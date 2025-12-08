@@ -1,0 +1,558 @@
+import React, { useState, useMemo, useEffect, useRef } from 'react';
+import { Category, Log, TodoItem, TodoCategory, Scope } from '../types';
+import { X, Trash2, TrendingUp, Plus, Minus } from 'lucide-react';
+import { TodoAssociation } from '../components/TodoAssociation';
+import { ScopeAssociation } from '../components/ScopeAssociation';
+import { FocusScoreSelector } from '../components/FocusScoreSelector';
+
+interface AddLogModalProps {
+  initialLog?: Log | null;
+  initialStartTime?: number;
+  initialEndTime?: number;
+  onClose: () => void;
+  onSave: (log: Log) => void;
+  onDelete?: (id: string) => void;
+  categories: Category[];
+  todos: TodoItem[];
+  todoCategories: TodoCategory[];
+  scopes: Scope[];
+}
+
+export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialStartTime, initialEndTime, onClose, onSave, onDelete, categories, todos, todoCategories, scopes }) => {
+  const [selectedCategoryId, setSelectedCategoryId] = useState<string>(categories[0].id);
+  const [selectedActivityId, setSelectedActivityId] = useState<string>(categories[0].activities[0].id);
+  const [note, setNote] = useState('');
+
+  const [linkedTodoId, setLinkedTodoId] = useState<string | undefined>(undefined);
+
+  const [progressIncrement, setProgressIncrement] = useState(0);
+  const [focusScore, setFocusScore] = useState<number | undefined>(undefined);
+  const [scopeIds, setScopeIds] = useState<string[] | undefined>(undefined);
+
+  // --- TIME STATE (New Logic) ---
+  const [trackStartTime, setTrackStartTime] = useState<number>(0);
+  const [trackEndTime, setTrackEndTime] = useState<number>(0);
+  const [currentStartTime, setCurrentStartTime] = useState<number>(0);
+  const [currentEndTime, setCurrentEndTime] = useState<number>(0);
+
+  useEffect(() => {
+    let tStart = 0;
+    let tEnd = 0;
+    let cStart = 0;
+    let cEnd = 0;
+
+    if (initialLog) {
+      // Scenario 1: Edit Log -> Track is FIXED to original bounds
+      tStart = initialLog.startTime;
+      tEnd = initialLog.endTime;
+      cStart = initialLog.startTime;
+      cEnd = initialLog.endTime;
+
+      setSelectedCategoryId(initialLog.categoryId);
+      setSelectedActivityId(initialLog.activityId);
+      setNote(initialLog.note || '');
+      setLinkedTodoId(initialLog.linkedTodoId);
+      setProgressIncrement(initialLog.progressIncrement || 0);
+      setFocusScore(initialLog.focusScore);
+      setScopeIds(initialLog.scopeIds);
+
+      // Sync Todo Category
+      // (Logic moved to TodoAssociation)
+
+    } else if (initialStartTime && initialEndTime) {
+      // Scenario 2: Gap -> Track is Gap, Default Full Selection
+      tStart = initialStartTime;
+      tEnd = initialEndTime;
+      cStart = initialStartTime;
+      cEnd = initialEndTime;
+
+      setSelectedCategoryId(categories[0].id);
+      setSelectedActivityId(categories[0].activities[0].id);
+      setNote('');
+      setLinkedTodoId(undefined);
+      setProgressIncrement(0);
+      setFocusScore(undefined);
+      setScopeIds(undefined);
+
+    } else {
+      // Scenario 3: New Button -> Default 1 Hour duration ending Now
+      const now = Date.now();
+      const oneHourAgo = now - 60 * 60 * 1000;
+
+      tStart = oneHourAgo;
+      tEnd = now;
+      cStart = oneHourAgo;
+      cEnd = now;
+
+      setSelectedCategoryId(categories[0].id);
+      setSelectedActivityId(categories[0].activities[0].id);
+      setNote('');
+      setLinkedTodoId(undefined);
+      setProgressIncrement(0);
+      setFocusScore(undefined);
+      setScopeIds(undefined);
+
+    }
+
+    setTrackStartTime(tStart);
+    setTrackEndTime(tEnd);
+    setCurrentStartTime(cStart);
+    setCurrentEndTime(cEnd);
+  }, [initialLog, initialStartTime, initialEndTime, categories, todos, todoCategories]);
+
+  // Derived Values for Display and Inputs
+  // Helper to get H/M from timestamp
+  const getHM = (ts: number) => {
+    const d = new Date(ts);
+    return { h: d.getHours(), m: d.getMinutes() };
+  };
+
+  const startHM = useMemo(() => getHM(currentStartTime), [currentStartTime]);
+  const endHM = useMemo(() => getHM(currentEndTime), [currentEndTime]);
+
+  // Handle Input Changes (H/M)
+  const handleTimeInput = (type: 'start' | 'end', field: 'h' | 'm', value: number) => {
+    let targetTime = type === 'start' ? currentStartTime : currentEndTime;
+    const d = new Date(targetTime);
+
+    if (field === 'h') d.setHours(value);
+    else d.setMinutes(value);
+
+    let newTime = d.getTime();
+
+    // Constraints check
+    // 1. Must be within Track Bounds - REMOVED for manual input freedom
+    // Manual input can exceed slider bounds. Slider remains bound to track.
+
+    // 2. Start <= End
+    if (type === 'start') {
+      if (newTime > currentEndTime) newTime = currentEndTime;
+      setCurrentStartTime(newTime);
+    } else {
+      if (newTime < currentStartTime) newTime = currentStartTime;
+      setCurrentEndTime(newTime);
+    }
+  };
+
+
+  const selectedCategory = categories.find(c => c.id === selectedCategoryId) || categories[0];
+  const linkedTodo = todos.find(t => t.id === linkedTodoId);
+
+  const durationDisplay = useMemo(() => {
+    const diff = (currentEndTime - currentStartTime) / 1000 / 60; // mins
+    const h = Math.floor(diff / 60);
+    const m = Math.round(diff % 60);
+    if (h > 0 && m > 0) return `${h}h ${m}m`;
+    if (h > 0) return `${h}h`;
+    return `${m}m`;
+  }, [currentStartTime, currentEndTime]);
+
+  const handleSave = () => {
+    const duration = (currentEndTime - currentStartTime) / 1000;
+    if (duration <= 0) return; // Prevent zero duration logs
+
+    const newLog: Log = {
+      id: initialLog ? initialLog.id : crypto.randomUUID(),
+      categoryId: selectedCategoryId,
+      activityId: selectedActivityId,
+      startTime: currentStartTime,
+      endTime: currentEndTime,
+      duration: duration,
+      note: note.trim(),
+      linkedTodoId: linkedTodoId,
+      progressIncrement: linkedTodoId && progressIncrement ? progressIncrement : undefined,
+      focusScore: focusScore,
+      scopeIds: scopeIds,
+    };
+    onSave(newLog);
+  };
+
+  const handleDelete = () => {
+    if (initialLog && onDelete) {
+      onDelete(initialLog.id);
+    }
+  };
+
+  // --- Slider Logic ---
+  const sliderRef = useRef<HTMLDivElement>(null);
+  const [isDraggingStart, setIsDraggingStart] = useState(false);
+  const [isDraggingEnd, setIsDraggingEnd] = useState(false);
+
+  // Convert Time to Percentage relative to Track
+  const trackDuration = trackEndTime - trackStartTime;
+  // If trackDuration is 0 (shouldn't happen), prevent division by zero
+  const safeTrackDuration = trackDuration > 0 ? trackDuration : 1;
+
+  const startPercent = Math.max(0, Math.min(100, ((currentStartTime - trackStartTime) / safeTrackDuration) * 100));
+  const endPercent = Math.max(0, Math.min(100, ((currentEndTime - trackStartTime) / safeTrackDuration) * 100));
+
+  const calculateTimeFromClientX = (clientX: number) => {
+    if (!sliderRef.current || trackDuration <= 0) return null;
+    const rect = sliderRef.current.getBoundingClientRect();
+    const percent = Math.min(100, Math.max(0, ((clientX - rect.left) / rect.width) * 100));
+
+    // Calculate time from percent
+    let newTime = trackStartTime + (percent / 100) * trackDuration;
+    const MS_PER_MIN = 60000;
+    // Round to nearest minute
+    return Math.round(newTime / MS_PER_MIN) * MS_PER_MIN;
+  };
+
+  const handleDragUpdate = (clientX: number) => {
+    const newTime = calculateTimeFromClientX(clientX);
+    if (newTime === null) return;
+
+    if (isDraggingStart) {
+      // Constraint: start <= end
+      if (newTime > currentEndTime) {
+        setCurrentStartTime(currentEndTime); // Stick to end
+      } else if (newTime < trackStartTime) {
+        setCurrentStartTime(trackStartTime); // Stick to start
+      } else {
+        setCurrentStartTime(newTime);
+      }
+    } else if (isDraggingEnd) {
+      // Constraint: end >= start
+      if (newTime < currentStartTime) {
+        setCurrentEndTime(currentStartTime); // Stick to start
+      } else if (newTime > trackEndTime) {
+        setCurrentEndTime(trackEndTime); // Stick to end
+      } else {
+        setCurrentEndTime(newTime);
+      }
+    }
+  };
+
+  const handleMouseMove = (e: MouseEvent) => {
+    handleDragUpdate(e.clientX);
+  };
+
+  const handleTouchMove = (e: TouchEvent) => {
+    if (e.touches.length > 0) {
+      handleDragUpdate(e.touches[0].clientX);
+    }
+  };
+
+  const handleMouseUp = () => {
+    setIsDraggingStart(false);
+    setIsDraggingEnd(false);
+  };
+
+  useEffect(() => {
+    if (isDraggingStart || isDraggingEnd) {
+      window.addEventListener('mousemove', handleMouseMove);
+      window.addEventListener('mouseup', handleMouseUp);
+      window.addEventListener('touchmove', handleTouchMove, { passive: false });
+      window.addEventListener('touchend', handleMouseUp);
+    }
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+      window.removeEventListener('touchmove', handleTouchMove);
+      window.removeEventListener('touchend', handleMouseUp);
+    };
+  }, [isDraggingStart, isDraggingEnd]);
+
+
+  return (
+    <div
+      className="fixed inset-0 z-[100] flex items-end md:items-center justify-center bg-stone-900/40 backdrop-blur-sm animate-fadeIn pb-[env(safe-area-inset-bottom)]"
+      onClick={onClose}
+    >
+      {/* Modal Content - Bottom Sheet on Mobile, Center on Desktop */}
+      <div
+        className="w-full h-[85vh] md:h-auto md:max-h-[85vh] md:max-w-2xl bg-[#faf9f6] rounded-t-[2rem] md:rounded-3xl shadow-2xl flex flex-col overflow-hidden relative animate-slideUp"
+        onClick={(e) => e.stopPropagation()}
+      >
+
+        {/* Header */}
+        <div className="flex items-center justify-between p-6 border-b border-stone-100 bg-white/50">
+          <button onClick={onClose} className="p-2 -ml-2 hover:bg-stone-100 rounded-full text-stone-500 transition-colors">
+            <X size={24} />
+          </button>
+          <div className="flex flex-col items-center">
+            <span className="text-[10px] uppercase tracking-widest text-stone-400 font-bold mb-1">Total Time</span>
+            <span className="text-2xl font-bold text-stone-900 tabular-nums font-mono">{durationDisplay}</span>
+          </div>
+          <div className="w-10 flex justify-end">
+            {initialLog && onDelete && (
+              <button
+                onClick={handleDelete}
+                className="p-2 -mr-2 text-stone-300 hover:text-red-500 hover:bg-stone-100 rounded-full transition-colors"
+              >
+                <Trash2 size={20} />
+              </button>
+            )}
+          </div>
+        </div>
+
+        <div className="flex-1 overflow-y-auto px-6 py-6 space-y-8 no-scrollbar pb-60">
+
+          {/* Time Input & Slider */}
+          <div className="space-y-6">
+            {/* Manual Inputs */}
+            <div className="flex items-center justify-center gap-4">
+              <div className="flex flex-col items-center">
+                <span className="text-[10px] font-bold text-stone-400 uppercase tracking-wider mb-1">Start</span>
+                <div className="flex items-center bg-white rounded-xl border border-stone-200 px-3 py-2 shadow-sm">
+                  <input
+                    type="number"
+                    min={0} max={23}
+                    value={String(startHM.h).padStart(2, '0')}
+                    onChange={e => handleTimeInput('start', 'h', parseInt(e.target.value) || 0)}
+                    onFocus={e => e.target.select()}
+                    className="w-8 text-center text-xl font-mono font-bold text-stone-800 outline-none bg-transparent"
+                  />
+                  <span className="text-stone-300 mx-1">:</span>
+                  <input
+                    type="number"
+                    min={0} max={59}
+                    value={String(startHM.m).padStart(2, '0')}
+                    onChange={e => handleTimeInput('start', 'm', parseInt(e.target.value) || 0)}
+                    onFocus={e => e.target.select()}
+                    className="w-8 text-center text-xl font-mono font-bold text-stone-800 outline-none bg-transparent"
+                  />
+                </div>
+              </div>
+
+              <div className="h-px w-8 bg-stone-300 mt-6"></div>
+
+              <div className="flex flex-col items-center">
+                <span className="text-[10px] font-bold text-stone-400 uppercase tracking-wider mb-1">End</span>
+                <div className="flex items-center bg-white rounded-xl border border-stone-200 px-3 py-2 shadow-sm">
+                  <input
+                    type="number"
+                    min={0} max={23}
+                    value={String(endHM.h).padStart(2, '0')}
+                    onChange={e => handleTimeInput('end', 'h', parseInt(e.target.value) || 0)}
+                    onFocus={e => e.target.select()}
+                    className="w-8 text-center text-xl font-mono font-bold text-stone-800 outline-none bg-transparent"
+                  />
+                  <span className="text-stone-300 mx-1">:</span>
+                  <input
+                    type="number"
+                    min={0} max={59}
+                    value={String(endHM.m).padStart(2, '0')}
+                    onChange={e => handleTimeInput('end', 'm', parseInt(e.target.value) || 0)}
+                    onFocus={e => e.target.select()}
+                    className="w-8 text-center text-xl font-mono font-bold text-stone-800 outline-none bg-transparent"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Slider (Dual Handle) */}
+            <div className="px-2 pt-4 pb-2">
+              <div
+                ref={sliderRef}
+                className="relative h-2 bg-stone-200 rounded-full w-full touch-none"
+              >
+                {/* Track Fill */}
+                <div
+                  className="absolute top-0 h-full bg-stone-800 opacity-20 rounded-full"
+                  style={{ left: `${startPercent}%`, width: `${endPercent - startPercent}%` }}
+                />
+
+                {/* Left Handle */}
+                <div
+                  onMouseDown={() => setIsDraggingStart(true)}
+                  onTouchStart={(e) => { e.stopPropagation(); setIsDraggingStart(true); }}
+                  className="absolute top-1/2 -translate-y-1/2 w-6 h-6 bg-white border-2 border-stone-800 rounded-full shadow-md z-10 flex items-center justify-center hover:scale-110 transition-transform cursor-grab active:cursor-grabbing"
+                  style={{ left: `calc(${startPercent}% - 12px)` }}
+                >
+                  <div className="w-1.5 h-1.5 bg-stone-800 rounded-full" />
+                </div>
+
+                {/* Right Handle */}
+                <div
+                  onMouseDown={() => setIsDraggingEnd(true)}
+                  onTouchStart={(e) => { e.stopPropagation(); setIsDraggingEnd(true); }}
+                  className="absolute top-1/2 -translate-y-1/2 w-6 h-6 bg-stone-800 border-2 border-stone-800 rounded-full shadow-md z-10 flex items-center justify-center hover:scale-110 transition-transform cursor-grab active:cursor-grabbing"
+                  style={{ left: `calc(${endPercent}% - 12px)` }}
+                >
+                  <div className="w-1.5 h-1.5 bg-white rounded-full" />
+                </div>
+              </div>
+              <div className="flex justify-between mt-2 text-[10px] text-stone-400 font-mono">
+                <span>{getHM(trackStartTime).h}:{String(getHM(trackStartTime).m).padStart(2, '0')}</span>
+                <span>Max: {Math.floor(trackDuration / 1000 / 60)}m</span>
+                <span>{getHM(trackEndTime).h}:{String(getHM(trackEndTime).m).padStart(2, '0')}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Activity Selection (Grid) */}
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold text-stone-400 uppercase tracking-widest">Associated Tag</span>
+            </div>
+
+            {/* Category Grid */}
+            <div className="grid grid-cols-4 gap-2">
+              {categories.map(cat => (
+                <button
+                  key={cat.id}
+                  onClick={() => { setSelectedCategoryId(cat.id); setSelectedActivityId(cat.activities[0].id); }}
+                  className={`
+                        px-2 py-2 rounded-lg text-[10px] font-medium text-center border transition-colors flex items-center justify-center gap-1.5 truncate
+                        ${selectedCategoryId === cat.id
+                      ? 'bg-stone-900 text-white border-stone-900'
+                      : 'bg-stone-50 text-stone-500 border-stone-100 hover:bg-stone-100'}
+                     `}
+                >
+                  <span>{cat.icon}</span>
+                  <span className="truncate">{cat.name}</span>
+                </button>
+              ))}
+            </div>
+
+            {/* Activity Grid */}
+            <div className="grid grid-cols-4 gap-3 pt-2">
+              {selectedCategory.activities.map(act => {
+                const isActive = selectedActivityId === act.id;
+                return (
+                  <button
+                    key={act.id}
+                    onClick={() => setSelectedActivityId(act.id)}
+                    className="flex flex-col items-center gap-2 p-3 rounded-xl transition-all duration-200 active:scale-95 hover:bg-stone-50"
+                  >
+                    <div className={`
+                          w-10 h-10 rounded-full flex items-center justify-center text-xl transition-all
+                          ${isActive ? 'ring-1 ring-stone-300 ring-offset-1 scale-110' : ''}
+                          ${act.color}
+                       `}>
+                      {act.icon}
+                    </div>
+                    <span className={`text-xs text-center font-medium leading-tight ${isActive ? 'text-stone-900 font-bold' : 'text-stone-400'}`}>
+                      {act.name}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Todo Association with Embedded Progress */}
+          <div className="space-y-0">
+            <TodoAssociation
+              todos={todos}
+              todoCategories={todoCategories}
+              linkedTodoId={linkedTodoId}
+              onChange={(id) => {
+                setLinkedTodoId(id);
+                setProgressIncrement(0);
+              }}
+              renderExtraContent={(tId) => {
+                const t = todos.find(x => x.id === tId);
+                if (!t?.isProgress) return null;
+                return (
+                  <div className="pt-0 flex items-center justify-between animate-in slide-in-from-top-2">
+                    {/* Left: Label + Stats */}
+                    <div className="flex items-center gap-3">
+                      <span className="text-xs font-bold text-stone-400">P.</span>
+                      <div className="flex items-center gap-1.5 text-[10px] text-stone-400 px-2 py-1 rounded-md border border-stone-100 bg-stone-50">
+                        <TrendingUp size={10} />
+                        <span className="font-mono">{t.completedUnits || 0} / {t.totalAmount}</span>
+                      </div>
+                    </div>
+
+                    {/* Right: Controls */}
+                    <div className="flex items-center rounded-lg p-0.5 scale-90 origin-right">
+                      <button
+                        onClick={() => setProgressIncrement(Math.max(0, progressIncrement - 1))}
+                        className="w-8 h-8 flex items-center justify-center text-stone-400 hover:text-stone-600 hover:bg-stone-100/50 rounded-md transition-colors active:scale-95"
+                      >
+                        <Minus size={16} />
+                      </button>
+                      <div className="flex items-center justify-center min-w-[40px]">
+                        {progressIncrement > 0 && <span className="text-xs font-bold text-stone-800 mr-0.5">+</span>}
+                        <input
+                          type="number"
+                          min={0}
+                          value={progressIncrement}
+                          onChange={(e) => setProgressIncrement(Math.max(0, parseInt(e.target.value) || 0))}
+                          className={`w-8 text-left text-sm font-bold tabular-nums bg-transparent outline-none p-0 border-none focus:ring-0 ${progressIncrement > 0 ? 'text-stone-800' : 'text-stone-300'}`}
+                        />
+                      </div>
+                      <button
+                        onClick={() => setProgressIncrement(progressIncrement + 1)}
+                        className="w-8 h-8 flex items-center justify-center text-stone-600 hover:bg-stone-100/50 rounded-md transition-colors active:scale-95"
+                      >
+                        <Plus size={16} />
+                      </button>
+                    </div>
+                  </div>
+                );
+              }}
+            />
+          </div>
+
+          {/* Scope Association */}
+          <div className="space-y-0">
+            <ScopeAssociation
+              scopes={scopes}
+              selectedScopeIds={scopeIds}
+              onSelect={setScopeIds}
+            />
+          </div>
+
+          {/* Focus Score Selector */}
+          {
+            (() => {
+              const cat = categories.find(c => c.id === selectedCategoryId);
+              const act = cat?.activities.find(a => a.id === selectedActivityId);
+              if (act?.enableFocusScore ?? cat?.enableFocusScore) {
+                return (
+                  <div className="space-y-4 animate-in slide-in-from-top-2">
+                    <FocusScoreSelector value={focusScore} onChange={setFocusScore} />
+                  </div>
+                );
+              }
+              return null;
+            })()
+          }
+
+          {/* Note Input */}
+          <div>
+            <span className="text-xs font-bold text-stone-400 uppercase tracking-widest mb-2 block">Note</span>
+            <textarea
+              value={note}
+              onChange={e => setNote(e.target.value)}
+              className="w-full bg-white border border-stone-200 rounded-2xl p-4 text-stone-800 text-sm min-h-[100px] shadow-sm focus:outline-none focus:ring-1 focus:ring-stone-900 focus:border-stone-900 transition-all resize-none placeholder:text-stone-300 font-serif"
+              placeholder="Add a note..."
+            />
+          </div>
+
+        </div >
+
+        {/* Footer */}
+        < div className="p-6 bg-white border-t border-stone-100" >
+          <button
+            onClick={handleSave}
+            className="w-full bg-stone-900 text-white py-3 rounded-xl font-bold text-base shadow-xl active:scale-[0.99] transition-all hover:bg-black"
+          >
+            {initialLog ? 'Update Log' : 'Save Log'}
+          </button>
+        </div >
+
+      </div >
+
+      <style>{`
+        @keyframes fadeIn {
+          from { opacity: 0; }
+          to { opacity: 1; }
+        }
+        @keyframes slideUp {
+          from { transform: translateY(100%); }
+          to { transform: translateY(0); }
+        }
+        .animate-fadeIn {
+          animation: fadeIn 0.2s ease-out;
+        }
+        .animate-slideUp {
+          animation: slideUp 0.3s cubic-bezier(0.32, 0.72, 0, 1);
+        }
+      `}</style>
+    </div >
+  );
+};
