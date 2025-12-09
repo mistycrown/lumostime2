@@ -315,8 +315,21 @@ const App: React.FC = () => {
       // Logic for "+" button: Backfill mode
       const dayStart = new Date(currentDate);
       dayStart.setHours(0, 0, 0, 0);
-      const dayEnd = new Date(currentDate);
-      dayEnd.setHours(23, 59, 59, 999);
+
+      // 判断是否是今天
+      const now = new Date();
+      const isToday = dayStart.getDate() === now.getDate() &&
+        dayStart.getMonth() === now.getMonth() &&
+        dayStart.getFullYear() === now.getFullYear();
+
+      // 如果是今天，结束时间是当前时间；否则是23:59
+      let dayEnd: Date;
+      if (isToday) {
+        dayEnd = now;
+      } else {
+        dayEnd = new Date(currentDate);
+        dayEnd.setHours(23, 59, 59, 999);
+      }
 
       // Filter logs ENDING on this day
       const logsOnDay = logs.filter(log =>
@@ -331,7 +344,7 @@ const App: React.FC = () => {
         newStart = logsOnDay.reduce((max, log) => Math.max(max, log.endTime), dayStart.getTime());
       }
 
-      // Default range: Last End (or 00:00) -> 23:59
+      // Default range: Last End (or 00:00) -> (today: now, past: 23:59)
       setInitialLogTimes({ start: newStart, end: dayEnd.getTime() });
     }
     setIsAddModalOpen(true);
@@ -666,6 +679,9 @@ const App: React.FC = () => {
           todos,
           categories,
           todoCategories,
+          scopes,
+          goals,
+          autoLinkRules,
           version: '1.0.0',
           timestamp: Date.now()
         };
@@ -677,7 +693,7 @@ const App: React.FC = () => {
     }, 30000); // 30s debounce
 
     return () => clearTimeout(timer);
-  }, [logs, todos, categories, todoCategories]);
+  }, [logs, todos, categories, todoCategories, scopes, goals, autoLinkRules]);
 
   // 3. App Hide -> Upload (Best Effort)
   useEffect(() => {
@@ -686,7 +702,15 @@ const App: React.FC = () => {
         const config = webdavService.getConfig();
         if (config) {
           const dataToSync = {
-            logs, todos, categories, todoCategories, version: '1.0.0', timestamp: Date.now()
+            logs,
+            todos,
+            categories,
+            todoCategories,
+            scopes,
+            goals,
+            autoLinkRules,
+            version: '1.0.0',
+            timestamp: Date.now()
           };
           webdavService.uploadData(dataToSync).catch(console.error);
         }
@@ -695,8 +719,7 @@ const App: React.FC = () => {
 
     document.addEventListener('visibilitychange', handleVisibilityChange);
     return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
-    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
-  }, [logs, todos, categories, todoCategories]);
+  }, [logs, todos, categories, todoCategories, scopes, goals, autoLinkRules]);
 
   // 4. Hardware Back Button Handling
   useEffect(() => {

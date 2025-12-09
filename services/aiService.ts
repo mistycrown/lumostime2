@@ -173,6 +173,8 @@ Role: You are a professional time management assistant.
 Task: Extract time records from the user's natural language description.
 
 Context:
+- Current Time: ${context.now} (for understanding "now" or "until now")
+- Target Date: ${context.targetDate} (the date user wants to log activities for)
 - Existing Tag List: ${JSON.stringify(tagList)}
 
 Requirements:
@@ -181,9 +183,10 @@ Requirements:
 3. **CRITICAL: All records must be within the same day (00:00 to 23:59).**
 4. **NO cross-day records allowed.** If a time range would cross midnight, end it at "23:59".
 5. If user says "3 PM", return "15:00". If user says "9 AM", return "09:00".
-6. If only duration is given (e.g., "read for 2 hours"), you can estimate a reasonable time range.
-7. Match activities to provided tags where possible.
-8. Return format must be a pure JSON Array.
+6. **If user says "until now" or "to now"**, use the CURRENT TIME (${context.now}) from the context above.
+7. If only duration is given (e.g., "read for 2 hours"), you can estimate a reasonable time range.
+8. Match activities to provided tags where possible.
+9. Return format must be a pure JSON Array.
 
 JSON Output Schema:
 [
@@ -196,13 +199,20 @@ JSON Output Schema:
   }
 ]
 
-Example:
+Example 1:
 User: "下午三点到五点阅读,五点半吃饭一个小时,七点到八点玩游戏"
 Output:
 [
   {"startTime": "15:00", "endTime": "17:00", "description": "阅读", "categoryName": "学习", "activityName": "书籍文献"},
   {"startTime": "17:30", "endTime": "18:30", "description": "吃饭", "categoryName": "生活", "activityName": "饮食"},
   {"startTime": "19:00", "endTime": "20:00", "description": "玩游戏", "categoryName": "爱欲再生产", "activityName": "玩玩游戏"}
+]
+
+Example 2 (assuming current time is 10:30):
+User: "早上九点到现在"
+Output:
+[
+  {"startTime": "09:00", "endTime": "10:30", "description": "工作", "categoryName": "工作", "activityName": "一般工作"}
 ]
 `;
 

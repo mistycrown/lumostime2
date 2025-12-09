@@ -302,9 +302,14 @@ export const AIBatchModal: React.FC<AIBatchModalProps> = ({ onClose, onSave, cat
         try {
             // 使用用户当前选择的日期（或今天）
             const baseDate = targetDate ? new Date(targetDate) : new Date();
+
+            // 获取当前真实时间（用于理解"现在"）
+            const now = new Date();
+            const currentTime = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+
             const entries = await aiService.parseNaturalLanguage(inputText, {
-                now: formatDateForAI(baseDate),
-                targetDate: formatDateForAI(baseDate),
+                now: currentTime, // 只传递时间 HH:mm
+                targetDate: formatDateForAI(baseDate), // 目标日期
                 categories: categories
             });
             // Add UI IDs and detect auto-link suggestions
