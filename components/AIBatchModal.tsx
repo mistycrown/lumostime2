@@ -1,16 +1,22 @@
 import React, { useState, useEffect } from 'react';
-import { Sparkles, X, AlertTriangle, Plus, Trash2, Wand2, CheckCircle2 } from 'lucide-react';
+import { Sparkles, X, AlertTriangle, Plus, Trash2, Wand2, CheckCircle2, Lightbulb } from 'lucide-react';
 import { aiService, ParsedTimeEntry } from '../services/aiService';
-import { Category } from '../types';
+import { Category, AutoLinkRule, Scope } from '../types';
 
 interface AIBatchModalProps {
     onClose: () => void;
     onSave: (entries: ParsedTimeEntry[]) => void;
     categories: Category[];
     targetDate?: Date;
+    autoLinkRules?: AutoLinkRule[];
+    scopes?: Scope[];
 }
 
-type ParsedEntryWithId = ParsedTimeEntry & { _uiId: string };
+type ParsedEntryWithId = ParsedTimeEntry & {
+    _uiId: string;
+    suggestedScopeIds?: string[]; // 建议关联的领域ID
+    scopeIds?: string[]; // 用户接受的关联领域ID（临时存储，保存时使用）
+};
 
 // Helper to format Date to yyyyMMdd
 const formatCompactDate = (iso: string) => {
@@ -29,14 +35,24 @@ const formatCompactTime = (iso: string) => {
     return `${h}${m}`;
 };
 
+// Helper to format Date to YYYY-MM-DD for AI context
+const formatDateForAI = (date: Date) => {
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, '0');
+    const d = String(date.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+};
+
 interface ReviewCardProps {
     entry: ParsedEntryWithId;
     onUpdate: (field: keyof ParsedTimeEntry, value: any) => void;
     onDelete: () => void;
     categories: Category[];
+    scopes?: Scope[];
+    onAcceptSuggestion?: (scopeIds: string[]) => void;
 }
 
-const ReviewCard: React.FC<ReviewCardProps> = ({ entry, onUpdate, onDelete, categories }) => {
+const ReviewCard: React.FC<ReviewCardProps> = ({ entry, onUpdate, onDelete, categories, scopes, onAcceptSuggestion }) => {
     const [dateStr, setDateStr] = useState(formatCompactDate(entry.startTime));
     const [startStr, setStartStr] = useState(formatCompactTime(entry.startTime));
     const [endStr, setEndStr] = useState(formatCompactTime(entry.endTime));
@@ -197,17 +213,86 @@ const ReviewCard: React.FC<ReviewCardProps> = ({ entry, onUpdate, onDelete, cate
                         ))}
                     </div>
                 </div>
+
+                {/* Auto-Link Suggestion */}
+                {entry.suggestedScopeIds && entry.suggestedScopeIds.length > 0 && scopes && onAcceptSuggestion && (
+                    <div className="mt-4 p-3 bg-purple-50 border border-purple-100 rounded-xl">
+                        <div className="flex items-start gap-2">
+                            <Lightbulb size={16} className="text-purple-600 mt-0.5 flex-shrink-0" />
+                            <div className="flex-1">
+                                <p className="text-xs font-bold text-purple-900 mb-2">建议关联领域</p>
+                                <div className="flex flex-wrap gap-2">
+                                    {entry.suggestedScopeIds.map(scopeId => {
+                                        const scope = scopes.find(s => s.id === scopeId);
+                                        if (!scope) return null;
+                                        return (
+                                            <button
+                                                key={scopeId}
+                                                onClick={() => onAcceptSuggestion([scopeId])}
+                                                className="flex items-center gap-1 px-2 py-1 bg-white border border-purple-200 rounded-lg text-xs font-medium text-purple-700 hover:bg-purple-100 transition-colors"
+                                            >
+                                                <span>{scope.icon}</span>
+                                                <span>{scope.name}</span>
+                                                <CheckCircle2 size={12} />
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* Accepted Scope Display */}
+                {entry.scopeIds && entry.scopeIds.length > 0 && scopes && (
+                    <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-xl">
+                        <div className="flex items-start gap-2">
+                            <CheckCircle2 size={16} className="text-green-600 mt-0.5 flex-shrink-0" />
+                            <div className="flex-1">
+                                <p className="text-xs font-bold text-green-900 mb-2">已关联到</p>
+                                <div className="flex flex-wrap gap-2">
+                                    {entry.scopeIds.map(scopeId => {
+                                        const scope = scopes.find(s => s.id === scopeId);
+                                        if (!scope) return null;
+                                        return (
+                                            <div
+                                                key={scopeId}
+                                                className="flex items-center gap-1 px-2 py-1 bg-white border border-green-300 rounded-lg text-xs font-medium text-green-800"
+                                            >
+                                                <span>{scope.icon}</span>
+                                                <span>{scope.name}</span>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                )}
             </div>
         </div>
     );
 };
 
-export const AIBatchModal: React.FC<AIBatchModalProps> = ({ onClose, onSave, categories, targetDate }) => {
+export const AIBatchModal: React.FC<AIBatchModalProps> = ({ onClose, onSave, categories, targetDate, autoLinkRules = [], scopes = [] }) => {
     const [step, setStep] = useState<'input' | 'review'>('input');
     const [inputText, setInputText] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [parsedEntries, setParsedEntries] = useState<ParsedEntryWithId[]>([]);
     const [error, setError] = useState<string | null>(null);
+
+    // 检测自动关联规则
+    const detectAutoLinkSuggestions = (entry: ParsedTimeEntry): string[] => {
+        const category = categories.find(c => c.name === entry.categoryName);
+        if (!category) return [];
+
+        const activity = category.activities.find(a => a.name === entry.activityName);
+        if (!activity) return [];
+
+        // 查找匹配的自动关联规则
+        const matchingRules = autoLinkRules.filter(rule => rule.activityId === activity.id);
+        return matchingRules.map(rule => rule.scopeId);
+    };
 
     const handleParse = async () => {
         if (!inputText.trim()) return;
@@ -215,16 +300,22 @@ export const AIBatchModal: React.FC<AIBatchModalProps> = ({ onClose, onSave, cat
         setIsLoading(true);
         setError(null);
         try {
+            // 使用用户当前选择的日期（或今天）
             const baseDate = targetDate ? new Date(targetDate) : new Date();
             const entries = await aiService.parseNaturalLanguage(inputText, {
-                now: baseDate.toString(),
+                now: formatDateForAI(baseDate),
+                targetDate: formatDateForAI(baseDate),
                 categories: categories
             });
-            // Add UI IDs
-            const entriesWithIds = entries.map(e => ({
-                ...e,
-                _uiId: crypto.randomUUID()
-            }));
+            // Add UI IDs and detect auto-link suggestions
+            const entriesWithIds = entries.map(e => {
+                const suggestedScopeIds = detectAutoLinkSuggestions(e);
+                return {
+                    ...e,
+                    _uiId: crypto.randomUUID(),
+                    suggestedScopeIds: suggestedScopeIds.length > 0 ? suggestedScopeIds : undefined
+                };
+            });
             setParsedEntries(entriesWithIds);
             setStep('review');
         } catch (e) {
@@ -244,6 +335,20 @@ export const AIBatchModal: React.FC<AIBatchModalProps> = ({ onClose, onSave, cat
         setParsedEntries(parsedEntries.filter((_, i) => i !== index));
     };
 
+    const handleAcceptSuggestion = (index: number, scopeIds: string[]) => {
+        const newEntries = [...parsedEntries];
+        // 接受建议：将建议的scopeIds添加到entry的scopeIds字段
+        // 注意：ParsedTimeEntry目前没有scopeIds字段，需要在保存时处理
+        // 这里先清除建议提示
+        newEntries[index] = {
+            ...newEntries[index],
+            suggestedScopeIds: undefined,
+            // 暂存scopeIds，在保存时使用
+            scopeIds: scopeIds as any
+        };
+        setParsedEntries(newEntries);
+    };
+
     const handleAddEntry = () => {
         setParsedEntries([...parsedEntries, {
             startTime: new Date().toISOString(),
@@ -256,8 +361,11 @@ export const AIBatchModal: React.FC<AIBatchModalProps> = ({ onClose, onSave, cat
     };
 
     const handleConfirm = () => {
-        // Strip UI IDs before saving
-        const cleanEntries = parsedEntries.map(({ _uiId, ...rest }) => rest);
+        // Strip UI-only fields before saving, but keep scopeIds if present
+        const cleanEntries = parsedEntries.map(({ _uiId, suggestedScopeIds, scopeIds, ...rest }) => ({
+            ...rest,
+            ...(scopeIds && scopeIds.length > 0 ? { scopeIds } : {})
+        })) as any;
         onSave(cleanEntries);
         onClose();
     };
@@ -319,6 +427,8 @@ export const AIBatchModal: React.FC<AIBatchModalProps> = ({ onClose, onSave, cat
                                         onUpdate={(field, val) => handleUpdateEntry(idx, field, val)}
                                         onDelete={() => handleDeleteEntry(idx)}
                                         categories={categories}
+                                        scopes={scopes}
+                                        onAcceptSuggestion={(scopeIds) => handleAcceptSuggestion(idx, scopeIds)}
                                     />
                                 ))}
                             </div>

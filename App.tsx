@@ -295,7 +295,9 @@ const App: React.FC = () => {
         startTime: start,
         endTime: end,
         duration: duration,
-        note: entry.description
+        note: entry.description,
+        // Include scopeIds if user accepted the suggestion
+        ...(entry.scopeIds && entry.scopeIds.length > 0 ? { scopeIds: entry.scopeIds } : {})
       };
     });
 
@@ -849,6 +851,7 @@ const App: React.FC = () => {
             onToast={addToast}
             startWeekOnSunday={startWeekOnSunday}
             scopes={scopes}
+            autoLinkRules={autoLinkRules}
           />
         );
       case AppView.STATS:

@@ -23,6 +23,7 @@ interface TimelineViewProps {
     todoCategories: TodoCategory[];
     onToast?: (type: ToastType, message: string) => void;
     startWeekOnSunday?: boolean;
+    autoLinkRules?: any[]; // AutoLinkRule[]
 }
 
 interface TimelineItem {
@@ -37,11 +38,12 @@ interface TimelineItem {
         categoryIcon?: string;
         categoryColor?: string;
         linkedTodoTitle?: string;
+        linkedTodo?: TodoItem; // 完整的待办对象
         linkedScopeData?: { icon: string; name: string }[]; // Changed to array
     };
 }
 
-export const TimelineView: React.FC<TimelineViewProps> = ({ logs, todos, scopes, onAddLog, onEditLog, categories, currentDate, onDateChange, onShowStats, onBatchAddLogs, onSync, isSyncing, todoCategories, onToast, startWeekOnSunday = false }) => {
+export const TimelineView: React.FC<TimelineViewProps> = ({ logs, todos, scopes, onAddLog, onEditLog, categories, currentDate, onDateChange, onShowStats, onBatchAddLogs, onSync, isSyncing, todoCategories, onToast, startWeekOnSunday = false, autoLinkRules = [] }) => {
     const [isCalendarExpanded, setIsCalendarExpanded] = useState(false);
     const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
     const [isAIModalOpen, setIsAIModalOpen] = useState(false);
@@ -137,6 +139,7 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ logs, todos, scopes,
                     categoryIcon: category?.icon,
                     categoryColor: category?.themeColor,
                     linkedTodoTitle: linkedTodo?.title,
+                    linkedTodo: linkedTodo, // 传递完整的待办对象
                     linkedScopeData: linkedScopes.length > 0
                         ? linkedScopes.map(s => ({ icon: s.icon || '📍', name: s.name }))
                         : undefined
@@ -256,8 +259,11 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ logs, todos, scopes,
 
             if (log.focusScore) text += ` ⚡️${log.focusScore}`;
             if (todo) text += ` @${todo.title}`;
-            if (log.progressIncrement && log.progressIncrement > 0) text += ` +${log.progressIncrement}`;
-            if (todo && todo.isProgress) text += `（${(todo.completedUnits || 0)}/${todo.totalAmount}）`;
+            // 只有进度待办才显示进度增量和进度比例
+            if (todo?.isProgress) {
+                if (log.progressIncrement && log.progressIncrement > 0) text += ` +${log.progressIncrement}`;
+                text += `（${(todo.completedUnits || 0)}/${todo.totalAmount}）`;
+            }
             if (scopes_list.length > 0) text += ` %${scopes_list.map(s => s.name).join(', ')}`;
             text += '\n';
         });
@@ -367,7 +373,8 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ logs, todos, scopes,
                                                 <span className="text-[10px] font-medium text-stone-500 border border-stone-200 px-2 py-0.5 rounded flex items-center gap-1 bg-stone-50/30">
                                                     <span className="text-stone-400 font-bold">@</span>
                                                     <span className="line-clamp-1">{item.logData.linkedTodoTitle}</span>
-                                                    {item.logData.progressIncrement && item.logData.progressIncrement > 0 && (
+                                                    {/* 只有进度待办且有进度增量时才显示 */}
+                                                    {item.logData.linkedTodo?.isProgress && item.logData.progressIncrement && item.logData.progressIncrement > 0 && (
                                                         <span className="font-mono text-stone-400 ml-0.5">+{item.logData.progressIncrement}</span>
                                                     )}
                                                 </span>
@@ -478,6 +485,8 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ logs, todos, scopes,
                     onSave={onBatchAddLogs}
                     categories={categories}
                     targetDate={currentDate}
+                    autoLinkRules={autoLinkRules}
+                    scopes={scopes}
                 />
             )}
         </div>
