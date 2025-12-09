@@ -112,24 +112,34 @@ export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialSta
 
   // Handle Input Changes (H/M)
   const handleTimeInput = (type: 'start' | 'end', field: 'h' | 'm', value: number) => {
+    // 获取日期基准：使用 trackStartTime 的日期部分，确保所有时间都在同一天
+    const baseDate = new Date(trackStartTime);
+    baseDate.setHours(0, 0, 0, 0);
+
+    // 获取当前时间的小时和分钟
     let targetTime = type === 'start' ? currentStartTime : currentEndTime;
-    const d = new Date(targetTime);
+    const currentHM = getHM(targetTime);
 
-    if (field === 'h') d.setHours(value);
-    else d.setMinutes(value);
+    // 根据用户输入创建新的时间
+    let newHours = currentHM.h;
+    let newMinutes = currentHM.m;
 
-    let newTime = d.getTime();
+    if (field === 'h') {
+      newHours = Math.max(0, Math.min(23, value)); // 限制在 0-23
+    } else {
+      newMinutes = Math.max(0, Math.min(59, value)); // 限制在 0-59
+    }
 
-    // Constraints check
-    // 1. Must be within Track Bounds - REMOVED for manual input freedom
-    // Manual input can exceed slider bounds. Slider remains bound to track.
+    // 基于同一天的基准日期构建新时间戳
+    const newDate = new Date(baseDate);
+    newDate.setHours(newHours, newMinutes, 0, 0);
+    const newTime = newDate.getTime();
 
-    // 2. Start <= End
+    // 直接设置新时间，不做约束检查，允许用户自由输入
+    // 如果出现 start > end 的情况，在保存时会被验证（handleSave 中 duration <= 0 会阻止保存）
     if (type === 'start') {
-      if (newTime > currentEndTime) newTime = currentEndTime;
       setCurrentStartTime(newTime);
     } else {
-      if (newTime < currentStartTime) newTime = currentStartTime;
       setCurrentEndTime(newTime);
     }
   };
@@ -140,6 +150,10 @@ export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialSta
 
   const durationDisplay = useMemo(() => {
     const diff = (currentEndTime - currentStartTime) / 1000 / 60; // mins
+
+    // 如果持续时间为负数或零，显示占位符
+    if (diff <= 0) return '---';
+
     const h = Math.floor(diff / 60);
     const m = Math.round(diff % 60);
     if (h > 0 && m > 0) return `${h}h ${m}m`;
@@ -297,18 +311,38 @@ export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialSta
                 <div className="flex items-center bg-white rounded-xl border border-stone-200 px-3 py-2 shadow-sm">
                   <input
                     type="number"
+                    inputMode="numeric"
                     min={0} max={23}
                     value={String(startHM.h).padStart(2, '0')}
-                    onChange={e => handleTimeInput('start', 'h', parseInt(e.target.value) || 0)}
+                    onChange={e => {
+                      const val = e.target.value;
+                      if (val === '') return; // 允许清空
+                      const num = parseInt(val);
+                      if (!isNaN(num)) handleTimeInput('start', 'h', num);
+                    }}
+                    onBlur={e => {
+                      const val = e.target.value;
+                      if (val === '') handleTimeInput('start', 'h', 0);
+                    }}
                     onFocus={e => e.target.select()}
                     className="w-8 text-center text-xl font-mono font-bold text-stone-800 outline-none bg-transparent"
                   />
                   <span className="text-stone-300 mx-1">:</span>
                   <input
                     type="number"
+                    inputMode="numeric"
                     min={0} max={59}
                     value={String(startHM.m).padStart(2, '0')}
-                    onChange={e => handleTimeInput('start', 'm', parseInt(e.target.value) || 0)}
+                    onChange={e => {
+                      const val = e.target.value;
+                      if (val === '') return; // 允许清空
+                      const num = parseInt(val);
+                      if (!isNaN(num)) handleTimeInput('start', 'm', num);
+                    }}
+                    onBlur={e => {
+                      const val = e.target.value;
+                      if (val === '') handleTimeInput('start', 'm', 0);
+                    }}
                     onFocus={e => e.target.select()}
                     className="w-8 text-center text-xl font-mono font-bold text-stone-800 outline-none bg-transparent"
                   />
@@ -322,18 +356,38 @@ export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialSta
                 <div className="flex items-center bg-white rounded-xl border border-stone-200 px-3 py-2 shadow-sm">
                   <input
                     type="number"
+                    inputMode="numeric"
                     min={0} max={23}
                     value={String(endHM.h).padStart(2, '0')}
-                    onChange={e => handleTimeInput('end', 'h', parseInt(e.target.value) || 0)}
+                    onChange={e => {
+                      const val = e.target.value;
+                      if (val === '') return; // 允许清空
+                      const num = parseInt(val);
+                      if (!isNaN(num)) handleTimeInput('end', 'h', num);
+                    }}
+                    onBlur={e => {
+                      const val = e.target.value;
+                      if (val === '') handleTimeInput('end', 'h', 0);
+                    }}
                     onFocus={e => e.target.select()}
                     className="w-8 text-center text-xl font-mono font-bold text-stone-800 outline-none bg-transparent"
                   />
                   <span className="text-stone-300 mx-1">:</span>
                   <input
                     type="number"
+                    inputMode="numeric"
                     min={0} max={59}
                     value={String(endHM.m).padStart(2, '0')}
-                    onChange={e => handleTimeInput('end', 'm', parseInt(e.target.value) || 0)}
+                    onChange={e => {
+                      const val = e.target.value;
+                      if (val === '') return; // 允许清空
+                      const num = parseInt(val);
+                      if (!isNaN(num)) handleTimeInput('end', 'm', num);
+                    }}
+                    onBlur={e => {
+                      const val = e.target.value;
+                      if (val === '') handleTimeInput('end', 'm', 0);
+                    }}
                     onFocus={e => e.target.select()}
                     className="w-8 text-center text-xl font-mono font-bold text-stone-800 outline-none bg-transparent"
                   />
