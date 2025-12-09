@@ -1322,6 +1322,7 @@ const App: React.FC = () => {
             todos={todos}
             todoCategories={todoCategories}
             scopes={scopes}
+            autoLinkRules={autoLinkRules}
           />
         )}
 
