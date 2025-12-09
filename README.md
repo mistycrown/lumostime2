@@ -135,9 +135,39 @@ npx cap add android
    ```
    *在 Android Studio 中打开后，点击绿色的 "Run" ▶️ 按钮即可在模拟器或真机上运行。*
 
+### 🌐 Vercel 部署
+
+本项目支持一键部署到 Vercel,并通过 Serverless 函数解决 WebDAV 跨域问题。
+
+#### 快速部署
+
+1. **使用 Vercel Dashboard**:
+   - 访问 [Vercel](https://vercel.com)
+   - 导入你的 Git 仓库
+   - Vercel 会自动检测配置并部署
+
+2. **使用命令行**:
+   ```bash
+   # 安装 Vercel CLI
+   npm install -g vercel
+   
+   # 登录并部署
+   vercel
+   
+   # 或使用快速部署脚本
+   ./deploy.ps1
+   ```
+
+#### WebDAV 跨域解决方案
+
+在浏览器环境中,WebDAV 请求会遇到 CORS 限制。项目已配置:
+- **开发环境**: 通过 Vite 代理转发请求
+- **生产环境**: 通过 Vercel Serverless 函数 (`/api/webdav-proxy`) 代理请求
+- **原生应用**: 使用原生 HTTP 客户端,无 CORS 限制
+
+详细部署指南请查看: [VERCEL_DEPLOY.md](./VERCEL_DEPLOY.md)
+
+
 ---
-
-*LumosTime - Illuminate your time, illuminate your life.*
-
 
 
