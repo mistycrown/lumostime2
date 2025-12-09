@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
-import { Category, Log, TodoItem, TodoCategory, Scope } from '../types';
-import { X, Trash2, TrendingUp, Plus, Minus } from 'lucide-react';
+import { Category, Log, TodoItem, TodoCategory, Scope, AutoLinkRule } from '../types';
+import { X, Trash2, TrendingUp, Plus, Minus, Lightbulb, CheckCircle2 } from 'lucide-react';
 import { TodoAssociation } from '../components/TodoAssociation';
 import { ScopeAssociation } from '../components/ScopeAssociation';
 import { FocusScoreSelector } from '../components/FocusScoreSelector';
@@ -16,9 +16,10 @@ interface AddLogModalProps {
   todos: TodoItem[];
   todoCategories: TodoCategory[];
   scopes: Scope[];
+  autoLinkRules?: AutoLinkRule[];
 }
 
-export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialStartTime, initialEndTime, onClose, onSave, onDelete, categories, todos, todoCategories, scopes }) => {
+export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialStartTime, initialEndTime, onClose, onSave, onDelete, categories, todos, todoCategories, scopes, autoLinkRules = [] }) => {
   const [selectedCategoryId, setSelectedCategoryId] = useState<string>(categories[0].id);
   const [selectedActivityId, setSelectedActivityId] = useState<string>(categories[0].activities[0].id);
   const [note, setNote] = useState('');
@@ -28,6 +29,9 @@ export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialSta
   const [progressIncrement, setProgressIncrement] = useState(0);
   const [focusScore, setFocusScore] = useState<number | undefined>(undefined);
   const [scopeIds, setScopeIds] = useState<string[] | undefined>(undefined);
+
+  // 自动关联建议状态
+  const [suggestedScopeIds, setSuggestedScopeIds] = useState<string[] | undefined>(undefined);
 
   // --- TIME STATE (New Logic) ---
   const [trackStartTime, setTrackStartTime] = useState<number>(0);
@@ -147,6 +151,40 @@ export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialSta
 
   const selectedCategory = categories.find(c => c.id === selectedCategoryId) || categories[0];
   const linkedTodo = todos.find(t => t.id === linkedTodoId);
+
+  // 检测自动关联规则
+  useEffect(() => {
+    const category = categories.find(c => c.id === selectedCategoryId);
+    if (!category) return;
+
+    const activity = category.activities.find(a => a.id === selectedActivityId);
+    if (!activity) return;
+
+    // 查找匹配的自动关联规则
+    const matchingRules = autoLinkRules.filter(rule => rule.activityId === activity.id);
+    const matchingScopeIds = matchingRules.map(rule => rule.scopeId);
+
+    if (matchingScopeIds.length > 0) {
+      // 检查是否已经在当前选中的领域中
+      const alreadySelected = matchingScopeIds.every(id => scopeIds?.includes(id));
+      if (!alreadySelected) {
+        setSuggestedScopeIds(matchingScopeIds);
+      } else {
+        setSuggestedScopeIds(undefined);
+      }
+    } else {
+      setSuggestedScopeIds(undefined);
+    }
+  }, [selectedCategoryId, selectedActivityId, autoLinkRules, categories, scopeIds]);
+
+  // 接受自动关联建议
+  const handleAcceptSuggestion = (scopeId: string) => {
+    const currentScopeIds = scopeIds || [];
+    if (!currentScopeIds.includes(scopeId)) {
+      setScopeIds([...currentScopeIds, scopeId]);
+    }
+    setSuggestedScopeIds(undefined);
+  };
 
   const durationDisplay = useMemo(() => {
     const diff = (currentEndTime - currentStartTime) / 1000 / 60; // mins
@@ -540,6 +578,35 @@ export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialSta
               }}
             />
           </div>
+
+          {/* Auto-Link Suggestion */}
+          {suggestedScopeIds && suggestedScopeIds.length > 0 && (
+            <div className="p-3 bg-purple-50 border border-purple-100 rounded-xl animate-in slide-in-from-top-2">
+              <div className="flex items-start gap-2">
+                <Lightbulb size={16} className="text-purple-600 mt-0.5 flex-shrink-0" />
+                <div className="flex-1">
+                  <p className="text-xs font-bold text-purple-900 mb-2">是否关联到以下领域？</p>
+                  <div className="flex flex-wrap gap-2">
+                    {suggestedScopeIds.map(scopeId => {
+                      const scope = scopes.find(s => s.id === scopeId);
+                      if (!scope) return null;
+                      return (
+                        <button
+                          key={scopeId}
+                          onClick={() => handleAcceptSuggestion(scopeId)}
+                          className="flex items-center gap-1 px-2 py-1 bg-white border border-purple-200 rounded-lg text-xs font-medium text-purple-700 hover:bg-purple-100 transition-colors active:scale-95"
+                        >
+                          <span>{scope.icon}</span>
+                          <span>{scope.name}</span>
+                          <CheckCircle2 size={12} />
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Scope Association */}
           <div className="space-y-0">
