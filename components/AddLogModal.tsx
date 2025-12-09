@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { Category, Log, TodoItem, TodoCategory, Scope, AutoLinkRule } from '../types';
-import { X, Trash2, TrendingUp, Plus, Minus, Lightbulb, CheckCircle2 } from 'lucide-react';
+import { X, Trash2, TrendingUp, Plus, Minus, Lightbulb, CheckCircle2, Clock } from 'lucide-react';
 import { TodoAssociation } from '../components/TodoAssociation';
 import { ScopeAssociation } from '../components/ScopeAssociation';
 import { FocusScoreSelector } from '../components/FocusScoreSelector';
@@ -184,6 +184,18 @@ export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialSta
       setScopeIds([...currentScopeIds, scopeId]);
     }
     setSuggestedScopeIds(undefined);
+  };
+
+  // 设置开始时间为当前时间
+  const handleSetStartToNow = () => {
+    const now = Date.now();
+    setCurrentStartTime(now);
+  };
+
+  // 设置结束时间为当前时间
+  const handleSetEndToNow = () => {
+    const now = Date.now();
+    setCurrentEndTime(now);
   };
 
   const durationDisplay = useMemo(() => {
@@ -385,6 +397,14 @@ export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialSta
                     className="w-8 text-center text-xl font-mono font-bold text-stone-800 outline-none bg-transparent"
                   />
                 </div>
+                <button
+                  onClick={handleSetStartToNow}
+                  className="mt-2 flex items-center gap-1 px-2 py-1 text-xs font-medium text-stone-600 hover:text-stone-900 hover:bg-stone-100 rounded-lg transition-colors active:scale-95"
+                  title="设置开始时间为当前时间"
+                >
+                  <Clock size={12} />
+                  <span>到现在</span>
+                </button>
               </div>
 
               <div className="h-px w-8 bg-stone-300 mt-6"></div>
@@ -430,6 +450,14 @@ export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialSta
                     className="w-8 text-center text-xl font-mono font-bold text-stone-800 outline-none bg-transparent"
                   />
                 </div>
+                <button
+                  onClick={handleSetEndToNow}
+                  className="mt-2 flex items-center gap-1 px-2 py-1 text-xs font-medium text-stone-600 hover:text-stone-900 hover:bg-stone-100 rounded-lg transition-colors active:scale-95"
+                  title="设置结束时间为当前时间"
+                >
+                  <Clock size={12} />
+                  <span>到现在</span>
+                </button>
               </div>
             </div>
 
