@@ -7,8 +7,18 @@ export interface AIConfig {
 }
 
 export interface ParsedTimeEntry {
-    startTime: string; // ISO
-    endTime: string;   // ISO
+    startTime: string; // ISO (完整日期时间)
+    endTime: string;   // ISO (完整日期时间)
+    description: string;
+    categoryName: string;
+    activityName: string;
+    scopeIds?: string[]; // 可选：用户接受的关联领域ID
+}
+
+// AI返回的原始时间条目（只包含时间，不包含日期）
+interface AIRawTimeEntry {
+    startTime: string; // HH:mm格式
+    endTime: string;   // HH:mm格式
     description: string;
     categoryName: string;
     activityName: string;
@@ -144,7 +154,8 @@ export const aiService = {
     parseNaturalLanguage: async (
         text: string,
         context: {
-            now: string; // ISO
+            now: string; // YYYY-MM-DD格式的当前日期
+            targetDate: string; // YYYY-MM-DD格式的目标日期（用户选择补记的日期）
             categories: any[]; // Pass simplified structure
         }
     ): Promise<ParsedTimeEntry[]> => {
@@ -162,34 +173,39 @@ Role: You are a professional time management assistant.
 Task: Extract time records from the user's natural language description.
 
 Context:
-- Current User Time: ${context.now}
 - Existing Tag List: ${JSON.stringify(tagList)}
 
 Requirements:
-1. Identify start and end times. If relative (e.g., "yesterday"), calculate the specific date based on "Current User Time".
-2. IMPORTANT: The user is speaking in their Local Timezone. Do NOT convert to UTC.
-3. Return the start/end time as an ISO-like string WITHOUT the 'Z' suffix (e.g., "YYYY-MM-DDTHH:mm:ss"). This ensures it is treated as local time by the client.
-   - Example: If user says "3 PM" and it's 2025-12-06, return "2025-12-06T15:00:00".
-   - Do NOT use "2025-12-06T15:00:00Z" (which would be treated as UTC).
-4. If duration is given, calculate endTime based on startTime.
-5. Match activities to provided tags where possible. Default to reasonable guesses if not found.
-6. Return format must be a pure JSON Array.
-7. STRICT SINGLE-DAY LOGGING:
-   - You MUST NOT create a log that spans across midnight.
-   - If an implied duration goes into the next day (e.g. "I slept from 10 PM to 8 AM"), you MUST truncate the endTime to 23:59:59 of the start day.
-   - Ignore the portion of the activity that falls on the next day. The user will log it separately.
+1. **You ONLY need to return the TIME (hour and minute), NOT the date.**
+2. Return time in 24-hour format: "HH:mm" (e.g., "09:00", "15:30", "23:45")
+3. **CRITICAL: All records must be within the same day (00:00 to 23:59).**
+4. **NO cross-day records allowed.** If a time range would cross midnight, end it at "23:59".
+5. If user says "3 PM", return "15:00". If user says "9 AM", return "09:00".
+6. If only duration is given (e.g., "read for 2 hours"), you can estimate a reasonable time range.
+7. Match activities to provided tags where possible.
+8. Return format must be a pure JSON Array.
 
 JSON Output Schema:
 [
   {
-    "startTime": "YYYY-MM-DDTHH:mm:ss",
-    "endTime": "YYYY-MM-DDTHH:mm:ss",
+    "startTime": "HH:mm",
+    "endTime": "HH:mm",
     "description": "String",
     "categoryName": "String (Top Level Name)",
     "activityName": "String (Activity Name)"
   }
 ]
+
+Example:
+User: "下午三点到五点阅读,五点半吃饭一个小时,七点到八点玩游戏"
+Output:
+[
+  {"startTime": "15:00", "endTime": "17:00", "description": "阅读", "categoryName": "学习", "activityName": "书籍文献"},
+  {"startTime": "17:30", "endTime": "18:30", "description": "吃饭", "categoryName": "生活", "activityName": "饮食"},
+  {"startTime": "19:00", "endTime": "20:00", "description": "玩游戏", "categoryName": "爱欲再生产", "activityName": "玩玩游戏"}
+]
 `;
+
 
         try {
             if (config.provider === 'openai') {
@@ -213,7 +229,8 @@ JSON Output Schema:
                 if (data.error) throw new Error(data.error.message);
 
                 let content = data.choices[0].message.content;
-                return aiService.cleanAndParseJSON(content);
+                const rawEntries = aiService.cleanAndParseJSON(content) as AIRawTimeEntry[];
+                return aiService.combineWithDate(rawEntries, context.targetDate);
             }
 
             if (config.provider === 'gemini') {
@@ -243,7 +260,8 @@ JSON Output Schema:
                 const content = data.candidates?.[0]?.content?.parts?.[0]?.text;
                 if (!content) throw new Error('No content in Gemini response');
 
-                return aiService.cleanAndParseJSON(content);
+                const rawEntries = aiService.cleanAndParseJSON(content) as AIRawTimeEntry[];
+                return aiService.combineWithDate(rawEntries, context.targetDate);
             }
 
             return [];
@@ -251,6 +269,25 @@ JSON Output Schema:
             console.error(error);
             throw new Error('Failed to parse time entries');
         }
+    },
+
+    // 将AI返回的时间（HH:mm）与用户选择的日期组合成完整的ISO字符串
+    combineWithDate: (rawEntries: AIRawTimeEntry[], targetDate: string): ParsedTimeEntry[] => {
+        return rawEntries.map(entry => {
+            // targetDate格式: YYYY-MM-DD
+            // entry.startTime格式: HH:mm
+            // 组合成: YYYY-MM-DDTHH:mm:ss
+            const startISO = `${targetDate}T${entry.startTime}:00`;
+            const endISO = `${targetDate}T${entry.endTime}:00`;
+
+            return {
+                startTime: startISO,
+                endTime: endISO,
+                description: entry.description,
+                categoryName: entry.categoryName,
+                activityName: entry.activityName
+            };
+        });
     },
 
     cleanAndParseJSON: (content: string): ParsedTimeEntry[] => {
