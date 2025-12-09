@@ -1,3 +1,27 @@
+# 20251209
+
+## Vercel 部署配置完成
+
+已添加 WebDAV 跨域解决方案:
+1. 创建了 `/api/webdav-proxy.ts` - Serverless 函数代理 WebDAV 请求
+2. 创建了 `vercel.json` - Vercel 配置文件
+3. 更新了 `services/webdavService.ts` - 生产环境使用代理
+4. 添加了 `@vercel/node` 依赖
+5. 创建了 `VERCEL_DEPLOY.md` - 详细部署指南
+6. 创建了 `deploy.ps1` - 快速部署脚本
+7. 更新了 `README.md` - 添加 Vercel 部署说明
+
+**部署方式**:
+- 方式1: 访问 vercel.com,导入 Git 仓库,自动部署
+- 方式2: 运行 `./deploy.ps1` 脚本
+- 方式3: 手动运行 `vercel` 命令
+
+**WebDAV 跨域解决**:
+- 开发环境: Vite 代理
+- 生产环境: Vercel Serverless 函数代理
+- 原生应用: 原生 HTTP,无 CORS 限制
+
+---
 
 npm run build
 npx cap sync
