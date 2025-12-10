@@ -45,7 +45,15 @@ interface TimelineItem {
 
 export const TimelineView: React.FC<TimelineViewProps> = ({ logs, todos, scopes, onAddLog, onEditLog, categories, currentDate, onDateChange, onShowStats, onBatchAddLogs, onSync, isSyncing, todoCategories, onToast, startWeekOnSunday = false, autoLinkRules = [] }) => {
     const [isCalendarExpanded, setIsCalendarExpanded] = useState(false);
-    const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
+    const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>(() => {
+        const saved = localStorage.getItem('lumos_timeline_sort');
+        return (saved === 'asc' || saved === 'desc') ? saved : 'asc';
+    });
+
+    React.useEffect(() => {
+        localStorage.setItem('lumos_timeline_sort', sortOrder);
+    }, [sortOrder]);
+
     const [isAIModalOpen, setIsAIModalOpen] = useState(false);
     const scrollContainerRef = useRef<HTMLDivElement>(null);
 
