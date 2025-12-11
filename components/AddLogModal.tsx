@@ -17,9 +17,10 @@ interface AddLogModalProps {
   todoCategories: TodoCategory[];
   scopes: Scope[];
   autoLinkRules?: AutoLinkRule[];
+  lastLogEndTime?: number;
 }
 
-export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialStartTime, initialEndTime, onClose, onSave, onDelete, categories, todos, todoCategories, scopes, autoLinkRules = [] }) => {
+export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialStartTime, initialEndTime, onClose, onSave, onDelete, categories, todos, todoCategories, scopes, autoLinkRules = [], lastLogEndTime }) => {
   const [selectedCategoryId, setSelectedCategoryId] = useState<string>(categories[0].id);
   const [selectedActivityId, setSelectedActivityId] = useState<string>(categories[0].activities[0].id);
   const [note, setNote] = useState('');
@@ -431,13 +432,21 @@ export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialSta
                     className="w-8 text-center text-xl font-mono font-bold text-stone-800 outline-none bg-transparent"
                   />
                 </div>
+
                 <button
-                  onClick={handleSetStartToNow}
+                  onClick={() => {
+                    if (lastLogEndTime) {
+                      setCurrentStartTime(lastLogEndTime);
+                    } else {
+                      // Fallback to now if no last log
+                      handleSetStartToNow();
+                    }
+                  }}
                   className="mt-2 flex items-center gap-1 px-2 py-1 text-xs font-medium text-stone-600 hover:text-stone-900 hover:bg-stone-100 rounded-lg transition-colors active:scale-95"
-                  title="设置开始时间为当前时间"
+                  title="设置开始时间为上一条记录的结束时间"
                 >
                   <Clock size={12} />
-                  <span>到现在</span>
+                  <span>到上尾</span>
                 </button>
               </div>
 
