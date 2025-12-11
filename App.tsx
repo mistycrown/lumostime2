@@ -887,6 +887,8 @@ const App: React.FC = () => {
             isFullScreen={isStatsFullScreen}
             onToggleFullScreen={() => setIsStatsFullScreen(!isStatsFullScreen)}
             onToast={addToast}
+            todos={todos}
+            todoCategories={todoCategories}
           />
         );
       case AppView.TAGS:
