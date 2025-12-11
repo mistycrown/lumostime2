@@ -545,7 +545,7 @@ export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentD
                       <div className="flex items-center justify-between mb-1.5">
                         <div className="flex items-center gap-2">
                           <span className="text-base">{cat.icon}</span>
-                          <span className="font-bold text-stone-700 text-xs">{cat.name}</span>
+                          <span className="font-bold text-stone-700 text-[13px]">{cat.name}</span>
                         </div>
                         <div className="flex items-center gap-2">
                           <span className="text-xs font-mono text-stone-400">{formatDuration(cat.duration)}</span>
@@ -557,7 +557,7 @@ export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentD
                       </div>
                       <div className="pl-6 space-y-1">
                         {cat.items.map(act => (
-                          <div key={act.id} className="flex items-center justify-between text-[10px] text-stone-500 hover:bg-stone-50 rounded px-2 py-0.5 -ml-2 transition-colors">
+                          <div key={act.id} className="flex items-center justify-between text-[11px] text-stone-500 hover:bg-stone-50 rounded px-2 py-0.5 -ml-2 transition-colors">
                             <div className="flex items-center gap-1.5">
                               <div className={`w-1 h-1 rounded-full`} style={{ backgroundColor: getHexColor(cat.themeColor) }}></div>
                               <span>{act.name}</span>
@@ -616,7 +616,7 @@ export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentD
                         <div className="flex items-center justify-between mb-1.5">
                           <div className="flex items-center gap-2">
                             <span className="text-base">{cat.icon}</span>
-                            <span className="font-bold text-stone-700 text-xs">{cat.name}</span>
+                            <span className="font-bold text-stone-700 text-[13px]">{cat.name}</span>
                           </div>
                           <div className="flex items-center gap-2">
                             <span className="text-xs font-mono text-stone-400">{formatDuration(cat.duration)}</span>
@@ -629,7 +629,7 @@ export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentD
                         {pieRange !== 'year' && (
                           <div className="pl-6 space-y-1">
                             {cat.items.map(act => (
-                              <div key={act.id} className="flex items-center justify-between text-[10px] text-stone-500 hover:bg-stone-50 rounded px-2 py-0.5 -ml-2 transition-colors">
+                              <div key={act.id} className="flex items-center justify-between text-[11px] text-stone-500 hover:bg-stone-50 rounded px-2 py-0.5 -ml-2 transition-colors">
                                 <div className="flex items-center gap-1.5">
                                   <div className={`w-1 h-1 rounded-full`} style={{ backgroundColor: cat.assignedColor }}></div>
                                   <span>{act.name}</span>
