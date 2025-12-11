@@ -16,9 +16,10 @@ interface CalendarWidgetProps {
     customScale?: { min: number; max: number };
     heatmapMode?: 'duration' | 'focus';
     staticMode?: boolean;
+    renderCustomDay?: (date: Date, isSelected: boolean, isToday: boolean) => React.ReactNode;
 }
 
-export const CalendarWidget: React.FC<CalendarWidgetProps> = ({ currentDate, onDateChange, logs = [], isExpanded, onExpandToggle, extraHeaderControls, disableSelection, customScale, heatmapMode, staticMode, preventCollapse, onResetView, startWeekOnSunday = false }) => {
+export const CalendarWidget: React.FC<CalendarWidgetProps> = ({ currentDate, onDateChange, logs = [], isExpanded, onExpandToggle, extraHeaderControls, disableSelection, customScale, heatmapMode, staticMode, preventCollapse, onResetView, startWeekOnSunday = false, renderCustomDay }) => {
     const [viewMode, setViewMode] = useState<'calendar' | 'month_year'>('calendar');
 
     // ... (keep existing helper functions)
@@ -358,7 +359,14 @@ export const CalendarWidget: React.FC<CalendarWidgetProps> = ({ currentDate, onD
                                         ${today && !selected && !staticMode ? 'border border-stone-300' : ''}
                                      `}
                                             >
-                                                {day.getDate()}
+                                                {/* Custom Background/Content */}
+                                                {renderCustomDay && (
+                                                    <div className="absolute inset-0 rounded-lg overflow-hidden z-0">
+                                                        {renderCustomDay(day, selected, today)}
+                                                    </div>
+                                                )}
+
+                                                <span className="relative z-10">{day.getDate()}</span>
                                                 {/* Dot indicator for selected day if it has data, to show it's not empty */}
                                                 {selected && intensityValue > 0 && (
                                                     <div className="absolute bottom-1 w-1 h-1 rounded-full bg-white/50" />

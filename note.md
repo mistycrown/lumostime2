@@ -807,12 +807,25 @@ B. 记录模式,时长 (Duration)天数 (Days)有效时长 (Focus),TimeEntry 表
                         "><span>🎓</span><span class="truncate">论文进度</span></button>
 ```
 
-2. 有关键字的标签，新增一个“关键字”tab。
-首先显示日历（复用时间线/专注中的日历），热力图的
-以关键字为分组。关键字从专注记录备注中寻找。如果匹配到，则为该关键字中一个条目。每一组关键字，首先呈现关键字（在这个月）的所有条目的时间、总个数。点击按钮后，以列表形式呈现关键字条目。列表形式参考下面代码，只是把待办改成专注记录。
+2. 有关键字的标签（activity），新增一个“关键字”tab。
+首先显示日历（复用时间线/专注中的日历），热力图的颜色由每天时间记录所对应的关键字决定。
+- 如果当日无activity记录，不着色。
+- 如果当日有activity记录，无关键字匹配，着灰色。
+- 如果当日有一个匹配关键字的activity记录，着对应关键字的颜色。
+- 如果当日有n个匹配关键字的记录，将当日的格子横向地分成n份，每份着对应关键字的颜色。
+
+热力图下面，
+以（细tab中设置的）关键字为分组。关键字关联的记录从专注记录备注中寻找。如果匹配到，则记录为该关键字中一个条目。每一组关键字，首先呈现关键字（在这个月）的所有条目的时间、总个数。点击按钮后，以列表形式呈现关键字条目。列表形式参考下面代码，只是把待办改成专注记录。
 ```
 <div class="bg-white rounded-2xl p-6 border border-stone-100 shadow-sm"><h3 class="text-sm font-bold text-stone-400 uppercase tracking-widest mb-4">Associated Todos</h3><div class="space-y-0 text-sm"><div class="group flex items-center gap-3 py-2 border-b border-stone-100 last:border-0 hover:bg-stone-50 md:-mx-2 md:px-2 transition-colors cursor-pointer"><div class="w-4 h-4 shrink-0 rounded-[4px] border-2 flex items-center justify-center transition-colors border-stone-300 group-hover:border-stone-400"></div><span class="flex-1 font-medium truncate min-w-0 text-stone-700">Can Unconfident LLM Annotations Be Used for Confident Conclusions?</span></div><div class="group flex items-center gap-3 py-2 border-b border-stone-100 last:border-0 hover:bg-stone-50 md:-mx-2 md:px-2 transition-colors cursor-pointer"><div class="w-4 h-4 shrink-0 rounded-[4px] border-2 flex items-center justify-center transition-colors border-stone-300 group-hover:border-stone-400"></div><span class="flex-1 font-medium truncate min-w-0 text-stone-700">Beyond Tokens in Language Models: Interpreting Activations through Text Genre Chunks</span></div><div class="group flex items-center gap-3 py-2 border-b border-stone-100 last:border-0 hover:bg-stone-50 md:-mx-2 md:px-2 transition-colors cursor-pointer"><div class="w-4 h-4 shrink-0 rounded-[4px] border-2 flex items-center justify-center transition-colors border-stone-300 group-hover:border-stone-400"></div><span class="flex-1 font-medium truncate min-w-0 text-stone-700">Information-Theoretic Generative Clustering of Documents</span></div><div class="group flex items-center gap-3 py-2 border-b border-stone-100 last:border-0 hover:bg-stone-50 md:-mx-2 md:px-2 transition-colors cursor-pointer"><div class="w-4 h-4 shrink-0 rounded-[4px] border-2 flex items-center justify-center transition-colors border-stone-300 group-hover:border-stone-400"></div><span class="flex-1 font-medium truncate min-w-0 text-stone-700">渐构</span><span class="text-xs text-stone-300 font-serif whitespace-nowrap shrink-0">共 41m</span></div></div></div>
 
 ```
 
+3. 手动补记页面，监听备注输入栏，当用户在备注中输入关键字时，提醒用户是否快速关联到对应标签（activity）.关联提醒的样式参考以下代码。标题为：是否关联到以下标签？
+如果用户点击确认，则在页面上面的标签（activity）选择处，自动选择。
+关联提醒的div位置在备注框的上方，在关联领域选择的下方。
+
+```
+<div class="p-3 bg-purple-50 border border-purple-100 rounded-xl animate-in slide-in-from-top-2"><div class="flex items-start gap-2"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-lightbulb text-purple-600 mt-0.5 flex-shrink-0" aria-hidden="true"><path d="M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5"></path><path d="M9 18h6"></path><path d="M10 22h4"></path></svg><div class="flex-1"><p class="text-xs font-bold text-purple-900 mb-2">是否关联到以下领域？</p><div class="flex flex-wrap gap-2"><button class="flex items-center gap-1 px-2 py-1 bg-white border border-purple-200 rounded-lg text-xs font-medium text-purple-700 hover:bg-purple-100 transition-colors active:scale-95"><span>🥦</span><span>健康生活</span><svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-circle-check" aria-hidden="true"><circle cx="12" cy="12" r="10"></circle><path d="m9 12 2 2 4-4"></path></svg></button></div></div></div></div>
+```
 

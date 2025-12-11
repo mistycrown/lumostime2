@@ -30,8 +30,10 @@ export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialSta
   const [focusScore, setFocusScore] = useState<number | undefined>(undefined);
   const [scopeIds, setScopeIds] = useState<string[] | undefined>(undefined);
 
-  // 自动关联建议状态
+  // 自动关联建议状态 (Scope)
   const [suggestedScopeIds, setSuggestedScopeIds] = useState<string[] | undefined>(undefined);
+  // 基于关键字的 Activity 建议 (New)
+  const [suggestedActivity, setSuggestedActivity] = useState<{ activityId: string; categoryId: string; name: string; icon: string; matchedKeyword: string } | undefined>(undefined);
 
   // --- TIME STATE (New Logic) ---
   const [trackStartTime, setTrackStartTime] = useState<number>(0);
@@ -176,6 +178,38 @@ export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialSta
       setSuggestedScopeIds(undefined);
     }
   }, [selectedCategoryId, selectedActivityId, autoLinkRules, categories, scopeIds]);
+
+  // 监听备注输入，推荐关联标签
+  useEffect(() => {
+    if (!note) {
+      setSuggestedActivity(undefined);
+      return;
+    }
+
+    // 遍历所有 categories 和 activities 寻找匹配
+    // 优先匹配长度更长的关键字？暂不考虑，先匹配到的优先
+    for (const cat of categories) {
+      for (const act of cat.activities) {
+        // 跳过当前选中的 activity
+        if (act.id === selectedActivityId) continue;
+
+        const keywords = act.keywords || [];
+        for (const kw of keywords) {
+          if (note.includes(kw)) {
+            setSuggestedActivity({
+              activityId: act.id,
+              categoryId: cat.id,
+              name: act.name,
+              icon: act.icon,
+              matchedKeyword: kw
+            });
+            return; // 找到第一个匹配就停止
+          }
+        }
+      }
+    }
+    setSuggestedActivity(undefined);
+  }, [note, categories, selectedActivityId]);
 
   // 接受自动关联建议
   const handleAcceptSuggestion = (scopeId: string) => {
@@ -660,6 +694,33 @@ export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialSta
               return null;
             })()
           }
+
+          {/* Keyword Activity Suggestion */}
+          {suggestedActivity && (
+            <div className="p-3 bg-purple-50 border border-purple-100 rounded-xl animate-in slide-in-from-top-2">
+              <div className="flex items-start gap-2">
+                <Lightbulb size={16} className="text-purple-600 mt-0.5 flex-shrink-0" />
+                <div className="flex-1">
+                  <p className="text-xs font-bold text-purple-900 mb-2">是否关联到以下标签？</p>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      onClick={() => {
+                        setSelectedCategoryId(suggestedActivity.categoryId);
+                        setSelectedActivityId(suggestedActivity.activityId);
+                        setSuggestedActivity(undefined);
+                      }}
+                      className="flex items-center gap-1 px-2 py-1 bg-white border border-purple-200 rounded-lg text-xs font-medium text-purple-700 hover:bg-purple-100 transition-colors active:scale-95"
+                    >
+                      <span>{suggestedActivity.icon}</span>
+                      <span>{suggestedActivity.name}</span>
+                      <CheckCircle2 size={12} />
+                    </button>
+                    <span className="text-[10px] text-purple-400 self-center">(匹配关键字: {suggestedActivity.matchedKeyword})</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Note Input */}
           <div>
