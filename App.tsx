@@ -1323,6 +1323,7 @@ const App: React.FC = () => {
             todoCategories={todoCategories}
             scopes={scopes}
             autoLinkRules={autoLinkRules}
+            lastLogEndTime={logs.length > 0 ? Math.max(...logs.filter(l => l.id !== editingLog?.id).map(l => l.endTime)) : undefined}
           />
         )}
 
