@@ -12,6 +12,8 @@ interface StatsViewProps {
   isFullScreen: boolean;
   onToggleFullScreen: () => void;
   onToast?: (type: ToastType, message: string) => void;
+  todos: import('../types').TodoItem[];
+  todoCategories: import('../types').TodoCategory[];
 }
 
 type ViewType = 'pie' | 'matrix' | 'schedule';
@@ -28,7 +30,7 @@ interface CategoryStat extends Category {
   items: ActivityStat[];
 }
 
-export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentDate, onBack, isFullScreen, onToggleFullScreen, onToast }) => {
+export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentDate, onBack, isFullScreen, onToggleFullScreen, onToast, todos, todoCategories }) => {
   const [viewType, setViewType] = useState<ViewType>('pie');
   const [pieRange, setPieRange] = useState<PieRange>('day');
   const [scheduleRange, setScheduleRange] = useState<ScheduleRange>('day');
@@ -173,6 +175,20 @@ export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentD
       });
       text += '\n';
     });
+    text += '\n';
+
+
+    if (todoStats.totalDuration > 0) {
+      text += `\n## 📋 待办专注分布\n**待办总时长**: ${formatDuration(todoStats.totalDuration)}\n\n`;
+      todoStats.categoryStats.forEach(cat => {
+        text += `- **[${cat.name}]** ${formatDuration(cat.duration)} (${cat.percentage.toFixed(1)}%)\n`;
+        cat.items.forEach(item => {
+          text += `    * ${item.name}: ${formatDuration(item.duration)}\n`;
+        });
+        text += '\n';
+      });
+    }
+
     navigator.clipboard.writeText(text).then(() => onToast?.('success', '已复制')).catch(() => onToast?.('error', '复制失败'));
   };
 
@@ -222,6 +238,69 @@ export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentD
       return { ...cat, d, hexColor: getHexColor(cat.themeColor) };
     }).filter(Boolean);
   }, [stats]);
+
+  // Todo Stats
+  const todoStats = useMemo(() => {
+    const logsWithTodos = filteredLogs.filter(l => l.linkedTodoId);
+    const totalDuration = logsWithTodos.reduce((acc, log) => acc + Math.max(0, (log.endTime - log.startTime) / 1000), 0);
+
+    const todoDurations: Record<string, number> = {};
+    logsWithTodos.forEach(l => {
+      const d = Math.max(0, (l.endTime - l.startTime) / 1000);
+      todoDurations[l.linkedTodoId!] = (todoDurations[l.linkedTodoId!] || 0) + d;
+    });
+
+    const COLORS = ['#fee2e2', '#ffedd5', '#fef9c3', '#dcfce7', '#ccfbf1', '#dbeafe', '#e0e7ff', '#f3e8ff', '#fce7f3', '#ffe4e6'];
+
+    const categoryStats = todoCategories.map((cat, index) => {
+      const catTodos = todos.filter(t => t.categoryId === cat.id);
+      let catDuration = 0;
+      const items = catTodos.map(t => {
+        const d = todoDurations[t.id] || 0;
+        catDuration += d;
+        return {
+          id: t.id,
+          name: t.title,
+          duration: d,
+        };
+      }).filter(i => i.duration > 0).sort((a, b) => b.duration - a.duration);
+
+      return {
+        ...cat,
+        duration: catDuration,
+        percentage: totalDuration > 0 ? (catDuration / totalDuration) * 100 : 0,
+        items,
+        assignedColor: COLORS[index % COLORS.length]
+      };
+    }).filter(c => c.duration > 0).sort((a, b) => b.duration - a.duration);
+
+    return { totalDuration, categoryStats };
+  }, [filteredLogs, todos, todoCategories]);
+
+  const todoPieChartData = useMemo(() => {
+    let currentAngle = 0; const gapAngle = 2; const radius = 80; const center = 100;
+    return todoStats.categoryStats.map(cat => {
+      const sweepAngle = (cat.percentage / 100) * 360;
+      if (sweepAngle < 1) return null;
+      const startAngle = currentAngle;
+      const endAngle = currentAngle + sweepAngle - gapAngle;
+      currentAngle += sweepAngle;
+      const startRad = (startAngle - 90) * Math.PI / 180.0;
+      const endRad = (endAngle - 90) * Math.PI / 180.0;
+      const x1 = center + radius * Math.cos(startRad);
+      const y1 = center + radius * Math.sin(startRad);
+      const x2 = center + radius * Math.cos(endRad);
+      const y2 = center + radius * Math.sin(endRad);
+      const largeArcFlag = endAngle - startAngle <= 180 ? "0" : "1";
+      const d = ["M", x1, y1, "A", radius, radius, 0, largeArcFlag, 1, x2, y2].join(" ");
+      return { ...cat, d, hexColor: cat.assignedColor };
+    }).filter(Boolean);
+  }, [todoStats]);
+
+  const { h: totalTodoH, m: totalTodoM } = (() => {
+    const s = todoStats.totalDuration;
+    return { h: Math.floor(s / 3600), m: Math.floor((s % 3600) / 60) };
+  })();
 
   const layoutDayEvents = (dayLogs: Log[]) => {
     const sorted = [...dayLogs].sort((a, b) => a.startTime - b.startTime);
@@ -450,7 +529,7 @@ export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentD
                     ))}
                   </svg>
                   <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                    <span className="text-xs font-bold text-stone-300 uppercase">Total</span>
+                    <span className="text-xs font-bold text-stone-300 uppercase">Tags</span>
                     <div className="flex items-baseline gap-0.5 text-stone-800">
                       <span className="text-3xl font-bold font-mono">{totalH}</span>
                       <span className="text-xs text-stone-400">h</span>
@@ -491,6 +570,80 @@ export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentD
                   ))}
                 </div>
               </div>
+
+              {/* Filter Chips - Pie View Position */}
+              <div className="flex flex-wrap gap-2 justify-center pt-2 pb-4">
+                {categories.map(cat => (
+                  <button
+                    key={cat.id}
+                    onClick={() => toggleExclusion(cat.id)}
+                    className={`px-3 py-1.5 rounded-full text-[10px] font-bold flex items-center gap-1 transition-all ${excludedCategoryIds.includes(cat.id)
+                      ? 'bg-stone-50 text-stone-300 grayscale'
+                      : 'bg-white border border-stone-200 text-stone-600'
+                      }`}
+                  >
+                    <span>{cat.icon}</span>
+                    <span>{cat.name}</span>
+                  </button>
+                ))}
+              </div>
+
+              {/* Todo Stats Chart (New) */}
+              {todoStats.totalDuration > 0 && (
+                <div className="flex flex-col items-center pt-8 border-t border-stone-100 mt-8">
+
+                  <div className="relative w-56 h-56 mb-8 mt-2">
+                    <svg viewBox="0 0 200 200" className="w-full h-full transform -rotate-90">
+                      <circle cx="100" cy="100" r="80" fill="none" stroke="#f5f5f4" strokeWidth="25" />
+                      {todoPieChartData.map((segment, idx) => (
+                        <path key={segment && segment.id} d={segment && segment.d} fill="none" stroke={segment && segment.hexColor} strokeWidth="25" strokeLinecap="round" className="animate-in fade-in duration-700" style={{ animationDelay: `${idx * 100}ms` }} />
+                      ))}
+                    </svg>
+                    <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                      <span className="text-xs font-bold text-stone-300 uppercase">Todos</span>
+                      <div className="flex items-baseline gap-0.5 text-stone-800">
+                        <span className="text-3xl font-bold font-mono">{totalTodoH}</span>
+                        <span className="text-xs text-stone-400">h</span>
+                        <span className="text-xl font-bold font-mono">{totalTodoM}</span>
+                        <span className="text-xs text-stone-400">m</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="w-full space-y-4">
+                    {todoStats.categoryStats.map(cat => (
+                      <div key={cat.id} className="group">
+                        <div className="flex items-center justify-between mb-1.5">
+                          <div className="flex items-center gap-2">
+                            <span className="text-base">{cat.icon}</span>
+                            <span className="font-bold text-stone-700 text-xs">{cat.name}</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs font-mono text-stone-400">{formatDuration(cat.duration)}</span>
+                            <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 bg-stone-100 rounded text-stone-500">{cat.percentage.toFixed(0)}%</span>
+                          </div>
+                        </div>
+                        <div className="w-full h-1.5 bg-stone-50 rounded-full overflow-hidden mb-2">
+                          <div className="h-full rounded-full" style={{ width: `${cat.percentage}%`, backgroundColor: cat.assignedColor }} />
+                        </div>
+                        {pieRange !== 'year' && (
+                          <div className="pl-6 space-y-1">
+                            {cat.items.map(act => (
+                              <div key={act.id} className="flex items-center justify-between text-[10px] text-stone-500 hover:bg-stone-50 rounded px-2 py-0.5 -ml-2 transition-colors">
+                                <div className="flex items-center gap-1.5">
+                                  <div className={`w-1 h-1 rounded-full`} style={{ backgroundColor: cat.assignedColor }}></div>
+                                  <span>{act.name}</span>
+                                </div>
+                                <span className="font-mono opacity-60">{formatDuration(act.duration)}</span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
@@ -540,6 +693,23 @@ export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentD
                   </div>
                 )}
               </div>
+
+              {/* Filter Chips - Matrix View Position */}
+              <div className="flex flex-wrap gap-2 justify-center pt-6 pb-2">
+                {categories.map(cat => (
+                  <button
+                    key={cat.id}
+                    onClick={() => toggleExclusion(cat.id)}
+                    className={`px-3 py-1.5 rounded-full text-[10px] font-bold flex items-center gap-1 transition-all ${excludedCategoryIds.includes(cat.id)
+                      ? 'bg-stone-50 text-stone-300 grayscale'
+                      : 'bg-white border border-stone-200 text-stone-600'
+                      }`}
+                  >
+                    <span>{cat.icon}</span>
+                    <span>{cat.name}</span>
+                  </button>
+                ))}
+              </div>
             </div>
           )}
 
@@ -550,24 +720,7 @@ export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentD
             </div>
           )}
 
-          {/* Common Filter Chips (Visible ONLY if NOT in Schedule View) */}
-          {viewType !== 'schedule' && !isFullScreen && (
-            <div className="flex flex-wrap gap-2 justify-center pt-2">
-              {categories.map(cat => (
-                <button
-                  key={cat.id}
-                  onClick={() => toggleExclusion(cat.id)}
-                  className={`px-3 py-1.5 rounded-full text-[10px] font-bold flex items-center gap-1 transition-all ${excludedCategoryIds.includes(cat.id)
-                    ? 'bg-stone-50 text-stone-300 grayscale'
-                    : 'bg-white border border-stone-200 text-stone-600'
-                    }`}
-                >
-                  <span>{cat.icon}</span>
-                  <span>{cat.name}</span>
-                </button>
-              ))}
-            </div>
-          )}
+
 
         </div>
 

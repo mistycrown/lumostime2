@@ -274,6 +274,18 @@ export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialSta
 
   // --- Slider Logic ---
   const sliderRef = useRef<HTMLDivElement>(null);
+  const noteRef = useRef<HTMLTextAreaElement>(null);
+
+  // Auto-focus note on new log
+  useEffect(() => {
+    if (!initialLog && noteRef.current) {
+      setTimeout(() => {
+        noteRef.current?.focus();
+        noteRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }, 400); // 延时稍长一点以等待动画完成
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   const [isDraggingStart, setIsDraggingStart] = useState(false);
   const [isDraggingEnd, setIsDraggingEnd] = useState(false);
 
@@ -735,6 +747,7 @@ export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialSta
           <div>
             <span className="text-xs font-bold text-stone-400 uppercase tracking-widest mb-2 block">Note</span>
             <textarea
+              ref={noteRef}
               value={note}
               onChange={e => setNote(e.target.value)}
               className="w-full bg-white border border-stone-200 rounded-2xl p-4 text-stone-800 text-sm min-h-[100px] shadow-sm focus:outline-none focus:ring-1 focus:ring-stone-900 focus:border-stone-900 transition-all resize-none placeholder:text-stone-300 font-serif"
