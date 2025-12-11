@@ -829,3 +829,6 @@ B. 记录模式,时长 (Duration)天数 (Days)有效时长 (Focus),TimeEntry 表
 <div class="p-3 bg-purple-50 border border-purple-100 rounded-xl animate-in slide-in-from-top-2"><div class="flex items-start gap-2"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-lightbulb text-purple-600 mt-0.5 flex-shrink-0" aria-hidden="true"><path d="M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5"></path><path d="M9 18h6"></path><path d="M10 22h4"></path></svg><div class="flex-1"><p class="text-xs font-bold text-purple-900 mb-2">是否关联到以下领域？</p><div class="flex flex-wrap gap-2"><button class="flex items-center gap-1 px-2 py-1 bg-white border border-purple-200 rounded-lg text-xs font-medium text-purple-700 hover:bg-purple-100 transition-colors active:scale-95"><span>🥦</span><span>健康生活</span><svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-circle-check" aria-hidden="true"><circle cx="12" cy="12" r="10"></circle><path d="m9 12 2 2 4-4"></path></svg></button></div></div></div></div>
 ```
 
+将手动补记中的开始时间输入下方的“到现在”，改成“到上尾”快速定位到上一条记录的结束时间。
+
+
