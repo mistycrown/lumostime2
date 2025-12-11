@@ -799,6 +799,20 @@ B. 记录模式,时长 (Duration)天数 (Days)有效时长 (Focus),TimeEntry 表
 
 ## 关键字功能
 1. 在二级标签（活动）中增加关键字功能。体现为在标签详情页中，细节tab中，可以添加关键字。可添加多个。系统自动为每个关键字分配颜色（淡色系，系统中已经设置的）。
+关键字的胶囊ui参考以下代码，只是在每个胶囊的右侧添加一个小叉，用于删除关键字。
+```
+<button class="
+                            px-2 py-2 rounded-lg text-[10px] font-medium text-center border transition-colors flex items-center justify-center gap-1.5 truncate
+                            bg-stone-50 text-stone-500 border-stone-100 hover:bg-stone-100
+                        "><span>🎓</span><span class="truncate">论文进度</span></button>
+```
+
 2. 有关键字的标签，新增一个“关键字”tab。
 首先显示日历（复用时间线/专注中的日历），热力图的
-以关键字为分组。关键字从专注记录备注中寻找。如果匹配到，则为该关键字中一个条目。每一组关键字，以列表形式呈现
+以关键字为分组。关键字从专注记录备注中寻找。如果匹配到，则为该关键字中一个条目。每一组关键字，首先呈现关键字（在这个月）的所有条目的时间、总个数。点击按钮后，以列表形式呈现关键字条目。列表形式参考下面代码，只是把待办改成专注记录。
+```
+<div class="bg-white rounded-2xl p-6 border border-stone-100 shadow-sm"><h3 class="text-sm font-bold text-stone-400 uppercase tracking-widest mb-4">Associated Todos</h3><div class="space-y-0 text-sm"><div class="group flex items-center gap-3 py-2 border-b border-stone-100 last:border-0 hover:bg-stone-50 md:-mx-2 md:px-2 transition-colors cursor-pointer"><div class="w-4 h-4 shrink-0 rounded-[4px] border-2 flex items-center justify-center transition-colors border-stone-300 group-hover:border-stone-400"></div><span class="flex-1 font-medium truncate min-w-0 text-stone-700">Can Unconfident LLM Annotations Be Used for Confident Conclusions?</span></div><div class="group flex items-center gap-3 py-2 border-b border-stone-100 last:border-0 hover:bg-stone-50 md:-mx-2 md:px-2 transition-colors cursor-pointer"><div class="w-4 h-4 shrink-0 rounded-[4px] border-2 flex items-center justify-center transition-colors border-stone-300 group-hover:border-stone-400"></div><span class="flex-1 font-medium truncate min-w-0 text-stone-700">Beyond Tokens in Language Models: Interpreting Activations through Text Genre Chunks</span></div><div class="group flex items-center gap-3 py-2 border-b border-stone-100 last:border-0 hover:bg-stone-50 md:-mx-2 md:px-2 transition-colors cursor-pointer"><div class="w-4 h-4 shrink-0 rounded-[4px] border-2 flex items-center justify-center transition-colors border-stone-300 group-hover:border-stone-400"></div><span class="flex-1 font-medium truncate min-w-0 text-stone-700">Information-Theoretic Generative Clustering of Documents</span></div><div class="group flex items-center gap-3 py-2 border-b border-stone-100 last:border-0 hover:bg-stone-50 md:-mx-2 md:px-2 transition-colors cursor-pointer"><div class="w-4 h-4 shrink-0 rounded-[4px] border-2 flex items-center justify-center transition-colors border-stone-300 group-hover:border-stone-400"></div><span class="flex-1 font-medium truncate min-w-0 text-stone-700">渐构</span><span class="text-xs text-stone-300 font-serif whitespace-nowrap shrink-0">共 41m</span></div></div></div>
+
+```
+
+

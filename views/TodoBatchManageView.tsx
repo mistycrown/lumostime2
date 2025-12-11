@@ -179,7 +179,7 @@ export const TodoBatchManageView: React.FC<TodoBatchManageViewProps> = ({ onBack
                 </button>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-4 space-y-6 pb-24">
+            <div className="flex-1 overflow-y-auto p-4 space-y-6 pb-40">
                 {data.map((category, catIndex) => (
                     <div
                         key={category.id}

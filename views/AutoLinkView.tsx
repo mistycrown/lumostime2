@@ -79,7 +79,7 @@ export const AutoLinkView: React.FC<AutoLinkViewProps> = ({
                 <span className="text-stone-800 font-bold text-lg">自动关联规则</span>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-4 space-y-4 pb-20">
+            <div className="flex-1 overflow-y-auto p-4 space-y-4 pb-40">
                 {/* 说明 */}
                 <div className="bg-blue-50 rounded-xl p-4 text-sm text-blue-700 leading-relaxed">
                     <p className="font-bold mb-1">💡 功能说明</p>
