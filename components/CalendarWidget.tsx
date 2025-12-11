@@ -13,6 +13,9 @@ interface CalendarWidgetProps {
     preventCollapse?: boolean;
     startWeekOnSunday?: boolean;
     onResetView?: () => void;
+    customScale?: { min: number; max: number };
+    heatmapMode?: 'duration' | 'focus';
+    staticMode?: boolean;
 }
 
 export const CalendarWidget: React.FC<CalendarWidgetProps> = ({ currentDate, onDateChange, logs = [], isExpanded, onExpandToggle, extraHeaderControls, disableSelection, customScale, heatmapMode, staticMode, preventCollapse, onResetView, startWeekOnSunday = false }) => {

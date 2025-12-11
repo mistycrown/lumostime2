@@ -332,7 +332,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
                     <span className="text-stone-800 font-bold text-lg">AI API</span>
                 </div>
 
-                <div className="p-4 space-y-4 overflow-y-auto pb-20">
+                <div className="p-4 space-y-4 overflow-y-auto pb-40">
                     <div className="bg-white rounded-2xl p-6 shadow-sm space-y-6">
 
                         <div className="space-y-4">
@@ -444,7 +444,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
                     <span className="text-stone-800 font-bold text-lg">WebDAV Sync</span>
                 </div>
 
-                <div className="p-4 space-y-4 overflow-y-auto pb-20">
+                <div className="p-4 space-y-4 overflow-y-auto pb-40">
                     <div className="bg-white rounded-2xl p-6 shadow-sm space-y-4">
                         <div className="flex items-center gap-3 text-stone-600 mb-2">
                             <Server size={24} />
@@ -702,7 +702,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
                     <span className="text-stone-800 font-bold text-lg">用户指南</span>
                 </div>
 
-                <div className="flex-1 overflow-y-auto px-5 py-6 pb-20">
+                <div className="flex-1 overflow-y-auto px-5 py-6 pb-40">
                     <div className="markdown-content">
                         <ReactMarkdown
                             remarkPlugins={[remarkGfm]}
@@ -745,7 +745,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
                 <div className="w-8"></div>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-4 space-y-6 pb-20">
+            <div className="flex-1 overflow-y-auto p-4 space-y-6 pb-40">
 
                 {/* Section: General */}
                 <div className="space-y-3">

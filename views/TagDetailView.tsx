@@ -142,8 +142,12 @@ export const TagDetailView: React.FC<TagDetailViewProps> = ({ tagId, logs, todos
 
       const stats = new Map<string, number>();
       filteredLogs.forEach(log => {
-         if (log.scopeId) {
-            stats.set(log.scopeId, (stats.get(log.scopeId) || 0) + log.duration);
+         if (log.scopeIds && log.scopeIds.length > 0) {
+            // 如果有多个scope，将时长平均分配给每个scope
+            const durationPerScope = log.duration / log.scopeIds.length;
+            log.scopeIds.forEach(scopeId => {
+               stats.set(scopeId, (stats.get(scopeId) || 0) + durationPerScope);
+            });
          } else {
             stats.set('uncategorized', (stats.get('uncategorized') || 0) + log.duration);
          }
@@ -502,12 +506,12 @@ export const TagDetailView: React.FC<TagDetailViewProps> = ({ tagId, logs, todos
                                                       </span>
                                                    </span>
 
-                                                   {/* Scope Tag */}
-                                                   {(() => {
-                                                      const linkedScope = log.scopeId ? scopes.find(s => s.id === log.scopeId) : undefined;
+                                                   {/* Scope Tags */}
+                                                   {log.scopeIds && log.scopeIds.length > 0 && log.scopeIds.map(scopeId => {
+                                                      const linkedScope = scopes.find(s => s.id === scopeId);
                                                       if (linkedScope) {
                                                          return (
-                                                            <span className="text-[10px] font-medium text-stone-500 border border-stone-200 px-2 py-0.5 rounded flex items-center gap-1 bg-stone-50/30">
+                                                            <span key={scopeId} className="text-[10px] font-medium text-stone-500 border border-stone-200 px-2 py-0.5 rounded flex items-center gap-1 bg-stone-50/30">
                                                                <span className="text-stone-400 font-bold">%</span>
                                                                <span>{linkedScope.icon || '📍'}</span>
                                                                <span>{linkedScope.name}</span>
@@ -515,7 +519,7 @@ export const TagDetailView: React.FC<TagDetailViewProps> = ({ tagId, logs, todos
                                                          );
                                                       }
                                                       return null;
-                                                   })()}
+                                                   })}
                                                 </div>
                                              </div>
                                           </div>
