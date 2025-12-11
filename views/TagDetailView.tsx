@@ -2,7 +2,7 @@ import React, { useMemo, useState, useEffect } from 'react';
 import { Log, Category, Activity, TodoItem } from '../types';
 import { COLOR_OPTIONS } from '../constants';
 import { CalendarWidget } from '../components/CalendarWidget';
-import { ArrowLeft, Clock, Calendar as CalendarIcon, MoreHorizontal, ChevronDown, Check, X, Zap, Save, CheckCircle2, Circle } from 'lucide-react';
+import { ArrowLeft, Clock, Calendar as CalendarIcon, MoreHorizontal, ChevronDown, Check, X, Zap, Save, CheckCircle2, Circle, Plus } from 'lucide-react';
 import { FocusCharts } from '../components/FocusCharts';
 import { DateRangeFilter } from '../components/DateRangeFilter';
 import { MatrixAnalysisChart } from '../components/MatrixAnalysisChart';
@@ -45,6 +45,8 @@ export const TagDetailView: React.FC<TagDetailViewProps> = ({ tagId, logs, todos
    const [displayDate, setDisplayDate] = useState(new Date());
    const [analysisRange, setAnalysisRange] = useState<'Week' | 'Month' | 'Year' | 'All'>('Month');
    const [analysisDate, setAnalysisDate] = useState(new Date());
+   const [newKeyword, setNewKeyword] = useState(''); // New State for adding keyword
+   const [expandedKeywords, setExpandedKeywords] = useState<Set<string>>(new Set()); // Track expanded keyword sections
 
    // Sync state when categories prop changes (e.g., after save)
    useEffect(() => {
@@ -191,6 +193,58 @@ export const TagDetailView: React.FC<TagDetailViewProps> = ({ tagId, logs, todos
       setActivity({ ...activity, color });
    };
 
+   // Keyword Logic
+   const KEYWORD_COLORS = [
+      'bg-stone-50 text-stone-500 border-stone-100 hover:bg-stone-100',
+      'bg-red-50 text-red-500 border-red-100 hover:bg-red-100',
+      'bg-orange-50 text-orange-500 border-orange-100 hover:bg-orange-100',
+      'bg-amber-50 text-amber-500 border-amber-100 hover:bg-amber-100',
+      'bg-yellow-50 text-yellow-500 border-yellow-100 hover:bg-yellow-100',
+      'bg-lime-50 text-lime-500 border-lime-100 hover:bg-lime-100',
+      'bg-green-50 text-green-500 border-green-100 hover:bg-green-100',
+      'bg-emerald-50 text-emerald-500 border-emerald-100 hover:bg-emerald-100',
+      'bg-teal-50 text-teal-500 border-teal-100 hover:bg-teal-100',
+      'bg-cyan-50 text-cyan-500 border-cyan-100 hover:bg-cyan-100',
+      'bg-sky-50 text-sky-500 border-sky-100 hover:bg-sky-100',
+      'bg-blue-50 text-blue-500 border-blue-100 hover:bg-blue-100',
+      'bg-indigo-50 text-indigo-500 border-indigo-100 hover:bg-indigo-100',
+      'bg-violet-50 text-violet-500 border-violet-100 hover:bg-violet-100',
+      'bg-purple-50 text-purple-500 border-purple-100 hover:bg-purple-100',
+      'bg-fuchsia-50 text-fuchsia-500 border-fuchsia-100 hover:bg-fuchsia-100',
+      'bg-pink-50 text-pink-500 border-pink-100 hover:bg-pink-100',
+      'bg-rose-50 text-rose-500 border-rose-100 hover:bg-rose-100',
+   ];
+
+   const getKeywordColor = (keyword: string) => {
+      let hash = 0;
+      for (let i = 0; i < keyword.length; i++) {
+         hash = keyword.charCodeAt(i) + ((hash << 5) - hash);
+      }
+      const index = Math.abs(hash) % KEYWORD_COLORS.length;
+      return KEYWORD_COLORS[index];
+   };
+
+   const handleAddKeyword = () => {
+      if (!newKeyword.trim() || !activity) return;
+      const currentKeywords = activity.keywords || [];
+      if (!currentKeywords.includes(newKeyword.trim())) {
+         setActivity({
+            ...activity,
+            keywords: [...currentKeywords, newKeyword.trim()]
+         });
+      }
+      setNewKeyword('');
+   };
+
+   const handleRemoveKeyword = (keywordToRemove: string) => {
+      if (!activity) return;
+      const currentKeywords = activity.keywords || [];
+      setActivity({
+         ...activity,
+         keywords: currentKeywords.filter(k => k !== keywordToRemove)
+      });
+   };
+
    const renderContent = () => {
       switch (activeTab) {
          case 'Details':
@@ -226,6 +280,53 @@ export const TagDetailView: React.FC<TagDetailViewProps> = ({ tagId, logs, todos
                                  />
                               ))}
                            </div>
+                        </div>
+                     </div>
+                  </div>
+
+                  {/* Keywords Section */}
+                  <div className="bg-white rounded-2xl p-6 border border-stone-100 shadow-sm">
+                     <h3 className="text-sm font-bold text-stone-400 uppercase tracking-widest mb-4">Keywords</h3>
+                     <div className="space-y-4">
+                        <div className="flex flex-wrap gap-2">
+                           {(activity.keywords || []).map(keyword => (
+                              <button
+                                 key={keyword}
+                                 onClick={() => handleRemoveKeyword(keyword)}
+                                 className={`
+                                    px-3 py-1.5 rounded-lg text-[11px] font-medium text-center border transition-colors flex items-center justify-center gap-1.5 truncate group
+                                    ${getKeywordColor(keyword)}
+                                 `}
+                              >
+                                 <span className="truncate max-w-[100px]">{keyword}</span>
+                                 <X size={10} className="opacity-40 hover:opacity-100 transition-opacity" />
+                              </button>
+                           ))}
+                           {(activity.keywords || []).length === 0 && (
+                              <span className="text-xs text-stone-300 italic">No keywords added yet.</span>
+                           )}
+                        </div>
+                        <div className="flex items-center gap-2">
+                           <input
+                              type="text"
+                              value={newKeyword}
+                              onChange={(e) => setNewKeyword(e.target.value)}
+                              onKeyDown={(e) => {
+                                 if (e.key === 'Enter') {
+                                    e.preventDefault();
+                                    handleAddKeyword();
+                                 }
+                              }}
+                              placeholder="Add a keyword..."
+                              className="flex-1 bg-stone-50 border border-stone-200 rounded-xl px-4 py-2.5 text-sm font-bold text-stone-700 outline-none focus:border-stone-400 focus:bg-white transition-colors placeholder:font-normal"
+                           />
+                           <button
+                              onClick={handleAddKeyword}
+                              disabled={!newKeyword.trim()}
+                              className="p-2.5 bg-stone-800 text-white rounded-xl hover:bg-stone-700 disabled:opacity-50 disabled:hover:bg-stone-800 transition-colors"
+                           >
+                              <Plus size={18} />
+                           </button>
                         </div>
                      </div>
                   </div>
@@ -609,6 +710,205 @@ export const TagDetailView: React.FC<TagDetailViewProps> = ({ tagId, logs, todos
                   onDateChange={setDisplayDate}
                />
             );
+         case 'Keywords':
+            return (
+               <>
+                  <div className="bg-white rounded-[2rem] p-0 mb-8 border border-stone-100 shadow-[0_4px_20px_rgba(0,0,0,0.02)] overflow-hidden">
+                     <CalendarWidget
+                        currentDate={displayDate}
+                        onDateChange={(newDate) => {
+                           if (newDate.getMonth() !== displayDate.getMonth() || newDate.getFullYear() !== displayDate.getFullYear()) {
+                              setDisplayDate(newDate);
+                           }
+                        }}
+                        logs={tagLogs} // Pass logs for basic tracking, but visual is overridden
+                        isExpanded={true}
+                        onExpandToggle={() => { }}
+                        staticMode={true} // Disable default heat map coloring
+                        disableSelection={true}
+                        renderCustomDay={(date, isSelected, isToday) => {
+                           // Find logs for this day
+                           const dayLogs = tagLogs.filter(l => {
+                              const d = new Date(l.startTime);
+                              return d.getDate() === date.getDate() &&
+                                 d.getMonth() === date.getMonth() &&
+                                 d.getFullYear() === date.getFullYear();
+                           });
+
+                           if (dayLogs.length === 0) return null;
+
+                           // Find matched keywords in these logs
+                           const matchedKeywords = new Set<string>();
+                           const currentActivityKeywords = activity.keywords || [];
+
+                           dayLogs.forEach(log => {
+                              // Check title and note for keywords
+                              currentActivityKeywords.forEach(kw => {
+                                 if ((log.title && log.title.includes(kw)) || (log.note && log.note.includes(kw))) {
+                                    matchedKeywords.add(kw);
+                                 }
+                              });
+                           });
+
+                           // 1. Logs but no keywords matched -> Gray
+                           if (matchedKeywords.size === 0) {
+                              return <div className="w-full h-full bg-stone-200/50" />;
+                           }
+
+                           // 2. Matched keywords -> Split colors
+                           const keywordsArray = Array.from(matchedKeywords);
+                           return (
+                              <div className="w-full h-full flex">
+                                 {keywordsArray.map(kw => {
+                                    // Extract background color class from getKeywordColor return string
+                                    // The string is like "bg-red-50 text-red-500 ..."
+                                    // We just apply the whole class string, but maybe force opacity or brightness?
+                                    // Actually the bg-xxx-50 might be too light for a calendar cell background which needs to be visible.
+                                    // Let's try using the class directly first.
+                                    return (
+                                       <div
+                                          key={kw}
+                                          className={`h-full flex-1 ${getKeywordColor(kw)}`}
+                                          style={{ border: 'none' }} // Remove borders from the keyword pill style
+                                       />
+                                    );
+                                 })}
+                              </div>
+                           );
+                        }}
+                     />
+                     <div className="p-6 pt-2 border-t border-stone-100">
+                        <div className="flex flex-wrap gap-2 justify-center">
+                           <span className="text-xs text-stone-400 font-medium mr-2 self-center">Legend:</span>
+                           <div className="flex items-center gap-1.5">
+                              <div className="w-3 h-3 rounded bg-stone-200/50"></div>
+                              <span className="text-xs text-stone-500">Unmatched</span>
+                           </div>
+                           {(activity.keywords || []).map(kw => (
+                              <div key={kw} className="flex items-center gap-1.5 ml-2">
+                                 <div className={`w-3 h-3 rounded ${getKeywordColor(kw).split(' ')[0]}`}></div> {/* Take just the bg class */}
+                                 <span className="text-xs text-stone-500">{kw}</span>
+                              </div>
+                           ))}
+                        </div>
+                     </div>
+                  </div>
+
+                  {/* Keyword Grouped Lists */}
+                  <div className="space-y-6">
+                     {(() => {
+                        // Filter logs for current month
+                        const currentMonthLogs = tagLogs.filter(l => {
+                           const d = new Date(l.startTime);
+                           return d.getMonth() === displayDate.getMonth() && d.getFullYear() === displayDate.getFullYear();
+                        });
+
+                        // Group logic
+                        const groups = (activity.keywords || []).map(kw => {
+                           const logs = currentMonthLogs.filter(l =>
+                              (l.title && l.title.includes(kw)) || (l.note && l.note.includes(kw))
+                           );
+                           return { keyword: kw, logs };
+                        });
+
+                        // Also maybe "Unmatched"? (Optional, but good for UX)
+                        // Let's stick to defined keywords first as requested.
+
+                        return groups.map(group => {
+                           const totalDuration = group.logs.reduce((acc, curr) => acc + curr.duration, 0);
+                           const h = Math.floor(totalDuration / 3600);
+                           const m = Math.floor((totalDuration % 3600) / 60);
+                           const timeStr = h > 0 ? `${h}h ${m}m` : `${m}m`;
+                           const isExpanded = expandedKeywords.has(group.keyword);
+
+                           return (
+                              <div key={group.keyword} className="bg-white rounded-2xl p-6 border border-stone-100 shadow-sm transition-all">
+                                 {/* Header */}
+                                 <div
+                                    onClick={() => {
+                                       const newSet = new Set(expandedKeywords);
+                                       if (newSet.has(group.keyword)) {
+                                          newSet.delete(group.keyword);
+                                       } else {
+                                          newSet.add(group.keyword);
+                                       }
+                                       setExpandedKeywords(newSet);
+                                    }}
+                                    className="flex items-center justify-between cursor-pointer group select-none"
+                                 >
+                                    <div className="flex items-center gap-3">
+                                       <div className={`w-3 h-3 rounded-full ${getKeywordColor(group.keyword).split(' ')[0]}`}></div>
+                                       <h3 className="text-sm font-bold text-stone-700 uppercase tracking-widest">{group.keyword}</h3>
+                                       <span className="bg-stone-100 text-stone-500 text-[10px] font-bold px-2 py-0.5 rounded-full">
+                                          {group.logs.length}
+                                       </span>
+                                    </div>
+                                    <div className="flex items-center gap-3">
+                                       <span className="font-mono text-sm font-bold text-stone-400 group-hover:text-stone-600 transition-colors">
+                                          {timeStr}
+                                       </span>
+                                       <ChevronDown size={16} className={`text-stone-300 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
+                                    </div>
+                                 </div>
+
+                                 {/* List */}
+                                 {isExpanded && (
+                                    <div className="mt-6 space-y-0 text-sm animate-in slide-in-from-top-2 fade-in duration-200">
+                                       {group.logs.length === 0 ? (
+                                          <div className="text-center py-8 text-stone-300 italic text-xs">
+                                             No records found for this keyword in this month.
+                                          </div>
+                                       ) : (
+                                          group.logs
+                                             .sort((a, b) => b.startTime - a.startTime)
+                                             .map(log => {
+                                                const logH = Math.floor(log.duration / 3600);
+                                                const logM = Math.floor((log.duration % 3600) / 60);
+                                                const logTimeStr = logH > 0 ? `${logH}h ${logM}m` : `${logM}m`;
+                                                const dateObj = new Date(log.startTime);
+
+                                                return (
+                                                   <div
+                                                      key={log.id}
+                                                      onClick={() => onEditLog?.(log)}
+                                                      className="group flex items-center gap-3 py-3 border-b border-stone-100 last:border-0 hover:bg-stone-50 md:-mx-2 md:px-2 transition-colors cursor-pointer"
+                                                   >
+                                                      <div className="w-8 flex flex-col items-center justify-center shrink-0">
+                                                         <span className="text-[10px] font-bold text-stone-400 leading-none">
+                                                            {dateObj.getDate()}
+                                                         </span>
+                                                         <span className="text-[8px] text-stone-300 uppercase leading-none mt-0.5">
+                                                            {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][dateObj.getDay()]}
+                                                         </span>
+                                                      </div>
+
+                                                      <div className="w-1 h-8 rounded-full bg-stone-100 group-hover:bg-stone-200 transition-colors shrink-0"></div>
+
+                                                      <div className="flex-1 min-w-0 flex flex-col justify-center">
+                                                         <span className="font-medium truncate text-stone-700 leading-tight">
+                                                            {log.note || log.title || "No description"}
+                                                         </span>
+                                                         <span className="text-[10px] text-stone-400 mt-0.5 font-mono">
+                                                            {dateObj.getHours().toString().padStart(2, '0')}:{dateObj.getMinutes().toString().padStart(2, '0')}
+                                                         </span>
+                                                      </div>
+
+                                                      <span className="text-xs text-stone-400 font-mono whitespace-nowrap shrink-0 group-hover:text-stone-600">
+                                                         {logTimeStr}
+                                                      </span>
+                                                   </div>
+                                                );
+                                             })
+                                       )}
+                                    </div>
+                                 )}
+                              </div>
+                           );
+                        });
+                     })()}
+                  </div>
+               </>
+            );
          default:
             return null;
       }
@@ -631,15 +931,18 @@ export const TagDetailView: React.FC<TagDetailViewProps> = ({ tagId, logs, todos
 
          {/* Tabs */}
          <div className="flex gap-6 border-b border-stone-200 mb-8 overflow-x-auto no-scrollbar">
-            {['Details', 'Timeline', '关联'].concat((activity.enableFocusScore ?? category.enableFocusScore) ? ['Focus'] : []).map((tab) => (
-               <button
-                  key={tab}
-                  onClick={() => setActiveTab(tab)}
-                  className={`pb-3 text-sm font-serif tracking-wide whitespace-nowrap transition-colors ${activeTab === tab ? 'text-stone-900 border-b-2 border-stone-900 font-bold' : 'text-stone-400 hover:text-stone-600'}`}
-               >
-                  {tab === 'Timeline' ? '時間線' : tab === 'Details' ? '细节' : tab === 'Focus' ? '专 注' : tab}
-               </button>
-            ))}
+            {['Details', 'Timeline', '关联']
+               .concat((activity.enableFocusScore ?? category.enableFocusScore) ? ['Focus'] : [])
+               .concat((activity.keywords && activity.keywords.length > 0) ? ['Keywords'] : [])
+               .map((tab) => (
+                  <button
+                     key={tab}
+                     onClick={() => setActiveTab(tab)}
+                     className={`pb-3 text-sm font-serif tracking-wide whitespace-nowrap transition-colors ${activeTab === tab ? 'text-stone-900 border-b-2 border-stone-900 font-bold' : 'text-stone-400 hover:text-stone-600'}`}
+                  >
+                     {tab === 'Timeline' ? '時間線' : tab === 'Details' ? '细节' : tab === 'Focus' ? '专 注' : tab}
+                  </button>
+               ))}
          </div>
 
          {renderContent()}

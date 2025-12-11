@@ -6,7 +6,7 @@ export interface Activity {
   heatmapMin?: number; // Custom heatmap scale (Minutes)
   heatmapMax?: number;
   enableFocusScore?: boolean; // Override parent setting
-  keywords?: { text: string; colorId: string }[]; // Keywords with assigned colors
+  keywords?: string[]; // (NEW) Keywords for finer classification
 }
 
 export interface Category {
