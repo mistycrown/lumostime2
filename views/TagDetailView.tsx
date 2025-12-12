@@ -306,7 +306,7 @@ export const TagDetailView: React.FC<TagDetailViewProps> = ({ tagId, logs, todos
                               <span className="text-xs text-stone-300 italic">No keywords added yet.</span>
                            )}
                         </div>
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 min-w-0">
                            <input
                               type="text"
                               value={newKeyword}
@@ -318,12 +318,12 @@ export const TagDetailView: React.FC<TagDetailViewProps> = ({ tagId, logs, todos
                                  }
                               }}
                               placeholder="Add a keyword..."
-                              className="flex-1 bg-stone-50 border border-stone-200 rounded-xl px-4 py-2.5 text-sm font-bold text-stone-700 outline-none focus:border-stone-400 focus:bg-white transition-colors placeholder:font-normal"
+                              className="flex-1 min-w-0 bg-stone-50 border border-stone-200 rounded-xl px-4 py-2.5 text-sm font-bold text-stone-700 outline-none focus:border-stone-400 focus:bg-white transition-colors placeholder:font-normal"
                            />
                            <button
                               onClick={handleAddKeyword}
                               disabled={!newKeyword.trim()}
-                              className="p-2.5 bg-stone-800 text-white rounded-xl hover:bg-stone-700 disabled:opacity-50 disabled:hover:bg-stone-800 transition-colors"
+                              className="p-2.5 bg-stone-800 text-white rounded-xl hover:bg-stone-700 disabled:opacity-50 disabled:hover:bg-stone-800 transition-colors shrink-0"
                            >
                               <Plus size={18} />
                            </button>
