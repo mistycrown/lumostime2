@@ -263,6 +263,23 @@ const App: React.FC = () => {
   };
 
   const handleDeleteLog = (id: string) => {
+    // 1. 找到要删除的日志
+    const logToDelete = logs.find(l => l.id === id);
+
+    // 2. 如果该日志关联了待办且有进度增量，回退进度
+    if (logToDelete?.linkedTodoId && logToDelete.progressIncrement) {
+      setTodos(prevTodos => prevTodos.map(t => {
+        if (t.id === logToDelete.linkedTodoId && t.isProgress) {
+          return {
+            ...t,
+            completedUnits: Math.max(0, (t.completedUnits || 0) - (logToDelete.progressIncrement || 0))
+          };
+        }
+        return t;
+      }));
+    }
+
+    // 3. 删除日志
     setLogs(prev => prev.filter(l => l.id !== id));
     closeModal();
   };
