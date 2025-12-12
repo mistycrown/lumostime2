@@ -4,6 +4,8 @@ LumosTime 是一款专注于个人成长与生活记录的全能时间管理应�
 
 支持 **Web** 、 **Windows** 与 **Android** 原生应用。
 
+🌐 **在线预览**: [lumostime2.vercel.app](https://lumostime2.vercel.app)
+
 📖 **[快速入门指南](./USER_GUIDE.md)** - 详细的功能使用说明
 
 ## ✨ 核心功能
@@ -50,13 +52,33 @@ LumosTime 是一款专注于个人成长与生活记录的全能时间管理应�
 ### 7. 📈 专注度分析 (Focus Analysis)
 - **专注热力图**：类似 GitHub Contribution 的热力图，展示专注强度
 - **专注堆积图**：分析不同专注等级的时长构成与趋势
-- **每日/月度趋势**：追踪专注度变化
 
 ### 8. ☁️ 数据同步 (Data Sync)
 - **WebDAV 同步**：支持坚果云、Nextcloud 等，多端数据自动同步
 - **导出/导入**：完整 JSON 数据备份与恢复
 - **自动同步**：后台自动同步与启动时自动拉取
 - **本地优先**：所有数据优先存储于本地
+
+
+### 🧩 核心数据模型 (Data Model)
+
+下图展示了 LumosTime 中各个数据实体之间的关联关系与自动化流转逻辑：
+
+![LumosTime Data Model](static/989fa351f36f3b2e0d3c12a63b6d298e.png)
+
+- **核心实体**：
+  - **Category/Activity**: 基础分类体系，Activity 是 Category 的子集。
+  - **Log (专注记录)**: 最小时间单元，承载实际投入。
+  - **Todo (待办)**: 具体的任务项，可作为记录时间的入口。
+- **聚合维度**：
+  - **Scope (领域)**: 跨分类的聚合维度（如"输出"、"英语"）。
+  - **Goal (目标)**: 基于 Scope 设定的量化指标。
+  - **Keyword (关键字)**: 用于文本分析的细粒度标记。
+- **流转逻辑**：
+  - **关联 (Link)**: 实体间的直接引用（如 Log 关联 Todo）。
+  - **自动匹配 (Auto Match)**: 基于预设规则，Activity 可自动关联 Scope 或 Keyword。
+  - **自动统计 (Auto Count)**: Log 的时长和 Todo 的完成数会自动汇总到 Goal 和 Keyword 统计中。
+
 
 ## 🛠️ 技术栈
 
