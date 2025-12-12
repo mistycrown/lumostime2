@@ -28,3 +28,11 @@ dist-ssr
 
 # Vercel
 .vercel
+
+# Android Signing Keys (重要：不要提交到 Git)
+*.jks
+*.keystore
+
+note.md
+
+# keytool -genkey -v -keystore lumostime-release-key.jks -keyalg RSA -keysize 2048 -validity 10000 -alias lumostime -storepass lumostime2025 -keypass lumostime2025 -dname "CN=LumosTime, OU=Development, O=MistyCrown, L=Beijing, ST=Beijing, C=CN"

@@ -453,7 +453,7 @@ export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentD
   };
 
   return (
-    <div className={`${isFullScreen ? 'fixed inset-0 z-50 bg-stone-50' : 'h-full bg-[#faf9f6]'} flex flex-col overflow-hidden animate-in slide-in-from-right duration-300`}>
+    <div className={`${isFullScreen ? 'fixed inset-0 z-50 bg-stone-50 pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]' : 'h-full bg-[#faf9f6]'} flex flex-col overflow-hidden animate-in slide-in-from-right duration-300`}>
 
       {/* Fullscreen Exit Button - Only visible in fullscreen mode */}
       {isFullScreen && (

@@ -3,9 +3,21 @@
 
 npm run build
 npx cap sync
+npx cap open android
+
+
 npm run electron:build
 
 npm run dev
+
+
+git reset --hard 4f556ea1ccb0a0e3f73a441423e3121f24973935
+git push --force
+
+
+
+
+
 
 # 20251205
 在标签详情页面。删除year和life页面。
