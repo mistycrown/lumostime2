@@ -54,6 +54,8 @@ interface SettingsViewProps {
     onToggleStartWeekOnSunday?: () => void;
     onOpenAutoLink?: () => void;
     onOpenSearch?: () => void;
+    minIdleTimeThreshold?: number;
+    onSetMinIdleTimeThreshold?: (val: number) => void;
 }
 
 const AI_PRESETS = {
@@ -75,7 +77,7 @@ const AI_PRESETS = {
     }
 };
 
-export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, onImport, onReset, onClearData, onToast, syncData, onSyncUpdate, startWeekOnSunday, onToggleStartWeekOnSunday, onOpenAutoLink, onOpenSearch }) => {
+export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, onImport, onReset, onClearData, onToast, syncData, onSyncUpdate, startWeekOnSunday, onToggleStartWeekOnSunday, onOpenAutoLink, onOpenSearch, minIdleTimeThreshold = 1, onSetMinIdleTimeThreshold }) => {
     const [activeSubmenu, setActiveSubmenu] = useState<'main' | 'data' | 'cloud' | 'ai' | 'preferences' | 'guide'>('main');
     const [webdavConfig, setWebdavConfig] = useState<WebDAVConfig | null>(null);
     const [isSyncing, setIsSyncing] = useState(false);
@@ -669,7 +671,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
                             <h3 className="font-bold text-lg">界面与显示</h3>
                         </div>
 
-                        <div className="flex items-center justify-between py-2">
+                        <div className="flex items-center justify-between py-2 border-b border-stone-100 last:border-0">
                             <div>
                                 <h4 className="font-bold text-stone-700">从周日开始</h4>
                                 <p className="text-xs text-stone-400 mt-1">日历视图每周第一天将设为周日</p>
@@ -682,6 +684,28 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
                                 <div className={`w-5 h-5 bg-white rounded-full shadow-sm transition-transform ${startWeekOnSunday ? 'translate-x-5' : 'translate-x-0'
                                     }`} />
                             </button>
+                        </div>
+
+                        <div className="flex items-center justify-between py-2">
+                            <div>
+                                <h4 className="font-bold text-stone-700">最小空闲时间隐藏阈值</h4>
+                                <p className="text-xs text-stone-400 mt-1">小于此分钟数的空闲时间将不显示（分钟）</p>
+                            </div>
+                            <div className="flex items-center bg-stone-100 rounded-lg overflow-hidden">
+                                <button
+                                    className="p-2 hover:bg-stone-200 transition-colors"
+                                    onClick={() => onSetMinIdleTimeThreshold?.(Math.max(0, (minIdleTimeThreshold || 1) - 1))}
+                                >
+                                    <ChevronLeft size={16} />
+                                </button>
+                                <span className="w-8 text-center text-sm font-bold font-mono">{minIdleTimeThreshold}</span>
+                                <button
+                                    className="p-2 hover:bg-stone-200 transition-colors"
+                                    onClick={() => onSetMinIdleTimeThreshold?.((minIdleTimeThreshold || 1) + 1)}
+                                >
+                                    <ChevronRight size={16} />
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>

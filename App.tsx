@@ -144,6 +144,16 @@ const App: React.FC = () => {
     localStorage.setItem('lumos_data_last_modified', dataLastModified.toString());
   }, [dataLastModified]);
 
+  // --- Preference State ---
+  const [minIdleTimeThreshold, setMinIdleTimeThreshold] = useState<number>(() => {
+    const saved = localStorage.getItem('lumos_min_idle_time');
+    return saved ? parseInt(saved) : 1; // Default 1 minute
+  });
+
+  useEffect(() => {
+    localStorage.setItem('lumos_min_idle_time', minIdleTimeThreshold.toString());
+  }, [minIdleTimeThreshold]);
+
 
 
 
@@ -878,20 +888,28 @@ const App: React.FC = () => {
           <TimelineView
             logs={logs}
             todos={todos}
+            categories={categories}
             onAddLog={openAddModal}
             onEditLog={openEditModal}
-            categories={categories}
             currentDate={currentDate}
             onDateChange={setCurrentDate}
             onShowStats={() => setCurrentView(AppView.STATS)}
-            onSync={handleQuickSync}
-            isSyncing={isSyncing}
             onBatchAddLogs={handleBatchAddLogs}
+            onSync={() => {
+              // Trigger explicit sync download (or sync check)
+              // But maybe user just wants to see status?
+              // Let's do a download check
+              webdavService.downloadData().then(data => {
+                if (data) handleSyncDataUpdate(data);
+              });
+            }}
+            isSyncing={isSyncing}
             todoCategories={todoCategories}
             onToast={addToast}
             startWeekOnSunday={startWeekOnSunday}
-            scopes={scopes}
             autoLinkRules={autoLinkRules}
+            scopes={scopes}
+            minIdleTimeThreshold={minIdleTimeThreshold}
           />
         );
       case AppView.STATS:
@@ -1271,6 +1289,8 @@ const App: React.FC = () => {
               setIsSettingsOpen(false);
               setIsSearchOpen(true);
             }}
+            minIdleTimeThreshold={minIdleTimeThreshold}
+            onSetMinIdleTimeThreshold={setMinIdleTimeThreshold}
           />
         )}
 

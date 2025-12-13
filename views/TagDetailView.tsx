@@ -216,12 +216,22 @@ export const TagDetailView: React.FC<TagDetailViewProps> = ({ tagId, logs, todos
    ];
 
    const getKeywordColor = (keyword: string) => {
-      let hash = 0;
-      for (let i = 0; i < keyword.length; i++) {
-         hash = keyword.charCodeAt(i) + ((hash << 5) - hash);
+      // Logic: Use Index in the list
+      const keywords = activity?.keywords || [];
+      let index = keywords.indexOf(keyword);
+
+      // If not in list (e.g. new keyword being typed or removed), try to predictable hash or simple mod
+      if (index === -1) {
+         // Fallback to avoid error, maybe hash
+         let hash = 0;
+         for (let i = 0; i < keyword.length; i++) {
+            hash = keyword.charCodeAt(i) + ((hash << 5) - hash);
+         }
+         index = Math.abs(hash);
       }
-      const index = Math.abs(hash) % KEYWORD_COLORS.length;
-      return KEYWORD_COLORS[index];
+
+      const colorIndex = index % KEYWORD_COLORS.length;
+      return KEYWORD_COLORS[colorIndex];
    };
 
    const handleAddKeyword = () => {
@@ -779,7 +789,6 @@ export const TagDetailView: React.FC<TagDetailViewProps> = ({ tagId, logs, todos
                      />
                      <div className="p-6 pt-2 border-t border-stone-100">
                         <div className="flex flex-wrap gap-2 justify-center">
-                           <span className="text-xs text-stone-400 font-medium mr-2 self-center">Legend:</span>
                            <div className="flex items-center gap-1.5">
                               <div className="w-3 h-3 rounded bg-stone-200/50"></div>
                               <span className="text-xs text-stone-500">Unmatched</span>
