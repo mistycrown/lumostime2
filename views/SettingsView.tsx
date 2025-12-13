@@ -31,7 +31,8 @@ import {
     Bot,
     X,
     Link,
-    Search
+    Search,
+    ChevronDown
 } from 'lucide-react';
 import { webdavService, WebDAVConfig } from '../services/webdavService';
 import { aiService, AIConfig } from '../services/aiService';
@@ -56,6 +57,8 @@ interface SettingsViewProps {
     onOpenSearch?: () => void;
     minIdleTimeThreshold?: number;
     onSetMinIdleTimeThreshold?: (val: number) => void;
+    defaultView?: string;
+    onSetDefaultView?: (view: any) => void;
 }
 
 const AI_PRESETS = {
@@ -77,10 +80,13 @@ const AI_PRESETS = {
     }
 };
 
-export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, onImport, onReset, onClearData, onToast, syncData, onSyncUpdate, startWeekOnSunday, onToggleStartWeekOnSunday, onOpenAutoLink, onOpenSearch, minIdleTimeThreshold = 1, onSetMinIdleTimeThreshold }) => {
+export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, onImport, onReset, onClearData, onToast, syncData, onSyncUpdate, startWeekOnSunday, onToggleStartWeekOnSunday, onOpenAutoLink, onOpenSearch, minIdleTimeThreshold = 1, onSetMinIdleTimeThreshold, defaultView = 'RECORD', onSetDefaultView }) => {
     const [activeSubmenu, setActiveSubmenu] = useState<'main' | 'data' | 'cloud' | 'ai' | 'preferences' | 'guide'>('main');
     const [webdavConfig, setWebdavConfig] = useState<WebDAVConfig | null>(null);
     const [isSyncing, setIsSyncing] = useState(false);
+
+    // UI States
+    const [isDefaultViewDropdownOpen, setIsDefaultViewDropdownOpen] = useState(false);
     const [configForm, setConfigForm] = useState<WebDAVConfig>({ url: '', username: '', password: '' });
     const [confirmReset, setConfirmReset] = useState(false);
     const [confirmClear, setConfirmClear] = useState(false);
@@ -705,6 +711,59 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
                                 >
                                     <ChevronRight size={16} />
                                 </button>
+                            </div>
+                        </div>
+
+                        <div className="flex items-center justify-between py-2 border-t border-stone-100 relative z-10">
+                            <div>
+                                <h4 className="font-bold text-stone-700">启动默认页</h4>
+                                <p className="text-xs text-stone-400 mt-1">应用启动时默认显示的页面</p>
+                            </div>
+                            <div className="relative">
+                                <button
+                                    onClick={() => setIsDefaultViewDropdownOpen(!isDefaultViewDropdownOpen)}
+                                    className="flex items-center gap-2 bg-stone-100 hover:bg-stone-200 text-stone-700 text-sm font-bold px-4 py-2 rounded-lg transition-colors"
+                                >
+                                    <span>
+                                        {defaultView === 'RECORD' && '计时'}
+                                        {defaultView === 'TIMELINE' && '时间轴'}
+                                        {defaultView === 'STATS' && '统计'}
+                                        {defaultView === 'TODO' && '待办'}
+                                        {defaultView === 'SCOPE' && '领域'}
+                                    </span>
+                                    <ChevronDown size={14} className={`transition-transform ${isDefaultViewDropdownOpen ? 'rotate-180' : ''}`} />
+                                </button>
+
+                                {isDefaultViewDropdownOpen && (
+                                    <>
+                                        {/* Backdrop to close */}
+                                        <div className="fixed inset-0 z-10" onClick={() => setIsDefaultViewDropdownOpen(false)} />
+
+                                        {/* Dropdown Menu */}
+                                        <div className="absolute right-0 top-full mt-2 w-32 bg-white rounded-xl shadow-xl border border-stone-100 overflow-hidden z-20 flex flex-col py-1 animate-in fade-in zoom-in-95 duration-200 origin-top-right">
+                                            {[
+                                                { label: '计时', value: 'RECORD' },
+                                                { label: '时间轴', value: 'TIMELINE' },
+                                                { label: '统计', value: 'STATS' },
+                                                { label: '待办', value: 'TODO' },
+                                                { label: '领域', value: 'SCOPE' }
+                                            ].map(opt => (
+                                                <button
+                                                    key={opt.value}
+                                                    onClick={() => {
+                                                        onSetDefaultView?.(opt.value);
+                                                        setIsDefaultViewDropdownOpen(false);
+                                                    }}
+                                                    className={`px-4 py-2.5 text-left text-sm font-medium transition-colors hover:bg-stone-50 flex items-center justify-between ${defaultView === opt.value ? 'text-stone-900 bg-stone-50' : 'text-stone-500'
+                                                        }`}
+                                                >
+                                                    {opt.label}
+                                                    {defaultView === opt.value && <div className="w-1.5 h-1.5 rounded-full bg-stone-800" />}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </>
+                                )}
                             </div>
                         </div>
                     </div>
