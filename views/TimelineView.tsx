@@ -1,7 +1,7 @@
 import React, { useMemo, useState, useRef } from 'react';
 import { Log, Activity, TodoItem, Category, TodoCategory, Scope } from '../types';
 import { CATEGORIES } from '../constants';
-import { Plus, MoreHorizontal, BarChart2, ArrowUp, ArrowDown, Sparkles, RefreshCw, Zap, Share } from 'lucide-react';
+import { Plus, MoreHorizontal, BarChart2, ArrowUp, ArrowDown, Sparkles, RefreshCw, Zap, Share, Timer } from 'lucide-react';
 import { CalendarWidget } from '../components/CalendarWidget';
 import { AIBatchModal } from '../components/AIBatchModal';
 import { ParsedTimeEntry } from '../services/aiService';
@@ -25,6 +25,7 @@ interface TimelineViewProps {
     startWeekOnSunday?: boolean;
     autoLinkRules?: any[]; // AutoLinkRule[]
     minIdleTimeThreshold?: number; // In minutes
+    onQuickPunch?: () => void;
 }
 
 interface TimelineItem {
@@ -44,7 +45,7 @@ interface TimelineItem {
     };
 }
 
-export const TimelineView: React.FC<TimelineViewProps> = ({ logs, todos, scopes, onAddLog, onEditLog, categories, currentDate, onDateChange, onShowStats, onBatchAddLogs, onSync, isSyncing, todoCategories, onToast, startWeekOnSunday = false, autoLinkRules = [], minIdleTimeThreshold = 1 }) => {
+export const TimelineView: React.FC<TimelineViewProps> = ({ logs, todos, scopes, onAddLog, onEditLog, categories, currentDate, onDateChange, onShowStats, onBatchAddLogs, onSync, isSyncing, todoCategories, onToast, startWeekOnSunday = false, autoLinkRules = [], minIdleTimeThreshold = 1, onQuickPunch }) => {
     const [isCalendarExpanded, setIsCalendarExpanded] = useState(false);
     const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>(() => {
         const saved = localStorage.getItem('lumos_timeline_sort');
@@ -144,9 +145,9 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ logs, todos, scopes,
                 logData: {
                     ...currentLog,
                     activity,
-                    categoryName: category?.name,
-                    categoryIcon: category?.icon,
-                    categoryColor: category?.themeColor,
+                    categoryName: category?.name || (currentLog.categoryId === 'uncategorized' ? '未分类' : 'Unknown'),
+                    categoryIcon: category?.icon || (currentLog.categoryId === 'uncategorized' ? '⏱️' : '?'),
+                    categoryColor: category?.themeColor || '#a8a29e', // Stone-400 fallback
                     linkedTodoTitle: linkedTodo?.title,
                     linkedTodo: linkedTodo, // 传递完整的待办对象
                     linkedScopeData: linkedScopes.length > 0
@@ -356,8 +357,8 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ logs, todos, scopes,
                                         className="cursor-pointer active:opacity-70 transition-opacity"
                                     >
                                         <div className="flex items-center gap-2 mb-1">
-                                            <h3 className="text-lg font-bold text-stone-900 leading-tight">
-                                                {item.logData.activity?.name}
+                                            <h3 className={`text-lg font-bold leading-tight ${!item.logData.activity ? 'text-stone-500 italic' : 'text-stone-900'}`}>
+                                                {item.logData.activity?.name || item.logData.title || "未命名记录"}
                                             </h3>
                                             {item.logData.focusScore && (
                                                 <span className="text-sm font-bold text-stone-400 font-mono flex items-center gap-0.5">
@@ -477,6 +478,15 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ logs, todos, scopes,
                 title="AI Magic Backfill"
             >
                 <Sparkles size={20} />
+            </button>
+
+            {/* Floating Punch Button */}
+            <button
+                onClick={onQuickPunch}
+                className="fixed bottom-24 right-[5.5rem] w-12 h-12 bg-white text-stone-600 rounded-full shadow-xl flex items-center justify-center active:scale-90 transition-transform z-40 border border-stone-200"
+                title="Quick Punch (Mark Time)"
+            >
+                <Timer size={20} />
             </button>
 
             {/* Floating Add Button */}
