@@ -46,7 +46,6 @@ if (typeof window !== 'undefined') {
 }
 
 const App: React.FC = () => {
-  const [currentView, setCurrentView] = useState<AppView>(AppView.RECORD);
   const [returnToSearch, setReturnToSearch] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isAutoLinkOpen, setIsAutoLinkOpen] = useState(false);
@@ -150,9 +149,25 @@ const App: React.FC = () => {
     return saved ? parseInt(saved) : 1; // Default 1 minute
   });
 
+  const [defaultView, setDefaultView] = useState<AppView>(() => {
+    const saved = localStorage.getItem('lumos_default_view');
+    return (saved as AppView) || AppView.RECORD;
+  });
+
+  const [currentView, setCurrentView] = useState<AppView>(() => {
+    // If specific hash/url logic exists that overrides? No routing here.
+    // Just use defaultView logic.
+    const saved = localStorage.getItem('lumos_default_view');
+    return (saved as AppView) || AppView.RECORD;
+  });
+
   useEffect(() => {
     localStorage.setItem('lumos_min_idle_time', minIdleTimeThreshold.toString());
   }, [minIdleTimeThreshold]);
+
+  useEffect(() => {
+    localStorage.setItem('lumos_default_view', defaultView);
+  }, [defaultView]);
 
 
 
@@ -1357,6 +1372,8 @@ const App: React.FC = () => {
             }}
             minIdleTimeThreshold={minIdleTimeThreshold}
             onSetMinIdleTimeThreshold={setMinIdleTimeThreshold}
+            defaultView={defaultView}
+            onSetDefaultView={setDefaultView}
           />
         )}
 
