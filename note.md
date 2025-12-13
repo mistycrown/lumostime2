@@ -5,7 +5,8 @@ npm run build
 npx cap sync
 npx cap open android
 
-
+npm run build
+npx cap sync
 npm run electron:build
 
 npm run dev
