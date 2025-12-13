@@ -24,6 +24,7 @@ interface TimelineViewProps {
     onToast?: (type: ToastType, message: string) => void;
     startWeekOnSunday?: boolean;
     autoLinkRules?: any[]; // AutoLinkRule[]
+    minIdleTimeThreshold?: number; // In minutes
 }
 
 interface TimelineItem {
@@ -43,7 +44,7 @@ interface TimelineItem {
     };
 }
 
-export const TimelineView: React.FC<TimelineViewProps> = ({ logs, todos, scopes, onAddLog, onEditLog, categories, currentDate, onDateChange, onShowStats, onBatchAddLogs, onSync, isSyncing, todoCategories, onToast, startWeekOnSunday = false, autoLinkRules = [] }) => {
+export const TimelineView: React.FC<TimelineViewProps> = ({ logs, todos, scopes, onAddLog, onEditLog, categories, currentDate, onDateChange, onShowStats, onBatchAddLogs, onSync, isSyncing, todoCategories, onToast, startWeekOnSunday = false, autoLinkRules = [], minIdleTimeThreshold = 1 }) => {
     const [isCalendarExpanded, setIsCalendarExpanded] = useState(false);
     const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>(() => {
         const saved = localStorage.getItem('lumos_timeline_sort');
@@ -154,17 +155,15 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ logs, todos, scopes,
                 }
             });
 
-            // Gap to next log (Only in ascending mode does gap logic make sense easily)
-            // In descending mode, gaps are between prev end and current start? 
-            // Let's simplified: Disable gaps in descending mode for now or adjust logic.
-            // Or just iterate and check difference.
-            // If desc, dayLogs[i] is LATER than dayLogs[i+1].
-            // Gap is between dayLogs[i+1].endTime and dayLogs[i].startTime.
+            // Gap to next log
+            // Use minIdleTimeThreshold * 60 seconds. Default if undefined is 60s.
+            const thresholdSeconds = (minIdleTimeThreshold || 1) * 60;
+
             if (sortOrder === 'asc' && i < dayLogs.length - 1) {
                 const nextLog = dayLogs[i + 1];
                 const gapDuration = (nextLog.startTime - currentLog.endTime) / 1000;
 
-                if (gapDuration > 60) {
+                if (gapDuration > thresholdSeconds) {
                     items.push({
                         type: 'gap',
                         id: `gap-${currentLog.id}`,
@@ -179,7 +178,7 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ logs, todos, scopes,
                 // Gap is from nextLog.endTime UP TO currentLog.startTime
                 const gapDuration = (currentLog.startTime - nextLog.endTime) / 1000;
 
-                if (gapDuration > 60) {
+                if (gapDuration > thresholdSeconds) {
                     items.push({
                         type: 'gap',
                         id: `gap-${currentLog.id}`,
