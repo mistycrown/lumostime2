@@ -23,6 +23,7 @@ import { INITIAL_LOGS, INITIAL_TODOS, MOCK_TODO_CATEGORIES, VIEW_TITLES, CATEGOR
 import { ToastContainer, ToastMessage, ToastType } from './components/Toast';
 import { webdavService } from './services/webdavService';
 import { ParsedTimeEntry } from './services/aiService';
+import { NfcService } from './services/NfcService';
 import {
   PlusCircle,
   BarChart2,
@@ -800,7 +801,116 @@ const App: React.FC = () => {
     }, 30000); // 30s debounce
 
     return () => clearTimeout(timer);
-  }, [logs, todos, categories, todoCategories, scopes, goals, autoLinkRules]);
+  }, [logs, todos, categories, todoCategories, scopes, goals, autoLinkRules, lastSyncTime]);
+
+  // --- NFC / Deep Link Handling ---
+  useEffect(() => {
+    const setupListener = async () => {
+      const listener = await CapacitorApp.addListener('appUrlOpen', (data: { url: string }) => {
+        try {
+          const urlObj = new URL(data.url);
+          // Check scheme and host. Host 'record' for actions.
+          if (urlObj.protocol.includes('lumostime') && urlObj.host === 'record') {
+            const action = urlObj.searchParams.get('action');
+
+            if (action === 'quick_punch') {
+              handleQuickPunch();
+              addToast('success', 'NFC: Quick Punch Recorded');
+            } else if (action === 'start') {
+              const catId = urlObj.searchParams.get('cat_id');
+              const actId = urlObj.searchParams.get('act_id');
+
+              if (catId && actId) {
+                // Find activity
+                const cat = categories.find(c => c.id === catId);
+                const act = cat?.activities.find(a => a.id === actId);
+
+                if (cat && act) {
+                  // Stop all active sessions to ensure clean switch
+                  if (activeSessions.length > 0) {
+                    activeSessions.forEach(session => {
+                      handleStopActivity(session.id);
+                    });
+                  }
+
+                  handleStartActivity(act, cat.id);
+                  addToast('success', `NFC: Started ${act.name}`);
+                } else {
+                  addToast('error', 'NFC: Activity not found');
+                }
+              }
+            }
+          }
+        } catch (e) {
+          console.error('Deep link error', e);
+        }
+      });
+      return listener;
+    };
+
+    const setupNfcScanListener = async () => {
+      const listener = await NfcService.addListener('nfcTagScanned', (data: { type: string, value?: string }) => {
+        console.log('NFC Scanned:', data);
+
+        if (data.type === 'uri' && data.value) {
+          const urlObj = new URL(data.value);
+          // Re-use logic for protocol check
+          if (urlObj.protocol.includes('lumostime') && urlObj.host === 'record') {
+            const action = urlObj.searchParams.get('action');
+
+            if (action === 'quick_punch') {
+              handleQuickPunch();
+              addToast('success', 'NFC: Quick Punch Recorded');
+            } else if (action === 'start') {
+              const catId = urlObj.searchParams.get('cat_id');
+              const actId = urlObj.searchParams.get('act_id');
+              if (catId && actId) {
+                const cat = categories.find(c => c.id === catId);
+                const act = cat?.activities.find(a => a.id === actId);
+                if (cat && act) {
+                  // Check if this activity is already active
+                  const existingSession = activeSessions.find(s => s.activityId === actId);
+
+                  if (existingSession) {
+                    // TOGGLE OFF: Stop the activity
+                    handleStopActivity(existingSession.id);
+                    addToast('success', `NFC: Stopped ${act.name}`);
+                  } else {
+                    // TOGGLE ON: Start the activity (and stop others if needed)
+                    if (activeSessions.length > 0) {
+                      activeSessions.forEach(session => handleStopActivity(session.id));
+                    }
+                    handleStartActivity(act, cat.id);
+                    addToast('success', `NFC: Started ${act.name}`);
+                  }
+                } else {
+                  addToast('error', 'NFC: Activity not found');
+                }
+              }
+            }
+          } else {
+            addToast('info', `NFC Scanned: ${data.value}`);
+          }
+        } else {
+          addToast('info', 'NFC Tag Scanned (No actionable URI)');
+        }
+      });
+      return listener;
+    };
+
+    let listenerHandle: any = null;
+    let scanListenerHandle: any = null;
+
+    setupListener().then(h => listenerHandle = h);
+    setupNfcScanListener().then(h => scanListenerHandle = h);
+
+    return () => {
+      if (listenerHandle) listenerHandle.remove();
+      if (scanListenerHandle) scanListenerHandle.remove();
+    };
+  }, [categories, activeSessions, logs, autoLinkRules]);
+
+
 
   // 3. App Hide -> Upload (Best Effort)
   useEffect(() => {
