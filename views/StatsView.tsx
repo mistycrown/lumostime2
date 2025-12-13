@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Log, Category, Activity } from '../types';
+import { Log, Category, Activity, Scope } from '../types';
 import { COLOR_OPTIONS } from '../constants';
 import { Minimize2, Share, PieChart, Grid, Calendar } from 'lucide-react';
 import { ToastType } from '../components/Toast';
@@ -14,6 +14,7 @@ interface StatsViewProps {
   onToast?: (type: ToastType, message: string) => void;
   todos: import('../types').TodoItem[];
   todoCategories: import('../types').TodoCategory[];
+  scopes: import('../types').Scope[];
 }
 
 type ViewType = 'pie' | 'matrix' | 'schedule';
@@ -30,7 +31,7 @@ interface CategoryStat extends Category {
   items: ActivityStat[];
 }
 
-export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentDate, onBack, isFullScreen, onToggleFullScreen, onToast, todos, todoCategories }) => {
+export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentDate, onBack, isFullScreen, onToggleFullScreen, onToast, todos, todoCategories, scopes }) => {
   const [viewType, setViewType] = useState<ViewType>('pie');
   const [pieRange, setPieRange] = useState<PieRange>('day');
   const [scheduleRange, setScheduleRange] = useState<ScheduleRange>('day');
@@ -189,6 +190,17 @@ export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentD
       });
     }
 
+    if (scopeStats.totalDuration > 0) {
+      text += `\n## 🎯 领域专注分布\n**领域总时长**: ${formatDuration(scopeStats.totalDuration)}\n\n`;
+      scopeStats.categoryStats.forEach(scope => {
+        text += `- **[${scope.name}]** ${formatDuration(scope.duration)} (${scope.percentage.toFixed(1)}%)\n`;
+        scope.items.forEach(item => {
+          text += `    * ${item.name}: ${formatDuration(item.duration)}\n`;
+        });
+        text += '\n';
+      });
+    }
+
     navigator.clipboard.writeText(text).then(() => onToast?.('success', '已复制')).catch(() => onToast?.('error', '复制失败'));
   };
 
@@ -299,6 +311,98 @@ export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentD
 
   const { h: totalTodoH, m: totalTodoM } = (() => {
     const s = todoStats.totalDuration;
+    return { h: Math.floor(s / 3600), m: Math.floor((s % 3600) / 60) };
+  })();
+
+  // Scope Stats
+  const scopeStats = useMemo(() => {
+    // 1. Filter logs that have ANY scope assigned
+    const logsWithScopes = filteredLogs.filter(l => l.scopeIds && l.scopeIds.length > 0);
+
+    // We calculate "Scoped Duration" separate from Total Duration.
+    // If a log has multiple scopes, we SPLIT the duration to avoid > 100% in pie chart.
+    // e.g. 1 hour log with 2 scopes => 30 mins each.
+
+    let totalScopedDuration = 0;
+    const scopeDurations: Record<string, number> = {};
+    const scopeActivityBreakdown: Record<string, Record<string, number>> = {}; // scopeId -> activityName -> duration
+
+    logsWithScopes.forEach(l => {
+      const d = Math.max(0, (l.endTime - l.startTime) / 1000);
+      const count = l.scopeIds!.length;
+      const splitDuration = d / count;
+
+      // Find activity name for breakdown
+      const cat = categories.find(c => c.id === l.categoryId);
+      const act = cat?.activities.find(a => a.id === l.activityId);
+      const actName = act?.name || 'Unknown';
+
+      totalScopedDuration += d; // Wait, total time is simple sum of log durations (regardless of split)
+      // Actually, if we want the pie chart to sum to "Total Scoped Time", 
+      // simple sum of logs is correct, and sum of split parts = sum of logs.
+
+      l.scopeIds!.forEach(sId => {
+        scopeDurations[sId] = (scopeDurations[sId] || 0) + splitDuration;
+
+        if (!scopeActivityBreakdown[sId]) scopeActivityBreakdown[sId] = {};
+        scopeActivityBreakdown[sId][actName] = (scopeActivityBreakdown[sId][actName] || 0) + splitDuration;
+      });
+    });
+
+    // We can't use simple sum of splits for totalScopedDuration if we want "Real Time".
+    // But for the pie chart "Whole", sum of splits IS the whole.
+    // So distinct logs duration sum is the denominator.
+
+    const distinctTotalDuration = logsWithScopes.reduce((acc, l) => acc + Math.max(0, (l.endTime - l.startTime) / 1000), 0);
+
+    const categoryStats = scopes.map(scope => {
+      const duration = scopeDurations[scope.id] || 0;
+
+      // Breakdown items
+      const breakdown = scopeActivityBreakdown[scope.id] || {};
+      const items = Object.entries(breakdown).map(([name, d]) => ({
+        id: name, // pseudo id
+        name: name,
+        duration: d,
+        icon: '', // activity icon hard to get here efficiently without lookup map, skip for now
+        color: ''
+      })).sort((a, b) => b.duration - a.duration);
+
+      return {
+        ...scope,
+        duration,
+        percentage: distinctTotalDuration > 0 ? (duration / distinctTotalDuration) * 100 : 0,
+        items,
+        // Fallback for color if not set (scopes usually have themeColor)
+        themeColor: scope.themeColor || 'stone'
+      };
+    }).filter(s => s.duration > 0).sort((a, b) => b.duration - a.duration);
+
+    return { totalDuration: distinctTotalDuration, categoryStats };
+  }, [filteredLogs, scopes, categories]);
+
+  const scopePieChartData = useMemo(() => {
+    let currentAngle = 0; const gapAngle = 2; const radius = 80; const center = 100;
+    return scopeStats.categoryStats.map(cat => {
+      const sweepAngle = (cat.percentage / 100) * 360;
+      if (sweepAngle < 1) return null;
+      const startAngle = currentAngle;
+      const endAngle = currentAngle + sweepAngle - gapAngle;
+      currentAngle += sweepAngle;
+      const startRad = (startAngle - 90) * Math.PI / 180.0;
+      const endRad = (endAngle - 90) * Math.PI / 180.0;
+      const x1 = center + radius * Math.cos(startRad);
+      const y1 = center + radius * Math.sin(startRad);
+      const x2 = center + radius * Math.cos(endRad);
+      const y2 = center + radius * Math.sin(endRad);
+      const largeArcFlag = endAngle - startAngle <= 180 ? "0" : "1";
+      const d = ["M", x1, y1, "A", radius, radius, 0, largeArcFlag, 1, x2, y2].join(" ");
+      return { ...cat, d, hexColor: getHexColor(cat.themeColor) };
+    }).filter(Boolean);
+  }, [scopeStats]);
+
+  const { h: totalScopeH, m: totalScopeM } = (() => {
+    const s = scopeStats.totalDuration;
     return { h: Math.floor(s / 3600), m: Math.floor((s % 3600) / 60) };
   })();
 
@@ -644,6 +748,62 @@ export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentD
                   </div>
                 </div>
               )}
+
+              {/* Scope Stats Chart (New) */}
+              {scopeStats.totalDuration > 0 && (
+                <div className="flex flex-col items-center pt-8 border-t border-stone-100 mt-8">
+                  <div className="relative w-56 h-56 mb-8 mt-2">
+                    <svg viewBox="0 0 200 200" className="w-full h-full transform -rotate-90">
+                      <circle cx="100" cy="100" r="80" fill="none" stroke="#f5f5f4" strokeWidth="25" />
+                      {scopePieChartData.map((segment, idx) => (
+                        <path key={segment && segment.id} d={segment && segment.d} fill="none" stroke={segment && segment.hexColor} strokeWidth="25" strokeLinecap="round" className="animate-in fade-in duration-700" style={{ animationDelay: `${idx * 100}ms` }} />
+                      ))}
+                    </svg>
+                    <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                      <span className="text-xs font-bold text-stone-300 uppercase">Scopes</span>
+                      <div className="flex items-baseline gap-0.5 text-stone-800">
+                        <span className="text-3xl font-bold font-mono">{totalScopeH}</span>
+                        <span className="text-xs text-stone-400">h</span>
+                        <span className="text-xl font-bold font-mono">{totalScopeM}</span>
+                        <span className="text-xs text-stone-400">m</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="w-full space-y-4">
+                    {scopeStats.categoryStats.map(scope => (
+                      <div key={scope.id} className="group">
+                        <div className="flex items-center justify-between mb-1.5">
+                          <div className="flex items-center gap-2">
+                            <span className="text-base">{scope.icon}</span>
+                            <span className="font-bold text-stone-700 text-[13px]">{scope.name}</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs font-mono text-stone-400">{formatDuration(scope.duration)}</span>
+                            <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 bg-stone-100 rounded text-stone-500">{scope.percentage.toFixed(0)}%</span>
+                          </div>
+                        </div>
+                        <div className="w-full h-1.5 bg-stone-50 rounded-full overflow-hidden mb-2">
+                          <div className="h-full rounded-full" style={{ width: `${scope.percentage}%`, backgroundColor: getHexColor(scope.themeColor) }} />
+                        </div>
+                        {pieRange !== 'year' && (
+                          <div className="pl-6 space-y-1">
+                            {scope.items.map(act => (
+                              <div key={act.id} className="flex items-center justify-between text-[11px] text-stone-500 hover:bg-stone-50 rounded px-2 py-0.5 -ml-2 transition-colors">
+                                <div className="flex items-center gap-1.5">
+                                  <div className={`w-1 h-1 rounded-full`} style={{ backgroundColor: getHexColor(scope.themeColor) }}></div>
+                                  <span>{act.name}</span>
+                                </div>
+                                <span className="font-mono opacity-60">{formatDuration(act.duration)}</span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
@@ -737,6 +897,6 @@ export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentD
           </div>
         )}
       </div>
-    </div>
+    </div >
   );
 };

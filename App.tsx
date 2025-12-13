@@ -1115,6 +1115,7 @@ const App: React.FC = () => {
             onToast={addToast}
             todos={todos}
             todoCategories={todoCategories}
+            scopes={scopes}
           />
         );
       case AppView.TAGS:
