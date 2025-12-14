@@ -53,6 +53,7 @@ const App: React.FC = () => {
   const [isAutoLinkOpen, setIsAutoLinkOpen] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isStatsFullScreen, setIsStatsFullScreen] = useState(false);
+  const [statsTitle, setStatsTitle] = useState<string>('数据统计'); // 动态统计页面标题
   const [isSyncing, setIsSyncing] = useState(false);
   const [activeSessions, setActiveSessions] = useState<ActiveSession[]>([]);
   const [focusDetailSessionId, setFocusDetailSessionId] = useState<string | null>(null);
@@ -1137,6 +1138,7 @@ const App: React.FC = () => {
             isFullScreen={isStatsFullScreen}
             onToggleFullScreen={() => setIsStatsFullScreen(!isStatsFullScreen)}
             onToast={addToast}
+            onTitleChange={setStatsTitle}
             todos={todos}
             todoCategories={todoCategories}
             scopes={scopes}
@@ -1263,6 +1265,9 @@ const App: React.FC = () => {
     if (currentView === AppView.SCOPE) {
       if (selectedScopeId) return 'Scope Details';
       return 'Scopes';
+    }
+    if (currentView === AppView.STATS) {
+      return statsTitle; // 使用动态标题
     }
     return VIEW_TITLES[currentView];
   };

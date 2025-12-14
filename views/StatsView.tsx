@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Log, Category, Activity, Scope } from '../types';
 import { COLOR_OPTIONS } from '../constants';
 import { Minimize2, Share, PieChart, Grid, Calendar } from 'lucide-react';
@@ -12,6 +12,7 @@ interface StatsViewProps {
   isFullScreen: boolean;
   onToggleFullScreen: () => void;
   onToast?: (type: ToastType, message: string) => void;
+  onTitleChange?: (title: string) => void;  // 新增：用于更新标题
   todos: import('../types').TodoItem[];
   todoCategories: import('../types').TodoCategory[];
   scopes: import('../types').Scope[];
@@ -31,7 +32,7 @@ interface CategoryStat extends Category {
   items: ActivityStat[];
 }
 
-export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentDate, onBack, isFullScreen, onToggleFullScreen, onToast, todos, todoCategories, scopes }) => {
+export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentDate, onBack, isFullScreen, onToggleFullScreen, onToast, onTitleChange, todos, todoCategories, scopes }) => {
   const [viewType, setViewType] = useState<ViewType>('pie');
   const [pieRange, setPieRange] = useState<PieRange>('day');
   const [scheduleRange, setScheduleRange] = useState<ScheduleRange>('day');
@@ -39,6 +40,35 @@ export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentD
 
   const toggleExclusion = (id: string) => {
     setExcludedCategoryIds(prev => prev.includes(id) ? prev.filter(c => c !== id) : [...prev, id]);
+  };
+
+  // 生成动态标题
+  const getDynamicTitle = (date: Date, rangeType: PieRange | 'week_fixed' | 'day_fixed'): string => {
+    const formatDateShort = (d: Date) => `${d.getMonth() + 1}/${d.getDate()}`;
+
+    if (rangeType === 'day' || rangeType === 'day_fixed') {
+      // 日视图：显示完整日期，如「12月14日」
+      return `${date.getMonth() + 1}月${date.getDate()}日`;
+    } else if (rangeType === 'week' || rangeType === 'week_fixed') {
+      // 周视图：显示日期范围，如「12/8 - 12/14」
+      const startDate = new Date(date);
+      const day = startDate.getDay();
+      const diff = startDate.getDate() - day + (day === 0 ? -6 : 1);
+      startDate.setDate(diff);
+
+      const endDate = new Date(startDate);
+      endDate.setDate(startDate.getDate() + 6);
+
+      return `${formatDateShort(startDate)} - ${formatDateShort(endDate)}`;
+    } else if (rangeType === 'month') {
+      // 月视图：显示年月，如「2025年12月」
+      return `${date.getFullYear()}年${date.getMonth() + 1}月`;
+    } else if (rangeType === 'year') {
+      // 年视图：只显示年份，如「2025年」
+      return `${date.getFullYear()}年`;
+    }
+
+    return '';
   };
 
   // --- Date Helpers ---
@@ -78,6 +108,25 @@ export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentD
     if (viewType === 'schedule') return getDateRange(currentDate, scheduleRange === 'day' ? 'day_fixed' : 'week_fixed');
     return getDateRange(currentDate, 'day');
   }, [currentDate, viewType, pieRange, scheduleRange]);
+
+  // 当视图类型、时间范围或日期变化时，自动更新标题
+  useEffect(() => {
+    if (onTitleChange) {
+      let rangeType: PieRange | 'week_fixed' | 'day_fixed';
+      if (viewType === 'pie') {
+        rangeType = pieRange;
+      } else if (viewType === 'matrix') {
+        rangeType = 'week_fixed';
+      } else if (viewType === 'schedule') {
+        rangeType = scheduleRange === 'day' ? 'day_fixed' : 'week_fixed';
+      } else {
+        rangeType = 'day';
+      }
+
+      const title = getDynamicTitle(currentDate, rangeType);
+      onTitleChange(title);
+    }
+  }, [currentDate, viewType, pieRange, scheduleRange, onTitleChange]);
 
   const { start: rangeStart, end: rangeEnd } = effectiveRange;
 
