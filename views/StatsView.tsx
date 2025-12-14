@@ -77,6 +77,38 @@ export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentD
     onDateChange(newDate);
   };
 
+  // 触摸滑动手势处理
+  const [touchStart, setTouchStart] = useState<number | null>(null);
+  const [touchEnd, setTouchEnd] = useState<number | null>(null);
+
+  // 最小滑动距离（像素）
+  const minSwipeDistance = 50;
+
+  const onTouchStart = (e: React.TouchEvent) => {
+    setTouchEnd(null);
+    setTouchStart(e.targetTouches[0].clientX);
+  };
+
+  const onTouchMove = (e: React.TouchEvent) => {
+    setTouchEnd(e.targetTouches[0].clientX);
+  };
+
+  const onTouchEnd = () => {
+    if (!touchStart || !touchEnd) return;
+
+    const distance = touchStart - touchEnd;
+    const isLeftSwipe = distance > minSwipeDistance;
+    const isRightSwipe = distance < -minSwipeDistance;
+
+    if (isLeftSwipe) {
+      // 向左滑动 = 下一个时间段
+      handleNavigateDate('next');
+    } else if (isRightSwipe) {
+      // 向右滑动 = 上一个时间段
+      handleNavigateDate('prev');
+    }
+  };
+
   // 生成动态标题
   const getDynamicTitle = (date: Date, rangeType: PieRange | 'week_fixed' | 'day_fixed'): string => {
     const formatDateShort = (d: Date) => `${d.getMonth() + 1}/${d.getDate()}`;
@@ -641,7 +673,12 @@ export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentD
   };
 
   return (
-    <div className={`${isFullScreen ? 'fixed inset-0 z-50 bg-stone-50 pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]' : 'h-full bg-[#faf9f6]'} flex flex-col overflow-hidden animate-in slide-in-from-right duration-300`}>
+    <div
+      className={`${isFullScreen ? 'fixed inset-0 z-50 bg-stone-50 pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]' : 'h-full bg-[#faf9f6]'} flex flex-col overflow-hidden animate-in slide-in-from-right duration-300`}
+      onTouchStart={onTouchStart}
+      onTouchMove={onTouchMove}
+      onTouchEnd={onTouchEnd}
+    >
 
       {/* Fullscreen Exit Button - Only visible in fullscreen mode */}
       {isFullScreen && (
