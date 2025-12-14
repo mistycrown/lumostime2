@@ -1135,6 +1135,7 @@ const App: React.FC = () => {
             categories={categories}
             currentDate={currentDate}
             onBack={() => setCurrentView(AppView.TIMELINE)}
+            onDateChange={setCurrentDate}
             isFullScreen={isStatsFullScreen}
             onToggleFullScreen={() => setIsStatsFullScreen(!isStatsFullScreen)}
             onToast={addToast}
