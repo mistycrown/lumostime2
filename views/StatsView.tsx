@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { Log, Category, Activity, Scope } from '../types';
 import { COLOR_OPTIONS } from '../constants';
-import { Minimize2, Share, PieChart, Grid, Calendar } from 'lucide-react';
+import { Minimize2, Share, PieChart, Grid, Calendar, ChevronLeft, ChevronRight } from 'lucide-react';
 import { ToastType } from '../components/Toast';
 
 interface StatsViewProps {
@@ -9,6 +9,7 @@ interface StatsViewProps {
   categories: Category[];
   currentDate: Date;
   onBack: () => void;
+  onDateChange?: (date: Date) => void;  // 新增：日期变化回调
   isFullScreen: boolean;
   onToggleFullScreen: () => void;
   onToast?: (type: ToastType, message: string) => void;
@@ -32,7 +33,7 @@ interface CategoryStat extends Category {
   items: ActivityStat[];
 }
 
-export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentDate, onBack, isFullScreen, onToggleFullScreen, onToast, onTitleChange, todos, todoCategories, scopes }) => {
+export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentDate, onBack, onDateChange, isFullScreen, onToggleFullScreen, onToast, onTitleChange, todos, todoCategories, scopes }) => {
   const [viewType, setViewType] = useState<ViewType>('pie');
   const [pieRange, setPieRange] = useState<PieRange>('day');
   const [scheduleRange, setScheduleRange] = useState<ScheduleRange>('day');
@@ -40,6 +41,40 @@ export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentD
 
   const toggleExclusion = (id: string) => {
     setExcludedCategoryIds(prev => prev.includes(id) ? prev.filter(c => c !== id) : [...prev, id]);
+  };
+
+  // 日期导航函数
+  const handleNavigateDate = (direction: 'prev' | 'next') => {
+    if (!onDateChange) return;
+
+    const newDate = new Date(currentDate);
+    let rangeType: PieRange | 'week_fixed' | 'day_fixed';
+
+    // 确定当前时间范围类型
+    if (viewType === 'pie') {
+      rangeType = pieRange;
+    } else if (viewType === 'matrix') {
+      rangeType = 'week_fixed';
+    } else if (viewType === 'schedule') {
+      rangeType = scheduleRange === 'day' ? 'day_fixed' : 'week_fixed';
+    } else {
+      rangeType = 'day';
+    }
+
+    const multiplier = direction === 'prev' ? -1 : 1;
+
+    // 根据范围类型调整日期
+    if (rangeType === 'day' || rangeType === 'day_fixed') {
+      newDate.setDate(newDate.getDate() + multiplier);
+    } else if (rangeType === 'week' || rangeType === 'week_fixed') {
+      newDate.setDate(newDate.getDate() + (7 * multiplier));
+    } else if (rangeType === 'month') {
+      newDate.setMonth(newDate.getMonth() + multiplier);
+    } else if (rangeType === 'year') {
+      newDate.setFullYear(newDate.getFullYear() + multiplier);
+    }
+
+    onDateChange(newDate);
   };
 
   // 生成动态标题
@@ -610,7 +645,7 @@ export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentD
 
       {/* Fullscreen Exit Button - Only visible in fullscreen mode */}
       {isFullScreen && (
-        <div className="absolute top-4 left-4 z-50">
+        <div className="absolute bottom-4 left-4 z-50">
           <button onClick={onToggleFullScreen} className="p-2 transition-all text-stone-400 hover:text-stone-800 bg-white/80 hover:bg-white rounded-full shadow-lg backdrop-blur-sm" title="退出全屏">
             <Minimize2 size={20} />
           </button>
@@ -621,7 +656,7 @@ export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentD
       <div className={`flex-1 overflow-y-auto custom-scrollbar ${isFullScreen ? 'pt-0' : 'pt-2'}`}>
         <div className={`${isFullScreen ? 'h-full flex flex-col' : 'px-5 pb-24 space-y-6 max-w-2xl mx-auto'}`}>
 
-          {/* Control Bar: Time Range (Left) + View Switcher (Right) - Hidden in FullScreen */}
+          {/* Control Bar: Time Range (Left) + Date Navigation + View Switcher (Right) - Hidden in FullScreen */}
           {!isFullScreen && (
             <div className="flex items-center justify-between mb-4">
               {/* Left: Time Range Selector (only for pie and schedule views) */}
@@ -654,23 +689,44 @@ export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentD
                 )}
               </div>
 
-              {/* Right: View Type Switcher (icon only) */}
-              <div className="flex bg-stone-100 p-0.5 rounded-lg">
-                <button onClick={() => setViewType('pie')} className={`p-1.5 rounded-md transition-all ${viewType === 'pie' ? 'bg-white text-stone-900 shadow-sm' : 'text-stone-400 hover:text-stone-600'}`} title="饼图">
-                  <PieChart size={14} />
-                </button>
-                <button onClick={() => setViewType('matrix')} className={`p-1.5 rounded-md transition-all ${viewType === 'matrix' ? 'bg-white text-stone-900 shadow-sm' : 'text-stone-400 hover:text-stone-600'}`} title="矩阵">
-                  <Grid size={14} />
-                </button>
-                <button onClick={() => setViewType('schedule')} className={`p-1.5 rounded-md transition-all ${viewType === 'schedule' ? 'bg-white text-stone-900 shadow-sm' : 'text-stone-400 hover:text-stone-600'}`} title="日程">
-                  <Calendar size={14} />
-                </button>
+              {/* Right: Date Navigation + View Type Switcher */}
+              <div className="flex items-center gap-2">
+                {/* Date Navigation Buttons */}
+                <div className="flex items-center gap-1 bg-stone-100 p-0.5 rounded-lg">
+                  <button
+                    onClick={() => handleNavigateDate('prev')}
+                    className="p-1.5 rounded-md transition-all text-stone-400 hover:text-stone-800 hover:bg-white"
+                    title="上一个时间段"
+                  >
+                    <ChevronLeft size={14} />
+                  </button>
+                  <button
+                    onClick={() => handleNavigateDate('next')}
+                    className="p-1.5 rounded-md transition-all text-stone-400 hover:text-stone-800 hover:bg-white"
+                    title="下一个时间段"
+                  >
+                    <ChevronRight size={14} />
+                  </button>
+                </div>
+
+                {/* View Type Switcher (icon only) */}
+                <div className="flex bg-stone-100 p-0.5 rounded-lg">
+                  <button onClick={() => setViewType('pie')} className={`p-1.5 rounded-md transition-all ${viewType === 'pie' ? 'bg-white text-stone-900 shadow-sm' : 'text-stone-400 hover:text-stone-600'}`} title="饼图">
+                    <PieChart size={14} />
+                  </button>
+                  <button onClick={() => setViewType('matrix')} className={`p-1.5 rounded-md transition-all ${viewType === 'matrix' ? 'bg-white text-stone-900 shadow-sm' : 'text-stone-400 hover:text-stone-600'}`} title="矩阵">
+                    <Grid size={14} />
+                  </button>
+                  <button onClick={() => setViewType('schedule')} className={`p-1.5 rounded-md transition-all ${viewType === 'schedule' ? 'bg-white text-stone-900 shadow-sm' : 'text-stone-400 hover:text-stone-600'}`} title="日程">
+                    <Calendar size={14} />
+                  </button>
+                </div>
               </div>
             </div>
           )}
 
           {/* --- Pie View Content --- */}
-          {viewType === 'pie' && !isFullScreen && (
+          {viewType === 'pie' && (
             <div className="space-y-6 animate-in fade-in zoom-in-95 duration-300">
               {/* Chart Card - No border */}
               <div className="flex flex-col items-center">
