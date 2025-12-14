@@ -4,7 +4,7 @@ import { CalendarWidget } from '../components/CalendarWidget';
 import { FocusCharts } from '../components/FocusCharts';
 import { MatrixAnalysisChart } from '../components/MatrixAnalysisChart';
 import { DateRangeFilter, RangeType } from '../components/DateRangeFilter';
-import { Check, Save, Zap, Clock, BarChart2 } from 'lucide-react';
+import { Check, Save, Zap, Clock, BarChart2, Archive } from 'lucide-react';
 import { COLOR_OPTIONS } from '../constants';
 import { GoalCard } from '../components/GoalCard';
 
@@ -20,6 +20,7 @@ interface ScopeDetailViewProps {
     onEditGoal?: (goal: Goal) => void;
     onEditTodo?: (todo: TodoItem) => void;
     onDeleteGoal?: (goalId: string) => void;
+    onArchiveGoal?: (goalId: string) => void;
     onAddGoal?: () => void;
 }
 
@@ -35,12 +36,14 @@ export const ScopeDetailView: React.FC<ScopeDetailViewProps> = ({
     onEditGoal,
     onEditTodo,
     onDeleteGoal,
+    onArchiveGoal,
     onAddGoal
 }) => {
     const [activeTab, setActiveTab] = useState('时间线');
     const [scope, setScope] = useState(initialScope);
     const [displayDate, setDisplayDate] = useState(new Date());
     const [isSaveSuccess, setIsSaveSuccess] = useState(false);
+    const [showArchived, setShowArchived] = useState(false); // 是否显示归档目标
 
     // Analysis State
     const [analysisRange, setAnalysisRange] = useState<RangeType>('Month');
@@ -99,6 +102,11 @@ export const ScopeDetailView: React.FC<ScopeDetailViewProps> = ({
         const name = val.slice(firstChar.length).trim();
         // If user deletes everything, we might have empty icon and empty name
         setScope(prev => ({ ...prev, icon, name }));
+    };
+
+    // 处理归档目标
+    const handleArchiveGoal = (goalId: string) => {
+        onArchiveGoal?.(goalId);
     };
 
     const tabs = ['细节', '时间线', '关联', '目标'];
@@ -516,11 +524,19 @@ export const ScopeDetailView: React.FC<ScopeDetailViewProps> = ({
 
 
             case '目标':
-                const scopeGoals = goals.filter(g => g.scopeId === scope.id && g.status !== 'archived');
+                // 分离未归档和归档目标
+                const activeGoals = goals.filter(g =>
+                    g.scopeId === scope.id && g.status !== 'archived'
+                );
+                const archivedGoals = goals.filter(g =>
+                    g.scopeId === scope.id && g.status === 'archived'
+                );
+                const archivedCount = archivedGoals.length;
+
                 return (
                     <div className="space-y-4 max-w-3xl">
-                        {/* Goals List */}
-                        {scopeGoals.length === 0 ? (
+                        {/* 未归档目标列表 */}
+                        {activeGoals.length === 0 && archivedCount === 0 ? (
                             <div className="bg-white rounded-2xl p-12 border border-dashed border-stone-200 text-center">
                                 <p className="text-stone-400 mb-4">还没有设置目标</p>
                                 {onAddGoal && (
@@ -534,7 +550,8 @@ export const ScopeDetailView: React.FC<ScopeDetailViewProps> = ({
                             </div>
                         ) : (
                             <>
-                                {scopeGoals.map(goal => (
+                                {/* 显示未归档目标 */}
+                                {activeGoals.map(goal => (
                                     <GoalCard
                                         key={goal.id}
                                         goal={goal}
@@ -542,8 +559,10 @@ export const ScopeDetailView: React.FC<ScopeDetailViewProps> = ({
                                         todos={todos}
                                         onEdit={onEditGoal}
                                         onDelete={onDeleteGoal}
+                                        onArchive={handleArchiveGoal}
                                     />
                                 ))}
+                                {/* 添加新目标按钮 */}
                                 {onAddGoal && (
                                     <button
                                         onClick={onAddGoal}
@@ -552,6 +571,44 @@ export const ScopeDetailView: React.FC<ScopeDetailViewProps> = ({
                                         + 添加新目标
                                     </button>
                                 )}
+
+                                {/* 显示归档 Toggle（在未归档目标后） */}
+                                {archivedCount > 0 && (
+                                    <div className="flex items-center justify-between px-4 py-3 bg-stone-50 rounded-xl mt-6">
+                                        <div className="flex items-center gap-2">
+                                            <Archive size={16} className="text-stone-400" />
+                                            <span className="text-sm font-medium text-stone-600">
+                                                显示归档目标
+                                            </span>
+                                            <span className="text-xs text-stone-400">
+                                                ({archivedCount})
+                                            </span>
+                                        </div>
+                                        <button
+                                            onClick={() => setShowArchived(!showArchived)}
+                                            className={`w-12 h-6 rounded-full p-1 transition-colors ${showArchived ? 'bg-stone-900' : 'bg-stone-200'
+                                                }`}
+                                        >
+                                            <div
+                                                className={`w-4 h-4 rounded-full bg-white transition-transform shadow-sm ${showArchived ? 'translate-x-6' : ''
+                                                    }`}
+                                            />
+                                        </button>
+                                    </div>
+                                )}
+
+                                {/* 归档目标列表（仅在开启时显示） */}
+                                {showArchived && archivedGoals.map(goal => (
+                                    <GoalCard
+                                        key={goal.id}
+                                        goal={goal}
+                                        logs={logs}
+                                        todos={todos}
+                                        onEdit={onEditGoal}
+                                        onDelete={onDeleteGoal}
+                                        onArchive={handleArchiveGoal}
+                                    />
+                                ))}
                             </>
                         )}
                     </div>

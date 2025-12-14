@@ -568,6 +568,18 @@ const App: React.FC = () => {
     setGoals(prev => prev.filter(g => g.id !== goalId));
   };
 
+  const handleArchiveGoal = (goalId: string) => {
+    setGoals(prev => prev.map(g => {
+      if (g.id === goalId) {
+        return {
+          ...g,
+          status: g.status === 'archived' ? 'active' : 'archived'
+        };
+      }
+      return g;
+    }));
+  };
+
   const closeGoalEditor = () => {
     setIsGoalEditorOpen(false);
     setEditingGoal(null);
@@ -1200,6 +1212,7 @@ const App: React.FC = () => {
               onEditLog={openEditModal}
               onEditGoal={handleEditGoal}
               onDeleteGoal={handleDeleteGoal}
+              onArchiveGoal={handleArchiveGoal}
               onAddGoal={() => handleAddGoal(selectedScope.id)}
               onEditTodo={openEditTodoModal}
             />

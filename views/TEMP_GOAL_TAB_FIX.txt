@@ -1,0 +1,92 @@
+            case '目标':
+                // 分离未归档和归档目标
+                const activeGoals = goals.filter(g => 
+                    g.scopeId === scope.id && g.status !== 'archived'
+                );
+                const archivedGoals = goals.filter(g => 
+                    g.scopeId === scope.id && g.status === 'archived'
+                );
+                const archivedCount = archivedGoals.length;
+
+                return (
+                    <div className="space-y-4 max-w-3xl">
+                        {/* 未归档目标列表 */}
+                        {activeGoals.length === 0 && archivedCount === 0 ? (
+                            <div className="bg-white rounded-2xl p-12 border border-dashed border-stone-200 text-center">
+                                <p className="text-stone-400 mb-4">还没有设置目标</p>
+                                {onAddGoal && (
+                                    <button
+                                        onClick={onAddGoal}
+                                        className="px-6 py-3 bg-stone-900 text-white rounded-xl font-medium hover:bg-black transition-colors"
+                                    >
+                                        创建第一个目标
+                                    </button>
+                                )}
+                            </div>
+                        ) : (
+                            <>
+                                {/* 显示未归档目标 */}
+                                {activeGoals.map(goal => (
+                                    <GoalCard
+                                        key={goal.id}
+                                        goal={goal}
+                                        logs={logs}
+                                        todos={todos}
+                                        onEdit={onEditGoal}
+                                        onDelete={onDeleteGoal}
+                                        onArchive={handleArchiveGoal}
+                                    />
+                                ))}
+                                {/* 添加新目标按钮 */}
+                                {onAddGoal && (
+                                    <button
+                                        onClick={onAddGoal}
+                                        className="w-full py-2.5 border-2 border-dashed border-stone-200 rounded-xl text-stone-400 hover:text-stone-600 hover:border-stone-300 transition-colors text-sm font-medium"
+                                    >
+                                        + 添加新目标
+                                    </button>
+                                )}
+                                
+                                {/* 显示归档 Toggle（在未归档目标后） */}
+                                {archivedCount > 0 && (
+                                    <div className="flex items-center justify-between px-4 py-3 bg-stone-50 rounded-xl mt-6">
+                                        <div className="flex items-center gap-2">
+                                            <Archive size={16} className="text-stone-400" />
+                                            <span className="text-sm font-medium text-stone-600">
+                                                显示归档目标
+                                            </span>
+                                            <span className="text-xs text-stone-400">
+                                                ({archivedCount})
+                                            </span>
+                                        </div>
+                                        <button
+                                            onClick={() => setShowArchived(!showArchived)}
+                                            className={`w-12 h-6 rounded-full p-1 transition-colors ${
+                                                showArchived ? 'bg-stone-900' : 'bg-stone-200'
+                                            }`}
+                                        >
+                                            <div
+                                                className={`w-4 h-4 rounded-full bg-white transition-transform shadow-sm ${
+                                                    showArchived ? 'translate-x-6' : ''
+                                                }`}
+                                            />
+                                        </button>
+                                    </div>
+                                )}
+                                
+                                {/* 归档目标列表（仅在开启时显示） */}
+                                {showArchived && archivedGoals.map(goal => (
+                                    <GoalCard
+                                        key={goal.id}
+                                        goal={goal}
+                                        logs={logs}
+                                        todos={todos}
+                                        onEdit={onEditGoal}
+                                        onDelete={onDeleteGoal}
+                                        onArchive={handleArchiveGoal}
+                                    />
+                                ))}
+                            </>
+                        )}
+                    </div>
+                );
