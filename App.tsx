@@ -22,6 +22,7 @@ import { Activity, ActiveSession, AppView, Log, TodoItem, TodoCategory, Category
 import { INITIAL_LOGS, INITIAL_TODOS, MOCK_TODO_CATEGORIES, VIEW_TITLES, CATEGORIES, SCOPES, INITIAL_GOALS } from './constants';
 import { ToastContainer, ToastMessage, ToastType } from './components/Toast';
 import { webdavService } from './services/webdavService';
+import { splitLogByDays } from './utils/logUtils';
 import { ParsedTimeEntry } from './services/aiService';
 import { NfcService } from './services/NfcService';
 import {
@@ -202,8 +203,8 @@ const App: React.FC = () => {
       const duration = (endTime - session.startTime) / 1000;
 
       if (duration > 1) {
-        const newLog: Log = {
-          id: crypto.randomUUID(),
+        // 创建基础Log对象（不包含id，因为拆分时每条记录需要新id）
+        const baseLog = {
           activityId: session.activityId,
           categoryId: session.categoryId,
           startTime: session.startTime,
@@ -212,23 +213,34 @@ const App: React.FC = () => {
           linkedTodoId: session.linkedTodoId,
           title: finalSessionData?.title || session.title,
           note: finalSessionData?.note || session.note,
-          progressIncrement: finalSessionData?.progressIncrement, // Link increment to log
+          progressIncrement: finalSessionData?.progressIncrement,
           focusScore: finalSessionData?.focusScore || session.focusScore,
           scopeIds: session.scopeIds
         };
 
-        // Handle Progress Update
-        if (finalSessionData?.progressIncrement && finalSessionData.progressIncrement > 0 && session.linkedTodoId) {
+        // 使用拆分函数，自动处理跨天情况
+        const logs = splitLogByDays(baseLog);
+
+        // 处理进度增量（仅对第一条记录）
+        if (logs[0].progressIncrement && logs[0].progressIncrement > 0 && session.linkedTodoId) {
           setTodos(prev => prev.map(t => {
             if (t.id === session.linkedTodoId && t.isProgress) {
               const current = t.completedUnits || 0;
-              return { ...t, completedUnits: current + finalSessionData.progressIncrement! };
+              return { ...t, completedUnits: current + logs[0].progressIncrement! };
             }
             return t;
           }));
+
+          // 清除其他记录的progressIncrement，避免重复计算
+          logs.forEach((log, index) => {
+            if (index > 0) {
+              delete log.progressIncrement;
+            }
+          });
         }
 
-        setLogs(prev => [newLog, ...prev]);
+        // 添加所有拆分后的记录到logs状态
+        setLogs(prev => [...logs, ...prev]);
       }
     }
     setActiveSessions(prev => prev.filter(s => s.id !== sessionId));
