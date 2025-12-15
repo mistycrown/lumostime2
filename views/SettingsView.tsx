@@ -46,6 +46,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { ReviewTemplateManageView } from './ReviewTemplateManageView';
 import { ReviewTemplate } from '../types';
+import { DEFAULT_NARRATIVE_PROMPT } from '../services/narrativeService';
 // @ts-ignore
 import userGuideContent from '../USER_GUIDE.md?raw';
 
@@ -72,6 +73,9 @@ interface SettingsViewProps {
     // Daily Review Time
     dailyReviewTime?: string;
     onSetDailyReviewTime?: (time: string) => void;
+    aiNarrativePrompt?: string;
+    onSetAiNarrativePrompt?: (prompt: string) => void;
+    onResetAiNarrativePrompt?: () => void;
 }
 
 const AI_PRESETS = {
@@ -93,10 +97,20 @@ const AI_PRESETS = {
     }
 };
 
-export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, onImport, onReset, onClearData, onToast, syncData, onSyncUpdate, startWeekOnSunday, onToggleStartWeekOnSunday, onOpenAutoLink, onOpenSearch, minIdleTimeThreshold = 1, onSetMinIdleTimeThreshold, defaultView = 'RECORD', onSetDefaultView, reviewTemplates = [], onUpdateReviewTemplates, dailyReviewTime, onSetDailyReviewTime }) => {
-    const [activeSubmenu, setActiveSubmenu] = useState<'main' | 'data' | 'cloud' | 'ai' | 'preferences' | 'guide' | 'nfc' | 'templates'>('main');
+export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, onImport, onReset, onClearData, onToast, syncData, onSyncUpdate, startWeekOnSunday, onToggleStartWeekOnSunday, onOpenAutoLink, onOpenSearch, minIdleTimeThreshold = 1, onSetMinIdleTimeThreshold, defaultView = 'RECORD', onSetDefaultView, reviewTemplates = [], onUpdateReviewTemplates, dailyReviewTime, onSetDailyReviewTime, aiNarrativePrompt, onSetAiNarrativePrompt, onResetAiNarrativePrompt }) => {
+    const [activeSubmenu, setActiveSubmenu] = useState<'main' | 'data' | 'cloud' | 'ai' | 'preferences' | 'guide' | 'nfc' | 'templates' | 'narrative_prompt'>('main');
     const [webdavConfig, setWebdavConfig] = useState<WebDAVConfig | null>(null);
     const [isSyncing, setIsSyncing] = useState(false);
+
+    // AI Narrative Prompt editor state (moved to top level to avoid Hooks rules violation)
+    const [localPrompt, setLocalPrompt] = useState(aiNarrativePrompt || DEFAULT_NARRATIVE_PROMPT);
+    const [hasPromptChanges, setHasPromptChanges] = useState(false);
+
+    // Sync local prompt when prop changes
+    useEffect(() => {
+        setLocalPrompt(aiNarrativePrompt || DEFAULT_NARRATIVE_PROMPT);
+        setHasPromptChanges(false);
+    }, [aiNarrativePrompt]);
 
     // NFC State
     const [isWritingNfc, setIsWritingNfc] = useState(false);
@@ -1024,6 +1038,89 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
         )
     }
 
+    if (activeSubmenu === 'narrative_prompt') {
+        const handleSave = () => {
+            onSetAiNarrativePrompt?.(localPrompt);
+            setHasPromptChanges(false);
+            onToast('success', 'AI 叙事提示词已保存');
+        };
+
+        const handleReset = () => {
+            onResetAiNarrativePrompt?.();
+            setHasPromptChanges(false);
+            onToast('success', '已恢复默认提示词');
+        };
+
+        return (
+            <div className="fixed inset-0 z-50 bg-[#fdfbf7] flex flex-col font-serif animate-in slide-in-from-right duration-300 pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">
+                <div className="flex items-center gap-3 px-4 h-14 border-b border-stone-100 bg-[#fdfbf7]/80 backdrop-blur-md sticky top-0 z-10">
+                    <button
+                        onClick={() => setActiveSubmenu('main')}
+                        className="text-stone-400 hover:text-stone-600 p-1"
+                    >
+                        <ChevronLeft size={24} />
+                    </button>
+                    <span className="text-stone-800 font-bold text-lg">AI 叙事设定</span>
+                </div>
+
+                <div className="flex-1 overflow-y-auto p-4 pb-40">
+                    <div className="bg-white rounded-2xl p-6 shadow-sm space-y-4">
+                        <div className="flex items-center gap-2 mb-2">
+                            <div className="w-10 h-10 rounded-xl bg-purple-50 flex items-center justify-center text-purple-500">
+                                <MessageSquare size={20} />
+                            </div>
+                            <div>
+                                <h4 className="font-bold text-stone-800 text-[15px]">AI 叙事提示词</h4>
+                                <p className="text-xs text-stone-400 mt-0.5">自定义生成每日回顾的 AI 指令</p>
+                            </div>
+                        </div>
+
+                        <div className="text-xs text-stone-500 bg-stone-50 p-3 rounded-lg border border-stone-100">
+                            <p className="mb-2">💡 <strong>可用占位符:</strong></p>
+                            <ul className="space-y-1 ml-4">
+                                <li><code className="text-stone-700 bg-white px-1 py-0.5 rounded">{'${date}'}</code> - 回顾日期</li>
+                                <li><code className="text-stone-700 bg-white px-1 py-0.5 rounded">{'${statsText}'}</code> - 时间统计数据</li>
+                                <li><code className="text-stone-700 bg-white px-1 py-0.5 rounded">{'${timelineText}'}</code> - 活动时间轴</li>
+                                <li><code className="text-stone-700 bg-white px-1 py-0.5 rounded">{'${answersText}'}</code> - 回顾问答内容</li>
+                            </ul>
+                        </div>
+
+                        <textarea
+                            className="w-full h-96 bg-stone-50 border border-stone-200 rounded-xl p-4 text-xs font-mono text-stone-600 outline-none focus:border-stone-400 resize-none leading-relaxed"
+                            value={localPrompt}
+                            onChange={(e) => {
+                                setLocalPrompt(e.target.value);
+                                setHasPromptChanges(true);
+                            }}
+                            placeholder="输入自定义提示词..."
+                        />
+
+                        <div className="flex gap-3">
+                            <button
+                                onClick={handleReset}
+                                className="flex-1 py-2.5 bg-stone-100 text-stone-600 text-sm font-bold rounded-xl hover:bg-stone-200 transition-colors flex items-center justify-center gap-2"
+                            >
+                                <RotateCcw size={16} />
+                                重置默认
+                            </button>
+                            <button
+                                onClick={handleSave}
+                                disabled={!hasPromptChanges}
+                                className={`flex-1 py-2.5 text-sm font-bold rounded-xl transition-colors flex items-center justify-center gap-2 ${hasPromptChanges
+                                    ? 'bg-stone-800 text-white hover:bg-stone-700 shadow-md'
+                                    : 'bg-stone-200 text-stone-400 cursor-not-allowed'
+                                    }`}
+                            >
+                                <Save size={16} />
+                                保存修改
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
     if (activeSubmenu === 'templates') {
         return (
             <ReviewTemplateManageView
@@ -1099,8 +1196,13 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
                         <MenuItem
                             icon={<FileText size={18} className="text-orange-500" />}
                             label="回顾模板"
-                            isLast
                             onClick={() => setActiveSubmenu('templates')}
+                        />
+                        <MenuItem
+                            icon={<MessageSquare size={18} className="text-purple-500" />}
+                            label="AI 叙事设定"
+                            isLast
+                            onClick={() => setActiveSubmenu('narrative_prompt')}
                         />
                     </div>
                 </div>
