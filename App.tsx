@@ -185,6 +185,15 @@ const App: React.FC = () => {
     return stored ? JSON.parse(stored) : DEFAULT_REVIEW_TEMPLATES;
   });
 
+  // Daily Review Time
+  const [dailyReviewTime, setDailyReviewTime] = useState<string>(() => {
+    return localStorage.getItem('lumostime_review_time') || '22:00';
+  });
+
+  useEffect(() => {
+    localStorage.setItem('lumostime_review_time', dailyReviewTime);
+  }, [dailyReviewTime]);
+
   // Daily Review View State (路由状态)
   const [isDailyReviewOpen, setIsDailyReviewOpen] = useState(false);
   const [currentReviewDate, setCurrentReviewDate] = useState<Date | null>(null);
@@ -1348,6 +1357,8 @@ Guidelines:
             onQuickPunch={handleQuickPunch}
             dailyReview={dailyReviews.find(r => r.date === currentDate.toISOString().split('T')[0])}
             onOpenDailyReview={handleOpenDailyReview}
+            templates={reviewTemplates}
+            dailyReviewTime={dailyReviewTime}
           />
         );
       case AppView.STATS:
@@ -1754,6 +1765,8 @@ Guidelines:
             onSetDefaultView={setDefaultView}
             reviewTemplates={reviewTemplates}
             onUpdateReviewTemplates={setReviewTemplates}
+            dailyReviewTime={dailyReviewTime}
+            onSetDailyReviewTime={setDailyReviewTime}
           />
         )}
 

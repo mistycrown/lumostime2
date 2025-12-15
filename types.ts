@@ -182,6 +182,7 @@ export interface ReviewTemplate {
   isSystem: boolean; // 是否系统预设
   order: number;
   enabled: boolean; // 是否启用
+  syncToTimeline?: boolean; // 是否同步到时间轴显示
 }
 
 // 问题回答

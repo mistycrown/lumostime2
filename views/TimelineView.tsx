@@ -1,11 +1,23 @@
 import React, { useMemo, useState, useRef } from 'react';
-import { Log, Activity, TodoItem, Category, TodoCategory, Scope, DailyReview } from '../types';
+import { Log, Activity, TodoItem, Category, TodoCategory, Scope, DailyReview, ReviewTemplate } from '../types';
 import { CATEGORIES } from '../constants';
+import * as LucideIcons from 'lucide-react';
 import { Plus, MoreHorizontal, BarChart2, ArrowUp, ArrowDown, Sparkles, RefreshCw, Zap, Share, Timer } from 'lucide-react';
 import { CalendarWidget } from '../components/CalendarWidget';
 import { AIBatchModal } from '../components/AIBatchModal';
 import { ParsedTimeEntry } from '../services/aiService';
 import { ToastType } from '../components/Toast';
+
+// Helper to render dynamic icon
+const DynamicIcon: React.FC<{ name: string; size?: number; className?: string }> = ({ name, size = 16, className }) => {
+    // Correctly accessing the icon from the namespace import
+    // Need to capitalize first letter because Lucide exports are PascalCase (e.g. 'star' -> 'Star')
+    // But user might input 'book' or 'Book'. Let's try direct access then PascalCase.
+    const PascalName = name.charAt(0).toUpperCase() + name.slice(1);
+    const IconComponent = (LucideIcons as any)[name] || (LucideIcons as any)[PascalName] || LucideIcons.Star;
+
+    return <IconComponent size={size} className={className} />;
+};
 
 interface TimelineViewProps {
     logs: Log[];
@@ -28,6 +40,8 @@ interface TimelineViewProps {
     onQuickPunch?: () => void;
     dailyReview?: DailyReview; // 当天的日报数据
     onOpenDailyReview?: () => void; // 打开/创建日报
+    templates?: ReviewTemplate[]; // Added: passed from App
+    dailyReviewTime?: string;
 }
 
 interface TimelineItem {
@@ -47,7 +61,7 @@ interface TimelineItem {
     };
 }
 
-export const TimelineView: React.FC<TimelineViewProps> = ({ logs, todos, scopes, onAddLog, onEditLog, categories, currentDate, onDateChange, onShowStats, onBatchAddLogs, onSync, isSyncing, todoCategories, onToast, startWeekOnSunday = false, autoLinkRules = [], minIdleTimeThreshold = 1, onQuickPunch, dailyReview, onOpenDailyReview }) => {
+export const TimelineView: React.FC<TimelineViewProps> = ({ logs, todos, scopes, onAddLog, onEditLog, categories, currentDate, onDateChange, onShowStats, onBatchAddLogs, onSync, isSyncing, todoCategories, onToast, startWeekOnSunday = false, autoLinkRules = [], minIdleTimeThreshold = 1, onQuickPunch, dailyReview, onOpenDailyReview, templates = [], dailyReviewTime = '22:00' }) => {
     const [isCalendarExpanded, setIsCalendarExpanded] = useState(false);
     const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>(() => {
         const saved = localStorage.getItem('lumos_timeline_sort');
@@ -194,6 +208,28 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ logs, todos, scopes,
         }
         return items;
     }, [logs, currentDate, todos, categories, sortOrder]);
+
+    const shouldShowReviewNode = useMemo(() => {
+        // 1. If daily review exists, always show
+        if (dailyReview) return true;
+
+        // 2. Base requirement: Must rely on onOpenDailyReview handler
+        if (!onOpenDailyReview) return false;
+
+        // 3. Base requirement: Must have timeline items (per existing logic)
+        if (dayTimeline.length === 0) return false;
+
+        // 4. If NOT Today (History), always show (if it meets above reqs)
+        if (!isToday(currentDate)) return true;
+
+        // 5. If Today, check time
+        const [targetHour, targetMinute] = (dailyReviewTime || '22:00').split(':').map(Number);
+        const now = new Date();
+        const currentHour = now.getHours();
+        const currentMinute = now.getMinutes();
+
+        return (currentHour > targetHour || (currentHour === targetHour && currentMinute >= targetMinute));
+    }, [dailyReview, onOpenDailyReview, dayTimeline.length, currentDate, dailyReviewTime]);
 
     const formatTime = (ts: number) => {
         const d = new Date(ts);
@@ -440,40 +476,105 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ logs, todos, scopes,
                         }
                     })}
 
-                    {/* End of Line Dot */}
-                    <div className="absolute -left-[3px] bottom-0 w-1.5 h-1.5 rounded-full bg-stone-300" />
-                </div>
+                    {/* Review Section - Merged into Timeline */}
+                    {shouldShowReviewNode && (
+                        <>
+                            {/* Review Entry Button as a Node */}
+                            {onOpenDailyReview && (
+                                <div className="relative pl-8 mt-6 animate-in slide-in-from-bottom-2 duration-500">
+                                    {/* Time Marker */}
+                                    <div className="absolute -left-[60px] top-0.5 w-[45px] text-right">
+                                        <span className="text-xs font-bold text-stone-400 font-mono">Review</span>
+                                    </div>
 
-                {/* Daily Review Button */}
-                {dayTimeline.length > 0 && onOpenDailyReview && (
-                    <div className="mt-8 mb-2">
-                        <button
-                            onClick={onOpenDailyReview}
-                            className="flex items-center gap-2 text-stone-500 hover:text-stone-800 transition-colors text-xs font-medium group"
-                        >
-                            <Sparkles size={14} className="group-hover:text-amber-500 transition-colors" />
-                            <span>
-                                {dailyReview ? `查看${currentDate.getMonth() + 1}-${currentDate.getDate()}的日报` : '准备好回顾今天了吗？'}
-                            </span>
-                        </button>
-                        {/* 显示叙事摘要 */}
-                        {dailyReview?.narrative && (
-                            <p className="text-xs text-stone-400 mt-1 ml-6 line-clamp-1">
-                                {dailyReview.narrative.slice(0, 50)}{dailyReview.narrative.length > 50 ? '...' : ''}
-                            </p>
-                        )}
-                    </div>
-                )}
+                                    {/* Timeline Dot */}
+                                    <div className="absolute -left-[5px] top-3 w-2.5 h-2.5 rounded-full bg-amber-400 border-2 border-[#faf9f6] z-10" />
+
+                                    {/* Content: Simple Text Button */}
+                                    <button
+                                        onClick={onOpenDailyReview}
+                                        className="text-left hover:text-amber-600 transition-colors group"
+                                    >
+                                        <h3 className="font-bold text-stone-900 text-lg group-hover:text-amber-600 transition-colors">
+                                            今日回顾
+                                        </h3>
+                                    </button>
+                                </div>
+                            )}
+
+                            {/* Synced Template Content */}
+                            {dailyReview && templates.length > 0 && templates.filter(t => t.enabled && t.syncToTimeline).map((template) => {
+                                // Check if template has answers
+                                const hasAnswers = template.questions.some(q =>
+                                    dailyReview.answers?.some(a => a.questionId === q.id && a.answer) || (q.type === 'rating' && dailyReview.answers?.some(a => a.questionId === q.id))
+                                );
+
+                                if (!hasAnswers) return null;
+
+                                return (
+                                    <div key={template.id} className="relative pl-8 mt-6 animate-in slide-in-from-bottom-2 duration-500">
+                                        {/* Time Marker - Template Title */}
+                                        <div className="absolute -left-[60px] top-0.5 w-[45px] text-right flex flex-col items-end">
+                                            <span className="text-xs font-bold text-stone-500 leading-tight">
+                                                {template.title.replace(/[\p{Emoji_Presentation}\p{Extended_Pictographic}]/u, '')}
+                                            </span>
+                                        </div>
+
+                                        {/* Timeline Dot */}
+                                        <div className="absolute -left-[5px] top-1.5 w-2.5 h-2.5 rounded-full bg-stone-300 border-2 border-[#faf9f6] z-10" />
+
+                                        {/* Content Wrapper */}
+                                        <div className="space-y-4">
+                                            {/* Questions List */}
+                                            <div className="space-y-3">
+                                                {template.questions.map(q => {
+                                                    const answer = dailyReview.answers?.find(a => a.questionId === q.id);
+                                                    if (!answer || (q.type !== 'rating' && !answer.answer)) return null;
+
+                                                    return (
+                                                        <div key={q.id} className="group">
+                                                            <div className="mb-1.5">
+                                                                <h4 className="text-sm font-normal text-stone-600 border-l-2 border-stone-200 pl-2 leading-snug">
+                                                                    {q.question}
+                                                                </h4>
+                                                            </div>
+
+                                                            {q.type === 'rating' ? (
+                                                                <div className="flex items-center gap-1">
+                                                                    {Array.from({ length: parseInt(typeof answer.answer === 'string' ? answer.answer : String(answer.answer)) || 0 }).map((_, i) => (
+                                                                        <span key={i} className={q.colorId ? `text-${q.colorId}-500` : "text-amber-500"}>
+                                                                            <DynamicIcon name={q.icon || 'star'} size={18} />
+                                                                        </span>
+                                                                    ))}
+                                                                </div>
+                                                            ) : (
+                                                                <div className="text-sm text-stone-500 leading-relaxed font-light whitespace-pre-wrap">
+                                                                    {answer.answer}
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </>
+                    )}
+
+
+                </div>
 
                 {/* Export/Share Button at the bottom */}
                 {dayTimeline.length > 0 && (
-                    <div className="mt-2">
+                    <div className="mt-10">
                         <button
                             onClick={handleExport}
                             className="flex items-center gap-2 text-stone-400 hover:text-stone-600 transition-colors text-xs font-medium"
                         >
                             <Share size={14} />
-                            <span>导出日报</span>
+                            <span>导出当日时间轴</span>
                         </button>
                     </div>
                 )}
@@ -519,16 +620,18 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ logs, todos, scopes,
             >
                 <Plus size={24} strokeWidth={1.5} />
             </button>
-            {isAIModalOpen && (
-                <AIBatchModal
-                    onClose={() => setIsAIModalOpen(false)}
-                    onSave={onBatchAddLogs}
-                    categories={categories}
-                    targetDate={currentDate}
-                    autoLinkRules={autoLinkRules}
-                    scopes={scopes}
-                />
-            )}
-        </div>
+            {
+                isAIModalOpen && (
+                    <AIBatchModal
+                        onClose={() => setIsAIModalOpen(false)}
+                        onSave={onBatchAddLogs}
+                        categories={categories}
+                        targetDate={currentDate}
+                        autoLinkRules={autoLinkRules}
+                        scopes={scopes}
+                    />
+                )
+            }
+        </div >
     );
 };
