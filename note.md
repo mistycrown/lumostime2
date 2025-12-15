@@ -10,14 +10,30 @@ npx cap sync
 npm run electron:build
 
 npm run dev
+npm run dev:electron
 
-
-git reset --hard 4f556ea1ccb0a0e3f73a441423e3121f24973935
+git reset --hard 0cee3fbf54840700dd4c8f62bdb97acebe8253f4
 git push --force
 
 
+---
 
 
+
+
+在标签详情——细节页更改关键字的地方，随机指定的关键字颜色不要包含灰色。 
+
+现在搜索页面的标题栏仍然会被状态栏遮挡。请你检查一下。 
+
+# 20251215 ai日报
+1. 在每天时间轴的下面，导出日报按钮的上面，增加一个按钮“准备好回顾今天了吗？”
+样式和下面的导出日报按钮一样，防止在同一个div中。icon+标题。
+```
+<div class="mt-8"><button class="flex items-center gap-2 text-stone-400 hover:text-stone-600 transition-colors text-xs font-medium"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-share" aria-hidden="true"><path d="M12 2v13"></path><path d="m16 6-4-4-4 4"></path><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"></path></svg><span>导出日报</span></button></div>
+```
+
+2. 点击按钮后，进入“每日回顾页”（标题用英文）页面的样式模仿标签详情页。
+标题用
 
 
 # 20251205

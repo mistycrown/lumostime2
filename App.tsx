@@ -713,6 +713,62 @@ const App: React.FC = () => {
     }));
   };
 
+  const handleCategoryChange = (activityId: string, newCategoryId: string) => {
+    let activityToMove: Activity | undefined;
+    let oldCategoryId: string | undefined;
+
+    // Find the activity and its current category
+    for (const cat of categories) {
+      const foundActivity = cat.activities.find(a => a.id === activityId);
+      if (foundActivity) {
+        activityToMove = foundActivity;
+        oldCategoryId = cat.id;
+        break;
+      }
+    }
+
+    if (!activityToMove || !oldCategoryId || oldCategoryId === newCategoryId) {
+      return;
+    }
+
+    // Move the activity to the new category
+    setCategories(prev => prev.map(cat => {
+      if (cat.id === oldCategoryId) {
+        // Remove activity from old category
+        return {
+          ...cat,
+          activities: cat.activities.filter(a => a.id !== activityId)
+        };
+      } else if (cat.id === newCategoryId) {
+        // Add activity to new category
+        return {
+          ...cat,
+          activities: [...cat.activities, activityToMove!]
+        };
+      }
+      return cat;
+    }));
+
+    // Update categoryId in all logs for this activity
+    setLogs(prev => prev.map(log => {
+      if (log.activityId === activityId) {
+        return { ...log, categoryId: newCategoryId };
+      }
+      return log;
+    }));
+
+    // Update active sessions
+    setActiveSessions(prev => prev.map(s => {
+      if (s.activityId === activityId) {
+        return {
+          ...s,
+          categoryId: newCategoryId
+        };
+      }
+      return s;
+    }));
+  };
+
   // Persist data to localStorage whenever it changes
   useEffect(() => {
     localStorage.setItem('lumostime_logs', JSON.stringify(logs));
@@ -1155,6 +1211,7 @@ const App: React.FC = () => {
               onToggleTodo={handleToggleTodo}
               categories={categories}
               onUpdateActivity={handleUpdateActivity}
+              onCategoryChange={handleCategoryChange}
               onEditLog={openEditModal}
               onEditTodo={openEditTodoModal}
               scopes={scopes}
