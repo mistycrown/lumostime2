@@ -223,7 +223,19 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ logs, todos, scopes,
         if (!isToday(currentDate)) return true;
 
         // 5. If Today, check time
-        const [targetHour, targetMinute] = (dailyReviewTime || '22:00').split(':').map(Number);
+        let targetHour = 22;
+        let targetMinute = 0;
+        const timeStr = dailyReviewTime || '22:00';
+
+        if (timeStr.includes(':')) {
+            const parts = timeStr.split(':').map(Number);
+            targetHour = parts[0];
+            targetMinute = parts[1];
+        } else if (timeStr.length === 4) {
+            targetHour = parseInt(timeStr.substring(0, 2));
+            targetMinute = parseInt(timeStr.substring(2, 4));
+        }
+
         const now = new Date();
         const currentHour = now.getHours();
         const currentMinute = now.getMinutes();

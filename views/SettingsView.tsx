@@ -740,10 +740,16 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
                                 <p className="text-xs text-stone-400 mt-1">到达该时间后，时间轴将显示今日回顾节点</p>
                             </div>
                             <input
-                                type="time"
-                                value={dailyReviewTime || '22:00'}
-                                onChange={(e) => onSetDailyReviewTime?.(e.target.value)}
-                                className="bg-stone-100 border-none rounded-lg px-3 py-1.5 text-sm font-bold text-stone-700 focus:ring-2 focus:ring-stone-200"
+                                type="text"
+                                inputMode="numeric"
+                                maxLength={4}
+                                value={(dailyReviewTime || '22:00').replace(':', '')}
+                                onChange={(e) => {
+                                    const val = e.target.value.replace(/[^0-9]/g, '');
+                                    onSetDailyReviewTime?.(val);
+                                }}
+                                onFocus={(e) => e.target.select()}
+                                className="bg-stone-100 border-none rounded-lg px-3 py-1.5 text-sm font-bold text-stone-700 focus:outline-none focus:ring-0 focus:bg-stone-200 transition-colors w-20 text-center tracking-widest font-mono"
                             />
                         </div>
 
