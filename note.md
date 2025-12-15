@@ -126,8 +126,18 @@ Try：明天打算尝试的一个微小改变是什么？
 ```
 
 
+在叙事这个页面的话，如果没有今天的叙事，就显示两个按钮。
 
+第一个按钮是“新建叙事”。那么这里呢，就让用户自己去填写，生成一个空白文档即可。
 
+第二个选项是“与AI共创叙事”。这样的话，就调用我们刚才的工作流，给AI发送请求，然后AI再返回一些内容。我们就是用户和AI一起写任何一个叙事。
+
+这个按钮的话，您的格式呢就参考下面的这个UI。 
+
+```
+<button class="w-full py-4 text-stone-400 hover:text-stone-600 transition-colors flex items-center justify-center gap-2 text-sm font-medium"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-pen-line" aria-hidden="true"><path d="M13 21h8"></path><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"></path></svg><span>切换编辑模式</span></button>
+```
+然后，请你在设置的页面增加一个子页面。这里可以编辑模板，具体参考我之前的需求文档。 
 
 # 20251205
 在标签详情页面。删除year和life页面。

@@ -300,6 +300,55 @@ Output:
         });
     },
 
+    // Generate general content (for Narrative, etc.)
+    generateNarrative: async (prompt: string): Promise<string> => {
+        const config = aiService.getConfig();
+        const fetchFn = Capacitor.isNativePlatform() ? nativeFetch : fetch;
+
+        try {
+            if (config.provider === 'openai') {
+                const response = await fetchFn(`${config.baseUrl}/chat/completions`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${config.apiKey}`
+                    },
+                    body: JSON.stringify({
+                        model: config.modelName,
+                        messages: [
+                            { role: 'system', content: 'You are a helpful assistant that generates personal daily review narratives based on provided data.' },
+                            { role: 'user', content: prompt }
+                        ]
+                    })
+                });
+                const data = await response.json();
+                if (data.error) throw new Error(data.error.message);
+                return data.choices?.[0]?.message?.content || '';
+            }
+
+            if (config.provider === 'gemini') {
+                const baseUrl = config.baseUrl || 'https://generativelanguage.googleapis.com/v1beta/models';
+                const url = `${baseUrl}/${config.modelName}:generateContent?key=${config.apiKey}`;
+
+                const response = await fetchFn(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        contents: [{ parts: [{ text: prompt }] }]
+                    })
+                });
+                const data = await response.json();
+                if (data.error) throw new Error(data.error.message);
+                return data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+            }
+
+            return 'AI Configuration Error: Unknown provider';
+        } catch (error: any) {
+            console.error('AI Generation Error', error);
+            throw new Error(error.message || 'Failed to generate narrative');
+        }
+    },
+
     cleanAndParseJSON: (content: string): ParsedTimeEntry[] => {
         // Clean markdown if present
         if (content.includes('```json')) {
