@@ -1116,6 +1116,13 @@ const App: React.FC = () => {
         return;
       }
 
+      // 1.5. Daily Review (Between Modals and Management Modes)
+      if (isDailyReviewOpen) {
+        setIsDailyReviewOpen(false);
+        setCurrentReviewDate(null);
+        return;
+      }
+
       // 2. Full Screen / Management Modes
       if (isStatsFullScreen) {
         setIsStatsFullScreen(false);
@@ -1157,6 +1164,7 @@ const App: React.FC = () => {
     };
   }, [
     isSettingsOpen, isAutoLinkOpen, isSearchOpen, focusDetailSessionId, isAddModalOpen, isTodoModalOpen,
+    isDailyReviewOpen,
     isStatsFullScreen, isTodoManaging, isTagsManaging,
     currentView, selectedTagId, selectedCategoryId
   ]);

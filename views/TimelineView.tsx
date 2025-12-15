@@ -538,21 +538,22 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ logs, todos, scopes,
                                         {/* Content Wrapper */}
                                         <div className="space-y-4">
                                             {/* Questions List */}
-                                            <div className="space-y-3">
+                                            <div className="space-y-3" style={{ paddingTop: '2px' }}>
                                                 {template.questions.map(q => {
                                                     const answer = dailyReview.answers?.find(a => a.questionId === q.id);
                                                     if (!answer || (q.type !== 'rating' && !answer.answer)) return null;
 
                                                     return (
                                                         <div key={q.id} className="group">
-                                                            <div className="mb-1.5">
-                                                                <h4 className="text-sm font-normal text-stone-600 border-l-2 border-stone-200 pl-2 leading-snug">
+                                                            <div className="mb-1.5 flex items-start gap-2">
+                                                                <div className="w-1.5 h-1.5 mt-1.5 rounded-full bg-stone-300 shrink-0"></div>
+                                                                <h4 className="text-sm font-normal text-stone-600 leading-snug flex-1">
                                                                     {q.question}
                                                                 </h4>
                                                             </div>
 
                                                             {q.type === 'rating' ? (
-                                                                <div className="flex items-center gap-1">
+                                                                <div className="flex items-center gap-1" style={{ marginLeft: '14px' }}>
                                                                     {Array.from({ length: parseInt(typeof answer.answer === 'string' ? answer.answer : String(answer.answer)) || 0 }).map((_, i) => (
                                                                         <span key={i} className={q.colorId ? `text-${q.colorId}-500` : "text-amber-500"}>
                                                                             <DynamicIcon name={q.icon || 'star'} size={18} />
@@ -560,7 +561,7 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ logs, todos, scopes,
                                                                     ))}
                                                                 </div>
                                                             ) : (
-                                                                <div className="text-sm text-stone-500 leading-relaxed font-light whitespace-pre-wrap">
+                                                                <div className="text-sm text-stone-500 leading-relaxed font-light whitespace-pre-wrap" style={{ marginLeft: '14px' }}>
                                                                     {answer.answer}
                                                                 </div>
                                                             )}
