@@ -1,5 +1,7 @@
 import { Category, Log, AppView, TodoCategory, TodoItem, Scope, Goal, ReviewTemplate } from './types';
 
+// --- Default User Personal Info ---
+export const DEFAULT_USER_PERSONAL_INFO = `我是一名正在攻读博士学位的研究生，我的专业方向是语言学。除了学术研究，我对AI技术和工具开发也充满热情，喜欢用代码解决实际问题。我相信持续学习和自我反思的力量，希望在学术与技术之间找到平衡，成为一个既有深度又有广度的学者。`;
 
 // --- Colors ---
 // Provide a palette for consistent usage (Tailwind text classes mapped to implicit bg via component logic)
@@ -438,101 +440,89 @@ export const VIEW_TITLES: Record<AppView, string> = {
 
 export const DEFAULT_REVIEW_TEMPLATES: ReviewTemplate[] = [
   {
-    id: 'template-emotion',
-    title: '🌟 情绪感知',
+    id: 'template-microlight',
+    title: '💫 捕捉微光',
     isSystem: true,
     order: 1,
-    enabled: true,
+    enabled: false,
+    syncToTimeline: false,
     questions: [
       {
-        id: 'q-emotion-1',
-        question: '今天的高光时刻是什么？',
+        id: 'q-microlight-1',
+        question: '今天发生的哪件小事让你嘴角上扬？',
         type: 'text'
       },
       {
-        id: 'q-emotion-2',
-        question: '低谷时刻是什么？',
+        id: 'q-microlight-2',
+        question: '为什么这件事在今天发生？',
         type: 'text'
       },
       {
-        id: 'q-emotion-3',
-        question: '能量状态如何？',
-        type: 'choice',
-        choices: ['高能量', '中能量', '低能量']
-      },
-      {
-        id: 'q-emotion-4',
-        question: '给今天打个分',
-        type: 'rating',
-        icon: 'star'
+        id: 'q-microlight-3',
+        question: '今天你要谢谢自己做了什么？',
+        type: 'text'
       }
     ]
   },
   {
-    id: 'template-growth',
-    title: '🌱 成长反思',
+    id: 'template-vision',
+    title: '🎯 愿景校准',
     isSystem: true,
     order: 2,
-    enabled: true,
+    enabled: false,
+    syncToTimeline: false,
     questions: [
       {
-        id: 'q-growth-1',
-        question: '今天学到了什么？',
+        id: 'q-vision-1',
+        question: '哪件事最符合"理想自我"的身份？',
         type: 'text'
       },
       {
-        id: 'q-growth-2',
-        question: '遇到了什么挑战？如何应对的？',
+        id: 'q-vision-2',
+        question: '是否有行为与你的核心愿望背道而驰？',
         type: 'text'
       },
       {
-        id: 'q-growth-3',
-        question: '明天想要改进的一件事？',
+        id: 'q-vision-3',
+        question: '你感觉到离你的大目标更近了吗？',
+        type: 'choice',
+        choices: ['靠近一大步', '微小寸进', '原地踏步', '暂时后退']
+      },
+      {
+        id: 'q-vision-4',
+        question: '请用现在时态写下一句明天的状态：',
         type: 'text'
       }
     ]
   },
   {
-    id: 'template-gratitude',
-    title: '🙏 感恩记录',
+    id: 'template-minimal',
+    title: '⚡️ 极简复盘',
     isSystem: true,
     order: 3,
     enabled: true,
+    syncToTimeline: false,
     questions: [
       {
-        id: 'q-gratitude-1',
-        question: '今天感激的三件事？',
+        id: 'q-minimal-1',
+        question: 'Keep：今天做对了什么？',
         type: 'text'
       },
       {
-        id: 'q-gratitude-2',
-        question: '谁给了你帮助或支持？',
-        type: 'text'
-      }
-    ]
-  },
-  {
-    id: 'template-achievement',
-    title: '🏆 成就盘点',
-    isSystem: true,
-    order: 4,
-    enabled: true,
-    questions: [
-      {
-        id: 'q-achievement-1',
-        question: '今天完成的主要任务？',
+        id: 'q-minimal-2',
+        question: 'Problem：今天的低效环节在哪里？',
         type: 'text'
       },
       {
-        id: 'q-achievement-2',
-        question: '最满意的成果是什么？',
+        id: 'q-minimal-3',
+        question: 'Try：明天打算尝试的微小改变是什么？',
         type: 'text'
       },
       {
-        id: 'q-achievement-3',
-        question: '完成度如何？',
-        type: 'choice',
-        choices: ['超出预期', '符合预期', '低于预期']
+        id: 'q-minimal-4',
+        question: '给今天打个分：',
+        type: 'rating',
+        icon: 'star'
       }
     ]
   }
