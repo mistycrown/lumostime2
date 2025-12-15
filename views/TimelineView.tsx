@@ -2,7 +2,7 @@ import React, { useMemo, useState, useRef } from 'react';
 import { Log, Activity, TodoItem, Category, TodoCategory, Scope, DailyReview, ReviewTemplate } from '../types';
 import { CATEGORIES } from '../constants';
 import * as LucideIcons from 'lucide-react';
-import { Plus, MoreHorizontal, BarChart2, ArrowUp, ArrowDown, Sparkles, RefreshCw, Zap, Share, Timer } from 'lucide-react';
+import { Plus, MoreHorizontal, BarChart2, ArrowUp, ArrowDown, Sparkles, RefreshCw, Zap, Share, Timer, Clock } from 'lucide-react';
 import { CalendarWidget } from '../components/CalendarWidget';
 import { AIBatchModal } from '../components/AIBatchModal';
 import { ParsedTimeEntry } from '../services/aiService';
@@ -578,9 +578,53 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ logs, todos, scopes,
 
                 </div>
 
+
+                {/* This Day in Previous Years */}
+                {(() => {
+                    const currentMonth = currentDate.getMonth();
+                    const currentDay = currentDate.getDate();
+                    const currentYear = currentDate.getFullYear();
+
+                    // Find all unique years (except current year) that have logs on this month/day
+                    const yearsWithLogs = logs.reduce((years, log) => {
+                        const logDate = new Date(log.startTime);
+                        if (logDate.getMonth() === currentMonth &&
+                            logDate.getDate() === currentDay &&
+                            logDate.getFullYear() !== currentYear) {
+                            const year = logDate.getFullYear();
+                            if (!years.includes(year)) {
+                                years.push(year);
+                            }
+                        }
+                        return years;
+                    }, [] as number[]).sort((a, b) => b - a); // Sort descending (most recent first)
+
+                    if (yearsWithLogs.length === 0) return null;
+
+                    return (
+                        <div className="mt-8 space-y-2">
+                            <p className="text-xs text-stone-400 mb-3">时空隧道：</p>
+                            {yearsWithLogs.map(year => (
+                                <button
+                                    key={year}
+                                    onClick={() => {
+                                        const targetDate = new Date(currentDate);
+                                        targetDate.setFullYear(year);
+                                        onDateChange(targetDate);
+                                    }}
+                                    className="flex items-center gap-2 text-stone-400 hover:text-stone-600 transition-colors text-xs font-medium"
+                                >
+                                    <Clock size={14} />
+                                    <span>{year}年{currentMonth + 1}月{currentDay}日</span>
+                                </button>
+                            ))}
+                        </div>
+                    );
+                })()}
+
                 {/* Export/Share Button at the bottom */}
                 {dayTimeline.length > 0 && (
-                    <div className="mt-10">
+                    <div className="mt-6">
                         <button
                             onClick={handleExport}
                             className="flex items-center gap-2 text-stone-400 hover:text-stone-600 transition-colors text-xs font-medium"
