@@ -69,6 +69,9 @@ interface SettingsViewProps {
     // Daily Review Templates
     reviewTemplates?: ReviewTemplate[];
     onUpdateReviewTemplates?: (templates: ReviewTemplate[]) => void;
+    // Daily Review Time
+    dailyReviewTime?: string;
+    onSetDailyReviewTime?: (time: string) => void;
 }
 
 const AI_PRESETS = {
@@ -90,7 +93,7 @@ const AI_PRESETS = {
     }
 };
 
-export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, onImport, onReset, onClearData, onToast, syncData, onSyncUpdate, startWeekOnSunday, onToggleStartWeekOnSunday, onOpenAutoLink, onOpenSearch, minIdleTimeThreshold = 1, onSetMinIdleTimeThreshold, defaultView = 'RECORD', onSetDefaultView, reviewTemplates = [], onUpdateReviewTemplates }) => {
+export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, onImport, onReset, onClearData, onToast, syncData, onSyncUpdate, startWeekOnSunday, onToggleStartWeekOnSunday, onOpenAutoLink, onOpenSearch, minIdleTimeThreshold = 1, onSetMinIdleTimeThreshold, defaultView = 'RECORD', onSetDefaultView, reviewTemplates = [], onUpdateReviewTemplates, dailyReviewTime, onSetDailyReviewTime }) => {
     const [activeSubmenu, setActiveSubmenu] = useState<'main' | 'data' | 'cloud' | 'ai' | 'preferences' | 'guide' | 'nfc' | 'templates'>('main');
     const [webdavConfig, setWebdavConfig] = useState<WebDAVConfig | null>(null);
     const [isSyncing, setIsSyncing] = useState(false);
@@ -729,6 +732,19 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
                                 <div className={`w-5 h-5 bg-white rounded-full shadow-sm transition-transform ${startWeekOnSunday ? 'translate-x-5' : 'translate-x-0'
                                     }`} />
                             </button>
+                        </div>
+
+                        <div className="flex items-center justify-between py-2 border-b border-stone-100">
+                            <div>
+                                <h4 className="font-bold text-stone-700">每日回顾时间</h4>
+                                <p className="text-xs text-stone-400 mt-1">到达该时间后，时间轴将显示今日回顾节点</p>
+                            </div>
+                            <input
+                                type="time"
+                                value={dailyReviewTime || '22:00'}
+                                onChange={(e) => onSetDailyReviewTime?.(e.target.value)}
+                                className="bg-stone-100 border-none rounded-lg px-3 py-1.5 text-sm font-bold text-stone-700 focus:ring-2 focus:ring-stone-200"
+                            />
                         </div>
 
                         <div className="flex items-center justify-between py-2">

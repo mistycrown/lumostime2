@@ -136,7 +136,7 @@ const TemplateList: React.FC<{
                             <div className="flex items-center gap-2">
                                 <button
                                     onClick={() => handleToggle(template.id)}
-                                    className={`p-2 rounded-lg transition-colors ${template.enabled ? 'text-emerald-600' : 'text-stone-300'}`}
+                                    className={`p-2 rounded-lg transition-colors ${template.enabled ? 'text-[#2F4F4F]' : 'text-stone-300'}`}
                                 >
                                     {template.enabled ? <ToggleRight size={28} /> : <ToggleLeft size={28} />}
                                 </button>
@@ -225,6 +225,18 @@ const TemplateEditor: React.FC<{
                         onChange={e => onUpdate({ ...template, title: e.target.value })}
                         placeholder="请输入模板名称"
                     />
+                </div>
+                <div className="flex items-center justify-between pt-2">
+                    <div className="flex flex-col">
+                        <span className="text-sm font-bold text-stone-700">同步到时间轴</span>
+                        <span className="text-[10px] text-stone-400">开启后，此模板的问答将显示在时间轴底部</span>
+                    </div>
+                    <button
+                        onClick={() => onUpdate({ ...template, syncToTimeline: !template.syncToTimeline })}
+                        className={`p-2 rounded-lg transition-colors ${template.syncToTimeline ? 'text-[#2F4F4F]' : 'text-stone-300'}`}
+                    >
+                        {template.syncToTimeline ? <ToggleRight size={28} /> : <ToggleLeft size={28} />}
+                    </button>
                 </div>
             </div>
 
