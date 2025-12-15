@@ -2,6 +2,9 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { ChevronLeft, Trash2, Sparkles, Edit3, RefreshCw } from 'lucide-react';
 import { DailyReview, ReviewTemplate, ReviewAnswer, Category, Log, TodoCategory, TodoItem, Scope, ReviewQuestion } from '../types';
 import * as LucideIcons from 'lucide-react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import { ConfirmModal } from '../components/ConfirmModal';
 
 interface DailyReviewViewProps {
     review: DailyReview;
@@ -15,6 +18,7 @@ interface DailyReviewViewProps {
     onDelete: () => void;
     onUpdateReview: (review: DailyReview) => void;
     onGenerateNarrative: (review: DailyReview, statsText: string, timelineText: string) => Promise<string>;
+    addToast: (message: string, type: 'success' | 'error' | 'info') => void; // Assuming ToastType is 'success' | 'error' | 'info'
 }
 
 type TabType = 'data' | 'guide' | 'narrative';
@@ -30,7 +34,8 @@ export const DailyReviewView: React.FC<DailyReviewViewProps> = ({
     scopes,
     onDelete,
     onUpdateReview,
-    onGenerateNarrative
+    onGenerateNarrative,
+    addToast
 }) => {
     const [activeTab, setActiveTab] = useState<TabType>('data');
     const [answers, setAnswers] = useState<ReviewAnswer[]>(review.answers || []);
@@ -195,6 +200,7 @@ export const DailyReviewView: React.FC<DailyReviewViewProps> = ({
 
             const generated = await onGenerateNarrative(review, statsText, timelineText);
             setNarrative(generated);
+            setEditedNarrative(generated); // Sync to edit box
 
             const updatedReview = {
                 ...review,
@@ -206,6 +212,7 @@ export const DailyReviewView: React.FC<DailyReviewViewProps> = ({
             onUpdateReview(updatedReview);
         } catch (error) {
             console.error('生成叙事失败:', error);
+            addToast('生成叙事失败', 'error');
         } finally {
             setIsGenerating(false);
         }
@@ -224,6 +231,34 @@ export const DailyReviewView: React.FC<DailyReviewViewProps> = ({
             updatedAt: Date.now()
         };
         onUpdateReview(updatedReview);
+    };
+
+    const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
+
+    const handleDeleteNarrative = () => {
+        setIsDeleteConfirmOpen(true);
+    };
+
+    const confirmDeleteNarrative = async () => {
+        try {
+            const updatedReview = {
+                ...review,
+                narrative: '',
+                narrativeUpdatedAt: undefined,
+                updatedAt: Date.now()
+            };
+            // update local state
+            await onUpdateReview(updatedReview);
+            setNarrative('');
+            setEditedNarrative('');
+            setIsEditing(false); // reset to false to show empty state options
+            addToast('叙事已删除', 'success');
+        } catch (error) {
+            console.error('Failed to delete narrative', error);
+            addToast('删除失败', 'error');
+        } finally {
+            setIsDeleteConfirmOpen(false);
+        }
     };
 
     // 渲染问题 (编辑模式)
@@ -498,7 +533,7 @@ export const DailyReviewView: React.FC<DailyReviewViewProps> = ({
 
                 {/* Tab 2: Guide */}
                 {activeTab === 'guide' && (
-                    <div className="space-y-6 animate-in fade-in duration-300">
+                    <div className="space-y-6 animate-in fade-in duration-300 pb-40">
                         {templates.filter(t => t.enabled).length === 0 ? (
                             <div className="text-center py-12">
                                 <p className="text-stone-400">暂无启用的回顾模板</p>
@@ -507,7 +542,7 @@ export const DailyReviewView: React.FC<DailyReviewViewProps> = ({
                         ) : (
                             isReadingMode ? (
                                 // 阅读模式 (小票风格 - 优化版)
-                                <div className="space-y-8 px-1 pb-8">
+                                <div className="space-y-8 px-1">
                                     {templates.filter(t => t.enabled).map((template, idx, arr) => (
                                         <div key={template.id}>
                                             <div className="space-y-6 mb-8">
@@ -543,116 +578,125 @@ export const DailyReviewView: React.FC<DailyReviewViewProps> = ({
                                 ))
                             )
                         )}
-
-                        {/* Mode Toggle Button */}
-                        {templates.filter(t => t.enabled).length > 0 && (
-                            <button
-                                onClick={toggleReadingMode}
-                                className="w-full py-4 text-stone-400 hover:text-stone-600 transition-colors flex items-center justify-center gap-2 text-sm font-medium"
-                            >
-                                {isReadingMode ? (
-                                    <>
-                                        <Edit3 size={16} />
-                                        <span>切换编辑模式</span>
-                                    </>
-                                ) : (
-                                    <>
-                                        <LucideIcons.BookOpen size={16} />
-                                        <span>切换阅读模式</span>
-                                    </>
-                                )}
-                            </button>
-                        )}
                     </div>
                 )}
 
                 {/* Tab 3: Narrative */}
                 {activeTab === 'narrative' && (
-                    <div className="space-y-4 animate-in fade-in duration-300">
+                    <div className="space-y-4 animate-in fade-in duration-300 relative min-h-[50vh] pb-40">
                         {!narrative && !isEditing ? (
-                            <div className="bg-white rounded-2xl p-8 shadow-sm text-center">
-                                <Sparkles size={48} className="mx-auto text-amber-500 mb-4" />
-                                <p className="text-stone-500 mb-6">让AI为你生成今天的叙事日记</p>
+                            <div className="flex flex-col gap-1 py-8">
+                                {/* 选项1：新建空白叙事 */}
+                                <button
+                                    onClick={() => {
+                                        setEditedNarrative('');
+                                        setIsEditing(true);
+                                    }}
+                                    className="w-full py-4 text-stone-400 hover:text-stone-600 transition-colors flex items-center justify-center gap-2 text-sm font-medium"
+                                >
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-pen-line" aria-hidden="true">
+                                        <path d="M13 21h8"></path>
+                                        <path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"></path>
+                                    </svg>
+                                    <span>新建叙事</span>
+                                </button>
+
+                                {/* 选项2：与AI共创 */}
                                 <button
                                     onClick={handleGenerateNarrative}
                                     disabled={isGenerating}
-                                    className="px-6 py-3 bg-stone-900 text-white rounded-xl font-medium hover:bg-stone-800 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 mx-auto"
+                                    className="w-full py-4 text-stone-600 hover:text-stone-900 transition-colors flex items-center justify-center gap-2 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
                                     {isGenerating ? (
                                         <>
                                             <RefreshCw size={16} className="animate-spin" />
-                                            生成中...
+                                            AI正在撰写中...
                                         </>
                                     ) : (
                                         <>
-                                            <Sparkles size={16} />
-                                            生成叙事
+                                            <div className="bg-stone-800 text-white p-1.5 rounded-lg">
+                                                <Sparkles size={14} />
+                                            </div>
+                                            <span>与AI共创叙事</span>
                                         </>
                                     )}
                                 </button>
                             </div>
                         ) : (
                             <>
-                                <div className="bg-white rounded-2xl p-5 shadow-sm">
-                                    {isEditing ? (
+                                {isEditing ? (
+                                    <div className="mb-24">
                                         <textarea
                                             value={editedNarrative}
                                             onChange={(e) => setEditedNarrative(e.target.value)}
-                                            className="w-full bg-stone-50 border border-stone-200 rounded-xl px-4 py-3 text-stone-800 outline-none focus:border-stone-400 transition-colors resize-none"
-                                            rows={15}
+                                            className="w-full bg-white border border-stone-200 rounded-2xl p-6 text-stone-800 outline-none resize-none text-[15px] leading-relaxed shadow-sm block"
+                                            rows={24}
+                                            placeholder="在此开始写作..."
                                         />
-                                    ) : (
-                                        <p className="text-stone-700 leading-relaxed whitespace-pre-wrap">{narrative}</p>
-                                    )}
-                                </div>
+                                    </div>
+                                ) : (
+                                    <div className="px-1 prose prose-stone max-w-none text-[15px] leading-relaxed prose-headings:font-bold prose-headings:text-stone-800 prose-headings:my-5 prose-strong:text-stone-900 mb-24">
+                                        <ReactMarkdown
+                                            remarkPlugins={[remarkGfm]}
+                                            components={{
+                                                p: ({ node, ...props }) => <p className="mb-6 last:mb-0" {...props} />,
+                                                blockquote: ({ node, ...props }) => <blockquote className="border-l-4 border-stone-300 pl-4 italic text-stone-600 my-6 font-serif bg-stone-50 py-2 pr-2 rounded-r" {...props} />
+                                            }}
+                                        >
+                                            {narrative}
+                                        </ReactMarkdown>
+                                    </div>
+                                )}
 
-                                <div className="flex gap-3">
-                                    {isEditing ? (
-                                        <>
-                                            <button
-                                                onClick={handleSaveNarrative}
-                                                className="flex-1 px-4 py-3 bg-stone-900 text-white rounded-xl font-medium hover:bg-stone-800 transition-all"
-                                            >
-                                                保存
-                                            </button>
-                                            <button
-                                                onClick={() => {
-                                                    setIsEditing(false);
-                                                    setEditedNarrative('');
-                                                }}
-                                                className="flex-1 px-4 py-3 bg-stone-100 text-stone-600 rounded-xl font-medium hover:bg-stone-200 transition-all"
-                                            >
-                                                取消
-                                            </button>
-                                        </>
-                                    ) : (
-                                        <>
-                                            <button
-                                                onClick={() => {
-                                                    setIsEditing(true);
-                                                    setEditedNarrative(narrative);
-                                                }}
-                                                className="flex-1 px-4 py-3 bg-stone-100 text-stone-600 rounded-xl font-medium hover:bg-stone-200 transition-all flex items-center justify-center gap-2"
-                                            >
-                                                <Edit3 size={16} />
-                                                编辑
-                                            </button>
-                                            <button
-                                                onClick={handleGenerateNarrative}
-                                                disabled={isGenerating}
-                                                className="flex-1 px-4 py-3 bg-stone-100 text-stone-600 rounded-xl font-medium hover:bg-stone-200 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
-                                            >
-                                                <RefreshCw size={16} className={isGenerating ? 'animate-spin' : ''} />
-                                                重新生成
-                                            </button>
-                                        </>
-                                    )}
+                                {/* 删除叙事 - 仅在有内容时显示，且不占主要位置 */}
+                                <div className="flex justify-center pt-4 opacity-50 hover:opacity-100 transition-opacity">
+                                    <button
+                                        onClick={handleDeleteNarrative}
+                                        className="text-red-400 hover:text-red-500 text-xs flex items-center gap-1 px-4 py-2"
+                                    >
+                                        <Trash2 size={14} />
+                                        <span>删除叙事</span>
+                                    </button>
                                 </div>
                             </>
                         )}
                     </div>
                 )}
             </div>
+
+            {/* Floating Action Button for Guide Tab */}
+            {activeTab === 'guide' && templates.filter(t => t.enabled).length > 0 && (
+                <button
+                    onClick={toggleReadingMode}
+                    className="fixed bottom-24 right-6 w-14 h-14 bg-stone-900 rounded-full text-white shadow-2xl flex items-center justify-center active:scale-90 transition-transform z-40 border border-stone-800"
+                >
+                    {isReadingMode ? <Edit3 size={24} /> : <LucideIcons.BookOpen size={24} />}
+                </button>
+            )}
+
+            {/* Floating Action Button for Narrative Tab */}
+            {activeTab === 'narrative' && (narrative || isEditing) && (
+                <button
+                    onClick={() => {
+                        if (isEditing) handleSaveNarrative();
+                        else setIsEditing(true);
+                    }}
+                    className="fixed bottom-24 right-6 w-14 h-14 bg-stone-900 rounded-full text-white shadow-2xl flex items-center justify-center active:scale-90 transition-transform z-40 border border-stone-800"
+                >
+                    {isEditing ? <LucideIcons.Check size={24} /> : <Edit3 size={24} />}
+                </button>
+            )}
+            {/* Delete Confirmation Modal */}
+            <ConfirmModal
+                isOpen={isDeleteConfirmOpen}
+                onClose={() => setIsDeleteConfirmOpen(false)}
+                onConfirm={confirmDeleteNarrative}
+                title="删除叙事？"
+                description="确定要删除当前生成的叙事吗？此操作无法撤销，需要重新生成。"
+                confirmText="确认删除"
+                type="danger"
+            />
         </div>
     );
 };
+
