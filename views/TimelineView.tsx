@@ -1,5 +1,5 @@
 import React, { useMemo, useState, useRef } from 'react';
-import { Log, Activity, TodoItem, Category, TodoCategory, Scope } from '../types';
+import { Log, Activity, TodoItem, Category, TodoCategory, Scope, DailyReview } from '../types';
 import { CATEGORIES } from '../constants';
 import { Plus, MoreHorizontal, BarChart2, ArrowUp, ArrowDown, Sparkles, RefreshCw, Zap, Share, Timer } from 'lucide-react';
 import { CalendarWidget } from '../components/CalendarWidget';
@@ -26,6 +26,8 @@ interface TimelineViewProps {
     autoLinkRules?: any[]; // AutoLinkRule[]
     minIdleTimeThreshold?: number; // In minutes
     onQuickPunch?: () => void;
+    dailyReview?: DailyReview; // 当天的日报数据
+    onOpenDailyReview?: () => void; // 打开/创建日报
 }
 
 interface TimelineItem {
@@ -45,7 +47,7 @@ interface TimelineItem {
     };
 }
 
-export const TimelineView: React.FC<TimelineViewProps> = ({ logs, todos, scopes, onAddLog, onEditLog, categories, currentDate, onDateChange, onShowStats, onBatchAddLogs, onSync, isSyncing, todoCategories, onToast, startWeekOnSunday = false, autoLinkRules = [], minIdleTimeThreshold = 1, onQuickPunch }) => {
+export const TimelineView: React.FC<TimelineViewProps> = ({ logs, todos, scopes, onAddLog, onEditLog, categories, currentDate, onDateChange, onShowStats, onBatchAddLogs, onSync, isSyncing, todoCategories, onToast, startWeekOnSunday = false, autoLinkRules = [], minIdleTimeThreshold = 1, onQuickPunch, dailyReview, onOpenDailyReview }) => {
     const [isCalendarExpanded, setIsCalendarExpanded] = useState(false);
     const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>(() => {
         const saved = localStorage.getItem('lumos_timeline_sort');
@@ -442,9 +444,30 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ logs, todos, scopes,
                     <div className="absolute -left-[3px] bottom-0 w-1.5 h-1.5 rounded-full bg-stone-300" />
                 </div>
 
+                {/* Daily Review Button */}
+                {dayTimeline.length > 0 && onOpenDailyReview && (
+                    <div className="mt-8 mb-2">
+                        <button
+                            onClick={onOpenDailyReview}
+                            className="flex items-center gap-2 text-stone-500 hover:text-stone-800 transition-colors text-xs font-medium group"
+                        >
+                            <Sparkles size={14} className="group-hover:text-amber-500 transition-colors" />
+                            <span>
+                                {dailyReview ? `查看${currentDate.getMonth() + 1}-${currentDate.getDate()}的日报` : '准备好回顾今天了吗？'}
+                            </span>
+                        </button>
+                        {/* 显示叙事摘要 */}
+                        {dailyReview?.narrative && (
+                            <p className="text-xs text-stone-400 mt-1 ml-6 line-clamp-1">
+                                {dailyReview.narrative.slice(0, 50)}{dailyReview.narrative.length > 50 ? '...' : ''}
+                            </p>
+                        )}
+                    </div>
+                )}
+
                 {/* Export/Share Button at the bottom */}
                 {dayTimeline.length > 0 && (
-                    <div className="mt-8">
+                    <div className="mt-2">
                         <button
                             onClick={handleExport}
                             className="flex items-center gap-2 text-stone-400 hover:text-stone-600 transition-colors text-xs font-medium"
