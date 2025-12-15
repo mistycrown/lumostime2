@@ -14,12 +14,13 @@ import { CategoryDetailView } from './views/CategoryDetailView';
 import { TodoBatchManageView } from './views/TodoBatchManageView';
 import { AutoLinkView } from './views/AutoLinkView';
 import { SearchView } from './views/SearchView';
+import { DailyReviewView } from './views/DailyReviewView'; // 新增：每日回顾
 import { TimerFloating } from './components/TimerFloating';
 import { AddLogModal } from './components/AddLogModal';
 import { TodoDetailModal } from './components/TodoDetailModal';
 import { GoalEditor } from './components/GoalEditor';
-import { Activity, ActiveSession, AppView, Log, TodoItem, TodoCategory, Category, Goal, AutoLinkRule } from './types';
-import { INITIAL_LOGS, INITIAL_TODOS, MOCK_TODO_CATEGORIES, VIEW_TITLES, CATEGORIES, SCOPES, INITIAL_GOALS } from './constants';
+import { Activity, ActiveSession, AppView, Log, TodoItem, TodoCategory, Category, Goal, AutoLinkRule, DailyReview, ReviewTemplate } from './types';
+import { INITIAL_LOGS, INITIAL_TODOS, MOCK_TODO_CATEGORIES, VIEW_TITLES, CATEGORIES, SCOPES, INITIAL_GOALS, DEFAULT_REVIEW_TEMPLATES } from './constants';
 import { ToastContainer, ToastMessage, ToastType } from './components/Toast';
 import { webdavService } from './services/webdavService';
 import { splitLogByDays } from './utils/logUtils';
@@ -172,6 +173,29 @@ const App: React.FC = () => {
   useEffect(() => {
     localStorage.setItem('lumos_default_view', defaultView);
   }, [defaultView]);
+
+  // Daily Review State (每日回顾状态)
+  const [dailyReviews, setDailyReviews] = useState<DailyReview[]>(() => {
+    const stored = localStorage.getItem('lumostime_dailyReviews');
+    return stored ? JSON.parse(stored) : [];
+  });
+
+  const [reviewTemplates, setReviewTemplates] = useState<ReviewTemplate[]>(() => {
+    const stored = localStorage.getItem('lumostime_reviewTemplates');
+    return stored ? JSON.parse(stored) : DEFAULT_REVIEW_TEMPLATES;
+  });
+
+  // Daily Review View State (路由状态)
+  const [isDailyReviewOpen, setIsDailyReviewOpen] = useState(false);
+  const [currentReviewDate, setCurrentReviewDate] = useState<Date | null>(null);
+
+  useEffect(() => {
+    localStorage.setItem('lumostime_dailyReviews', JSON.stringify(dailyReviews));
+  }, [dailyReviews]);
+
+  useEffect(() => {
+    localStorage.setItem('lumostime_reviewTemplates', JSON.stringify(reviewTemplates));
+  }, [reviewTemplates]);
 
 
 
@@ -1154,8 +1178,72 @@ const App: React.FC = () => {
     handleSelectTag(activity.id);
   };
 
+  // Daily Review Handlers
+  const handleOpenDailyReview = () => {
+    const dateStr = currentDate.toISOString().split('T')[0];
+    let review = dailyReviews.find(r => r.date === dateStr);
+
+    // 如果没有日报，创建新的
+    if (!review) {
+      review = {
+        id: crypto.randomUUID(),
+        date: dateStr,
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+        answers: []
+      };
+      setDailyReviews(prev => [...prev, review!]);
+    }
+
+    setCurrentReviewDate(currentDate);
+    setIsDailyReviewOpen(true);
+  };
+
+  const handleUpdateReview = (updatedReview: DailyReview) => {
+    setDailyReviews(prev => prev.map(r =>
+      r.id === updatedReview.id ? updatedReview : r
+    ));
+  };
+
+  const handleDeleteReview = () => {
+    if (!currentReviewDate) return;
+    const dateStr = currentReviewDate.toISOString().split('T')[0];
+    setDailyReviews(prev => prev.filter(r => r.date !== dateStr));
+    setIsDailyReviewOpen(false);
+    setCurrentReviewDate(null);
+  };
+
+  const handleGenerateNarrative = async (review: DailyReview, statsText: string, timelineText: string): Promise<string> => {
+    // TODO: 实现AI调用
+    // 暂时返回一个占位文本
+    return `今天是${review.date}的一天。\n\n${statsText}\n\n${timelineText}\n\n基于我的回顾：\n${review.answers.map(a => `${a.question}: ${a.answer}`).join('\n')}`;
+  };
+
   const renderView = () => {
     if (isSettingsOpen) return null;
+
+    // Daily Review has priority over other views
+    if (isDailyReviewOpen && currentReviewDate) {
+      const dateStr = currentReviewDate.toISOString().split('T')[0];
+      const review = dailyReviews.find(r => r.date === dateStr);
+      if (!review) return null;
+
+      return (
+        <DailyReviewView
+          review={review}
+          date={currentReviewDate}
+          templates={reviewTemplates}
+          categories={categories}
+          logs={logs}
+          todos={todos}
+          todoCategories={todoCategories}
+          scopes={scopes}
+          onDelete={handleDeleteReview}
+          onUpdateReview={handleUpdateReview}
+          onGenerateNarrative={handleGenerateNarrative}
+        />
+      );
+    }
 
     switch (currentView) {
       case AppView.RECORD:
@@ -1205,6 +1293,8 @@ const App: React.FC = () => {
             scopes={scopes}
             minIdleTimeThreshold={minIdleTimeThreshold}
             onQuickPunch={handleQuickPunch}
+            dailyReview={dailyReviews.find(r => r.date === currentDate.toISOString().split('T')[0])}
+            onOpenDailyReview={handleOpenDailyReview}
           />
         );
       case AppView.STATS:
@@ -1338,6 +1428,7 @@ const App: React.FC = () => {
   };
 
   const getHeaderTitle = () => {
+    if (isDailyReviewOpen) return 'Daily Review';
     if (currentView === AppView.TAGS) {
       if (selectedTagId) return 'Tag Details';
       if (selectedCategoryId) return 'Category Details';
@@ -1430,7 +1521,7 @@ const App: React.FC = () => {
       <ToastContainer toasts={toasts} onRemove={removeToast} />
 
       {/* Top Header Bar */}
-      {!isSettingsOpen && currentView !== AppView.TIMELINE && !isStatsFullScreen &&
+      {!isSettingsOpen && (currentView !== AppView.TIMELINE || isDailyReviewOpen) && !isStatsFullScreen &&
         !(currentView === AppView.TODO && isTodoManaging) &&
         !(currentView === AppView.TAGS && isTagsManaging) &&
         !(currentView === AppView.SCOPE && isScopeManaging) && (
@@ -1446,13 +1537,17 @@ const App: React.FC = () => {
                   <RefreshCw size={18} />
                 </button>
               )}
-              {/* Show Back button if in Tag Detail, Category Detail, Scope Detail, or Stats */}
+              {/* Show Back button if in Tag Detail, Category Detail, Scope Detail, Stats, or Daily Review */}
               {((currentView === AppView.TAGS && (selectedTagId || selectedCategoryId)) ||
                 (currentView === AppView.SCOPE && selectedScopeId) ||
-                currentView === AppView.STATS) && (
+                currentView === AppView.STATS ||
+                isDailyReviewOpen) && (
                   <button
                     onClick={() => {
-                      if (currentView === AppView.STATS) {
+                      if (isDailyReviewOpen) {
+                        setIsDailyReviewOpen(false);
+                        setCurrentReviewDate(null);
+                      } else if (currentView === AppView.STATS) {
                         setCurrentView(AppView.TIMELINE);
                       } else if (currentView === AppView.SCOPE) {
                         handleBackFromScope();

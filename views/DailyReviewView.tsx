@@ -12,7 +12,6 @@ interface DailyReviewViewProps {
     todos: TodoItem[];
     todoCategories: TodoCategory[];
     scopes: Scope[];
-    onBack: () => void;
     onDelete: () => void;
     onUpdateReview: (review: DailyReview) => void;
     onGenerateNarrative: (review: DailyReview, statsText: string, timelineText: string) => Promise<string>;
@@ -29,7 +28,6 @@ export const DailyReviewView: React.FC<DailyReviewViewProps> = ({
     todos,
     todoCategories,
     scopes,
-    onBack,
     onDelete,
     onUpdateReview,
     onGenerateNarrative
@@ -238,8 +236,8 @@ export const DailyReviewView: React.FC<DailyReviewViewProps> = ({
                                 key={choice}
                                 onClick={() => updateAnswer(q.id, q.question, choice)}
                                 className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${answer?.answer === choice
-                                        ? 'bg-stone-900 text-white shadow-md'
-                                        : 'bg-stone-100 text-stone-600 hover:bg-stone-200'
+                                    ? 'bg-stone-900 text-white shadow-md'
+                                    : 'bg-stone-100 text-stone-600 hover:bg-stone-200'
                                     }`}
                             >
                                 {choice}
@@ -279,17 +277,14 @@ export const DailyReviewView: React.FC<DailyReviewViewProps> = ({
     };
 
     return (
-        <div className="fixed inset-0 z-50 bg-[#fdfbf7] flex flex-col pt-[env(safe-area-inset-top)] animate-in slide-in-from-right duration-300">
-            {/* Header */}
-            <div className="flex items-center justify-between px-6 py-4 border-b border-stone-100">
-                <div className="flex items-center gap-3">
-                    <button
-                        onClick={onBack}
-                        className="text-stone-400 hover:text-stone-600 p-1"
-                    >
-                        <ChevronLeft size={24} />
-                    </button>
-                    <span className="text-stone-800 font-bold text-lg">&amp; {formatDate(date)}</span>
+        <div className="h-full bg-[#faf9f6] overflow-y-auto no-scrollbar pb-24 px-7 pt-4">
+            {/* Date Display Section */}
+            <div className="mb-6 flex items-center justify-between">
+                <div>
+                    <h1 className="text-2xl font-bold text-stone-900 flex items-center gap-3">
+                        <span className="text-stone-300 font-normal">&amp;</span>
+                        {formatDate(date)}
+                    </h1>
                 </div>
                 <button
                     onClick={onDelete}
@@ -300,14 +295,14 @@ export const DailyReviewView: React.FC<DailyReviewViewProps> = ({
             </div>
 
             {/* Tab Navigation */}
-            <div className="flex items-center gap-1 px-6 pt-4 pb-2 border-b border-stone-100">
+            <div className="flex gap-6 border-b border-stone-200 mb-8 overflow-x-auto no-scrollbar">
                 {(['data', 'guide', 'narrative'] as TabType[]).map(tab => (
                     <button
                         key={tab}
                         onClick={() => setActiveTab(tab)}
-                        className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${activeTab === tab
-                                ? 'bg-stone-900 text-white shadow-md'
-                                : 'text-stone-500 hover:text-stone-700 hover:bg-stone-100'
+                        className={`pb-3 text-sm font-serif tracking-wide whitespace-nowrap transition-colors ${activeTab === tab
+                            ? 'text-stone-900 border-b-2 border-stone-900 font-bold'
+                            : 'text-stone-400 hover:text-stone-600'
                             }`}
                     >
                         {{ data: '数据', guide: '引导', narrative: '叙事' }[tab]}
@@ -316,7 +311,7 @@ export const DailyReviewView: React.FC<DailyReviewViewProps> = ({
             </div>
 
             {/* Tab Content */}
-            <div className="flex-1 overflow-y-auto px-6 py-6 space-y-6">
+            <div className="space-y-6">
                 {/* Tab 1: Data */}
                 {activeTab === 'data' && (
                     <div className="space-y-6 animate-in fade-in duration-300">
