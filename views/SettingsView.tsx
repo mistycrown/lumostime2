@@ -108,11 +108,21 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
     const [localPrompt, setLocalPrompt] = useState(aiNarrativePrompt || DEFAULT_NARRATIVE_PROMPT);
     const [hasPromptChanges, setHasPromptChanges] = useState(false);
 
+    // Local state for narrative_prompt page
+    const [localUserInfo, setLocalUserInfo] = useState(userPersonalInfo || '');
+    const [hasNarrativeChanges, setHasNarrativeChanges] = useState(false);
+
     // Sync local prompt when prop changes
     useEffect(() => {
         setLocalPrompt(aiNarrativePrompt || DEFAULT_NARRATIVE_PROMPT);
         setHasPromptChanges(false);
     }, [aiNarrativePrompt]);
+
+    // Sync local user info when prop changes
+    useEffect(() => {
+        setLocalUserInfo(userPersonalInfo || '');
+        setHasNarrativeChanges(false);
+    }, [userPersonalInfo]);
 
     // NFC State
     const [isWritingNfc, setIsWritingNfc] = useState(false);
@@ -1042,14 +1052,15 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
 
     if (activeSubmenu === 'narrative_prompt') {
         const handleSave = () => {
+            onSetUserPersonalInfo?.(localUserInfo);
             onSetAiNarrativePrompt?.(localPrompt);
-            setHasPromptChanges(false);
-            onToast('success', 'AI 叙事提示词已保存');
+            setHasNarrativeChanges(false);
+            onToast('success', 'AI 叙事设定已保存');
         };
 
         const handleReset = () => {
             onResetAiNarrativePrompt?.();
-            setHasPromptChanges(false);
+            setHasNarrativeChanges(false);
             onToast('success', '已恢复默认提示词');
         };
 
@@ -1080,9 +1091,10 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
 
                         <textarea
                             className="w-full h-32 bg-stone-50 border border-stone-200 rounded-xl p-4 text-xs text-stone-600 outline-none focus:border-stone-400 resize-none leading-relaxed"
-                            value={userPersonalInfo || ''}
+                            value={localUserInfo}
                             onChange={(e) => {
-                                onSetUserPersonalInfo?.(e.target.value);
+                                setLocalUserInfo(e.target.value);
+                                setHasNarrativeChanges(true);
                             }}
                             placeholder="例如：我是一名正在攻读博士学位的研究生..."
                             maxLength={2000}
@@ -1095,14 +1107,24 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
 
                     {/* AI Narrative Prompt Section */}
                     <div className="bg-white rounded-2xl p-6 shadow-sm space-y-4">
-                        <div className="flex items-center gap-2 mb-2">
-                            <div className="w-10 h-10 rounded-xl bg-purple-50 flex items-center justify-center text-purple-500">
-                                <MessageSquare size={20} />
+                        <div className="flex items-center justify-between mb-2">
+                            <div className="flex items-center gap-2">
+                                <div className="w-10 h-10 rounded-xl bg-purple-50 flex items-center justify-center text-purple-500">
+                                    <MessageSquare size={20} />
+                                </div>
+                                <div>
+                                    <h4 className="font-bold text-stone-800 text-[15px]">AI 叙事提示词</h4>
+                                    <p className="text-xs text-stone-400 mt-0.5">自定义生成每日回顾的 AI 指令</p>
+                                </div>
                             </div>
-                            <div>
-                                <h4 className="font-bold text-stone-800 text-[15px]">AI 叙事提示词</h4>
-                                <p className="text-xs text-stone-400 mt-0.5">自定义生成每日回顾的 AI 指令</p>
-                            </div>
+                            <button
+                                onClick={handleReset}
+                                className="p-2 text-stone-400 hover:text-stone-600 hover:bg-stone-100 rounded-lg transition-colors flex items-center gap-1.5"
+                                title="重置为默认提示词"
+                            >
+                                <RotateCcw size={16} />
+                                <span className="text-xs font-medium">重置默认</span>
+                            </button>
                         </div>
 
                         <div className="text-xs text-stone-500 bg-stone-50 p-3 rounded-lg border border-stone-100">
@@ -1122,23 +1144,16 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
                             value={localPrompt}
                             onChange={(e) => {
                                 setLocalPrompt(e.target.value);
-                                setHasPromptChanges(true);
+                                setHasNarrativeChanges(true);
                             }}
                             placeholder="输入自定义提示词..."
                         />
 
-                        <div className="flex gap-3">
-                            <button
-                                onClick={handleReset}
-                                className="flex-1 py-2.5 bg-stone-100 text-stone-600 text-sm font-bold rounded-xl hover:bg-stone-200 transition-colors flex items-center justify-center gap-2"
-                            >
-                                <RotateCcw size={16} />
-                                重置默认
-                            </button>
+                        <div className="flex justify-end">
                             <button
                                 onClick={handleSave}
-                                disabled={!hasPromptChanges}
-                                className={`flex-1 py-2.5 text-sm font-bold rounded-xl transition-colors flex items-center justify-center gap-2 ${hasPromptChanges
+                                disabled={!hasNarrativeChanges}
+                                className={`px-6 py-2.5 text-sm font-bold rounded-xl transition-colors flex items-center justify-center gap-2 ${hasNarrativeChanges
                                     ? 'bg-stone-800 text-white hover:bg-stone-700 shadow-md'
                                     : 'bg-stone-200 text-stone-400 cursor-not-allowed'
                                     }`}
