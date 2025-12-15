@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { ChevronLeft, Trash2, Sparkles, Edit3, RefreshCw } from 'lucide-react';
 import { DailyReview, ReviewTemplate, ReviewAnswer, Category, Log, TodoCategory, TodoItem, Scope, ReviewQuestion } from '../types';
+import { COLOR_OPTIONS } from '../constants';
 import * as LucideIcons from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -22,6 +23,19 @@ interface DailyReviewViewProps {
 }
 
 type TabType = 'data' | 'guide' | 'narrative';
+
+// Helper to extract emoji
+const getTemplateDisplayInfo = (title: string) => {
+    const emojiRegex = /^(\p{Emoji_Presentation}|\p{Extended_Pictographic})/u;
+    const match = title.match(emojiRegex);
+    if (match) {
+        return {
+            emoji: match[0],
+            text: title.substring(match[0].length).trim()
+        };
+    }
+    return { emoji: null, text: title };
+};
 
 export const DailyReviewView: React.FC<DailyReviewViewProps> = ({
     review,
@@ -315,22 +329,27 @@ export const DailyReviewView: React.FC<DailyReviewViewProps> = ({
                 <div key={q.id} className="space-y-2">
                     <label className="text-sm font-medium text-stone-700">{q.question}</label>
                     <div className="flex gap-4">
-                        {[1, 2, 3, 4, 5].map((rating) => (
-                            <button
-                                key={rating}
-                                onClick={() => updateAnswer(q.id, q.question, rating.toString())}
-                                className={`p-2 rounded-xl transition-all ${currentRating >= rating
-                                    ? 'text-amber-400 bg-amber-50 scale-110'
-                                    : 'text-stone-200 hover:text-stone-300'
-                                    }`}
-                            >
-                                <RatingIcon
-                                    size={32}
-                                    fill={currentRating >= rating ? "currentColor" : "none"}
-                                    strokeWidth={currentRating >= rating ? 0 : 2}
-                                />
-                            </button>
-                        ))}
+                        {[1, 2, 3, 4, 5].map((rating) => {
+                            const colorOption = COLOR_OPTIONS.find(c => c.id === q.colorId) || COLOR_OPTIONS.find(c => c.id === 'amber')!;
+                            const isActive = currentRating >= rating;
+
+                            return (
+                                <button
+                                    key={rating}
+                                    onClick={() => updateAnswer(q.id, q.question, rating.toString())}
+                                    className={`p-2 rounded-xl transition-all ${isActive
+                                        ? `${colorOption.text} ${colorOption.bg} scale-110`
+                                        : 'text-stone-200 hover:text-stone-300'
+                                        }`}
+                                >
+                                    <RatingIcon
+                                        size={32}
+                                        fill={isActive ? "currentColor" : "none"}
+                                        strokeWidth={isActive ? 0 : 2}
+                                    />
+                                </button>
+                            );
+                        })}
                     </div>
                 </div>
             );
@@ -381,12 +400,16 @@ export const DailyReviewView: React.FC<DailyReviewViewProps> = ({
                                     return Icon || LucideIcons.Star;
                                 };
                                 const RatingIcon = getIcon(q.icon);
+                                const colorOption = COLOR_OPTIONS.find(c => c.id === q.colorId) || COLOR_OPTIONS.find(c => c.id === 'amber')!;
+                                const isActive = currentRating >= rating;
+
                                 return (
                                     <RatingIcon
                                         key={rating}
                                         size={18}
-                                        className={currentRating >= rating ? "text-amber-500" : "text-stone-200"}
-                                        fill={currentRating >= rating ? "currentColor" : "none"}
+                                        className={isActive ? colorOption.text : "text-stone-200"}
+                                        fill={isActive ? "currentColor" : "none"}
+                                        strokeWidth={isActive ? 0 : 2}
                                     />
                                 );
                             })}
@@ -543,39 +566,47 @@ export const DailyReviewView: React.FC<DailyReviewViewProps> = ({
                             isReadingMode ? (
                                 // 阅读模式 (小票风格 - 优化版)
                                 <div className="space-y-8 px-1">
-                                    {templates.filter(t => t.enabled).map((template, idx, arr) => (
-                                        <div key={template.id}>
-                                            <div className="space-y-6 mb-8">
-                                                <h3 className="text-base font-bold text-stone-900">
-                                                    {template.title}
-                                                </h3>
-                                                <div className="space-y-8 pl-1">
-                                                    {template.questions.map(q => renderReadingQuestion(q))}
+                                    {templates.filter(t => t.enabled).map((template, idx, arr) => {
+                                        const { emoji, text } = getTemplateDisplayInfo(template.title);
+                                        return (
+                                            <div key={template.id}>
+                                                <div className="space-y-6 mb-8">
+                                                    <h3 className="text-base font-bold text-stone-900 flex items-center gap-2">
+                                                        {emoji && <span className="text-xl">{emoji}</span>}
+                                                        <span>{text}</span>
+                                                    </h3>
+                                                    <div className="space-y-8 pl-1">
+                                                        {template.questions.map(q => renderReadingQuestion(q))}
+                                                    </div>
                                                 </div>
+                                                {/* 模板分割线 (除了最后一个) */}
+                                                {idx < arr.length - 1 && (
+                                                    <div className="h-px bg-stone-100" />
+                                                )}
                                             </div>
-                                            {/* 模板分割线 (除了最后一个) */}
-                                            {idx < arr.length - 1 && (
-                                                <div className="h-px bg-stone-100" />
-                                            )}
-                                        </div>
-                                    ))}
+                                        );
+                                    })}
                                 </div>
                             ) : (
                                 // 编辑模式 (卡片风格)
-                                templates.filter(t => t.enabled).map(template => (
-                                    <div key={template.id} className="bg-white rounded-2xl p-5 shadow-sm">
-                                        <h3 className="text-sm font-bold text-stone-400 uppercase tracking-wider mb-4">
-                                            {template.title}
-                                        </h3>
-                                        <div className="space-y-6">
-                                            {template.questions.map(q => (
-                                                <div key={q.id}>
-                                                    {renderQuestion(q)}
-                                                </div>
-                                            ))}
+                                templates.filter(t => t.enabled).map(template => {
+                                    const { emoji, text } = getTemplateDisplayInfo(template.title);
+                                    return (
+                                        <div key={template.id} className="bg-white rounded-2xl p-5 shadow-sm">
+                                            <h3 className="text-base font-bold text-stone-900 flex items-center gap-2 mb-4">
+                                                {emoji && <span className="text-xl">{emoji}</span>}
+                                                <span>{text}</span>
+                                            </h3>
+                                            <div className="space-y-6">
+                                                {template.questions.map(q => (
+                                                    <div key={q.id}>
+                                                        {renderQuestion(q)}
+                                                    </div>
+                                                ))}
+                                            </div>
                                         </div>
-                                    </div>
-                                ))
+                                    );
+                                })
                             )
                         )}
                     </div>
