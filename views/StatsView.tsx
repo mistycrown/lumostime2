@@ -805,7 +805,7 @@ export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentD
                         {cat.items.map(act => (
                           <div key={act.id} className="flex items-center justify-between text-[11px] text-stone-500 hover:bg-stone-50 rounded px-2 py-0.5 -ml-2 transition-colors">
                             <div className="flex items-center gap-1.5">
-                              <div className={`w-1 h-1 rounded-full`} style={{ backgroundColor: getHexColor(cat.themeColor) }}></div>
+                              <span className="text-xs">{act.icon}</span>
                               <span>{act.name}</span>
                             </div>
                             <span className="font-mono opacity-60">{formatDuration(act.duration)}</span>
