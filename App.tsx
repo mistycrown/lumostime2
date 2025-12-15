@@ -20,7 +20,7 @@ import { AddLogModal } from './components/AddLogModal';
 import { TodoDetailModal } from './components/TodoDetailModal';
 import { GoalEditor } from './components/GoalEditor';
 import { Activity, ActiveSession, AppView, Log, TodoItem, TodoCategory, Category, Goal, AutoLinkRule, DailyReview, ReviewTemplate } from './types';
-import { INITIAL_LOGS, INITIAL_TODOS, MOCK_TODO_CATEGORIES, VIEW_TITLES, CATEGORIES, SCOPES, INITIAL_GOALS, DEFAULT_REVIEW_TEMPLATES } from './constants';
+import { INITIAL_LOGS, INITIAL_TODOS, MOCK_TODO_CATEGORIES, VIEW_TITLES, CATEGORIES, SCOPES, INITIAL_GOALS, DEFAULT_REVIEW_TEMPLATES, DEFAULT_USER_PERSONAL_INFO } from './constants';
 import { ToastContainer, ToastMessage, ToastType } from './components/Toast';
 import { webdavService } from './services/webdavService';
 import { splitLogByDays } from './utils/logUtils';
@@ -203,6 +203,17 @@ const App: React.FC = () => {
   useEffect(() => {
     localStorage.setItem('lumostime_ai_narrative_prompt', aiNarrativePrompt);
   }, [aiNarrativePrompt]);
+
+  // User Personal Info for AI Narrative
+  const [userPersonalInfo, setUserPersonalInfo] = useState<string>(() => {
+    const stored = localStorage.getItem('lumostime_user_personal_info');
+    if (stored) return stored;
+    return DEFAULT_USER_PERSONAL_INFO;
+  });
+
+  useEffect(() => {
+    localStorage.setItem('lumostime_user_personal_info', userPersonalInfo);
+  }, [userPersonalInfo]);
 
   // Daily Review View State (路由状态)
   const [isDailyReviewOpen, setIsDailyReviewOpen] = useState(false);
@@ -1237,7 +1248,7 @@ const App: React.FC = () => {
   };
 
   const handleGenerateNarrative = async (review: DailyReview, statsText: string, timelineText: string): Promise<string> => {
-    return narrativeService.generateDailyNarrative(review, statsText, timelineText, aiNarrativePrompt);
+    return narrativeService.generateDailyNarrative(review, statsText, timelineText, aiNarrativePrompt, scopes, userPersonalInfo);
   };
 
   const renderView = () => {
@@ -1729,6 +1740,8 @@ const App: React.FC = () => {
             aiNarrativePrompt={aiNarrativePrompt}
             onSetAiNarrativePrompt={setAiNarrativePrompt}
             onResetAiNarrativePrompt={() => setAiNarrativePrompt('')}
+            userPersonalInfo={userPersonalInfo}
+            onSetUserPersonalInfo={setUserPersonalInfo}
           />
         )}
 

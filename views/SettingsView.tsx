@@ -76,6 +76,8 @@ interface SettingsViewProps {
     aiNarrativePrompt?: string;
     onSetAiNarrativePrompt?: (prompt: string) => void;
     onResetAiNarrativePrompt?: () => void;
+    userPersonalInfo?: string;
+    onSetUserPersonalInfo?: (info: string) => void;
 }
 
 const AI_PRESETS = {
@@ -97,7 +99,7 @@ const AI_PRESETS = {
     }
 };
 
-export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, onImport, onReset, onClearData, onToast, syncData, onSyncUpdate, startWeekOnSunday, onToggleStartWeekOnSunday, onOpenAutoLink, onOpenSearch, minIdleTimeThreshold = 1, onSetMinIdleTimeThreshold, defaultView = 'RECORD', onSetDefaultView, reviewTemplates = [], onUpdateReviewTemplates, dailyReviewTime, onSetDailyReviewTime, aiNarrativePrompt, onSetAiNarrativePrompt, onResetAiNarrativePrompt }) => {
+export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, onImport, onReset, onClearData, onToast, syncData, onSyncUpdate, startWeekOnSunday, onToggleStartWeekOnSunday, onOpenAutoLink, onOpenSearch, minIdleTimeThreshold = 1, onSetMinIdleTimeThreshold, defaultView = 'RECORD', onSetDefaultView, reviewTemplates = [], onUpdateReviewTemplates, dailyReviewTime, onSetDailyReviewTime, aiNarrativePrompt, onSetAiNarrativePrompt, onResetAiNarrativePrompt, userPersonalInfo, onSetUserPersonalInfo }) => {
     const [activeSubmenu, setActiveSubmenu] = useState<'main' | 'data' | 'cloud' | 'ai' | 'preferences' | 'guide' | 'nfc' | 'templates' | 'narrative_prompt'>('main');
     const [webdavConfig, setWebdavConfig] = useState<WebDAVConfig | null>(null);
     const [isSyncing, setIsSyncing] = useState(false);
@@ -1064,6 +1066,34 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
                 </div>
 
                 <div className="flex-1 overflow-y-auto p-4 pb-40">
+                    {/* User Personal Info Section */}
+                    <div className="bg-white rounded-2xl p-6 shadow-sm space-y-4 mb-4">
+                        <div className="flex items-center gap-2 mb-2">
+                            <div className="w-10 h-10 rounded-xl bg-amber-50 flex items-center justify-center text-amber-500">
+                                <User size={20} />
+                            </div>
+                            <div>
+                                <h4 className="font-bold text-stone-800 text-[15px]">个人信息</h4>
+                                <p className="text-xs text-stone-400 mt-0.5">让 AI 了解你的背景，生成更贴合的叙事</p>
+                            </div>
+                        </div>
+
+                        <textarea
+                            className="w-full h-32 bg-stone-50 border border-stone-200 rounded-xl p-4 text-xs text-stone-600 outline-none focus:border-stone-400 resize-none leading-relaxed"
+                            value={userPersonalInfo || ''}
+                            onChange={(e) => {
+                                onSetUserPersonalInfo?.(e.target.value);
+                            }}
+                            placeholder="例如：我是一名正在攻读博士学位的研究生..."
+                            maxLength={2000}
+                        />
+
+                        <p className="text-[10px] text-stone-400 text-center">
+                            🔒 隐私说明：您的信息将发送给配置的 AI 服务商用于生成个性化叙事
+                        </p>
+                    </div>
+
+                    {/* AI Narrative Prompt Section */}
                     <div className="bg-white rounded-2xl p-6 shadow-sm space-y-4">
                         <div className="flex items-center gap-2 mb-2">
                             <div className="w-10 h-10 rounded-xl bg-purple-50 flex items-center justify-center text-purple-500">
@@ -1079,6 +1109,8 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
                             <p className="mb-2">💡 <strong>可用占位符:</strong></p>
                             <ul className="space-y-1 ml-4">
                                 <li><code className="text-stone-700 bg-white px-1 py-0.5 rounded">{'${date}'}</code> - 回顾日期</li>
+                                <li><code className="text-stone-700 bg-white px-1 py-0.5 rounded">{'${userInfo}'}</code> - 用户个人信息</li>
+                                <li><code className="text-stone-700 bg-white px-1 py-0.5 rounded">{'${scopesInfo}'}</code> - 人生领域信息</li>
                                 <li><code className="text-stone-700 bg-white px-1 py-0.5 rounded">{'${statsText}'}</code> - 时间统计数据</li>
                                 <li><code className="text-stone-700 bg-white px-1 py-0.5 rounded">{'${timelineText}'}</code> - 活动时间轴</li>
                                 <li><code className="text-stone-700 bg-white px-1 py-0.5 rounded">{'${answersText}'}</code> - 回顾问答内容</li>
