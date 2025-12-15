@@ -654,7 +654,7 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ logs, todos, scopes,
             {/* Floating AI Button (Above Add) */}
             <button
                 onClick={() => setIsAIModalOpen(true)}
-                className="fixed bottom-40 right-6 w-12 h-12 bg-white text-purple-600 rounded-full shadow-xl flex items-center justify-center active:scale-90 transition-transform z-40 border border-purple-100"
+                className="fixed bottom-40 right-6 w-12 h-12 bg-white text-amber-400 rounded-full shadow-xl flex items-center justify-center active:scale-90 transition-transform z-40 border border-amber-100"
                 title="AI Magic Backfill"
             >
                 <Sparkles size={20} />

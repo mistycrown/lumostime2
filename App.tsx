@@ -877,7 +877,7 @@ const App: React.FC = () => {
       return;
     }
     setDataLastModified(Date.now());
-  }, [logs, todos, categories, todoCategories, scopes, goals, autoLinkRules]);
+  }, [logs, todos, categories, todoCategories, scopes, goals, autoLinkRules, reviewTemplates, dailyReviews, aiNarrativePrompt, userPersonalInfo]);
 
   // --- Sync Logic ---
 
@@ -928,6 +928,8 @@ const App: React.FC = () => {
           autoLinkRules,
           reviewTemplates,
           dailyReviews,
+          aiNarrativePrompt,
+          userPersonalInfo,
           version: '1.0.0',
           timestamp: Date.now()
         };
@@ -939,7 +941,7 @@ const App: React.FC = () => {
     }, 30000); // 30s debounce
 
     return () => clearTimeout(timer);
-  }, [logs, todos, categories, todoCategories, scopes, goals, autoLinkRules, lastSyncTime]);
+  }, [logs, todos, categories, todoCategories, scopes, goals, autoLinkRules, reviewTemplates, dailyReviews, aiNarrativePrompt, userPersonalInfo, lastSyncTime]);
 
   // --- NFC / Deep Link Handling ---
   useEffect(() => {
@@ -1071,6 +1073,8 @@ const App: React.FC = () => {
             autoLinkRules,
             reviewTemplates,
             dailyReviews,
+            aiNarrativePrompt,
+            userPersonalInfo,
             version: '1.0.0',
             timestamp: Date.now()
           };
@@ -1081,7 +1085,7 @@ const App: React.FC = () => {
 
     document.addEventListener('visibilitychange', handleVisibilityChange);
     return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
-  }, [logs, todos, categories, todoCategories, scopes, goals, autoLinkRules]);
+  }, [logs, todos, categories, todoCategories, scopes, goals, autoLinkRules, reviewTemplates, dailyReviews, aiNarrativePrompt, userPersonalInfo]);
 
   // 4. Hardware Back Button Handling
   useEffect(() => {
@@ -1527,6 +1531,10 @@ const App: React.FC = () => {
         scopes,
         goals,
         autoLinkRules,
+        reviewTemplates,
+        dailyReviews,
+        aiNarrativePrompt,
+        userPersonalInfo,
         timestamp: dataLastModified, // Use tracked modification time
         version: '1.0.0'
       };
