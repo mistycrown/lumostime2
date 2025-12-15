@@ -536,14 +536,22 @@ export const TagDetailView: React.FC<TagDetailViewProps> = ({ tagId, logs, todos
                                  {monthHours}<span className="text-sm text-stone-400 mx-1 font-sans">h</span>{monthMins}<span className="text-sm text-stone-400 ml-1 font-sans">m</span>
                               </span>
                            </div>
-                           <div className="text-xs text-stone-500 bg-stone-100 inline-block px-2 py-1 rounded mt-2 font-medium">
-                              Recorded {tagLogs.length} days / {monthDays} days
-                           </div>
+                           {(() => {
+                              const totalDays = new Set(tagLogs.map(l => new Date(l.startTime).toDateString())).size;
+                              return (
+                                 <div className="text-xs text-stone-500 bg-stone-100 inline-block px-2 py-1 rounded mt-2 font-medium">
+                                    Recorded {totalDays} days / {monthDays} days
+                                 </div>
+                              );
+                           })()}
                         </div>
                         <div className="text-right">
                            <div className="text-[10px] uppercase tracking-widest text-stone-400 mb-1 font-bold">Avg. Daily</div>
                            <div className="text-lg font-bold text-stone-700 font-mono">
-                              {tagLogs.length > 0 ? Math.round(totalSeconds / 60 / tagLogs.length) : 0}m
+                              {(() => {
+                                 const totalDays = new Set(tagLogs.map(l => new Date(l.startTime).toDateString())).size;
+                                 return totalDays > 0 ? Math.round(totalSeconds / 60 / totalDays) : 0;
+                              })()}m
                               <span className="text-base text-stone-400 mx-2 font-sans">/</span>
                               <span className="text-base font-bold text-stone-600">
                                  {monthDays > 0 ? Math.round(monthSeconds / 60 / monthDays) : 0}m
