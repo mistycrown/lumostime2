@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { ChevronLeft, Trash2, Sparkles, Edit3, RefreshCw } from 'lucide-react';
-import { DailyReview, ReviewTemplate, ReviewAnswer, Category, Log, TodoCategory, TodoItem, Scope } from '../types';
+import { DailyReview, ReviewTemplate, ReviewAnswer, Category, Log, TodoCategory, TodoItem, Scope, ReviewQuestion } from '../types';
 import * as LucideIcons from 'lucide-react';
 
 interface DailyReviewViewProps {
@@ -38,6 +38,18 @@ export const DailyReviewView: React.FC<DailyReviewViewProps> = ({
     const [isEditing, setIsEditing] = useState(false);
     const [isGenerating, setIsGenerating] = useState(false);
     const [editedNarrative, setEditedNarrative] = useState('');
+
+    // 初始化阅读模式状态
+    const [isReadingMode, setIsReadingMode] = useState(() => {
+        return localStorage.getItem('dailyReview_guideMode') === 'reading';
+    });
+
+    // 切换阅读模式
+    const toggleReadingMode = () => {
+        const newMode = !isReadingMode;
+        setIsReadingMode(newMode);
+        localStorage.setItem('dailyReview_guideMode', newMode ? 'reading' : 'editing');
+    };
 
     // 格式化日期
     const formatDate = (d: Date) => {
@@ -88,7 +100,14 @@ export const DailyReviewView: React.FC<DailyReviewViewProps> = ({
             const duration = linkedLogs.reduce((acc, l) => acc + (l.duration || 0), 0);
             const percentage = totalDuration > 0 ? (duration / totalDuration) * 100 : 0;
 
-            return { ...cat, duration, percentage };
+            // 计算每个具体待办的时长
+            const todoItems = catTodos.map(todo => {
+                const todoLogs = dayLogs.filter(l => l.linkedTodoId === todo.id);
+                const todoDuration = todoLogs.reduce((acc, l) => acc + (l.duration || 0), 0);
+                return { ...todo, duration: todoDuration };
+            }).filter(t => t.duration > 0);
+
+            return { ...cat, duration, percentage, todos: todoItems };
         }).filter(c => c.duration > 0);
 
         // 领域统计
@@ -207,8 +226,8 @@ export const DailyReviewView: React.FC<DailyReviewViewProps> = ({
         onUpdateReview(updatedReview);
     };
 
-    // 渲染问题
-    const renderQuestion = (q: typeof enabledQuestions[0]) => {
+    // 渲染问题 (编辑模式)
+    const renderQuestion = (q: ReviewQuestion) => {
         const answer = answers.find(a => a.questionId === q.id);
 
         if (q.type === 'text') {
@@ -219,7 +238,7 @@ export const DailyReviewView: React.FC<DailyReviewViewProps> = ({
                         value={answer?.answer || ''}
                         onChange={(e) => updateAnswer(q.id, q.question, e.target.value)}
                         className="w-full bg-stone-50 border border-stone-200 rounded-xl px-4 py-3 text-stone-800 outline-none focus:border-stone-400 transition-colors resize-none"
-                        rows={3}
+                        rows={2}
                         placeholder="输入你的回答..."
                     />
                 </div>
@@ -249,22 +268,31 @@ export const DailyReviewView: React.FC<DailyReviewViewProps> = ({
         }
 
         if (q.type === 'rating') {
-            const IconComponent = q.icon ? (LucideIcons as any)[q.icon.charAt(0).toUpperCase() + q.icon.slice(1)] : LucideIcons.Star;
-            const rating = answer?.answer ? parseInt(answer.answer) : 0;
+            const getIcon = (iconName?: string) => {
+                if (!iconName) return LucideIcons.Star;
+                const Icon = (LucideIcons as any)[iconName] || (LucideIcons as any)[iconName.charAt(0).toUpperCase() + iconName.slice(1)];
+                return Icon || LucideIcons.Star;
+            };
+            const RatingIcon = getIcon(q.icon);
+            const currentRating = parseInt(answer?.answer || '0');
 
             return (
                 <div key={q.id} className="space-y-2">
                     <label className="text-sm font-medium text-stone-700">{q.question}</label>
-                    <div className="flex gap-2">
-                        {[1, 2, 3, 4, 5].map(score => (
+                    <div className="flex gap-4">
+                        {[1, 2, 3, 4, 5].map((rating) => (
                             <button
-                                key={score}
-                                onClick={() => updateAnswer(q.id, q.question, String(score))}
-                                className="transition-all hover:scale-110"
+                                key={rating}
+                                onClick={() => updateAnswer(q.id, q.question, rating.toString())}
+                                className={`p-2 rounded-xl transition-all ${currentRating >= rating
+                                    ? 'text-amber-400 bg-amber-50 scale-110'
+                                    : 'text-stone-200 hover:text-stone-300'
+                                    }`}
                             >
-                                <IconComponent
+                                <RatingIcon
                                     size={32}
-                                    className={score <= rating ? 'fill-amber-400 text-amber-400' : 'text-stone-300'}
+                                    fill={currentRating >= rating ? "currentColor" : "none"}
+                                    strokeWidth={currentRating >= rating ? 0 : 2}
                                 />
                             </button>
                         ))}
@@ -274,6 +302,64 @@ export const DailyReviewView: React.FC<DailyReviewViewProps> = ({
         }
 
         return null;
+    };
+
+    // 渲染问题 (阅读模式 - 小票风格)
+    const renderReadingQuestion = (q: ReviewQuestion) => {
+        const answer = answers.find(a => a.questionId === q.id);
+        const hasAnswer = answer?.answer && answer.answer.trim().length > 0;
+
+        return (
+            <div key={q.id}>
+                <p className="text-[15px] font-bold text-stone-800 mb-2">{q.question}</p>
+
+                <div className="pl-3 border-l-2 border-stone-200">
+                    {q.type === 'text' && (
+                        <div className={`text-sm leading-relaxed ${!hasAnswer ? 'text-stone-400 italic' : 'text-stone-600'}`}>
+                            {hasAnswer ? answer.answer : '未填写'}
+                        </div>
+                    )}
+
+                    {q.type === 'choice' && (
+                        <div className="flex gap-2 flex-wrap pt-1">
+                            {q.choices?.map(choice => (
+                                <span
+                                    key={choice}
+                                    className={`px-3 py-1 rounded text-xs font-medium border ${answer?.answer === choice
+                                        ? 'bg-stone-800 text-white border-stone-800'
+                                        : 'text-stone-400 border-stone-200'
+                                        }`}
+                                >
+                                    {choice}
+                                </span>
+                            ))}
+                        </div>
+                    )}
+
+                    {q.type === 'rating' && (
+                        <div className="flex gap-1 pt-1">
+                            {[1, 2, 3, 4, 5].map((rating) => {
+                                const currentRating = parseInt(answer?.answer || '0');
+                                const getIcon = (iconName?: string) => {
+                                    if (!iconName) return LucideIcons.Star;
+                                    const Icon = (LucideIcons as any)[iconName] || (LucideIcons as any)[iconName.charAt(0).toUpperCase() + iconName.slice(1)];
+                                    return Icon || LucideIcons.Star;
+                                };
+                                const RatingIcon = getIcon(q.icon);
+                                return (
+                                    <RatingIcon
+                                        key={rating}
+                                        size={18}
+                                        className={currentRating >= rating ? "text-amber-500" : "text-stone-200"}
+                                        fill={currentRating >= rating ? "currentColor" : "none"}
+                                    />
+                                );
+                            })}
+                        </div>
+                    )}
+                </div>
+            </div>
+        );
     };
 
     return (
@@ -354,19 +440,31 @@ export const DailyReviewView: React.FC<DailyReviewViewProps> = ({
                         {stats.todoStats.length > 0 && (
                             <div className="bg-white rounded-2xl p-5 shadow-sm">
                                 <h3 className="text-sm font-bold text-stone-400 uppercase tracking-wider mb-4">待办统计</h3>
-                                <div className="space-y-2">
-                                    {stats.todoStats.map(todo => (
-                                        <div key={todo.id} className="flex items-center justify-between">
-                                            <div className="flex items-center gap-2">
-                                                <span className="text-base">{todo.icon}</span>
-                                                <span className="font-medium text-stone-700 text-sm">{todo.name}</span>
+                                <div className="space-y-3">
+                                    {stats.todoStats.map(todoCat => (
+                                        <div key={todoCat.id}>
+                                            <div className="flex items-center justify-between mb-2">
+                                                <div className="flex items-center gap-2">
+                                                    <span className="text-base">{todoCat.icon}</span>
+                                                    <span className="font-bold text-stone-700 text-sm">{todoCat.name}</span>
+                                                </div>
+                                                <div className="flex items-center gap-2">
+                                                    <span className="text-xs text-stone-400">{formatDuration(todoCat.duration)}</span>
+                                                    <span className="text-xs font-bold px-2 py-0.5 bg-stone-100 rounded text-stone-500">
+                                                        {todoCat.percentage.toFixed(0)}%
+                                                    </span>
+                                                </div>
                                             </div>
-                                            <div className="flex items-center gap-2">
-                                                <span className="text-xs text-stone-400">{formatDuration(todo.duration)}</span>
-                                                <span className="text-xs font-bold px-2 py-0.5 bg-stone-100 rounded text-stone-500">
-                                                    {todo.percentage.toFixed(0)}%
-                                                </span>
-                                            </div>
+                                            {todoCat.todos && todoCat.todos.length > 0 && (
+                                                <div className="ml-6 space-y-1">
+                                                    {todoCat.todos.map(todo => (
+                                                        <div key={todo.id} className="flex items-center justify-between text-xs">
+                                                            <span className="text-stone-500">{todo.title}</span>
+                                                            <span className="text-stone-400">{formatDuration(todo.duration)}</span>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            )}
                                         </div>
                                     ))}
                                 </div>
@@ -401,22 +499,69 @@ export const DailyReviewView: React.FC<DailyReviewViewProps> = ({
                 {/* Tab 2: Guide */}
                 {activeTab === 'guide' && (
                     <div className="space-y-6 animate-in fade-in duration-300">
-                        {enabledQuestions.length === 0 ? (
+                        {templates.filter(t => t.enabled).length === 0 ? (
                             <div className="text-center py-12">
                                 <p className="text-stone-400">暂无启用的回顾模板</p>
                                 <p className="text-xs text-stone-300 mt-2">请在设置中启用回顾模板</p>
                             </div>
                         ) : (
-                            enabledQuestions.map((q, index) => (
-                                <div key={q.id} className="bg-white rounded-2xl p-5 shadow-sm">
-                                    {index === 0 || enabledQuestions[index - 1].templateTitle !== q.templateTitle ? (
-                                        <h3 className="text-xs font-bold text-stone-400 uppercase tracking-wider mb-4">
-                                            {q.templateTitle}
-                                        </h3>
-                                    ) : null}
-                                    {renderQuestion(q)}
+                            isReadingMode ? (
+                                // 阅读模式 (小票风格 - 优化版)
+                                <div className="space-y-8 px-1 pb-8">
+                                    {templates.filter(t => t.enabled).map((template, idx, arr) => (
+                                        <div key={template.id}>
+                                            <div className="space-y-6 mb-8">
+                                                <h3 className="text-base font-bold text-stone-900">
+                                                    {template.title}
+                                                </h3>
+                                                <div className="space-y-8 pl-1">
+                                                    {template.questions.map(q => renderReadingQuestion(q))}
+                                                </div>
+                                            </div>
+                                            {/* 模板分割线 (除了最后一个) */}
+                                            {idx < arr.length - 1 && (
+                                                <div className="h-px bg-stone-100" />
+                                            )}
+                                        </div>
+                                    ))}
                                 </div>
-                            ))
+                            ) : (
+                                // 编辑模式 (卡片风格)
+                                templates.filter(t => t.enabled).map(template => (
+                                    <div key={template.id} className="bg-white rounded-2xl p-5 shadow-sm">
+                                        <h3 className="text-sm font-bold text-stone-400 uppercase tracking-wider mb-4">
+                                            {template.title}
+                                        </h3>
+                                        <div className="space-y-6">
+                                            {template.questions.map(q => (
+                                                <div key={q.id}>
+                                                    {renderQuestion(q)}
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                ))
+                            )
+                        )}
+
+                        {/* Mode Toggle Button */}
+                        {templates.filter(t => t.enabled).length > 0 && (
+                            <button
+                                onClick={toggleReadingMode}
+                                className="w-full py-4 text-stone-400 hover:text-stone-600 transition-colors flex items-center justify-center gap-2 text-sm font-medium"
+                            >
+                                {isReadingMode ? (
+                                    <>
+                                        <Edit3 size={16} />
+                                        <span>切换编辑模式</span>
+                                    </>
+                                ) : (
+                                    <>
+                                        <LucideIcons.BookOpen size={16} />
+                                        <span>切换阅读模式</span>
+                                    </>
+                                )}
+                            </button>
                         )}
                     </div>
                 )}

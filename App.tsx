@@ -1214,9 +1214,24 @@ const App: React.FC = () => {
   };
 
   const handleGenerateNarrative = async (review: DailyReview, statsText: string, timelineText: string): Promise<string> => {
+    // 调试信息：发送给AI的内容
+    console.log('%c[AI Request] Generating Narrative...', 'color: #3b82f6; font-weight: bold');
+    console.log('Input Data:', {
+      date: review.date,
+      stats: statsText,
+      timeline: timelineText,
+      answers: review.answers
+    });
+
     // TODO: 实现AI调用
     // 暂时返回一个占位文本
-    return `今天是${review.date}的一天。\n\n${statsText}\n\n${timelineText}\n\n基于我的回顾：\n${review.answers.map(a => `${a.question}: ${a.answer}`).join('\n')}`;
+    const mockResponse = `今天是${review.date}的一天。\n\n${statsText}\n\n${timelineText}\n\n基于我的回顾：\n${review.answers.map(a => `${a.question}: ${a.answer}`).join('\n')}`;
+
+    // 调试信息：AI返回的结果
+    console.log('%c[AI Response] Received Result:', 'color: #10b981; font-weight: bold');
+    console.log('Output:', mockResponse);
+
+    return mockResponse;
   };
 
   const renderView = () => {
