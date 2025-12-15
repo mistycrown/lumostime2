@@ -508,7 +508,7 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ logs, todos, scopes,
                                         className="text-left hover:text-amber-600 transition-colors group"
                                     >
                                         <h3 className="font-bold text-stone-900 text-lg group-hover:text-amber-600 transition-colors">
-                                            今日回顾
+                                            {dailyReview ? '今日回顾' : '准备好开始回顾了吗？'}
                                         </h3>
                                     </button>
                                 </div>
