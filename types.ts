@@ -158,3 +158,46 @@ export interface AutoLinkRule {
   activityId: string; // 关联的 Activity ID
   scopeId: string;    // 自动关联的 Scope ID
 }
+
+// ========== Daily Review (每日回顾) ==========
+
+// 回顾模板问题类型
+export type QuestionType = 'text' | 'choice' | 'rating';
+
+// 回顾模板问题
+export interface ReviewQuestion {
+  id: string;
+  question: string;
+  type: QuestionType;
+  choices?: string[]; // 选择题选项，用分号分隔
+  icon?: string; // 打分题的Lucide图标名称，如'star', 'heart'等
+}
+
+// 回顾模板
+export interface ReviewTemplate {
+  id: string;
+  title: string;
+  questions: ReviewQuestion[];
+  isSystem: boolean; // 是否系统预设
+  order: number;
+  enabled: boolean; // 是否启用
+}
+
+// 问题回答
+export interface ReviewAnswer {
+  questionId: string;
+  question: string; // 保存问题文本，以防模板被修改
+  answer: string; // 文本答案或选择的选项
+}
+
+// 每日回顾
+export interface DailyReview {
+  id: string;
+  date: string; // YYYY-MM-DD格式
+  createdAt: number;
+  updatedAt: number;
+  answers: ReviewAnswer[]; // 引导问答的答案
+  narrative?: string; // AI生成的叙事
+  narrativeUpdatedAt?: number;
+  isEdited?: boolean; // 叙事是否被手动编辑过
+}

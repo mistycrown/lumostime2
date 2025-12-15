@@ -1,4 +1,5 @@
-import { Category, Log, AppView, TodoCategory, TodoItem, Scope, Goal } from './types';
+import { Category, Log, AppView, TodoCategory, TodoItem, Scope, Goal, ReviewTemplate } from './types';
+
 
 // --- Colors ---
 // Provide a palette for consistent usage (Tailwind text classes mapped to implicit bg via component logic)
@@ -168,7 +169,7 @@ export const INITIAL_GOALS: Goal[] = [
     id: 'goal_1',
     title: 'Q1 广韵文献攻坚',
     scopeId: 's1', // 专业输入
-    filterTags: ['reading'], // 仅计算阅读活动
+    filterActivityIds: ['reading'], // 仅计算阅读活动
     startDate: '2025-01-01',
     endDate: '2025-03-31',
     metric: 'duration_raw',
@@ -424,7 +425,7 @@ export const INITIAL_LOGS: Log[] = [
 ];
 
 export const VIEW_TITLES: Record<AppView, string> = {
-  [AppView.RECORD]: 'Lumos Time',
+  [AppView.RECORD]: 'Lumo Time',
   [AppView.TIMELINE]: '时间轴',
   [AppView.STATS]: '数据统计',
   [AppView.TAGS]: '标签管理',
@@ -432,3 +433,107 @@ export const VIEW_TITLES: Record<AppView, string> = {
   [AppView.TODO]: 'TODO',
   [AppView.SETTINGS]: '设置',
 };
+
+// ========== Daily Review Templates (每日回顾模板) ==========
+
+export const DEFAULT_REVIEW_TEMPLATES: ReviewTemplate[] = [
+  {
+    id: 'template-emotion',
+    title: '情绪感知',
+    isSystem: true,
+    order: 1,
+    enabled: true,
+    questions: [
+      {
+        id: 'q-emotion-1',
+        question: '今天的高光时刻是什么？',
+        type: 'text'
+      },
+      {
+        id: 'q-emotion-2',
+        question: '低谷时刻是什么？',
+        type: 'text'
+      },
+      {
+        id: 'q-emotion-3',
+        question: '能量状态如何？',
+        type: 'choice',
+        choices: ['高能量', '中能量', '低能量']
+      },
+      {
+        id: 'q-emotion-4',
+        question: '给今天打个分',
+        type: 'rating',
+        icon: 'star'
+      }
+    ]
+  },
+  {
+    id: 'template-growth',
+    title: '成长反思',
+    isSystem: true,
+    order: 2,
+    enabled: true,
+    questions: [
+      {
+        id: 'q-growth-1',
+        question: '今天学到了什么？',
+        type: 'text'
+      },
+      {
+        id: 'q-growth-2',
+        question: '遇到了什么挑战？如何应对的？',
+        type: 'text'
+      },
+      {
+        id: 'q-growth-3',
+        question: '明天想要改进的一件事？',
+        type: 'text'
+      }
+    ]
+  },
+  {
+    id: 'template-gratitude',
+    title: '感恩记录',
+    isSystem: true,
+    order: 3,
+    enabled: true,
+    questions: [
+      {
+        id: 'q-gratitude-1',
+        question: '今天感激的三件事？',
+        type: 'text'
+      },
+      {
+        id: 'q-gratitude-2',
+        question: '谁给了你帮助或支持？',
+        type: 'text'
+      }
+    ]
+  },
+  {
+    id: 'template-achievement',
+    title: '成就盘点',
+    isSystem: true,
+    order: 4,
+    enabled: true,
+    questions: [
+      {
+        id: 'q-achievement-1',
+        question: '今天完成的主要任务？',
+        type: 'text'
+      },
+      {
+        id: 'q-achievement-2',
+        question: '最满意的成果是什么？',
+        type: 'text'
+      },
+      {
+        id: 'q-achievement-3',
+        question: '完成度如何？',
+        type: 'choice',
+        choices: ['超出预期', '符合预期', '低于预期']
+      }
+    ]
+  }
+];

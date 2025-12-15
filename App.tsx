@@ -40,6 +40,7 @@ import {
   Settings
 } from 'lucide-react';
 import { App as CapacitorApp } from '@capacitor/app';
+import { Capacitor } from '@capacitor/core';
 import { Buffer } from 'buffer';
 
 // Polyfill Buffer for webdav library
@@ -983,7 +984,12 @@ const App: React.FC = () => {
     let scanListenerHandle: any = null;
 
     setupListener().then(h => listenerHandle = h);
-    setupNfcScanListener().then(h => scanListenerHandle = h);
+
+    // 仅在移动平台注册 NFC 监听器,避免 Web/Electron 环境报错
+    const platform = Capacitor.getPlatform();
+    if (platform === 'android' || platform === 'ios') {
+      setupNfcScanListener().then(h => scanListenerHandle = h);
+    }
 
     return () => {
       if (listenerHandle) listenerHandle.remove();
@@ -1166,13 +1172,30 @@ const App: React.FC = () => {
             onDateChange={setCurrentDate}
             onShowStats={() => setCurrentView(AppView.STATS)}
             onBatchAddLogs={handleBatchAddLogs}
-            onSync={() => {
-              // Trigger explicit sync download (or sync check)
-              // But maybe user just wants to see status?
-              // Let's do a download check
-              webdavService.downloadData().then(data => {
-                if (data) handleSyncDataUpdate(data);
-              });
+            onSync={async (e) => {
+              e.preventDefault();
+              setIsSyncing(true);
+              try {
+                const data = await webdavService.downloadData();
+                if (data) {
+                  // 统计数据量
+                  const logCount = data.logs?.length || 0;
+                  const todoCount = data.todos?.length || 0;
+
+                  handleSyncDataUpdate(data);
+                  updateLastSyncTime();
+
+                  // 明确的同步方向和数据量
+                  addToast('success', `✓ 已从云端拉取: ${logCount}条记录, ${todoCount}个待办`);
+                } else {
+                  addToast('info', '云端暂无备份数据');
+                }
+              } catch (error) {
+                console.error('Sync error:', error);
+                addToast('error', '从云端拉取失败,请检查配置');
+              } finally {
+                setIsSyncing(false);
+              }
             }}
             isSyncing={isSyncing}
             todoCategories={todoCategories}
