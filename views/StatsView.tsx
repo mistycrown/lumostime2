@@ -81,8 +81,8 @@ export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentD
   const [touchStart, setTouchStart] = useState<number | null>(null);
   const [touchEnd, setTouchEnd] = useState<number | null>(null);
 
-  // 最小滑动距离（像素）
-  const minSwipeDistance = 50;
+  // 最小滑动距离（像素）- 增加阈值以降低灵敏度，减少误触
+  const minSwipeDistance = 100;
 
   const onTouchStart = (e: React.TouchEvent) => {
     setTouchEnd(null);
