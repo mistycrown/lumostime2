@@ -215,7 +215,7 @@ export const CalendarWidget: React.FC<CalendarWidgetProps> = ({ currentDate, onD
                     <div className="px-6 pb-6 animate-in fade-in duration-300">
                         {viewMode === 'calendar' ? (
                             <>
-                                <div className="flex items-center justify-between mb-4 px-2">
+                                <div className="flex items-center justify-between mt-3 mb-4 px-2">
                                     <button onClick={() => switchMonth(-1)} className="p-1 hover:bg-stone-100 rounded-full"><ChevronLeft size={20} /></button>
                                     <button onClick={() => setViewMode('month_year')} className="font-bold text-stone-800 hover:bg-stone-100 px-2 py-1 rounded-lg transition-colors">
                                         {currentDate.getFullYear()} . {currentDate.getMonth() + 1}
@@ -379,7 +379,7 @@ export const CalendarWidget: React.FC<CalendarWidgetProps> = ({ currentDate, onD
                         ) : (
                             // Month/Year Picker Mode
                             <div className="flex flex-col h-[280px]">
-                                <div className="flex items-center justify-between mb-6 px-4">
+                                <div className="flex items-center justify-between mt-3 mb-0 px-4">
                                     <button onClick={() => switchYear(-1)} className="p-2 hover:bg-stone-100 rounded-full"><ChevronLeft size={24} /></button>
                                     <span className="text-2xl font-bold text-stone-800">{currentDate.getFullYear()}</span>
                                     <button onClick={() => switchYear(1)} className="p-2 hover:bg-stone-100 rounded-full"><ChevronRight size={24} /></button>
