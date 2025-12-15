@@ -171,6 +171,7 @@ export interface ReviewQuestion {
   type: QuestionType;
   choices?: string[]; // 选择题选项，用分号分隔
   icon?: string; // 打分题的Lucide图标名称，如'star', 'heart'等
+  colorId?: string; // 打分题的颜色ID，对应 COLOR_OPTIONS
 }
 
 // 回顾模板

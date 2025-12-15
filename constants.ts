@@ -5,24 +5,24 @@ import { Category, Log, AppView, TodoCategory, TodoItem, Scope, Goal, ReviewTemp
 // Provide a palette for consistent usage (Tailwind text classes mapped to implicit bg via component logic)
 // The user requested "Optional Colors Option". We can define them here for reference or use them in future Settings.
 export const COLOR_OPTIONS = [
-  { id: 'stone', label: 'Stone', hex: '#f5f5f4', bg: 'bg-stone-100', text: 'text-stone-700', border: 'border-stone-200', title: 'text-stone-600', ring: 'ring-stone-300' },
-  { id: 'red', label: 'Red', hex: '#fee2e2', bg: 'bg-red-100', text: 'text-red-700', border: 'border-red-200', title: 'text-red-600', ring: 'ring-red-300' },
-  { id: 'orange', label: 'Orange', hex: '#ffedd5', bg: 'bg-orange-100', text: 'text-orange-700', border: 'border-orange-200', title: 'text-orange-600', ring: 'ring-orange-300' },
-  { id: 'amber', label: 'Amber', hex: '#fef3c7', bg: 'bg-amber-100', text: 'text-amber-700', border: 'border-amber-200', title: 'text-amber-600', ring: 'ring-amber-300' },
-  { id: 'yellow', label: 'Yellow', hex: '#fef9c3', bg: 'bg-yellow-100', text: 'text-yellow-700', border: 'border-yellow-200', title: 'text-yellow-600', ring: 'ring-yellow-300' },
-  { id: 'lime', label: 'Lime', hex: '#ecfccb', bg: 'bg-lime-100', text: 'text-lime-700', border: 'border-lime-200', title: 'text-lime-600', ring: 'ring-lime-300' },
-  { id: 'green', label: 'Green', hex: '#dcfce7', bg: 'bg-green-100', text: 'text-green-700', border: 'border-green-200', title: 'text-green-600', ring: 'ring-green-300' },
-  { id: 'emerald', label: 'Emerald', hex: '#d1fae5', bg: 'bg-emerald-100', text: 'text-emerald-700', border: 'border-emerald-200', title: 'text-emerald-600', ring: 'ring-emerald-300' },
-  { id: 'teal', label: 'Teal', hex: '#ccfbf1', bg: 'bg-teal-100', text: 'text-teal-700', border: 'border-teal-200', title: 'text-teal-600', ring: 'ring-teal-300' },
-  { id: 'cyan', label: 'Cyan', hex: '#cffafe', bg: 'bg-cyan-100', text: 'text-cyan-700', border: 'border-cyan-200', title: 'text-cyan-600', ring: 'ring-cyan-300' },
-  { id: 'sky', label: 'Sky', hex: '#e0f2fe', bg: 'bg-sky-100', text: 'text-sky-700', border: 'border-sky-200', title: 'text-sky-600', ring: 'ring-sky-300' },
-  { id: 'blue', label: 'Blue', hex: '#dbeafe', bg: 'bg-blue-100', text: 'text-blue-700', border: 'border-blue-200', title: 'text-blue-600', ring: 'ring-blue-300' },
-  { id: 'indigo', label: 'Indigo', hex: '#e0e7ff', bg: 'bg-indigo-100', text: 'text-indigo-700', border: 'border-indigo-200', title: 'text-indigo-600', ring: 'ring-indigo-300' },
-  { id: 'violet', label: 'Violet', hex: '#ede9fe', bg: 'bg-violet-100', text: 'text-violet-700', border: 'border-violet-200', title: 'text-violet-600', ring: 'ring-violet-300' },
-  { id: 'purple', label: 'Purple', hex: '#f3e8ff', bg: 'bg-purple-100', text: 'text-purple-700', border: 'border-purple-200', title: 'text-purple-600', ring: 'ring-purple-300' },
-  { id: 'fuchsia', label: 'Fuchsia', hex: '#fae8ff', bg: 'bg-fuchsia-100', text: 'text-fuchsia-700', border: 'border-fuchsia-200', title: 'text-fuchsia-600', ring: 'ring-fuchsia-300' },
-  { id: 'pink', label: 'Pink', hex: '#fce7f3', bg: 'bg-pink-100', text: 'text-pink-700', border: 'border-pink-200', title: 'text-pink-600', ring: 'ring-pink-300' },
-  { id: 'rose', label: 'Rose', hex: '#ffe4e6', bg: 'bg-rose-100', text: 'text-rose-700', border: 'border-rose-200', title: 'text-rose-600', ring: 'ring-rose-300' },
+  { id: 'stone', label: 'Stone', hex: '#f5f5f4', bg: 'bg-stone-50', text: 'text-stone-500', border: 'border-stone-200', title: 'text-stone-600', ring: 'ring-stone-200', picker: 'bg-stone-200' },
+  { id: 'red', label: 'Red', hex: '#fee2e2', bg: 'bg-red-50', text: 'text-red-500', border: 'border-red-200', title: 'text-red-600', ring: 'ring-red-200', picker: 'bg-red-200' },
+  { id: 'orange', label: 'Orange', hex: '#ffedd5', bg: 'bg-orange-50', text: 'text-orange-500', border: 'border-orange-200', title: 'text-orange-600', ring: 'ring-orange-200', picker: 'bg-orange-200' },
+  { id: 'amber', label: 'Amber', hex: '#fef3c7', bg: 'bg-amber-50', text: 'text-amber-500', border: 'border-amber-200', title: 'text-amber-600', ring: 'ring-amber-200', picker: 'bg-amber-200' },
+  { id: 'yellow', label: 'Yellow', hex: '#fef9c3', bg: 'bg-yellow-50', text: 'text-yellow-500', border: 'border-yellow-200', title: 'text-yellow-600', ring: 'ring-yellow-200', picker: 'bg-yellow-200' },
+  { id: 'lime', label: 'Lime', hex: '#ecfccb', bg: 'bg-lime-50', text: 'text-lime-500', border: 'border-lime-200', title: 'text-lime-600', ring: 'ring-lime-200', picker: 'bg-lime-200' },
+  { id: 'green', label: 'Green', hex: '#dcfce7', bg: 'bg-green-50', text: 'text-green-500', border: 'border-green-200', title: 'text-green-600', ring: 'ring-green-200', picker: 'bg-green-200' },
+  { id: 'emerald', label: 'Emerald', hex: '#d1fae5', bg: 'bg-emerald-50', text: 'text-emerald-500', border: 'border-emerald-200', title: 'text-emerald-600', ring: 'ring-emerald-200', picker: 'bg-emerald-200' },
+  { id: 'teal', label: 'Teal', hex: '#ccfbf1', bg: 'bg-teal-50', text: 'text-teal-500', border: 'border-teal-200', title: 'text-teal-600', ring: 'ring-teal-200', picker: 'bg-teal-200' },
+  { id: 'cyan', label: 'Cyan', hex: '#cffafe', bg: 'bg-cyan-50', text: 'text-cyan-500', border: 'border-cyan-200', title: 'text-cyan-600', ring: 'ring-cyan-200', picker: 'bg-cyan-200' },
+  { id: 'sky', label: 'Sky', hex: '#e0f2fe', bg: 'bg-sky-50', text: 'text-sky-500', border: 'border-sky-200', title: 'text-sky-600', ring: 'ring-sky-200', picker: 'bg-sky-200' },
+  { id: 'blue', label: 'Blue', hex: '#dbeafe', bg: 'bg-blue-50', text: 'text-blue-500', border: 'border-blue-200', title: 'text-blue-600', ring: 'ring-blue-200', picker: 'bg-blue-200' },
+  { id: 'indigo', label: 'Indigo', hex: '#e0e7ff', bg: 'bg-indigo-50', text: 'text-indigo-500', border: 'border-indigo-200', title: 'text-indigo-600', ring: 'ring-indigo-200', picker: 'bg-indigo-200' },
+  { id: 'violet', label: 'Violet', hex: '#ede9fe', bg: 'bg-violet-50', text: 'text-violet-500', border: 'border-violet-200', title: 'text-violet-600', ring: 'ring-violet-200', picker: 'bg-violet-200' },
+  { id: 'purple', label: 'Purple', hex: '#f3e8ff', bg: 'bg-purple-50', text: 'text-purple-500', border: 'border-purple-200', title: 'text-purple-600', ring: 'ring-purple-200', picker: 'bg-purple-200' },
+  { id: 'fuchsia', label: 'Fuchsia', hex: '#fae8ff', bg: 'bg-fuchsia-50', text: 'text-fuchsia-500', border: 'border-fuchsia-200', title: 'text-fuchsia-600', ring: 'ring-fuchsia-200', picker: 'bg-fuchsia-200' },
+  { id: 'pink', label: 'Pink', hex: '#fce7f3', bg: 'bg-pink-50', text: 'text-pink-500', border: 'border-pink-200', title: 'text-pink-600', ring: 'ring-pink-200', picker: 'bg-pink-200' },
+  { id: 'rose', label: 'Rose', hex: '#ffe4e6', bg: 'bg-rose-50', text: 'text-rose-500', border: 'border-rose-200', title: 'text-rose-600', ring: 'ring-rose-200', picker: 'bg-rose-200' },
 ];
 
 
@@ -439,7 +439,7 @@ export const VIEW_TITLES: Record<AppView, string> = {
 export const DEFAULT_REVIEW_TEMPLATES: ReviewTemplate[] = [
   {
     id: 'template-emotion',
-    title: '情绪感知',
+    title: '🌟 情绪感知',
     isSystem: true,
     order: 1,
     enabled: true,
@@ -470,7 +470,7 @@ export const DEFAULT_REVIEW_TEMPLATES: ReviewTemplate[] = [
   },
   {
     id: 'template-growth',
-    title: '成长反思',
+    title: '🌱 成长反思',
     isSystem: true,
     order: 2,
     enabled: true,
@@ -494,7 +494,7 @@ export const DEFAULT_REVIEW_TEMPLATES: ReviewTemplate[] = [
   },
   {
     id: 'template-gratitude',
-    title: '感恩记录',
+    title: '🙏 感恩记录',
     isSystem: true,
     order: 3,
     enabled: true,
@@ -513,7 +513,7 @@ export const DEFAULT_REVIEW_TEMPLATES: ReviewTemplate[] = [
   },
   {
     id: 'template-achievement',
-    title: '成就盘点',
+    title: '🏆 成就盘点',
     isSystem: true,
     order: 4,
     enabled: true,

@@ -896,6 +896,8 @@ const App: React.FC = () => {
           scopes,
           goals,
           autoLinkRules,
+          reviewTemplates,
+          dailyReviews,
           version: '1.0.0',
           timestamp: Date.now()
         };
@@ -1037,6 +1039,8 @@ const App: React.FC = () => {
             scopes,
             goals,
             autoLinkRules,
+            reviewTemplates,
+            dailyReviews,
             version: '1.0.0',
             timestamp: Date.now()
           };
@@ -1502,6 +1506,8 @@ Guidelines:
     if (data.scopes) setScopes(data.scopes);
     if (data.goals) setGoals(data.goals);
     if (data.autoLinkRules) setAutoLinkRules(data.autoLinkRules);
+    if (data.reviewTemplates) setReviewTemplates(data.reviewTemplates);
+    if (data.dailyReviews) setDailyReviews(data.dailyReviews);
 
     if (data.timestamp) {
       setDataLastModified(data.timestamp);
@@ -1668,6 +1674,8 @@ Guidelines:
               setCategories(CATEGORIES);
               setScopes(SCOPES);
               setTodoCategories(MOCK_TODO_CATEGORIES);
+              setReviewTemplates(DEFAULT_REVIEW_TEMPLATES);
+              setDailyReviews([]);
               addToast('success', 'Data reset to defaults');
               setIsSettingsOpen(false);
             }}
@@ -1676,6 +1684,8 @@ Guidelines:
               setTodos([]);
               setGoals([]);
               setScopes([]);
+              setReviewTemplates([]);
+              setDailyReviews([]);
               addToast('success', 'All data cleared successfully');
               setIsSettingsOpen(false);
             }}
@@ -1714,6 +1724,8 @@ Guidelines:
                   if (data.scopes) setScopes(data.scopes);
                   if (data.goals) setGoals(data.goals);
                   if (data.autoLinkRules) setAutoLinkRules(data.autoLinkRules);
+                  if (data.reviewTemplates) setReviewTemplates(data.reviewTemplates);
+                  if (data.dailyReviews) setDailyReviews(data.dailyReviews);
                   if (data.timestamp) setDataLastModified(data.timestamp);
                   addToast('success', 'Data imported successfully!');
                   setIsSettingsOpen(false); // Close settings after import to see changes
@@ -1724,7 +1736,7 @@ Guidelines:
               reader.readAsText(file);
             }}
             onToast={addToast}
-            syncData={{ logs, todos, categories, todoCategories, scopes, goals, autoLinkRules }}
+            syncData={{ logs, todos, categories, todoCategories, scopes, goals, autoLinkRules, reviewTemplates, dailyReviews }}
             onSyncUpdate={handleSyncDataUpdate}
             startWeekOnSunday={startWeekOnSunday}
             onToggleStartWeekOnSunday={() => setStartWeekOnSunday(!startWeekOnSunday)}
@@ -1740,6 +1752,8 @@ Guidelines:
             onSetMinIdleTimeThreshold={setMinIdleTimeThreshold}
             defaultView={defaultView}
             onSetDefaultView={setDefaultView}
+            reviewTemplates={reviewTemplates}
+            onUpdateReviewTemplates={setReviewTemplates}
           />
         )}
 

@@ -44,6 +44,8 @@ import { CustomSelect } from '../components/CustomSelect';
 import { ToastType } from '../components/Toast';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import { ReviewTemplateManageView } from './ReviewTemplateManageView';
+import { ReviewTemplate } from '../types';
 // @ts-ignore
 import userGuideContent from '../USER_GUIDE.md?raw';
 
@@ -64,6 +66,9 @@ interface SettingsViewProps {
     onSetMinIdleTimeThreshold?: (val: number) => void;
     defaultView?: string;
     onSetDefaultView?: (view: any) => void;
+    // Daily Review Templates
+    reviewTemplates?: ReviewTemplate[];
+    onUpdateReviewTemplates?: (templates: ReviewTemplate[]) => void;
 }
 
 const AI_PRESETS = {
@@ -85,8 +90,8 @@ const AI_PRESETS = {
     }
 };
 
-export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, onImport, onReset, onClearData, onToast, syncData, onSyncUpdate, startWeekOnSunday, onToggleStartWeekOnSunday, onOpenAutoLink, onOpenSearch, minIdleTimeThreshold = 1, onSetMinIdleTimeThreshold, defaultView = 'RECORD', onSetDefaultView }) => {
-    const [activeSubmenu, setActiveSubmenu] = useState<'main' | 'data' | 'cloud' | 'ai' | 'preferences' | 'guide' | 'nfc'>('main');
+export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, onImport, onReset, onClearData, onToast, syncData, onSyncUpdate, startWeekOnSunday, onToggleStartWeekOnSunday, onOpenAutoLink, onOpenSearch, minIdleTimeThreshold = 1, onSetMinIdleTimeThreshold, defaultView = 'RECORD', onSetDefaultView, reviewTemplates = [], onUpdateReviewTemplates }) => {
+    const [activeSubmenu, setActiveSubmenu] = useState<'main' | 'data' | 'cloud' | 'ai' | 'preferences' | 'guide' | 'nfc' | 'templates'>('main');
     const [webdavConfig, setWebdavConfig] = useState<WebDAVConfig | null>(null);
     const [isSyncing, setIsSyncing] = useState(false);
 
@@ -997,6 +1002,22 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
         )
     }
 
+    if (activeSubmenu === 'templates') {
+        return (
+            <ReviewTemplateManageView
+                templates={reviewTemplates}
+                onUpdateTemplates={(newTemplates) => {
+                    onUpdateReviewTemplates?.(newTemplates);
+                    // Also update syncData if connected to ensure changes sync
+                    if (webdavConfig) {
+                        onSyncUpdate({ ...syncData, reviewTemplates: newTemplates });
+                    }
+                }}
+                onBack={() => setActiveSubmenu('main')}
+            />
+        );
+    }
+
     return (
         <div className="fixed inset-0 z-50 bg-[#fdfbf7] flex flex-col font-serif animate-in slide-in-from-right duration-300 pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">
             {/* Header */}
@@ -1046,6 +1067,18 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
                             label="偏好设置"
                             isLast
                             onClick={() => setActiveSubmenu('preferences')}
+                        />
+                    </div>
+                </div>
+                {/* Section: Daily Review */}
+                <div className="space-y-3">
+                    <h3 className="text-[10px] font-bold text-stone-400 uppercase tracking-wider pl-2">每日回顾</h3>
+                    <div className="bg-white rounded-2xl overflow-hidden shadow-[0_2px_10px_rgba(0,0,0,0.03)]">
+                        <MenuItem
+                            icon={<FileText size={18} className="text-orange-500" />}
+                            label="回顾模板"
+                            isLast
+                            onClick={() => setActiveSubmenu('templates')}
                         />
                     </div>
                 </div>
