@@ -29,11 +29,59 @@ git push --force
 1. 在每天时间轴的下面，导出日报按钮的上面，增加一个按钮“准备好回顾今天了吗？”
 样式和下面的导出日报按钮一样，防止在同一个div中。icon+标题。
 ```
-<div class="mt-8"><button class="flex items-center gap-2 text-stone-400 hover:text-stone-600 transition-colors text-xs font-medium"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-share" aria-hidden="true"><path d="M12 2v13"></path><path d="m16 6-4-4-4 4"></path><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"></path></svg><span>导出日报</span></button></div>
+<div class="mt-8 mb-2">
+  <button class="flex items-center gap-2 text-stone-500 hover:text-stone-800 transition-colors text-xs font-medium group">
+    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-sparkles group-hover:text-amber-500 transition-colors" aria-hidden="true">
+      <path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/>
+    </svg>
+    <span>准备好回顾今天了吗？</span>
+  </button>
+</div>
+
+<div class="mt-2">
+  <button class="flex items-center gap-2 text-stone-400 hover:text-stone-600 transition-colors text-xs font-medium">
+    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-share" aria-hidden="true"><path d="M12 2v13"></path><path d="m16 6-4-4-4 4"></path><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"></path></svg>
+    <span>导出日报</span>
+  </button>
+</div>
 ```
 
 2. 点击按钮后，进入“每日回顾页”（标题用英文）页面的样式模仿标签详情页。
-标题用
+标题用&符号引出，然后写出今天的日期，比如 &2025-12-16。
+下面是tab导航。分成数据、引导、叙事。
+Tab 1: 数据 - 详细逻辑
+复制粘贴数据统计页面环形图部分的标签统计、待办统计、领域统计的代码。只是不显示环形图，只显示数据。
+
+Tab 2: 引导 - 详细逻辑
+读取用户设置，展现用户所勾选的每日回顾引导模块。
+每一模块之间用分割线表示。依次列出问题。
+选用与主题风格一致的ui。
+页面最末尾添加封存按钮，封存后的日记，引导问题不再受到设置调整的影响。点击封存后，按钮变成“已封存”，再次点击，可以编辑文本，按钮变成“封存”。
+该页面有实时保存功能，确保用户中途退出不会丢失数据。
+
+Tab 3: 叙事 - 详细逻辑
+首先展示一个“生成”按钮，点击后，
+结合用户填写的引导问题，结合今日的数据（可以复用时间轴导出文本+数据统计环形图导出数据文本），发送给ai，让ai生成一篇第一人称的叙述日记。提示词先随便写，后面再调整。
+将ai返回结果存储到这一页。
+页面底部也有编辑按钮，用户点击后可进行修改/保存
+
+3. 自定义设置。在设置页中增加一项具体的设置“每日回顾引导”。
+用户可以自定义回顾模板，每个模板由标题和几个问题组成。比如：
+
+```
+title：情绪感知
+今天的高光时刻是什么？
+低谷时刻是什么？
+能量状态如何？[高能量；中能量；低能量]
+```
+
+系统预设一些模板，用户也可以自定义新建模板。
+模板中的每一行，为一个问题，在每日回顾-引导页分开呈现。
+问答题格式：一个提问框，一个输入框。
+选择题格式：一个提问框，下面一行是均分分布的选项，如：
+能量状态如何？
+[高能量；中能量；低能量]
+
 
 
 # 20251205

@@ -160,11 +160,11 @@ export const CalendarWidget: React.FC<CalendarWidgetProps> = ({ currentDate, onD
             </div>
 
             {/* Calendar Area */}
-            <div className={`transition-all duration-500 ease-in-out overflow-hidden ${isExpanded ? 'max-h-[400px] opacity-100' : 'max-h-[80px] opacity-100'}`}>
+            <div className={`transition-all duration-500 ease-in-out overflow-hidden ${isExpanded ? 'max-h-[400px] opacity-100' : 'max-h-[75px] opacity-100'}`}>
 
                 {!isExpanded ? (
                     // Week View (Collapsed)
-                    <div className="flex justify-between items-center px-4 pb-4 md:justify-center md:gap-8 h-[80px]">
+                    <div className="flex justify-between items-center px-4 pb-1 md:justify-center md:gap-8 h-[75px]">
                         {getWeekDays().map((day, idx) => {
                             const selected = !disableSelection && isSameDay(day, currentDate);
                             const today = isToday(day);
