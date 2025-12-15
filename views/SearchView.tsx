@@ -140,9 +140,9 @@ export const SearchView: React.FC<SearchViewProps> = ({
         : 0;
 
     return (
-        <div className="fixed inset-0 z-50 bg-[#fdfbf7] flex flex-col animate-in slide-in-from-right duration-300">
+        <div className="fixed inset-0 z-50 bg-[#fdfbf7] flex flex-col pt-[env(safe-area-inset-top)] animate-in slide-in-from-right duration-300">
             {/* Header */}
-            <div className="flex items-center gap-3 px-4 h-14 border-b border-stone-100 bg-[#fdfbf7]/80 backdrop-blur-md sticky top-0">
+            <div className="flex items-center gap-3 px-4 pt-4 pb-3 border-b border-stone-100 bg-[#fdfbf7]/80 backdrop-blur-md sticky top-0">
                 <button
                     onClick={onClose}
                     className="text-stone-400 hover:text-stone-600 p-1"

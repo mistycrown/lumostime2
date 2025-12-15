@@ -16,12 +16,13 @@ interface TagDetailViewProps {
    onToggleTodo: (id: string) => void;
    categories: Category[];
    onUpdateActivity: (activity: Activity) => void;
+   onCategoryChange?: (activityId: string, newCategoryId: string) => void;
    onEditLog?: (log: Log) => void;
    onEditTodo?: (todo: TodoItem) => void;
    scopes: Scope[];
 }
 
-export const TagDetailView: React.FC<TagDetailViewProps> = ({ tagId, logs, todos, onToggleTodo, categories, onUpdateActivity, onEditLog, onEditTodo, scopes }) => {
+export const TagDetailView: React.FC<TagDetailViewProps> = ({ tagId, logs, todos, onToggleTodo, categories, onUpdateActivity, onCategoryChange, onEditLog, onEditTodo, scopes }) => {
    // Find Activity and Category
    let initialActivity: Activity | undefined;
    let initialCategory: Category | undefined;
@@ -47,6 +48,7 @@ export const TagDetailView: React.FC<TagDetailViewProps> = ({ tagId, logs, todos
    const [analysisDate, setAnalysisDate] = useState(new Date());
    const [newKeyword, setNewKeyword] = useState(''); // New State for adding keyword
    const [expandedKeywords, setExpandedKeywords] = useState<Set<string>>(new Set()); // Track expanded keyword sections
+   const [isCategoryDropdownOpen, setIsCategoryDropdownOpen] = useState(false); // State for category dropdown
 
    // Sync state when categories prop changes (e.g., after save)
    useEffect(() => {
@@ -59,6 +61,23 @@ export const TagDetailView: React.FC<TagDetailViewProps> = ({ tagId, logs, todos
          }
       }
    }, [categories, tagId]);
+
+   // Close dropdown when clicking outside
+   useEffect(() => {
+      const handleClickOutside = (event: MouseEvent) => {
+         if (isCategoryDropdownOpen) {
+            const target = event.target as HTMLElement;
+            if (!target.closest('.category-dropdown-container')) {
+               setIsCategoryDropdownOpen(false);
+            }
+         }
+      };
+
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => {
+         document.removeEventListener('mousedown', handleClickOutside);
+      };
+   }, [isCategoryDropdownOpen]);
 
    if (!activity || !category) return <div>Tag not found</div>;
 
@@ -193,26 +212,25 @@ export const TagDetailView: React.FC<TagDetailViewProps> = ({ tagId, logs, todos
       setActivity({ ...activity, color });
    };
 
-   // Keyword Logic
+   // Keyword Logic - 颜色按跳跃式排列，相邻颜色对比度高
    const KEYWORD_COLORS = [
-      'bg-stone-50 text-stone-500 border-stone-100 hover:bg-stone-100',
-      'bg-red-50 text-red-500 border-red-100 hover:bg-red-100',
-      'bg-orange-50 text-orange-500 border-orange-100 hover:bg-orange-100',
-      'bg-amber-50 text-amber-500 border-amber-100 hover:bg-amber-100',
-      'bg-yellow-50 text-yellow-500 border-yellow-100 hover:bg-yellow-100',
-      'bg-lime-50 text-lime-500 border-lime-100 hover:bg-lime-100',
-      'bg-green-50 text-green-500 border-green-100 hover:bg-green-100',
-      'bg-emerald-50 text-emerald-500 border-emerald-100 hover:bg-emerald-100',
-      'bg-teal-50 text-teal-500 border-teal-100 hover:bg-teal-100',
-      'bg-cyan-50 text-cyan-500 border-cyan-100 hover:bg-cyan-100',
-      'bg-sky-50 text-sky-500 border-sky-100 hover:bg-sky-100',
-      'bg-blue-50 text-blue-500 border-blue-100 hover:bg-blue-100',
-      'bg-indigo-50 text-indigo-500 border-indigo-100 hover:bg-indigo-100',
-      'bg-violet-50 text-violet-500 border-violet-100 hover:bg-violet-100',
-      'bg-purple-50 text-purple-500 border-purple-100 hover:bg-purple-100',
-      'bg-fuchsia-50 text-fuchsia-500 border-fuchsia-100 hover:bg-fuchsia-100',
-      'bg-pink-50 text-pink-500 border-pink-100 hover:bg-pink-100',
-      'bg-rose-50 text-rose-500 border-rose-100 hover:bg-rose-100',
+      'bg-red-100 text-red-600 border-red-200 hover:bg-red-200',        // 红
+      'bg-cyan-100 text-cyan-600 border-cyan-200 hover:bg-cyan-200',    // 青
+      'bg-yellow-100 text-yellow-600 border-yellow-200 hover:bg-yellow-200',  // 黄
+      'bg-blue-100 text-blue-600 border-blue-200 hover:bg-blue-200',    // 蓝
+      'bg-orange-100 text-orange-600 border-orange-200 hover:bg-orange-200',  // 橙
+      'bg-teal-100 text-teal-600 border-teal-200 hover:bg-teal-200',    // 蓝绿
+      'bg-amber-100 text-amber-600 border-amber-200 hover:bg-amber-200',  // 琥珀
+      'bg-indigo-100 text-indigo-600 border-indigo-200 hover:bg-indigo-200',  // 靛蓝
+      'bg-lime-100 text-lime-600 border-lime-200 hover:bg-lime-200',    // 青柠
+      'bg-purple-100 text-purple-600 border-purple-200 hover:bg-purple-200',  // 紫
+      'bg-green-100 text-green-600 border-green-200 hover:bg-green-200',  // 绿
+      'bg-fuchsia-100 text-fuchsia-600 border-fuchsia-200 hover:bg-fuchsia-200',  // 紫红
+      'bg-emerald-100 text-emerald-600 border-emerald-200 hover:bg-emerald-200',  // 翠绿
+      'bg-pink-100 text-pink-600 border-pink-200 hover:bg-pink-200',    // 粉
+      'bg-sky-100 text-sky-600 border-sky-200 hover:bg-sky-200',        // 天蓝
+      'bg-rose-100 text-rose-600 border-rose-200 hover:bg-rose-200',    // 玫瑰
+      'bg-violet-100 text-violet-600 border-violet-200 hover:bg-violet-200',  // 紫罗兰
    ];
 
    const getKeywordColor = (keyword: string) => {
@@ -271,6 +289,44 @@ export const TagDetailView: React.FC<TagDetailViewProps> = ({ tagId, logs, todos
                               onChange={(e) => handleNameChange(e.target.value)}
                               className="w-full bg-stone-50 border border-stone-200 rounded-xl px-4 py-3 text-stone-800 font-bold outline-none focus:border-stone-400 transition-colors"
                            />
+                        </div>
+                        <div>
+                           <label className="text-xs text-stone-400 font-medium mb-1.5 block">一级分类</label>
+                           <div className="relative category-dropdown-container">
+                              <button
+                                 onClick={() => setIsCategoryDropdownOpen(!isCategoryDropdownOpen)}
+                                 className="w-full bg-stone-50 border border-stone-200 rounded-xl px-4 py-3 text-stone-800 font-bold outline-none hover:border-stone-400 transition-colors flex items-center justify-between"
+                              >
+                                 <div className="flex items-center gap-2">
+                                    <span className="text-lg">{category?.icon}</span>
+                                    <span>{category?.name}</span>
+                                 </div>
+                                 <ChevronDown size={18} className={`text-stone-400 transition-transform ${isCategoryDropdownOpen ? 'rotate-180' : ''}`} />
+                              </button>
+                              {isCategoryDropdownOpen && (
+                                 <div className="absolute z-10 w-full mt-2 bg-white border border-stone-200 rounded-xl shadow-lg max-h-60 overflow-y-auto">
+                                    {categories.map(cat => (
+                                       <button
+                                          key={cat.id}
+                                          onClick={() => {
+                                             if (onCategoryChange && cat.id !== category?.id) {
+                                                onCategoryChange(activity.id, cat.id);
+                                                setCategory(cat);
+                                             }
+                                             setIsCategoryDropdownOpen(false);
+                                          }}
+                                          className={`w-full px-4 py-3 text-left hover:bg-stone-50 transition-colors flex items-center gap-2 ${cat.id === category?.id ? 'bg-stone-100' : ''}`}
+                                       >
+                                          <span className="text-lg">{cat.icon}</span>
+                                          <span className="font-bold text-stone-800">{cat.name}</span>
+                                          {cat.id === category?.id && (
+                                             <Check size={16} className="ml-auto text-stone-600" />
+                                          )}
+                                       </button>
+                                    ))}
+                                 </div>
+                              )}
+                           </div>
                         </div>
                      </div>
                   </div>
