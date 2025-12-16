@@ -526,7 +526,7 @@ export const TagDetailView: React.FC<TagDetailViewProps> = ({ tagId, logs, todos
                         disableSelection={true}
                      />
 
-                     <div className="px-6 pb-6 pt-2 flex items-end justify-between">
+                     <div className="px-6 pb-6 pt-2 flex flex-wrap gap-y-4 items-end justify-between">
                         <div>
                            <div className="text-[10px] uppercase tracking-widest text-stone-400 mb-1 font-bold">Total Time</div>
                            <div className="text-2xl font-bold text-stone-900 font-mono">
@@ -545,7 +545,7 @@ export const TagDetailView: React.FC<TagDetailViewProps> = ({ tagId, logs, todos
                               );
                            })()}
                         </div>
-                        <div className="text-right">
+                        <div className="text-right ml-auto">
                            <div className="text-[10px] uppercase tracking-widest text-stone-400 mb-1 font-bold">Avg. Daily</div>
                            <div className="text-lg font-bold text-stone-700 font-mono">
                               {(() => {
