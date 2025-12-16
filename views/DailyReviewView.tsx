@@ -1,11 +1,13 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { ChevronLeft, Trash2, Sparkles, Edit3, RefreshCw } from 'lucide-react';
-import { DailyReview, ReviewTemplate, ReviewAnswer, Category, Log, TodoCategory, TodoItem, Scope, ReviewQuestion } from '../types';
+import { DailyReview, ReviewTemplate, ReviewAnswer, Category, Log, TodoCategory, TodoItem, Scope, ReviewQuestion, NarrativeTemplate } from '../types';
 import { COLOR_OPTIONS } from '../constants';
 import * as LucideIcons from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import remarkBreaks from 'remark-breaks';
 import { ConfirmModal } from '../components/ConfirmModal';
+import { NarrativeStyleSelectionModal } from '../components/NarrativeStyleSelectionModal';
 
 interface DailyReviewViewProps {
     review: DailyReview;
@@ -16,9 +18,10 @@ interface DailyReviewViewProps {
     todos: TodoItem[];
     todoCategories: TodoCategory[];
     scopes: Scope[];
+    customNarrativeTemplates?: NarrativeTemplate[];
     onDelete: () => void;
     onUpdateReview: (review: DailyReview) => void;
-    onGenerateNarrative: (review: DailyReview, statsText: string, timelineText: string) => Promise<string>;
+    onGenerateNarrative: (review: DailyReview, statsText: string, timelineText: string, promptTemplate?: string) => Promise<string>;
     addToast: (message: string, type: 'success' | 'error' | 'info') => void; // Assuming ToastType is 'success' | 'error' | 'info'
 }
 
@@ -46,6 +49,7 @@ export const DailyReviewView: React.FC<DailyReviewViewProps> = ({
     todos,
     todoCategories,
     scopes,
+    customNarrativeTemplates,
     onDelete,
     onUpdateReview,
     onGenerateNarrative,
@@ -57,6 +61,7 @@ export const DailyReviewView: React.FC<DailyReviewViewProps> = ({
     const [isEditing, setIsEditing] = useState(false);
     const [isGenerating, setIsGenerating] = useState(false);
     const [editedNarrative, setEditedNarrative] = useState('');
+    const [isStyleModalOpen, setIsStyleModalOpen] = useState(false);
 
     // 初始化阅读模式状态
     const [isReadingMode, setIsReadingMode] = useState(() => {
@@ -187,8 +192,14 @@ export const DailyReviewView: React.FC<DailyReviewViewProps> = ({
         onUpdateReview(updatedReview);
     };
 
-    // 生成叙事
-    const handleGenerateNarrative = async () => {
+    // 生成叙事 - Step 1: Open Modal
+    const handleGenerateNarrative = () => {
+        setIsStyleModalOpen(true);
+    };
+
+    // 生成叙事 - Step 2: Execute with Selected Template
+    const handleSelectStyle = async (template: NarrativeTemplate) => {
+        setIsStyleModalOpen(false);
         setIsGenerating(true);
         try {
             // 生成统计文本
@@ -212,7 +223,7 @@ export const DailyReviewView: React.FC<DailyReviewViewProps> = ({
                 return `${startTime.getHours()}:${String(startTime.getMinutes()).padStart(2, '0')}-${endTime.getHours()}:${String(endTime.getMinutes()).padStart(2, '0')} ${act?.name || ''} ${log.note ? '- ' + log.note : ''}`;
             }).join('\n');
 
-            const generated = await onGenerateNarrative(review, statsText, timelineText);
+            const generated = await onGenerateNarrative(review, statsText, timelineText, template.prompt);
             setNarrative(generated);
             setEditedNarrative(generated); // Sync to edit box
 
@@ -667,8 +678,9 @@ export const DailyReviewView: React.FC<DailyReviewViewProps> = ({
                                     </div>
                                 ) : (
                                     <div className="px-1 prose prose-stone max-w-none text-[15px] leading-relaxed prose-headings:font-bold prose-headings:text-stone-800 prose-headings:my-5 prose-strong:text-stone-900 mb-24">
+                                        {/* ... (in rendering) */}
                                         <ReactMarkdown
-                                            remarkPlugins={[remarkGfm]}
+                                            remarkPlugins={[remarkGfm, remarkBreaks]}
                                             components={{
                                                 p: ({ node, ...props }) => <p className="mb-6 last:mb-0" {...props} />,
                                                 blockquote: ({ node, ...props }) => <blockquote className="border-l-4 border-stone-300 pl-4 italic text-stone-600 my-6 font-serif bg-stone-50 py-2 pr-2 rounded-r" {...props} />
@@ -717,6 +729,14 @@ export const DailyReviewView: React.FC<DailyReviewViewProps> = ({
                     {isEditing ? <LucideIcons.Check size={24} /> : <Edit3 size={24} />}
                 </button>
             )}
+            {/* Narrative Style Selection Modal */}
+            <NarrativeStyleSelectionModal
+                isOpen={isStyleModalOpen}
+                onClose={() => setIsStyleModalOpen(false)}
+                onSelect={handleSelectStyle}
+                customTemplates={customNarrativeTemplates}
+            />
+
             {/* Delete Confirmation Modal */}
             <ConfirmModal
                 isOpen={isDeleteConfirmOpen}

@@ -35,7 +35,8 @@ import {
     Search,
     ChevronDown,
     Nfc,
-
+    Edit2,
+    PlusCircle
 } from 'lucide-react';
 import { webdavService, WebDAVConfig } from '../services/webdavService';
 import { NfcService } from '../services/NfcService';
@@ -45,7 +46,7 @@ import { ToastType } from '../components/Toast';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { ReviewTemplateManageView } from './ReviewTemplateManageView';
-import { ReviewTemplate } from '../types';
+import { ReviewTemplate, NarrativeTemplate } from '../types';
 import { DEFAULT_NARRATIVE_PROMPT } from '../services/narrativeService';
 import { NARRATIVE_TEMPLATES } from '../constants';
 // @ts-ignore
@@ -74,13 +75,11 @@ interface SettingsViewProps {
     // Daily Review Time
     dailyReviewTime?: string;
     onSetDailyReviewTime?: (time: string) => void;
-    aiNarrativePrompt?: string;
-    onSetAiNarrativePrompt?: (prompt: string) => void;
-    onResetAiNarrativePrompt?: () => void;
+    // AI Narrative
+    customNarrativeTemplates?: NarrativeTemplate[];
+    onUpdateCustomNarrativeTemplates?: (templates: NarrativeTemplate[]) => void;
     userPersonalInfo?: string;
     onSetUserPersonalInfo?: (info: string) => void;
-    narrativeTemplateId?: string;
-    onSetNarrativeTemplateId?: (id: string) => void;
 }
 
 const AI_PRESETS = {
@@ -102,29 +101,14 @@ const AI_PRESETS = {
     }
 };
 
-export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, onImport, onReset, onClearData, onToast, syncData, onSyncUpdate, startWeekOnSunday, onToggleStartWeekOnSunday, onOpenAutoLink, onOpenSearch, minIdleTimeThreshold = 1, onSetMinIdleTimeThreshold, defaultView = 'RECORD', onSetDefaultView, reviewTemplates = [], onUpdateReviewTemplates, dailyReviewTime, onSetDailyReviewTime, aiNarrativePrompt, onSetAiNarrativePrompt, onResetAiNarrativePrompt, userPersonalInfo, onSetUserPersonalInfo, narrativeTemplateId, onSetNarrativeTemplateId }) => {
+export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, onImport, onReset, onClearData, onToast, syncData, onSyncUpdate, startWeekOnSunday, onToggleStartWeekOnSunday, onOpenAutoLink, onOpenSearch, minIdleTimeThreshold = 1, onSetMinIdleTimeThreshold, defaultView = 'RECORD', onSetDefaultView, reviewTemplates = [], onUpdateReviewTemplates, dailyReviewTime, onSetDailyReviewTime, customNarrativeTemplates, onUpdateCustomNarrativeTemplates, userPersonalInfo, onSetUserPersonalInfo }) => {
     const [activeSubmenu, setActiveSubmenu] = useState<'main' | 'data' | 'cloud' | 'ai' | 'preferences' | 'guide' | 'nfc' | 'templates' | 'narrative_prompt'>('main');
     const [webdavConfig, setWebdavConfig] = useState<WebDAVConfig | null>(null);
     const [isSyncing, setIsSyncing] = useState(false);
 
-    // AI Narrative Prompt editor state (moved to top level to avoid Hooks rules violation)
-    const [localPrompt, setLocalPrompt] = useState(aiNarrativePrompt || DEFAULT_NARRATIVE_PROMPT);
-    const [hasPromptChanges, setHasPromptChanges] = useState(false);
-
-    // Local state for narrative_prompt page
-    const [localUserInfo, setLocalUserInfo] = useState(userPersonalInfo || '');
-    const [hasNarrativeChanges, setHasNarrativeChanges] = useState(false);
-
-    // Sync local prompt when prop changes
-    useEffect(() => {
-        setLocalPrompt(aiNarrativePrompt || DEFAULT_NARRATIVE_PROMPT);
-        setHasPromptChanges(false);
-    }, [aiNarrativePrompt]);
-
     // Sync local user info when prop changes
     useEffect(() => {
-        setLocalUserInfo(userPersonalInfo || '');
-        setHasNarrativeChanges(false);
+        // We handle local user info state inside the specific submenu render to avoid conflicts
     }, [userPersonalInfo]);
 
     // NFC State
@@ -163,7 +147,19 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
     const [confirmClear, setConfirmClear] = useState(false);
 
     // AI Config State
-    // AI Config State
+    const [localUserInfo, setLocalUserInfo] = useState(userPersonalInfo || '');
+    const [showAddTemplateModal, setShowAddTemplateModal] = useState(false);
+    const [editingTemplate, setEditingTemplate] = useState<NarrativeTemplate | null>(null);
+
+    // Modal State for Narrative Templates
+    const [modalTitle, setModalTitle] = useState('');
+    const [modalDesc, setModalDesc] = useState('');
+    const [modalPrompt, setModalPrompt] = useState('');
+    const [modalError, setModalError] = useState('');
+
+    useEffect(() => {
+        setLocalUserInfo(userPersonalInfo || '');
+    }, [userPersonalInfo]);
     const [aiConfigForm, setAiConfigForm] = useState<AIConfig>({ provider: 'openai', apiKey: '', baseUrl: '', modelName: '' });
     const [activePreset, setActivePreset] = useState<string>('openai');
     const [aiTestStatus, setAiTestStatus] = useState<'idle' | 'testing' | 'success' | 'error'>('idle');
@@ -646,6 +642,67 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
         );
     }
 
+    const handleSaveUserInfo = () => {
+        onSetUserPersonalInfo?.(localUserInfo);
+        onToast('success', '个人信息已保存');
+    };
+
+    const handleAddTemplate = () => {
+        setEditingTemplate(null);
+        setModalTitle('');
+        setModalDesc('');
+        setModalPrompt('');
+        setModalError('');
+        setShowAddTemplateModal(true);
+    };
+
+    const handleEditTemplate = (template: NarrativeTemplate) => {
+        setEditingTemplate(template);
+        setModalTitle(template.title);
+        setModalDesc(template.description);
+        setModalPrompt(template.prompt);
+        setModalError('');
+        setShowAddTemplateModal(true);
+    };
+
+    const handleDeleteTemplate = (id: string) => {
+        if (window.confirm('确定要删除这个自定义模板吗？')) {
+            const newTemplates = (customNarrativeTemplates || []).filter(t => t.id !== id);
+            onUpdateCustomNarrativeTemplates?.(newTemplates);
+            onToast('success', '模板已删除');
+        }
+    };
+
+    const handleSaveTemplate = () => {
+        if (!modalTitle.trim()) {
+            setModalError('标题不能为空');
+            return;
+        }
+        if (!modalPrompt.trim()) {
+            setModalError('提示词不能为空');
+            return;
+        }
+
+        const newTemplate: NarrativeTemplate = {
+            id: editingTemplate ? editingTemplate.id : `custom_${Date.now()}`,
+            title: modalTitle.trim(),
+            description: modalDesc.trim(),
+            prompt: modalPrompt,
+            isCustom: true
+        };
+
+        let updatedTemplates = [...(customNarrativeTemplates || [])];
+        if (editingTemplate) {
+            updatedTemplates = updatedTemplates.map(t => t.id === editingTemplate.id ? newTemplate : t);
+        } else {
+            updatedTemplates.push(newTemplate);
+        }
+
+        onUpdateCustomNarrativeTemplates?.(updatedTemplates);
+        setShowAddTemplateModal(false);
+        onToast('success', editingTemplate ? '模板已更新' : '新模板已创建');
+    };
+
     if (activeSubmenu === 'data') {
         return (
             <div className="fixed inset-0 z-50 bg-[#fdfbf7] flex flex-col font-serif animate-in slide-in-from-right duration-300 pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">
@@ -1054,19 +1111,6 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
     }
 
     if (activeSubmenu === 'narrative_prompt') {
-        const handleSave = () => {
-            onSetUserPersonalInfo?.(localUserInfo);
-            onSetAiNarrativePrompt?.(localPrompt);
-            setHasNarrativeChanges(false);
-            onToast('success', 'AI 叙事设定已保存');
-        };
-
-        const handleReset = () => {
-            onResetAiNarrativePrompt?.();
-            setHasNarrativeChanges(false);
-            onToast('success', '已恢复默认提示词');
-        };
-
         return (
             <div className="fixed inset-0 z-50 bg-[#fdfbf7] flex flex-col font-serif animate-in slide-in-from-right duration-300 pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">
                 <div className="flex items-center gap-3 px-4 h-14 border-b border-stone-100 bg-[#fdfbf7]/80 backdrop-blur-md sticky top-0 z-10">
@@ -1095,115 +1139,149 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
                         <textarea
                             className="w-full h-32 bg-stone-50 border border-stone-200 rounded-xl p-4 text-xs text-stone-600 outline-none focus:border-stone-400 resize-none leading-relaxed"
                             value={localUserInfo}
-                            onChange={(e) => {
-                                setLocalUserInfo(e.target.value);
-                                setHasNarrativeChanges(true);
-                            }}
+                            onChange={(e) => setLocalUserInfo(e.target.value)}
                             placeholder="例如：我是一名正在攻读博士学位的研究生..."
                             maxLength={2000}
                         />
 
-                        <p className="text-[10px] text-stone-400 text-center">
-                            🔒 隐私说明：您的信息将发送给配置的 AI 服务商用于生成个性化叙事
-                        </p>
+                        <div className="flex justify-end">
+                            <button
+                                onClick={handleSaveUserInfo}
+                                disabled={localUserInfo === (userPersonalInfo || '')}
+                                className={`text-sm font-bold px-4 py-2 rounded-lg transition-colors ${localUserInfo !== (userPersonalInfo || '')
+                                    ? 'bg-stone-800 text-white'
+                                    : 'bg-stone-100 text-stone-400'
+                                    }`}
+                            >
+                                保存信息
+                            </button>
+                        </div>
                     </div>
 
-                    {/* Narrative Template Selector */}
+                    {/* Custom Templates List */}
                     <div className="bg-white rounded-2xl p-6 shadow-sm space-y-4">
-                        <div className="flex items-center gap-2 mb-2">
-                            <div className="w-10 h-10 rounded-xl bg-indigo-50 flex items-center justify-center text-indigo-500">
-                                <Sparkles size={20} />
+                        <div className="flex items-center justify-between mb-2">
+                            <div className="flex items-center gap-2">
+                                <div className="w-10 h-10 rounded-xl bg-indigo-50 flex items-center justify-center text-indigo-500">
+                                    <Sparkles size={20} />
+                                </div>
+                                <div>
+                                    <h4 className="font-bold text-stone-800 text-[15px]">自定义叙事模板</h4>
+                                    <p className="text-xs text-stone-400 mt-0.5">管理你自己创建的叙事风格</p>
+                                </div>
                             </div>
-                            <div>
-                                <h4 className="font-bold text-stone-800 text-[15px]">叙事风格</h4>
-                                <p className="text-xs text-stone-400 mt-0.5">选择 AI 生成每日回顾的风格模板</p>
-                            </div>
+                            <button
+                                onClick={handleAddTemplate}
+                                className="px-3 py-1.5 bg-stone-800 text-white text-xs font-bold rounded-lg flex items-center gap-1 hover:bg-stone-700 transition-colors"
+                            >
+                                <PlusCircle size={14} />
+                                新建模板
+                            </button>
                         </div>
 
-                        {/* Capsule Selector */}
-                        <div className="flex flex-wrap gap-2">
-                            {NARRATIVE_TEMPLATES.map(template => (
-                                <button
-                                    key={template.id}
-                                    onClick={() => {
-                                        onSetNarrativeTemplateId?.(template.id);
-                                        // If switching to custom, maybe init with default prompt if empty?
-                                        // But we keep it simple.
-                                    }}
-                                    className={`px-4 py-2 rounded-full text-xs font-bold border transition-all ${narrativeTemplateId === template.id
-                                        ? 'bg-stone-800 text-white border-stone-800 shadow-md transform scale-105'
-                                        : 'bg-white text-stone-500 border-stone-200 hover:border-stone-300 hover:bg-stone-50'
-                                        }`}
-                                >
-                                    {template.title}
-                                </button>
-                            ))}
-                        </div>
+                        <div className="space-y-3">
+                            {(!customNarrativeTemplates || customNarrativeTemplates.length === 0) && (
+                                <div className="text-center py-8 text-stone-400 text-xs bg-stone-50 rounded-xl border border-dashed border-stone-200">
+                                    还没有创建自定义模板<br />点击右上角创建你的专属风格
+                                </div>
+                            )}
 
-                        {/* Description Display */}
-                        <div className="bg-stone-50 rounded-xl p-4 text-xs text-stone-500 border border-stone-100 italic">
-                            {NARRATIVE_TEMPLATES.find(t => t.id === narrativeTemplateId)?.description}
-                        </div>
-                    </div>
-
-                    {/* AI Narrative Prompt Section (Condition: Custom Only) */}
-                    {narrativeTemplateId === 'custom' && (
-                        <div className="bg-white rounded-2xl p-6 shadow-sm space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-300">
-                            <div className="flex items-center justify-between mb-2">
-                                <div className="flex items-center gap-2">
-                                    <div className="w-10 h-10 rounded-xl bg-purple-50 flex items-center justify-center text-purple-500">
-                                        <MessageSquare size={20} />
-                                    </div>
+                            {customNarrativeTemplates?.map(template => (
+                                <div key={template.id} className="p-4 bg-stone-50 rounded-xl border border-stone-100 flex items-start justify-between group hover:border-stone-300 transition-colors">
                                     <div>
-                                        <h4 className="font-bold text-stone-800 text-[15px]">自定义提示词</h4>
-                                        <p className="text-xs text-stone-400 mt-0.5">完全自定义 AI 的生成指令</p>
+                                        <h5 className="font-bold text-stone-800 text-sm">{template.title}</h5>
+                                        <p className="text-xs text-stone-500 mt-1 line-clamp-2">{template.description}</p>
+                                    </div>
+                                    <div className="flex items-center gap-2 opacity-100 md:opacity-0 group-hover:opacity-100 transition-opacity">
+                                        <button
+                                            onClick={() => handleEditTemplate(template)}
+                                            className="p-1.5 text-stone-400 hover:text-stone-600 hover:bg-stone-200 rounded-lg"
+                                        >
+                                            <Edit2 size={16} />
+                                        </button>
+                                        <button
+                                            onClick={() => handleDeleteTemplate(template.id)}
+                                            className="p-1.5 text-stone-400 hover:text-red-500 hover:bg-red-50 rounded-lg"
+                                        >
+                                            <Trash2 size={16} />
+                                        </button>
                                     </div>
                                 </div>
-                                <button
-                                    onClick={handleReset}
-                                    className="p-2 text-stone-400 hover:text-stone-600 hover:bg-stone-100 rounded-lg transition-colors flex items-center gap-1.5"
-                                    title="重置为默认提示词"
-                                >
-                                    <RotateCcw size={16} />
-                                    <span className="text-xs font-medium">重置默认</span>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+
+                {/* Add/Edit Modal Overlay */}
+                {showAddTemplateModal && (
+                    <div className="fixed inset-0 z-[60] bg-black/50 flex items-center justify-center p-4">
+                        <div className="bg-white rounded-2xl w-full max-w-lg shadow-xl animate-in fade-in zoom-in-95 duration-200 flex flex-col max-h-[90vh]">
+                            <div className="flex items-center justify-between p-4 border-b border-stone-100">
+                                <h3 className="font-bold text-lg text-stone-800">
+                                    {editingTemplate ? '编辑模板' : '创建新模板'}
+                                </h3>
+                                <button onClick={() => setShowAddTemplateModal(false)} className="p-1 text-stone-400 hover:text-stone-600">
+                                    <X size={24} />
                                 </button>
                             </div>
 
-                            <div className="text-xs text-stone-500 bg-stone-50 p-3 rounded-lg border border-stone-100">
-                                <p className="mb-2">💡 <strong>可用占位符:</strong></p>
-                                <ul className="space-y-1 ml-4">
-                                    <li><code className="text-stone-700 bg-white px-1 py-0.5 rounded">{'${date}'}</code> - 回顾日期</li>
-                                    <li><code className="text-stone-700 bg-white px-1 py-0.5 rounded">{'${userInfo}'}</code> - 用户个人信息</li>
-                                    <li><code className="text-stone-700 bg-white px-1 py-0.5 rounded">{'${scopesInfo}'}</code> - 人生领域信息</li>
-                                    <li><code className="text-stone-700 bg-white px-1 py-0.5 rounded">{'${statsText}'}</code> - 时间统计数据</li>
-                                    <li><code className="text-stone-700 bg-white px-1 py-0.5 rounded">{'${timelineText}'}</code> - 活动时间轴</li>
-                                    <li><code className="text-stone-700 bg-white px-1 py-0.5 rounded">{'${answersText}'}</code> - 回顾问答内容</li>
-                                </ul>
+                            <div className="p-4 space-y-4 overflow-y-auto flex-1">
+                                <div>
+                                    <label className="block text-xs font-bold text-stone-600 mb-1.5">模板名称</label>
+                                    <input
+                                        type="text"
+                                        className="w-full bg-stone-50 border border-stone-200 rounded-xl px-4 py-2.5 text-sm text-stone-800 outline-none focus:border-stone-400"
+                                        placeholder="例如：发朋友圈风格"
+                                        value={modalTitle}
+                                        onChange={e => setModalTitle(e.target.value)}
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="block text-xs font-bold text-stone-600 mb-1.5">简短描述</label>
+                                    <input
+                                        type="text"
+                                        className="w-full bg-stone-50 border border-stone-200 rounded-xl px-4 py-2.5 text-sm text-stone-800 outline-none focus:border-stone-400"
+                                        placeholder="例如：emoji多一点，语气轻松"
+                                        value={modalDesc}
+                                        onChange={e => setModalDesc(e.target.value)}
+                                    />
+                                </div>
+
+                                <div>
+                                    <div className="flex justify-between items-center mb-1.5">
+                                        <label className="block text-xs font-bold text-stone-600">叙事风格描述 (Narrative Persona)</label>
+                                    </div>
+                                    <textarea
+                                        className="w-full h-48 bg-stone-50 border border-stone-200 rounded-xl p-4 text-xs font-mono text-stone-600 outline-none focus:border-stone-400 resize-none leading-relaxed"
+                                        placeholder="例如：你是一个幽默的脱口秀演员，请用夸张和调侃的语气点评我今天的时间记录..."
+                                        value={modalPrompt}
+                                        onChange={e => setModalPrompt(e.target.value)}
+                                    />
+                                </div>
+
+                                {modalError && (
+                                    <div className="text-red-500 text-xs font-bold px-1">{modalError}</div>
+                                )}
                             </div>
 
-                            <textarea
-                                className="w-full h-96 bg-stone-50 border border-stone-200 rounded-xl p-4 text-xs font-mono text-stone-600 outline-none focus:border-stone-400 resize-none leading-relaxed"
-                                value={localPrompt}
-                                onChange={(e) => {
-                                    setLocalPrompt(e.target.value);
-                                    setHasNarrativeChanges(true);
-                                }}
-                                placeholder="输入自定义提示词..."
-                            />
+                            <div className="p-4 border-t border-stone-100 flex justify-end gap-3">
+                                <button
+                                    onClick={() => setShowAddTemplateModal(false)}
+                                    className="px-4 py-2 text-sm font-bold text-stone-500 hover:bg-stone-100 rounded-xl transition-colors"
+                                >
+                                    取消
+                                </button>
+                                <button
+                                    onClick={handleSaveTemplate}
+                                    className="px-6 py-2 text-sm font-bold text-white bg-stone-800 hover:bg-stone-700 rounded-xl shadow-md transition-colors"
+                                >
+                                    保存
+                                </button>
+                            </div>
                         </div>
-                    )}
-
-                    <div className="flex justify-end pt-4 pb-8">
-                        <button
-                            onClick={handleSave}
-                            className="px-6 py-2.5 text-sm font-bold rounded-xl transition-colors flex items-center justify-center gap-2 bg-stone-800 text-white hover:bg-stone-700 shadow-md"
-                        >
-                            <Save size={16} />
-                            保存修改
-                        </button>
                     </div>
-
-                </div>
+                )}
             </div>
         );
     }

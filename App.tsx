@@ -19,7 +19,7 @@ import { TimerFloating } from './components/TimerFloating';
 import { AddLogModal } from './components/AddLogModal';
 import { TodoDetailModal } from './components/TodoDetailModal';
 import { GoalEditor } from './components/GoalEditor';
-import { Activity, ActiveSession, AppView, Log, TodoItem, TodoCategory, Category, Goal, AutoLinkRule, DailyReview, ReviewTemplate } from './types';
+import { Activity, ActiveSession, AppView, Log, TodoItem, TodoCategory, Category, Goal, AutoLinkRule, DailyReview, ReviewTemplate, NarrativeTemplate } from './types';
 import { INITIAL_LOGS, INITIAL_TODOS, MOCK_TODO_CATEGORIES, VIEW_TITLES, CATEGORIES, SCOPES, INITIAL_GOALS, DEFAULT_REVIEW_TEMPLATES, DEFAULT_USER_PERSONAL_INFO, INITIAL_DAILY_REVIEWS } from './constants';
 import { ToastContainer, ToastMessage, ToastType } from './components/Toast';
 import { webdavService } from './services/webdavService';
@@ -196,14 +196,28 @@ const App: React.FC = () => {
     localStorage.setItem('lumostime_review_time', dailyReviewTime);
   }, [dailyReviewTime]);
 
-  // AI Narrative Prompt
-  const [aiNarrativePrompt, setAiNarrativePrompt] = useState<string>(() => {
-    return localStorage.getItem('lumostime_ai_narrative_prompt') || '';
+  // Custom AI Narrative Templates
+  const [customNarrativeTemplates, setCustomNarrativeTemplates] = useState<NarrativeTemplate[]>(() => {
+    const stored = localStorage.getItem('lumostime_custom_narrative_templates');
+    if (stored) return JSON.parse(stored);
+
+    // Migration: Check for old custom prompt
+    const oldPrompt = localStorage.getItem('lumostime_ai_narrative_prompt');
+    if (oldPrompt && oldPrompt.trim() !== '') {
+      return [{
+        id: 'custom_migrated',
+        title: '我的自定义模版',
+        description: '从旧版本迁移的自定义提示向',
+        prompt: oldPrompt,
+        isCustom: true
+      }];
+    }
+    return [];
   });
 
   useEffect(() => {
-    localStorage.setItem('lumostime_ai_narrative_prompt', aiNarrativePrompt);
-  }, [aiNarrativePrompt]);
+    localStorage.setItem('lumostime_custom_narrative_templates', JSON.stringify(customNarrativeTemplates));
+  }, [customNarrativeTemplates]);
 
   // User Personal Info for AI Narrative
   const [userPersonalInfo, setUserPersonalInfo] = useState<string>(() => {
@@ -215,15 +229,6 @@ const App: React.FC = () => {
   useEffect(() => {
     localStorage.setItem('lumostime_user_personal_info', userPersonalInfo);
   }, [userPersonalInfo]);
-
-  // AI Narrative Template ID
-  const [narrativeTemplateId, setNarrativeTemplateId] = useState<string>(() => {
-    return localStorage.getItem('lumostime_narrative_template_id') || 'default';
-  });
-
-  useEffect(() => {
-    localStorage.setItem('lumostime_narrative_template_id', narrativeTemplateId);
-  }, [narrativeTemplateId]);
 
   // Daily Review View State (路由状态)
   const [isDailyReviewOpen, setIsDailyReviewOpen] = useState(false);
@@ -887,7 +892,7 @@ const App: React.FC = () => {
       return;
     }
     setDataLastModified(Date.now());
-  }, [logs, todos, categories, todoCategories, scopes, goals, autoLinkRules, reviewTemplates, dailyReviews, aiNarrativePrompt, userPersonalInfo]);
+  }, [logs, todos, categories, todoCategories, scopes, goals, autoLinkRules, reviewTemplates, dailyReviews, customNarrativeTemplates, userPersonalInfo]);
 
   // --- Sync Logic ---
 
@@ -938,7 +943,7 @@ const App: React.FC = () => {
           autoLinkRules,
           reviewTemplates,
           dailyReviews,
-          aiNarrativePrompt,
+          customNarrativeTemplates,
           userPersonalInfo,
           version: '1.0.0',
           timestamp: Date.now()
@@ -951,7 +956,7 @@ const App: React.FC = () => {
     }, 30000); // 30s debounce
 
     return () => clearTimeout(timer);
-  }, [logs, todos, categories, todoCategories, scopes, goals, autoLinkRules, reviewTemplates, dailyReviews, aiNarrativePrompt, userPersonalInfo, lastSyncTime]);
+  }, [logs, todos, categories, todoCategories, scopes, goals, autoLinkRules, reviewTemplates, dailyReviews, customNarrativeTemplates, userPersonalInfo, lastSyncTime]);
 
   // --- NFC / Deep Link Handling ---
   useEffect(() => {
@@ -1083,7 +1088,7 @@ const App: React.FC = () => {
             autoLinkRules,
             reviewTemplates,
             dailyReviews,
-            aiNarrativePrompt,
+            customNarrativeTemplates,
             userPersonalInfo,
             version: '1.0.0',
             timestamp: Date.now()
@@ -1095,7 +1100,7 @@ const App: React.FC = () => {
 
     document.addEventListener('visibilitychange', handleVisibilityChange);
     return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
-  }, [logs, todos, categories, todoCategories, scopes, goals, autoLinkRules, reviewTemplates, dailyReviews, aiNarrativePrompt, userPersonalInfo]);
+  }, [logs, todos, categories, todoCategories, scopes, goals, autoLinkRules, reviewTemplates, dailyReviews, customNarrativeTemplates, userPersonalInfo]);
 
   // 4. Hardware Back Button Handling
   useEffect(() => {
@@ -1269,17 +1274,18 @@ const App: React.FC = () => {
     setCurrentReviewDate(null);
   };
 
-  const handleGenerateNarrative = async (review: DailyReview, statsText: string, timelineText: string): Promise<string> => {
-    let selectedPrompt = '';
+  const handleGenerateNarrative = async (review: DailyReview, statsText: string, timelineText: string, promptTemplate?: string): Promise<string> => {
+    let finalPrompt = '';
 
-    if (narrativeTemplateId === 'custom') {
-      selectedPrompt = aiNarrativePrompt;
+    if (promptTemplate) {
+      finalPrompt = promptTemplate;
     } else {
-      const template = NARRATIVE_TEMPLATES.find(t => t.id === narrativeTemplateId);
-      selectedPrompt = template?.prompt || '';
+      // Fallback for legacy calls (should not happen after full refactor)
+      // Default to the system default template
+      finalPrompt = NARRATIVE_TEMPLATES.find(t => t.id === 'default')?.prompt || '';
     }
 
-    return narrativeService.generateDailyNarrative(review, statsText, timelineText, selectedPrompt, scopes, userPersonalInfo);
+    return narrativeService.generateDailyNarrative(review, statsText, timelineText, finalPrompt, scopes, userPersonalInfo);
   };
 
   const renderView = () => {
@@ -1301,6 +1307,7 @@ const App: React.FC = () => {
           todos={todos}
           todoCategories={todoCategories}
           scopes={scopes}
+          customNarrativeTemplates={customNarrativeTemplates}
           onDelete={handleDeleteReview}
           onUpdateReview={handleUpdateReview}
           onGenerateNarrative={handleGenerateNarrative}
@@ -1521,8 +1528,7 @@ const App: React.FC = () => {
     if (data.autoLinkRules) setAutoLinkRules(data.autoLinkRules);
     if (data.reviewTemplates) setReviewTemplates(data.reviewTemplates);
     if (data.dailyReviews) setDailyReviews(data.dailyReviews);
-    if (data.aiNarrativePrompt) setAiNarrativePrompt(data.aiNarrativePrompt);
-    if (data.narrativeTemplateId) setNarrativeTemplateId(data.narrativeTemplateId);
+    if (data.customNarrativeTemplates) setCustomNarrativeTemplates(data.customNarrativeTemplates);
     if (data.userPersonalInfo) setUserPersonalInfo(data.userPersonalInfo);
 
     if (data.timestamp) {
@@ -1564,7 +1570,7 @@ const App: React.FC = () => {
         autoLinkRules,
         reviewTemplates,
         dailyReviews,
-        aiNarrativePrompt,
+        customNarrativeTemplates,
         userPersonalInfo,
         timestamp: dataLastModified, // Use tracked modification time
         version: '1.0.0'
@@ -1696,10 +1702,9 @@ const App: React.FC = () => {
               setTodoCategories(MOCK_TODO_CATEGORIES);
               setReviewTemplates(DEFAULT_REVIEW_TEMPLATES);
               setDailyReviews([]);
-              setDailyReviews([]);
               setAutoLinkRules([]);
-              setAiNarrativePrompt('');
-              setNarrativeTemplateId('default');
+              setCustomNarrativeTemplates([]);
+              addToast('success', 'Data reset to defaults');
               addToast('success', 'Data reset to defaults');
               setIsSettingsOpen(false);
             }}
@@ -1762,7 +1767,7 @@ const App: React.FC = () => {
               reader.readAsText(file);
             }}
             onToast={addToast}
-            syncData={{ logs, todos, categories, todoCategories, scopes, goals, autoLinkRules, reviewTemplates, dailyReviews, aiNarrativePrompt, narrativeTemplateId, userPersonalInfo }}
+            syncData={{ logs, todos, categories, todoCategories, scopes, goals, autoLinkRules, reviewTemplates, dailyReviews, customNarrativeTemplates, userPersonalInfo }}
             onSyncUpdate={handleSyncDataUpdate}
             startWeekOnSunday={startWeekOnSunday}
             onToggleStartWeekOnSunday={() => setStartWeekOnSunday(!startWeekOnSunday)}
@@ -1782,16 +1787,10 @@ const App: React.FC = () => {
             onUpdateReviewTemplates={setReviewTemplates}
             dailyReviewTime={dailyReviewTime}
             onSetDailyReviewTime={setDailyReviewTime}
-            aiNarrativePrompt={aiNarrativePrompt}
-            onSetAiNarrativePrompt={setAiNarrativePrompt}
-            onResetAiNarrativePrompt={() => {
-              setAiNarrativePrompt('');
-              setNarrativeTemplateId('default'); // Reset to default template
-            }}
+            customNarrativeTemplates={customNarrativeTemplates}
+            onUpdateCustomNarrativeTemplates={setCustomNarrativeTemplates}
             userPersonalInfo={userPersonalInfo}
             onSetUserPersonalInfo={setUserPersonalInfo}
-            narrativeTemplateId={narrativeTemplateId}
-            onSetNarrativeTemplateId={setNarrativeTemplateId}
           />
         )}
 
