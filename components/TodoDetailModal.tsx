@@ -594,7 +594,7 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({ initialTodo, c
                                   </div>
 
                                   {/* Timeline Dot */}
-                                  <div className="absolute -left-[5px] top-1.5 w-2.5 h-2.5 rounded-full bg-stone-900 border-2 border-[#faf9f6] z-10" />
+                                  <div className="absolute left-[3px] top-2 w-2.5 h-2.5 rounded-full bg-stone-900 border-2 border-[#faf9f6] z-10" />
 
                                   {/* Content Content (Minimalist) */}
                                   <div className="relative top-[-2px]">
