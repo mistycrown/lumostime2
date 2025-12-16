@@ -48,7 +48,7 @@ import remarkGfm from 'remark-gfm';
 import { ReviewTemplateManageView } from './ReviewTemplateManageView';
 import { ConfirmModal } from '../components/ConfirmModal';
 import { ReviewTemplate, NarrativeTemplate } from '../types';
-import { DEFAULT_NARRATIVE_PROMPT } from '../services/narrativeService';
+
 import { NARRATIVE_TEMPLATES } from '../constants';
 // @ts-ignore
 import userGuideContent from '../USER_GUIDE.md?raw';
