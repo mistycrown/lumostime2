@@ -16,6 +16,8 @@ export interface Category {
   activities: Activity[];
   themeColor: string; // Hex color for stats chart
   enableFocusScore?: boolean; // Default for all activities in category
+  heatmapMin?: number; // Custom heatmap scale (Minutes)
+  heatmapMax?: number;
 }
 
 // Scope (领域) - orthogonal to Tags
