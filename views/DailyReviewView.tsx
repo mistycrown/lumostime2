@@ -339,7 +339,7 @@ export const DailyReviewView: React.FC<DailyReviewViewProps> = ({
             return (
                 <div key={q.id} className="space-y-2">
                     <label className="text-sm font-medium text-stone-700">{q.question}</label>
-                    <div className="flex gap-4">
+                    <div className="grid grid-cols-5 gap-1">
                         {[1, 2, 3, 4, 5].map((rating) => {
                             const colorOption = COLOR_OPTIONS.find(c => c.id === q.colorId) || COLOR_OPTIONS.find(c => c.id === 'amber')!;
                             const isActive = currentRating >= rating;
@@ -348,13 +348,14 @@ export const DailyReviewView: React.FC<DailyReviewViewProps> = ({
                                 <button
                                     key={rating}
                                     onClick={() => updateAnswer(q.id, q.question, rating.toString())}
-                                    className={`p-2 rounded-xl transition-all ${isActive
-                                        ? `${colorOption.text} ${colorOption.bg} scale-110`
+                                    className={`p-2 rounded-xl transition-all flex items-center justify-center aspect-square max-w-14 w-full mx-auto ${isActive
+                                        ? `${colorOption.text} ${colorOption.bg} scale-105`
                                         : 'text-stone-200 hover:text-stone-300'
                                         }`}
                                 >
                                     <RatingIcon
-                                        size={32}
+                                        size={28}
+                                        className="shrink-0"
                                         fill={isActive ? "currentColor" : "none"}
                                         strokeWidth={isActive ? 0 : 2}
                                     />
@@ -682,6 +683,9 @@ export const DailyReviewView: React.FC<DailyReviewViewProps> = ({
                                         <ReactMarkdown
                                             remarkPlugins={[remarkGfm, remarkBreaks]}
                                             components={{
+                                                h1: ({ node, ...props }) => <h1 className="text-xl font-bold text-stone-900 mt-8 mb-4 flex items-center gap-2" {...props} />,
+                                                h2: ({ node, ...props }) => <h2 className="text-lg font-bold text-stone-800 mt-6 mb-3 flex items-center gap-2" {...props} />,
+                                                h3: ({ node, ...props }) => <h3 className="text-base font-bold text-stone-800 mt-5 mb-2" {...props} />,
                                                 p: ({ node, ...props }) => <p className="mb-6 last:mb-0" {...props} />,
                                                 blockquote: ({ node, ...props }) => <blockquote className="border-l-4 border-stone-300 pl-4 italic text-stone-600 my-6 font-serif bg-stone-50 py-2 pr-2 rounded-r" {...props} />,
                                                 ul: ({ node, ...props }) => <ul className="list-disc pl-5 my-4 space-y-1 text-stone-700" {...props} />,

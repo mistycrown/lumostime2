@@ -146,16 +146,6 @@ export const SCOPES: Scope[] = [
     order: 2,
     enableFocusScore: true,
     themeColor: 'text-orange-600'
-  },
-  {
-    id: 's4',
-    name: 'AI玩具',
-    icon: '⚡️',
-    description: '掌握AI工具，提高效率。',
-    isArchived: false,
-    order: 3,
-    enableFocusScore: true,
-    themeColor: 'text-pink-600'
   }
 ];
 
