@@ -1674,6 +1674,7 @@ const App: React.FC = () => {
               setTodoCategories(MOCK_TODO_CATEGORIES);
               setReviewTemplates(DEFAULT_REVIEW_TEMPLATES);
               setDailyReviews([]);
+              setAutoLinkRules([]);
               addToast('success', 'Data reset to defaults');
               setIsSettingsOpen(false);
             }}
@@ -1684,6 +1685,7 @@ const App: React.FC = () => {
               setScopes([]);
               setReviewTemplates([]);
               setDailyReviews([]);
+              setAutoLinkRules([]);
               addToast('success', 'All data cleared successfully');
               setIsSettingsOpen(false);
             }}
