@@ -435,7 +435,7 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({ initialTodo, c
                     );
                   })()}
                 </div>
-                <div className="text-right">
+                <div className="text-right ml-auto">
                   <div className="text-[10px] uppercase tracking-widest text-stone-400 mb-1 font-bold">Avg. Daily</div>
                   <div className="text-xl font-bold text-stone-700 font-mono">
                     {(() => {
