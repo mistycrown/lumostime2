@@ -613,7 +613,7 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({ initialTodo, c
 
                                     {/* Note */}
                                     {log.note && (
-                                      <p className="text-sm text-stone-500 leading-relaxed mb-2 font-light">
+                                      <p className="text-sm text-stone-500 leading-relaxed mb-2 font-light whitespace-pre-wrap">
                                         {log.note}
                                       </p>
                                     )}

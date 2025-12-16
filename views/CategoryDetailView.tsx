@@ -485,7 +485,7 @@ export const CategoryDetailView: React.FC<CategoryDetailViewProps> = ({ category
                                                                     )}
                                                                 </div>
                                                                 {log.note && (
-                                                                    <p className="text-sm text-stone-500 font-light leading-relaxed mb-2">
+                                                                    <p className="text-sm text-stone-500 font-light leading-relaxed mb-2 whitespace-pre-wrap">
                                                                         {log.note}
                                                                     </p>
                                                                 )}
