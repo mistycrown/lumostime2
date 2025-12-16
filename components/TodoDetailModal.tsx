@@ -415,7 +415,7 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({ initialTodo, c
                   }
                 />
               </div>
-              <div className="px-6 pb-6 pt-4 flex items-end justify-between border-t border-stone-50">
+              <div className="px-6 pb-6 pt-4 flex flex-wrap gap-y-4 items-end justify-between border-t border-stone-50">
                 <div>
                   <div className="text-[10px] uppercase tracking-widest text-stone-400 mb-1 font-bold">Total Time</div>
                   <div className="text-2xl font-bold text-stone-900 font-mono">
