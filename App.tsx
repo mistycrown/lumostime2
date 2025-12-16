@@ -1729,6 +1729,10 @@ const App: React.FC = () => {
                 scopes,
                 goals,
                 autoLinkRules,
+                reviewTemplates,
+                dailyReviews,
+                customNarrativeTemplates,
+                userPersonalInfo,
                 version: '1.0.0',
                 timestamp: Date.now()
               };
@@ -1757,6 +1761,9 @@ const App: React.FC = () => {
                   if (data.autoLinkRules) setAutoLinkRules(data.autoLinkRules);
                   if (data.reviewTemplates) setReviewTemplates(data.reviewTemplates);
                   if (data.dailyReviews) setDailyReviews(data.dailyReviews);
+                  if (data.customNarrativeTemplates) setCustomNarrativeTemplates(data.customNarrativeTemplates);
+                  if (data.userPersonalInfo) setUserPersonalInfo(data.userPersonalInfo);
+
                   if (data.timestamp) setDataLastModified(data.timestamp);
                   addToast('success', 'Data imported successfully!');
                   setIsSettingsOpen(false); // Close settings after import to see changes
