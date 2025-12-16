@@ -566,12 +566,12 @@ export const DEFAULT_REVIEW_TEMPLATES: ReviewTemplate[] = [
     questions: [
       {
         id: 'q-microlight-1',
-        question: '今天发生的哪件小事让你嘴角上扬？',
+        question: '今天发生了哪三件让你觉得不错的事情？',
         type: 'text'
       },
       {
         id: 'q-microlight-2',
-        question: '为什么这件事在今天发生？',
+        question: '为什么这些好事在今天发生？',
         type: 'text'
       },
       {
@@ -591,12 +591,12 @@ export const DEFAULT_REVIEW_TEMPLATES: ReviewTemplate[] = [
     questions: [
       {
         id: 'q-vision-1',
-        question: '哪件事最符合"理想自我"的身份？',
+        question: '今天哪件事最符合"理想自我"的身份？',
         type: 'text'
       },
       {
         id: 'q-vision-2',
-        question: '是否有行为与你的核心愿望背道而驰？',
+        question: '今天是否有行为与你的核心愿望背道而驰？',
         type: 'text'
       },
       {
@@ -614,7 +614,7 @@ export const DEFAULT_REVIEW_TEMPLATES: ReviewTemplate[] = [
   },
   {
     id: 'template-minimal',
-    title: '⚡️ 极简复盘',
+    title: '⚡️ KPT迭代',
     isSystem: true,
     order: 3,
     enabled: true,
@@ -622,12 +622,12 @@ export const DEFAULT_REVIEW_TEMPLATES: ReviewTemplate[] = [
     questions: [
       {
         id: 'q-minimal-1',
-        question: 'Keep：今天做对了什么？',
+        question: 'Keep：今天有哪些地方可以继续保持？',
         type: 'text'
       },
       {
         id: 'q-minimal-2',
-        question: 'Problem：今天的低效环节在哪里？',
+        question: 'Problem：今天有哪些地方可以改进？',
         type: 'text'
       },
       {
