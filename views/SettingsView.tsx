@@ -46,6 +46,7 @@ import { ToastType } from '../components/Toast';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { ReviewTemplateManageView } from './ReviewTemplateManageView';
+import { ConfirmModal } from '../components/ConfirmModal';
 import { ReviewTemplate, NarrativeTemplate } from '../types';
 import { DEFAULT_NARRATIVE_PROMPT } from '../services/narrativeService';
 import { NARRATIVE_TEMPLATES } from '../constants';
@@ -642,6 +643,8 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
         );
     }
 
+    const [deletingTemplateId, setDeletingTemplateId] = useState<string | null>(null);
+
     const handleSaveUserInfo = () => {
         onSetUserPersonalInfo?.(localUserInfo);
         onToast('success', '个人信息已保存');
@@ -666,11 +669,16 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
     };
 
     const handleDeleteTemplate = (id: string) => {
-        if (window.confirm('确定要删除这个自定义模板吗？')) {
-            const newTemplates = (customNarrativeTemplates || []).filter(t => t.id !== id);
-            onUpdateCustomNarrativeTemplates?.(newTemplates);
-            onToast('success', '模板已删除');
-        }
+        setDeletingTemplateId(id);
+    };
+
+    const confirmDeleteTemplate = () => {
+        if (!deletingTemplateId) return;
+
+        const newTemplates = (customNarrativeTemplates || []).filter(t => t.id !== deletingTemplateId);
+        onUpdateCustomNarrativeTemplates?.(newTemplates);
+        setDeletingTemplateId(null);
+        onToast('success', '模板已删除');
     };
 
     const handleSaveTemplate = () => {
@@ -1282,6 +1290,18 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
                         </div>
                     </div>
                 )}
+
+                {/* Delete Confirmation Modal */}
+                <ConfirmModal
+                    isOpen={!!deletingTemplateId}
+                    onClose={() => setDeletingTemplateId(null)}
+                    onConfirm={confirmDeleteTemplate}
+                    title="删除自定义叙事"
+                    description="确定要删除这个叙事风格吗？此操作无法撤销。"
+                    confirmText="删除"
+                    cancelText="取消"
+                    type="danger"
+                />
             </div>
         );
     }
@@ -1407,6 +1427,18 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
                 </div>
 
             </div>
+
+            {/* Delete Confirmation Modal for Custom Templates */}
+            <ConfirmModal
+                isOpen={!!deletingTemplateId}
+                onClose={() => setDeletingTemplateId(null)}
+                onConfirm={confirmDeleteTemplate}
+                title="删除自定义叙事"
+                description="确定要删除这个叙事风格吗？此操作无法撤销。"
+                confirmText="删除"
+                cancelText="取消"
+                type="danger"
+            />
         </div>
     );
 };
