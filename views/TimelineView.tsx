@@ -419,7 +419,7 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ logs, todos, scopes,
                                         </div>
 
                                         {item.logData.note && (
-                                            <p className="text-sm text-stone-500 leading-relaxed mb-2 font-light">
+                                            <p className="text-sm text-stone-500 leading-relaxed mb-2 font-light whitespace-pre-wrap">
                                                 {item.logData.note}
                                             </p>
                                         )}
