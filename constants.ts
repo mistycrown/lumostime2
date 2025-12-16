@@ -1,7 +1,7 @@
-import { Category, Log, AppView, TodoCategory, TodoItem, Scope, Goal, ReviewTemplate } from './types';
+import { Category, Log, AppView, TodoCategory, TodoItem, Scope, Goal, ReviewTemplate, DailyReview } from './types';
 
 // --- Default User Personal Info ---
-export const DEFAULT_USER_PERSONAL_INFO = `我是一名正在攻读博士学位的研究生，我的专业方向是语言学。除了学术研究，我对AI技术和工具开发也充满热情，喜欢用代码解决实际问题。我相信持续学习和自我反思的力量，希望在学术与技术之间找到平衡，成为一个既有深度又有广度的学者。`;
+export const DEFAULT_USER_PERSONAL_INFO = `我是一名正在攻读博士学位的研究生，我对AI技术充满热情。我相信持续学习和自我反思的力量，希望成为一个既有深度又有广度的学者。`;
 
 // --- Colors ---
 // Provide a palette for consistent usage (Tailwind text classes mapped to implicit bg via component logic)
@@ -232,6 +232,17 @@ export const INITIAL_TODOS: TodoItem[] = [
     defaultScopeIds: ['s2'],
     note: '导出 CSV 并预处理'
   },
+  {
+    id: 't_thesis_3',
+    categoryId: 'thesis',
+    title: '修改论文摘要',
+    isCompleted: true,
+    completedAt: new Date(NOW - 2 * DAY_MS).toISOString(),
+    linkedCategoryId: 'study',
+    linkedActivityId: 'writing',
+    defaultScopeIds: ['s2'],
+    note: '根据导师意见修改'
+  },
 
   // Reading (Linked to Professional Input Scope)
   {
@@ -255,17 +266,34 @@ export const INITIAL_TODOS: TodoItem[] = [
     categoryId: 'study',
     title: '研读 Transformer 架构论文',
     isCompleted: true,
+    completedAt: new Date(NOW - 5 * DAY_MS).toISOString(),
     linkedCategoryId: 'study',
     linkedActivityId: 'reading',
     defaultScopeIds: ['s4'], // AI玩具
   },
+  {
+    id: 't_read_3',
+    categoryId: 'study',
+    title: '学习 Rust 语言基础',
+    isCompleted: false,
+    linkedCategoryId: 'study',
+    linkedActivityId: 'self_study',
+    defaultScopeIds: ['s4'],
+    isProgress: true,
+    totalAmount: 20,
+    unitAmount: 1,
+    completedUnits: 3,
+    note: '完成 Rustlings 练习'
+  },
 
   // Life
   { id: 't_life_1', categoryId: 'life', title: '预约牙医', isCompleted: false, note: '周五下午有空' },
-  { id: 't_life_2', categoryId: 'life', title: '购买下周食材', isCompleted: true },
+  { id: 't_life_2', categoryId: 'life', title: '购买下周食材', isCompleted: true, completedAt: new Date(NOW - DAY_MS).toISOString() },
+  { id: 't_life_3', categoryId: 'life', title: '缴纳电费', isCompleted: false },
 
   // Dev
-  { id: 't_dev_1', categoryId: 'dev', title: '优化 LumoTime 性能', isCompleted: false, defaultScopeIds: ['s4'] },
+  { id: 't_dev_1', categoryId: 'dev', title: '优化 LumosTime 性能', isCompleted: false, defaultScopeIds: ['s4'] },
+  { id: 't_dev_2', categoryId: 'dev', title: '修复 Android 端回退按钮', isCompleted: true, completedAt: new Date(NOW - 1 * DAY_MS).toISOString(), defaultScopeIds: ['s4'] },
 ];
 
 export const INITIAL_LOGS: Log[] = [
@@ -302,6 +330,14 @@ export const INITIAL_LOGS: Log[] = [
     note: '尝试新的 LLM API',
     focusScore: 5
   },
+  {
+    id: 'l_today_5', // New entry
+    activityId: 'workout', categoryId: 'self',
+    startTime: new Date().setHours(17, 0, 0, 0), endTime: new Date().setHours(18, 0, 0, 0),
+    duration: 3600,
+    note: '有氧运动 5km',
+    focusScore: 4
+  },
 
   // ==================== YESTERDAY ====================
   {
@@ -322,6 +358,16 @@ export const INITIAL_LOGS: Log[] = [
     scopeIds: ['s3'], // 博雅通识
     note: '夜间反思'
   },
+  {
+    id: 'l_y_3', // New entry
+    activityId: 'coding', categoryId: 'study',
+    startTime: new Date(NOW - DAY_MS).setHours(14, 0, 0, 0), endTime: new Date(NOW - DAY_MS).setHours(17, 0, 0, 0),
+    duration: 3 * 3600,
+    scopeIds: ['s4'],
+    linkedTodoId: 't_dev_2',
+    note: '修复关键 bug',
+    focusScore: 5
+  },
 
   // ==================== 2 DAYS AGO ====================
   {
@@ -340,6 +386,52 @@ export const INITIAL_LOGS: Log[] = [
     duration: 3 * 3600,
     note: '黑神话：悟空',
     focusScore: 5
+  },
+  {
+    id: 'l_d2_3', // New entry
+    activityId: 'writing', categoryId: 'study',
+    startTime: new Date(NOW - 2 * DAY_MS).setHours(14, 0, 0, 0), endTime: new Date(NOW - 2 * DAY_MS).setHours(16, 0, 0, 0),
+    duration: 2 * 3600,
+    scopeIds: ['s2'],
+    linkedTodoId: 't_thesis_3',
+    note: '修改摘要',
+    focusScore: 4
+  },
+
+  // ==================== 3 DAYS AGO (Mixed) ====================
+  {
+    id: 'l_d3_1',
+    activityId: 'part_time', categoryId: 'others',
+    startTime: new Date(NOW - 3 * DAY_MS).setHours(13, 0, 0, 0), endTime: new Date(NOW - 3 * DAY_MS).setHours(17, 0, 0, 0),
+    duration: 4 * 3600,
+    note: '兼职：翻译稿件',
+  },
+  {
+    id: 'l_d3_2',
+    activityId: 'reading', categoryId: 'study',
+    startTime: new Date(NOW - 3 * DAY_MS).setHours(20, 0, 0, 0), endTime: new Date(NOW - 3 * DAY_MS).setHours(21, 30, 0, 0),
+    duration: 1.5 * 3600,
+    scopeIds: ['s1'],
+    focusScore: 3
+  },
+
+  // ==================== 4 DAYS AGO (Focus) ====================
+  {
+    id: 'l_d4_1',
+    activityId: 'coding', categoryId: 'study',
+    startTime: new Date(NOW - 4 * DAY_MS).setHours(9, 0, 0, 0), endTime: new Date(NOW - 4 * DAY_MS).setHours(12, 0, 0, 0),
+    duration: 3 * 3600,
+    scopeIds: ['s4'],
+    note: '重构前端组件库',
+    focusScore: 5
+  },
+  {
+    id: 'l_d4_2',
+    activityId: 'design', categoryId: 'explore',
+    startTime: new Date(NOW - 4 * DAY_MS).setHours(14, 0, 0, 0), endTime: new Date(NOW - 4 * DAY_MS).setHours(16, 0, 0, 0),
+    duration: 2 * 3600,
+    note: '设计新 Logo',
+    focusScore: 4
   },
 
   // ==================== LAST WEEK (Spread out data) ====================
@@ -424,6 +516,31 @@ export const INITIAL_LOGS: Log[] = [
     scopeIds: ['s4'], // AI
     focusScore: 5
   },
+  // Additional Logs for Volume (Recent)
+  {
+    id: 'l_extra_1',
+    activityId: 'reading', categoryId: 'study',
+    startTime: new Date(NOW - 3 * DAY_MS).setHours(8, 0, 0, 0), endTime: new Date(NOW - 3 * DAY_MS).setHours(10, 0, 0, 0),
+    duration: 2 * 3600,
+    scopeIds: ['s1'],
+    focusScore: 5
+  },
+  {
+    id: 'l_extra_2',
+    activityId: 'coding', categoryId: 'study',
+    startTime: new Date(NOW - 3 * DAY_MS).setHours(22, 0, 0, 0), endTime: new Date(NOW - 3 * DAY_MS).setHours(23, 30, 0, 0),
+    duration: 1.5 * 3600,
+    scopeIds: ['s4'],
+    focusScore: 4
+  },
+  {
+    id: 'l_extra_3',
+    activityId: 'writing', categoryId: 'study',
+    startTime: new Date(NOW - 4 * DAY_MS).setHours(19, 0, 0, 0), endTime: new Date(NOW - 4 * DAY_MS).setHours(21, 0, 0, 0),
+    duration: 2 * 3600,
+    scopeIds: ['s2'],
+    focusScore: 5
+  }
 ];
 
 export const VIEW_TITLES: Record<AppView, string> = {
@@ -527,3 +644,5 @@ export const DEFAULT_REVIEW_TEMPLATES: ReviewTemplate[] = [
     ]
   }
 ];
+
+export const INITIAL_DAILY_REVIEWS: DailyReview[] = [];

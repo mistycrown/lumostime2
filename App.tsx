@@ -20,7 +20,7 @@ import { AddLogModal } from './components/AddLogModal';
 import { TodoDetailModal } from './components/TodoDetailModal';
 import { GoalEditor } from './components/GoalEditor';
 import { Activity, ActiveSession, AppView, Log, TodoItem, TodoCategory, Category, Goal, AutoLinkRule, DailyReview, ReviewTemplate } from './types';
-import { INITIAL_LOGS, INITIAL_TODOS, MOCK_TODO_CATEGORIES, VIEW_TITLES, CATEGORIES, SCOPES, INITIAL_GOALS, DEFAULT_REVIEW_TEMPLATES, DEFAULT_USER_PERSONAL_INFO } from './constants';
+import { INITIAL_LOGS, INITIAL_TODOS, MOCK_TODO_CATEGORIES, VIEW_TITLES, CATEGORIES, SCOPES, INITIAL_GOALS, DEFAULT_REVIEW_TEMPLATES, DEFAULT_USER_PERSONAL_INFO, INITIAL_DAILY_REVIEWS } from './constants';
 import { ToastContainer, ToastMessage, ToastType } from './components/Toast';
 import { webdavService } from './services/webdavService';
 import { splitLogByDays } from './utils/logUtils';
@@ -178,7 +178,7 @@ const App: React.FC = () => {
   // Daily Review State (每日回顾状态)
   const [dailyReviews, setDailyReviews] = useState<DailyReview[]>(() => {
     const stored = localStorage.getItem('lumostime_dailyReviews');
-    return stored ? JSON.parse(stored) : [];
+    return stored ? JSON.parse(stored) : INITIAL_DAILY_REVIEWS;
   });
 
   const [reviewTemplates, setReviewTemplates] = useState<ReviewTemplate[]>(() => {
@@ -1285,6 +1285,7 @@ const App: React.FC = () => {
           onDelete={handleDeleteReview}
           onUpdateReview={handleUpdateReview}
           onGenerateNarrative={handleGenerateNarrative}
+          addToast={addToast}
         />
       );
     }
