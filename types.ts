@@ -212,4 +212,5 @@ export interface NarrativeTemplate {
   title: string;
   description: string; // 简短描述，用于UI展示
   prompt: string; // 提示词内容
+  isCustom?: boolean; // Whether created by user
 }

@@ -1,4 +1,4 @@
-import { Category, Log, AppView, TodoCategory, TodoItem, Scope, Goal, ReviewTemplate, DailyReview } from './types';
+import { Category, Log, AppView, TodoCategory, TodoItem, Scope, Goal, ReviewTemplate, DailyReview, NarrativeTemplate } from './types';
 
 // --- Default User Personal Info ---
 export const DEFAULT_USER_PERSONAL_INFO = `我是一名正在攻读博士学位的研究生，我对AI技术充满热情。我相信持续学习和自我反思的力量，希望成为一个既有深度又有广度的学者。`;
@@ -121,7 +121,7 @@ export const SCOPES: Scope[] = [
     id: 's1',
     name: '专业输入',
     icon: '🚩',
-    description: '操千曲而后晓声，观千剑而后识器。',
+    description: '关于科研学术的专业训练。',
     isArchived: false,
     order: 0,
     enableFocusScore: true,
@@ -131,7 +131,7 @@ export const SCOPES: Scope[] = [
     id: 's2',
     name: '博士课题',
     icon: '🏛️',
-    description: '修辞立其诚，所以居业也。',
+    description: '完成毕业论文，获得博士学位。',
     isArchived: false,
     order: 1,
     enableFocusScore: true,
@@ -141,7 +141,7 @@ export const SCOPES: Scope[] = [
     id: 's3',
     name: '博雅通识',
     icon: '🦉',
-    description: '风檐展书读，古道照颜色。',
+    description: '扩宽知识边界，探索发现新知。',
     isArchived: false,
     order: 2,
     enableFocusScore: true,
@@ -151,7 +151,7 @@ export const SCOPES: Scope[] = [
     id: 's4',
     name: 'AI玩具',
     icon: '⚡️',
-    description: '满眼生机转化钧，天工人巧日争新。',
+    description: '掌握AI工具，提高效率。',
     isArchived: false,
     order: 3,
     enableFocusScore: true,
@@ -647,28 +647,20 @@ export const DEFAULT_REVIEW_TEMPLATES: ReviewTemplate[] = [
 
 export const INITIAL_DAILY_REVIEWS: DailyReview[] = [];
 
-// ========== AI Narrative Templates (AI 叙事模板) ==========
+// ========== AI Narrative  (AI 叙事模板) ==========
 
-export const NARRATIVE_TEMPLATES = [
+export const NARRATIVE_TEMPLATES: NarrativeTemplate[] = [
   {
     id: 'default',
     title: '默认风格',
     description: '客观、清晰的日报风格',
     prompt: `
-请根据我的【今日时间记录】和【回顾问答】，为我生成一篇结构清晰、语气客观的每日回顾叙事（Narrative），就像是一位理性的观察者在记录这一天。
-
-**输入数据：**
-- **日期**：\${date}
-- **用户画像**：\${userInfo}
-- **人生领域**：\${scopesInfo}
-- **时间统计**：\${statsText}
-- **活动时间轴**：\${timelineText}
-- **回顾问答**：\${answersText}
+请为我生成一篇结构清晰、语气客观的每日回顾叙事（Narrative），就像是一位理性的观察者在记录这一天。
 
 **写作要求：**
 - **摘要**：开头用一句话概括今天的主要成就或特点。
 - **时间流**：按时间顺序梳理今天的关键活动，突出不同领域的平衡。
-- **洞察**：结合回顾问答，简要分析今天的状态（专注度、情绪等）。
+- **洞察**：简要分析今天的状态（专注度、情绪等）。
 - **格式**：使用 markdown 格式，适当使用**加粗**突出重点。
 - **长度**：300-400字。
 - **人称**：第一人称“我”。
@@ -679,15 +671,7 @@ export const NARRATIVE_TEMPLATES = [
     title: '深度反思',
     description: '侧重内心感受与意义探寻',
     prompt: `
-请作为一位充满智慧的导师，根据我的【今日时间记录】和【回顾问答】，为我生成一篇侧重内心感受与意义探寻的每日反思。
-
-**输入数据：**
-- **日期**：\${date}
-- **用户画像**：\${userInfo}
-- **人生领域**：\${scopesInfo}
-- **时间统计**：\${statsText}
-- **活动时间轴**：\${timelineText}
-- **回顾问答**：\${answersText}
+请作为一位充满智慧的导师，为我生成一篇侧重内心感受与意义探寻的每日反思。
 
 **写作要求：**
 - **核心**：不要流水账，要挖掘活动背后的意义。
@@ -704,15 +688,7 @@ export const NARRATIVE_TEMPLATES = [
     title: '散文诗意',
     description: '优雅、感性的文学化表达',
     prompt: `
-请以一位作家的笔触，将我枯燥的【今日时间记录】转化为一篇优雅、感性的散文。
-
-**输入数据：**
-- **日期**：\${date}
-- **用户画像**：\${userInfo}
-- **人生领域**：\${scopesInfo}
-- **时间统计**：\${statsText}
-- **活动时间轴**：\${timelineText}
-- **回顾问答**：\${answersText}
+请以一位作家的笔触，将我枯燥的时间记录转化为一篇优雅、感性的散文。
 
 **写作要求：**
 - **风格**：优美、细腻，运用比喻和意象。
@@ -722,11 +698,5 @@ export const NARRATIVE_TEMPLATES = [
 - **长度**：300-400字。
 - **人称**：第一人称“我”。
     `.trim()
-  },
-  {
-    id: 'custom',
-    title: '自定义',
-    description: '完全由你自己定义的提示词',
-    prompt: '' // Placeholder, logic will use customPrompt
   }
 ];

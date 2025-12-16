@@ -91,6 +91,29 @@ export const narrativeService = {
 
         let promptTemplate = customPrompt || DEFAULT_NARRATIVE_PROMPT;
 
+        // Smart Prompt Assembly:
+        // If the template is just a persona (doesn't include ${statsText}), 
+        // automatically append the standard data structure.
+        if (!promptTemplate.includes('${statsText}') && !promptTemplate.includes('${timelineText}')) {
+            promptTemplate += `\n
+User Context (用户背景):
+- **我的背景**: \${userInfo}
+- **我关注的人生领域**: \${scopesInfo}
+
+Data Provided (今日数据):
+1. **时间统计**:
+\${statsText}
+
+2. **活动时间轴**:
+\${timelineText}
+
+3. **我的自我反思 (问答)**:
+\${answersText}
+
+**Date**: \${date}
+`;
+        }
+
         // Replace placeholders
         const prompt = promptTemplate
             .replace(/\${date}/g, review.date)
@@ -102,11 +125,8 @@ export const narrativeService = {
 
         console.log('Input Data:', {
             date: review.date,
-            stats: statsText,
-            timeline: timelineText,
-            answers: review.answers,
-            userInfo: userInfo,
-            scopesInfo: scopesInfo,
+            promptLength: prompt.length,
+            // Only logging the final prompt to avoid confusion about duplication
             fullPrompt: prompt
         });
 
