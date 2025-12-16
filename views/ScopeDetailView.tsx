@@ -415,7 +415,7 @@ export const ScopeDetailView: React.FC<ScopeDetailViewProps> = ({
                                     return (
                                         <div key={day} className="mb-8 last:mb-0">
                                             {/* Day Header */}
-                                            <div className="flex items-baseline justify-between mb-6 px-2 sticky top-0 bg-[#faf9f6]/95 backdrop-blur z-10 py-2 border-b border-stone-100">
+                                            <div className="flex items-baseline justify-between mb-6 px-2 py-2 border-b border-stone-100">
                                                 <div className="flex items-baseline gap-3">
                                                     <span className="text-2xl font-black text-stone-900 font-mono tracking-tighter">
                                                         {String(displayMonth + 1).padStart(2, '0')}/{String(day).padStart(2, '0')}
@@ -446,7 +446,7 @@ export const ScopeDetailView: React.FC<ScopeDetailViewProps> = ({
                                                             onClick={() => onEditLog?.(log)}
                                                         >
                                                             {/* Time - Absolute Left */}
-                                                            <div className="absolute -left-[60px] top-0 w-[45px] text-right flex flex-col items-end">
+                                                            <div className="absolute -left-[60px] top-2 w-[45px] text-right flex flex-col items-end">
                                                                 <span className="text-sm font-bold text-stone-800 leading-none font-mono">
                                                                     {timeStr}
                                                                 </span>
@@ -456,10 +456,10 @@ export const ScopeDetailView: React.FC<ScopeDetailViewProps> = ({
                                                             </div>
 
                                                             {/* Timeline Dot */}
-                                                            <div className="absolute -left-[5px] top-1.5 w-2.5 h-2.5 rounded-full bg-stone-900 border-2 border-[#faf9f6] z-10" />
+                                                            <div className="absolute left-[3px] top-2 w-2.5 h-2.5 rounded-full bg-stone-900 border-2 border-[#faf9f6] z-10" />
 
                                                             {/* Content */}
-                                                            <div className="relative top-[-2px]">
+                                                            <div className="relative">
                                                                 <div className="flex items-center gap-2 mb-1">
                                                                     <h4 className="text-lg font-bold text-stone-900 leading-tight">
                                                                         {activity?.name || category?.name}
