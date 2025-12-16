@@ -1,5 +1,5 @@
 import React from 'react';
-import { Trash2, AlertTriangle, Info } from 'lucide-react';
+import { Trash2, AlertTriangle, Info, X } from 'lucide-react';
 
 interface ConfirmModalProps {
     isOpen: boolean;
@@ -37,45 +37,48 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
 
     const getIconBg = () => {
         switch (type) {
-            case 'danger': return 'bg-red-100';
-            case 'warning': return 'bg-amber-100';
-            case 'info': return 'bg-blue-100';
+            case 'danger': return 'bg-red-50';
+            case 'warning': return 'bg-amber-50';
+            case 'info': return 'bg-blue-50';
         }
     };
 
     const getConfirmBtnClass = () => {
         switch (type) {
-            case 'danger': return 'text-red-500 hover:bg-red-50 active:bg-red-100';
-            case 'warning': return 'text-amber-500 hover:bg-amber-50 active:bg-amber-100';
-            case 'info': return 'text-blue-500 hover:bg-blue-50 active:bg-blue-100';
+            case 'danger': return 'bg-white border border-red-200 text-red-500 hover:bg-red-50 shadow-sm';
+            case 'warning': return 'bg-white border border-amber-200 text-amber-500 hover:bg-amber-50 shadow-sm';
+            case 'info': return 'bg-white border border-blue-200 text-blue-500 hover:bg-blue-50 shadow-sm';
         }
     };
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/20 backdrop-blur-sm animate-in fade-in duration-200">
-            <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm overflow-hidden animate-in zoom-in-95 duration-200">
-                <div className="p-6 text-center space-y-4">
-                    <div className={`w-12 h-12 rounded-full flex items-center justify-center mx-auto ${getIconBg()}`}>
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/20 backdrop-blur-sm animate-in fade-in duration-200">
+            <div className="bg-[#fdfbf7] w-full max-w-sm rounded-[2rem] shadow-2xl overflow-hidden flex flex-col animate-in zoom-in-95 duration-200">
+                {/* Header / Content Wrapper */}
+                <div className="p-8 flex flex-col items-center text-center">
+
+                    <div className={`w-16 h-16 rounded-full flex items-center justify-center mb-6 ${getIconBg()}`}>
                         {getIcon()}
                     </div>
-                    <div>
-                        <h3 className="text-lg font-bold text-stone-900">{title}</h3>
-                        <p className="text-stone-500 text-sm mt-2">
-                            {description}
-                        </p>
-                    </div>
+
+                    <h3 className="text-xl font-bold text-stone-800 mb-3">{title}</h3>
+
+                    <p className="text-stone-500 leading-relaxed">
+                        {description}
+                    </p>
                 </div>
-                <div className="flex border-t border-stone-100">
+
+                {/* Footer Buttons */}
+                <div className="p-5 bg-white border-t border-stone-100 flex gap-3">
                     <button
                         onClick={onClose}
-                        className="flex-1 py-4 text-stone-600 font-medium hover:bg-stone-50 transition-colors active:bg-stone-100"
+                        className="flex-1 py-3.5 bg-white border border-stone-200 text-stone-600 rounded-2xl font-bold hover:bg-stone-50 transition-colors"
                     >
                         {cancelText}
                     </button>
-                    <div className="w-px bg-stone-100"></div>
                     <button
                         onClick={onConfirm}
-                        className={`flex-1 py-4 font-medium transition-colors ${getConfirmBtnClass()}`}
+                        className={`flex-1 py-3.5 rounded-2xl font-bold hover:scale-[1.01] active:scale-[0.99] transition-transform shadow-xl ${getConfirmBtnClass()}`}
                     >
                         {confirmText}
                     </button>
