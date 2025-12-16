@@ -205,3 +205,11 @@ export interface DailyReview {
   narrativeUpdatedAt?: number;
   isEdited?: boolean; // 叙事是否被手动编辑过
 }
+
+// Narrative Template (AI 叙事模板)
+export interface NarrativeTemplate {
+  id: string;
+  title: string;
+  description: string; // 简短描述，用于UI展示
+  prompt: string; // 提示词内容
+}

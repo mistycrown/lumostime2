@@ -47,6 +47,7 @@ import remarkGfm from 'remark-gfm';
 import { ReviewTemplateManageView } from './ReviewTemplateManageView';
 import { ReviewTemplate } from '../types';
 import { DEFAULT_NARRATIVE_PROMPT } from '../services/narrativeService';
+import { NARRATIVE_TEMPLATES } from '../constants';
 // @ts-ignore
 import userGuideContent from '../USER_GUIDE.md?raw';
 
@@ -78,6 +79,8 @@ interface SettingsViewProps {
     onResetAiNarrativePrompt?: () => void;
     userPersonalInfo?: string;
     onSetUserPersonalInfo?: (info: string) => void;
+    narrativeTemplateId?: string;
+    onSetNarrativeTemplateId?: (id: string) => void;
 }
 
 const AI_PRESETS = {
@@ -99,7 +102,7 @@ const AI_PRESETS = {
     }
 };
 
-export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, onImport, onReset, onClearData, onToast, syncData, onSyncUpdate, startWeekOnSunday, onToggleStartWeekOnSunday, onOpenAutoLink, onOpenSearch, minIdleTimeThreshold = 1, onSetMinIdleTimeThreshold, defaultView = 'RECORD', onSetDefaultView, reviewTemplates = [], onUpdateReviewTemplates, dailyReviewTime, onSetDailyReviewTime, aiNarrativePrompt, onSetAiNarrativePrompt, onResetAiNarrativePrompt, userPersonalInfo, onSetUserPersonalInfo }) => {
+export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, onImport, onReset, onClearData, onToast, syncData, onSyncUpdate, startWeekOnSunday, onToggleStartWeekOnSunday, onOpenAutoLink, onOpenSearch, minIdleTimeThreshold = 1, onSetMinIdleTimeThreshold, defaultView = 'RECORD', onSetDefaultView, reviewTemplates = [], onUpdateReviewTemplates, dailyReviewTime, onSetDailyReviewTime, aiNarrativePrompt, onSetAiNarrativePrompt, onResetAiNarrativePrompt, userPersonalInfo, onSetUserPersonalInfo, narrativeTemplateId, onSetNarrativeTemplateId }) => {
     const [activeSubmenu, setActiveSubmenu] = useState<'main' | 'data' | 'cloud' | 'ai' | 'preferences' | 'guide' | 'nfc' | 'templates' | 'narrative_prompt'>('main');
     const [webdavConfig, setWebdavConfig] = useState<WebDAVConfig | null>(null);
     const [isSyncing, setIsSyncing] = useState(false);
@@ -1105,64 +1108,101 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
                         </p>
                     </div>
 
-                    {/* AI Narrative Prompt Section */}
+                    {/* Narrative Template Selector */}
                     <div className="bg-white rounded-2xl p-6 shadow-sm space-y-4">
-                        <div className="flex items-center justify-between mb-2">
-                            <div className="flex items-center gap-2">
-                                <div className="w-10 h-10 rounded-xl bg-purple-50 flex items-center justify-center text-purple-500">
-                                    <MessageSquare size={20} />
-                                </div>
-                                <div>
-                                    <h4 className="font-bold text-stone-800 text-[15px]">AI 叙事提示词</h4>
-                                    <p className="text-xs text-stone-400 mt-0.5">自定义生成每日回顾的 AI 指令</p>
-                                </div>
+                        <div className="flex items-center gap-2 mb-2">
+                            <div className="w-10 h-10 rounded-xl bg-indigo-50 flex items-center justify-center text-indigo-500">
+                                <Sparkles size={20} />
                             </div>
-                            <button
-                                onClick={handleReset}
-                                className="p-2 text-stone-400 hover:text-stone-600 hover:bg-stone-100 rounded-lg transition-colors flex items-center gap-1.5"
-                                title="重置为默认提示词"
-                            >
-                                <RotateCcw size={16} />
-                                <span className="text-xs font-medium">重置默认</span>
-                            </button>
+                            <div>
+                                <h4 className="font-bold text-stone-800 text-[15px]">叙事风格</h4>
+                                <p className="text-xs text-stone-400 mt-0.5">选择 AI 生成每日回顾的风格模板</p>
+                            </div>
                         </div>
 
-                        <div className="text-xs text-stone-500 bg-stone-50 p-3 rounded-lg border border-stone-100">
-                            <p className="mb-2">💡 <strong>可用占位符:</strong></p>
-                            <ul className="space-y-1 ml-4">
-                                <li><code className="text-stone-700 bg-white px-1 py-0.5 rounded">{'${date}'}</code> - 回顾日期</li>
-                                <li><code className="text-stone-700 bg-white px-1 py-0.5 rounded">{'${userInfo}'}</code> - 用户个人信息</li>
-                                <li><code className="text-stone-700 bg-white px-1 py-0.5 rounded">{'${scopesInfo}'}</code> - 人生领域信息</li>
-                                <li><code className="text-stone-700 bg-white px-1 py-0.5 rounded">{'${statsText}'}</code> - 时间统计数据</li>
-                                <li><code className="text-stone-700 bg-white px-1 py-0.5 rounded">{'${timelineText}'}</code> - 活动时间轴</li>
-                                <li><code className="text-stone-700 bg-white px-1 py-0.5 rounded">{'${answersText}'}</code> - 回顾问答内容</li>
-                            </ul>
+                        {/* Capsule Selector */}
+                        <div className="flex flex-wrap gap-2">
+                            {NARRATIVE_TEMPLATES.map(template => (
+                                <button
+                                    key={template.id}
+                                    onClick={() => {
+                                        onSetNarrativeTemplateId?.(template.id);
+                                        // If switching to custom, maybe init with default prompt if empty?
+                                        // But we keep it simple.
+                                    }}
+                                    className={`px-4 py-2 rounded-full text-xs font-bold border transition-all ${narrativeTemplateId === template.id
+                                        ? 'bg-stone-800 text-white border-stone-800 shadow-md transform scale-105'
+                                        : 'bg-white text-stone-500 border-stone-200 hover:border-stone-300 hover:bg-stone-50'
+                                        }`}
+                                >
+                                    {template.title}
+                                </button>
+                            ))}
                         </div>
 
-                        <textarea
-                            className="w-full h-96 bg-stone-50 border border-stone-200 rounded-xl p-4 text-xs font-mono text-stone-600 outline-none focus:border-stone-400 resize-none leading-relaxed"
-                            value={localPrompt}
-                            onChange={(e) => {
-                                setLocalPrompt(e.target.value);
-                                setHasNarrativeChanges(true);
-                            }}
-                            placeholder="输入自定义提示词..."
-                        />
-
-                        <div className="flex justify-end">
-                            <button
-                                onClick={handleSave}
-                                disabled={!hasNarrativeChanges}
-                                className={`px-6 py-2.5 text-sm font-bold rounded-xl transition-colors flex items-center justify-center gap-2 ${hasNarrativeChanges
-                                    ? 'bg-stone-800 text-white hover:bg-stone-700 shadow-md'
-                                    : 'bg-stone-200 text-stone-400 cursor-not-allowed'
-                                    }`}
-                            >
-                                <Save size={16} />
-                                保存修改
-                            </button>
+                        {/* Description Display */}
+                        <div className="bg-stone-50 rounded-xl p-4 text-xs text-stone-500 border border-stone-100 italic">
+                            {NARRATIVE_TEMPLATES.find(t => t.id === narrativeTemplateId)?.description}
                         </div>
                     </div>
+
+                    {/* AI Narrative Prompt Section (Condition: Custom Only) */}
+                    {narrativeTemplateId === 'custom' && (
+                        <div className="bg-white rounded-2xl p-6 shadow-sm space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-300">
+                            <div className="flex items-center justify-between mb-2">
+                                <div className="flex items-center gap-2">
+                                    <div className="w-10 h-10 rounded-xl bg-purple-50 flex items-center justify-center text-purple-500">
+                                        <MessageSquare size={20} />
+                                    </div>
+                                    <div>
+                                        <h4 className="font-bold text-stone-800 text-[15px]">自定义提示词</h4>
+                                        <p className="text-xs text-stone-400 mt-0.5">完全自定义 AI 的生成指令</p>
+                                    </div>
+                                </div>
+                                <button
+                                    onClick={handleReset}
+                                    className="p-2 text-stone-400 hover:text-stone-600 hover:bg-stone-100 rounded-lg transition-colors flex items-center gap-1.5"
+                                    title="重置为默认提示词"
+                                >
+                                    <RotateCcw size={16} />
+                                    <span className="text-xs font-medium">重置默认</span>
+                                </button>
+                            </div>
+
+                            <div className="text-xs text-stone-500 bg-stone-50 p-3 rounded-lg border border-stone-100">
+                                <p className="mb-2">💡 <strong>可用占位符:</strong></p>
+                                <ul className="space-y-1 ml-4">
+                                    <li><code className="text-stone-700 bg-white px-1 py-0.5 rounded">{'${date}'}</code> - 回顾日期</li>
+                                    <li><code className="text-stone-700 bg-white px-1 py-0.5 rounded">{'${userInfo}'}</code> - 用户个人信息</li>
+                                    <li><code className="text-stone-700 bg-white px-1 py-0.5 rounded">{'${scopesInfo}'}</code> - 人生领域信息</li>
+                                    <li><code className="text-stone-700 bg-white px-1 py-0.5 rounded">{'${statsText}'}</code> - 时间统计数据</li>
+                                    <li><code className="text-stone-700 bg-white px-1 py-0.5 rounded">{'${timelineText}'}</code> - 活动时间轴</li>
+                                    <li><code className="text-stone-700 bg-white px-1 py-0.5 rounded">{'${answersText}'}</code> - 回顾问答内容</li>
+                                </ul>
+                            </div>
+
+                            <textarea
+                                className="w-full h-96 bg-stone-50 border border-stone-200 rounded-xl p-4 text-xs font-mono text-stone-600 outline-none focus:border-stone-400 resize-none leading-relaxed"
+                                value={localPrompt}
+                                onChange={(e) => {
+                                    setLocalPrompt(e.target.value);
+                                    setHasNarrativeChanges(true);
+                                }}
+                                placeholder="输入自定义提示词..."
+                            />
+                        </div>
+                    )}
+
+                    <div className="flex justify-end pt-4 pb-8">
+                        <button
+                            onClick={handleSave}
+                            className="px-6 py-2.5 text-sm font-bold rounded-xl transition-colors flex items-center justify-center gap-2 bg-stone-800 text-white hover:bg-stone-700 shadow-md"
+                        >
+                            <Save size={16} />
+                            保存修改
+                        </button>
+                    </div>
+
                 </div>
             </div>
         );

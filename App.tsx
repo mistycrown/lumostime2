@@ -27,6 +27,7 @@ import { splitLogByDays } from './utils/logUtils';
 import { ParsedTimeEntry, aiService } from './services/aiService';
 import { narrativeService } from './services/narrativeService';
 import { NfcService } from './services/NfcService';
+import { NARRATIVE_TEMPLATES } from './constants';
 import {
   PlusCircle,
   BarChart2,
@@ -214,6 +215,15 @@ const App: React.FC = () => {
   useEffect(() => {
     localStorage.setItem('lumostime_user_personal_info', userPersonalInfo);
   }, [userPersonalInfo]);
+
+  // AI Narrative Template ID
+  const [narrativeTemplateId, setNarrativeTemplateId] = useState<string>(() => {
+    return localStorage.getItem('lumostime_narrative_template_id') || 'default';
+  });
+
+  useEffect(() => {
+    localStorage.setItem('lumostime_narrative_template_id', narrativeTemplateId);
+  }, [narrativeTemplateId]);
 
   // Daily Review View State (路由状态)
   const [isDailyReviewOpen, setIsDailyReviewOpen] = useState(false);
@@ -1260,7 +1270,16 @@ const App: React.FC = () => {
   };
 
   const handleGenerateNarrative = async (review: DailyReview, statsText: string, timelineText: string): Promise<string> => {
-    return narrativeService.generateDailyNarrative(review, statsText, timelineText, aiNarrativePrompt, scopes, userPersonalInfo);
+    let selectedPrompt = '';
+
+    if (narrativeTemplateId === 'custom') {
+      selectedPrompt = aiNarrativePrompt;
+    } else {
+      const template = NARRATIVE_TEMPLATES.find(t => t.id === narrativeTemplateId);
+      selectedPrompt = template?.prompt || '';
+    }
+
+    return narrativeService.generateDailyNarrative(review, statsText, timelineText, selectedPrompt, scopes, userPersonalInfo);
   };
 
   const renderView = () => {
@@ -1502,6 +1521,9 @@ const App: React.FC = () => {
     if (data.autoLinkRules) setAutoLinkRules(data.autoLinkRules);
     if (data.reviewTemplates) setReviewTemplates(data.reviewTemplates);
     if (data.dailyReviews) setDailyReviews(data.dailyReviews);
+    if (data.aiNarrativePrompt) setAiNarrativePrompt(data.aiNarrativePrompt);
+    if (data.narrativeTemplateId) setNarrativeTemplateId(data.narrativeTemplateId);
+    if (data.userPersonalInfo) setUserPersonalInfo(data.userPersonalInfo);
 
     if (data.timestamp) {
       setDataLastModified(data.timestamp);
@@ -1674,7 +1696,10 @@ const App: React.FC = () => {
               setTodoCategories(MOCK_TODO_CATEGORIES);
               setReviewTemplates(DEFAULT_REVIEW_TEMPLATES);
               setDailyReviews([]);
+              setDailyReviews([]);
               setAutoLinkRules([]);
+              setAiNarrativePrompt('');
+              setNarrativeTemplateId('default');
               addToast('success', 'Data reset to defaults');
               setIsSettingsOpen(false);
             }}
@@ -1686,6 +1711,7 @@ const App: React.FC = () => {
               setReviewTemplates([]);
               setDailyReviews([]);
               setAutoLinkRules([]);
+              // Optional: Clear AI preferences? Maybe keep them.
               addToast('success', 'All data cleared successfully');
               setIsSettingsOpen(false);
             }}
@@ -1736,7 +1762,7 @@ const App: React.FC = () => {
               reader.readAsText(file);
             }}
             onToast={addToast}
-            syncData={{ logs, todos, categories, todoCategories, scopes, goals, autoLinkRules, reviewTemplates, dailyReviews }}
+            syncData={{ logs, todos, categories, todoCategories, scopes, goals, autoLinkRules, reviewTemplates, dailyReviews, aiNarrativePrompt, narrativeTemplateId, userPersonalInfo }}
             onSyncUpdate={handleSyncDataUpdate}
             startWeekOnSunday={startWeekOnSunday}
             onToggleStartWeekOnSunday={() => setStartWeekOnSunday(!startWeekOnSunday)}
@@ -1758,9 +1784,14 @@ const App: React.FC = () => {
             onSetDailyReviewTime={setDailyReviewTime}
             aiNarrativePrompt={aiNarrativePrompt}
             onSetAiNarrativePrompt={setAiNarrativePrompt}
-            onResetAiNarrativePrompt={() => setAiNarrativePrompt('')}
+            onResetAiNarrativePrompt={() => {
+              setAiNarrativePrompt('');
+              setNarrativeTemplateId('default'); // Reset to default template
+            }}
             userPersonalInfo={userPersonalInfo}
             onSetUserPersonalInfo={setUserPersonalInfo}
+            narrativeTemplateId={narrativeTemplateId}
+            onSetNarrativeTemplateId={setNarrativeTemplateId}
           />
         )}
 
