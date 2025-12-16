@@ -683,7 +683,11 @@ export const DailyReviewView: React.FC<DailyReviewViewProps> = ({
                                             remarkPlugins={[remarkGfm, remarkBreaks]}
                                             components={{
                                                 p: ({ node, ...props }) => <p className="mb-6 last:mb-0" {...props} />,
-                                                blockquote: ({ node, ...props }) => <blockquote className="border-l-4 border-stone-300 pl-4 italic text-stone-600 my-6 font-serif bg-stone-50 py-2 pr-2 rounded-r" {...props} />
+                                                blockquote: ({ node, ...props }) => <blockquote className="border-l-4 border-stone-300 pl-4 italic text-stone-600 my-6 font-serif bg-stone-50 py-2 pr-2 rounded-r" {...props} />,
+                                                ul: ({ node, ...props }) => <ul className="list-disc pl-5 my-4 space-y-1 text-stone-700" {...props} />,
+                                                ol: ({ node, ...props }) => <ol className="list-decimal pl-5 my-4 space-y-1 text-stone-700" {...props} />,
+                                                li: ({ node, ...props }) => <li className="pl-1" {...props} />,
+                                                hr: ({ node, ...props }) => <hr className="my-10 border-stone-300" {...props} />
                                             }}
                                         >
                                             {narrative}
@@ -722,7 +726,10 @@ export const DailyReviewView: React.FC<DailyReviewViewProps> = ({
                 <button
                     onClick={() => {
                         if (isEditing) handleSaveNarrative();
-                        else setIsEditing(true);
+                        else {
+                            setEditedNarrative(narrative);
+                            setIsEditing(true);
+                        }
                     }}
                     className="fixed bottom-24 right-6 w-14 h-14 bg-stone-900 rounded-full text-white shadow-2xl flex items-center justify-center active:scale-90 transition-transform z-40 border border-stone-800"
                 >
