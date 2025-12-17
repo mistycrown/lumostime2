@@ -37,7 +37,8 @@ import {
     Nfc,
     Edit2,
     PlusCircle,
-    ArrowUpCircle
+    ArrowUpCircle,
+    Coffee
 } from 'lucide-react';
 import { webdavService, WebDAVConfig } from '../services/webdavService';
 import { NfcService } from '../services/NfcService';
@@ -165,6 +166,9 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
     const [isCheckingUpdate, setIsCheckingUpdate] = useState(false);
     const [updateInfo, setUpdateInfo] = useState<VersionInfo | null>(null);
     const [showUpdateModal, setShowUpdateModal] = useState(false);
+
+    // Donation Modal State
+    const [showDonationModal, setShowDonationModal] = useState(false);
 
     useEffect(() => {
         setLocalUserInfo(userPersonalInfo || '');
@@ -1464,8 +1468,13 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
                         <MenuItem
                             icon={<BookOpen size={18} />}
                             label="用户指南"
-                            isLast
                             onClick={() => setActiveSubmenu('guide')}
+                        />
+                        <MenuItem
+                            icon={<Coffee size={18} className="text-amber-600" />}
+                            label="请我喝杯咖啡 ☕"
+                            isLast
+                            onClick={() => setShowDonationModal(true)}
                         />
                     </div>
                 </div>
@@ -1529,6 +1538,64 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
                                     立即下载
                                 </button>
                             </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Donation Modal - 赞赏码模态框 */}
+            {showDonationModal && (
+                <div
+                    className="fixed inset-0 z-[60] bg-black/50 flex items-center justify-center p-4"
+                    onClick={() => setShowDonationModal(false)}
+                >
+                    <div
+                        className="bg-white rounded-2xl w-full max-w-md shadow-xl animate-in fade-in zoom-in-95 duration-200"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <div className="p-6 space-y-4">
+                            {/* Header */}
+                            <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-3">
+                                    <div className="w-12 h-12 rounded-full bg-amber-100 flex items-center justify-center">
+                                        <Coffee size={24} className="text-amber-600" />
+                                    </div>
+                                    <div>
+                                        <h3 className="font-bold text-lg text-stone-800">感谢支持</h3>
+                                        <p className="text-sm text-stone-500">您的支持是我最大的动力</p>
+                                    </div>
+                                </div>
+                                <button
+                                    onClick={() => setShowDonationModal(false)}
+                                    className="p-1 text-stone-400 hover:text-stone-600 rounded-lg hover:bg-stone-100 transition-colors"
+                                >
+                                    <X size={24} />
+                                </button>
+                            </div>
+
+                            {/* QR Code Image */}
+                            <div className="flex justify-center">
+                                <div className="bg-stone-50 p-4 rounded-2xl">
+                                    <img
+                                        src="/assets/buy me a coffee.jpg"
+                                        alt="赞赏码"
+                                        className="w-64 h-64 object-contain rounded-xl"
+                                    />
+                                </div>
+                            </div>
+
+                            {/* Footer Message */}
+                            <div className="text-center space-y-2">
+                                <p className="text-sm text-stone-600">扫码支持开发者</p>
+                            </div>
+
+                            {/* Close Button */}
+                            <button
+                                onClick={() => setShowDonationModal(false)}
+                                className="w-full py-3 px-4 text-sm font-medium text-stone-600 bg-stone-100 hover:bg-stone-200 rounded-xl transition-colors"
+                            >
+                                关闭
+                            </button>
                         </div>
                     </div>
                 </div>

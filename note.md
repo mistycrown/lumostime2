@@ -13,11 +13,28 @@ npm run dev
 git reset --hard 0cee3fbf54840700dd4c8f62bdb97acebe8253f4
 git push --force
 
+
+
+当你真正发布新版本时：
+先更新 package.json 和 updateService.ts 中的版本号
+构建新的 APK
+创建 GitHub Release 并上传 APK 
+再更新 version.json 的版本号
+
+
 # 20251217
 
 搜索功能搜索日报
 
 周报功能？
+1. 数据层面，添加周报、周报引导模板类型。
+2. 交互层面。
+入口：
+1）设置页面-偏好设置-设置周报入口显示时间，默认为周日22：00.只有现在这一周应用这个
+
+
+自动检查更新？ 
+赞助
 
 # 20251216 预设叙事模板
 
