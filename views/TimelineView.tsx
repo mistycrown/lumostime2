@@ -604,30 +604,7 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ logs, todos, scopes,
                                 </div>
                             )}
 
-                            {/* Weekly Review Node - 显示在每周最后一天的末尾 */}
-                            {weeklyReviewData.shouldShow && (
-                                <div className="relative pl-8 mt-6 animate-in slide-in-from-bottom-2 duration-500">
-                                    {/* Time Marker */}
-                                    <div className="absolute -left-[60px] top-0.5 w-[45px] text-right">
-                                        <span className="text-xs font-bold text-purple-400 font-mono">Week</span>
-                                    </div>
-
-                                    {/* Timeline Dot */}
-                                    <div className="absolute -left-[5px] top-3 w-2.5 h-2.5 rounded-full bg-purple-400 border-2 border-[#faf9f6] z-10" />
-
-                                    {/* Content: Simple Text Button */}
-                                    <button
-                                        onClick={() => onOpenWeeklyReview?.(weeklyReviewData.weekStart, weeklyReviewData.weekEnd)}
-                                        className="text-left hover:text-purple-600 transition-colors group"
-                                    >
-                                        <h3 className="font-bold text-stone-900 text-lg group-hover:text-purple-600 transition-colors">
-                                            {weeklyReviewData.weeklyReview ? '本周小结' : '为本周作个小结吧！'}
-                                        </h3>
-                                    </button>
-                                </div>
-                            )}
-
-                            {/* Synced Template Content */}
+                            {/* Synced Template Content (Daily) - Moved here */}
                             {dailyReview && templates.length > 0 && templates.filter(t => t.isDailyTemplate && t.syncToTimeline).map((template) => {
                                 // Check if template has answers
                                 const hasAnswers = template.questions.some(q =>
@@ -686,6 +663,89 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ logs, todos, scopes,
                                     </div>
                                 );
                             })}
+
+                            {/* Weekly Review Node */}
+                            {weeklyReviewData.shouldShow && (
+                                <>
+                                    <div className="relative pl-8 mt-6 animate-in slide-in-from-bottom-2 duration-500">
+                                        {/* Time Marker */}
+                                        <div className="absolute -left-[60px] top-0.5 w-[45px] text-right">
+                                            <span className="text-xs font-bold text-purple-400 font-mono">Week</span>
+                                        </div>
+
+                                        {/* Timeline Dot */}
+                                        <div className="absolute -left-[5px] top-3 w-2.5 h-2.5 rounded-full bg-purple-400 border-2 border-[#faf9f6] z-10" />
+
+                                        {/* Content: Simple Text Button */}
+                                        <button
+                                            onClick={() => onOpenWeeklyReview?.(weeklyReviewData.weekStart, weeklyReviewData.weekEnd)}
+                                            className="text-left hover:text-purple-600 transition-colors group"
+                                        >
+                                            <h3 className="font-bold text-stone-900 text-lg group-hover:text-purple-600 transition-colors">
+                                                {weeklyReviewData.weeklyReview ? '本周小结' : '为本周作个小结吧！'}
+                                            </h3>
+                                        </button>
+                                    </div>
+
+                                    {/* Synced Template Content (Weekly) */}
+                                    {weeklyReviewData.weeklyReview && templates.length > 0 && templates.filter(t => !t.isDailyTemplate && t.syncToTimeline).map((template) => {
+                                        const hasAnswers = template.questions.some(q =>
+                                            weeklyReviewData.weeklyReview!.answers?.some(a => a.questionId === q.id && a.answer) || (q.type === 'rating' && weeklyReviewData.weeklyReview!.answers?.some(a => a.questionId === q.id))
+                                        );
+
+                                        if (!hasAnswers) return null;
+
+                                        return (
+                                            <div key={template.id} className="relative pl-8 mt-6 animate-in slide-in-from-bottom-2 duration-500">
+                                                {/* Time Marker - Template Title */}
+                                                <div className="absolute -left-[60px] top-0.5 w-[45px] text-right flex flex-col items-end">
+                                                    <span className="text-xs font-bold text-stone-500 leading-tight">
+                                                        {template.title.replace(/[\p{Emoji_Presentation}\p{Extended_Pictographic}]/u, '')}
+                                                    </span>
+                                                </div>
+
+                                                {/* Timeline Dot */}
+                                                <div className="absolute -left-[5px] top-1.5 w-2.5 h-2.5 rounded-full bg-stone-300 border-2 border-[#faf9f6] z-10" />
+
+                                                {/* Content Wrapper */}
+                                                <div className="space-y-4">
+                                                    <div className="space-y-3" style={{ paddingTop: '2px' }}>
+                                                        {template.questions.map(q => {
+                                                            const answer = weeklyReviewData.weeklyReview!.answers?.find(a => a.questionId === q.id);
+                                                            if (!answer || (q.type !== 'rating' && !answer.answer)) return null;
+
+                                                            return (
+                                                                <div key={q.id} className="group">
+                                                                    <div className="mb-1.5 flex items-start gap-2">
+                                                                        <div className="w-1.5 h-1.5 mt-1.5 rounded-full bg-stone-300 shrink-0"></div>
+                                                                        <h4 className="text-sm font-normal text-stone-600 leading-snug flex-1">
+                                                                            {q.question}
+                                                                        </h4>
+                                                                    </div>
+
+                                                                    {q.type === 'rating' ? (
+                                                                        <div className="flex items-center gap-1" style={{ marginLeft: '14px' }}>
+                                                                            {Array.from({ length: parseInt(typeof answer.answer === 'string' ? answer.answer : String(answer.answer)) || 0 }).map((_, i) => (
+                                                                                <span key={i} className={q.colorId ? `text-${q.colorId}-500` : "text-amber-500"}>
+                                                                                    <DynamicIcon name={q.icon || 'star'} size={18} />
+                                                                                </span>
+                                                                            ))}
+                                                                        </div>
+                                                                    ) : (
+                                                                        <div className="text-sm text-stone-500 leading-relaxed font-light whitespace-pre-wrap" style={{ marginLeft: '14px' }}>
+                                                                            {answer.answer}
+                                                                        </div>
+                                                                    )}
+                                                                </div>
+                                                            );
+                                                        })}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </>
+                            )}
                         </>
                     )}
 
