@@ -3,6 +3,7 @@
   "private": true,
   "version": "0.0.0",
   "description": "LumosTime - A personal time management application",
+  "license": "GPL-3.0",
   "author": "Your Name",
   "type": "module",
   "main": "dist-electron/main.js",

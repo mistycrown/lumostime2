@@ -8,6 +8,7 @@ import remarkGfm from 'remark-gfm';
 import remarkBreaks from 'remark-breaks';
 import { ConfirmModal } from '../components/ConfirmModal';
 import { NarrativeStyleSelectionModal } from '../components/NarrativeStyleSelectionModal';
+import { StatsView } from './StatsView';
 
 interface DailyReviewViewProps {
     review: DailyReview;
@@ -83,7 +84,7 @@ export const DailyReviewView: React.FC<DailyReviewViewProps> = ({
         return `${year}-${month}-${day}`;
     };
 
-    // 获取当天的logs
+    // 获取当天的logs（保留以便可能在其他地方使用）
     const dayLogs = useMemo(() => {
         const start = new Date(date);
         start.setHours(0, 0, 0, 0);
@@ -96,26 +97,17 @@ export const DailyReviewView: React.FC<DailyReviewViewProps> = ({
         );
     }, [logs, date]);
 
-    // 计算统计数据
+    // 注意：以下stats计算仅用于AI叙事生成，数据展示由StatsView处理
     const stats = useMemo(() => {
         const totalDuration = dayLogs.reduce((acc, log) => acc + (log.duration || 0), 0);
 
-        // 标签统计
         const categoryStats = categories.map(cat => {
             const catLogs = dayLogs.filter(l => l.categoryId === cat.id);
             const duration = catLogs.reduce((acc, l) => acc + (l.duration || 0), 0);
             const percentage = totalDuration > 0 ? (duration / totalDuration) * 100 : 0;
-
-            const activityStats = cat.activities.map(act => {
-                const actLogs = catLogs.filter(l => l.activityId === act.id);
-                const actDuration = actLogs.reduce((acc, l) => acc + (l.duration || 0), 0);
-                return { ...act, duration: actDuration };
-            }).filter(a => a.duration > 0);
-
-            return { ...cat, duration, percentage, activities: activityStats };
+            return { ...cat, duration, percentage };
         }).filter(c => c.duration > 0);
 
-        // 待办统计
         const todoStats = todoCategories.map(cat => {
             const catTodos = todos.filter(t => t.categoryId === cat.id);
             const linkedLogs = dayLogs.filter(l =>
@@ -123,32 +115,22 @@ export const DailyReviewView: React.FC<DailyReviewViewProps> = ({
             );
             const duration = linkedLogs.reduce((acc, l) => acc + (l.duration || 0), 0);
             const percentage = totalDuration > 0 ? (duration / totalDuration) * 100 : 0;
-
-            // 计算每个具体待办的时长
-            const todoItems = catTodos.map(todo => {
-                const todoLogs = dayLogs.filter(l => l.linkedTodoId === todo.id);
-                const todoDuration = todoLogs.reduce((acc, l) => acc + (l.duration || 0), 0);
-                return { ...todo, duration: todoDuration };
-            }).filter(t => t.duration > 0);
-
-            return { ...cat, duration, percentage, todos: todoItems };
+            return { ...cat, duration, percentage };
         }).filter(c => c.duration > 0);
 
-        // 领域统计
         const scopeStats = scopes.map(scope => {
             const scopeLogs = dayLogs.filter(l =>
                 l.scopeIds && l.scopeIds.includes(scope.id)
             );
             const duration = scopeLogs.reduce((acc, l) => acc + (l.duration || 0), 0);
             const percentage = totalDuration > 0 ? (duration / totalDuration) * 100 : 0;
-
             return { ...scope, duration, percentage };
         }).filter(s => s.duration > 0);
 
         return { totalDuration, categoryStats, todoStats, scopeStats };
     }, [dayLogs, categories, todos, todoCategories, scopes]);
 
-    // 格式化时长
+    // 格式化时长（用于AI叙事生成）
     const formatDuration = (seconds: number) => {
         const h = Math.floor(seconds / 3600);
         const m = Math.floor((seconds % 3600) / 60);
@@ -468,101 +450,23 @@ export const DailyReviewView: React.FC<DailyReviewViewProps> = ({
 
             {/* Tab Content */}
             <div className="space-y-6">
-                {/* Tab 1: Data */}
+                {/* Tab 1: Data - 使用 StatsView 组件 */}
                 {activeTab === 'data' && (
-                    <div className="space-y-6 animate-in fade-in duration-300">
-                        {/* 标签统计 */}
-                        {stats.categoryStats.length > 0 && (
-                            <div className="bg-white rounded-2xl p-5 shadow-sm">
-                                <h3 className="text-sm font-bold text-stone-400 uppercase tracking-wider mb-4">标签统计</h3>
-                                <div className="space-y-3">
-                                    {stats.categoryStats.map(cat => (
-                                        <div key={cat.id}>
-                                            <div className="flex items-center justify-between mb-2">
-                                                <div className="flex items-center gap-2">
-                                                    <span className="text-base">{cat.icon}</span>
-                                                    <span className="font-bold text-stone-700 text-sm">{cat.name}</span>
-                                                </div>
-                                                <div className="flex items-center gap-2">
-                                                    <span className="text-xs text-stone-400">{formatDuration(cat.duration)}</span>
-                                                    <span className="text-xs font-bold px-2 py-0.5 bg-stone-100 rounded text-stone-500">
-                                                        {cat.percentage.toFixed(0)}%
-                                                    </span>
-                                                </div>
-                                            </div>
-                                            {cat.activities.length > 0 && (
-                                                <div className="ml-6 space-y-1">
-                                                    {cat.activities.map(act => (
-                                                        <div key={act.id} className="flex items-center justify-between text-xs">
-                                                            <span className="text-stone-500">{act.icon} {act.name}</span>
-                                                            <span className="text-stone-400">{formatDuration(act.duration)}</span>
-                                                        </div>
-                                                    ))}
-                                                </div>
-                                            )}
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-                        )}
-
-                        {/* 待办统计 */}
-                        {stats.todoStats.length > 0 && (
-                            <div className="bg-white rounded-2xl p-5 shadow-sm">
-                                <h3 className="text-sm font-bold text-stone-400 uppercase tracking-wider mb-4">待办统计</h3>
-                                <div className="space-y-3">
-                                    {stats.todoStats.map(todoCat => (
-                                        <div key={todoCat.id}>
-                                            <div className="flex items-center justify-between mb-2">
-                                                <div className="flex items-center gap-2">
-                                                    <span className="text-base">{todoCat.icon}</span>
-                                                    <span className="font-bold text-stone-700 text-sm">{todoCat.name}</span>
-                                                </div>
-                                                <div className="flex items-center gap-2">
-                                                    <span className="text-xs text-stone-400">{formatDuration(todoCat.duration)}</span>
-                                                    <span className="text-xs font-bold px-2 py-0.5 bg-stone-100 rounded text-stone-500">
-                                                        {todoCat.percentage.toFixed(0)}%
-                                                    </span>
-                                                </div>
-                                            </div>
-                                            {todoCat.todos && todoCat.todos.length > 0 && (
-                                                <div className="ml-6 space-y-1">
-                                                    {todoCat.todos.map(todo => (
-                                                        <div key={todo.id} className="flex items-center justify-between text-xs">
-                                                            <span className="text-stone-500">{todo.title}</span>
-                                                            <span className="text-stone-400">{formatDuration(todo.duration)}</span>
-                                                        </div>
-                                                    ))}
-                                                </div>
-                                            )}
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-                        )}
-
-                        {/* 领域统计 */}
-                        {stats.scopeStats.length > 0 && (
-                            <div className="bg-white rounded-2xl p-5 shadow-sm">
-                                <h3 className="text-sm font-bold text-stone-400 uppercase tracking-wider mb-4">领域统计</h3>
-                                <div className="space-y-2">
-                                    {stats.scopeStats.map(scope => (
-                                        <div key={scope.id} className="flex items-center justify-between">
-                                            <div className="flex items-center gap-2">
-                                                <span className="text-base">{scope.icon}</span>
-                                                <span className="font-medium text-stone-700 text-sm">{scope.name}</span>
-                                            </div>
-                                            <div className="flex items-center gap-2">
-                                                <span className="text-xs text-stone-400">{formatDuration(scope.duration)}</span>
-                                                <span className="text-xs font-bold px-2 py-0.5 bg-stone-100 rounded text-stone-500">
-                                                    {scope.percentage.toFixed(0)}%
-                                                </span>
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-                        )}
+                    <div className="animate-in fade-in duration-300 -mx-7 -mt-4 pb-6">
+                        <StatsView
+                            logs={logs}
+                            categories={categories}
+                            currentDate={date}
+                            onBack={() => { }} // Daily Review 不需要返回按钮
+                            isFullScreen={false}
+                            onToggleFullScreen={() => { }}
+                            todos={todos}
+                            todoCategories={todoCategories}
+                            scopes={scopes}
+                            hideControls={true}  // 隐藏控制栏
+                            forcedView="pie"     // 强制为饼图视图
+                            forcedRange="day"    // 强制为日视图
+                        />
                     </div>
                 )}
 
