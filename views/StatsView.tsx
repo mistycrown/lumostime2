@@ -17,6 +17,10 @@ interface StatsViewProps {
   todos: TodoItem[];
   todoCategories: TodoCategory[];
   scopes: Scope[];
+  // Daily Review 支持
+  hideControls?: boolean;  // 隐藏视图切换和时间范围选择器
+  forcedView?: ViewType;   // 强制视图类型
+  forcedRange?: PieRange;  // 强制时间范围
 }
 
 type ViewType = 'pie' | 'matrix' | 'schedule' | 'line';
@@ -33,9 +37,9 @@ interface CategoryStat extends Category {
   items: ActivityStat[];
 }
 
-export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentDate, onBack, onDateChange, isFullScreen, onToggleFullScreen, onToast, onTitleChange, todos, todoCategories, scopes }) => {
-  const [viewType, setViewType] = useState<ViewType>('pie');
-  const [pieRange, setPieRange] = useState<PieRange>('day');
+export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentDate, onBack, onDateChange, isFullScreen, onToggleFullScreen, onToast, onTitleChange, todos, todoCategories, scopes, hideControls = false, forcedView, forcedRange }) => {
+  const [viewType, setViewType] = useState<ViewType>(forcedView || 'pie');
+  const [pieRange, setPieRange] = useState<PieRange>(forcedRange || 'day');
   const [scheduleRange, setScheduleRange] = useState<ScheduleRange>('day');
   const [lineRange, setLineRange] = useState<'week' | 'month'>('week');
   const [excludedCategoryIds, setExcludedCategoryIds] = useState<string[]>([]);
@@ -835,7 +839,7 @@ export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentD
         <div className={`${isFullScreen ? 'h-full flex flex-col' : 'px-5 pb-24 space-y-6 max-w-2xl mx-auto'}`}>
 
           {/* Control Bar: Time Range (Left) + Date Navigation + View Switcher (Right) - Hidden in FullScreen */}
-          {!isFullScreen && (
+          {!hideControls && !isFullScreen && (
             <div className="flex items-center justify-between mb-4">
               {/* Left: Time Range Selector (only for pie and schedule views) */}
               <div className="flex-1">
