@@ -36,11 +36,13 @@ import {
     ChevronDown,
     Nfc,
     Edit2,
-    PlusCircle
+    PlusCircle,
+    ArrowUpCircle
 } from 'lucide-react';
 import { webdavService, WebDAVConfig } from '../services/webdavService';
 import { NfcService } from '../services/NfcService';
 import { aiService, AIConfig } from '../services/aiService';
+import { UpdateService, VersionInfo } from '../services/updateService';
 import { CustomSelect } from '../components/CustomSelect';
 import { ToastType } from '../components/Toast';
 import ReactMarkdown from 'react-markdown';
@@ -158,6 +160,11 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
     const [modalPrompt, setModalPrompt] = useState('');
     const [modalError, setModalError] = useState('');
     const [deletingTemplateId, setDeletingTemplateId] = useState<string | null>(null);
+
+    // Update Check State
+    const [isCheckingUpdate, setIsCheckingUpdate] = useState(false);
+    const [updateInfo, setUpdateInfo] = useState<VersionInfo | null>(null);
+    const [showUpdateModal, setShowUpdateModal] = useState(false);
 
     useEffect(() => {
         setLocalUserInfo(userPersonalInfo || '');
@@ -393,6 +400,41 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
             }
         } catch (e) {
             setAiTestStatus('error');
+        }
+    };
+
+    const handleCheckUpdate = async () => {
+        setIsCheckingUpdate(true);
+        try {
+            const latestVersion = await UpdateService.checkNeedsUpdate();
+
+            if (latestVersion) {
+                // 有新版本可用
+                setUpdateInfo(latestVersion);
+                setShowUpdateModal(true);
+            } else {
+                const versionData = await UpdateService.checkForUpdates();
+                if (versionData) {
+                    // 已是最新版本
+                    onToast('success', `当前已是最新版本 v${UpdateService.getCurrentVersion()}`);
+                } else {
+                    // 检查失败
+                    onToast('error', '检查更新失败，请稍后重试');
+                }
+            }
+        } catch (error) {
+            console.error('检查更新出错:', error);
+            onToast('error', '检查更新失败，请检查网络连接');
+        } finally {
+            setIsCheckingUpdate(false);
+        }
+    };
+
+    const handleDownloadUpdate = () => {
+        if (updateInfo?.updateUrl) {
+            UpdateService.openUpdateUrl(updateInfo.updateUrl);
+            setShowUpdateModal(false);
+            onToast('info', '已在浏览器中打开下载页面');
         }
     };
 
@@ -1415,6 +1457,11 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
                     <h3 className="text-[10px] font-bold text-stone-400 uppercase tracking-wider pl-2">关于</h3>
                     <div className="bg-white rounded-2xl overflow-hidden shadow-[0_2px_10px_rgba(0,0,0,0.03)]">
                         <MenuItem
+                            icon={<ArrowUpCircle size={18} className="text-blue-500" />}
+                            label={isCheckingUpdate ? "检查中..." : "检查更新"}
+                            onClick={handleCheckUpdate}
+                        />
+                        <MenuItem
                             icon={<BookOpen size={18} />}
                             label="用户指南"
                             isLast
@@ -1424,10 +1471,68 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
                 </div>
 
                 <div className="text-center pt-4 pb-8">
-                    <span className="text-[10px] text-stone-300">Version 1.0.1 (WebDAV Build)</span>
+                    <span className="text-[10px] text-stone-300">LumosTime v{UpdateService.getCurrentVersion()}</span>
                 </div>
 
             </div>
+
+            {/* Update Available Modal */}
+            {showUpdateModal && updateInfo && (
+                <div className="fixed inset-0 z-[60] bg-black/50 flex items-center justify-center p-4">
+                    <div className="bg-white rounded-2xl w-full max-w-md shadow-xl animate-in fade-in zoom-in-95 duration-200">
+                        <div className="p-6 space-y-4">
+                            <div className="flex items-center gap-3">
+                                <div className="w-12 h-12 rounded-full bg-blue-100 flex items-center justify-center">
+                                    <ArrowUpCircle size={24} className="text-blue-600" />
+                                </div>
+                                <div>
+                                    <h3 className="font-bold text-lg text-stone-800">发现新版本</h3>
+                                    <p className="text-sm text-stone-500">v{updateInfo.version}</p>
+                                </div>
+                            </div>
+
+                            <div className="space-y-3">
+                                <div className="bg-stone-50 rounded-xl p-4">
+                                    <div className="flex justify-between items-center mb-2">
+                                        <span className="text-xs font-bold text-stone-400">当前版本</span>
+                                        <span className="text-sm font-medium text-stone-600">v{UpdateService.getCurrentVersion()}</span>
+                                    </div>
+                                    <div className="flex justify-between items-center">
+                                        <span className="text-xs font-bold text-stone-400">最新版本</span>
+                                        <span className="text-sm font-bold text-blue-600">v{updateInfo.version}</span>
+                                    </div>
+                                </div>
+
+                                {updateInfo.releaseNotes && (
+                                    <div>
+                                        <h4 className="text-xs font-bold text-stone-600 mb-2">更新内容</h4>
+                                        <div className="bg-stone-50 rounded-xl p-4">
+                                            <p className="text-sm text-stone-700 leading-relaxed whitespace-pre-line">
+                                                {updateInfo.releaseNotes}
+                                            </p>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+
+                            <div className="flex gap-3 pt-2">
+                                <button
+                                    onClick={() => setShowUpdateModal(false)}
+                                    className="flex-1 py-3 px-4 text-sm font-medium text-stone-600 bg-stone-100 hover:bg-stone-200 rounded-xl transition-colors"
+                                >
+                                    稍后提醒
+                                </button>
+                                <button
+                                    onClick={handleDownloadUpdate}
+                                    className="flex-1 py-3 px-4 text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-xl shadow-lg shadow-blue-200 transition-all active:scale-[0.98]"
+                                >
+                                    立即下载
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* Delete Confirmation Modal for Custom Templates */}
             <ConfirmModal
