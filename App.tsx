@@ -1900,35 +1900,59 @@ const App: React.FC = () => {
             icon={<PlusCircle size={24} />}
             label="記錄"
             isActive={currentView === AppView.RECORD}
-            onClick={() => { setCurrentView(AppView.RECORD); setSelectedTagId(null); }}
+            onClick={() => {
+              setCurrentView(AppView.RECORD);
+              setSelectedTagId(null);
+              setIsDailyReviewOpen(false);
+              setCurrentReviewDate(null);
+            }}
           />
 
           <NavButton
             icon={<CheckSquare size={24} />}
             label="待辦"
             isActive={currentView === AppView.TODO}
-            onClick={() => { setCurrentView(AppView.TODO); setSelectedTagId(null); }}
+            onClick={() => {
+              setCurrentView(AppView.TODO);
+              setSelectedTagId(null);
+              setIsDailyReviewOpen(false);
+              setCurrentReviewDate(null);
+            }}
           />
 
           <NavButton
             icon={<Clock size={24} />}
             label="時間軸"
             isActive={currentView === AppView.TIMELINE}
-            onClick={() => { setCurrentView(AppView.TIMELINE); setSelectedTagId(null); }}
+            onClick={() => {
+              setCurrentView(AppView.TIMELINE);
+              setSelectedTagId(null);
+              setIsDailyReviewOpen(false);
+              setCurrentReviewDate(null);
+            }}
           />
 
           <NavButton
             icon={<Tag size={24} />}
             label="標籤"
             isActive={currentView === AppView.TAGS}
-            onClick={() => setCurrentView(AppView.TAGS)}
+            onClick={() => {
+              setCurrentView(AppView.TAGS);
+              setIsDailyReviewOpen(false);
+              setCurrentReviewDate(null);
+            }}
           />
 
           <NavButton
             icon={<Briefcase size={24} />}
             label="領域"
             isActive={currentView === AppView.SCOPE}
-            onClick={() => { setCurrentView(AppView.SCOPE); setSelectedScopeId(null); }}
+            onClick={() => {
+              setCurrentView(AppView.SCOPE);
+              setSelectedScopeId(null);
+              setIsDailyReviewOpen(false);
+              setCurrentReviewDate(null);
+            }}
           />
         </nav>
       )}
