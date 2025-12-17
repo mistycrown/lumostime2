@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { Log, Category, Activity, Scope } from '../types';
 import { COLOR_OPTIONS } from '../constants';
-import { Minimize2, Share, PieChart, Grid, Calendar, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Minimize2, Share, PieChart, Grid, Calendar, ChevronLeft, ChevronRight, TrendingUp } from 'lucide-react';
 import { ToastType } from '../components/Toast';
 
 interface StatsViewProps {
@@ -19,7 +19,7 @@ interface StatsViewProps {
   scopes: import('../types').Scope[];
 }
 
-type ViewType = 'pie' | 'matrix' | 'schedule';
+type ViewType = 'pie' | 'matrix' | 'schedule' | 'line';
 type PieRange = 'day' | 'week' | 'month' | 'year';
 type ScheduleRange = 'day' | 'week';
 
@@ -37,6 +37,7 @@ export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentD
   const [viewType, setViewType] = useState<ViewType>('pie');
   const [pieRange, setPieRange] = useState<PieRange>('day');
   const [scheduleRange, setScheduleRange] = useState<ScheduleRange>('day');
+  const [lineRange, setLineRange] = useState<'week' | 'month'>('week');
   const [excludedCategoryIds, setExcludedCategoryIds] = useState<string[]>([]);
 
   const toggleExclusion = (id: string) => {
@@ -55,6 +56,8 @@ export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentD
       rangeType = pieRange;
     } else if (viewType === 'matrix') {
       rangeType = 'week_fixed';
+    } else if (viewType === 'line') {
+      rangeType = lineRange === 'week' ? 'week_fixed' : 'month';
     } else if (viewType === 'schedule') {
       rangeType = scheduleRange === 'day' ? 'day_fixed' : 'week_fixed';
     } else {
@@ -110,7 +113,7 @@ export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentD
   };
 
   // 生成动态标题
-  const getDynamicTitle = (date: Date, rangeType: PieRange | 'week_fixed' | 'day_fixed'): string => {
+  const getDynamicTitle = (date: Date, rangeType: PieRange | 'week_fixed' | 'day_fixed' | 'month'): string => {
     const formatDateShort = (d: Date) => `${d.getMonth() + 1}/${d.getDate()}`;
 
     if (rangeType === 'day' || rangeType === 'day_fixed') {
@@ -139,7 +142,7 @@ export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentD
   };
 
   // --- Date Helpers ---
-  const getDateRange = (date: Date, rangeType: PieRange | 'week_fixed' | 'day_fixed') => {
+  const getDateRange = (date: Date, rangeType: PieRange | 'week_fixed' | 'day_fixed' | 'month') => {
     const start = new Date(date);
     const end = new Date(date);
 
@@ -172,20 +175,23 @@ export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentD
   const effectiveRange = useMemo(() => {
     if (viewType === 'pie') return getDateRange(currentDate, pieRange);
     if (viewType === 'matrix') return getDateRange(currentDate, 'week_fixed');
+    if (viewType === 'line') return getDateRange(currentDate, lineRange === 'week' ? 'week_fixed' : 'month');
     if (viewType === 'schedule') return getDateRange(currentDate, scheduleRange === 'day' ? 'day_fixed' : 'week_fixed');
     return getDateRange(currentDate, 'day');
-  }, [currentDate, viewType, pieRange, scheduleRange]);
+  }, [currentDate, viewType, pieRange, scheduleRange, lineRange]);
 
   // 当视图类型、时间范围或日期变化时，自动更新标题
   useEffect(() => {
     if (onTitleChange) {
-      let rangeType: PieRange | 'week_fixed' | 'day_fixed';
+      let rangeType: PieRange | 'week_fixed' | 'day_fixed' | 'month';
       if (viewType === 'pie') {
         rangeType = pieRange;
       } else if (viewType === 'matrix') {
         rangeType = 'week_fixed';
       } else if (viewType === 'schedule') {
         rangeType = scheduleRange === 'day' ? 'day_fixed' : 'week_fixed';
+      } else if (viewType === 'line') {
+        rangeType = lineRange === 'week' ? 'week_fixed' : 'month';
       } else {
         rangeType = 'day';
       }
@@ -193,7 +199,7 @@ export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentD
       const title = getDynamicTitle(currentDate, rangeType);
       onTitleChange(title);
     }
-  }, [currentDate, viewType, pieRange, scheduleRange, onTitleChange]);
+  }, [currentDate, viewType, pieRange, scheduleRange, lineRange, onTitleChange]);
 
   const { start: rangeStart, end: rangeEnd } = effectiveRange;
 
@@ -724,6 +730,22 @@ export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentD
                     ))}
                   </div>
                 )}
+                {viewType === 'line' && (
+                  <div className="flex bg-stone-100/50 p-0.5 rounded-lg w-fit">
+                    <button
+                      onClick={() => setLineRange('week')}
+                      className={`px-2.5 py-1 rounded-md text-[10px] font-bold transition-all ${lineRange === 'week' ? 'bg-white text-stone-900 shadow-sm' : 'text-stone-400 hover:text-stone-600'}`}
+                    >
+                      周
+                    </button>
+                    <button
+                      onClick={() => setLineRange('month')}
+                      className={`px-2.5 py-1 rounded-md text-[10px] font-bold transition-all ${lineRange === 'month' ? 'bg-white text-stone-900 shadow-sm' : 'text-stone-400 hover:text-stone-600'}`}
+                    >
+                      月
+                    </button>
+                  </div>
+                )}
               </div>
 
               {/* Right: Date Navigation + View Type Switcher */}
@@ -753,6 +775,9 @@ export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentD
                   </button>
                   <button onClick={() => setViewType('matrix')} className={`p-1.5 rounded-md transition-all ${viewType === 'matrix' ? 'bg-white text-stone-900 shadow-sm' : 'text-stone-400 hover:text-stone-600'}`} title="矩阵">
                     <Grid size={14} />
+                  </button>
+                  <button onClick={() => setViewType('line')} className={`p-1.5 rounded-md transition-all ${viewType === 'line' ? 'bg-white text-stone-900 shadow-sm' : 'text-stone-400 hover:text-stone-600'}`} title="趋势">
+                    <TrendingUp size={14} />
                   </button>
                   <button onClick={() => setViewType('schedule')} className={`p-1.5 rounded-md transition-all ${viewType === 'schedule' ? 'bg-white text-stone-900 shadow-sm' : 'text-stone-400 hover:text-stone-600'}`} title="日程">
                     <Calendar size={14} />
@@ -946,6 +971,312 @@ export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentD
                   </div>
                 </div>
               )}
+            </div>
+          )}
+
+          {/* --- Line Chart View Content --- */}
+          {viewType === 'line' && (
+            <div className="space-y-6 animate-in fade-in zoom-in-95 duration-300 pb-20 relative">
+
+              {(() => {
+                // --- Data Preparation Logic ---
+                // 1. Generate Array of 7 Days for X-Axis
+                const daysOfRange: Date[] = [];
+                let d = new Date(rangeStart);
+                while (d <= rangeEnd) {
+                  daysOfRange.push(new Date(d));
+                  d.setDate(d.getDate() + 1);
+                }
+
+                // Helper to get formatted date label
+                const getLabel = (date: Date) => {
+                  const dayName = ['日', '一', '二', '三', '四', '五', '六'][date.getDay()];
+                  const isMonthView = daysOfRange.length > 10;
+                  return isMonthView ? `${date.getDate()}` : `${dayName}`;
+                };
+
+                // Helper to get max value for Y-Axis scaling
+                const getMaxValue = (dataPoints: number[][]) => {
+                  let max = 0;
+                  dataPoints.forEach(series => series.forEach(v => { if (v > max) max = v; }));
+                  return max > 0 ? Math.ceil(max) : 5; // Default to 5 hours if empty
+                };
+
+                const CHART_LINE_COLORS: Record<string, string> = {
+                  stone: '#d6d3d1', red: '#fca5a5', orange: '#fdba74', amber: '#fcd34d',
+                  yellow: '#fde047', lime: '#bef264', green: '#86efac', emerald: '#6ee7b7',
+                  teal: '#5eead4', cyan: '#67e8f9', sky: '#7dd3fc', blue: '#93c5fd',
+                  indigo: '#a5b4fc', violet: '#c4b5fd', purple: '#d8b4fe', fuchsia: '#f0abfc',
+                  pink: '#f9a8d4', rose: '#fda4af'
+                };
+
+                const getStroke = (colorClass: string) => {
+                  const match = colorClass?.match(/(?:text|bg)-([a-z]+)-/);
+                  const colorId = match ? match[1] : 'stone';
+                  return CHART_LINE_COLORS[colorId] || '#d6d3d1';
+                };
+
+                // 2. Prepare Activity Data (Series)
+                const allActivitiesMap = new Map<string, { name: string, color: string, total: number }>();
+
+                filteredLogs.forEach(log => {
+                  const cat = categories.find(c => c.id === log.categoryId);
+                  const act = cat?.activities.find(a => a.id === log.activityId);
+                  if (!act) return;
+
+                  const duration = Math.max(0, (log.endTime - log.startTime) / 1000) / 3600; // in Hours
+                  const key = act.id;
+
+                  if (!allActivitiesMap.has(key)) {
+                    allActivitiesMap.set(key, { name: act.name, color: act.color, total: 0 });
+                  }
+                  allActivitiesMap.get(key)!.total += duration;
+                });
+
+                const topActivities = Array.from(allActivitiesMap.entries())
+                  .sort((a, b) => b[1].total - a[1].total)
+                  // .slice(0, 5) // REMOVED: Show all activities
+                  .map(([id, info]) => ({ id, ...info }));
+
+                const activitySeries = topActivities.map(act => {
+                  return daysOfRange.map(day => {
+                    const dStart = new Date(day); dStart.setHours(0, 0, 0, 0);
+                    const dEnd = new Date(day); dEnd.setHours(23, 59, 59, 999);
+
+                    const logs = filteredLogs.filter(l =>
+                      l.activityId === act.id &&
+                      l.startTime >= dStart.getTime() &&
+                      l.startTime <= dEnd.getTime()
+                    );
+
+                    const dailyTotal = logs.reduce((acc, l) => acc + Math.max(0, (l.endTime - l.startTime) / 1000), 0);
+                    return dailyTotal / 3600; // hours
+                  });
+                });
+
+                // 3. Prepare Scope Data (Series) - USING UNFILTERED LOGS (Independent of Category Filter)
+                const unfilteredLogs = logs.filter(log =>
+                  log.startTime >= rangeStart.getTime() &&
+                  log.endTime <= rangeEnd.getTime()
+                );
+
+                // 3a. Prepare TODO Data (Series) - Also using UNFILTERED LOGS
+                const allTodosMap = new Map<string, { name: string, color: string, total: number }>();
+
+                unfilteredLogs.forEach(log => {
+                  if (!log.linkedTodoId) return;
+
+                  const todo = todos.find(t => t.id === log.linkedTodoId);
+                  if (!todo) return;
+
+                  const duration = Math.max(0, (log.endTime - log.startTime) / 1000) / 3600;
+                  const key = todo.id;
+
+                  // Random color assignment derived from ID
+                  if (!allTodosMap.has(key)) {
+                    const colorKeys = Object.keys(CHART_LINE_COLORS);
+                    // Simple hash
+                    let hash = 0;
+                    for (let i = 0; i < key.length; i++) {
+                      hash = key.charCodeAt(i) + ((hash << 5) - hash);
+                    }
+                    const colorKey = colorKeys[Math.abs(hash) % colorKeys.length];
+                    // Use the bg-{color}-... class format to reuse getStroke logic, or just store the color name
+                    // Actually getStroke expects a Tailwind class string like "text-red-500" or "bg-red-50"
+                    // Let's construct a fake class string to pass to getStroke: "bg-{colorName}-50"
+                    allTodosMap.set(key, { name: todo.title, color: `bg-${colorKey}-50`, total: 0 });
+                  }
+                  allTodosMap.get(key)!.total += duration;
+                });
+
+                const topTodos = Array.from(allTodosMap.entries())
+                  .sort((a, b) => b[1].total - a[1].total)
+                  .slice(0, 5) // Top 5 Todos
+                  .map(([id, info]) => ({ id, ...info }));
+
+                const todoSeries = topTodos.map(todo => {
+                  return daysOfRange.map(day => {
+                    const dStart = new Date(day); dStart.setHours(0, 0, 0, 0);
+                    const dEnd = new Date(day); dEnd.setHours(23, 59, 59, 999);
+
+                    const logs = unfilteredLogs.filter(l =>
+                      l.linkedTodoId === todo.id &&
+                      l.startTime >= dStart.getTime() &&
+                      l.startTime <= dEnd.getTime()
+                    );
+
+                    const dailyTotal = logs.reduce((acc, l) => acc + Math.max(0, (l.endTime - l.startTime) / 1000), 0);
+                    return dailyTotal / 3600;
+                  });
+                });
+
+                // 3b. Prepare Scope Data (Series)
+                const allScopesMap = new Map<string, { name: string, color: string, total: number }>();
+
+                unfilteredLogs.forEach(log => {
+                  if (!log.scopeIds || log.scopeIds.length === 0) return;
+
+                  const duration = Math.max(0, (log.endTime - log.startTime) / 1000) / 3600;
+                  const splitDuration = duration / log.scopeIds.length;
+
+                  log.scopeIds.forEach(sId => {
+                    const scope = scopes.find(s => s.id === sId);
+                    if (!scope) return;
+
+                    if (!allScopesMap.has(sId)) {
+                      allScopesMap.set(sId, { name: scope.name, color: scope.themeColor, total: 0 });
+                    }
+                    allScopesMap.get(sId)!.total += splitDuration;
+                  });
+                });
+
+                const topScopes = Array.from(allScopesMap.entries())
+                  .sort((a, b) => b[1].total - a[1].total)
+                  .map(([id, info]) => ({ id, ...info }));
+
+                const scopeSeries = topScopes.map(scope => {
+                  return daysOfRange.map(day => {
+                    const dStart = new Date(day); dStart.setHours(0, 0, 0, 0);
+                    const dEnd = new Date(day); dEnd.setHours(23, 59, 59, 999);
+
+                    // Find logs with this scope in this day
+                    const logs = unfilteredLogs.filter(l =>
+                      l.scopeIds?.includes(scope.id) &&
+                      l.startTime >= dStart.getTime() &&
+                      l.startTime <= dEnd.getTime()
+                    );
+
+                    // Calculate split duration
+                    let dailyTotal = 0;
+                    logs.forEach(l => {
+                      const d = Math.max(0, (l.endTime - l.startTime) / 1000);
+                      dailyTotal += (d / (l.scopeIds?.length || 1));
+                    });
+
+                    return dailyTotal / 3600;
+                  });
+                });
+
+                // Chart Rendering Helper
+                const renderChart = (title: string, seriesData: number[][], seriesMeta: { name: string, color: string }[]) => {
+                  if (seriesData.length === 0 || seriesData.every(s => s.every(v => v === 0))) return null;
+
+                  const height = 220;
+                  const width = 600;
+                  const padding = { top: 20, right: 20, bottom: 40, left: 40 };
+                  const chartWidth = width - padding.left - padding.right;
+                  const chartHeight = height - padding.top - padding.bottom;
+
+                  const maxY = getMaxValue(seriesData);
+                  const yTicks = 5;
+
+                  const getX = (index: number) => padding.left + (index / (daysOfRange.length - 1)) * chartWidth;
+                  const getY = (value: number) => height - padding.bottom - (value / maxY) * chartHeight;
+
+                  return (
+                    <div className="mb-4">
+                      <h3 className="text-lg font-bold text-stone-900 mb-4 px-2 text-center">
+                        <span>{title}</span>
+                      </h3>
+
+                      <div className="relative w-full aspect-[16/9] sm:aspect-[2/1]">
+                        <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-full text-xs">
+                          {/* Y-Axis Labels Only (No Grid Lines) */}
+                          {Array.from({ length: yTicks + 1 }).map((_, i) => {
+                            const val = (maxY / yTicks) * i;
+                            const y = getY(val);
+                            return (
+                              <text key={i} x={padding.left - 10} y={y + 4} textAnchor="end" fill="#d6d3d1" fontSize="10">{val.toFixed(1)}h</text>
+                            );
+                          })}
+
+                          {/* X-Axis */}
+                          {daysOfRange.map((d, i) => (
+                            <text key={i} x={getX(i)} y={height - 15} textAnchor="middle" fill="#a8a29e" fontSize="11" fontWeight="500">
+                              {getLabel(d)}
+                            </text>
+                          ))}
+
+                          {/* Lines */}
+                          {seriesData.map((points, sIdx) => {
+                            if (points.length < 2) return null;
+                            const pathD = points.map((val, i) => `${i === 0 ? 'M' : 'L'} ${getX(i)} ${getY(val)}`).join(' ');
+                            const color = getStroke(seriesMeta[sIdx].color);
+                            return (
+                              <g key={sIdx}>
+                                <path d={pathD} fill="none" stroke={color} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+                                {points.map((val, i) => (
+                                  <circle key={i} cx={getX(i)} cy={getY(val)} r="3" fill="white" stroke={color} strokeWidth="2" />
+                                ))}
+                              </g>
+                            );
+                          })}
+                        </svg>
+                      </div>
+
+                      {/* Legend */}
+                      <div className="flex flex-wrap gap-x-4 gap-y-2 mt-2 px-4 justify-center">
+                        {seriesMeta.map((meta, i) => {
+                          const color = getStroke(meta.color);
+                          return (
+                            <div key={i} className="flex items-center gap-1.5">
+                              <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: color }}></div>
+                              <span className="text-xs font-medium text-stone-600">{meta.name}</span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                };
+
+                const tagsChart = renderChart('TAGS', activitySeries, topActivities);
+                const todoChart = renderChart('TODOS', todoSeries, topTodos);
+                const scopeChart = renderChart('SCOPES', scopeSeries, topScopes);
+
+                return (
+                  <div className="flex flex-col">
+                    {/* Activity Trends */}
+                    {tagsChart}
+
+                    {/* Category Filters (Between Charts) */}
+                    <div className="flex flex-wrap justify-center gap-2 pt-2 -mt-2 mb-2 px-2">
+                      {categories.map(cat => {
+                        const isExcluded = excludedCategoryIds.includes(cat.id);
+                        const activeColor = getHexColor(cat.themeColor);
+                        return (
+                          <button
+                            key={cat.id}
+                            onClick={() => toggleExclusion(cat.id)}
+                            className={`px-3 py-1.5 rounded-full text-[10px] font-bold flex items-center gap-1 transition-all border shadow-sm ${isExcluded
+                              ? 'bg-stone-50 border-stone-200 text-stone-400 opacity-60 grayscale'
+                              : 'bg-white border-stone-200 text-stone-600'
+                              }`}
+                            style={!isExcluded ? {} : {}}
+                          >
+                            <span>{cat.icon}</span>
+                            <span>{cat.name}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    {/* TODO Trends (Middle) */}
+                    {todoChart && (
+                      <div className="w-full flex flex-col items-center pt-2 border-t border-stone-100 mt-6 mb-6"></div>
+                    )}
+                    {todoChart}
+
+                    {/* Scope Trends */}
+                    {scopeChart && (
+                      <div className="w-full flex flex-col items-center pt-2 border-t border-stone-100 mt-6 mb-6"></div>
+                    )}
+                    {scopeChart}
+                  </div>
+                );
+
+              })()}
+
             </div>
           )}
 
