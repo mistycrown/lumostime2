@@ -60,10 +60,6 @@ const TemplateList: React.FC<{
 }> = ({ templates, onUpdateTemplates, onEdit }) => {
     const [deleteId, setDeleteId] = useState<string | null>(null);
 
-    const handleToggle = (id: string) => {
-        onUpdateTemplates(templates.map(t => t.id === id ? { ...t, enabled: !t.enabled } : t));
-    };
-
     const confirmDelete = () => {
         if (!deleteId) return;
         onUpdateTemplates(templates.filter(t => t.id !== deleteId));
@@ -134,12 +130,6 @@ const TemplateList: React.FC<{
                             </div>
 
                             <div className="flex items-center gap-2">
-                                <button
-                                    onClick={() => handleToggle(template.id)}
-                                    className={`p-2 rounded-lg transition-colors ${template.enabled ? 'text-[#2F4F4F]' : 'text-stone-300'}`}
-                                >
-                                    {template.enabled ? <ToggleRight size={28} /> : <ToggleLeft size={28} />}
-                                </button>
                                 <button
                                     onClick={() => setDeleteId(template.id)}
                                     className="p-2 text-stone-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
@@ -236,6 +226,30 @@ const TemplateEditor: React.FC<{
                         className={`p-2 rounded-lg transition-colors ${template.syncToTimeline ? 'text-[#2F4F4F]' : 'text-stone-300'}`}
                     >
                         {template.syncToTimeline ? <ToggleRight size={28} /> : <ToggleLeft size={28} />}
+                    </button>
+                </div>
+                <div className="flex items-center justify-between pt-2">
+                    <div className="flex flex-col">
+                        <span className="text-sm font-bold text-stone-700">设置为日报模板</span>
+                        <span className="text-[10px] text-stone-400">开启后，此模板将在日报中使用</span>
+                    </div>
+                    <button
+                        onClick={() => onUpdate({ ...template, isDailyTemplate: !template.isDailyTemplate })}
+                        className={`p-2 rounded-lg transition-colors ${template.isDailyTemplate ? 'text-[#2F4F4F]' : 'text-stone-300'}`}
+                    >
+                        {template.isDailyTemplate ? <ToggleRight size={28} /> : <ToggleLeft size={28} />}
+                    </button>
+                </div>
+                <div className="flex items-center justify-between pt-2">
+                    <div className="flex flex-col">
+                        <span className="text-sm font-bold text-stone-700">设置为周报模板</span>
+                        <span className="text-[10px] text-stone-400">开启后，此模板将在周报中使用</span>
+                    </div>
+                    <button
+                        onClick={() => onUpdate({ ...template, isWeeklyTemplate: !template.isWeeklyTemplate })}
+                        className={`p-2 rounded-lg transition-colors ${template.isWeeklyTemplate ? 'text-[#2F4F4F]' : 'text-stone-300'}`}
+                    >
+                        {template.isWeeklyTemplate ? <ToggleRight size={28} /> : <ToggleLeft size={28} />}
                     </button>
                 </div>
             </div>

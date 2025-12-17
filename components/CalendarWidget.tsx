@@ -184,7 +184,7 @@ export const CalendarWidget: React.FC<CalendarWidgetProps> = ({ currentDate, onD
                                     {/* Week Day - Fixed Top Position */}
                                     <div className="absolute top-2.5 left-0 right-0 flex justify-center">
                                         <span className="text-[10px] font-serif font-medium uppercase tracking-wider opacity-80 leading-none">
-                                            {weekDaysShort[day.getDay()]}
+                                            {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][day.getDay()]}
                                         </span>
                                     </div>
 

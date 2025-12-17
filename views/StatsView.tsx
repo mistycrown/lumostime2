@@ -18,7 +18,9 @@ interface StatsViewProps {
   todoCategories: TodoCategory[];
   scopes: Scope[];
   // Daily Review 支持
-  hideControls?: boolean;  // 隐藏视图切换和时间范围选择器
+  hideControls?: boolean;  // 隐藏所有控制条
+  hideRangeControls?: boolean; // 隐藏左侧时间范围选择 (日/周/月/年)
+  hideDateNavigation?: boolean; // 隐藏中间日期导航 (< >)
   forcedView?: ViewType;   // 强制视图类型
   forcedRange?: PieRange;  // 强制时间范围
 }
@@ -37,10 +39,10 @@ interface CategoryStat extends Category {
   items: ActivityStat[];
 }
 
-export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentDate, onBack, onDateChange, isFullScreen, onToggleFullScreen, onToast, onTitleChange, todos, todoCategories, scopes, hideControls = false, forcedView, forcedRange }) => {
+export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentDate, onBack, onDateChange, isFullScreen, onToggleFullScreen, onToast, onTitleChange, todos, todoCategories, scopes, hideControls = false, hideRangeControls = false, hideDateNavigation = false, forcedView, forcedRange }) => {
   const [viewType, setViewType] = useState<ViewType>(forcedView || 'pie');
   const [pieRange, setPieRange] = useState<PieRange>(forcedRange || 'day');
-  const [scheduleRange, setScheduleRange] = useState<ScheduleRange>('day');
+  const [scheduleRange, setScheduleRange] = useState<ScheduleRange>(forcedRange === 'week' ? 'week' : 'day');
   const [lineRange, setLineRange] = useState<'week' | 'month'>('week');
   const [excludedCategoryIds, setExcludedCategoryIds] = useState<string[]>([]);
 
@@ -839,11 +841,12 @@ export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentD
         <div className={`${isFullScreen ? 'h-full flex flex-col' : 'px-5 pb-24 space-y-6 max-w-2xl mx-auto'}`}>
 
           {/* Control Bar: Time Range (Left) + Date Navigation + View Switcher (Right) - Hidden in FullScreen */}
+          {/* Control Bar: Time Range (Left) + Date Navigation + View Switcher (Right) - Hidden in FullScreen */}
           {!hideControls && !isFullScreen && (
             <div className="flex items-center justify-between mb-4">
               {/* Left: Time Range Selector (only for pie and schedule views) */}
               <div className="flex-1">
-                {viewType === 'pie' && (
+                {!hideRangeControls && viewType === 'pie' && (
                   <div className="flex bg-stone-100/50 p-0.5 rounded-lg w-fit">
                     {(['day', 'week', 'month', 'year'] as PieRange[]).map((r) => (
                       <button
@@ -856,7 +859,7 @@ export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentD
                     ))}
                   </div>
                 )}
-                {viewType === 'schedule' && (
+                {!hideRangeControls && viewType === 'schedule' && (
                   <div className="flex bg-stone-100/50 p-0.5 rounded-lg w-fit">
                     {(['day', 'week'] as ScheduleRange[]).map((r) => (
                       <button
@@ -869,7 +872,7 @@ export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentD
                     ))}
                   </div>
                 )}
-                {viewType === 'line' && (
+                {!hideRangeControls && viewType === 'line' && (
                   <div className="flex bg-stone-100/50 p-0.5 rounded-lg w-fit">
                     <button
                       onClick={() => setLineRange('week')}
@@ -890,22 +893,24 @@ export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentD
               {/* Right: Date Navigation + View Type Switcher */}
               <div className="flex items-center gap-2">
                 {/* Date Navigation Buttons */}
-                <div className="flex items-center gap-1 bg-stone-100 p-0.5 rounded-lg">
-                  <button
-                    onClick={() => handleNavigateDate('prev')}
-                    className="p-1.5 rounded-md transition-all text-stone-400 hover:text-stone-800 hover:bg-white"
-                    title="上一个时间段"
-                  >
-                    <ChevronLeft size={14} />
-                  </button>
-                  <button
-                    onClick={() => handleNavigateDate('next')}
-                    className="p-1.5 rounded-md transition-all text-stone-400 hover:text-stone-800 hover:bg-white"
-                    title="下一个时间段"
-                  >
-                    <ChevronRight size={14} />
-                  </button>
-                </div>
+                {!hideDateNavigation && (
+                  <div className="flex items-center gap-1 bg-stone-100 p-0.5 rounded-lg">
+                    <button
+                      onClick={() => handleNavigateDate('prev')}
+                      className="p-1.5 rounded-md transition-all text-stone-400 hover:text-stone-800 hover:bg-white"
+                      title="上一个时间段"
+                    >
+                      <ChevronLeft size={14} />
+                    </button>
+                    <button
+                      onClick={() => handleNavigateDate('next')}
+                      className="p-1.5 rounded-md transition-all text-stone-400 hover:text-stone-800 hover:bg-white"
+                      title="下一个时间段"
+                    >
+                      <ChevronRight size={14} />
+                    </button>
+                  </div>
+                )}
 
                 {/* View Type Switcher (icon only) */}
                 <div className="flex bg-stone-100 p-0.5 rounded-lg">
