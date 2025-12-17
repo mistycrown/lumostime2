@@ -157,6 +157,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
     const [modalDesc, setModalDesc] = useState('');
     const [modalPrompt, setModalPrompt] = useState('');
     const [modalError, setModalError] = useState('');
+    const [deletingTemplateId, setDeletingTemplateId] = useState<string | null>(null);
 
     useEffect(() => {
         setLocalUserInfo(userPersonalInfo || '');
@@ -643,7 +644,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
         );
     }
 
-    const [deletingTemplateId, setDeletingTemplateId] = useState<string | null>(null);
+
 
     const handleSaveUserInfo = () => {
         onSetUserPersonalInfo?.(localUserInfo);

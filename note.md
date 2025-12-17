@@ -1,4 +1,3 @@
-# 20251209
 
 
 npm run build
@@ -14,12 +13,11 @@ npm run dev
 git reset --hard 0cee3fbf54840700dd4c8f62bdb97acebe8253f4
 git push --force
 
+# 20251217
 
 搜索功能搜索日报
 
-LumosTime时间管理软件
-
-
+现在日报页面会永远保持在页面最前端，点击底部的导航栏，不能正常切换tab
 
 # 20251216 预设叙事模板
 
