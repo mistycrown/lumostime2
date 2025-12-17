@@ -1838,6 +1838,7 @@ const App: React.FC = () => {
             categories={categories}
             todoCategories={todoCategories}
             scopes={scopes}
+            autoLinkRules={autoLinkRules}
             onClose={() => setFocusDetailSessionId(null)}
             onComplete={(s) => handleStopActivity(s.id, s)}
             onUpdate={handleUpdateSession}
