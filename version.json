@@ -1,0 +1,7 @@
+{
+    "version": "1.0.2",
+    "versionCode": 2,
+    "updateUrl": "https://github.com/mistycrown/lumostime2/releases/latest",
+    "releaseNotes": "📱 新功能\n• 添加了更新检测功能\n• 优化了界面性能\n\n🐛 问题修复\n• 修复了一些已知问题\n• 提升了稳定性",
+    "forceUpdate": false
+}
