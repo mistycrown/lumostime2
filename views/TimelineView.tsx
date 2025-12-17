@@ -1,5 +1,5 @@
 import React, { useMemo, useState, useRef } from 'react';
-import { Log, Activity, TodoItem, Category, TodoCategory, Scope, DailyReview, ReviewTemplate } from '../types';
+import { Log, Activity, TodoItem, Category, TodoCategory, Scope, DailyReview, ReviewTemplate, WeeklyReview, AutoLinkRule } from '../types';
 import { CATEGORIES } from '../constants';
 import * as LucideIcons from 'lucide-react';
 import { Plus, MoreHorizontal, BarChart2, ArrowUp, ArrowDown, Sparkles, RefreshCw, Zap, Share, Timer, Clock } from 'lucide-react';
@@ -21,27 +21,32 @@ const DynamicIcon: React.FC<{ name: string; size?: number; className?: string }>
 
 interface TimelineViewProps {
     logs: Log[];
-    todos: TodoItem[];
-    scopes: Scope[];
+    categories: Category[];
     onAddLog: (startTime?: number, endTime?: number) => void;
     onEditLog: (log: Log) => void;
-    categories: Category[];
     currentDate: Date;
     onDateChange: (date: Date) => void;
     onShowStats: () => void;
     onBatchAddLogs: (entries: ParsedTimeEntry[]) => void;
-    onSync?: (e: React.MouseEvent) => void;
-    isSyncing?: boolean;
+    onSync: (e: any) => void;
+    isSyncing: boolean;
+    todos: TodoItem[];
     todoCategories: TodoCategory[];
-    onToast?: (type: ToastType, message: string) => void;
+    onToast: (type: ToastType, message: string) => void;
     startWeekOnSunday?: boolean;
-    autoLinkRules?: any[]; // AutoLinkRule[]
-    minIdleTimeThreshold?: number; // In minutes
+    autoLinkRules: AutoLinkRule[];
+    scopes: Scope[];
+    minIdleTimeThreshold?: number;
     onQuickPunch?: () => void;
-    dailyReview?: DailyReview; // 当天的日报数据
-    onOpenDailyReview?: () => void; // 打开/创建日报
-    templates?: ReviewTemplate[]; // Added: passed from App
+    // Daily Review
+    dailyReview?: DailyReview;
+    onOpenDailyReview?: () => void;
+    templates: ReviewTemplate[];
     dailyReviewTime?: string;
+    // Weekly Review
+    weeklyReviews?: WeeklyReview[];
+    onOpenWeeklyReview?: (weekStart: Date, weekEnd: Date) => void;
+    weeklyReviewTime?: string;
 }
 
 interface TimelineItem {
@@ -61,7 +66,7 @@ interface TimelineItem {
     };
 }
 
-export const TimelineView: React.FC<TimelineViewProps> = ({ logs, todos, scopes, onAddLog, onEditLog, categories, currentDate, onDateChange, onShowStats, onBatchAddLogs, onSync, isSyncing, todoCategories, onToast, startWeekOnSunday = false, autoLinkRules = [], minIdleTimeThreshold = 1, onQuickPunch, dailyReview, onOpenDailyReview, templates = [], dailyReviewTime = '22:00' }) => {
+export const TimelineView: React.FC<TimelineViewProps> = ({ logs, todos, scopes, onAddLog, onEditLog, categories, currentDate, onDateChange, onShowStats, onBatchAddLogs, onSync, isSyncing, todoCategories, onToast, startWeekOnSunday = false, autoLinkRules = [], minIdleTimeThreshold = 1, onQuickPunch, dailyReview, onOpenDailyReview, templates = [], dailyReviewTime = '22:00', weeklyReviews = [], onOpenWeeklyReview, weeklyReviewTime = '0-2200' }) => {
     const [isCalendarExpanded, setIsCalendarExpanded] = useState(false);
     const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>(() => {
         const saved = localStorage.getItem('lumos_timeline_sort');
@@ -73,6 +78,91 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ logs, todos, scopes,
     }, [sortOrder]);
 
     const [isAIModalOpen, setIsAIModalOpen] = useState(false);
+
+    // 计算当前日期所在周的范围和周报相关数据
+    const weeklyReviewData = useMemo(() => {
+        // 使用日期字符串手动解析构造本地时间，避免UTC转换导致的时区偏差
+        const dateStr = currentDate.toISOString().split('T')[0];
+        const [y, m, d] = dateStr.split('-').map(Number);
+        // 构造中午12点的时间以避免夏令时/时区边界问题
+        const current = new Date(y, m - 1, d, 12, 0, 0, 0);
+
+        // 计算周的开始和结束日期
+        const dayOfWeek = current.getDay(); // 0 = Sunday, 6 = Saturday
+        let weekStart: Date, weekEnd: Date;
+
+        // 创建日期的深拷贝并重置为该日中午
+        const makeDate = (base: Date, offsetDays: number) => {
+            const date = new Date(base.getTime());
+            date.setDate(base.getDate() + offsetDays);
+            return date;
+        };
+
+        if (startWeekOnSunday) {
+            // 周日作为一周的开始 (0-6: 周日到周六)
+            const daysFromSunday = dayOfWeek;
+            weekStart = makeDate(current, -daysFromSunday);
+            weekEnd = makeDate(weekStart, 6); // 周六是最后一天
+        } else {
+            // 周一作为一周的开始 (1-0: 周一到周日)
+            const daysFromMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+            weekStart = makeDate(current, -daysFromMonday);
+            weekEnd = makeDate(weekStart, 6); // 周日是最后一天
+        }
+
+        // 检查当前日期是否是该周的最后一天
+        // 比较日期字符串而非时间戳，避免小时数差异
+        const currentStr = current.getFullYear() + '-' + (current.getMonth() + 1).toString().padStart(2, '0') + '-' + current.getDate().toString().padStart(2, '0');
+        const weekEndStrFormatted = weekEnd.getFullYear() + '-' + (weekEnd.getMonth() + 1).toString().padStart(2, '0') + '-' + weekEnd.getDate().toString().padStart(2, '0');
+        const isLastDayOfWeek = currentStr === weekEndStrFormatted;
+
+        // 查找该周的周报
+        const weekStartStr = weekStart.getFullYear() + '-' + (weekStart.getMonth() + 1).toString().padStart(2, '0') + '-' + weekStart.getDate().toString().padStart(2, '0');
+        const weeklyReview = weeklyReviews?.find(r =>
+            r.weekStartDate === weekStartStr && r.weekEndDate === weekEndStrFormatted
+        );
+
+        // 判断是否应该显示周报入口
+        let shouldShow = false;
+        if (onOpenWeeklyReview && isLastDayOfWeek) {
+            // 如果已经有周报，总是显示
+            if (weeklyReview) {
+                shouldShow = true;
+            } else {
+                // 如果是今天，检查是否到达设定时间
+                const now = new Date();
+                const nowStr = now.getFullYear() + '-' + (now.getMonth() + 1).toString().padStart(2, '0') + '-' + now.getDate().toString().padStart(2, '0');
+                const isToday = currentStr === nowStr;
+
+                if (isToday) {
+                    // 解析weeklyReviewTime (格式: "0-2200"，0表示最后一天，2200是时间)
+                    const timeStr = (weeklyReviewTime || '0-2200').split('-')[1] || '2200';
+                    const targetHour = parseInt(timeStr.substring(0, 2));
+                    const targetMinute = parseInt(timeStr.substring(2, 4));
+
+                    const currentHour = now.getHours();
+                    const currentMinute = now.getMinutes();
+
+                    // 检查是否到达设定的时间
+                    if (currentHour > targetHour || (currentHour === targetHour && currentMinute >= targetMinute)) {
+                        shouldShow = true;
+                    }
+                } else {
+                    // 历史日期，总是显示
+                    shouldShow = true;
+                }
+            }
+        }
+
+        return {
+            weekStart,
+            weekEnd,
+            weeklyReview,
+            shouldShow,
+            isLastDayOfWeek
+        };
+    }, [currentDate, startWeekOnSunday, weeklyReviews, onOpenWeeklyReview, weeklyReviewTime]);
+
     const scrollContainerRef = useRef<HTMLDivElement>(null);
 
     // --- Date Helpers ---
@@ -183,7 +273,7 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ logs, todos, scopes,
                 if (gapDuration > thresholdSeconds) {
                     items.push({
                         type: 'gap',
-                        id: `gap-${currentLog.id}`,
+                        id: `gap - ${currentLog.id} `,
                         startTime: currentLog.endTime,
                         endTime: nextLog.startTime,
                         duration: gapDuration
@@ -198,7 +288,7 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ logs, todos, scopes,
                 if (gapDuration > thresholdSeconds) {
                     items.push({
                         type: 'gap',
-                        id: `gap-${currentLog.id}`,
+                        id: `gap - ${currentLog.id} `,
                         startTime: nextLog.endTime,
                         endTime: currentLog.startTime,
                         duration: gapDuration
@@ -245,14 +335,14 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ logs, todos, scopes,
 
     const formatTime = (ts: number) => {
         const d = new Date(ts);
-        return `${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`;
+        return `${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')} `;
     };
 
     const formatDurationCompact = (seconds: number) => {
         const h = Math.floor(seconds / 3600);
         const m = Math.floor((seconds % 3600) / 60);
-        if (h > 0) return `${h}h ${m}m`;
-        return `${m}m`;
+        if (h > 0) return `${h}h ${m} m`;
+        return `${m} m`;
     };
 
     // Helper to check if a day has logs
@@ -296,15 +386,15 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ logs, todos, scopes,
         const weekMap = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
         const weekStr = weekMap[currentDate.getDay()];
 
-        let text = `## 📅 ${dateStr} ${weekStr}时间记录\n`;
-        text += `**总记录时长**: ${totalH}h ${totalM}m | **平均专注度**: ${avgFocus}\n\n`;
+        let text = `## 📅 ${dateStr} ${weekStr} 时间记录\n`;
+        text += `** 总记录时长 **: ${totalH}h ${totalM} m | ** 平均专注度 **: ${avgFocus} \n\n`;
 
         // 4. Entries
         dayLogs.forEach(log => {
             const start = new Date(log.startTime);
             const end = new Date(log.endTime);
-            const sTime = `${String(start.getHours()).padStart(2, '0')}:${String(start.getMinutes()).padStart(2, '0')}`;
-            const eTime = `${String(end.getHours()).padStart(2, '0')}:${String(end.getMinutes()).padStart(2, '0')}`;
+            const sTime = `${String(start.getHours()).padStart(2, '0')}:${String(start.getMinutes()).padStart(2, '0')} `;
+            const eTime = `${String(end.getHours()).padStart(2, '0')}:${String(end.getMinutes()).padStart(2, '0')} `;
             const mins = Math.round(log.duration / 60);
 
             const cat = categories.find(c => c.id === log.categoryId);
@@ -312,14 +402,14 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ logs, todos, scopes,
             const todo = todos.find(t => t.id === log.linkedTodoId);
             const scopes_list = log.scopeIds?.map(id => scopes.find(s => s.id === id)).filter(Boolean) || [];
 
-            const content = log.note ? ` ${log.note}` : '';
-            text += `- ${sTime} - ${eTime} (${mins}m) **[${cat?.name || '未知'}/${act?.name || '未知'}]**${content}`;
+            const content = log.note ? ` ${log.note} ` : '';
+            text += `- ${sTime} - ${eTime} (${mins}m) ** [${cat?.name || '未知'}/${act?.name || '未知'}] ** ${content} `;
 
-            if (log.focusScore) text += ` ⚡️${log.focusScore}`;
-            if (todo) text += ` @${todo.title}`;
+            if (log.focusScore) text += ` ⚡️${log.focusScore} `;
+            if (todo) text += ` @${todo.title} `;
             // 只有进度待办才显示进度增量和进度比例
             if (todo?.isProgress) {
-                if (log.progressIncrement && log.progressIncrement > 0) text += ` +${log.progressIncrement}`;
+                if (log.progressIncrement && log.progressIncrement > 0) text += ` + ${log.progressIncrement} `;
                 text += `（${(todo.completedUnits || 0)}/${todo.totalAmount}）`;
             }
             if (scopes_list.length > 0) text += ` %${scopes_list.map(s => s.name).join(', ')}`;
@@ -514,8 +604,31 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ logs, todos, scopes,
                                 </div>
                             )}
 
+                            {/* Weekly Review Node - 显示在每周最后一天的末尾 */}
+                            {weeklyReviewData.shouldShow && (
+                                <div className="relative pl-8 mt-6 animate-in slide-in-from-bottom-2 duration-500">
+                                    {/* Time Marker */}
+                                    <div className="absolute -left-[60px] top-0.5 w-[45px] text-right">
+                                        <span className="text-xs font-bold text-purple-400 font-mono">Week</span>
+                                    </div>
+
+                                    {/* Timeline Dot */}
+                                    <div className="absolute -left-[5px] top-3 w-2.5 h-2.5 rounded-full bg-purple-400 border-2 border-[#faf9f6] z-10" />
+
+                                    {/* Content: Simple Text Button */}
+                                    <button
+                                        onClick={() => onOpenWeeklyReview?.(weeklyReviewData.weekStart, weeklyReviewData.weekEnd)}
+                                        className="text-left hover:text-purple-600 transition-colors group"
+                                    >
+                                        <h3 className="font-bold text-stone-900 text-lg group-hover:text-purple-600 transition-colors">
+                                            {weeklyReviewData.weeklyReview ? '本周小结' : '为本周作个小结吧！'}
+                                        </h3>
+                                    </button>
+                                </div>
+                            )}
+
                             {/* Synced Template Content */}
-                            {dailyReview && templates.length > 0 && templates.filter(t => t.enabled && t.syncToTimeline).map((template) => {
+                            {dailyReview && templates.length > 0 && templates.filter(t => t.isDailyTemplate && t.syncToTimeline).map((template) => {
                                 // Check if template has answers
                                 const hasAnswers = template.questions.some(q =>
                                     dailyReview.answers?.some(a => a.questionId === q.id && a.answer) || (q.type === 'rating' && dailyReview.answers?.some(a => a.questionId === q.id))

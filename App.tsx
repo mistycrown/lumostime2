@@ -15,11 +15,12 @@ import { TodoBatchManageView } from './views/TodoBatchManageView';
 import { AutoLinkView } from './views/AutoLinkView';
 import { SearchView } from './views/SearchView';
 import { DailyReviewView } from './views/DailyReviewView'; // 新增：每日回顾
+import { WeeklyReviewView } from './views/WeeklyReviewView'; // 新增：每周回顾
 import { TimerFloating } from './components/TimerFloating';
 import { AddLogModal } from './components/AddLogModal';
 import { TodoDetailModal } from './components/TodoDetailModal';
 import { GoalEditor } from './components/GoalEditor';
-import { Activity, ActiveSession, AppView, Log, TodoItem, TodoCategory, Category, Goal, AutoLinkRule, DailyReview, ReviewTemplate, NarrativeTemplate } from './types';
+import { Activity, ActiveSession, AppView, Log, TodoItem, TodoCategory, Category, Goal, AutoLinkRule, DailyReview, WeeklyReview, ReviewTemplate, NarrativeTemplate } from './types';
 import { INITIAL_LOGS, INITIAL_TODOS, MOCK_TODO_CATEGORIES, VIEW_TITLES, CATEGORIES, SCOPES, INITIAL_GOALS, DEFAULT_REVIEW_TEMPLATES, DEFAULT_USER_PERSONAL_INFO, INITIAL_DAILY_REVIEWS } from './constants';
 import { ToastContainer, ToastMessage, ToastType } from './components/Toast';
 import { webdavService } from './services/webdavService';
@@ -196,6 +197,15 @@ const App: React.FC = () => {
     localStorage.setItem('lumostime_review_time', dailyReviewTime);
   }, [dailyReviewTime]);
 
+  // Weekly Review Time
+  const [weeklyReviewTime, setWeeklyReviewTime] = useState<string>(() => {
+    return localStorage.getItem('lumostime_weekly_review_time') || '0-2200';
+  });
+
+  useEffect(() => {
+    localStorage.setItem('lumostime_weekly_review_time', weeklyReviewTime);
+  }, [weeklyReviewTime]);
+
   // Custom AI Narrative Templates
   const [customNarrativeTemplates, setCustomNarrativeTemplates] = useState<NarrativeTemplate[]>(() => {
     const stored = localStorage.getItem('lumostime_custom_narrative_templates');
@@ -242,7 +252,20 @@ const App: React.FC = () => {
     localStorage.setItem('lumostime_reviewTemplates', JSON.stringify(reviewTemplates));
   }, [reviewTemplates]);
 
+  // Weekly Review State (每周回顾状态)
+  const [weeklyReviews, setWeeklyReviews] = useState<WeeklyReview[]>(() => {
+    const stored = localStorage.getItem('lumostime_weeklyReviews');
+    return stored ? JSON.parse(stored) : [];
+  });
 
+  // Weekly Review View State (路由状态)
+  const [isWeeklyReviewOpen, setIsWeeklyReviewOpen] = useState(false);
+  const [currentWeeklyReviewStart, setCurrentWeeklyReviewStart] = useState<Date | null>(null);
+  const [currentWeeklyReviewEnd, setCurrentWeeklyReviewEnd] = useState<Date | null>(null);
+
+  useEffect(() => {
+    localStorage.setItem('lumostime_weeklyReviews', JSON.stringify(weeklyReviews));
+  }, [weeklyReviews]);
 
 
 
@@ -1288,6 +1311,56 @@ const App: React.FC = () => {
     return narrativeService.generateDailyNarrative(review, statsText, timelineText, finalPrompt, scopes, userPersonalInfo);
   };
 
+  // Weekly Review Handlers
+  const handleOpenWeeklyReview = (weekStart: Date, weekEnd: Date) => {
+    const weekStartStr = weekStart.toISOString().split('T')[0];
+    const weekEndStr = weekEnd.toISOString().split('T')[0];
+    let review = weeklyReviews.find(r => r.weekStartDate === weekStartStr && r.weekEndDate === weekEndStr);
+
+    // 如果没有周报，创建新的
+    if (!review) {
+      review = {
+        id: crypto.randomUUID(),
+        weekStartDate: weekStartStr,
+        weekEndDate: weekEndStr,
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+        answers: []
+      };
+      setWeeklyReviews(prev => [...prev, review!]);
+    }
+
+    setCurrentWeeklyReviewStart(weekStart);
+    setCurrentWeeklyReviewEnd(weekEnd);
+    setIsWeeklyReviewOpen(true);
+  };
+
+  const handleCloseWeeklyReview = () => {
+    setIsWeeklyReviewOpen(false);
+    setCurrentWeeklyReviewStart(null);
+    setCurrentWeeklyReviewEnd(null);
+  };
+
+  const handleUpdateWeeklyReview = (updatedReview: WeeklyReview) => {
+    setWeeklyReviews(prev => prev.map(r => r.id === updatedReview.id ? updatedReview : r));
+  };
+
+  const handleDeleteWeeklyReview = () => {
+    if (!currentWeeklyReviewStart || !currentWeeklyReviewEnd) return;
+
+    const weekStartStr = currentWeeklyReviewStart.toISOString().split('T')[0];
+    const weekEndStr = currentWeeklyReviewEnd.toISOString().split('T')[0];
+    setWeeklyReviews(prev => prev.filter(r => !(r.weekStartDate === weekStartStr && r.weekEndDate === weekEndStr)));
+    handleCloseWeeklyReview();
+    addToast('success', '周报已删除');
+  };
+
+  const handleGenerateWeeklyNarrative = async (review: WeeklyReview, statsText: string, promptTemplate?: string): Promise<string> => {
+    const finalPrompt = promptTemplate || (NARRATIVE_TEMPLATES.find(t => t.id === 'default')?.prompt || '');
+    // 周报不需要timeline文本，只传入空字符串
+    return narrativeService.generateDailyNarrative(review as any, statsText, '', finalPrompt, scopes, userPersonalInfo);
+  };
+
   const renderView = () => {
     if (isSettingsOpen) return null;
 
@@ -1311,6 +1384,34 @@ const App: React.FC = () => {
           onDelete={handleDeleteReview}
           onUpdateReview={handleUpdateReview}
           onGenerateNarrative={handleGenerateNarrative}
+          addToast={addToast}
+        />
+      );
+    }
+
+    // Weekly Review has second priority
+    if (isWeeklyReviewOpen && currentWeeklyReviewStart && currentWeeklyReviewEnd) {
+      const weekStartStr = currentWeeklyReviewStart.toISOString().split('T')[0];
+      const weekEndStr = currentWeeklyReviewEnd.toISOString().split('T')[0];
+      const review = weeklyReviews.find(r => r.weekStartDate === weekStartStr && r.weekEndDate === weekEndStr);
+      if (!review) return null;
+
+      return (
+        <WeeklyReviewView
+          review={review}
+          weekStartDate={currentWeeklyReviewStart}
+          weekEndDate={currentWeeklyReviewEnd}
+          templates={reviewTemplates}
+          categories={categories}
+          logs={logs}
+          todos={todos}
+          todoCategories={todoCategories}
+          scopes={scopes}
+          customNarrativeTemplates={customNarrativeTemplates}
+          onDelete={handleDeleteWeeklyReview}
+          onUpdateReview={handleUpdateWeeklyReview}
+          onGenerateNarrative={handleGenerateWeeklyNarrative}
+          onClose={() => setIsWeeklyReviewOpen(false)}
           addToast={addToast}
         />
       );
@@ -1368,6 +1469,9 @@ const App: React.FC = () => {
             onOpenDailyReview={handleOpenDailyReview}
             templates={reviewTemplates}
             dailyReviewTime={dailyReviewTime}
+            weeklyReviews={weeklyReviews}
+            onOpenWeeklyReview={handleOpenWeeklyReview}
+            weeklyReviewTime={weeklyReviewTime}
           />
         );
       case AppView.STATS:
@@ -1794,6 +1898,8 @@ const App: React.FC = () => {
             onUpdateReviewTemplates={setReviewTemplates}
             dailyReviewTime={dailyReviewTime}
             onSetDailyReviewTime={setDailyReviewTime}
+            weeklyReviewTime={weeklyReviewTime}
+            onSetWeeklyReviewTime={setWeeklyReviewTime}
             customNarrativeTemplates={customNarrativeTemplates}
             onUpdateCustomNarrativeTemplates={setCustomNarrativeTemplates}
             userPersonalInfo={userPersonalInfo}

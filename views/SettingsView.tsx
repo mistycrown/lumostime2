@@ -79,6 +79,9 @@ interface SettingsViewProps {
     // Daily Review Time
     dailyReviewTime?: string;
     onSetDailyReviewTime?: (time: string) => void;
+    // Weekly Review Time
+    weeklyReviewTime?: string;
+    onSetWeeklyReviewTime?: (time: string) => void;
     // AI Narrative
     customNarrativeTemplates?: NarrativeTemplate[];
     onUpdateCustomNarrativeTemplates?: (templates: NarrativeTemplate[]) => void;
@@ -105,7 +108,7 @@ const AI_PRESETS = {
     }
 };
 
-export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, onImport, onReset, onClearData, onToast, syncData, onSyncUpdate, startWeekOnSunday, onToggleStartWeekOnSunday, onOpenAutoLink, onOpenSearch, minIdleTimeThreshold = 1, onSetMinIdleTimeThreshold, defaultView = 'RECORD', onSetDefaultView, reviewTemplates = [], onUpdateReviewTemplates, dailyReviewTime, onSetDailyReviewTime, customNarrativeTemplates, onUpdateCustomNarrativeTemplates, userPersonalInfo, onSetUserPersonalInfo }) => {
+export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, onImport, onReset, onClearData, onToast, syncData, onSyncUpdate, startWeekOnSunday, onToggleStartWeekOnSunday, onOpenAutoLink, onOpenSearch, minIdleTimeThreshold = 1, onSetMinIdleTimeThreshold, defaultView = 'RECORD', onSetDefaultView, reviewTemplates = [], onUpdateReviewTemplates, dailyReviewTime, onSetDailyReviewTime, weeklyReviewTime, onSetWeeklyReviewTime, customNarrativeTemplates, onUpdateCustomNarrativeTemplates, userPersonalInfo, onSetUserPersonalInfo }) => {
     const [activeSubmenu, setActiveSubmenu] = useState<'main' | 'data' | 'cloud' | 'ai' | 'preferences' | 'guide' | 'nfc' | 'templates' | 'narrative_prompt'>('main');
     const [webdavConfig, setWebdavConfig] = useState<WebDAVConfig | null>(null);
     const [isSyncing, setIsSyncing] = useState(false);
@@ -892,6 +895,29 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
                                 onFocus={(e) => e.target.select()}
                                 className="bg-stone-100 border-none rounded-lg px-3 py-1.5 text-sm font-bold text-stone-700 focus:outline-none focus:ring-0 focus:bg-stone-200 transition-colors w-20 text-center tracking-widest font-mono"
                             />
+                        </div>
+
+                        <div className="flex items-center justify-between py-2 border-b border-stone-100">
+                            <div>
+                                <h4 className="font-bold text-stone-700">每周回顾时间</h4>
+                                <p className="text-xs text-stone-400 mt-1">到达该时间后，时间轴将在每周最后一天显示本周回顾节点</p>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <input
+                                    type="text"
+                                    inputMode="numeric"
+                                    maxLength={4}
+                                    placeholder="2200"
+                                    value={(weeklyReviewTime || '0-2200').split('-')[1] || '2200'}
+                                    onChange={(e) => {
+                                        const val = e.target.value.replace(/[^0-9]/g, '');
+                                        // 周报时间格式：总是存储为"0-<time>"，0表示最后一天
+                                        onSetWeeklyReviewTime?.(`0-${val}`);
+                                    }}
+                                    onFocus={(e) => e.target.select()}
+                                    className="bg-stone-100 border-none rounded-lg px-3 py-1.5 text-sm font-bold text-stone-700 focus:outline-none focus:ring-0 focus:bg-stone-200 transition-colors w-20 text-center tracking-widest font-mono"
+                                />
+                            </div>
                         </div>
 
                         <div className="flex items-center justify-between py-2">

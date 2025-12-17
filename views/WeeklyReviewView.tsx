@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { ChevronLeft, Trash2, Sparkles, Edit3, RefreshCw } from 'lucide-react';
-import { DailyReview, ReviewTemplate, ReviewAnswer, Category, Log, TodoCategory, TodoItem, Scope, ReviewQuestion, NarrativeTemplate } from '../types';
+import { WeeklyReview, ReviewTemplate, ReviewAnswer, Category, Log, TodoCategory, TodoItem, Scope, ReviewQuestion, NarrativeTemplate } from '../types';
 import { COLOR_OPTIONS } from '../constants';
 import * as LucideIcons from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
@@ -10,9 +10,10 @@ import { ConfirmModal } from '../components/ConfirmModal';
 import { NarrativeStyleSelectionModal } from '../components/NarrativeStyleSelectionModal';
 import { StatsView } from './StatsView';
 
-interface DailyReviewViewProps {
-    review: DailyReview;
-    date: Date;
+interface WeeklyReviewViewProps {
+    review: WeeklyReview;
+    weekStartDate: Date;
+    weekEndDate: Date;
     templates: ReviewTemplate[];
     categories: Category[];
     logs: Log[];
@@ -21,8 +22,9 @@ interface DailyReviewViewProps {
     scopes: Scope[];
     customNarrativeTemplates?: NarrativeTemplate[];
     onDelete: () => void;
-    onUpdateReview: (review: DailyReview) => void;
-    onGenerateNarrative: (review: DailyReview, statsText: string, timelineText: string, promptTemplate?: string) => Promise<string>;
+    onUpdateReview: (review: WeeklyReview) => void;
+    onGenerateNarrative: (review: WeeklyReview, statsText: string, promptTemplate?: string) => Promise<string>;
+    onClose: () => void;
     addToast: (message: string, type: 'success' | 'error' | 'info') => void; // Assuming ToastType is 'success' | 'error' | 'info'
 }
 
@@ -41,9 +43,10 @@ const getTemplateDisplayInfo = (title: string) => {
     return { emoji: null, text: title };
 };
 
-export const DailyReviewView: React.FC<DailyReviewViewProps> = ({
+export const WeeklyReviewView: React.FC<WeeklyReviewViewProps> = ({
     review,
-    date,
+    weekStartDate,
+    weekEndDate,
     templates,
     categories,
     logs,
@@ -54,6 +57,7 @@ export const DailyReviewView: React.FC<DailyReviewViewProps> = ({
     onDelete,
     onUpdateReview,
     onGenerateNarrative,
+    onClose,
     addToast
 }) => {
     const [activeTab, setActiveTab] = useState<TabType>('data');
@@ -76,33 +80,49 @@ export const DailyReviewView: React.FC<DailyReviewViewProps> = ({
         localStorage.setItem('dailyReview_guideMode', newMode ? 'reading' : 'editing');
     };
 
-    // 格式化日期
+    // 格式化标题日期 (2025/12/08 - 12/14)
+    const formatTitleDate = (start: Date, end: Date) => {
+        const startYear = start.getFullYear();
+        const startMonth = String(start.getMonth() + 1).padStart(2, '0');
+        const startDay = String(start.getDate()).padStart(2, '0');
+
+        const endYear = end.getFullYear();
+        const endMonth = String(end.getMonth() + 1).padStart(2, '0');
+        const endDay = String(end.getDate()).padStart(2, '0');
+
+        if (startYear === endYear) {
+            return `${startYear}/${startMonth}/${startDay} - ${endMonth}/${endDay}`;
+        }
+        return `${startYear}/${startMonth}/${startDay} - ${endYear}/${endMonth}/${endDay}`;
+    };
+
+    // 简单的日期格式化 (用于其他地方 if needed)
     const formatDate = (d: Date) => {
         const year = d.getFullYear();
         const month = String(d.getMonth() + 1).padStart(2, '0');
         const day = String(d.getDate()).padStart(2, '0');
-        return `${year}/${month}/${day}`;
+        return `${year}-${month}-${day}`;
     };
 
-    // 获取当天的logs（保留以便可能在其他地方使用）
-    const dayLogs = useMemo(() => {
-        const start = new Date(date);
+    // 获取本周的logs
+    const weekLogs = useMemo(() => {
+        const start = new Date(weekStartDate);
         start.setHours(0, 0, 0, 0);
-        const end = new Date(date);
+        const end = new Date(weekEndDate);
         end.setHours(23, 59, 59, 999);
 
         return logs.filter(log =>
             log.startTime >= start.getTime() &&
             log.endTime <= end.getTime()
         );
-    }, [logs, date]);
+    }, [logs, weekStartDate, weekEndDate]);
 
-    // 注意：以下stats计算仅用于AI叙事生成，数据展示由StatsView处理
+    // 统计本周数据（用于AI叙事生成）
     const stats = useMemo(() => {
-        const totalDuration = dayLogs.reduce((acc, log) => acc + (log.duration || 0), 0);
+        const totalDuration = weekLogs.reduce((acc, log) => acc + (log.duration || 0), 0);
 
         const categoryStats = categories.map(cat => {
-            const catLogs = dayLogs.filter(l => l.categoryId === cat.id);
+            const catLogs = weekLogs.filter(l => l.categoryId === cat.id);
             const duration = catLogs.reduce((acc, l) => acc + (l.duration || 0), 0);
             const percentage = totalDuration > 0 ? (duration / totalDuration) * 100 : 0;
             return { ...cat, duration, percentage };
@@ -110,7 +130,7 @@ export const DailyReviewView: React.FC<DailyReviewViewProps> = ({
 
         const todoStats = todoCategories.map(cat => {
             const catTodos = todos.filter(t => t.categoryId === cat.id);
-            const linkedLogs = dayLogs.filter(l =>
+            const linkedLogs = weekLogs.filter(l =>
                 l.linkedTodoId && catTodos.some(t => t.id === l.linkedTodoId)
             );
             const duration = linkedLogs.reduce((acc, l) => acc + (l.duration || 0), 0);
@@ -119,7 +139,7 @@ export const DailyReviewView: React.FC<DailyReviewViewProps> = ({
         }).filter(c => c.duration > 0);
 
         const scopeStats = scopes.map(scope => {
-            const scopeLogs = dayLogs.filter(l =>
+            const scopeLogs = weekLogs.filter(l =>
                 l.scopeIds && l.scopeIds.includes(scope.id)
             );
             const duration = scopeLogs.reduce((acc, l) => acc + (l.duration || 0), 0);
@@ -128,7 +148,7 @@ export const DailyReviewView: React.FC<DailyReviewViewProps> = ({
         }).filter(s => s.duration > 0);
 
         return { totalDuration, categoryStats, todoStats, scopeStats };
-    }, [dayLogs, categories, todos, todoCategories, scopes]);
+    }, [weekLogs, categories, todos, todoCategories, scopes]);
 
     // 格式化时长（用于AI叙事生成）
     const formatDuration = (seconds: number) => {
@@ -138,11 +158,11 @@ export const DailyReviewView: React.FC<DailyReviewViewProps> = ({
         return `${m}分钟`;
     };
 
-    // 获取日报模板questions
+    // 获取周报模板questions
     const enabledQuestions = useMemo(() => {
         const questions: Array<ReviewTemplate['questions'][0] & { templateTitle: string }> = [];
         templates
-            .filter(t => t.isDailyTemplate)
+            .filter(t => t.isWeeklyTemplate)
             .sort((a, b) => a.order - b.order)
             .forEach(template => {
                 template.questions.forEach(q => {
@@ -184,6 +204,50 @@ export const DailyReviewView: React.FC<DailyReviewViewProps> = ({
         setIsStyleModalOpen(false);
         setIsGenerating(true);
         try {
+            // 生成每日详细统计
+            const dailyStatsText = (() => {
+                const daysOfWeek = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
+                let text = '每日统计详情：\n';
+
+                // 为了按顺序显示（假设周一开始），需要根据 weekStartDate
+                const startDay = new Date(weekStartDate);
+                startDay.setHours(0, 0, 0, 0);
+
+                for (let i = 0; i < 7; i++) {
+                    const currentDay = new Date(startDay);
+                    currentDay.setDate(startDay.getDate() + i);
+                    const dayStart = currentDay.getTime();
+                    const dayEnd = dayStart + 86400000 - 1;
+
+                    const dayLogs = weekLogs.filter(log =>
+                        log.startTime >= dayStart && log.endTime <= dayEnd
+                    );
+
+                    if (dayLogs.length === 0) continue;
+
+                    const dayDuration = dayLogs.reduce((acc, log) => acc + (log.endTime - log.startTime) / 1000, 0);
+                    const dayLabel = `${currentDay.getMonth() + 1}/${currentDay.getDate()} ${daysOfWeek[currentDay.getDay()]}`;
+
+                    text += `\n【${dayLabel}】 总时长：${formatDuration(dayDuration)}\n`;
+
+                    // 当天的分类统计
+                    const dayCategories = new Map<string, number>();
+                    dayLogs.forEach(log => {
+                        const catName = categories.find(c => c.id === log.categoryId)?.name || '未知';
+                        const duration = (log.endTime - log.startTime) / 1000;
+                        dayCategories.set(catName, (dayCategories.get(catName) || 0) + duration);
+                    });
+
+                    // 排序并添加到文本
+                    Array.from(dayCategories.entries())
+                        .sort((a, b) => b[1] - a[1]) // 按时长降序
+                        .forEach(([name, duration]) => {
+                            text += `  - ${name}: ${formatDuration(duration)}\n`;
+                        });
+                }
+                return text;
+            })();
+
             // 生成统计文本
             const statsText = `总时长：${formatDuration(stats.totalDuration)}\n\n` +
                 `标签统计：\n${stats.categoryStats.map(c =>
@@ -194,18 +258,10 @@ export const DailyReviewView: React.FC<DailyReviewViewProps> = ({
                 ).join('\n')}\n\n` +
                 `领域统计：\n${stats.scopeStats.map(s =>
                     `- ${s.name}: ${formatDuration(s.duration)} (${s.percentage.toFixed(1)}%)`
-                ).join('\n')}`;
+                ).join('\n')}\n\n` +
+                dailyStatsText;
 
-            // 生成时间轴文本
-            const timelineText = dayLogs.map(log => {
-                const cat = categories.find(c => c.id === log.categoryId);
-                const act = cat?.activities.find(a => a.id === log.activityId);
-                const startTime = new Date(log.startTime);
-                const endTime = new Date(log.endTime);
-                return `${startTime.getHours()}:${String(startTime.getMinutes()).padStart(2, '0')}-${endTime.getHours()}:${String(endTime.getMinutes()).padStart(2, '0')} ${act?.name || ''} ${log.note ? '- ' + log.note : ''}`;
-            }).join('\n');
-
-            const generated = await onGenerateNarrative(review, statsText, timelineText, template.prompt);
+            const generated = await onGenerateNarrative(review, statsText, template.prompt);
             setNarrative(generated);
             setEditedNarrative(generated); // Sync to edit box
 
@@ -417,11 +473,26 @@ export const DailyReviewView: React.FC<DailyReviewViewProps> = ({
     return (
         <div className="h-full bg-[#faf9f6] overflow-y-auto no-scrollbar pb-24 px-7 pt-4">
             {/* Date Display Section */}
+            {/* Header - Navigation Bar */}
+            <header className="h-14 flex items-center justify-between px-5 bg-[#fdfbf7] border-b border-stone-100 shrink-0 z-30 mb-4 -mx-7 -mt-4">
+                <div className="w-8 flex items-center">
+                    <button
+                        onClick={onClose}
+                        className="text-stone-400 hover:text-stone-600 transition-colors"
+                    >
+                        <ChevronLeft size={24} />
+                    </button>
+                </div>
+                <h1 className="text-lg font-bold text-stone-700 tracking-wide">Weekly Review</h1>
+                <div className="w-8"></div>
+            </header>
+
+            {/* Sub-Header - Date & Actions */}
             <div className="mb-6 flex items-center justify-between">
                 <div>
                     <h1 className="text-2xl font-bold text-stone-900 flex items-center gap-3">
-                        <span className="text-stone-300 font-normal">&amp;</span>
-                        {formatDate(date)}
+                        <span className="text-stone-300 font-normal">&</span>
+                        {formatTitleDate(weekStartDate, weekEndDate)}
                     </h1>
                 </div>
                 <button
@@ -456,16 +527,16 @@ export const DailyReviewView: React.FC<DailyReviewViewProps> = ({
                         <StatsView
                             logs={logs}
                             categories={categories}
-                            currentDate={date}
-                            onBack={() => { }} // Daily Review 不需要返回按钮
+                            currentDate={weekStartDate}
+                            onBack={() => { }} // Weekly Review 不需要返回按钮
                             isFullScreen={false}
                             onToggleFullScreen={() => { }}
                             todos={todos}
                             todoCategories={todoCategories}
                             scopes={scopes}
-                            hideControls={true}  // 隐藏控制栏
-                            forcedView="pie"     // 强制为饼图视图
-                            forcedRange="day"    // 强制为日视图
+                            forcedRange="week"   // 强制为周视图
+                            hideRangeControls={true} // 隐藏左侧时间范围切换
+                            hideDateNavigation={true} // 隐藏前后切换
                         />
                     </div>
                 )}
@@ -473,7 +544,7 @@ export const DailyReviewView: React.FC<DailyReviewViewProps> = ({
                 {/* Tab 2: Guide */}
                 {activeTab === 'guide' && (
                     <div className="space-y-6 animate-in fade-in duration-300 pb-40">
-                        {templates.filter(t => t.isDailyTemplate).length === 0 ? (
+                        {templates.filter(t => t.isWeeklyTemplate).length === 0 ? (
                             <div className="text-center py-12">
                                 <p className="text-stone-400">暂无启用的回顾模板</p>
                                 <p className="text-xs text-stone-300 mt-2">请在设置中启用回顾模板</p>
@@ -482,7 +553,7 @@ export const DailyReviewView: React.FC<DailyReviewViewProps> = ({
                             isReadingMode ? (
                                 // 阅读模式 (小票风格 - 优化版)
                                 <div className="space-y-8 px-1">
-                                    {templates.filter(t => t.isDailyTemplate).map((template, idx, arr) => {
+                                    {templates.filter(t => t.isWeeklyTemplate).map((template, idx, arr) => {
                                         const { emoji, text } = getTemplateDisplayInfo(template.title);
                                         return (
                                             <div key={template.id}>
@@ -505,7 +576,7 @@ export const DailyReviewView: React.FC<DailyReviewViewProps> = ({
                                 </div>
                             ) : (
                                 // 编辑模式 (卡片风格)
-                                templates.filter(t => t.isDailyTemplate).map(template => {
+                                templates.filter(t => t.isWeeklyTemplate).map(template => {
                                     const { emoji, text } = getTemplateDisplayInfo(template.title);
                                     return (
                                         <div key={template.id} className="bg-white rounded-2xl p-5 shadow-sm">
@@ -620,7 +691,7 @@ export const DailyReviewView: React.FC<DailyReviewViewProps> = ({
             </div>
 
             {/* Floating Action Button for Guide Tab */}
-            {activeTab === 'guide' && templates.filter(t => t.isDailyTemplate).length > 0 && (
+            {activeTab === 'guide' && templates.filter(t => t.isWeeklyTemplate).length > 0 && (
                 <button
                     onClick={toggleReadingMode}
                     className="fixed bottom-24 right-6 w-14 h-14 bg-stone-900 rounded-full text-white shadow-2xl flex items-center justify-center active:scale-90 transition-transform z-40 border border-stone-800"

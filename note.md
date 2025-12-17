@@ -26,12 +26,30 @@ git push --force
 
 搜索功能搜索日报
 
-周报功能？
-1. 数据层面，添加周报、周报引导模板类型。
+现在开发周报功能，周报功能与日报功能大部分内容雷同，请尽量参考日报功能，保持ui风格、交互逻辑一致。不要擅自改动。
+1. 数据层面，添加周报数据类型。回顾模板增加是否设为日报模板、是否设为周报模板数据类型
 2. 交互层面。
 入口：
-1）设置页面-偏好设置-设置周报入口显示时间，默认为周日22：00.只有现在这一周应用这个
+1）设置页面-偏好设置-设置周报入口显示时间，默认为周日22：00.只有现在这一周应用这个时间设置，以前的周默认显示周回顾。
+2）设置页面-回顾模板，在原有日回顾模板基础上，增加可设置选项：设置为日报模板、设置为周报模板。
+去除回顾模板外层：<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-toggle-left" aria-hidden="true"><circle cx="9" cy="12" r="3"></circle><rect width="20" height="14" x="2" y="5" rx="7"></rect></svg>
+在编辑模板内层添加开关，模仿<div class="flex items-center justify-between pt-2"><div class="flex flex-col"><span class="text-sm font-bold text-stone-700">同步到时间轴</span><span class="text-[10px] text-stone-400">开启后，此模板的问答将显示在时间轴底部</span></div><button class="p-2 rounded-lg transition-colors text-stone-300"><svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-toggle-left" aria-hidden="true"><circle cx="9" cy="12" r="3"></circle><rect width="20" height="14" x="2" y="5" rx="7"></rect></svg></button></div>，开关设置为“设置为日报模板”和“设置为周报模板”
+3）时间轴页面，在每周日的时间轴末尾，添加周回顾入口。格式参考日回顾入口。如果未生成周回顾，显示“为本周作个小结吧！”，如果已生成，显示“本周小结”。周回顾应该在周日的日回顾的后面。
+4）周报详情页（weekly review）
+与日报详情相同，分为数据、引导、叙事三个tab
+- 数据页显示本周范围内（周范围根据用户的偏好设置，从周一到周日or从周日到周六）的环状图、矩阵图、趋势图、日程图（引用stats组件）
+- 引导页显示设置为周回顾引导模板的问题。阅读模式、编辑模式的切换与日报相同。
+- 叙事页面与日报相同。与ai共创叙事选择提示词的模板与日报相同。只是在数据部分，传入给ai的数据改为:每一天的领域投入、标签投入、待办投入。不需要再传时间轴数据。
 
+每周回顾时间设置，日期应该只能是每周最后一天（根据用户设置的偏好设置，周日或周六），所以不需要选择日期，只需要填入时间，请删除周几选择的框。
+
+周报页面没有返回键啊？请你模仿一下日报界面。
+周报的标题2025-12-08 - 2025-12-14 改成2025/12/08 - 12/14
+
+
+周报的统计没有给出每天的时间统计，而是给了整个一周的时间统计。这样是不对的。应该是周一：论文写作几小时，周二……这样给出每天的数据。
+在周报统计页面，切换到日程图的时候，默认是以日为单位的时间轴，但如果是周报页面，应该显示以周为单位的时间轴。
+周报的返回页面参考日报的返回页面，不要自创ui。请检查整个标题栏的样式<header class="h-14 flex items-center justify-between px-5 bg-[#fdfbf7] border-b border-stone-100 shrink-0 z-30"><div class="w-8 flex items-center"><button class="text-stone-400 hover:text-stone-600"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-chevron-left" aria-hidden="true"><path d="m15 18-6-6 6-6"></path></svg></button></div><h1 class="text-lg font-bold text-stone-700 tracking-wide">Daily Review</h1><div class="w-8"></div></header>
 
 自动检查更新？ 
 赞助
