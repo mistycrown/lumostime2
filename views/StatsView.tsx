@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { Log, Category, Activity, Scope } from '../types';
+import { Log, Category, Activity, Scope, TodoItem, TodoCategory } from '../types';
 import { COLOR_OPTIONS } from '../constants';
-import { Minimize2, Share, PieChart, Grid, Calendar, ChevronLeft, ChevronRight, TrendingUp } from 'lucide-react';
+import { Minimize2, Share, PieChart, Grid, Calendar, ChevronLeft, ChevronRight, TrendingUp, TrendingDown } from 'lucide-react';
 import { ToastType } from '../components/Toast';
 
 interface StatsViewProps {
@@ -9,14 +9,14 @@ interface StatsViewProps {
   categories: Category[];
   currentDate: Date;
   onBack: () => void;
-  onDateChange?: (date: Date) => void;  // 新增：日期变化回调
+  onDateChange?: (date: Date) => void;
   isFullScreen: boolean;
   onToggleFullScreen: () => void;
   onToast?: (type: ToastType, message: string) => void;
-  onTitleChange?: (title: string) => void;  // 新增：用于更新标题
-  todos: import('../types').TodoItem[];
-  todoCategories: import('../types').TodoCategory[];
-  scopes: import('../types').Scope[];
+  onTitleChange?: (title: string) => void;
+  todos: TodoItem[];
+  todoCategories: TodoCategory[];
+  scopes: Scope[];
 }
 
 type ViewType = 'pie' | 'matrix' | 'schedule' | 'line';
@@ -110,6 +110,24 @@ export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentD
       // 向右滑动 = 上一个时间段
       handleNavigateDate('prev');
     }
+  };
+
+  // 增长/下降指示器渲染函数
+  const renderGrowth = (current: number, previous: number) => {
+    if (!previous || previous < 0.1) return null; // Avoid division by zero or tiny base
+    const delta = current - previous;
+    const percentage = Math.round((delta / previous) * 100);
+    if (percentage === 0) return null;
+
+    const isPositive = percentage > 0;
+    // 上升=绿色(emerald-500)，下降=红色(red-400)
+
+    return (
+      <div className={`flex items-center gap-0.5 text-[10px] font-medium ml-1.5 ${isPositive ? 'text-emerald-500' : 'text-red-400'}`}>
+        {isPositive ? <TrendingUp size={10} /> : <TrendingDown size={10} />}
+        <span>{Math.abs(percentage)}%</span>
+      </div>
+    );
   };
 
   // 生成动态标题
@@ -316,9 +334,7 @@ export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentD
       text += `\n## 🎯 领域专注分布\n**领域总时长**: ${formatDuration(scopeStats.totalDuration)}\n\n`;
       scopeStats.categoryStats.forEach(scope => {
         text += `- **[${scope.name}]** ${formatDuration(scope.duration)} (${scope.percentage.toFixed(1)}%)\n`;
-        scope.items.forEach(item => {
-          text += `    * ${item.name}: ${formatDuration(item.duration)}\n`;
-        });
+        // Removed scope.items.forEach
         text += '\n';
       });
     }
@@ -461,7 +477,7 @@ export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentD
 
       totalScopedDuration += d; // Wait, total time is simple sum of log durations (regardless of split)
       // Actually, if we want the pie chart to sum to "Total Scoped Time", 
-      // simple sum of logs is correct, and sum of split parts = sum of logs.
+      // simple sum of splits IS the whole.
 
       l.scopeIds!.forEach(sId => {
         scopeDurations[sId] = (scopeDurations[sId] || 0) + splitDuration;
@@ -502,6 +518,125 @@ export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentD
 
     return { totalDuration: distinctTotalDuration, categoryStats };
   }, [filteredLogs, scopes, categories]);
+
+  // --- Previous Period Helpers ---
+  const getPreviousDateRange = (currentStart: Date, currentEnd: Date, rangeType: PieRange | 'week_fixed' | 'day_fixed' | 'month') => {
+    const start = new Date(currentStart);
+    const end = new Date(currentEnd);
+
+    if (rangeType === 'day' || rangeType === 'day_fixed') {
+      start.setDate(start.getDate() - 1);
+      end.setDate(end.getDate() - 1);
+    } else if (rangeType === 'week' || rangeType === 'week_fixed') {
+      start.setDate(start.getDate() - 7);
+      end.setDate(end.getDate() - 7);
+    } else if (rangeType === 'month') {
+      start.setMonth(start.getMonth() - 1);
+      // Adjust end date logic for month? Actually simple range shift is safer:
+      // But for month view we want the "previous month".
+      // Our getCurrentRange already handles "start of month" to "end of month".
+      // So if we just shift start back 1 month, and re-calculate end?
+      // Let's rely on standard logic:
+      const prevMonth = new Date(start);
+      prevMonth.setMonth(prevMonth.getMonth() - 1); // Go to previous month
+      return getDateRange(prevMonth, 'month');
+    } else if (rangeType === 'year') {
+      start.setFullYear(start.getFullYear() - 1);
+      return getDateRange(start, 'year');
+    }
+    return { start, end };
+  };
+
+  const previousRange = useMemo(() => {
+    let rangeType: PieRange | 'week_fixed' | 'day_fixed' | 'month';
+    if (viewType === 'pie') {
+      rangeType = pieRange;
+    } else if (viewType === 'matrix') {
+      rangeType = 'week_fixed';
+    } else if (viewType === 'schedule') {
+      rangeType = scheduleRange === 'day' ? 'day_fixed' : 'week_fixed';
+    } else if (viewType === 'line') {
+      rangeType = lineRange === 'week' ? 'week_fixed' : 'month';
+    } else {
+      rangeType = 'day';
+    }
+    return getPreviousDateRange(rangeStart, rangeEnd, rangeType);
+  }, [rangeStart, rangeEnd, viewType, pieRange, scheduleRange, lineRange]);
+
+  const previousFilteredLogs = useMemo(() => {
+    return logs.filter(log =>
+      log.startTime >= previousRange.start.getTime() &&
+      log.endTime <= previousRange.end.getTime() &&
+      !excludedCategoryIds.includes(log.categoryId) // Keep same filters
+    );
+  }, [logs, previousRange, excludedCategoryIds]);
+
+  const previousStats = useMemo(() => {
+    const totalDuration = previousFilteredLogs.reduce((acc, log) => acc + Math.max(0, (log.endTime - log.startTime) / 1000), 0);
+
+    // Map of Category ID -> Duration
+    const catDurations = new Map<string, number>();
+    // Map of Activity ID -> Duration
+    const actDurations = new Map<string, number>();
+
+    previousFilteredLogs.forEach(log => {
+      const d = Math.max(0, (log.endTime - log.startTime) / 1000);
+      catDurations.set(log.categoryId, (catDurations.get(log.categoryId) || 0) + d);
+      actDurations.set(log.activityId, (actDurations.get(log.activityId) || 0) + d);
+    });
+
+    return { totalDuration, catDurations, actDurations };
+  }, [previousFilteredLogs]);
+
+  // Previous Todo Stats
+  const previousTodoStats = useMemo(() => {
+    const logsWithTodos = previousFilteredLogs.filter(l => l.linkedTodoId);
+    const totalDuration = logsWithTodos.reduce((acc, log) => acc + Math.max(0, (log.endTime - log.startTime) / 1000), 0);
+    const todoDurations = new Map<string, number>();
+    logsWithTodos.forEach(l => {
+      const d = Math.max(0, (l.endTime - l.startTime) / 1000);
+      todoDurations.set(l.linkedTodoId!, (todoDurations.get(l.linkedTodoId!) || 0) + d);
+    });
+
+    // Aggregate by Category
+    const categoryDurations = new Map<string, number>();
+    todoCategories.forEach(cat => {
+      const catTodos = todos.filter(t => t.categoryId === cat.id);
+      let d = 0;
+      catTodos.forEach(t => d += (todoDurations.get(t.id) || 0));
+      categoryDurations.set(cat.id, d);
+    });
+
+    return { totalDuration, todoDurations, categoryDurations };
+  }, [previousFilteredLogs, todos, todoCategories]);
+
+  // Previous Scope Stats
+  const previousScopeStats = useMemo(() => {
+    const logsWithScopes = previousFilteredLogs.filter(l => l.scopeIds && l.scopeIds.length > 0);
+    const distinctTotalDuration = logsWithScopes.reduce((acc, l) => acc + Math.max(0, (l.endTime - l.startTime) / 1000), 0);
+
+    const scopeDurations = new Map<string, number>();
+    const scopeActivityBreakdown: Record<string, Record<string, number>> = {};
+
+    logsWithScopes.forEach(l => {
+      const d = Math.max(0, (l.endTime - l.startTime) / 1000);
+      const count = l.scopeIds!.length;
+      const splitDuration = d / count;
+
+      // Find activity name for breakdown
+      const cat = categories.find(c => c.id === l.categoryId);
+      const act = cat?.activities.find(a => a.id === l.activityId);
+      const actName = act?.name || 'Unknown';
+
+      l.scopeIds!.forEach(sId => {
+        scopeDurations.set(sId, (scopeDurations.get(sId) || 0) + splitDuration);
+
+        if (!scopeActivityBreakdown[sId]) scopeActivityBreakdown[sId] = {};
+        scopeActivityBreakdown[sId][actName] = (scopeActivityBreakdown[sId][actName] || 0) + splitDuration;
+      });
+    });
+    return { totalDuration: distinctTotalDuration, scopeDurations, scopeActivityBreakdown };
+  }, [previousFilteredLogs, categories]);
 
   const scopePieChartData = useMemo(() => {
     let currentAngle = 0; const gapAngle = 2; const radius = 80; const center = 100;
@@ -817,6 +952,8 @@ export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentD
                         <div className="flex items-center gap-2">
                           <span className="text-base">{cat.icon}</span>
                           <span className="font-bold text-stone-700 text-[13px]">{cat.name}</span>
+                          {/* Growth Indicator for Category */}
+                          {renderGrowth(cat.duration, previousStats.catDurations.get(cat.id) || 0)}
                         </div>
                         <div className="flex items-center gap-2">
                           <span className="text-xs font-mono text-stone-400">{formatDuration(cat.duration)}</span>
@@ -832,6 +969,8 @@ export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentD
                             <div className="flex items-center gap-1.5">
                               <span className="text-xs">{act.icon}</span>
                               <span>{act.name}</span>
+                              {/* Growth Indicator for Activity */}
+                              {renderGrowth(act.duration, previousStats.actDurations.get(act.id) || 0)}
                             </div>
                             <span className="font-mono opacity-60">{formatDuration(act.duration)}</span>
                           </div>
@@ -888,6 +1027,8 @@ export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentD
                           <div className="flex items-center gap-2">
                             <span className="text-base">{cat.icon}</span>
                             <span className="font-bold text-stone-700 text-[13px]">{cat.name}</span>
+                            {/* Growth Indicator for Todo Category */}
+                            {renderGrowth(cat.duration, previousTodoStats.categoryDurations?.get(cat.id) || 0)}
                           </div>
                           <div className="flex items-center gap-2">
                             <span className="text-xs font-mono text-stone-400">{formatDuration(cat.duration)}</span>
@@ -904,6 +1045,8 @@ export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentD
                                 <div className="flex items-center gap-1.5">
                                   <div className={`w-1 h-1 rounded-full`} style={{ backgroundColor: cat.assignedColor }}></div>
                                   <span>{act.name}</span>
+                                  {/* Growth Indicator for Todo Item */}
+                                  {renderGrowth(act.duration, previousTodoStats.todoDurations.get(act.id) || 0)}
                                 </div>
                                 <span className="font-mono opacity-60">{formatDuration(act.duration)}</span>
                               </div>
@@ -944,6 +1087,8 @@ export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentD
                           <div className="flex items-center gap-2">
                             <span className="text-base">{scope.icon}</span>
                             <span className="font-bold text-stone-700 text-[13px]">{scope.name}</span>
+                            {/* Growth Indicator for Scope */}
+                            {renderGrowth(scope.duration, previousScopeStats.scopeDurations.get(scope.id) || 0)}
                           </div>
                           <div className="flex items-center gap-2">
                             <span className="text-xs font-mono text-stone-400">{formatDuration(scope.duration)}</span>
@@ -953,19 +1098,6 @@ export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentD
                         <div className="w-full h-1.5 bg-stone-50 rounded-full overflow-hidden mb-2">
                           <div className="h-full rounded-full" style={{ width: `${scope.percentage}%`, backgroundColor: getHexColor(scope.themeColor) }} />
                         </div>
-                        {pieRange !== 'year' && (
-                          <div className="pl-6 space-y-1">
-                            {scope.items.map(act => (
-                              <div key={act.id} className="flex items-center justify-between text-[11px] text-stone-500 hover:bg-stone-50 rounded px-2 py-0.5 -ml-2 transition-colors">
-                                <div className="flex items-center gap-1.5">
-                                  <div className={`w-1 h-1 rounded-full`} style={{ backgroundColor: getHexColor(scope.themeColor) }}></div>
-                                  <span>{act.name}</span>
-                                </div>
-                                <span className="font-mono opacity-60">{formatDuration(act.duration)}</span>
-                              </div>
-                            ))}
-                          </div>
-                        )}
                       </div>
                     ))}
                   </div>
