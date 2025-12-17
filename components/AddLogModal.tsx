@@ -31,11 +31,6 @@ export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialSta
   const [focusScore, setFocusScore] = useState<number | undefined>(undefined);
   const [scopeIds, setScopeIds] = useState<string[] | undefined>(undefined);
 
-  // 自动关联建议状态 (Scope)
-  const [suggestedScopeIds, setSuggestedScopeIds] = useState<string[] | undefined>(undefined);
-  // 基于关键字的 Activity 建议 (New)
-  const [suggestedActivity, setSuggestedActivity] = useState<{ activityId: string; categoryId: string; name: string; icon: string; matchedKeyword: string } | undefined>(undefined);
-
   // --- TIME STATE (New Logic) ---
   const [trackStartTime, setTrackStartTime] = useState<number>(0);
   const [trackEndTime, setTrackEndTime] = useState<number>(0);
@@ -107,6 +102,99 @@ export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialSta
     setCurrentEndTime(cEnd);
   }, [initialLog, initialStartTime, initialEndTime, categories, todos, todoCategories]);
 
+  // Unified Suggestion State
+  const [suggestions, setSuggestions] = useState<{
+    activity?: { id: string; categoryId: string; name: string; icon: string; reason: string; matchedKeyword?: string };
+    scopes: { id: string; name: string; icon: string; reason: string }[];
+  }>({ scopes: [] });
+
+  // Unified Suggestion Logic
+  useEffect(() => {
+    const newSuggestions: typeof suggestions = { scopes: [] };
+
+    // 1. Activity Suggestions (Priority: Linked Todo > Note Keywords)
+    const linkedTodo = todos.find(t => t.id === linkedTodoId);
+
+    // Check Linked Todo Activity
+    if (linkedTodo?.linkedActivityId && linkedTodo.linkedCategoryId) {
+      // Only suggest if not already selected
+      if (linkedTodo.linkedActivityId !== selectedActivityId) {
+        const cat = categories.find(c => c.id === linkedTodo.linkedCategoryId);
+        const act = cat?.activities.find(a => a.id === linkedTodo.linkedActivityId);
+        if (cat && act) {
+          newSuggestions.activity = {
+            id: act.id,
+            categoryId: cat.id,
+            name: act.name,
+            icon: act.icon,
+            reason: '关联待办'
+          };
+        }
+      }
+    }
+
+    // If no todo suggestion, check Note Keywords
+    if (!newSuggestions.activity && note) {
+      for (const cat of categories) {
+        for (const act of cat.activities) {
+          // Skip currently selected
+          if (act.id === selectedActivityId) continue;
+
+          for (const kw of (act.keywords || [])) {
+            if (note.includes(kw)) {
+              newSuggestions.activity = {
+                id: act.id,
+                categoryId: cat.id,
+                name: act.name,
+                icon: act.icon,
+                reason: '关键词匹配',
+                matchedKeyword: kw
+              };
+              break;
+            }
+          }
+          if (newSuggestions.activity) break;
+        }
+        if (newSuggestions.activity) break;
+      }
+    }
+
+    // 2. Scope Suggestions (Combine Todo Scopes + AutoLink Rules)
+    const candidateScopes = new Map<string, { id: string; name: string; icon: string; reason: string }>();
+
+    // From Linked Todo
+    if (linkedTodo?.defaultScopeIds) {
+      for (const sId of linkedTodo.defaultScopeIds) {
+        // Skip if already selected
+        if (scopeIds?.includes(sId)) continue;
+
+        const s = scopes.find(scope => scope.id === sId);
+        if (s) {
+          candidateScopes.set(sId, { id: s.id, name: s.name, icon: s.icon, reason: '关联待办' });
+        }
+      }
+    }
+
+    // From AutoLink Rules (based on currently selected Activity)
+    const activeRules = autoLinkRules.filter(r => r.activityId === selectedActivityId);
+    for (const rule of activeRules) {
+      if (scopeIds?.includes(rule.scopeId)) continue;
+
+      const s = scopes.find(scope => scope.id === rule.scopeId);
+      if (s) {
+        // If already added by Todo, keep Todo reason (or overwrite? Todo seems more specific)
+        if (!candidateScopes.has(rule.scopeId)) {
+          candidateScopes.set(rule.scopeId, { id: s.id, name: s.name, icon: s.icon, reason: '自动规则' });
+        }
+      }
+    }
+
+    newSuggestions.scopes = Array.from(candidateScopes.values());
+
+    setSuggestions(newSuggestions);
+
+  }, [linkedTodoId, note, selectedActivityId, scopeIds, categories, todos, scopes, autoLinkRules]);
+
   // Derived Values for Display and Inputs
   // Helper to get H/M from timestamp
   const getHM = (ts: number) => {
@@ -155,70 +243,21 @@ export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialSta
   const selectedCategory = categories.find(c => c.id === selectedCategoryId) || categories[0];
   const linkedTodo = todos.find(t => t.id === linkedTodoId);
 
-  // 检测自动关联规则
-  useEffect(() => {
-    const category = categories.find(c => c.id === selectedCategoryId);
-    if (!category) return;
-
-    const activity = category.activities.find(a => a.id === selectedActivityId);
-    if (!activity) return;
-
-    // 查找匹配的自动关联规则
-    const matchingRules = autoLinkRules.filter(rule => rule.activityId === activity.id);
-    const matchingScopeIds = matchingRules.map(rule => rule.scopeId);
-
-    if (matchingScopeIds.length > 0) {
-      // 检查是否已经在当前选中的领域中
-      const alreadySelected = matchingScopeIds.every(id => scopeIds?.includes(id));
-      if (!alreadySelected) {
-        setSuggestedScopeIds(matchingScopeIds);
-      } else {
-        setSuggestedScopeIds(undefined);
-      }
-    } else {
-      setSuggestedScopeIds(undefined);
+  // Apply Handlers
+  const handleAcceptActivity = () => {
+    if (suggestions.activity) {
+      setSelectedCategoryId(suggestions.activity.categoryId);
+      setSelectedActivityId(suggestions.activity.id);
+      // Suggestions will update automatically via useEffect
     }
-  }, [selectedCategoryId, selectedActivityId, autoLinkRules, categories, scopeIds]);
+  };
 
-  // 监听备注输入，推荐关联标签
-  useEffect(() => {
-    if (!note) {
-      setSuggestedActivity(undefined);
-      return;
-    }
-
-    // 遍历所有 categories 和 activities 寻找匹配
-    // 优先匹配长度更长的关键字？暂不考虑，先匹配到的优先
-    for (const cat of categories) {
-      for (const act of cat.activities) {
-        // 跳过当前选中的 activity
-        if (act.id === selectedActivityId) continue;
-
-        const keywords = act.keywords || [];
-        for (const kw of keywords) {
-          if (note.includes(kw)) {
-            setSuggestedActivity({
-              activityId: act.id,
-              categoryId: cat.id,
-              name: act.name,
-              icon: act.icon,
-              matchedKeyword: kw
-            });
-            return; // 找到第一个匹配就停止
-          }
-        }
-      }
-    }
-    setSuggestedActivity(undefined);
-  }, [note, categories, selectedActivityId]);
-
-  // 接受自动关联建议
-  const handleAcceptSuggestion = (scopeId: string) => {
+  const handleAcceptScope = (scopeId: string) => {
     const currentScopeIds = scopeIds || [];
     if (!currentScopeIds.includes(scopeId)) {
       setScopeIds([...currentScopeIds, scopeId]);
     }
-    setSuggestedScopeIds(undefined);
+    // Suggestions will update automatically via useEffect
   };
 
   // 设置开始时间为当前时间
@@ -364,6 +403,7 @@ export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialSta
     };
   }, [isDraggingStart, isDraggingEnd]);
 
+  const hasSuggestions = suggestions.activity || suggestions.scopes.length > 0;
 
   return (
     <div
@@ -662,35 +702,6 @@ export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialSta
             />
           </div>
 
-          {/* Auto-Link Suggestion */}
-          {suggestedScopeIds && suggestedScopeIds.length > 0 && (
-            <div className="p-3 bg-purple-50 border border-purple-100 rounded-xl animate-in slide-in-from-top-2">
-              <div className="flex items-start gap-2">
-                <Lightbulb size={16} className="text-purple-600 mt-0.5 flex-shrink-0" />
-                <div className="flex-1">
-                  <p className="text-xs font-bold text-purple-900 mb-2">是否关联到以下领域？</p>
-                  <div className="flex flex-wrap gap-2">
-                    {suggestedScopeIds.map(scopeId => {
-                      const scope = scopes.find(s => s.id === scopeId);
-                      if (!scope) return null;
-                      return (
-                        <button
-                          key={scopeId}
-                          onClick={() => handleAcceptSuggestion(scopeId)}
-                          className="flex items-center gap-1 px-2 py-1 bg-white border border-purple-200 rounded-lg text-xs font-medium text-purple-700 hover:bg-purple-100 transition-colors active:scale-95"
-                        >
-                          <span>{scope.icon}</span>
-                          <span>{scope.name}</span>
-                          <CheckCircle2 size={12} />
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-
           {/* Scope Association */}
           <div className="space-y-0">
             <ScopeAssociation
@@ -716,27 +727,42 @@ export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialSta
             })()
           }
 
-          {/* Keyword Activity Suggestion */}
-          {suggestedActivity && (
+          {/* Smart Association Suggestion (Unified) */}
+          {hasSuggestions && (
             <div className="p-3 bg-purple-50 border border-purple-100 rounded-xl animate-in slide-in-from-top-2">
               <div className="flex items-start gap-2">
                 <Lightbulb size={16} className="text-purple-600 mt-0.5 flex-shrink-0" />
                 <div className="flex-1">
-                  <p className="text-xs font-bold text-purple-900 mb-2">是否关联到以下标签？</p>
+                  <p className="text-xs font-bold text-purple-900 mb-2">建议关联</p>
                   <div className="flex flex-wrap gap-2">
-                    <button
-                      onClick={() => {
-                        setSelectedCategoryId(suggestedActivity.categoryId);
-                        setSelectedActivityId(suggestedActivity.activityId);
-                        setSuggestedActivity(undefined);
-                      }}
-                      className="flex items-center gap-1 px-2 py-1 bg-white border border-purple-200 rounded-lg text-xs font-medium text-purple-700 hover:bg-purple-100 transition-colors active:scale-95"
-                    >
-                      <span>{suggestedActivity.icon}</span>
-                      <span>{suggestedActivity.name}</span>
-                      <CheckCircle2 size={12} />
-                    </button>
-                    <span className="text-[10px] text-purple-400 self-center">(匹配关键字: {suggestedActivity.matchedKeyword})</span>
+
+                    {/* Activity Suggestions */}
+                    {suggestions.activity && (
+                      <button
+                        onClick={handleAcceptActivity}
+                        className="flex items-center gap-1 px-2 py-1 bg-white border border-purple-200 rounded-lg text-xs font-medium text-purple-700 hover:bg-purple-100 transition-colors active:scale-95"
+                      >
+                        <span className="opacity-70 text-[10px] mr-0.5">[{suggestions.activity.reason}]</span>
+                        <span>{suggestions.activity.icon}</span>
+                        <span>{suggestions.activity.name}</span>
+                        <CheckCircle2 size={12} />
+                      </button>
+                    )}
+
+                    {/* Scope Suggestions */}
+                    {suggestions.scopes.map(scope => (
+                      <button
+                        key={scope.id}
+                        onClick={() => handleAcceptScope(scope.id)}
+                        className="flex items-center gap-1 px-2 py-1 bg-white border border-purple-200 rounded-lg text-xs font-medium text-purple-700 hover:bg-purple-100 transition-colors active:scale-95"
+                      >
+                        <span className="opacity-70 text-[10px] mr-0.5">[{scope.reason}]</span>
+                        <span>{scope.icon}</span>
+                        <span>{scope.name}</span>
+                        <CheckCircle2 size={12} />
+                      </button>
+                    ))}
+
                   </div>
                 </div>
               </div>
@@ -755,7 +781,7 @@ export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialSta
             />
           </div>
 
-        </div >
+        </div>
 
         {/* Footer */}
         < div className="p-6 bg-white border-t border-stone-100" >
