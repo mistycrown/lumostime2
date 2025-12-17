@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { ActiveSession, TodoItem, Category, Activity, TodoCategory, Scope } from '../types';
-import { X, Check, ChevronDown, TrendingUp, Plus, Minus } from 'lucide-react';
+import { ActiveSession, TodoItem, Category, Activity, TodoCategory, Scope, AutoLinkRule } from '../types';
+import { X, Check, ChevronDown, TrendingUp, Plus, Minus, Lightbulb, CheckCircle2 } from 'lucide-react';
 import { TodoAssociation } from '../components/TodoAssociation';
 import { ScopeAssociation } from '../components/ScopeAssociation';
 import { FocusScoreSelector } from '../components/FocusScoreSelector';
@@ -11,12 +11,13 @@ interface FocusDetailViewProps {
     categories: Category[];
     todoCategories: TodoCategory[];
     scopes: Scope[];
+    autoLinkRules?: AutoLinkRule[];
     onClose: () => void;
     onComplete: (session: ActiveSession) => void;
     onUpdate: (session: ActiveSession) => void;
 }
 
-export const FocusDetailView: React.FC<FocusDetailViewProps> = ({ session, todos, categories, todoCategories, scopes, onClose, onComplete, onUpdate }) => {
+export const FocusDetailView: React.FC<FocusDetailViewProps> = ({ session, todos, categories, todoCategories, scopes, autoLinkRules = [], onClose, onComplete, onUpdate }) => {
     const [elapsed, setElapsed] = useState(0);
     const [note, setNote] = useState(session.note || '');
     const [isActivitySelectorOpen, setIsActivitySelectorOpen] = useState(false);
@@ -39,6 +40,101 @@ export const FocusDetailView: React.FC<FocusDetailViewProps> = ({ session, todos
         }, 400);
         return () => clearTimeout(timer);
     }, []);
+
+    // Unified Suggestion State
+    const [suggestions, setSuggestions] = useState<{
+        activity?: { id: string; categoryId: string; name: string; icon: string; reason: string; matchedKeyword?: string };
+        scopes: { id: string; name: string; icon: string; reason: string }[];
+    }>({ scopes: [] });
+
+    // Unified Suggestion Logic
+    useEffect(() => {
+        const newSuggestions: typeof suggestions = { scopes: [] };
+
+        const linkedTodo = todos.find(t => t.id === session.linkedTodoId);
+
+        // 1. Activity Suggestions (Priority: Linked Todo > Note Keywords)
+        if (linkedTodo?.linkedActivityId && linkedTodo.linkedCategoryId) {
+            if (linkedTodo.linkedActivityId !== session.activityId) {
+                const cat = categories.find(c => c.id === linkedTodo.linkedCategoryId);
+                const act = cat?.activities.find(a => a.id === linkedTodo.linkedActivityId);
+                if (cat && act) {
+                    newSuggestions.activity = {
+                        id: act.id, categoryId: cat.id, name: act.name, icon: act.icon, reason: '关联待办'
+                    };
+                }
+            }
+        }
+
+        // If no todo suggestion, check Note Keywords
+        if (!newSuggestions.activity && note) {
+            for (const cat of categories) {
+                for (const act of cat.activities) {
+                    if (act.id === session.activityId) continue;
+                    for (const kw of (act.keywords || [])) {
+                        if (note.includes(kw)) {
+                            newSuggestions.activity = {
+                                id: act.id, categoryId: cat.id, name: act.name, icon: act.icon, reason: '关键词匹配', matchedKeyword: kw
+                            };
+                            break;
+                        }
+                    }
+                    if (newSuggestions.activity) break;
+                }
+                if (newSuggestions.activity) break;
+            }
+        }
+
+        // 2. Scope Suggestions
+        const candidateScopes = new Map<string, { id: string; name: string; icon: string; reason: string }>();
+        const currentScopeIds = session.scopeIds || [];
+
+        // From Linked Todo
+        if (linkedTodo?.defaultScopeIds) {
+            for (const sId of linkedTodo.defaultScopeIds) {
+                if (currentScopeIds.includes(sId)) continue;
+                const s = scopes.find(scope => scope.id === sId);
+                if (s) {
+                    candidateScopes.set(sId, { id: s.id, name: s.name, icon: s.icon, reason: '关联待办' });
+                }
+            }
+        }
+
+        // From AutoLink Rules
+        const activeRules = autoLinkRules.filter(r => r.activityId === session.activityId);
+        for (const rule of activeRules) {
+            if (currentScopeIds.includes(rule.scopeId)) continue;
+            const s = scopes.find(scope => scope.id === rule.scopeId);
+            if (s) {
+                if (!candidateScopes.has(rule.scopeId)) {
+                    candidateScopes.set(rule.scopeId, { id: s.id, name: s.name, icon: s.icon, reason: '自动规则' });
+                }
+            }
+        }
+
+        newSuggestions.scopes = Array.from(candidateScopes.values());
+        setSuggestions(newSuggestions);
+
+    }, [session.linkedTodoId, note, session.activityId, session.scopeIds, categories, todos, scopes, autoLinkRules]);
+
+    const handleAcceptActivity = () => {
+        if (suggestions.activity) {
+            const cat = categories.find(c => c.id === suggestions.activity!.categoryId);
+            const act = cat?.activities.find(a => a.id === suggestions.activity!.id);
+            if (act && cat) {
+                handleActivitySelect(act, cat.id);
+            }
+        }
+    };
+
+    const handleAcceptScope = (scopeId: string) => {
+        const current = session.scopeIds || [];
+        if (!current.includes(scopeId)) {
+            onUpdate({ ...session, scopeIds: [...current, scopeId] });
+        }
+    };
+
+    const hasSuggestions = suggestions.activity || suggestions.scopes.length > 0;
 
     useEffect(() => {
         const interval = setInterval(() => {
@@ -224,6 +320,47 @@ export const FocusDetailView: React.FC<FocusDetailViewProps> = ({ session, todos
                     }
                     return null;
                 })()}
+
+                {/* Smart Association Suggestion (Unified) */}
+                {hasSuggestions && (
+                    <div className="w-full px-8 mb-4 animate-in slide-in-from-top-2">
+                        <div className="p-3 bg-purple-50 border border-purple-100 rounded-xl">
+                            <div className="flex items-start gap-2">
+                                <Lightbulb size={16} className="text-purple-600 mt-0.5 flex-shrink-0" />
+                                <div className="flex-1">
+                                    <p className="text-xs font-bold text-purple-900 mb-2">建议关联</p>
+                                    <div className="flex flex-wrap gap-2">
+                                        {/* Activity Suggestions */}
+                                        {suggestions.activity && (
+                                            <button
+                                                onClick={handleAcceptActivity}
+                                                className="flex items-center gap-1 px-2 py-1 bg-white border border-purple-200 rounded-lg text-xs font-medium text-purple-700 hover:bg-purple-100 transition-colors active:scale-95"
+                                            >
+                                                <span className="opacity-70 text-[10px] mr-0.5">[{suggestions.activity.reason}]</span>
+                                                <span>{suggestions.activity.icon}</span>
+                                                <span>{suggestions.activity.name}</span>
+                                                <CheckCircle2 size={12} />
+                                            </button>
+                                        )}
+                                        {/* Scope Suggestions */}
+                                        {suggestions.scopes.map(scope => (
+                                            <button
+                                                key={scope.id}
+                                                onClick={() => handleAcceptScope(scope.id)}
+                                                className="flex items-center gap-1 px-2 py-1 bg-white border border-purple-200 rounded-lg text-xs font-medium text-purple-700 hover:bg-purple-100 transition-colors active:scale-95"
+                                            >
+                                                <span className="opacity-70 text-[10px] mr-0.5">[{scope.reason}]</span>
+                                                <span>{scope.icon}</span>
+                                                <span>{scope.name}</span>
+                                                <CheckCircle2 size={12} />
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                )}
 
                 {/* Note Input */}
                 <div className="w-full px-8 mb-8">
