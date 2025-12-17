@@ -10,7 +10,7 @@ export interface VersionInfo {
 export class UpdateService {
     // GitHub Raw URL 指向版本信息文件
     // 格式: https://raw.githubusercontent.com/用户名/仓库名/分支名/version.json
-    private static UPDATE_CHECK_URL = 'https://raw.githubusercontent.com/mistycrown/lumostime2/main/version.json';
+    private static UPDATE_CHECK_URL = 'https://raw.githubusercontent.com/mistycrown/lumostime2/master/version.json';
 
     // 当前应用版本（从 package.json 读取）
     private static CURRENT_VERSION = '1.0.1';
