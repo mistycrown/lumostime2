@@ -979,7 +979,7 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ logs, todos, scopes,
             {/* Floating AI Button (Above Add) */}
             <button
                 onClick={() => setIsAIModalOpen(true)}
-                className="fixed bottom-40 right-6 w-12 h-12 bg-white text-amber-400 rounded-full shadow-xl flex items-center justify-center active:scale-90 transition-transform z-40 border border-amber-100"
+                className="fixed bottom-36 right-6 w-12 h-12 bg-white text-amber-400 rounded-full shadow-xl flex items-center justify-center active:scale-90 transition-transform z-40 border border-amber-100"
                 title="AI Magic Backfill"
             >
                 <Sparkles size={20} />
@@ -988,7 +988,7 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ logs, todos, scopes,
             {/* Floating Punch Button */}
             <button
                 onClick={onQuickPunch}
-                className="fixed bottom-24 right-[5.5rem] w-12 h-12 bg-white text-stone-600 rounded-full shadow-xl flex items-center justify-center active:scale-90 transition-transform z-40 border border-stone-200"
+                className="fixed bottom-20 right-[5.5rem] w-12 h-12 bg-white text-stone-600 rounded-full shadow-xl flex items-center justify-center active:scale-90 transition-transform z-40 border border-stone-200"
                 title="Quick Punch (Mark Time)"
             >
                 <Timer size={20} />
@@ -997,9 +997,9 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ logs, todos, scopes,
             {/* Floating Add Button */}
             <button
                 onClick={() => onAddLog()}
-                className="fixed bottom-24 right-6 w-14 h-14 bg-stone-900 rounded-full text-white shadow-2xl flex items-center justify-center active:scale-90 transition-transform z-40 border border-stone-800"
-            >
-                <Plus size={24} strokeWidth={1.5} />
+                className="fixed bottom-20 right-6 w-14 h-14 bg-stone-900 rounded-full text-white shadow-2xl flex items-center justify-center active:scale-90 transition-transform z-40 border border-stone-800"
+                title="Add Activity"
+            >    <Plus size={24} strokeWidth={1.5} />
             </button>
             {
                 isAIModalOpen && (

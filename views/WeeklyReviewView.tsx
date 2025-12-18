@@ -694,7 +694,7 @@ export const WeeklyReviewView: React.FC<WeeklyReviewViewProps> = ({
             {activeTab === 'guide' && templates.filter(t => t.isWeeklyTemplate).length > 0 && (
                 <button
                     onClick={toggleReadingMode}
-                    className="fixed bottom-24 right-6 w-14 h-14 bg-stone-900 rounded-full text-white shadow-2xl flex items-center justify-center active:scale-90 transition-transform z-40 border border-stone-800"
+                    className="fixed bottom-16 right-6 w-14 h-14 bg-stone-900 rounded-full text-white shadow-2xl flex items-center justify-center active:scale-90 transition-transform z-40 border border-stone-800"
                 >
                     {isReadingMode ? <Edit3 size={24} /> : <LucideIcons.BookOpen size={24} />}
                 </button>
@@ -710,7 +710,7 @@ export const WeeklyReviewView: React.FC<WeeklyReviewViewProps> = ({
                             setIsEditing(true);
                         }
                     }}
-                    className="fixed bottom-24 right-6 w-14 h-14 bg-stone-900 rounded-full text-white shadow-2xl flex items-center justify-center active:scale-90 transition-transform z-40 border border-stone-800"
+                    className="fixed bottom-16 right-6 w-14 h-14 bg-stone-900 rounded-full text-white shadow-2xl flex items-center justify-center active:scale-90 transition-transform z-40 border border-stone-800"
                 >
                     {isEditing ? <LucideIcons.Check size={24} /> : <Edit3 size={24} />}
                 </button>
