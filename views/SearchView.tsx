@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
-import { Search, X, ChevronLeft } from 'lucide-react';
-import { Log, Category, TodoItem, TodoCategory, Scope, Goal } from '../types';
+import { Search, X, ChevronLeft, FileText } from 'lucide-react';
+import { Log, Category, TodoItem, TodoCategory, Scope, Goal, DailyReview, WeeklyReview, MonthlyReview } from '../types';
 
 interface SearchViewProps {
     logs: Log[];
@@ -9,15 +9,21 @@ interface SearchViewProps {
     todoCategories: TodoCategory[];
     scopes: Scope[];
     goals: Goal[];
+    dailyReviews: DailyReview[];
+    weeklyReviews: WeeklyReview[];
+    monthlyReviews: MonthlyReview[];
     onClose: () => void;
     onSelectLog: (log: Log) => void;
     onSelectTodo: (todo: TodoItem) => void;
     onSelectScope: (scope: Scope) => void;
     onSelectCategory: (category: Category) => void;
     onSelectActivity: (activity: { id: string }, categoryId: string) => void;
+    onSelectDailyReview: (date: string) => void;
+    onSelectWeeklyReview: (id: string, weekStartDate: string) => void;
+    onSelectMonthlyReview: (id: string, monthStr: string) => void;
 }
 
-type SearchType = 'record' | 'category' | 'activity' | 'todo' | 'scope';
+type SearchType = 'record' | 'category' | 'activity' | 'todo' | 'scope' | 'review';
 
 export const SearchView: React.FC<SearchViewProps> = ({
     logs,
@@ -26,12 +32,18 @@ export const SearchView: React.FC<SearchViewProps> = ({
     todoCategories,
     scopes,
     goals,
+    dailyReviews,
+    weeklyReviews,
+    monthlyReviews,
     onClose,
     onSelectLog,
     onSelectTodo,
     onSelectScope,
     onSelectCategory,
-    onSelectActivity
+    onSelectActivity,
+    onSelectDailyReview,
+    onSelectWeeklyReview,
+    onSelectMonthlyReview
 }) => {
     const [query, setQuery] = useState('');
     const [searchMode, setSearchMode] = useState<'all' | 'partial'>('all');
@@ -51,7 +63,7 @@ export const SearchView: React.FC<SearchViewProps> = ({
 
         const lowerQuery = query.toLowerCase().trim();
         const typesToSearch = searchMode === 'all'
-            ? ['record', 'category', 'activity', 'todo', 'scope'] as SearchType[]
+            ? ['record', 'category', 'activity', 'todo', 'scope', 'review'] as SearchType[]
             : selectedTypes;
 
         const results = {
@@ -59,8 +71,83 @@ export const SearchView: React.FC<SearchViewProps> = ({
             categories: [] as Category[],
             activities: [] as { activity: { name: string; icon: string; id: string; color: string }; category: Category }[],
             todos: [] as { todo: TodoItem; category: TodoCategory }[],
-            scopes: [] as Scope[]
+            scopes: [] as Scope[],
+            reviews: [] as { type: 'daily' | 'weekly' | 'monthly'; date: string; id: string; title: string; snippet?: string }[]
         };
+
+        // 搜索复盘
+        if (typesToSearch.includes('review')) {
+            const getSnippet = (text: string, query: string): string | undefined => {
+                const lowerText = text.toLowerCase();
+                const index = lowerText.indexOf(query);
+                if (index === -1) return undefined;
+
+                const start = Math.max(0, index - 10);
+                const end = Math.min(text.length, index + query.length + 20);
+                return (start > 0 ? '...' : '') + text.substring(start, end) + (end < text.length ? '...' : '');
+            };
+
+            const getReviewMatch = (review: { answers: { answer: string }[], narrative?: string }, query: string) => {
+                // Check answers
+                const answerMatch = review.answers?.find(ans => ans.answer && ans.answer.toLowerCase().includes(query));
+                if (answerMatch) {
+                    return getSnippet(answerMatch.answer, query);
+                }
+                // Check narrative
+                if (review.narrative && review.narrative.toLowerCase().includes(query)) {
+                    return getSnippet(review.narrative, query);
+                }
+                return undefined;
+            };
+
+            // Daily Reviews
+            dailyReviews.forEach(review => {
+                const snippet = getReviewMatch(review, lowerQuery);
+                const dateMatch = review.date.includes(lowerQuery);
+
+                if (snippet || dateMatch) {
+                    results.reviews.push({
+                        type: 'daily',
+                        date: review.date,
+                        id: review.date,
+                        title: `${review.date} 日报`,
+                        snippet: snippet || (dateMatch ? '日期匹配' : undefined)
+                    });
+                }
+            });
+
+            // Weekly Reviews
+            weeklyReviews.forEach(review => {
+                const snippet = getReviewMatch(review, lowerQuery);
+                const dateMatch = review.weekStartDate.includes(lowerQuery);
+
+                if (snippet || dateMatch) {
+                    results.reviews.push({
+                        type: 'weekly',
+                        date: review.weekStartDate,
+                        id: review.id,
+                        title: `${review.weekStartDate} 周报`,
+                        snippet: snippet || (dateMatch ? '日期匹配' : undefined)
+                    });
+                }
+            });
+
+            // Monthly Reviews
+            monthlyReviews.forEach(review => {
+                const snippet = getReviewMatch(review, lowerQuery);
+                const dateMatch = review.monthStartDate.includes(lowerQuery);
+
+                if (snippet || dateMatch) {
+                    results.reviews.push({
+                        type: 'monthly',
+                        date: review.monthStartDate,
+                        id: review.id,
+                        title: `${review.monthStartDate.substring(0, 7)} 月报`,
+                        snippet: snippet || (dateMatch ? '日期匹配' : undefined)
+                    });
+                }
+            });
+        }
 
         // 搜索记录
         if (typesToSearch.includes('record')) {
@@ -129,14 +216,15 @@ export const SearchView: React.FC<SearchViewProps> = ({
         }
 
         return results;
-    }, [query, searchMode, selectedTypes, logs, categories, todos, todoCategories, scopes]);
+    }, [query, searchMode, selectedTypes, logs, categories, todos, todoCategories, scopes, dailyReviews, weeklyReviews, monthlyReviews]);
 
     const totalResults = searchResults
         ? searchResults.records.length +
         searchResults.categories.length +
         searchResults.activities.length +
         searchResults.todos.length +
-        searchResults.scopes.length
+        searchResults.scopes.length +
+        searchResults.reviews.length
         : 0;
 
     return (
@@ -153,55 +241,61 @@ export const SearchView: React.FC<SearchViewProps> = ({
             </div>
 
             <div className="flex-1 overflow-y-auto p-4 space-y-4 pb-20">
-                {/* 搜索框 */}
+                {/* 搜索框和筛选按钮 */}
                 <div className="bg-white rounded-2xl p-4 shadow-sm">
-                    <div className="flex items-center gap-2 bg-stone-50 px-3 py-2 rounded-xl focus-within:ring-2 focus-within:ring-stone-300 transition-all">
-                        <Search size={18} className="text-stone-400 flex-shrink-0" />
-                        <input
-                            type="text"
-                            placeholder="搜索记录、待办、标签..."
-                            className="flex-1 bg-transparent border-none outline-none text-stone-700 placeholder:text-stone-300 text-sm"
-                            value={query}
-                            onChange={e => setQuery(e.target.value)}
-                            autoFocus
-                        />
-                        {query && (
-                            <button
-                                onClick={() => setQuery('')}
-                                className="text-stone-300 hover:text-stone-500 transition-colors"
-                            >
-                                <X size={16} />
-                            </button>
-                        )}
-                    </div>
+                    <div className="flex flex-col gap-3">
+                        <div className="flex gap-2 w-full">
+                            {/* 原搜索框 */}
+                            <div className="flex-1 min-w-0 flex items-center gap-2 bg-stone-50 px-3 py-2 rounded-xl focus-within:ring-2 focus-within:ring-stone-300 transition-all">
+                                <Search size={18} className="text-stone-400 flex-shrink-0" />
+                                <input
+                                    type="text"
+                                    placeholder="搜索记录、待办、标签..."
+                                    className="flex-1 w-full min-w-0 bg-transparent border-none outline-none text-stone-700 placeholder:text-stone-300 text-sm"
+                                    value={query}
+                                    onChange={e => setQuery(e.target.value)}
+                                    autoFocus
+                                />
+                                {query && (
+                                    <button
+                                        onClick={() => setQuery('')}
+                                        className="text-stone-300 hover:text-stone-500 transition-colors flex-shrink-0"
+                                    >
+                                        <X size={16} />
+                                    </button>
+                                )}
+                            </div>
 
-                    {/* 搜索模式切换 */}
-                    <div className="flex gap-2 mt-3">
-                        <button
-                            onClick={() => setSearchMode('all')}
-                            className={`px-3 py-1.5 rounded-full text-xs font-bold transition-all ${searchMode === 'all'
-                                ? 'bg-stone-900 text-white'
-                                : 'bg-stone-100 text-stone-500 hover:bg-stone-200'
-                                }`}
-                        >
-                            全部
-                        </button>
-                        <button
-                            onClick={() => setSearchMode('partial')}
-                            className={`px-3 py-1.5 rounded-full text-xs font-bold transition-all ${searchMode === 'partial'
-                                ? 'bg-stone-900 text-white'
-                                : 'bg-stone-100 text-stone-500 hover:bg-stone-200'
-                                }`}
-                        >
-                            部分
-                        </button>
+                            {/* 搜索模式切换 */}
+                            <div className="flex gap-1 flex-shrink-0 items-center">
+                                <button
+                                    onClick={() => setSearchMode('all')}
+                                    className={`px-3 py-2 h-full rounded-xl text-xs font-bold transition-all flex items-center ${searchMode === 'all'
+                                        ? 'bg-stone-900 text-white'
+                                        : 'bg-stone-100 text-stone-500 hover:bg-stone-200'
+                                        }`}
+                                >
+                                    全部
+                                </button>
+                                <button
+                                    onClick={() => setSearchMode('partial')}
+                                    className={`px-3 py-2 h-full rounded-xl text-xs font-bold transition-all flex items-center ${searchMode === 'partial'
+                                        ? 'bg-stone-900 text-white'
+                                        : 'bg-stone-100 text-stone-500 hover:bg-stone-200'
+                                        }`}
+                                >
+                                    部分
+                                </button>
+                            </div>
+                        </div>
                     </div>
 
                     {/* 类型选择（仅在部分模式下显示） */}
                     {searchMode === 'partial' && (
-                        <div className="mt-3 grid grid-cols-5 gap-1.5 animate-in slide-in-from-top-2">
+                        <div className="mt-3 grid grid-cols-6 gap-1.5 animate-in slide-in-from-top-2">
                             {[
                                 { type: 'record' as const, label: '记录' },
+                                { type: 'review' as const, label: '复盘' },
                                 { type: 'category' as const, label: '分类' },
                                 { type: 'activity' as const, label: '标签' },
                                 { type: 'todo' as const, label: '待办' },
@@ -233,6 +327,39 @@ export const SearchView: React.FC<SearchViewProps> = ({
                                 {totalResults} 项
                             </span>
                         </div>
+
+                        {/* 复盘结果 */}
+                        {searchResults.reviews.length > 0 && (
+                            <div className="bg-white rounded-2xl overflow-hidden shadow-sm">
+                                <div className="px-4 py-2 bg-stone-50 border-b border-stone-100">
+                                    <span className="text-[10px] font-bold text-stone-500 uppercase tracking-wider">
+                                        复盘 ({searchResults.reviews.length})
+                                    </span>
+                                </div>
+                                {searchResults.reviews.map((review, idx) => (
+                                    <button
+                                        key={`${review.type}-${review.id}`}
+                                        onClick={() => {
+                                            if (review.type === 'daily') onSelectDailyReview(review.date);
+                                            else if (review.type === 'weekly') onSelectWeeklyReview(review.id, review.date);
+                                            else if (review.type === 'monthly') onSelectMonthlyReview(review.id, review.date);
+                                        }}
+                                        className={`w-full text-left px-4 py-3 hover:bg-stone-50 transition-colors ${idx < searchResults.reviews.length - 1 ? 'border-b border-stone-50' : ''
+                                            }`}
+                                    >
+                                        <div className="flex items-center gap-2 mb-1">
+                                            <span className="text-sm"><FileText size={16} className="text-stone-400" /></span>
+                                            <span className="text-sm font-bold text-stone-800">
+                                                {review.title}
+                                            </span>
+                                        </div>
+                                        {review.snippet && (
+                                            <p className="text-xs text-stone-500 line-clamp-1 ml-6">{review.snippet}</p>
+                                        )}
+                                    </button>
+                                ))}
+                            </div>
+                        )}
 
                         {/* 记录结果 */}
                         {searchResults.records.length > 0 && (
