@@ -26,6 +26,18 @@ git push --force
 
 搜索功能搜索日报
 
+在设置回顾模板-编辑模板页面中增加开关：设置为月报模板，并且将之联系到月报生成的动作中去。
+
+现在周回顾和月回顾都不在时间轴中显示了，这是为什么，请排查
+
+月报的数据面板，应显示饼状图和趋势图的切换标签，不要多，也不要少。
+在设置回顾模板-编辑模板页面中增加开关：设置为月报模板，并且将之联系到月报生成的动作中去。
+
+按照这个改月报的标题栏和日期栏<header class="h-14 flex items-center justify-between px-5 bg-[#fdfbf7] border-b border-stone-100 shrink-0 z-30 mb-4 -mx-7 -mt-4"><div class="w-8 flex items-center"><button class="text-stone-400 hover:text-stone-600 transition-colors"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-chevron-left" aria-hidden="true"><path d="m15 18-6-6 6-6"></path></svg></button></div><h1 class="text-lg font-bold text-stone-700 tracking-wide">Weekly Review</h1><div class="w-8"></div></header>
+
+
+
+
 现在开发周报功能，周报功能与日报功能大部分内容雷同，请尽量参考日报功能，保持ui风格、交互逻辑一致。不要擅自改动。
 1. 数据层面，添加周报数据类型。回顾模板增加是否设为日报模板、是否设为周报模板数据类型
 2. 交互层面。

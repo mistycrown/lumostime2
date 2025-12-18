@@ -16,11 +16,12 @@ import { AutoLinkView } from './views/AutoLinkView';
 import { SearchView } from './views/SearchView';
 import { DailyReviewView } from './views/DailyReviewView'; // 新增：每日回顾
 import { WeeklyReviewView } from './views/WeeklyReviewView'; // 新增：每周回顾
+import { MonthlyReviewView } from './views/MonthlyReviewView'; // 新增：每月回顾
 import { TimerFloating } from './components/TimerFloating';
 import { AddLogModal } from './components/AddLogModal';
 import { TodoDetailModal } from './components/TodoDetailModal';
 import { GoalEditor } from './components/GoalEditor';
-import { Activity, ActiveSession, AppView, Log, TodoItem, TodoCategory, Category, Goal, AutoLinkRule, DailyReview, WeeklyReview, ReviewTemplate, NarrativeTemplate } from './types';
+import { Activity, ActiveSession, AppView, Log, TodoItem, TodoCategory, Category, Goal, AutoLinkRule, DailyReview, WeeklyReview, MonthlyReview, ReviewTemplate, NarrativeTemplate } from './types';
 import { INITIAL_LOGS, INITIAL_TODOS, MOCK_TODO_CATEGORIES, VIEW_TITLES, CATEGORIES, SCOPES, INITIAL_GOALS, DEFAULT_REVIEW_TEMPLATES, DEFAULT_USER_PERSONAL_INFO, INITIAL_DAILY_REVIEWS } from './constants';
 import { ToastContainer, ToastMessage, ToastType } from './components/Toast';
 import { webdavService } from './services/webdavService';
@@ -51,6 +52,9 @@ import { Buffer } from 'buffer';
 if (typeof window !== 'undefined') {
   window.Buffer = window.Buffer || Buffer;
 }
+
+// Helper to format date to YYYY-MM-DD string
+const formatDate = (date: Date): string => date.toISOString().split('T')[0];
 
 const App: React.FC = () => {
   const [returnToSearch, setReturnToSearch] = useState(false);
@@ -206,6 +210,15 @@ const App: React.FC = () => {
     localStorage.setItem('lumostime_weekly_review_time', weeklyReviewTime);
   }, [weeklyReviewTime]);
 
+  // Monthly Review Time
+  const [monthlyReviewTime, setMonthlyReviewTime] = useState<string>(() => {
+    return localStorage.getItem('lumostime_monthly_review_time') || '0-2200'; // 0-2200 means Last Day of Month at 22:00
+  });
+
+  useEffect(() => {
+    localStorage.setItem('lumostime_monthly_review_time', monthlyReviewTime);
+  }, [monthlyReviewTime]);
+
   // Custom AI Narrative Templates
   const [customNarrativeTemplates, setCustomNarrativeTemplates] = useState<NarrativeTemplate[]>(() => {
     const stored = localStorage.getItem('lumostime_custom_narrative_templates');
@@ -267,6 +280,20 @@ const App: React.FC = () => {
     localStorage.setItem('lumostime_weeklyReviews', JSON.stringify(weeklyReviews));
   }, [weeklyReviews]);
 
+  // Monthly Review State (每月回顾状态)
+  const [monthlyReviews, setMonthlyReviews] = useState<MonthlyReview[]>(() => {
+    const stored = localStorage.getItem('lumostime_monthlyReviews');
+    return stored ? JSON.parse(stored) : [];
+  });
+
+  // Monthly Review View State (路由状态)
+  const [isMonthlyReviewOpen, setIsMonthlyReviewOpen] = useState(false);
+  const [currentMonthlyReviewStart, setCurrentMonthlyReviewStart] = useState<Date | null>(null);
+  const [currentMonthlyReviewEnd, setCurrentMonthlyReviewEnd] = useState<Date | null>(null);
+
+  useEffect(() => {
+    localStorage.setItem('lumostime_monthlyReviews', JSON.stringify(monthlyReviews));
+  }, [monthlyReviews]);
 
 
   const handleStartActivity = (activity: Activity, categoryId: string, todoId?: string, scopeId?: string) => {
@@ -915,7 +942,7 @@ const App: React.FC = () => {
       return;
     }
     setDataLastModified(Date.now());
-  }, [logs, todos, categories, todoCategories, scopes, goals, autoLinkRules, reviewTemplates, dailyReviews, customNarrativeTemplates, userPersonalInfo]);
+  }, [logs, todos, categories, todoCategories, scopes, goals, autoLinkRules, reviewTemplates, dailyReviews, weeklyReviews, monthlyReviews, customNarrativeTemplates, userPersonalInfo]);
 
   // --- Sync Logic ---
 
@@ -966,6 +993,8 @@ const App: React.FC = () => {
           autoLinkRules,
           reviewTemplates,
           dailyReviews,
+          weeklyReviews,
+          monthlyReviews,
           customNarrativeTemplates,
           userPersonalInfo,
           version: '1.0.0',
@@ -979,7 +1008,7 @@ const App: React.FC = () => {
     }, 30000); // 30s debounce
 
     return () => clearTimeout(timer);
-  }, [logs, todos, categories, todoCategories, scopes, goals, autoLinkRules, reviewTemplates, dailyReviews, customNarrativeTemplates, userPersonalInfo, lastSyncTime]);
+  }, [logs, todos, categories, todoCategories, scopes, goals, autoLinkRules, reviewTemplates, dailyReviews, weeklyReviews, monthlyReviews, customNarrativeTemplates, userPersonalInfo, lastSyncTime]);
 
   // --- NFC / Deep Link Handling ---
   useEffect(() => {
@@ -1111,6 +1140,8 @@ const App: React.FC = () => {
             autoLinkRules,
             reviewTemplates,
             dailyReviews,
+            weeklyReviews,
+            monthlyReviews,
             customNarrativeTemplates,
             userPersonalInfo,
             version: '1.0.0',
@@ -1123,7 +1154,7 @@ const App: React.FC = () => {
 
     document.addEventListener('visibilitychange', handleVisibilityChange);
     return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
-  }, [logs, todos, categories, todoCategories, scopes, goals, autoLinkRules, reviewTemplates, dailyReviews, customNarrativeTemplates, userPersonalInfo]);
+  }, [logs, todos, categories, todoCategories, scopes, goals, autoLinkRules, reviewTemplates, dailyReviews, weeklyReviews, monthlyReviews, customNarrativeTemplates, userPersonalInfo]);
 
   // 4. Hardware Back Button Handling
   useEffect(() => {
@@ -1154,10 +1185,22 @@ const App: React.FC = () => {
         return;
       }
 
-      // 1.5. Daily Review (Between Modals and Management Modes)
+      // 1.5. Daily/Weekly/Monthly Review (Between Modals and Management Modes)
       if (isDailyReviewOpen) {
         setIsDailyReviewOpen(false);
         setCurrentReviewDate(null);
+        return;
+      }
+      if (isWeeklyReviewOpen) {
+        setIsWeeklyReviewOpen(false);
+        setCurrentWeeklyReviewStart(null);
+        setCurrentWeeklyReviewEnd(null);
+        return;
+      }
+      if (isMonthlyReviewOpen) {
+        setIsMonthlyReviewOpen(false);
+        setCurrentMonthlyReviewStart(null);
+        setCurrentMonthlyReviewEnd(null);
         return;
       }
 
@@ -1202,7 +1245,7 @@ const App: React.FC = () => {
     };
   }, [
     isSettingsOpen, isAutoLinkOpen, isSearchOpen, focusDetailSessionId, isAddModalOpen, isTodoModalOpen,
-    isDailyReviewOpen,
+    isDailyReviewOpen, isWeeklyReviewOpen, isMonthlyReviewOpen,
     isStatsFullScreen, isTodoManaging, isTagsManaging,
     currentView, selectedTagId, selectedCategoryId
   ]);
@@ -1361,6 +1404,56 @@ const App: React.FC = () => {
     return narrativeService.generateDailyNarrative(review as any, statsText, '', finalPrompt, scopes, userPersonalInfo);
   };
 
+  // Monthly Review Handlers (每月回顾处理函数)
+  const handleOpenMonthlyReview = (monthStart: Date, monthEnd: Date) => {
+    const monthStartStr = monthStart.toISOString().split('T')[0];
+    const monthEndStr = monthEnd.toISOString().split('T')[0];
+    let review = monthlyReviews.find(r => r.monthStartDate === monthStartStr && r.monthEndDate === monthEndStr);
+
+    // 如果没有月报，创建新的
+    if (!review) {
+      review = {
+        id: crypto.randomUUID(),
+        monthStartDate: monthStartStr,
+        monthEndDate: monthEndStr,
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+        answers: []
+      };
+      setMonthlyReviews(prev => [...prev, review!]);
+    }
+
+    setCurrentMonthlyReviewStart(monthStart);
+    setCurrentMonthlyReviewEnd(monthEnd);
+    setIsMonthlyReviewOpen(true);
+  };
+
+  const handleCloseMonthlyReview = () => {
+    setIsMonthlyReviewOpen(false);
+    setCurrentMonthlyReviewStart(null);
+    setCurrentMonthlyReviewEnd(null);
+  };
+
+  const handleUpdateMonthlyReview = (updatedReview: MonthlyReview) => {
+    setMonthlyReviews(prev => prev.map(r => r.id === updatedReview.id ? updatedReview : r));
+  };
+
+  const handleDeleteMonthlyReview = () => {
+    if (!currentMonthlyReviewStart || !currentMonthlyReviewEnd) return;
+
+    const monthStartStr = currentMonthlyReviewStart.toISOString().split('T')[0];
+    const monthEndStr = currentMonthlyReviewEnd.toISOString().split('T')[0];
+    setMonthlyReviews(prev => prev.filter(r => !(r.monthStartDate === monthStartStr && r.monthEndDate === monthEndStr)));
+    handleCloseMonthlyReview();
+    addToast('success', '月报已删除');
+  };
+
+  const handleGenerateMonthlyNarrative = async (review: MonthlyReview, statsText: string, promptTemplate?: string): Promise<string> => {
+    const finalPrompt = promptTemplate || (NARRATIVE_TEMPLATES.find(t => t.id === 'default')?.prompt || '');
+    // 月报不需要timeline文本，只传入空字符串
+    return narrativeService.generateDailyNarrative(review as any, statsText, '', finalPrompt, scopes, userPersonalInfo);
+  };
+
   const renderView = () => {
     if (isSettingsOpen) return null;
 
@@ -1411,8 +1504,36 @@ const App: React.FC = () => {
           onDelete={handleDeleteWeeklyReview}
           onUpdateReview={handleUpdateWeeklyReview}
           onGenerateNarrative={handleGenerateWeeklyNarrative}
-          onClose={() => setIsWeeklyReviewOpen(false)}
+          onClose={handleCloseWeeklyReview}
           addToast={addToast}
+        />
+      );
+    }
+
+    // Monthly Review has third priority
+    if (isMonthlyReviewOpen && currentMonthlyReviewStart && currentMonthlyReviewEnd) {
+      const monthStartStr = currentMonthlyReviewStart.toISOString().split('T')[0];
+      const monthEndStr = currentMonthlyReviewEnd.toISOString().split('T')[0];
+      const review = monthlyReviews.find(r => r.monthStartDate === monthStartStr && r.monthEndDate === monthEndStr);
+      if (!review) return null;
+
+      return (
+        <MonthlyReviewView
+          review={review}
+          monthStartDate={currentMonthlyReviewStart}
+          monthEndDate={currentMonthlyReviewEnd}
+          templates={reviewTemplates}
+          categories={categories}
+          logs={logs}
+          todos={todos}
+          todoCategories={todoCategories}
+          scopes={scopes}
+          customNarrativeTemplates={customNarrativeTemplates}
+          onDelete={handleDeleteMonthlyReview}
+          onUpdateReview={handleUpdateMonthlyReview}
+          onGenerateNarrative={handleGenerateMonthlyNarrative}
+          addToast={addToast}
+          onClose={handleCloseMonthlyReview}
         />
       );
     }
@@ -1472,6 +1593,9 @@ const App: React.FC = () => {
             weeklyReviews={weeklyReviews}
             onOpenWeeklyReview={handleOpenWeeklyReview}
             weeklyReviewTime={weeklyReviewTime}
+            monthlyReviews={monthlyReviews}
+            onOpenMonthlyReview={handleOpenMonthlyReview}
+            monthlyReviewTime={monthlyReviewTime}
           />
         );
       case AppView.STATS:
@@ -1606,6 +1730,7 @@ const App: React.FC = () => {
 
   const getHeaderTitle = () => {
     if (isDailyReviewOpen) return 'Daily Review';
+    if (isMonthlyReviewOpen) return 'Monthly Review';
     if (currentView === AppView.TAGS) {
       if (selectedTagId) return 'Tag Details';
       if (selectedCategoryId) return 'Category Details';
@@ -1726,12 +1851,15 @@ const App: React.FC = () => {
               {((currentView === AppView.TAGS && (selectedTagId || selectedCategoryId)) ||
                 (currentView === AppView.SCOPE && selectedScopeId) ||
                 currentView === AppView.STATS ||
-                isDailyReviewOpen) && (
+                isDailyReviewOpen ||
+                isMonthlyReviewOpen) && (
                   <button
                     onClick={() => {
                       if (isDailyReviewOpen) {
                         setIsDailyReviewOpen(false);
                         setCurrentReviewDate(null);
+                      } else if (isMonthlyReviewOpen) {
+                        handleCloseMonthlyReview();
                       } else if (currentView === AppView.STATS) {
                         setCurrentView(AppView.TIMELINE);
                       } else if (currentView === AppView.SCOPE) {
@@ -1900,6 +2028,8 @@ const App: React.FC = () => {
             onSetDailyReviewTime={setDailyReviewTime}
             weeklyReviewTime={weeklyReviewTime}
             onSetWeeklyReviewTime={setWeeklyReviewTime}
+            monthlyReviewTime={monthlyReviewTime}
+            onSetMonthlyReviewTime={setMonthlyReviewTime}
             customNarrativeTemplates={customNarrativeTemplates}
             onUpdateCustomNarrativeTemplates={setCustomNarrativeTemplates}
             userPersonalInfo={userPersonalInfo}
@@ -2010,6 +2140,7 @@ const App: React.FC = () => {
               setCurrentView(AppView.RECORD);
               setSelectedTagId(null);
               setIsDailyReviewOpen(false);
+              setIsMonthlyReviewOpen(false);
               setCurrentReviewDate(null);
             }}
           />
@@ -2022,6 +2153,7 @@ const App: React.FC = () => {
               setCurrentView(AppView.TODO);
               setSelectedTagId(null);
               setIsDailyReviewOpen(false);
+              setIsMonthlyReviewOpen(false);
               setCurrentReviewDate(null);
             }}
           />
@@ -2034,6 +2166,7 @@ const App: React.FC = () => {
               setCurrentView(AppView.TIMELINE);
               setSelectedTagId(null);
               setIsDailyReviewOpen(false);
+              setIsMonthlyReviewOpen(false);
               setCurrentReviewDate(null);
             }}
           />
@@ -2045,6 +2178,7 @@ const App: React.FC = () => {
             onClick={() => {
               setCurrentView(AppView.TAGS);
               setIsDailyReviewOpen(false);
+              setIsMonthlyReviewOpen(false);
               setCurrentReviewDate(null);
             }}
           />
@@ -2057,6 +2191,7 @@ const App: React.FC = () => {
               setCurrentView(AppView.SCOPE);
               setSelectedScopeId(null);
               setIsDailyReviewOpen(false);
+              setIsMonthlyReviewOpen(false);
               setCurrentReviewDate(null);
             }}
           />

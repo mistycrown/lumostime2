@@ -563,6 +563,7 @@ export const DEFAULT_REVIEW_TEMPLATES: ReviewTemplate[] = [
     order: 1,
     enabled: false,
     syncToTimeline: false,
+    isDailyTemplate: true,
     questions: [
       {
         id: 'q-microlight-1',
@@ -588,6 +589,7 @@ export const DEFAULT_REVIEW_TEMPLATES: ReviewTemplate[] = [
     order: 2,
     enabled: false,
     syncToTimeline: false,
+    isDailyTemplate: true,
     questions: [
       {
         id: 'q-vision-1',
@@ -619,6 +621,7 @@ export const DEFAULT_REVIEW_TEMPLATES: ReviewTemplate[] = [
     order: 3,
     enabled: true,
     syncToTimeline: false,
+    isDailyTemplate: true,
     questions: [
       {
         id: 'q-minimal-1',
