@@ -30,6 +30,7 @@ export interface Scope {
   order: number;
   enableFocusScore?: boolean; // Whether to track focus in this scope
   themeColor: string; // Hex color or Tailwind class name
+  keywords?: string[]; // 关键字列表，用于快速匹配和统计
 }
 
 // Goal (目标) - attached to Scope
