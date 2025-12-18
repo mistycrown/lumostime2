@@ -20,7 +20,7 @@ git push --force
 构建新的 APK
 创建 GitHub Release 并上传 APK 
 再更新 version.json 的版本号
-
+# 20251218
 
 # 20251217
 

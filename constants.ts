@@ -564,6 +564,8 @@ export const DEFAULT_REVIEW_TEMPLATES: ReviewTemplate[] = [
     enabled: false,
     syncToTimeline: false,
     isDailyTemplate: true,
+    isWeeklyTemplate: false,
+    isMonthlyTemplate: false,
     questions: [
       {
         id: 'q-microlight-1',
@@ -590,6 +592,8 @@ export const DEFAULT_REVIEW_TEMPLATES: ReviewTemplate[] = [
     enabled: false,
     syncToTimeline: false,
     isDailyTemplate: true,
+    isWeeklyTemplate: false,
+    isMonthlyTemplate: false,
     questions: [
       {
         id: 'q-vision-1',
@@ -622,6 +626,8 @@ export const DEFAULT_REVIEW_TEMPLATES: ReviewTemplate[] = [
     enabled: true,
     syncToTimeline: false,
     isDailyTemplate: true,
+    isWeeklyTemplate: false,
+    isMonthlyTemplate: false,
     questions: [
       {
         id: 'q-minimal-1',
@@ -643,6 +649,62 @@ export const DEFAULT_REVIEW_TEMPLATES: ReviewTemplate[] = [
         question: '给今天打个分：',
         type: 'rating',
         icon: 'star'
+      }
+    ]
+  },
+  {
+    id: 'template-weekly-default',
+    title: '📅 本周复盘',
+    isSystem: true,
+    order: 4,
+    enabled: true,
+    syncToTimeline: false,
+    isDailyTemplate: false,
+    isWeeklyTemplate: true,
+    isMonthlyTemplate: false,
+    questions: [
+      {
+        id: 'q-weekly-1',
+        question: '本周最重要的成就是什么？',
+        type: 'text'
+      },
+      {
+        id: 'q-weekly-2',
+        question: '本周有哪些地方可以做得更好？',
+        type: 'text'
+      },
+      {
+        id: 'q-weekly-3',
+        question: '为下周设定的一个核心目标是？',
+        type: 'text'
+      }
+    ]
+  },
+  {
+    id: 'template-monthly-default',
+    title: '🌙 月度回望',
+    isSystem: true,
+    order: 5,
+    enabled: true,
+    syncToTimeline: false,
+    isDailyTemplate: false,
+    isWeeklyTemplate: false,
+    isMonthlyTemplate: true,
+    questions: [
+      {
+        id: 'q-monthly-1',
+        question: '本月最难忘的一个时刻（高光时刻）？',
+        type: 'text'
+      },
+      {
+        id: 'q-monthly-2',
+        question: '哪件事让你最有成就感？',
+        type: 'text'
+      },
+      {
+        id: 'q-monthly-3',
+        question: '给下个月的一个关键词：',
+        type: 'text'
       }
     ]
   }

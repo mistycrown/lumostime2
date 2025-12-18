@@ -1757,6 +1757,8 @@ const App: React.FC = () => {
     if (data.autoLinkRules) setAutoLinkRules(data.autoLinkRules);
     if (data.reviewTemplates) setReviewTemplates(data.reviewTemplates);
     if (data.dailyReviews) setDailyReviews(data.dailyReviews);
+    if (data.weeklyReviews) setWeeklyReviews(data.weeklyReviews);
+    if (data.monthlyReviews) setMonthlyReviews(data.monthlyReviews);
     if (data.customNarrativeTemplates) setCustomNarrativeTemplates(data.customNarrativeTemplates);
     if (data.userPersonalInfo) setUserPersonalInfo(data.userPersonalInfo);
 
@@ -1799,6 +1801,8 @@ const App: React.FC = () => {
         autoLinkRules,
         reviewTemplates,
         dailyReviews,
+        weeklyReviews,
+        monthlyReviews,
         customNarrativeTemplates,
         userPersonalInfo,
         timestamp: dataLastModified, // Use tracked modification time
@@ -1963,6 +1967,8 @@ const App: React.FC = () => {
                 autoLinkRules,
                 reviewTemplates,
                 dailyReviews,
+                weeklyReviews,
+                monthlyReviews,
                 customNarrativeTemplates,
                 userPersonalInfo,
                 version: '1.0.0',
@@ -1993,6 +1999,8 @@ const App: React.FC = () => {
                   if (data.autoLinkRules) setAutoLinkRules(data.autoLinkRules);
                   if (data.reviewTemplates) setReviewTemplates(data.reviewTemplates);
                   if (data.dailyReviews) setDailyReviews(data.dailyReviews);
+                  if (data.weeklyReviews) setWeeklyReviews(data.weeklyReviews);
+                  if (data.monthlyReviews) setMonthlyReviews(data.monthlyReviews);
                   if (data.customNarrativeTemplates) setCustomNarrativeTemplates(data.customNarrativeTemplates);
                   if (data.userPersonalInfo) setUserPersonalInfo(data.userPersonalInfo);
 
@@ -2006,7 +2014,8 @@ const App: React.FC = () => {
               reader.readAsText(file);
             }}
             onToast={addToast}
-            syncData={{ logs, todos, categories, todoCategories, scopes, goals, autoLinkRules, reviewTemplates, dailyReviews, customNarrativeTemplates, userPersonalInfo }}
+            syncData={{ logs, todos, categories, todoCategories, scopes, goals, autoLinkRules, reviewTemplates, dailyReviews, weeklyReviews, monthlyReviews, customNarrativeTemplates, userPersonalInfo }}
+            onSyncUpdate={handleSyncDataUpdate}
             onSyncUpdate={handleSyncDataUpdate}
             startWeekOnSunday={startWeekOnSunday}
             onToggleStartWeekOnSunday={() => setStartWeekOnSunday(!startWeekOnSunday)}
