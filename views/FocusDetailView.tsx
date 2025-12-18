@@ -306,7 +306,17 @@ export const FocusDetailView: React.FC<FocusDetailViewProps> = ({ session, todos
                 {(() => {
                     const currentCategory = categories.find(c => c.id === session.categoryId);
                     const currentActivity = currentCategory?.activities.find(a => a.id === session.activityId);
-                    const shouldShowFocus = currentActivity?.enableFocusScore ?? currentCategory?.enableFocusScore;
+
+                    // Check if should show focus score: activity > category > any associated scope
+                    let shouldShowFocus = currentActivity?.enableFocusScore ?? currentCategory?.enableFocusScore;
+
+                    // Also check if any of the selected scopes has enableFocusScore
+                    if (!shouldShowFocus && session.scopeIds && session.scopeIds.length > 0) {
+                        shouldShowFocus = session.scopeIds.some(sid => {
+                            const scope = scopes.find(s => s.id === sid);
+                            return scope?.enableFocusScore === true;
+                        });
+                    }
 
                     if (shouldShowFocus) {
                         return (

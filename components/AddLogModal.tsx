@@ -739,7 +739,19 @@ export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialSta
             (() => {
               const cat = categories.find(c => c.id === selectedCategoryId);
               const act = cat?.activities.find(a => a.id === selectedActivityId);
-              if (act?.enableFocusScore ?? cat?.enableFocusScore) {
+
+              // Check if should show focus score: activity > category > any associated scope
+              let shouldShowFocus = act?.enableFocusScore ?? cat?.enableFocusScore;
+
+              // Also check if any of the selected scopes has enableFocusScore
+              if (!shouldShowFocus && scopeIds && scopeIds.length > 0) {
+                shouldShowFocus = scopeIds.some(sid => {
+                  const scope = scopes.find(s => s.id === sid);
+                  return scope?.enableFocusScore === true;
+                });
+              }
+
+              if (shouldShowFocus) {
                 return (
                   <div className="space-y-4 animate-in slide-in-from-top-2">
                     <FocusScoreSelector value={focusScore} onChange={setFocusScore} />
