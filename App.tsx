@@ -102,6 +102,9 @@ const App: React.FC = () => {
   const [selectedTagId, setSelectedTagId] = useState<string | null>(null);
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
 
+  // Search Navigation State
+  const [isOpenedFromSearch, setIsOpenedFromSearch] = useState(false);
+
   // Modal State
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [editingLog, setEditingLog] = useState<Log | null>(null);
@@ -1841,7 +1844,7 @@ const App: React.FC = () => {
         !(currentView === AppView.SCOPE && isScopeManaging) && (
           <header className="h-14 flex items-center justify-between px-5 bg-[#fdfbf7] border-b border-stone-100 shrink-0 z-30">
             <div className="w-8 flex items-center">
-              {(currentView === AppView.TODO || currentView === AppView.RECORD) && (
+              {(currentView === AppView.TODO || currentView === AppView.RECORD) && !isDailyReviewOpen && !isMonthlyReviewOpen && (
                 <button
                   onClick={handleQuickSync}
                   disabled={isSyncing}
@@ -1862,8 +1865,16 @@ const App: React.FC = () => {
                       if (isDailyReviewOpen) {
                         setIsDailyReviewOpen(false);
                         setCurrentReviewDate(null);
+                        if (isOpenedFromSearch) {
+                          setIsSearchOpen(true);
+                          setIsOpenedFromSearch(false);
+                        }
                       } else if (isMonthlyReviewOpen) {
                         handleCloseMonthlyReview();
+                        if (isOpenedFromSearch) {
+                          setIsSearchOpen(true);
+                          setIsOpenedFromSearch(false);
+                        }
                       } else if (currentView === AppView.STATS) {
                         setCurrentView(AppView.TIMELINE);
                       } else if (currentView === AppView.SCOPE) {
@@ -1881,7 +1892,9 @@ const App: React.FC = () => {
             <h1 className="text-lg font-bold text-stone-700 tracking-wide">
               {getHeaderTitle()}
             </h1>
-            {currentView === AppView.RECORD ? (
+            {(isDailyReviewOpen || isMonthlyReviewOpen) ? (
+              <div className="w-8" />
+            ) : currentView === AppView.RECORD ? (
               <button
                 onClick={() => setIsSettingsOpen(true)}
                 className="w-8 flex justify-end text-stone-400 hover:text-stone-600 transition-colors"
@@ -1938,6 +1951,8 @@ const App: React.FC = () => {
               setTodoCategories(MOCK_TODO_CATEGORIES);
               setReviewTemplates(DEFAULT_REVIEW_TEMPLATES);
               setDailyReviews([]);
+              setWeeklyReviews([]);
+              setMonthlyReviews([]);
               setAutoLinkRules([]);
               setCustomNarrativeTemplates([]);
               addToast('success', 'Data reset to defaults');
@@ -1951,6 +1966,8 @@ const App: React.FC = () => {
               setScopes([]);
               setReviewTemplates([]);
               setDailyReviews([]);
+              setWeeklyReviews([]);
+              setMonthlyReviews([]);
               setAutoLinkRules([]);
               // Optional: Clear AI preferences? Maybe keep them.
               addToast('success', 'All data cleared successfully');
@@ -2016,7 +2033,6 @@ const App: React.FC = () => {
             onToast={addToast}
             syncData={{ logs, todos, categories, todoCategories, scopes, goals, autoLinkRules, reviewTemplates, dailyReviews, weeklyReviews, monthlyReviews, customNarrativeTemplates, userPersonalInfo }}
             onSyncUpdate={handleSyncDataUpdate}
-            onSyncUpdate={handleSyncDataUpdate}
             startWeekOnSunday={startWeekOnSunday}
             onToggleStartWeekOnSunday={() => setStartWeekOnSunday(!startWeekOnSunday)}
             onOpenAutoLink={() => {
@@ -2066,12 +2082,44 @@ const App: React.FC = () => {
             todoCategories={todoCategories}
             scopes={scopes}
             goals={goals}
+            dailyReviews={dailyReviews}
+            weeklyReviews={weeklyReviews}
+            monthlyReviews={monthlyReviews}
             onClose={handleCloseSearch}
             onSelectLog={handleSelectSearchLog}
             onSelectTodo={handleSelectSearchTodo}
             onSelectScope={handleSelectSearchScope}
             onSelectCategory={handleSelectSearchCategory}
             onSelectActivity={handleSelectSearchActivity}
+            onSelectDailyReview={(dateStr) => {
+              const date = new Date(dateStr);
+              // Fix timezone offset issue manually or just trust the YYYY-MM-DD string
+              // Since our logic uses new Date(dateStr) which might be UTC, but our App treats it as local...
+              // Actually, best to use the same logic as elsewhere: new Date(dateStr)
+              // But be careful if it results in previous day due to timezone.
+              // Let's assume input string "YYYY-MM-DD".
+              // App uses local dates mostly.
+              // To be safe: new Date(dateStr + 'T00:00:00')
+              setCurrentReviewDate(new Date(dateStr));
+              setIsDailyReviewOpen(true);
+              setIsSearchOpen(false);
+              setIsOpenedFromSearch(true);
+            }}
+            onSelectWeeklyReview={(id) => {
+              const review = weeklyReviews.find(r => r.id === id);
+              if (review) {
+                handleOpenWeeklyReview(new Date(review.weekStartDate), new Date(review.weekEndDate));
+                setIsSearchOpen(false);
+              }
+            }}
+            onSelectMonthlyReview={(id) => {
+              const review = monthlyReviews.find(r => r.id === id);
+              if (review) {
+                handleOpenMonthlyReview(new Date(review.monthStartDate), new Date(review.monthEndDate));
+                setIsSearchOpen(false);
+                setIsOpenedFromSearch(true);
+              }
+            }}
           />
         </div>
 
