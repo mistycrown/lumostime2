@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { ChevronLeft, Trash2, Sparkles, Edit3, RefreshCw } from 'lucide-react';
+import { ChevronLeft, Trash2, Sparkles, Edit3, RefreshCw, X, Calendar } from 'lucide-react';
 import { WeeklyReview, ReviewTemplate, ReviewAnswer, Category, Log, TodoCategory, TodoItem, Scope, ReviewQuestion, NarrativeTemplate } from '../types';
 import { COLOR_OPTIONS } from '../constants';
 import * as LucideIcons from 'lucide-react';
@@ -158,19 +158,13 @@ export const WeeklyReviewView: React.FC<WeeklyReviewViewProps> = ({
         return `${m}分钟`;
     };
 
-    // 获取周报模板questions
-    const enabledQuestions = useMemo(() => {
-        const questions: Array<ReviewTemplate['questions'][0] & { templateTitle: string }> = [];
-        templates
-            .filter(t => t.isWeeklyTemplate)
-            .sort((a, b) => a.order - b.order)
-            .forEach(template => {
-                template.questions.forEach(q => {
-                    questions.push({ ...q, templateTitle: template.title });
-                });
-            });
-        return questions;
-    }, [templates]);
+    // 获取用于显示的模板列表 (用于渲染模板卡片)
+    const templatesForDisplay = useMemo(() => {
+        return review.templateSnapshot ||
+            templates
+                .filter(t => t.enabled && t.isWeeklyTemplate)
+                .sort((a, b) => a.order - b.order);
+    }, [review.templateSnapshot, templates]);
 
     // 更新答案
     const updateAnswer = (questionId: string, question: string, answer: string) => {
@@ -189,6 +183,24 @@ export const WeeklyReviewView: React.FC<WeeklyReviewViewProps> = ({
         const updatedReview = {
             ...review,
             answers: newAnswers,
+            updatedAt: Date.now()
+        };
+        onUpdateReview(updatedReview);
+    };
+
+    // 切换模板的syncToTimeline状态
+    const toggleTemplateSyncToTimeline = (templateId: string) => {
+        if (!review.templateSnapshot) return;
+
+        const updatedSnapshot = review.templateSnapshot.map(t =>
+            t.id === templateId
+                ? { ...t, syncToTimeline: !t.syncToTimeline }
+                : t
+        );
+
+        const updatedReview = {
+            ...review,
+            templateSnapshot: updatedSnapshot,
             updatedAt: Date.now()
         };
         onUpdateReview(updatedReview);
@@ -544,16 +556,16 @@ export const WeeklyReviewView: React.FC<WeeklyReviewViewProps> = ({
                 {/* Tab 2: Guide */}
                 {activeTab === 'guide' && (
                     <div className="space-y-6 animate-in fade-in duration-300 pb-40">
-                        {templates.filter(t => t.isWeeklyTemplate).length === 0 ? (
+                        {templatesForDisplay.length === 0 ? (
                             <div className="text-center py-12">
                                 <p className="text-stone-400">暂无启用的回顾模板</p>
                                 <p className="text-xs text-stone-300 mt-2">请在设置中启用回顾模板</p>
                             </div>
                         ) : (
                             isReadingMode ? (
-                                // 阅读模式 (小票风格 - 优化版)
+                                // 阅读模式 (小票风格 - 优化版) - 无开关
                                 <div className="space-y-8 px-1">
-                                    {templates.filter(t => t.isWeeklyTemplate).map((template, idx, arr) => {
+                                    {templatesForDisplay.map((template, idx, arr) => {
                                         const { emoji, text } = getTemplateDisplayInfo(template.title);
                                         return (
                                             <div key={template.id}>
@@ -576,14 +588,27 @@ export const WeeklyReviewView: React.FC<WeeklyReviewViewProps> = ({
                                 </div>
                             ) : (
                                 // 编辑模式 (卡片风格)
-                                templates.filter(t => t.isWeeklyTemplate).map(template => {
+                                templatesForDisplay.map(template => {
                                     const { emoji, text } = getTemplateDisplayInfo(template.title);
                                     return (
                                         <div key={template.id} className="bg-white rounded-2xl p-5 shadow-sm">
-                                            <h3 className="text-base font-bold text-stone-900 flex items-center gap-2 mb-4">
-                                                {emoji && <span className="text-xl">{emoji}</span>}
-                                                <span>{text}</span>
-                                            </h3>
+                                            <div className="flex items-center justify-between mb-4">
+                                                <h3 className="text-base font-bold text-stone-900 flex items-center gap-2">
+                                                    {emoji && <span className="text-xl">{emoji}</span>}
+                                                    <span>{text}</span>
+                                                </h3>
+                                                {/* syncToTimeline 开关 */}
+                                                <button
+                                                    onClick={() => toggleTemplateSyncToTimeline(template.id)}
+                                                    className={`w-8 h-8 rounded-full flex items-center justify-center transition-colors ${template.syncToTimeline
+                                                            ? 'bg-stone-800 text-white'
+                                                            : 'bg-stone-100 text-stone-400'
+                                                        }`}
+                                                    title={template.syncToTimeline ? '已同步到时间轴' : '未同步到时间轴'}
+                                                >
+                                                    <Calendar size={16} />
+                                                </button>
+                                            </div>
                                             <div className="space-y-6">
                                                 {template.questions.map(q => (
                                                     <div key={q.id}>

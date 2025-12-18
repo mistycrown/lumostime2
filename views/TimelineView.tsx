@@ -672,8 +672,8 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ logs, todos, scopes,
                                 </div>
                             )}
 
-                            {/* Synced Template Content (Daily) - Moved here */}
-                            {dailyReview && templates.length > 0 && templates.filter(t => t.isDailyTemplate && t.syncToTimeline).map((template) => {
+                            {/* Synced Template Content (Daily) - Using Snapshot */}
+                            {dailyReview?.templateSnapshot?.filter(t => t.syncToTimeline).map((template) => {
                                 // Check if template has answers
                                 const hasAnswers = template.questions.some(q =>
                                     dailyReview.answers?.some(a => a.questionId === q.id && a.answer) || (q.type === 'rating' && dailyReview.answers?.some(a => a.questionId === q.id))
@@ -755,8 +755,8 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ logs, todos, scopes,
                                         </button>
                                     </div>
 
-                                    {/* Synced Template Content (Weekly) */}
-                                    {weeklyReviewData.weeklyReview && templates.length > 0 && templates.filter(t => !t.isDailyTemplate && t.syncToTimeline).map((template) => {
+                                    {/* Synced Template Content (Weekly) - Using Snapshot */}
+                                    {weeklyReviewData.weeklyReview?.templateSnapshot?.filter(t => t.syncToTimeline).map((template) => {
                                         const hasAnswers = template.questions.some(q =>
                                             weeklyReviewData.weeklyReview!.answers?.some(a => a.questionId === q.id && a.answer) || (q.type === 'rating' && weeklyReviewData.weeklyReview!.answers?.some(a => a.questionId === q.id))
                                         );
@@ -838,8 +838,8 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ logs, todos, scopes,
                                         </button>
                                     </div>
 
-                                    {/* Synced Template Content (Monthly) */}
-                                    {monthlyReviewData.monthlyReview && templates.length > 0 && templates.filter(t => !t.isDailyTemplate && t.syncToTimeline).map((template) => {
+                                    {/* Synced Template Content (Monthly) - Using Snapshot */}
+                                    {monthlyReviewData.monthlyReview?.templateSnapshot?.filter(t => t.syncToTimeline).map((template) => {
                                         const hasAnswers = template.questions.some(q =>
                                             monthlyReviewData.monthlyReview!.answers?.some(a => a.questionId === q.id && a.answer) || (q.type === 'rating' && monthlyReviewData.monthlyReview!.answers?.some(a => a.questionId === q.id))
                                         );

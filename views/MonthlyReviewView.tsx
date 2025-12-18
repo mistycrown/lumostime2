@@ -1,5 +1,5 @@
-import React, { useState, useMemo, useEffect } from 'react';
-import { ChevronLeft, Trash2, Sparkles, Edit3, RefreshCw, Calendar } from 'lucide-react';
+import React, { useState, useMemo } from 'react';
+import { ChevronLeft, Trash2, Sparkles, Edit3, RefreshCw, X, Calendar } from 'lucide-react';
 import { MonthlyReview, ReviewTemplate, ReviewAnswer, Category, Log, TodoCategory, TodoItem, Scope, ReviewQuestion, NarrativeTemplate } from '../types';
 import { COLOR_OPTIONS } from '../constants';
 import * as LucideIcons from 'lucide-react';
@@ -143,9 +143,23 @@ export const MonthlyReviewView: React.FC<MonthlyReviewViewProps> = ({
 
     // 获取月报模板questions
     const enabledQuestions = useMemo(() => {
-        const monthlyTemplates = templates.filter(t => t.isMonthlyTemplate);
-        return monthlyTemplates.flatMap(t => t.questions);
-    }, [templates]);
+        // 优先使用快照 (创建即归档)
+        // 如果快照不存在,回退到全局templates (兼容旧数据)
+        const templatesToUse = review.templateSnapshot ||
+            templates
+                .filter(t => t.enabled && t.isMonthlyTemplate)
+                .sort((a, b) => a.order - b.order);
+
+        return templatesToUse.flatMap(t => t.questions);
+    }, [review.templateSnapshot, templates]);
+
+    // 获取用于显示的模板列表 (用于渲染模板卡片)
+    const templatesForDisplay = useMemo(() => {
+        return review.templateSnapshot ||
+            templates
+                .filter(t => t.enabled && t.isMonthlyTemplate)
+                .sort((a, b) => a.order - b.order);
+    }, [review.templateSnapshot, templates]);
 
     // Update Answer
     const updateAnswer = (questionId: string, question: string, answer: string) => {
@@ -160,10 +174,28 @@ export const MonthlyReviewView: React.FC<MonthlyReviewViewProps> = ({
 
         setAnswers(newAnswers);
 
-        // Real-time save
+        // 实时保存
         const updatedReview = {
             ...review,
             answers: newAnswers,
+            updatedAt: Date.now()
+        };
+        onUpdateReview(updatedReview);
+    };
+
+    // 切换模板的syncToTimeline状态
+    const toggleTemplateSyncToTimeline = (templateId: string) => {
+        if (!review.templateSnapshot) return;
+
+        const updatedSnapshot = review.templateSnapshot.map(t =>
+            t.id === templateId
+                ? { ...t, syncToTimeline: !t.syncToTimeline }
+                : t
+        );
+
+        const updatedReview = {
+            ...review,
+            templateSnapshot: updatedSnapshot,
             updatedAt: Date.now()
         };
         onUpdateReview(updatedReview);
@@ -578,9 +610,9 @@ export const MonthlyReviewView: React.FC<MonthlyReviewViewProps> = ({
                             </div>
                         ) : (
                             isReadingMode ? (
-                                // Reading Mode (Optimized Receipt Style)
+                                // Reading Mode (Optimized Receipt Style) - 无开关
                                 <div className="space-y-8 px-1">
-                                    {templates.filter(t => t.isMonthlyTemplate).map((template, idx, arr) => {
+                                    {templatesForDisplay.map((template, idx, arr) => {
                                         const { emoji, text } = getTemplateDisplayInfo(template.title);
                                         return (
                                             <div key={template.id}>
@@ -603,14 +635,27 @@ export const MonthlyReviewView: React.FC<MonthlyReviewViewProps> = ({
                                 </div>
                             ) : (
                                 // Edit Mode (Card Style)
-                                templates.filter(t => t.isMonthlyTemplate).map(template => {
+                                templatesForDisplay.map(template => {
                                     const { emoji, text } = getTemplateDisplayInfo(template.title);
                                     return (
                                         <div key={template.id} className="bg-white rounded-2xl p-5 shadow-sm">
-                                            <h3 className="text-base font-bold text-stone-900 flex items-center gap-2 mb-4">
-                                                {emoji && <span className="text-xl">{emoji}</span>}
-                                                <span>{text}</span>
-                                            </h3>
+                                            <div className="flex items-center justify-between mb-4">
+                                                <h3 className="text-base font-bold text-stone-900 flex items-center gap-2">
+                                                    {emoji && <span className="text-xl">{emoji}</span>}
+                                                    <span>{text}</span>
+                                                </h3>
+                                                {/* syncToTimeline 开关 */}
+                                                <button
+                                                    onClick={() => toggleTemplateSyncToTimeline(template.id)}
+                                                    className={`w-8 h-8 rounded-full flex items-center justify-center transition-colors ${template.syncToTimeline
+                                                            ? 'bg-stone-800 text-white'
+                                                            : 'bg-stone-100 text-stone-400'
+                                                        }`}
+                                                    title={template.syncToTimeline ? '已同步到时间轴' : '未同步到时间轴'}
+                                                >
+                                                    <Calendar size={16} />
+                                                </button>
+                                            </div>
                                             <div className="space-y-6">
                                                 {template.questions.map(q => (
                                                     <div key={q.id}>

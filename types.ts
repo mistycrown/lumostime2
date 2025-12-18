@@ -191,6 +191,15 @@ export interface ReviewTemplate {
   syncToTimeline: boolean;          // 是否同步到时间轴显示
 }
 
+// 回顾模板快照 (创建回顾时保存的模板状态)
+export interface ReviewTemplateSnapshot {
+  id: string;
+  title: string;
+  questions: ReviewQuestion[];
+  order?: number; // 可选,用于排序
+  syncToTimeline?: boolean; // 是否同步到时间轴显示
+}
+
 // 问题回答
 export interface ReviewAnswer {
   questionId: string;
@@ -208,6 +217,7 @@ export interface DailyReview {
   narrative?: string; // AI生成的叙事
   narrativeUpdatedAt?: number;
   isEdited?: boolean; // 叙事是否被手动编辑过
+  templateSnapshot?: ReviewTemplateSnapshot[]; // 创建时的模板快照
 }
 
 // 每周回顾
@@ -221,19 +231,21 @@ export interface WeeklyReview {
   narrative?: string; // AI生成的叙事
   narrativeUpdatedAt?: number;
   isEdited?: boolean; // 叙事是否被手动编辑过
+  templateSnapshot?: ReviewTemplateSnapshot[]; // 创建时的模板快照
 }
 
 // 每月回顾
 export interface MonthlyReview {
   id: string;
   monthStartDate: string; // YYYY-MM-DD格式，月的第一天
-  monthEndDate: string;   // YYYY-MM-DD格式，月的最后一天
+  monthEndDate: string;   // YYYY-MM-DD格式，月 的最后一天
   createdAt: number;
   updatedAt: number;
   answers: ReviewAnswer[]; // 引导问答的答案
   narrative?: string; // AI生成的叙事
   narrativeUpdatedAt?: number;
   isEdited?: boolean; // 叙事是否被手动编辑过
+  templateSnapshot?: ReviewTemplateSnapshot[]; // 创建时的模板快照
 }
 
 // Narrative Template (AI 叙事模板)

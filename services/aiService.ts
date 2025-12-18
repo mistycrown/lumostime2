@@ -301,9 +301,11 @@ Output:
     },
 
     // Generate general content (for Narrative, etc.)
-    generateNarrative: async (prompt: string): Promise<string> => {
+    generateNarrative: async (prompt: string, systemPrompt?: string): Promise<string> => {
         const config = aiService.getConfig();
         const fetchFn = Capacitor.isNativePlatform() ? nativeFetch : fetch;
+
+        const effectiveSystemPrompt = systemPrompt || 'You are a helpful assistant that generates personal daily review narratives based on provided data.';
 
         try {
             if (config.provider === 'openai') {
@@ -316,7 +318,7 @@ Output:
                     body: JSON.stringify({
                         model: config.modelName,
                         messages: [
-                            { role: 'system', content: 'You are a helpful assistant that generates personal daily review narratives based on provided data.' },
+                            { role: 'system', content: effectiveSystemPrompt },
                             { role: 'user', content: prompt }
                         ]
                     })
@@ -334,7 +336,8 @@ Output:
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        contents: [{ parts: [{ text: prompt }] }]
+                        contents: [{ parts: [{ text: prompt }] }],
+                        system_instruction: { parts: [{ text: effectiveSystemPrompt }] }
                     })
                 });
                 const data = await response.json();
