@@ -73,7 +73,9 @@ const TemplateList: React.FC<{
             enabled: true,
             questions: [],
             isSystem: false,
-            order: templates.length + 1
+            order: templates.length + 1,
+            isDailyTemplate: false, // Default to false
+            syncToTimeline: false // Default to false
         };
         onUpdateTemplates([...templates, newTemplate]);
         onEdit(newTemplate.id);
@@ -234,7 +236,10 @@ const TemplateEditor: React.FC<{
                         <span className="text-[10px] text-stone-400">开启后，此模板将在日报中使用</span>
                     </div>
                     <button
-                        onClick={() => onUpdate({ ...template, isDailyTemplate: !template.isDailyTemplate })}
+                        onClick={() => onUpdate({
+                            ...template,
+                            isDailyTemplate: !template.isDailyTemplate,
+                        })}
                         className={`p-2 rounded-lg transition-colors ${template.isDailyTemplate ? 'text-[#2F4F4F]' : 'text-stone-300'}`}
                     >
                         {template.isDailyTemplate ? <ToggleRight size={28} /> : <ToggleLeft size={28} />}
@@ -246,10 +251,28 @@ const TemplateEditor: React.FC<{
                         <span className="text-[10px] text-stone-400">开启后，此模板将在周报中使用</span>
                     </div>
                     <button
-                        onClick={() => onUpdate({ ...template, isWeeklyTemplate: !template.isWeeklyTemplate })}
+                        onClick={() => onUpdate({
+                            ...template,
+                            isWeeklyTemplate: !template.isWeeklyTemplate,
+                        })}
                         className={`p-2 rounded-lg transition-colors ${template.isWeeklyTemplate ? 'text-[#2F4F4F]' : 'text-stone-300'}`}
                     >
                         {template.isWeeklyTemplate ? <ToggleRight size={28} /> : <ToggleLeft size={28} />}
+                    </button>
+                </div>
+                <div className="flex items-center justify-between pt-2">
+                    <div className="flex flex-col">
+                        <span className="text-sm font-bold text-stone-700">设置为月报模板</span>
+                        <span className="text-[10px] text-stone-400">开启后，此模板将在月报中使用，并参与月报生成</span>
+                    </div>
+                    <button
+                        onClick={() => onUpdate({
+                            ...template,
+                            isMonthlyTemplate: !template.isMonthlyTemplate,
+                        })}
+                        className={`p-2 rounded-lg transition-colors ${template.isMonthlyTemplate ? 'text-[#2F4F4F]' : 'text-stone-300'}`}
+                    >
+                        {template.isMonthlyTemplate ? <ToggleRight size={28} /> : <ToggleLeft size={28} />}
                     </button>
                 </div>
             </div>

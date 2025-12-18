@@ -23,6 +23,7 @@ interface StatsViewProps {
   hideDateNavigation?: boolean; // 隐藏中间日期导航 (< >)
   forcedView?: ViewType;   // 强制视图类型
   forcedRange?: PieRange;  // 强制时间范围
+  allowedViews?: ViewType[]; // 允许切换的视图类型，默认全部
 }
 
 type ViewType = 'pie' | 'matrix' | 'schedule' | 'line';
@@ -39,7 +40,7 @@ interface CategoryStat extends Category {
   items: ActivityStat[];
 }
 
-export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentDate, onBack, onDateChange, isFullScreen, onToggleFullScreen, onToast, onTitleChange, todos, todoCategories, scopes, hideControls = false, hideRangeControls = false, hideDateNavigation = false, forcedView, forcedRange }) => {
+export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentDate, onBack, onDateChange, isFullScreen, onToggleFullScreen, onToast, onTitleChange, todos, todoCategories, scopes, hideControls = false, hideRangeControls = false, hideDateNavigation = false, forcedView, forcedRange, allowedViews = ['pie', 'matrix', 'line', 'schedule'] }) => {
   const [viewType, setViewType] = useState<ViewType>(forcedView || 'pie');
   const [pieRange, setPieRange] = useState<PieRange>(forcedRange || 'day');
   const [scheduleRange, setScheduleRange] = useState<ScheduleRange>(forcedRange === 'week' ? 'week' : 'day');
@@ -914,18 +915,26 @@ export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentD
 
                 {/* View Type Switcher (icon only) */}
                 <div className="flex bg-stone-100 p-0.5 rounded-lg">
-                  <button onClick={() => setViewType('pie')} className={`p-1.5 rounded-md transition-all ${viewType === 'pie' ? 'bg-white text-stone-900 shadow-sm' : 'text-stone-400 hover:text-stone-600'}`} title="饼图">
-                    <PieChart size={14} />
-                  </button>
-                  <button onClick={() => setViewType('matrix')} className={`p-1.5 rounded-md transition-all ${viewType === 'matrix' ? 'bg-white text-stone-900 shadow-sm' : 'text-stone-400 hover:text-stone-600'}`} title="矩阵">
-                    <Grid size={14} />
-                  </button>
-                  <button onClick={() => setViewType('line')} className={`p-1.5 rounded-md transition-all ${viewType === 'line' ? 'bg-white text-stone-900 shadow-sm' : 'text-stone-400 hover:text-stone-600'}`} title="趋势">
-                    <TrendingUp size={14} />
-                  </button>
-                  <button onClick={() => setViewType('schedule')} className={`p-1.5 rounded-md transition-all ${viewType === 'schedule' ? 'bg-white text-stone-900 shadow-sm' : 'text-stone-400 hover:text-stone-600'}`} title="日程">
-                    <Calendar size={14} />
-                  </button>
+                  {allowedViews.includes('pie') && (
+                    <button onClick={() => setViewType('pie')} className={`p-1.5 rounded-md transition-all ${viewType === 'pie' ? 'bg-white text-stone-900 shadow-sm' : 'text-stone-400 hover:text-stone-600'}`} title="饼图">
+                      <PieChart size={14} />
+                    </button>
+                  )}
+                  {allowedViews.includes('matrix') && (
+                    <button onClick={() => setViewType('matrix')} className={`p-1.5 rounded-md transition-all ${viewType === 'matrix' ? 'bg-white text-stone-900 shadow-sm' : 'text-stone-400 hover:text-stone-600'}`} title="矩阵">
+                      <Grid size={14} />
+                    </button>
+                  )}
+                  {allowedViews.includes('line') && (
+                    <button onClick={() => setViewType('line')} className={`p-1.5 rounded-md transition-all ${viewType === 'line' ? 'bg-white text-stone-900 shadow-sm' : 'text-stone-400 hover:text-stone-600'}`} title="趋势">
+                      <TrendingUp size={14} />
+                    </button>
+                  )}
+                  {allowedViews.includes('schedule') && (
+                    <button onClick={() => setViewType('schedule')} className={`p-1.5 rounded-md transition-all ${viewType === 'schedule' ? 'bg-white text-stone-900 shadow-sm' : 'text-stone-400 hover:text-stone-600'}`} title="日程">
+                      <Calendar size={14} />
+                    </button>
+                  )}
                 </div>
               </div>
             </div>

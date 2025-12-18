@@ -1,5 +1,5 @@
 import React, { useMemo, useState, useRef } from 'react';
-import { Log, Activity, TodoItem, Category, TodoCategory, Scope, DailyReview, ReviewTemplate, WeeklyReview, AutoLinkRule } from '../types';
+import { Log, Activity, TodoItem, Category, TodoCategory, Scope, DailyReview, ReviewTemplate, WeeklyReview, MonthlyReview, AutoLinkRule } from '../types';
 import { CATEGORIES } from '../constants';
 import * as LucideIcons from 'lucide-react';
 import { Plus, MoreHorizontal, BarChart2, ArrowUp, ArrowDown, Sparkles, RefreshCw, Zap, Share, Timer, Clock } from 'lucide-react';
@@ -47,6 +47,10 @@ interface TimelineViewProps {
     weeklyReviews?: WeeklyReview[];
     onOpenWeeklyReview?: (weekStart: Date, weekEnd: Date) => void;
     weeklyReviewTime?: string;
+    // Monthly Review
+    monthlyReviews?: MonthlyReview[];
+    onOpenMonthlyReview?: (monthStart: Date, monthEnd: Date) => void;
+    monthlyReviewTime?: string;
 }
 
 interface TimelineItem {
@@ -66,7 +70,7 @@ interface TimelineItem {
     };
 }
 
-export const TimelineView: React.FC<TimelineViewProps> = ({ logs, todos, scopes, onAddLog, onEditLog, categories, currentDate, onDateChange, onShowStats, onBatchAddLogs, onSync, isSyncing, todoCategories, onToast, startWeekOnSunday = false, autoLinkRules = [], minIdleTimeThreshold = 1, onQuickPunch, dailyReview, onOpenDailyReview, templates = [], dailyReviewTime = '22:00', weeklyReviews = [], onOpenWeeklyReview, weeklyReviewTime = '0-2200' }) => {
+export const TimelineView: React.FC<TimelineViewProps> = ({ logs, todos, scopes, onAddLog, onEditLog, categories, currentDate, onDateChange, onShowStats, onBatchAddLogs, onSync, isSyncing, todoCategories, onToast, startWeekOnSunday = false, autoLinkRules = [], minIdleTimeThreshold = 1, onQuickPunch, dailyReview, onOpenDailyReview, templates = [], dailyReviewTime = '22:00', weeklyReviews = [], onOpenWeeklyReview, weeklyReviewTime = '0-2200', monthlyReviews = [], onOpenMonthlyReview, monthlyReviewTime = '0-2200' }) => {
     const [isCalendarExpanded, setIsCalendarExpanded] = useState(false);
     const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>(() => {
         const saved = localStorage.getItem('lumos_timeline_sort');
@@ -81,9 +85,10 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ logs, todos, scopes,
 
     // 计算当前日期所在周的范围和周报相关数据
     const weeklyReviewData = useMemo(() => {
-        // 使用日期字符串手动解析构造本地时间，避免UTC转换导致的时区偏差
-        const dateStr = currentDate.toISOString().split('T')[0];
-        const [y, m, d] = dateStr.split('-').map(Number);
+        // 使用本地时间获取年月日，避免UTC转换导致的时区偏差
+        const y = currentDate.getFullYear();
+        const m = currentDate.getMonth() + 1;
+        const d = currentDate.getDate();
         // 构造中午12点的时间以避免夏令时/时区边界问题
         const current = new Date(y, m - 1, d, 12, 0, 0, 0);
 
@@ -162,6 +167,69 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ logs, todos, scopes,
             isLastDayOfWeek
         };
     }, [currentDate, startWeekOnSunday, weeklyReviews, onOpenWeeklyReview, weeklyReviewTime]);
+
+    // 计算当前日期所在月的范围和月报相关数据
+    const monthlyReviewData = useMemo(() => {
+        const currentYear = currentDate.getFullYear();
+        const currentMonth = currentDate.getMonth();
+
+        // 月的开始和结束日期
+        const monthStart = new Date(currentYear, currentMonth, 1);
+        const monthEnd = new Date(currentYear, currentMonth + 1, 0); // 下个月第0天即本月最后一天
+
+        // 格式化日期字符串以避免时区问题 (使用本地时间)
+        const currentStr = currentDate.getFullYear() + '-' + (currentDate.getMonth() + 1).toString().padStart(2, '0') + '-' + currentDate.getDate().toString().padStart(2, '0');
+        const monthEndStrFormatted = monthEnd.getFullYear() + '-' + (monthEnd.getMonth() + 1).toString().padStart(2, '0') + '-' + monthEnd.getDate().toString().padStart(2, '0');
+
+        // 检查当前日期是否是该月的最后一天
+        const isLastDayOfMonth = currentStr === monthEndStrFormatted;
+
+        // 查找该月的月报
+        const monthStartStr = monthStart.getFullYear() + '-' + (monthStart.getMonth() + 1).toString().padStart(2, '0') + '-' + monthStart.getDate().toString().padStart(2, '0');
+        const monthlyReview = monthlyReviews?.find(r =>
+            r.monthStartDate === monthStartStr && r.monthEndDate === monthEndStrFormatted
+        );
+
+        // 判断是否应该显示月报入口
+        let shouldShow = false;
+        if (onOpenMonthlyReview && isLastDayOfMonth) {
+            // 如果已经有月报，总是显示
+            if (monthlyReview) {
+                shouldShow = true;
+            } else {
+                // 如果是今天，检查是否到达设定时间
+                const now = new Date();
+                const nowStr = now.getFullYear() + '-' + (now.getMonth() + 1).toString().padStart(2, '0') + '-' + now.getDate().toString().padStart(2, '0');
+                const isToday = currentStr === nowStr;
+
+                if (isToday) {
+                    // 解析monthlyReviewTime (格式: "0-2200"，0表示最后一天，2200是时间)
+                    const timeStr = (monthlyReviewTime || '0-2200').split('-')[1] || '2200';
+                    const targetHour = parseInt(timeStr.substring(0, 2));
+                    const targetMinute = parseInt(timeStr.substring(2, 4));
+
+                    const currentHour = now.getHours();
+                    const currentMinute = now.getMinutes();
+
+                    // 检查是否到达设定的时间
+                    if (currentHour > targetHour || (currentHour === targetHour && currentMinute >= targetMinute)) {
+                        shouldShow = true;
+                    }
+                } else {
+                    // 历史日期，总是显示
+                    shouldShow = true;
+                }
+            }
+        }
+
+        return {
+            monthStart,
+            monthEnd,
+            monthlyReview,
+            shouldShow,
+            isLastDayOfMonth
+        };
+    }, [currentDate, monthlyReviews, onOpenMonthlyReview, monthlyReviewTime]);
 
     const scrollContainerRef = useRef<HTMLDivElement>(null);
 
@@ -712,6 +780,89 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ logs, todos, scopes,
                                                     <div className="space-y-3" style={{ paddingTop: '2px' }}>
                                                         {template.questions.map(q => {
                                                             const answer = weeklyReviewData.weeklyReview!.answers?.find(a => a.questionId === q.id);
+                                                            if (!answer || (q.type !== 'rating' && !answer.answer)) return null;
+
+                                                            return (
+                                                                <div key={q.id} className="group">
+                                                                    <div className="mb-1.5 flex items-start gap-2">
+                                                                        <div className="w-1.5 h-1.5 mt-1.5 rounded-full bg-stone-300 shrink-0"></div>
+                                                                        <h4 className="text-sm font-normal text-stone-600 leading-snug flex-1">
+                                                                            {q.question}
+                                                                        </h4>
+                                                                    </div>
+
+                                                                    {q.type === 'rating' ? (
+                                                                        <div className="flex items-center gap-1" style={{ marginLeft: '14px' }}>
+                                                                            {Array.from({ length: parseInt(typeof answer.answer === 'string' ? answer.answer : String(answer.answer)) || 0 }).map((_, i) => (
+                                                                                <span key={i} className={q.colorId ? `text-${q.colorId}-500` : "text-amber-500"}>
+                                                                                    <DynamicIcon name={q.icon || 'star'} size={18} />
+                                                                                </span>
+                                                                            ))}
+                                                                        </div>
+                                                                    ) : (
+                                                                        <div className="text-sm text-stone-500 leading-relaxed font-light whitespace-pre-wrap" style={{ marginLeft: '14px' }}>
+                                                                            {answer.answer}
+                                                                        </div>
+                                                                    )}
+                                                                </div>
+                                                            );
+                                                        })}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </>
+                            )}
+
+                            {/* Monthly Review Node (New) */}
+                            {monthlyReviewData.shouldShow && (
+                                <>
+                                    <div className="relative pl-8 mt-6 animate-in slide-in-from-bottom-2 duration-500">
+                                        {/* Time Marker */}
+                                        <div className="absolute -left-[60px] top-0.5 w-[45px] text-right">
+                                            <span className="text-xs font-bold text-pink-400 font-mono">Month</span>
+                                        </div>
+
+                                        {/* Timeline Dot */}
+                                        <div className="absolute -left-[5px] top-3 w-2.5 h-2.5 rounded-full bg-pink-400 border-2 border-[#faf9f6] z-10" />
+
+                                        {/* Content: Simple Text Button */}
+                                        <button
+                                            onClick={() => onOpenMonthlyReview?.(monthlyReviewData.monthStart, monthlyReviewData.monthEnd)}
+                                            className="text-left hover:text-pink-600 transition-colors group"
+                                        >
+                                            <h3 className="font-bold text-stone-900 text-lg group-hover:text-pink-600 transition-colors">
+                                                {monthlyReviewData.monthlyReview ? '本月小结' : '为本月作个小结吧！'}
+                                            </h3>
+                                        </button>
+                                    </div>
+
+                                    {/* Synced Template Content (Monthly) */}
+                                    {monthlyReviewData.monthlyReview && templates.length > 0 && templates.filter(t => !t.isDailyTemplate && t.syncToTimeline).map((template) => {
+                                        const hasAnswers = template.questions.some(q =>
+                                            monthlyReviewData.monthlyReview!.answers?.some(a => a.questionId === q.id && a.answer) || (q.type === 'rating' && monthlyReviewData.monthlyReview!.answers?.some(a => a.questionId === q.id))
+                                        );
+
+                                        if (!hasAnswers) return null;
+
+                                        return (
+                                            <div key={template.id} className="relative pl-8 mt-6 animate-in slide-in-from-bottom-2 duration-500">
+                                                {/* Time Marker - Template Title */}
+                                                <div className="absolute -left-[60px] top-0.5 w-[45px] text-right flex flex-col items-end">
+                                                    <span className="text-xs font-bold text-stone-500 leading-tight">
+                                                        {template.title.replace(/[\p{Emoji_Presentation}\p{Extended_Pictographic}]/u, '')}
+                                                    </span>
+                                                </div>
+
+                                                {/* Timeline Dot */}
+                                                <div className="absolute -left-[5px] top-1.5 w-2.5 h-2.5 rounded-full bg-stone-300 border-2 border-[#faf9f6] z-10" />
+
+                                                {/* Content Wrapper */}
+                                                <div className="space-y-4">
+                                                    <div className="space-y-3" style={{ paddingTop: '2px' }}>
+                                                        {template.questions.map(q => {
+                                                            const answer = monthlyReviewData.monthlyReview!.answers?.find(a => a.questionId === q.id);
                                                             if (!answer || (q.type !== 'rating' && !answer.answer)) return null;
 
                                                             return (

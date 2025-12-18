@@ -184,9 +184,10 @@ export interface ReviewTemplate {
   isSystem: boolean; // 是否系统预设
   order: number;
   enabled: boolean; // 是否启用
-  syncToTimeline?: boolean; // 是否同步到时间轴显示
-  isDailyTemplate?: boolean; // 是否设为日报模板
-  isWeeklyTemplate?: boolean; // 是否设为周报模板
+  isDailyTemplate: boolean;         // 是否用于每日回顾
+  isWeeklyTemplate?: boolean;       // 是否用于周回顾
+  isMonthlyTemplate?: boolean;      // 是否用于月回顾
+  syncToTimeline: boolean;          // 是否同步到时间轴显示
 }
 
 // 问题回答
@@ -213,6 +214,19 @@ export interface WeeklyReview {
   id: string;
   weekStartDate: string; // YYYY-MM-DD格式，周的第一天
   weekEndDate: string;   // YYYY-MM-DD格式，周的最后一天
+  createdAt: number;
+  updatedAt: number;
+  answers: ReviewAnswer[]; // 引导问答的答案
+  narrative?: string; // AI生成的叙事
+  narrativeUpdatedAt?: number;
+  isEdited?: boolean; // 叙事是否被手动编辑过
+}
+
+// 每月回顾
+export interface MonthlyReview {
+  id: string;
+  monthStartDate: string; // YYYY-MM-DD格式，月的第一天
+  monthEndDate: string;   // YYYY-MM-DD格式，月的最后一天
   createdAt: number;
   updatedAt: number;
   answers: ReviewAnswer[]; // 引导问答的答案
