@@ -1357,14 +1357,27 @@ const App: React.FC = () => {
     const dateStr = getLocalDateStr(dateToUse);
     let review = dailyReviews.find(r => r.date === dateStr);
 
-    // 如果没有日报，创建新的
+    // 如果没有日报,创建新的
     if (!review) {
+      // 创建模板快照
+      const templateSnapshot = reviewTemplates
+        .filter(t => t.enabled && t.isDailyTemplate)
+        .sort((a, b) => a.order - b.order)
+        .map(t => ({
+          id: t.id,
+          title: t.title,
+          questions: t.questions,
+          order: t.order,
+          syncToTimeline: t.syncToTimeline
+        }));
+
       review = {
         id: crypto.randomUUID(),
         date: dateStr,
         createdAt: Date.now(),
         updatedAt: Date.now(),
-        answers: []
+        answers: [],
+        templateSnapshot  // 保存当时的模板快照
       };
       setDailyReviews(prev => [...prev, review!]);
     }
@@ -1398,7 +1411,7 @@ const App: React.FC = () => {
       finalPrompt = NARRATIVE_TEMPLATES.find(t => t.id === 'default')?.prompt || '';
     }
 
-    return narrativeService.generateDailyNarrative(review, statsText, timelineText, finalPrompt, scopes, userPersonalInfo);
+    return narrativeService.generateDailyNarrative(review, statsText, timelineText, finalPrompt, scopes, userPersonalInfo, 'daily');
   };
 
   // Weekly Review Handlers
@@ -1407,15 +1420,28 @@ const App: React.FC = () => {
     const weekEndStr = getLocalDateStr(weekEnd);
     let review = weeklyReviews.find(r => r.weekStartDate === weekStartStr && r.weekEndDate === weekEndStr);
 
-    // 如果没有周报，创建新的
+    // 如果没有周报,创建新的
     if (!review) {
+      // 创建模板快照
+      const templateSnapshot = reviewTemplates
+        .filter(t => t.enabled && t.isWeeklyTemplate)
+        .sort((a, b) => a.order - b.order)
+        .map(t => ({
+          id: t.id,
+          title: t.title,
+          questions: t.questions,
+          order: t.order,
+          syncToTimeline: t.syncToTimeline
+        }));
+
       review = {
         id: crypto.randomUUID(),
         weekStartDate: weekStartStr,
         weekEndDate: weekEndStr,
         createdAt: Date.now(),
         updatedAt: Date.now(),
-        answers: []
+        answers: [],
+        templateSnapshot  // 保存当时的模板快照
       };
       setWeeklyReviews(prev => [...prev, review!]);
     }
@@ -1448,7 +1474,7 @@ const App: React.FC = () => {
   const handleGenerateWeeklyNarrative = async (review: WeeklyReview, statsText: string, promptTemplate?: string): Promise<string> => {
     const finalPrompt = promptTemplate || (NARRATIVE_TEMPLATES.find(t => t.id === 'default')?.prompt || '');
     // 周报不需要timeline文本，只传入空字符串
-    return narrativeService.generateDailyNarrative(review as any, statsText, '', finalPrompt, scopes, userPersonalInfo);
+    return narrativeService.generateDailyNarrative(review as any, statsText, '', finalPrompt, scopes, userPersonalInfo, 'weekly');
   };
 
   // Monthly Review Handlers (每月回顾处理函数)
@@ -1457,15 +1483,28 @@ const App: React.FC = () => {
     const monthEndStr = getLocalDateStr(monthEnd);
     let review = monthlyReviews.find(r => r.monthStartDate === monthStartStr && r.monthEndDate === monthEndStr);
 
-    // 如果没有月报，创建新的
+    // 如果没有月报,创建新的
     if (!review) {
+      // 创建模板快照
+      const templateSnapshot = reviewTemplates
+        .filter(t => t.enabled && t.isMonthlyTemplate)
+        .sort((a, b) => a.order - b.order)
+        .map(t => ({
+          id: t.id,
+          title: t.title,
+          questions: t.questions,
+          order: t.order,
+          syncToTimeline: t.syncToTimeline
+        }));
+
       review = {
         id: crypto.randomUUID(),
         monthStartDate: monthStartStr,
         monthEndDate: monthEndStr,
         createdAt: Date.now(),
         updatedAt: Date.now(),
-        answers: []
+        answers: [],
+        templateSnapshot  // 保存当时的模板快照
       };
       setMonthlyReviews(prev => [...prev, review!]);
     }
@@ -1498,7 +1537,7 @@ const App: React.FC = () => {
   const handleGenerateMonthlyNarrative = async (review: MonthlyReview, statsText: string, promptTemplate?: string): Promise<string> => {
     const finalPrompt = promptTemplate || (NARRATIVE_TEMPLATES.find(t => t.id === 'default')?.prompt || '');
     // 月报不需要timeline文本，只传入空字符串
-    return narrativeService.generateDailyNarrative(review as any, statsText, '', finalPrompt, scopes, userPersonalInfo);
+    return narrativeService.generateDailyNarrative(review as any, statsText, '', finalPrompt, scopes, userPersonalInfo, 'monthly');
   };
 
   const renderView = () => {
@@ -2281,7 +2320,10 @@ const App: React.FC = () => {
         !isTagsManaging &&
         !isScopeManaging &&
         currentView !== AppView.STATS && (
-          <nav className="fixed bottom-0 left-0 w-full h-14 md:h-16 bg-white border-t border-stone-100 flex justify-around items-center z-30 pb-safe md:pb-0">
+          <nav className={`fixed bottom-0 left-0 w-full h-14 md:h-16 border-t border-stone-100 flex justify-around items-center z-30 pb-safe md:pb-0 ${currentView === AppView.TIMELINE || currentView === AppView.TAGS
+              ? 'bg-[#faf9f6]'
+              : 'bg-white'
+            }`}>
             {[
               { view: AppView.RECORD, label: '记录' },
               { view: AppView.TODO, label: '待办' },
