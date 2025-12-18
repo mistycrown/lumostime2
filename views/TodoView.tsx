@@ -259,7 +259,7 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, categories, scopes, o
     <div className="flex h-full bg-[#faf9f6]">
       {/* Left Sidebar - Todo Categories */}
       <div
-        className={`flex-shrink-0 flex flex-col overflow-y-auto py-6 md:pl-4 pl-0 pr-2 no-scrollbar border-r border-stone-100 bg-[#faf9f6] z-10 transition-all duration-300 ${isSidebarOpen ? 'w-auto md:min-w-[12rem]' : 'w-16 items-center'}`}
+        className={`flex-shrink-0 flex flex-col overflow-y-auto pt-6 pb-20 md:pl-4 pl-0 pr-2 no-scrollbar border-r border-stone-100 bg-[#faf9f6] z-10 transition-all duration-300 ${isSidebarOpen ? 'w-auto md:min-w-[12rem]' : 'w-16 items-center'}`}
       >
         <div className="flex-1 w-full">
           {categories.map((category) => {

@@ -31,6 +31,7 @@ import { ParsedTimeEntry, aiService } from './services/aiService';
 import { narrativeService } from './services/narrativeService';
 import { NfcService } from './services/NfcService';
 import { NARRATIVE_TEMPLATES } from './constants';
+import * as LucideIcons from 'lucide-react';
 import {
   PlusCircle,
   BarChart2,
@@ -44,7 +45,10 @@ import {
   Maximize2,
   RefreshCw,
   Settings,
-  Layout // For Review Hub
+  Layout,
+  BookOpen,
+  BookMarked,
+  Target
 } from 'lucide-react';
 import { App as CapacitorApp } from '@capacitor/app';
 import { Capacitor } from '@capacitor/core';
@@ -2007,6 +2011,18 @@ const App: React.FC = () => {
       <main className="flex-1 overflow-hidden relative">
         {renderView()}
 
+        {/* Global Floating Action Button for Tags/Scope Toggle */}
+        {(currentView === AppView.TAGS || currentView === AppView.SCOPE) &&
+          !selectedTagId && !selectedScopeId && (
+            <button
+              onClick={() => setCurrentView(currentView === AppView.TAGS ? AppView.SCOPE : AppView.TAGS)}
+              className="fixed bottom-20 right-6 w-14 h-14 bg-stone-900 rounded-full text-white shadow-2xl flex items-center justify-center active:scale-90 transition-transform z-40 border border-stone-800"
+              aria-label={currentView === AppView.TAGS ? "Switch to Scope" : "Switch to Tags"}
+            >
+              {currentView === AppView.TAGS ? <Target size={24} /> : <Tag size={24} />}
+            </button>
+          )}
+
         {/* Full Screen Settings Overlay */}
         {isSettingsOpen && (
           <SettingsView
@@ -2253,88 +2269,49 @@ const App: React.FC = () => {
         )}
       </main>
 
-      {/* Bottom Navigation */}
-      {!isSettingsOpen && !isStatsFullScreen && (
-        <nav className="h-16 md:h-20 bg-white border-t border-stone-100 flex items-center justify-around px-2 pb-safe md:pb-0 z-30 shrink-0 shadow-[0_-5px_20px_rgba(0,0,0,0.02)]">
-
-          <NavButton
-            icon={<PlusCircle size={24} />}
-            label="記錄"
-            isActive={currentView === AppView.RECORD}
-            onClick={() => {
-              setCurrentView(AppView.RECORD);
-              setSelectedTagId(null);
-              setIsDailyReviewOpen(false);
-              setIsMonthlyReviewOpen(false);
-              setCurrentReviewDate(null);
-            }}
-          />
-
-          <NavButton
-            icon={<CheckSquare size={24} />}
-            label="待辦"
-            isActive={currentView === AppView.TODO}
-            onClick={() => {
-              setCurrentView(AppView.TODO);
-              setSelectedTagId(null);
-              setIsDailyReviewOpen(false);
-              setIsMonthlyReviewOpen(false);
-              setCurrentReviewDate(null);
-            }}
-          />
-
-          <NavButton
-            icon={<Clock size={24} />}
-            label="時間軸"
-            isActive={currentView === AppView.TIMELINE}
-            onClick={() => {
-              setCurrentView(AppView.TIMELINE);
-              setSelectedTagId(null);
-              setIsDailyReviewOpen(false);
-              setIsMonthlyReviewOpen(false);
-              setCurrentReviewDate(null);
-            }}
-          />
-
-          <NavButton
-            icon={<Layout size={24} />}
-            label="回顧"
-            isActive={currentView === AppView.REVIEW}
-            onClick={() => {
-              setCurrentView(AppView.REVIEW);
-              setSelectedTagId(null);
-              setIsDailyReviewOpen(false);
-              setIsMonthlyReviewOpen(false);
-              setCurrentReviewDate(null);
-            }}
-          />
-
-          <NavButton
-            icon={<Tag size={24} />}
-            label="標籤"
-            isActive={currentView === AppView.TAGS}
-            onClick={() => {
-              setCurrentView(AppView.TAGS);
-              setIsDailyReviewOpen(false);
-              setIsMonthlyReviewOpen(false);
-              setCurrentReviewDate(null);
-            }}
-          />
-
-          <NavButton
-            icon={<Briefcase size={24} />}
-            label="領域"
-            isActive={currentView === AppView.SCOPE}
-            onClick={() => {
-              setCurrentView(AppView.SCOPE);
-              setSelectedScopeId(null);
-              setIsDailyReviewOpen(false);
-              setIsMonthlyReviewOpen(false);
-              setCurrentReviewDate(null);
-            }}
-          />
-        </nav>
-      )}
+      {/* Bottom Text Navigation */}
+      {!isSettingsOpen && !isStatsFullScreen &&
+        !isTodoModalOpen &&
+        !selectedCategoryId &&
+        !selectedScopeId &&
+        !selectedTagId &&
+        !isDailyReviewOpen &&
+        !isWeeklyReviewOpen &&
+        !isMonthlyReviewOpen &&
+        !isTagsManaging &&
+        !isScopeManaging &&
+        currentView !== AppView.STATS && (
+          <nav className="fixed bottom-0 left-0 w-full h-14 md:h-16 bg-white border-t border-stone-100 flex justify-around items-center z-30 pb-safe md:pb-0">
+            {[
+              { view: AppView.RECORD, label: '记录' },
+              { view: AppView.TODO, label: '待办' },
+              { view: AppView.TIMELINE, label: '脉络' },
+              { view: AppView.REVIEW, label: '档案' },
+              { view: AppView.TAGS, label: '索引' },
+            ].map((item) => {
+              const isActive = currentView === item.view;
+              return (
+                <div
+                  key={item.view}
+                  onClick={() => {
+                    setCurrentView(item.view);
+                    // Reset states on view switch
+                    setSelectedTagId(null);
+                    setSelectedScopeId(null);
+                    setIsDailyReviewOpen(false);
+                    setIsMonthlyReviewOpen(false);
+                    setCurrentReviewDate(null);
+                  }}
+                  className={`flex-1 h-full flex items-center justify-center cursor-pointer relative transition-all duration-200 ${isActive ? 'text-stone-900' : 'text-stone-400'}`}
+                >
+                  <span className={`font-serif text-[13px] tracking-[1px] transition-all duration-200 ${isActive ? 'font-black' : 'font-medium'}`}>
+                    {item.label}
+                  </span>
+                </div>
+              );
+            })}
+          </nav>
+        )}
 
       {/* Goal Editor Modal */}
       {isGoalEditorOpen && (

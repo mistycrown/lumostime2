@@ -1153,11 +1153,11 @@ export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentD
                 };
 
                 const CHART_LINE_COLORS: Record<string, string> = {
-                  stone: '#d6d3d1', red: '#fca5a5', orange: '#fdba74', amber: '#fcd34d',
-                  yellow: '#fde047', lime: '#bef264', green: '#86efac', emerald: '#6ee7b7',
-                  teal: '#5eead4', cyan: '#67e8f9', sky: '#7dd3fc', blue: '#93c5fd',
-                  indigo: '#a5b4fc', violet: '#c4b5fd', purple: '#d8b4fe', fuchsia: '#f0abfc',
-                  pink: '#f9a8d4', rose: '#fda4af'
+                  red: '#fca5a5', blue: '#93c5fd', orange: '#fdba74', purple: '#d8b4fe',
+                  emerald: '#6ee7b7', fuchsia: '#f0abfc', yellow: '#fde047', cyan: '#67e8f9',
+                  rose: '#fda4af', indigo: '#a5b4fc', lime: '#bef264', violet: '#c4b5fd',
+                  amber: '#fcd34d', sky: '#7dd3fc', green: '#86efac', pink: '#f9a8d4',
+                  teal: '#5eead4'
                 };
 
                 const getStroke = (colorClass: string) => {
@@ -1167,24 +1167,30 @@ export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentD
                 };
 
                 // 2. Prepare Activity Data (Series)
-                const allActivitiesMap = new Map<string, { name: string, color: string, total: number }>();
+                // 2. Prepare Activity Data (Series)
+                const allActivitiesMap = new Map<string, { name: string, color: string, total: number, categoryId: string }>();
 
                 filteredLogs.forEach(log => {
                   const cat = categories.find(c => c.id === log.categoryId);
                   const act = cat?.activities.find(a => a.id === log.activityId);
-                  if (!act) return;
+                  if (!act || !cat) return;
 
                   const duration = Math.max(0, (log.endTime - log.startTime) / 1000) / 3600; // in Hours
                   const key = act.id;
 
                   if (!allActivitiesMap.has(key)) {
-                    allActivitiesMap.set(key, { name: act.name, color: act.color, total: 0 });
+                    allActivitiesMap.set(key, { name: act.name, color: act.color, total: 0, categoryId: cat.id });
                   }
                   allActivitiesMap.get(key)!.total += duration;
                 });
 
                 const topActivities = Array.from(allActivitiesMap.entries())
-                  .sort((a, b) => b[1].total - a[1].total)
+                  .sort((a, b) => {
+                    const catIdxA = categories.findIndex(c => c.id === a[1].categoryId);
+                    const catIdxB = categories.findIndex(c => c.id === b[1].categoryId);
+                    if (catIdxA !== catIdxB) return catIdxA - catIdxB;
+                    return b[1].total - a[1].total;
+                  })
                   // .slice(0, 5) // REMOVED: Show all activities
                   .map(([id, info]) => ({ id, ...info }));
 
@@ -1222,27 +1228,22 @@ export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentD
                   const duration = Math.max(0, (log.endTime - log.startTime) / 1000) / 3600;
                   const key = todo.id;
 
-                  // Random color assignment derived from ID
+                  // Only aggregate duration here, assign color later
                   if (!allTodosMap.has(key)) {
-                    const colorKeys = Object.keys(CHART_LINE_COLORS);
-                    // Simple hash
-                    let hash = 0;
-                    for (let i = 0; i < key.length; i++) {
-                      hash = key.charCodeAt(i) + ((hash << 5) - hash);
-                    }
-                    const colorKey = colorKeys[Math.abs(hash) % colorKeys.length];
-                    // Use the bg-{color}-... class format to reuse getStroke logic, or just store the color name
-                    // Actually getStroke expects a Tailwind class string like "text-red-500" or "bg-red-50"
-                    // Let's construct a fake class string to pass to getStroke: "bg-{colorName}-50"
-                    allTodosMap.set(key, { name: todo.title, color: `bg-${colorKey}-50`, total: 0 });
+                    allTodosMap.set(key, { name: todo.title, color: '', total: 0 });
                   }
                   allTodosMap.get(key)!.total += duration;
                 });
 
+                const colorKeys = Object.keys(CHART_LINE_COLORS);
                 const topTodos = Array.from(allTodosMap.entries())
                   .sort((a, b) => b[1].total - a[1].total)
                   .slice(0, 5) // Top 5 Todos
-                  .map(([id, info]) => ({ id, ...info }));
+                  .map(([id, info], index) => ({
+                    id,
+                    ...info,
+                    color: `bg-${colorKeys[index % colorKeys.length]}-50` // Assign color from pool cyclically
+                  }));
 
                 const todoSeries = topTodos.map(todo => {
                   return daysOfRange.map(day => {
@@ -1454,7 +1455,7 @@ export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentD
                       {matrixData.rows.map((row) => (
                         <div key={row.activity.id} className="flex items-center">
                           <div className="w-28 shrink-0 flex items-center gap-2 pr-2 overflow-hidden">
-                            <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs shrink-0 bg-stone-50`} style={{ color: getHexColor(row.category.themeColor) }}>
+                            <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs shrink-0 bg-stone-50`} style={{ color: getHexColor(row.activity.color) }}>
                               {row.activity.icon}
                             </div>
                             <span className="text-xs font-bold text-stone-600 truncate">{row.activity.name}</span>
@@ -1465,7 +1466,7 @@ export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentD
                                 <div
                                   className={`w-full max-w-[24px] h-full rounded-md transition-all duration-300 ${hasLog ? `scale-100 shadow-sm opacity-90` : 'scale-75 bg-stone-50/50'
                                     }`}
-                                  style={hasLog ? { backgroundColor: getHexColor(row.category.themeColor) } : {}}
+                                  style={hasLog ? { backgroundColor: getHexColor(row.activity.color) } : {}}
                                 />
                               </div>
                             ))}

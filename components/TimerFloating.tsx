@@ -79,7 +79,7 @@ export const TimerFloating: React.FC<TimerFloatingProps> = ({ sessions, todos, o
   if (sessions.length === 0) return null;
 
   return (
-    <div className="fixed bottom-24 left-4 right-4 md:left-auto md:right-6 md:w-[360px] z-50 flex flex-col-reverse gap-6 animate-in slide-in-from-bottom-5">
+    <div className="fixed bottom-20 left-4 right-4 md:left-auto md:right-6 md:w-[360px] z-50 flex flex-col-reverse gap-6 animate-in slide-in-from-bottom-5">
       {sessions.map(session => (
         <SingleTimer
           key={session.id}

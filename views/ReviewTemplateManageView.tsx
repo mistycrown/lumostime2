@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { ReviewTemplate, ReviewQuestion, QuestionType } from '../types';
 import { DEFAULT_REVIEW_TEMPLATES, COLOR_OPTIONS } from '../constants';
-import { ChevronLeft, Plus, Trash2, GripVertical, Check, X, Edit3, MessageSquare, List, Star, MoreVertical, ToggleLeft, ToggleRight, ArrowUp, ArrowDown } from 'lucide-react';
+import { ChevronLeft, Plus, Trash2, GripVertical, Check, X, Edit3, MessageSquare, List, Star, MoreVertical, ToggleLeft, ToggleRight, ArrowUp, ArrowDown, RotateCcw } from 'lucide-react';
 import { ConfirmModal } from '../components/ConfirmModal';
 
 interface ReviewTemplateManageViewProps {
@@ -12,22 +12,34 @@ interface ReviewTemplateManageViewProps {
 
 export const ReviewTemplateManageView: React.FC<ReviewTemplateManageViewProps> = ({ templates, onUpdateTemplates, onBack }) => {
     const [editingTemplateId, setEditingTemplateId] = useState<string | null>(null);
+    const [isResetConfirmOpen, setIsResetConfirmOpen] = useState(false);
     return (
         <div className="fixed inset-0 z-50 bg-[#fdfbf7] flex flex-col font-serif animate-in slide-in-from-right duration-300 pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">
             {/* Header */}
-            <div className="flex items-center gap-3 px-4 h-14 border-b border-stone-100 bg-[#fdfbf7]/80 backdrop-blur-md sticky top-0 z-10">
-                <button
-                    onClick={() => {
-                        if (editingTemplateId) setEditingTemplateId(null);
-                        else onBack();
-                    }}
-                    className="text-stone-400 hover:text-stone-600 p-1"
-                >
-                    <ChevronLeft size={24} />
-                </button>
-                <span className="text-stone-800 font-bold text-lg">
-                    {editingTemplateId ? '编辑模板' : '回顾模板'}
-                </span>
+            <div className="flex items-center justify-between px-4 h-14 border-b border-stone-100 bg-[#fdfbf7]/80 backdrop-blur-md sticky top-0 z-10">
+                <div className="flex items-center gap-3">
+                    <button
+                        onClick={() => {
+                            if (editingTemplateId) setEditingTemplateId(null);
+                            else onBack();
+                        }}
+                        className="text-stone-400 hover:text-stone-600 p-1"
+                    >
+                        <ChevronLeft size={24} />
+                    </button>
+                    <span className="text-stone-800 font-bold text-lg">
+                        {editingTemplateId ? '编辑模板' : '回顾模板'}
+                    </span>
+                </div>
+                {!editingTemplateId && (
+                    <button
+                        onClick={() => setIsResetConfirmOpen(true)}
+                        className="p-2 text-stone-400 hover:text-red-500 transition-colors"
+                        title="重置为默认"
+                    >
+                        <RotateCcw size={20} />
+                    </button>
+                )}
             </div>
 
             <div className="flex-1 overflow-y-auto pb-40">
@@ -47,6 +59,19 @@ export const ReviewTemplateManageView: React.FC<ReviewTemplateManageViewProps> =
                     />
                 )}
             </div>
+
+            <ConfirmModal
+                isOpen={isResetConfirmOpen}
+                onClose={() => setIsResetConfirmOpen(false)}
+                onConfirm={() => {
+                    onUpdateTemplates(DEFAULT_REVIEW_TEMPLATES);
+                    setIsResetConfirmOpen(false);
+                }}
+                title="重置回顾模板"
+                description="确定要重置所有回顾模板为默认状态吗？这将覆盖您当前的修改，且无法撤销。"
+                confirmText="重置"
+                type="danger"
+            />
         </div>
     );
 };
