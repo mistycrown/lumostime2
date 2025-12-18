@@ -260,80 +260,83 @@ export const CalendarWidget: React.FC<CalendarWidgetProps> = ({ currentDate, onD
                                         let bgClass = 'bg-transparent';
                                         let textClass = 'text-stone-600';
 
-                                        if (heatmapMode === 'focus') {
-                                            if (selected) {
-                                                bgClass = 'bg-stone-900 shadow-md';
-                                                textClass = 'text-white';
-                                            } else if (intensityValue > 0) {
-                                                // Focus Score Coloring (1-5)
-                                                // Round to nearest integer for simple mapping
-                                                const score = Math.round(intensityValue);
-                                                if (score >= 4.5) { // 5
-                                                    bgClass = 'bg-stone-800';
+                                        // Skip heatmap coloring if staticMode is enabled and renderCustomDay is provided
+                                        if (!staticMode || !renderCustomDay) {
+                                            if (heatmapMode === 'focus') {
+                                                if (selected) {
+                                                    bgClass = 'bg-stone-900 shadow-md';
                                                     textClass = 'text-white';
-                                                } else if (score >= 3.5) { // 4
-                                                    bgClass = 'bg-stone-600';
-                                                    textClass = 'text-white';
-                                                } else if (score >= 2.5) { // 3
-                                                    bgClass = 'bg-stone-400';
-                                                    textClass = 'text-white';
-                                                } else if (score >= 1.5) { // 2
-                                                    bgClass = 'bg-stone-300';
-                                                    textClass = 'text-stone-800';
-                                                } else { // 1
-                                                    bgClass = 'bg-stone-100';
-                                                    textClass = 'text-stone-600';
-                                                }
-                                            }
-                                        } else {
-                                            // Duration Coloring
-                                            const duration = intensityValue;
-
-                                            // Thresholds logic
-                                            let t1 = 1800; // 30m
-                                            let t2 = 7200; // 2h
-                                            let t3 = 14400; // 4h
-
-                                            if (customScale && customScale.max > customScale.min) {
-                                                const min = Math.max(0, customScale.min);
-                                                const max = Math.max(min + 60, customScale.max);
-                                                const range = max - min;
-                                                t1 = min + (range * 0.33);
-                                                t2 = min + (range * 0.66);
-                                                t3 = max;
-                                            }
-
-                                            if (selected) {
-                                                bgClass = 'bg-stone-900 shadow-md';
-                                                textClass = 'text-white';
-                                            } else if (duration > 0) {
-                                                if (customScale) {
-                                                    if (duration >= customScale.max) {
-                                                        bgClass = 'bg-stone-700';
+                                                } else if (intensityValue > 0) {
+                                                    // Focus Score Coloring (1-5)
+                                                    // Round to nearest integer for simple mapping
+                                                    const score = Math.round(intensityValue);
+                                                    if (score >= 4.5) { // 5
+                                                        bgClass = 'bg-stone-800';
                                                         textClass = 'text-white';
-                                                    } else if (duration <= t1) {
-                                                        bgClass = 'bg-stone-100';
-                                                        textClass = 'text-stone-600';
-                                                    } else if (duration <= t2) {
+                                                    } else if (score >= 3.5) { // 4
+                                                        bgClass = 'bg-stone-600';
+                                                        textClass = 'text-white';
+                                                    } else if (score >= 2.5) { // 3
+                                                        bgClass = 'bg-stone-400';
+                                                        textClass = 'text-white';
+                                                    } else if (score >= 1.5) { // 2
                                                         bgClass = 'bg-stone-300';
                                                         textClass = 'text-stone-800';
-                                                    } else {
-                                                        bgClass = 'bg-stone-500';
-                                                        textClass = 'text-white';
+                                                    } else { // 1
+                                                        bgClass = 'bg-stone-100';
+                                                        textClass = 'text-stone-600';
                                                     }
-                                                } else {
-                                                    if (duration <= 1800) {
-                                                        bgClass = 'bg-stone-100';
-                                                        textClass = 'text-stone-600';
-                                                    } else if (duration <= 7200) {
-                                                        bgClass = 'bg-stone-300';
-                                                        textClass = 'text-stone-800';
-                                                    } else if (duration <= 14400) {
-                                                        bgClass = 'bg-stone-500';
-                                                        textClass = 'text-white';
+                                                }
+                                            } else {
+                                                // Duration Coloring
+                                                const duration = intensityValue;
+
+                                                // Thresholds logic
+                                                let t1 = 1800; // 30m
+                                                let t2 = 7200; // 2h
+                                                let t3 = 14400; // 4h
+
+                                                if (customScale && customScale.max > customScale.min) {
+                                                    const min = Math.max(0, customScale.min);
+                                                    const max = Math.max(min + 60, customScale.max);
+                                                    const range = max - min;
+                                                    t1 = min + (range * 0.33);
+                                                    t2 = min + (range * 0.66);
+                                                    t3 = max;
+                                                }
+
+                                                if (selected) {
+                                                    bgClass = 'bg-stone-900 shadow-md';
+                                                    textClass = 'text-white';
+                                                } else if (duration > 0) {
+                                                    if (customScale) {
+                                                        if (duration >= customScale.max) {
+                                                            bgClass = 'bg-stone-700';
+                                                            textClass = 'text-white';
+                                                        } else if (duration <= t1) {
+                                                            bgClass = 'bg-stone-100';
+                                                            textClass = 'text-stone-600';
+                                                        } else if (duration <= t2) {
+                                                            bgClass = 'bg-stone-300';
+                                                            textClass = 'text-stone-800';
+                                                        } else {
+                                                            bgClass = 'bg-stone-500';
+                                                            textClass = 'text-white';
+                                                        }
                                                     } else {
-                                                        bgClass = 'bg-stone-700';
-                                                        textClass = 'text-white';
+                                                        if (duration <= 1800) {
+                                                            bgClass = 'bg-stone-100';
+                                                            textClass = 'text-stone-600';
+                                                        } else if (duration <= 7200) {
+                                                            bgClass = 'bg-stone-300';
+                                                            textClass = 'text-stone-800';
+                                                        } else if (duration <= 14400) {
+                                                            bgClass = 'bg-stone-500';
+                                                            textClass = 'text-white';
+                                                        } else {
+                                                            bgClass = 'bg-stone-700';
+                                                            textClass = 'text-white';
+                                                        }
                                                     }
                                                 }
                                             }

@@ -159,7 +159,7 @@ export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialSta
       }
     }
 
-    // 2. Scope Suggestions (Combine Todo Scopes + AutoLink Rules)
+    // 2. Scope Suggestions (Combine Todo Scopes + AutoLink Rules + Keyword Matching)
     const candidateScopes = new Map<string, { id: string; name: string; icon: string; reason: string }>();
 
     // From Linked Todo
@@ -185,6 +185,29 @@ export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialSta
         // If already added by Todo, keep Todo reason (or overwrite? Todo seems more specific)
         if (!candidateScopes.has(rule.scopeId)) {
           candidateScopes.set(rule.scopeId, { id: s.id, name: s.name, icon: s.icon, reason: '自动规则' });
+        }
+      }
+    }
+
+    // From Keyword Matching (based on note content)
+    if (note) {
+      for (const scope of scopes) {
+        // Skip if already selected
+        if (scopeIds?.includes(scope.id)) continue;
+        // Skip if already suggested by other means
+        if (candidateScopes.has(scope.id)) continue;
+
+        // Check if note contains any of the scope's keywords
+        for (const kw of (scope.keywords || [])) {
+          if (note.includes(kw)) {
+            candidateScopes.set(scope.id, {
+              id: scope.id,
+              name: scope.name,
+              icon: scope.icon,
+              reason: '关键词匹配'
+            });
+            break;
+          }
         }
       }
     }
