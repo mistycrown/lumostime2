@@ -1,7 +1,7 @@
 {
     "version": "1.0.2",
-    "versionCode": 2,
+    "versionCode": 3,
     "updateUrl": "https://github.com/mistycrown/lumostime2/releases/latest",
-    "releaseNotes": "📱 新功能\n• 添加了更新检测功能\n• 优化了界面性能\n\n🐛 问题修复\n• 修复了一些已知问题\n• 提升了稳定性",
+    "releaseNotes": "✨ 新功能\n• 领域关键字管理：可为领域添加关键字\n• 智能关键字匹配：备注中的关键字自动推荐领域\n• 关键字统计分析：热力图和分组列表展示\n• 领域专注度评分：支持基于领域的专注度记录\n\n🐛 问题修复\n• 修复关键字热力图显示异常问题\n• 优化专注度评分显示逻辑",
     "forceUpdate": false
 }
