@@ -133,6 +133,7 @@ export enum AppView {
   STATS = 'STATS',
   TAGS = 'TAGS',
   SCOPE = 'SCOPE', // NEW
+  REVIEW = 'REVIEW', // NEW: Review Hub
   TODO = 'TODO',
   SETTINGS = 'SETTINGS',
 }

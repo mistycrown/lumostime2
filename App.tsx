@@ -17,6 +17,7 @@ import { SearchView } from './views/SearchView';
 import { DailyReviewView } from './views/DailyReviewView'; // 新增：每日回顾
 import { WeeklyReviewView } from './views/WeeklyReviewView'; // 新增：每周回顾
 import { MonthlyReviewView } from './views/MonthlyReviewView'; // 新增：每月回顾
+import { ReviewHubView } from './views/ReviewHubView'; // 新增：复盘汇总
 import { TimerFloating } from './components/TimerFloating';
 import { AddLogModal } from './components/AddLogModal';
 import { TodoDetailModal } from './components/TodoDetailModal';
@@ -42,7 +43,8 @@ import {
   Settings2,
   Maximize2,
   RefreshCw,
-  Settings
+  Settings,
+  Layout // For Review Hub
 } from 'lucide-react';
 import { App as CapacitorApp } from '@capacitor/app';
 import { Capacitor } from '@capacitor/core';
@@ -928,6 +930,33 @@ const App: React.FC = () => {
   const [selectedScopeId, setSelectedScopeId] = useState<string | null>(null);
   const [isScopeManaging, setIsScopeManaging] = useState(false);
 
+  // --- History Navigation Logic for Scope Detail ---
+  useEffect(() => {
+    // Only handle if selectedScopeId is set
+    if (selectedScopeId) {
+      // Check if current state already has this scope (to prevent dupes on re-renders)
+      const currentState = window.history.state;
+      if (currentState?.scopeId !== selectedScopeId) {
+        window.history.pushState({ scopeId: selectedScopeId }, '');
+      }
+    }
+  }, [selectedScopeId]);
+
+  useEffect(() => {
+    const handlePopState = (event: PopStateEvent) => {
+      // If we are currently in Scope Detail view
+      if (selectedScopeId) {
+        // If the history event brings us to a state without scopeId (i.e. Back)
+        if (!event.state?.scopeId) {
+          setSelectedScopeId(null);
+        }
+      }
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, [selectedScopeId]);
+
   // Goal State
   const [isGoalEditorOpen, setIsGoalEditorOpen] = useState(false);
   const [editingGoal, setEditingGoal] = useState<Goal | null>(null);
@@ -1301,6 +1330,14 @@ const App: React.FC = () => {
     handleSelectCategory(category.id);
   };
 
+  // Helper to get local YYYY-MM-DD string
+  const getLocalDateStr = (d: Date) => {
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
   const handleSelectSearchActivity = (activity: { id: string }, categoryId: string) => {
     setReturnToSearch(true);
     setIsSearchOpen(false);
@@ -1309,8 +1346,11 @@ const App: React.FC = () => {
   };
 
   // Daily Review Handlers
-  const handleOpenDailyReview = () => {
-    const dateStr = currentDate.toISOString().split('T')[0];
+  const handleOpenDailyReview = (targetDate?: Date) => {
+    // Check if targetDate is a valid date, otherwise fallback to currentDate
+    // Ensure we are working with a Date object
+    const dateToUse = (targetDate instanceof Date && !isNaN(targetDate.getTime())) ? targetDate : currentDate;
+    const dateStr = getLocalDateStr(dateToUse);
     let review = dailyReviews.find(r => r.date === dateStr);
 
     // 如果没有日报，创建新的
@@ -1325,7 +1365,7 @@ const App: React.FC = () => {
       setDailyReviews(prev => [...prev, review!]);
     }
 
-    setCurrentReviewDate(currentDate);
+    setCurrentReviewDate(dateToUse);
     setIsDailyReviewOpen(true);
   };
 
@@ -1337,7 +1377,7 @@ const App: React.FC = () => {
 
   const handleDeleteReview = () => {
     if (!currentReviewDate) return;
-    const dateStr = currentReviewDate.toISOString().split('T')[0];
+    const dateStr = getLocalDateStr(currentReviewDate);
     setDailyReviews(prev => prev.filter(r => r.date !== dateStr));
     setIsDailyReviewOpen(false);
     setCurrentReviewDate(null);
@@ -1359,8 +1399,8 @@ const App: React.FC = () => {
 
   // Weekly Review Handlers
   const handleOpenWeeklyReview = (weekStart: Date, weekEnd: Date) => {
-    const weekStartStr = weekStart.toISOString().split('T')[0];
-    const weekEndStr = weekEnd.toISOString().split('T')[0];
+    const weekStartStr = getLocalDateStr(weekStart);
+    const weekEndStr = getLocalDateStr(weekEnd);
     let review = weeklyReviews.find(r => r.weekStartDate === weekStartStr && r.weekEndDate === weekEndStr);
 
     // 如果没有周报，创建新的
@@ -1394,8 +1434,8 @@ const App: React.FC = () => {
   const handleDeleteWeeklyReview = () => {
     if (!currentWeeklyReviewStart || !currentWeeklyReviewEnd) return;
 
-    const weekStartStr = currentWeeklyReviewStart.toISOString().split('T')[0];
-    const weekEndStr = currentWeeklyReviewEnd.toISOString().split('T')[0];
+    const weekStartStr = getLocalDateStr(currentWeeklyReviewStart);
+    const weekEndStr = getLocalDateStr(currentWeeklyReviewEnd);
     setWeeklyReviews(prev => prev.filter(r => !(r.weekStartDate === weekStartStr && r.weekEndDate === weekEndStr)));
     handleCloseWeeklyReview();
     addToast('success', '周报已删除');
@@ -1409,8 +1449,8 @@ const App: React.FC = () => {
 
   // Monthly Review Handlers (每月回顾处理函数)
   const handleOpenMonthlyReview = (monthStart: Date, monthEnd: Date) => {
-    const monthStartStr = monthStart.toISOString().split('T')[0];
-    const monthEndStr = monthEnd.toISOString().split('T')[0];
+    const monthStartStr = getLocalDateStr(monthStart);
+    const monthEndStr = getLocalDateStr(monthEnd);
     let review = monthlyReviews.find(r => r.monthStartDate === monthStartStr && r.monthEndDate === monthEndStr);
 
     // 如果没有月报，创建新的
@@ -1444,8 +1484,8 @@ const App: React.FC = () => {
   const handleDeleteMonthlyReview = () => {
     if (!currentMonthlyReviewStart || !currentMonthlyReviewEnd) return;
 
-    const monthStartStr = currentMonthlyReviewStart.toISOString().split('T')[0];
-    const monthEndStr = currentMonthlyReviewEnd.toISOString().split('T')[0];
+    const monthStartStr = getLocalDateStr(currentMonthlyReviewStart);
+    const monthEndStr = getLocalDateStr(currentMonthlyReviewEnd);
     setMonthlyReviews(prev => prev.filter(r => !(r.monthStartDate === monthStartStr && r.monthEndDate === monthEndStr)));
     handleCloseMonthlyReview();
     addToast('success', '月报已删除');
@@ -1462,7 +1502,7 @@ const App: React.FC = () => {
 
     // Daily Review has priority over other views
     if (isDailyReviewOpen && currentReviewDate) {
-      const dateStr = currentReviewDate.toISOString().split('T')[0];
+      const dateStr = getLocalDateStr(currentReviewDate);
       const review = dailyReviews.find(r => r.date === dateStr);
       if (!review) return null;
 
@@ -1487,8 +1527,8 @@ const App: React.FC = () => {
 
     // Weekly Review has second priority
     if (isWeeklyReviewOpen && currentWeeklyReviewStart && currentWeeklyReviewEnd) {
-      const weekStartStr = currentWeeklyReviewStart.toISOString().split('T')[0];
-      const weekEndStr = currentWeeklyReviewEnd.toISOString().split('T')[0];
+      const weekStartStr = getLocalDateStr(currentWeeklyReviewStart);
+      const weekEndStr = getLocalDateStr(currentWeeklyReviewEnd);
       const review = weeklyReviews.find(r => r.weekStartDate === weekStartStr && r.weekEndDate === weekEndStr);
       if (!review) return null;
 
@@ -1515,8 +1555,8 @@ const App: React.FC = () => {
 
     // Monthly Review has third priority
     if (isMonthlyReviewOpen && currentMonthlyReviewStart && currentMonthlyReviewEnd) {
-      const monthStartStr = currentMonthlyReviewStart.toISOString().split('T')[0];
-      const monthEndStr = currentMonthlyReviewEnd.toISOString().split('T')[0];
+      const monthStartStr = getLocalDateStr(currentMonthlyReviewStart);
+      const monthEndStr = getLocalDateStr(currentMonthlyReviewEnd);
       const review = monthlyReviews.find(r => r.monthStartDate === monthStartStr && r.monthEndDate === monthEndStr);
       if (!review) return null;
 
@@ -1589,7 +1629,7 @@ const App: React.FC = () => {
             scopes={scopes}
             minIdleTimeThreshold={minIdleTimeThreshold}
             onQuickPunch={handleQuickPunch}
-            dailyReview={dailyReviews.find(r => r.date === currentDate.toISOString().split('T')[0])}
+            dailyReview={dailyReviews.find(r => r.date === getLocalDateStr(currentDate))}
             onOpenDailyReview={handleOpenDailyReview}
             templates={reviewTemplates}
             dailyReviewTime={dailyReviewTime}
@@ -1616,6 +1656,28 @@ const App: React.FC = () => {
             todos={todos}
             todoCategories={todoCategories}
             scopes={scopes}
+          />
+        );
+      case AppView.REVIEW:
+        return (
+          <ReviewHubView
+            logs={logs}
+            dailyReviews={dailyReviews}
+            weeklyReviews={weeklyReviews}
+            monthlyReviews={monthlyReviews}
+            onOpenDailyReview={(date) => {
+              // Must handle potential time zone issues if creating from calendar
+              // But keeping it simple: just use date object
+              // We need to set setCurrentReviewDate
+              // Also need to check if review exists? ReviewHub handles logic,
+              // here we just open the view.
+              // If review doesn't exist, DailyReviewView handles creation?
+              // Wait, DailyReviewView takes a 'review' object.
+              // So if new, we need logic similar to handleOpenDailyReview but for specific date.
+              handleOpenDailyReview(date);
+            }}
+            onOpenWeeklyReview={handleOpenWeeklyReview}
+            onOpenMonthlyReview={handleOpenMonthlyReview}
           />
         );
       case AppView.TAGS:
@@ -1739,6 +1801,9 @@ const App: React.FC = () => {
       if (selectedCategoryId) return 'Category Details';
       return 'Tags';
     }
+    if (currentView === AppView.REVIEW) {
+      return 'My Chronicle';
+    }
     if (currentView === AppView.SCOPE) {
       if (selectedScopeId) return 'Scope Details';
       return 'Scopes';
@@ -1841,6 +1906,8 @@ const App: React.FC = () => {
       {!isSettingsOpen && (currentView !== AppView.TIMELINE || isDailyReviewOpen) && !isStatsFullScreen &&
         !(currentView === AppView.TODO && isTodoManaging) &&
         !(currentView === AppView.TAGS && isTagsManaging) &&
+        // Show header for Review Hub main page, hide for Weekly/Monthly detail views
+        !(currentView === AppView.REVIEW && (isWeeklyReviewOpen || isMonthlyReviewOpen)) &&
         !(currentView === AppView.SCOPE && isScopeManaging) && (
           <header className="h-14 flex items-center justify-between px-5 bg-[#fdfbf7] border-b border-stone-100 shrink-0 z-30">
             <div className="w-8 flex items-center">
@@ -1878,7 +1945,8 @@ const App: React.FC = () => {
                       } else if (currentView === AppView.STATS) {
                         setCurrentView(AppView.TIMELINE);
                       } else if (currentView === AppView.SCOPE) {
-                        handleBackFromScope();
+                        // Use history back to trigger popstate logic, ensuring consistency with hardware back button
+                        window.history.back();
                       } else {
                         handleBackFromTag();
                       }
@@ -2221,6 +2289,19 @@ const App: React.FC = () => {
             isActive={currentView === AppView.TIMELINE}
             onClick={() => {
               setCurrentView(AppView.TIMELINE);
+              setSelectedTagId(null);
+              setIsDailyReviewOpen(false);
+              setIsMonthlyReviewOpen(false);
+              setCurrentReviewDate(null);
+            }}
+          />
+
+          <NavButton
+            icon={<Layout size={24} />}
+            label="回顧"
+            isActive={currentView === AppView.REVIEW}
+            onClick={() => {
+              setCurrentView(AppView.REVIEW);
               setSelectedTagId(null);
               setIsDailyReviewOpen(false);
               setIsMonthlyReviewOpen(false);
