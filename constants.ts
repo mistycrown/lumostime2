@@ -4,27 +4,43 @@ import { Category, Log, AppView, TodoCategory, TodoItem, Scope, Goal, ReviewTemp
 export const DEFAULT_USER_PERSONAL_INFO = `我是一名正在攻读博士学位的研究生，我对AI技术充满热情。我相信持续学习和自我反思的力量，希望成为一个既有深度又有广度的学者。`;
 
 // --- Colors ---
-// Provide a palette for consistent usage (Tailwind text classes mapped to implicit bg via component logic)
-// The user requested "Optional Colors Option". We can define them here for reference or use them in future Settings.
+// Optimized color palette with distinct colors, organized by color family
 export const COLOR_OPTIONS = [
-  { id: 'stone', label: 'Stone', hex: '#f5f5f4', bg: 'bg-stone-50', text: 'text-stone-500', border: 'border-stone-200', title: 'text-stone-600', ring: 'ring-stone-200', picker: 'bg-stone-200' },
-  { id: 'red', label: 'Red', hex: '#fee2e2', bg: 'bg-red-50', text: 'text-red-500', border: 'border-red-200', title: 'text-red-600', ring: 'ring-red-200', picker: 'bg-red-200' },
-  { id: 'orange', label: 'Orange', hex: '#ffedd5', bg: 'bg-orange-50', text: 'text-orange-500', border: 'border-orange-200', title: 'text-orange-600', ring: 'ring-orange-200', picker: 'bg-orange-200' },
-  { id: 'amber', label: 'Amber', hex: '#fef3c7', bg: 'bg-amber-50', text: 'text-amber-500', border: 'border-amber-200', title: 'text-amber-600', ring: 'ring-amber-200', picker: 'bg-amber-200' },
-  { id: 'yellow', label: 'Yellow', hex: '#fef9c3', bg: 'bg-yellow-50', text: 'text-yellow-500', border: 'border-yellow-200', title: 'text-yellow-600', ring: 'ring-yellow-200', picker: 'bg-yellow-200' },
-  { id: 'lime', label: 'Lime', hex: '#ecfccb', bg: 'bg-lime-50', text: 'text-lime-500', border: 'border-lime-200', title: 'text-lime-600', ring: 'ring-lime-200', picker: 'bg-lime-200' },
-  { id: 'green', label: 'Green', hex: '#dcfce7', bg: 'bg-green-50', text: 'text-green-500', border: 'border-green-200', title: 'text-green-600', ring: 'ring-green-200', picker: 'bg-green-200' },
-  { id: 'emerald', label: 'Emerald', hex: '#d1fae5', bg: 'bg-emerald-50', text: 'text-emerald-500', border: 'border-emerald-200', title: 'text-emerald-600', ring: 'ring-emerald-200', picker: 'bg-emerald-200' },
-  { id: 'teal', label: 'Teal', hex: '#ccfbf1', bg: 'bg-teal-50', text: 'text-teal-500', border: 'border-teal-200', title: 'text-teal-600', ring: 'ring-teal-200', picker: 'bg-teal-200' },
-  { id: 'cyan', label: 'Cyan', hex: '#cffafe', bg: 'bg-cyan-50', text: 'text-cyan-500', border: 'border-cyan-200', title: 'text-cyan-600', ring: 'ring-cyan-200', picker: 'bg-cyan-200' },
-  { id: 'sky', label: 'Sky', hex: '#e0f2fe', bg: 'bg-sky-50', text: 'text-sky-500', border: 'border-sky-200', title: 'text-sky-600', ring: 'ring-sky-200', picker: 'bg-sky-200' },
-  { id: 'blue', label: 'Blue', hex: '#dbeafe', bg: 'bg-blue-50', text: 'text-blue-500', border: 'border-blue-200', title: 'text-blue-600', ring: 'ring-blue-200', picker: 'bg-blue-200' },
-  { id: 'indigo', label: 'Indigo', hex: '#e0e7ff', bg: 'bg-indigo-50', text: 'text-indigo-500', border: 'border-indigo-200', title: 'text-indigo-600', ring: 'ring-indigo-200', picker: 'bg-indigo-200' },
-  { id: 'violet', label: 'Violet', hex: '#ede9fe', bg: 'bg-violet-50', text: 'text-violet-500', border: 'border-violet-200', title: 'text-violet-600', ring: 'ring-violet-200', picker: 'bg-violet-200' },
-  { id: 'purple', label: 'Purple', hex: '#f3e8ff', bg: 'bg-purple-50', text: 'text-purple-500', border: 'border-purple-200', title: 'text-purple-600', ring: 'ring-purple-200', picker: 'bg-purple-200' },
-  { id: 'fuchsia', label: 'Fuchsia', hex: '#fae8ff', bg: 'bg-fuchsia-50', text: 'text-fuchsia-500', border: 'border-fuchsia-200', title: 'text-fuchsia-600', ring: 'ring-fuchsia-200', picker: 'bg-fuchsia-200' },
-  { id: 'pink', label: 'Pink', hex: '#fce7f3', bg: 'bg-pink-50', text: 'text-pink-500', border: 'border-pink-200', title: 'text-pink-600', ring: 'ring-pink-200', picker: 'bg-pink-200' },
-  { id: 'rose', label: 'Rose', hex: '#ffe4e6', bg: 'bg-rose-50', text: 'text-rose-500', border: 'border-rose-200', title: 'text-rose-600', ring: 'ring-rose-200', picker: 'bg-rose-200' },
+  // Neutrals (灰色系) - 3种
+  { id: 'stone', label: 'Stone', hex: '#a8a29e', bg: 'bg-stone-100', text: 'text-stone-600', border: 'border-stone-300', title: 'text-stone-600', ring: 'ring-stone-400', picker: 'bg-stone-400' },
+  { id: 'gray', label: 'Gray', hex: '#6b7280', bg: 'bg-gray-100', text: 'text-gray-600', border: 'border-gray-300', title: 'text-gray-700', ring: 'ring-gray-400', picker: 'bg-gray-500' },
+  { id: 'slate', label: 'Slate', hex: '#475569', bg: 'bg-slate-100', text: 'text-slate-600', border: 'border-slate-300', title: 'text-slate-700', ring: 'ring-slate-400', picker: 'bg-slate-600' },
+
+  // Reds (红色系) - 2种
+  { id: 'red', label: 'Red', hex: '#ef4444', bg: 'bg-red-50', text: 'text-red-600', border: 'border-red-300', title: 'text-red-600', ring: 'ring-red-400', picker: 'bg-red-400' },
+  { id: 'rose', label: 'Rose', hex: '#f43f5e', bg: 'bg-rose-50', text: 'text-rose-600', border: 'border-rose-300', title: 'text-rose-600', ring: 'ring-rose-400', picker: 'bg-rose-400' },
+
+  // Oranges (橙色系) - 2种
+  { id: 'orange', label: 'Orange', hex: '#f97316', bg: 'bg-orange-50', text: 'text-orange-600', border: 'border-orange-300', title: 'text-orange-600', ring: 'ring-orange-400', picker: 'bg-orange-400' },
+  { id: 'amber', label: 'Amber', hex: '#f59e0b', bg: 'bg-amber-50', text: 'text-amber-600', border: 'border-amber-300', title: 'text-amber-600', ring: 'ring-amber-400', picker: 'bg-amber-400' },
+
+  // Yellows (黄色系) - 2种
+  { id: 'yellow', label: 'Yellow', hex: '#eab308', bg: 'bg-yellow-50', text: 'text-yellow-600', border: 'border-yellow-300', title: 'text-yellow-600', ring: 'ring-yellow-400', picker: 'bg-yellow-400' },
+  { id: 'lime', label: 'Lime', hex: '#84cc16', bg: 'bg-lime-50', text: 'text-lime-600', border: 'border-lime-300', title: 'text-lime-600', ring: 'ring-lime-400', picker: 'bg-lime-500' },
+
+  // Greens (绿色系) - 3种
+  { id: 'green', label: 'Green', hex: '#22c55e', bg: 'bg-green-50', text: 'text-green-600', border: 'border-green-300', title: 'text-green-600', ring: 'ring-green-400', picker: 'bg-green-500' },
+  { id: 'emerald', label: 'Emerald', hex: '#10b981', bg: 'bg-emerald-50', text: 'text-emerald-600', border: 'border-emerald-300', title: 'text-emerald-600', ring: 'ring-emerald-400', picker: 'bg-emerald-500' },
+  { id: 'teal', label: 'Teal', hex: '#14b8a6', bg: 'bg-teal-50', text: 'text-teal-600', border: 'border-teal-300', title: 'text-teal-600', ring: 'ring-teal-400', picker: 'bg-teal-500' },
+
+  // Blues (蓝色系) - 3种
+  { id: 'cyan', label: 'Cyan', hex: '#06b6d4', bg: 'bg-cyan-50', text: 'text-cyan-600', border: 'border-cyan-300', title: 'text-cyan-600', ring: 'ring-cyan-400', picker: 'bg-cyan-500' },
+  { id: 'sky', label: 'Sky', hex: '#0ea5e9', bg: 'bg-sky-50', text: 'text-sky-600', border: 'border-sky-300', title: 'text-sky-600', ring: 'ring-sky-400', picker: 'bg-sky-500' },
+  { id: 'blue', label: 'Blue', hex: '#3b82f6', bg: 'bg-blue-50', text: 'text-blue-600', border: 'border-blue-300', title: 'text-blue-600', ring: 'ring-blue-400', picker: 'bg-blue-500' },
+
+  // Purples (紫色系) - 3种
+  { id: 'indigo', label: 'Indigo', hex: '#6366f1', bg: 'bg-indigo-50', text: 'text-indigo-600', border: 'border-indigo-300', title: 'text-indigo-600', ring: 'ring-indigo-400', picker: 'bg-indigo-500' },
+  { id: 'violet', label: 'Violet', hex: '#8b5cf6', bg: 'bg-violet-50', text: 'text-violet-600', border: 'border-violet-300', title: 'text-violet-600', ring: 'ring-violet-400', picker: 'bg-violet-500' },
+  { id: 'purple', label: 'Purple', hex: '#a855f7', bg: 'bg-purple-50', text: 'text-purple-600', border: 'border-purple-300', title: 'text-purple-600', ring: 'ring-purple-400', picker: 'bg-purple-500' },
+
+  // Pinks (粉色系) - 2种
+  { id: 'fuchsia', label: 'Fuchsia', hex: '#d946ef', bg: 'bg-fuchsia-50', text: 'text-fuchsia-600', border: 'border-fuchsia-300', title: 'text-fuchsia-600', ring: 'ring-fuchsia-400', picker: 'bg-fuchsia-500' },
+  { id: 'pink', label: 'Pink', hex: '#ec4899', bg: 'bg-pink-50', text: 'text-pink-600', border: 'border-pink-300', title: 'text-pink-600', ring: 'ring-pink-400', picker: 'bg-pink-500' },
 ];
 
 

@@ -256,7 +256,7 @@ export const CategoryDetailView: React.FC<CategoryDetailViewProps> = ({ category
                                                 key={opt.id}
                                                 onClick={() => handleColorChange(opt.title)}
                                                 title={opt.label}
-                                                className={`w-10 h-10 rounded-full border-2 ${opt.bg} ${opt.border} ${category.themeColor === opt.title ? `ring-2 ${opt.ring} ring-offset-2` : ''}`}
+                                                className={`w-7 h-7 rounded-full border-2 ${opt.bg} ${opt.border} ${category.themeColor === opt.title ? `ring-1 ${opt.ring} ring-offset-1` : ''}`}
                                             />
                                         ))}
                                     </div>
