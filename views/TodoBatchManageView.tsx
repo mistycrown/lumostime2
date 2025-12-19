@@ -14,7 +14,7 @@ interface CategoryWithTodos extends TodoCategory {
 }
 
 export const TodoBatchManageView: React.FC<TodoBatchManageViewProps> = ({ onBack, categories: initialCategories, todos: initialTodos, onSave }) => {
-    // Initialize state by merging categories and todos
+    // Initialize state by merging categories and todos (only show uncompleted todos)
     const [data, setData] = useState<CategoryWithTodos[]>(() => {
         return initialCategories.map(cat => ({
             ...cat,
@@ -162,7 +162,16 @@ export const TodoBatchManageView: React.FC<TodoBatchManageViewProps> = ({ onBack
     const handleSave = () => {
         // Separate categories and todos
         const finalCategories: TodoCategory[] = data.map(({ id, name, icon }) => ({ id, name, icon }));
-        const finalTodos: TodoItem[] = data.flatMap(c => c.items.map(t => ({ ...t, categoryId: c.id })));
+
+        // Get all edited uncompleted todos
+        const editedTodos: TodoItem[] = data.flatMap(c => c.items.map(t => ({ ...t, categoryId: c.id })));
+
+        // Get completed todos from original data (they were not loaded into edit state)
+        const completedTodos = initialTodos.filter(t => t.isCompleted);
+
+        // Merge edited todos with completed todos
+        const finalTodos = [...editedTodos, ...completedTodos];
+
         onSave(finalCategories, finalTodos);
     };
 

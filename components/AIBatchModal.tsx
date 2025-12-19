@@ -185,7 +185,10 @@ const ReviewCard: React.FC<ReviewCardProps> = ({ entry, onUpdate, onDelete, cate
                         {categories.map(cat => (
                             <button
                                 key={cat.id}
-                                onClick={() => setActiveCatId(cat.id)}
+                                onClick={() => {
+                                    setActiveCatId(cat.id);
+                                    onUpdate('categoryName', cat.name);
+                                }}
                                 className={`px-2 py-2 rounded-lg text-[10px] font-medium text-center border transition-colors truncate ${activeCatId === cat.id ? 'bg-stone-900 text-white border-stone-900' : 'bg-stone-50 text-stone-500 border-stone-100 hover:bg-stone-100'}`}
                             >
                                 {cat.name}

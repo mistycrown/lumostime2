@@ -477,7 +477,7 @@ export const CategoryDetailView: React.FC<CategoryDetailViewProps> = ({ category
                                                             <div className="relative top-[-2px]">
                                                                 <div className="flex items-center gap-2 mb-1">
                                                                     <span className="text-lg font-bold text-stone-900 leading-tight">{activity?.name || 'Unknown Activity'}</span>
-                                                                    {log.focusScore && (
+                                                                    {log.focusScore && log.focusScore > 0 && (
                                                                         <span className="text-sm font-bold text-stone-400 font-mono flex items-center gap-0.5">
                                                                             <Zap size={12} fill="currentColor" />
                                                                             {log.focusScore}
