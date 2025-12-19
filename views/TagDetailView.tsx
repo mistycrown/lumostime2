@@ -342,7 +342,7 @@ export const TagDetailView: React.FC<TagDetailViewProps> = ({ tagId, logs, todos
                                     key={opt.id}
                                     onClick={() => handleColorChange(`${opt.bg} ${opt.text} `)}
                                     title={opt.label}
-                                    className={`w-10 h-10 rounded-full ${opt.bg} ${activity?.color.includes(opt.bg) ? `ring-2 ${opt.ring} ring-offset-2` : ''}`}
+                                    className={`w-7 h-7 rounded-full ${opt.bg} ${activity?.color.includes(opt.bg) ? `ring-1 ${opt.ring} ring-offset-1` : ''}`}
                                  />
                               ))}
                            </div>

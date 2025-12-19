@@ -2286,7 +2286,18 @@ const App: React.FC = () => {
             todoCategories={todoCategories}
             scopes={scopes}
             autoLinkRules={autoLinkRules}
-            lastLogEndTime={logs.length > 0 ? Math.max(...logs.filter(l => l.id !== editingLog?.id).map(l => l.endTime)) : undefined}
+            lastLogEndTime={(() => {
+              if (logs.length === 0) return undefined;
+              const currentStartTime = editingLog?.startTime || Date.now();
+              // 查找结束时间在当前记录开始时间之前,且结束时间最接近当前记录开始时间的记录
+              const previousLogs = logs.filter(l =>
+                l.id !== editingLog?.id &&
+                l.endTime <= currentStartTime
+              );
+              if (previousLogs.length === 0) return undefined;
+              // 返回这些记录中结束时间最晚的那个
+              return Math.max(...previousLogs.map(l => l.endTime));
+            })()}
           />
         )}
 
@@ -2321,8 +2332,8 @@ const App: React.FC = () => {
         !isScopeManaging &&
         currentView !== AppView.STATS && (
           <nav className={`fixed bottom-0 left-0 w-full h-14 md:h-16 border-t border-stone-100 flex justify-around items-center z-30 pb-safe md:pb-0 ${currentView === AppView.TIMELINE || currentView === AppView.TAGS
-              ? 'bg-[#faf9f6]'
-              : 'bg-white'
+            ? 'bg-[#faf9f6]'
+            : 'bg-white'
             }`}>
             {[
               { view: AppView.RECORD, label: '记录' },

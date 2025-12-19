@@ -187,6 +187,10 @@ Requirements:
 7. If only duration is given (e.g., "read for 2 hours"), you can estimate a reasonable time range.
 8. Match activities to provided tags where possible.
 9. Return format must be a pure JSON Array.
+10. **CRITICAL: Preserve ALL details from user input in the 'description' field.**
+11. **DO NOT summarize, simplify, or omit any information provided by the user.**
+12. **Copy the user's original wording as much as possible for descriptions.**
+
 
 JSON Output Schema:
 [
