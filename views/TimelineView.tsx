@@ -473,7 +473,7 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ logs, todos, scopes,
             const content = log.note ? ` ${log.note} ` : '';
             text += `- ${sTime} - ${eTime} (${mins}m) ** [${cat?.name || '未知'}/${act?.name || '未知'}] ** ${content} `;
 
-            if (log.focusScore) text += ` ⚡️${log.focusScore} `;
+            if (log.focusScore && log.focusScore > 0) text += ` ⚡️${log.focusScore} `;
             if (todo) text += ` @${todo.title} `;
             // 只有进度待办才显示进度增量和进度比例
             if (todo?.isProgress) {
@@ -568,7 +568,7 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ logs, todos, scopes,
                                             <h3 className={`text-lg font-bold leading-tight ${!item.logData.activity ? 'text-stone-500 italic' : 'text-stone-900'}`}>
                                                 {item.logData.activity?.name || item.logData.title || "未命名记录"}
                                             </h3>
-                                            {item.logData.focusScore && (
+                                            {item.logData.focusScore && item.logData.focusScore > 0 && (
                                                 <span className="text-sm font-bold text-stone-400 font-mono flex items-center gap-0.5">
                                                     <Zap size={12} fill="currentColor" />
                                                     {item.logData.focusScore}

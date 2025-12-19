@@ -602,7 +602,7 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({ initialTodo, c
                                       <h4 className="text-lg font-bold text-stone-900 leading-tight">
                                         {activity?.name || category?.name || 'Unknown'}
                                       </h4>
-                                      {log.focusScore && (
+                                      {log.focusScore && log.focusScore > 0 && (
                                         <span className="text-sm font-bold text-stone-400 font-mono flex items-center gap-0.5">
                                           <Zap size={12} fill="currentColor" />
                                           {log.focusScore}

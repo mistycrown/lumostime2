@@ -258,11 +258,11 @@ export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentD
   }, [filteredLogs, categories]);
 
   const getHexColor = (className: string = '') => {
-    if (typeof className !== 'string') return '#78716c';
+    if (typeof className !== 'string') return '#e7e5e4';
     const match = className.match(/(?:text|bg)-([a-z]+)-/);
     const colorId = match ? match[1] : 'stone';
     const option = COLOR_OPTIONS.find(opt => opt.id === colorId);
-    return option ? option.hex : '#78716c';
+    return option ? (option.lightHex || option.hex) : '#e7e5e4';
   };
 
   const getScheduleStyle = (className: string = '') => {

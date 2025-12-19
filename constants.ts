@@ -7,40 +7,40 @@ export const DEFAULT_USER_PERSONAL_INFO = `我是一名正在攻读博士学位�
 // Optimized color palette with distinct colors, organized by color family
 export const COLOR_OPTIONS = [
   // Neutrals (灰色系) - 3种
-  { id: 'stone', label: 'Stone', hex: '#a8a29e', bg: 'bg-stone-100', text: 'text-stone-600', border: 'border-stone-300', title: 'text-stone-600', ring: 'ring-stone-400', picker: 'bg-stone-400' },
-  { id: 'gray', label: 'Gray', hex: '#6b7280', bg: 'bg-gray-100', text: 'text-gray-600', border: 'border-gray-300', title: 'text-gray-700', ring: 'ring-gray-400', picker: 'bg-gray-500' },
-  { id: 'slate', label: 'Slate', hex: '#475569', bg: 'bg-slate-100', text: 'text-slate-600', border: 'border-slate-300', title: 'text-slate-700', ring: 'ring-slate-400', picker: 'bg-slate-600' },
+  { id: 'stone', label: 'Stone', hex: '#a8a29e', lightHex: '#e7e5e4', bg: 'bg-stone-100', text: 'text-stone-600', border: 'border-stone-300', title: 'text-stone-600', ring: 'ring-stone-400', picker: 'bg-stone-400' },
+  { id: 'gray', label: 'Gray', hex: '#6b7280', lightHex: '#e5e7eb', bg: 'bg-gray-100', text: 'text-gray-600', border: 'border-gray-300', title: 'text-gray-700', ring: 'ring-gray-400', picker: 'bg-gray-500' },
+  { id: 'slate', label: 'Slate', hex: '#475569', lightHex: '#e2e8f0', bg: 'bg-slate-100', text: 'text-slate-600', border: 'border-slate-300', title: 'text-slate-700', ring: 'ring-slate-400', picker: 'bg-slate-600' },
 
   // Reds (红色系) - 2种
-  { id: 'red', label: 'Red', hex: '#ef4444', bg: 'bg-red-50', text: 'text-red-600', border: 'border-red-300', title: 'text-red-600', ring: 'ring-red-400', picker: 'bg-red-400' },
-  { id: 'rose', label: 'Rose', hex: '#f43f5e', bg: 'bg-rose-50', text: 'text-rose-600', border: 'border-rose-300', title: 'text-rose-600', ring: 'ring-rose-400', picker: 'bg-rose-400' },
+  { id: 'red', label: 'Red', hex: '#ef4444', lightHex: '#fecaca', bg: 'bg-red-50', text: 'text-red-600', border: 'border-red-300', title: 'text-red-600', ring: 'ring-red-400', picker: 'bg-red-400' },
+  { id: 'rose', label: 'Rose', hex: '#f43f5e', lightHex: '#fecdd3', bg: 'bg-rose-50', text: 'text-rose-600', border: 'border-rose-300', title: 'text-rose-600', ring: 'ring-rose-400', picker: 'bg-rose-400' },
 
   // Oranges (橙色系) - 2种
-  { id: 'orange', label: 'Orange', hex: '#f97316', bg: 'bg-orange-50', text: 'text-orange-600', border: 'border-orange-300', title: 'text-orange-600', ring: 'ring-orange-400', picker: 'bg-orange-400' },
-  { id: 'amber', label: 'Amber', hex: '#f59e0b', bg: 'bg-amber-50', text: 'text-amber-600', border: 'border-amber-300', title: 'text-amber-600', ring: 'ring-amber-400', picker: 'bg-amber-400' },
+  { id: 'orange', label: 'Orange', hex: '#f97316', lightHex: '#fed7aa', bg: 'bg-orange-50', text: 'text-orange-600', border: 'border-orange-300', title: 'text-orange-600', ring: 'ring-orange-400', picker: 'bg-orange-400' },
+  { id: 'amber', label: 'Amber', hex: '#f59e0b', lightHex: '#fde68a', bg: 'bg-amber-50', text: 'text-amber-600', border: 'border-amber-300', title: 'text-amber-600', ring: 'ring-amber-400', picker: 'bg-amber-400' },
 
   // Yellows (黄色系) - 2种
-  { id: 'yellow', label: 'Yellow', hex: '#eab308', bg: 'bg-yellow-50', text: 'text-yellow-600', border: 'border-yellow-300', title: 'text-yellow-600', ring: 'ring-yellow-400', picker: 'bg-yellow-400' },
-  { id: 'lime', label: 'Lime', hex: '#84cc16', bg: 'bg-lime-50', text: 'text-lime-600', border: 'border-lime-300', title: 'text-lime-600', ring: 'ring-lime-400', picker: 'bg-lime-500' },
+  { id: 'yellow', label: 'Yellow', hex: '#eab308', lightHex: '#fef08a', bg: 'bg-yellow-50', text: 'text-yellow-600', border: 'border-yellow-300', title: 'text-yellow-600', ring: 'ring-yellow-400', picker: 'bg-yellow-400' },
+  { id: 'lime', label: 'Lime', hex: '#84cc16', lightHex: '#d9f99d', bg: 'bg-lime-50', text: 'text-lime-600', border: 'border-lime-300', title: 'text-lime-600', ring: 'ring-lime-400', picker: 'bg-lime-500' },
 
   // Greens (绿色系) - 3种
-  { id: 'green', label: 'Green', hex: '#22c55e', bg: 'bg-green-50', text: 'text-green-600', border: 'border-green-300', title: 'text-green-600', ring: 'ring-green-400', picker: 'bg-green-500' },
-  { id: 'emerald', label: 'Emerald', hex: '#10b981', bg: 'bg-emerald-50', text: 'text-emerald-600', border: 'border-emerald-300', title: 'text-emerald-600', ring: 'ring-emerald-400', picker: 'bg-emerald-500' },
-  { id: 'teal', label: 'Teal', hex: '#14b8a6', bg: 'bg-teal-50', text: 'text-teal-600', border: 'border-teal-300', title: 'text-teal-600', ring: 'ring-teal-400', picker: 'bg-teal-500' },
+  { id: 'green', label: 'Green', hex: '#22c55e', lightHex: '#bbf7d0', bg: 'bg-green-50', text: 'text-green-600', border: 'border-green-300', title: 'text-green-600', ring: 'ring-green-400', picker: 'bg-green-500' },
+  { id: 'emerald', label: 'Emerald', hex: '#10b981', lightHex: '#a7f3d0', bg: 'bg-emerald-50', text: 'text-emerald-600', border: 'border-emerald-300', title: 'text-emerald-600', ring: 'ring-emerald-400', picker: 'bg-emerald-500' },
+  { id: 'teal', label: 'Teal', hex: '#14b8a6', lightHex: '#99f6e4', bg: 'bg-teal-50', text: 'text-teal-600', border: 'border-teal-300', title: 'text-teal-600', ring: 'ring-teal-400', picker: 'bg-teal-500' },
 
   // Blues (蓝色系) - 3种
-  { id: 'cyan', label: 'Cyan', hex: '#06b6d4', bg: 'bg-cyan-50', text: 'text-cyan-600', border: 'border-cyan-300', title: 'text-cyan-600', ring: 'ring-cyan-400', picker: 'bg-cyan-500' },
-  { id: 'sky', label: 'Sky', hex: '#0ea5e9', bg: 'bg-sky-50', text: 'text-sky-600', border: 'border-sky-300', title: 'text-sky-600', ring: 'ring-sky-400', picker: 'bg-sky-500' },
-  { id: 'blue', label: 'Blue', hex: '#3b82f6', bg: 'bg-blue-50', text: 'text-blue-600', border: 'border-blue-300', title: 'text-blue-600', ring: 'ring-blue-400', picker: 'bg-blue-500' },
+  { id: 'cyan', label: 'Cyan', hex: '#06b6d4', lightHex: '#a5f3fc', bg: 'bg-cyan-50', text: 'text-cyan-600', border: 'border-cyan-300', title: 'text-cyan-600', ring: 'ring-cyan-400', picker: 'bg-cyan-500' },
+  { id: 'sky', label: 'Sky', hex: '#0ea5e9', lightHex: '#bae6fd', bg: 'bg-sky-50', text: 'text-sky-600', border: 'border-sky-300', title: 'text-sky-600', ring: 'ring-sky-400', picker: 'bg-sky-500' },
+  { id: 'blue', label: 'Blue', hex: '#3b82f6', lightHex: '#bfdbfe', bg: 'bg-blue-50', text: 'text-blue-600', border: 'border-blue-300', title: 'text-blue-600', ring: 'ring-blue-400', picker: 'bg-blue-500' },
 
   // Purples (紫色系) - 3种
-  { id: 'indigo', label: 'Indigo', hex: '#6366f1', bg: 'bg-indigo-50', text: 'text-indigo-600', border: 'border-indigo-300', title: 'text-indigo-600', ring: 'ring-indigo-400', picker: 'bg-indigo-500' },
-  { id: 'violet', label: 'Violet', hex: '#8b5cf6', bg: 'bg-violet-50', text: 'text-violet-600', border: 'border-violet-300', title: 'text-violet-600', ring: 'ring-violet-400', picker: 'bg-violet-500' },
-  { id: 'purple', label: 'Purple', hex: '#a855f7', bg: 'bg-purple-50', text: 'text-purple-600', border: 'border-purple-300', title: 'text-purple-600', ring: 'ring-purple-400', picker: 'bg-purple-500' },
+  { id: 'indigo', label: 'Indigo', hex: '#6366f1', lightHex: '#c7d2fe', bg: 'bg-indigo-50', text: 'text-indigo-600', border: 'border-indigo-300', title: 'text-indigo-600', ring: 'ring-indigo-400', picker: 'bg-indigo-500' },
+  { id: 'violet', label: 'Violet', hex: '#8b5cf6', lightHex: '#ddd6fe', bg: 'bg-violet-50', text: 'text-violet-600', border: 'border-violet-300', title: 'text-violet-600', ring: 'ring-violet-400', picker: 'bg-violet-500' },
+  { id: 'purple', label: 'Purple', hex: '#a855f7', lightHex: '#e9d5ff', bg: 'bg-purple-50', text: 'text-purple-600', border: 'border-purple-300', title: 'text-purple-600', ring: 'ring-purple-400', picker: 'bg-purple-500' },
 
   // Pinks (粉色系) - 2种
-  { id: 'fuchsia', label: 'Fuchsia', hex: '#d946ef', bg: 'bg-fuchsia-50', text: 'text-fuchsia-600', border: 'border-fuchsia-300', title: 'text-fuchsia-600', ring: 'ring-fuchsia-400', picker: 'bg-fuchsia-500' },
-  { id: 'pink', label: 'Pink', hex: '#ec4899', bg: 'bg-pink-50', text: 'text-pink-600', border: 'border-pink-300', title: 'text-pink-600', ring: 'ring-pink-400', picker: 'bg-pink-500' },
+  { id: 'fuchsia', label: 'Fuchsia', hex: '#d946ef', lightHex: '#f5d0fe', bg: 'bg-fuchsia-50', text: 'text-fuchsia-600', border: 'border-fuchsia-300', title: 'text-fuchsia-600', ring: 'ring-fuchsia-400', picker: 'bg-fuchsia-500' },
+  { id: 'pink', label: 'Pink', hex: '#ec4899', lightHex: '#fbcfe8', bg: 'bg-pink-50', text: 'text-pink-600', border: 'border-pink-300', title: 'text-pink-600', ring: 'ring-pink-400', picker: 'bg-pink-500' },
 ];
 
 
