@@ -1,5 +1,4 @@
 import React, { useState, useMemo } from 'react';
-import { CATEGORIES } from '../constants';
 import { TodoItem, TodoCategory, Log, Category, Scope } from '../types';
 import { ScopeAssociation } from './ScopeAssociation';
 import { X, Trash2, Link as LinkIcon, CheckCircle2, TrendingUp, BarChart3, List, Plus, Minus, Clock, Save, MoreHorizontal, ChevronLeft, Check, ChevronDown, Zap, Circle } from 'lucide-react';
@@ -103,7 +102,7 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({ initialTodo, c
     });
   };
 
-  const selectedLinkCategory = CATEGORIES.find(c => c.id === linkedCategoryId);
+  const selectedLinkCategory = categories?.find(c => c.id === linkedCategoryId);
 
   // Linked Logs
   const linkedLogs = useMemo(() => logs.filter(l => l.linkedTodoId === todoId), [logs, todoId]);
