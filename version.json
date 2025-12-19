@@ -2,6 +2,6 @@
     "version": "1.0.3",
     "versionCode": 4,
     "updateUrl": "https://github.com/mistycrown/lumostime2/releases/latest",
-    "releaseNotes": "v1.0.3本版本问题修复🐛•修复专注度打分取消后显示0的问题•修复AI补记中更改分类后未生效的问题•修复批量管理页面移动分类次序导致已完成待办丢失的问题",
+    "releaseNotes": "v1.0.3本版本问题修复🐛•修复专注度打分取消后显示\"0\"的问题•修复AI补记中更改分类后未生效的问题•修复批量管理页面移动分类次序导致已完成待办丢失的问题",
     "forceUpdate": false
 }
