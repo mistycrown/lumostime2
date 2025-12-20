@@ -332,7 +332,7 @@ const App: React.FC = () => {
     if (Capacitor.getPlatform() === 'android') {
       const taskName = `${activity.icon} ${activity.name}`;
       // Start Focus Notification if enabled
-      const statusBarEnabled = localStorage.getItem('cfg_status_bar_enabled') !== 'false';
+      const statusBarEnabled = localStorage.getItem('cfg_status_bar_enabled') === 'true'; // Default false
       if (statusBarEnabled) {
         FocusNotification.startFocusNotification({
           taskName
@@ -342,7 +342,8 @@ const App: React.FC = () => {
       }
       // 更新悬浮球状态
       // Use toString() for safety
-      if (newSession && newSession.startTime) {
+      const floatingWindowEnabled = localStorage.getItem('cfg_floating_window_enabled') === 'true'; // Default false
+      if (floatingWindowEnabled && newSession && newSession.startTime) {
         FocusNotification.updateFloatingWindow({
           icon: activity.icon,
           isFocusing: true,
