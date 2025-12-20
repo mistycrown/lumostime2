@@ -191,6 +191,37 @@ public class AppUsagePlugin extends Plugin {
         return "data:image/png;base64," + Base64.encodeToString(byteArray, Base64.NO_WRAP);
     }
 
+    @PluginMethod
+    public void startMonitor(PluginCall call) {
+        if (!hasUsageStatsPermission()) {
+            call.reject("Permission denied");
+            return;
+        }
+
+        try {
+            Intent serviceIntent = new Intent(getContext(), AppMonitorService.class);
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                getContext().startForegroundService(serviceIntent);
+            } else {
+                getContext().startService(serviceIntent);
+            }
+            call.resolve();
+        } catch (Exception e) {
+            call.reject("Failed to start service", e);
+        }
+    }
+
+    @PluginMethod
+    public void stopMonitor(PluginCall call) {
+        try {
+            Intent serviceIntent = new Intent(getContext(), AppMonitorService.class);
+            getContext().stopService(serviceIntent);
+            call.resolve();
+        } catch (Exception e) {
+            call.reject("Failed to stop service", e);
+        }
+    }
+
     private boolean hasUsageStatsPermission() {
         AppOpsManager appOps = (AppOpsManager) getContext().getSystemService(Context.APP_OPS_SERVICE);
         int mode = appOps.checkOpNoThrow(AppOpsManager.OPSTR_GET_USAGE_STATS,

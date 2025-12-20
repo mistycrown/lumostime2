@@ -8,6 +8,8 @@ export interface AppUsagePlugin {
     saveAppRule(options: { packageName: string; activityId: string }): Promise<void>;
     removeAppRule(options: { packageName: string }): Promise<void>;
     getAppRules(): Promise<{ rules: { [packageName: string]: string } }>;
+    startMonitor(): Promise<void>;
+    stopMonitor(): Promise<void>;
 }
 
 const AppUsage = registerPlugin<AppUsagePlugin>('AppUsage');
