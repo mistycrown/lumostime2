@@ -12,8 +12,19 @@ import com.getcapacitor.Plugin;
 import com.getcapacitor.PluginCall;
 import com.getcapacitor.PluginMethod;
 import com.getcapacitor.annotation.CapacitorPlugin;
+import android.content.pm.ApplicationInfo;
+import android.content.pm.PackageManager;
+import android.graphics.Bitmap;
+import android.graphics.Canvas;
+import android.graphics.drawable.BitmapDrawable;
+import android.graphics.drawable.Drawable;
+import android.util.Base64;
+import com.getcapacitor.JSArray;
+import java.io.ByteArrayOutputStream;
 import java.util.List;
-import java.util.TreeMap;
+import java.util.Map;
+import org.json.JSONException;
+import org.json.JSONObject;
 
 @CapacitorPlugin(name = "AppUsage")
 public class AppUsagePlugin extends Plugin {
@@ -72,6 +83,112 @@ public class AppUsagePlugin extends Plugin {
             }
         }
         return packageName;
+    }
+
+    @PluginMethod
+    public void getInstalledApps(PluginCall call) {
+        new Thread(() -> {
+            try {
+                PackageManager pm = getContext().getPackageManager();
+                List<ApplicationInfo> apps = pm.getInstalledApplications(PackageManager.GET_META_DATA);
+                JSArray ret = new JSArray();
+
+                for (ApplicationInfo app : apps) {
+                    if ((app.flags & ApplicationInfo.FLAG_SYSTEM) == 0
+                            || (app.flags & ApplicationInfo.FLAG_UPDATED_SYSTEM_APP) != 0) {
+                        JSObject obj = new JSObject();
+                        obj.put("packageName", app.packageName);
+                        obj.put("label", pm.getApplicationLabel(app).toString());
+                        // Icon conversion is heavy, do it carefully or pagination?
+                        // For now, let's try sending all, but maybe resize?
+                        // Or maybe just names first for speed?
+                        // User requirement: "显示图标". So we must send it.
+                        try {
+                            Drawable icon = pm.getApplicationIcon(app);
+                            obj.put("icon", drawableToBase64(icon));
+                        } catch (Exception e) {
+                            obj.put("icon", "");
+                        }
+                        ret.put(obj);
+                    }
+                }
+                call.resolve(new JSObject().put("apps", ret));
+            } catch (Exception e) {
+                call.reject("Failed to get apps", e);
+            }
+        }).start();
+    }
+
+    @PluginMethod
+    public void saveAppRule(PluginCall call) {
+        String packageName = call.getString("packageName");
+        String activityId = call.getString("activityId");
+        if (packageName == null || activityId == null) {
+            call.reject("Missing packageName or activityId");
+            return;
+        }
+
+        android.content.SharedPreferences prefs = getContext().getSharedPreferences("AppUsageRules",
+                Context.MODE_PRIVATE);
+        prefs.edit().putString(packageName, activityId).apply();
+        call.resolve();
+    }
+
+    @PluginMethod
+    public void removeAppRule(PluginCall call) {
+        String packageName = call.getString("packageName");
+        if (packageName == null) {
+            call.reject("Missing packageName");
+            return;
+        }
+
+        android.content.SharedPreferences prefs = getContext().getSharedPreferences("AppUsageRules",
+                Context.MODE_PRIVATE);
+        prefs.edit().remove(packageName).apply();
+        call.resolve();
+    }
+
+    @PluginMethod
+    public void getAppRules(PluginCall call) {
+        android.content.SharedPreferences prefs = getContext().getSharedPreferences("AppUsageRules",
+                Context.MODE_PRIVATE);
+        Map<String, ?> all = prefs.getAll();
+        JSObject rules = new JSObject();
+        for (Map.Entry<String, ?> entry : all.entrySet()) {
+            if (entry.getValue() instanceof String) {
+                rules.put(entry.getKey(), entry.getValue());
+            }
+        }
+        call.resolve(new JSObject().put("rules", rules));
+    }
+
+    private String drawableToBase64(Drawable drawable) {
+        Bitmap bitmap;
+        if (drawable instanceof BitmapDrawable) {
+            bitmap = ((BitmapDrawable) drawable).getBitmap();
+        } else {
+            int width = drawable.getIntrinsicWidth();
+            int height = drawable.getIntrinsicHeight();
+            // Handle some drawables having 0 intrinsic size
+            if (width <= 0)
+                width = 96;
+            if (height <= 0)
+                height = 96;
+
+            bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
+            Canvas canvas = new Canvas(bitmap);
+            drawable.setBounds(0, 0, canvas.getWidth(), canvas.getHeight());
+            drawable.draw(canvas);
+        }
+
+        ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
+        // Compress to PNG, quality 100 (PNG ignores quality)
+        // Resize if too big? Icons are usually small (48-96dp).
+        // Let's resize to standard 48x48 to save memory if needed?
+        // No, keep original for quality, usually they are < 20kb.
+        bitmap.compress(Bitmap.CompressFormat.PNG, 100, byteArrayOutputStream);
+        byte[] byteArray = byteArrayOutputStream.toByteArray();
+        return "data:image/png;base64," + Base64.encodeToString(byteArray, Base64.NO_WRAP);
     }
 
     private boolean hasUsageStatsPermission() {
