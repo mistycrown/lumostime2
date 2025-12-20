@@ -31,6 +31,7 @@ import { ParsedTimeEntry, aiService } from './services/aiService';
 import { narrativeService } from './services/narrativeService';
 import { NfcService } from './services/NfcService';
 import { NARRATIVE_TEMPLATES } from './constants';
+import FocusNotification from './plugins/FocusNotificationPlugin';
 import * as LucideIcons from 'lucide-react';
 import {
   PlusCircle,
@@ -304,6 +305,25 @@ const App: React.FC = () => {
     localStorage.setItem('lumostime_monthlyReviews', JSON.stringify(monthlyReviews));
   }, [monthlyReviews]);
 
+  // 通知计时器（监听activeSessions，更新通知时间）
+  useEffect(() => {
+    if (Capacitor.getPlatform() !== 'android' || activeSessions.length === 0) {
+      return;
+    }
+
+    // 只为第一个session更新通知
+    const firstSession = activeSessions[0];
+
+    const interval = setInterval(() => {
+      const elapsed = Math.floor((Date.now() - firstSession.startTime) / 1000);
+      FocusNotification.updateFocusTime({ elapsedSeconds: elapsed }).catch(err => {
+        console.error('❌ 更新专注通知失败:', err);
+      });
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [activeSessions]);
+
 
   const handleStartActivity = (activity: Activity, categoryId: string, todoId?: string, scopeId?: string) => {
     let appliedScopeIds: string[] | undefined = scopeId ? [scopeId] : undefined;
@@ -324,6 +344,19 @@ const App: React.FC = () => {
       scopeIds: appliedScopeIds
     };
     setActiveSessions(prev => [...prev, newSession]);
+
+    // 启动通知（仅Android平台）
+    if (Capacitor.getPlatform() === 'android') {
+      const taskName = `${activity.icon} ${activity.name}`;
+      FocusNotification.startFocusNotification({ taskName })
+        .then(() => {
+          // Service启动后立即更新一次，确保通知显示
+          return FocusNotification.updateFocusTime({ elapsedSeconds: 0 });
+        })
+        .catch(err => {
+          console.error('❌ 启动专注通知失败:', err);
+        });
+    }
   };
 
   const handleStopActivity = (sessionId: string, finalSessionData?: ActiveSession) => {
@@ -375,11 +408,25 @@ const App: React.FC = () => {
     }
     setActiveSessions(prev => prev.filter(s => s.id !== sessionId));
     if (focusDetailSessionId === sessionId) setFocusDetailSessionId(null);
+
+    // 停止通知（仅Android平台）
+    if (Capacitor.getPlatform() === 'android') {
+      FocusNotification.stopFocusNotification().catch(err => {
+        console.error('❌ 停止专注通知失败:', err);
+      });
+    }
   };
 
   const handleCancelSession = (sessionId: string) => {
     setActiveSessions(prev => prev.filter(s => s.id !== sessionId));
     if (focusDetailSessionId === sessionId) setFocusDetailSessionId(null);
+
+    // 停止通知（仅Android平台）
+    if (Capacitor.getPlatform() === 'android') {
+      FocusNotification.stopFocusNotification().catch(err => {
+        console.error('❌ 停止专注通知失败:', err);
+      });
+    }
   };
 
   const handleUpdateSession = (updatedSession: ActiveSession) => {

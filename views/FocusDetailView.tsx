@@ -4,6 +4,8 @@ import { X, Check, ChevronDown, TrendingUp, Plus, Minus, Lightbulb, CheckCircle2
 import { TodoAssociation } from '../components/TodoAssociation';
 import { ScopeAssociation } from '../components/ScopeAssociation';
 import { FocusScoreSelector } from '../components/FocusScoreSelector';
+import FocusNotification from '../plugins/FocusNotificationPlugin';
+import { Capacitor } from '@capacitor/core';
 
 interface FocusDetailViewProps {
     session: ActiveSession;
@@ -136,10 +138,13 @@ export const FocusDetailView: React.FC<FocusDetailViewProps> = ({ session, todos
 
     const hasSuggestions = suggestions.activity || suggestions.scopes.length > 0;
 
+    // 计时器
     useEffect(() => {
         const interval = setInterval(() => {
-            setElapsed(Math.floor((Date.now() - session.startTime) / 1000));
+            const newElapsed = Math.floor((Date.now() - session.startTime) / 1000);
+            setElapsed(newElapsed);
         }, 1000);
+
         return () => clearInterval(interval);
     }, [session.startTime]);
 
@@ -174,6 +179,13 @@ export const FocusDetailView: React.FC<FocusDetailViewProps> = ({ session, todos
     const linkedTodo = todos.find(t => t.id === session.linkedTodoId);
 
     const handleComplete = () => {
+        // 停止通知（仅Android平台）
+        if (Capacitor.getPlatform() === 'android') {
+            FocusNotification.stopFocusNotification().catch(err => {
+                console.error('停止专注通知失败:', err);
+            });
+        }
+
         onComplete({
             ...session,
             note,
