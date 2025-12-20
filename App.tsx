@@ -331,9 +331,15 @@ const App: React.FC = () => {
     // 启动通知（仅Android平台）
     if (Capacitor.getPlatform() === 'android') {
       const taskName = `${activity.icon} ${activity.name}`;
-      FocusNotification.startFocusNotification({ taskName }).catch(err => {
-        console.error('❌ 启动专注通知失败:', err);
-      });
+      // Start Focus Notification if enabled
+      const statusBarEnabled = localStorage.getItem('cfg_status_bar_enabled') !== 'false';
+      if (statusBarEnabled) {
+        FocusNotification.startFocusNotification({
+          taskName
+        }).catch(err => {
+          console.error('❌ 启动专注通知失败:', err);
+        });
+      }
       // 更新悬浮球状态
       // Use toString() for safety
       if (newSession && newSession.startTime) {
