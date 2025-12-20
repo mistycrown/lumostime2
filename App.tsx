@@ -2078,6 +2078,7 @@ const App: React.FC = () => {
               setMonthlyReviews([]);
               setAutoLinkRules([]);
               setCustomNarrativeTemplates([]);
+              setUserPersonalInfo('');
               addToast('success', 'Data reset to defaults');
               addToast('success', 'Data reset to defaults');
               setIsSettingsOpen(false);
@@ -2092,6 +2093,7 @@ const App: React.FC = () => {
               setWeeklyReviews([]);
               setMonthlyReviews([]);
               setAutoLinkRules([]);
+              setUserPersonalInfo('');
               // Optional: Clear AI preferences? Maybe keep them.
               addToast('success', 'All data cleared successfully');
               setIsSettingsOpen(false);
