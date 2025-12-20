@@ -40,7 +40,8 @@ import {
     PlusCircle,
     ArrowUpCircle,
     Layout,
-    Coffee
+    Coffee,
+    Smartphone
 } from 'lucide-react';
 import { webdavService, WebDAVConfig } from '../services/webdavService';
 import { NfcService } from '../services/NfcService';
@@ -54,6 +55,7 @@ import { ReviewTemplateManageView } from './ReviewTemplateManageView';
 import { ConfirmModal } from '../components/ConfirmModal';
 import { ReviewTemplate, NarrativeTemplate } from '../types';
 import FocusNotification from '../plugins/FocusNotificationPlugin';
+import { AutoRecordSettingsView } from './AutoRecordSettingsView';
 
 import { NARRATIVE_TEMPLATES } from '../constants';
 // @ts-ignore
@@ -115,7 +117,7 @@ const AI_PRESETS = {
 };
 
 export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, onImport, onReset, onClearData, onToast, syncData, onSyncUpdate, startWeekOnSunday, onToggleStartWeekOnSunday, onOpenAutoLink, onOpenSearch, minIdleTimeThreshold = 1, onSetMinIdleTimeThreshold, defaultView = 'RECORD', onSetDefaultView, reviewTemplates = [], onUpdateReviewTemplates, dailyReviewTime, onSetDailyReviewTime, weeklyReviewTime, onSetWeeklyReviewTime, monthlyReviewTime, onSetMonthlyReviewTime, customNarrativeTemplates, onUpdateCustomNarrativeTemplates, userPersonalInfo, onSetUserPersonalInfo }) => {
-    const [activeSubmenu, setActiveSubmenu] = useState<'main' | 'data' | 'cloud' | 'ai' | 'preferences' | 'guide' | 'nfc' | 'templates' | 'narrative_prompt'>('main');
+    const [activeSubmenu, setActiveSubmenu] = useState<'main' | 'data' | 'cloud' | 'ai' | 'preferences' | 'guide' | 'nfc' | 'templates' | 'narrative_prompt' | 'auto_record'>('main');
     const [webdavConfig, setWebdavConfig] = useState<WebDAVConfig | null>(null);
     const [isSyncing, setIsSyncing] = useState(false);
 
@@ -818,6 +820,10 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
         setShowAddTemplateModal(false);
         onToast('success', editingTemplate ? '模板已更新' : '新模板已创建');
     };
+
+    if (activeSubmenu === 'auto_record') {
+        return <AutoRecordSettingsView onBack={() => setActiveSubmenu('main')} />;
+    }
 
     if (activeSubmenu === 'data') {
         return (
@@ -1532,6 +1538,11 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
                 <div className="space-y-3">
                     <h3 className="text-[10px] font-bold text-stone-400 uppercase tracking-wider pl-2">Android 特性</h3>
                     <div className="bg-white rounded-2xl overflow-hidden shadow-[0_2px_10px_rgba(0,0,0,0.03)]">
+                        <MenuItem
+                            icon={<Smartphone size={18} className="text-indigo-500" />}
+                            label="应用自动记录"
+                            onClick={() => setActiveSubmenu('auto_record')}
+                        />
                         <ToggleItem
                             icon={<SquareActivity size={18} className="text-teal-500" />}
                             label="开启悬浮球"
