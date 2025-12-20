@@ -821,8 +821,13 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
         onToast('success', editingTemplate ? '模板已更新' : '新模板已创建');
     };
 
+    const { categories } = syncData;
+
     if (activeSubmenu === 'auto_record') {
-        return <AutoRecordSettingsView onBack={() => setActiveSubmenu('main')} />;
+        return <AutoRecordSettingsView
+            onBack={() => setActiveSubmenu('main')}
+            categories={categories || []}
+        />;
     }
 
     if (activeSubmenu === 'data') {
