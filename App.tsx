@@ -334,6 +334,15 @@ const App: React.FC = () => {
       FocusNotification.startFocusNotification({ taskName }).catch(err => {
         console.error('❌ 启动专注通知失败:', err);
       });
+      // 更新悬浮球状态
+      // Use toString() for safety
+      if (newSession && newSession.startTime) {
+        FocusNotification.updateFloatingWindow({
+          icon: activity.icon,
+          isFocusing: true,
+          startTime: newSession.startTime.toString()
+        }).catch((e) => console.error("Update FW failed", e));
+      }
     }
   };
 
@@ -388,10 +397,13 @@ const App: React.FC = () => {
     if (focusDetailSessionId === sessionId) setFocusDetailSessionId(null);
 
     // 停止通知（仅Android平台）
+    // 停止通知（仅Android平台）
     if (Capacitor.getPlatform() === 'android') {
       FocusNotification.stopFocusNotification().catch(err => {
         console.error('❌ 停止专注通知失败:', err);
       });
+      // 恢复悬浮球状态
+      FocusNotification.updateFloatingWindow({ isFocusing: false }).catch(() => { });
     }
   };
 
@@ -400,10 +412,13 @@ const App: React.FC = () => {
     if (focusDetailSessionId === sessionId) setFocusDetailSessionId(null);
 
     // 停止通知（仅Android平台）
+    // 停止通知（仅Android平台）
     if (Capacitor.getPlatform() === 'android') {
       FocusNotification.stopFocusNotification().catch(err => {
         console.error('❌ 停止专注通知失败:', err);
       });
+      // 恢复悬浮球状态
+      FocusNotification.updateFloatingWindow({ isFocusing: false }).catch(() => { });
     }
   };
 

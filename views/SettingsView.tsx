@@ -38,6 +38,7 @@ import {
     Edit2,
     PlusCircle,
     ArrowUpCircle,
+    Layout,
     Coffee
 } from 'lucide-react';
 import { webdavService, WebDAVConfig } from '../services/webdavService';
@@ -51,6 +52,7 @@ import remarkGfm from 'remark-gfm';
 import { ReviewTemplateManageView } from './ReviewTemplateManageView';
 import { ConfirmModal } from '../components/ConfirmModal';
 import { ReviewTemplate, NarrativeTemplate } from '../types';
+import FocusNotification from '../plugins/FocusNotificationPlugin';
 
 import { NARRATIVE_TEMPLATES } from '../constants';
 // @ts-ignore
@@ -150,6 +152,41 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
     const handleCancelNfc = async () => {
         await NfcService.cancelWrite();
         setIsWritingNfc(false);
+    };
+
+    // Floating Window State
+    const [floatingWindowEnabled, setFloatingWindowEnabled] = useState(false);
+
+    const handleToggleFloatingWindow = async () => {
+        // @ts-ignore
+        if (window.Capacitor?.getPlatform() !== 'android') {
+            onToast('info', '仅支持 Android 设备');
+            return;
+        }
+
+        if (!floatingWindowEnabled) {
+            try {
+                const res = await FocusNotification.checkFloatingPermission();
+                if (res.granted) {
+                    await FocusNotification.startFloatingWindow();
+                    setFloatingWindowEnabled(true);
+                    onToast('success', '悬浮球已开启');
+                } else {
+                    await FocusNotification.requestFloatingPermission();
+                    onToast('info', '请授予悬浮窗权限后重试');
+                }
+            } catch (e) {
+                console.error(e);
+                onToast('error', '开启失败');
+            }
+        } else {
+            try {
+                await FocusNotification.stopFloatingWindow();
+                setFloatingWindowEnabled(false);
+            } catch (e) {
+                console.error(e);
+            }
+        }
     };
 
     // UI States
@@ -1475,6 +1512,19 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
                         />
                     </div>
                 </div>
+                {/* Section: Android Features */}
+                <div className="space-y-3">
+                    <h3 className="text-[10px] font-bold text-stone-400 uppercase tracking-wider pl-2">Android 特性</h3>
+                    <div className="bg-white rounded-2xl overflow-hidden shadow-[0_2px_10px_rgba(0,0,0,0.03)]">
+                        <ToggleItem
+                            icon={<Layout size={18} className="text-teal-500" />}
+                            label="开启悬浮球 (测试)"
+                            checked={floatingWindowEnabled}
+                            onChange={handleToggleFloatingWindow}
+                            isLast
+                        />
+                    </div>
+                </div>
                 {/* Section: Daily Review */}
                 <div className="space-y-3">
                     <h3 className="text-[10px] font-bold text-stone-400 uppercase tracking-wider pl-2">每日回顾</h3>
@@ -1680,5 +1730,21 @@ const MenuItem: React.FC<{ icon: React.ReactNode, label: string, isLast?: boolea
             <span className="text-[15px] font-medium text-stone-700">{label}</span>
         </div>
         <ChevronRight size={16} className="text-stone-300" />
+    </div>
+);
+
+
+const ToggleItem: React.FC<{ icon: React.ReactNode, label: string, isLast?: boolean, checked: boolean, onChange: () => void }> = ({ icon, label, isLast, checked, onChange }) => (
+    <div
+        onClick={onChange}
+        className={`flex items-center justify-between p-4 active:bg-stone-50 transition-colors cursor-pointer ${!isLast ? 'border-b border-stone-50' : ''}`}
+    >
+        <div className="flex items-center gap-3.5">
+            <div className="text-stone-600">{icon}</div>
+            <span className="text-[15px] font-medium text-stone-700">{label}</span>
+        </div>
+        <div className={`w-10 h-6 rounded-full transition-colors relative ${checked ? 'bg-green-500' : 'bg-stone-200'}`}>
+            <div className={`absolute top-1 w-4 h-4 rounded-full bg-white shadow-sm transition-transform ${checked ? 'left-5' : 'left-1'}`} />
+        </div>
     </div>
 );
