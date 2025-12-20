@@ -1,9 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { ArrowLeft, Check, ShieldAlert } from 'lucide-react';
 import AppUsage from '../plugins/AppUsagePlugin';
-// Assuming using simple state navigation or passed props since no react-router likely
-// If using react-router, useNavigate is fine, but looking at App.tsx, it seems conditional rendering.
-// Start with a component that takes an onBack prop.
 
 interface Props {
     onBack: () => void;
@@ -11,6 +8,7 @@ interface Props {
 
 export const AutoRecordSettingsView: React.FC<Props> = ({ onBack }) => {
     const [hasPermission, setHasPermission] = useState<boolean>(false);
+    const [currentPackage, setCurrentPackage] = useState<string>('');
 
     useEffect(() => {
         checkPermission();
@@ -29,20 +27,11 @@ export const AutoRecordSettingsView: React.FC<Props> = ({ onBack }) => {
             setHasPermission(result.granted);
         } catch (error) {
             console.error('Error checking permission:', error);
-            // Fallback for dev/browser
-            if (process.env.NODE_ENV === 'development') {
-                // setHasPermission(true); 
-            }
         }
     };
 
     const handlePermissionClick = async () => {
         if (hasPermission) {
-            // Using a simple alert for now as requested by user "Toast提示"
-            // In App.tsx I saw addToast, but here I might not have access to it unless passed.
-            // I'll use window.alert or console for now, or if I can use the Toast component.
-            // But let's stick to the requested "Toast" if possible via a prop or context?
-            // For now simple alert is safer than breaking.
             alert("已获得权限");
             return;
         }
@@ -51,6 +40,22 @@ export const AutoRecordSettingsView: React.FC<Props> = ({ onBack }) => {
             await AppUsage.requestPermissions();
         } catch (error) {
             console.error('Error requesting permission:', error);
+        }
+    };
+
+    const handleTestDetection = async () => {
+        try {
+            // @ts-ignore
+            const result = await AppUsage.getRunningApp();
+            setCurrentPackage(result.packageName);
+            if (result.packageName) {
+                alert(`Detected: ${result.packageName}`);
+            } else {
+                alert("No app detected (or permission missing)");
+            }
+        } catch (error) {
+            console.error(error);
+            alert("Error detecting app");
         }
     };
 
@@ -95,6 +100,24 @@ export const AutoRecordSettingsView: React.FC<Props> = ({ onBack }) => {
                             {hasPermission ? '已开启' : '去授权'}
                         </div>
                     </div>
+                </section>
+
+                {/* Test Section */}
+                <section className="bg-white dark:bg-slate-800 rounded-2xl p-4 shadow-sm border border-slate-100 dark:border-slate-700">
+                    <h2 className="text-sm font-semibold text-slate-500 dark:text-slate-400 mb-4 uppercase tracking-wider">测试功能</h2>
+
+                    <button
+                        onClick={handleTestDetection}
+                        className="w-full py-3 bg-indigo-600 text-white rounded-xl font-bold shadow-lg shadow-indigo-200 active:scale-[0.98] transition-all"
+                    >
+                        检测当前应用
+                    </button>
+
+                    {currentPackage && (
+                        <div className="mt-4 p-3 bg-slate-100 dark:bg-slate-900 rounded-xl text-center font-mono text-sm text-slate-600 dark:text-slate-300">
+                            {currentPackage}
+                        </div>
+                    )}
                 </section>
 
                 <div className="px-2">
