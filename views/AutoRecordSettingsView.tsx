@@ -26,6 +26,7 @@ export const AutoRecordSettingsView: React.FC<Props> = ({ onBack, categories }) 
     const [isLoading, setIsLoading] = useState(false);
     const [isDetecting, setIsDetecting] = useState(false);
     const [detectedPackage, setDetectedPackage] = useState<string>('');
+    const [isMonitoring, setIsMonitoring] = useState(false); // Monitor state
 
     // Selection Modal State
     const [selectedApp, setSelectedApp] = useState<InstalledApp | null>(null);
@@ -50,6 +51,32 @@ export const AutoRecordSettingsView: React.FC<Props> = ({ onBack, categories }) 
             setHasPermission(res.granted);
         } catch (e) { console.error(e); }
     };
+
+
+
+    // Need to persist monitoring state? For now let's just use local state for UI, 
+    // but in reality we should check if service is running or check a stored pref.
+    // For MVP validation, we'll just toggle.
+    // Actually, persistence is better.
+    const toggleMonitoring = async () => {
+        try {
+            if (isMonitoring) {
+                await AppUsage.stopMonitor();
+                setIsMonitoring(false);
+                localStorage.setItem('cfg_auto_record_enabled', 'false');
+            } else {
+                await AppUsage.startMonitor();
+                setIsMonitoring(true);
+                localStorage.setItem('cfg_auto_record_enabled', 'true');
+            }
+        } catch (e) { console.error(e); }
+    };
+
+    // Load persisted state
+    useEffect(() => {
+        const saved = localStorage.getItem('cfg_auto_record_enabled') === 'true';
+        if (saved) setIsMonitoring(true);
+    }, []);
 
     const loadData = async () => {
         setIsLoading(true);
@@ -191,8 +218,8 @@ export const AutoRecordSettingsView: React.FC<Props> = ({ onBack, categories }) 
                                                 key={act.id}
                                                 onClick={() => handleSaveRule(act.id)}
                                                 className={`flex items-center gap-3 p-3 rounded-xl border text-left transition-all ${isSelected
-                                                        ? 'bg-indigo-50 border-indigo-500 ring-1 ring-indigo-500 dark:bg-indigo-900/30 dark:border-indigo-400'
-                                                        : 'bg-white border-slate-100 dark:bg-slate-800 dark:border-slate-700 active:scale-95'
+                                                    ? 'bg-indigo-50 border-indigo-500 ring-1 ring-indigo-500 dark:bg-indigo-900/30 dark:border-indigo-400'
+                                                    : 'bg-white border-slate-100 dark:bg-slate-800 dark:border-slate-700 active:scale-95'
                                                     }`}
                                             >
                                                 <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm ${act.color || 'bg-slate-100 text-slate-500'}`}>
@@ -248,6 +275,22 @@ export const AutoRecordSettingsView: React.FC<Props> = ({ onBack, categories }) 
                             <ChevronRight size={20} className="text-amber-400" />
                         </div>
                     )}
+
+                    {/* Monitoring Switch */}
+                    <div className="bg-white dark:bg-slate-800 rounded-xl p-4 shadow-sm border border-slate-100 dark:border-slate-700 flex items-center justify-between">
+                        <div>
+                            <div className="font-bold text-slate-800 dark:text-white">后台自动检测</div>
+                            <div className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                                开启后将在通知栏常驻，实时检测应用切换
+                            </div>
+                        </div>
+                        <div
+                            onClick={toggleMonitoring}
+                            className={`w-12 h-7 rounded-full transition-colors flex items-center px-1 cursor-pointer ${isMonitoring ? 'bg-indigo-500' : 'bg-slate-200 dark:bg-slate-700'}`}
+                        >
+                            <div className={`w-5 h-5 rounded-full bg-white shadow-sm transition-transform ${isMonitoring ? 'translate-x-5' : ''}`} />
+                        </div>
+                    </div>
 
                     {/* Test Button (Keep it for verification) */}
                     <div className="flex gap-2">
