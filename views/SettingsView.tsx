@@ -83,8 +83,6 @@ interface SettingsViewProps {
     onSetDailyReviewTime?: (time: string) => void;
     // Weekly Review Time
     weeklyReviewTime?: string;
-    // Weekly Review Time
-    weeklyReviewTime?: string;
     onSetWeeklyReviewTime?: (time: string) => void;
     // Monthly Review Time
     monthlyReviewTime?: string;
@@ -155,7 +153,9 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
     };
 
     // Floating Window State
-    const [floatingWindowEnabled, setFloatingWindowEnabled] = useState(false);
+    const [floatingWindowEnabled, setFloatingWindowEnabled] = useState(() => {
+        return localStorage.getItem('cfg_floating_window_enabled') === 'true';
+    });
 
     const handleToggleFloatingWindow = async () => {
         // @ts-ignore
@@ -170,6 +170,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
                 if (res.granted) {
                     await FocusNotification.startFloatingWindow();
                     setFloatingWindowEnabled(true);
+                    localStorage.setItem('cfg_floating_window_enabled', 'true');
                     onToast('success', '悬浮球已开启');
                 } else {
                     await FocusNotification.requestFloatingPermission();
@@ -183,10 +184,24 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
             try {
                 await FocusNotification.stopFloatingWindow();
                 setFloatingWindowEnabled(false);
+                localStorage.setItem('cfg_floating_window_enabled', 'false');
             } catch (e) {
                 console.error(e);
             }
         }
+    };
+
+    // Status Bar Notification State
+    const [statusBarEnabled, setStatusBarEnabled] = useState(() => {
+        // Default to true if not set
+        const val = localStorage.getItem('cfg_status_bar_enabled');
+        return val === null || val === 'true';
+    });
+
+    const handleToggleStatusBar = () => {
+        const newState = !statusBarEnabled;
+        setStatusBarEnabled(newState);
+        localStorage.setItem('cfg_status_bar_enabled', newState ? 'true' : 'false');
     };
 
     // UI States
@@ -1521,6 +1536,12 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
                             label="开启悬浮球 (测试)"
                             checked={floatingWindowEnabled}
                             onChange={handleToggleFloatingWindow}
+                        />
+                        <ToggleItem
+                            icon={<Layout size={18} className="text-blue-500" />}
+                            label="开启状态栏通知"
+                            checked={statusBarEnabled}
+                            onChange={handleToggleStatusBar}
                             isLast
                         />
                     </div>
