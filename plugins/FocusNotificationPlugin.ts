@@ -17,6 +17,31 @@ export interface FocusNotificationPlugin {
      * 停止专注通知
      */
     stopFocusNotification(): Promise<void>;
+
+    /**
+     * 检查是否有悬浮窗权限
+     */
+    checkFloatingPermission(): Promise<{ granted: boolean }>;
+
+    /**
+     * 请求悬浮窗权限
+     */
+    requestFloatingPermission(): Promise<void>;
+
+    /**
+     * 启动悬浮窗服务
+     */
+    startFloatingWindow(options?: { icon?: string, isFocusing?: boolean, startTime?: string }): Promise<void>;
+
+    /**
+     * 更新悬浮窗内容
+     */
+    updateFloatingWindow(options: { icon?: string, isFocusing: boolean, startTime?: string }): Promise<void>;
+
+    /**
+     * 停止悬浮窗服务
+     */
+    stopFloatingWindow(): Promise<void>;
 }
 
 const FocusNotification = registerPlugin<FocusNotificationPlugin>('FocusNotification', {
