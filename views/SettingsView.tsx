@@ -27,6 +27,7 @@ import {
     Save,
     Globe,
     Trash2,
+    SquareActivity,
 
     Sparkles, // AI Icon
     Bot,
@@ -193,9 +194,9 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
 
     // Status Bar Notification State
     const [statusBarEnabled, setStatusBarEnabled] = useState(() => {
-        // Default to true if not set
+        // Default to false (only 'true' means enabled)
         const val = localStorage.getItem('cfg_status_bar_enabled');
-        return val === null || val === 'true';
+        return val === 'true';
     });
 
     const handleToggleStatusBar = () => {
@@ -1532,8 +1533,8 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
                     <h3 className="text-[10px] font-bold text-stone-400 uppercase tracking-wider pl-2">Android 特性</h3>
                     <div className="bg-white rounded-2xl overflow-hidden shadow-[0_2px_10px_rgba(0,0,0,0.03)]">
                         <ToggleItem
-                            icon={<Layout size={18} className="text-teal-500" />}
-                            label="开启悬浮球 (测试)"
+                            icon={<SquareActivity size={18} className="text-teal-500" />}
+                            label="开启悬浮球"
                             checked={floatingWindowEnabled}
                             onChange={handleToggleFloatingWindow}
                         />
