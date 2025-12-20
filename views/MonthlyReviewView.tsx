@@ -471,7 +471,7 @@ export const MonthlyReviewView: React.FC<MonthlyReviewViewProps> = ({
 
                 <div className="pl-3 border-l-2 border-stone-200">
                     {q.type === 'text' && (
-                        <div className={`text-sm leading-relaxed ${!hasAnswer ? 'text-stone-400 italic' : 'text-stone-600'}`}>
+                        <div className={`text-sm leading-relaxed whitespace-pre-wrap ${!hasAnswer ? 'text-stone-400 italic' : 'text-stone-600'}`}>
                             {hasAnswer ? answer.answer : '未填写'}
                         </div>
                     )}
@@ -648,8 +648,8 @@ export const MonthlyReviewView: React.FC<MonthlyReviewViewProps> = ({
                                                 <button
                                                     onClick={() => toggleTemplateSyncToTimeline(template.id)}
                                                     className={`w-8 h-8 rounded-full flex items-center justify-center transition-colors ${template.syncToTimeline
-                                                            ? 'bg-stone-800 text-white'
-                                                            : 'bg-stone-100 text-stone-400'
+                                                        ? 'bg-stone-800 text-white'
+                                                        : 'bg-stone-100 text-stone-400'
                                                         }`}
                                                     title={template.syncToTimeline ? '已同步到时间轴' : '未同步到时间轴'}
                                                 >

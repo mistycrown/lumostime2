@@ -431,7 +431,7 @@ export const WeeklyReviewView: React.FC<WeeklyReviewViewProps> = ({
 
                 <div className="pl-3 border-l-2 border-stone-200">
                     {q.type === 'text' && (
-                        <div className={`text-sm leading-relaxed ${!hasAnswer ? 'text-stone-400 italic' : 'text-stone-600'}`}>
+                        <div className={`text-sm leading-relaxed whitespace-pre-wrap ${!hasAnswer ? 'text-stone-400 italic' : 'text-stone-600'}`}>
                             {hasAnswer ? answer.answer : '未填写'}
                         </div>
                     )}
@@ -483,7 +483,7 @@ export const WeeklyReviewView: React.FC<WeeklyReviewViewProps> = ({
     };
 
     return (
-        <div className="h-full bg-[#faf9f6] overflow-y-auto no-scrollbar pb-24 px-7 pt-4">
+        <div className="h-full bg-[#faf9f6] flex flex-col overflow-hidden px-7 pt-4">
             {/* Date Display Section */}
             {/* Header - Navigation Bar */}
             <header className="h-14 flex items-center justify-between px-5 bg-[#fdfbf7] border-b border-stone-100 shrink-0 z-30 mb-4 -mx-7 -mt-4">
@@ -516,7 +516,7 @@ export const WeeklyReviewView: React.FC<WeeklyReviewViewProps> = ({
             </div>
 
             {/* Tab Navigation */}
-            <div className="flex gap-6 border-b border-stone-200 mb-8 overflow-x-auto no-scrollbar">
+            <div className="flex gap-6 border-b border-stone-200 mb-3 overflow-x-auto no-scrollbar">
                 {(['data', 'guide', 'narrative'] as TabType[]).map(tab => (
                     <button
                         key={tab}
@@ -532,10 +532,10 @@ export const WeeklyReviewView: React.FC<WeeklyReviewViewProps> = ({
             </div>
 
             {/* Tab Content */}
-            <div className="space-y-6">
+            <div className="flex-1 overflow-hidden flex flex-col">
                 {/* Tab 1: Data - 使用 StatsView 组件 */}
                 {activeTab === 'data' && (
-                    <div className="animate-in fade-in duration-300 -mx-7 -mt-4 pb-6">
+                    <div className="flex-1 overflow-hidden -mx-7 animate-in fade-in duration-300">
                         <StatsView
                             logs={logs}
                             categories={categories}
@@ -555,7 +555,7 @@ export const WeeklyReviewView: React.FC<WeeklyReviewViewProps> = ({
 
                 {/* Tab 2: Guide */}
                 {activeTab === 'guide' && (
-                    <div className="space-y-6 animate-in fade-in duration-300 pb-40">
+                    <div className="flex-1 overflow-y-auto no-scrollbar space-y-6 animate-in fade-in duration-300 pb-40">
                         {templatesForDisplay.length === 0 ? (
                             <div className="text-center py-12">
                                 <p className="text-stone-400">暂无启用的回顾模板</p>
@@ -601,8 +601,8 @@ export const WeeklyReviewView: React.FC<WeeklyReviewViewProps> = ({
                                                 <button
                                                     onClick={() => toggleTemplateSyncToTimeline(template.id)}
                                                     className={`w-8 h-8 rounded-full flex items-center justify-center transition-colors ${template.syncToTimeline
-                                                            ? 'bg-stone-800 text-white'
-                                                            : 'bg-stone-100 text-stone-400'
+                                                        ? 'bg-stone-800 text-white'
+                                                        : 'bg-stone-100 text-stone-400'
                                                         }`}
                                                     title={template.syncToTimeline ? '已同步到时间轴' : '未同步到时间轴'}
                                                 >
@@ -626,7 +626,7 @@ export const WeeklyReviewView: React.FC<WeeklyReviewViewProps> = ({
 
                 {/* Tab 3: Narrative */}
                 {activeTab === 'narrative' && (
-                    <div className="space-y-4 animate-in fade-in duration-300 relative min-h-[50vh] pb-40">
+                    <div className="flex-1 overflow-y-auto no-scrollbar space-y-4 animate-in fade-in duration-300 pb-40">
                         {!narrative && !isEditing ? (
                             <div className="flex flex-col gap-1 py-8">
                                 {/* 选项1：新建空白叙事 */}
