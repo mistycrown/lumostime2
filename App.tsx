@@ -305,24 +305,7 @@ const App: React.FC = () => {
     localStorage.setItem('lumostime_monthlyReviews', JSON.stringify(monthlyReviews));
   }, [monthlyReviews]);
 
-  // 通知计时器（监听activeSessions，更新通知时间）
-  useEffect(() => {
-    if (Capacitor.getPlatform() !== 'android' || activeSessions.length === 0) {
-      return;
-    }
 
-    // 只为第一个session更新通知
-    const firstSession = activeSessions[0];
-
-    const interval = setInterval(() => {
-      const elapsed = Math.floor((Date.now() - firstSession.startTime) / 1000);
-      FocusNotification.updateFocusTime({ elapsedSeconds: elapsed }).catch(err => {
-        console.error('❌ 更新专注通知失败:', err);
-      });
-    }, 1000);
-
-    return () => clearInterval(interval);
-  }, [activeSessions]);
 
 
   const handleStartActivity = (activity: Activity, categoryId: string, todoId?: string, scopeId?: string) => {
@@ -348,14 +331,9 @@ const App: React.FC = () => {
     // 启动通知（仅Android平台）
     if (Capacitor.getPlatform() === 'android') {
       const taskName = `${activity.icon} ${activity.name}`;
-      FocusNotification.startFocusNotification({ taskName })
-        .then(() => {
-          // Service启动后立即更新一次，确保通知显示
-          return FocusNotification.updateFocusTime({ elapsedSeconds: 0 });
-        })
-        .catch(err => {
-          console.error('❌ 启动专注通知失败:', err);
-        });
+      FocusNotification.startFocusNotification({ taskName }).catch(err => {
+        console.error('❌ 启动专注通知失败:', err);
+      });
     }
   };
 

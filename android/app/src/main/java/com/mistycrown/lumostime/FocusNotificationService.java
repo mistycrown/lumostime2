@@ -5,45 +5,27 @@ import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.app.Service;
-import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
-import android.content.IntentFilter;
 import android.os.Build;
-import android.os.Bundle;
 import android.os.IBinder;
 import android.util.Log;
 import androidx.core.app.NotificationCompat;
-import org.json.JSONObject;
 
 /**
  * 专注通知前台服务
  * 显示持续的通知，展示当前专注任务和计时
+ * 使用 setUsesChronometer 实现系统原生低功耗计时
  */
 public class FocusNotificationService extends Service {
 
     private static final String TAG = "FocusNotifService";
     private static final String CHANNEL_ID = "focus_notification_channel";
     private static final int NOTIFICATION_ID = 1001;
-    private static final String ACTION_UPDATE = "com.mistycrown.lumostime.UPDATE_FOCUS_TIME";
-    private static final String ACTION_STOP = "com.mistycrown.lumostime.STOP_FOCUS";
 
     private String taskName = "专注中";
-    private int elapsedSeconds = 0;
+    private long startTime = 0;
     private NotificationManager notificationManager;
-
-    // 广播接收器：接收更新时间的指令
-    private final BroadcastReceiver updateReceiver = new BroadcastReceiver() {
-        @Override
-        public void onReceive(Context context, Intent intent) {
-            Log.d(TAG, "📡 收到广播: " + intent.getAction());
-            if (ACTION_UPDATE.equals(intent.getAction())) {
-                elapsedSeconds = intent.getIntExtra("elapsedSeconds", 0);
-                Log.d(TAG, "⏱️ 更新时间: " + elapsedSeconds + "秒 (" + formatTime(elapsedSeconds) + ")");
-                updateNotification();
-            }
-        }
-    };
 
     @Override
     public void onCreate() {
@@ -51,25 +33,19 @@ public class FocusNotificationService extends Service {
         Log.d(TAG, "📱 Service onCreate 被调用");
         notificationManager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
         createNotificationChannel();
-
-        // 注册广播接收器
-        IntentFilter filter = new IntentFilter(ACTION_UPDATE);
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            registerReceiver(updateReceiver, filter, Context.RECEIVER_NOT_EXPORTED);
-        } else {
-            registerReceiver(updateReceiver, filter);
-        }
-        Log.d(TAG, "✅ 广播接收器已注册");
     }
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
         Log.d(TAG, "🚀 Service onStartCommand 被调用");
         if (intent != null) {
-            taskName = intent.getStringExtra("taskName");
-            if (taskName == null)
-                taskName = "专注中";
-            elapsedSeconds = 0;
+            String newTaskName = intent.getStringExtra("taskName");
+            if (newTaskName != null) {
+                taskName = newTaskName;
+            }
+            // 每次启动服务时重置开始时间为当前时间
+            // 如果需要精确同步React端时间，可以通过Intent传递startTime，但通常误差在几十毫秒内可忽略
+            startTime = System.currentTimeMillis();
             Log.d(TAG, "📝 任务名: " + taskName);
         }
 
@@ -100,12 +76,6 @@ public class FocusNotificationService extends Service {
         if (notificationManager != null) {
             notificationManager.cancel(NOTIFICATION_ID);
         }
-
-        try {
-            unregisterReceiver(updateReceiver);
-        } catch (Exception e) {
-            // 忽略取消注册错误
-        }
     }
 
     @Override
@@ -121,7 +91,7 @@ public class FocusNotificationService extends Service {
             NotificationChannel channel = new NotificationChannel(
                     CHANNEL_ID,
                     "专注计时通知",
-                    NotificationManager.IMPORTANCE_DEFAULT); // 改为DEFAULT确保状态栏显示
+                    NotificationManager.IMPORTANCE_DEFAULT);
             channel.setDescription("显示当前专注任务和计时");
             channel.setShowBadge(false);
             notificationManager.createNotificationChannel(channel);
@@ -140,77 +110,18 @@ public class FocusNotificationService extends Service {
                 notificationIntent,
                 PendingIntent.FLAG_IMMUTABLE);
 
-        // 格式化时间
-        String timeText = formatTime(elapsedSeconds);
-
         NotificationCompat.Builder builder = new NotificationCompat.Builder(this, CHANNEL_ID)
                 .setContentTitle(taskName)
-                .setContentText(timeText)
+                .setContentText("专注进行中...")
                 .setSmallIcon(android.R.drawable.ic_dialog_info)
                 .setContentIntent(pendingIntent)
                 .setOngoing(true)
                 .setPriority(NotificationCompat.PRIORITY_LOW)
-                .setCategory(NotificationCompat.CATEGORY_PROGRESS);
-
-        // 添加小米超级岛JSON扩展参数
-        try {
-            JSONObject focusParam = new JSONObject();
-            focusParam.put("version", 1);
-
-            // 焦点通知内容
-            JSONObject focus = new JSONObject();
-            focus.put("title", "正在专注");
-            focus.put("content", taskName + " - " + timeText);
-            focusParam.put("focus", focus);
-
-            // AOD息屏显示
-            JSONObject aod = new JSONObject();
-            aod.put("aodTitle", taskName);
-            aod.put("aodContent", timeText);
-            focusParam.put("aod", aod);
-
-            // 状态栏文案
-            focusParam.put("ticker", "LumosTime 正在计时");
-
-            // 将JSON参数添加到通知的extras中
-            Bundle extras = new Bundle();
-            extras.putString("miui.focus.param", focusParam.toString());
-            builder.addExtras(extras);
-
-        } catch (Exception e) {
-            // 如果JSON构建失败，忽略错误，降级为普通通知
-            e.printStackTrace();
-        }
+                .setCategory(NotificationCompat.CATEGORY_PROGRESS)
+                // 关键优化：使用系统计时器，省电且无需频繁更新
+                .setUsesChronometer(true)
+                .setWhen(startTime);
 
         return builder.build();
-    }
-
-    /**
-     * 更新通知
-     */
-    private void updateNotification() {
-        notificationManager.notify(NOTIFICATION_ID, createNotification());
-    }
-
-    /**
-     * 格式化时间为 HH:MM:SS
-     */
-    private String formatTime(int seconds) {
-        int hours = seconds / 3600;
-        int minutes = (seconds % 3600) / 60;
-        int secs = seconds % 60;
-        return String.format("%02d:%02d:%02d", hours, minutes, secs);
-    }
-
-    /**
-     * 发送更新广播的静态方法
-     */
-    public static void sendUpdateBroadcast(Context context, int elapsedSeconds) {
-        Log.d("FocusNotifService", "📤 发送更新广播: " + elapsedSeconds + "秒");
-        Intent intent = new Intent(ACTION_UPDATE);
-        // 显式指定接收者组件（解决Android 13+隐式广播限制）
-        intent.setPackage(context.getPackageName());
-        intent.putExtra("elapsedSeconds", elapsedSeconds);
-        context.sendBroadcast(intent);
     }
 }

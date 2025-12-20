@@ -11,11 +11,7 @@ export interface FocusNotificationPlugin {
      */
     startFocusNotification(options: { taskName: string }): Promise<void>;
 
-    /**
-     * 更新专注计时
-     * @param options.elapsedSeconds 已专注的秒数
-     */
-    updateFocusTime(options: { elapsedSeconds: number }): Promise<void>;
+
 
     /**
      * 停止专注通知

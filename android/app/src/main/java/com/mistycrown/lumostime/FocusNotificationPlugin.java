@@ -100,21 +100,6 @@ public class FocusNotificationPlugin extends Plugin {
     }
 
     /**
-     * 更新专注计时
-     * 
-     * @param call 包含 elapsedSeconds 参数
-     */
-    @PluginMethod
-    public void updateFocusTime(PluginCall call) {
-        Integer elapsedSeconds = call.getInt("elapsedSeconds", 0);
-
-        // 发送广播更新通知
-        FocusNotificationService.sendUpdateBroadcast(getContext(), elapsedSeconds);
-
-        call.resolve();
-    }
-
-    /**
      * 停止专注通知
      */
     @PluginMethod
