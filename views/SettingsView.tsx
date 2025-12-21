@@ -194,18 +194,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
         }
     };
 
-    // Status Bar Notification State
-    const [statusBarEnabled, setStatusBarEnabled] = useState(() => {
-        // Default to false (only 'true' means enabled)
-        const val = localStorage.getItem('cfg_status_bar_enabled');
-        return val === 'true';
-    });
 
-    const handleToggleStatusBar = () => {
-        const newState = !statusBarEnabled;
-        setStatusBarEnabled(newState);
-        localStorage.setItem('cfg_status_bar_enabled', newState ? 'true' : 'false');
-    };
 
     // UI States
     const [isDefaultViewDropdownOpen, setIsDefaultViewDropdownOpen] = useState(false);
@@ -1554,13 +1543,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
                             checked={floatingWindowEnabled}
                             onChange={handleToggleFloatingWindow}
                         />
-                        <ToggleItem
-                            icon={<Layout size={18} className="text-blue-500" />}
-                            label="开启状态栏通知"
-                            checked={statusBarEnabled}
-                            onChange={handleToggleStatusBar}
-                            isLast
-                        />
+
                     </div>
                 </div>
                 {/* Section: Daily Review */}

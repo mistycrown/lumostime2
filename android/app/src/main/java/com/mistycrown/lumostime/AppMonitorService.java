@@ -203,6 +203,11 @@ public class AppMonitorService extends Service {
             // Send notification
             updateNotification("检测到应用: " + appLabel);
 
+            // Update Floating Window
+            FloatingWindowService.updateCurrentApp(currentPackage, appLabel);
+            // Update Plugin State
+            AppUsagePlugin.updateCurrentPackage(currentPackage);
+
             // Show Toast
             String finalAppLabel = appLabel;
             handler.post(() -> {

@@ -309,7 +309,7 @@ const App: React.FC = () => {
 
 
 
-  const handleStartActivity = (activity: Activity, categoryId: string, todoId?: string, scopeId?: string, isAuto: boolean = false) => {
+  const handleStartActivity = (activity: Activity, categoryId: string, todoId?: string, scopeId?: string) => {
     let appliedScopeIds: string[] | undefined = scopeId ? [scopeId] : undefined;
     if (!scopeId && autoLinkRules.length > 0) {
       const matchingRules = autoLinkRules.filter(rule => rule.activityId === activity.id);
@@ -325,23 +325,12 @@ const App: React.FC = () => {
       activityIcon: activity.icon,
       startTime: Date.now(),
       linkedTodoId: todoId,
-      scopeIds: appliedScopeIds,
-      isAuto: isAuto
+      scopeIds: appliedScopeIds
     };
     setActiveSessions(prev => [...prev, newSession]);
 
     // 启动通知（仅Android平台）
     if (Capacitor.getPlatform() === 'android') {
-      const taskName = `${activity.icon} ${activity.name}`;
-      // Start Focus Notification if enabled
-      const statusBarEnabled = localStorage.getItem('cfg_status_bar_enabled') === 'true'; // Default false
-      if (statusBarEnabled) {
-        FocusNotification.startFocusNotification({
-          taskName
-        }).catch(err => {
-          console.error('❌ 启动专注通知失败:', err);
-        });
-      }
       // 更新悬浮球状态
       // Use toString() for safety
       const floatingWindowEnabled = localStorage.getItem('cfg_floating_window_enabled') === 'true'; // Default false
@@ -355,22 +344,11 @@ const App: React.FC = () => {
     }
   };
 
-  const handleStopActivity = (sessionId: string, finalSessionData?: ActiveSession, overrideEndTime?: number) => {
+  const handleStopActivity = (sessionId: string, finalSessionData?: ActiveSession, customEndTime?: number) => {
     const session = activeSessions.find(s => s.id === sessionId);
     if (session) {
-      const endTime = overrideEndTime || Date.now();
+      const endTime = customEndTime || Date.now();
       const duration = (endTime - session.startTime) / 1000;
-
-      // Min Duration Check for Auto Sessions
-      if (session.isAuto) {
-        const minDurationStr = localStorage.getItem('cfg_auto_record_min_duration');
-        const minDurationRef = minDurationStr ? parseInt(minDurationStr, 10) : 0;
-        if (duration < minDurationRef * 60) {
-          console.log(`[Auto-Stop] Discarding session (Duration ${duration}s < Min ${minDurationRef}m)`);
-          handleCancelSession(sessionId);
-          return;
-        }
-      }
 
       if (duration > 1) {
         // 创建基础Log对象（不包含id，因为拆分时每条记录需要新id）
@@ -419,9 +397,6 @@ const App: React.FC = () => {
     // 停止通知（仅Android平台）
     // 停止通知（仅Android平台）
     if (Capacitor.getPlatform() === 'android') {
-      FocusNotification.stopFocusNotification().catch(err => {
-        console.error('❌ 停止专注通知失败:', err);
-      });
       // 恢复悬浮球状态
       FocusNotification.updateFloatingWindow({ isFocusing: false }).catch(() => { });
     }
@@ -434,9 +409,6 @@ const App: React.FC = () => {
     // 停止通知（仅Android平台）
     // 停止通知（仅Android平台）
     if (Capacitor.getPlatform() === 'android') {
-      FocusNotification.stopFocusNotification().catch(err => {
-        console.error('❌ 停止专注通知失败:', err);
-      });
       // 恢复悬浮球状态
       FocusNotification.updateFloatingWindow({ isFocusing: false }).catch(() => { });
     }
@@ -845,8 +817,8 @@ const App: React.FC = () => {
 
           // 2. Check for Immediate Stop trigger (Screen Off)
           if (pkg === 'SCREEN_OFF') {
-            console.log("Screen Off during suspension -> Stop immediately (using suspendedAt)");
-            stopSessionForPkg(originalPkg, suspendedAt);
+            console.log("Screen Off during suspension -> Stop immediately");
+            stopSessionForPkg(originalPkg);
             suspensionRef.current = null;
             lastAutoStartPackage.current = null;
             AppUsage.setSwitchPending({ pending: false });
@@ -855,7 +827,8 @@ const App: React.FC = () => {
 
           // 3. Check Timeout (1 Minute)
           if (Date.now() - suspendedAt > 60000) {
-            console.log("Suspension timeout -> Stop session (using suspendedAt)");
+            console.log("Suspension timeout -> Stop session");
+            // Use suspendedAt to exclude buffer time
             stopSessionForPkg(originalPkg, suspendedAt);
             suspensionRef.current = null;
             lastAutoStartPackage.current = null;
@@ -913,7 +886,7 @@ const App: React.FC = () => {
               setTimeout(() => {
                 if (lastAutoStartPackage.current === pkg) {
                   if (targetActivity && targetCategoryId) {
-                    handleStartActivity(targetActivity, targetCategoryId, undefined, undefined, true);
+                    handleStartActivity(targetActivity, targetCategoryId);
                   }
                 }
               }, 1500);

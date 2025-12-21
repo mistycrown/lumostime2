@@ -66,11 +66,9 @@ public class FloatingWindowService extends Service {
             if (isSwitching && isFocusing) {
                 if (now - switchingStartTime > 60000) {
                     Log.i(TAG, "⏰ Native Timeout Triggered! Ending Session Visuals.");
-                    isSwitching = false;
-                    isFocusing = false;
-                    updateContent(null, false, 0); // Reset to default state
-                    showTempTextInternal("自动结束");
-                    return; // Next cycle will handle the rest
+                    // Show "自动结束" then revert to Icon
+                    showAutoEndAnimation();
+                    return;
                 }
             }
 
@@ -278,6 +276,69 @@ public class FloatingWindowService extends Service {
         }
     }
 
+    private void showAutoEndAnimation() {
+        isSwitching = false;
+        isFocusing = false;
+
+        if (timeView != null) {
+            handler.removeCallbacks(updateRunnable);
+
+            if (emojiView != null)
+                emojiView.setVisibility(View.GONE);
+            if (iconView != null)
+                iconView.setVisibility(View.GONE);
+
+            timeView.setText("自动结束");
+            timeView.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 11);
+            timeView.setVisibility(View.VISIBLE);
+            timeView.setScaleY(1f);
+
+            // Revert to App Icon after 3 seconds
+            handler.postDelayed(() -> {
+                resetToInitialState();
+            }, 3000);
+        }
+    }
+
+    private void resetToInitialState() {
+        Log.i(TAG, "🔄 Resetting to Initial State");
+        isFocusing = false;
+        isSwitching = false;
+        isMoving = false;
+        currentDisplayState = 2; // Icon state
+
+        handler.removeCallbacks(updateRunnable);
+
+        // Hide overlay views
+        if (emojiView != null)
+            emojiView.setVisibility(View.GONE);
+        if (timeView != null)
+            timeView.setVisibility(View.GONE);
+        if (switchStateView != null)
+            switchStateView.setVisibility(View.GONE);
+
+        // Ensure Icon is valid and visible
+        if (iconView != null) {
+            iconView.setVisibility(View.VISIBLE);
+            iconView.setScaleY(1f);
+
+            // Force reload current app icon or default
+            String pkg = currentAppPackage;
+            currentAppPackage = ""; // invalid to force update
+
+            if (pkg != null && !pkg.isEmpty()) {
+                updateAppIconInternal(pkg, "");
+            } else {
+                // Try to use own icon
+                try {
+                    iconView.setImageDrawable(getPackageManager().getApplicationIcon(getPackageName()));
+                } catch (Exception e) {
+                    iconView.setImageResource(android.R.drawable.sym_def_app_icon);
+                }
+            }
+        }
+    }
+
     private void updateAppIconInternal(String packageName, String appLabel) {
         if (packageName.equals(currentAppPackage)) {
             return; // No change
@@ -289,12 +350,15 @@ public class FloatingWindowService extends Service {
             Drawable appIcon = pm.getApplicationIcon(packageName);
             iconView.setImageDrawable(appIcon);
 
-            // Ensure icon is visible and others hidden
-            iconView.setVisibility(View.VISIBLE);
-            if (emojiView != null)
-                emojiView.setVisibility(View.GONE);
-            if (timeView != null)
-                timeView.setVisibility(View.GONE);
+            // Only force visibility if NOT focusing (in focus mode, Runnable handles
+            // visibility)
+            if (!isFocusing) {
+                iconView.setVisibility(View.VISIBLE);
+                if (emojiView != null)
+                    emojiView.setVisibility(View.GONE);
+                if (timeView != null)
+                    timeView.setVisibility(View.GONE);
+            }
 
             Log.i(TAG, "✅ Updated icon for:: " + packageName);
         } catch (PackageManager.NameNotFoundException e) {
@@ -439,18 +503,7 @@ public class FloatingWindowService extends Service {
             handler.post(updateRunnable);
         } else {
             // Stop Focusing Mode -> Show App Icon
-            handler.removeCallbacks(updateRunnable);
-
-            // Clean up animations
-            emojiView.animate().cancel();
-            timeView.animate().cancel();
-            iconView.animate().cancel();
-
-            emojiView.setVisibility(View.GONE);
-            timeView.setVisibility(View.GONE);
-
-            iconView.setScaleY(1f);
-            iconView.setVisibility(View.VISIBLE);
+            resetToInitialState();
         }
     }
 
