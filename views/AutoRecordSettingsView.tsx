@@ -47,7 +47,7 @@ export const AutoRecordSettingsView: React.FC<Props> = ({ onBack, categories }) 
 
     const checkPermission = async () => {
         try {
-            const res = await AppUsage.checkPermissions();
+            const res = await AppUsage.checkAccessibilityPermission();
             setHasPermission(res.granted);
         } catch (e) { console.error(e); }
     };
@@ -102,7 +102,7 @@ export const AutoRecordSettingsView: React.FC<Props> = ({ onBack, categories }) 
 
     const handlePermissionClick = async () => {
         if (hasPermission) return;
-        try { await AppUsage.requestPermissions(); } catch (e) { console.log(e); }
+        try { await AppUsage.requestAccessibilityPermission(); } catch (e) { console.log(e); }
     };
 
     const handleTestDetection = async () => {
@@ -268,8 +268,8 @@ export const AutoRecordSettingsView: React.FC<Props> = ({ onBack, categories }) 
                             <div className="flex items-center gap-3">
                                 <ShieldAlert className="text-amber-600 dark:text-amber-500" size={24} />
                                 <div>
-                                    <div className="font-bold text-amber-900 dark:text-amber-400">需要权限</div>
-                                    <div className="text-xs text-amber-700 dark:text-amber-500">点击授权以启用自动记录功能</div>
+                                    <div className="font-bold text-amber-900 dark:text-amber-400">需要无障碍服务权限</div>
+                                    <div className="text-xs text-amber-700 dark:text-amber-500">点击授权以启用实时应用检测</div>
                                 </div>
                             </div>
                             <ChevronRight size={20} className="text-amber-400" />
