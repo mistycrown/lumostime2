@@ -780,6 +780,7 @@ const App: React.FC = () => {
   // --- Auto App Record Logic ---
   const [appRules, setAppRules] = useState<Record<string, string>>({});
   const lastAutoStartPackage = useRef<string | null>(null);
+  const suspensionRef = useRef<{ originalPkg: string; suspendedAt: number } | null>(null);
 
   // Load rules on mount
   useEffect(() => {
@@ -809,30 +810,75 @@ const App: React.FC = () => {
         const pkg = res.packageName;
         if (!pkg) return;
 
-        // --- Auto-Stop Logic ---
-        // If we were tracking an app (lastAutoStartPackage) and now pkg changed (e.g. Screen Off, Launcher, Other App)
+        // Helper to stop session
+        const stopSessionForPkg = (p: string) => {
+          const actId = appRules[p];
+          if (actId) {
+            const s = activeSessions.find(x => x.activityId === actId);
+            if (s) handleStopActivity(s.id);
+          }
+        };
+
+        // --- Suspension Logic (Switching Delay) ---
+        if (suspensionRef.current) {
+          const { originalPkg, suspendedAt } = suspensionRef.current;
+
+          // 1. Check if returned to original app
+          if (pkg === originalPkg) {
+            console.log(`Resumed ${originalPkg} from suspension`);
+            suspensionRef.current = null;
+            AppUsage.setSwitchPending({ pending: false });
+            return; // Resume normal monitoring
+          }
+
+          // 2. Check for Immediate Stop trigger (Screen Off)
+          if (pkg === 'SCREEN_OFF') {
+            console.log("Screen Off during suspension -> Stop immediately");
+            stopSessionForPkg(originalPkg);
+            suspensionRef.current = null;
+            lastAutoStartPackage.current = null;
+            AppUsage.setSwitchPending({ pending: false });
+            return;
+          }
+
+          // 3. Check Timeout (1 Minute)
+          if (Date.now() - suspendedAt > 60000) {
+            console.log("Suspension timeout -> Stop session");
+            stopSessionForPkg(originalPkg);
+            suspensionRef.current = null;
+            lastAutoStartPackage.current = null;
+            AppUsage.setSwitchPending({ pending: false });
+          }
+
+          // While suspended, we DO NOT match other rules. We wait.
+          return;
+        }
+
+        // --- Auto-Stop Logic (Enter Suspension) ---
         if (lastAutoStartPackage.current && lastAutoStartPackage.current !== pkg) {
           const lastPkg = lastAutoStartPackage.current;
-          const lastActivityId = appRules[lastPkg];
 
-          if (lastActivityId) {
-            const session = activeSessions.find(s => s.activityId === lastActivityId);
-            if (session) {
-              console.log(`Auto-stopping session for ${lastPkg} (switched to ${pkg})`);
-              handleStopActivity(session.id);
-            }
+          // If Screen Off, stop immediately (no suspension)
+          if (pkg === 'SCREEN_OFF') {
+            stopSessionForPkg(lastPkg);
+            lastAutoStartPackage.current = null;
+          } else {
+            // Enter Suspension
+            console.log(`Switched away from ${lastPkg} to ${pkg} -> Start Suspension`);
+            suspensionRef.current = {
+              originalPkg: lastPkg,
+              suspendedAt: Date.now()
+            };
+            AppUsage.setSwitchPending({ pending: true });
           }
-          // Reset tracker immediately
-          lastAutoStartPackage.current = null;
+          return; // Don't match new rules yet
         }
 
         // --- Auto-Start Logic ---
         const matchedActivityId = appRules[pkg];
         if (matchedActivityId) {
-          // Check if already active
           const isAlreadyRunning = activeSessions.some(s => s.activityId === matchedActivityId);
 
-          // Only start if NOT running AND we haven't already auto-started it (and haven't switched away)
           if (!isAlreadyRunning && lastAutoStartPackage.current !== pkg) {
             let targetActivity: Activity | undefined;
             let targetCategoryId: string | undefined;
@@ -848,18 +894,11 @@ const App: React.FC = () => {
 
             if (targetActivity && targetCategoryId) {
               console.log("Auto-starting activity:", targetActivity.name);
-
-              // Mark as handled immediately to prevent double-triggering
-              // Also serves as the flag for Auto-Stop logic to know we are tracking this
               lastAutoStartPackage.current = pkg;
 
-              // 1. Show "开始计时" on floating ball
               await AppUsage.showFloatingText({ text: "开始计时" });
 
-              // 2. Start Session after delay
               setTimeout(() => {
-                // Critical: Check if we are STILL tracking this package.
-                // If user switched away during delay, the interval loop would have cleared lastAutoStartPackage.
                 if (lastAutoStartPackage.current === pkg) {
                   if (targetActivity && targetCategoryId) {
                     handleStartActivity(targetActivity, targetCategoryId);
@@ -869,14 +908,10 @@ const App: React.FC = () => {
             }
           }
         }
-
-        // Note: We don't need a standalone 'else' to clear lastAutoStartPackage 
-        // because the Auto-Stop block at top handles ANY mismatch.
-
       } catch (e) {
         // quiet
       }
-    }, 1000); // Check every 1s
+    }, 1000);
 
     return () => clearInterval(interval);
   }, [appRules, activeSessions]);

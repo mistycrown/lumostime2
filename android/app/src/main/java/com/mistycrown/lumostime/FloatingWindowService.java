@@ -33,6 +33,7 @@ public class FloatingWindowService extends Service {
 
     private TextView emojiView;
     private TextView timeView;
+    private TextView switchStateView;
     // private TextView appNameView; // Debug removed
     private android.widget.ImageView iconView;
     private android.widget.FrameLayout containerView;
@@ -42,7 +43,9 @@ public class FloatingWindowService extends Service {
     // State
     private boolean isMoving = false;
     private boolean isFocusing = false;
+    private boolean isSwitching = false;
     private long startTime = 0;
+    private long switchingStartTime = 0; // Track when switching started
     private android.os.Handler handler = new android.os.Handler(android.os.Looper.getMainLooper());
     private static final long CYCLE_DURATION = 9000; // 5s Time + 2s Emoji + 2s Icon
     private static final long SHOW_TIME_DURATION = 5000;
@@ -59,13 +62,25 @@ public class FloatingWindowService extends Service {
             long now = System.currentTimeMillis();
             long cycleTime = now % CYCLE_DURATION;
 
+            // Native Timeout Check (60s)
+            if (isSwitching && isFocusing) {
+                if (now - switchingStartTime > 60000) {
+                    Log.i(TAG, "⏰ Native Timeout Triggered! Ending Session Visuals.");
+                    isSwitching = false;
+                    isFocusing = false;
+                    updateContent(null, false, 0); // Reset to default state
+                    showTempTextInternal("自动结束");
+                    return; // Next cycle will handle the rest
+                }
+            }
+
             int newState;
             if (cycleTime < SHOW_TIME_DURATION) {
                 newState = 0; // Time
             } else if (cycleTime < SHOW_EMOJI_DURATION) {
                 newState = 1; // Emoji
             } else {
-                newState = 2; // Icon
+                newState = isSwitching ? 3 : 2; // Icon or SwitchText
             }
 
             // Update Time Text constantly
@@ -104,6 +119,8 @@ public class FloatingWindowService extends Service {
                 return emojiView;
             case 2:
                 return iconView;
+            case 3:
+                return switchStateView;
             default:
                 return timeView;
         }
@@ -192,6 +209,15 @@ public class FloatingWindowService extends Service {
             instance.updateAppIconInternal(packageName, appLabel);
         } else {
             Log.w(TAG, "FloatingWindowService instance is null, cannot update");
+        }
+    }
+
+    public static void setSwitchingPending(boolean pending) {
+        if (instance != null) {
+            if (pending && !instance.isSwitching) {
+                instance.switchingStartTime = System.currentTimeMillis();
+            }
+            instance.isSwitching = pending;
         }
     }
 
@@ -337,6 +363,19 @@ public class FloatingWindowService extends Service {
                 android.graphics.Typeface.create(android.graphics.Typeface.SERIF, android.graphics.Typeface.BOLD));
         timeView.setVisibility(View.GONE);
         containerView.addView(timeView, new android.widget.FrameLayout.LayoutParams(
+                android.view.ViewGroup.LayoutParams.MATCH_PARENT,
+                android.view.ViewGroup.LayoutParams.MATCH_PARENT));
+
+        // Switch State View
+        switchStateView = new TextView(this);
+        switchStateView.setText("切换页面");
+        switchStateView.setTextColor(Color.parseColor("#EF4444")); // Red-500
+        switchStateView.setGravity(Gravity.CENTER);
+        switchStateView.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 11);
+        switchStateView.setTypeface(
+                android.graphics.Typeface.create(android.graphics.Typeface.SERIF, android.graphics.Typeface.BOLD));
+        switchStateView.setVisibility(View.GONE);
+        containerView.addView(switchStateView, new android.widget.FrameLayout.LayoutParams(
                 android.view.ViewGroup.LayoutParams.MATCH_PARENT,
                 android.view.ViewGroup.LayoutParams.MATCH_PARENT));
 

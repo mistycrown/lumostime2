@@ -280,6 +280,15 @@ public class AppUsagePlugin extends Plugin {
         }
     }
 
+    @PluginMethod
+    public void setSwitchPending(PluginCall call) {
+        Boolean pending = call.getBoolean("pending");
+        if (pending == null)
+            pending = false;
+        FloatingWindowService.setSwitchingPending(pending);
+        call.resolve();
+    }
+
     private boolean hasUsageStatsPermission() {
         AppOpsManager appOps = (AppOpsManager) getContext().getSystemService(Context.APP_OPS_SERVICE);
         int mode = appOps.checkOpNoThrow(AppOpsManager.OPSTR_GET_USAGE_STATS,

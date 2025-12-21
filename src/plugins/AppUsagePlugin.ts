@@ -13,6 +13,7 @@ export interface AppUsagePlugin {
     saveAppRule(options: { packageName: string, activityId: string }): Promise<void>;
     removeAppRule(options: { packageName: string }): Promise<void>;
     getAppRules(): Promise<{ rules: Record<string, string> }>;
+    setSwitchPending(options: { pending: boolean }): Promise<void>;
 }
 
 const AppUsage = registerPlugin<AppUsagePlugin>('AppUsage');
