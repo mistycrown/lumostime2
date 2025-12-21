@@ -40,7 +40,8 @@ public class AppUsagePlugin extends Plugin {
 
     @PluginMethod
     public void checkPermissions(PluginCall call) {
-        boolean granted = hasUsageStatsPermission();
+        // Redirect to Accessibility Check
+        boolean granted = isAccessibilityServiceEnabled();
         JSObject ret = new JSObject();
         ret.put("granted", granted);
         call.resolve(ret);
@@ -48,14 +49,11 @@ public class AppUsagePlugin extends Plugin {
 
     @PluginMethod
     public void requestPermissions(PluginCall call) {
-        if (!hasUsageStatsPermission()) {
-            Intent intent = new Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS);
-            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-            getContext().startActivity(intent);
-            call.resolve();
-        } else {
-            call.resolve();
-        }
+        // Redirect to Accessibility Settings
+        Intent intent = new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS);
+        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        getContext().startActivity(intent);
+        call.resolve();
     }
 
     @PluginMethod
@@ -85,7 +83,7 @@ public class AppUsagePlugin extends Plugin {
             return;
         }
 
-        // Prioritize real-time data from AccessibilityService if available
+        // Only use real-time data from AccessibilityService
         if (currentRealtimePackage != null) {
             JSObject ret = new JSObject();
             ret.put("packageName", currentRealtimePackage);
@@ -93,38 +91,10 @@ public class AppUsagePlugin extends Plugin {
             return;
         }
 
-        if (!hasUsageStatsPermission()) {
-            call.reject("Permission denied");
-            return;
-        }
-
-        String packageName = getTopPackageName();
+        // If Accessibility not running or no data yet
         JSObject ret = new JSObject();
-        ret.put("packageName", packageName != null ? packageName : "");
+        ret.put("packageName", "");
         call.resolve(ret);
-    }
-
-    private String getTopPackageName() {
-        UsageStatsManager usageStatsManager = (UsageStatsManager) getContext()
-                .getSystemService(Context.USAGE_STATS_SERVICE);
-        long endTime = System.currentTimeMillis();
-        long startTime = endTime - 60000; // Look back 60 seconds to ensure we capture the launch
-
-        android.app.usage.UsageEvents.Event event = new android.app.usage.UsageEvents.Event();
-        android.app.usage.UsageEvents usageEvents = usageStatsManager.queryEvents(startTime, endTime);
-        String packageName = null;
-        long lastTimestamp = 0;
-
-        while (usageEvents.hasNextEvent()) {
-            usageEvents.getNextEvent(event);
-            if (event.getEventType() == android.app.usage.UsageEvents.Event.MOVE_TO_FOREGROUND) {
-                if (event.getTimeStamp() > lastTimestamp) {
-                    lastTimestamp = event.getTimeStamp();
-                    packageName = event.getPackageName();
-                }
-            }
-        }
-        return packageName;
     }
 
     @PluginMethod
@@ -141,10 +111,6 @@ public class AppUsagePlugin extends Plugin {
                         JSObject obj = new JSObject();
                         obj.put("packageName", app.packageName);
                         obj.put("label", pm.getApplicationLabel(app).toString());
-                        // Icon conversion is heavy, do it carefully or pagination?
-                        // For now, let's try sending all, but maybe resize?
-                        // Or maybe just names first for speed?
-                        // User requirement: "显示图标". So we must send it.
                         try {
                             Drawable icon = pm.getApplicationIcon(app);
                             obj.put("icon", drawableToBase64(icon));
@@ -211,7 +177,6 @@ public class AppUsagePlugin extends Plugin {
         } else {
             int width = drawable.getIntrinsicWidth();
             int height = drawable.getIntrinsicHeight();
-            // Handle some drawables having 0 intrinsic size
             if (width <= 0)
                 width = 96;
             if (height <= 0)
@@ -224,10 +189,6 @@ public class AppUsagePlugin extends Plugin {
         }
 
         ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
-        // Compress to PNG, quality 100 (PNG ignores quality)
-        // Resize if too big? Icons are usually small (48-96dp).
-        // Let's resize to standard 48x48 to save memory if needed?
-        // No, keep original for quality, usually they are < 20kb.
         bitmap.compress(Bitmap.CompressFormat.PNG, 100, byteArrayOutputStream);
         byte[] byteArray = byteArrayOutputStream.toByteArray();
         return "data:image/png;base64," + Base64.encodeToString(byteArray, Base64.NO_WRAP);
@@ -235,33 +196,14 @@ public class AppUsagePlugin extends Plugin {
 
     @PluginMethod
     public void startMonitor(PluginCall call) {
-        if (!hasUsageStatsPermission()) {
-            call.reject("Permission denied");
-            return;
-        }
-
-        try {
-            Intent serviceIntent = new Intent(getContext(), AppMonitorService.class);
-            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
-                getContext().startForegroundService(serviceIntent);
-            } else {
-                getContext().startService(serviceIntent);
-            }
-            call.resolve();
-        } catch (Exception e) {
-            call.reject("Failed to start service", e);
-        }
+        // Deprecated/Removed functionality - just resolve or reject
+        call.resolve();
     }
 
     @PluginMethod
     public void stopMonitor(PluginCall call) {
-        try {
-            Intent serviceIntent = new Intent(getContext(), AppMonitorService.class);
-            getContext().stopService(serviceIntent);
-            call.resolve();
-        } catch (Exception e) {
-            call.reject("Failed to stop service", e);
-        }
+        // Deprecated/Removed functionality
+        call.resolve();
     }
 
     @PluginMethod
@@ -287,13 +229,6 @@ public class AppUsagePlugin extends Plugin {
             pending = false;
         FloatingWindowService.setSwitchingPending(pending);
         call.resolve();
-    }
-
-    private boolean hasUsageStatsPermission() {
-        AppOpsManager appOps = (AppOpsManager) getContext().getSystemService(Context.APP_OPS_SERVICE);
-        int mode = appOps.checkOpNoThrow(AppOpsManager.OPSTR_GET_USAGE_STATS,
-                android.os.Process.myUid(), getContext().getPackageName());
-        return mode == AppOpsManager.MODE_ALLOWED;
     }
 
     private boolean isAccessibilityServiceEnabled() {
