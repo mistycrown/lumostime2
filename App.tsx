@@ -344,7 +344,7 @@ const App: React.FC = () => {
     }
   };
 
-  const handleStopActivity = (sessionId: string, finalSessionData?: ActiveSession, customEndTime?: number) => {
+  const handleStopActivity = (sessionId: string, finalSessionData?: ActiveSession, customEndTime?: number, skipUI?: boolean) => {
     const session = activeSessions.find(s => s.id === sessionId);
     if (session) {
       const endTime = customEndTime || Date.now();
@@ -396,7 +396,7 @@ const App: React.FC = () => {
 
     // 停止通知（仅Android平台）
     // 停止通知（仅Android平台）
-    if (Capacitor.getPlatform() === 'android') {
+    if (Capacitor.getPlatform() === 'android' && !skipUI) {
       // 恢复悬浮球状态
       FocusNotification.updateFloatingWindow({ isFocusing: false }).catch(() => { });
     }
@@ -795,11 +795,11 @@ const App: React.FC = () => {
         if (!pkg) return;
 
         // Helper to stop session
-        const stopSessionForPkg = (p: string, endTime?: number) => {
+        const stopSessionForPkg = (p: string, endTime?: number, skipUI?: boolean) => {
           const actId = appRules[p];
           if (actId) {
             const s = activeSessions.find(x => x.activityId === actId);
-            if (s) handleStopActivity(s.id, undefined, endTime);
+            if (s) handleStopActivity(s.id, undefined, endTime, skipUI);
           }
         };
 
@@ -825,18 +825,27 @@ const App: React.FC = () => {
             return;
           }
 
-          // 3. Check Timeout (1 Minute)
-          if (Date.now() - suspendedAt > 60000) {
-            console.log("Suspension timeout -> Stop session");
-            // Use suspendedAt to exclude buffer time
-            stopSessionForPkg(originalPkg, suspendedAt);
+          // 3. Check for Direct Switch to another Rule
+          if (appRules[pkg]) {
+            console.log(`Switched to another rule app ${pkg} during suspension -> Stop previous immediately`);
+            stopSessionForPkg(originalPkg, undefined, true); // Skip UI update
             suspensionRef.current = null;
             lastAutoStartPackage.current = null;
             AppUsage.setSwitchPending({ pending: false });
+            // Fall through to Auto-Start logic below
+          } else {
+            // 4. Check Timeout (1 Minute)
+            if (Date.now() - suspendedAt > 60000) {
+              console.log("Suspension timeout -> Stop session");
+              // Use suspendedAt to exclude buffer time
+              stopSessionForPkg(originalPkg, suspendedAt);
+              suspensionRef.current = null;
+              lastAutoStartPackage.current = null;
+              AppUsage.setSwitchPending({ pending: false });
+            }
+            // While suspended and not matched new rule, we wait.
+            return;
           }
-
-          // While suspended, we DO NOT match other rules. We wait.
-          return;
         }
 
         // --- Auto-Stop Logic (Enter Suspension) ---
@@ -847,6 +856,12 @@ const App: React.FC = () => {
           if (pkg === 'SCREEN_OFF') {
             stopSessionForPkg(lastPkg);
             lastAutoStartPackage.current = null;
+          } else if (appRules[pkg]) {
+            // Direct Switch to another Rule
+            console.log(`Direct switch from ${lastPkg} to ${pkg} -> Stop previous`);
+            stopSessionForPkg(lastPkg, undefined, true); // Skip UI update for seamless transition
+            lastAutoStartPackage.current = null;
+            // Fall through to Auto-Start logic below
           } else {
             // Enter Suspension
             console.log(`Switched away from ${lastPkg} to ${pkg} -> Start Suspension`);
