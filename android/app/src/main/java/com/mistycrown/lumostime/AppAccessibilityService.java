@@ -4,6 +4,8 @@ import android.accessibilityservice.AccessibilityService;
 import android.accessibilityservice.AccessibilityServiceInfo;
 import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.content.pm.ResolveInfo;
+import java.util.List;
 import android.os.Handler;
 import android.os.Looper;
 import android.util.Log;
@@ -40,6 +42,12 @@ public class AppAccessibilityService extends AccessibilityService {
                     return;
                 }
 
+                // Filter out system/background apps (ignore apps without launch intent)
+                if (!isInterestingApp(currentPackage)) {
+                    Log.d(TAG, "Ignored non-launchable app: " + currentPackage);
+                    return;
+                }
+
                 Log.i(TAG, "===== APP SWITCHED: " + lastPackageName + " -> " + currentPackage + " =====");
                 lastPackageName = currentPackage;
 
@@ -72,6 +80,37 @@ public class AppAccessibilityService extends AccessibilityService {
     @Override
     public void onInterrupt() {
         Log.w(TAG, "AccessibilityService interrupted");
+    }
+
+    private boolean isInterestingApp(String packageName) {
+        try {
+            PackageManager pm = getPackageManager();
+
+            // 1. Check if it's a Home app (Launcher)
+            // System launchers should be recorded as they signify end of app usage
+            Intent homeIntent = new Intent(Intent.ACTION_MAIN);
+            homeIntent.addCategory(Intent.CATEGORY_HOME);
+
+            // Check default launcher
+            ResolveInfo defaultLauncher = pm.resolveActivity(homeIntent, PackageManager.MATCH_DEFAULT_ONLY);
+            if (defaultLauncher != null && packageName.equals(defaultLauncher.activityInfo.packageName)) {
+                return true;
+            }
+
+            // Comprehensive check for any home activity
+            List<ResolveInfo> homeActivities = pm.queryIntentActivities(homeIntent, PackageManager.MATCH_DEFAULT_ONLY);
+            for (ResolveInfo info : homeActivities) {
+                if (packageName.equals(info.activityInfo.packageName)) {
+                    return true;
+                }
+            }
+
+            // 2. Apps that can be launched by user (have a launcher icon)
+            Intent launchIntent = pm.getLaunchIntentForPackage(packageName);
+            return launchIntent != null;
+        } catch (Exception e) {
+            return false;
+        }
     }
 
     @Override
