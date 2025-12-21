@@ -60,18 +60,17 @@ public class AppAccessibilityService extends AccessibilityService {
                     Log.w(TAG, "Could not get app label for " + currentPackage);
                 }
 
-                // Show Toast notification
-                String finalAppLabel = appLabel;
-                handler.post(() -> {
-                    android.widget.Toast.makeText(
-                            getApplicationContext(),
-                            "检测到切换: " + finalAppLabel,
-                            android.widget.Toast.LENGTH_SHORT).show();
-                });
+                // Toast notification removed
+                // String finalAppLabel = appLabel;
+                // handler.post(() -> { ... });
 
                 // Update FloatingWindowService directly via static method
                 Log.i(TAG, "📤 Calling FloatingWindowService.updateCurrentApp");
                 FloatingWindowService.updateCurrentApp(currentPackage, appLabel);
+
+                // Also update AppUsagePlugin for frontend access
+                AppUsagePlugin.updateCurrentPackage(currentPackage);
+
                 Log.i(TAG, "📤 Call completed");
             }
         }
