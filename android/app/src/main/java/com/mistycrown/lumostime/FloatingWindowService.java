@@ -44,10 +44,12 @@ public class FloatingWindowService extends Service {
     private boolean isFocusing = false;
     private long startTime = 0;
     private android.os.Handler handler = new android.os.Handler(android.os.Looper.getMainLooper());
-    private static final long CYCLE_DURATION = 7000;
+    private static final long CYCLE_DURATION = 9000; // 5s Time + 2s Emoji + 2s Icon
     private static final long SHOW_TIME_DURATION = 5000;
+    private static final long SHOW_EMOJI_DURATION = 7000; // 5s to 7s
 
-    private boolean isShowingTime = false;
+    private int currentDisplayState = 0; // 0: Time, 1: Emoji, 2: Icon
+
     private Runnable updateRunnable = new Runnable() {
         @Override
         public void run() {
@@ -57,41 +59,55 @@ public class FloatingWindowService extends Service {
             long now = System.currentTimeMillis();
             long cycleTime = now % CYCLE_DURATION;
 
-            boolean shouldShowTime = cycleTime < SHOW_TIME_DURATION;
-
-            if (shouldShowTime) {
-                // Update time text
-                long elapsed = now - startTime;
-                if (startTime <= 0 || elapsed > 24 * 60 * 60 * 1000L) {
-                    elapsed = 0; // Prevent huge numbers if startTime is invalid
-                }
-
-                String timeText = formatDuration(elapsed);
-                timeView.setText(timeText);
-
-                // Adaptive Text Size: Force DP units in loop
-                if (timeText.length() > 5) {
-                    timeView.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 9);
-                } else {
-                    timeView.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 11);
-                }
-
-                if (!isShowingTime) {
-                    // Switch to Time
-                    flipViews(emojiView, timeView);
-                    isShowingTime = true;
-                }
+            int newState;
+            if (cycleTime < SHOW_TIME_DURATION) {
+                newState = 0; // Time
+            } else if (cycleTime < SHOW_EMOJI_DURATION) {
+                newState = 1; // Emoji
             } else {
-                if (isShowingTime) {
-                    // Switch to Icon
-                    flipViews(timeView, emojiView);
-                    isShowingTime = false;
+                newState = 2; // Icon
+            }
+
+            // Update Time Text constantly
+            long elapsed = now - startTime;
+            if (startTime <= 0 || elapsed > 24 * 60 * 60 * 1000L) {
+                elapsed = 0;
+            }
+            String timeText = formatDuration(elapsed);
+            timeView.setText(timeText);
+            if (timeText.length() > 5) {
+                timeView.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 9);
+            } else {
+                timeView.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 11);
+            }
+
+            // Handle State Transitions
+            if (newState != currentDisplayState) {
+                View fromView = getViewForState(currentDisplayState);
+                View toView = getViewForState(newState);
+
+                if (fromView != toView) {
+                    flipViews(fromView, toView);
                 }
+                currentDisplayState = newState;
             }
 
             handler.postDelayed(this, 500);
         }
     };
+
+    private View getViewForState(int state) {
+        switch (state) {
+            case 0:
+                return timeView;
+            case 1:
+                return emojiView;
+            case 2:
+                return iconView;
+            default:
+                return timeView;
+        }
+    }
 
     private void flipViews(final View from, final View to) {
         from.animate().scaleY(0f).setDuration(200).withEndAction(new Runnable() {
@@ -345,8 +361,10 @@ public class FloatingWindowService extends Service {
             }
             // Reset to Time initially
             emojiView.setVisibility(View.GONE);
+            iconView.setVisibility(View.GONE);
             timeView.setVisibility(View.VISIBLE);
-            isShowingTime = true;
+            timeView.setScaleY(1f); // Ensure scale is reset
+            currentDisplayState = 0;
 
             handler.removeCallbacks(updateRunnable);
             handler.post(updateRunnable);
@@ -357,6 +375,7 @@ public class FloatingWindowService extends Service {
             // Clean up animations
             emojiView.animate().cancel();
             timeView.animate().cancel();
+            iconView.animate().cancel();
 
             emojiView.setVisibility(View.GONE);
             timeView.setVisibility(View.GONE);
