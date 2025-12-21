@@ -2,8 +2,13 @@ package com.mistycrown.lumostime;
 
 import android.app.Service;
 import android.content.Intent;
+import android.content.IntentFilter;
+import android.content.BroadcastReceiver;
+import android.content.Context;
+import android.content.pm.PackageManager;
 import android.graphics.Color;
 import android.graphics.PixelFormat;
+import android.graphics.drawable.Drawable;
 import android.os.Build;
 import android.os.IBinder;
 import android.util.Log;
@@ -20,14 +25,19 @@ import android.util.TypedValue;
  */
 public class FloatingWindowService extends Service {
     private static final String TAG = "FloatingWindowService";
+    private static FloatingWindowService instance = null;
+
     private WindowManager windowManager;
     private View floatingView;
     private WindowManager.LayoutParams params;
 
     private TextView emojiView;
     private TextView timeView;
+    private TextView appNameView; // Debug: show app name
     private android.widget.ImageView iconView;
     private android.widget.FrameLayout containerView;
+    private BroadcastReceiver appChangeReceiver;
+    private String currentAppPackage = "";
 
     // State
     private boolean isMoving = false;
@@ -139,15 +149,93 @@ public class FloatingWindowService extends Service {
             floatingView = null;
         }
         handler.removeCallbacks(updateRunnable);
+
+        if (appChangeReceiver != null) {
+            try {
+                unregisterReceiver(appChangeReceiver);
+            } catch (Exception e) {
+                Log.e(TAG, "Unregister receiver failed", e);
+            }
+        }
     }
 
     @Override
     public void onCreate() {
         super.onCreate();
+        instance = this;
         Log.d(TAG, "🟢 悬浮窗服务 onCreate");
 
         windowManager = (WindowManager) getSystemService(WINDOW_SERVICE);
         initView();
+        registerAppChangeReceiver();
+    }
+
+    // Public method for external access
+    public static void updateCurrentApp(String packageName, String appLabel) {
+        if (instance != null) {
+            instance.updateAppIconInternal(packageName, appLabel);
+        } else {
+            Log.w(TAG, "FloatingWindowService instance is null, cannot update");
+        }
+    }
+
+    private void registerAppChangeReceiver() {
+        appChangeReceiver = new BroadcastReceiver() {
+            @Override
+            public void onReceive(Context context, Intent intent) {
+                Log.i(TAG, "📥 Broadcast received!");
+                String packageName = intent.getStringExtra("packageName");
+                String appLabel = intent.getStringExtra("appLabel");
+                Log.i(TAG, "Package: " + packageName + ", Label: " + appLabel + ", isFocusing: " + isFocusing);
+
+                if (packageName != null && !isFocusing) {
+                    updateAppIconInternal(packageName, appLabel);
+                } else {
+                    Log.w(TAG, "Skipped update: packageName=" + packageName + ", isFocusing=" + isFocusing);
+                }
+            }
+        };
+        IntentFilter filter = new IntentFilter("com.mistycrown.lumostime.APP_CHANGED");
+
+        // Android 13+ requires explicit export flag
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            registerReceiver(appChangeReceiver, filter, Context.RECEIVER_NOT_EXPORTED);
+        } else {
+            registerReceiver(appChangeReceiver, filter);
+        }
+        Log.d(TAG, "Registered app change receiver");
+    }
+
+    private void updateAppIconInternal(String packageName, String appLabel) {
+        Log.i(TAG, "🔄 updateAppIconInternal called: " + packageName);
+        if (packageName.equals(currentAppPackage)) {
+            Log.d(TAG, "Same package, skipping");
+            return; // No change
+        }
+        currentAppPackage = packageName;
+
+        // Show app name in debug view (create if doesn't exist)
+        if (appNameView != null && appLabel != null) {
+            appNameView.setText(appLabel);
+            appNameView.setVisibility(View.VISIBLE);
+            iconView.setVisibility(View.GONE); // Hide icon, show text
+            Log.d(TAG, "Set app name to: " + appLabel);
+        }
+
+        try {
+            PackageManager pm = getPackageManager();
+            Drawable appIcon = pm.getApplicationIcon(packageName);
+            iconView.setImageDrawable(appIcon);
+            Log.i(TAG, "✅ Updated icon successfully for: " + packageName);
+        } catch (PackageManager.NameNotFoundException e) {
+            Log.w(TAG, "❌ Could not find app icon for: " + packageName);
+            // Fallback to default
+            try {
+                iconView.setImageDrawable(getPackageManager().getApplicationIcon(getPackageName()));
+            } catch (Exception ex) {
+                iconView.setImageResource(android.R.drawable.sym_def_app_icon);
+            }
+        }
     }
 
     private void initView() {
@@ -204,6 +292,17 @@ public class FloatingWindowService extends Service {
                 android.graphics.Typeface.create(android.graphics.Typeface.SERIF, android.graphics.Typeface.BOLD));
         timeView.setVisibility(View.GONE);
         containerView.addView(timeView, new android.widget.FrameLayout.LayoutParams(
+                android.view.ViewGroup.LayoutParams.MATCH_PARENT,
+                android.view.ViewGroup.LayoutParams.MATCH_PARENT));
+
+        // App Name View (Debug)
+        appNameView = new TextView(this);
+        appNameView.setTextColor(Color.parseColor("#1F2937")); // Gray-800
+        appNameView.setGravity(Gravity.CENTER);
+        appNameView.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 9);
+        appNameView.setTypeface(android.graphics.Typeface.DEFAULT_BOLD);
+        appNameView.setVisibility(View.GONE);
+        containerView.addView(appNameView, new android.widget.FrameLayout.LayoutParams(
                 android.view.ViewGroup.LayoutParams.MATCH_PARENT,
                 android.view.ViewGroup.LayoutParams.MATCH_PARENT));
 
