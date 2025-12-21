@@ -2,6 +2,7 @@ package com.mistycrown.lumostime;
 
 import android.accessibilityservice.AccessibilityService;
 import android.accessibilityservice.AccessibilityServiceInfo;
+import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.os.Handler;
 import android.os.Looper;
@@ -59,6 +60,11 @@ public class AppAccessibilityService extends AccessibilityService {
                             "检测到切换: " + finalAppLabel,
                             android.widget.Toast.LENGTH_SHORT).show();
                 });
+
+                // Update FloatingWindowService directly via static method
+                Log.i(TAG, "📤 Calling FloatingWindowService.updateCurrentApp");
+                FloatingWindowService.updateCurrentApp(currentPackage, appLabel);
+                Log.i(TAG, "📤 Call completed");
             }
         }
     }
