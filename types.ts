@@ -83,6 +83,7 @@ export interface ActiveSession {
   note?: string;
   progressIncrement?: number; // New: Carry over to Log
   focusScore?: number; // 1-5
+  isAuto?: boolean; // New: Auto-start flag
 }
 
 export interface Log {

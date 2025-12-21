@@ -32,6 +32,7 @@ export const AutoRecordSettingsView: React.FC<Props> = ({ onBack, categories }) 
     const [selectedApp, setSelectedApp] = useState<InstalledApp | null>(null);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
+    const [minDuration, setMinDuration] = useState(1); // Default 1 min
 
     useEffect(() => {
         checkPermission();
@@ -72,10 +73,19 @@ export const AutoRecordSettingsView: React.FC<Props> = ({ onBack, categories }) 
         } catch (e) { console.error(e); }
     };
 
+    const handleDurationChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const val = parseInt(e.target.value, 10) || 0;
+        setMinDuration(val);
+        localStorage.setItem('cfg_auto_record_min_duration', val.toString());
+    };
+
     // Load persisted state
     useEffect(() => {
         const saved = localStorage.getItem('cfg_auto_record_enabled') === 'true';
         if (saved) setIsMonitoring(true);
+
+        const savedDuration = localStorage.getItem('cfg_auto_record_min_duration');
+        if (savedDuration) setMinDuration(parseInt(savedDuration, 10));
     }, []);
 
     const loadData = async () => {
@@ -290,6 +300,24 @@ export const AutoRecordSettingsView: React.FC<Props> = ({ onBack, categories }) 
                         >
                             <div className={`w-5 h-5 rounded-full bg-white shadow-sm transition-transform ${isMonitoring ? 'translate-x-5' : ''}`} />
                         </div>
+                    </div>
+
+                    {/* Min Duration Setting */}
+                    <div className="bg-white dark:bg-slate-800 rounded-xl p-4 shadow-sm border border-slate-100 dark:border-slate-700">
+                        <div className="flex items-center justify-between mb-2">
+                            <div className="font-bold text-slate-800 dark:text-white">最小有效时长</div>
+                            <div className="text-sm font-bold text-indigo-600">{minDuration} 分钟</div>
+                        </div>
+                        <div className="text-xs text-slate-500 dark:text-slate-400 mb-3">
+                            自动记录时，如果时长不足 {minDuration} 分钟，将不保存记录。
+                        </div>
+                        <input
+                            type="range"
+                            min="0" max="60" step="1"
+                            value={minDuration}
+                            onChange={handleDurationChange}
+                            className="w-full accent-indigo-500 cursor-pointer"
+                        />
                     </div>
 
                     {/* Test Button (Keep it for verification) */}

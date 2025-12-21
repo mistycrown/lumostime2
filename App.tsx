@@ -309,7 +309,7 @@ const App: React.FC = () => {
 
 
 
-  const handleStartActivity = (activity: Activity, categoryId: string, todoId?: string, scopeId?: string) => {
+  const handleStartActivity = (activity: Activity, categoryId: string, todoId?: string, scopeId?: string, isAuto: boolean = false) => {
     let appliedScopeIds: string[] | undefined = scopeId ? [scopeId] : undefined;
     if (!scopeId && autoLinkRules.length > 0) {
       const matchingRules = autoLinkRules.filter(rule => rule.activityId === activity.id);
@@ -325,7 +325,8 @@ const App: React.FC = () => {
       activityIcon: activity.icon,
       startTime: Date.now(),
       linkedTodoId: todoId,
-      scopeIds: appliedScopeIds
+      scopeIds: appliedScopeIds,
+      isAuto: isAuto
     };
     setActiveSessions(prev => [...prev, newSession]);
 
@@ -354,11 +355,22 @@ const App: React.FC = () => {
     }
   };
 
-  const handleStopActivity = (sessionId: string, finalSessionData?: ActiveSession) => {
+  const handleStopActivity = (sessionId: string, finalSessionData?: ActiveSession, overrideEndTime?: number) => {
     const session = activeSessions.find(s => s.id === sessionId);
     if (session) {
-      const endTime = Date.now();
+      const endTime = overrideEndTime || Date.now();
       const duration = (endTime - session.startTime) / 1000;
+
+      // Min Duration Check for Auto Sessions
+      if (session.isAuto) {
+        const minDurationStr = localStorage.getItem('cfg_auto_record_min_duration');
+        const minDurationRef = minDurationStr ? parseInt(minDurationStr, 10) : 0;
+        if (duration < minDurationRef * 60) {
+          console.log(`[Auto-Stop] Discarding session (Duration ${duration}s < Min ${minDurationRef}m)`);
+          handleCancelSession(sessionId);
+          return;
+        }
+      }
 
       if (duration > 1) {
         // 创建基础Log对象（不包含id，因为拆分时每条记录需要新id）
@@ -811,11 +823,11 @@ const App: React.FC = () => {
         if (!pkg) return;
 
         // Helper to stop session
-        const stopSessionForPkg = (p: string) => {
+        const stopSessionForPkg = (p: string, endTime?: number) => {
           const actId = appRules[p];
           if (actId) {
             const s = activeSessions.find(x => x.activityId === actId);
-            if (s) handleStopActivity(s.id);
+            if (s) handleStopActivity(s.id, undefined, endTime);
           }
         };
 
@@ -833,8 +845,8 @@ const App: React.FC = () => {
 
           // 2. Check for Immediate Stop trigger (Screen Off)
           if (pkg === 'SCREEN_OFF') {
-            console.log("Screen Off during suspension -> Stop immediately");
-            stopSessionForPkg(originalPkg);
+            console.log("Screen Off during suspension -> Stop immediately (using suspendedAt)");
+            stopSessionForPkg(originalPkg, suspendedAt);
             suspensionRef.current = null;
             lastAutoStartPackage.current = null;
             AppUsage.setSwitchPending({ pending: false });
@@ -843,8 +855,8 @@ const App: React.FC = () => {
 
           // 3. Check Timeout (1 Minute)
           if (Date.now() - suspendedAt > 60000) {
-            console.log("Suspension timeout -> Stop session");
-            stopSessionForPkg(originalPkg);
+            console.log("Suspension timeout -> Stop session (using suspendedAt)");
+            stopSessionForPkg(originalPkg, suspendedAt);
             suspensionRef.current = null;
             lastAutoStartPackage.current = null;
             AppUsage.setSwitchPending({ pending: false });
@@ -901,7 +913,7 @@ const App: React.FC = () => {
               setTimeout(() => {
                 if (lastAutoStartPackage.current === pkg) {
                   if (targetActivity && targetCategoryId) {
-                    handleStartActivity(targetActivity, targetCategoryId);
+                    handleStartActivity(targetActivity, targetCategoryId, undefined, undefined, true);
                   }
                 }
               }, 1500);
