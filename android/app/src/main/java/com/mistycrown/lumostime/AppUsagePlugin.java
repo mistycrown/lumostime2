@@ -25,6 +25,9 @@ import java.util.List;
 import java.util.Map;
 import org.json.JSONException;
 import org.json.JSONObject;
+import android.text.TextUtils;
+import android.accessibilityservice.AccessibilityServiceInfo;
+import android.view.accessibility.AccessibilityManager;
 
 @CapacitorPlugin(name = "AppUsage")
 public class AppUsagePlugin extends Plugin {
@@ -47,6 +50,22 @@ public class AppUsagePlugin extends Plugin {
         } else {
             call.resolve();
         }
+    }
+
+    @PluginMethod
+    public void checkAccessibilityPermission(PluginCall call) {
+        boolean granted = isAccessibilityServiceEnabled();
+        JSObject ret = new JSObject();
+        ret.put("granted", granted);
+        call.resolve(ret);
+    }
+
+    @PluginMethod
+    public void requestAccessibilityPermission(PluginCall call) {
+        Intent intent = new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS);
+        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        getContext().startActivity(intent);
+        call.resolve();
     }
 
     @PluginMethod
@@ -227,5 +246,20 @@ public class AppUsagePlugin extends Plugin {
         int mode = appOps.checkOpNoThrow(AppOpsManager.OPSTR_GET_USAGE_STATS,
                 android.os.Process.myUid(), getContext().getPackageName());
         return mode == AppOpsManager.MODE_ALLOWED;
+    }
+
+    private boolean isAccessibilityServiceEnabled() {
+        AccessibilityManager am = (AccessibilityManager) getContext().getSystemService(Context.ACCESSIBILITY_SERVICE);
+        List<AccessibilityServiceInfo> serviceInfoList = am
+                .getEnabledAccessibilityServiceList(AccessibilityServiceInfo.FEEDBACK_GENERIC);
+
+        String expectedComponentName = getContext().getPackageName() + "/.AppAccessibilityService";
+        for (AccessibilityServiceInfo info : serviceInfoList) {
+            String id = info.getId();
+            if (id != null && id.equals(expectedComponentName)) {
+                return true;
+            }
+        }
+        return false;
     }
 }

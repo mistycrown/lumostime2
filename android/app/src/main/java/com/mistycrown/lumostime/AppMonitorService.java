@@ -17,13 +17,14 @@ import android.os.IBinder;
 import android.os.Looper;
 import android.util.Log;
 import androidx.core.app.NotificationCompat;
+import java.util.List;
 import java.util.Map;
 
 public class AppMonitorService extends Service {
     private static final String TAG = "AppMonitorService";
     private static final String CHANNEL_ID = "app_monitor_channel";
     private static final int NOTIFICATION_ID = 2001;
-    private static final int CHECK_INTERVAL = 3000; // 3 seconds
+    private static final int CHECK_INTERVAL = 1000; // 1 second for faster detection
 
     private Handler handler;
     private Runnable checkRunnable;
@@ -32,6 +33,8 @@ public class AppMonitorService extends Service {
     private UsageStatsManager usageStatsManager;
     private SharedPreferences prefs;
 
+    private android.os.PowerManager.WakeLock wakeLock;
+
     @Override
     public void onCreate() {
         super.onCreate();
@@ -39,6 +42,19 @@ public class AppMonitorService extends Service {
         usageStatsManager = (UsageStatsManager) getSystemService(Context.USAGE_STATS_SERVICE);
         prefs = getSharedPreferences("AppUsageRules", Context.MODE_PRIVATE);
         handler = new Handler(Looper.getMainLooper());
+
+        // Acquire WakeLock to ensure service runs even when screen is off/doze
+        try {
+            android.os.PowerManager powerManager = (android.os.PowerManager) getSystemService(POWER_SERVICE);
+            if (powerManager != null) {
+                wakeLock = powerManager.newWakeLock(android.os.PowerManager.PARTIAL_WAKE_LOCK,
+                        "LumosTime:MonitorWakeLock");
+                wakeLock.setReferenceCounted(false);
+                wakeLock.acquire(); // No timeout - will release on service destroy
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Error acquiring WakeLock", e);
+        }
 
         checkRunnable = new Runnable() {
             @Override
@@ -55,6 +71,33 @@ public class AppMonitorService extends Service {
     public int onStartCommand(Intent intent, int flags, int startId) {
         if (!isRunning) {
             isRunning = true;
+            try {
+                if (wakeLock != null && !wakeLock.isHeld()) {
+                    wakeLock.acquire();
+                }
+            } catch (Exception e) {
+                Log.e(TAG, "WakeLock acquire failed", e);
+            }
+
+            // Initialize lastPackageName to current app to avoid triggering on service
+            // start
+            // Get current foreground app
+            long time = System.currentTimeMillis();
+            UsageEvents events = usageStatsManager.queryEvents(time - 5000, time);
+            if (events != null) {
+                UsageEvents.Event event = new UsageEvents.Event();
+                long lastTime = 0;
+                while (events.hasNextEvent()) {
+                    events.getNextEvent(event);
+                    if (event.getEventType() == UsageEvents.Event.MOVE_TO_FOREGROUND
+                            && event.getTimeStamp() > lastTime) {
+                        lastTime = event.getTimeStamp();
+                        lastPackageName = event.getPackageName();
+                    }
+                }
+            }
+            Log.i(TAG, "Service started, initial app: " + lastPackageName);
+
             startForeground(NOTIFICATION_ID, createNotification("LumosTime 正在自动记录中..."));
             handler.post(checkRunnable);
         }
@@ -64,6 +107,13 @@ public class AppMonitorService extends Service {
     @Override
     public void onDestroy() {
         isRunning = false;
+        try {
+            if (wakeLock != null && wakeLock.isHeld()) {
+                wakeLock.release();
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "WakeLock release failed", e);
+        }
         handler.removeCallbacks(checkRunnable);
         stopForeground(true);
         super.onDestroy();
@@ -75,17 +125,32 @@ public class AppMonitorService extends Service {
     }
 
     private void checkForegroundApp() {
-        long endTime = System.currentTimeMillis();
-        long startTime = endTime - 60000; // 60s lookback
-
-        UsageEvents usageEvents = usageStatsManager.queryEvents(startTime, endTime);
-        UsageEvents.Event event = new UsageEvents.Event();
         String currentPackage = null;
+        long time = System.currentTimeMillis();
+
+        // Use queryEvents to get the most recent MOVE_TO_FOREGROUND event
+        // This is the most reliable way to detect app switches
+        long startTime = time - 3000; // Look back 3 seconds (we poll every 1 second now)
+
+        Log.d(TAG, "checkForegroundApp() called, querying events from " + startTime + " to " + time);
+
+        UsageEvents usageEvents = usageStatsManager.queryEvents(startTime, time);
+        if (usageEvents == null) {
+            Log.e(TAG, "usageEvents is null - PERMISSION NOT GRANTED!");
+            return;
+        }
+
+        UsageEvents.Event event = new UsageEvents.Event();
         long lastTimestamp = 0;
+        int eventCount = 0;
+        int foregroundEventCount = 0;
 
         while (usageEvents.hasNextEvent()) {
             usageEvents.getNextEvent(event);
+            eventCount++;
             if (event.getEventType() == UsageEvents.Event.MOVE_TO_FOREGROUND) {
+                foregroundEventCount++;
+                Log.d(TAG, "Found MOVE_TO_FOREGROUND event: " + event.getPackageName() + " at " + event.getTimeStamp());
                 if (event.getTimeStamp() > lastTimestamp) {
                     lastTimestamp = event.getTimeStamp();
                     currentPackage = event.getPackageName();
@@ -93,25 +158,60 @@ public class AppMonitorService extends Service {
             }
         }
 
+        Log.d(TAG, "Total events: " + eventCount + ", Foreground events: " + foregroundEventCount);
+
+        // If no MOVE_TO_FOREGROUND event found, try queryUsageStats as fallback
+        // to get the app with most recent usage
+        if (currentPackage == null) {
+            Log.d(TAG, "No MOVE_TO_FOREGROUND events found, trying queryUsageStats fallback");
+            List<android.app.usage.UsageStats> stats = usageStatsManager.queryUsageStats(
+                    UsageStatsManager.INTERVAL_BEST, time - 3000, time);
+
+            if (stats != null && !stats.isEmpty()) {
+                Log.d(TAG, "queryUsageStats returned " + stats.size() + " apps");
+                android.app.usage.UsageStats mostRecent = null;
+                for (android.app.usage.UsageStats usageStats : stats) {
+                    if (mostRecent == null || usageStats.getLastTimeUsed() > mostRecent.getLastTimeUsed()) {
+                        mostRecent = usageStats;
+                    }
+                }
+                if (mostRecent != null) {
+                    currentPackage = mostRecent.getPackageName();
+                    Log.d(TAG, "Most recent app from stats: " + currentPackage);
+                }
+            } else {
+                Log.w(TAG, "queryUsageStats returned null or empty");
+            }
+        }
+
+        Log.d(TAG, "Current package: " + currentPackage + ", Last package: " + lastPackageName);
+
         if (currentPackage != null && !currentPackage.equals(lastPackageName)) {
             // App Changed
-            Log.d(TAG, "App changed from " + lastPackageName + " to " + currentPackage);
+            Log.i(TAG, "===== APP CHANGED: " + lastPackageName + " -> " + currentPackage + " =====");
             lastPackageName = currentPackage;
 
             // Check if this app is in our rules
-            // Although verifying step 4 just requires notification on change, let's look up
-            // label for better UX
             String appLabel = currentPackage;
             try {
                 PackageManager pm = getPackageManager();
                 appLabel = pm.getApplicationLabel(pm.getApplicationInfo(currentPackage, 0)).toString();
             } catch (Exception e) {
+                Log.w(TAG, "Could not get app label for " + currentPackage);
             }
 
             // Send notification
-            // We update the existing notification or send a new one?
-            // User requested: "Notify user detected [Package]"
             updateNotification("检测到应用: " + appLabel);
+
+            // Show Toast
+            String finalAppLabel = appLabel;
+            handler.post(() -> {
+                android.widget.Toast
+                        .makeText(getApplicationContext(), "检测到切换: " + finalAppLabel, android.widget.Toast.LENGTH_SHORT)
+                        .show();
+            });
+        } else if (currentPackage == null) {
+            Log.w(TAG, "Could not determine current package!");
         }
     }
 

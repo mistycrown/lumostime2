@@ -3,5 +3,6 @@
     <string name="app_name">LumosTime</string>
     <string name="title_activity_main">LumosTime</string>
     <string name="package_name">com.mistycrown.lumostime</string>
-    <string name="custom_url_scheme">com.mistycrown.lumostime</string>
+    <string name="custom_url_scheme">lumostime</string>
+    <string name="accessibility_service_description">LumosTime 使用无障碍服务检测应用切换，实现自动时间记录功能。本服务不会收集或上传任何个人信息。</string>
 </resources>
