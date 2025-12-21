@@ -142,6 +142,33 @@ const App: React.FC = () => {
     localStorage.setItem('lumostime_autoLinkRules', JSON.stringify(autoLinkRules));
   }, [autoLinkRules]);
 
+  // --- Auto-Start Floating Window on App Launch ---
+  useEffect(() => {
+    const initFloatingWindow = async () => {
+      // @ts-ignore
+      if (typeof window !== 'undefined' && window.Capacitor?.getPlatform() === 'android') {
+        const enabled = localStorage.getItem('cfg_floating_window_enabled') === 'true';
+        if (enabled) {
+          try {
+            // Check permission first to be safe
+            const res = await FocusNotification.checkFloatingPermission();
+            if (res.granted) {
+              await FocusNotification.startFloatingWindow();
+              console.log("Floating window auto-started");
+            } else {
+              console.warn("Floating window enabled but permission missing on init");
+              // Consider syncing local storage to false here if strictly required
+              // localStorage.setItem('cfg_floating_window_enabled', 'false');
+            }
+          } catch (e) {
+            console.error("Failed to auto-start floating window", e);
+          }
+        }
+      }
+    };
+    initFloatingWindow();
+  }, []);
+
   // --- Auto Sync Logic ---
   const [lastSyncTime, setLastSyncTime] = useState<number>(() => {
     const saved = localStorage.getItem('lumos_last_sync_time');

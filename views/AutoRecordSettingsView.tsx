@@ -179,12 +179,17 @@ export const AutoRecordSettingsView: React.FC<Props> = ({ onBack, categories }) 
             <div
                 className="fixed inset-0 z-[60] flex flex-col bg-[#fdfbf7] animate-in slide-in-from-bottom duration-200 font-serif"
                 style={{
-                    paddingTop: 'env(safe-area-inset-top)',
                     paddingBottom: 'env(safe-area-inset-bottom)'
                 }}
             >
                 {/* Modal Header */}
-                <div className="flex items-center justify-between px-4 h-14 border-b border-stone-100 bg-[#fdfbf7]/80 backdrop-blur-md shrink-0">
+                <div
+                    className="flex items-center justify-between px-4 border-b border-stone-100 bg-[#fdfbf7]/80 backdrop-blur-md shrink-0 box-border"
+                    style={{
+                        height: 'calc(3.5rem + env(safe-area-inset-top))',
+                        paddingTop: 'env(safe-area-inset-top)'
+                    }}
+                >
                     <button onClick={() => setIsModalOpen(false)} className="p-2 -ml-2 text-stone-400 hover:text-stone-600">
                         <X size={24} />
                     </button>
@@ -242,14 +247,19 @@ export const AutoRecordSettingsView: React.FC<Props> = ({ onBack, categories }) 
 
     return (
         <div
-            className="flex flex-col h-full bg-[#fdfbf7] text-stone-900 absolute inset-0 z-50 font-serif"
+            className="flex flex-col h-full bg-[#fdfbf7] text-stone-900 fixed inset-0 z-50 font-serif"
             style={{
-                paddingTop: 'env(safe-area-inset-top)',
                 paddingBottom: 'env(safe-area-inset-bottom)'
             }}
         >
             {/* Main Header */}
-            <div className="flex items-center px-4 h-14 border-b border-stone-100 bg-[#fdfbf7]/80 backdrop-blur-md shrink-0 z-10 gap-3 sticky top-0">
+            <div
+                className="flex items-center px-4 border-b border-stone-100 bg-[#fdfbf7]/80 backdrop-blur-md shrink-0 z-10 gap-3 sticky top-0 box-border"
+                style={{
+                    height: 'calc(3.5rem + env(safe-area-inset-top))',
+                    paddingTop: 'env(safe-area-inset-top)'
+                }}
+            >
                 <button
                     onClick={onBack}
                     className="p-2 -ml-2 rounded-full hover:bg-stone-100 active:scale-95 transition-transform"
