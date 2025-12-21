@@ -5,10 +5,14 @@ export interface AppUsagePlugin {
     requestPermissions(): Promise<void>;
     checkAccessibilityPermission(): Promise<{ granted: boolean }>;
     requestAccessibilityPermission(): Promise<void>;
+    showFloatingText(options: { text: string }): Promise<void>;
     getRunningApp(): Promise<{ packageName: string }>;
     getInstalledApps(): Promise<{ apps: any[] }>;
     startMonitor(): Promise<void>;
     stopMonitor(): Promise<void>;
+    saveAppRule(options: { packageName: string, activityId: string }): Promise<void>;
+    removeAppRule(options: { packageName: string }): Promise<void>;
+    getAppRules(): Promise<{ rules: Record<string, string> }>;
 }
 
 const AppUsage = registerPlugin<AppUsagePlugin>('AppUsage');

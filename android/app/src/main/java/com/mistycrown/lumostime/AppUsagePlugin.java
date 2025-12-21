@@ -255,6 +255,22 @@ public class AppUsagePlugin extends Plugin {
         }
     }
 
+    @PluginMethod
+    public void showFloatingText(PluginCall call) {
+        String text = call.getString("text");
+        if (text == null) {
+            call.reject("Missing text");
+            return;
+        }
+
+        try {
+            FloatingWindowService.showTempText(text);
+            call.resolve();
+        } catch (Exception e) {
+            call.reject("Failed to show text", e);
+        }
+    }
+
     private boolean hasUsageStatsPermission() {
         AppOpsManager appOps = (AppOpsManager) getContext().getSystemService(Context.APP_OPS_SERVICE);
         int mode = appOps.checkOpNoThrow(AppOpsManager.OPSTR_GET_USAGE_STATS,

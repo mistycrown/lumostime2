@@ -195,6 +195,14 @@ public class FloatingWindowService extends Service {
         }
     }
 
+    public static void showTempText(String text) {
+        if (instance != null) {
+            new android.os.Handler(android.os.Looper.getMainLooper()).post(() -> {
+                instance.showTempTextInternal(text);
+            });
+        }
+    }
+
     private void registerAppChangeReceiver() {
         appChangeReceiver = new BroadcastReceiver() {
             @Override
@@ -220,6 +228,28 @@ public class FloatingWindowService extends Service {
             registerReceiver(appChangeReceiver, filter);
         }
         Log.d(TAG, "Registered app change receiver");
+    }
+
+    private void showTempTextInternal(String text) {
+        if (timeView != null) {
+            // Temporarily override display to show text
+            handler.removeCallbacks(updateRunnable); // Pause the cycle
+
+            // Hide others
+            if (emojiView != null)
+                emojiView.setVisibility(View.GONE);
+            if (iconView != null)
+                iconView.setVisibility(View.GONE);
+
+            // Show text
+            timeView.setText(text);
+            timeView.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 11);
+            timeView.setVisibility(View.VISIBLE);
+            timeView.setScaleY(1f);
+
+            // Resume cycle after 2 seconds (or wait for next update)
+            handler.postDelayed(updateRunnable, 2000);
+        }
     }
 
     private void updateAppIconInternal(String packageName, String appLabel) {

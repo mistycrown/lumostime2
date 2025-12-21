@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { RecordView } from './views/RecordView';
 import { StatsView } from './views/StatsView';
 import { TimelineView } from './views/TimelineView';
+import AppUsage from './plugins/AppUsagePlugin';
 import { SettingsView } from './views/SettingsView';
 import { TagsView } from './views/TagsView';
 import { TagDetailView } from './views/TagDetailView';
@@ -753,6 +754,8 @@ const App: React.FC = () => {
     setEditingGoal(null);
   };
 
+
+
   const handleDeleteGoal = (goalId: string) => {
     setGoals(prev => prev.filter(g => g.id !== goalId));
   };
@@ -774,8 +777,100 @@ const App: React.FC = () => {
     setEditingGoal(null);
   };
 
+  // --- Auto App Record Logic ---
+  const [appRules, setAppRules] = useState<Record<string, string>>({});
+  const lastAutoStartPackage = useRef<string | null>(null);
 
-  // ...
+  // Load rules on mount
+  useEffect(() => {
+    const loadRules = async () => {
+      try {
+        const res = await AppUsage.getAppRules();
+        if (res.rules) {
+          setAppRules(res.rules);
+        }
+      } catch (e) {
+        console.error("Failed to load app rules", e);
+      }
+    };
+    loadRules();
+    // Also reload when returning from settings (simplified)
+    document.addEventListener('resume', loadRules);
+    return () => document.removeEventListener('resume', loadRules);
+  }, []);
+
+  // Poll for current app
+  useEffect(() => {
+    if (Capacitor.getPlatform() !== 'android') return;
+
+    const interval = setInterval(async () => {
+      try {
+        const res = await AppUsage.getRunningApp();
+        const pkg = res.packageName;
+        if (!pkg) return;
+
+        // Check against rules
+        const matchedActivityId = appRules[pkg];
+
+        // If matched an activity
+        if (matchedActivityId) {
+          // Check if already active
+          const isAlreadyRunning = activeSessions.some(s => s.activityId === matchedActivityId);
+
+          // Avoid re-triggering if we just auto-started this package
+          if (!isAlreadyRunning && lastAutoStartPackage.current !== pkg) {
+            // Find Activity Object
+            let targetActivity: Activity | undefined;
+            let targetCategoryId: string | undefined;
+
+            for (const cat of CATEGORIES) {
+              const act = cat.activities.find(a => a.id === matchedActivityId);
+              if (act) {
+                targetActivity = act;
+                targetCategoryId = cat.id;
+                break;
+              }
+            }
+
+            if (targetActivity && targetCategoryId) {
+              console.log("Auto-starting activity:", targetActivity.name);
+
+              // Mark as handled immediately to prevent double-triggering
+              lastAutoStartPackage.current = pkg;
+
+              // 1. Show "开始计时" on floating ball
+              await AppUsage.showFloatingText({ text: "开始计时" });
+
+              // 2. Start Session after delay
+              setTimeout(() => {
+                if (targetActivity && targetCategoryId) {
+                  handleStartActivity(targetActivity, targetCategoryId);
+                }
+              }, 1500);
+            }
+          }
+        } else {
+          // Not matched (e.g. Launcher or other app)
+          // If we have an active session that was AUTO-STARTED from the PREVIOUS app, maybe we should stop it?
+          // Or just leave it? User asked for "Auto Start", didn't explicitly detail "Auto Stop" logic yet, 
+          // but hinted "unable to treat return to desktop as event".
+          // Let's implement Auto-Stop if returning to Launcher?
+          // For now, let's Stick to User Request: "Start Timer". 
+
+          // Reset lastAutoStart if we moved to a diff app
+          if (lastAutoStartPackage.current !== pkg) {
+            lastAutoStartPackage.current = null;
+          }
+        }
+
+      } catch (e) {
+        // quiet
+      }
+    }, 1000); // Check every 1s
+
+    return () => clearInterval(interval);
+  }, [appRules, activeSessions]);
+
 
   // Tag Navigation logic
   const handleSelectTag = (tagId: string) => {

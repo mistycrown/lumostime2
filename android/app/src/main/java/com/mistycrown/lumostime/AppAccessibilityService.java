@@ -104,7 +104,19 @@ public class AppAccessibilityService extends AccessibilityService {
                 }
             }
 
-            // 2. Apps that can be launched by user (have a launcher icon)
+            // 2. Filter out Input Methods (IMEs)
+            // Even if they have a launcher icon (like settings), we don't want to track
+            // them as active apps
+            android.view.inputmethod.InputMethodManager imm = (android.view.inputmethod.InputMethodManager) getSystemService(
+                    INPUT_METHOD_SERVICE);
+            java.util.List<android.view.inputmethod.InputMethodInfo> inputMethods = imm.getInputMethodList();
+            for (android.view.inputmethod.InputMethodInfo imi : inputMethods) {
+                if (packageName.equals(imi.getPackageName())) {
+                    return false;
+                }
+            }
+
+            // 3. Apps that can be launched by user (have a launcher icon)
             Intent launchIntent = pm.getLaunchIntentForPackage(packageName);
             return launchIntent != null;
         } catch (Exception e) {
