@@ -33,7 +33,7 @@ public class FloatingWindowService extends Service {
 
     private TextView emojiView;
     private TextView timeView;
-    private TextView appNameView; // Debug: show app name
+    // private TextView appNameView; // Debug removed
     private android.widget.ImageView iconView;
     private android.widget.FrameLayout containerView;
     private BroadcastReceiver appChangeReceiver;
@@ -207,31 +207,30 @@ public class FloatingWindowService extends Service {
     }
 
     private void updateAppIconInternal(String packageName, String appLabel) {
-        Log.i(TAG, "🔄 updateAppIconInternal called: " + packageName);
         if (packageName.equals(currentAppPackage)) {
-            Log.d(TAG, "Same package, skipping");
             return; // No change
         }
         currentAppPackage = packageName;
-
-        // Show app name in debug view (create if doesn't exist)
-        if (appNameView != null && appLabel != null) {
-            appNameView.setText(appLabel);
-            appNameView.setVisibility(View.VISIBLE);
-            iconView.setVisibility(View.GONE); // Hide icon, show text
-            Log.d(TAG, "Set app name to: " + appLabel);
-        }
 
         try {
             PackageManager pm = getPackageManager();
             Drawable appIcon = pm.getApplicationIcon(packageName);
             iconView.setImageDrawable(appIcon);
-            Log.i(TAG, "✅ Updated icon successfully for: " + packageName);
+
+            // Ensure icon is visible and others hidden
+            iconView.setVisibility(View.VISIBLE);
+            if (emojiView != null)
+                emojiView.setVisibility(View.GONE);
+            if (timeView != null)
+                timeView.setVisibility(View.GONE);
+
+            Log.i(TAG, "✅ Updated icon for:: " + packageName);
         } catch (PackageManager.NameNotFoundException e) {
             Log.w(TAG, "❌ Could not find app icon for: " + packageName);
             // Fallback to default
             try {
                 iconView.setImageDrawable(getPackageManager().getApplicationIcon(getPackageName()));
+                iconView.setVisibility(View.VISIBLE);
             } catch (Exception ex) {
                 iconView.setImageResource(android.R.drawable.sym_def_app_icon);
             }
@@ -295,16 +294,9 @@ public class FloatingWindowService extends Service {
                 android.view.ViewGroup.LayoutParams.MATCH_PARENT,
                 android.view.ViewGroup.LayoutParams.MATCH_PARENT));
 
-        // App Name View (Debug)
-        appNameView = new TextView(this);
-        appNameView.setTextColor(Color.parseColor("#1F2937")); // Gray-800
-        appNameView.setGravity(Gravity.CENTER);
-        appNameView.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 9);
-        appNameView.setTypeface(android.graphics.Typeface.DEFAULT_BOLD);
-        appNameView.setVisibility(View.GONE);
-        containerView.addView(appNameView, new android.widget.FrameLayout.LayoutParams(
-                android.view.ViewGroup.LayoutParams.MATCH_PARENT,
-                android.view.ViewGroup.LayoutParams.MATCH_PARENT));
+        // App Name View removed
+        // appNameView = new TextView(this);
+        // ...
 
         floatingView = containerView;
 

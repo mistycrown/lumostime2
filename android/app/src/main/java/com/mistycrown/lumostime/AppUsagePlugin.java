@@ -31,6 +31,12 @@ import android.view.accessibility.AccessibilityManager;
 
 @CapacitorPlugin(name = "AppUsage")
 public class AppUsagePlugin extends Plugin {
+    // Real-time package name from AccessibilityService
+    private static String currentRealtimePackage = null;
+
+    public static void updateCurrentPackage(String packageName) {
+        currentRealtimePackage = packageName;
+    }
 
     @PluginMethod
     public void checkPermissions(PluginCall call) {
@@ -70,6 +76,14 @@ public class AppUsagePlugin extends Plugin {
 
     @PluginMethod
     public void getRunningApp(PluginCall call) {
+        // Prioritize real-time data from AccessibilityService if available
+        if (currentRealtimePackage != null) {
+            JSObject ret = new JSObject();
+            ret.put("packageName", currentRealtimePackage);
+            call.resolve(ret);
+            return;
+        }
+
         if (!hasUsageStatsPermission()) {
             call.reject("Permission denied");
             return;
