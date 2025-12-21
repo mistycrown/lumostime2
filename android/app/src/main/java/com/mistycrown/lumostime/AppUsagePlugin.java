@@ -76,6 +76,15 @@ public class AppUsagePlugin extends Plugin {
 
     @PluginMethod
     public void getRunningApp(PluginCall call) {
+        // Check screen state first
+        android.os.PowerManager pm = (android.os.PowerManager) getContext().getSystemService(Context.POWER_SERVICE);
+        if (pm != null && !pm.isInteractive()) {
+            JSObject ret = new JSObject();
+            ret.put("packageName", "SCREEN_OFF");
+            call.resolve(ret);
+            return;
+        }
+
         // Prioritize real-time data from AccessibilityService if available
         if (currentRealtimePackage != null) {
             JSObject ret = new JSObject();

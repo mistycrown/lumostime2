@@ -799,7 +799,7 @@ const App: React.FC = () => {
     return () => document.removeEventListener('resume', loadRules);
   }, []);
 
-  // Poll for current app
+  // Poll for current app (Auto-Start & Auto-Stop)
   useEffect(() => {
     if (Capacitor.getPlatform() !== 'android') return;
 
@@ -809,17 +809,31 @@ const App: React.FC = () => {
         const pkg = res.packageName;
         if (!pkg) return;
 
-        // Check against rules
-        const matchedActivityId = appRules[pkg];
+        // --- Auto-Stop Logic ---
+        // If we were tracking an app (lastAutoStartPackage) and now pkg changed (e.g. Screen Off, Launcher, Other App)
+        if (lastAutoStartPackage.current && lastAutoStartPackage.current !== pkg) {
+          const lastPkg = lastAutoStartPackage.current;
+          const lastActivityId = appRules[lastPkg];
 
-        // If matched an activity
+          if (lastActivityId) {
+            const session = activeSessions.find(s => s.activityId === lastActivityId);
+            if (session) {
+              console.log(`Auto-stopping session for ${lastPkg} (switched to ${pkg})`);
+              handleStopActivity(session.id);
+            }
+          }
+          // Reset tracker immediately
+          lastAutoStartPackage.current = null;
+        }
+
+        // --- Auto-Start Logic ---
+        const matchedActivityId = appRules[pkg];
         if (matchedActivityId) {
           // Check if already active
           const isAlreadyRunning = activeSessions.some(s => s.activityId === matchedActivityId);
 
-          // Avoid re-triggering if we just auto-started this package
+          // Only start if NOT running AND we haven't already auto-started it (and haven't switched away)
           if (!isAlreadyRunning && lastAutoStartPackage.current !== pkg) {
-            // Find Activity Object
             let targetActivity: Activity | undefined;
             let targetCategoryId: string | undefined;
 
@@ -836,6 +850,7 @@ const App: React.FC = () => {
               console.log("Auto-starting activity:", targetActivity.name);
 
               // Mark as handled immediately to prevent double-triggering
+              // Also serves as the flag for Auto-Stop logic to know we are tracking this
               lastAutoStartPackage.current = pkg;
 
               // 1. Show "开始计时" on floating ball
@@ -843,25 +858,20 @@ const App: React.FC = () => {
 
               // 2. Start Session after delay
               setTimeout(() => {
-                if (targetActivity && targetCategoryId) {
-                  handleStartActivity(targetActivity, targetCategoryId);
+                // Critical: Check if we are STILL tracking this package.
+                // If user switched away during delay, the interval loop would have cleared lastAutoStartPackage.
+                if (lastAutoStartPackage.current === pkg) {
+                  if (targetActivity && targetCategoryId) {
+                    handleStartActivity(targetActivity, targetCategoryId);
+                  }
                 }
               }, 1500);
             }
           }
-        } else {
-          // Not matched (e.g. Launcher or other app)
-          // If we have an active session that was AUTO-STARTED from the PREVIOUS app, maybe we should stop it?
-          // Or just leave it? User asked for "Auto Start", didn't explicitly detail "Auto Stop" logic yet, 
-          // but hinted "unable to treat return to desktop as event".
-          // Let's implement Auto-Stop if returning to Launcher?
-          // For now, let's Stick to User Request: "Start Timer". 
-
-          // Reset lastAutoStart if we moved to a diff app
-          if (lastAutoStartPackage.current !== pkg) {
-            lastAutoStartPackage.current = null;
-          }
         }
+
+        // Note: We don't need a standalone 'else' to clear lastAutoStartPackage 
+        // because the Auto-Stop block at top handles ANY mismatch.
 
       } catch (e) {
         // quiet
