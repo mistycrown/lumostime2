@@ -763,25 +763,37 @@ const App: React.FC = () => {
 
   // --- Auto App Record Logic ---
   const [appRules, setAppRules] = useState<Record<string, string>>({});
+  const [appLabels, setAppLabels] = useState<Record<string, string>>({}); // Store app names
   const lastAutoStartPackage = useRef<string | null>(null);
   const suspensionRef = useRef<{ originalPkg: string; suspendedAt: number } | null>(null);
 
-  // Load rules on mount
+  // Load rules and app labels on mount
   useEffect(() => {
-    const loadRules = async () => {
+    const loadData = async () => {
       try {
-        const res = await AppUsage.getAppRules();
-        if (res.rules) {
-          setAppRules(res.rules);
+        const rulesRes = await AppUsage.getAppRules();
+        if (rulesRes.rules) {
+          setAppRules(rulesRes.rules);
         }
+
+        // Fetch App Labels
+        const appsRes = await AppUsage.getInstalledApps();
+        const labelMap: Record<string, string> = {};
+        if (appsRes.apps) {
+          appsRes.apps.forEach(a => {
+            labelMap[a.packageName] = a.label;
+          });
+        }
+        setAppLabels(labelMap);
+
       } catch (e) {
-        console.error("Failed to load app rules", e);
+        console.error("Failed to load app data", e);
       }
     };
-    loadRules();
+    loadData();
     // Also reload when returning from settings (simplified)
-    document.addEventListener('resume', loadRules);
-    return () => document.removeEventListener('resume', loadRules);
+    document.addEventListener('resume', loadData);
+    return () => document.removeEventListener('resume', loadData);
   }, []);
 
   // Poll for current app (Auto-Start & Auto-Stop)
@@ -789,17 +801,36 @@ const App: React.FC = () => {
     if (Capacitor.getPlatform() !== 'android') return;
 
     const interval = setInterval(async () => {
+      // Check if feature is enabled
+      const autoRecordEnabled = localStorage.getItem('cfg_auto_record_enabled') === 'true';
+      if (!autoRecordEnabled) return;
+
       try {
         const res = await AppUsage.getRunningApp();
         const pkg = res.packageName;
         if (!pkg) return;
 
         // Helper to stop session
+        // Helper to stop session
         const stopSessionForPkg = (p: string, endTime?: number, skipUI?: boolean) => {
           const actId = appRules[p];
           if (actId) {
             const s = activeSessions.find(x => x.activityId === actId);
-            if (s) handleStopActivity(s.id, undefined, endTime, skipUI);
+            if (s) {
+              // Calculate Duration for Note
+              const finalEnd = endTime || Date.now();
+              const durationSec = Math.floor((finalEnd - s.startTime) / 1000);
+              const mins = Math.floor(durationSec / 60);
+              const secs = durationSec % 60;
+              const durationStr = mins > 0 ? `${mins}分${secs}秒` : `${secs}秒`;
+
+              // Get App Name
+              const appName = appLabels[p] || p;
+              const note = `自动记录：${appName}（${durationStr}）`;
+
+              // Pass note in finalSessionData
+              handleStopActivity(s.id, { ...s, note }, finalEnd, skipUI);
+            }
           }
         };
 
@@ -896,7 +927,7 @@ const App: React.FC = () => {
               console.log("Auto-starting activity:", targetActivity.name);
               lastAutoStartPackage.current = pkg;
 
-              await AppUsage.showFloatingText({ text: "开始计时" });
+              await AppUsage.showFloatingText({ text: "开始\n计时" });
 
               setTimeout(() => {
                 if (lastAutoStartPackage.current === pkg) {

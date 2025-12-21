@@ -24,8 +24,7 @@ export const AutoRecordSettingsView: React.FC<Props> = ({ onBack, categories }) 
     const [installedApps, setInstalledApps] = useState<InstalledApp[]>([]);
     const [rules, setRules] = useState<{ [key: string]: string }>({});
     const [isLoading, setIsLoading] = useState(false);
-    const [isDetecting, setIsDetecting] = useState(false);
-    const [detectedPackage, setDetectedPackage] = useState<string>('');
+
     const [isMonitoring, setIsMonitoring] = useState(false); // Monitor state
 
     // Selection Modal State
@@ -72,10 +71,24 @@ export const AutoRecordSettingsView: React.FC<Props> = ({ onBack, categories }) 
         } catch (e) { console.error(e); }
     };
 
-    // Load persisted state
+    // Load persisted state and verify permission
     useEffect(() => {
         const saved = localStorage.getItem('cfg_auto_record_enabled') === 'true';
-        if (saved) setIsMonitoring(true);
+        if (saved) {
+            // Verify if actually granted/running
+            AppUsage.checkAccessibilityPermission().then(res => {
+                if (res.granted) {
+                    setIsMonitoring(true);
+                } else {
+                    // Saved as True but permission missing -> Force Off
+                    setIsMonitoring(false);
+                    localStorage.setItem('cfg_auto_record_enabled', 'false');
+                }
+            }).catch(e => {
+                console.error(e);
+                setIsMonitoring(false);
+            });
+        }
     }, []);
 
     const loadData = async () => {
@@ -105,27 +118,7 @@ export const AutoRecordSettingsView: React.FC<Props> = ({ onBack, categories }) 
         try { await AppUsage.requestAccessibilityPermission(); } catch (e) { console.log(e); }
     };
 
-    const handleTestDetection = async () => {
-        setIsDetecting(true);
-        try {
-            // @ts-ignore
-            const res = await AppUsage.getRunningApp();
-            setDetectedPackage(res.packageName);
-            if (res.packageName) {
-                // Determine if linked
-                const ruleId = rules[res.packageName];
-                const matchedActivity = getActivityById(ruleId);
-                const appName = installedApps.find(a => a.packageName === res.packageName)?.label || res.packageName;
 
-                alert(`当前应用: ${appName}\n${matchedActivity ? `已关联: ${matchedActivity.name}` : '未关联'}`);
-            } else {
-                alert("未检测到前台应用");
-            }
-        } catch (e) {
-            alert("检测失败");
-        }
-        setIsDetecting(false);
-    };
 
     const handleAppClick = (app: InstalledApp) => {
         setSelectedApp(app);
@@ -183,32 +176,38 @@ export const AutoRecordSettingsView: React.FC<Props> = ({ onBack, categories }) 
         const currentRuleId = rules[selectedApp.packageName];
 
         return (
-            <div className="fixed inset-0 z-[60] flex flex-col bg-slate-50 dark:bg-slate-900 animate-in slide-in-from-bottom duration-200">
+            <div
+                className="fixed inset-0 z-[60] flex flex-col bg-[#fdfbf7] animate-in slide-in-from-bottom duration-200 font-serif"
+                style={{
+                    paddingTop: 'env(safe-area-inset-top)',
+                    paddingBottom: 'env(safe-area-inset-bottom)'
+                }}
+            >
                 {/* Modal Header */}
-                <div className="flex items-center justify-between px-4 py-3 bg-white dark:bg-slate-800 shadow-sm shrink-0">
-                    <button onClick={() => setIsModalOpen(false)} className="p-2 -ml-2 text-slate-500">
+                <div className="flex items-center justify-between px-4 h-14 border-b border-stone-100 bg-[#fdfbf7]/80 backdrop-blur-md shrink-0">
+                    <button onClick={() => setIsModalOpen(false)} className="p-2 -ml-2 text-stone-400 hover:text-stone-600">
                         <X size={24} />
                     </button>
-                    <div className="font-bold text-slate-800 dark:text-white flex items-center gap-2">
+                    <div className="font-bold text-stone-800 flex items-center gap-2">
                         {selectedApp.icon && <img src={selectedApp.icon} className="w-6 h-6 rounded-md" />}
                         {selectedApp.label}
                     </div>
                     {currentRuleId ? (
-                        <button onClick={handleRemoveRule} className="p-2 -mr-2 text-red-500">
+                        <button onClick={handleRemoveRule} className="p-2 -mr-2 text-red-500 hover:bg-red-50 rounded-lg">
                             <Trash2 size={20} />
                         </button>
                     ) : <div className="w-8"></div>}
                 </div>
 
                 <div className="flex-1 overflow-y-auto p-4">
-                    <h3 className="text-xs font-bold text-slate-400 mb-4 uppercase tracking-wider">选择关联标签</h3>
+                    <h3 className="text-xs font-bold text-stone-400 mb-4 uppercase tracking-wider">选择关联标签</h3>
 
                     <div className="space-y-6">
                         {categories.map(cat => (
                             <div key={cat.id}>
                                 <div className="flex items-center gap-2 mb-3 px-1">
                                     <span className="text-lg">{cat.icon}</span>
-                                    <span className="font-bold text-slate-700 dark:text-slate-300">{cat.name}</span>
+                                    <span className="font-bold text-stone-700">{cat.name}</span>
                                 </div>
                                 <div className="grid grid-cols-2 gap-3">
                                     {cat.activities.map(act => {
@@ -218,17 +217,17 @@ export const AutoRecordSettingsView: React.FC<Props> = ({ onBack, categories }) 
                                                 key={act.id}
                                                 onClick={() => handleSaveRule(act.id)}
                                                 className={`flex items-center gap-3 p-3 rounded-xl border text-left transition-all ${isSelected
-                                                    ? 'bg-indigo-50 border-indigo-500 ring-1 ring-indigo-500 dark:bg-indigo-900/30 dark:border-indigo-400'
-                                                    : 'bg-white border-slate-100 dark:bg-slate-800 dark:border-slate-700 active:scale-95'
+                                                    ? 'bg-stone-50 border-stone-300'
+                                                    : 'bg-white border-stone-100 hover:border-stone-300 active:scale-95'
                                                     }`}
                                             >
-                                                <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm ${act.color || 'bg-slate-100 text-slate-500'}`}>
+                                                <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm ${act.color || 'bg-stone-100 text-stone-500'}`}>
                                                     {act.icon}
                                                 </div>
-                                                <span className={`text-sm font-medium truncate flex-1 ${isSelected ? 'text-indigo-700 dark:text-indigo-300' : 'text-slate-700 dark:text-slate-300'}`}>
+                                                <span className={`text-sm font-medium truncate flex-1 ${isSelected ? 'text-stone-900' : 'text-stone-700'}`}>
                                                     {act.name}
                                                 </span>
-                                                {isSelected && <Check size={16} className="text-indigo-600 dark:text-indigo-400" />}
+                                                {isSelected && <Check size={16} className="text-stone-400" />}
                                             </button>
                                         );
                                     })}
@@ -242,34 +241,39 @@ export const AutoRecordSettingsView: React.FC<Props> = ({ onBack, categories }) 
     };
 
     return (
-        <div className="flex flex-col h-full bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-slate-100 absolute inset-0 z-50">
+        <div
+            className="flex flex-col h-full bg-[#fdfbf7] text-stone-900 absolute inset-0 z-50 font-serif"
+            style={{
+                paddingTop: 'env(safe-area-inset-top)',
+                paddingBottom: 'env(safe-area-inset-bottom)'
+            }}
+        >
             {/* Main Header */}
-            <div className="flex items-center px-4 py-3 bg-white dark:bg-slate-800 shadow-sm shrink-0 z-10 gap-3">
+            <div className="flex items-center px-4 h-14 border-b border-stone-100 bg-[#fdfbf7]/80 backdrop-blur-md shrink-0 z-10 gap-3 sticky top-0">
                 <button
                     onClick={onBack}
-                    className="p-2 rounded-full hover:bg-slate-100 dark:hover:bg-slate-700 active:scale-95 transition-transform"
+                    className="p-2 -ml-2 rounded-full hover:bg-stone-100 active:scale-95 transition-transform"
                 >
-                    <ArrowLeft size={20} className="text-slate-600 dark:text-slate-400" />
+                    <ArrowLeft size={20} className="text-stone-500" />
                 </button>
                 <div className="flex-1">
-                    <h1 className="text-lg font-bold text-slate-800 dark:text-white">应用自动记录</h1>
+                    <h1 className="text-lg font-bold text-stone-800">应用自动记录</h1>
                 </div>
-                {/* Search Toggle? */}
             </div>
 
             <main className="flex-1 overflow-y-auto">
-                <div className="p-4 space-y-6">
+                <div className="p-4 space-y-6 pb-20">
                     {/* Permission Status */}
                     {!hasPermission && (
                         <div
                             onClick={handlePermissionClick}
-                            className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl p-4 flex items-center justify-between"
+                            className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-center justify-between"
                         >
                             <div className="flex items-center gap-3">
-                                <ShieldAlert className="text-amber-600 dark:text-amber-500" size={24} />
+                                <ShieldAlert className="text-amber-600" size={24} />
                                 <div>
-                                    <div className="font-bold text-amber-900 dark:text-amber-400">需要无障碍服务权限</div>
-                                    <div className="text-xs text-amber-700 dark:text-amber-500">点击授权以启用实时应用检测</div>
+                                    <div className="font-bold text-amber-900">需要无障碍服务权限</div>
+                                    <div className="text-xs text-amber-700">点击授权以启用实时应用检测</div>
                                 </div>
                             </div>
                             <ChevronRight size={20} className="text-amber-400" />
@@ -277,95 +281,86 @@ export const AutoRecordSettingsView: React.FC<Props> = ({ onBack, categories }) 
                     )}
 
                     {/* Monitoring Switch */}
-                    <div className="bg-white dark:bg-slate-800 rounded-xl p-4 shadow-sm border border-slate-100 dark:border-slate-700 flex items-center justify-between">
+                    <div className="bg-white rounded-2xl p-4 shadow-[0_2px_10px_rgba(0,0,0,0.03)] border border-stone-100 flex items-center justify-between">
                         <div>
-                            <div className="font-bold text-slate-800 dark:text-white">后台自动检测</div>
-                            <div className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                            <div className="font-bold text-stone-800">后台自动检测</div>
+                            <div className="text-xs text-stone-500 mt-1">
                                 开启后将在通知栏常驻，实时检测应用切换
                             </div>
                         </div>
                         <div
                             onClick={toggleMonitoring}
-                            className={`w-12 h-7 rounded-full transition-colors flex items-center px-1 cursor-pointer ${isMonitoring ? 'bg-indigo-500' : 'bg-slate-200 dark:bg-slate-700'}`}
+                            className={`w-12 h-7 rounded-full transition-colors flex items-center px-1 cursor-pointer ${isMonitoring ? 'bg-stone-800' : 'bg-stone-200'}`}
                         >
                             <div className={`w-5 h-5 rounded-full bg-white shadow-sm transition-transform ${isMonitoring ? 'translate-x-5' : ''}`} />
                         </div>
                     </div>
 
-                    {/* Test Button (Keep it for verification) */}
-                    <div className="flex gap-2">
-                        <button
-                            onClick={handleTestDetection}
-                            className="flex-1 py-2 bg-slate-200 dark:bg-slate-700 rounded-lg text-sm font-bold text-slate-600 dark:text-slate-300 active:scale-95 transition-transform"
-                        >
-                            {isDetecting ? '检测中...' : '检测当前应用 (测试)'}
-                        </button>
-                    </div>
 
                     {/* App List */}
                     <div>
                         <div className="flex items-center justify-between mb-4">
-                            <h2 className="text-sm font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">已安装应用 ({installedApps.length})</h2>
-                            {/* Search Input */}
+                            <h2 className="text-sm font-semibold text-stone-400 uppercase tracking-wider pl-2">已安装应用 ({installedApps.length})</h2>
                         </div>
 
                         {/* Search Box */}
                         <div className="relative mb-4">
-                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-stone-400" size={16} />
                             <input
                                 type="text"
                                 placeholder="搜索应用..."
                                 value={searchQuery}
                                 onChange={(e) => setSearchQuery(e.target.value)}
-                                className="w-full pl-9 pr-4 py-2 bg-white dark:bg-slate-800 rounded-xl border border-slate-100 dark:border-slate-700 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                className="w-full pl-9 pr-4 py-2 bg-white rounded-xl border border-stone-100 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 text-stone-800 placeholder-stone-400"
                             />
                         </div>
 
                         {isLoading ? (
-                            <div className="text-center py-10 text-slate-400">加载中...</div>
+                            <div className="text-center py-10 text-stone-300">加载中...</div>
                         ) : (
-                            <div className="space-y-2">
-                                {filteredApps.map(app => {
+                            <div className="bg-white rounded-2xl overflow-hidden shadow-[0_2px_10px_rgba(0,0,0,0.03)] border border-stone-100">
+                                {filteredApps.map((app, index) => {
                                     const ruleId = rules[app.packageName];
                                     const matched = ruleId ? getActivityById(ruleId) : null;
+                                    const isLast = index === filteredApps.length - 1;
 
                                     return (
                                         <div
                                             key={app.packageName}
                                             onClick={() => handleAppClick(app)}
-                                            className="bg-white dark:bg-slate-800 p-3 rounded-xl flex items-center gap-3 shadow-sm border border-slate-50 dark:border-slate-700 active:scale-[0.99] transition-transform cursor-pointer"
+                                            className={`p-4 flex items-center gap-3 active:bg-stone-50 transition-colors cursor-pointer ${!isLast ? 'border-b border-stone-50' : ''}`}
                                         >
                                             <div className="w-10 h-10 shrink-0">
                                                 {app.icon ? (
                                                     <img src={app.icon} className="w-full h-full object-contain" />
                                                 ) : (
-                                                    <div className="w-full h-full bg-slate-100 rounded-full flex items-center justify-center">
-                                                        <Smartphone size={16} className="text-slate-400" />
+                                                    <div className="w-full h-full bg-stone-100 rounded-full flex items-center justify-center">
+                                                        <Smartphone size={16} className="text-stone-400" />
                                                     </div>
                                                 )}
                                             </div>
                                             <div className="flex-1 min-w-0">
-                                                <div className="font-medium text-slate-800 dark:text-slate-200 truncate">{app.label}</div>
-                                                <div className="text-[10px] text-slate-400 truncate">{app.packageName}</div>
+                                                <div className="font-medium text-stone-800 truncate">{app.label}</div>
+                                                <div className="text-[10px] text-stone-400 truncate">{app.packageName}</div>
                                             </div>
 
                                             {matched ? (
-                                                <div className="flex items-center gap-2 bg-indigo-50 dark:bg-indigo-900/30 px-2 py-1 rounded-lg">
+                                                <div className="flex items-center gap-2 bg-stone-100 px-2 py-1 rounded-lg">
                                                     <span className="text-lg">{matched.icon}</span>
-                                                    <span className="text-xs font-bold text-indigo-700 dark:text-indigo-300 max-w-[80px] truncate">
+                                                    <span className="text-xs font-bold text-stone-600 max-w-[80px] truncate">
                                                         {matched.name}
                                                     </span>
                                                 </div>
                                             ) : (
-                                                <div className="px-2 py-1 rounded-lg bg-slate-50 dark:bg-slate-700/50">
-                                                    <span className="text-xs text-slate-400">未关联</span>
+                                                <div className="px-2 py-1 rounded-lg bg-stone-50">
+                                                    <span className="text-xs text-stone-400">未关联</span>
                                                 </div>
                                             )}
                                         </div>
                                     );
                                 })}
                                 {filteredApps.length === 0 && !isLoading && (
-                                    <div className="text-center py-10 text-slate-400">未找到应用</div>
+                                    <div className="text-center py-10 text-stone-300">未找到应用</div>
                                 )}
                             </div>
                         )}

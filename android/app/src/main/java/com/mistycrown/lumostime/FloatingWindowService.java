@@ -432,7 +432,7 @@ public class FloatingWindowService extends Service {
 
         // Switch State View
         switchStateView = new TextView(this);
-        switchStateView.setText("切换页面");
+        switchStateView.setText("切换\n页面");
         switchStateView.setTextColor(Color.parseColor("#EF4444")); // Red-500
         switchStateView.setGravity(Gravity.CENTER);
         switchStateView.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 11);

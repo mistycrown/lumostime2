@@ -1,6 +1,11 @@
 import { registerPlugin } from '@capacitor/core';
 
 export interface AppUsagePlugin {
+    checkAccessibilityPermission(): Promise<{ granted: boolean }>;
+    requestAccessibilityPermission(): Promise<void>;
+    showFloatingText(options: { text: string }): Promise<void>;
+    setSwitchPending(options: { pending: boolean }): Promise<void>;
+
     checkPermissions(): Promise<{ granted: boolean }>;
     requestPermissions(): Promise<void>;
     getRunningApp(): Promise<{ packageName: string }>;

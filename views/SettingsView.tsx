@@ -160,6 +160,19 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
         return localStorage.getItem('cfg_floating_window_enabled') === 'true';
     });
 
+    // Sync state with actual permission on mount
+    useEffect(() => {
+        if (floatingWindowEnabled) {
+            FocusNotification.checkFloatingPermission().then(res => {
+                if (!res.granted) {
+                    // Permission missing, force off to ensure consistency
+                    setFloatingWindowEnabled(false);
+                    localStorage.setItem('cfg_floating_window_enabled', 'false');
+                }
+            }).catch(e => console.error("FW perm check failed", e));
+        }
+    }, []);
+
     const handleToggleFloatingWindow = async () => {
         // @ts-ignore
         if (window.Capacitor?.getPlatform() !== 'android') {
