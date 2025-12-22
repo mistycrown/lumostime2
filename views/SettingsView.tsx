@@ -1034,10 +1034,13 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
                                     className="flex items-center gap-2 bg-stone-100 hover:bg-stone-200 text-stone-700 text-sm font-bold px-4 py-2 rounded-lg transition-colors"
                                 >
                                     <span>
-                                        {defaultView === 'RECORD' && '计时'}
-                                        {defaultView === 'TIMELINE' && '时间轴'}
-                                        {defaultView === 'STATS' && '统计'}
+                                        {defaultView === 'RECORD' && '记录'}
                                         {defaultView === 'TODO' && '待办'}
+                                        {defaultView === 'TIMELINE' && '脉络'}
+                                        {defaultView === 'REVIEW' && '档案'}
+                                        {defaultView === 'TAGS' && '索引'}
+                                        {defaultView === 'STATS' && '统计页'}
+                                        {/* Fallback for legacy 'SCOPE' or others if set */}
                                         {defaultView === 'SCOPE' && '领域'}
                                     </span>
                                     <ChevronDown size={14} className={`transition-transform ${isDefaultViewDropdownOpen ? 'rotate-180' : ''}`} />
@@ -1048,14 +1051,15 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
                                         {/* Backdrop to close */}
                                         <div className="fixed inset-0 z-10" onClick={() => setIsDefaultViewDropdownOpen(false)} />
 
-                                        {/* Dropdown Menu */}
-                                        <div className="absolute right-0 top-full mt-2 w-32 bg-white rounded-xl shadow-xl border border-stone-100 overflow-hidden z-20 flex flex-col py-1 animate-in fade-in zoom-in-95 duration-200 origin-top-right">
+                                        {/* Dropdown Menu - Opens Upwards */}
+                                        <div className="absolute right-0 bottom-full mb-2 w-32 bg-white rounded-xl shadow-xl border border-stone-100 overflow-hidden z-20 flex flex-col py-1 animate-in fade-in zoom-in-95 duration-200 origin-bottom-right">
                                             {[
-                                                { label: '计时', value: 'RECORD' },
-                                                { label: '时间轴', value: 'TIMELINE' },
-                                                { label: '统计', value: 'STATS' },
+                                                { label: '记录', value: 'RECORD' },
                                                 { label: '待办', value: 'TODO' },
-                                                { label: '领域', value: 'SCOPE' }
+                                                { label: '脉络', value: 'TIMELINE' },
+                                                { label: '档案', value: 'REVIEW' },
+                                                { label: '索引', value: 'TAGS' },
+                                                { label: '统计页', value: 'STATS' }
                                             ].map(opt => (
                                                 <button
                                                     key={opt.value}
