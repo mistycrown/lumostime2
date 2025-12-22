@@ -164,6 +164,30 @@ const App: React.FC = () => {
     loadAppRules();
   }, []);
 
+  // Auto-start Floating Window if enabled
+  useEffect(() => {
+    const initFloatingWindow = async () => {
+      if (Capacitor.getPlatform() !== 'android') return;
+
+      const enabled = localStorage.getItem('cfg_floating_window_enabled') === 'true';
+      if (enabled) {
+        try {
+          // Check if we still have permission
+          const res = await FocusNotification.checkFloatingPermission();
+          if (res.granted) {
+            await FocusNotification.startFloatingWindow();
+            console.log('🔵 Auto-started floating window');
+          } else {
+            console.log('⚠️ Floating window enabled but permission missing');
+          }
+        } catch (e) {
+          console.error('❌ Failed to auto-start floating window:', e);
+        }
+      }
+    };
+    initFloatingWindow();
+  }, []);
+
   // --- Auto Sync Logic ---
   const [lastSyncTime, setLastSyncTime] = useState<number>(() => {
     const saved = localStorage.getItem('lumos_last_sync_time');
