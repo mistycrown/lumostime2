@@ -532,10 +532,10 @@ export const WeeklyReviewView: React.FC<WeeklyReviewViewProps> = ({
             </div>
 
             {/* Tab Content */}
-            <div className="flex-1 overflow-hidden flex flex-col">
+            <div className="flex-1 overflow-hidden flex flex-col -mx-7">
                 {/* Tab 1: Data - 使用 StatsView 组件 */}
                 {activeTab === 'data' && (
-                    <div className="flex-1 overflow-hidden -mx-7 animate-in fade-in duration-300">
+                    <div className="flex-1 overflow-hidden animate-in fade-in duration-300">
                         <StatsView
                             logs={logs}
                             categories={categories}
@@ -555,7 +555,7 @@ export const WeeklyReviewView: React.FC<WeeklyReviewViewProps> = ({
 
                 {/* Tab 2: Guide */}
                 {activeTab === 'guide' && (
-                    <div className="flex-1 overflow-y-auto no-scrollbar space-y-6 animate-in fade-in duration-300 pb-40">
+                    <div className="flex-1 overflow-y-auto no-scrollbar space-y-6 animate-in fade-in duration-300 pb-40 px-7">
                         {templatesForDisplay.length === 0 ? (
                             <div className="text-center py-12">
                                 <p className="text-stone-400">暂无启用的回顾模板</p>
@@ -626,7 +626,7 @@ export const WeeklyReviewView: React.FC<WeeklyReviewViewProps> = ({
 
                 {/* Tab 3: Narrative */}
                 {activeTab === 'narrative' && (
-                    <div className="flex-1 overflow-y-auto no-scrollbar space-y-4 animate-in fade-in duration-300 pb-40">
+                    <div className="flex-1 overflow-y-auto no-scrollbar space-y-4 animate-in fade-in duration-300 pb-40 px-7">
                         {!narrative && !isEditing ? (
                             <div className="flex flex-col gap-1 py-8">
                                 {/* 选项1：新建空白叙事 */}
