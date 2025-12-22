@@ -713,7 +713,7 @@ const App: React.FC = () => {
   const handleStartTodoFocus = (todo: TodoItem) => {
     // Check for link
     if (todo.linkedCategoryId && todo.linkedActivityId) {
-      const cat = CATEGORIES.find(c => c.id === todo.linkedCategoryId);
+      const cat = categories.find(c => c.id === todo.linkedCategoryId);
       const act = cat?.activities.find(a => a.id === todo.linkedActivityId);
 
       if (cat && act) {
@@ -1989,6 +1989,7 @@ const App: React.FC = () => {
           <TodoView
             todos={todos}
             categories={todoCategories}
+            activityCategories={categories}
             scopes={scopes}
             onToggleTodo={handleToggleTodo}
             onEditTodo={openEditTodoModal}

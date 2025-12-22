@@ -1,12 +1,13 @@
 import React, { useState } from 'react';
-import { MOCK_TODO_CATEGORIES, CATEGORIES } from '../constants';
+import { MOCK_TODO_CATEGORIES } from '../constants';
 import { Scope } from '../types';
-import { TodoItem, TodoCategory } from '../types';
+import { TodoItem, TodoCategory, Category } from '../types';
 import { PlayCircle, CheckCircle2, Circle, Plus, MoreHorizontal, Settings2, ChevronLeft, ChevronRight, LayoutList, Rows } from 'lucide-react';
 
 interface TodoViewProps {
   todos: TodoItem[];
   categories: TodoCategory[];
+  activityCategories: Category[];
   scopes: Scope[];
   onToggleTodo: (id: string) => void;
   onEditTodo: (todo: TodoItem) => void;
@@ -19,13 +20,14 @@ interface TodoViewProps {
 const SwipeableTodoItem: React.FC<{
   todo: TodoItem;
   categories: TodoCategory[];
+  activityCategories: Category[];
   scopes: Scope[];
   onToggle: (id: string) => void;
   onEdit: (todo: TodoItem) => void;
   onStartFocus: (todo: TodoItem) => void;
   onDuplicate: (todo: TodoItem) => void;
   viewMode: 'loose' | 'compact';
-}> = ({ todo, categories, scopes, onToggle, onEdit, onStartFocus, onDuplicate, viewMode }) => {
+}> = ({ todo, categories, activityCategories, scopes, onToggle, onEdit, onStartFocus, onDuplicate, viewMode }) => {
   const [touchStart, setTouchStart] = useState<number | null>(null);
   const [translateX, setTranslateX] = useState(0);
 
@@ -75,7 +77,7 @@ const SwipeableTodoItem: React.FC<{
 
   const linkedDetails = (() => {
     if (!todo.linkedCategoryId || !todo.linkedActivityId) return null;
-    const cat = CATEGORIES.find(c => c.id === todo.linkedCategoryId);
+    const cat = activityCategories.find(c => c.id === todo.linkedCategoryId);
     const act = cat?.activities.find(a => a.id === todo.linkedActivityId);
     return act && cat ? { categoryName: cat.name, categoryIcon: cat.icon, activityName: act.name, activityIcon: act.icon } : null;
   })();
@@ -235,7 +237,7 @@ const SwipeableTodoItem: React.FC<{
   );
 };
 
-export const TodoView: React.FC<TodoViewProps> = ({ todos, categories, scopes, onToggleTodo, onEditTodo, onAddTodo, onStartFocus, onDuplicateTodo }) => {
+export const TodoView: React.FC<TodoViewProps> = ({ todos, categories, activityCategories, scopes, onToggleTodo, onEditTodo, onAddTodo, onStartFocus, onDuplicateTodo }) => {
   const [selectedCategoryId, setSelectedCategoryId] = useState<string>(categories[0]?.id || '');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
@@ -352,6 +354,7 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, categories, scopes, o
               key={todo.id}
               todo={todo}
               categories={categories}
+              activityCategories={activityCategories}
               scopes={scopes}
               onToggle={onToggleTodo}
               onEdit={onEditTodo}
