@@ -253,7 +253,7 @@ export const ReviewHubView: React.FC<ReviewHubViewProps> = ({
                     </div>
                 ) : (
                     /* Weekly Grid Scroll Container */
-                    <div className="grid grid-rows-2 grid-flow-col auto-cols-[160px] gap-3 overflow-x-auto -mr-5 pr-5 pb-5 snap-x snap-mandatory scrollbar-hide">
+                    <div className="flex overflow-x-auto gap-3 -mr-5 pr-5 pb-5 snap-x snap-mandatory scrollbar-hide">
                         {sortedWeeklyReviews.map((w, idx) => {
                             const startDate = new Date(w.weekStartDate);
                             const endDate = new Date(w.weekEndDate);
@@ -282,7 +282,7 @@ export const ReviewHubView: React.FC<ReviewHubViewProps> = ({
                                 <div
                                     key={w.id}
                                     onClick={() => onOpenWeeklyReview(new Date(w.weekStartDate), new Date(w.weekEndDate))}
-                                    className={`snap-start rounded-2xl p-4 h-[140px] flex flex-col justify-between relative overflow-hidden border transition-all active:scale-95
+                                    className={`snap-start flex-none w-[calc(50%-6px)] rounded-2xl p-4 h-[140px] flex flex-col justify-between relative overflow-hidden border transition-all active:scale-95
                  ${isDark
                                             ? 'bg-stone-900 text-white border-stone-900'
                                             : 'bg-white text-stone-900 border-stone-200'}

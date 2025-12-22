@@ -251,6 +251,22 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, categories, scopes, o
   }, [viewMode]);
 
   const selectedCategory = categories.find(c => c.id === selectedCategoryId) || categories[0];
+
+  // 如果没有分类，显示空状态而不是崩溃
+  if (!selectedCategory) {
+    return (
+      <div className="flex h-full items-center justify-center bg-[#faf9f6] flex-col gap-4">
+        <div className="w-16 h-16 rounded-full bg-stone-100 flex items-center justify-center text-stone-300">
+          <LayoutList size={32} />
+        </div>
+        <div className="text-center">
+          <p className="text-stone-500 font-bold mb-1">暂无待办分类</p>
+          <p className="text-xs text-stone-400">请先创建分类以添加待办事项</p>
+        </div>
+      </div>
+    );
+  }
+
   const filteredTodos = todos
     .filter(t => t.categoryId === selectedCategoryId)
     .sort((a, b) => Number(a.isCompleted) - Number(b.isCompleted));
