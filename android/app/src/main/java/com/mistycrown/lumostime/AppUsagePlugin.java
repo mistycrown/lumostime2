@@ -88,7 +88,7 @@ public class AppUsagePlugin extends Plugin {
                 String displayName = (activityName != null && !activityName.isEmpty()) ? activityName : appLabel;
                 Log.d(TAG, "✅ 检测到关联: " + appLabel + " → " + displayName);
                 // 显示提醒(持久显示直到点击),显示标签名称
-                FloatingWindowService.showPrompt(packageName, displayName);
+                FloatingWindowService.showPrompt(packageName, displayName, appLabel);
             } else {
                 Log.d(TAG, "ℹ️ 应用未关联: " + appLabel);
             }
