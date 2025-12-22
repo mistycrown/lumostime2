@@ -31,11 +31,45 @@ import android.view.accessibility.AccessibilityManager;
 
 @CapacitorPlugin(name = "AppUsage")
 public class AppUsagePlugin extends Plugin {
+    private static final String TAG = "AppUsagePlugin";
+
     // Real-time package name from AccessibilityService
     private static String currentRealtimePackage = null;
+    private static AppUsagePlugin instance = null;
+
+    @Override
+    public void load() {
+        super.load();
+        instance = this;
+        Log.d(TAG, "✅ AppUsagePlugin loaded, instance saved");
+    }
+
+    @Override
+    protected void handleOnDestroy() {
+        super.handleOnDestroy();
+        instance = null;
+        Log.d(TAG, "🔴 AppUsagePlugin destroyed, instance cleared");
+    }
 
     public static void updateCurrentPackage(String packageName) {
         currentRealtimePackage = packageName;
+    }
+
+    /**
+     * 静态方法: 触发应用检测事件到React Native
+     * 供AppAccessibilityService调用
+     */
+    public static void triggerAppDetected(String packageName, String appLabel) {
+        if (instance != null && instance.getBridge() != null) {
+            Log.d(TAG, "📤 触发应用检测事件: " + packageName);
+            // 手动构造JSON字符串
+            String jsonData = String.format("{\"packageName\":\"%s\",\"appLabel\":\"%s\"}",
+                    packageName.replace("\"", "\\\""),
+                    appLabel.replace("\"", "\\\""));
+            instance.getBridge().triggerWindowJSEvent("appDetected", jsonData);
+        } else {
+            Log.w(TAG, "⚠️ 无法触发应用检测事件: Plugin instance或Bridge为null");
+        }
     }
 
     @PluginMethod
