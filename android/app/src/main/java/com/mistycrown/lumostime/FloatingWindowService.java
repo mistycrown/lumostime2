@@ -50,6 +50,11 @@ public class FloatingWindowService extends Service {
 
     private int currentDisplayState = 0; // 0: Time, 1: Emoji, 2: Icon
 
+    // 提醒模式状态
+    private boolean isPromptMode = false;
+    private String promptPackageName = "";
+    private String promptAppLabel = "";
+
     private Runnable updateRunnable = new Runnable() {
         @Override
         public void run() {
@@ -196,6 +201,75 @@ public class FloatingWindowService extends Service {
         } else {
             Log.w(TAG, "⚠️ FloatingWindowService instance为null, 无法更新图标");
         }
+    }
+
+    public static void showTempText(String text) {
+        Log.d(TAG, "📥 showTempText被调用: " + text);
+        if (instance != null) {
+            Log.d(TAG, "✅ instance存在,准备显示文字");
+            new android.os.Handler(android.os.Looper.getMainLooper()).post(() -> {
+                instance.showTempTextInternal(text);
+            });
+        } else {
+            Log.w(TAG, "⚠️ FloatingWindowService instance为null, 无法显示文字");
+        }
+    }
+
+    private void showTempTextInternal(String text) {
+        Log.d(TAG, "🔤 showTempTextInternal: " + text);
+        if (timeView != null) {
+            // 暂停循环更新
+            handler.removeCallbacks(updateRunnable);
+
+            // 隐藏其他视图
+            if (emojiView != null)
+                emojiView.setVisibility(View.GONE);
+            if (iconView != null)
+                iconView.setVisibility(View.GONE);
+
+            // 显示文字
+            timeView.setText(text);
+            timeView.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 9);
+            timeView.setVisibility(View.VISIBLE);
+            timeView.setScaleY(1f);
+
+            Log.d(TAG, "✅ 文字已显示在timeView (持久显示,等待用户点击)");
+            // 不再设置定时器,持久显示直到点击
+        } else {
+            Log.w(TAG, "⚠️ timeView为null");
+        }
+    }
+
+    public static void showPrompt(String packageName, String appLabel) {
+        Log.d(TAG, "📥 showPrompt被调用: " + packageName + " / " + appLabel);
+        if (instance != null) {
+            instance.showPromptInternal(packageName, appLabel);
+        } else {
+            Log.w(TAG, "⚠️ FloatingWindowService instance为null");
+        }
+    }
+
+    private void showPromptInternal(String packageName, String appLabel) {
+        this.isPromptMode = true;
+        this.promptPackageName = packageName;
+        this.promptAppLabel = appLabel;
+
+        showTempTextInternal("开始?\n" + appLabel);
+        Log.d(TAG, "✅ 进入提醒模式: " + appLabel);
+    }
+
+    private void hidePrompt() {
+        this.isPromptMode = false;
+        this.promptPackageName = "";
+        this.promptAppLabel = "";
+
+        // 恢复显示应用图标
+        if (timeView != null)
+            timeView.setVisibility(View.GONE);
+        if (iconView != null)
+            iconView.setVisibility(View.VISIBLE);
+
+        Log.d(TAG, "✅ 退出提醒模式");
     }
 
     private void registerAppChangeReceiver() {
@@ -433,6 +507,16 @@ public class FloatingWindowService extends Service {
             if (isFocusing) {
                 Log.d(TAG, "🎯 悬浮球点击: 专注状态 -> 触发结束计时");
                 FocusNotificationPlugin.triggerStopFocusFromFloating();
+                return;
+            }
+
+            // 如果是提醒模式,隐藏提醒并显示"开始计时"
+            if (isPromptMode) {
+                Log.d(TAG, "🎯 悬浮球点击: 提醒模式 -> 开始计时 " + promptAppLabel);
+                hidePrompt();
+                // 显示"开始计时"提示
+                showTempText("开始计时");
+                // TODO: 这里应该通知React Native开始计时
                 return;
             }
 

@@ -67,8 +67,33 @@ public class AppUsagePlugin extends Plugin {
                     packageName.replace("\"", "\\\""),
                     appLabel.replace("\"", "\\\""));
             instance.getBridge().triggerWindowJSEvent("appDetected", jsonData);
+
+            // 同时在Java层检查关联并显示提醒
+            instance.checkAndShowPrompt(packageName, appLabel);
         } else {
             Log.w(TAG, "⚠️ 无法触发应用检测事件: Plugin instance或Bridge为null");
+        }
+    }
+
+    private void checkAndShowPrompt(String packageName, String appLabel) {
+        try {
+            // 读取应用关联规则
+            android.content.SharedPreferences prefs = getContext().getSharedPreferences("AppUsageRules",
+                    Context.MODE_PRIVATE);
+            String activityId = prefs.getString(packageName, null);
+            String activityName = prefs.getString(packageName + "_name", null);
+
+            if (activityId != null) {
+                // 优先显示标签名称,如果没有则显示应用名称
+                String displayName = (activityName != null && !activityName.isEmpty()) ? activityName : appLabel;
+                Log.d(TAG, "✅ 检测到关联: " + appLabel + " → " + displayName);
+                // 显示提醒(持久显示直到点击),显示标签名称
+                FloatingWindowService.showPrompt(packageName, displayName);
+            } else {
+                Log.d(TAG, "ℹ️ 应用未关联: " + appLabel);
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "检查关联失败", e);
         }
     }
 
@@ -190,6 +215,7 @@ public class AppUsagePlugin extends Plugin {
     public void saveAppRule(PluginCall call) {
         String packageName = call.getString("packageName");
         String activityId = call.getString("activityId");
+        String activityName = call.getString("activityName");
         if (packageName == null || activityId == null) {
             call.reject("Missing packageName or activityId");
             return;
@@ -197,7 +223,9 @@ public class AppUsagePlugin extends Plugin {
 
         android.content.SharedPreferences prefs = getContext().getSharedPreferences("AppUsageRules",
                 Context.MODE_PRIVATE);
-        prefs.edit().putString(packageName, activityId).apply();
+        prefs.edit().putString(packageName, activityId)
+                .putString(packageName + "_name", activityName != null ? activityName : "")
+                .apply();
         call.resolve();
     }
 
