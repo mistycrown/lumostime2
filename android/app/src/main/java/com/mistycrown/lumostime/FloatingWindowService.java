@@ -251,6 +251,11 @@ public class FloatingWindowService extends Service {
     }
 
     private void showPromptInternal(String packageName, String appLabel, String realAppName) {
+        if (isFocusing) {
+            Log.d(TAG, "⏸️ 当前正在专注中, 忽略提醒: " + appLabel);
+            return;
+        }
+
         this.isPromptMode = true;
         this.promptPackageName = packageName;
         this.promptAppLabel = appLabel;
