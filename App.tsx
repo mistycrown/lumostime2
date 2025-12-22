@@ -328,7 +328,7 @@ const App: React.FC = () => {
 
 
 
-  const handleStartActivity = (activity: Activity, categoryId: string, todoId?: string, scopeId?: string) => {
+  const handleStartActivity = (activity: Activity, categoryId: string, todoId?: string, scopeId?: string, note?: string) => {
     let appliedScopeIds: string[] | undefined = scopeId ? [scopeId] : undefined;
     if (!scopeId && autoLinkRules.length > 0) {
       const matchingRules = autoLinkRules.filter(rule => rule.activityId === activity.id);
@@ -344,7 +344,8 @@ const App: React.FC = () => {
       activityIcon: activity.icon,
       startTime: Date.now(),
       linkedTodoId: todoId,
-      scopeIds: appliedScopeIds
+      scopeIds: appliedScopeIds,
+      note: note
     };
     setActiveSessions(prev => [...prev, newSession]);
 
@@ -1298,24 +1299,79 @@ const App: React.FC = () => {
               }
             }
 
+
+
             if (foundCat && foundAct) {
               console.log(`✅ 检测到关联: ${appLabel} → ${foundAct.name}`);
-
-              // 临时方案:使用showFloatingText显示提醒
-              AppUsage.showFloatingText({ text: `开始?\n${foundAct.icon} ${foundAct.name}` })
-                .catch(err => console.error('显示提醒失败:', err));
-
-              console.log('🔔 显示提醒:', foundAct.name);
+              // 提醒已在原生层处理,无需JS调用
             } else {
               console.log('⚠️ 未找到activityId对应的Activity:', activityId);
             }
           }
         } catch (e) {
-          console.error('处理应用检测事件失败:', e);
+          console.error('处理应用检测事件败:', e);
+        }
+      };
+
+      const handleStartFromPrompt = (event: any) => {
+        try {
+          console.log('📥 收到悬浮球开始计时事件:', event);
+
+          let packageName = '';
+          let appLabel = '';
+
+          // 解析事件数据
+          if (event.detail) {
+            const data = typeof event.detail === 'string' ? JSON.parse(event.detail) : event.detail;
+            packageName = data.packageName;
+            appLabel = data.appLabel;
+          } else {
+            packageName = event.packageName;
+            appLabel = event.appLabel;
+          }
+
+          if (!packageName) {
+            console.warn('⚠️ packageName为空');
+            return;
+          }
+
+          console.log('🚀 开始计时:', packageName, appLabel);
+
+          // 查找关联规则
+          const activityId = appRules[packageName];
+          if (activityId) {
+            // 查找Activity
+            let foundCat = null;
+            let foundAct = null;
+            for (const cat of categories) {
+              const act = cat.activities.find(a => a.id === activityId);
+              if (act) {
+                foundCat = cat;
+                foundAct = act;
+                break;
+              }
+            }
+
+            if (foundCat && foundAct) {
+              console.log(`✅ 找到关联活动: ${foundAct.name}, 准备开始...`);
+              // 调用handleStartActivity, 传入关联应用的名称作为note
+              // 注意: handleStartActivity签名为 (activity, categoryId, todoId, scopeId, note)
+              handleStartActivity(foundAct, foundCat.id, undefined, undefined, `关联启动: ${appLabel || packageName}`);
+              addToast('success', `已开始: ${foundAct.name}`);
+            } else {
+              console.warn('⚠️ 未找到关联的Activity:', activityId);
+            }
+          } else {
+            console.warn('⚠️ 未找到应用关联规则:', packageName);
+          }
+
+        } catch (e) {
+          console.error('处理开始计时事件失败:', e);
         }
       };
 
       window.addEventListener('appDetected', handleAppDetected);
+      window.addEventListener('startFocusFromPrompt', handleStartFromPrompt);
 
       return () => {
         window.removeEventListener('appDetected', handleAppDetected);
