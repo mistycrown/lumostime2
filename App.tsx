@@ -2298,7 +2298,7 @@ const App: React.FC = () => {
           !selectedTagId && !selectedScopeId && (
             <button
               onClick={() => setCurrentView(currentView === AppView.TAGS ? AppView.SCOPE : AppView.TAGS)}
-              className="fixed bottom-20 right-6 w-14 h-14 bg-stone-900 rounded-full text-white shadow-2xl flex items-center justify-center active:scale-90 transition-transform z-40 border border-stone-800"
+              className="fixed bottom-[calc(4.5rem+env(safe-area-inset-bottom))] right-6 w-14 h-14 bg-stone-900 rounded-full text-white shadow-2xl flex items-center justify-center active:scale-90 transition-transform z-40 border border-stone-800"
               aria-label={currentView === AppView.TAGS ? "Switch to Scope" : "Switch to Tags"}
             >
               {currentView === AppView.TAGS ? <Target size={24} /> : <Tag size={24} />}
@@ -2576,7 +2576,7 @@ const App: React.FC = () => {
         !isTagsManaging &&
         !isScopeManaging &&
         currentView !== AppView.STATS && (
-          <nav className={`fixed bottom-0 left-0 w-full h-14 md:h-16 border-t border-stone-100 flex justify-around items-center z-30 pb-safe md:pb-0 ${currentView === AppView.TIMELINE || currentView === AppView.TAGS
+          <nav className={`fixed bottom-0 left-0 w-full h-12 md:h-16 box-content border-t border-stone-100 flex justify-around items-center z-30 pb-[env(safe-area-inset-bottom)] ${currentView === AppView.TIMELINE || currentView === AppView.TAGS
             ? 'bg-[#faf9f6]'
             : 'bg-white'
             }`}>
