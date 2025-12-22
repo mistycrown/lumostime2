@@ -1,19 +1,12 @@
-
-
 npm run build
 npx cap sync
 npx cap open android
 
-npm run build
-npx cap sync
 npm run electron:build
-
 npm run dev
 
 git reset --hard 04a7d4a425066ad7a9210c3042d1e7d2e32b26e7
 git push --force
-
-
 
 发布新版本时：
 先更新 package.json 和 updateService.ts 中的版本号
@@ -22,7 +15,7 @@ git push --force
 再更新 version.json 的版本号
 
 待开发功能：
-
+桌面小组件快速打点
 
 
 # v1.0.4
@@ -32,8 +25,8 @@ git push --force
 修复回顾阅读模式文本换行问题
 修复手机端检查更新失败的问题。增加Gitee API更新检测源。
 修复周报页面数据统计左边文字遮挡问题。
-
 修复导航栏被手机自带导航键遮挡的问题。
+
 
 新特性：
 实现补记中到上尾的连续追溯
