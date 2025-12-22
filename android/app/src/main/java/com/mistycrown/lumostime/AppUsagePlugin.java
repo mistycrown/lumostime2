@@ -60,18 +60,12 @@ public class AppUsagePlugin extends Plugin {
      * 供AppAccessibilityService调用
      */
     public static void triggerAppDetected(String packageName, String appLabel) {
-        if (instance != null && instance.getBridge() != null) {
-            Log.d(TAG, "📤 触发应用检测事件: " + packageName);
-            // 手动构造JSON字符串
-            String jsonData = String.format("{\"packageName\":\"%s\",\"appLabel\":\"%s\"}",
-                    packageName.replace("\"", "\\\""),
-                    appLabel.replace("\"", "\\\""));
-            instance.getBridge().triggerWindowJSEvent("appDetected", jsonData);
-
-            // 同时在Java层检查关联并显示提醒
+        if (instance != null) {
+            // Log.d(TAG, "📤 触发应用检测事件: " + packageName);
+            // 在Java层检查关联并显示提醒 (无需发JS事件)
             instance.checkAndShowPrompt(packageName, appLabel);
         } else {
-            Log.w(TAG, "⚠️ 无法触发应用检测事件: Plugin instance或Bridge为null");
+            Log.w(TAG, "⚠️ 无法触发应用检测: Plugin instance为null");
         }
     }
 
@@ -86,9 +80,9 @@ public class AppUsagePlugin extends Plugin {
             if (activityId != null) {
                 // 优先显示标签名称,如果没有则显示应用名称
                 String displayName = (activityName != null && !activityName.isEmpty()) ? activityName : appLabel;
-                Log.d(TAG, "✅ 检测到关联: " + appLabel + " → " + displayName);
-                // 显示提醒(持久显示直到点击),显示标签名称
-                FloatingWindowService.showPrompt(packageName, displayName, appLabel);
+                // Log.d(TAG, "✅ 检测到关联: " + appLabel + " → " + displayName);
+                // 显示提醒(持久显示直到点击),显示标签名称, 传递 appLabel (真实应用名) 用于备注, 传递 activityId 用于JS定位
+                FloatingWindowService.showPrompt(packageName, displayName, appLabel, activityId);
             } else {
                 Log.d(TAG, "ℹ️ 应用未关联: " + appLabel);
             }

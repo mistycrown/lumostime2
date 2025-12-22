@@ -1279,54 +1279,7 @@ const App: React.FC = () => {
   // --- 应用检测监听 (半自动计时) ---
   useEffect(() => {
     const setupAppDetectionListener = () => {
-      const handleAppDetected = (event: any) => {
-        try {
-          // 数据在event对象的直接属性上,不是event.detail
-          const packageName = event.packageName;
-          const appLabel = event.appLabel;
 
-          if (!packageName) {
-            console.warn('⚠️ packageName为空');
-            return;
-          }
-
-          console.log('📱 应用切换:', packageName, appLabel);
-
-          // 只在空闲状态下检查关联
-          if (activeSessions.length > 0) {
-            console.log('当前已有活动会话,跳过提醒');
-            return;
-          }
-
-          // 检查是否有应用关联规则
-          const activityId = appRules[packageName];
-          if (activityId) {
-            // 查找对应的Activity信息
-            let foundCat = null;
-            let foundAct = null;
-
-            for (const cat of categories) {
-              const act = cat.activities.find(a => a.id === activityId);
-              if (act) {
-                foundCat = cat;
-                foundAct = act;
-                break;
-              }
-            }
-
-
-
-            if (foundCat && foundAct) {
-              console.log(`✅ 检测到关联: ${appLabel} → ${foundAct.name}`);
-              // 提醒已在原生层处理,无需JS调用
-            } else {
-              console.log('⚠️ 未找到activityId对应的Activity:', activityId);
-            }
-          }
-        } catch (e) {
-          console.error('处理应用检测事件败:', e);
-        }
-      };
 
 
       const handleStartFromPrompt = (event: any) => {
@@ -1344,6 +1297,7 @@ const App: React.FC = () => {
           let packageName = '';
           let appLabel = '';
           let realAppName = '';
+          let eventActivityId = '';
 
           // 解析事件数据
           if (event.detail) {
@@ -1351,10 +1305,12 @@ const App: React.FC = () => {
             packageName = data.packageName;
             appLabel = data.appLabel;
             realAppName = data.realAppName;
+            eventActivityId = data.activityId;
           } else {
             packageName = event.packageName;
             appLabel = event.appLabel;
             realAppName = event.realAppName;
+            eventActivityId = event.activityId;
           }
 
           if (!packageName) {
@@ -1362,10 +1318,10 @@ const App: React.FC = () => {
             return;
           }
 
-          console.log('🚀 开始计时:', packageName, appLabel, realAppName);
+          console.log('🚀 开始计时:', packageName, appLabel, realAppName, eventActivityId);
 
-          // 查找关联规则
-          const activityId = appRules[packageName];
+          // 优先使用事件中的 activityId (如果有), 否则回退到 appRules 查找
+          const activityId = eventActivityId || appRules[packageName];
           if (activityId) {
             // 查找Activity
             let foundCat = null;
@@ -1398,11 +1354,9 @@ const App: React.FC = () => {
         }
       };
 
-      window.addEventListener('appDetected', handleAppDetected);
       window.addEventListener('startFocusFromPrompt', handleStartFromPrompt);
 
       return () => {
-        window.removeEventListener('appDetected', handleAppDetected);
         window.removeEventListener('startFocusFromPrompt', handleStartFromPrompt);
       };
     };

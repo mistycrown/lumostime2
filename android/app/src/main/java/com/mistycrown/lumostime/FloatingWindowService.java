@@ -33,7 +33,6 @@ public class FloatingWindowService extends Service {
 
     private TextView emojiView;
     private TextView timeView;
-    // private TextView appNameView; // Debug removed
     private android.widget.ImageView iconView;
     private android.widget.FrameLayout containerView;
     private BroadcastReceiver appChangeReceiver;
@@ -55,6 +54,7 @@ public class FloatingWindowService extends Service {
     private String promptPackageName = "";
     private String promptAppLabel = ""; // 显示在悬浮球上的文本(可能是标签名)
     private String promptRealAppName = ""; // 真实的应用名称(如"小红书")
+    private String promptActivityId = ""; // 关联的Activity ID
 
     private Runnable updateRunnable = new Runnable() {
         @Override
@@ -241,16 +241,16 @@ public class FloatingWindowService extends Service {
         }
     }
 
-    public static void showPrompt(String packageName, String appLabel, String realAppName) {
-        Log.d(TAG, "📥 showPrompt被调用: " + packageName + " / " + appLabel + " / " + realAppName);
+    public static void showPrompt(String packageName, String appLabel, String realAppName, String activityId) {
+        Log.d(TAG, "📥 showPrompt被调用: " + packageName + " / " + appLabel + " / " + realAppName + " / " + activityId);
         if (instance != null) {
-            instance.showPromptInternal(packageName, appLabel, realAppName);
+            instance.showPromptInternal(packageName, appLabel, realAppName, activityId);
         } else {
             Log.w(TAG, "⚠️ FloatingWindowService instance为null");
         }
     }
 
-    private void showPromptInternal(String packageName, String appLabel, String realAppName) {
+    private void showPromptInternal(String packageName, String appLabel, String realAppName, String activityId) {
         if (isFocusing) {
             Log.d(TAG, "⏸️ 当前正在专注中, 忽略提醒: " + appLabel);
             return;
@@ -260,6 +260,7 @@ public class FloatingWindowService extends Service {
         this.promptPackageName = packageName;
         this.promptAppLabel = appLabel;
         this.promptRealAppName = realAppName;
+        this.promptActivityId = activityId;
 
         showTempTextInternal("开始?\n" + appLabel);
         Log.d(TAG, "✅ 进入提醒模式: " + appLabel + " (原应用: " + realAppName + ")");
@@ -523,7 +524,7 @@ public class FloatingWindowService extends Service {
 
                 // 1. 触发React Native开始计时
                 FocusNotificationPlugin.triggerStartFocusFromPrompt(promptPackageName, promptAppLabel,
-                        promptRealAppName);
+                        promptRealAppName, promptActivityId);
 
                 // 2. 隐藏提醒,显示"开始计时"
                 hidePrompt();
