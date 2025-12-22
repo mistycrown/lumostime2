@@ -135,7 +135,17 @@ export const AutoRecordSettingsView: React.FC<Props> = ({ onBack, categories }) 
     const handleSaveRule = async (activityId: string) => {
         if (!selectedApp) return;
         try {
-            await AppUsage.saveAppRule({ packageName: selectedApp.packageName, activityId });
+            // 查找activity名称
+            let activityName = '';
+            for (const cat of categories) {
+                const act = cat.activities.find(a => a.id === activityId);
+                if (act) {
+                    activityName = act.name;
+                    break;
+                }
+            }
+
+            await AppUsage.saveAppRule({ packageName: selectedApp.packageName, activityId, activityName });
             setRules(prev => ({ ...prev, [selectedApp.packageName]: activityId }));
             setIsModalOpen(false);
             setSelectedApp(null);

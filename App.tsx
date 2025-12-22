@@ -1301,13 +1301,9 @@ const App: React.FC = () => {
             if (foundCat && foundAct) {
               console.log(`✅ 检测到关联: ${appLabel} → ${foundAct.name}`);
 
-              // TODO: 调用Plugin显示提醒
-              // FocusNotification.showPrompt({
-              //   activityName: foundAct.name,
-              //   activityId: foundAct.id,
-              //   activityIcon: foundAct.icon,
-              //   packageName: packageName
-              // });
+              // 临时方案:使用showFloatingText显示提醒
+              AppUsage.showFloatingText({ text: `开始?\n${foundAct.icon} ${foundAct.name}` })
+                .catch(err => console.error('显示提醒失败:', err));
 
               console.log('🔔 显示提醒:', foundAct.name);
             } else {
