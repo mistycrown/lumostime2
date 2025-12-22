@@ -513,10 +513,13 @@ public class FloatingWindowService extends Service {
             // 如果是提醒模式,隐藏提醒并显示"开始计时"
             if (isPromptMode) {
                 Log.d(TAG, "🎯 悬浮球点击: 提醒模式 -> 开始计时 " + promptAppLabel);
+
+                // 1. 触发React Native开始计时
+                FocusNotificationPlugin.triggerStartFocusFromPrompt(promptPackageName, promptAppLabel);
+
+                // 2. 隐藏提醒,显示"开始计时"
                 hidePrompt();
-                // 显示"开始计时"提示
                 showTempText("开始计时");
-                // TODO: 这里应该通知React Native开始计时
                 return;
             }
 
