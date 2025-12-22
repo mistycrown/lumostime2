@@ -76,14 +76,14 @@ export const AutoLinkView: React.FC<AutoLinkViewProps> = ({
                 >
                     <ChevronLeft size={24} />
                 </button>
-                <span className="text-stone-800 font-bold text-lg">自动关联规则</span>
+                <span className="text-stone-800 font-bold text-lg">标签关联领域规则</span>
             </div>
 
             <div className="flex-1 overflow-y-auto p-4 space-y-4 pb-40">
                 {/* 说明 */}
                 <div className="bg-blue-50 rounded-xl p-4 text-sm text-blue-700 leading-relaxed">
                     <p className="font-bold mb-1">💡 功能说明</p>
-                    <p>为活动（标签）设置默认关联的领域。开始计时时，系统会自动应用这些规则，您也可以手动修改。</p>
+                    <p>为标签设置默认的关联的领域，开始计时或者补计时系统会提醒您应用这些规则。</p>
                 </div>
 
                 {/* 规则列表 */}
