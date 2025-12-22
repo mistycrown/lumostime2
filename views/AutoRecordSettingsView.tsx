@@ -232,11 +232,9 @@ export const AutoRecordSettingsView: React.FC<Props> = ({ onBack, categories }) 
             <main className="flex-1 overflow-y-auto">
                 <div className="p-4 space-y-6 pb-20">
                     {/* Usage Tip */}
-                    <div className="bg-blue-50 border border-blue-100 rounded-xl p-4 flex gap-3 text-xs text-blue-800 leading-relaxed shadow-sm">
-                        <div className="shrink-0 mt-0.5"><div className="w-4 h-4 rounded-full bg-blue-200 text-blue-600 flex items-center justify-center font-bold text-[10px]">i</div></div>
-                        <div>
-                            必须要开启 <span className="font-bold">悬浮窗</span>。进入到对应页面后会提示是否开始计时，点击“开始”计时，再次点击结束计时。
-                        </div>
+                    <div className="bg-blue-50 rounded-xl p-4 text-sm text-blue-700 leading-relaxed">
+                        <p className="font-bold mb-1">💡 功能说明</p>
+                        <p>必须要开启 <span className="font-bold">悬浮窗</span>。进入到对应页面后会提示是否开始计时，点击“开始”计时，再次点击结束计时。</p>
                     </div>
 
                     {/* Permission Status */}
@@ -273,7 +271,7 @@ export const AutoRecordSettingsView: React.FC<Props> = ({ onBack, categories }) 
                                 placeholder="搜索应用..."
                                 value={searchQuery}
                                 onChange={(e) => setSearchQuery(e.target.value)}
-                                className="w-full pl-9 pr-4 py-2 bg-white rounded-xl border border-stone-100 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 text-stone-800 placeholder-stone-400"
+                                className="w-full pl-9 pr-4 py-2 bg-white rounded-xl border border-stone-100 text-sm focus:outline-none focus:border-stone-300 transition-colors text-stone-800 placeholder-stone-400"
                             />
                         </div>
 
