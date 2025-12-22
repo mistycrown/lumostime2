@@ -155,7 +155,8 @@ public class FloatingWindowService extends Service {
     @Override
     public void onDestroy() {
         super.onDestroy();
-        Log.d(TAG, "🔴 悬浮窗服务销毁");
+        instance = null;
+        Log.d(TAG, "🔴 悬浮窗服务销毁, instance已清空");
         if (floatingView != null) {
             try {
                 windowManager.removeView(floatingView);
@@ -188,10 +189,12 @@ public class FloatingWindowService extends Service {
 
     // Public method for external access
     public static void updateCurrentApp(String packageName, String appLabel) {
+        Log.d(TAG, "📥 updateCurrentApp被调用: package=" + packageName + ", label=" + appLabel);
         if (instance != null) {
+            Log.d(TAG, "✅ instance存在, isFocusing=" + instance.isFocusing);
             instance.updateAppIconInternal(packageName, appLabel);
         } else {
-            Log.w(TAG, "FloatingWindowService instance is null, cannot update");
+            Log.w(TAG, "⚠️ FloatingWindowService instance为null, 无法更新图标");
         }
     }
 
@@ -426,6 +429,15 @@ public class FloatingWindowService extends Service {
 
     private void openApp() {
         try {
+            // 如果当前是专注状态,通知React Native结束计时
+            if (isFocusing) {
+                Log.d(TAG, "🎯 悬浮球点击: 专注状态 -> 触发结束计时");
+                FocusNotificationPlugin.triggerStopFocusFromFloating();
+                return;
+            }
+
+            // 空闲状态: 打开应用
+            Log.d(TAG, "🎯 悬浮球点击: 空闲状态 -> 打开应用");
             Intent intent = getPackageManager().getLaunchIntentForPackage(getPackageName());
             if (intent != null) {
                 intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_BROUGHT_TO_FRONT);

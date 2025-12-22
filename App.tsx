@@ -1205,6 +1205,40 @@ const App: React.FC = () => {
     };
   }, [categories, activeSessions, logs, autoLinkRules]);
 
+  // --- 悬浮球点击结束计时监听 ---
+  useEffect(() => {
+    const setupFloatingWindowListener = () => {
+      // 监听从悬浮球发送的结束计时事件
+      const handleStopFromFloating = () => {
+        console.log('📥 收到悬浮球结束计时事件');
+
+        // 结束当前所有的活动会话
+        if (activeSessions.length > 0) {
+          console.log(`🛑 结束 ${activeSessions.length} 个活动会话`);
+          activeSessions.forEach(session => {
+            handleStopActivity(session.id);
+          });
+          addToast('success', '已从悬浮球结束计时');
+        } else {
+          console.log('⚠️ 没有活动会话需要结束');
+        }
+      };
+
+      // 注册全局事件监听器
+      window.addEventListener('stopFocusFromFloating', handleStopFromFloating);
+
+      return () => {
+        window.removeEventListener('stopFocusFromFloating', handleStopFromFloating);
+      };
+    };
+
+    // 仅在Android平台注册监听器
+    const platform = Capacitor.getPlatform();
+    if (platform === 'android') {
+      const cleanup = setupFloatingWindowListener();
+      return cleanup;
+    }
+  }, [activeSessions]);
 
 
   // 3. App Hide -> Upload (Best Effort)

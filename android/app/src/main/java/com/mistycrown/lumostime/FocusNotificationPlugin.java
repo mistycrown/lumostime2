@@ -25,6 +25,34 @@ import com.getcapacitor.annotation.PermissionCallback;
 public class FocusNotificationPlugin extends Plugin {
 
     private static final String TAG = "FocusNotification";
+    private static FocusNotificationPlugin instance = null;
+
+    @Override
+    public void load() {
+        super.load();
+        instance = this;
+        Log.d(TAG, "✅ FocusNotificationPlugin loaded, instance saved");
+    }
+
+    @Override
+    protected void handleOnDestroy() {
+        super.handleOnDestroy();
+        instance = null;
+        Log.d(TAG, "🔴 FocusNotificationPlugin destroyed, instance cleared");
+    }
+
+    /**
+     * 静态方法: 从悬浮球触发结束计时事件
+     * 供FloatingWindowService调用
+     */
+    public static void triggerStopFocusFromFloating() {
+        if (instance != null && instance.getBridge() != null) {
+            Log.d(TAG, "📤 触发停止计时事件到React Native");
+            instance.getBridge().triggerWindowJSEvent("stopFocusFromFloating", "{}");
+        } else {
+            Log.w(TAG, "⚠️ 无法触发事件: Plugin instance或Bridge为null");
+        }
+    }
 
     /**
      * 启动专注通知
