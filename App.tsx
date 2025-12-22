@@ -75,6 +75,9 @@ const App: React.FC = () => {
   const [activeSessions, setActiveSessions] = useState<ActiveSession[]>([]);
   const [focusDetailSessionId, setFocusDetailSessionId] = useState<string | null>(null);
 
+  // 防抖Ref: 记录上次处理开始计时事件的时间
+  const lastPromptTimeRef = useRef(0);
+
   // Load from localStorage or use initial data
   const [logs, setLogs] = useState<Log[]>(() => {
     const stored = localStorage.getItem('lumostime_logs');
@@ -1313,21 +1316,33 @@ const App: React.FC = () => {
         }
       };
 
+
       const handleStartFromPrompt = (event: any) => {
         try {
+          const now = Date.now();
+          // 增加防抖时间到 3 秒, 使用 ref
+          if (now - lastPromptTimeRef.current < 3000) {
+            console.log('⏳ 忽略重复点击事件 (Debounced)');
+            return;
+          }
+          lastPromptTimeRef.current = now;
+
           console.log('📥 收到悬浮球开始计时事件:', event);
 
           let packageName = '';
           let appLabel = '';
+          let realAppName = '';
 
           // 解析事件数据
           if (event.detail) {
             const data = typeof event.detail === 'string' ? JSON.parse(event.detail) : event.detail;
             packageName = data.packageName;
             appLabel = data.appLabel;
+            realAppName = data.realAppName;
           } else {
             packageName = event.packageName;
             appLabel = event.appLabel;
+            realAppName = event.realAppName;
           }
 
           if (!packageName) {
@@ -1335,7 +1350,7 @@ const App: React.FC = () => {
             return;
           }
 
-          console.log('🚀 开始计时:', packageName, appLabel);
+          console.log('🚀 开始计时:', packageName, appLabel, realAppName);
 
           // 查找关联规则
           const activityId = appRules[packageName];
@@ -1354,9 +1369,10 @@ const App: React.FC = () => {
 
             if (foundCat && foundAct) {
               console.log(`✅ 找到关联活动: ${foundAct.name}, 准备开始...`);
-              // 调用handleStartActivity, 传入关联应用的名称作为note
-              // 注意: handleStartActivity签名为 (activity, categoryId, todoId, scopeId, note)
-              handleStartActivity(foundAct, foundCat.id, undefined, undefined, `关联启动: ${appLabel || packageName}`);
+              // 调用handleStartActivity
+              // 使用realAppName(如果存在)作为备注,否则回退到appLabel或packageName
+              const appNameForNote = realAppName || appLabel || packageName;
+              handleStartActivity(foundAct, foundCat.id, undefined, undefined, `关联启动: ${appNameForNote}`);
               addToast('success', `已开始: ${foundAct.name}`);
             } else {
               console.warn('⚠️ 未找到关联的Activity:', activityId);
@@ -1375,6 +1391,7 @@ const App: React.FC = () => {
 
       return () => {
         window.removeEventListener('appDetected', handleAppDetected);
+        window.removeEventListener('startFocusFromPrompt', handleStartFromPrompt);
       };
     };
 

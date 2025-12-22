@@ -57,12 +57,13 @@ public class FocusNotificationPlugin extends Plugin {
     /**
      * 静态方法: 从悬浮球触发开始计时事件(提醒模式)
      */
-    public static void triggerStartFocusFromPrompt(String packageName, String appLabel) {
+    public static void triggerStartFocusFromPrompt(String packageName, String appLabel, String realAppName) {
         if (instance != null && instance.getBridge() != null) {
-            Log.d(TAG, "📤 触发开始时事件到React Native: " + packageName);
-            String jsonData = String.format("{\"packageName\":\"%s\",\"appLabel\":\"%s\"}",
+            Log.d(TAG, "📤 触发开始计时事件到React Native: " + packageName);
+            String jsonData = String.format("{\"packageName\":\"%s\",\"appLabel\":\"%s\",\"realAppName\":\"%s\"}",
                     packageName.replace("\"", "\\\""),
-                    appLabel.replace("\"", "\\\""));
+                    appLabel.replace("\"", "\\\""),
+                    realAppName.replace("\"", "\\\""));
             instance.getBridge().triggerWindowJSEvent("startFocusFromPrompt", jsonData);
         } else {
             Log.w(TAG, "⚠️ 无法触发事件: Plugin instance或Bridge为null");

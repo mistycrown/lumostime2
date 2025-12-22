@@ -53,7 +53,8 @@ public class FloatingWindowService extends Service {
     // 提醒模式状态
     private boolean isPromptMode = false;
     private String promptPackageName = "";
-    private String promptAppLabel = "";
+    private String promptAppLabel = ""; // 显示在悬浮球上的文本(可能是标签名)
+    private String promptRealAppName = ""; // 真实的应用名称(如"小红书")
 
     private Runnable updateRunnable = new Runnable() {
         @Override
@@ -240,22 +241,23 @@ public class FloatingWindowService extends Service {
         }
     }
 
-    public static void showPrompt(String packageName, String appLabel) {
-        Log.d(TAG, "📥 showPrompt被调用: " + packageName + " / " + appLabel);
+    public static void showPrompt(String packageName, String appLabel, String realAppName) {
+        Log.d(TAG, "📥 showPrompt被调用: " + packageName + " / " + appLabel + " / " + realAppName);
         if (instance != null) {
-            instance.showPromptInternal(packageName, appLabel);
+            instance.showPromptInternal(packageName, appLabel, realAppName);
         } else {
             Log.w(TAG, "⚠️ FloatingWindowService instance为null");
         }
     }
 
-    private void showPromptInternal(String packageName, String appLabel) {
+    private void showPromptInternal(String packageName, String appLabel, String realAppName) {
         this.isPromptMode = true;
         this.promptPackageName = packageName;
         this.promptAppLabel = appLabel;
+        this.promptRealAppName = realAppName;
 
         showTempTextInternal("开始?\n" + appLabel);
-        Log.d(TAG, "✅ 进入提醒模式: " + appLabel);
+        Log.d(TAG, "✅ 进入提醒模式: " + appLabel + " (原应用: " + realAppName + ")");
     }
 
     private void hidePrompt() {
@@ -515,7 +517,8 @@ public class FloatingWindowService extends Service {
                 Log.d(TAG, "🎯 悬浮球点击: 提醒模式 -> 开始计时 " + promptAppLabel);
 
                 // 1. 触发React Native开始计时
-                FocusNotificationPlugin.triggerStartFocusFromPrompt(promptPackageName, promptAppLabel);
+                FocusNotificationPlugin.triggerStartFocusFromPrompt(promptPackageName, promptAppLabel,
+                        promptRealAppName);
 
                 // 2. 隐藏提醒,显示"开始计时"
                 hidePrompt();
