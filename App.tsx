@@ -378,16 +378,8 @@ const App: React.FC = () => {
 
     // 启动通知（仅Android平台）
     if (Capacitor.getPlatform() === 'android') {
-      const taskName = `${activity.icon} ${activity.name}`;
-      // Start Focus Notification if enabled
-      const statusBarEnabled = localStorage.getItem('cfg_status_bar_enabled') === 'true'; // Default false
-      if (statusBarEnabled) {
-        FocusNotification.startFocusNotification({
-          taskName
-        }).catch(err => {
-          console.error('❌ 启动专注通知失败:', err);
-        });
-      }
+
+
       // 更新悬浮球状态
       // Use toString() for safety
       const floatingWindowEnabled = localStorage.getItem('cfg_floating_window_enabled') === 'true'; // Default false
@@ -454,9 +446,7 @@ const App: React.FC = () => {
     // 停止通知（仅Android平台）
     // 停止通知（仅Android平台）
     if (Capacitor.getPlatform() === 'android') {
-      FocusNotification.stopFocusNotification().catch(err => {
-        console.error('❌ 停止专注通知失败:', err);
-      });
+
       // 恢复悬浮球状态
       FocusNotification.updateFloatingWindow({ isFocusing: false }).catch(() => { });
     }
@@ -469,9 +459,7 @@ const App: React.FC = () => {
     // 停止通知（仅Android平台）
     // 停止通知（仅Android平台）
     if (Capacitor.getPlatform() === 'android') {
-      FocusNotification.stopFocusNotification().catch(err => {
-        console.error('❌ 停止专注通知失败:', err);
-      });
+
       // 恢复悬浮球状态
       FocusNotification.updateFloatingWindow({ isFocusing: false }).catch(() => { });
     }
