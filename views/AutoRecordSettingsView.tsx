@@ -25,8 +25,6 @@ export const AutoRecordSettingsView: React.FC<Props> = ({ onBack, categories }) 
     const [rules, setRules] = useState<{ [key: string]: string }>({});
     const [isLoading, setIsLoading] = useState(false);
 
-    const [isMonitoring, setIsMonitoring] = useState(false); // Monitor state
-
     // Selection Modal State
     const [selectedApp, setSelectedApp] = useState<InstalledApp | null>(null);
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -50,46 +48,6 @@ export const AutoRecordSettingsView: React.FC<Props> = ({ onBack, categories }) 
             setHasPermission(res.granted);
         } catch (e) { console.error(e); }
     };
-
-
-
-    // Need to persist monitoring state? For now let's just use local state for UI, 
-    // but in reality we should check if service is running or check a stored pref.
-    // For MVP validation, we'll just toggle.
-    // Actually, persistence is better.
-    const toggleMonitoring = async () => {
-        try {
-            if (isMonitoring) {
-                await AppUsage.stopMonitor();
-                setIsMonitoring(false);
-                localStorage.setItem('cfg_auto_record_enabled', 'false');
-            } else {
-                await AppUsage.startMonitor();
-                setIsMonitoring(true);
-                localStorage.setItem('cfg_auto_record_enabled', 'true');
-            }
-        } catch (e) { console.error(e); }
-    };
-
-    // Load persisted state and verify permission
-    useEffect(() => {
-        const saved = localStorage.getItem('cfg_auto_record_enabled') === 'true';
-        if (saved) {
-            // Verify if actually granted/running
-            AppUsage.checkAccessibilityPermission().then(res => {
-                if (res.granted) {
-                    setIsMonitoring(true);
-                } else {
-                    // Saved as True but permission missing -> Force Off
-                    setIsMonitoring(false);
-                    localStorage.setItem('cfg_auto_record_enabled', 'false');
-                }
-            }).catch(e => {
-                console.error(e);
-                setIsMonitoring(false);
-            });
-        }
-    }, []);
 
     const loadData = async () => {
         setIsLoading(true);
@@ -267,12 +225,20 @@ export const AutoRecordSettingsView: React.FC<Props> = ({ onBack, categories }) 
                     <ArrowLeft size={20} className="text-stone-500" />
                 </button>
                 <div className="flex-1">
-                    <h1 className="text-lg font-bold text-stone-800">应用自动记录</h1>
+                    <h1 className="text-lg font-bold text-stone-800">应用关联标签规则</h1>
                 </div>
             </div>
 
             <main className="flex-1 overflow-y-auto">
                 <div className="p-4 space-y-6 pb-20">
+                    {/* Usage Tip */}
+                    <div className="bg-blue-50 border border-blue-100 rounded-xl p-4 flex gap-3 text-xs text-blue-800 leading-relaxed shadow-sm">
+                        <div className="shrink-0 mt-0.5"><div className="w-4 h-4 rounded-full bg-blue-200 text-blue-600 flex items-center justify-center font-bold text-[10px]">i</div></div>
+                        <div>
+                            必须要开启 <span className="font-bold">悬浮窗</span>。进入到对应页面后会提示是否开始计时，点击“开始”计时，再次点击结束计时。
+                        </div>
+                    </div>
+
                     {/* Permission Status */}
                     {!hasPermission && (
                         <div
@@ -290,21 +256,7 @@ export const AutoRecordSettingsView: React.FC<Props> = ({ onBack, categories }) 
                         </div>
                     )}
 
-                    {/* Monitoring Switch */}
-                    <div className="bg-white rounded-2xl p-4 shadow-[0_2px_10px_rgba(0,0,0,0.03)] border border-stone-100 flex items-center justify-between">
-                        <div>
-                            <div className="font-bold text-stone-800">后台自动检测</div>
-                            <div className="text-xs text-stone-500 mt-1">
-                                开启后将在通知栏常驻，实时检测应用切换
-                            </div>
-                        </div>
-                        <div
-                            onClick={toggleMonitoring}
-                            className={`w-12 h-7 rounded-full transition-colors flex items-center px-1 cursor-pointer ${isMonitoring ? 'bg-stone-800' : 'bg-stone-200'}`}
-                        >
-                            <div className={`w-5 h-5 rounded-full bg-white shadow-sm transition-transform ${isMonitoring ? 'translate-x-5' : ''}`} />
-                        </div>
-                    </div>
+
 
 
                     {/* App List */}

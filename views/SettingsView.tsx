@@ -1510,7 +1510,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
                         />
                         <MenuItem
                             icon={<Link size={18} className="text-blue-500" />}
-                            label="自动关联规则"
+                            label="标签关联领域规则"
                             onClick={() => {
                                 onOpenAutoLink?.();
                             }}
@@ -1534,7 +1534,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
                     <div className="bg-white rounded-2xl overflow-hidden shadow-[0_2px_10px_rgba(0,0,0,0.03)]">
                         <MenuItem
                             icon={<Smartphone size={18} className="text-indigo-500" />}
-                            label="应用自动记录"
+                            label="应用关联标签规则"
                             onClick={() => setActiveSubmenu('auto_record')}
                         />
                         <ToggleItem
