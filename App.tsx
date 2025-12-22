@@ -32,6 +32,7 @@ import { narrativeService } from './services/narrativeService';
 import { NfcService } from './services/NfcService';
 import { NARRATIVE_TEMPLATES } from './constants';
 import FocusNotification from './plugins/FocusNotificationPlugin';
+import AppUsage from './plugins/AppUsagePlugin';
 import * as LucideIcons from 'lucide-react';
 import {
   PlusCircle,
@@ -140,6 +141,25 @@ const App: React.FC = () => {
   useEffect(() => {
     localStorage.setItem('lumostime_autoLinkRules', JSON.stringify(autoLinkRules));
   }, [autoLinkRules]);
+
+  // App Rules (应用自动记录规则): packageName -> activityId
+  const [appRules, setAppRules] = useState<{ [packageName: string]: string }>({});
+
+  // Load app rules on mount
+  useEffect(() => {
+    const loadAppRules = async () => {
+      if (Capacitor.getPlatform() === 'android') {
+        try {
+          const result = await AppUsage.getAppRules();
+          setAppRules(result.rules || {});
+          console.log('📋 已加载应用规则:', result.rules);
+        } catch (e) {
+          console.error('加载应用规则失败:', e);
+        }
+      }
+    };
+    loadAppRules();
+  }, []);
 
   // --- Auto Sync Logic ---
   const [lastSyncTime, setLastSyncTime] = useState<number>(() => {
@@ -1240,6 +1260,79 @@ const App: React.FC = () => {
     }
   }, [activeSessions]);
 
+  // --- 应用检测监听 (半自动计时) ---
+  useEffect(() => {
+    const setupAppDetectionListener = () => {
+      const handleAppDetected = (event: any) => {
+        try {
+          // 数据在event对象的直接属性上,不是event.detail
+          const packageName = event.packageName;
+          const appLabel = event.appLabel;
+
+          if (!packageName) {
+            console.warn('⚠️ packageName为空');
+            return;
+          }
+
+          console.log('📱 应用切换:', packageName, appLabel);
+
+          // 只在空闲状态下检查关联
+          if (activeSessions.length > 0) {
+            console.log('当前已有活动会话,跳过提醒');
+            return;
+          }
+
+          // 检查是否有应用关联规则
+          const activityId = appRules[packageName];
+          if (activityId) {
+            // 查找对应的Activity信息
+            let foundCat = null;
+            let foundAct = null;
+
+            for (const cat of categories) {
+              const act = cat.activities.find(a => a.id === activityId);
+              if (act) {
+                foundCat = cat;
+                foundAct = act;
+                break;
+              }
+            }
+
+            if (foundCat && foundAct) {
+              console.log(`✅ 检测到关联: ${appLabel} → ${foundAct.name}`);
+
+              // TODO: 调用Plugin显示提醒
+              // FocusNotification.showPrompt({
+              //   activityName: foundAct.name,
+              //   activityId: foundAct.id,
+              //   activityIcon: foundAct.icon,
+              //   packageName: packageName
+              // });
+
+              console.log('🔔 显示提醒:', foundAct.name);
+            } else {
+              console.log('⚠️ 未找到activityId对应的Activity:', activityId);
+            }
+          }
+        } catch (e) {
+          console.error('处理应用检测事件失败:', e);
+        }
+      };
+
+      window.addEventListener('appDetected', handleAppDetected);
+
+      return () => {
+        window.removeEventListener('appDetected', handleAppDetected);
+      };
+    };
+
+    // 仅在Android平台注册监听器
+    const platform = Capacitor.getPlatform();
+    if (platform === 'android') {
+      const cleanup = setupAppDetectionListener();
+      return cleanup;
+    }
+  }, [activeSessions, appRules, categories]);
 
   // 3. App Hide -> Upload (Best Effort)
   useEffect(() => {

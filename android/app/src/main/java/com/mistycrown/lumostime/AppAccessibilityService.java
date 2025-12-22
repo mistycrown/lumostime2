@@ -71,6 +71,9 @@ public class AppAccessibilityService extends AccessibilityService {
                 // Also update AppUsagePlugin for frontend access
                 AppUsagePlugin.updateCurrentPackage(currentPackage);
 
+                // Trigger app detected event to React Native
+                AppUsagePlugin.triggerAppDetected(currentPackage, appLabel);
+
                 Log.i(TAG, "📤 Call completed");
             }
         }
