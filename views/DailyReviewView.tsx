@@ -484,9 +484,11 @@ export const DailyReviewView: React.FC<DailyReviewViewProps> = ({
                             todos={todos}
                             todoCategories={todoCategories}
                             scopes={scopes}
-                            hideControls={true}  // 隐藏控制栏
-                            forcedView="pie"     // 强制为饼图视图
+                            hideControls={false}  // 显示控制栏 (用于切换视图)
+                            hideRangeControls={true} // 隐藏左侧时间范围切换 (日/周/月/年) - 保持日视图简单
+                            hideDateNavigation={true} // 隐藏日期导航 - 页面已有
                             forcedRange="day"    // 强制为日视图
+                            allowedViews={['pie', 'schedule']} // 仅允许切换：环形图 & 日程
                         />
                     </div>
                 )}
