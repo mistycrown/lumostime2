@@ -1,3 +1,12 @@
+/**
+ * @file TodoView.tsx
+ * @input Todos, Categories, Scopes
+ * @output Todo Status Updates, Edit Triggers, Focus Timer Start
+ * @pos View (Main Tab)
+ * @description The main To-Do list interface. Displays tasks grouped by category, supports swipe actions (complete/duplicate), and filtering.
+ * 
+ * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
+ */
 import React, { useState } from 'react';
 import { MOCK_TODO_CATEGORIES } from '../constants';
 import { Scope } from '../types';

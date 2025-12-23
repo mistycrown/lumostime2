@@ -1,3 +1,10 @@
+/**
+ * @file MainActivity.java
+ * @input Application Launch
+ * @output WebView Container
+ * @pos Android Entry Point
+ * @description The main Android Activity provided by Capacitor. Serves as the container for the WebView.
+ */
 package com.mistycrown.lumostime;
 
 import com.getcapacitor.BridgeActivity;

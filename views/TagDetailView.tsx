@@ -1,3 +1,12 @@
+/**
+ * @file TagDetailView.tsx
+ * @input Activity ID, Logs, Associated Todos, Categories
+ * @output Activity Updates (Name, Color), Todo Toggles
+ * @pos View (Detail Page)
+ * @description Detailed analytics and settings for a specific Activity (Tag). Features an activity heatmap, history timeline, keyword management, and associated To-Do tracking.
+ * 
+ * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
+ */
 import React, { useMemo, useState, useEffect } from 'react';
 import { Log, Category, Activity, TodoItem } from '../types';
 import { COLOR_OPTIONS } from '../constants';

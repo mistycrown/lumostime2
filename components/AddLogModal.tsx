@@ -1,3 +1,12 @@
+/**
+ * @file AddLogModal.tsx
+ * @input props: initialLog, time ranges, categories, todos, etc.
+ * @output Modal Interaction (Save/Delete Log)
+ * @pos Component (Modal)
+ * @description A complex modal for creating or editing time logs. Handles duration calculation, activity selection, todo association, and focus scoring.
+ * 
+ * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
+ */
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { Category, Log, TodoItem, TodoCategory, Scope, AutoLinkRule } from '../types';
 import { X, Trash2, TrendingUp, Plus, Minus, Lightbulb, CheckCircle2, Clock } from 'lucide-react';

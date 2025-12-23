@@ -1,3 +1,12 @@
+/**
+ * @file FocusScoreSelector.tsx
+ * @input value (number), onChange
+ * @output Focus Score Input UI (1-5 Lightning Bolts)
+ * @pos Component (Input)
+ * @description A 5-point rating selector for logging focus intensity.
+ * 
+ * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
+ */
 import React from 'react';
 import { Zap } from 'lucide-react';
 

@@ -1,3 +1,12 @@
+/**
+ * @file TodoBatchManageView.tsx
+ * @input Todos, Categories
+ * @output Updated Categories/Todos (Reorder, CRUD)
+ * @pos View (Modal/Page)
+ * @description A specialized view for bulk management of To-Do items and categories. Supports drag-and-drop reordering of both categories and items across categories.
+ * 
+ * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
+ */
 import React, { useState, useEffect } from 'react';
 import { TodoCategory, TodoItem } from '../types';
 import { ChevronDown, ChevronRight, GripVertical, Plus, Trash2, ArrowUp, ArrowDown, X, Check } from 'lucide-react';

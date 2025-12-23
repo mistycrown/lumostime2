@@ -1,3 +1,12 @@
+/**
+ * @file TimelineView.tsx
+ * @input Logs, Categories, Todos, Scopes, Reviews (Daily/Weekly/Monthly)
+ * @output Log CRUD, Date Navigation, Sync Trigger, Review Navigation
+ * @pos View (Main Tab)
+ * @description The primary daily view. Visualizes time usage on a timeline, supports adding/editing logs, gap detection, and integrates Daily/Weekly/Monthly review entry points.
+ * 
+ * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
+ */
 import React, { useMemo, useState, useRef } from 'react';
 import { Log, Activity, TodoItem, Category, TodoCategory, Scope, DailyReview, ReviewTemplate, WeeklyReview, MonthlyReview, AutoLinkRule } from '../types';
 import { CATEGORIES } from '../constants';

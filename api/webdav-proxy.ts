@@ -1,3 +1,12 @@
+/**
+ * @file webdav-proxy.ts
+ * @input HTTP Request (Vercel Node.js Request)
+ * @output Proxied WebDAV Response (HTTP Response)
+ * @pos API Endpoint (Serverless Helper)
+ * @description Vercel Serverless Function that proxies WebDAV requests to bypass CORS restrictions in web environments.
+ * 
+ * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
+ */
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 
 /**
@@ -33,7 +42,7 @@ export default async function handler(
             headers: {
                 'Content-Type': req.headers['content-type'] || 'application/xml; charset=utf-8',
                 'Authorization': req.headers['authorization'] || '',
-                'Depth': req.headers['depth'] || '0',
+                'Depth': (Array.isArray(req.headers['depth']) ? req.headers['depth'][0] : (req.headers['depth'] as string)) || '0',
             },
         };
 

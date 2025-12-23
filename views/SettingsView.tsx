@@ -1,3 +1,12 @@
+/**
+ * @file SettingsView.tsx
+ * @input User Settings, Sync Data, AI Config, App State
+ * @output Configuration Updates, Data Sync Actions, Navigation
+ * @pos View (Settings Modal)
+ * @description The central configuration hub. Manages Cloud Sync (WebDAV), AI integration (Providers/Presets), Data (Import/Export), and Application Preferences (Appearance, Habits, etc.).
+ * 
+ * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
+ */
 import React, { useState, useRef, useEffect } from 'react';
 import {
     ChevronRight,

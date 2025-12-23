@@ -1,3 +1,12 @@
+/**
+ * @file StatsView.tsx
+ * @input Logs, Categories, Todos, Scopes, Current Date
+ * @output Navigation Events (Date Change, Back)
+ * @pos View (Statistics Dashboard)
+ * @description A comprehensive analytics dashboard supporting multiple visualization modes: Pie (Distribution), Matrix (Consistency), Schedule (Timeline), and Line (Trend). Analyzes time usage across Activities, Todos, and Scopes.
+ * 
+ * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
+ */
 import React, { useState, useMemo, useEffect } from 'react';
 import { Log, Category, Activity, Scope, TodoItem, TodoCategory } from '../types';
 import { COLOR_OPTIONS } from '../constants';

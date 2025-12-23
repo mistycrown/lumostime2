@@ -1,3 +1,12 @@
+/**
+ * @file App.tsx
+ * @input localStorage (logs, todos, user preferences), Capacitor Plugins (AppUsage, FocusNotification), Services (webdav, ai, nfc)
+ * @output Main UI Render, State Management, Data Persistence (JSON in localStorage)
+ * @pos Root Component, Application Entry Point (Logic Hub)
+ * @description The main component that holds the global state (logs, todos, active sessions) and handles routing between views (Record, Stats, Timeline, etc.).
+ * 
+ * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
+ */
 import React, { useState, useEffect, useRef } from 'react';
 import { RecordView } from './views/RecordView';
 import { StatsView } from './views/StatsView';
@@ -193,6 +202,62 @@ const App: React.FC = () => {
     const saved = localStorage.getItem('lumos_last_sync_time');
     return saved ? parseInt(saved) : 0;
   });
+
+  // --- Floating Window Listeners ---
+
+  // 1. Start Listener (Stable dependencies)
+  useEffect(() => {
+    if (Capacitor.getPlatform() !== 'android') return;
+    let startListener: any;
+
+    const setupStart = async () => {
+      startListener = await FocusNotification.addListener('startFocusFromPrompt', (data: any) => {
+        console.log('⚡ Received startFocusFromPrompt:', data);
+        const { activityId, appLabel } = data;
+        let targetActivity: Activity | undefined;
+        let targetCategoryId: string | undefined;
+
+        for (const cat of CATEGORIES) {
+          const found = cat.activities.find(a => a.id === activityId);
+          if (found) {
+            targetActivity = found;
+            targetCategoryId = cat.id;
+            break;
+          }
+        }
+
+        if (targetActivity && targetCategoryId) {
+          // Use functional update or just call handleStartActivity (it uses prev state inside)
+          // handleStartActivity is stable enough or doesn't depend on stale state for *adding*
+          handleStartActivity(targetActivity, targetCategoryId, undefined, undefined, `自动记录: ${appLabel}`);
+          addToast('success', `已开始: ${targetActivity.name} (${appLabel})`);
+        }
+      });
+    };
+    setupStart();
+    return () => { if (startListener) startListener.remove(); };
+  }, []); // Empty dependency for Start
+
+  // 2. Stop Listener (Depends on activeSessions)
+  useEffect(() => {
+    if (Capacitor.getPlatform() !== 'android') return;
+    let stopListener: any;
+
+    const setupStop = async () => {
+      stopListener = await FocusNotification.addListener('stopFocusFromFloating', () => {
+        console.log('⚡ Received stopFocusFromFloating (Active sessions: ' + activeSessions.length + ')');
+        if (activeSessions.length > 0) {
+          // Stop the last added session (usually the one triggered by floating ball)
+          const lastSession = activeSessions[activeSessions.length - 1];
+          handleStopActivity(lastSession.id);
+          addToast('info', '计时已结束');
+        }
+      });
+    };
+    setupStop();
+    return () => { if (stopListener) stopListener.remove(); };
+  }, [activeSessions]); // Re-binds when sessions change
+
 
   const updateLastSyncTime = () => {
     const now = Date.now();

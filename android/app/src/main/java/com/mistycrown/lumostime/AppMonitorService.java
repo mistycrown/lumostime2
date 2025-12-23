@@ -1,3 +1,10 @@
+/**
+ * @file AppMonitorService.java
+ * @input Accessibility Events (via AppAccessibilityService)
+ * @output Time Tracking Logic
+ * @pos Native Logic Layer
+ * @description Service responsible for the core logic of app usage monitoring and time aggregation (if applicable).
+ */
 package com.mistycrown.lumostime;
 
 import android.app.Notification;

@@ -1,3 +1,12 @@
+/**
+ * @file ScopeAssociation.tsx
+ * @input scopes list, selected IDs
+ * @output Scope Selection Grid
+ * @pos Component (Input)
+ * @description A grid of toggleable buttons for associating scopes (tags) with a log or todo item.
+ * 
+ * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
+ */
 import React from 'react';
 import { Scope } from '../types';
 import { Target } from 'lucide-react';

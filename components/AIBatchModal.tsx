@@ -1,3 +1,12 @@
+/**
+ * @file AIBatchModal.tsx
+ * @input categories, targetDate, natural language input
+ * @output AI-generated schedule entries
+ * @pos Component (AI Integration)
+ * @description A modal interface for AI-powered batch schedule generation. Handles natural language input parsing and manual review of generated entries.
+ * 
+ * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
+ */
 import React, { useState, useEffect } from 'react';
 import { Sparkles, X, AlertTriangle, Plus, Trash2, Wand2, CheckCircle2, Lightbulb } from 'lucide-react';
 import { aiService, ParsedTimeEntry } from '../services/aiService';

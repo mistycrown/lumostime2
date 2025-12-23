@@ -1,3 +1,10 @@
+/**
+ * @file AppUsagePlugin.java
+ * @input JS Plugin Calls
+ * @output Native Usage Stats
+ * @pos Native Plugin
+ * @description Capacitor plugin exposing Android "UsageStats" and accessibility permission controls to the React application.
+ */
 package com.mistycrown.lumostime;
 
 import android.app.AppOpsManager;

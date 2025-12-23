@@ -1,3 +1,10 @@
+/**
+ * @file AppAccessibilityService.java
+ * @input System Accessibility Events
+ * @output App Change Events
+ * @pos Native Service
+ * @description Accessibility Service detecting foreground application changes. Triggers auto-tracking features by notifying the Plugin layer.
+ */
 package com.mistycrown.lumostime;
 
 import android.accessibilityservice.AccessibilityService;

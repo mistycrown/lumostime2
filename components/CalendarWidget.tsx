@@ -1,3 +1,12 @@
+/**
+ * @file CalendarWidget.tsx
+ * @input currentDate, logs, viewMode
+ * @output Interactive Calendar / Heatmap
+ * @pos Component (Core UI)
+ * @description A versatile calendar component supporting Expand/Collapse views, Week/Month modes, and Heatmap visualization (Duration or Focus).
+ * 
+ * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
+ */
 import React, { useState } from 'react';
 import { Log } from '../types';
 import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, X } from 'lucide-react';

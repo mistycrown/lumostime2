@@ -1,3 +1,12 @@
+/**
+ * @file ActivityItem.tsx
+ * @input activity object, onClick handler
+ * @output Activity Icon Button
+ * @pos Component (Display)
+ * @description A reusable circular icon component for representing an activity, handling click interactions.
+ * 
+ * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
+ */
 import React from 'react';
 import { Activity } from '../types';
 
@@ -8,11 +17,11 @@ interface ActivityItemProps {
 
 export const ActivityItem: React.FC<ActivityItemProps> = ({ activity, onClick }) => {
   return (
-    <div 
+    <div
       className="flex flex-col items-center gap-2 cursor-pointer group"
       onClick={() => onClick(activity)}
     >
-      <div 
+      <div
         className={`w-16 h-16 md:w-20 md:h-20 rounded-full flex items-center justify-center text-3xl md:text-4xl shadow-sm transition-transform group-hover:scale-105 group-active:scale-95 ${activity.color}`}
       >
         {activity.icon}

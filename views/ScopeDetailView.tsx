@@ -1,3 +1,12 @@
+/**
+ * @file ScopeDetailView.tsx
+ * @input Scope Data, Logs, Associated Todos/Goals
+ * @output Updated Scope, Managed Goals/Keywords
+ * @pos View (Detail Page)
+ * @description A comprehensive detail view for a specific Scope (Domain). Features a heatmap, keyword analysis, matrix chart (Tags vs Time), and management of associated Goals and Todos.
+ * 
+ * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
+ */
 import React, { useState, useMemo } from 'react';
 import { Scope, Log, Category, TodoItem, Goal } from '../types';
 import { CalendarWidget } from '../components/CalendarWidget';

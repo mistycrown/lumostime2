@@ -1,3 +1,12 @@
+/**
+ * @file narrativeService.ts
+ * @input User Review Data, Statistics Text, AI Service
+ * @output Generated Narrative String (Markdown)
+ * @pos Service (Business Logic for Reviews)
+ * @description Orchestrates the generation of daily, weekly, and monthly AI narratives by constructing prompts and calling the AI Service.
+ * 
+ * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
+ */
 import { DailyReview, Scope } from '../types';
 import { aiService } from './aiService';
 

@@ -1,3 +1,12 @@
+/**
+ * @file TodoAssociation.tsx
+ * @input todos, categories, linked ID
+ * @output Todo Selection UI
+ * @pos Component (Input)
+ * @description A specialized selector for linking a log entry to a specific Todo item, grouped by category.
+ * 
+ * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
+ */
 import React, { useState, useEffect } from 'react';
 import { TodoItem, TodoCategory } from '../types';
 import { CheckCircle2, Circle, ListTodo, TrendingUp, Ban } from 'lucide-react';

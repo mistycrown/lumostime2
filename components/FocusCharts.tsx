@@ -1,3 +1,12 @@
+/**
+ * @file FocusCharts.tsx
+ * @input logs, currentDate
+ * @output Focus Statistics & Stacked Bar Chart
+ * @pos Component (Visualization)
+ * @description Visualizes focus trends over time using a calendar heatmap and a stacked bar chart showing focus score distribution.
+ * 
+ * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
+ */
 import React, { useMemo, useState } from 'react';
 import { Log } from '../types';
 import { CalendarWidget } from './CalendarWidget';

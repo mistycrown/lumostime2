@@ -1,3 +1,12 @@
+/**
+ * @file logUtils.ts
+ * @input Log objects
+ * @output Processed/Split logs
+ * @pos Utility (Log Data Manipulation)
+ * @description Helper functions for processing time logs, specifically handling logs that cross midnight boundaries.
+ * 
+ * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
+ */
 import { Log } from '../types';
 
 /**

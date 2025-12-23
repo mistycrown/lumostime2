@@ -1,3 +1,12 @@
+/**
+ * @file Toast.tsx
+ * @input toast messages list
+ * @output Notification Overlay
+ * @pos Component (Global UI)
+ * @description Renders a stack of temporary notification toasts (success, error, info) with optional actions.
+ * 
+ * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
+ */
 import React, { useEffect } from 'react';
 import { X, CheckCircle, AlertCircle, Info } from 'lucide-react';
 

@@ -1,3 +1,12 @@
+/**
+ * @file SearchView.tsx
+ * @input All App Data (Logs, Todos, Reviews, etc.)
+ * @output Navigation Event (Select Item)
+ * @pos View (Global Overlay)
+ * @description A global search interface that allows users to find Logs, Categories, Activities, Todos, Scopes, and Reviews. Supports partial filtering and full-text search.
+ * 
+ * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
+ */
 import React, { useState, useMemo } from 'react';
 import { Search, X, ChevronLeft, FileText } from 'lucide-react';
 import { Log, Category, TodoItem, TodoCategory, Scope, Goal, DailyReview, WeeklyReview, MonthlyReview } from '../types';

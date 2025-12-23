@@ -1,3 +1,12 @@
+/**
+ * @file types.ts
+ * @input None
+ * @output TypeScript Interfaces & Types
+ * @pos Type Definitions (Shared contract)
+ * @description Defines the core data structures (Log, TodoItem, Category, Activity, etc.) used throughout the application.
+ * 
+ * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
+ */
 export interface Activity {
   id: string;
   name: string;

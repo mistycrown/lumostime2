@@ -1,3 +1,12 @@
+/**
+ * @file TodoDetailModal.tsx
+ * @input props: TodoItem, logs, categories
+ * @output Modal Interaction (Edit Todo, View History)
+ * @pos Component (Modal)
+ * @description Displays detailed information for a specific Todo item, including its progress, associated history logs, and focus stats.
+ * 
+ * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
+ */
 import React, { useState, useMemo } from 'react';
 import { TodoItem, TodoCategory, Log, Category, Scope } from '../types';
 import { ScopeAssociation } from './ScopeAssociation';

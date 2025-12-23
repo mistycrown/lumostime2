@@ -1,3 +1,12 @@
+/**
+ * @file CategoryDetailView.tsx
+ * @input Category ID, Logs, Associated Todos/Scopes
+ * @output Detailed Category Analysis
+ * @pos View (Detail Page)
+ * @description Displays comprehensive analytics for a specific category, including a heatmap, history log, focus trends, and cross-analysis with scopes. Also allows editing category properties.
+ * 
+ * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
+ */
 import React, { useMemo, useState } from 'react';
 import { Log, Category, Activity, TodoItem } from '../types';
 import { COLOR_OPTIONS } from '../constants';

@@ -1,3 +1,12 @@
+/**
+ * @file AddActivityModal.tsx
+ * @input categoryId
+ * @output Activity Creation Form
+ * @pos Component (Modal)
+ * @description A modal form for creating a new activity within a specific category, including icon and color selection.
+ * 
+ * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
+ */
 import React, { useState } from 'react';
 import { X, Check } from 'lucide-react';
 import { CATEGORIES } from '../constants';

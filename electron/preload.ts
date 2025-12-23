@@ -1,3 +1,12 @@
+/**
+ * @file preload.ts
+ * @input Window Object
+ * @output IPC Bridge
+ * @pos Electron Preload
+ * @description Exposes safe IPC methods to the renderer process via `contextBridge`, enabling communication between the web app and the main process.
+ * 
+ * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
+ */
 import { ipcRenderer, contextBridge } from 'electron'
 
 // --------- Expose some API to the Renderer process ---------

@@ -1,4 +1,10 @@
-
+/**
+ * @file aiService.ts
+ * @input Unstructured Time Text, API Keys
+ * @output Parsed Structured Time Entries
+ * @pos Service (Business Logic)
+ * @description Core service for communicating with AI Providers (OpenAI/Gemini). Handles prompt construction and response parsing for converting natural language into time logs.
+ */
 export interface AIConfig {
     provider: 'openai' | 'gemini';
     apiKey: string;
@@ -27,6 +33,15 @@ interface AIRawTimeEntry {
 const AI_CONFIG_KEY = 'lumostime_ai_config';
 const AI_PROFILES_KEY = 'lumostime_ai_profiles';
 
+/**
+ * @file aiService.ts
+ * @input AI Configuration (OpenAI/Gemini keys), User Natural Language Input
+ * @output Parsed Time Entries (JSON), Generated Narratives
+ * @pos Service (AI Integration Layer)
+ * @description Handles all interactions with AI providers, including configuration management, connection testing, and prompt execution.
+ * 
+ * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
+ */
 import { HTTP } from '@awesome-cordova-plugins/http';
 import { Capacitor } from '@capacitor/core';
 
