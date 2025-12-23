@@ -1,3 +1,12 @@
+/**
+ * @file AutoLinkView.tsx
+ * @input Categories, Scopes
+ * @output User Interaction (Rules Configuration)
+ * @pos View (Settings Sub-page)
+ * @description Provides a UI for managing automatic association rules between Tags (Activities) and Scopes (Domains), allowing users to define default scopes for specific activities.
+ * 
+ * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
+ */
 import React, { useState } from 'react';
 import { ChevronLeft, Plus, Trash2, Link, X } from 'lucide-react';
 import { AutoLinkRule, Category, Scope, Activity } from '../types';

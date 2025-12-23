@@ -1,3 +1,12 @@
+/**
+ * @file GoalCard.tsx
+ * @input goal object, logs, todos
+ * @output Goal Progress Card (Compact/Full)
+ * @pos Component (Display)
+ * @description Displays the progress of a user's goal, supporting multiple metrics (duration, count, frequency) and rendering interactive actions.
+ * 
+ * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
+ */
 import React from 'react';
 import { Goal, Log, TodoItem } from '../types';
 import { Target, Edit2, Trash2, Archive } from 'lucide-react';
@@ -62,8 +71,8 @@ export const GoalCard: React.FC<GoalCardProps> = ({ goal, logs, todos, onEdit, o
     return (
         <div
             className={`rounded-xl p-4 transition-all cursor-pointer ${isArchived
-                    ? 'bg-stone-50 border-2 border-dashed border-stone-300 opacity-70 hover:opacity-90'
-                    : 'bg-white border border-stone-100 shadow-sm hover:shadow-md'
+                ? 'bg-stone-50 border-2 border-dashed border-stone-300 opacity-70 hover:opacity-90'
+                : 'bg-white border border-stone-100 shadow-sm hover:shadow-md'
                 }`}
             onClick={() => onEdit?.(goal)}
         >

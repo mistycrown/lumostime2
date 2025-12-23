@@ -1,3 +1,10 @@
+/**
+ * @file FloatingWindowService.java
+ * @input Intent Commands (Start/Stop/Update)
+ * @output Floating UI Overlay
+ * @pos Native Service
+ * @description Background service managing the "LumosTime Island" floating window. Handles UI rendering, touch events, and state updates (Time/Icon/Emoji).
+ */
 package com.mistycrown.lumostime;
 
 import android.app.Service;

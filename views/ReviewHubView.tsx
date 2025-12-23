@@ -1,3 +1,12 @@
+/**
+ * @file ReviewHubView.tsx
+ * @input Daily/Weekly/Monthly Review Lists
+ * @output Navigation to Specific Review
+ * @pos View (Main Tab)
+ * @description The central dashboard for accessing past reviews. Displays summaries and entry points for Daily, Weekly, and Monthly reviews, often using carousels or lists.
+ * 
+ * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
+ */
 import React, { useMemo } from 'react';
 import * as LucideIcons from 'lucide-react';
 import { DailyReview, WeeklyReview, MonthlyReview, Log } from '../types';

@@ -1,3 +1,12 @@
+/**
+ * @file ReviewTemplateManageView.tsx
+ * @input Existing Review Templates
+ * @output Created/Updated/Deleted Templates
+ * @pos View (Settings Sub-page)
+ * @description A dedicated interface for managing review templates. Allows users to create, edit, reorder, and delete templates and their associated questions.
+ * 
+ * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
+ */
 import React, { useState } from 'react';
 import { ReviewTemplate, ReviewQuestion, QuestionType } from '../types';
 import { DEFAULT_REVIEW_TEMPLATES, COLOR_OPTIONS } from '../constants';

@@ -1,3 +1,12 @@
+/**
+ * @file goalUtils.ts
+ * @input Goal objects, Logs array, Todos array
+ * @output Progress calculations (current value, target value, percentage) for Goals
+ * @pos Utility (Goal Logic)
+ * @description Pure functions for calculating goal progress based on different metrics (duration, task count, frequency, etc.).
+ * 
+ * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
+ */
 import { Goal, Log, TodoItem } from '../types';
 
 /**

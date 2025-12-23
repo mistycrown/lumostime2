@@ -1,3 +1,12 @@
+/**
+ * @file DateRangeFilter.tsx
+ * @input rangeType (Week/Month/Year/All), date
+ * @output Date Range Navigation UI
+ * @pos Component (Input)
+ * @description Controls for filtering views by date range, including tab switching and previous/next navigation.
+ * 
+ * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
+ */
 import React from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 

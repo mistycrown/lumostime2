@@ -1,3 +1,12 @@
+/**
+ * @file DailyReviewView.tsx
+ * @input Daily Review Data, Logs, Templates
+ * @output Updated Review Data, Generated Narrative
+ * @pos View (Review System)
+ * @description The interface for conducting a daily review. Supports answering template questions (Data/Guide tabs) and generating/editing an AI-assisted narrative summary.
+ * 
+ * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
+ */
 import React, { useState, useMemo, useEffect } from 'react';
 import { ChevronLeft, Trash2, Sparkles, Edit3, RefreshCw, Calendar } from 'lucide-react';
 import { DailyReview, ReviewTemplate, ReviewAnswer, Category, Log, TodoCategory, TodoItem, Scope, ReviewQuestion, NarrativeTemplate } from '../types';

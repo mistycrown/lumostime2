@@ -1,3 +1,12 @@
+/**
+ * @file RecordView.tsx
+ * @input Categories, Activities
+ * @output Measurement Start Event
+ * @pos View (Main Tab)
+ * @description The primary interface for starting new time blocks. Features a category sidebar and a grid of activity buttons.
+ * 
+ * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
+ */
 import React, { useState } from 'react';
 import { Category, Activity } from '../types';
 import { ChevronLeft, ChevronRight } from 'lucide-react';

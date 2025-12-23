@@ -1,3 +1,12 @@
+/**
+ * @file AutoRecordSettingsView.tsx
+ * @input Installed Apps List, Categories
+ * @output Accessibility Permission Request, App Association Rules
+ * @pos View (Settings Sub-page)
+ * @description Allows users to grant accessibility permissions and configure which third-party apps should trigger automatic time tracking and link to specific activities.
+ * 
+ * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
+ */
 import React, { useEffect, useState, useMemo } from 'react';
 import { ArrowLeft, Check, ShieldAlert, Smartphone, ChevronRight, X, Search, Link as LinkIcon, Trash2 } from 'lucide-react';
 import AppUsage from '../plugins/AppUsagePlugin';

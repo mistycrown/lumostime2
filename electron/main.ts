@@ -1,3 +1,12 @@
+/**
+ * @file main.ts
+ * @input App Lifecycle
+ * @output Window Management
+ * @pos Electron Main
+ * @description Entry point for the Electron application. Handles window creation, lifecycle events, and inter-process communication (IPC).
+ * 
+ * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
+ */
 import { app, BrowserWindow, shell, ipcMain } from 'electron'
 import { createRequire } from 'node:module'
 import { fileURLToPath } from 'node:url'

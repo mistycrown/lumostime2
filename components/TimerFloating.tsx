@@ -1,3 +1,12 @@
+/**
+ * @file TimerFloating.tsx
+ * @input props: activeSessions, todos
+ * @output Floating UI Elements
+ * @pos Component (Global UI)
+ * @description Renders floating timer balls for active sessions, allowing quick access to stop or cancel ongoing activities.
+ * 
+ * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
+ */
 import React, { useEffect, useState } from 'react';
 import { ActiveSession, TodoItem } from '../types';
 import { StopCircle, X, CheckCircle2 } from 'lucide-react';

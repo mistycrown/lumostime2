@@ -1,3 +1,10 @@
+/**
+ * @file LumosNfcPlugin.java
+ * @input NFC Tag Scans
+ * @output JS Events
+ * @pos Native Plugin
+ * @description Capacitor plugin for handling NFC tag reading and writing operations.
+ */
 package com.mistycrown.lumostime;
 
 import android.app.PendingIntent;
@@ -30,7 +37,7 @@ public class LumosNfcPlugin extends Plugin {
         activeCall = call;
         // Keep the call to resolve later when tag is found
         call.setKeepAlive(true);
-        
+
         enableForegroundDispatch();
     }
 
@@ -46,26 +53,28 @@ public class LumosNfcPlugin extends Plugin {
     }
 
     private void enableForegroundDispatch() {
-        if (getActivity() == null) return;
+        if (getActivity() == null)
+            return;
         NfcAdapter nfcAdapter = NfcAdapter.getDefaultAdapter(getActivity());
         if (nfcAdapter != null && nfcAdapter.isEnabled()) {
             Intent intent = new Intent(getActivity(), getActivity().getClass());
             intent.addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP);
-            
+
             int flags = PendingIntent.FLAG_UPDATE_CURRENT;
             if (Build.VERSION.SDK_INT >= 31) { // Android 12+
                 flags |= PendingIntent.FLAG_MUTABLE;
             }
-            
+
             PendingIntent pendingIntent = PendingIntent.getActivity(getActivity(), 0, intent, flags);
-            IntentFilter[] intentFilters = new IntentFilter[]{}; 
-            
+            IntentFilter[] intentFilters = new IntentFilter[] {};
+
             nfcAdapter.enableForegroundDispatch(getActivity(), pendingIntent, intentFilters, null);
         }
     }
 
     private void disableForegroundDispatch() {
-        if (getActivity() == null) return;
+        if (getActivity() == null)
+            return;
         NfcAdapter nfcAdapter = NfcAdapter.getDefaultAdapter(getActivity());
         if (nfcAdapter != null) {
             nfcAdapter.disableForegroundDispatch(getActivity());
@@ -76,12 +85,12 @@ public class LumosNfcPlugin extends Plugin {
     protected void handleOnNewIntent(Intent intent) {
         super.handleOnNewIntent(intent);
         String action = intent.getAction();
-        if (NfcAdapter.ACTION_TAG_DISCOVERED.equals(action) || 
-            NfcAdapter.ACTION_NDEF_DISCOVERED.equals(action) ||
-            NfcAdapter.ACTION_TECH_DISCOVERED.equals(action)) {
-            
+        if (NfcAdapter.ACTION_TAG_DISCOVERED.equals(action) ||
+                NfcAdapter.ACTION_NDEF_DISCOVERED.equals(action) ||
+                NfcAdapter.ACTION_TECH_DISCOVERED.equals(action)) {
+
             Tag tag = intent.getParcelableExtra(NfcAdapter.EXTRA_TAG);
-            
+
             if (isWriting) {
                 writeTag(tag);
             } else {
@@ -118,20 +127,21 @@ public class LumosNfcPlugin extends Plugin {
                     }
                 }
             }
-            
+
             // Fallback if no URI or empty
             JSObject ret = new JSObject();
             ret.put("type", "unknown");
             notifyListeners("nfcTagScanned", ret);
-            
+
         } catch (Exception e) {
             e.printStackTrace();
         }
     }
 
     private void writeTag(Tag tag) {
-        if (activeCall == null) return;
-        
+        if (activeCall == null)
+            return;
+
         String uriStr = activeCall.getString("uri");
         if (uriStr == null) {
             activeCall.reject("URI is required");
@@ -142,7 +152,7 @@ public class LumosNfcPlugin extends Plugin {
         try {
             // Check for CLEAR command
             if ("lumostime://clear".equals(uriStr)) {
-                 // Write empty message
+                // Write empty message
                 NdefMessage message = new NdefMessage(new NdefRecord(NdefRecord.TNF_EMPTY, null, null, null));
                 writeNdefMessageToTag(tag, message);
                 return;
@@ -151,11 +161,12 @@ public class LumosNfcPlugin extends Plugin {
             NdefRecord uriRecord = NdefRecord.createUri(Uri.parse(uriStr));
             // Force AAR to ensuring Xiaomi/other Custom ROMs open THIS app
             NdefRecord aarRecord = NdefRecord.createApplicationRecord("com.mistycrown.lumostime");
-            // Important: URI record must be first for some dispatchers, but AAR ensures app selection
-            NdefMessage message = new NdefMessage(new NdefRecord[]{uriRecord, aarRecord});
-            
+            // Important: URI record must be first for some dispatchers, but AAR ensures app
+            // selection
+            NdefMessage message = new NdefMessage(new NdefRecord[] { uriRecord, aarRecord });
+
             writeNdefMessageToTag(tag, message);
-             
+
         } catch (Exception e) {
             activeCall.reject("Write failed: " + e.getMessage());
         }
@@ -169,18 +180,18 @@ public class LumosNfcPlugin extends Plugin {
                 if (ndef.getMaxSize() < message.toByteArray().length) {
                     activeCall.reject("Tag capacity is too small");
                 } else if (!ndef.isWritable()) {
-                     activeCall.reject("Tag is read-only");
+                    activeCall.reject("Tag is read-only");
                 } else {
                     ndef.writeNdefMessage(message);
-                    
+
                     JSObject ret = new JSObject();
                     ret.put("status", "success");
                     activeCall.resolve(ret);
-                    
+
                     // Cleanup
                     isWriting = false;
                     activeCall = null;
-                   // disableForegroundDispatch(); // Don't disable global dispatch
+                    // disableForegroundDispatch(); // Don't disable global dispatch
                 }
                 ndef.close();
             } else {
@@ -189,11 +200,11 @@ public class LumosNfcPlugin extends Plugin {
                     formatable.connect();
                     formatable.format(message);
                     formatable.close();
-                    
+
                     JSObject ret = new JSObject();
                     ret.put("status", "success");
                     activeCall.resolve(ret);
-                    
+
                     isWriting = false;
                     activeCall = null;
                     // disableForegroundDispatch();
@@ -213,11 +224,11 @@ public class LumosNfcPlugin extends Plugin {
         super.handleOnPause();
         disableForegroundDispatch();
     }
-    
+
     @Override
     protected void handleOnResume() {
         super.handleOnResume();
         // Always enable foreground dispatch to capture tags when app is open
-        enableForegroundDispatch(); 
+        enableForegroundDispatch();
     }
 }

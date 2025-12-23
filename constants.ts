@@ -1,3 +1,12 @@
+/**
+ * @file constants.ts
+ * @input None
+ * @output Static Data (Colors, Categories, Initial States, Templates)
+ * @pos Global Configuration & Static Data
+ * @description Defines application-wide constants, configuration options, and initial mock data.
+ * 
+ * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
+ */
 import { Category, Log, AppView, TodoCategory, TodoItem, Scope, Goal, ReviewTemplate, DailyReview, NarrativeTemplate } from './types';
 
 // --- Default User Personal Info ---

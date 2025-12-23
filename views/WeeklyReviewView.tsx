@@ -1,3 +1,12 @@
+/**
+ * @file WeeklyReviewView.tsx
+ * @input WeeklyReview Data, Logs, Stats, Templates
+ * @output Review Updates, Narrative Generation
+ * @pos View (Review Modal)
+ * @description The interface for conducting Weekly Reviews. Integrates statistics visualization, guided reflection templates, and AI-assisted narrative generation.
+ * 
+ * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
+ */
 import React, { useState, useMemo, useEffect } from 'react';
 import { ChevronLeft, Trash2, Sparkles, Edit3, RefreshCw, X, Calendar } from 'lucide-react';
 import { WeeklyReview, ReviewTemplate, ReviewAnswer, Category, Log, TodoCategory, TodoItem, Scope, ReviewQuestion, NarrativeTemplate } from '../types';

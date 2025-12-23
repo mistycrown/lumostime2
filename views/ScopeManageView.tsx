@@ -1,3 +1,12 @@
+/**
+ * @file ScopeManageView.tsx
+ * @input Scope List
+ * @output Created/Updated/Archived Scopes
+ * @pos View (Settings Sub-page)
+ * @description A management interface for Scopes. Allows creating new scopes, renaming, changing icons, reordering, and archiving/restoring scopes.
+ * 
+ * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
+ */
 import React, { useState } from 'react';
 import { Scope } from '../types';
 import { ChevronLeft, Plus, Trash2, Archive, ArchiveRestore, GripVertical, ArrowUp, ArrowDown, X, Check } from 'lucide-react';

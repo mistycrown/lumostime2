@@ -1,3 +1,12 @@
+/**
+ * @file NfcService.ts
+ * @input Capacitor NFC Plugin
+ * @output NFC Read/Write Operations
+ * @pos Service (Hardware Abstraction)
+ * @description Provides a wrapper around the Native NFC capabilities for identifying and writing to NFC tags.
+ * 
+ * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
+ */
 import { registerPlugin } from '@capacitor/core';
 
 interface LumosNfcPlugin {

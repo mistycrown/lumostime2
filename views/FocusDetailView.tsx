@@ -1,3 +1,12 @@
+/**
+ * @file FocusDetailView.tsx
+ * @input Active Session Data, Todos, Categories, Scopes
+ * @output Session Updates (Note, Association), Completion Event
+ * @pos View (Active Focus Overlay)
+ * @description The main interface displayed during an active focus session. Shows the timer, allows associating the session with a Todo or Scope, editing the note, and completing the session.
+ * 
+ * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
+ */
 import React, { useState, useEffect, useRef } from 'react';
 import { ActiveSession, TodoItem, Category, Activity, TodoCategory, Scope, AutoLinkRule } from '../types';
 import { X, Check, ChevronDown, TrendingUp, Plus, Minus, Lightbulb, CheckCircle2 } from 'lucide-react';
@@ -179,13 +188,6 @@ export const FocusDetailView: React.FC<FocusDetailViewProps> = ({ session, todos
     const linkedTodo = todos.find(t => t.id === session.linkedTodoId);
 
     const handleComplete = () => {
-        // 停止通知（仅Android平台）
-        if (Capacitor.getPlatform() === 'android') {
-            FocusNotification.stopFocusNotification().catch(err => {
-                console.error('停止专注通知失败:', err);
-            });
-        }
-
         onComplete({
             ...session,
             note,

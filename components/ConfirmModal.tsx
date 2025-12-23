@@ -1,3 +1,12 @@
+/**
+ * @file ConfirmModal.tsx
+ * @input title, description, actions
+ * @output Confirmation Dialog
+ * @pos Component (Modal)
+ * @description A generic modal for confirming user actions (e.g., delete, archive) with configurable types (danger, warning, info).
+ * 
+ * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
+ */
 import React from 'react';
 import { Trash2, AlertTriangle, Info, X } from 'lucide-react';
 

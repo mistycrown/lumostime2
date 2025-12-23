@@ -1,3 +1,12 @@
+/**
+ * @file ScopeView.tsx
+ * @input Scope List, Log Statistics
+ * @output Navigation to Scope Detail
+ * @pos View (Main Tab)
+ * @description The main landing page for the "Scopes" (Domains) feature. Displays a card list of all active scopes with summary statistics (Total Time, Monthly Time).
+ * 
+ * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
+ */
 import React, { useMemo } from 'react';
 import { Scope, Goal, Log, TodoItem } from '../types';
 import { GoalCard } from '../components/GoalCard';

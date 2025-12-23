@@ -1,3 +1,12 @@
+/**
+ * @file MatrixAnalysisChart.tsx
+ * @input items arrary (label, value), title
+ * @output List-based Bar Chart
+ * @pos Component (Visualization)
+ * @description Renders a sorted list of items as horizontal bars, useful for ranking activities or categories by duration.
+ * 
+ * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
+ */
 import React from 'react';
 
 interface MatrixItem {

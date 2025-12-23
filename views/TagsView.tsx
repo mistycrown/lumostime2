@@ -1,3 +1,12 @@
+/**
+ * @file TagsView.tsx
+ * @input Categories, Logs
+ * @output Selection Events, Category Updates
+ * @pos View (Main Tab)
+ * @description The main "Library" view displaying all Categories and Activities in a hierarchical list. Supports expanding/collapsing categories and switching to a Batch Management mode.
+ * 
+ * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
+ */
 import React, { useState, useMemo } from 'react';
 import { Log, Category } from '../types';
 import { ChevronDown, ChevronRight, Settings2 } from 'lucide-react';

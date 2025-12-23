@@ -1,3 +1,12 @@
+/**
+ * @file NarrativeStyleSelectionModal.tsx
+ * @input onSelect callback
+ * @output Narrative Style Grid
+ * @pos Component (Modal)
+ * @description Modal for selecting a narrative style template for AI summary generation.
+ * 
+ * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
+ */
 import React, { useState, useEffect } from 'react';
 import { X, CheckCircle2, Sparkles } from 'lucide-react';
 import { NarrativeTemplate } from '../types';

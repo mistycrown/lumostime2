@@ -1,3 +1,12 @@
+/**
+ * @file webdavService.ts
+ * @input WebDAV Server Credentials, Local Data
+ * @output Remote Storage Operations (Upload/Download)
+ * @pos Service (Data Synchronization)
+ * @description Manages WebDAV connections and file operations, handling platform-specific networking (Cordova HTTP for native, Proxy for web).
+ * 
+ * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
+ */
 import { createClient, WebDAVClient } from 'webdav';
 import { HTTP } from '@awesome-cordova-plugins/http';
 import { Capacitor } from '@capacitor/core';
@@ -205,7 +214,7 @@ export class WebDAVService {
         if (!this.client) return null;
         try {
             // @ts-ignore
-            const stat = await this.client.stat(`/${filename}`);
+            const stat = await this.client.stat(`/${filename}`) as any;
             if (stat && stat.lastmod) {
                 return new Date(stat.lastmod);
             }

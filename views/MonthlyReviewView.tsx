@@ -1,3 +1,12 @@
+/**
+ * @file MonthlyReviewView.tsx
+ * @input Month Log Data, Review Data, Templates
+ * @output Update Review Data, Generate Narrative
+ * @pos View (Review System)
+ * @description A comprehensive view for conducting monthly reviews. Includes tabs for statistical data, guided questions (Review Guide), and an AI-assisted narrative editor.
+ * 
+ * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
+ */
 import React, { useState, useMemo } from 'react';
 import { ChevronLeft, Trash2, Sparkles, Edit3, RefreshCw, X, Calendar } from 'lucide-react';
 import { MonthlyReview, ReviewTemplate, ReviewAnswer, Category, Log, TodoCategory, TodoItem, Scope, ReviewQuestion, NarrativeTemplate } from '../types';

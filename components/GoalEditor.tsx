@@ -1,3 +1,12 @@
+/**
+ * @file GoalEditor.tsx
+ * @input goal (optional), scopeId, categories, todoCategories
+ * @output Goal Creation/Editing Form
+ * @pos Component (Modal/Form)
+ * @description A form modal for creating or editing goals, including title, metric type (duration, count, etc.), target values, and date ranges.
+ * 
+ * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
+ */
 import React, { useState, useEffect } from 'react';
 import { Goal, Category, TodoCategory } from '../types';
 import { X } from 'lucide-react';

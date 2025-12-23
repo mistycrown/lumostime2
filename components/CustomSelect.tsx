@@ -1,3 +1,12 @@
+/**
+ * @file CustomSelect.tsx
+ * @input value, options, onChange
+ * @output Dropdown Select UI
+ * @pos Component (Input)
+ * @description A styled dropdown component supporting icons and custom labels, replacing native select elements.
+ * 
+ * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
+ */
 import React, { useState, useRef, useEffect } from 'react';
 import { ChevronDown, Check, X } from 'lucide-react';
 

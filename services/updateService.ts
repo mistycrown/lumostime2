@@ -1,3 +1,12 @@
+/**
+ * @file updateService.ts
+ * @input Remote JSON Data (Gitee/GitHub)
+ * @output Version Information, Update Availability
+ * @pos Service (App Maintenance)
+ * @description Checks for application updates by fetching version metadata from remote repositories, with robust fallback mechanisms.
+ * 
+ * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
+ */
 // 应用更新检测服务
 import { CapacitorHttp, HttpResponse } from '@capacitor/core';
 

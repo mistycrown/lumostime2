@@ -1,3 +1,12 @@
+/**
+ * @file BatchManageView.tsx
+ * @input Categories, Activities
+ * @output Updated Category Structure
+ * @pos View (Settings Sub-page)
+ * @description A dedicated management interface for batch editing categories and activities, including creating, renaming, deleting, and reordering.
+ * 
+ * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
+ */
 import React, { useState } from 'react';
 import { Category, Activity } from '../types';
 import { ChevronDown, ChevronRight, GripVertical, Plus, Trash2, ArrowUp, ArrowDown, X, Check } from 'lucide-react';
