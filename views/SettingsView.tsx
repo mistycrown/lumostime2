@@ -65,6 +65,7 @@ import { ConfirmModal } from '../components/ConfirmModal';
 import { ReviewTemplate, NarrativeTemplate } from '../types';
 import FocusNotification from '../plugins/FocusNotificationPlugin';
 import { AutoRecordSettingsView } from './AutoRecordSettingsView';
+import { AutoLinkView } from './AutoLinkView';
 
 import { NARRATIVE_TEMPLATES } from '../constants';
 // @ts-ignore
@@ -126,7 +127,7 @@ const AI_PRESETS = {
 };
 
 export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, onImport, onReset, onClearData, onToast, syncData, onSyncUpdate, startWeekOnSunday, onToggleStartWeekOnSunday, onOpenAutoLink, onOpenSearch, minIdleTimeThreshold = 1, onSetMinIdleTimeThreshold, defaultView = 'RECORD', onSetDefaultView, reviewTemplates = [], onUpdateReviewTemplates, dailyReviewTime, onSetDailyReviewTime, weeklyReviewTime, onSetWeeklyReviewTime, monthlyReviewTime, onSetMonthlyReviewTime, customNarrativeTemplates, onUpdateCustomNarrativeTemplates, userPersonalInfo, onSetUserPersonalInfo }) => {
-    const [activeSubmenu, setActiveSubmenu] = useState<'main' | 'data' | 'cloud' | 'ai' | 'preferences' | 'guide' | 'nfc' | 'templates' | 'narrative_prompt' | 'auto_record'>('main');
+    const [activeSubmenu, setActiveSubmenu] = useState<'main' | 'data' | 'cloud' | 'ai' | 'preferences' | 'guide' | 'nfc' | 'templates' | 'narrative_prompt' | 'auto_record' | 'autolink'>('main');
     const [webdavConfig, setWebdavConfig] = useState<WebDAVConfig | null>(null);
     const [isSyncing, setIsSyncing] = useState(false);
 
@@ -1489,6 +1490,20 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
         );
     }
 
+    if (activeSubmenu === 'autolink') {
+        return (
+            <AutoLinkView
+                onClose={() => setActiveSubmenu('main')}
+                rules={syncData.autoLinkRules || []}
+                onUpdateRules={(rules) => {
+                    onSyncUpdate({ ...syncData, autoLinkRules: rules });
+                }}
+                categories={syncData.categories || []}
+                scopes={syncData.scopes || []}
+            />
+        );
+    }
+
     return (
         <div className="fixed inset-0 z-50 bg-[#fdfbf7] flex flex-col font-serif animate-in slide-in-from-right duration-300 pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">
             {/* Header */}
@@ -1524,9 +1539,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
                         <MenuItem
                             icon={<Link size={18} className="text-blue-500" />}
                             label="标签关联领域规则"
-                            onClick={() => {
-                                onOpenAutoLink?.();
-                            }}
+                            onClick={() => setActiveSubmenu('autolink')}
                         />
                         <MenuItem
                             icon={<Nfc size={18} className="text-orange-500" />}
