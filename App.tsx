@@ -124,6 +124,7 @@ const App: React.FC = () => {
 
   // Search Navigation State
   const [isOpenedFromSearch, setIsOpenedFromSearch] = useState(false);
+  const [isSearchOpenedFromSettings, setIsSearchOpenedFromSettings] = useState(false);
 
   // Modal State
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -2442,6 +2443,7 @@ const App: React.FC = () => {
             onOpenSearch={() => {
               setIsSettingsOpen(false);
               setIsSearchOpen(true);
+              setIsSearchOpenedFromSettings(true);
             }}
             minIdleTimeThreshold={minIdleTimeThreshold}
             onSetMinIdleTimeThreshold={setMinIdleTimeThreshold}
@@ -2485,7 +2487,13 @@ const App: React.FC = () => {
             dailyReviews={dailyReviews}
             weeklyReviews={weeklyReviews}
             monthlyReviews={monthlyReviews}
-            onClose={handleCloseSearch}
+            onClose={() => {
+              setIsSearchOpen(false);
+              if (isSearchOpenedFromSettings) {
+                setIsSettingsOpen(true);
+                setIsSearchOpenedFromSettings(false);
+              }
+            }}
             onSelectLog={handleSelectSearchLog}
             onSelectTodo={handleSelectSearchTodo}
             onSelectScope={handleSelectSearchScope}
