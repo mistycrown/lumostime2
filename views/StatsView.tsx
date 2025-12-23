@@ -53,7 +53,7 @@ export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentD
   const [viewType, setViewType] = useState<ViewType>(forcedView || 'pie');
   const [pieRange, setPieRange] = useState<PieRange>(forcedRange || 'day');
   const [scheduleRange, setScheduleRange] = useState<ScheduleRange>(forcedRange === 'week' ? 'week' : 'day');
-  const [lineRange, setLineRange] = useState<'week' | 'month'>('week');
+  const [lineRange, setLineRange] = useState<'week' | 'month'>((forcedRange === 'month' || forcedRange === 'year') ? 'month' : 'week');
   const [excludedCategoryIds, setExcludedCategoryIds] = useState<string[]>([]);
 
   const toggleExclusion = (id: string) => {
