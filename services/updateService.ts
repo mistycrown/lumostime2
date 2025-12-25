@@ -26,7 +26,7 @@ export class UpdateService {
     private static GITHUB_UPDATE_URL = 'https://raw.githubusercontent.com/mistycrown/lumostime2/master/version.json';
 
     // 当前应用版本（从 package.json 读取）
-    private static CURRENT_VERSION = '1.0.3';
+    private static CURRENT_VERSION = '1.0.4';
 
     /**
      * 从 Gitee API 获取版本信息
