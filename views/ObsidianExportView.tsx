@@ -457,7 +457,7 @@ export const ObsidianExportView: React.FC<ObsidianExportViewProps> = ({
                             />
                         </div>
                         <p className="text-xs text-stone-400 mt-1 ml-1">
-                            支持占位符: {'{YYYY}'} (年), {'{WW}'} (周数)
+                            支持占位符: {'{YYYY}'} (年), {'{MM}'} (月), {'{WW}'} (周数)
                         </p>
                     </div>
 
