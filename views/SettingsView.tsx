@@ -37,19 +37,21 @@ import {
     Globe,
     Trash2,
     SquareActivity,
-
-    Sparkles, // AI Icon
     Bot,
-    X,
-    Link,
-    Search,
     ChevronDown,
+    Wifi,
+    ArrowUpCircle,
+    Coffee,
+    Send,
+    X,
     Nfc,
+    Target,
     Edit2,
     PlusCircle,
-    ArrowUpCircle,
-    Layout,
-    Coffee,
+    Sparkles,
+    Edit,
+    Search,
+    Link,
     Smartphone
 } from 'lucide-react';
 import { webdavService, WebDAVConfig } from '../services/webdavService';
@@ -62,10 +64,11 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { ReviewTemplateManageView } from './ReviewTemplateManageView';
 import { ConfirmModal } from '../components/ConfirmModal';
-import { ReviewTemplate, NarrativeTemplate } from '../types';
+import { ReviewTemplate, NarrativeTemplate, Log, TodoItem, Scope, DailyReview } from '../types';
 import FocusNotification from '../plugins/FocusNotificationPlugin';
 import { AutoRecordSettingsView } from './AutoRecordSettingsView';
 import { AutoLinkView } from './AutoLinkView';
+import { ObsidianExportView } from './ObsidianExportView';
 
 import { NARRATIVE_TEMPLATES } from '../constants';
 // @ts-ignore
@@ -105,6 +108,12 @@ interface SettingsViewProps {
     onUpdateCustomNarrativeTemplates?: (templates: NarrativeTemplate[]) => void;
     userPersonalInfo?: string;
     onSetUserPersonalInfo?: (info: string) => void;
+    // Obsidian Export
+    logs?: Log[];
+    todos?: TodoItem[];
+    scopes?: Scope[];
+    currentDate?: Date;
+    dailyReviews?: DailyReview[];
 }
 
 const AI_PRESETS = {
@@ -126,8 +135,8 @@ const AI_PRESETS = {
     }
 };
 
-export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, onImport, onReset, onClearData, onToast, syncData, onSyncUpdate, startWeekOnSunday, onToggleStartWeekOnSunday, onOpenAutoLink, onOpenSearch, minIdleTimeThreshold = 1, onSetMinIdleTimeThreshold, defaultView = 'RECORD', onSetDefaultView, reviewTemplates = [], onUpdateReviewTemplates, dailyReviewTime, onSetDailyReviewTime, weeklyReviewTime, onSetWeeklyReviewTime, monthlyReviewTime, onSetMonthlyReviewTime, customNarrativeTemplates, onUpdateCustomNarrativeTemplates, userPersonalInfo, onSetUserPersonalInfo }) => {
-    const [activeSubmenu, setActiveSubmenu] = useState<'main' | 'data' | 'cloud' | 'ai' | 'preferences' | 'guide' | 'nfc' | 'templates' | 'narrative_prompt' | 'auto_record' | 'autolink'>('main');
+export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, onImport, onReset, onClearData, onToast, syncData, onSyncUpdate, startWeekOnSunday, onToggleStartWeekOnSunday, onOpenAutoLink, onOpenSearch, minIdleTimeThreshold = 1, onSetMinIdleTimeThreshold, defaultView = 'RECORD', onSetDefaultView, reviewTemplates = [], onUpdateReviewTemplates, dailyReviewTime, onSetDailyReviewTime, weeklyReviewTime, onSetWeeklyReviewTime, monthlyReviewTime, onSetMonthlyReviewTime, customNarrativeTemplates, onUpdateCustomNarrativeTemplates, userPersonalInfo, onSetUserPersonalInfo, logs = [], todos = [], scopes = [], currentDate = new Date(), dailyReviews = [] }) => {
+    const [activeSubmenu, setActiveSubmenu] = useState<'main' | 'data' | 'cloud' | 'ai' | 'preferences' | 'guide' | 'nfc' | 'templates' | 'narrative_prompt' | 'auto_record' | 'autolink' | 'obsidian_export'>('main');
     const [webdavConfig, setWebdavConfig] = useState<WebDAVConfig | null>(null);
     const [isSyncing, setIsSyncing] = useState(false);
 
@@ -163,6 +172,11 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
     const handleCancelNfc = async () => {
         await NfcService.cancelWrite();
         setIsWritingNfc(false);
+    };
+
+    // 检测是否在 Electron 环境
+    const isElectronEnvironment = () => {
+        return typeof window !== 'undefined' && !!(window as any).ipcRenderer;
     };
 
     // Floating Window State
@@ -826,6 +840,23 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
         return <AutoRecordSettingsView
             onBack={() => setActiveSubmenu('main')}
             categories={categories || []}
+        />;
+    }
+
+    if (activeSubmenu === 'obsidian_export') {
+        // 获取当天的 dailyReview
+        const dateStr = currentDate.toISOString().split('T')[0]; // YYYY-MM-DD
+        const todayReview = dailyReviews.find(r => r.date === dateStr);
+
+        return <ObsidianExportView
+            onBack={() => setActiveSubmenu('main')}
+            logs={logs}
+            categories={categories || []}
+            todos={todos}
+            scopes={scopes}
+            currentDate={currentDate}
+            onToast={onToast}
+            dailyReview={todayReview}
         />;
     }
 
@@ -1601,9 +1632,16 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
                         <MenuItem
                             icon={<Database size={18} />}
                             label="数据导出导入 (包含重置)"
-                            isLast
                             onClick={() => setActiveSubmenu('data')}
                         />
+                        {isElectronEnvironment() && (
+                            <MenuItem
+                                icon={<FileText size={18} className="text-indigo-500" />}
+                                label="导出到 Obsidian"
+                                isLast
+                                onClick={() => setActiveSubmenu('obsidian_export')}
+                            />
+                        )}
                     </div>
                 </div>
 

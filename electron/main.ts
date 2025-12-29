@@ -135,3 +135,40 @@ ipcMain.handle('open-win', (_, arg) => {
         childWindow.loadFile(indexHtml, { hash: arg })
     }
 })
+
+// Obsidian Export: 写入 Markdown 文件
+import fs from 'fs/promises'
+
+ipcMain.handle('write-obsidian-file', async (_, { filePath, content }) => {
+    try {
+        // 确保目录存在
+        const dir = path.dirname(filePath)
+        await fs.mkdir(dir, { recursive: true })
+
+        let finalContent = content
+
+        // 检测文件是否已存在
+        try {
+            const existingContent = await fs.readFile(filePath, 'utf-8')
+            // 如果文件存在,追加新内容(在末尾添加分隔符和新内容)
+            finalContent = existingContent + '\n\n---\n\n' + content
+            console.log(`📝 文件已存在,追加内容: ${filePath}`)
+        } catch (error: any) {
+            // 文件不存在,使用新内容
+            if (error.code === 'ENOENT') {
+                console.log(`📄 创建新文件: ${filePath}`)
+            } else {
+                throw error
+            }
+        }
+
+        // 写入文件 (UTF-8 编码)
+        await fs.writeFile(filePath, finalContent, 'utf-8')
+
+        console.log(`✅ Obsidian 文件写入成功: ${filePath}`)
+        return { success: true }
+    } catch (error: any) {
+        console.error('❌ 写入 Obsidian 文件失败:', error)
+        throw new Error(`文件写入失败: ${error.message}`)
+    }
+})
