@@ -2461,6 +2461,11 @@ const App: React.FC = () => {
             onUpdateCustomNarrativeTemplates={setCustomNarrativeTemplates}
             userPersonalInfo={userPersonalInfo}
             onSetUserPersonalInfo={setUserPersonalInfo}
+            logs={logs}
+            todos={todos}
+            scopes={scopes}
+            currentDate={currentDate}
+            dailyReviews={dailyReviews}
           />
         )}
 
