@@ -109,16 +109,13 @@ class ObsidianExportService {
         scopes: Scope[],
         date: Date
     ): string {
-        const dayLogs = logs.filter(log => {
-            const logDate = new Date(log.startTime);
-            return logDate.toDateString() === date.toDateString();
-        });
-
-        if (dayLogs.length === 0) {
+        // 直接使用传入的logs,不再进行日期筛选
+        // 因为调用者(日报/周报/月报生成函数)已经负责筛选了正确时间范围内的数据
+        if (logs.length === 0) {
             return `## 📊 数据统计\n\n暂无数据\n`;
         }
 
-        const totalDuration = dayLogs.reduce((acc, l) => acc + l.duration, 0);
+        const totalDuration = logs.reduce((acc, l) => acc + l.duration, 0);
         const formatDuration = (seconds: number) => {
             const h = Math.floor(seconds / 3600);
             const m = Math.floor((seconds % 3600) / 60);
@@ -136,7 +133,7 @@ class ObsidianExportService {
             activities: Map<string, { activityName: string; duration: number }>;
         }>();
 
-        dayLogs.forEach(log => {
+        logs.forEach(log => {
             const cat = categories.find(c => c.id === log.categoryId);
             const act = cat?.activities.find(a => a.id === log.activityId);
             if (cat && act) {
@@ -196,7 +193,7 @@ class ObsidianExportService {
             todos: Map<string, { todoTitle: string; duration: number }>;
         }>();
 
-        dayLogs.forEach(log => {
+        logs.forEach(log => {
             if (log.linkedTodoId) {
                 const todo = todos.find(t => t.id === log.linkedTodoId);
                 if (todo) {
@@ -252,14 +249,16 @@ class ObsidianExportService {
 
         // 按领域统计
         const scopeStats = new Map<string, number>();
-        dayLogs.forEach(log => {
-            log.scopeIds?.forEach(scopeId => {
-                const scope = scopes.find(s => s.id === scopeId);
-                if (scope) {
-                    const current = scopeStats.get(scope.name) || 0;
-                    scopeStats.set(scope.name, current + log.duration);
-                }
-            });
+        logs.forEach(log => {
+            if (log.scopeIds && log.scopeIds.length > 0) {
+                log.scopeIds.forEach(scopeId => {
+                    const scope = scopes.find(s => s.id === scopeId);
+                    if (scope) {
+                        const current = scopeStats.get(scope.name) || 0;
+                        scopeStats.set(scope.name, current + log.duration);
+                    }
+                });
+            }
         });
 
         if (scopeStats.size > 0) {
@@ -294,15 +293,15 @@ class ObsidianExportService {
     /**
      * 生成 AI 叙事内容(使用引用块避免格式冲突)
      */
-    generateNarrativeMarkdown(dailyReview: DailyReview | undefined, date: Date): string {
-        if (!dailyReview || !dailyReview.narrative) {
-            return `## ✨ AI 叙事\n\n暂无 AI 生成的叙事\n`;
+    generateNarrativeMarkdown(narrative?: string): string {
+        if (!narrative) {
+            return `## ✨ 叙事\n\n暂无叙事\n`;
         }
 
-        let text = `## ✨ AI 叙事\n\n`;
+        let text = `## ✨ 叙事\n\n`;
 
         // 将叙事内容按行分割,每行添加引用符号
-        const narrativeLines = dailyReview.narrative.split('\n');
+        const narrativeLines = narrative.split('\n');
         narrativeLines.forEach(line => {
             text += `> ${line}\n`;
         });
@@ -368,7 +367,7 @@ class ObsidianExportService {
             const scopesList = log.scopeIds?.map(id => scopes.find(s => s.id === id)).filter(Boolean) || [];
 
             const content = log.note ? ` ${log.note}` : '';
-            text += `- ${sTime}-${eTime} (${mins}m) **[${cat?.name || '未知'}/${act?.name || '未知'}]**${content}`;
+            text += `${sTime}-${eTime} (${mins}m) **[${cat?.name || '未知'}/${act?.name || '未知'}]**${content}`;
 
             if (log.focusScore && log.focusScore > 0) text += ` ⚡️${log.focusScore}`;
             if (todo) text += ` @${todo.title}`;
@@ -411,7 +410,7 @@ class ObsidianExportService {
         }
 
         if (options.includeNarrative) {
-            sections.push(this.generateNarrativeMarkdown(dailyReview, date));
+            sections.push(this.generateNarrativeMarkdown(dailyReview?.narrative));
         }
 
         return sections.join('\n\n');
@@ -429,17 +428,18 @@ class ObsidianExportService {
         options: ObsidianExportOptions,
         weeklyReview?: any // WeeklyReview 类型
     ): string {
-        // 计算周的开始日期(上周一)
+        // 计算周的开始日期(周日往前推6天,形成完整的7天周)
         const weekStart = new Date(weekEndDate);
-        const dayOfWeek = weekEndDate.getDay();
-        const daysToSubtract = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
-        weekStart.setDate(weekEndDate.getDate() - daysToSubtract - 6);
+        weekStart.setDate(weekEndDate.getDate() - 6);
+        weekStart.setHours(0, 0, 0, 0);
 
         // 筛选整周的logs
+        const weekStartTime = weekStart.getTime();
+        const weekEndTime = new Date(weekEndDate);
+        weekEndTime.setHours(23, 59, 59, 999);
+
         const weekLogs = logs.filter(log => {
-            const logDate = new Date(log.startTime);
-            logDate.setHours(0, 0, 0, 0);
-            return logDate >= weekStart && logDate <= weekEndDate;
+            return log.startTime >= weekStartTime && log.startTime <= weekEndTime.getTime();
         });
 
         const sections: string[] = [];
@@ -458,7 +458,7 @@ class ObsidianExportService {
         }
 
         if (options.includeNarrative && weeklyReview) {
-            sections.push(this.generateNarrativeMarkdown(weeklyReview, weekEndDate));
+            sections.push(this.generateNarrativeMarkdown(weeklyReview?.narrative));
         }
 
         return sections.join('\n\n');
@@ -478,12 +478,15 @@ class ObsidianExportService {
     ): string {
         // 计算月的开始日期
         const monthStart = new Date(monthEndDate.getFullYear(), monthEndDate.getMonth(), 1);
+        monthStart.setHours(0, 0, 0, 0);
 
         // 筛选整月的logs
+        const monthStartTime = monthStart.getTime();
+        const monthEndTime = new Date(monthEndDate);
+        monthEndTime.setHours(23, 59, 59, 999);
+
         const monthLogs = logs.filter(log => {
-            const logDate = new Date(log.startTime);
-            logDate.setHours(0, 0, 0, 0);
-            return logDate >= monthStart && logDate <= monthEndDate;
+            return log.startTime >= monthStartTime && log.startTime <= monthEndTime.getTime();
         });
 
         const sections: string[] = [];
@@ -502,7 +505,7 @@ class ObsidianExportService {
         }
 
         if (options.includeNarrative && monthlyReview) {
-            sections.push(this.generateNarrativeMarkdown(monthlyReview, monthEndDate));
+            sections.push(this.generateNarrativeMarkdown(monthlyReview?.narrative));
         }
 
         return sections.join('\n\n');
