@@ -107,7 +107,8 @@ class ObsidianExportService {
         categories: Category[],
         todos: TodoItem[],
         scopes: Scope[],
-        date: Date
+        date: Date,
+        todoCategories?: any[] // TodoCategory[]
     ): string {
         // 直接使用传入的logs,不再进行日期筛选
         // 因为调用者(日报/周报/月报生成函数)已经负责筛选了正确时间范围内的数据
@@ -199,7 +200,7 @@ class ObsidianExportService {
                 if (todo) {
                     let categoryData = todoMap.get(todo.categoryId);
                     if (!categoryData) {
-                        const todoCat = categories.find(c => c.id === todo.categoryId);
+                        const todoCat = todoCategories?.find(c => c.id === todo.categoryId);
                         categoryData = {
                             categoryId: todo.categoryId,
                             categoryName: todoCat?.name || '未分类',
@@ -392,8 +393,9 @@ class ObsidianExportService {
         todos: TodoItem[],
         scopes: Scope[],
         date: Date,
-        options: ObsidianExportOptions,
-        dailyReview?: DailyReview
+        dailyReview?: DailyReview,
+        options: ObsidianExportOptions = this.defaultOptions,
+        todoCategories?: any[]
     ): string {
         const sections: string[] = [];
 
@@ -402,7 +404,7 @@ class ObsidianExportService {
         }
 
         if (options.includeStats) {
-            sections.push(this.generateStatsMarkdown(logs, categories, todos, scopes, date));
+            sections.push(this.generateStatsMarkdown(logs, categories, todos, scopes, date, todoCategories));
         }
 
         if (options.includeQuestions) {
@@ -426,7 +428,8 @@ class ObsidianExportService {
         scopes: Scope[],
         weekEndDate: Date,
         options: ObsidianExportOptions,
-        weeklyReview?: any // WeeklyReview 类型
+        weeklyReview?: any, // WeeklyReview 类型
+        todoCategories?: any[]
     ): string {
         // 计算周的开始日期(周日往前推6天,形成完整的7天周)
         const weekStart = new Date(weekEndDate);
@@ -450,7 +453,7 @@ class ObsidianExportService {
         sections.push(`**周期**: ${this.formatDate(weekStart)} - ${dateStr}\n`);
 
         if (options.includeStats && weekLogs.length > 0) {
-            sections.push(this.generateStatsMarkdown(weekLogs, categories, todos, scopes, weekEndDate));
+            sections.push(this.generateStatsMarkdown(weekLogs, categories, todos, scopes, weekEndDate, todoCategories));
         }
 
         if (options.includeQuestions && weeklyReview) {
@@ -474,7 +477,8 @@ class ObsidianExportService {
         scopes: Scope[],
         monthEndDate: Date,
         options: ObsidianExportOptions,
-        monthlyReview?: any // MonthlyReview 类型
+        monthlyReview?: any, // MonthlyReview 类型
+        todoCategories?: any[]
     ): string {
         // 计算月的开始日期
         const monthStart = new Date(monthEndDate.getFullYear(), monthEndDate.getMonth(), 1);
@@ -497,7 +501,7 @@ class ObsidianExportService {
         sections.push(`**月份**: ${year}-${String(month).padStart(2, '0')}\n`);
 
         if (options.includeStats && monthLogs.length > 0) {
-            sections.push(this.generateStatsMarkdown(monthLogs, categories, todos, scopes, monthEndDate));
+            sections.push(this.generateStatsMarkdown(monthLogs, categories, todos, scopes, monthEndDate, todoCategories));
         }
 
         if (options.includeQuestions && monthlyReview) {
@@ -597,6 +601,15 @@ class ObsidianExportService {
     private isElectronEnvironment(): boolean {
         return typeof window !== 'undefined' && !!(window as any).ipcRenderer;
     }
+
+    private defaultOptions: ObsidianExportOptions = {
+        includeTimeline: true,
+        includeStats: true,
+        includeQuestions: true,
+        includeNarrative: true,
+        exportWeeklyReviews: false,
+        exportMonthlyReviews: false
+    };
 
     /**
      * 保存配置到 localStorage

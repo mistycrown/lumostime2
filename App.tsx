@@ -2466,6 +2466,7 @@ const App: React.FC = () => {
             scopes={scopes}
             currentDate={currentDate}
             dailyReviews={dailyReviews}
+            todoCategories={todoCategories}
           />
         )}
 
