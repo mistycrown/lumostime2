@@ -62,14 +62,9 @@ class ObsidianExportService {
         scopes: Scope[],
         date: Date
     ): string {
-        // 筛选当天的日志
-        const startOfDay = new Date(date);
-        startOfDay.setHours(0, 0, 0, 0);
-        const endOfDay = new Date(date);
-        endOfDay.setHours(23, 59, 59, 999);
-
         const dayLogs = logs.filter(log => {
-            return log.startTime >= startOfDay.getTime() && log.endTime <= endOfDay.getTime();
+            const logDate = new Date(log.startTime);
+            return logDate.toDateString() === date.toDateString();
         });
 
         if (dayLogs.length === 0) {
@@ -86,19 +81,36 @@ class ObsidianExportService {
         let text = `## 📊 数据统计\n`;
         text += `**总时长**: ${formatDuration(totalDuration)}\n\n`;
 
-        // 按活动统计(二级分类)
-        const activityStats = new Map<string, { categoryName: string; activityName: string; duration: number }>();
+        // 按一级分类和二级活动统计
+        const categoryMap = new Map<string, {
+            categoryId: string;
+            categoryName: string;
+            totalDuration: number;
+            activities: Map<string, { activityName: string; duration: number }>;
+        }>();
+
         dayLogs.forEach(log => {
             const cat = categories.find(c => c.id === log.categoryId);
             const act = cat?.activities.find(a => a.id === log.activityId);
             if (cat && act) {
-                const key = `${cat.name}/${act.name}`;
-                const current = activityStats.get(key);
-                if (current) {
-                    current.duration += log.duration;
-                } else {
-                    activityStats.set(key, {
+                let categoryData = categoryMap.get(cat.id);
+                if (!categoryData) {
+                    categoryData = {
+                        categoryId: cat.id,
                         categoryName: cat.name,
+                        totalDuration: 0,
+                        activities: new Map()
+                    };
+                    categoryMap.set(cat.id, categoryData);
+                }
+
+                categoryData.totalDuration += log.duration;
+
+                const activityData = categoryData.activities.get(act.id);
+                if (activityData) {
+                    activityData.duration += log.duration;
+                } else {
+                    categoryData.activities.set(act.id, {
                         activityName: act.name,
                         duration: log.duration
                     });
@@ -106,37 +118,88 @@ class ObsidianExportService {
             }
         });
 
-        if (activityStats.size > 0) {
+        if (categoryMap.size > 0) {
             text += `### 分类统计\n\n`;
-            Array.from(activityStats.entries())
-                .sort((a, b) => b[1].duration - a[1].duration)
-                .forEach(([key, stat]) => {
-                    const percentage = ((stat.duration / totalDuration) * 100).toFixed(1);
-                    text += `- **[${stat.categoryName}/${stat.activityName}]**: ${formatDuration(stat.duration)} (${percentage}%)\n`;
+
+            // 按总时长排序分类
+            const sortedCategories = Array.from(categoryMap.values())
+                .sort((a, b) => b.totalDuration - a.totalDuration);
+
+            sortedCategories.forEach(catData => {
+                const percentage = ((catData.totalDuration / totalDuration) * 100).toFixed(1);
+                text += `- **${catData.categoryName}**: ${formatDuration(catData.totalDuration)} (${percentage}%)\n`;
+
+                // 二级活动列表
+                const sortedActivities = Array.from(catData.activities.values())
+                    .sort((a, b) => b.duration - a.duration);
+
+                sortedActivities.forEach(actData => {
+                    const actPercentage = ((actData.duration / totalDuration) * 100).toFixed(1);
+                    text += `  - ${actData.activityName}: ${formatDuration(actData.duration)} (${actPercentage}%)\n`;
                 });
+            });
             text += '\n';
         }
 
-        // 按待办统计
-        const todoStats = new Map<string, number>();
+        // 按待办分类和具体待办统计
+        const todoMap = new Map<string, {
+            categoryId: string;
+            categoryName: string;
+            totalDuration: number;
+            todos: Map<string, { todoTitle: string; duration: number }>;
+        }>();
+
         dayLogs.forEach(log => {
             if (log.linkedTodoId) {
                 const todo = todos.find(t => t.id === log.linkedTodoId);
                 if (todo) {
-                    const current = todoStats.get(todo.title) || 0;
-                    todoStats.set(todo.title, current + log.duration);
+                    let categoryData = todoMap.get(todo.categoryId);
+                    if (!categoryData) {
+                        const todoCat = categories.find(c => c.id === todo.categoryId);
+                        categoryData = {
+                            categoryId: todo.categoryId,
+                            categoryName: todoCat?.name || '未分类',
+                            totalDuration: 0,
+                            todos: new Map()
+                        };
+                        todoMap.set(todo.categoryId, categoryData);
+                    }
+
+                    categoryData.totalDuration += log.duration;
+
+                    const todoData = categoryData.todos.get(todo.id);
+                    if (todoData) {
+                        todoData.duration += log.duration;
+                    } else {
+                        categoryData.todos.set(todo.id, {
+                            todoTitle: todo.title,
+                            duration: log.duration
+                        });
+                    }
                 }
             }
         });
 
-        if (todoStats.size > 0) {
+        if (todoMap.size > 0) {
             text += `### 待办统计\n\n`;
-            Array.from(todoStats.entries())
-                .sort((a, b) => b[1] - a[1])
-                .forEach(([title, duration]) => {
-                    const percentage = ((duration / totalDuration) * 100).toFixed(1);
-                    text += `- **${title}**: ${formatDuration(duration)} (${percentage}%)\n`;
+
+            // 按总时长排序待办分类
+            const sortedTodoCategories = Array.from(todoMap.values())
+                .sort((a, b) => b.totalDuration - a.totalDuration);
+
+            sortedTodoCategories.forEach(catData => {
+                const percentage = ((catData.totalDuration / totalDuration) * 100).toFixed(1);
+                text += `- **${catData.categoryName}**: ${formatDuration(catData.totalDuration)} (${percentage}%)\n`;
+
+                // 具体待办列表
+                const sortedTodos = Array.from(catData.todos.values())
+                    .sort((a, b) => b.duration - a.duration);
+
+                sortedTodos.forEach(todoData => {
+                    const todoPercentage = ((todoData.duration / totalDuration) * 100).toFixed(1);
+                    text += `  - ${todoData.todoTitle}: ${formatDuration(todoData.duration)} (${todoPercentage}%)\n`;
                 });
+            });
             text += '\n';
         }
 
