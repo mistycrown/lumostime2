@@ -18,6 +18,8 @@ export interface ObsidianExportOptions {
     includeStats: boolean;        // 数据统计
     includeQuestions: boolean;    // 引导提问
     includeNarrative: boolean;    // AI 叙事
+    exportWeeklyReviews?: boolean;  // 导出范围内周报
+    exportMonthlyReviews?: boolean; // 导出范围内月报
 }
 
 /**
@@ -26,31 +28,74 @@ export interface ObsidianExportOptions {
 export interface ObsidianExportConfig {
     rootPath: string;        // 根目录,如: "F:\Obsidian Vault\01 diary"
     pathTemplate: string;    // 路径模板,如: "{YYYY}/{MM}/{YYYY}-{MM}-{DD}.md"
+    weeklyPathTemplate?: string;  // 周报路径模板,如: "{YYYY}/{YYYY}-W{WW}.md"
+    monthlyPathTemplate?: string; // 月报路径模板,如: "{YYYY}/{YYYY}-{MM}.md"
 }
+
+/**
+ * LocalStorage 存储key
+ */
+const STORAGE_KEY = 'lumos_obsidian_export_config';
 
 /**
  * Obsidian 导出服务
  */
 class ObsidianExportService {
     /**
-     * 生成目标文件完整路径
+     * 生成文件路径
      */
     generateFilePath(config: ObsidianExportConfig, date: Date): string {
         const year = date.getFullYear();
         const month = String(date.getMonth() + 1).padStart(2, '0');
         const day = String(date.getDate()).padStart(2, '0');
 
-        const relativePath = config.pathTemplate
+        let filePath = config.pathTemplate
             .replace(/{YYYY}/g, String(year))
             .replace(/{MM}/g, month)
             .replace(/{DD}/g, day);
 
-        // 使用路径分隔符拼接,Windows 下会自动使用反斜杠
-        const fullPath = config.rootPath.replace(/\/$/, '') + '/' + relativePath;
-
-        // 统一使用反斜杠(Windows)
+        const fullPath = config.rootPath.replace(/\/$/, '') + '/' + filePath;
         return fullPath.replace(/\//g, '\\');
     }
+
+    /**
+     * 生成周报文件路径
+     */
+    generateWeeklyFilePath(config: ObsidianExportConfig, date: Date): string {
+        if (!config.weeklyPathTemplate) {
+            throw new Error('周报路径模板未配置');
+        }
+
+        const year = date.getFullYear();
+        const weekNumber = this.getISOWeek(date);
+
+        let filePath = config.weeklyPathTemplate
+            .replace(/{YYYY}/g, String(year))
+            .replace(/{WW}/g, String(weekNumber).padStart(2, '0'));
+
+        const fullPath = config.rootPath.replace(/\/$/, '') + '/' + filePath;
+        return fullPath.replace(/\//g, '\\');
+    }
+
+    /**
+     * 生成月报文件路径
+     */
+    generateMonthlyFilePath(config: ObsidianExportConfig, date: Date): string {
+        if (!config.monthlyPathTemplate) {
+            throw new Error('月报路径模板未配置');
+        }
+
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+
+        let filePath = config.monthlyPathTemplate
+            .replace(/{YYYY}/g, String(year))
+            .replace(/{MM}/g, month);
+
+        const fullPath = config.rootPath.replace(/\/$/, '') + '/' + filePath;
+        return fullPath.replace(/\//g, '\\');
+    }
+
 
     /**
      * 生成数据统计内容
@@ -371,6 +416,138 @@ class ObsidianExportService {
     }
 
     /**
+     * 生成周报 Markdown 内容(不含时间记录)
+     */
+    generateWeeklyMarkdown(
+        logs: Log[],
+        categories: Category[],
+        todos: TodoItem[],
+        scopes: Scope[],
+        weekEndDate: Date,
+        options: ObsidianExportOptions,
+        weeklyReview?: any // WeeklyReview 类型
+    ): string {
+        // 计算周的开始日期(上周一)
+        const weekStart = new Date(weekEndDate);
+        const dayOfWeek = weekEndDate.getDay();
+        const daysToSubtract = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+        weekStart.setDate(weekEndDate.getDate() - daysToSubtract - 6);
+
+        // 筛选整周的logs
+        const weekLogs = logs.filter(log => {
+            const logDate = new Date(log.startTime);
+            logDate.setHours(0, 0, 0, 0);
+            return logDate >= weekStart && logDate <= weekEndDate;
+        });
+
+        const sections: string[] = [];
+        const dateStr = this.formatDate(weekEndDate);
+        const weekNumber = this.getISOWeek(weekEndDate);
+
+        sections.push(`# ${weekEndDate.getFullYear()} 年第 ${weekNumber} 周周报\n`);
+        sections.push(`**周期**: ${this.formatDate(weekStart)} - ${dateStr}\n`);
+
+        if (options.includeStats && weekLogs.length > 0) {
+            sections.push(this.generateStatsMarkdown(weekLogs, categories, todos, scopes, weekEndDate));
+        }
+
+        if (options.includeQuestions && weeklyReview) {
+            sections.push(this.generateQuestionsMarkdown(weeklyReview, weekEndDate));
+        }
+
+        if (options.includeNarrative && weeklyReview) {
+            sections.push(this.generateNarrativeMarkdown(weeklyReview, weekEndDate));
+        }
+
+        return sections.join('\n\n');
+    }
+
+    /**
+     * 生成月报 Markdown 内容(不含时间记录)
+     */
+    generateMonthlyMarkdown(
+        logs: Log[],
+        categories: Category[],
+        todos: TodoItem[],
+        scopes: Scope[],
+        monthEndDate: Date,
+        options: ObsidianExportOptions,
+        monthlyReview?: any // MonthlyReview 类型
+    ): string {
+        // 计算月的开始日期
+        const monthStart = new Date(monthEndDate.getFullYear(), monthEndDate.getMonth(), 1);
+
+        // 筛选整月的logs
+        const monthLogs = logs.filter(log => {
+            const logDate = new Date(log.startTime);
+            logDate.setHours(0, 0, 0, 0);
+            return logDate >= monthStart && logDate <= monthEndDate;
+        });
+
+        const sections: string[] = [];
+        const year = monthEndDate.getFullYear();
+        const month = monthEndDate.getMonth() + 1;
+
+        sections.push(`# ${year} 年 ${month} 月月报\n`);
+        sections.push(`**月份**: ${year}-${String(month).padStart(2, '0')}\n`);
+
+        if (options.includeStats && monthLogs.length > 0) {
+            sections.push(this.generateStatsMarkdown(monthLogs, categories, todos, scopes, monthEndDate));
+        }
+
+        if (options.includeQuestions && monthlyReview) {
+            sections.push(this.generateQuestionsMarkdown(monthlyReview, monthEndDate));
+        }
+
+        if (options.includeNarrative && monthlyReview) {
+            sections.push(this.generateNarrativeMarkdown(monthlyReview, monthEndDate));
+        }
+
+        return sections.join('\n\n');
+    }
+
+    /**
+     * 获取日期范围内的周末(周日)
+     */
+    getWeekEndsInRange(startDate: Date, endDate: Date): Date[] {
+        const weekEnds: Date[] = [];
+        const current = new Date(startDate);
+        current.setHours(0, 0, 0, 0);
+
+        while (current <= endDate) {
+            if (current.getDay() === 0) { // 周日
+                weekEnds.push(new Date(current));
+            }
+            current.setDate(current.getDate() + 1);
+        }
+
+        return weekEnds;
+    }
+
+    /**
+     * 获取日期范围内的月末
+     */
+    getMonthEndsInRange(startDate: Date, endDate: Date): Date[] {
+        const monthEnds: Date[] = [];
+        const current = new Date(startDate);
+        current.setHours(0, 0, 0, 0);
+
+        while (current <= endDate) {
+            const nextDay = new Date(current);
+            nextDay.setDate(nextDay.getDate() + 1);
+
+            // 如果下一天是新月份的第一天,当前日期就是月末
+            if (nextDay.getDate() === 1) {
+                monthEnds.push(new Date(current));
+            }
+
+            current.setDate(current.getDate() + 1);
+        }
+
+        return monthEnds;
+    }
+
+    /**
      * 格式化日期为 YYYY-MM-DD
      */
     private formatDate(date: Date): string {
@@ -381,23 +558,29 @@ class ObsidianExportService {
     }
 
     /**
-     * 导出到文件 (Electron)
-     * 通过 IPC 调用主进程的文件写入功能
+     * 获取 ISO 周数
+     */
+    private getISOWeek(date: Date): number {
+        const d = new Date(date);
+        d.setHours(0, 0, 0, 0);
+        // Thursday in current week decides the year.
+        d.setDate(d.getDate() + 3 - (d.getDay() + 6) % 7);
+        // January 4 is always in week 1.
+        const week1 = new Date(d.getFullYear(), 0, 4);
+        // Adjust to Thursday in week 1 and count number of weeks from date to week1.
+        return 1 + Math.round(((d.getTime() - week1.getTime()) / 86400000 - 3 + (week1.getDay() + 6) % 7) / 7);
+    }
+
+    /**
+     * 导出到文件 (通过 Electron IPC)
      */
     async exportToFile(filePath: string, content: string): Promise<void> {
-        if (typeof window === 'undefined' || !(window as any).ipcRenderer) {
-            throw new Error('此功能仅在 Electron 环境下可用');
+        if (!this.isElectronEnvironment()) {
+            throw new Error('仅支持 PC 端(Electron)导出');
         }
 
         try {
-            const result = await (window as any).ipcRenderer.invoke('write-obsidian-file', {
-                filePath,
-                content
-            });
-
-            if (!result.success) {
-                throw new Error('文件写入失败');
-            }
+            await (window as any).ipcRenderer.invoke('write-obsidian-file', { filePath, content });
         } catch (error: any) {
             throw new Error(`文件写入失败: ${error.message}`);
         }
@@ -406,35 +589,24 @@ class ObsidianExportService {
     /**
      * 检测是否在 Electron 环境
      */
-    isElectronEnvironment(): boolean {
+    private isElectronEnvironment(): boolean {
         return typeof window !== 'undefined' && !!(window as any).ipcRenderer;
     }
 
     /**
-     * 获取保存的配置
+     * 保存配置到 localStorage
      */
-    getConfig(): ObsidianExportConfig | null {
-        try {
-            const rootPath = localStorage.getItem('lumos_obsidian_root_path');
-            const pathTemplate = localStorage.getItem('lumos_obsidian_path_template');
-
-            if (!rootPath || !pathTemplate) {
-                return null;
-            }
-
-            return { rootPath, pathTemplate };
-        } catch (error) {
-            return null;
-        }
+    saveConfig(config: ObsidianExportConfig): void {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(config));
     }
 
     /**
-     * 保存配置
+     * 从 localStorage 读取配置
      */
-    saveConfig(config: ObsidianExportConfig): void {
-        localStorage.setItem('lumos_obsidian_root_path', config.rootPath);
-        localStorage.setItem('lumos_obsidian_path_template', config.pathTemplate);
+    getConfig(): ObsidianExportConfig | null {
+        const stored = localStorage.getItem(STORAGE_KEY);
+        return stored ? JSON.parse(stored) : null;
     }
 }
 
-export const obsidianExportService = new ObsidianExportService();
+export default new ObsidianExportService();

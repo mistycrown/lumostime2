@@ -10,7 +10,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { ChevronLeft, FolderOpen, FileText, Download, CheckCircle2, AlertCircle } from 'lucide-react';
-import { obsidianExportService, ObsidianExportConfig, ObsidianExportOptions } from '../services/obsidianExportService';
+import obsidianExportService, { ObsidianExportConfig, ObsidianExportOptions } from '../services/obsidianExportService';
 import { Log, Category, TodoItem, Scope, DailyReview } from '../types';
 import { ToastType } from '../components/Toast';
 
@@ -23,6 +23,7 @@ interface ObsidianExportViewProps {
     currentDate: Date;
     onToast: (type: ToastType, message: string) => void;
     dailyReview?: DailyReview;
+    dailyReviews: DailyReview[];  // 所有日报review
 }
 
 export const ObsidianExportView: React.FC<ObsidianExportViewProps> = ({
@@ -33,19 +34,26 @@ export const ObsidianExportView: React.FC<ObsidianExportViewProps> = ({
     scopes,
     currentDate,
     onToast,
-    dailyReview
+    dailyReview,
+    dailyReviews
 }) => {
+    // 配置状态
     const [rootPath, setRootPath] = useState('');
     const [pathTemplate, setPathTemplate] = useState('{YYYY}/{MM}/{YYYY}-{MM}-{DD}.md');
-    const [isExporting, setIsExporting] = useState(false);
+    const [weeklyPathTemplate, setWeeklyPathTemplate] = useState('{YYYY}/{YYYY}-W{WW}.md');
+    const [monthlyPathTemplate, setMonthlyPathTemplate] = useState('{YYYY}/{YYYY}-{MM}.md');
 
-    // 导出选项状态
+    // 导出选项
     const [exportOptions, setExportOptions] = useState<ObsidianExportOptions>({
         includeTimeline: true,
         includeStats: true,
         includeQuestions: true,
-        includeNarrative: true
+        includeNarrative: true,
+        exportWeeklyReviews: false,
+        exportMonthlyReviews: false
     });
+
+    const [isExporting, setIsExporting] = useState(false);
 
     // 时间范围选择
     const [dateRangeMode, setDateRangeMode] = useState<'single' | 'range'>('single');
@@ -81,6 +89,12 @@ export const ObsidianExportView: React.FC<ObsidianExportViewProps> = ({
         if (config) {
             setRootPath(config.rootPath);
             setPathTemplate(config.pathTemplate);
+            if (config.weeklyPathTemplate) {
+                setWeeklyPathTemplate(config.weeklyPathTemplate);
+            }
+            if (config.monthlyPathTemplate) {
+                setMonthlyPathTemplate(config.monthlyPathTemplate);
+            }
         }
         // 初始化日期输入框
         setStartDateInput(formatDateTo8Digits(currentDate));
@@ -99,19 +113,17 @@ export const ObsidianExportView: React.FC<ObsidianExportViewProps> = ({
     };
 
     // 保存配置
-    const handleSaveConfig = () => {
-        if (!rootPath.trim()) {
-            onToast('error', '请输入根目录路径');
-            return;
-        }
-        if (!pathTemplate.trim()) {
-            onToast('error', '请输入路径格式模板');
+    const handleSave = () => {
+        if (!rootPath || !pathTemplate) {
+            onToast('error', '请填写根目录路径和路径模板');
             return;
         }
 
         const config: ObsidianExportConfig = {
-            rootPath: rootPath.trim(),
-            pathTemplate: pathTemplate.trim()
+            rootPath,
+            pathTemplate,
+            weeklyPathTemplate: weeklyPathTemplate || undefined,
+            monthlyPathTemplate: monthlyPathTemplate || undefined
         };
 
         obsidianExportService.saveConfig(config);
@@ -208,7 +220,9 @@ export const ObsidianExportView: React.FC<ObsidianExportViewProps> = ({
         try {
             const config: ObsidianExportConfig = {
                 rootPath: rootPath.trim(),
-                pathTemplate: pathTemplate.trim()
+                pathTemplate: pathTemplate.trim(),
+                weeklyPathTemplate: weeklyPathTemplate || undefined,
+                monthlyPathTemplate: monthlyPathTemplate || undefined
             };
 
             if (dateRangeMode === 'single') {
@@ -250,6 +264,10 @@ export const ObsidianExportView: React.FC<ObsidianExportViewProps> = ({
                     );
 
                     if (dayLogs.length > 0) {
+                        // 查找当天的dailyReview
+                        const dateStr = current.toISOString().split('T')[0];
+                        const dayReview = dailyReviews.find(r => r.date === dateStr);
+
                         // 只导出有记录的日期
                         const content = obsidianExportService.generateFullMarkdown(
                             dayLogs,
@@ -258,7 +276,7 @@ export const ObsidianExportView: React.FC<ObsidianExportViewProps> = ({
                             scopes,
                             current,
                             exportOptions,
-                            undefined // 范围导出不包含dailyReview
+                            dayReview  // 传递当天的review
                         );
 
                         await obsidianExportService.exportToFile(filePath, content);
@@ -269,11 +287,82 @@ export const ObsidianExportView: React.FC<ObsidianExportViewProps> = ({
                     current.setDate(current.getDate() + 1);
                 }
 
+                // 周报导出
+                if (exportOptions.exportWeeklyReviews && weeklyPathTemplate) {
+                    const weekEnds = obsidianExportService.getWeekEndsInRange(startDate, endDate);
+                    for (const weekEnd of weekEnds) {
+                        // 计算周的开始日期
+                        const weekStart = new Date(weekEnd);
+                        const dayOfWeek = weekEnd.getDay();
+                        const daysToSubtract = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+                        weekStart.setDate(weekEnd.getDate() - daysToSubtract - 6);
+                        weekStart.setHours(0, 0, 0, 0);
+
+                        const weekEndTime = new Date(weekEnd);
+                        weekEndTime.setHours(23, 59, 59, 999);
+
+                        // 检查该周是否有logs
+                        const weekLogs = logs.filter(log =>
+                            log.startTime >= weekStart.getTime() && log.endTime <= weekEndTime.getTime()
+                        );
+
+                        // 只导出有数据的周报
+                        if (weekLogs.length > 0) {
+                            const filePath = obsidianExportService.generateWeeklyFilePath(config, weekEnd);
+                            const content = obsidianExportService.generateWeeklyMarkdown(
+                                logs,
+                                categories,
+                                todos,
+                                scopes,
+                                weekEnd,
+                                exportOptions,
+                                undefined // TODO: 从App获取weeklyReview
+                            );
+                            await obsidianExportService.exportToFile(filePath, content);
+                            exportedCount++;
+                        }
+                    }
+                }
+
+                // 月报导出
+                if (exportOptions.exportMonthlyReviews && monthlyPathTemplate) {
+                    const monthEnds = obsidianExportService.getMonthEndsInRange(startDate, endDate);
+                    for (const monthEnd of monthEnds) {
+                        // 计算月的开始日期
+                        const monthStart = new Date(monthEnd.getFullYear(), monthEnd.getMonth(), 1);
+                        monthStart.setHours(0, 0, 0, 0);
+
+                        const monthEndTime = new Date(monthEnd);
+                        monthEndTime.setHours(23, 59, 59, 999);
+
+                        // 检查该月是否有logs
+                        const monthLogs = logs.filter(log =>
+                            log.startTime >= monthStart.getTime() && log.endTime <= monthEndTime.getTime()
+                        );
+
+                        // 只导出有数据的月报
+                        if (monthLogs.length > 0) {
+                            const filePath = obsidianExportService.generateMonthlyFilePath(config, monthEnd);
+                            const content = obsidianExportService.generateMonthlyMarkdown(
+                                logs,
+                                categories,
+                                todos,
+                                scopes,
+                                monthEnd,
+                                exportOptions,
+                                undefined // TODO: 从App获取monthlyReview
+                            );
+                            await obsidianExportService.exportToFile(filePath, content);
+                            exportedCount++;
+                        }
+                    }
+                }
+
                 onToast('success', `批量导出成功: ${exportedCount}个文件`);
             }
         } catch (error: any) {
             console.error('导出失败:', error);
-            onToast('error', error.message || '导出失败');
+            onToast('error', `导出失败: ${error.message}`);
         } finally {
             setIsExporting(false);
         }
@@ -335,7 +424,7 @@ export const ObsidianExportView: React.FC<ObsidianExportViewProps> = ({
                     {/* 路径格式模板 */}
                     <div>
                         <label className="text-xs font-bold text-stone-400 uppercase ml-1">
-                            路径格式模板 (Path Template)
+                            日报路径模板 (PATH TEMPLATE)
                         </label>
                         <div className="flex items-center gap-2 bg-stone-50 px-3 py-2 rounded-xl mt-1 focus-within:ring-2 focus-within:ring-stone-200 transition-all">
                             <FileText size={18} className="text-stone-400" />
@@ -352,6 +441,46 @@ export const ObsidianExportView: React.FC<ObsidianExportViewProps> = ({
                         </p>
                     </div>
 
+                    {/* 周报路径模板 */}
+                    <div>
+                        <label className="text-xs font-bold text-stone-400 uppercase ml-1">
+                            周报路径模板
+                        </label>
+                        <div className="flex items-center gap-2 bg-stone-50 px-3 py-2 rounded-xl mt-1 focus-within:ring-2 focus-within:ring-stone-200 transition-all">
+                            <FileText size={18} className="text-stone-400" />
+                            <input
+                                type="text"
+                                placeholder="{YYYY}/{YYYY}-W{WW}.md"
+                                className="flex-1 bg-transparent border-none outline-none text-stone-700 placeholder:text-stone-300 text-sm"
+                                value={weeklyPathTemplate}
+                                onChange={e => setWeeklyPathTemplate(e.target.value)}
+                            />
+                        </div>
+                        <p className="text-xs text-stone-400 mt-1 ml-1">
+                            支持占位符: {'{YYYY}'} (年), {'{WW}'} (周数)
+                        </p>
+                    </div>
+
+                    {/* 月报路径模板 */}
+                    <div>
+                        <label className="text-xs font-bold text-stone-400 uppercase ml-1">
+                            月报路径模板
+                        </label>
+                        <div className="flex items-center gap-2 bg-stone-50 px-3 py-2 rounded-xl mt-1 focus-within:ring-2 focus-within:ring-stone-200 transition-all">
+                            <FileText size={18} className="text-stone-400" />
+                            <input
+                                type="text"
+                                placeholder="{YYYY}/{YYYY}-{MM}.md"
+                                className="flex-1 bg-transparent border-none outline-none text-stone-700 placeholder:text-stone-300 text-sm"
+                                value={monthlyPathTemplate}
+                                onChange={e => setMonthlyPathTemplate(e.target.value)}
+                            />
+                        </div>
+                        <p className="text-xs text-stone-400 mt-1 ml-1">
+                            支持占位符: {'{YYYY}'} (年), {'{MM}'} (月)
+                        </p>
+                    </div>
+
                     {/* 路径预览 */}
                     {rootPath && pathTemplate && (
                         <div className="p-3 bg-stone-50 rounded-xl border border-stone-100">
@@ -364,7 +493,7 @@ export const ObsidianExportView: React.FC<ObsidianExportViewProps> = ({
 
                     {/* 保存配置按钮 */}
                     <button
-                        onClick={handleSaveConfig}
+                        onClick={handleSave}
                         className="flex items-center justify-center gap-2 w-full py-3 bg-stone-800 text-white rounded-xl font-medium active:scale-[0.98] transition-transform shadow-lg shadow-stone-200"
                     >
                         <CheckCircle2 size={18} />
@@ -436,7 +565,7 @@ export const ObsidianExportView: React.FC<ObsidianExportViewProps> = ({
                         </div>
                     </div>
 
-                    {/* 时间范围快捷按钮 */}
+                    {/* 时间范围输入和快捷选择 */}
                     <div className="space-y-2">
                         <p className="text-xs font-bold text-stone-400 uppercase">快捷选择</p>
                         <div className="flex flex-wrap gap-2">
@@ -537,6 +666,30 @@ export const ObsidianExportView: React.FC<ObsidianExportViewProps> = ({
                                 `}
                             >
                                 <span>叙事</span>
+                            </button>
+
+                            <button
+                                onClick={() => setExportOptions({ ...exportOptions, exportWeeklyReviews: !exportOptions.exportWeeklyReviews })}
+                                className={`
+                                    px-3 py-1.5 text-xs font-medium rounded-lg transition-colors
+                                    ${exportOptions.exportWeeklyReviews
+                                        ? 'bg-stone-100 text-stone-700 border border-stone-400 hover:bg-stone-200'
+                                        : 'bg-stone-100 text-stone-500 hover:bg-stone-200'}
+                                `}
+                            >
+                                周报
+                            </button>
+
+                            <button
+                                onClick={() => setExportOptions({ ...exportOptions, exportMonthlyReviews: !exportOptions.exportMonthlyReviews })}
+                                className={`
+                                    px-3 py-1.5 text-xs font-medium rounded-lg transition-colors
+                                    ${exportOptions.exportMonthlyReviews
+                                        ? 'bg-stone-100 text-stone-700 border border-stone-400 hover:bg-stone-200'
+                                        : 'bg-stone-100 text-stone-500 hover:bg-stone-200'}
+                                `}
+                            >
+                                月报
                             </button>
                         </div>
                     </div>
