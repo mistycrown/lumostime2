@@ -291,19 +291,17 @@ export const ObsidianExportView: React.FC<ObsidianExportViewProps> = ({
                 if (exportOptions.exportWeeklyReviews && weeklyPathTemplate) {
                     const weekEnds = obsidianExportService.getWeekEndsInRange(startDate, endDate);
                     for (const weekEnd of weekEnds) {
-                        // 计算周的开始日期
+                        // 计算周的开始日期 (周日回推6天)
                         const weekStart = new Date(weekEnd);
-                        const dayOfWeek = weekEnd.getDay();
-                        const daysToSubtract = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
-                        weekStart.setDate(weekEnd.getDate() - daysToSubtract - 6);
+                        weekStart.setDate(weekEnd.getDate() - 6);
                         weekStart.setHours(0, 0, 0, 0);
 
                         const weekEndTime = new Date(weekEnd);
                         weekEndTime.setHours(23, 59, 59, 999);
 
-                        // 检查该周是否有logs
+                        // 检查该周是否有logs (只检查开始时间)
                         const weekLogs = logs.filter(log =>
-                            log.startTime >= weekStart.getTime() && log.endTime <= weekEndTime.getTime()
+                            log.startTime >= weekStart.getTime() && log.startTime <= weekEndTime.getTime()
                         );
 
                         // 只导出有数据的周报
@@ -335,9 +333,9 @@ export const ObsidianExportView: React.FC<ObsidianExportViewProps> = ({
                         const monthEndTime = new Date(monthEnd);
                         monthEndTime.setHours(23, 59, 59, 999);
 
-                        // 检查该月是否有logs
+                        // 检查该月是否有logs (只检查开始时间)
                         const monthLogs = logs.filter(log =>
-                            log.startTime >= monthStart.getTime() && log.endTime <= monthEndTime.getTime()
+                            log.startTime >= monthStart.getTime() && log.startTime <= monthEndTime.getTime()
                         );
 
                         // 只导出有数据的月报
