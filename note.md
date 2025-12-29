@@ -18,6 +18,7 @@ git push --force
 桌面小组件快速打点
 几个同步按钮的逻辑
 ai自动添加多个任务
+数据导出Excel
 
 # 1.0.5
 pc端增加导出到obsidian功能
