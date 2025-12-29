@@ -857,6 +857,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
             currentDate={currentDate}
             onToast={onToast}
             dailyReview={todayReview}
+            dailyReviews={dailyReviews}
         />;
     }
 

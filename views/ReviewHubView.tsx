@@ -358,9 +358,9 @@ export const ReviewHubView: React.FC<ReviewHubViewProps> = ({
                                     </div>
 
                                     {/* Content Card */}
-                                    <div className={`flex-1 rounded-lg p-4 ${contentClass}`}>
-                                        <div className="flex justify-between items-start mb-1.5">
-                                            <div className="font-serif text-[17px] font-bold leading-snug text-stone-900 flex-1 pr-2">
+                                    <div className={`flex-1 min-w-0 rounded-lg p-4 ${contentClass}`}>
+                                        <div className="flex justify-between items-start mb-1.5 gap-2">
+                                            <div className="font-serif text-[17px] font-bold leading-snug text-stone-900 flex-1 min-w-0 truncate">
                                                 {title}
                                             </div>
                                             <span className={`text-[10px] font-bold uppercase inline-block px-1.5 py-0.5 rounded-sm shrink-0 whitespace-nowrap ${tagClass}`}>

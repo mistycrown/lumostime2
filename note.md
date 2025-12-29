@@ -18,10 +18,10 @@ git push --force
 桌面小组件快速打点
 几个同步按钮的逻辑
 ai自动添加多个任务
-桌面端日报导出到obsidian
 
 # 1.0.5
 pc端增加导出到obsidian功能
+
 
 # 20251229
 我要开发一个从 lumostime 里面导出数据到 Obsidian 的日报的功能。 
