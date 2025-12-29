@@ -18,6 +18,7 @@ interface ObsidianExportViewProps {
     onBack: () => void;
     logs: Log[];
     categories: Category[];
+    todoCategories?: any[]; // TodoCategory[]
     todos: TodoItem[];
     scopes: Scope[];
     currentDate: Date;
@@ -35,7 +36,8 @@ export const ObsidianExportView: React.FC<ObsidianExportViewProps> = ({
     currentDate,
     onToast,
     dailyReview,
-    dailyReviews
+    dailyReviews,
+    todoCategories
 }) => {
     // 配置状态
     const [rootPath, setRootPath] = useState('');
@@ -239,8 +241,9 @@ export const ObsidianExportView: React.FC<ObsidianExportViewProps> = ({
                     todos,
                     scopes,
                     startDate,
+                    startDate.toDateString() === currentDate.toDateString() ? dailyReview : undefined,
                     exportOptions,
-                    startDate.toDateString() === currentDate.toDateString() ? dailyReview : undefined
+                    todoCategories
                 );
 
                 await obsidianExportService.exportToFile(filePath, content);
@@ -275,8 +278,9 @@ export const ObsidianExportView: React.FC<ObsidianExportViewProps> = ({
                             todos,
                             scopes,
                             current,
+                            dayReview,  // 传递当天的review
                             exportOptions,
-                            dayReview  // 传递当天的review
+                            todoCategories
                         );
 
                         await obsidianExportService.exportToFile(filePath, content);
@@ -314,7 +318,8 @@ export const ObsidianExportView: React.FC<ObsidianExportViewProps> = ({
                                 scopes,
                                 weekEnd,
                                 exportOptions,
-                                undefined // TODO: 从App获取weeklyReview
+                                undefined, // TODO: 从App获取weeklyReview
+                                todoCategories
                             );
                             await obsidianExportService.exportToFile(filePath, content);
                             exportedCount++;
@@ -348,7 +353,8 @@ export const ObsidianExportView: React.FC<ObsidianExportViewProps> = ({
                                 scopes,
                                 monthEnd,
                                 exportOptions,
-                                undefined // TODO: 从App获取monthlyReview
+                                undefined, // TODO: 从App获取monthlyReview
+                                todoCategories
                             );
                             await obsidianExportService.exportToFile(filePath, content);
                             exportedCount++;
