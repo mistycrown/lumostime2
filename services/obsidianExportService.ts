@@ -67,10 +67,12 @@ class ObsidianExportService {
         }
 
         const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
         const weekNumber = this.getISOWeek(date);
 
         let filePath = config.weeklyPathTemplate
             .replace(/{YYYY}/g, String(year))
+            .replace(/{MM}/g, month)
             .replace(/{WW}/g, String(weekNumber).padStart(2, '0'));
 
         const fullPath = config.rootPath.replace(/\/$/, '') + '/' + filePath;
