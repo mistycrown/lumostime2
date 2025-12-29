@@ -52,6 +52,29 @@ export const ObsidianExportView: React.FC<ObsidianExportViewProps> = ({
     const [startDate, setStartDate] = useState(currentDate);
     const [endDate, setEndDate] = useState(currentDate);
 
+    // 日期输入框(8位格式)
+    const [startDateInput, setStartDateInput] = useState('');
+    const [endDateInput, setEndDateInput] = useState('');
+
+    // 格式化日期为8位字符串 YYYYMMDD
+    const formatDateTo8Digits = (date: Date): string => {
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        return `${year}${month}${day}`;
+    };
+
+    // 解析8位字符串为日期
+    const parse8DigitsToDate = (str: string): Date | null => {
+        if (str.length !== 8) return null;
+        const year = parseInt(str.substring(0, 4));
+        const month = parseInt(str.substring(4, 6)) - 1;
+        const day = parseInt(str.substring(6, 8));
+        const date = new Date(year, month, day);
+        if (isNaN(date.getTime())) return null;
+        return date;
+    };
+
     // 加载保存的配置
     useEffect(() => {
         const config = obsidianExportService.getConfig();
@@ -59,6 +82,9 @@ export const ObsidianExportView: React.FC<ObsidianExportViewProps> = ({
             setRootPath(config.rootPath);
             setPathTemplate(config.pathTemplate);
         }
+        // 初始化日期输入框
+        setStartDateInput(formatDateTo8Digits(currentDate));
+        setEndDateInput(formatDateTo8Digits(currentDate));
     }, []);
 
     // 生成预览路径
@@ -97,40 +123,41 @@ export const ObsidianExportView: React.FC<ObsidianExportViewProps> = ({
         const today = new Date();
         today.setHours(0, 0, 0, 0);
 
+        let newStartDate: Date;
+        let newEndDate: Date;
+
         switch (type) {
             case 'today':
                 setDateRangeMode('single');
-                setStartDate(today);
-                setEndDate(today);
+                newStartDate = today;
+                newEndDate = today;
                 break;
             case 'yesterday':
                 const yesterday = new Date(today);
                 yesterday.setDate(yesterday.getDate() - 1);
                 setDateRangeMode('single');
-                setStartDate(yesterday);
-                setEndDate(yesterday);
+                newStartDate = yesterday;
+                newEndDate = yesterday;
                 break;
             case 'thisWeek':
-                // 本周: 从周一到今天
                 const thisWeekStart = new Date(today);
-                const dayOfWeek = today.getDay(); // 0=周日, 1=周一
+                const dayOfWeek = today.getDay();
                 const daysFromMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
                 thisWeekStart.setDate(today.getDate() - daysFromMonday);
                 setDateRangeMode('range');
-                setStartDate(thisWeekStart);
-                setEndDate(today);
+                newStartDate = thisWeekStart;
+                newEndDate = today;
                 break;
             case 'lastWeek':
-                // 上周: 上周一到上周日
                 const lastWeekEnd = new Date(today);
                 const currentDayOfWeek = today.getDay();
                 const daysToLastSunday = currentDayOfWeek === 0 ? 0 : currentDayOfWeek;
-                lastWeekEnd.setDate(today.getDate() - daysToLastSunday - 1); // 上周日
+                lastWeekEnd.setDate(today.getDate() - daysToLastSunday - 1);
                 const lastWeekStart = new Date(lastWeekEnd);
-                lastWeekStart.setDate(lastWeekEnd.getDate() - 6); // 上周一
+                lastWeekStart.setDate(lastWeekEnd.getDate() - 6);
                 setDateRangeMode('range');
-                setStartDate(lastWeekStart);
-                setEndDate(lastWeekEnd);
+                newStartDate = lastWeekStart;
+                newEndDate = lastWeekEnd;
                 break;
             case 'lastSevenDays':
                 const lastWeekEnd2 = new Date(today);
@@ -138,24 +165,31 @@ export const ObsidianExportView: React.FC<ObsidianExportViewProps> = ({
                 const lastWeekStart2 = new Date(lastWeekEnd2);
                 lastWeekStart2.setDate(lastWeekStart2.getDate() - 6);
                 setDateRangeMode('range');
-                setStartDate(lastWeekStart2);
-                setEndDate(lastWeekEnd2);
+                newStartDate = lastWeekStart2;
+                newEndDate = lastWeekEnd2;
                 break;
             case 'thisMonth':
                 const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
                 const monthEnd = new Date(today.getFullYear(), today.getMonth() + 1, 0);
                 setDateRangeMode('range');
-                setStartDate(monthStart);
-                setEndDate(monthEnd);
+                newStartDate = monthStart;
+                newEndDate = monthEnd;
                 break;
             case 'lastMonth':
                 const lastMonthStart = new Date(today.getFullYear(), today.getMonth() - 1, 1);
                 const lastMonthEnd = new Date(today.getFullYear(), today.getMonth(), 0);
                 setDateRangeMode('range');
-                setStartDate(lastMonthStart);
-                setEndDate(lastMonthEnd);
+                newStartDate = lastMonthStart;
+                newEndDate = lastMonthEnd;
                 break;
+            default:
+                return;
         }
+
+        setStartDate(newStartDate);
+        setEndDate(newEndDate);
+        setStartDateInput(formatDateTo8Digits(newStartDate));
+        setEndDateInput(formatDateTo8Digits(newEndDate));
     };
 
     // 执行导出
@@ -348,6 +382,60 @@ export const ObsidianExportView: React.FC<ObsidianExportViewProps> = ({
                         选择日期范围并导出数据到 Obsidian
                     </p>
 
+                    {/* 日期输入框 */}
+                    <div className="space-y-3">
+                        <p className="text-xs font-bold text-stone-400 uppercase tracking-widest px-1">时间范围</p>
+                        <div className="flex items-center gap-2">
+                            <div className="flex-1">
+                                <label className="text-xs text-stone-400 mb-1 block px-1">起始日期</label>
+                                <input
+                                    type="text"
+                                    placeholder="20251229"
+                                    maxLength={8}
+                                    value={startDateInput}
+                                    onChange={(e) => {
+                                        const value = e.target.value.replace(/\D/g, '');
+                                        setStartDateInput(value);
+                                        if (value.length === 8) {
+                                            const date = parse8DigitsToDate(value);
+                                            if (date) {
+                                                setStartDate(date);
+                                                setDateRangeMode(date.toDateString() === endDate.toDateString() ? 'single' : 'range');
+                                            }
+                                        } else {
+                                            setDateRangeMode('range'); // 如果输入不完整，暂时视为范围模式
+                                        }
+                                    }}
+                                    className="w-full bg-white border border-stone-200 rounded-lg px-3 py-2 text-sm font-mono text-stone-800 focus:outline-none focus:ring-2 focus:ring-stone-300 focus:border-stone-300"
+                                />
+                            </div>
+                            <span className="text-stone-300 mt-5">-</span>
+                            <div className="flex-1">
+                                <label className="text-xs text-stone-400 mb-1 block px-1">结束日期</label>
+                                <input
+                                    type="text"
+                                    placeholder="20251229"
+                                    maxLength={8}
+                                    value={endDateInput}
+                                    onChange={(e) => {
+                                        const value = e.target.value.replace(/\D/g, '');
+                                        setEndDateInput(value);
+                                        if (value.length === 8) {
+                                            const date = parse8DigitsToDate(value);
+                                            if (date) {
+                                                setEndDate(date);
+                                                setDateRangeMode(startDate.toDateString() === date.toDateString() ? 'single' : 'range');
+                                            }
+                                        } else {
+                                            setDateRangeMode('range'); // 如果输入不完整，暂时视为范围模式
+                                        }
+                                    }}
+                                    className="w-full bg-white border border-stone-200 rounded-lg px-3 py-2 text-sm font-mono text-stone-800 focus:outline-none focus:ring-2 focus:ring-stone-300 focus:border-stone-300"
+                                />
+                            </div>
+                        </div>
+                    </div>
+
                     {/* 时间范围快捷按钮 */}
                     <div className="space-y-2">
                         <p className="text-xs font-bold text-stone-400 uppercase">快捷选择</p>
@@ -397,71 +485,58 @@ export const ObsidianExportView: React.FC<ObsidianExportViewProps> = ({
                         </div>
                     </div>
 
-                    {/* 日期范围显示 */}
-                    <div className="p-3 bg-blue-50 rounded-xl border border-blue-100">
-                        <p className="text-xs font-bold text-blue-600 mb-1">
-                            {dateRangeMode === 'single' ? '单日导出' : '范围导出'}
-                        </p>
-                        <p className="text-sm text-blue-700">
-                            {dateRangeMode === 'range' && ` 至 ${endDate.toLocaleDateString('zh-CN')}`}
-                        </p>
-                    </div>
 
                     {/* 导出选项胶囊按钮 */}
                     <div className="space-y-3">
                         <p className="text-xs font-bold text-stone-400 uppercase tracking-widest px-1">选择导出内容</p>
 
-                        <div className="grid grid-cols-2 gap-2">
+                        <div className="flex flex-wrap gap-2">
                             <button
                                 onClick={() => setExportOptions({ ...exportOptions, includeTimeline: !exportOptions.includeTimeline })}
                                 className={`
-                                    px-3 py-2.5 rounded-lg text-sm font-medium text-center border transition-colors flex items-center justify-center gap-2
+                                    px-3 py-1.5 text-xs font-medium rounded-lg transition-colors
                                     ${exportOptions.includeTimeline
-                                        ? 'bg-stone-900 text-white border-stone-900'
-                                        : 'bg-stone-50 text-stone-500 border-stone-100 hover:bg-stone-100'}
+                                        ? 'bg-stone-100 text-stone-700 border border-stone-400 hover:bg-stone-200'
+                                        : 'bg-stone-100 text-stone-500 hover:bg-stone-200'}
                                 `}
                             >
-                                <span>📅</span>
-                                <span>时间记录</span>
+                                <span>记录</span>
                             </button>
 
                             <button
                                 onClick={() => setExportOptions({ ...exportOptions, includeStats: !exportOptions.includeStats })}
                                 className={`
-                                    px-3 py-2.5 rounded-lg text-sm font-medium text-center border transition-colors flex items-center justify-center gap-2
+                                    px-3 py-1.5 text-xs font-medium rounded-lg transition-colors
                                     ${exportOptions.includeStats
-                                        ? 'bg-stone-900 text-white border-stone-900'
-                                        : 'bg-stone-50 text-stone-500 border-stone-100 hover:bg-stone-100'}
+                                        ? 'bg-stone-100 text-stone-700 border border-stone-400 hover:bg-stone-200'
+                                        : 'bg-stone-100 text-stone-500 hover:bg-stone-200'}
                                 `}
                             >
-                                <span>📊</span>
-                                <span>数据统计</span>
+                                <span>数据</span>
                             </button>
 
                             <button
                                 onClick={() => setExportOptions({ ...exportOptions, includeQuestions: !exportOptions.includeQuestions })}
                                 className={`
-                                    px-3 py-2.5 rounded-lg text-sm font-medium text-center border transition-colors flex items-center justify-center gap-2
+                                    px-3 py-1.5 text-xs font-medium rounded-lg transition-colors
                                     ${exportOptions.includeQuestions
-                                        ? 'bg-stone-900 text-white border-stone-900'
-                                        : 'bg-stone-50 text-stone-500 border-stone-100 hover:bg-stone-100'}
+                                        ? 'bg-stone-100 text-stone-700 border border-stone-400 hover:bg-stone-200'
+                                        : 'bg-stone-100 text-stone-500 hover:bg-stone-200'}
                                 `}
                             >
-                                <span>💭</span>
-                                <span>引导提问</span>
+                                <span>引导</span>
                             </button>
 
                             <button
                                 onClick={() => setExportOptions({ ...exportOptions, includeNarrative: !exportOptions.includeNarrative })}
                                 className={`
-                                    px-3 py-2.5 rounded-lg text-sm font-medium text-center border transition-colors flex items-center justify-center gap-2
+                                    px-3 py-1.5 text-xs font-medium rounded-lg transition-colors
                                     ${exportOptions.includeNarrative
-                                        ? 'bg-stone-900 text-white border-stone-900'
-                                        : 'bg-stone-50 text-stone-500 border-stone-100 hover:bg-stone-100'}
+                                        ? 'bg-stone-100 text-stone-700 border border-stone-400 hover:bg-stone-200'
+                                        : 'bg-stone-100 text-stone-500 hover:bg-stone-200'}
                                 `}
                             >
-                                <span>✨</span>
-                                <span>AI 叙事</span>
+                                <span>叙事</span>
                             </button>
                         </div>
                     </div>
