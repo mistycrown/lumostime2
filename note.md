@@ -25,14 +25,80 @@ pc端增加导出到obsidian功能
 增加自定义筛选器功能
 
 # 20251230
+在数据导出导入这个设置页里，在末尾增加一个新的卡片：导出为xlsx。
+第一行设置时间范围，两个输入框，起始时间和结束时间。
+第二行设置快捷按钮，今天、昨天、本周、上周、本月、上月、今年、全部
+第三行为导出按钮。
+参考这个div的ui
+```
+<div class="bg-white rounded-2xl p-6 shadow-sm space-y-4"><div class="flex items-center gap-3 text-stone-600 mb-2"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-download" aria-hidden="true"><path d="M12 15V3"></path><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><path d="m7 10 5 5 5-5"></path></svg><h3 class="font-bold text-lg">导出数据</h3></div><p class="text-sm text-stone-500 mb-4 leading-relaxed">选择日期范围并导出数据到 Obsidian</p><div class="space-y-3"><p class="text-xs font-bold text-stone-400 uppercase tracking-widest px-1">时间范围</p><div class="flex items-center gap-2"><div class="flex-1"><label class="text-xs text-stone-400 mb-1 block px-1">起始日期</label><input placeholder="20251229" maxlength="8" class="w-full bg-white border border-stone-200 rounded-lg px-3 py-2 text-sm font-mono text-stone-800 focus:outline-none focus:ring-2 focus:ring-stone-300 focus:border-stone-300" type="text" value="20251228"></div><span class="text-stone-300 mt-5">-</span><div class="flex-1"><label class="text-xs text-stone-400 mb-1 block px-1">结束日期</label><input placeholder="20251229" maxlength="8" class="w-full bg-white border border-stone-200 rounded-lg px-3 py-2 text-sm font-mono text-stone-800 focus:outline-none focus:ring-2 focus:ring-stone-300 focus:border-stone-300" type="text" value="20251228"></div></div></div><div class="space-y-2"><p class="text-xs font-bold text-stone-400 uppercase">快捷选择</p><div class="flex flex-wrap gap-2"><button class="px-3 py-1.5 text-xs font-medium bg-stone-100 hover:bg-stone-200 text-stone-700 rounded-lg transition-colors">今天</button><button class="px-3 py-1.5 text-xs font-medium bg-stone-100 hover:bg-stone-200 text-stone-700 rounded-lg transition-colors">昨天</button><button class="px-3 py-1.5 text-xs font-medium bg-stone-100 hover:bg-stone-200 text-stone-700 rounded-lg transition-colors">最近7天</button><button class="px-3 py-1.5 text-xs font-medium bg-stone-100 hover:bg-stone-200 text-stone-700 rounded-lg transition-colors">本周</button><button class="px-3 py-1.5 text-xs font-medium bg-stone-100 hover:bg-stone-200 text-stone-700 rounded-lg transition-colors">上周</button><button class="px-3 py-1.5 text-xs font-medium bg-stone-100 hover:bg-stone-200 text-stone-700 rounded-lg transition-colors">本月</button><button class="px-3 py-1.5 text-xs font-medium bg-stone-100 hover:bg-stone-200 text-stone-700 rounded-lg transition-colors">上月</button></div></div><div class="space-y-3"><p class="text-xs font-bold text-stone-400 uppercase tracking-widest px-1">选择导出内容</p><div class="flex flex-wrap gap-2"><button class="
+                                    px-3 py-1.5 text-xs font-medium rounded-lg transition-colors
+                                    bg-stone-100 text-stone-700 border border-stone-400 hover:bg-stone-200
+                                "><span>记录</span></button><button class="
+                                    px-3 py-1.5 text-xs font-medium rounded-lg transition-colors
+                                    bg-stone-100 text-stone-700 border border-stone-400 hover:bg-stone-200
+                                "><span>数据</span></button><button class="
+                                    px-3 py-1.5 text-xs font-medium rounded-lg transition-colors
+                                    bg-stone-100 text-stone-700 border border-stone-400 hover:bg-stone-200
+                                "><span>引导</span></button><button class="
+                                    px-3 py-1.5 text-xs font-medium rounded-lg transition-colors
+                                    bg-stone-100 text-stone-700 border border-stone-400 hover:bg-stone-200
+                                "><span>叙事</span></button><button class="
+                                    px-3 py-1.5 text-xs font-medium rounded-lg transition-colors
+                                    bg-stone-100 text-stone-500 hover:bg-stone-200
+                                ">周报</button><button class="
+                                    px-3 py-1.5 text-xs font-medium rounded-lg transition-colors
+                                    bg-stone-100 text-stone-500 hover:bg-stone-200
+                                ">月报</button></div></div><button class="flex items-center justify-center gap-2 w-full py-3 rounded-xl font-medium active:scale-[0.98] transition-all shadow-lg bg-stone-800 text-white shadow-stone-300 hover:bg-stone-900"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-download" aria-hidden="true"><path d="M12 15V3"></path><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><path d="m7 10 5 5 5-5"></path></svg>导出数据</button></div>
+
+```
+
+---
+
 增加筛选器功能。
 用户可以通过特定的符号，比如说井号引导标签，百分号引导领域，然后@引导代办，以及不带符号的就是搜索全文备注，来定义筛选条件。所有的筛选都是包含，也就是用户输入的关键词只要包含到目标的被注标签领域或者代办当中，都算匹配成功。每一个筛选条件之间用空格分割。比如说“瑜伽 #运动 %健康 @柔韧”
 这个功能的入口在设置页面的“搜索全部”下面。名称为“自定义筛选器”。用户点击之后进入自定义筛选器页面。右上角有增加自定义筛选器功能的按钮。点击“增加”，用户可以输入筛选的条件。筛选器条目显示筛选器的名称和匹配到的记录数量、总时间。增加之后，用户点击新建好的筛选器，可以进入筛选器详情的页面。
 筛选期详情的UI设计请参考标签详情、分类详情、代办详情、日报详情、周报详情等各种详情。这些详情都是一样的，也就是第一行是标题栏“筛选器详情”（英文），第二行是具体的筛选期的名字。下面是 tab 导航栏，展示时间线（模仿现有的时间线格式）热力图tab（其他tab等后面再添加）
 首先，请你先实现设置页面自定义筛选条件实现筛选匹配的功能
 
-1. 时间线处，显示该筛选器所有的记录，而不局限于某一个月。去除时间线页面中的日历。
+时间线处，显示该筛选器所有的记录，而不局限于某一个月。去除时间线页面中的日历。
 
+1. 在时间线的上面，增加
+关键指标卡片 (KPI Cards)：
+累计投入时长：例如 56小时 20分钟。
+累计次数：例如 42次。
+平均每次时长：例如 1小时 20分钟（这个可以看出这是否是一个碎片化任务）。
+
+2. 增加一个tab 标题：节奏
+时间规律（分析生活节奏）
+核心问题： “我习惯在什么时候做这件事？” 目的： 帮助用户发现自己的生物钟和行为模式。
+2.1 24小时分布图 (24h Activity Bar Chart)
+图表形式：横轴是 0点-24点，纵轴是时长。采用面积图的方式。
+洞察：用户可能会发现，“原来我大部分瑜伽记录都发生在晚上 20:00 - 22:00”。这能帮他确认自己的习惯。
+随机分配100色系的淡色颜色
+2.2 周热力图 (Weekly Pattern)
+图表形式：横轴是周一到周日，纵轴是活跃度。
+洞察：一眼看出是“周末突击型”选手，还是“工作日规律型”选手。
+
+3. 把热力图tab 改成 ：趋势
+GitHub 风格热力图 (Calendar Heatmap)
+图表形式：一整年的格子图，颜色越深代表时间越长。
+洞察：这是最直观的“坚持图谱”。看着满满的格子，成就感爆棚；看到大片空白，会产生一种温和的提醒。
+
+趋势折线图 (Trend Line)
+图表形式：按周/月汇总时长的面积。
+洞察：它是上升的还是下降的？比如“上个月瑜伽时间明显下降了”，提示用户该回炉重造了。
+
+4. 增加tab：专注
+首先写专注统计总数据：
+平均专注度XXX，专注记录总XXX条
+
+专注度/能量分析 (Focus/Energy Breakdown)
+图表形式：百分比条。
+内容：筛选出的记录中，专注度 5 分的占比多少？1 分的占比多少？
+洞察：如果“瑜伽”的记录里 90% 都是高专注，说明这是一件高滋养的事情。
+
+下面展示横轴为时间日期，纵轴为专注时长，圆点大小为专注度的散点图。
 
 # 20251229
 我要开发一个从 lumostime 里面导出数据到 Obsidian 的日报的功能。 
