@@ -54,6 +54,7 @@ import {
     Link,
     Smartphone
 } from 'lucide-react';
+import * as XLSX from 'xlsx';
 import { webdavService, WebDAVConfig } from '../services/webdavService';
 import { NfcService } from '../services/NfcService';
 import { aiService, AIConfig } from '../services/aiService';
@@ -147,6 +148,167 @@ const AI_PRESETS = {
 
 export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, onImport, onReset, onClearData, onToast, syncData, onSyncUpdate, startWeekOnSunday, onToggleStartWeekOnSunday, onOpenAutoLink, onOpenSearch, minIdleTimeThreshold = 1, onSetMinIdleTimeThreshold, defaultView = 'RECORD', onSetDefaultView, reviewTemplates = [], onUpdateReviewTemplates, dailyReviewTime, onSetDailyReviewTime, weeklyReviewTime, onSetWeeklyReviewTime, monthlyReviewTime, onSetMonthlyReviewTime, customNarrativeTemplates, onUpdateCustomNarrativeTemplates, userPersonalInfo, onSetUserPersonalInfo, logs = [], todos = [], scopes = [], currentDate = new Date(), dailyReviews = [], weeklyReviews = [], monthlyReviews = [], todoCategories = [], filters = [], onUpdateFilters, categoriesData = [], onEditLog }) => {
     const [activeSubmenu, setActiveSubmenu] = useState<'main' | 'data' | 'cloud' | 'ai' | 'preferences' | 'guide' | 'nfc' | 'templates' | 'narrative_prompt' | 'auto_record' | 'autolink' | 'obsidian_export' | 'filters'>('main');
+
+    // Excel Export State and Logic
+    const [xlsxStartDate, setXlsxStartDate] = useState(() => {
+        const d = new Date();
+        return d.toISOString().split('T')[0].replace(/-/g, '');
+    });
+    const [xlsxEndDate, setXlsxEndDate] = useState(() => {
+        const d = new Date();
+        return d.toISOString().split('T')[0].replace(/-/g, '');
+    });
+
+    const handleXlsxQuickSelect = (type: 'today' | 'yesterday' | 'thisWeek' | 'lastWeek' | 'thisMonth' | 'lastMonth' | 'thisYear' | 'all') => {
+        const now = new Date();
+        let start = new Date();
+        let end = new Date();
+
+        const formatDate = (d: Date) => d.toISOString().split('T')[0].replace(/-/g, '');
+
+        switch (type) {
+            case 'today':
+                // start/end is now
+                break;
+            case 'yesterday':
+                start.setDate(now.getDate() - 1);
+                end.setDate(now.getDate() - 1);
+                break;
+            case 'thisWeek': {
+                const day = now.getDay();
+                const diff = day === 0 ? 6 : day - 1; // Mon is 0
+                start.setDate(now.getDate() - diff);
+                // end is today
+                break;
+            }
+            case 'lastWeek': {
+                const day = now.getDay();
+                const diff = day === 0 ? 6 : day - 1;
+                end.setDate(now.getDate() - diff - 1); // Last Sunday
+                start.setDate(now.getDate() - diff - 7 - 1 + 1); // Last Monday
+                break;
+            }
+            case 'thisMonth':
+                start.setDate(1);
+                break;
+            case 'lastMonth':
+                start.setMonth(now.getMonth() - 1);
+                start.setDate(1);
+                end.setDate(0); // Last day of last month
+                break;
+            case 'thisYear':
+                start.setMonth(0, 1);
+                break;
+            case 'all':
+                start = new Date('2020-01-01'); // Long enough ago
+                break;
+        }
+
+        setXlsxStartDate(formatDate(start));
+        setXlsxEndDate(formatDate(end));
+    };
+
+    const handleExportXlsx = () => {
+        if (!xlsxStartDate || !xlsxEndDate) {
+            onToast('error', '请输入起始和结束日期');
+            return;
+        }
+
+        try {
+            // Parse dates (YYYYMMDD)
+            const parseDate = (str: string) => {
+                if (str.length !== 8) return null;
+                const y = parseInt(str.substring(0, 4));
+                const m = parseInt(str.substring(4, 6)) - 1;
+                const d = parseInt(str.substring(6, 8));
+                return new Date(y, m, d);
+            };
+
+            const sDate = parseDate(xlsxStartDate);
+            const eDate = parseDate(xlsxEndDate);
+
+            if (!sDate || !eDate) {
+                onToast('error', '日期格式错误 (YYYYMMDD)');
+                return;
+            }
+
+            // End date should include the whole day, so set to 23:59:59 or simply compare timestamps
+            eDate.setHours(23, 59, 59, 999);
+            sDate.setHours(0, 0, 0, 0);
+
+            const filteredLogs = logs.filter(log => {
+                const t = log.startTime;
+                return t >= sDate.getTime() && t <= eDate.getTime();
+            });
+
+            if (filteredLogs.length === 0) {
+                onToast('info', '该时间段内无数据');
+                return;
+            }
+
+            // Transform Data
+            const data = filteredLogs.map(log => {
+                const category = categoriesData.find(c => c.id === log.categoryId);
+                const activity = category?.activities.find(a => a.id === log.activityId);
+                const todo = todos.find(t => t.id === log.linkedTodoId);
+                // Find scopes using syncData.scopes if possible or scopes prop
+                const linkedScopes = (scopes || []).filter(s => log.scopeIds?.includes(s.id)).map(s => s.name).join(', ');
+
+                // Format Duration: HH:mm:ss
+                const h = Math.floor(log.duration / 3600);
+                const m = Math.floor((log.duration % 3600) / 60);
+                const s = log.duration % 60;
+                const durationStr = `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+
+                const formatTime = (ts: number) => {
+                    const d = new Date(ts);
+                    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}:${String(d.getSeconds()).padStart(2, '0')}`;
+                };
+
+                return {
+                    'id': log.id,
+                    '开始时间': formatTime(log.startTime),
+                    '结束时间': formatTime(log.endTime),
+                    '持续时长': durationStr,
+                    '一级分类': category?.name || 'Unknown',
+                    '二级标签': log.activityName || activity?.name || 'Unknown',
+                    '关联待办': todo?.title || '',
+                    '关联领域': linkedScopes,
+                    '备注': log.note || '',
+                    '专注得分': log.focusScore || ''
+                };
+            });
+
+            // Auto-width
+            const wscols = [
+                { wch: 36 }, // id
+                { wch: 20 }, // start
+                { wch: 20 }, // end
+                { wch: 10 }, // duration
+                { wch: 15 }, // cat
+                { wch: 15 }, // act
+                { wch: 30 }, // todo
+                { wch: 20 }, // scopes
+                { wch: 50 }, // note
+                { wch: 10 }, // score
+            ];
+
+            const ws = XLSX.utils.json_to_sheet(data);
+            ws['!cols'] = wscols;
+
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, "Exported Data");
+
+            const filename = `lumostime_export_${xlsxStartDate}-${xlsxEndDate}.xlsx`;
+            XLSX.writeFile(wb, filename);
+
+            onToast('success', `导出成功: ${filename}`);
+
+        } catch (e: any) {
+            console.error(e);
+            onToast('error', '导出失败: ' + e.message);
+        }
+    };
     const [webdavConfig, setWebdavConfig] = useState<WebDAVConfig | null>(null);
     const [isSyncing, setIsSyncing] = useState(false);
 
@@ -751,7 +913,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
                                     <input
                                         type="text"
                                         className="w-full bg-stone-50 border border-stone-200 rounded-xl px-4 py-2.5 text-sm text-stone-800 font-mono outline-none focus:border-stone-400"
-                                        placeholder="例如:瑜伽|跑步 #运动 %健康|%工作"
+                                        placeholder=""
                                         value={filterExpression}
                                         onChange={e => setFilterExpression(e.target.value)}
                                     />
@@ -1153,7 +1315,8 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
                     <span className="text-stone-800 font-bold text-lg">数据导出导入</span>
                 </div>
 
-                <div className="p-4 space-y-4">
+                <div className="p-4 space-y-4 overflow-y-auto pb-40">
+                    {/* Backup & Restore Card */}
                     <div className="bg-white rounded-2xl p-6 shadow-sm space-y-4">
                         <div className="flex items-center gap-3 text-stone-600 mb-2">
                             <Database size={24} />
@@ -1169,7 +1332,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
                                 className="flex items-center justify-center gap-2 w-full py-3 bg-stone-800 text-white rounded-xl font-medium active:scale-[0.98] transition-transform"
                             >
                                 <Download size={18} />
-                                导出数据备份
+                                导出数据备份 (JSON)
                             </button>
 
                             <button
@@ -1177,7 +1340,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
                                 className="flex items-center justify-center gap-2 w-full py-3 bg-white border border-stone-200 text-stone-700 rounded-xl font-medium active:scale-[0.98] transition-transform hover:bg-stone-50"
                             >
                                 <Upload size={18} />
-                                导入数据备份
+                                导入数据备份 (JSON)
                             </button>
                             <input
                                 type="file"
@@ -1211,6 +1374,78 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
                                 {confirmClear ? "确认清空？将被永久删除" : "清空所有数据 (记录/待办/目标/领域)"}
                             </button>
                         </div>
+                    </div>
+
+                    {/* Excel Export Card */}
+                    <div className="bg-white rounded-2xl p-6 shadow-sm space-y-4">
+                        <div className="flex items-center gap-3 text-stone-600 mb-2">
+                            <FileText size={24} />
+                            <h3 className="font-bold text-lg">导出 Excel 报表</h3>
+                        </div>
+                        <p className="text-sm text-stone-500 mb-4 leading-relaxed">
+                            选择日期范围并导出时间记录到 Excel 文件 (xlsx)。
+                        </p>
+
+                        <div className="space-y-3">
+                            <p className="text-xs font-bold text-stone-400 uppercase tracking-widest px-1">时间范围</p>
+                            <div className="flex items-center gap-2">
+                                <div className="flex-1">
+                                    <label className="text-xs text-stone-400 mb-1 block px-1">起始日期</label>
+                                    <input
+                                        placeholder="YYYYMMDD"
+                                        maxLength={8}
+                                        className="w-full bg-white border border-stone-200 rounded-lg px-3 py-2 text-sm font-mono text-stone-800 focus:outline-none focus:ring-2 focus:ring-stone-300 focus:border-stone-300"
+                                        type="text"
+                                        value={xlsxStartDate}
+                                        onChange={(e) => setXlsxStartDate(e.target.value)}
+                                    />
+                                </div>
+                                <span className="text-stone-300 mt-5">-</span>
+                                <div className="flex-1">
+                                    <label className="text-xs text-stone-400 mb-1 block px-1">结束日期</label>
+                                    <input
+                                        placeholder="YYYYMMDD"
+                                        maxLength={8}
+                                        className="w-full bg-white border border-stone-200 rounded-lg px-3 py-2 text-sm font-mono text-stone-800 focus:outline-none focus:ring-2 focus:ring-stone-300 focus:border-stone-300"
+                                        type="text"
+                                        value={xlsxEndDate}
+                                        onChange={(e) => setXlsxEndDate(e.target.value)}
+                                    />
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="space-y-2">
+                            <p className="text-xs font-bold text-stone-400 uppercase">快捷选择</p>
+                            <div className="flex flex-wrap gap-2">
+                                {(['today', 'yesterday', 'thisWeek', 'lastWeek', 'thisMonth', 'lastMonth', 'thisYear', 'all'] as const).map(t => (
+                                    <button
+                                        key={t}
+                                        onClick={() => handleXlsxQuickSelect(t)}
+                                        className="px-3 py-1.5 text-xs font-medium bg-stone-100 hover:bg-stone-200 text-stone-700 rounded-lg transition-colors"
+                                    >
+                                        {{
+                                            today: '今天',
+                                            yesterday: '昨天',
+                                            thisWeek: '本周',
+                                            lastWeek: '上周',
+                                            thisMonth: '本月',
+                                            lastMonth: '上月',
+                                            thisYear: '今年',
+                                            all: '全部'
+                                        }[t]}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+
+                        <button
+                            onClick={handleExportXlsx}
+                            className="flex items-center justify-center gap-2 w-full py-3 rounded-xl font-medium active:scale-[0.98] transition-all shadow-lg bg-stone-800 text-white shadow-stone-300 hover:bg-stone-900"
+                        >
+                            <Download size={18} />
+                            导出 Excel
+                        </button>
                     </div>
 
                     <div className="flex gap-3 p-4 bg-orange-50 rounded-xl text-orange-700 text-sm">
