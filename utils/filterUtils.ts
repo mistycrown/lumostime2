@@ -105,7 +105,13 @@ export function matchesFilter(
         // 所有标签条件组都必须满足 (AND)
         const allTagGroupsMatch = condition.tags.every(tagGroup => {
             // 每个条件组内,只要有一个匹配即可 (OR)
-            return tagGroup.some(tag => activityNameLower.includes(tag.toLowerCase()));
+            // 修改: 支持匹配 Activity 名称 OR Category 名称
+            return tagGroup.some(tag => {
+                const lowerTag = tag.toLowerCase();
+                const activityMatch = activityNameLower.includes(lowerTag);
+                const categoryMatch = category ? category.name.toLowerCase().includes(lowerTag) : false;
+                return activityMatch || categoryMatch;
+            });
         });
 
         if (!allTagGroupsMatch) return false;
