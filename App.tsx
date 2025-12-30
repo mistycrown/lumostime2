@@ -31,7 +31,7 @@ import { TimerFloating } from './components/TimerFloating';
 import { AddLogModal } from './components/AddLogModal';
 import { TodoDetailModal } from './components/TodoDetailModal';
 import { GoalEditor } from './components/GoalEditor';
-import { Activity, ActiveSession, AppView, Log, TodoItem, TodoCategory, Category, Goal, AutoLinkRule, DailyReview, WeeklyReview, MonthlyReview, ReviewTemplate, NarrativeTemplate } from './types';
+import { Activity, ActiveSession, AppView, Log, TodoItem, TodoCategory, Category, Goal, AutoLinkRule, DailyReview, WeeklyReview, MonthlyReview, ReviewTemplate, NarrativeTemplate, Filter } from './types';
 import { INITIAL_LOGS, INITIAL_TODOS, MOCK_TODO_CATEGORIES, VIEW_TITLES, CATEGORIES, SCOPES, INITIAL_GOALS, DEFAULT_REVIEW_TEMPLATES, DEFAULT_USER_PERSONAL_INFO, INITIAL_DAILY_REVIEWS } from './constants';
 import { ToastContainer, ToastMessage, ToastType } from './components/Toast';
 import { webdavService } from './services/webdavService';
@@ -417,6 +417,17 @@ const App: React.FC = () => {
   useEffect(() => {
     localStorage.setItem('lumostime_monthlyReviews', JSON.stringify(monthlyReviews));
   }, [monthlyReviews]);
+
+  // Filters State (自定义筛选器)
+  const [filters, setFilters] = useState<Filter[]>(() => {
+    const stored = localStorage.getItem('lumostime_filters');
+    return stored ? JSON.parse(stored) : [];
+  });
+
+  useEffect(() => {
+    localStorage.setItem('lumostime_filters', JSON.stringify(filters));
+  }, [filters]);
+
 
 
 
@@ -1127,7 +1138,7 @@ const App: React.FC = () => {
       return;
     }
     setDataLastModified(Date.now());
-  }, [logs, todos, categories, todoCategories, scopes, goals, autoLinkRules, reviewTemplates, dailyReviews, weeklyReviews, monthlyReviews, customNarrativeTemplates, userPersonalInfo]);
+  }, [logs, todos, categories, todoCategories, scopes, goals, autoLinkRules, reviewTemplates, dailyReviews, weeklyReviews, monthlyReviews, customNarrativeTemplates, userPersonalInfo, filters]);
 
   // --- Sync Logic ---
 
@@ -1193,7 +1204,7 @@ const App: React.FC = () => {
     }, 30000); // 30s debounce
 
     return () => clearTimeout(timer);
-  }, [logs, todos, categories, todoCategories, scopes, goals, autoLinkRules, reviewTemplates, dailyReviews, weeklyReviews, monthlyReviews, customNarrativeTemplates, userPersonalInfo, lastSyncTime]);
+  }, [logs, todos, categories, todoCategories, scopes, goals, autoLinkRules, reviewTemplates, dailyReviews, weeklyReviews, monthlyReviews, customNarrativeTemplates, userPersonalInfo, filters, lastSyncTime]);
 
   // --- NFC / Deep Link Handling ---
   useEffect(() => {
@@ -2148,6 +2159,7 @@ const App: React.FC = () => {
     if (data.monthlyReviews) setMonthlyReviews(data.monthlyReviews);
     if (data.customNarrativeTemplates) setCustomNarrativeTemplates(data.customNarrativeTemplates);
     if (data.userPersonalInfo) setUserPersonalInfo(data.userPersonalInfo);
+    if (data.filters) setFilters(data.filters);
 
     if (data.timestamp) {
       setDataLastModified(data.timestamp);
@@ -2192,6 +2204,7 @@ const App: React.FC = () => {
         monthlyReviews,
         customNarrativeTemplates,
         userPersonalInfo,
+        filters,
         timestamp: dataLastModified, // Use tracked modification time
         version: '1.0.0'
       };
@@ -2355,6 +2368,7 @@ const App: React.FC = () => {
               setAutoLinkRules([]);
               setCustomNarrativeTemplates([]);
               setUserPersonalInfo('');
+              setFilters([]);
               addToast('success', 'Data reset to defaults');
               addToast('success', 'Data reset to defaults');
               setIsSettingsOpen(false);
@@ -2370,6 +2384,7 @@ const App: React.FC = () => {
               setMonthlyReviews([]);
               setAutoLinkRules([]);
               setUserPersonalInfo('');
+              setFilters([]);
               // Optional: Clear AI preferences? Maybe keep them.
               addToast('success', 'All data cleared successfully');
               setIsSettingsOpen(false);
@@ -2389,6 +2404,7 @@ const App: React.FC = () => {
                 monthlyReviews,
                 customNarrativeTemplates,
                 userPersonalInfo,
+                filters,
                 version: '1.0.0',
                 timestamp: Date.now()
               };
@@ -2421,6 +2437,7 @@ const App: React.FC = () => {
                   if (data.monthlyReviews) setMonthlyReviews(data.monthlyReviews);
                   if (data.customNarrativeTemplates) setCustomNarrativeTemplates(data.customNarrativeTemplates);
                   if (data.userPersonalInfo) setUserPersonalInfo(data.userPersonalInfo);
+                  if (data.filters) setFilters(data.filters);
 
                   if (data.timestamp) setDataLastModified(data.timestamp);
                   addToast('success', 'Data imported successfully!');
@@ -2432,7 +2449,7 @@ const App: React.FC = () => {
               reader.readAsText(file);
             }}
             onToast={addToast}
-            syncData={{ logs, todos, categories, todoCategories, scopes, goals, autoLinkRules, reviewTemplates, dailyReviews, weeklyReviews, monthlyReviews, customNarrativeTemplates, userPersonalInfo }}
+            syncData={{ logs, todos, categories, todoCategories, scopes, goals, autoLinkRules, reviewTemplates, dailyReviews, weeklyReviews, monthlyReviews, customNarrativeTemplates, userPersonalInfo, filters }}
             onSyncUpdate={handleSyncDataUpdate}
             startWeekOnSunday={startWeekOnSunday}
             onToggleStartWeekOnSunday={() => setStartWeekOnSunday(!startWeekOnSunday)}
@@ -2469,6 +2486,9 @@ const App: React.FC = () => {
             weeklyReviews={weeklyReviews}
             monthlyReviews={monthlyReviews}
             todoCategories={todoCategories}
+            filters={filters}
+            onUpdateFilters={setFilters}
+            categoriesData={categories}
           />
         )}
 

@@ -258,6 +258,7 @@ export interface MonthlyReview {
   templateSnapshot?: ReviewTemplateSnapshot[]; // 创建时的模板快照
 }
 
+
 // Narrative Template (AI 叙事模板)
 export interface NarrativeTemplate {
   id: string;
@@ -267,3 +268,23 @@ export interface NarrativeTemplate {
   isCustom?: boolean; // Whether created by user
   icon?: string;
 }
+
+// ========== Custom Filter (自定义筛选器) ==========
+
+// 自定义筛选器
+export interface Filter {
+  id: string;
+  name: string;                    // 筛选器名称
+  filterExpression: string;        // 原始筛选表达式,如"瑜伽 #运动 %健康 @柔韧"
+  createdAt: number;               // 创建时间
+  icon?: string;                   // 可选图标
+}
+
+// 解析后的筛选条件
+export interface ParsedFilterCondition {
+  tags: string[][];                // # 引导的标签关键词组 (外层AND, 内层OR)
+  scopes: string[][];              // % 引导的领域关键词组 (外层AND, 内层OR)
+  todos: string[][];               // @ 引导的代办关键词组 (外层AND, 内层OR)
+  notes: string[][];               // 无符号的全文备注关键词组 (外层AND, 内层OR)
+}
+
