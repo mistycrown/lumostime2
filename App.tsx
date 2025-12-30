@@ -2489,6 +2489,7 @@ const App: React.FC = () => {
             filters={filters}
             onUpdateFilters={setFilters}
             categoriesData={categories}
+            onEditLog={openEditModal}
           />
         )}
 
@@ -2586,7 +2587,7 @@ const App: React.FC = () => {
         )}
 
         {/* Manual Add/Edit Log Modal */}
-        {isAddModalOpen && !isSettingsOpen && (
+        {isAddModalOpen && (
           <AddLogModal
             initialLog={editingLog}
             initialStartTime={initialLogTimes?.start}

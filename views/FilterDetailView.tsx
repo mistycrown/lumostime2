@@ -394,7 +394,7 @@ export const FilterDetailView: React.FC<FilterDetailViewProps> = ({
                                 return (
                                     <div key={date.toISOString()} className="mb-8 last:mb-0">
                                         {/* Date Header */}
-                                        <div className="flex items-baseline justify-between mb-6 px-2 sticky top-0 bg-[#faf9f6]/95 backdrop-blur z-10 py-2 border-b border-stone-100">
+                                        <div className="flex items-baseline justify-between mb-6 px-2 bg-[#faf9f6] z-10 py-2 border-b border-stone-100">
                                             <div className="flex items-baseline gap-3">
                                                 <span className="text-2xl font-black text-stone-900 font-mono tracking-tighter">
                                                     {String(month).padStart(2, '0')}/{String(day).padStart(2, '0')}
@@ -852,14 +852,15 @@ export const FilterDetailView: React.FC<FilterDetailViewProps> = ({
                                             x = ((date - 1 + (d.getHours() / 24)) / 31) * 100;
                                         }
 
-                                        const r = (log.duration / focusStats.maxDur) * 10 + 2;
+                                        // Adjusted size to be even smaller as requested (2nd adjustment)
+                                        const r = (log.duration / focusStats.maxDur) * 3 + 1;
 
                                         return (
                                             <circle
                                                 key={log.id}
                                                 cx={`${x}%`}
                                                 cy={`${y}%`}
-                                                r={Math.max(r, 3)}
+                                                r={Math.max(r, 1.5)}
                                                 fill={themeColor}
                                                 opacity={0.3 + (score / 10)}
                                             />
