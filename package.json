@@ -34,7 +34,8 @@
     "remark-gfm": "^4.0.1",
     "rxjs": "^7.8.2",
     "tailwind-merge": "^3.4.0",
-    "webdav": "^5.8.0"
+    "webdav": "^5.8.0",
+    "xlsx": "^0.18.5"
   },
   "devDependencies": {
     "@capacitor/assets": "^3.0.5",

@@ -899,7 +899,7 @@ export const FilterDetailView: React.FC<FilterDetailViewProps> = ({
     };
 
     return (
-        <div className="h-screen w-screen flex flex-col bg-[#fdfbf7] text-stone-800 overflow-hidden select-none font-serif relative pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">
+        <div className="fixed inset-0 z-50 flex flex-col bg-[#fdfbf7] text-stone-800 overflow-hidden select-none font-serif pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">
             {/* Header */}
             <header className="h-14 flex items-center justify-between px-5 bg-[#fdfbf7] border-b border-stone-100 shrink-0 z-30">
                 <div className="w-8 flex items-center">
