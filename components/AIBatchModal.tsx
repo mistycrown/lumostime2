@@ -58,10 +58,9 @@ interface ReviewCardProps {
     onDelete: () => void;
     categories: Category[];
     scopes?: Scope[];
-    onAcceptSuggestion?: (scopeIds: string[]) => void;
 }
 
-const ReviewCard: React.FC<ReviewCardProps> = ({ entry, onUpdate, onDelete, categories, scopes, onAcceptSuggestion }) => {
+const ReviewCard: React.FC<ReviewCardProps> = ({ entry, onUpdate, onDelete, categories, scopes }) => {
     const [dateStr, setDateStr] = useState(formatCompactDate(entry.startTime));
     const [startStr, setStartStr] = useState(formatCompactTime(entry.startTime));
     const [endStr, setEndStr] = useState(formatCompactTime(entry.endTime));
@@ -181,14 +180,14 @@ const ReviewCard: React.FC<ReviewCardProps> = ({ entry, onUpdate, onDelete, cate
                         type="text"
                         value={entry.description}
                         onChange={(e) => onUpdate('description', e.target.value)}
-                        className="w-full bg-transparent border-b border-stone-200 px-0 py-2 text-base font-medium text-stone-800 placeholder:text-stone-300 outline-none focus:border-stone-400 transition-all"
+                        className="w-full bg-transparent border-b border-stone-200 px-0 py-2 text-lg font-bold text-stone-900 placeholder:text-stone-300 outline-none focus:border-stone-400 transition-all font-serif"
                         placeholder="Activity description..."
                     />
                 </div>
 
                 {/* Link Tag Section (Inline) */}
                 <div className="pt-2">
-                    <span className="text-xs font-bold text-stone-400 uppercase tracking-widest mb-3 block">Associated Tag</span>
+                    <label className="text-[10px] font-bold text-stone-300 uppercase tracking-wider mb-2 block">ASSOCIATED TAG</label>
                     {/* Categories */}
                     <div className="grid grid-cols-4 gap-2 mb-3">
                         {categories.map(cat => (
@@ -226,61 +225,37 @@ const ReviewCard: React.FC<ReviewCardProps> = ({ entry, onUpdate, onDelete, cate
                     </div>
                 </div>
 
-                {/* Auto-Link Suggestion */}
-                {entry.suggestedScopeIds && entry.suggestedScopeIds.length > 0 && scopes && onAcceptSuggestion && (
-                    <div className="mt-4 p-3 bg-purple-50 border border-purple-100 rounded-xl">
-                        <div className="flex items-start gap-2">
-                            <Lightbulb size={16} className="text-purple-600 mt-0.5 flex-shrink-0" />
-                            <div className="flex-1">
-                                <p className="text-xs font-bold text-purple-900 mb-2">建议关联领域</p>
-                                <div className="flex flex-wrap gap-2">
-                                    {entry.suggestedScopeIds.map(scopeId => {
-                                        const scope = scopes.find(s => s.id === scopeId);
-                                        if (!scope) return null;
-                                        return (
-                                            <button
-                                                key={scopeId}
-                                                onClick={() => onAcceptSuggestion([scopeId])}
-                                                className="flex items-center gap-1 px-2 py-1 bg-white border border-purple-200 rounded-lg text-xs font-medium text-purple-700 hover:bg-purple-100 transition-colors"
-                                            >
-                                                <span>{scope.icon}</span>
-                                                <span>{scope.name}</span>
-                                                <CheckCircle2 size={12} />
-                                            </button>
-                                        );
-                                    })}
-                                </div>
-                            </div>
-                        </div>
+                {/* Scope Selection */}
+                <div className="pt-2">
+                    <label className="text-[10px] font-bold text-stone-300 uppercase tracking-wider mb-2 block">ASSOCIATED SCOPE</label>
+                    <div className="flex flex-wrap gap-2">
+                        {scopes?.map(scope => {
+                            const isSelected = entry.scopeIds?.includes(scope.id);
+                            return (
+                                <button
+                                    key={scope.id}
+                                    onClick={() => {
+                                        const currentIds = entry.scopeIds || [];
+                                        const newIds = isSelected
+                                            ? currentIds.filter(id => id !== scope.id)
+                                            : [...currentIds, scope.id];
+                                        onUpdate('scopeIds', newIds);
+                                    }}
+                                    className={`
+                                        px-2.5 py-1.5 rounded-lg text-[11px] font-bold transition-all flex items-center gap-1.5
+                                        ${isSelected
+                                            ? 'bg-stone-800 text-white shadow-md'
+                                            : 'bg-stone-50 text-stone-400 border border-transparent hover:bg-stone-100'}
+                                    `}
+                                    title={scope.name}
+                                >
+                                    <span className={isSelected ? '' : ''}>{scope.icon}</span>
+                                    {isSelected && <span>{scope.name}</span>}
+                                </button>
+                            );
+                        })}
                     </div>
-                )}
-
-                {/* Accepted Scope Display */}
-                {entry.scopeIds && entry.scopeIds.length > 0 && scopes && (
-                    <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-xl">
-                        <div className="flex items-start gap-2">
-                            <CheckCircle2 size={16} className="text-green-600 mt-0.5 flex-shrink-0" />
-                            <div className="flex-1">
-                                <p className="text-xs font-bold text-green-900 mb-2">已关联到</p>
-                                <div className="flex flex-wrap gap-2">
-                                    {entry.scopeIds.map(scopeId => {
-                                        const scope = scopes.find(s => s.id === scopeId);
-                                        if (!scope) return null;
-                                        return (
-                                            <div
-                                                key={scopeId}
-                                                className="flex items-center gap-1 px-2 py-1 bg-white border border-green-300 rounded-lg text-xs font-medium text-green-800"
-                                            >
-                                                <span>{scope.icon}</span>
-                                                <span>{scope.name}</span>
-                                            </div>
-                                        );
-                                    })}
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                )}
+                </div>
             </div>
         </div>
     );
@@ -322,15 +297,29 @@ export const AIBatchModal: React.FC<AIBatchModalProps> = ({ onClose, onSave, cat
             const entries = await aiService.parseNaturalLanguage(inputText, {
                 now: currentTime, // 只传递时间 HH:mm
                 targetDate: formatDateForAI(baseDate), // 目标日期
-                categories: categories
+                categories: categories,
+                scopes: scopes
             });
+
             // Add UI IDs and detect auto-link suggestions
             const entriesWithIds = entries.map(e => {
-                const suggestedScopeIds = detectAutoLinkSuggestions(e);
+                const autoLinkResult = detectAutoLinkSuggestions(e);
+
+                // Logic: AutoLink Rule > AI Inference > Empty
+                // detectAutoLinkSuggestions returns array if rule found, or empty.
+                // AI inference is in e.scopeIds.
+
+                let finalScopeIds: string[] = [];
+                if (autoLinkResult.length > 0) {
+                    finalScopeIds = autoLinkResult;
+                } else if (e.scopeIds && e.scopeIds.length > 0) {
+                    finalScopeIds = e.scopeIds;
+                }
+
                 return {
                     ...e,
                     _uiId: crypto.randomUUID(),
-                    suggestedScopeIds: suggestedScopeIds.length > 0 ? suggestedScopeIds : undefined
+                    scopeIds: finalScopeIds // Overwrite with final logic
                 };
             });
             setParsedEntries(entriesWithIds);
@@ -352,19 +341,7 @@ export const AIBatchModal: React.FC<AIBatchModalProps> = ({ onClose, onSave, cat
         setParsedEntries(parsedEntries.filter((_, i) => i !== index));
     };
 
-    const handleAcceptSuggestion = (index: number, scopeIds: string[]) => {
-        const newEntries = [...parsedEntries];
-        // 接受建议：将建议的scopeIds添加到entry的scopeIds字段
-        // 注意：ParsedTimeEntry目前没有scopeIds字段，需要在保存时处理
-        // 这里先清除建议提示
-        newEntries[index] = {
-            ...newEntries[index],
-            suggestedScopeIds: undefined,
-            // 暂存scopeIds，在保存时使用
-            scopeIds: scopeIds as any
-        };
-        setParsedEntries(newEntries);
-    };
+
 
     const handleAddEntry = () => {
         setParsedEntries([...parsedEntries, {
@@ -445,7 +422,6 @@ export const AIBatchModal: React.FC<AIBatchModalProps> = ({ onClose, onSave, cat
                                         onDelete={() => handleDeleteEntry(idx)}
                                         categories={categories}
                                         scopes={scopes}
-                                        onAcceptSuggestion={(scopeIds) => handleAcceptSuggestion(idx, scopeIds)}
                                     />
                                 ))}
                             </div>

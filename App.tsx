@@ -1585,6 +1585,23 @@ const App: React.FC = () => {
     addToast('success', 'Task duplicated');
   };
 
+  const handleBatchAddTodos = (newTodosData: Partial<TodoItem>[]) => {
+    const newTodos: TodoItem[] = newTodosData.map(data => ({
+      id: crypto.randomUUID(),
+      categoryId: data.categoryId || todoCategories[0].id,
+      title: data.title || 'New Task',
+      isCompleted: false,
+      completedUnits: 0,
+      linkedActivityId: data.linkedActivityId,
+      linkedCategoryId: data.linkedCategoryId,
+      defaultScopeIds: data.defaultScopeIds,
+      ...data
+    }));
+
+    setTodos(prev => [...newTodos, ...prev]);
+    addToast('success', `${newTodos.length} tasks added`);
+  };
+
   // --- Search Handlers ---
   const handleOpenSearch = () => {
     setIsSearchOpen(true);
@@ -2048,7 +2065,9 @@ const App: React.FC = () => {
             onEditTodo={openEditTodoModal}
             onAddTodo={openAddTodoModal}
             onStartFocus={handleStartTodoFocus}
+            onBatchAddTodos={handleBatchAddTodos}
             onDuplicateTodo={handleDuplicateTodo}
+            autoLinkRules={autoLinkRules}
           />
         );
       case AppView.SCOPE:

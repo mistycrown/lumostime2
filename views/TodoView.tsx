@@ -10,8 +10,11 @@
 import React, { useState } from 'react';
 import { MOCK_TODO_CATEGORIES } from '../constants';
 import { Scope } from '../types';
-import { TodoItem, TodoCategory, Category } from '../types';
-import { PlayCircle, CheckCircle2, Circle, Plus, MoreHorizontal, Settings2, ChevronLeft, ChevronRight, LayoutList, Rows } from 'lucide-react';
+import { TodoItem, TodoCategory, Category, AutoLinkRule } from '../types';
+import { PlayCircle, CheckCircle2, Circle, Plus, MoreHorizontal, Settings2, ChevronLeft, ChevronRight, LayoutList, Rows, Sparkles } from 'lucide-react';
+import { AITodoInputModal } from '../components/AITodoInputModal';
+import { AITodoConfirmModal, ParsedTask } from '../components/AITodoConfirmModal';
+import { aiService, AIParsedTodo } from '../services/aiService';
 
 interface TodoViewProps {
   todos: TodoItem[];
@@ -23,6 +26,8 @@ interface TodoViewProps {
   onAddTodo: (categoryId: string) => void;
   onStartFocus: (todo: TodoItem) => void;
   onDuplicateTodo: (todo: TodoItem) => void;
+  onBatchAddTodos?: (todos: Partial<TodoItem>[]) => void;
+  autoLinkRules?: AutoLinkRule[];
 }
 
 // Sub-component for Swipeable Item
@@ -246,9 +251,71 @@ const SwipeableTodoItem: React.FC<{
   );
 };
 
-export const TodoView: React.FC<TodoViewProps> = ({ todos, categories, activityCategories, scopes, onToggleTodo, onEditTodo, onAddTodo, onStartFocus, onDuplicateTodo }) => {
+export const TodoView: React.FC<TodoViewProps> = ({ todos, categories, activityCategories, scopes, onToggleTodo, onEditTodo, onAddTodo, onStartFocus, onDuplicateTodo, onBatchAddTodos, autoLinkRules = [] }) => {
   const [selectedCategoryId, setSelectedCategoryId] = useState<string>(categories[0]?.id || '');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+
+  // AI States
+  const [isAIInputOpen, setIsAIInputOpen] = useState(false);
+  const [isAIConfirmOpen, setIsAIConfirmOpen] = useState(false);
+  const [isAIGenerating, setIsAIGenerating] = useState(false); // Loading state
+  const [aiParsedTasks, setAiParsedTasks] = useState<ParsedTask[]>([]);
+
+  const handleAIGenerate = async (text: string) => {
+    setIsAIGenerating(true);
+    try {
+      // Call AI Service
+      const parsedTodos = await aiService.parseTodoText(text, {
+        todoCategories: categories,
+        activityCategories: activityCategories,
+        scopes: scopes
+      });
+
+      // Map to Modal Data Structure
+      const tasksWithId: ParsedTask[] = parsedTodos.map((t, idx) => ({
+        id: Date.now().toString() + idx,
+        title: t.title,
+        categoryId: t.categoryId || selectedCategoryId, // Use AI's or fallback to current
+        linkedActivityId: t.linkedActivityId,
+        linkedCategoryId: undefined, // Let Modal auto-derive
+        defaultScopeIds: t.defaultScopeIds || [],
+      }));
+
+      // Apply Auto-Link Rules (Rule > AI)
+      const tasksWithRules = tasksWithId.map(task => {
+        if (task.linkedActivityId) {
+          const rule = autoLinkRules.find(r => r.activityId === task.linkedActivityId);
+          if (rule) {
+            return { ...task, defaultScopeIds: [rule.scopeId] };
+          }
+        }
+        return task;
+      });
+
+      setAiParsedTasks(tasksWithRules);
+      setIsAIInputOpen(false); // Close input ONLY on success
+      setIsAIConfirmOpen(true); // Open confirm
+    } catch (error) {
+      console.error("AI Generation Failed", error);
+      alert("AI Analysis Failed. Please check your network or API Key settings in Settings -> AI Integration.");
+      // Ideally use toast, but alert is safer if toast prop is missing/optional
+    } finally {
+      setIsAIGenerating(false);
+    }
+  };
+
+  const handleAISave = (tasks: ParsedTask[]) => {
+    const newTodos: Partial<TodoItem>[] = tasks.map(t => ({
+      title: t.title,
+      categoryId: t.categoryId,
+      linkedActivityId: t.linkedActivityId,
+      linkedCategoryId: t.linkedCategoryId,
+      defaultScopeIds: t.defaultScopeIds,
+      isCompleted: false
+    }));
+    onBatchAddTodos?.(newTodos);
+    setIsAIConfirmOpen(false);
+  };
 
   // 从 localStorage 读取用户上次选择的视图模式
   const [viewMode, setViewMode] = useState<'loose' | 'compact'>(() => {
@@ -348,12 +415,21 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, categories, activityC
             {selectedCategory.name}
             <span className="text-stone-300 text-lg font-normal">Tasks</span>
           </h1>
-          <button
-            onClick={() => onAddTodo(selectedCategoryId)}
-            className="w-10 h-10 rounded-full bg-stone-900 text-white flex items-center justify-center shadow-lg active:scale-90 transition-transform"
-          >
-            <Plus size={20} />
-          </button>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => setIsAIInputOpen(true)}
+              className="w-8 h-8 rounded-full bg-stone-50 text-stone-400 flex items-center justify-center hover:bg-stone-100 hover:text-stone-600 active:scale-95 transition-all"
+              title="AI Add Task"
+            >
+              <Sparkles size={16} />
+            </button>
+            <button
+              onClick={() => onAddTodo(selectedCategoryId)}
+              className="w-10 h-10 rounded-full bg-stone-900 text-white flex items-center justify-center shadow-lg active:scale-90 transition-transform"
+            >
+              <Plus size={20} />
+            </button>
+          </div>
         </div>
 
         {/* Task List */}
@@ -381,6 +457,26 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, categories, activityC
           )}
         </div>
       </div>
+
+      {isAIInputOpen && (
+        <AITodoInputModal
+          onClose={() => setIsAIInputOpen(false)}
+          onGenerate={handleAIGenerate}
+          isLoading={isAIGenerating}
+        />
+      )}
+
+      {isAIConfirmOpen && (
+        <AITodoConfirmModal
+          onClose={() => setIsAIConfirmOpen(false)}
+          onSave={handleAISave}
+          initialTasks={aiParsedTasks}
+          todoCategories={categories}
+          activityCategories={activityCategories}
+          scopes={scopes}
+          autoLinkRules={autoLinkRules}
+        />
+      )}
     </div>
   );
 };

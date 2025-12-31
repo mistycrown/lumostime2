@@ -3,8 +3,9 @@
  * @input Unstructured Time Text, API Keys
  * @output Parsed Structured Time Entries
  * @pos Service (Business Logic)
- * @description Core service for communicating with AI Providers (OpenAI/Gemini). Handles prompt construction and response parsing for converting natural language into time logs.
+ * @description Core service for communicating with AI Providers (OpenAI/Gemini). Handles prompt construction and response parsing for converting natural language into time logs and todo tasks.
  */
+import { TodoCategory, Category, Scope } from '../types';
 export interface AIConfig {
     provider: 'openai' | 'gemini';
     apiKey: string;
@@ -28,6 +29,15 @@ interface AIRawTimeEntry {
     description: string;
     categoryName: string;
     activityName: string;
+    scopeIds?: string[]; // AI inferred scopes
+}
+
+// AI返回的待办任务结构
+export interface AIParsedTodo {
+    title: string;
+    categoryId?: string;
+    linkedActivityId?: string;
+    defaultScopeIds?: string[];
 }
 
 const AI_CONFIG_KEY = 'lumostime_ai_config';
@@ -172,6 +182,7 @@ export const aiService = {
             now: string; // YYYY-MM-DD格式的当前日期
             targetDate: string; // YYYY-MM-DD格式的目标日期（用户选择补记的日期）
             categories: any[]; // Pass simplified structure
+            scopes?: Scope[]; // Optional scopes for context
         }
     ): Promise<ParsedTimeEntry[]> => {
         const config = aiService.getConfig();
@@ -183,6 +194,8 @@ export const aiService = {
             activities: c.activities.map((a: any) => a.name)
         }));
 
+        const scopeContext = context.scopes ? context.scopes.map(s => ({ id: s.id, name: s.name })) : [];
+
         const systemPrompt = `
 Role: You are a professional time management assistant.
 Task: Extract time records from the user's natural language description.
@@ -191,6 +204,7 @@ Context:
 - Current Time: ${context.now} (for understanding "now" or "until now")
 - Target Date: ${context.targetDate} (the date user wants to log activities for)
 - Existing Tag List: ${JSON.stringify(tagList)}
+- Available Scopes: ${JSON.stringify(scopeContext)}
 
 Requirements:
 1. **You ONLY need to return the TIME (hour and minute), NOT the date.**
@@ -201,10 +215,11 @@ Requirements:
 6. **If user says "until now" or "to now"**, use the CURRENT TIME (${context.now}) from the context above.
 7. If only duration is given (e.g., "read for 2 hours"), you can estimate a reasonable time range.
 8. Match activities to provided tags where possible.
-9. Return format must be a pure JSON Array.
-10. **CRITICAL: Preserve ALL details from user input in the 'description' field.**
-11. **DO NOT summarize, simplify, or omit any information provided by the user.**
-12. **Copy the user's original wording as much as possible for descriptions.**
+9. **Infer Scopes**: Based on the activity description and available scopes, suggest relevant 'scopeIds'. If no scope matches well, leave it empty.
+10. Return format must be a pure JSON Array.
+11. **CRITICAL: Preserve ALL details from user input in the 'description' field.**
+12. **DO NOT summarize, simplify, or omit any information provided by the user.**
+13. **Copy the user's original wording as much as possible for descriptions.**
 
 
 JSON Output Schema:
@@ -214,7 +229,8 @@ JSON Output Schema:
     "endTime": "HH:mm",
     "description": "String",
     "categoryName": "String (Top Level Name)",
-    "activityName": "String (Activity Name)"
+    "activityName": "String (Activity Name)",
+    "scopeIds": ["String (Scope ID)"]
   }
 ]
 
@@ -222,16 +238,9 @@ Example 1:
 User: "下午三点到五点阅读,五点半吃饭一个小时,七点到八点玩游戏"
 Output:
 [
-  {"startTime": "15:00", "endTime": "17:00", "description": "阅读", "categoryName": "学习", "activityName": "书籍文献"},
-  {"startTime": "17:30", "endTime": "18:30", "description": "吃饭", "categoryName": "生活", "activityName": "饮食"},
-  {"startTime": "19:00", "endTime": "20:00", "description": "玩游戏", "categoryName": "爱欲再生产", "activityName": "玩玩游戏"}
-]
-
-Example 2 (assuming current time is 10:30):
-User: "早上九点到现在"
-Output:
-[
-  {"startTime": "09:00", "endTime": "10:30", "description": "工作", "categoryName": "工作", "activityName": "一般工作"}
+  {"startTime": "15:00", "endTime": "17:00", "description": "阅读", "categoryName": "学习", "activityName": "书籍文献", "scopeIds": ["scope_id_for_growth"]},
+  {"startTime": "17:30", "endTime": "18:30", "description": "吃饭", "categoryName": "生活", "activityName": "饮食", "scopeIds": ["scope_id_for_life"]},
+  {"startTime": "19:00", "endTime": "20:00", "description": "玩游戏", "categoryName": "爱欲再生产", "activityName": "玩玩游戏", "scopeIds": []}
 ]
 `;
 
@@ -300,6 +309,116 @@ Output:
         }
     },
 
+    parseTodoText: async (
+        text: string,
+        context: {
+            todoCategories: TodoCategory[];
+            activityCategories: Category[];
+            scopes: Scope[];
+        }
+    ): Promise<AIParsedTodo[]> => {
+        const config = aiService.getConfig();
+        const fetchFn = Capacitor.isNativePlatform() ? nativeFetch : fetch;
+
+        // Simplify context for AI
+        const todoCats = context.todoCategories.map(c => ({ id: c.id, name: c.name }));
+        const activityCats = context.activityCategories.map(c => ({
+            categoryName: c.name,
+            activities: c.activities.map(a => ({ id: a.id, name: a.name }))
+        }));
+        const scopeList = context.scopes.map(s => ({ id: s.id, name: s.name }));
+
+        const systemPrompt = `
+Role: You are a smart task organizer for a Todo app.
+Task: Parse the user's natural language input into structured todo tasks.
+
+Context Data:
+1. **Todo Lists** (Assign 'categoryId'):
+${JSON.stringify(todoCats)}
+
+2. **Activity Tags** (Assign 'linkedActivityId'):
+${JSON.stringify(activityCats)}
+(Find the most relevant activity. If none fits well, leave it empty.)
+
+3. **Professional Scopes** (Assign 'defaultScopeIds' array):
+${JSON.stringify(scopeList)}
+(Select all relevant scopes based on the context.)
+
+Requirements:
+1. **Extract Tasks**: Split the input into multiple tasks if the user mentions multiple things.
+2. **Analyze**: For each task, infer the best Todo List, Activity Tag, and Scopes based on semantic meaning.
+3. **Format**: Return a JSON Array of objects.
+4. **Strict JSON**: Output ONLY valid JSON.
+5. **Scope Inference**: Adopt a **Minimal Matching Principle**. Only suggest a Scope if you are highly confident it matches based on the user's explicit intent or strong semantic connection. **Better to leave 'defaultScopeIds' empty than to guess incorrectly.**
+
+JSON Output Schema:
+[
+  {
+    "title": "Task Name",
+    "categoryId": "ID from Todo Lists (Required, pick best fit or default)",
+    "linkedActivityId": "ID from Activity Tags (Optional)",
+    "defaultScopeIds": ["ID from Scopes", ...]
+  }
+]
+`;
+
+        try {
+            if (config.provider === 'openai') {
+                const response = await fetchFn(`${config.baseUrl}/chat/completions`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${config.apiKey}`
+                    },
+                    body: JSON.stringify({
+                        model: config.modelName,
+                        messages: [
+                            { role: 'system', content: systemPrompt },
+                            { role: 'user', content: text }
+                        ],
+                        response_format: { type: "json_object" }
+                    })
+                });
+                const data = await response.json();
+                if (data.error) throw new Error(data.error.message);
+
+                const content = data.choices[0].message.content;
+                return aiService.cleanAndParseJSON(content) as AIParsedTodo[];
+            }
+
+            if (config.provider === 'gemini') {
+                const baseUrl = config.baseUrl || 'https://generativelanguage.googleapis.com/v1beta/models';
+                const url = `${baseUrl}/${config.modelName}:generateContent?key=${config.apiKey}`;
+
+                const body = {
+                    contents: [{ role: 'user', parts: [{ text: text }] }],
+                    system_instruction: { parts: [{ text: systemPrompt }] },
+                    generationConfig: {
+                        response_mime_type: "application/json"
+                    }
+                };
+
+                const response = await fetchFn(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(body)
+                });
+                const data = await response.json();
+
+                if (data.error) throw new Error(data.error.message);
+                const content = data.candidates?.[0]?.content?.parts?.[0]?.text;
+                if (!content) throw new Error('No content in Gemini response');
+
+                return aiService.cleanAndParseJSON(content) as AIParsedTodo[];
+            }
+
+            return [];
+        } catch (error) {
+            console.error('Todo Parsing Error', error);
+            throw new Error('Failed to parse tasks');
+        }
+    },
+
     // 将AI返回的时间（HH:mm）与用户选择的日期组合成完整的ISO字符串
     combineWithDate: (rawEntries: AIRawTimeEntry[], targetDate: string): ParsedTimeEntry[] => {
         return rawEntries.map(entry => {
@@ -314,7 +433,8 @@ Output:
                 endTime: endISO,
                 description: entry.description,
                 categoryName: entry.categoryName,
-                activityName: entry.activityName
+                activityName: entry.activityName,
+                scopeIds: entry.scopeIds || []
             };
         });
     },
@@ -371,7 +491,7 @@ Output:
         }
     },
 
-    cleanAndParseJSON: (content: string): ParsedTimeEntry[] => {
+    cleanAndParseJSON: (content: string): any => {
         // Clean markdown if present
         if (content.includes('```json')) {
             content = content.replace(/```json\n?|\n?```/g, '');
