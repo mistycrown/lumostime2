@@ -318,6 +318,14 @@ public class FloatingWindowService extends Service {
         if (packageName.equals(currentAppPackage)) {
             return; // No change
         }
+
+        // Fix: If we were in prompt mode for an app, and user switched to another app,
+        // clear the prompt
+        if (isPromptMode && !packageName.equals(promptPackageName)) {
+            Log.d(TAG, "User switched from " + promptPackageName + " to " + packageName + ", clearing prompt.");
+            hidePrompt();
+        }
+
         currentAppPackage = packageName;
 
         try {

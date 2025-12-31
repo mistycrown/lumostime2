@@ -678,6 +678,43 @@ const App: React.FC = () => {
     addToast('success', 'Quick Punch Recorded!');
   };
 
+  // --- Deep Link Listener for Quick Punch ---
+  // Use Ref to access fresh handleQuickPunch closure without re-binding listener
+  const quickPunchRef = useRef(handleQuickPunch);
+  useEffect(() => {
+    quickPunchRef.current = handleQuickPunch;
+  }, [handleQuickPunch]);
+
+  useEffect(() => {
+    const setupDeepLink = async () => {
+      await CapacitorApp.addListener('appUrlOpen', (data) => {
+        console.log('🔗 Deep Link received:', data.url);
+        if (data.url.includes('action=quick_log')) {
+          console.log('⚡ Executing Quick Punch via Deep Link');
+          // Add a small delay to ensure app is ready or state is settled if coming from cold start
+          setTimeout(() => {
+            quickPunchRef.current();
+          }, 300);
+        }
+      });
+    };
+    setupDeepLink();
+
+    // Check if app was launched with URL (Cold Start)
+    CapacitorApp.getLaunchUrl().then(url => {
+      if (url && url.url.includes('action=quick_log')) {
+        console.log('⚡ Launched with Quick Punch URL');
+        setTimeout(() => {
+          quickPunchRef.current();
+        }, 800); // Longer delay for cold start
+      }
+    });
+
+    return () => {
+      CapacitorApp.removeAllListeners();
+    };
+  }, []);
+
   const handleBatchAddLogs = (entries: ParsedTimeEntry[]) => {
     const newLogs: Log[] = entries.map(entry => {
       // Resolve Category

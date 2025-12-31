@@ -301,7 +301,17 @@ export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialSta
   // 设置结束时间为当前时间
   const handleSetEndToNow = () => {
     const now = Date.now();
-    setCurrentEndTime(now);
+    const startDate = new Date(currentStartTime);
+    const nowDate = new Date(now);
+
+    // 如果跨天（比如昨天开始，现在是今天凌晨），则限制到昨天23:59:59
+    if (startDate.toDateString() !== nowDate.toDateString()) {
+      const endOfDay = new Date(currentStartTime);
+      endOfDay.setHours(23, 59, 59, 999);
+      setCurrentEndTime(endOfDay.getTime());
+    } else {
+      setCurrentEndTime(now);
+    }
   };
 
   const durationDisplay = useMemo(() => {
