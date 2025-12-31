@@ -1925,31 +1925,7 @@ const App: React.FC = () => {
             onDateChange={setCurrentDate}
             onShowStats={() => setCurrentView(AppView.STATS)}
             onBatchAddLogs={handleBatchAddLogs}
-            onSync={async (e) => {
-              e.preventDefault();
-              setIsSyncing(true);
-              try {
-                const data = await webdavService.downloadData();
-                if (data) {
-                  // 统计数据量
-                  const logCount = data.logs?.length || 0;
-                  const todoCount = data.todos?.length || 0;
-
-                  handleSyncDataUpdate(data);
-                  updateLastSyncTime();
-
-                  // 明确的同步方向和数据量
-                  addToast('success', `✓ 已从云端拉取: ${logCount}条记录, ${todoCount}个待办`);
-                } else {
-                  addToast('info', '云端暂无备份数据');
-                }
-              } catch (error) {
-                console.error('Sync error:', error);
-                addToast('error', '从云端拉取失败,请检查配置');
-              } finally {
-                setIsSyncing(false);
-              }
-            }}
+            onSync={handleQuickSync}
             isSyncing={isSyncing}
             todoCategories={todoCategories}
             onToast={addToast}
