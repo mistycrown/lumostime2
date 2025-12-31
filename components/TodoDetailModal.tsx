@@ -559,7 +559,7 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({ initialTodo, c
                       return (
                         <div key={dateKey} className="mb-8 last:mb-0">
                           {/* Date Header */}
-                          <div className="flex items-baseline justify-between mb-6 px-2 sticky top-0 bg-[#faf9f6]/95 backdrop-blur z-10 py-2 border-b border-stone-100">
+                          <div className="flex items-baseline justify-between mb-6 px-2 py-2 border-b border-stone-100">
                             <div className="flex items-baseline gap-3">
                               <span className="text-2xl font-black text-stone-900 font-mono tracking-tighter">
                                 {String(month).padStart(2, '0')}/{String(day).padStart(2, '0')}
