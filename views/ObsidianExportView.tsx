@@ -9,8 +9,9 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { ChevronLeft, FolderOpen, FileText, Download, CheckCircle2, AlertCircle } from 'lucide-react';
+import { ChevronLeft, FolderOpen, FileText, Download, CheckCircle2, AlertCircle, FileSpreadsheet } from 'lucide-react';
 import obsidianExportService, { ObsidianExportConfig, ObsidianExportOptions } from '../services/obsidianExportService';
+import excelExportService from '../services/excelExportService';
 import { Log, Category, TodoItem, Scope, DailyReview, WeeklyReview, MonthlyReview } from '../types';
 import { ToastType } from '../components/Toast';
 
@@ -77,6 +78,13 @@ export const ObsidianExportView: React.FC<ObsidianExportViewProps> = ({
     const [startDateInput, setStartDateInput] = useState('');
     const [endDateInput, setEndDateInput] = useState('');
 
+    // Excel导出相关状态
+    const [excelStartDate, setExcelStartDate] = useState(currentDate);
+    const [excelEndDate, setExcelEndDate] = useState(currentDate);
+    const [excelStartInput, setExcelStartInput] = useState('');
+    const [excelEndInput, setExcelEndInput] = useState('');
+    const [isExportingExcel, setIsExportingExcel] = useState(false);
+
     // 格式化日期为8位字符串 YYYYMMDD
     const formatDateTo8Digits = (date: Date): string => {
         const year = date.getFullYear();
@@ -112,7 +120,78 @@ export const ObsidianExportView: React.FC<ObsidianExportViewProps> = ({
         // 初始化日期输入框
         setStartDateInput(formatDateTo8Digits(currentDate));
         setEndDateInput(formatDateTo8Digits(currentDate));
+        // 初始化Excel导出日期输入框
+        setExcelStartInput(formatDateTo8Digits(currentDate));
+        setExcelEndInput(formatDateTo8Digits(currentDate));
     }, []);
+
+    // Excel导出快捷日期范围选择
+    const setExcelQuickRange = (type: 'today' | 'yesterday' | 'thisWeek' | 'lastWeek' | 'thisMonth' | 'lastMonth' | 'thisYear' | 'all') => {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+
+        let newStartDate: Date;
+        let newEndDate: Date;
+
+        switch (type) {
+            case 'today':
+                newStartDate = today;
+                newEndDate = today;
+                break;
+            case 'yesterday':
+                const yesterday = new Date(today);
+                yesterday.setDate(yesterday.getDate() - 1);
+                newStartDate = yesterday;
+                newEndDate = yesterday;
+                break;
+            case 'thisWeek':
+                const thisWeekStart = new Date(today);
+                const dayOfWeek = today.getDay();
+                const daysFromMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+                thisWeekStart.setDate(today.getDate() - daysFromMonday);
+                newStartDate = thisWeekStart;
+                newEndDate = today;
+                break;
+            case 'lastWeek':
+                const lastWeekEnd = new Date(today);
+                const currentDayOfWeek = today.getDay();
+                const daysToLastSunday = currentDayOfWeek === 0 ? 0 : currentDayOfWeek;
+                lastWeekEnd.setDate(today.getDate() - daysToLastSunday - 1);
+                const lastWeekStart = new Date(lastWeekEnd);
+                lastWeekStart.setDate(lastWeekEnd.getDate() - 6);
+                newStartDate = lastWeekStart;
+                newEndDate = lastWeekEnd;
+                break;
+            case 'thisMonth':
+                const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
+                newStartDate = monthStart;
+                newEndDate = today;
+                break;
+            case 'lastMonth':
+                const lastMonthStart = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+                const lastMonthEnd = new Date(today.getFullYear(), today.getMonth(), 0);
+                newStartDate = lastMonthStart;
+                newEndDate = lastMonthEnd;
+                break;
+            case 'thisYear':
+                const yearStart = new Date(today.getFullYear(), 0, 1);
+                newStartDate = yearStart;
+                newEndDate = today;
+                break;
+            case 'all':
+                // 设置一个很早的日期作为起始
+                newStartDate = new Date(2020, 0, 1);
+                newEndDate = today;
+                break;
+            default:
+                return;
+        }
+
+        setExcelStartDate(newStartDate);
+        setExcelEndDate(newEndDate);
+        setExcelStartInput(formatDateTo8Digits(newStartDate));
+        setExcelEndInput(formatDateTo8Digits(newEndDate));
+    };
 
     // 生成预览路径
     const previewPath = () => {
@@ -389,6 +468,27 @@ export const ObsidianExportView: React.FC<ObsidianExportViewProps> = ({
             onToast('error', `导出失败: ${error.message}`);
         } finally {
             setIsExporting(false);
+        }
+    };
+
+    // 执行Excel导出
+    const handleExcelExport = async () => {
+        setIsExportingExcel(true);
+        try {
+            excelExportService.exportLogsToExcel(
+                logs,
+                categories,
+                todos,
+                scopes,
+                excelStartDate,
+                excelEndDate
+            );
+            onToast('success', 'Excel导出成功');
+        } catch (error: any) {
+            console.error('Excel导出失败:', error);
+            onToast('error', `Excel导出失败: ${error.message}`);
+        } finally {
+            setIsExportingExcel(false);
         }
     };
 
@@ -739,6 +839,143 @@ export const ObsidianExportView: React.FC<ObsidianExportViewProps> = ({
                         )}
                     </button>
                 </div>
+
+                {/* Excel导出卡片 */}
+                <div className="bg-white rounded-2xl p-6 shadow-sm space-y-4">
+                    <div className="flex items-center gap-3 text-stone-600 mb-2">
+                        <FileSpreadsheet size={24} />
+                        <h3 className="font-bold text-lg">导出为xlsx</h3>
+                    </div>
+                    <p className="text-sm text-stone-500 mb-4 leading-relaxed">
+                        选择日期范围并导出时间记录到Excel文件
+                    </p>
+
+                    {/* 时间范围 */}
+                    <div className="space-y-3">
+                        <p className="text-xs font-bold text-stone-400 uppercase tracking-widest px-1">时间范围</p>
+                        <div className="flex items-center gap-2">
+                            <div className="flex-1">
+                                <label className="text-xs text-stone-400 mb-1 block px-1">起始时间</label>
+                                <input
+                                    type="text"
+                                    placeholder="20251229"
+                                    maxLength={8}
+                                    value={excelStartInput}
+                                    onChange={(e) => {
+                                        const value = e.target.value.replace(/\D/g, '');
+                                        setExcelStartInput(value);
+                                        if (value.length === 8) {
+                                            const date = parse8DigitsToDate(value);
+                                            if (date) {
+                                                setExcelStartDate(date);
+                                            }
+                                        }
+                                    }}
+                                    className="w-full bg-white border border-stone-200 rounded-lg px-3 py-2 text-sm font-mono text-stone-800 focus:outline-none focus:ring-2 focus:ring-stone-300 focus:border-stone-300"
+                                />
+                            </div>
+                            <span className="text-stone-300 mt-5">-</span>
+                            <div className="flex-1">
+                                <label className="text-xs text-stone-400 mb-1 block px-1">结束时间</label>
+                                <input
+                                    type="text"
+                                    placeholder="20251229"
+                                    maxLength={8}
+                                    value={excelEndInput}
+                                    onChange={(e) => {
+                                        const value = e.target.value.replace(/\D/g, '');
+                                        setExcelEndInput(value);
+                                        if (value.length === 8) {
+                                            const date = parse8DigitsToDate(value);
+                                            if (date) {
+                                                setExcelEndDate(date);
+                                            }
+                                        }
+                                    }}
+                                    className="w-full bg-white border border-stone-200 rounded-lg px-3 py-2 text-sm font-mono text-stone-800 focus:outline-none focus:ring-2 focus:ring-stone-300 focus:border-stone-300"
+                                />
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* 快捷按钮 */}
+                    <div className="space-y-2">
+                        <p className="text-xs font-bold text-stone-400 uppercase">快捷选择</p>
+                        <div className="flex flex-wrap gap-2">
+                            <button
+                                onClick={() => setExcelQuickRange('today')}
+                                className="px-3 py-1.5 text-xs font-medium bg-stone-100 hover:bg-stone-200 text-stone-700 rounded-lg transition-colors"
+                            >
+                                今天
+                            </button>
+                            <button
+                                onClick={() => setExcelQuickRange('yesterday')}
+                                className="px-3 py-1.5 text-xs font-medium bg-stone-100 hover:bg-stone-200 text-stone-700 rounded-lg transition-colors"
+                            >
+                                昨天
+                            </button>
+                            <button
+                                onClick={() => setExcelQuickRange('thisWeek')}
+                                className="px-3 py-1.5 text-xs font-medium bg-stone-100 hover:bg-stone-200 text-stone-700 rounded-lg transition-colors"
+                            >
+                                本周
+                            </button>
+                            <button
+                                onClick={() => setExcelQuickRange('lastWeek')}
+                                className="px-3 py-1.5 text-xs font-medium bg-stone-100 hover:bg-stone-200 text-stone-700 rounded-lg transition-colors"
+                            >
+                                上周
+                            </button>
+                            <button
+                                onClick={() => setExcelQuickRange('thisMonth')}
+                                className="px-3 py-1.5 text-xs font-medium bg-stone-100 hover:bg-stone-200 text-stone-700 rounded-lg transition-colors"
+                            >
+                                本月
+                            </button>
+                            <button
+                                onClick={() => setExcelQuickRange('lastMonth')}
+                                className="px-3 py-1.5 text-xs font-medium bg-stone-100 hover:bg-stone-200 text-stone-700 rounded-lg transition-colors"
+                            >
+                                上月
+                            </button>
+                            <button
+                                onClick={() => setExcelQuickRange('thisYear')}
+                                className="px-3 py-1.5 text-xs font-medium bg-stone-100 hover:bg-stone-200 text-stone-700 rounded-lg transition-colors"
+                            >
+                                今年
+                            </button>
+                            <button
+                                onClick={() => setExcelQuickRange('all')}
+                                className="px-3 py-1.5 text-xs font-medium bg-stone-100 hover:bg-stone-200 text-stone-700 rounded-lg transition-colors"
+                            >
+                                全部
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* 导出按钮 */}
+                    <button
+                        onClick={handleExcelExport}
+                        disabled={isExportingExcel}
+                        className={`flex items-center justify-center gap-2 w-full py-3 rounded-xl font-medium active:scale-[0.98] transition-all shadow-lg ${isExportingExcel
+                            ? 'bg-stone-400 text-white cursor-not-allowed'
+                            : 'bg-stone-800 text-white shadow-stone-300 hover:bg-stone-900'
+                            }`}
+                    >
+                        {isExportingExcel ? (
+                            <>
+                                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                                导出中...
+                            </>
+                        ) : (
+                            <>
+                                <FileSpreadsheet size={18} />
+                                导出Excel
+                            </>
+                        )}
+                    </button>
+                </div>
+
 
                 {/* 说明卡片 */}
                 <div className="flex gap-3 p-4 bg-blue-50 rounded-xl text-blue-700 text-sm">

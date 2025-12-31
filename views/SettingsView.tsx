@@ -48,13 +48,13 @@ import {
     Target,
     Edit2,
     PlusCircle,
+    FileSpreadsheet,
     Sparkles,
     Edit,
     Search,
     Link,
     Smartphone
 } from 'lucide-react';
-import * as XLSX from 'xlsx';
 import { webdavService, WebDAVConfig } from '../services/webdavService';
 import { NfcService } from '../services/NfcService';
 import { aiService, AIConfig } from '../services/aiService';
@@ -72,6 +72,7 @@ import { AutoLinkView } from './AutoLinkView';
 import { ObsidianExportView } from './ObsidianExportView';
 import { getFilterStats } from '../utils/filterUtils';
 import { FilterDetailView } from './FilterDetailView';
+import excelExportService from '../services/excelExportService';
 
 import { NARRATIVE_TEMPLATES } from '../constants';
 // @ts-ignore
@@ -148,167 +149,6 @@ const AI_PRESETS = {
 
 export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, onImport, onReset, onClearData, onToast, syncData, onSyncUpdate, startWeekOnSunday, onToggleStartWeekOnSunday, onOpenAutoLink, onOpenSearch, minIdleTimeThreshold = 1, onSetMinIdleTimeThreshold, defaultView = 'RECORD', onSetDefaultView, reviewTemplates = [], onUpdateReviewTemplates, dailyReviewTime, onSetDailyReviewTime, weeklyReviewTime, onSetWeeklyReviewTime, monthlyReviewTime, onSetMonthlyReviewTime, customNarrativeTemplates, onUpdateCustomNarrativeTemplates, userPersonalInfo, onSetUserPersonalInfo, logs = [], todos = [], scopes = [], currentDate = new Date(), dailyReviews = [], weeklyReviews = [], monthlyReviews = [], todoCategories = [], filters = [], onUpdateFilters, categoriesData = [], onEditLog }) => {
     const [activeSubmenu, setActiveSubmenu] = useState<'main' | 'data' | 'cloud' | 'ai' | 'preferences' | 'guide' | 'nfc' | 'templates' | 'narrative_prompt' | 'auto_record' | 'autolink' | 'obsidian_export' | 'filters'>('main');
-
-    // Excel Export State and Logic
-    const [xlsxStartDate, setXlsxStartDate] = useState(() => {
-        const d = new Date();
-        return d.toISOString().split('T')[0].replace(/-/g, '');
-    });
-    const [xlsxEndDate, setXlsxEndDate] = useState(() => {
-        const d = new Date();
-        return d.toISOString().split('T')[0].replace(/-/g, '');
-    });
-
-    const handleXlsxQuickSelect = (type: 'today' | 'yesterday' | 'thisWeek' | 'lastWeek' | 'thisMonth' | 'lastMonth' | 'thisYear' | 'all') => {
-        const now = new Date();
-        let start = new Date();
-        let end = new Date();
-
-        const formatDate = (d: Date) => d.toISOString().split('T')[0].replace(/-/g, '');
-
-        switch (type) {
-            case 'today':
-                // start/end is now
-                break;
-            case 'yesterday':
-                start.setDate(now.getDate() - 1);
-                end.setDate(now.getDate() - 1);
-                break;
-            case 'thisWeek': {
-                const day = now.getDay();
-                const diff = day === 0 ? 6 : day - 1; // Mon is 0
-                start.setDate(now.getDate() - diff);
-                // end is today
-                break;
-            }
-            case 'lastWeek': {
-                const day = now.getDay();
-                const diff = day === 0 ? 6 : day - 1;
-                end.setDate(now.getDate() - diff - 1); // Last Sunday
-                start.setDate(now.getDate() - diff - 7 - 1 + 1); // Last Monday
-                break;
-            }
-            case 'thisMonth':
-                start.setDate(1);
-                break;
-            case 'lastMonth':
-                start.setMonth(now.getMonth() - 1);
-                start.setDate(1);
-                end.setDate(0); // Last day of last month
-                break;
-            case 'thisYear':
-                start.setMonth(0, 1);
-                break;
-            case 'all':
-                start = new Date('2020-01-01'); // Long enough ago
-                break;
-        }
-
-        setXlsxStartDate(formatDate(start));
-        setXlsxEndDate(formatDate(end));
-    };
-
-    const handleExportXlsx = () => {
-        if (!xlsxStartDate || !xlsxEndDate) {
-            onToast('error', '请输入起始和结束日期');
-            return;
-        }
-
-        try {
-            // Parse dates (YYYYMMDD)
-            const parseDate = (str: string) => {
-                if (str.length !== 8) return null;
-                const y = parseInt(str.substring(0, 4));
-                const m = parseInt(str.substring(4, 6)) - 1;
-                const d = parseInt(str.substring(6, 8));
-                return new Date(y, m, d);
-            };
-
-            const sDate = parseDate(xlsxStartDate);
-            const eDate = parseDate(xlsxEndDate);
-
-            if (!sDate || !eDate) {
-                onToast('error', '日期格式错误 (YYYYMMDD)');
-                return;
-            }
-
-            // End date should include the whole day, so set to 23:59:59 or simply compare timestamps
-            eDate.setHours(23, 59, 59, 999);
-            sDate.setHours(0, 0, 0, 0);
-
-            const filteredLogs = logs.filter(log => {
-                const t = log.startTime;
-                return t >= sDate.getTime() && t <= eDate.getTime();
-            });
-
-            if (filteredLogs.length === 0) {
-                onToast('info', '该时间段内无数据');
-                return;
-            }
-
-            // Transform Data
-            const data = filteredLogs.map(log => {
-                const category = categoriesData.find(c => c.id === log.categoryId);
-                const activity = category?.activities.find(a => a.id === log.activityId);
-                const todo = todos.find(t => t.id === log.linkedTodoId);
-                // Find scopes using syncData.scopes if possible or scopes prop
-                const linkedScopes = (scopes || []).filter(s => log.scopeIds?.includes(s.id)).map(s => s.name).join(', ');
-
-                // Format Duration: HH:mm:ss
-                const h = Math.floor(log.duration / 3600);
-                const m = Math.floor((log.duration % 3600) / 60);
-                const s = log.duration % 60;
-                const durationStr = `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
-
-                const formatTime = (ts: number) => {
-                    const d = new Date(ts);
-                    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}:${String(d.getSeconds()).padStart(2, '0')}`;
-                };
-
-                return {
-                    'id': log.id,
-                    '开始时间': formatTime(log.startTime),
-                    '结束时间': formatTime(log.endTime),
-                    '持续时长': durationStr,
-                    '一级分类': category?.name || 'Unknown',
-                    '二级标签': log.activityName || activity?.name || 'Unknown',
-                    '关联待办': todo?.title || '',
-                    '关联领域': linkedScopes,
-                    '备注': log.note || '',
-                    '专注得分': log.focusScore || ''
-                };
-            });
-
-            // Auto-width
-            const wscols = [
-                { wch: 36 }, // id
-                { wch: 20 }, // start
-                { wch: 20 }, // end
-                { wch: 10 }, // duration
-                { wch: 15 }, // cat
-                { wch: 15 }, // act
-                { wch: 30 }, // todo
-                { wch: 20 }, // scopes
-                { wch: 50 }, // note
-                { wch: 10 }, // score
-            ];
-
-            const ws = XLSX.utils.json_to_sheet(data);
-            ws['!cols'] = wscols;
-
-            const wb = XLSX.utils.book_new();
-            XLSX.utils.book_append_sheet(wb, ws, "Exported Data");
-
-            const filename = `lumostime_export_${xlsxStartDate}-${xlsxEndDate}.xlsx`;
-            XLSX.writeFile(wb, filename);
-
-            onToast('success', `导出成功: ${filename}`);
-
-        } catch (e: any) {
-            console.error(e);
-            onToast('error', '导出失败: ' + e.message);
-        }
-    };
     const [webdavConfig, setWebdavConfig] = useState<WebDAVConfig | null>(null);
     const [isSyncing, setIsSyncing] = useState(false);
 
@@ -913,7 +753,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
                                     <input
                                         type="text"
                                         className="w-full bg-stone-50 border border-stone-200 rounded-xl px-4 py-2.5 text-sm text-stone-800 font-mono outline-none focus:border-stone-400"
-                                        placeholder=""
+                                        placeholder="例如:瑜伽|跑步 #运动 %健康|%工作"
                                         value={filterExpression}
                                         onChange={e => setFilterExpression(e.target.value)}
                                     />
@@ -1305,18 +1145,25 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
     if (activeSubmenu === 'data') {
         return (
             <div className="fixed inset-0 z-50 bg-[#fdfbf7] flex flex-col font-serif animate-in slide-in-from-right duration-300 pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">
-                <div className="flex items-center gap-3 px-4 h-14 border-b border-stone-100 bg-[#fdfbf7]/80 backdrop-blur-md sticky top-0">
+                <div
+                    className="flex items-center px-4 border-b border-stone-100 bg-[#fdfbf7]/80 backdrop-blur-md shrink-0 z-10 gap-3 sticky top-0 box-border"
+                    style={{
+                        height: 'calc(3.5rem + env(safe-area-inset-top))',
+                        paddingTop: 'env(safe-area-inset-top)'
+                    }}
+                >
                     <button
                         onClick={() => setActiveSubmenu('main')}
-                        className="text-stone-400 hover:text-stone-600 p-1"
+                        className="p-2 -ml-2 rounded-full hover:bg-stone-100 active:scale-95 transition-transform"
                     >
-                        <ChevronLeft size={24} />
+                        <ChevronLeft size={20} className="text-stone-500" />
                     </button>
-                    <span className="text-stone-800 font-bold text-lg">数据导出导入</span>
+                    <div className="flex-1">
+                        <h1 className="text-lg font-bold text-stone-800">数据导出导入</h1>
+                    </div>
                 </div>
 
                 <div className="p-4 space-y-4 overflow-y-auto pb-40">
-                    {/* Backup & Restore Card */}
                     <div className="bg-white rounded-2xl p-6 shadow-sm space-y-4">
                         <div className="flex items-center gap-3 text-stone-600 mb-2">
                             <Database size={24} />
@@ -1332,7 +1179,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
                                 className="flex items-center justify-center gap-2 w-full py-3 bg-stone-800 text-white rounded-xl font-medium active:scale-[0.98] transition-transform"
                             >
                                 <Download size={18} />
-                                导出数据备份 (JSON)
+                                导出数据备份
                             </button>
 
                             <button
@@ -1340,7 +1187,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
                                 className="flex items-center justify-center gap-2 w-full py-3 bg-white border border-stone-200 text-stone-700 rounded-xl font-medium active:scale-[0.98] transition-transform hover:bg-stone-50"
                             >
                                 <Upload size={18} />
-                                导入数据备份 (JSON)
+                                导入数据备份
                             </button>
                             <input
                                 type="file"
@@ -1376,81 +1223,24 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
                         </div>
                     </div>
 
-                    {/* Excel Export Card */}
+                    {/* Excel导出卡片 */}
                     <div className="bg-white rounded-2xl p-6 shadow-sm space-y-4">
                         <div className="flex items-center gap-3 text-stone-600 mb-2">
-                            <FileText size={24} />
-                            <h3 className="font-bold text-lg">导出 Excel 报表</h3>
+                            <FileSpreadsheet size={24} />
+                            <h3 className="font-bold text-lg">导出为xlsx</h3>
                         </div>
                         <p className="text-sm text-stone-500 mb-4 leading-relaxed">
-                            选择日期范围并导出时间记录到 Excel 文件 (xlsx)。
+                            选择日期范围并导出时间记录到Excel文件
                         </p>
 
-                        <div className="space-y-3">
-                            <p className="text-xs font-bold text-stone-400 uppercase tracking-widest px-1">时间范围</p>
-                            <div className="flex items-center gap-2">
-                                <div className="flex-1">
-                                    <label className="text-xs text-stone-400 mb-1 block px-1">起始日期</label>
-                                    <input
-                                        placeholder="YYYYMMDD"
-                                        maxLength={8}
-                                        className="w-full bg-white border border-stone-200 rounded-lg px-3 py-2 text-sm font-mono text-stone-800 focus:outline-none focus:ring-2 focus:ring-stone-300 focus:border-stone-300"
-                                        type="text"
-                                        value={xlsxStartDate}
-                                        onChange={(e) => setXlsxStartDate(e.target.value)}
-                                    />
-                                </div>
-                                <span className="text-stone-300 mt-5">-</span>
-                                <div className="flex-1">
-                                    <label className="text-xs text-stone-400 mb-1 block px-1">结束日期</label>
-                                    <input
-                                        placeholder="YYYYMMDD"
-                                        maxLength={8}
-                                        className="w-full bg-white border border-stone-200 rounded-lg px-3 py-2 text-sm font-mono text-stone-800 focus:outline-none focus:ring-2 focus:ring-stone-300 focus:border-stone-300"
-                                        type="text"
-                                        value={xlsxEndDate}
-                                        onChange={(e) => setXlsxEndDate(e.target.value)}
-                                    />
-                                </div>
-                            </div>
-                        </div>
-
-                        <div className="space-y-2">
-                            <p className="text-xs font-bold text-stone-400 uppercase">快捷选择</p>
-                            <div className="flex flex-wrap gap-2">
-                                {(['today', 'yesterday', 'thisWeek', 'lastWeek', 'thisMonth', 'lastMonth', 'thisYear', 'all'] as const).map(t => (
-                                    <button
-                                        key={t}
-                                        onClick={() => handleXlsxQuickSelect(t)}
-                                        className="px-3 py-1.5 text-xs font-medium bg-stone-100 hover:bg-stone-200 text-stone-700 rounded-lg transition-colors"
-                                    >
-                                        {{
-                                            today: '今天',
-                                            yesterday: '昨天',
-                                            thisWeek: '本周',
-                                            lastWeek: '上周',
-                                            thisMonth: '本月',
-                                            lastMonth: '上月',
-                                            thisYear: '今年',
-                                            all: '全部'
-                                        }[t]}
-                                    </button>
-                                ))}
-                            </div>
-                        </div>
-
-                        <button
-                            onClick={handleExportXlsx}
-                            className="flex items-center justify-center gap-2 w-full py-3 rounded-xl font-medium active:scale-[0.98] transition-all shadow-lg bg-stone-800 text-white shadow-stone-300 hover:bg-stone-900"
-                        >
-                            <Download size={18} />
-                            导出 Excel
-                        </button>
-                    </div>
-
-                    <div className="flex gap-3 p-4 bg-orange-50 rounded-xl text-orange-700 text-sm">
-                        <AlertCircle size={20} className="shrink-0" />
-                        <p>导入数据是覆盖操作，导入后当前数据将被备份文件替换，请谨慎操作。</p>
+                        <ExcelExportCardContent
+                            logs={logs}
+                            categories={categories || []}
+                            todos={todos}
+                            scopes={scopes}
+                            onToast={onToast}
+                            todoCategories={todoCategories}
+                        />
                     </div>
                 </div>
             </div>
@@ -2322,6 +2112,226 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
                 type="danger"
             />
         </div>
+    );
+};
+
+// Excel导出卡片内容组件
+const ExcelExportCardContent: React.FC<{
+    logs: Log[];
+    categories: Category[];
+    todos: TodoItem[];
+    todoCategories: TodoCategory[];
+    scopes: Scope[];
+    onToast: (type: ToastType, message: string) => void;
+}> = ({ logs, categories, todos, todoCategories, scopes, onToast }) => {
+    const [excelStartDate, setExcelStartDate] = useState(new Date());
+    const [excelEndDate, setExcelEndDate] = useState(new Date());
+    const [excelStartInput, setExcelStartInput] = useState('');
+    const [excelEndInput, setExcelEndInput] = useState('');
+    const [isExportingExcel, setIsExportingExcel] = useState(false);
+
+    // 格式化日期为8位字符串 YYYYMMDD
+    const formatDateTo8Digits = (date: Date): string => {
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        return `${year}${month}${day}`;
+    };
+
+    // 解析8位字符串为日期
+    const parse8DigitsToDate = (str: string): Date | null => {
+        if (str.length !== 8) return null;
+        const year = parseInt(str.substring(0, 4));
+        const month = parseInt(str.substring(4, 6)) - 1;
+        const day = parseInt(str.substring(6, 8));
+        const date = new Date(year, month, day);
+        if (isNaN(date.getTime())) return null;
+        return date;
+    };
+
+    // 初始化日期
+    useEffect(() => {
+        const today = new Date();
+        setExcelStartInput(formatDateTo8Digits(today));
+        setExcelEndInput(formatDateTo8Digits(today));
+    }, []);
+
+    // Excel导出快捷日期范围选择
+    const setExcelQuickRange = (type: string) => {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+
+        let newStartDate: Date;
+        let newEndDate: Date;
+
+        switch (type) {
+            case 'today':
+                newStartDate = today;
+                newEndDate = today;
+                break;
+            case 'yesterday':
+                const yesterday = new Date(today);
+                yesterday.setDate(yesterday.getDate() - 1);
+                newStartDate = yesterday;
+                newEndDate = yesterday;
+                break;
+            case 'thisWeek':
+                const thisWeekStart = new Date(today);
+                const dayOfWeek = today.getDay();
+                const daysFromMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+                thisWeekStart.setDate(today.getDate() - daysFromMonday);
+                newStartDate = thisWeekStart;
+                newEndDate = today;
+                break;
+            case 'lastWeek':
+                const lastWeekEnd = new Date(today);
+                const currentDayOfWeek = today.getDay();
+                const daysToLastSunday = currentDayOfWeek === 0 ? 0 : currentDayOfWeek;
+                lastWeekEnd.setDate(today.getDate() - daysToLastSunday - 1);
+                const lastWeekStart = new Date(lastWeekEnd);
+                lastWeekStart.setDate(lastWeekEnd.getDate() - 6);
+                newStartDate = lastWeekStart;
+                newEndDate = lastWeekEnd;
+                break;
+            case 'thisMonth':
+                const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
+                newStartDate = monthStart;
+                newEndDate = today;
+                break;
+            case 'lastMonth':
+                const lastMonthStart = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+                const lastMonthEnd = new Date(today.getFullYear(), today.getMonth(), 0);
+                newStartDate = lastMonthStart;
+                newEndDate = lastMonthEnd;
+                break;
+            case 'thisYear':
+                const yearStart = new Date(today.getFullYear(), 0, 1);
+                newStartDate = yearStart;
+                newEndDate = today;
+                break;
+            case 'all':
+                newStartDate = new Date(2020, 0, 1);
+                newEndDate = today;
+                break;
+            default:
+                return;
+        }
+
+        setExcelStartDate(newStartDate);
+        setExcelEndDate(newEndDate);
+        setExcelStartInput(formatDateTo8Digits(newStartDate));
+        setExcelEndInput(formatDateTo8Digits(newEndDate));
+    };
+
+    // 执行Excel导出
+    const handleExcelExport = () => {
+        setIsExportingExcel(true);
+        try {
+            excelExportService.exportLogsToExcel(
+                logs,
+                categories,
+                todos,
+                todoCategories,
+                scopes,
+                excelStartDate,
+                excelEndDate
+            );
+            onToast('success', 'Excel导出成功');
+        } catch (error: any) {
+            console.error('Excel导出失败:', error);
+            onToast('error', `Excel导出失败: ${error.message}`);
+        } finally {
+            setIsExportingExcel(false);
+        }
+    };
+
+    return (
+        <>
+            {/* 时间范围 */}
+            <div className="space-y-3">
+                <p className="text-xs font-bold text-stone-400 uppercase tracking-widest px-1">时间范围</p>
+                <div className="flex items-center gap-2">
+                    <div className="flex-1">
+                        <label className="text-xs text-stone-400 mb-1 block px-1">起始时间</label>
+                        <input
+                            type="text"
+                            placeholder="20251229"
+                            maxLength={8}
+                            value={excelStartInput}
+                            onChange={(e) => {
+                                const value = e.target.value.replace(/\D/g, '');
+                                setExcelStartInput(value);
+                                if (value.length === 8) {
+                                    const date = parse8DigitsToDate(value);
+                                    if (date) {
+                                        setExcelStartDate(date);
+                                    }
+                                }
+                            }}
+                            className="w-full bg-white border border-stone-200 rounded-lg px-3 py-2 text-sm font-mono text-stone-800 focus:outline-none focus:ring-2 focus:ring-stone-300 focus:border-stone-300"
+                        />
+                    </div>
+                    <span className="text-stone-300 mt-5">-</span>
+                    <div className="flex-1">
+                        <label className="text-xs text-stone-400 mb-1 block px-1">结束时间</label>
+                        <input
+                            type="text"
+                            placeholder="20251229"
+                            maxLength={8}
+                            value={excelEndInput}
+                            onChange={(e) => {
+                                const value = e.target.value.replace(/\D/g, '');
+                                setExcelEndInput(value);
+                                if (value.length === 8) {
+                                    const date = parse8DigitsToDate(value);
+                                    if (date) {
+                                        setExcelEndDate(date);
+                                    }
+                                }
+                            }}
+                            className="w-full bg-white border border-stone-200 rounded-lg px-3 py-2 text-sm font-mono text-stone-800 focus:outline-none focus:ring-2 focus:ring-stone-300 focus:border-stone-300"
+                        />
+                    </div>
+                </div>
+            </div>
+
+            {/* 快捷按钮 */}
+            <div className="space-y-2">
+                <p className="text-xs font-bold text-stone-400 uppercase">快捷选择</p>
+                <div className="flex flex-wrap gap-2">
+                    <button onClick={() => setExcelQuickRange('today')} className="px-3 py-1.5 text-xs font-medium bg-stone-100 hover:bg-stone-200 text-stone-700 rounded-lg transition-colors">今天</button>
+                    <button onClick={() => setExcelQuickRange('yesterday')} className="px-3 py-1.5 text-xs font-medium bg-stone-100 hover:bg-stone-200 text-stone-700 rounded-lg transition-colors">昨天</button>
+                    <button onClick={() => setExcelQuickRange('thisWeek')} className="px-3 py-1.5 text-xs font-medium bg-stone-100 hover:bg-stone-200 text-stone-700 rounded-lg transition-colors">本周</button>
+                    <button onClick={() => setExcelQuickRange('lastWeek')} className="px-3 py-1.5 text-xs font-medium bg-stone-100 hover:bg-stone-200 text-stone-700 rounded-lg transition-colors">上周</button>
+                    <button onClick={() => setExcelQuickRange('thisMonth')} className="px-3 py-1.5 text-xs font-medium bg-stone-100 hover:bg-stone-200 text-stone-700 rounded-colors">本月</button>
+                    <button onClick={() => setExcelQuickRange('lastMonth')} className="px-3 py-1.5 text-xs font-medium bg-stone-100 hover:bg-stone-200 text-stone-700 rounded-lg transition-colors">上月</button>
+                    <button onClick={() => setExcelQuickRange('thisYear')} className="px-3 py-1.5 text-xs font-medium bg-stone-100 hover:bg-stone-200 text-stone-700 rounded-lg transition-colors">今年</button>
+                    <button onClick={() => setExcelQuickRange('all')} className="px-3 py-1.5 text-xs font-medium bg-stone-100 hover:bg-stone-200 text-stone-700 rounded-lg transition-colors">全部</button>
+                </div>
+            </div>
+
+            {/* 导出按钮 */}
+            <button
+                onClick={handleExcelExport}
+                disabled={isExportingExcel}
+                className={`flex items-center justify-center gap-2 w-full py-3 rounded-xl font-medium active:scale-[0.98] transition-all shadow-lg ${isExportingExcel
+                    ? 'bg-stone-400 text-white cursor-not-allowed'
+                    : 'bg-stone-800 text-white shadow-stone-300 hover:bg-stone-900'
+                    }`}
+            >
+                {isExportingExcel ? (
+                    <>
+                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                        导出中...
+                    </>
+                ) : (
+                    <>
+                        <FileSpreadsheet size={18} />
+                        导出Excel
+                    </>
+                )}
+            </button>
+        </>
     );
 };
 
