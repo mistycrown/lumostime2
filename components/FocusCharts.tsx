@@ -99,6 +99,7 @@ export const FocusCharts: React.FC<FocusChartsProps> = ({ logs, currentDate, onD
                     onExpandToggle={() => setIsExpanded(!isExpanded)}
                     heatmapMode="focus"
                     disableSelection={true}
+                    hideTopBar={true}
                     preventCollapse={true}
                     onResetView={() => onDateChange(new Date())}
                 />
