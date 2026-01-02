@@ -533,6 +533,7 @@ export const TagDetailView: React.FC<TagDetailViewProps> = ({ tagId, logs, todos
                               : undefined
                         }
                         disableSelection={true}
+                        hideTopBar={true}
                      />
 
                      <div className="px-6 pb-6 pt-2 flex flex-wrap gap-y-4 items-end justify-between">
@@ -809,6 +810,7 @@ export const TagDetailView: React.FC<TagDetailViewProps> = ({ tagId, logs, todos
                         onExpandToggle={() => { }}
                         staticMode={true} // Disable default heat map coloring
                         disableSelection={true}
+                        hideTopBar={true}
                         renderCustomDay={(date, isSelected, isToday) => {
                            // Find logs for this day
                            const dayLogs = tagLogs.filter(l => {

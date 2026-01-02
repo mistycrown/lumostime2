@@ -26,9 +26,10 @@ interface CalendarWidgetProps {
     heatmapMode?: 'duration' | 'focus';
     staticMode?: boolean;
     renderCustomDay?: (date: Date, isSelected: boolean, isToday: boolean) => React.ReactNode;
+    hideTopBar?: boolean; // 隐藏顶部栏（用于详情页面）
 }
 
-export const CalendarWidget: React.FC<CalendarWidgetProps> = ({ currentDate, onDateChange, logs = [], isExpanded, onExpandToggle, extraHeaderControls, disableSelection, customScale, heatmapMode, staticMode, preventCollapse, onResetView, startWeekOnSunday = false, renderCustomDay }) => {
+export const CalendarWidget: React.FC<CalendarWidgetProps> = ({ currentDate, onDateChange, logs = [], isExpanded, onExpandToggle, extraHeaderControls, disableSelection, customScale, heatmapMode, staticMode, preventCollapse, onResetView, startWeekOnSunday = false, renderCustomDay, hideTopBar = false }) => {
     const [viewMode, setViewMode] = useState<'calendar' | 'month_year'>('calendar');
 
     // ... (keep existing helper functions)
@@ -114,59 +115,64 @@ export const CalendarWidget: React.FC<CalendarWidgetProps> = ({ currentDate, onD
     };
 
     return (
-        <div className="bg-white z-20 shadow-sm transition-all duration-500 ease-in-out overflow-hidden flex flex-col shrink-0 border-b border-stone-200">
+        <div className={hideTopBar
+            ? "z-20 transition-all duration-500 ease-in-out overflow-hidden flex flex-col shrink-0"
+            : "bg-white z-20 shadow-sm transition-all duration-500 ease-in-out overflow-hidden flex flex-col shrink-0 border-b border-stone-200"
+        }>
 
-            {/* Top Bar */}
-            <div className="px-6 py-4 flex items-center justify-between border-b border-stone-100">
-                <div className="flex flex-col">
-                    <button
-                        onClick={() => {
-                            if (isExpanded) {
-                                setViewMode(viewMode === 'calendar' ? 'month_year' : 'calendar');
-                            } else {
-                                onExpandToggle();
-                                setViewMode('month_year');
-                            }
-                        }}
-                        className="text-xs font-medium text-stone-400 uppercase tracking-widest hover:text-stone-600 transition-colors text-left whitespace-nowrap"
-                    >
-                        {String(currentDate.getFullYear()).slice(-2)}/{String(currentDate.getMonth() + 1).padStart(2, '0')}
-                    </button>
-                </div>
+            {/* Top Bar - 详情页面模式下隐藏 */}
+            {!hideTopBar && (
+                <div className="px-6 py-4 flex items-center justify-between border-b border-stone-100">
+                    <div className="flex flex-col">
+                        <button
+                            onClick={() => {
+                                if (isExpanded) {
+                                    setViewMode(viewMode === 'calendar' ? 'month_year' : 'calendar');
+                                } else {
+                                    onExpandToggle();
+                                    setViewMode('month_year');
+                                }
+                            }}
+                            className="text-xs font-medium text-stone-400 uppercase tracking-widest hover:text-stone-600 transition-colors text-left whitespace-nowrap"
+                        >
+                            {String(currentDate.getFullYear()).slice(-2)}/{String(currentDate.getMonth() + 1).padStart(2, '0')}
+                        </button>
+                    </div>
 
-                <div className="flex items-center gap-3">
-                    {extraHeaderControls}
-                    {!staticMode && (
-                        <>
-                            {!disableSelection && (
+                    <div className="flex items-center gap-3">
+                        {extraHeaderControls}
+                        {!staticMode && (
+                            <>
+                                {!disableSelection && (
+                                    <button
+                                        onClick={() => onDateChange(new Date())}
+                                        className="text-xs font-bold text-stone-500 border border-stone-300 px-3 py-1.5 rounded-full hover:bg-stone-100 active:scale-95 transition-transform"
+                                    >
+                                        Today
+                                    </button>
+                                )}
                                 <button
-                                    onClick={() => onDateChange(new Date())}
-                                    className="text-xs font-bold text-stone-500 border border-stone-300 px-3 py-1.5 rounded-full hover:bg-stone-100 active:scale-95 transition-transform"
-                                >
-                                    Today
-                                </button>
-                            )}
-                            <button
-                                onClick={() => {
-                                    if (preventCollapse) {
-                                        if (onResetView) onResetView();
-                                        setViewMode('calendar');
-                                    } else {
-                                        onExpandToggle();
-                                        setViewMode('calendar');
-                                    }
-                                }}
-                                className={`
+                                    onClick={() => {
+                                        if (preventCollapse) {
+                                            if (onResetView) onResetView();
+                                            setViewMode('calendar');
+                                        } else {
+                                            onExpandToggle();
+                                            setViewMode('calendar');
+                                        }
+                                    }}
+                                    className={`
                                p-2 rounded-full border transition-all active:scale-95
                                ${isExpanded ? 'bg-stone-900 text-white border-stone-900' : 'bg-white text-stone-600 border-stone-300 hover:border-stone-500'}
                             `}
-                            >
-                                {isExpanded ? <X size={20} /> : <CalendarIcon size={20} />}
-                            </button>
-                        </>
-                    )}
+                                >
+                                    {isExpanded ? <X size={20} /> : <CalendarIcon size={20} />}
+                                </button>
+                            </>
+                        )}
+                    </div>
                 </div>
-            </div>
+            )}
 
             {/* Calendar Area */}
             <div className={`transition-all duration-500 ease-in-out overflow-hidden ${isExpanded ? 'max-h-[400px] opacity-100' : 'max-h-[75px] opacity-100'}`}>
@@ -221,7 +227,7 @@ export const CalendarWidget: React.FC<CalendarWidgetProps> = ({ currentDate, onD
                     </div>
                 ) : (
                     // Expanded View
-                    <div className="px-6 pb-6 animate-in fade-in duration-300">
+                    <div className={hideTopBar ? "px-6 pb-6 pt-6 animate-in fade-in duration-300" : "px-6 pb-6 animate-in fade-in duration-300"}>
                         {viewMode === 'calendar' ? (
                             <>
                                 <div className="flex items-center justify-between mt-3 mb-4 px-2">

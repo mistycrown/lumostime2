@@ -479,6 +479,7 @@ export const ScopeDetailView: React.FC<ScopeDetailViewProps> = ({
                                 isExpanded={true}
                                 onExpandToggle={() => { }}
                                 disableSelection={true}
+                                hideTopBar={true}
                             />
 
                             {/* Stats Footer */}
@@ -660,6 +661,7 @@ export const ScopeDetailView: React.FC<ScopeDetailViewProps> = ({
                                 onExpandToggle={() => { }}
                                 staticMode={true}
                                 disableSelection={true}
+                                hideTopBar={true}
                                 renderCustomDay={(date, isSelected, isToday) => {
                                     // Find logs for this day
                                     const dayLogs = scopeLogs.filter(l => {

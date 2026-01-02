@@ -358,7 +358,6 @@ export const CategoryDetailView: React.FC<CategoryDetailViewProps> = ({ category
             case 'Timeline':
                 return (
                     <>
-                        {/* Heatmap Section */}
                         <div className="bg-white rounded-[2rem] p-0 mb-8 border border-stone-100 shadow-[0_4px_20px_rgba(0,0,0,0.02)] overflow-hidden">
                             <CalendarWidget
                                 currentDate={displayDate}
@@ -372,6 +371,7 @@ export const CategoryDetailView: React.FC<CategoryDetailViewProps> = ({ category
                                 isExpanded={true}
                                 onExpandToggle={() => { }}
                                 disableSelection={true}
+                                hideTopBar={true}
                                 customScale={
                                     (category.heatmapMin !== undefined || category.heatmapMax !== undefined)
                                         ? { min: (category.heatmapMin || 30) * 60, max: (category.heatmapMax || 240) * 60 }
