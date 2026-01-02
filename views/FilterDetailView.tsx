@@ -10,7 +10,7 @@
 import React, { useMemo, useState, useRef, useEffect } from 'react';
 import { Filter, Log, Category, Scope, TodoItem, TodoCategory } from '../types';
 import { getFilteredLogs } from '../utils/filterUtils';
-import { CalendarWidget } from '../components/CalendarWidget';
+import { DetailTimelineCard } from '../components/DetailTimelineCard';
 import { Clock, ChevronLeft } from 'lucide-react';
 
 interface FilterDetailViewProps {
@@ -314,191 +314,64 @@ export const FilterDetailView: React.FC<FilterDetailViewProps> = ({
     const renderContent = () => {
         switch (activeTab) {
             case '时间线':
-                const avgDurationMins = filteredLogs.length > 0
-                    ? Math.round(totalSeconds / filteredLogs.length / 60)
-                    : 0;
-                const avgDurationH = Math.floor(avgDurationMins / 60);
-                const avgDurationM = avgDurationMins % 60;
-                const avgDurationStr = avgDurationH > 0 ? `${avgDurationH}小时${avgDurationM}分钟` : `${avgDurationM}分钟`;
-
                 return (
-                    <div className="space-y-8 mt-4">
-                        {/* Core Metrics - Styled like Focus Metrics (Transparent, Clean, Horizontal) */}
-                        <div className="flex items-start justify-around px-2 py-4">
-                            {/* Total Duration */}
-                            <div className="flex flex-col items-center gap-2">
-                                <span className="text-xs font-bold text-stone-900 tracking-wider">累计投入</span>
-                                <div className="flex items-baseline text-stone-800">
-                                    <span className="text-3xl font-black font-mono tracking-tight">{totalHours}</span>
-                                    <span className="text-sm font-bold opacity-60 ml-0.5 mr-1 text-stone-400">h</span>
-                                    <span className="text-xl font-bold font-mono tracking-tight">{totalMins}</span>
-                                    <span className="text-xs font-bold opacity-60 ml-0.5 text-stone-400">m</span>
-                                </div>
-                            </div>
+                    <DetailTimelineCard
+                        filteredLogs={filteredLogs}
+                        displayDate={displayDate}
+                        onDateChange={setDisplayDate}
+                        entityInfo={{
+                            icon: '🔍',
+                            name: filter.name,
+                            type: 'other' // Filter treats as generic container
+                        }}
+                        onEditLog={onEditLog}
+                        categories={categories}
+                        renderLogMetadata={(log) => {
+                            // Find related entities
+                            const category = categories.find(c => c.id === log.categoryId);
+                            const activity = category?.activities.find(a => a.id === log.activityId);
+                            const linkedTodo = todos.find(t => t.id === log.linkedTodoId);
 
-                            {/* Divider */}
-                            <div className="w-px h-10 bg-stone-200/50 mt-1"></div>
-
-                            {/* Count */}
-                            <div className="flex flex-col items-center gap-2">
-                                <span className="text-xs font-bold text-stone-900 tracking-wider">累计次数</span>
-                                <div className="flex items-baseline text-stone-800">
-                                    <span className="text-3xl font-black font-mono tracking-tight">{filteredLogs.length}</span>
-                                </div>
-                            </div>
-
-                            {/* Divider */}
-                            <div className="w-px h-10 bg-stone-200/50 mt-1"></div>
-
-                            {/* Avg Duration */}
-                            <div className="flex flex-col items-center gap-2">
-                                <span className="text-xs font-bold text-stone-900 tracking-wider">平均时长</span>
-                                <div className="flex items-baseline text-stone-800">
-                                    {avgDurationH > 0 ? (
-                                        <>
-                                            <span className="text-3xl font-black font-mono tracking-tight">{avgDurationH}</span>
-                                            <span className="text-sm font-bold opacity-60 ml-0.5 mr-1 text-stone-400">h</span>
-                                            {avgDurationM > 0 && (
-                                                <>
-                                                    <span className="text-xl font-bold font-mono tracking-tight">{avgDurationM}</span>
-                                                    <span className="text-xs font-bold opacity-60 ml-0.5 text-stone-400">m</span>
-                                                </>
-                                            )}
-                                        </>
-                                    ) : (
-                                        <>
-                                            <span className="text-3xl font-black font-mono tracking-tight">{avgDurationM}</span>
-                                            <span className="text-sm font-bold opacity-60 ml-0.5 text-stone-400">m</span>
-                                        </>
+                            return (
+                                <div className="flex flex-wrap items-center gap-2 mt-1">
+                                    {/* Linked Todo */}
+                                    {linkedTodo && (
+                                        <span className="text-[10px] font-medium text-stone-500 border border-stone-200 px-2 py-0.5 rounded flex items-center gap-1 bg-stone-50/30">
+                                            <span className="text-stone-400 font-bold">@</span>
+                                            <span className="line-clamp-1">{linkedTodo.title}</span>
+                                        </span>
                                     )}
-                                </div>
-                            </div>
-                        </div>
 
-                        {timelineGroups.length === 0 ? (
-                            // ... (Existing)
-                            // ...
-                            // ...
+                                    {/* Category Tag */}
+                                    <span className="text-[10px] font-medium text-stone-500 border border-stone-200 px-2 py-0.5 rounded flex items-center gap-1 bg-stone-50/30">
+                                        <span className="font-bold text-stone-400">#</span>
+                                        <span>{category?.icon}</span>
+                                        <span className="flex items-center">
+                                            <span>{category?.name}</span>
+                                            <span className="mx-1 text-stone-300">/</span>
+                                            <span className="mr-1">{activity?.icon}</span>
+                                            <span className="text-stone-500">{activity?.name}</span>
+                                        </span>
+                                    </span>
 
-                            <div className="text-center py-20 text-stone-400 font-serif italic text-lg opacity-60">
-                                暂无记录
-                            </div>
-                        ) : (
-                            timelineGroups.map((group) => {
-                                const { date, logs: groupLogs, duration } = group;
-                                const weekDay = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'][date.getDay()];
-                                const month = date.getMonth() + 1;
-                                const day = date.getDate();
-                                const durationMins = Math.round(duration / 60);
-
-                                return (
-                                    <div key={date.toISOString()} className="mb-8 last:mb-0">
-                                        {/* Date Header */}
-                                        <div className="flex items-baseline justify-between mb-6 px-2 bg-[#faf9f6] z-10 py-2 border-b border-stone-100">
-                                            <div className="flex items-baseline gap-3">
-                                                <span className="text-2xl font-black text-stone-900 font-mono tracking-tighter">
-                                                    {String(month).padStart(2, '0')}/{String(day).padStart(2, '0')}
+                                    {/* Scope Tags */}
+                                    {log.scopeIds && log.scopeIds.length > 0 && log.scopeIds.map(scopeId => {
+                                        const linkedScope = scopes.find(s => s.id === scopeId);
+                                        if (linkedScope) {
+                                            return (
+                                                <span key={scopeId} className="text-[10px] font-medium text-stone-500 border border-stone-200 px-2 py-0.5 rounded flex items-center gap-1 bg-stone-50/30">
+                                                    <span className="text-stone-400 font-bold">%</span>
+                                                    <span>{linkedScope.icon || '📍'}</span>
+                                                    <span>{linkedScope.name}</span>
                                                 </span>
-                                                <span className="text-xs font-bold text-stone-400 tracking-[0.2em] uppercase">{weekDay}</span>
-                                            </div>
-                                            <span className="font-mono text-sm font-bold text-stone-800 bg-stone-100 px-2 py-0.5 rounded-md">
-                                                {durationMins}m
-                                            </span>
-                                        </div>
-
-                                        {/* Timeline Items */}
-                                        <div className="relative border-l border-stone-300 ml-[70px] space-y-6 pb-4">
-                                            {groupLogs.sort((a, b) => b.startTime - a.startTime).map(log => {
-                                                const d = new Date(log.startTime);
-                                                const timeStr = `${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`;
-                                                const durationMins = Math.round(log.duration / 60);
-                                                const h = Math.floor(durationMins / 60);
-                                                const m = durationMins % 60;
-                                                const durStr = h > 0 ? `${h}h ${m}m` : `${m}m`;
-
-                                                // 获取关联信息
-                                                const category = categories.find(c => c.id === log.categoryId);
-                                                const activity = category?.activities.find(a => a.id === log.activityId);
-                                                const linkedTodo = todos.find(t => t.id === log.linkedTodoId);
-
-                                                return (
-                                                    <div
-                                                        key={log.id}
-                                                        className="relative pl-8 group cursor-pointer rounded-xl hover:bg-stone-50/80 transition-colors p-2 -ml-2"
-                                                        onClick={() => onEditLog?.(log)}
-                                                    >
-                                                        {/* 时间和时长 */}
-                                                        <div className="absolute -left-[60px] top-0 w-[45px] text-right flex flex-col items-end">
-                                                            <span className="text-sm font-bold text-stone-800 leading-none font-mono">
-                                                                {timeStr}
-                                                            </span>
-                                                            <span className="text-[10px] font-medium text-stone-400 mt-1">
-                                                                {durStr}
-                                                            </span>
-                                                        </div>
-
-                                                        {/* 时间线圆点 */}
-                                                        <div className="absolute left-[3px] top-2 w-2.5 h-2.5 rounded-full bg-stone-900 border-2 border-[#faf9f6] z-10" />
-
-                                                        {/* 内容 */}
-                                                        <div className="relative top-[-2px]">
-                                                            <div className="flex items-center gap-2 mb-1">
-                                                                <h4 className="text-lg font-bold text-stone-900 leading-tight">
-                                                                    {activity?.name || "活动"}
-                                                                </h4>
-                                                                {/* 连续追踪次数标记 (模拟) - 这里可以根据实际逻辑添加 */}
-                                                            </div>
-
-                                                            {log.note && (
-                                                                <p className="text-sm text-stone-500 leading-relaxed mb-2 font-light whitespace-pre-wrap">
-                                                                    {log.note}
-                                                                </p>
-                                                            )}
-
-                                                            {/* 标签 */}
-                                                            <div className="flex flex-wrap items-center gap-2 mt-1">
-                                                                {linkedTodo && (
-                                                                    <span className="text-[10px] font-medium text-stone-500 border border-stone-200 px-2 py-0.5 rounded flex items-center gap-1 bg-stone-50/30">
-                                                                        <span className="text-stone-400 font-bold">@</span>
-                                                                        <span className="line-clamp-1">{linkedTodo.title}</span>
-                                                                    </span>
-                                                                )}
-
-                                                                <span className="text-[10px] font-medium text-stone-500 border border-stone-200 px-2 py-0.5 rounded flex items-center gap-1 bg-stone-50/30">
-                                                                    <span className="font-bold text-stone-400">#</span>
-                                                                    <span>{category?.icon}</span>
-                                                                    <span className="flex items-center">
-                                                                        <span>{category?.name}</span>
-                                                                        <span className="mx-1 text-stone-300">/</span>
-                                                                        <span className="mr-1">{activity?.icon}</span>
-                                                                        <span className="text-stone-500">{activity?.name}</span>
-                                                                    </span>
-                                                                </span>
-
-                                                                {log.scopeIds && log.scopeIds.length > 0 && log.scopeIds.map(scopeId => {
-                                                                    const linkedScope = scopes.find(s => s.id === scopeId);
-                                                                    if (linkedScope) {
-                                                                        return (
-                                                                            <span key={scopeId} className="text-[10px] font-medium text-stone-500 border border-stone-200 px-2 py-0.5 rounded flex items-center gap-1 bg-stone-50/30">
-                                                                                <span className="text-stone-400 font-bold">%</span>
-                                                                                <span>{linkedScope.icon || '📍'}</span>
-                                                                                <span>{linkedScope.name}</span>
-                                                                            </span>
-                                                                        );
-                                                                    }
-                                                                    return null;
-                                                                })}
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                );
-                                            })}
-                                        </div>
-                                    </div>
-                                );
-                            })
-                        )}
-                    </div>
+                                            );
+                                        }
+                                        return null;
+                                    })}
+                                </div>
+                            );
+                        }}
+                    />
                 );
 
             case '节奏':

@@ -16,6 +16,7 @@ import { Clock, Save, ChevronRight, Check, Zap, CheckCircle2, Circle } from 'luc
 import { DateRangeFilter } from '../components/DateRangeFilter';
 import { MatrixAnalysisChart } from '../components/MatrixAnalysisChart';
 import { Scope } from '../types';
+import { DetailTimelineCard } from '../components/DetailTimelineCard';
 
 interface CategoryDetailViewProps {
     categoryId: string;
@@ -357,171 +358,67 @@ export const CategoryDetailView: React.FC<CategoryDetailViewProps> = ({ category
                 );
             case 'Timeline':
                 return (
-                    <>
-                        <div className="bg-white rounded-[2rem] p-0 mb-8 border border-stone-100 shadow-[0_4px_20px_rgba(0,0,0,0.02)] overflow-hidden">
-                            <CalendarWidget
-                                currentDate={displayDate}
-                                onDateChange={(newDate) => {
-                                    // Only update if month/year changes to allow navigation
-                                    if (newDate.getMonth() !== displayDate.getMonth() || newDate.getFullYear() !== displayDate.getFullYear()) {
-                                        setDisplayDate(newDate);
-                                    }
-                                }}
-                                logs={catLogs}
-                                isExpanded={true}
-                                onExpandToggle={() => { }}
-                                disableSelection={true}
-                                hideTopBar={true}
-                                customScale={
-                                    (category.heatmapMin !== undefined || category.heatmapMax !== undefined)
-                                        ? { min: (category.heatmapMin || 30) * 60, max: (category.heatmapMax || 240) * 60 }
-                                        : undefined
-                                }
-                            />
+                    <DetailTimelineCard
+                        filteredLogs={catLogs}
+                        displayDate={displayDate}
+                        onDateChange={setDisplayDate}
+                        customScale={
+                            (category.heatmapMin !== undefined || category.heatmapMax !== undefined)
+                                ? { min: (category.heatmapMin || 30) * 60, max: (category.heatmapMax || 240) * 60 }
+                                : undefined
+                        }
+                        entityInfo={{
+                            icon: category.icon,
+                            name: category.name,
+                            type: 'category'
+                        }}
+                        onEditLog={onEditLog}
+                        categories={categories}
+                        renderLogMetadata={(log) => {
+                            const category = categories.find(c => c.id === log.categoryId);
+                            const activity = category?.activities.find(a => a.id === log.activityId);
+                            const linkedTodo = todos.find(t => t.id === log.linkedTodoId);
 
-                            <div className="px-6 pb-6 pt-2 flex flex-wrap gap-y-4 items-end justify-between">
-                                <div>
-                                    <div className="text-[10px] uppercase tracking-widest text-stone-400 mb-1 font-bold">Total Time</div>
-                                    <div className="text-2xl font-bold text-stone-900 font-mono">
-                                        {totalHours}<span className="text-base text-stone-400 mx-1 font-sans">h</span>{totalMins}<span className="text-base text-stone-400 ml-1 font-sans">m</span>
-                                        <span className="text-lg text-stone-300 mx-2 font-sans">/</span>
-                                        <span className="text-lg font-bold text-stone-600">
-                                            {monthHours}<span className="text-sm text-stone-400 mx-1 font-sans">h</span>{monthMins}<span className="text-sm text-stone-400 ml-1 font-sans">m</span>
+                            return (
+                                <div className="flex flex-wrap items-center gap-2 mt-1">
+                                    {/* Linked Todo */}
+                                    {linkedTodo && (
+                                        <span className="text-[10px] font-medium text-stone-500 border border-stone-200 px-2 py-0.5 rounded flex items-center gap-1 bg-stone-50/30">
+                                            <span className="text-stone-400 font-bold">@</span>
+                                            <span className="line-clamp-1">{linkedTodo.title}</span>
                                         </span>
-                                    </div>
-                                    {(() => {
-                                        const totalDays = new Set(catLogs.map(l => new Date(l.startTime).toDateString())).size;
-                                        const monthDays = new Set(monthLogs.map(l => new Date(l.startTime).toDateString())).size;
-                                        return (
-                                            <div className="text-[10px] font-bold text-stone-500 bg-stone-100 px-2 py-1 rounded inline-block mt-1">
-                                                Recorded {totalDays} days / {monthDays} days
-                                            </div>
-                                        );
-                                    })()}
-                                </div>
-                                <div className="text-right ml-auto">
-                                    <div className="text-[10px] uppercase tracking-widest text-stone-400 mb-1 font-bold">Avg. Daily</div>
-                                    <div className="text-xl font-bold text-stone-700 font-mono">
-                                        {(() => {
-                                            const totalDays = new Set(catLogs.map(l => new Date(l.startTime).toDateString())).size;
-                                            const monthDays = new Set(monthLogs.map(l => new Date(l.startTime).toDateString())).size;
-                                            const avgTotal = totalDays > 0 ? Math.round(totalSeconds / 60 / totalDays) : 0;
-                                            const avgMonth = monthDays > 0 ? Math.round(monthSeconds / 60 / monthDays) : 0;
+                                    )}
+
+                                    {/* Category Tag */}
+                                    <span className="text-[10px] font-medium text-stone-500 border border-stone-200 px-2 py-0.5 rounded flex items-center gap-1 bg-stone-50/30">
+                                        <span className="font-bold text-stone-400">#</span>
+                                        <span>{category?.icon}</span>
+                                        <span className="flex items-center">
+                                            <span>{category?.name}</span>
+                                            <span className="mx-1 text-stone-300">/</span>
+                                            <span className="mr-1">{activity?.icon}</span>
+                                            <span className="text-stone-500">{activity?.name}</span>
+                                        </span>
+                                    </span>
+
+                                    {/* Scope Tags */}
+                                    {log.scopeIds && log.scopeIds.length > 0 && log.scopeIds.map(scopeId => {
+                                        const linkedScope = scopes.find(s => s.id === scopeId);
+                                        if (linkedScope) {
                                             return (
-                                                <>
-                                                    {avgTotal}m
-                                                    <span className="text-base text-stone-400 mx-2 font-sans">/</span>
-                                                    <span className="text-base font-bold text-stone-600">{avgMonth}m</span>
-                                                </>
+                                                <span key={scopeId} className="text-[10px] font-medium text-stone-500 border border-stone-200 px-2 py-0.5 rounded flex items-center gap-1 bg-stone-50/30">
+                                                    <span className="text-stone-400 font-bold">%</span>
+                                                    <span>{linkedScope.icon || '📍'}</span>
+                                                    <span>{linkedScope.name}</span>
+                                                </span>
                                             );
-                                        })()}
-                                    </div>
+                                        }
+                                        return null;
+                                    })}
                                 </div>
-                            </div>
-                        </div>
-
-                        {/* History List */}
-                        <div className="space-y-8">
-                            <div className="flex items-center gap-2 mb-2">
-                                <Clock size={14} className="text-stone-400" />
-                                <span className="text-xs font-bold text-stone-400 uppercase tracking-widest">History ({displayMonth + 1}/{displayYear})</span>
-                            </div>
-
-                            {heatmapData.size === 0 ? (
-                                <div className="text-center py-10 text-stone-400 text-sm italic border border-dashed border-stone-200 rounded-2xl">
-                                    No activity recorded in this month.
-                                </div>
-                            ) : (
-                                Array.from(heatmapData.keys()).sort((a: number, b: number) => b - a).map((day: number) => {
-                                    const daySeconds = heatmapData.get(day) || 0;
-                                    const dayLogsFiltered = catLogs.filter(l => {
-                                        const d = new Date(l.startTime);
-                                        return d.getDate() === day && d.getMonth() === displayMonth && d.getFullYear() === displayYear;
-                                    });
-
-                                    const date = new Date(displayYear, displayMonth, day);
-                                    const weekDay = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'][date.getDay()];
-
-                                    return (
-                                        <div key={day} className="flex flex-col gap-3 group">
-                                            <div className="flex justify-between items-end border-b border-stone-100 pb-2">
-                                                <div className="flex items-baseline gap-2">
-                                                    <span className="text-lg font-bold text-stone-800 font-mono">{String(displayMonth + 1).padStart(2, '0')}/{String(day).padStart(2, '0')}</span>
-                                                    <span className="text-xs font-medium text-stone-400">{weekDay}</span>
-                                                </div>
-                                                <div className="flex items-center gap-2">
-                                                    <span className="font-bold text-stone-900 font-mono">{Math.floor(daySeconds / 60)}m</span>
-                                                </div>
-                                            </div>
-
-                                            <div className="relative border-l border-stone-300 ml-[70px] space-y-6 pb-4">
-                                                {dayLogsFiltered.map(log => {
-                                                    const activity = category.activities.find(a => a.id === log.activityId);
-                                                    const d = new Date(log.startTime);
-                                                    const timeStr = `${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`;
-                                                    const durationMins = Math.round(log.duration / 60);
-                                                    const h = Math.floor(durationMins / 60);
-                                                    const m = durationMins % 60;
-                                                    const durStr = h > 0 ? `${h}h ${m}m` : `${m}m`;
-
-                                                    return (
-                                                        <div
-                                                            key={log.id}
-                                                            className="relative pl-8 group cursor-pointer rounded-xl hover:bg-stone-50/80 transition-colors p-2 -ml-2"
-                                                            onClick={() => onEditLog?.(log)}
-                                                        >
-                                                            {/* Time & Duration - Absolute Left */}
-                                                            <div className="absolute -left-[60px] top-0 w-[45px] text-right flex flex-col items-end">
-                                                                <span className="text-sm font-bold text-stone-800 leading-none font-mono">
-                                                                    {timeStr}
-                                                                </span>
-                                                                <span className="text-[10px] font-medium text-stone-400 mt-1">
-                                                                    {durStr}
-                                                                </span>
-                                                            </div>
-
-                                                            {/* Timeline Dot */}
-                                                            <div className="absolute left-[3px] top-2 w-2.5 h-2.5 rounded-full bg-stone-900 border-2 border-[#faf9f6] z-10" />
-
-                                                            <div className="relative top-[-2px]">
-                                                                <div className="flex items-center gap-2 mb-1">
-                                                                    <span className="text-lg font-bold text-stone-900 leading-tight">{activity?.name || 'Unknown Activity'}</span>
-                                                                    {log.focusScore && log.focusScore > 0 && (
-                                                                        <span className="text-sm font-bold text-stone-400 font-mono flex items-center gap-0.5">
-                                                                            <Zap size={12} fill="currentColor" />
-                                                                            {log.focusScore}
-                                                                        </span>
-                                                                    )}
-                                                                </div>
-                                                                {log.note && (
-                                                                    <p className="text-sm text-stone-500 font-light leading-relaxed mb-2 whitespace-pre-wrap">
-                                                                        {log.note}
-                                                                    </p>
-                                                                )}
-                                                                {/* Optional: Add tags here if accessed context allows, e.g. linked todo */}
-                                                                <div className="flex flex-wrap items-center gap-2 mt-1">
-                                                                    <span className="text-[10px] font-medium text-stone-500 border border-stone-200 px-2 py-0.5 rounded flex items-center gap-1 bg-stone-50/30">
-                                                                        <span className="font-bold text-stone-400">#</span>
-                                                                        <span>{category.icon}</span>
-                                                                        <span className="flex items-center">
-                                                                            <span>{category.name}</span>
-                                                                            <span className="mx-1 text-stone-300">/</span>
-                                                                            <span className="mr-1">{activity?.icon}</span>
-                                                                            <span className="text-stone-500">{activity?.name}</span>
-                                                                        </span>
-                                                                    </span>
-                                                                </div>
-                                                            </div>
-                                                        </div>
-                                                    );
-                                                })}
-                                            </div>
-                                        </div>
-                                    );
-                                })
-                            )}
-                        </div>
-                    </>
+                            );
+                        }}
+                    />
                 );
             case 'Focus':
                 return (

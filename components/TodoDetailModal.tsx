@@ -648,24 +648,20 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({ initialTodo, c
                                           <span className="text-stone-500">{activity?.name}</span>
                                         </span>
                                       </span>
-                                    </div>
 
-                                    {/* Scope Tags */}
-                                    {log.scopeIds && log.scopeIds.length > 0 && (
-                                      <div className="mt-1 flex flex-wrap items-center gap-1">
-                                        {log.scopeIds.map(scopeId => {
-                                          const scope = scopes.find(s => s.id === scopeId);
-                                          if (!scope) return null;
-                                          return (
-                                            <span key={scopeId} className="text-[10px] font-medium text-stone-500 border border-stone-200 px-2 py-0.5 rounded inline-flex items-center gap-1 bg-stone-50/30">
-                                              <span className="text-stone-400 font-bold">%</span>
-                                              <span>{scope.icon}</span>
-                                              <span className="line-clamp-1">{scope.name}</span>
-                                            </span>
-                                          );
-                                        })}
-                                      </div>
-                                    )}
+                                      {/* Scope Tags */}
+                                      {log.scopeIds && log.scopeIds.length > 0 && log.scopeIds.map(scopeId => {
+                                        const scope = scopes.find(s => s.id === scopeId);
+                                        if (!scope) return null;
+                                        return (
+                                          <span key={scopeId} className="text-[10px] font-medium text-stone-500 border border-stone-200 px-2 py-0.5 rounded inline-flex items-center gap-1 bg-stone-50/30">
+                                            <span className="text-stone-400 font-bold">%</span>
+                                            <span>{scope.icon}</span>
+                                            <span className="line-clamp-1">{scope.name}</span>
+                                          </span>
+                                        );
+                                      })}
+                                    </div>
                                   </div>
                                 </div>
                               );

@@ -16,6 +16,7 @@ import { FocusCharts } from '../components/FocusCharts';
 import { DateRangeFilter } from '../components/DateRangeFilter';
 import { MatrixAnalysisChart } from '../components/MatrixAnalysisChart';
 import { Scope } from '../types';
+import { DetailTimelineCard } from '../components/DetailTimelineCard';
 
 
 interface TagDetailViewProps {
@@ -514,209 +515,72 @@ export const TagDetailView: React.FC<TagDetailViewProps> = ({ tagId, logs, todos
             );
          case 'Timeline':
             return (
-               <>
-                  {/* Heatmap Section */}
-                  <div className="bg-white rounded-[2rem] p-0 mb-8 border border-stone-100 shadow-[0_4px_20px_rgba(0,0,0,0.02)] overflow-hidden">
-                     <CalendarWidget
-                        currentDate={displayDate}
-                        onDateChange={(newDate) => {
-                           if (newDate.getMonth() !== displayDate.getMonth() || newDate.getFullYear() !== displayDate.getFullYear()) {
-                              setDisplayDate(newDate);
-                           }
-                        }}
-                        logs={tagLogs}
-                        isExpanded={true}
-                        onExpandToggle={() => { }}
-                        customScale={
-                           (activity.heatmapMin !== undefined || activity.heatmapMax !== undefined)
-                              ? { min: (activity.heatmapMin || 30) * 60, max: (activity.heatmapMax || 240) * 60 }
-                              : undefined
-                        }
-                        disableSelection={true}
-                        hideTopBar={true}
-                     />
-
-                     <div className="px-6 pb-6 pt-2 flex flex-wrap gap-y-4 items-end justify-between">
-                        <div>
-                           <div className="text-[10px] uppercase tracking-widest text-stone-400 mb-1 font-bold">Total Time</div>
-                           <div className="text-2xl font-bold text-stone-900 font-mono">
-                              {totalHours}<span className="text-base text-stone-400 mx-1 font-sans">h</span>{totalMins}<span className="text-base text-stone-400 ml-1 font-sans">m</span>
-                              <span className="text-lg text-stone-300 mx-2 font-sans">/</span>
-                              <span className="text-lg font-bold text-stone-600">
-                                 {monthHours}<span className="text-sm text-stone-400 mx-1 font-sans">h</span>{monthMins}<span className="text-sm text-stone-400 ml-1 font-sans">m</span>
-                              </span>
-                           </div>
+               <DetailTimelineCard
+                  filteredLogs={tagLogs}
+                  displayDate={displayDate}
+                  onDateChange={setDisplayDate}
+                  customScale={
+                     (activity.heatmapMin !== undefined || activity.heatmapMax !== undefined)
+                        ? { min: (activity.heatmapMin || 30) * 60, max: (activity.heatmapMax || 240) * 60 }
+                        : undefined
+                  }
+                  entityInfo={{
+                     icon: activity.icon,
+                     name: activity.name,
+                     type: 'activity'
+                  }}
+                  onEditLog={onEditLog}
+                  categories={categories}
+                  renderLogMetadata={(log) => {
+                     return (
+                        <div className="flex flex-wrap items-center gap-2 mt-1">
+                           {/* Linked Todo */}
                            {(() => {
-                              const totalDays = new Set(tagLogs.map(l => new Date(l.startTime).toDateString())).size;
-                              return (
-                                 <div className="text-xs text-stone-500 bg-stone-100 inline-block px-2 py-1 rounded mt-2 font-medium">
-                                    Recorded {totalDays} days / {monthDays} days
-                                 </div>
-                              );
-                           })()}
-                        </div>
-                        <div className="text-right ml-auto">
-                           <div className="text-[10px] uppercase tracking-widest text-stone-400 mb-1 font-bold">Avg. Daily</div>
-                           <div className="text-lg font-bold text-stone-700 font-mono">
-                              {(() => {
-                                 const totalDays = new Set(tagLogs.map(l => new Date(l.startTime).toDateString())).size;
-                                 return totalDays > 0 ? Math.round(totalSeconds / 60 / totalDays) : 0;
-                              })()}m
-                              <span className="text-base text-stone-400 mx-2 font-sans">/</span>
-                              <span className="text-base font-bold text-stone-600">
-                                 {monthDays > 0 ? Math.round(monthSeconds / 60 / monthDays) : 0}m
-                              </span>
-                           </div>
-                        </div>
-                     </div>
-                  </div>
-
-                  {/* History List for Selected Month */}
-                  <div className="space-y-2 mt-8">
-                     <div className="flex items-center gap-2 mb-6 px-2">
-                        <Clock size={16} className="text-stone-400" />
-                        <span className="text-xs font-bold text-stone-400 uppercase tracking-widest">History ({displayMonth + 1}/{displayYear})</span>
-                     </div>
-
-                     {heatmapData.size === 0 ? (
-                        <div className="text-center py-12 text-stone-400 text-sm italic border border-dashed border-stone-200 rounded-3xl mx-2">
-                           No activity recorded in this month.
-                        </div>
-                     ) : (
-                        Array.from(heatmapData.keys()).sort((a: number, b: number) => b - a).map((day: number) => {
-                           const daySeconds = heatmapData.get(day) || 0;
-                           const dayLogsFiltered = tagLogs.filter(l => {
-                              const d = new Date(l.startTime);
-                              return d.getDate() === day && d.getMonth() === displayMonth && d.getFullYear() === displayYear;
-                           });
-
-                           // Get day of week
-                           const date = new Date(displayYear, displayMonth, day);
-                           const weekDay = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'][date.getDay()];
-
-                           return (
-                              <div key={day} className="mb-8 last:mb-0">
-                                 {/* Day Header */}
-                                 <div className="flex items-baseline justify-between mb-6 px-2 sticky top-0 bg-[#faf9f6]/95 backdrop-blur z-10 py-2 border-b border-stone-100">
-                                    <div className="flex items-baseline gap-3">
-                                       <span className="text-2xl font-black text-stone-900 font-mono tracking-tighter">
-                                          {String(displayMonth + 1).padStart(2, '0')}/{String(day).padStart(2, '0')}
-                                       </span>
-                                       <span className="text-xs font-bold text-stone-400 tracking-[0.2em]">{weekDay}</span>
-                                    </div>
-                                    <span className="font-mono text-sm font-bold text-stone-800 bg-stone-100 px-2 py-0.5 rounded-md">
-                                       {Math.floor(daySeconds / 60)}m
+                              const linkedTodo = todos.find(t => t.id === log.linkedTodoId);
+                              if (linkedTodo) {
+                                 return (
+                                    <span className="text-[10px] font-medium text-stone-500 border border-stone-200 px-2 py-0.5 rounded flex items-center gap-1 bg-stone-50/30">
+                                       <span className="text-stone-400 font-bold">@</span>
+                                       <span className="line-clamp-1">{linkedTodo.title}</span>
+                                       {log.progressIncrement && log.progressIncrement > 0 && (
+                                          <span className="font-mono text-stone-400 ml-0.5">+{log.progressIncrement}</span>
+                                       )}
                                     </span>
-                                 </div>
+                                 );
+                              }
+                              return null;
+                           })()}
 
-                                 {/* Timeline Items */}
-                                 <div className="relative border-l border-stone-300 ml-[70px] space-y-6 pb-4">
-                                    {dayLogsFiltered.sort((a, b) => b.startTime - a.startTime).map(log => {
-                                       const d = new Date(log.startTime);
-                                       const timeStr = `${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')} `;
-                                       const durationMins = Math.round(log.duration / 60);
-                                       const h = Math.floor(durationMins / 60);
-                                       const m = durationMins % 60;
-                                       const durStr = h > 0 ? `${h}h ${m} m` : `${m} m`;
+                           {/* Category Tag */}
+                           <span className="text-[10px] font-medium text-stone-500 border border-stone-200 px-2 py-0.5 rounded flex items-center gap-1 bg-stone-50/30">
+                              <span className="font-bold text-stone-400">#</span>
+                              <span>{category?.icon}</span>
+                              <span className="flex items-center">
+                                 <span>{category?.name}</span>
+                                 <span className="mx-1 text-stone-300">/</span>
+                                 <span className="mr-1">{activity?.icon}</span>
+                                 <span className="text-stone-500">{activity?.name}</span>
+                              </span>
+                           </span>
 
-                                       return (
-                                          <div
-                                             key={log.id}
-                                             className="relative pl-8 group cursor-pointer rounded-xl hover:bg-stone-50/80 transition-colors p-2 -ml-2"
-                                             onClick={() => onEditLog?.(log)}
-                                          >
-                                             {/* Time & Duration - Absolute Left */}
-                                             <div className="absolute -left-[60px] top-0 w-[45px] text-right flex flex-col items-end">
-                                                <span className="text-sm font-bold text-stone-800 leading-none font-mono">
-                                                   {timeStr}
-                                                </span>
-                                                <span className="text-[10px] font-medium text-stone-400 mt-1">
-                                                   {durStr}
-                                                </span>
-                                             </div>
-
-                                             {/* Timeline Dot */}
-                                             <div className="absolute left-[3px] top-2 w-2.5 h-2.5 rounded-full bg-stone-900 border-2 border-[#faf9f6] z-10" />
-
-                                             {/* Content Content (Minimalist) */}
-                                             <div className="relative top-[-2px]">
-                                                {/* Title */}
-                                                <div className="flex items-center gap-2 mb-1">
-                                                   <h4 className="text-lg font-bold text-stone-900 leading-tight">
-                                                      {activity?.name || "Activity"}
-                                                   </h4>
-                                                   {log.focusScore && log.focusScore > 0 && (
-                                                      <span className="text-sm font-bold text-stone-400 font-mono flex items-center gap-0.5">
-                                                         <Zap size={12} fill="currentColor" />
-                                                         {log.focusScore}
-                                                      </span>
-                                                   )}
-                                                </div>
-
-                                                {/* Note */}
-                                                {log.note && (
-                                                   <p className="text-sm text-stone-500 leading-relaxed mb-2 font-light whitespace-pre-wrap">
-                                                      {log.note}
-                                                   </p>
-                                                )}
-
-                                                {/* Tags / Metadata */}
-                                                <div className="flex flex-wrap items-center gap-2 mt-1">
-                                                   {/* Linked Todo */}
-                                                   {(() => {
-                                                      const linkedTodo = todos.find(t => t.id === log.linkedTodoId);
-                                                      if (linkedTodo) {
-                                                         return (
-                                                            <span className="text-[10px] font-medium text-stone-500 border border-stone-200 px-2 py-0.5 rounded flex items-center gap-1 bg-stone-50/30">
-                                                               <span className="text-stone-400 font-bold">@</span>
-                                                               <span className="line-clamp-1">{linkedTodo.title}</span>
-                                                               {log.progressIncrement && log.progressIncrement > 0 && (
-                                                                  <span className="font-mono text-stone-400 ml-0.5">+{log.progressIncrement}</span>
-                                                               )}
-                                                            </span>
-                                                         );
-                                                      }
-                                                      return null;
-                                                   })()}
-
-                                                   {/* Category Tag */}
-                                                   <span className="text-[10px] font-medium text-stone-500 border border-stone-200 px-2 py-0.5 rounded flex items-center gap-1 bg-stone-50/30">
-                                                      <span className="font-bold text-stone-400">#</span>
-                                                      <span>{category?.icon}</span>
-                                                      <span className="flex items-center">
-                                                         <span>{category?.name}</span>
-                                                         <span className="mx-1 text-stone-300">/</span>
-                                                         <span className="mr-1">{activity?.icon}</span>
-                                                         <span className="text-stone-500">{activity?.name}</span>
-                                                      </span>
-                                                   </span>
-
-                                                   {/* Scope Tags */}
-                                                   {log.scopeIds && log.scopeIds.length > 0 && log.scopeIds.map(scopeId => {
-                                                      const linkedScope = scopes.find(s => s.id === scopeId);
-                                                      if (linkedScope) {
-                                                         return (
-                                                            <span key={scopeId} className="text-[10px] font-medium text-stone-500 border border-stone-200 px-2 py-0.5 rounded flex items-center gap-1 bg-stone-50/30">
-                                                               <span className="text-stone-400 font-bold">%</span>
-                                                               <span>{linkedScope.icon || '📍'}</span>
-                                                               <span>{linkedScope.name}</span>
-                                                            </span>
-                                                         );
-                                                      }
-                                                      return null;
-                                                   })}
-                                                </div>
-                                             </div>
-                                          </div>
-                                       );
-                                    })}
-                                 </div>
-                              </div>
-                           );
-                        })
-                     )}
-                  </div>
-               </>
+                           {/* Scope Tags */}
+                           {log.scopeIds && log.scopeIds.length > 0 && log.scopeIds.map(scopeId => {
+                              const linkedScope = scopes.find(s => s.id === scopeId);
+                              if (linkedScope) {
+                                 return (
+                                    <span key={scopeId} className="text-[10px] font-medium text-stone-500 border border-stone-200 px-2 py-0.5 rounded flex items-center gap-1 bg-stone-50/30">
+                                       <span className="text-stone-400 font-bold">%</span>
+                                       <span>{linkedScope.icon || '📍'}</span>
+                                       <span>{linkedScope.name}</span>
+                                    </span>
+                                 );
+                              }
+                              return null;
+                           })}
+                        </div>
+                     );
+                  }}
+               />
             );
 
          case '关联':
