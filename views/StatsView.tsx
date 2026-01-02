@@ -12,6 +12,7 @@ import { Log, Category, Activity, Scope, TodoItem, TodoCategory } from '../types
 import { COLOR_OPTIONS } from '../constants';
 import { Minimize2, Share, PieChart, Grid, Calendar, ChevronLeft, ChevronRight, TrendingUp, TrendingDown } from 'lucide-react';
 import { ToastType } from '../components/Toast';
+import { MonthHeatmap } from '../components/MonthHeatmap';
 
 interface StatsViewProps {
   logs: Log[];
@@ -37,7 +38,7 @@ interface StatsViewProps {
 
 type ViewType = 'pie' | 'matrix' | 'schedule' | 'line';
 type PieRange = 'day' | 'week' | 'month' | 'year';
-type ScheduleRange = 'day' | 'week';
+type ScheduleRange = 'day' | 'week' | 'month';
 
 interface ActivityStat extends Activity {
   duration: number;
@@ -52,7 +53,9 @@ interface CategoryStat extends Category {
 export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentDate, onBack, onDateChange, isFullScreen, onToggleFullScreen, onToast, onTitleChange, todos, todoCategories, scopes, hideControls = false, hideRangeControls = false, hideDateNavigation = false, forcedView, forcedRange, allowedViews = ['pie', 'matrix', 'line', 'schedule'] }) => {
   const [viewType, setViewType] = useState<ViewType>(forcedView || 'pie');
   const [pieRange, setPieRange] = useState<PieRange>(forcedRange || 'day');
-  const [scheduleRange, setScheduleRange] = useState<ScheduleRange>(forcedRange === 'week' ? 'week' : 'day');
+  const [scheduleRange, setScheduleRange] = useState<ScheduleRange>(
+    forcedRange === 'month' ? 'month' : (forcedRange === 'week' ? 'week' : 'day')
+  );
   const [lineRange, setLineRange] = useState<'week' | 'month'>((forcedRange === 'month' || forcedRange === 'year') ? 'month' : 'week');
   const [excludedCategoryIds, setExcludedCategoryIds] = useState<string[]>([]);
 
@@ -75,7 +78,9 @@ export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentD
     } else if (viewType === 'line') {
       rangeType = lineRange === 'week' ? 'week_fixed' : 'month';
     } else if (viewType === 'schedule') {
-      rangeType = scheduleRange === 'day' ? 'day_fixed' : 'week_fixed';
+      if (scheduleRange === 'day') rangeType = 'day_fixed';
+      else if (scheduleRange === 'month') rangeType = 'month';
+      else rangeType = 'week_fixed';
     } else {
       rangeType = 'day';
     }
@@ -210,7 +215,11 @@ export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentD
     if (viewType === 'pie') return getDateRange(currentDate, pieRange);
     if (viewType === 'matrix') return getDateRange(currentDate, 'week_fixed');
     if (viewType === 'line') return getDateRange(currentDate, lineRange === 'week' ? 'week_fixed' : 'month');
-    if (viewType === 'schedule') return getDateRange(currentDate, scheduleRange === 'day' ? 'day_fixed' : 'week_fixed');
+    if (viewType === 'schedule') {
+      if (scheduleRange === 'day') return getDateRange(currentDate, 'day_fixed');
+      if (scheduleRange === 'month') return getDateRange(currentDate, 'month');
+      return getDateRange(currentDate, 'week_fixed');
+    }
     return getDateRange(currentDate, 'day');
   }, [currentDate, viewType, pieRange, scheduleRange, lineRange]);
 
@@ -223,7 +232,9 @@ export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentD
       } else if (viewType === 'matrix') {
         rangeType = 'week_fixed';
       } else if (viewType === 'schedule') {
-        rangeType = scheduleRange === 'day' ? 'day_fixed' : 'week_fixed';
+        if (scheduleRange === 'day') rangeType = 'day_fixed';
+        else if (scheduleRange === 'month') rangeType = 'month';
+        else rangeType = 'week_fixed';
       } else if (viewType === 'line') {
         rangeType = lineRange === 'week' ? 'week_fixed' : 'month';
       } else {
@@ -748,7 +759,7 @@ export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentD
           </div>
         </div>
       );
-    } else {
+    } else if (scheduleRange === 'week') {
       const weekDays = Array.from({ length: 7 }, (_, i) => {
         const d = new Date(rangeStart);
         d.setDate(d.getDate() + i);
@@ -826,6 +837,17 @@ export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentD
           </div>
         </div>
       )
+    } else if (scheduleRange === 'month') {
+      // Month heatmap view
+      return (
+        <div className={`${containerClasses} p-1`} style={{ height: isFullScreen ? '100%' : '700px' }}>
+          <MonthHeatmap
+            logs={filteredLogs}
+            categories={categories}
+            month={currentDate}
+          />
+        </div>
+      );
     }
   };
 
@@ -871,13 +893,13 @@ export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentD
                 )}
                 {!hideRangeControls && viewType === 'schedule' && (
                   <div className="flex bg-stone-100/50 p-0.5 rounded-lg w-fit">
-                    {(['day', 'week'] as ScheduleRange[]).map((r) => (
+                    {(['day', 'week', 'month'] as ScheduleRange[]).map((r) => (
                       <button
                         key={r}
                         onClick={() => setScheduleRange(r)}
                         className={`px-2.5 py-1 rounded-md text-[10px] font-bold transition-all ${scheduleRange === r ? 'bg-white text-stone-900 shadow-sm' : 'text-stone-400 hover:text-stone-600'}`}
                       >
-                        {{ day: '日', week: '周' }[r]}
+                        {{ day: '日', week: '周', month: '月' }[r]}
                       </button>
                     ))}
                   </div>

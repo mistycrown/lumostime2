@@ -604,7 +604,7 @@ export const MonthlyReviewView: React.FC<MonthlyReviewViewProps> = ({
                             hideDateNavigation={true} // Hide date navigation
                             // forcedView="pie"  <- User wants to switch views
                             forcedRange="month" // Force month range
-                            allowedViews={['pie', 'line']} // Only Pie and Trend
+                            allowedViews={['pie', 'line', 'schedule']} // Pie, Trend, and Schedule (Month Heatmap)
                         />
                     </div>
                 )}
