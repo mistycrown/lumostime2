@@ -34,6 +34,8 @@ interface DetailTimelineCardProps {
 
     // 自定义元数据渲染（用于显示不同页面特定的标签）
     renderLogMetadata?: (log: Log) => React.ReactNode;
+    // 默认视图模式 (默认 'month')
+    defaultViewMode?: 'month' | 'all';
 }
 
 export const DetailTimelineCard: React.FC<DetailTimelineCardProps> = ({
@@ -44,9 +46,10 @@ export const DetailTimelineCard: React.FC<DetailTimelineCardProps> = ({
     entityInfo,
     onEditLog,
     categories,
-    renderLogMetadata
+    renderLogMetadata,
+    defaultViewMode = 'month'
 }) => {
-    const [viewMode, setViewMode] = React.useState<'month' | 'all'>('month');
+    const [viewMode, setViewMode] = React.useState<'month' | 'all'>(defaultViewMode);
 
     const displayMonth = displayDate.getMonth();
     const displayYear = displayDate.getFullYear();

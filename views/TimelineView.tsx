@@ -240,6 +240,42 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ logs, todos, scopes,
         };
     }, [currentDate, monthlyReviews, onOpenMonthlyReview, monthlyReviewTime]);
 
+    // 触摸滑动手势处理
+    const [touchStart, setTouchStart] = useState<number | null>(null);
+    const [touchEnd, setTouchEnd] = useState<number | null>(null);
+
+    // 最小滑动距离（像素）- 防止误触
+    const minSwipeDistance = 100;
+
+    const onTouchStart = (e: React.TouchEvent) => {
+        setTouchEnd(null);
+        setTouchStart(e.targetTouches[0].clientX);
+    };
+
+    const onTouchMove = (e: React.TouchEvent) => {
+        setTouchEnd(e.targetTouches[0].clientX);
+    };
+
+    const onTouchEnd = () => {
+        if (!touchStart || !touchEnd) return;
+
+        const distance = touchStart - touchEnd;
+        const isLeftSwipe = distance > minSwipeDistance;
+        const isRightSwipe = distance < -minSwipeDistance;
+
+        if (isLeftSwipe) {
+            // 向左滑动 = 下一天 (Next Day)
+            const nextDate = new Date(currentDate);
+            nextDate.setDate(nextDate.getDate() + 1);
+            onDateChange(nextDate);
+        } else if (isRightSwipe) {
+            // 向右滑动 = 上一天 (Previous Day)
+            const prevDate = new Date(currentDate);
+            prevDate.setDate(prevDate.getDate() - 1);
+            onDateChange(prevDate);
+        }
+    };
+
     const scrollContainerRef = useRef<HTMLDivElement>(null);
 
     // --- Date Helpers ---
@@ -501,7 +537,12 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ logs, todos, scopes,
     };
 
     return (
-        <div className="h-full bg-[#faf9f6] flex flex-col relative text-stone-900">
+        <div
+            className="h-full bg-[#faf9f6] flex flex-col relative text-stone-900"
+            onTouchStart={onTouchStart}
+            onTouchMove={onTouchMove}
+            onTouchEnd={onTouchEnd}
+        >
 
             {/* Header & Calendar Container */}
             <div className="flex flex-col shrink-0">
