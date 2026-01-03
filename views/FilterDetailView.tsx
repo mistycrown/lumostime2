@@ -317,6 +317,7 @@ export const FilterDetailView: React.FC<FilterDetailViewProps> = ({
                 return (
                     <DetailTimelineCard
                         filteredLogs={filteredLogs}
+                        defaultViewMode="all"
                         displayDate={displayDate}
                         onDateChange={setDisplayDate}
                         entityInfo={{
