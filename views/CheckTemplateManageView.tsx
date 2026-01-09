@@ -174,17 +174,15 @@ export const CheckTemplateManageView: React.FC<CheckTemplateManageViewProps> = (
                                                         <span className="px-1.5 py-0.5 bg-stone-100 text-stone-400 text-[10px] rounded">已停用</span>
                                                     )}
                                                 </div>
-                                                <div className="space-y-1">
-                                                    {template.items.slice(0, 3).map((item, idx) => (
-                                                        <div key={idx} className="flex items-center gap-2 text-xs text-stone-500">
+                                                <div className="flex flex-wrap gap-2">
+                                                    {template.items.map((item, idx) => (
+                                                        <div
+                                                            key={idx}
+                                                            className="px-2 py-1.5 rounded-lg text-[10px] font-medium text-center border transition-colors flex items-center justify-center gap-1.5 bg-stone-50 text-stone-500 border-stone-100"
+                                                        >
                                                             <span className="truncate">{item.content}</span>
                                                         </div>
                                                     ))}
-                                                    {template.items.length > 3 && (
-                                                        <div className="text-[10px] text-stone-400 pl-3">
-                                                            +{template.items.length - 3} 更多...
-                                                        </div>
-                                                    )}
                                                 </div>
                                             </div>
 
