@@ -40,6 +40,7 @@ import { webdavService } from './services/webdavService';
 import { splitLogByDays } from './utils/logUtils';
 import { ParsedTimeEntry, aiService } from './services/aiService';
 import { narrativeService } from './services/narrativeService';
+import { UpdateService } from './services/updateService';
 import { NfcService } from './services/NfcService';
 import { NARRATIVE_TEMPLATES } from './constants';
 import FocusNotification from './plugins/FocusNotificationPlugin';
@@ -184,6 +185,25 @@ const AppContent: React.FC = () => {
       }
     };
     loadAppRules();
+  }, []);
+
+  // Check for Updates on Mount
+  useEffect(() => {
+    const checkUpdates = async () => {
+      console.log('App: checking for updates...');
+      try {
+        const updateInfo = await UpdateService.checkNeedsUpdate();
+        if (updateInfo) {
+          addToast('info', `发现新版本: ${updateInfo.version}`);
+          console.log('App: Update found', updateInfo);
+        } else {
+          console.log('App check: No updates found (System is up to date)');
+        }
+      } catch (e) {
+        console.error('App: Update check failed', e);
+      }
+    };
+    checkUpdates();
   }, []);
 
 
@@ -1216,12 +1236,32 @@ const AppContent: React.FC = () => {
           syncToTimeline: t.syncToTimeline
         }));
 
+      // 生成初始日课 (初始化 checkItems)
+      const initialCheckItems: any[] = [];
+      const dailyCheckTemplates = checkTemplates.filter(t => t.enabled && t.isDaily);
+      if (dailyCheckTemplates.length > 0) {
+        dailyCheckTemplates.sort((a, b) => a.order - b.order).forEach(t => {
+          t.items.forEach((item: any) => {
+            const content = typeof item === 'string' ? item : item.content;
+            const icon = typeof item === 'string' ? undefined : item.icon;
+            initialCheckItems.push({
+              id: crypto.randomUUID(),
+              category: t.title,
+              content: content,
+              icon: icon,
+              isCompleted: false
+            });
+          });
+        });
+      }
+
       review = {
         id: crypto.randomUUID(),
         date: dateStr,
         createdAt: Date.now(),
         updatedAt: Date.now(),
         answers: [],
+        checkItems: initialCheckItems, // Initialize with template items
         templateSnapshot  // 保存当时的模板快照
       };
       setDailyReviews(prev => [...prev, review!]);
@@ -1408,7 +1448,7 @@ const AppContent: React.FC = () => {
           onDelete={handleDeleteReview}
           onUpdateReview={handleUpdateReview}
           onGenerateNarrative={handleGenerateNarrative}
-          onGenerateNarrative={handleGenerateNarrative}
+
           addToast={addToast}
           checkTemplates={checkTemplates}
         />
@@ -2210,9 +2250,15 @@ const NavButton: React.FC<{ icon: React.ReactNode, label: string, isActive: bool
 
 const AppWithProviders: React.FC = () => {
   const { activeSessions, setActiveSessions } = useSession();
+  const { logs, setLogs } = useData();
 
   return (
-    <CategoryScopeProvider activeSessions={activeSessions} setActiveSessions={setActiveSessions}>
+    <CategoryScopeProvider
+      activeSessions={activeSessions}
+      setActiveSessions={setActiveSessions}
+      logs={logs}
+      setLogs={setLogs}
+    >
       <NavigationProvider>
         <AppContent />
       </NavigationProvider>

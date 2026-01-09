@@ -24,6 +24,7 @@ interface CategoryScopeContextType {
 
     // Activity管理
     handleUpdateActivity: (updatedActivity: any) => void;
+    handleCategoryChange: (activityId: string, newCategoryId: string) => void;
 }
 
 const CategoryScopeContext = createContext<CategoryScopeContextType | undefined>(undefined);
@@ -47,7 +48,9 @@ interface CategoryScopeProviderProps {
 export const CategoryScopeProvider: React.FC<CategoryScopeProviderProps> = ({
     children,
     activeSessions,
-    setActiveSessions
+    setActiveSessions,
+    logs,
+    setLogs
 }) => {
     // Categories State
     const [categories, setCategories] = useState<Category[]>(() => {
