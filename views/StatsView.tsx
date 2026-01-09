@@ -1726,11 +1726,7 @@ export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentD
                                     })}
                                   </div>
 
-                                  <div className="w-12 sm:w-16 shrink-0 flex items-center justify-end px-1 sm:px-2 border-l border-stone-100 ml-1 sm:ml-2">
-                                    <span className="text-xs sm:text-sm font-bold text-stone-800 font-mono">
-                                      {Math.round((habit.stats.checked / (checkStats.allDays.length || 1)) * 100)}%
-                                    </span>
-                                  </div>
+
                                 </div>
                               );
                             })}
