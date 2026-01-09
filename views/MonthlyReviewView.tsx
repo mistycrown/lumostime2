@@ -34,7 +34,7 @@ interface MonthlyReviewViewProps {
     onDelete: () => void;
     onUpdateReview: (review: MonthlyReview) => void;
     onGenerateNarrative: (review: MonthlyReview, statsText: string, promptTemplate?: string) => Promise<string>;
-    addToast: (message: string, type: 'success' | 'error' | 'info') => void;
+    addToast: (type: 'success' | 'error' | 'info', message: string) => void;
     onClose?: () => void;
 }
 
@@ -391,7 +391,7 @@ export const MonthlyReviewView: React.FC<MonthlyReviewViewProps> = ({
             onUpdateReview(updatedReview);
         } catch (error) {
             console.error('生成叙事失败:', error);
-            addToast('生成叙事失败', 'error');
+            addToast('error', '生成叙事失败');
         } finally {
             setIsGenerating(false);
         }
@@ -430,10 +430,10 @@ export const MonthlyReviewView: React.FC<MonthlyReviewViewProps> = ({
             setNarrative('');
             setEditedNarrative('');
             setIsEditing(false);
-            addToast('叙事已删除', 'success');
+            addToast('success', '叙事已删除');
         } catch (error) {
             console.error('Failed to delete narrative', error);
-            addToast('删除失败', 'error');
+            addToast('error', '删除失败');
         } finally {
             setIsDeleteConfirmOpen(false);
         }
