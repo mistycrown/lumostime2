@@ -8,9 +8,9 @@
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
 import React, { useState, useMemo, useEffect } from 'react';
-import { Log, Category, Activity, Scope, TodoItem, TodoCategory } from '../types';
+import { Log, Category, Activity, Scope, TodoItem, TodoCategory, DailyReview } from '../types';
 import { COLOR_OPTIONS } from '../constants';
-import { Minimize2, Share, PieChart, Grid, Calendar, ChevronLeft, ChevronRight, TrendingUp, TrendingDown } from 'lucide-react';
+import { Minimize2, Share, PieChart, Grid, Calendar, ChevronLeft, ChevronRight, TrendingUp, TrendingDown, CheckCircle2 } from 'lucide-react';
 import { ToastType } from '../components/Toast';
 import { MonthHeatmap } from '../components/MonthHeatmap';
 
@@ -27,6 +27,7 @@ interface StatsViewProps {
   todos: TodoItem[];
   todoCategories: TodoCategory[];
   scopes: Scope[];
+  dailyReviews?: DailyReview[]; // Add dailyReviews prop
   // Daily Review 支持
   hideControls?: boolean;  // 隐藏所有控制条
   hideRangeControls?: boolean; // 隐藏左侧时间范围选择 (日/周/月/年)
@@ -36,7 +37,7 @@ interface StatsViewProps {
   allowedViews?: ViewType[]; // 允许切换的视图类型，默认全部
 }
 
-type ViewType = 'pie' | 'matrix' | 'schedule' | 'line';
+type ViewType = 'pie' | 'matrix' | 'schedule' | 'line' | 'check';
 type PieRange = 'day' | 'week' | 'month' | 'year';
 type ScheduleRange = 'day' | 'week' | 'month';
 
@@ -50,7 +51,7 @@ interface CategoryStat extends Category {
   items: ActivityStat[];
 }
 
-export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentDate, onBack, onDateChange, isFullScreen, onToggleFullScreen, onToast, onTitleChange, todos, todoCategories, scopes, hideControls = false, hideRangeControls = false, hideDateNavigation = false, forcedView, forcedRange, allowedViews = ['pie', 'matrix', 'line', 'schedule'] }) => {
+export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentDate, onBack, onDateChange, isFullScreen, onToggleFullScreen, onToast, onTitleChange, todos, todoCategories, scopes, dailyReviews = [], hideControls = false, hideRangeControls = false, hideDateNavigation = false, forcedView, forcedRange, allowedViews = ['pie', 'matrix', 'line', 'schedule', 'check'] }) => {
   const [viewType, setViewType] = useState<ViewType>(forcedView || 'pie');
   const [pieRange, setPieRange] = useState<PieRange>(forcedRange || 'day');
   const [scheduleRange, setScheduleRange] = useState<ScheduleRange>(
@@ -220,6 +221,12 @@ export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentD
       if (scheduleRange === 'month') return getDateRange(currentDate, 'month');
       return getDateRange(currentDate, 'week_fixed');
     }
+    if (viewType === 'check') {
+      // Check view uses pieRange but doesn't support 'day'
+      // If pieRange is day, we default to week
+      const actualRange = pieRange === 'day' ? 'week' : pieRange;
+      return getDateRange(currentDate, actualRange);
+    }
     return getDateRange(currentDate, 'day');
   }, [currentDate, viewType, pieRange, scheduleRange, lineRange]);
 
@@ -237,6 +244,8 @@ export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentD
         else rangeType = 'week_fixed';
       } else if (viewType === 'line') {
         rangeType = lineRange === 'week' ? 'week_fixed' : 'month';
+      } else if (viewType === 'check') {
+        rangeType = pieRange === 'day' ? 'week' : pieRange;
       } else {
         rangeType = 'day';
       }
@@ -690,6 +699,80 @@ export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentD
     return { h: Math.floor(s / 3600), m: Math.floor((s % 3600) / 60) };
   })();
 
+  // --- Check Stats Logic ---
+  const checkStats = useMemo(() => {
+    if (viewType !== 'check') return { categories: [] };
+
+    // 1. Collect all dates in range
+    const days: string[] = [];
+    const dateMap: Record<string, Date> = {};
+    let curr = new Date(rangeStart);
+    while (curr <= rangeEnd) {
+      const dStr = `${curr.getFullYear()}-${String(curr.getMonth() + 1).padStart(2, '0')}-${String(curr.getDate()).padStart(2, '0')}`;
+      days.push(dStr);
+      dateMap[dStr] = new Date(curr);
+      curr.setDate(curr.getDate() + 1);
+    }
+
+    // 2. Identify unique habits (by content + category)
+    // Structure: Category -> Habit -> Date -> Status
+    const habits: Record<string, Record<string, Record<string, boolean>>> = {};
+    const habitStats: Record<string, { total: number, checked: number }> = {}; // Key: "Category|Habit"
+
+    dailyReviews.forEach(review => {
+      // Normalize review date to fit our range
+      // Review date is string YYYY-MM-DD
+      if (days.includes(review.date) && review.checkItems) {
+        review.checkItems.forEach(item => {
+          const category = item.category || '默认';
+          const content = item.content;
+          const key = `${category}|${content}`;
+
+          if (!habits[category]) habits[category] = {};
+          if (!habits[category][content]) habits[category][content] = {};
+
+          habits[category][content][review.date] = item.isCompleted;
+
+          if (!habitStats[key]) habitStats[key] = { total: 0, checked: 0 };
+          habitStats[key].total++;
+          if (item.isCompleted) habitStats[key].checked++;
+        });
+      }
+    });
+
+    // Convert to sorted array
+    const sortedCategories = Object.keys(habits).sort().map(cat => {
+      const catHabits = Object.keys(habits[cat]).sort().map(hab => {
+        const key = `${cat}|${hab}`;
+        const stats = habitStats[key] || { total: 0, checked: 0 };
+        // Determine icon: try to find one from the items
+        let icon = '';
+        Object.keys(habits[cat][hab]).some(d => {
+          // This is messy, as we stored boolean. We need to look up source dailyReviews!
+          // Optimization: Store icon in habits map or lookup.
+          // Let's iterate dailyReviews again or store it in habits structure? 
+          // Better: 'habits' should store { checked: boolean, icon: string }
+          return false;
+        });
+
+        // Simpler fallback: Look at the first review that has this item and grab the icon
+        const sampleReview = dailyReviews.find(r => r.checkItems?.some(i => i.content === hab));
+        const sampleItem = sampleReview?.checkItems?.find(i => i.content === hab);
+
+        return {
+          name: hab,
+          // Use Array.from to correctly handle emoji characters (surrogate pairs)
+          icon: Array.from(hab)[0] || '📝',
+          days: habits[cat][hab], // Map of DateStr -> Boolean
+          stats
+        };
+      });
+      return { name: cat, items: catHabits };
+    });
+
+    return { categories: sortedCategories, allDays: days, dateMap };
+  }, [dailyReviews, rangeStart, rangeEnd, viewType]);
+
   const layoutDayEvents = (dayLogs: Log[]) => {
     const sorted = [...dayLogs].sort((a, b) => a.startTime - b.startTime);
     const clusters: Log[][] = [];
@@ -920,6 +1003,30 @@ export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentD
                     </button>
                   </div>
                 )}
+                {!hideRangeControls && viewType === 'check' && (
+                  <div className="flex bg-stone-100/50 p-0.5 rounded-lg w-fit">
+                    {/* Check view supports Week, Month, Year. Day is disabled/hidden or just excluded */}
+
+                    <button
+                      onClick={() => setPieRange('week')}
+                      className={`px-2.5 py-1 rounded-md text-[10px] font-bold transition-all ${pieRange === 'week' ? 'bg-white text-stone-900 shadow-sm' : 'text-stone-400 hover:text-stone-600'}`}
+                    >
+                      周
+                    </button>
+                    <button
+                      onClick={() => setPieRange('month')}
+                      className={`px-2.5 py-1 rounded-md text-[10px] font-bold transition-all ${pieRange === 'month' ? 'bg-white text-stone-900 shadow-sm' : 'text-stone-400 hover:text-stone-600'}`}
+                    >
+                      月
+                    </button>
+                    <button
+                      onClick={() => setPieRange('year')}
+                      className={`px-2.5 py-1 rounded-md text-[10px] font-bold transition-all ${pieRange === 'year' ? 'bg-white text-stone-900 shadow-sm' : 'text-stone-400 hover:text-stone-600'}`}
+                    >
+                      年
+                    </button>
+                  </div>
+                )}
               </div>
 
               {/* Right: Date Navigation + View Type Switcher */}
@@ -964,6 +1071,18 @@ export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentD
                   {allowedViews.includes('schedule') && (
                     <button onClick={() => setViewType('schedule')} className={`p-1.5 rounded-md transition-all ${viewType === 'schedule' ? 'bg-white text-stone-900 shadow-sm' : 'text-stone-400 hover:text-stone-600'}`} title="日程">
                       <Calendar size={14} />
+                    </button>
+                  )}
+                  {allowedViews.includes('check') && (
+                    <button
+                      onClick={() => {
+                        setViewType('check');
+                        if (pieRange === 'day') setPieRange('week'); // Default to week if currently day
+                      }}
+                      className={`p-1.5 rounded-md transition-all ${viewType === 'check' ? 'bg-white text-stone-900 shadow-sm' : 'text-stone-400 hover:text-stone-600'}`}
+                      title="打卡"
+                    >
+                      <CheckCircle2 size={14} />
                     </button>
                   )}
                 </div>
@@ -1532,6 +1651,262 @@ export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentD
           {viewType === 'schedule' && (
             <div className={`animate-in fade-in zoom-in-95 duration-300 ${isFullScreen ? 'flex-1 flex flex-col' : ''}`}>
               {renderSchedule()}
+            </div>
+          )}
+
+          {/* --- Check View Content --- */}
+          {viewType === 'check' && (
+            <div className="space-y-6 animate-in fade-in zoom-in-95 duration-300">
+              {checkStats.categories.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-20 text-stone-400">
+                  <CheckCircle2 size={48} className="mb-4 opacity-20" />
+                  <p>该时间段无打卡记录</p>
+                </div>
+              ) : (
+                <>
+                  {/* Week View */}
+                  {pieRange === 'week' && (
+                    <div className="space-y-8">
+                      {checkStats.categories.map(cat => (
+                        <div key={cat.name} className="space-y-3">
+                          <div className="flex items-center gap-2">
+                            <h3 className="text-sm font-bold text-stone-900">{cat.name === '默认' ? '日常习惯' : cat.name}</h3>
+                            <div className="h-px bg-stone-100 flex-1"></div>
+                          </div>
+                          <div className="space-y-2">
+                            {cat.items.map(habit => {
+                              const colors = [
+                                { bg: 'bg-red-100', text: 'text-red-500', fill: 'bg-red-200' },
+                                { bg: 'bg-orange-100', text: 'text-orange-500', fill: 'bg-orange-200' },
+                                { bg: 'bg-amber-100', text: 'text-amber-500', fill: 'bg-amber-200' },
+                                { bg: 'bg-yellow-100', text: 'text-yellow-600', fill: 'bg-yellow-200' },
+                                { bg: 'bg-lime-100', text: 'text-lime-600', fill: 'bg-lime-200' },
+                                { bg: 'bg-green-100', text: 'text-green-600', fill: 'bg-green-200' },
+                                { bg: 'bg-emerald-100', text: 'text-emerald-600', fill: 'bg-emerald-200' },
+                                { bg: 'bg-teal-100', text: 'text-teal-600', fill: 'bg-teal-200' },
+                                { bg: 'bg-cyan-100', text: 'text-cyan-600', fill: 'bg-cyan-200' },
+                                { bg: 'bg-sky-100', text: 'text-sky-600', fill: 'bg-sky-200' },
+                                { bg: 'bg-blue-100', text: 'text-blue-600', fill: 'bg-blue-200' },
+                                { bg: 'bg-indigo-100', text: 'text-indigo-600', fill: 'bg-indigo-200' },
+                                { bg: 'bg-violet-100', text: 'text-violet-600', fill: 'bg-violet-200' },
+                                { bg: 'bg-purple-100', text: 'text-purple-600', fill: 'bg-purple-200' },
+                                { bg: 'bg-fuchsia-100', text: 'text-fuchsia-600', fill: 'bg-fuchsia-200' },
+                                { bg: 'bg-pink-100', text: 'text-pink-600', fill: 'bg-pink-200' },
+                                { bg: 'bg-rose-100', text: 'text-rose-600', fill: 'bg-rose-200' }
+                              ];
+                              const colorIndex = Math.abs(habit.name.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0)) % colors.length;
+                              const style = colors[colorIndex];
+
+                              return (
+                                <div key={habit.name} className="flex items-center justify-between bg-white rounded-xl p-3 shadow-sm border border-stone-100">
+                                  <div className="w-28 sm:w-40 shrink-0 flex items-center">
+                                    <span className="text-sm font-medium text-stone-800 truncate" title={habit.name}>
+                                      {habit.name}
+                                    </span>
+                                  </div>
+
+                                  <div className="flex items-center gap-1 sm:gap-2 flex-1 justify-end px-2 sm:px-4">
+                                    {checkStats.allDays.map(dayStr => {
+                                      const isChecked = habit.days[dayStr];
+                                      const date = checkStats.dateMap[dayStr];
+                                      return (
+                                        <div key={dayStr} className="flex flex-col items-center gap-1">
+                                          <div
+                                            title={`${date.toLocaleDateString()} ${isChecked ? '已完成' : '未完成'}`}
+                                            className={`w-6 h-6 sm:w-8 sm:h-8 rounded-full flex items-center justify-center transition-all ${isChecked
+                                              ? `${style.fill} ${style.text}`
+                                              : 'bg-stone-50 border border-stone-100'
+                                              }`}
+                                          >
+                                            {isChecked && <CheckCircle2 className="w-3 h-3 sm:w-4 sm:h-4" strokeWidth={3} />}
+                                          </div>
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+
+                                  <div className="w-12 sm:w-16 shrink-0 flex items-center justify-end px-1 sm:px-2 border-l border-stone-100 ml-1 sm:ml-2">
+                                    <span className="text-xs sm:text-sm font-bold text-stone-800 font-mono">
+                                      {Math.round((habit.stats.checked / (checkStats.allDays.length || 1)) * 100)}%
+                                    </span>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Month View */}
+                  {pieRange === 'month' && (
+                    <div className="grid grid-cols-2 gap-4">
+                      {checkStats.categories.flatMap(cat => cat.items.map(habit => {
+                        const colors = [
+                          { bg: 'bg-red-100', text: 'text-red-500', fill: 'bg-red-400' },
+                          { bg: 'bg-orange-100', text: 'text-orange-500', fill: 'bg-orange-400' },
+                          { bg: 'bg-amber-100', text: 'text-amber-500', fill: 'bg-amber-400' },
+                          { bg: 'bg-yellow-100', text: 'text-yellow-600', fill: 'bg-yellow-400' },
+                          { bg: 'bg-lime-100', text: 'text-lime-600', fill: 'bg-lime-400' },
+                          { bg: 'bg-green-100', text: 'text-green-600', fill: 'bg-green-400' },
+                          { bg: 'bg-emerald-100', text: 'text-emerald-600', fill: 'bg-emerald-400' },
+                          { bg: 'bg-teal-100', text: 'text-teal-600', fill: 'bg-teal-400' },
+                          { bg: 'bg-cyan-100', text: 'text-cyan-600', fill: 'bg-cyan-400' },
+                          { bg: 'bg-sky-100', text: 'text-sky-600', fill: 'bg-sky-400' },
+                          { bg: 'bg-blue-100', text: 'text-blue-600', fill: 'bg-blue-400' },
+                          { bg: 'bg-indigo-100', text: 'text-indigo-600', fill: 'bg-indigo-400' },
+                          { bg: 'bg-violet-100', text: 'text-violet-600', fill: 'bg-violet-400' },
+                          { bg: 'bg-purple-100', text: 'text-purple-600', fill: 'bg-purple-400' },
+                          { bg: 'bg-fuchsia-100', text: 'text-fuchsia-600', fill: 'bg-fuchsia-400' },
+                          { bg: 'bg-pink-100', text: 'text-pink-600', fill: 'bg-pink-400' },
+                          { bg: 'bg-rose-100', text: 'text-rose-600', fill: 'bg-rose-400' }
+                        ];
+                        const colorIndex = Math.abs(habit.name.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0)) % colors.length;
+                        const style = colors[colorIndex];
+
+                        return (
+                          <div key={`${cat.name}-${habit.name}`} className="bg-white rounded-2xl p-4 shadow-sm border border-stone-100 flex flex-col">
+                            <div className="flex items-start justify-between mb-2">
+                              <div className="flex items-center gap-3">
+                                <div>
+                                  <h4 className="font-bold text-stone-800 text-sm">
+                                    {habit.name}
+                                  </h4>
+                                  <p className="text-xs text-stone-400">{cat.name === '默认' ? '日常' : cat.name}</p>
+                                </div>
+                              </div>
+                            </div>
+
+                            <div className="flex-1">
+                              <div className="grid grid-cols-7 gap-1">
+                                {(() => {
+                                  // Monday start: Sunday is 0, we want it to be 6. Monday is 1, we want 0.
+                                  // formula: (day + 6) % 7
+                                  const startDay = (new Date(rangeStart).getDay() + 6) % 7;
+                                  const blanks = Array.from({ length: startDay }, (_, i) => <div key={`blank-${i}`} />);
+
+                                  return [
+                                    ...blanks,
+                                    ...checkStats.allDays.map(dayStr => {
+                                      const isChecked = habit.days[dayStr];
+                                      const dayNum = parseInt(dayStr.split('-')[2]);
+                                      return (
+                                        <div
+                                          key={dayStr}
+                                          className={`aspect-square rounded-md flex items-center justify-center text-[10px] font-medium transition-colors ${isChecked ? `${style.fill} text-white` : 'bg-stone-50 text-stone-300'
+                                            }`}
+                                        >
+                                          {dayNum}
+                                        </div>
+                                      )
+                                    })
+                                  ];
+                                })()}
+                              </div>
+                            </div>
+
+                            <div className="flex items-center justify-between mt-3 pt-2 border-t border-stone-50">
+                              <div className="flex items-center gap-1.5 text-xs text-stone-500">
+                                <CheckCircle2 size={14} className={style.text} />
+                                <span className="font-bold">{habit.stats.checked}</span>
+                                <span className="text-[10px] text-stone-300">次完成</span>
+                              </div>
+                              <div className="flex items-center gap-1.5 text-xs text-stone-500">
+                                <span className="text-[10px]">🔥</span>
+                                <span className="font-bold">{Math.round((habit.stats.checked / (checkStats.allDays.length || 1)) * 100)}%</span>
+                              </div>
+                            </div>
+                          </div>
+                        )
+                      }))}
+                    </div>
+                  )}
+
+                  {/* Year View */}
+                  {pieRange === 'year' && (
+                    <div className="space-y-4">
+                      {checkStats.categories.flatMap(cat => cat.items.map(habit => {
+                        const colors = [
+                          { bg: 'bg-red-100', text: 'text-red-500', fill: 'bg-red-400' },
+                          { bg: 'bg-orange-100', text: 'text-orange-500', fill: 'bg-orange-400' },
+                          { bg: 'bg-amber-100', text: 'text-amber-500', fill: 'bg-amber-400' },
+                          { bg: 'bg-yellow-100', text: 'text-yellow-600', fill: 'bg-yellow-400' },
+                          { bg: 'bg-lime-100', text: 'text-lime-600', fill: 'bg-lime-400' },
+                          { bg: 'bg-green-100', text: 'text-green-600', fill: 'bg-green-400' },
+                          { bg: 'bg-emerald-100', text: 'text-emerald-600', fill: 'bg-emerald-400' },
+                          { bg: 'bg-teal-100', text: 'text-teal-600', fill: 'bg-teal-400' },
+                          { bg: 'bg-cyan-100', text: 'text-cyan-600', fill: 'bg-cyan-400' },
+                          { bg: 'bg-sky-100', text: 'text-sky-600', fill: 'bg-sky-400' },
+                          { bg: 'bg-blue-100', text: 'text-blue-600', fill: 'bg-blue-400' },
+                          { bg: 'bg-indigo-100', text: 'text-indigo-600', fill: 'bg-indigo-400' },
+                          { bg: 'bg-violet-100', text: 'text-violet-600', fill: 'bg-violet-400' },
+                          { bg: 'bg-purple-100', text: 'text-purple-600', fill: 'bg-purple-400' },
+                          { bg: 'bg-fuchsia-100', text: 'text-fuchsia-600', fill: 'bg-fuchsia-400' },
+                          { bg: 'bg-pink-100', text: 'text-pink-600', fill: 'bg-pink-400' },
+                          { bg: 'bg-rose-100', text: 'text-rose-600', fill: 'bg-rose-400' }
+                        ];
+                        const colorIndex = Math.abs(habit.name.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0)) % colors.length;
+                        const style = colors[colorIndex];
+
+                        return (
+                          <div key={`${cat.name}-${habit.name}`} className="bg-white rounded-xl py-4 shadow-sm border border-stone-100 overflow-hidden">
+                            <div className="flex items-center gap-3 mb-4 px-4">
+                              <span className="font-bold text-sm text-stone-800 shrink-0">
+                                {habit.name}
+                              </span>
+                              <span className="text-xs text-stone-400 ml-auto shrink-0">{cat.name} · {habit.stats.checked}次</span>
+                            </div>
+
+
+                            <div className="px-4">
+                              <div className="overflow-x-auto pb-2 scrollbar-hide">
+                                <div className="flex gap-1 min-w-fit">
+                                  {(() => {
+                                    const weeks: string[][] = [];
+                                    let currentWeek: string[] = Array(7).fill(null);
+
+                                    const startDay = new Date(rangeStart).getDay();
+                                    let dayIndex = startDay;
+
+                                    checkStats.allDays.forEach((dayStr) => {
+                                      currentWeek[dayIndex] = dayStr;
+                                      dayIndex++;
+                                      if (dayIndex > 6) {
+                                        weeks.push(currentWeek);
+                                        currentWeek = Array(7).fill(null);
+                                        dayIndex = 0;
+                                      }
+                                    });
+                                    if (dayIndex > 0) weeks.push(currentWeek);
+
+                                    return weeks.map((week, wIdx) => (
+                                      <div key={wIdx} className="flex flex-col gap-1">
+                                        {week.map((dayStr, dIdx) => {
+                                          if (!dayStr) return <div key={dIdx} className="w-3 h-3" />;
+                                          const isChecked = habit.days[dayStr];
+                                          return (
+                                            <div
+                                              key={dayStr}
+                                              title={`${dayStr} ${isChecked ? '已完成' : ''}`}
+                                              className={`w-3 h-3 rounded-[2px] transition-colors ${isChecked ? style.fill : 'bg-stone-100'
+                                                }`}
+                                            />
+                                          );
+                                        })}
+                                      </div>
+                                    ));
+                                  })()}
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        )
+                      }))}
+                    </div>
+                  )}
+                </>
+              )}
             </div>
           )}
 

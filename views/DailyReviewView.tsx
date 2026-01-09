@@ -102,11 +102,17 @@ export const DailyReviewView: React.FC<DailyReviewViewProps> = ({
             if (dailyCheckTemplates.length > 0) {
                 const initialItems: CheckItem[] = [];
                 dailyCheckTemplates.sort((a, b) => a.order - b.order).forEach(t => {
-                    t.items.forEach(itemText => {
+                    t.items.forEach((item: any) => {
+                        // CheckTemplateItem object: { id, content, icon }
+                        // If it's a string (legacy), handle it. If object, use properties.
+                        const content = typeof item === 'string' ? item : item.content;
+                        const icon = typeof item === 'string' ? undefined : item.icon;
+
                         initialItems.push({
                             id: crypto.randomUUID(),
-                            category: t.title, // Use template title as category
-                            content: itemText,
+                            category: t.title,
+                            content: content,
+                            icon: icon,
                             isCompleted: false
                         });
                     });
@@ -626,7 +632,7 @@ export const DailyReviewView: React.FC<DailyReviewViewProps> = ({
                                                             )}
                                                         </div>
 
-                                                        {!editingCheckItemId && (
+                                                        {!editingCheckItemId && !item.category && (
                                                             <div className="flex items-center gap-3 opacity-0 group-hover:opacity-100 transition-opacity" onClick={e => e.stopPropagation()}>
                                                                 <button
                                                                     onClick={() => startEditingCheckItem(item)}

@@ -22,6 +22,7 @@ pc端增加导出到obsidian功能。
 增加数据导出到Excel功能。
 增加ai批量添加任务的功能。
 增加统计页面月横向时间轴视图。
+增加日报检查项功能
 修改ai补记关联领域的逻辑，ai现在可以自动推荐关联领域，并且自动应用标签关联领域规则。
 修改任务、分类、标签、领域时间线中的月历UI。
 增加任务、分类、标签、领域时间线中的“显示全部”按钮
@@ -37,6 +38,27 @@ pc端增加导出到obsidian功能。
 
 # 20260109
 快速打点新增的记录，不应该有跨天的记录，如果今天没有更早的记录，开始时间应当是当天的00：00，而不是追溯到很多天前的上一个记录
+
+筛选器详情的专注刻度，里面的散点会因为屏幕宽度的变化变成椭圆，请你修改，确保无论如何拉伸屏幕，都保持正圆
+
+
+---
+
+
+柱状图里面每一组统计项的排序应当是按照这个数据本身的存储顺序去改的，也就是说，如果这个日报数据中check项是排到前面的，那应该是这一条目的统计数据都是排到前面的
+
+给ai生成叙事的提示词中，要包含check项的完成情况。
+确保新功能对之前数据的兼容性，不要影响用户旧版本的数据，比如说没有check项的日报，应当直接显示暂无check项，而不是修改原数据。用户从旧版本更新，是没有清单模板数据的，可以加载一次自带的模板？以及还有没有其他新旧版本更新的问题，请检查提出。
+设置项里检查清单四个字改成“检查清单模板”
+
+每一个分类的检查清单模板，里面的具体条目内容，以胶囊的形式显示，不要一个一行。模仿这个胶囊。但是不要限定宽度，宽度根据文字内容自动调整。<button class="
+                            px-2 py-2 rounded-lg text-[10px] font-medium text-center border transition-colors flex items-center justify-center gap-1.5 truncate
+                            bg-stone-50 text-stone-500 border-stone-100 hover:bg-stone-100
+                        "><span>📚</span><span class="truncate">学习计划</span></button>每一个分类的卡片高度跟随检查项内容的多少自动调整。
+
+
+---
+
 在日报详情页面，增加一个“check” tab，排序在“数据”tab 之前。页面右下角有悬浮按钮“+”点击可新增check项。
 “check” tab显示本天需要检查的事项，以列表形式展现，每一项前可点击完成/取消完成。条目右侧显示编辑图标，点击后可以修改条目内容、删除条目。
 在设置页面，每日回顾的子分类下，新增“check模板”子设置页。用户可以在此添加和编辑check模板。具体的样式，可以参考“回顾模板”。
@@ -50,7 +72,19 @@ check存储的逻辑和引导回顾问题一样，一旦生成日报数据后，
 ```
 <div class="flex items-center justify-between mb-4"><div class="flex-1"><div class="flex bg-stone-100/50 p-0.5 rounded-lg w-fit"><button class="px-2.5 py-1 rounded-md text-[10px] font-bold transition-all bg-white text-stone-900 shadow-sm">日</button><button class="px-2.5 py-1 rounded-md text-[10px] font-bold transition-all text-stone-400 hover:text-stone-600">周</button><button class="px-2.5 py-1 rounded-md text-[10px] font-bold transition-all text-stone-400 hover:text-stone-600">月</button><button class="px-2.5 py-1 rounded-md text-[10px] font-bold transition-all text-stone-400 hover:text-stone-600">年</button></div></div><div class="flex items-center gap-2"><div class="flex items-center gap-1 bg-stone-100 p-0.5 rounded-lg"><button class="p-1.5 rounded-md transition-all text-stone-400 hover:text-stone-800 hover:bg-white" title="上一个时间段"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-chevron-left" aria-hidden="true"><path d="m15 18-6-6 6-6"></path></svg></button><button class="p-1.5 rounded-md transition-all text-stone-400 hover:text-stone-800 hover:bg-white" title="下一个时间段"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-chevron-right" aria-hidden="true"><path d="m9 18 6-6-6-6"></path></svg></button></div><div class="flex bg-stone-100 p-0.5 rounded-lg"><button class="p-1.5 rounded-md transition-all bg-white text-stone-900 shadow-sm" title="饼图"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-chart-pie" aria-hidden="true"><path d="M21 12c.552 0 1.005-.449.95-.998a10 10 0 0 0-8.953-8.951c-.55-.055-.998.398-.998.95v8a1 1 0 0 0 1 1z"></path><path d="M21.21 15.89A10 10 0 1 1 8 2.83"></path></svg></button><button class="p-1.5 rounded-md transition-all text-stone-400 hover:text-stone-600" title="矩阵"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-grid3x3 lucide-grid-3x3" aria-hidden="true"><rect width="18" height="18" x="3" y="3" rx="2"></rect><path d="M3 9h18"></path><path d="M3 15h18"></path><path d="M9 3v18"></path><path d="M15 3v18"></path></svg></button><button class="p-1.5 rounded-md transition-all text-stone-400 hover:text-stone-600" title="趋势"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-trending-up" aria-hidden="true"><path d="M16 7h6v6"></path><path d="m22 7-8.5 8.5-5-5L2 17"></path></svg></button><button class="p-1.5 rounded-md transition-all text-stone-400 hover:text-stone-600" title="日程"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-calendar" aria-hidden="true"><path d="M8 2v4"></path><path d="M16 2v4"></path><rect width="18" height="18" x="3" y="4" rx="2"></rect><path d="M3 10h18"></path></svg></button></div></div></div>
 ```
-给ai生成叙事的提示词中，要包含check项的完成情况。
+周、月、年视图的内容分别模仿这三张图。
+
+
+
+---
+周报详情-数据页面，添加本周check统计视图，只需要改引用的组件显示情况就行了，不要新写其他组件。
+月报详情-数据页面，添加本周check统计视图
+统计视图里的check统计事项应该是自下而上的进行统计的，而不是从模板里面读取的，因为有的时候用户修改了这个模板，但是历史数据没有修改，所以说统计项应该是自底向下的汇总，请你确定一下这个逻辑。而且检查事项的统计只统计带有模板分类属性的事项，有的是用户添加的“通用”类型的事项，这些是临时的，不用统计。
+为每一个检查事项分配一个随机颜色，颜色分配逻辑可以查看分类详情中的关键字颜色分配。只分配100色系的浅色，用来代替图中绿色。
+不需要当天加粗的黑色边框。
+不需要“完成率”三个字，也不需要显示完成天数，只需要显示完成率的数字即可
+不需要周的mo ru we th fr sa su 的标签。
+重置数据和恢复默认数据，似乎没有对检查清单模板生效。
 
 # 20260102
 分类详情页不该有领域的悬浮按钮。 

@@ -744,7 +744,12 @@ export const DEFAULT_CHECK_TEMPLATES: CheckTemplate[] = [
   {
     id: 'ct_daily_habits',
     title: '🌞 每日习惯',
-    items: ['早起喝水', '整理床铺', '吃维生素', '冥想 10 分钟'],
+    items: [
+      { id: 'i1', content: '💧 早起喝水', icon: '💧' },
+      { id: 'i2', content: '🛏️ 整理床铺', icon: '🛏️' },
+      { id: 'i3', content: '💊 吃维生素', icon: '💊' },
+      { id: 'i4', content: '🧘 冥想 10 分钟', icon: '🧘' }
+    ],
     enabled: true,
     order: 1,
     isDaily: true
@@ -752,7 +757,11 @@ export const DEFAULT_CHECK_TEMPLATES: CheckTemplate[] = [
   {
     id: 'ct_evening_routine',
     title: '🌜 晚间流程',
-    items: ['收拾书桌', '准备明天衣物', '阅读 15 分钟'],
+    items: [
+      { id: 'i5', content: '🧹 收拾书桌', icon: '🧹' },
+      { id: 'i6', content: '👕 准备明天衣物', icon: '👕' },
+      { id: 'i7', content: '📚 阅读 15 分钟', icon: '📚' }
+    ],
     enabled: true,
     order: 2,
     isDaily: true

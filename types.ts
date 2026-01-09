@@ -236,14 +236,22 @@ export interface CheckItem {
   id: string;
   category?: string; // 所属的模板标题或分组
   content: string;
+  icon?: string; // Icon from template
   isCompleted: boolean;
+}
+
+// 检查项定义 (用于模板)
+export interface CheckTemplateItem {
+  id: string; // Add ID for better tracking
+  content: string;
+  icon?: string; // Preset icon (emoji or Lucide name)
 }
 
 // 检查项模板
 export interface CheckTemplate {
   id: string;
   title: string;
-  items: string[]; // 预设的检查项内容列表
+  items: CheckTemplateItem[]; // Updated to object array
   enabled: boolean;
   order: number;
   isDaily: boolean; // 是否是每日必做

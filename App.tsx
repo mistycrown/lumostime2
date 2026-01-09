@@ -34,7 +34,7 @@ import { GoalEditor } from './components/GoalEditor';
 import { BottomNavigation } from './components/BottomNavigation';
 import { ModalManager } from './components/ModalManager';
 import { Activity, ActiveSession, AppView, Log, TodoItem, TodoCategory, Category, Goal, AutoLinkRule, DailyReview, WeeklyReview, MonthlyReview, ReviewTemplate, NarrativeTemplate, Filter } from './types';
-import { INITIAL_LOGS, INITIAL_TODOS, MOCK_TODO_CATEGORIES, VIEW_TITLES, CATEGORIES, SCOPES, INITIAL_GOALS, DEFAULT_REVIEW_TEMPLATES, DEFAULT_USER_PERSONAL_INFO, INITIAL_DAILY_REVIEWS } from './constants';
+import { INITIAL_LOGS, INITIAL_TODOS, MOCK_TODO_CATEGORIES, VIEW_TITLES, CATEGORIES, SCOPES, INITIAL_GOALS, DEFAULT_REVIEW_TEMPLATES, DEFAULT_USER_PERSONAL_INFO, INITIAL_DAILY_REVIEWS, DEFAULT_CHECK_TEMPLATES } from './constants';
 import { ToastMessage, ToastType } from './components/Toast';
 import { webdavService } from './services/webdavService';
 import { splitLogByDays } from './utils/logUtils';
@@ -1532,6 +1532,7 @@ const AppContent: React.FC = () => {
             todos={todos}
             todoCategories={todoCategories}
             scopes={scopes}
+            dailyReviews={dailyReviews}
           />
         );
       case AppView.REVIEW:
@@ -1910,7 +1911,9 @@ const AppContent: React.FC = () => {
               setCategories(CATEGORIES);
               setScopes(SCOPES);
               setTodoCategories(MOCK_TODO_CATEGORIES);
+              setTodoCategories(MOCK_TODO_CATEGORIES);
               setReviewTemplates(DEFAULT_REVIEW_TEMPLATES);
+              setCheckTemplates(DEFAULT_CHECK_TEMPLATES);
               setDailyReviews([]);
               setWeeklyReviews([]);
               setMonthlyReviews([]);
@@ -1927,7 +1930,9 @@ const AppContent: React.FC = () => {
               setTodos([]);
               setGoals([]);
               setScopes([]);
+              setScopes([]);
               setReviewTemplates([]);
+              setCheckTemplates([]);
               setDailyReviews([]);
               setWeeklyReviews([]);
               setMonthlyReviews([]);
