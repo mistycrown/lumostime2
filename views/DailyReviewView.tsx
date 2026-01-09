@@ -323,7 +323,7 @@ export const DailyReviewView: React.FC<DailyReviewViewProps> = ({
                     byCategory[cat].push(item);
                 });
 
-                let text = `\n\n检查清单完成情况：\n总完成率：${completed.length}/${total} (${percentage}%)\n\n`;
+                let text = `\n\n日课完成情况：\n总完成率：${completed.length}/${total} (${percentage}%)\n\n`;
 
                 Object.entries(byCategory).forEach(([category, items]) => {
                     text += `${category}：\n`;
@@ -584,7 +584,7 @@ export const DailyReviewView: React.FC<DailyReviewViewProps> = ({
                             : 'text-stone-400 hover:text-stone-600'
                             }`}
                     >
-                        {{ check: '检查', data: '数据', guide: '引导', narrative: '叙事' }[tab]}
+                        {{ check: '日课', data: '数据', guide: '引导', narrative: '叙事' }[tab]}
                     </button>
                 ))}
             </div>
@@ -597,7 +597,7 @@ export const DailyReviewView: React.FC<DailyReviewViewProps> = ({
                     <div className="animate-in fade-in duration-300 pb-40">
                         {checkItems.length === 0 ? (
                             <div className="text-center py-12">
-                                <p className="text-stone-400">今日无检查项</p>
+                                <p className="text-stone-400">今日无日课</p>
                                 <p className="text-xs text-stone-300 mt-2">点击右下角添加，或在设置中配置每日模板</p>
                             </div>
                         ) : (
@@ -696,7 +696,7 @@ export const DailyReviewView: React.FC<DailyReviewViewProps> = ({
                                         value={newCheckItemText}
                                         onChange={(e) => setNewCheckItemText(e.target.value)}
                                         className="flex-1 bg-transparent border-b border-stone-300 px-2 py-2 text-sm font-serif outline-none focus:border-stone-800 transition-colors"
-                                        placeholder="输入新检查项 (默认为通用)..."
+                                        placeholder="输入新日课 (默认为通用)..."
                                         autoFocus
                                         onKeyDown={(e) => {
                                             if (e.key === 'Enter') handleAddCheckItem();

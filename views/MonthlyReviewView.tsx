@@ -366,7 +366,7 @@ export const MonthlyReviewView: React.FC<MonthlyReviewViewProps> = ({
                     byCategory[stats.category].push({ content, total: stats.total, completed: stats.completed, rate });
                 });
 
-                let text = '\n\n检查清单完成情况（本月汇总）：\n';
+                let text = '\n\n日课完成情况（本月汇总）：\n';
                 Object.entries(byCategory).forEach(([category, items]) => {
                     text += `\n${category}：\n`;
                     items.forEach(item => {

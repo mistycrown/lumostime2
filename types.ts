@@ -224,14 +224,14 @@ export interface DailyReview {
   createdAt: number;
   updatedAt: number;
   answers: ReviewAnswer[]; // 引导问答的答案
-  checkItems?: CheckItem[]; // New: 每日检查项
+  checkItems?: CheckItem[]; // New: 每日日课
   narrative?: string; // AI生成的叙事
   narrativeUpdatedAt?: number;
   isEdited?: boolean; // 叙事是否被手动编辑过
   templateSnapshot?: ReviewTemplateSnapshot[]; // 创建时的模板快照
 }
 
-// 每日检查项
+// 每日日课
 export interface CheckItem {
   id: string;
   category?: string; // 所属的模板标题或分组
@@ -240,14 +240,14 @@ export interface CheckItem {
   isCompleted: boolean;
 }
 
-// 检查项定义 (用于模板)
+// 日课定义 (用于模板)
 export interface CheckTemplateItem {
   id: string; // Add ID for better tracking
   content: string;
   icon?: string; // Preset icon (emoji or Lucide name)
 }
 
-// 检查项模板
+// 日课模板
 export interface CheckTemplate {
   id: string;
   title: string;
