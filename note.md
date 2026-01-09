@@ -15,7 +15,6 @@ git push --force
 再更新 version.json 的版本号
 
 待开发功能：
-拆分和重构app.tsx
 
 # 1.0.5
 pc端增加导出到obsidian功能。
@@ -32,7 +31,26 @@ pc端增加导出到obsidian功能。
 修复凌晨时补记点击到现在会生成跨天记录的问题。
 修复用户未接受悬浮球建议开始应用关联标签记录时，悬浮球状态异常的问题。
 修复分类详情页未隐藏切换领域悬浮按钮的问题。
+拆分和重构app.tsx
 
+
+
+# 20260109
+快速打点新增的记录，不应该有跨天的记录，如果今天没有更早的记录，开始时间应当是当天的00：00，而不是追溯到很多天前的上一个记录
+在日报详情页面，增加一个“check” tab，排序在“数据”tab 之前。页面右下角有悬浮按钮“+”点击可新增check项。
+“check” tab显示本天需要检查的事项，以列表形式展现，每一项前可点击完成/取消完成。条目右侧显示编辑图标，点击后可以修改条目内容、删除条目。
+在设置页面，每日回顾的子分类下，新增“check模板”子设置页。用户可以在此添加和编辑check模板。具体的样式，可以参考“回顾模板”。
+首先，请修改日报数据类型，存储每天的check数据。然后新增数据类型：check的模板。
+check存储的逻辑和引导回顾问题一样，一旦生成日报数据后，就不受到模板修改的影响。
+然后，在设置页面添加“check模板”子设置页。
+然后，实现日报详情页读取模板、生成check项的功能。并实现交互ui效果。
+
+
+在数据统计页StatsView.tsx，右上角切换视图组件的最右侧，添加一个“check”统计视图。该视图只对周、月、年这三种时间范围生效。请定位这个组件：
+```
+<div class="flex items-center justify-between mb-4"><div class="flex-1"><div class="flex bg-stone-100/50 p-0.5 rounded-lg w-fit"><button class="px-2.5 py-1 rounded-md text-[10px] font-bold transition-all bg-white text-stone-900 shadow-sm">日</button><button class="px-2.5 py-1 rounded-md text-[10px] font-bold transition-all text-stone-400 hover:text-stone-600">周</button><button class="px-2.5 py-1 rounded-md text-[10px] font-bold transition-all text-stone-400 hover:text-stone-600">月</button><button class="px-2.5 py-1 rounded-md text-[10px] font-bold transition-all text-stone-400 hover:text-stone-600">年</button></div></div><div class="flex items-center gap-2"><div class="flex items-center gap-1 bg-stone-100 p-0.5 rounded-lg"><button class="p-1.5 rounded-md transition-all text-stone-400 hover:text-stone-800 hover:bg-white" title="上一个时间段"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-chevron-left" aria-hidden="true"><path d="m15 18-6-6 6-6"></path></svg></button><button class="p-1.5 rounded-md transition-all text-stone-400 hover:text-stone-800 hover:bg-white" title="下一个时间段"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-chevron-right" aria-hidden="true"><path d="m9 18 6-6-6-6"></path></svg></button></div><div class="flex bg-stone-100 p-0.5 rounded-lg"><button class="p-1.5 rounded-md transition-all bg-white text-stone-900 shadow-sm" title="饼图"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-chart-pie" aria-hidden="true"><path d="M21 12c.552 0 1.005-.449.95-.998a10 10 0 0 0-8.953-8.951c-.55-.055-.998.398-.998.95v8a1 1 0 0 0 1 1z"></path><path d="M21.21 15.89A10 10 0 1 1 8 2.83"></path></svg></button><button class="p-1.5 rounded-md transition-all text-stone-400 hover:text-stone-600" title="矩阵"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-grid3x3 lucide-grid-3x3" aria-hidden="true"><rect width="18" height="18" x="3" y="3" rx="2"></rect><path d="M3 9h18"></path><path d="M3 15h18"></path><path d="M9 3v18"></path><path d="M15 3v18"></path></svg></button><button class="p-1.5 rounded-md transition-all text-stone-400 hover:text-stone-600" title="趋势"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-trending-up" aria-hidden="true"><path d="M16 7h6v6"></path><path d="m22 7-8.5 8.5-5-5L2 17"></path></svg></button><button class="p-1.5 rounded-md transition-all text-stone-400 hover:text-stone-600" title="日程"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-calendar" aria-hidden="true"><path d="M8 2v4"></path><path d="M16 2v4"></path><rect width="18" height="18" x="3" y="4" rx="2"></rect><path d="M3 10h18"></path></svg></button></div></div></div>
+```
+给ai生成叙事的提示词中，要包含check项的完成情况。
 
 # 20260102
 分类详情页不该有领域的悬浮按钮。 

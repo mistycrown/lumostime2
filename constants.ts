@@ -7,7 +7,7 @@
  * 
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
-import { Category, Log, AppView, TodoCategory, TodoItem, Scope, Goal, ReviewTemplate, DailyReview, NarrativeTemplate } from './types';
+import { Category, Log, AppView, TodoCategory, TodoItem, Scope, Goal, ReviewTemplate, DailyReview, NarrativeTemplate, CheckTemplate } from './types';
 
 // --- Default User Personal Info ---
 export const DEFAULT_USER_PERSONAL_INFO = `我是一名正在攻读博士学位的研究生，我对AI技术充满热情。我相信持续学习和自我反思的力量，希望成为一个既有深度又有广度的学者。`;
@@ -737,6 +737,28 @@ export const DEFAULT_REVIEW_TEMPLATES: ReviewTemplate[] = [
 ];
 
 export const INITIAL_DAILY_REVIEWS: DailyReview[] = [];
+
+// ========== Check Templates (检查清单模板) ==========
+
+export const DEFAULT_CHECK_TEMPLATES: CheckTemplate[] = [
+  {
+    id: 'ct_daily_habits',
+    title: '🌞 每日习惯',
+    items: ['早起喝水', '整理床铺', '吃维生素', '冥想 10 分钟'],
+    enabled: true,
+    order: 1,
+    isDaily: true
+  },
+  {
+    id: 'ct_evening_routine',
+    title: '🌜 晚间流程',
+    items: ['收拾书桌', '准备明天衣物', '阅读 15 分钟'],
+    enabled: true,
+    order: 2,
+    isDaily: true
+  }
+];
+
 
 // ========== AI Narrative  (AI 叙事模板) ==========
 

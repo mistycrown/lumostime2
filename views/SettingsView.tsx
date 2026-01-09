@@ -64,8 +64,9 @@ import { ToastType } from '../components/Toast';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { ReviewTemplateManageView } from './ReviewTemplateManageView';
+import { CheckTemplateManageView } from './CheckTemplateManageView';
 import { ConfirmModal } from '../components/ConfirmModal';
-import { ReviewTemplate, NarrativeTemplate, Log, TodoItem, Scope, DailyReview, WeeklyReview, MonthlyReview, TodoCategory, Filter, Category } from '../types';
+import { ReviewTemplate, NarrativeTemplate, Log, TodoItem, Scope, DailyReview, WeeklyReview, MonthlyReview, TodoCategory, Filter, Category, CheckTemplate } from '../types';
 import FocusNotification from '../plugins/FocusNotificationPlugin';
 import { AutoRecordSettingsView } from './AutoRecordSettingsView';
 import { AutoLinkView } from './AutoLinkView';
@@ -98,6 +99,9 @@ interface SettingsViewProps {
     // Daily Review Templates
     reviewTemplates?: ReviewTemplate[];
     onUpdateReviewTemplates?: (templates: ReviewTemplate[]) => void;
+    // Daily Check Templates
+    checkTemplates?: CheckTemplate[];
+    onUpdateCheckTemplates?: (templates: CheckTemplate[]) => void;
     // Daily Review Time
     dailyReviewTime?: string;
     onSetDailyReviewTime?: (time: string) => void;
@@ -147,8 +151,8 @@ const AI_PRESETS = {
     }
 };
 
-export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, onImport, onReset, onClearData, onToast, syncData, onSyncUpdate, startWeekOnSunday, onToggleStartWeekOnSunday, onOpenAutoLink, onOpenSearch, minIdleTimeThreshold = 1, onSetMinIdleTimeThreshold, defaultView = 'RECORD', onSetDefaultView, reviewTemplates = [], onUpdateReviewTemplates, dailyReviewTime, onSetDailyReviewTime, weeklyReviewTime, onSetWeeklyReviewTime, monthlyReviewTime, onSetMonthlyReviewTime, customNarrativeTemplates, onUpdateCustomNarrativeTemplates, userPersonalInfo, onSetUserPersonalInfo, logs = [], todos = [], scopes = [], currentDate = new Date(), dailyReviews = [], weeklyReviews = [], monthlyReviews = [], todoCategories = [], filters = [], onUpdateFilters, categoriesData = [], onEditLog }) => {
-    const [activeSubmenu, setActiveSubmenu] = useState<'main' | 'data' | 'cloud' | 'ai' | 'preferences' | 'guide' | 'nfc' | 'templates' | 'narrative_prompt' | 'auto_record' | 'autolink' | 'obsidian_export' | 'filters'>('main');
+export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, onImport, onReset, onClearData, onToast, syncData, onSyncUpdate, startWeekOnSunday, onToggleStartWeekOnSunday, onOpenAutoLink, onOpenSearch, minIdleTimeThreshold = 1, onSetMinIdleTimeThreshold, defaultView = 'RECORD', onSetDefaultView, reviewTemplates = [], onUpdateReviewTemplates, checkTemplates = [], onUpdateCheckTemplates, dailyReviewTime, onSetDailyReviewTime, weeklyReviewTime, onSetWeeklyReviewTime, monthlyReviewTime, onSetMonthlyReviewTime, customNarrativeTemplates, onUpdateCustomNarrativeTemplates, userPersonalInfo, onSetUserPersonalInfo, logs = [], todos = [], scopes = [], currentDate = new Date(), dailyReviews = [], weeklyReviews = [], monthlyReviews = [], todoCategories = [], filters = [], onUpdateFilters, categoriesData = [], onEditLog }) => {
+    const [activeSubmenu, setActiveSubmenu] = useState<'main' | 'data' | 'cloud' | 'ai' | 'preferences' | 'guide' | 'nfc' | 'templates' | 'check_templates' | 'narrative_prompt' | 'auto_record' | 'autolink' | 'obsidian_export' | 'filters'>('main');
     const [webdavConfig, setWebdavConfig] = useState<WebDAVConfig | null>(null);
     const [isSyncing, setIsSyncing] = useState(false);
 
@@ -793,6 +797,16 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
                     type="danger"
                 />
             </div>
+        );
+    }
+
+    if (activeSubmenu === 'check_templates') {
+        return (
+            <CheckTemplateManageView
+                templates={checkTemplates}
+                onUpdateTemplates={(newTemplates) => onUpdateCheckTemplates?.(newTemplates)}
+                onBack={() => setActiveSubmenu('main')}
+            />
         );
     }
 
@@ -1921,6 +1935,11 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
                             icon={<FileText size={18} className="text-orange-500" />}
                             label="回顾模板"
                             onClick={() => setActiveSubmenu('templates')}
+                        />
+                        <MenuItem
+                            icon={<CheckCircle2 size={18} className="text-green-500" />}
+                            label="检查清单"
+                            onClick={() => setActiveSubmenu('check_templates')}
                         />
                         <MenuItem
                             icon={<MessageSquare size={18} className="text-purple-500" />}
