@@ -289,50 +289,40 @@ const AppContent: React.FC = () => {
 
 
   const handleQuickPunch = () => {
-    // 1. Determine Time Range (Same as Add + logic basically)
-    const dayStart = new Date(currentDate);
-    dayStart.setHours(0, 0, 0, 0);
-
+    // 1. Determine Time Range
+    // "Quick Punch" acts on Real Time "Now".
     const now = new Date();
-    // Use current date from App state, but 'now' for end time if it's "Today"
-    // If user is viewing a past date, punch logic might be weird. 
-    // Let's assume Quick Punch is ALWAYS for "Now" relative to the view, or strictly "Now"?
-    // "打点计时" implies "Right Now". So if I am viewing yesterday, should I add a log for yesterday?
-    // Usually "Punch" means "Mark current moment". 
-    // But if I am filling yesterday's log?
-    // Let's stick to: It fills gap on the *currently viewed date* UP TO *Now* (if today) or *End of day* (if past)?
-    // User said: "如果很忙...先点击打点计时". This implies REAL TIME usage.
-    // So it should probably only work if viewing TODAY, or force jump to Today.
-    // Let's enforce it uses "Now" as end time, and creates log on Today.
+    const endTimestamp = now.getTime();
 
-    // Actually, simple robust logic:
-    // It creates a log ending NOW. 
-    // Start time = End of last log (chronologically).
+    // Calculate Today's 00:00 boundary
+    const todayStart = new Date(now);
+    todayStart.setHours(0, 0, 0, 0);
+    const todayStartTimestamp = todayStart.getTime();
 
-    // Find absolute latest log in entire history? Or just today?
-    // "Timeline... idle time... last activity end time"
+    // Find the absolute latest log
     const allLogs = [...logs].sort((a, b) => b.endTime - a.endTime);
     const lastLog = allLogs[0];
 
-    const endTimestamp = Date.now();
-    let startTimestamp = endTimestamp - 300000; // Default 5 mins if no history?
+    let startTimestamp: number;
 
     if (lastLog) {
-      // If last log is in future (impossible?), clamp?
-      // If last log is > now, we can't punch.
+      // If last log is in the future relative to now, we can't punch safely.
       if (lastLog.endTime > endTimestamp) {
         addToast('error', 'Cannot punch: Future logs exist.');
         return;
       }
-      startTimestamp = lastLog.endTime;
+
+      // Fix: Clamp start time to at least 00:00 today.
+      // If last log ended yesterday (e.g. 23:00), max(yesterday_2300, today_0000) = today_0000.
+      // If last log ended today (e.g. 10:00), max(today_1000, today_0000) = today_1000.
+      startTimestamp = Math.max(lastLog.endTime, todayStartTimestamp);
     } else {
-      // No logs ever. Start from today 00:00?
-      const todayStart = new Date();
-      todayStart.setHours(0, 0, 0, 0);
-      startTimestamp = todayStart.getTime();
+      // No logs ever. Start from today 00:00
+      startTimestamp = todayStartTimestamp;
     }
 
     // Safety: ensure duration is positive
+    // If we just punched, or if last log ended exactly now
     if (endTimestamp <= startTimestamp) {
       addToast('info', 'Already up to date.');
       return;
