@@ -224,10 +224,29 @@ export interface DailyReview {
   createdAt: number;
   updatedAt: number;
   answers: ReviewAnswer[]; // 引导问答的答案
+  checkItems?: CheckItem[]; // New: 每日检查项
   narrative?: string; // AI生成的叙事
   narrativeUpdatedAt?: number;
   isEdited?: boolean; // 叙事是否被手动编辑过
   templateSnapshot?: ReviewTemplateSnapshot[]; // 创建时的模板快照
+}
+
+// 每日检查项
+export interface CheckItem {
+  id: string;
+  category?: string; // 所属的模板标题或分组
+  content: string;
+  isCompleted: boolean;
+}
+
+// 检查项模板
+export interface CheckTemplate {
+  id: string;
+  title: string;
+  items: string[]; // 预设的检查项内容列表
+  enabled: boolean;
+  order: number;
+  isDaily: boolean; // 是否是每日必做
 }
 
 // 每周回顾

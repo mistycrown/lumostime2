@@ -31,9 +31,11 @@ import { TimerFloating } from './components/TimerFloating';
 import { AddLogModal } from './components/AddLogModal';
 import { TodoDetailModal } from './components/TodoDetailModal';
 import { GoalEditor } from './components/GoalEditor';
+import { BottomNavigation } from './components/BottomNavigation';
+import { ModalManager } from './components/ModalManager';
 import { Activity, ActiveSession, AppView, Log, TodoItem, TodoCategory, Category, Goal, AutoLinkRule, DailyReview, WeeklyReview, MonthlyReview, ReviewTemplate, NarrativeTemplate, Filter } from './types';
 import { INITIAL_LOGS, INITIAL_TODOS, MOCK_TODO_CATEGORIES, VIEW_TITLES, CATEGORIES, SCOPES, INITIAL_GOALS, DEFAULT_REVIEW_TEMPLATES, DEFAULT_USER_PERSONAL_INFO, INITIAL_DAILY_REVIEWS } from './constants';
-import { ToastContainer, ToastMessage, ToastType } from './components/Toast';
+import { ToastMessage, ToastType } from './components/Toast';
 import { webdavService } from './services/webdavService';
 import { splitLogByDays } from './utils/logUtils';
 import { ParsedTimeEntry, aiService } from './services/aiService';
@@ -73,90 +75,100 @@ if (typeof window !== 'undefined') {
 // Helper to format date to YYYY-MM-DD string
 const formatDate = (date: Date): string => date.toISOString().split('T')[0];
 
-const App: React.FC = () => {
-  const [returnToSearch, setReturnToSearch] = useState(false);
-  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-  const [isAutoLinkOpen, setIsAutoLinkOpen] = useState(false);
-  const [isSearchOpen, setIsSearchOpen] = useState(false);
-  const [isStatsFullScreen, setIsStatsFullScreen] = useState(false);
-  const [statsTitle, setStatsTitle] = useState<string>('数据统计'); // 动态统计页面标题
+import { ToastProvider, useToast } from './contexts/ToastContext';
+import { DataProvider, useData } from './contexts/DataContext';
+import { SettingsProvider, useSettings } from './contexts/SettingsContext';
+import { ReviewProvider, useReview } from './contexts/ReviewContext';
+import { SessionProvider, useSession } from './contexts/SessionContext';
+import { NavigationProvider, useNavigation } from './contexts/NavigationContext';
+import { CategoryScopeProvider, useCategoryScope } from './contexts/CategoryScopeContext';
+
+
+
+const AppContent: React.FC = () => {
+  const { addToast } = useToast();
+  const { logs, setLogs, todos, setTodos, todoCategories, setTodoCategories } = useData();
+  const {
+    startWeekOnSunday, setStartWeekOnSunday,
+    minIdleTimeThreshold, setMinIdleTimeThreshold,
+    defaultView, setDefaultView,
+    autoLinkRules, setAutoLinkRules,
+    appRules, setAppRules,
+    customNarrativeTemplates, setCustomNarrativeTemplates,
+    userPersonalInfo, setUserPersonalInfo,
+    filters, setFilters,
+    lastSyncTime, setLastSyncTime, updateLastSyncTime,
+    dataLastModified, setDataLastModified, isRestoring
+  } = useSettings();
+  const {
+    reviewTemplates, setReviewTemplates,
+    dailyReviewTime, setDailyReviewTime,
+    weeklyReviewTime, setWeeklyReviewTime,
+    monthlyReviewTime, setMonthlyReviewTime,
+    dailyReviews, setDailyReviews,
+    weeklyReviews, setWeeklyReviews,
+    monthlyReviews, setMonthlyReviews,
+    checkTemplates, setCheckTemplates
+  } = useReview();
+  const {
+    activeSessions,
+    setActiveSessions,
+    focusDetailSessionId,
+    setFocusDetailSessionId,
+    startActivity,
+    stopActivity,
+    cancelSession
+  } = useSession();
+  const {
+    currentView, setCurrentView,
+    isSettingsOpen, setIsSettingsOpen,
+    isAutoLinkOpen, setIsAutoLinkOpen,
+    isSearchOpen, setIsSearchOpen,
+    isStatsFullScreen, setIsStatsFullScreen,
+    statsTitle, setStatsTitle,
+    isAddModalOpen, setIsAddModalOpen,
+    isTodoModalOpen, setIsTodoModalOpen,
+    isTodoManaging, setIsTodoManaging,
+    isGoalEditorOpen, setIsGoalEditorOpen,
+    isTagsManaging, setIsTagsManaging,
+    isScopeManaging, setIsScopeManaging,
+    isDailyReviewOpen, setIsDailyReviewOpen,
+    isWeeklyReviewOpen, setIsWeeklyReviewOpen,
+    isMonthlyReviewOpen, setIsMonthlyReviewOpen,
+    selectedTagId, setSelectedTagId,
+    selectedCategoryId, setSelectedCategoryId,
+    selectedScopeId, setSelectedScopeId,
+    editingLog, setEditingLog,
+    editingTodo, setEditingTodo,
+    editingGoal, setEditingGoal,
+    currentReviewDate, setCurrentReviewDate,
+    currentWeeklyReviewStart, setCurrentWeeklyReviewStart,
+    currentWeeklyReviewEnd, setCurrentWeeklyReviewEnd,
+    currentMonthlyReviewStart, setCurrentMonthlyReviewStart,
+    currentMonthlyReviewEnd, setCurrentMonthlyReviewEnd,
+    returnToSearch, setReturnToSearch,
+    isOpenedFromSearch, setIsOpenedFromSearch,
+    isSearchOpenedFromSettings, setIsSearchOpenedFromSettings,
+    todoCategoryToAdd, setTodoCategoryToAdd,
+    goalScopeId, setGoalScopeId,
+    initialLogTimes, setInitialLogTimes
+  } = useNavigation();
+  const {
+    categories,
+    setCategories,
+    handleUpdateCategories,
+    handleUpdateCategory,
+    handleUpdateActivity,
+    handleCategoryChange,
+    scopes,
+    setScopes,
+    handleUpdateScopes,
+    goals,
+    setGoals
+  } = useCategoryScope();
+
   const [isSyncing, setIsSyncing] = useState(false);
-  const [activeSessions, setActiveSessions] = useState<ActiveSession[]>([]);
-  const [focusDetailSessionId, setFocusDetailSessionId] = useState<string | null>(null);
-
-  // 防抖Ref: 记录上次处理开始计时事件的时间
   const lastPromptTimeRef = useRef(0);
-
-  // Load from localStorage or use initial data
-  const [logs, setLogs] = useState<Log[]>(() => {
-    const stored = localStorage.getItem('lumostime_logs');
-    return stored ? JSON.parse(stored) : INITIAL_LOGS;
-  });
-
-  // Todo State
-  const [todos, setTodos] = useState<TodoItem[]>(() => {
-    const stored = localStorage.getItem('lumostime_todos');
-    if (stored) {
-      return JSON.parse(stored);
-    }
-    return INITIAL_TODOS.map(todo => {
-      if (!todo.isProgress) return todo;
-      // Systemic Fix: Recalculate progress from logs to ensure consistency
-      const calculatedProgress = INITIAL_LOGS
-        .filter(log => log.linkedTodoId === todo.id)
-        .reduce((acc, log) => acc + (log.progressIncrement || 0), 0);
-      return { ...todo, completedUnits: calculatedProgress };
-    });
-  });
-
-  const [todoCategories, setTodoCategories] = useState<TodoCategory[]>(() => {
-    const stored = localStorage.getItem('lumostime_todoCategories');
-    return stored ? JSON.parse(stored) : MOCK_TODO_CATEGORIES;
-  });
-  const [isTodoModalOpen, setIsTodoModalOpen] = useState(false);
-  const [isTodoManaging, setIsTodoManaging] = useState(false);
-  const [editingTodo, setEditingTodo] = useState<TodoItem | null>(null);
-  const [todoCategoryToAdd, setTodoCategoryToAdd] = useState<string>(MOCK_TODO_CATEGORIES[0].id);
-
-  // Tag Navigation State
-  const [selectedTagId, setSelectedTagId] = useState<string | null>(null);
-  const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
-
-  // Search Navigation State
-  const [isOpenedFromSearch, setIsOpenedFromSearch] = useState(false);
-  const [isSearchOpenedFromSettings, setIsSearchOpenedFromSettings] = useState(false);
-
-  // Modal State
-  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
-  const [editingLog, setEditingLog] = useState<Log | null>(null);
-
-  // Toast State
-  const [toasts, setToasts] = useState<ToastMessage[]>([]);
-
-  const addToast = (type: ToastType, message: string, action?: { label: string, onClick: () => void }) => {
-    const id = Math.random().toString(36).substr(2, 9);
-    setToasts(prev => [...prev, { id, type, message, action }]);
-  };
-
-  const removeToast = (id: string) => {
-    setToasts(prev => prev.filter(t => t.id !== id));
-  };
-
-  // Preferences
-  const [startWeekOnSunday, setStartWeekOnSunday] = useState(false);
-
-  // Auto Link Rules (自动关联规则)
-  const [autoLinkRules, setAutoLinkRules] = useState<AutoLinkRule[]>(() => {
-    const stored = localStorage.getItem('lumostime_autoLinkRules');
-    return stored ? JSON.parse(stored) : [];
-  });
-
-  useEffect(() => {
-    localStorage.setItem('lumostime_autoLinkRules', JSON.stringify(autoLinkRules));
-  }, [autoLinkRules]);
-
-  // App Rules (应用自动记录规则): packageName -> activityId
-  const [appRules, setAppRules] = useState<{ [packageName: string]: string }>({});
 
   // Load app rules on mount
   useEffect(() => {
@@ -174,373 +186,36 @@ const App: React.FC = () => {
     loadAppRules();
   }, []);
 
-  // Auto-start Floating Window if enabled
-  useEffect(() => {
-    const initFloatingWindow = async () => {
-      if (Capacitor.getPlatform() !== 'android') return;
-
-      const enabled = localStorage.getItem('cfg_floating_window_enabled') === 'true';
-      if (enabled) {
-        try {
-          // Check if we still have permission
-          const res = await FocusNotification.checkFloatingPermission();
-          if (res.granted) {
-            await FocusNotification.startFloatingWindow();
-            console.log('🔵 Auto-started floating window');
-          } else {
-            console.log('⚠️ Floating window enabled but permission missing');
-          }
-        } catch (e) {
-          console.error('❌ Failed to auto-start floating window:', e);
-        }
-      }
-    };
-    initFloatingWindow();
-  }, []);
-
-  // --- Auto Sync Logic ---
-  const [lastSyncTime, setLastSyncTime] = useState<number>(() => {
-    const saved = localStorage.getItem('lumos_last_sync_time');
-    return saved ? parseInt(saved) : 0;
-  });
-
-  // --- Floating Window Listeners ---
-
-  // 1. Start Listener (Stable dependencies)
-  useEffect(() => {
-    if (Capacitor.getPlatform() !== 'android') return;
-    let startListener: any;
-
-    const setupStart = async () => {
-      startListener = await FocusNotification.addListener('startFocusFromPrompt', (data: any) => {
-        console.log('⚡ Received startFocusFromPrompt:', data);
-        const { activityId, appLabel } = data;
-        let targetActivity: Activity | undefined;
-        let targetCategoryId: string | undefined;
-
-        for (const cat of CATEGORIES) {
-          const found = cat.activities.find(a => a.id === activityId);
-          if (found) {
-            targetActivity = found;
-            targetCategoryId = cat.id;
-            break;
-          }
-        }
-
-        if (targetActivity && targetCategoryId) {
-          // Use functional update or just call handleStartActivity (it uses prev state inside)
-          // handleStartActivity is stable enough or doesn't depend on stale state for *adding*
-          handleStartActivity(targetActivity, targetCategoryId, undefined, undefined, `自动记录: ${appLabel}`);
-          addToast('success', `已开始: ${targetActivity.name} (${appLabel})`);
-        }
-      });
-    };
-    setupStart();
-    return () => { if (startListener) startListener.remove(); };
-  }, []); // Empty dependency for Start
-
-  // 2. Stop Listener (Depends on activeSessions)
-  useEffect(() => {
-    if (Capacitor.getPlatform() !== 'android') return;
-    let stopListener: any;
-
-    const setupStop = async () => {
-      stopListener = await FocusNotification.addListener('stopFocusFromFloating', () => {
-        console.log('⚡ Received stopFocusFromFloating (Active sessions: ' + activeSessions.length + ')');
-        if (activeSessions.length > 0) {
-          // Stop the last added session (usually the one triggered by floating ball)
-          const lastSession = activeSessions[activeSessions.length - 1];
-          handleStopActivity(lastSession.id);
-          addToast('info', '计时已结束');
-        }
-      });
-    };
-    setupStop();
-    return () => { if (stopListener) stopListener.remove(); };
-  }, [activeSessions]); // Re-binds when sessions change
-
-
-  const updateLastSyncTime = () => {
-    const now = Date.now();
-    setLastSyncTime(now);
-    localStorage.setItem('lumos_last_sync_time', now.toString());
-  };
-
-  // --- Data Modification Tracking ---
-  const [dataLastModified, setDataLastModified] = useState<number>(() => {
-    const saved = localStorage.getItem('lumos_data_last_modified');
-    return saved ? parseInt(saved) : Date.now();
-  });
-
-  const isRestoring = useRef(false);
-
-  useEffect(() => {
-    localStorage.setItem('lumos_data_last_modified', dataLastModified.toString());
-  }, [dataLastModified]);
-
-  // --- Preference State ---
-  const [minIdleTimeThreshold, setMinIdleTimeThreshold] = useState<number>(() => {
-    const saved = localStorage.getItem('lumos_min_idle_time');
-    return saved ? parseInt(saved) : 1; // Default 1 minute
-  });
-
-  const [defaultView, setDefaultView] = useState<AppView>(() => {
-    const saved = localStorage.getItem('lumos_default_view');
-    return (saved as AppView) || AppView.RECORD;
-  });
-
-  const [currentView, setCurrentView] = useState<AppView>(() => {
-    // If specific hash/url logic exists that overrides? No routing here.
-    // Just use defaultView logic.
-    const saved = localStorage.getItem('lumos_default_view');
-    return (saved as AppView) || AppView.RECORD;
-  });
-
-  useEffect(() => {
-    localStorage.setItem('lumos_min_idle_time', minIdleTimeThreshold.toString());
-  }, [minIdleTimeThreshold]);
-
-  useEffect(() => {
-    localStorage.setItem('lumos_default_view', defaultView);
-  }, [defaultView]);
-
-  // Daily Review State (每日回顾状态)
-  const [dailyReviews, setDailyReviews] = useState<DailyReview[]>(() => {
-    const stored = localStorage.getItem('lumostime_dailyReviews');
-    return stored ? JSON.parse(stored) : INITIAL_DAILY_REVIEWS;
-  });
-
-  const [reviewTemplates, setReviewTemplates] = useState<ReviewTemplate[]>(() => {
-    const stored = localStorage.getItem('lumostime_reviewTemplates');
-    return stored ? JSON.parse(stored) : DEFAULT_REVIEW_TEMPLATES;
-  });
-
-  // Daily Review Time
-  const [dailyReviewTime, setDailyReviewTime] = useState<string>(() => {
-    return localStorage.getItem('lumostime_review_time') || '22:00';
-  });
-
-  useEffect(() => {
-    localStorage.setItem('lumostime_review_time', dailyReviewTime);
-  }, [dailyReviewTime]);
-
-  // Weekly Review Time
-  const [weeklyReviewTime, setWeeklyReviewTime] = useState<string>(() => {
-    return localStorage.getItem('lumostime_weekly_review_time') || '0-2200';
-  });
-
-  useEffect(() => {
-    localStorage.setItem('lumostime_weekly_review_time', weeklyReviewTime);
-  }, [weeklyReviewTime]);
-
-  // Monthly Review Time
-  const [monthlyReviewTime, setMonthlyReviewTime] = useState<string>(() => {
-    return localStorage.getItem('lumostime_monthly_review_time') || '0-2200'; // 0-2200 means Last Day of Month at 22:00
-  });
-
-  useEffect(() => {
-    localStorage.setItem('lumostime_monthly_review_time', monthlyReviewTime);
-  }, [monthlyReviewTime]);
-
-  // Custom AI Narrative Templates
-  const [customNarrativeTemplates, setCustomNarrativeTemplates] = useState<NarrativeTemplate[]>(() => {
-    const stored = localStorage.getItem('lumostime_custom_narrative_templates');
-    if (stored) return JSON.parse(stored);
-
-    // Migration: Check for old custom prompt
-    const oldPrompt = localStorage.getItem('lumostime_ai_narrative_prompt');
-    if (oldPrompt && oldPrompt.trim() !== '') {
-      return [{
-        id: 'custom_migrated',
-        title: '我的自定义模版',
-        description: '从旧版本迁移的自定义提示向',
-        prompt: oldPrompt,
-        isCustom: true
-      }];
-    }
-    return [];
-  });
-
-  useEffect(() => {
-    localStorage.setItem('lumostime_custom_narrative_templates', JSON.stringify(customNarrativeTemplates));
-  }, [customNarrativeTemplates]);
-
-  // User Personal Info for AI Narrative
-  const [userPersonalInfo, setUserPersonalInfo] = useState<string>(() => {
-    const stored = localStorage.getItem('lumostime_user_personal_info');
-    if (stored) return stored;
-    return DEFAULT_USER_PERSONAL_INFO;
-  });
-
-  useEffect(() => {
-    localStorage.setItem('lumostime_user_personal_info', userPersonalInfo);
-  }, [userPersonalInfo]);
-
-  // Daily Review View State (路由状态)
-  const [isDailyReviewOpen, setIsDailyReviewOpen] = useState(false);
-  const [currentReviewDate, setCurrentReviewDate] = useState<Date | null>(null);
-
-  useEffect(() => {
-    localStorage.setItem('lumostime_dailyReviews', JSON.stringify(dailyReviews));
-  }, [dailyReviews]);
-
-  useEffect(() => {
-    localStorage.setItem('lumostime_reviewTemplates', JSON.stringify(reviewTemplates));
-  }, [reviewTemplates]);
-
-  // Weekly Review State (每周回顾状态)
-  const [weeklyReviews, setWeeklyReviews] = useState<WeeklyReview[]>(() => {
-    const stored = localStorage.getItem('lumostime_weeklyReviews');
-    return stored ? JSON.parse(stored) : [];
-  });
-
-  // Weekly Review View State (路由状态)
-  const [isWeeklyReviewOpen, setIsWeeklyReviewOpen] = useState(false);
-  const [currentWeeklyReviewStart, setCurrentWeeklyReviewStart] = useState<Date | null>(null);
-  const [currentWeeklyReviewEnd, setCurrentWeeklyReviewEnd] = useState<Date | null>(null);
-
-  useEffect(() => {
-    localStorage.setItem('lumostime_weeklyReviews', JSON.stringify(weeklyReviews));
-  }, [weeklyReviews]);
-
-  // Monthly Review State (每月回顾状态)
-  const [monthlyReviews, setMonthlyReviews] = useState<MonthlyReview[]>(() => {
-    const stored = localStorage.getItem('lumostime_monthlyReviews');
-    return stored ? JSON.parse(stored) : [];
-  });
-
-  // Monthly Review View State (路由状态)
-  const [isMonthlyReviewOpen, setIsMonthlyReviewOpen] = useState(false);
-  const [currentMonthlyReviewStart, setCurrentMonthlyReviewStart] = useState<Date | null>(null);
-  const [currentMonthlyReviewEnd, setCurrentMonthlyReviewEnd] = useState<Date | null>(null);
-
-  useEffect(() => {
-    localStorage.setItem('lumostime_monthlyReviews', JSON.stringify(monthlyReviews));
-  }, [monthlyReviews]);
-
-  // Filters State (自定义筛选器)
-  const [filters, setFilters] = useState<Filter[]>(() => {
-    const stored = localStorage.getItem('lumostime_filters');
-    return stored ? JSON.parse(stored) : [];
-  });
-
-  useEffect(() => {
-    localStorage.setItem('lumostime_filters', JSON.stringify(filters));
-  }, [filters]);
 
 
 
 
-
+  // Session 管理适配器（为保持调用兼容性）
   const handleStartActivity = (activity: Activity, categoryId: string, todoId?: string, scopeId?: string, note?: string) => {
-    let appliedScopeIds: string[] | undefined = scopeId ? [scopeId] : undefined;
-    if (!scopeId && autoLinkRules.length > 0) {
-      const matchingRules = autoLinkRules.filter(rule => rule.activityId === activity.id);
-      if (matchingRules.length > 0) {
-        appliedScopeIds = matchingRules.map(rule => rule.scopeId);
-      }
-    }
-    const newSession: ActiveSession = {
-      id: crypto.randomUUID(),
-      activityId: activity.id,
-      categoryId: categoryId,
-      activityName: activity.name,
-      activityIcon: activity.icon,
-      startTime: Date.now(),
-      linkedTodoId: todoId,
-      scopeIds: appliedScopeIds,
-      note: note
-    };
-    setActiveSessions(prev => [...prev, newSession]);
-
-    // 启动通知（仅Android平台）
-    if (Capacitor.getPlatform() === 'android') {
-
-
-      // 更新悬浮球状态
-      // Use toString() for safety
-      const floatingWindowEnabled = localStorage.getItem('cfg_floating_window_enabled') === 'true'; // Default false
-      if (floatingWindowEnabled && newSession && newSession.startTime) {
-        FocusNotification.updateFloatingWindow({
-          icon: activity.icon,
-          isFocusing: true,
-          startTime: newSession.startTime.toString()
-        }).catch((e) => console.error("Update FW failed", e));
-      }
-    }
+    startActivity(activity, categoryId, autoLinkRules, todoId, scopeId, note);
   };
 
   const handleStopActivity = (sessionId: string, finalSessionData?: ActiveSession) => {
-    const session = activeSessions.find(s => s.id === sessionId);
-    if (session) {
-      const endTime = Date.now();
-      const duration = (endTime - session.startTime) / 1000;
-
-      if (duration > 1) {
-        // 创建基础Log对象（不包含id，因为拆分时每条记录需要新id）
-        const baseLog = {
-          activityId: session.activityId,
-          categoryId: session.categoryId,
-          startTime: session.startTime,
-          endTime: endTime,
-          duration: duration,
-          linkedTodoId: session.linkedTodoId,
-          title: finalSessionData?.title || session.title,
-          note: finalSessionData?.note || session.note,
-          progressIncrement: finalSessionData?.progressIncrement,
-          focusScore: finalSessionData?.focusScore || session.focusScore,
-          scopeIds: session.scopeIds
-        };
-
-        // 使用拆分函数，自动处理跨天情况
-        const logs = splitLogByDays(baseLog);
-
-        // 处理进度增量（仅对第一条记录）
-        if (logs[0].progressIncrement && logs[0].progressIncrement > 0 && session.linkedTodoId) {
-          setTodos(prev => prev.map(t => {
-            if (t.id === session.linkedTodoId && t.isProgress) {
-              const current = t.completedUnits || 0;
-              return { ...t, completedUnits: current + logs[0].progressIncrement! };
-            }
-            return t;
-          }));
-
-          // 清除其他记录的progressIncrement，避免重复计算
-          logs.forEach((log, index) => {
-            if (index > 0) {
-              delete log.progressIncrement;
-            }
-          });
-        }
-
-        // 添加所有拆分后的记录到logs状态
-        setLogs(prev => [...logs, ...prev]);
+    stopActivity(
+      sessionId,
+      finalSessionData,
+      (logs) => setLogs(prev => [...logs, ...prev]),
+      (linkedTodoId, progressIncrement) => {
+        setTodos(prev => prev.map(t => {
+          if (t.id === linkedTodoId && t.isProgress) {
+            const current = t.completedUnits || 0;
+            return { ...t, completedUnits: current + progressIncrement };
+          }
+          return t;
+        }));
       }
-    }
-    setActiveSessions(prev => prev.filter(s => s.id !== sessionId));
-    if (focusDetailSessionId === sessionId) setFocusDetailSessionId(null);
-
-    // 停止通知（仅Android平台）
-    // 停止通知（仅Android平台）
-    if (Capacitor.getPlatform() === 'android') {
-
-      // 恢复悬浮球状态
-      FocusNotification.updateFloatingWindow({ isFocusing: false }).catch(() => { });
-    }
+    );
   };
 
   const handleCancelSession = (sessionId: string) => {
-    setActiveSessions(prev => prev.filter(s => s.id !== sessionId));
-    if (focusDetailSessionId === sessionId) setFocusDetailSessionId(null);
-
-    // 停止通知（仅Android平台）
-    // 停止通知（仅Android平台）
-    if (Capacitor.getPlatform() === 'android') {
-
-      // 恢复悬浮球状态
-      FocusNotification.updateFloatingWindow({ isFocusing: false }).catch(() => { });
-    }
+    cancelSession(sessionId);
   };
+
 
   const handleUpdateSession = (updatedSession: ActiveSession) => {
     setActiveSessions(prev => prev.map(s => s.id === updatedSession.id ? updatedSession : s));
@@ -752,7 +427,6 @@ const App: React.FC = () => {
     addToast('success', `Successfully backfilled ${newLogs.length} logs!`);
   };
 
-  const [initialLogTimes, setInitialLogTimes] = useState<{ start: number, end: number } | null>(null);
 
   const openAddModal = (startTime?: number, endTime?: number) => {
     setEditingLog(null);
@@ -958,143 +632,6 @@ const App: React.FC = () => {
   // Date State (Lifted for sharing between Timeline and Stats)
   const [currentDate, setCurrentDate] = useState(new Date());
 
-  // Category State
-  const [categories, setCategories] = useState(() => {
-    const stored = localStorage.getItem('lumostime_categories');
-    return stored ? JSON.parse(stored) : CATEGORIES;
-  });
-
-  // Scope State (NEW)
-  const [scopes, setScopes] = useState(() => {
-    const stored = localStorage.getItem('lumostime_scopes');
-    return stored ? JSON.parse(stored) : SCOPES;
-  });
-
-  // Goals State
-  const [goals, setGoals] = useState<Goal[]>(() => {
-    const stored = localStorage.getItem('lumostime_goals');
-    return stored ? JSON.parse(stored) : INITIAL_GOALS;
-  });
-
-  const handleUpdateCategories = (newCategories: typeof CATEGORIES) => {
-    setCategories(newCategories);
-
-    // Sync active sessions with new category/activity data
-    setActiveSessions(prevSessions => prevSessions.map(session => {
-      // Find the category (optional check, mainly for activity lookup if we wanted to be strict, but we can search all)
-      // Actually, session has categoryId, so we can look up efficiently.
-      const category = newCategories.find(c => c.id === session.categoryId);
-      if (!category) return session;
-
-      const activity = category.activities.find(a => a.id === session.activityId);
-      if (!activity) return session;
-
-      // Update session if name or icon changed
-      if (session.activityName !== activity.name || session.activityIcon !== activity.icon) {
-        return {
-          ...session,
-          activityName: activity.name,
-          activityIcon: activity.icon
-        };
-      }
-      return session;
-    }));
-  };
-
-  const handleUpdateCategory = (updatedCategory: Category) => {
-    setCategories(prev => prev.map(c => c.id === updatedCategory.id ? updatedCategory : c));
-    // Sync active sessions
-    setActiveSessions(prev => prev.map(s => {
-      if (s.categoryId === updatedCategory.id) {
-        // If the category name/icon changed, we might want to update session?
-        // But session stores activityName/Icon. 
-        // If category color changed, it might affect UI but session doesn't store color directly usually (looks up by ID).
-        return s;
-      }
-      return s;
-    }));
-  };
-
-  const handleUpdateActivity = (updatedActivity: Activity) => {
-    setCategories(prev => prev.map(cat => {
-      const activityIndex = cat.activities.findIndex(a => a.id === updatedActivity.id);
-      if (activityIndex > -1) {
-        const newActivities = [...cat.activities];
-        newActivities[activityIndex] = updatedActivity;
-        return { ...cat, activities: newActivities };
-      }
-      return cat;
-    }));
-
-    // Sync active sessions
-    setActiveSessions(prev => prev.map(s => {
-      if (s.activityId === updatedActivity.id) {
-        return {
-          ...s,
-          activityName: updatedActivity.name,
-          activityIcon: updatedActivity.icon
-        };
-      }
-      return s;
-    }));
-  };
-
-  const handleCategoryChange = (activityId: string, newCategoryId: string) => {
-    let activityToMove: Activity | undefined;
-    let oldCategoryId: string | undefined;
-
-    // Find the activity and its current category
-    for (const cat of categories) {
-      const foundActivity = cat.activities.find(a => a.id === activityId);
-      if (foundActivity) {
-        activityToMove = foundActivity;
-        oldCategoryId = cat.id;
-        break;
-      }
-    }
-
-    if (!activityToMove || !oldCategoryId || oldCategoryId === newCategoryId) {
-      return;
-    }
-
-    // Move the activity to the new category
-    setCategories(prev => prev.map(cat => {
-      if (cat.id === oldCategoryId) {
-        // Remove activity from old category
-        return {
-          ...cat,
-          activities: cat.activities.filter(a => a.id !== activityId)
-        };
-      } else if (cat.id === newCategoryId) {
-        // Add activity to new category
-        return {
-          ...cat,
-          activities: [...cat.activities, activityToMove!]
-        };
-      }
-      return cat;
-    }));
-
-    // Update categoryId in all logs for this activity
-    setLogs(prev => prev.map(log => {
-      if (log.activityId === activityId) {
-        return { ...log, categoryId: newCategoryId };
-      }
-      return log;
-    }));
-
-    // Update active sessions
-    setActiveSessions(prev => prev.map(s => {
-      if (s.activityId === activityId) {
-        return {
-          ...s,
-          categoryId: newCategoryId
-        };
-      }
-      return s;
-    }));
-  };
-
   // Persist data to localStorage whenever it changes
   useEffect(() => {
     localStorage.setItem('lumostime_logs', JSON.stringify(logs));
@@ -1109,29 +646,10 @@ const App: React.FC = () => {
   }, [todoCategories]);
 
   useEffect(() => {
-    localStorage.setItem('lumostime_categories', JSON.stringify(categories));
-  }, [categories]);
-
-  useEffect(() => {
-    localStorage.setItem('lumostime_scopes', JSON.stringify(scopes));
-  }, [scopes]);
-
-  useEffect(() => {
-    localStorage.setItem('lumostime_goals', JSON.stringify(goals));
-  }, [goals]);
-
-  useEffect(() => {
     localStorage.setItem('lumostime_autoLinkRules', JSON.stringify(autoLinkRules));
   }, [autoLinkRules]);
 
-  // Tags State
-  const [isTagsManaging, setIsTagsManaging] = useState(false);
-
-  // Scope State
-  const [selectedScopeId, setSelectedScopeId] = useState<string | null>(null);
-  const [isScopeManaging, setIsScopeManaging] = useState(false);
-
-  // --- History Navigation Logic for Scope Detail ---
+  //--- History Navigation Logic for Scope Detail ---
   useEffect(() => {
     // Only handle if selectedScopeId is set
     if (selectedScopeId) {
@@ -1158,10 +676,7 @@ const App: React.FC = () => {
     return () => window.removeEventListener('popstate', handlePopState);
   }, [selectedScopeId]);
 
-  // Goal State
-  const [isGoalEditorOpen, setIsGoalEditorOpen] = useState(false);
-  const [editingGoal, setEditingGoal] = useState<Goal | null>(null);
-  const [goalScopeId, setGoalScopeId] = useState<string>('');
+
 
   // Track data changes
   const isFirstRun = useRef(true);
@@ -1903,7 +1418,9 @@ const App: React.FC = () => {
           onDelete={handleDeleteReview}
           onUpdateReview={handleUpdateReview}
           onGenerateNarrative={handleGenerateNarrative}
+          onGenerateNarrative={handleGenerateNarrative}
           addToast={addToast}
+          checkTemplates={checkTemplates}
         />
       );
     }
@@ -2264,7 +1781,7 @@ const App: React.FC = () => {
 
   return (
     <div className={`h-screen w-screen flex flex-col ${currentView === AppView.TIMELINE ? 'bg-white' : 'bg-[#fdfbf7]'} text-stone-800 overflow-hidden select-none font-serif relative pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]`}>
-      <ToastContainer toasts={toasts} onRemove={removeToast} />
+
 
       {/* Top Header Bar */}
       {!isSettingsOpen && (currentView !== AppView.TIMELINE || isDailyReviewOpen) && !isStatsFullScreen &&
@@ -2508,6 +2025,9 @@ const App: React.FC = () => {
             onSetMonthlyReviewTime={setMonthlyReviewTime}
             customNarrativeTemplates={customNarrativeTemplates}
             onUpdateCustomNarrativeTemplates={setCustomNarrativeTemplates}
+            // Check Templates
+            checkTemplates={checkTemplates}
+            onUpdateCheckTemplates={setCheckTemplates}
             userPersonalInfo={userPersonalInfo}
             onSetUserPersonalInfo={setUserPersonalInfo}
             logs={logs}
@@ -2592,137 +2112,88 @@ const App: React.FC = () => {
           />
         </div>
 
-        {/* Focus Detail View Overlay */}
-        {focusDetailSessionId && !isSettingsOpen && (
-          <FocusDetailView
-            session={activeSessions.find(s => s.id === focusDetailSessionId)!}
-            todos={todos}
-            categories={categories}
-            todoCategories={todoCategories}
-            scopes={scopes}
-            autoLinkRules={autoLinkRules}
-            onClose={() => setFocusDetailSessionId(null)}
-            onComplete={(s) => handleStopActivity(s.id, s)}
-            onUpdate={handleUpdateSession}
-          />
-        )}
+        {/* All Modals */}
+        <ModalManager
+          // AddLog Modal
+          isAddModalOpen={isAddModalOpen}
+          editingLog={editingLog}
+          initialLogTimes={initialLogTimes}
+          onCloseAddLog={closeModal}
+          onSaveLog={handleSaveLog}
+          onDeleteLog={handleDeleteLog}
+          lastLogEndTime={(() => {
+            if (logs.length === 0) return undefined;
+            const currentStartTime = editingLog?.startTime || Date.now();
+            const previousLogs = logs.filter(l =>
+              l.id !== editingLog?.id &&
+              l.endTime <= currentStartTime
+            );
+            if (previousLogs.length === 0) return undefined;
+            return Math.max(...previousLogs.map(l => l.endTime));
+          })()}
 
-        {/* Active Timer Overlay */}
-        {activeSessions.length > 0 && !isSettingsOpen && !focusDetailSessionId && (
-          <TimerFloating
-            sessions={activeSessions}
-            todos={todos}
-            onStop={(id) => handleStopActivity(id)}
-            onCancel={handleCancelSession}
-            onClick={(s) => setFocusDetailSessionId(s.id)}
-          />
-        )}
+          // Todo Modal
+          isTodoModalOpen={isTodoModalOpen}
+          isSettingsOpen={isSettingsOpen}
+          editingTodo={editingTodo}
+          todoCategoryToAdd={todoCategoryToAdd}
+          todoCategories={todoCategories}
+          onCloseTodo={closeTodoModal}
+          onSaveTodo={handleSaveTodo}
+          onDeleteTodo={handleDeleteTodo}
+          onEditLog={openEditModal}
 
-        {/* Manual Add/Edit Log Modal */}
-        {isAddModalOpen && (
-          <AddLogModal
-            initialLog={editingLog}
-            initialStartTime={initialLogTimes?.start}
-            initialEndTime={initialLogTimes?.end}
-            onClose={closeModal}
-            onSave={handleSaveLog}
-            onDelete={handleDeleteLog}
-            categories={categories}
-            todos={todos}
-            todoCategories={todoCategories}
-            scopes={scopes}
-            autoLinkRules={autoLinkRules}
-            lastLogEndTime={(() => {
-              if (logs.length === 0) return undefined;
-              const currentStartTime = editingLog?.startTime || Date.now();
-              // 查找结束时间在当前记录开始时间之前,且结束时间最接近当前记录开始时间的记录
-              const previousLogs = logs.filter(l =>
-                l.id !== editingLog?.id &&
-                l.endTime <= currentStartTime
-              );
-              if (previousLogs.length === 0) return undefined;
-              // 返回这些记录中结束时间最晚的那个
-              return Math.max(...previousLogs.map(l => l.endTime));
-            })()}
-          />
-        )}
+          // Goal Editor
+          isGoalEditorOpen={isGoalEditorOpen}
+          editingGoal={editingGoal}
+          goalScopeId={goalScopeId}
+          onSaveGoal={handleSaveGoal}
+          onCloseGoal={closeGoalEditor}
 
-        {/* Todo Add/Edit Modal */}
-        {isTodoModalOpen && !isSettingsOpen && (
-          <TodoDetailModal
-            initialTodo={editingTodo}
-            currentCategory={todoCategories.find(c => c.id === todoCategoryToAdd)!}
-            onClose={closeTodoModal}
-            onSave={handleSaveTodo}
-            onDelete={handleDeleteTodo}
-            logs={logs}
-            onLogUpdate={handleSaveLog}
-            onEditLog={openEditModal}
-            todoCategories={todoCategories}
-            categories={categories}
-            scopes={scopes}
-          />
-        )}
+          // Session/Timer
+          activeSessions={activeSessions}
+          focusDetailSessionId={focusDetailSessionId}
+          onStopActivity={(id) => handleStopActivity(id)}
+          onCancelSession={handleCancelSession}
+          onClickSession={(s) => setFocusDetailSessionId(s.id)}
+          onUpdateSession={handleUpdateSession}
+          onCloseFocusDetail={() => setFocusDetailSessionId(null)}
+
+          // Common
+          categories={categories}
+          scopes={scopes}
+          autoLinkRules={autoLinkRules}
+          logs={logs}
+          todos={todos}
+        />
       </main>
 
-      {/* Bottom Text Navigation */}
-      {!isSettingsOpen && !isStatsFullScreen &&
-        !isTodoModalOpen &&
-        !selectedCategoryId &&
-        !selectedScopeId &&
-        !selectedTagId &&
-        !isDailyReviewOpen &&
-        !isWeeklyReviewOpen &&
-        !isMonthlyReviewOpen &&
-        !isTagsManaging &&
-        !isScopeManaging &&
-        currentView !== AppView.STATS && (
-          <nav className={`fixed bottom-0 left-0 w-full h-12 md:h-16 box-content border-t border-stone-100 flex justify-around items-center z-30 pb-[env(safe-area-inset-bottom)] ${currentView === AppView.TIMELINE || currentView === AppView.TAGS
-            ? 'bg-[#faf9f6]'
-            : 'bg-white'
-            }`}>
-            {[
-              { view: AppView.RECORD, label: '记录' },
-              { view: AppView.TODO, label: '待办' },
-              { view: AppView.TIMELINE, label: '脉络' },
-              { view: AppView.REVIEW, label: '档案' },
-              { view: AppView.TAGS, label: '索引' },
-            ].map((item) => {
-              const isActive = currentView === item.view;
-              return (
-                <div
-                  key={item.view}
-                  onClick={() => {
-                    setCurrentView(item.view);
-                    // Reset states on view switch
-                    setSelectedTagId(null);
-                    setSelectedScopeId(null);
-                    setIsDailyReviewOpen(false);
-                    setIsMonthlyReviewOpen(false);
-                    setCurrentReviewDate(null);
-                  }}
-                  className={`flex-1 h-full flex items-center justify-center cursor-pointer relative transition-all duration-200 ${isActive ? 'text-stone-900' : 'text-stone-400'}`}
-                >
-                  <span className={`font-serif text-[13px] tracking-[1px] transition-all duration-200 ${isActive ? 'font-black' : 'font-medium'}`}>
-                    {item.label}
-                  </span>
-                </div>
-              );
-            })}
-          </nav>
-        )}
-
-      {/* Goal Editor Modal */}
-      {isGoalEditorOpen && (
-        <GoalEditor
-          goal={editingGoal || undefined}
-          scopeId={goalScopeId}
-          categories={categories}
-          todoCategories={todoCategories}
-          onSave={handleSaveGoal}
-          onClose={closeGoalEditor}
-        />
-      )}
+      {/* Bottom Navigation */}
+      <BottomNavigation
+        currentView={currentView}
+        onViewChange={(view) => {
+          setCurrentView(view);
+          setSelectedTagId(null);
+          setSelectedScopeId(null);
+          setIsDailyReviewOpen(false);
+          setIsMonthlyReviewOpen(false);
+          setCurrentReviewDate(null);
+        }}
+        isVisible={
+          !isSettingsOpen &&
+          !isStatsFullScreen &&
+          !isTodoModalOpen &&
+          !selectedCategoryId &&
+          !selectedScopeId &&
+          !selectedTagId &&
+          !isDailyReviewOpen &&
+          !isWeeklyReviewOpen &&
+          !isMonthlyReviewOpen &&
+          !isTagsManaging &&
+          !isScopeManaging &&
+          currentView !== AppView.STATS
+        }
+      />
     </div>
   );
 };
@@ -2739,5 +2210,33 @@ const NavButton: React.FC<{ icon: React.ReactNode, label: string, isActive: bool
     {/* Label removed as per request */}
   </button>
 );
+
+const AppWithProviders: React.FC = () => {
+  const { activeSessions, setActiveSessions } = useSession();
+
+  return (
+    <CategoryScopeProvider activeSessions={activeSessions} setActiveSessions={setActiveSessions}>
+      <NavigationProvider>
+        <AppContent />
+      </NavigationProvider>
+    </CategoryScopeProvider>
+  );
+};
+
+const App: React.FC = () => {
+  return (
+    <ToastProvider>
+      <DataProvider>
+        <SettingsProvider>
+          <ReviewProvider>
+            <SessionProvider splitLogByDays={splitLogByDays}>
+              <AppWithProviders />
+            </SessionProvider>
+          </ReviewProvider>
+        </SettingsProvider>
+      </DataProvider>
+    </ToastProvider>
+  );
+};
 
 export default App;
