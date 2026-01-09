@@ -40,7 +40,7 @@ export const CheckTemplateManageView: React.FC<CheckTemplateManageViewProps> = (
         const newTemplate: CheckTemplate = {
             id: crypto.randomUUID(),
             title: '新检查清单',
-            items: ['检查项 1'], // Default item
+            items: [{ id: crypto.randomUUID(), content: '检查项 1', icon: '📝' }], // Default item
             enabled: true,
             order: (templates.length > 0 ? Math.max(...templates.map(t => t.order)) : 0) + 1,
             isDaily: true
@@ -66,7 +66,7 @@ export const CheckTemplateManageView: React.FC<CheckTemplateManageViewProps> = (
         }
 
         // Filter out empty items
-        const cleanItems = templateForm.items.map(i => i.trim()).filter(i => !!i);
+        const cleanItems = templateForm.items.filter(i => !!i.content.trim());
         const finalTemplate = { ...templateForm, items: cleanItems };
 
         if (editingTemplateId === 'NEW') {
@@ -92,14 +92,17 @@ export const CheckTemplateManageView: React.FC<CheckTemplateManageViewProps> = (
         if (!templateForm) return;
         setTemplateForm({
             ...templateForm,
-            items: [...templateForm.items, '']
+            ...templateForm,
+            items: [...templateForm.items, { id: crypto.randomUUID(), content: '', icon: '⚡' }]
         });
     };
 
-    const handleUpdateItem = (index: number, value: string) => {
+    const handleUpdateItem = (index: number, content: string) => {
         if (!templateForm) return;
         const newItems = [...templateForm.items];
-        newItems[index] = value;
+        // Auto-update icon based on first char of content
+        const icon = content.trim().slice(0, 1) || '📝';
+        newItems[index] = { ...newItems[index], content, icon };
         setTemplateForm({ ...templateForm, items: newItems });
     };
 
@@ -174,8 +177,7 @@ export const CheckTemplateManageView: React.FC<CheckTemplateManageViewProps> = (
                                                 <div className="space-y-1">
                                                     {template.items.slice(0, 3).map((item, idx) => (
                                                         <div key={idx} className="flex items-center gap-2 text-xs text-stone-500">
-                                                            <div className="w-1 h-1 rounded-full bg-stone-300" />
-                                                            <span className="truncate">{item}</span>
+                                                            <span className="truncate">{item.content}</span>
                                                         </div>
                                                     ))}
                                                     {template.items.length > 3 && (
@@ -255,14 +257,15 @@ export const CheckTemplateManageView: React.FC<CheckTemplateManageViewProps> = (
                                 </div>
                                 <div className="space-y-2">
                                     {templateForm.items.map((item, idx) => (
-                                        <div key={idx} className="flex items-center gap-2 group">
+                                        <div key={item.id || idx} className="flex items-center gap-2 group">
                                             <span className="text-stone-300 text-xs w-4 text-center">{idx + 1}</span>
+                                            {/* Content Input (Combined) */}
                                             <input
                                                 type="text"
-                                                value={item}
+                                                value={item.content}
                                                 onChange={(e) => handleUpdateItem(idx, e.target.value)}
-                                                className="flex-1 bg-white border border-stone-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-stone-400 focus:ring-2 focus:ring-stone-100 transition-all"
-                                                placeholder="输入检查内容..."
+                                                className="flex-1 bg-white border border-stone-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-stone-400 focus:ring-2 focus:ring-stone-100 transition-all font-mono"
+                                                placeholder="💧 输入检查内容 (首字符作为图标)..."
                                                 autoFocus={templateForm.items.length > 1 && idx === templateForm.items.length - 1}
                                             />
                                             <button

@@ -58,7 +58,61 @@ export const ReviewProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     // Check 模板
     const [checkTemplates, setCheckTemplates] = useState<CheckTemplate[]>(() => {
         const stored = localStorage.getItem('lumostime_checkTemplates');
-        return stored ? JSON.parse(stored) : DEFAULT_CHECK_TEMPLATES;
+
+        // Build map of default content -> default icon
+        const defaultIconMap: Record<string, string> = {};
+        DEFAULT_CHECK_TEMPLATES.forEach(t => {
+            t.items.forEach(i => {
+                if (i.content && i.icon) {
+                    defaultIconMap[i.content] = i.icon;
+                }
+            });
+        });
+
+        if (stored) {
+            try {
+                const parsed = JSON.parse(stored);
+                // Schema Migration & Icon Restoration
+                const migrated = parsed.map((t: any) => ({
+                    ...t,
+                    items: t.items.map((item: any) => {
+                        let content = '';
+                        let id = '';
+                        let currentIcon = '';
+
+                        if (typeof item === 'string') {
+                            content = item;
+                            id = crypto.randomUUID();
+                        } else {
+                            content = item.content;
+                            id = item.id || crypto.randomUUID();
+                            currentIcon = item.icon;
+                        }
+
+                        // Restore default icon if available, otherwise use existing or fall back to first char
+                        // We prioritize the default icon for known default items to fix the "no icon" issue
+                        let icon = defaultIconMap[content] || currentIcon || content.trim().slice(0, 1) || '📝';
+
+                        // MERGE: Ensure content starts with icon if it doesn't already
+                        try {
+                            // If content doesn't start with icon, prepend it
+                            if (!content.startsWith(icon)) {
+                                content = `${icon} ${content}`;
+                            }
+                        } catch (e) {
+                            // ignore string errors
+                        }
+
+                        return { id, content, icon };
+                    })
+                }));
+                return migrated;
+            } catch (e) {
+                console.error("Failed to parse checkTemplates, falling back to default", e);
+                return DEFAULT_CHECK_TEMPLATES;
+            }
+        }
+        return DEFAULT_CHECK_TEMPLATES;
     });
 
     // Review 时间设置
