@@ -325,7 +325,59 @@ export const MonthlyReviewView: React.FC<MonthlyReviewViewProps> = ({
                 ).join('\n')}\n\n` +
                 weeklyStatsText;
 
-            const generated = await onGenerateNarrative(review, statsText, template.prompt);
+            // 生成本月 check 项汇总统计
+            const checkText = (() => {
+                // 筛选本月的 dailyReviews
+                const monthStart = new Date(monthStartDate);
+                monthStart.setHours(0, 0, 0, 0);
+                const monthEnd = new Date(monthEndDate);
+                monthEnd.setHours(23, 59, 59, 999);
+
+                const monthDailyReviews = dailyReviews.filter(r => {
+                    const reviewDate = new Date(r.date);
+                    return reviewDate >= monthStart && reviewDate <= monthEnd;
+                });
+
+                // 统计每个 check 项的完成情况
+                const checkStats: Record<string, { category: string, total: number, completed: number }> = {};
+
+                monthDailyReviews.forEach(review => {
+                    if (review.checkItems) {
+                        review.checkItems.forEach(item => {
+                            if (!item.category) return; // 跳过无分类项
+                            const key = `${item.category}|${item.content}`;
+                            if (!checkStats[key]) {
+                                checkStats[key] = { category: item.category, total: 0, completed: 0 };
+                            }
+                            checkStats[key].total++;
+                            if (item.isCompleted) checkStats[key].completed++;
+                        });
+                    }
+                });
+
+                if (Object.keys(checkStats).length === 0) return '';
+
+                // 按分类分组
+                const byCategory: Record<string, Array<{ content: string, total: number, completed: number, rate: number }>> = {};
+                Object.entries(checkStats).forEach(([key, stats]) => {
+                    const content = key.split('|')[1];
+                    const rate = stats.total > 0 ? (stats.completed / stats.total) * 100 : 0;
+                    if (!byCategory[stats.category]) byCategory[stats.category] = [];
+                    byCategory[stats.category].push({ content, total: stats.total, completed: stats.completed, rate });
+                });
+
+                let text = '\n\n检查清单完成情况（本月汇总）：\n';
+                Object.entries(byCategory).forEach(([category, items]) => {
+                    text += `\n${category}：\n`;
+                    items.forEach(item => {
+                        text += `  ${item.content}: ${item.completed}/${item.total} (${item.rate.toFixed(0)}%)\n`;
+                    });
+                });
+
+                return text;
+            })();
+
+            const generated = await onGenerateNarrative(review, statsText + checkText, template.prompt);
             setNarrative(generated);
             setEditedNarrative(generated);
 

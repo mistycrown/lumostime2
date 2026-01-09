@@ -307,6 +307,36 @@ export const DailyReviewView: React.FC<DailyReviewViewProps> = ({
                     `- ${s.name}: ${formatDuration(s.duration)} (${s.percentage.toFixed(1)}%)`
                 ).join('\n')}`;
 
+            // 生成 check 项统计文本
+            const checkText = (() => {
+                if (!checkItems || checkItems.length === 0) return '';
+
+                const completed = checkItems.filter(item => item.isCompleted);
+                const total = checkItems.length;
+                const percentage = total > 0 ? ((completed.length / total) * 100).toFixed(1) : '0.0';
+
+                // 按分类分组
+                const byCategory: Record<string, CheckItem[]> = {};
+                checkItems.forEach(item => {
+                    const cat = item.category || '其他';
+                    if (!byCategory[cat]) byCategory[cat] = [];
+                    byCategory[cat].push(item);
+                });
+
+                let text = `\n\n检查清单完成情况：\n总完成率：${completed.length}/${total} (${percentage}%)\n\n`;
+
+                Object.entries(byCategory).forEach(([category, items]) => {
+                    text += `${category}：\n`;
+                    items.forEach(item => {
+                        const status = item.isCompleted ? '✓' : '✗';
+                        text += `  ${status} ${item.content}\n`;
+                    });
+                    text += '\n';
+                });
+
+                return text;
+            })();
+
             // 生成时间轴文本
             const timelineText = dayLogs.map(log => {
                 const cat = categories.find(c => c.id === log.categoryId);
@@ -316,7 +346,7 @@ export const DailyReviewView: React.FC<DailyReviewViewProps> = ({
                 return `${startTime.getHours()}:${String(startTime.getMinutes()).padStart(2, '0')}-${endTime.getHours()}:${String(endTime.getMinutes()).padStart(2, '0')} ${act?.name || ''} ${log.note ? '- ' + log.note : ''}`;
             }).join('\n');
 
-            const generated = await onGenerateNarrative(review, statsText, timelineText, template.prompt);
+            const generated = await onGenerateNarrative(review, statsText + checkText, timelineText, template.prompt);
             setNarrative(generated);
             setEditedNarrative(generated); // Sync to edit box
 
