@@ -695,52 +695,68 @@ export const FilterDetailView: React.FC<FilterDetailViewProps> = ({
                             </div>
 
                             <div className="h-64 relative border-l border-b border-stone-200 m-4">
-                                <svg className="w-full h-full overflow-visible" viewBox="0 0 100 100" preserveAspectRatio="none">
-                                    {focusStats.focusedLogs.map((log, idx) => {
-                                        const score = log.focusScore || 0;
-                                        const d = new Date(log.startTime);
+                                {focusStats.focusedLogs.map((log, idx) => {
+                                    const score = log.focusScore || 0;
+                                    const d = new Date(log.startTime);
 
-                                        // Y-axis: Focus Score (1-5)
-                                        // Map 1..5 to 20%..100% (inverted for SVG y)
-                                        // y = 100 - (score / 5 * 100)
-                                        const y = 100 - ((score / 5) * 100);
+                                    // Y-axis: Focus Score (1-5)
+                                    // Map 1..5 to 0%..100% relative to bottom (so 100 - val for top)
+                                    // 1->0%, 5->100% linear?
+                                    // Previous: y = 100 - ((score / 5) * 100); -> Score 0->100, 5->0 (Top).
+                                    // Wait, score 5 should be at top. score 1 at bottom.
+                                    // If container is 0 at top, 100 at bottom.
+                                    // Score 5 => Top (0%). Score 1 => Bottom (100%).
+                                    // Let's stick to the visible labels: 5 at top, 1 at bottom.
+                                    // Range is 1 to 5 (span 4).
+                                    // pct = (score - 1) / 4 * 100.
+                                    // top = 100 - pct.
+                                    // But previous code was: 100 - (score/5)*100.
+                                    // Score 5 => 0% (Top). Correct.
+                                    // Score 1 => 80% (Near Bottom).
+                                    // Score 0 => 100% (Bottom).
+                                    // This assumes scale is 0-5. Labels show 1-5.
+                                    // Let's keep previous logic for consistency: y = 100 - ((score / 5) * 100);
+                                    const topPct = 100 - ((score / 5) * 100);
 
-                                        // X-axis: Timeframe based
-                                        let x = 0;
-                                        if (focusTimeframe === 'day') {
-                                            // 0-24 Hours
-                                            const h = d.getHours() + d.getMinutes() / 60;
-                                            x = (h / 24) * 100;
-                                        } else if (focusTimeframe === 'week') {
-                                            // Mon(0) - Sun(6)
-                                            // getDay(): Sun=0, Mon=1...
-                                            let dayIdx = d.getDay() - 1;
-                                            if (dayIdx < 0) dayIdx = 6;
-                                            // To make it look like "Distribution", adding slight jitter or using Time of Day as minor offset?
-                                            // Let's us precise position: Day Index + (Hour/24)
-                                            x = ((dayIdx + (d.getHours() / 24)) / 7) * 100;
-                                        } else {
-                                            // Month: 1-31
-                                            const date = d.getDate();
-                                            // Position: (Date-1 + Time) / 31
-                                            x = ((date - 1 + (d.getHours() / 24)) / 31) * 100;
-                                        }
+                                    // X-axis
+                                    let leftPct = 0;
+                                    if (focusTimeframe === 'day') {
+                                        const h = d.getHours() + d.getMinutes() / 60;
+                                        leftPct = (h / 24) * 100;
+                                    } else if (focusTimeframe === 'week') {
+                                        let dayIdx = d.getDay() - 1;
+                                        if (dayIdx < 0) dayIdx = 6;
+                                        leftPct = ((dayIdx + (d.getHours() / 24)) / 7) * 100;
+                                    } else {
+                                        const date = d.getDate();
+                                        leftPct = ((date - 1 + (d.getHours() / 24)) / 31) * 100;
+                                    }
 
-                                        // Adjusted size to be even smaller as requested (2nd adjustment)
-                                        const r = (log.duration / focusStats.maxDur) * 3 + 1;
+                                    // Radius in pixels
+                                    // Previous logic: unit r = (duration/max)*3 + 1. (Range 1-4 units)
+                                    // In SVG 100 viewbox units, 1 unit ≈ 2.56px (based on h-64=256px).
+                                    // So radius_px ≈ unit_r * 2.5.
+                                    const rUnit = (log.duration / focusStats.maxDur) * 3 + 1;
+                                    const radiusPx = Math.max(rUnit * 2.5, 3); // Min size 3px radius
+                                    const diameterPx = radiusPx * 2;
 
-                                        return (
-                                            <circle
-                                                key={log.id}
-                                                cx={`${x}%`}
-                                                cy={`${y}%`}
-                                                r={Math.max(r, 1.5)}
-                                                fill={themeColor}
-                                                opacity={0.3 + (score / 10)}
-                                            />
-                                        );
-                                    })}
-                                </svg>
+                                    return (
+                                        <div
+                                            key={log.id}
+                                            className="absolute rounded-full shadow-sm hover:scale-110 transition-transform"
+                                            style={{
+                                                left: `${leftPct}%`,
+                                                top: `${topPct}%`,
+                                                width: `${diameterPx}px`,
+                                                height: `${diameterPx}px`,
+                                                backgroundColor: themeColor,
+                                                opacity: 0.3 + (score / 10),
+                                                transform: 'translate(-50%, -50%)',
+                                            }}
+                                            title={`${d.toLocaleString()} - Focus: ${score}, Duration: ${Math.round(log.duration / 60)}m`}
+                                        />
+                                    );
+                                })}
 
                                 {/* X-Axis Labels */}
                                 <div className="absolute -bottom-6 left-0 w-full flex justify-between text-[10px] text-stone-400 font-mono px-1">
