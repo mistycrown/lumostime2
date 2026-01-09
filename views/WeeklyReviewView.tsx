@@ -35,7 +35,7 @@ interface WeeklyReviewViewProps {
     onUpdateReview: (review: WeeklyReview) => void;
     onGenerateNarrative: (review: WeeklyReview, statsText: string, promptTemplate?: string) => Promise<string>;
     onClose: () => void;
-    addToast: (message: string, type: 'success' | 'error' | 'info') => void; // Assuming ToastType is 'success' | 'error' | 'info'
+    addToast: (type: 'success' | 'error' | 'info', message: string) => void;
 }
 
 type TabType = 'data' | 'guide' | 'narrative';
@@ -350,7 +350,7 @@ export const WeeklyReviewView: React.FC<WeeklyReviewViewProps> = ({
             onUpdateReview(updatedReview);
         } catch (error) {
             console.error('生成叙事失败:', error);
-            addToast('生成叙事失败', 'error');
+            addToast('error', '生成叙事失败');
         } finally {
             setIsGenerating(false);
         }
@@ -390,10 +390,10 @@ export const WeeklyReviewView: React.FC<WeeklyReviewViewProps> = ({
             setNarrative('');
             setEditedNarrative('');
             setIsEditing(false); // reset to false to show empty state options
-            addToast('叙事已删除', 'success');
+            addToast('success', '叙事已删除');
         } catch (error) {
             console.error('Failed to delete narrative', error);
-            addToast('删除失败', 'error');
+            addToast('error', '删除失败');
         } finally {
             setIsDeleteConfirmOpen(false);
         }

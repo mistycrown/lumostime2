@@ -33,7 +33,7 @@ interface DailyReviewViewProps {
     onDelete: () => void;
     onUpdateReview: (review: DailyReview) => void;
     onGenerateNarrative: (review: DailyReview, statsText: string, timelineText: string, promptTemplate?: string) => Promise<string>;
-    addToast: (message: string, type: 'success' | 'error' | 'info') => void; // Assuming ToastType is 'success' | 'error' | 'info'
+    addToast: (type: 'success' | 'error' | 'info', message: string) => void;
 }
 
 type TabType = 'check' | 'data' | 'guide' | 'narrative';
@@ -158,7 +158,7 @@ export const DailyReviewView: React.FC<DailyReviewViewProps> = ({
         setCheckItems([]);
         onUpdateReview({ ...review, checkItems: [], updatedAt: Date.now() });
         setIsClearCheckConfirmOpen(false);
-        addToast('日课已清空', 'success');
+        addToast('success', '日课已清空');
     };
 
     // 格式化日期
@@ -346,7 +346,7 @@ export const DailyReviewView: React.FC<DailyReviewViewProps> = ({
             onUpdateReview(updatedReview);
         } catch (error) {
             console.error('生成叙事失败:', error);
-            addToast('生成叙事失败', 'error');
+            addToast('error', '生成叙事失败');
         } finally {
             setIsGenerating(false);
         }
@@ -386,10 +386,10 @@ export const DailyReviewView: React.FC<DailyReviewViewProps> = ({
             setNarrative('');
             setEditedNarrative('');
             setIsEditing(false); // reset to false to show empty state options
-            addToast('叙事已删除', 'success');
+            addToast('success', '叙事已删除');
         } catch (error) {
             console.error('Failed to delete narrative', error);
-            addToast('删除失败', 'error');
+            addToast('error', '删除失败');
         } finally {
             setIsDeleteConfirmOpen(false);
         }
