@@ -1443,6 +1443,7 @@ const AppContent: React.FC = () => {
           todos={todos}
           todoCategories={todoCategories}
           scopes={scopes}
+          dailyReviews={dailyReviews}
           customNarrativeTemplates={customNarrativeTemplates}
           onDelete={handleDeleteWeeklyReview}
           onUpdateReview={handleUpdateWeeklyReview}
@@ -1471,6 +1472,7 @@ const AppContent: React.FC = () => {
           todos={todos}
           todoCategories={todoCategories}
           scopes={scopes}
+          dailyReviews={dailyReviews}
           customNarrativeTemplates={customNarrativeTemplates}
           onDelete={handleDeleteMonthlyReview}
           onUpdateReview={handleUpdateMonthlyReview}

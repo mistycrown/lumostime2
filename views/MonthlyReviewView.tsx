@@ -9,7 +9,7 @@
  */
 import React, { useState, useMemo } from 'react';
 import { ChevronLeft, Trash2, Sparkles, Edit3, RefreshCw, X, Calendar } from 'lucide-react';
-import { MonthlyReview, ReviewTemplate, ReviewAnswer, Category, Log, TodoCategory, TodoItem, Scope, ReviewQuestion, NarrativeTemplate } from '../types';
+import { MonthlyReview, ReviewTemplate, ReviewAnswer, Category, Log, TodoCategory, TodoItem, Scope, ReviewQuestion, NarrativeTemplate, DailyReview } from '../types';
 import { COLOR_OPTIONS } from '../constants';
 import * as LucideIcons from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
@@ -29,6 +29,7 @@ interface MonthlyReviewViewProps {
     todos: TodoItem[];
     todoCategories: TodoCategory[];
     scopes: Scope[];
+    dailyReviews: DailyReview[];
     customNarrativeTemplates?: NarrativeTemplate[];
     onDelete: () => void;
     onUpdateReview: (review: MonthlyReview) => void;
@@ -62,6 +63,7 @@ export const MonthlyReviewView: React.FC<MonthlyReviewViewProps> = ({
     todos,
     todoCategories,
     scopes,
+    dailyReviews,
     customNarrativeTemplates,
     onDelete,
     onUpdateReview,
@@ -597,6 +599,7 @@ export const MonthlyReviewView: React.FC<MonthlyReviewViewProps> = ({
                             todos={todos}
                             todoCategories={todoCategories}
                             scopes={scopes}
+                            dailyReviews={dailyReviews}
                             onToast={addToast}
                             onTitleChange={() => { }}
                             onDateChange={() => { }}
@@ -604,7 +607,7 @@ export const MonthlyReviewView: React.FC<MonthlyReviewViewProps> = ({
                             hideDateNavigation={true} // Hide date navigation
                             // forcedView="pie"  <- User wants to switch views
                             forcedRange="month" // Force month range
-                            allowedViews={['pie', 'line', 'schedule']} // Pie, Trend, and Schedule (Month Heatmap)
+                            allowedViews={['pie', 'line', 'schedule', 'check']} // 添加 check 视图
                         />
                     </div>
                 )}

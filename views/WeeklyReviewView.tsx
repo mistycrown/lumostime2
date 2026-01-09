@@ -9,7 +9,7 @@
  */
 import React, { useState, useMemo, useEffect } from 'react';
 import { ChevronLeft, Trash2, Sparkles, Edit3, RefreshCw, X, Calendar } from 'lucide-react';
-import { WeeklyReview, ReviewTemplate, ReviewAnswer, Category, Log, TodoCategory, TodoItem, Scope, ReviewQuestion, NarrativeTemplate } from '../types';
+import { WeeklyReview, ReviewTemplate, ReviewAnswer, Category, Log, TodoCategory, TodoItem, Scope, ReviewQuestion, NarrativeTemplate, DailyReview } from '../types';
 import { COLOR_OPTIONS } from '../constants';
 import * as LucideIcons from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
@@ -29,6 +29,7 @@ interface WeeklyReviewViewProps {
     todos: TodoItem[];
     todoCategories: TodoCategory[];
     scopes: Scope[];
+    dailyReviews: DailyReview[];
     customNarrativeTemplates?: NarrativeTemplate[];
     onDelete: () => void;
     onUpdateReview: (review: WeeklyReview) => void;
@@ -62,6 +63,7 @@ export const WeeklyReviewView: React.FC<WeeklyReviewViewProps> = ({
     todos,
     todoCategories,
     scopes,
+    dailyReviews,
     customNarrativeTemplates,
     onDelete,
     onUpdateReview,
@@ -555,9 +557,11 @@ export const WeeklyReviewView: React.FC<WeeklyReviewViewProps> = ({
                             todos={todos}
                             todoCategories={todoCategories}
                             scopes={scopes}
+                            dailyReviews={dailyReviews}
                             forcedRange="week"   // 强制为周视图
                             hideRangeControls={true} // 隐藏左侧时间范围切换
                             hideDateNavigation={true} // 隐藏前后切换
+                            allowedViews={['pie', 'line', 'schedule', 'check']} // 添加 check 视图
                         />
                     </div>
                 )}
