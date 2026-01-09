@@ -39,8 +39,8 @@ export const CheckTemplateManageView: React.FC<CheckTemplateManageViewProps> = (
     const handleAddTemplate = () => {
         const newTemplate: CheckTemplate = {
             id: crypto.randomUUID(),
-            title: '新检查清单',
-            items: [{ id: crypto.randomUUID(), content: '检查项 1', icon: '📝' }], // Default item
+            title: '新日课',
+            items: [{ id: crypto.randomUUID(), content: '日课 1', icon: '📝' }], // Default item
             enabled: true,
             order: (templates.length > 0 ? Math.max(...templates.map(t => t.order)) : 0) + 1,
             isDaily: true
@@ -137,7 +137,7 @@ export const CheckTemplateManageView: React.FC<CheckTemplateManageViewProps> = (
                 >
                     <ChevronLeft size={24} />
                 </button>
-                <span className="text-stone-800 font-bold text-lg">检查清单模板</span>
+                <span className="text-stone-800 font-bold text-lg">日课模板</span>
             </div>
 
             <div className="flex-1 overflow-y-auto p-4 pb-20">
@@ -157,7 +157,7 @@ export const CheckTemplateManageView: React.FC<CheckTemplateManageViewProps> = (
                         {templates.length === 0 ? (
                             <div className="p-12 text-center text-stone-400 bg-white rounded-2xl shadow-sm border border-stone-100">
                                 <CheckCircle2 size={32} className="mx-auto mb-3 opacity-30" />
-                                <p className="text-sm">暂无检查模板</p>
+                                <p className="text-sm">暂无日课模板</p>
                             </div>
                         ) : (
                             <div className="grid gap-3">
@@ -244,7 +244,7 @@ export const CheckTemplateManageView: React.FC<CheckTemplateManageViewProps> = (
                             {/* Items */}
                             <div>
                                 <div className="flex justify-between items-end mb-2">
-                                    <label className="block text-xs font-bold text-stone-500 uppercase tracking-wider">检查项列表</label>
+                                    <label className="block text-xs font-bold text-stone-500 uppercase tracking-wider">日课列表</label>
                                     <button
                                         onClick={handleAddItem}
                                         className="text-xs text-stone-500 hover:text-stone-800 font-bold flex items-center gap-1 px-2 py-1 hover:bg-stone-100 rounded-lg transition-colors"
@@ -277,7 +277,7 @@ export const CheckTemplateManageView: React.FC<CheckTemplateManageViewProps> = (
                                     ))}
                                     {templateForm.items.length === 0 && (
                                         <div className="text-center py-4 text-xs text-stone-300 border-2 border-dashed border-stone-100 rounded-lg">
-                                            暂无检查项
+                                            暂无日课
                                         </div>
                                     )}
                                 </div>
@@ -308,7 +308,7 @@ export const CheckTemplateManageView: React.FC<CheckTemplateManageViewProps> = (
                 onClose={() => setDeletingTemplateId(null)}
                 onConfirm={confirmDelete}
                 title="删除模板"
-                description="确定要删除这个检查清单模板吗？此操作不会影响已生成的历史记录。"
+                description="确定要删除这个日课模板吗？此操作不会影响已生成的历史记录。"
                 confirmText="删除"
                 cancelText="取消"
                 type="danger"

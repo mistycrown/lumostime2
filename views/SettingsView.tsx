@@ -1938,7 +1938,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
                         />
                         <MenuItem
                             icon={<CheckCircle2 size={18} className="text-green-500" />}
-                            label="检查清单模板"
+                            label="日课模板"
                             onClick={() => setActiveSubmenu('check_templates')}
                         />
                         <MenuItem

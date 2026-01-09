@@ -325,7 +325,7 @@ export const WeeklyReviewView: React.FC<WeeklyReviewViewProps> = ({
                     byCategory[stats.category].push({ content, total: stats.total, completed: stats.completed, rate });
                 });
 
-                let text = '\n检查清单完成情况（本周汇总）：\n';
+                let text = '\n日课完成情况（本周汇总）：\n';
                 Object.entries(byCategory).forEach(([category, items]) => {
                     text += `\n${category}：\n`;
                     items.forEach(item => {

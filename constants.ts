@@ -738,7 +738,7 @@ export const DEFAULT_REVIEW_TEMPLATES: ReviewTemplate[] = [
 
 export const INITIAL_DAILY_REVIEWS: DailyReview[] = [];
 
-// ========== Check Templates (检查清单模板) ==========
+// ========== Check Templates (日课模板) ==========
 
 export const DEFAULT_CHECK_TEMPLATES: CheckTemplate[] = [
   {
