@@ -1672,7 +1672,7 @@ export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentD
                         <div key={cat.name} className="space-y-3">
                           <div className="flex items-center gap-2">
                             <h3 className="text-sm font-bold text-stone-900">{cat.name === '默认' ? '日常习惯' : cat.name}</h3>
-                            <div className="h-px bg-stone-100 flex-1"></div>
+                            <div className="h-px bg-stone-200 flex-1"></div>
                           </div>
                           <div className="space-y-2">
                             {cat.items.map(habit => {
@@ -1699,7 +1699,7 @@ export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentD
                               const style = colors[colorIndex];
 
                               return (
-                                <div key={habit.name} className="flex items-center justify-between bg-white rounded-xl p-3 shadow-sm border border-stone-100">
+                                <div key={habit.name} className="flex items-center justify-between py-1">
                                   <div className="w-28 sm:w-40 shrink-0 flex items-center">
                                     <span className="text-sm font-medium text-stone-800 truncate" title={habit.name}>
                                       {habit.name}
@@ -1738,7 +1738,7 @@ export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentD
 
                   {/* Month View */}
                   {pieRange === 'month' && (
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-2 gap-3">
                       {checkStats.categories.flatMap(cat => cat.items.map(habit => {
                         const colors = [
                           { bg: 'bg-red-100', text: 'text-red-500', fill: 'bg-red-400' },
@@ -1794,7 +1794,6 @@ export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentD
                                           className={`aspect-square rounded-md flex items-center justify-center text-[10px] font-medium transition-colors ${isChecked ? `${style.fill} text-white` : 'bg-stone-50 text-stone-300'
                                             }`}
                                         >
-                                          {dayNum}
                                         </div>
                                       )
                                     })
@@ -1807,7 +1806,7 @@ export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentD
                               <div className="flex items-center gap-1.5 text-xs text-stone-500">
                                 <CheckCircle2 size={14} className={style.text} />
                                 <span className="font-bold">{habit.stats.checked}</span>
-                                <span className="text-[10px] text-stone-300">次完成</span>
+                                <span className="text-[10px] text-stone-300"></span>
                               </div>
                               <div className="flex items-center gap-1.5 text-xs text-stone-500">
                                 <span className="text-[10px]">🔥</span>
