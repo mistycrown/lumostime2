@@ -719,17 +719,31 @@ export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentD
     const habits: Record<string, Record<string, Record<string, boolean>>> = {};
     const habitStats: Record<string, { total: number, checked: number }> = {}; // Key: "Category|Habit"
 
+    // Track insertion order for categories and habits
+    const categoryOrder: string[] = [];
+    const habitOrder: Record<string, string[]> = {}; // Category -> Habit names in order
+
     dailyReviews.forEach(review => {
       // Normalize review date to fit our range
       // Review date is string YYYY-MM-DD
       if (days.includes(review.date) && review.checkItems) {
         review.checkItems.forEach(item => {
-          const category = item.category || '默认';
+          // 只包含有 category 的项目 (排除手动添加的临时项)
+          if (!item.category) return;
+
+          const category = item.category;
           const content = item.content;
           const key = `${category}|${content}`;
 
-          if (!habits[category]) habits[category] = {};
-          if (!habits[category][content]) habits[category][content] = {};
+          if (!habits[category]) {
+            habits[category] = {};
+            categoryOrder.push(category); // Track category order
+            habitOrder[category] = [];
+          }
+          if (!habits[category][content]) {
+            habits[category][content] = {};
+            habitOrder[category].push(content); // Track habit order within category
+          }
 
           habits[category][content][review.date] = item.isCompleted;
 
@@ -740,24 +754,11 @@ export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentD
       }
     });
 
-    // Convert to sorted array
-    const sortedCategories = Object.keys(habits).sort().map(cat => {
-      const catHabits = Object.keys(habits[cat]).sort().map(hab => {
+    // Convert to array using insertion order (first encountered)
+    const sortedCategories = categoryOrder.map(cat => {
+      const catHabits = habitOrder[cat].map(hab => {
         const key = `${cat}|${hab}`;
         const stats = habitStats[key] || { total: 0, checked: 0 };
-        // Determine icon: try to find one from the items
-        let icon = '';
-        Object.keys(habits[cat][hab]).some(d => {
-          // This is messy, as we stored boolean. We need to look up source dailyReviews!
-          // Optimization: Store icon in habits map or lookup.
-          // Let's iterate dailyReviews again or store it in habits structure? 
-          // Better: 'habits' should store { checked: boolean, icon: string }
-          return false;
-        });
-
-        // Simpler fallback: Look at the first review that has this item and grab the icon
-        const sampleReview = dailyReviews.find(r => r.checkItems?.some(i => i.content === hab));
-        const sampleItem = sampleReview?.checkItems?.find(i => i.content === hab);
 
         return {
           name: hab,
