@@ -262,7 +262,7 @@ export const CheckTemplateManageView: React.FC<CheckTemplateManageViewProps> = (
                                                 type="text"
                                                 value={item.content}
                                                 onChange={(e) => handleUpdateItem(idx, e.target.value)}
-                                                className="flex-1 bg-white border border-stone-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-stone-400 focus:ring-2 focus:ring-stone-100 transition-all font-mono"
+                                                className="flex-1 bg-white border border-stone-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-stone-400 focus:ring-2 focus:ring-stone-100 transition-all font-serif"
                                                 placeholder="💧 输入检查内容 (首字符作为图标)..."
                                                 autoFocus={templateForm.items.length > 1 && idx === templateForm.items.length - 1}
                                             />
