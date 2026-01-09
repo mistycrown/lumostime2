@@ -93,43 +93,22 @@ export const DailyReviewView: React.FC<DailyReviewViewProps> = ({
     const [isAddCheckItemOpen, setIsAddCheckItemOpen] = useState(false);
     const [editingCheckItemId, setEditingCheckItemId] = useState<string | null>(null);
     const [editingCheckItemText, setEditingCheckItemText] = useState('');
+    const [isClearCheckConfirmOpen, setIsClearCheckConfirmOpen] = useState(false);
 
-    // Initialize check items from templates if empty
+    // Sync state when review prop changes (e.g. deletion and re-creation)
     useEffect(() => {
-        if ((!review.checkItems || review.checkItems.length === 0) && checkItems.length === 0) {
-            // Find enabled daily check templates
-            const dailyCheckTemplates = checkTemplates.filter(t => t.enabled && t.isDaily);
-            if (dailyCheckTemplates.length > 0) {
-                const initialItems: CheckItem[] = [];
-                dailyCheckTemplates.sort((a, b) => a.order - b.order).forEach(t => {
-                    t.items.forEach((item: any) => {
-                        // CheckTemplateItem object: { id, content, icon }
-                        // If it's a string (legacy), handle it. If object, use properties.
-                        const content = typeof item === 'string' ? item : item.content;
-                        const icon = typeof item === 'string' ? undefined : item.icon;
+        setCheckItems(review.checkItems || []);
+        setAnswers(review.answers || []);
+        setNarrative(review.narrative || '');
+    }, [review.id]);
 
-                        initialItems.push({
-                            id: crypto.randomUUID(),
-                            category: t.title,
-                            content: content,
-                            icon: icon,
-                            isCompleted: false
-                        });
-                    });
-                });
-                if (initialItems.length > 0) {
-                    setCheckItems(initialItems);
-                    // Update review immediately
-                    const updatedReview = {
-                        ...review,
-                        checkItems: initialItems,
-                        updatedAt: Date.now()
-                    };
-                    onUpdateReview(updatedReview);
-                }
-            }
-        }
-    }, []); // Run once on mount. Or should it run if templates change? No, only on initialization to ensure independence.
+    // Check for "Today"
+    const isToday = useMemo(() => {
+        const now = new Date();
+        return date.getDate() === now.getDate() &&
+            date.getMonth() === now.getMonth() &&
+            date.getFullYear() === now.getFullYear();
+    }, [date]);
 
     const handleToggleCheckItem = (id: string) => {
         const newItems = checkItems.map(item =>
@@ -173,6 +152,13 @@ export const DailyReviewView: React.FC<DailyReviewViewProps> = ({
         onUpdateReview({ ...review, checkItems: newItems, updatedAt: Date.now() });
         setEditingCheckItemId(null);
         setEditingCheckItemText('');
+    };
+
+    const handleClearCheckItems = () => {
+        setCheckItems([]);
+        onUpdateReview({ ...review, checkItems: [], updatedAt: Date.now() });
+        setIsClearCheckConfirmOpen(false);
+        addToast('日课已清空', 'success');
     };
 
     // 格式化日期
@@ -712,6 +698,30 @@ export const DailyReviewView: React.FC<DailyReviewViewProps> = ({
                                 </div>
                             </div>
                         )}
+
+                        {/* Clear Button */}
+                        {checkItems.length > 0 && (
+                            <div className="mt-12 mb-8 flex justify-center">
+                                <button
+                                    onClick={() => setIsClearCheckConfirmOpen(true)}
+                                    className="flex items-center gap-2 text-stone-400 hover:text-red-500 transition-colors text-sm"
+                                >
+                                    <Trash2 size={16} />
+                                    <span>清空当日日课</span>
+                                </button>
+                            </div>
+                        )}
+
+                        <ConfirmModal
+                            isOpen={isClearCheckConfirmOpen}
+                            onClose={() => setIsClearCheckConfirmOpen(false)}
+                            onConfirm={handleClearCheckItems}
+                            title="清空日课"
+                            description="确定要清空当前的所有日课条目吗？此操作无法撤销。"
+                            confirmText="清空"
+                            cancelText="取消"
+                            type="danger"
+                        />
                     </div>
                 )}
 
