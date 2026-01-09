@@ -924,7 +924,7 @@ export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentD
     } else if (scheduleRange === 'month') {
       // Month heatmap view
       return (
-        <div className={`${containerClasses} p-1`} style={{ height: isFullScreen ? '100%' : '700px' }}>
+        <div className={`${containerClasses} p-1`} style={{ minHeight: isFullScreen ? '100%' : '700px', height: isFullScreen ? '100%' : 'auto' }}>
           <MonthHeatmap
             logs={filteredLogs}
             categories={categories}

@@ -35,6 +35,7 @@ pc端增加导出到obsidian功能。
 修复用户未接受悬浮球建议开始应用关联标签记录时，悬浮球状态异常的问题。
 修复分类详情页未隐藏切换领域悬浮按钮的问题。
 修复快速打点有时会生成跨天记录的问题。
+修复DailyReviewView、WeeklyReviewView 和 MonthlyReviewView 组件中addToast参数传递错误的问题。
 拆分和重构app.tsx
 
 

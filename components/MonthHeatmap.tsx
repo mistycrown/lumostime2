@@ -138,7 +138,7 @@ export const MonthHeatmap: React.FC<MonthHeatmapProps> = ({ logs, categories, mo
     }, [logs, categories, year, monthIndex]);
 
     return (
-        <div className="w-full h-full flex flex-col overflow-hidden">
+        <div className="w-full flex flex-col">
             {/* 热力图容器 - 固定高度，不使用flex-1 */}
             <div className="flex shrink-0" style={{ height: TOTAL_HEIGHT }}>
                 {/* 左侧：日期标签 - 减小宽度 */}
@@ -237,7 +237,7 @@ export const MonthHeatmap: React.FC<MonthHeatmapProps> = ({ logs, categories, mo
 
             {/* 图例 - 显示所有活动的颜色，按分类和活动顺序排列 */}
             {activityLegend.length > 0 && (
-                <div className="mt-4 pt-3 border-t border-stone-100 overflow-y-auto">
+                <div className="mt-4 pt-3 border-t border-stone-100">
                     <div className="flex flex-wrap gap-x-3 gap-y-1.5 justify-center px-2">
                         {activityLegend.map((activity, idx) => (
                             <div key={idx} className="flex items-center gap-1">
