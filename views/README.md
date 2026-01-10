@@ -16,7 +16,7 @@ The views are designed as "dumb" or "presentational" components where possible, 
 ## Key Components
 
 *   **TimelineView**: The core dashboard visualizing daily activities and reviews.
-*   **StatsView**: Comprehensive analytics with multiple visualization modes (Pie, Matrix, Line).
+*   **StatsView**: Comprehensive analytics with multiple visualization modes (Pie, Matrix, Line, Schedule, Check).
 *   **SettingsView**: Central configuration hub for Sync, AI, and App preferences.
 
 > ⚠️ **Note**: When modifying views, ensure that new state requirements are coordinated with `App.tsx` if they affect global data (Logs, Categories, Todos).

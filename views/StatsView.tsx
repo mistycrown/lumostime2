@@ -3,7 +3,10 @@
  * @input Logs, Categories, Todos, Scopes, Current Date
  * @output Navigation Events (Date Change, Back)
  * @pos View (Statistics Dashboard)
- * @description A comprehensive analytics dashboard supporting multiple visualization modes: Pie (Distribution), Matrix (Consistency), Schedule (Timeline), and Line (Trend). Analyzes time usage across Activities, Todos, and Scopes.
+ * @description A comprehensive analytics dashboard supporting multiple visualization modes: Pie (Distribution), Matrix (Consistency), Schedule (Timeline), Line (Trend), and Check (Habit tracking). Analyzes time usage across Activities, Todos, and Scopes.
+ * 
+ * 修改历史:
+ * - 2026-01-10: 修复日课统计(check)视图的日期导航功能，添加handleNavigateDate和previousRange中对check视图类型的处理
  * 
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
@@ -82,6 +85,9 @@ export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentD
       if (scheduleRange === 'day') rangeType = 'day_fixed';
       else if (scheduleRange === 'month') rangeType = 'month';
       else rangeType = 'week_fixed';
+    } else if (viewType === 'check') {
+      // Check view使用pieRange，但不支持day，默认为week
+      rangeType = pieRange === 'day' ? 'week' : pieRange;
     } else {
       rangeType = 'day';
     }
@@ -593,6 +599,9 @@ export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentD
       rangeType = scheduleRange === 'day' ? 'day_fixed' : 'week_fixed';
     } else if (viewType === 'line') {
       rangeType = lineRange === 'week' ? 'week_fixed' : 'month';
+    } else if (viewType === 'check') {
+      // Check view使用pieRange，但不支持day，默认为week
+      rangeType = pieRange === 'day' ? 'week' : pieRange;
     } else {
       rangeType = 'day';
     }
@@ -707,11 +716,19 @@ export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentD
     const days: string[] = [];
     const dateMap: Record<string, Date> = {};
     let curr = new Date(rangeStart);
-    while (curr <= rangeEnd) {
+
+    // 根据视图类型限制天数，防止溢出
+    let maxDays = 366; // 默认年视图最大天数
+    if (pieRange === 'week') maxDays = 7;
+    else if (pieRange === 'month') maxDays = 31;
+
+    let dayCount = 0;
+    while (curr <= rangeEnd && dayCount < maxDays) {
       const dStr = `${curr.getFullYear()}-${String(curr.getMonth() + 1).padStart(2, '0')}-${String(curr.getDate()).padStart(2, '0')}`;
       days.push(dStr);
       dateMap[dStr] = new Date(curr);
       curr.setDate(curr.getDate() + 1);
+      dayCount++;
     }
 
     // 2. Identify unique habits (by content + category)
@@ -1716,7 +1733,7 @@ export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentD
                                             title={`${date.toLocaleDateString()} ${isChecked ? '已完成' : '未完成'}`}
                                             className={`w-6 h-6 sm:w-8 sm:h-8 rounded-full flex items-center justify-center transition-all ${isChecked
                                               ? `${style.fill} ${style.text}`
-                                              : 'bg-stone-50 border border-stone-100'
+                                              : 'bg-white border border-stone-200'
                                               }`}
                                           >
                                             {isChecked && <CheckCircle2 className="w-3 h-3 sm:w-4 sm:h-4" strokeWidth={3} />}
