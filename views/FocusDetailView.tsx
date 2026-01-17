@@ -26,9 +26,10 @@ interface FocusDetailViewProps {
     onClose: () => void;
     onComplete: (session: ActiveSession) => void;
     onUpdate: (session: ActiveSession) => void;
+    autoFocusNote?: boolean;
 }
 
-export const FocusDetailView: React.FC<FocusDetailViewProps> = ({ session, todos, categories, todoCategories, scopes, autoLinkRules = [], onClose, onComplete, onUpdate }) => {
+export const FocusDetailView: React.FC<FocusDetailViewProps> = ({ session, todos, categories, todoCategories, scopes, autoLinkRules = [], onClose, onComplete, onUpdate, autoFocusNote = true }) => {
     const [elapsed, setElapsed] = useState(0);
     const [note, setNote] = useState(session.note || '');
     const [isActivitySelectorOpen, setIsActivitySelectorOpen] = useState(false);
@@ -41,7 +42,7 @@ export const FocusDetailView: React.FC<FocusDetailViewProps> = ({ session, todos
     useEffect(() => {
         // Delay focus allowing for animation
         const timer = setTimeout(() => {
-            if (noteRef.current) {
+            if (noteRef.current && autoFocusNote) {
                 noteRef.current.focus({ preventScroll: false });
                 // Smooth scroll to ensure it's visible even with keyboard
                 setTimeout(() => {

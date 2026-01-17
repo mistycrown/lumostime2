@@ -240,48 +240,73 @@ export const AutoLinkView: React.FC<AutoLinkViewProps> = ({
                         </div>
                     )}
 
-                    {/* 已有规则列表 */}
-                    {rules.map(rule => {
-                        const activityInfo = getActivityInfo(rule.activityId);
-                        const scopeInfo = getScopeInfo(rule.scopeId);
+                    {/* 已有规则列表 (按领域分组) */}
+                    {(() => {
+                        // Group rules by Scope
+                        const rulesByScope = scopes
+                            .map(scope => ({
+                                scope,
+                                rules: rules.filter(r => r.scopeId === scope.id)
+                            }))
+                            .filter(group => group.rules.length > 0);
 
-                        if (!activityInfo || !scopeInfo) return null;
+                        if (rulesByScope.length === 0) return null;
 
                         return (
-                            <div
-                                key={rule.id}
-                                className="bg-white rounded-2xl p-4 shadow-sm flex items-center gap-3"
-                            >
-                                {/* Activity 信息 */}
-                                <div className="flex-1">
-                                    <div className="flex items-center gap-2 text-sm">
-                                        <span className="text-lg">{activityInfo.activity.icon}</span>
-                                        <div>
-                                            <p className="font-bold text-stone-700">{activityInfo.activity.name}</p>
-                                            <p className="text-xs text-stone-400">{activityInfo.category.name}</p>
+                            <div className="space-y-6">
+                                {rulesByScope.map(group => (
+                                    <div key={group.scope.id} className="space-y-3">
+                                        {/* Scope Header */}
+                                        <div className="flex items-center gap-2 px-1">
+                                            <span className="text-lg">{group.scope.icon}</span>
+                                            <span className="font-bold text-stone-700">{group.scope.name}</span>
+                                            <span className="text-xs text-stone-400 bg-stone-100 px-1.5 py-0.5 rounded-full">
+                                                {group.rules.length}
+                                            </span>
+                                        </div>
+
+                                        {/* Rules in this Scope */}
+                                        <div className="grid grid-cols-1 gap-2">
+                                            {group.rules.map(rule => {
+                                                const activityInfo = getActivityInfo(rule.activityId);
+                                                if (!activityInfo) return null;
+
+                                                return (
+                                                    <div
+                                                        key={rule.id}
+                                                        className="bg-white rounded-xl p-3 shadow-sm flex items-center justify-between border border-stone-100"
+                                                    >
+                                                        {/* Activity Info */}
+                                                        <div className="flex items-center gap-3">
+                                                            <div className={`w-8 h-8 rounded-full flex items-center justify-center text-lg ${activityInfo.activity.color} bg-opacity-10`}>
+                                                                {activityInfo.activity.icon}
+                                                            </div>
+                                                            <div>
+                                                                <p className="font-bold text-stone-700 text-sm leading-tight">
+                                                                    {activityInfo.activity.name}
+                                                                </p>
+                                                                <p className="text-[10px] text-stone-400 mt-0.5">
+                                                                    {activityInfo.category.name}
+                                                                </p>
+                                                            </div>
+                                                        </div>
+
+                                                        {/* Delete Button */}
+                                                        <button
+                                                            onClick={() => handleDeleteRule(rule.id)}
+                                                            className="p-1.5 text-stone-300 hover:text-red-400 hover:bg-red-50 rounded-lg transition-colors"
+                                                        >
+                                                            <Trash2 size={14} />
+                                                        </button>
+                                                    </div>
+                                                );
+                                            })}
                                         </div>
                                     </div>
-
-                                    {/* 箭头和 Scope */}
-                                    <div className="flex items-center gap-2 mt-2 ml-7">
-                                        <span className="text-stone-400 text-xs">→</span>
-                                        <div className="flex items-center gap-1.5 px-2.5 py-1 bg-stone-50 rounded-lg">
-                                            <span className="text-sm">{scopeInfo.icon}</span>
-                                            <span className="text-xs text-stone-600 font-medium">{scopeInfo.name}</span>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                {/* 删除按钮 */}
-                                <button
-                                    onClick={() => handleDeleteRule(rule.id)}
-                                    className="p-2 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                                >
-                                    <Trash2 size={16} />
-                                </button>
+                                ))}
                             </div>
                         );
-                    })}
+                    })()}
                 </div>
             </div>
         </div>

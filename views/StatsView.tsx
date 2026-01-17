@@ -142,14 +142,21 @@ export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentD
 
   // 增长/下降指示器渲染函数
   const renderGrowth = (current: number, previous: number) => {
-    if (!previous || previous < 0.1) return null; // Avoid division by zero or tiny base
+    // Case 1: Both zero or very small -> No trend
+    if (current < 0.1 && (!previous || previous < 0.1)) return null;
+
+    // Case 2: No previous data (New entry) -> Hide
+    if (!previous || previous < 0.1) {
+      return null;
+    }
+
+    // Case 3: Standard calculation
     const delta = current - previous;
     const percentage = Math.round((delta / previous) * 100);
     if (percentage === 0) return null;
-
     const isPositive = percentage > 0;
-    // 上升=绿色(emerald-500)，下降=红色(red-400)
 
+    // 上升=绿色(emerald-500)，下降=红色(red-400)
     return (
       <div className={`flex items-center gap-0.5 text-[10px] font-medium ml-1.5 ${isPositive ? 'text-emerald-500' : 'text-red-400'}`}>
         {isPositive ? <TrendingUp size={10} /> : <TrendingDown size={10} />}
@@ -573,14 +580,9 @@ export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentD
       start.setDate(start.getDate() - 7);
       end.setDate(end.getDate() - 7);
     } else if (rangeType === 'month') {
-      start.setMonth(start.getMonth() - 1);
-      // Adjust end date logic for month? Actually simple range shift is safer:
-      // But for month view we want the "previous month".
-      // Our getCurrentRange already handles "start of month" to "end of month".
-      // So if we just shift start back 1 month, and re-calculate end?
-      // Let's rely on standard logic:
+      // Fix: Simply subtract 1 month from the current start date
       const prevMonth = new Date(start);
-      prevMonth.setMonth(prevMonth.getMonth() - 1); // Go to previous month
+      prevMonth.setMonth(prevMonth.getMonth() - 1);
       return getDateRange(prevMonth, 'month');
     } else if (rangeType === 'year') {
       start.setFullYear(start.getFullYear() - 1);

@@ -341,6 +341,22 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ logs, todos, scopes,
         }).sort((a, b) => sortOrder === 'asc' ? a.startTime - b.startTime : b.startTime - a.startTime);
 
         const items: TimelineItem[] = [];
+        const thresholdSeconds = (minIdleTimeThreshold || 1) * 60;
+
+        // ASC: Check for gap at start of day (00:00 -> First Log)
+        if (sortOrder === 'asc' && dayLogs.length > 0) {
+            const firstLog = dayLogs[0];
+            const gapDuration = (firstLog.startTime - startOfDay.getTime()) / 1000;
+            if (gapDuration > thresholdSeconds) {
+                items.push({
+                    type: 'gap',
+                    id: `gap-start-day`,
+                    startTime: startOfDay.getTime(),
+                    endTime: firstLog.startTime,
+                    duration: gapDuration
+                });
+            }
+        }
 
         for (let i = 0; i < dayLogs.length; i++) {
             const currentLog = dayLogs[i];
@@ -377,7 +393,7 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ logs, todos, scopes,
 
             // Gap to next log
             // Use minIdleTimeThreshold * 60 seconds. Default if undefined is 60s.
-            const thresholdSeconds = (minIdleTimeThreshold || 1) * 60;
+            // thresholdSeconds is defined above
 
             if (sortOrder === 'asc' && i < dayLogs.length - 1) {
                 const nextLog = dayLogs[i + 1];
@@ -407,6 +423,21 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ logs, todos, scopes,
                         duration: gapDuration
                     });
                 }
+            }
+        }
+
+        // DESC: Check for gap at start of day (First Log -> 00:00, displayed at bottom)
+        if (sortOrder === 'desc' && dayLogs.length > 0) {
+            const earliestLog = dayLogs[dayLogs.length - 1]; // Last item is earliest in desc
+            const gapDuration = (earliestLog.startTime - startOfDay.getTime()) / 1000;
+            if (gapDuration > thresholdSeconds) {
+                items.push({
+                    type: 'gap',
+                    id: `gap-start-day`,
+                    startTime: startOfDay.getTime(),
+                    endTime: earliestLog.startTime,
+                    duration: gapDuration
+                });
             }
         }
         return items;
