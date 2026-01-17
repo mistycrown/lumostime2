@@ -294,6 +294,9 @@ export interface NarrativeTemplate {
   prompt: string; // 提示词内容
   isCustom?: boolean; // Whether created by user
   icon?: string;
+  isDaily?: boolean;    // 是否用于日回顾
+  isWeekly?: boolean;   // 是否用于周回顾
+  isMonthly?: boolean;  // 是否用于月回顾
 }
 
 // ========== Custom Filter (自定义筛选器) ==========

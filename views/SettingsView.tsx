@@ -254,6 +254,9 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
     const [modalDesc, setModalDesc] = useState('');
     const [modalPrompt, setModalPrompt] = useState('');
     const [modalError, setModalError] = useState('');
+    const [modalIsDaily, setModalIsDaily] = useState(true);
+    const [modalIsWeekly, setModalIsWeekly] = useState(false);
+    const [modalIsMonthly, setModalIsMonthly] = useState(false);
     const [deletingTemplateId, setDeletingTemplateId] = useState<string | null>(null);
 
     // Update Check State
@@ -1074,6 +1077,9 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
         setModalTitle('');
         setModalDesc('');
         setModalPrompt('');
+        setModalIsDaily(true);
+        setModalIsWeekly(false);
+        setModalIsMonthly(false);
         setModalError('');
         setShowAddTemplateModal(true);
     };
@@ -1083,6 +1089,9 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
         setModalTitle(template.title);
         setModalDesc(template.description);
         setModalPrompt(template.prompt);
+        setModalIsDaily(template.isDaily !== false);
+        setModalIsWeekly(template.isWeekly === true);
+        setModalIsMonthly(template.isMonthly === true);
         setModalError('');
         setShowAddTemplateModal(true);
     };
@@ -1115,7 +1124,10 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
             title: modalTitle.trim(),
             description: modalDesc.trim(),
             prompt: modalPrompt,
-            isCustom: true
+            isCustom: true,
+            isDaily: modalIsDaily,
+            isWeekly: modalIsWeekly,
+            isMonthly: modalIsMonthly
         };
 
         let updatedTemplates = [...(customNarrativeTemplates || [])];
@@ -1739,6 +1751,18 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
                                 <div key={template.id} className="p-4 bg-stone-50 rounded-xl border border-stone-100 flex items-start justify-between group hover:border-stone-300 transition-colors">
                                     <div>
                                         <h5 className="font-bold text-stone-800 text-sm">{template.title}</h5>
+                                        <div className="flex flex-wrap gap-1 mt-1">
+                                            {/* Legacy compatibility: default to Daily if undefined */}
+                                            {(template.isDaily !== false) && (
+                                                <span className="text-[10px] px-1.5 py-0.5 bg-stone-100 text-stone-500 rounded border border-stone-200">每日</span>
+                                            )}
+                                            {template.isWeekly && (
+                                                <span className="text-[10px] px-1.5 py-0.5 bg-stone-100 text-stone-500 rounded border border-stone-200">每周</span>
+                                            )}
+                                            {template.isMonthly && (
+                                                <span className="text-[10px] px-1.5 py-0.5 bg-stone-100 text-stone-500 rounded border border-stone-200">每月</span>
+                                            )}
+                                        </div>
                                         <p className="text-xs text-stone-500 mt-1 line-clamp-2">{template.description}</p>
                                     </div>
                                     <div className="flex items-center gap-2 opacity-100 md:opacity-0 group-hover:opacity-100 transition-opacity">
@@ -1795,6 +1819,45 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
                                         value={modalDesc}
                                         onChange={e => setModalDesc(e.target.value)}
                                     />
+                                </div>
+
+                                <div>
+                                    <label className="block text-xs font-bold text-stone-600 mb-1.5">适用周期 (Applicability)</label>
+                                    <div className="grid grid-cols-3 gap-2">
+                                        <button
+                                            type="button"
+                                            onClick={() => setModalIsDaily(!modalIsDaily)}
+                                            className={`px-2 py-3 rounded-xl text-xs font-bold text-center border transition-all flex items-center justify-center gap-1.5 truncate ${modalIsDaily
+                                                ? 'bg-stone-900 text-white border-stone-900 shadow-md transform scale-[1.02]'
+                                                : 'bg-stone-50 text-stone-500 border-stone-100 hover:bg-stone-100'
+                                                }`}
+                                        >
+                                            <span className="text-sm">☀️</span>
+                                            <span className="truncate">每日</span>
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => setModalIsWeekly(!modalIsWeekly)}
+                                            className={`px-2 py-3 rounded-xl text-xs font-bold text-center border transition-all flex items-center justify-center gap-1.5 truncate ${modalIsWeekly
+                                                ? 'bg-stone-900 text-white border-stone-900 shadow-md transform scale-[1.02]'
+                                                : 'bg-stone-50 text-stone-500 border-stone-100 hover:bg-stone-100'
+                                                }`}
+                                        >
+                                            <span className="text-sm">📅</span>
+                                            <span className="truncate">每周</span>
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => setModalIsMonthly(!modalIsMonthly)}
+                                            className={`px-2 py-3 rounded-xl text-xs font-bold text-center border transition-all flex items-center justify-center gap-1.5 truncate ${modalIsMonthly
+                                                ? 'bg-stone-900 text-white border-stone-900 shadow-md transform scale-[1.02]'
+                                                : 'bg-stone-50 text-stone-500 border-stone-100 hover:bg-stone-100'
+                                                }`}
+                                        >
+                                            <span className="text-sm">🌙</span>
+                                            <span className="truncate">每月</span>
+                                        </button>
+                                    </div>
                                 </div>
 
                                 <div>

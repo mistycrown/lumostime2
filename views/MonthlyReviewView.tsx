@@ -866,6 +866,7 @@ export const MonthlyReviewView: React.FC<MonthlyReviewViewProps> = ({
                 onClose={() => setIsStyleModalOpen(false)}
                 onSelect={handleSelectStyle}
                 customTemplates={customNarrativeTemplates}
+                period="monthly"
             />
         </div>
     );

@@ -17,18 +17,28 @@ interface NarrativeStyleSelectionModalProps {
     onClose: () => void;
     onSelect: (template: NarrativeTemplate) => void;
     customTemplates?: NarrativeTemplate[];
+    period?: 'daily' | 'weekly' | 'monthly'; // New prop for filtering
 }
 
 export const NarrativeStyleSelectionModal: React.FC<NarrativeStyleSelectionModalProps> = ({
     isOpen,
     onClose,
     onSelect,
-    customTemplates = []
+    customTemplates = [],
+    period = 'daily'
 }) => {
     const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
 
     // Merge system and custom templates
-    const allTemplates = [...NARRATIVE_TEMPLATES, ...customTemplates];
+    // Filter based on the current period context
+    // Default system templates to isDaily=true if undefined? No, we updated constants.
+    // For custom templates without the field (legacy), assume true or false? Maybe true for backward compatibility?
+    const allTemplates = [...NARRATIVE_TEMPLATES, ...customTemplates].filter(t => {
+        if (period === 'daily') return t.isDaily !== false; // Default to true if undefined
+        if (period === 'weekly') return t.isWeekly === true;
+        if (period === 'monthly') return t.isMonthly === true;
+        return true;
+    });
 
     // Initialize selection if needed
     useEffect(() => {
