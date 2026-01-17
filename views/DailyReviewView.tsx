@@ -101,7 +101,7 @@ export const DailyReviewView: React.FC<DailyReviewViewProps> = ({
         setCheckItems(review.checkItems || []);
         setAnswers(review.answers || []);
         setNarrative(review.narrative || '');
-    }, [review.id]);
+    }, [review]);
 
     // Check for "Today"
     const isToday = useMemo(() => {

@@ -16,7 +16,9 @@ import {
     GripVertical,
     ArrowUp,
     ArrowDown,
-    Save
+    Save,
+    Database,
+    AlertCircle
 } from 'lucide-react';
 import { CheckTemplate } from '../types';
 import { ConfirmModal } from '../components/ConfirmModal';
@@ -25,12 +27,31 @@ interface CheckTemplateManageViewProps {
     templates: CheckTemplate[];
     onUpdateTemplates: (templates: CheckTemplate[]) => void;
     onBack: () => void;
+    dailyReviews: any[]; // DailyReview[] - simplified for imports
+    onBatchUpdateDailyReviewItems: (updates: any[]) => void;
 }
 
-export const CheckTemplateManageView: React.FC<CheckTemplateManageViewProps> = ({ templates, onUpdateTemplates, onBack }) => {
+export const CheckTemplateManageView: React.FC<CheckTemplateManageViewProps> = (props) => {
+    const { templates, onUpdateTemplates, onBack } = props;
     const [editingTemplateId, setEditingTemplateId] = useState<string | null>(null);
     const [templateForm, setTemplateForm] = useState<CheckTemplate | null>(null);
     const [deletingTemplateId, setDeletingTemplateId] = useState<string | null>(null);
+
+    // Batch Modify State
+    const [showBatchModal, setShowBatchModal] = useState(false);
+    const [batchTab, setBatchTab] = useState<'rename' | 'delete'>('rename');
+    const [batchTargetContent, setBatchTargetContent] = useState('');
+    const [batchNewContent, setBatchNewContent] = useState('');
+    const [batchResult, setBatchResult] = useState<string | null>(null);
+    const [batchStep, setBatchStep] = useState<'input' | 'confirm'>('input');
+    const [scanCount, setScanCount] = useState(0);
+
+    // Reset when tab/modal changes
+    React.useEffect(() => {
+        setBatchStep('input');
+        setScanCount(0);
+        setBatchResult(null);
+    }, [batchTab, showBatchModal]);
 
     // Validation
     const [errors, setErrors] = useState<{ title?: string }>({});
@@ -127,6 +148,91 @@ export const CheckTemplateManageView: React.FC<CheckTemplateManageViewProps> = (
         onUpdateTemplates(templates.map(t => t.id === template.id ? updated : t));
     };
 
+    // Batch Modification Logic
+    const handleBatchProcess = () => {
+        if (!batchTargetContent.trim()) return;
+
+        // Step 1: Scan
+        if (batchStep === 'input') {
+            let count = 0;
+            const target = batchTargetContent.trim();
+            props.dailyReviews.forEach(review => {
+                if (!review.checkItems) return;
+                review.checkItems.forEach((item: any) => {
+                    // Loose matching: includes
+                    if (item.content.includes(target)) {
+                        count++;
+                    }
+                });
+            });
+
+            setScanCount(count);
+            if (count > 0) {
+                setBatchStep('confirm');
+                setBatchResult(`🔍 扫描到 ${count} 条包含 "${target}" 的记录，请点击执行以确认修改。`);
+            } else {
+                setBatchResult('❌ 未找到匹配的日课记录');
+                setTimeout(() => setBatchResult(null), 2000);
+            }
+            return;
+        }
+
+        // Step 2: Execute
+        let updatedCount = 0;
+        // Iterate over props.dailyReviews
+        const updatedReviews = props.dailyReviews.map(review => {
+            if (!review.checkItems) return review;
+
+            let hasChange = false;
+            let newCheckItems = [...review.checkItems];
+            const target = batchTargetContent.trim();
+
+            if (batchTab === 'rename') {
+                if (!batchNewContent.trim()) return review;
+                newCheckItems = newCheckItems.map(item => {
+                    if (item.content.includes(target)) {
+                        hasChange = true;
+                        updatedCount++;
+                        // Replace the entire content with new content, or just replace the substring? 
+                        // Usually user wants to replace the whole item content to standardize it.
+                        return { ...item, content: batchNewContent.trim() };
+                    }
+                    return item;
+                });
+            } else if (batchTab === 'delete') {
+                const initialLen = newCheckItems.length;
+                newCheckItems = newCheckItems.filter(item => !item.content.includes(target));
+                if (newCheckItems.length !== initialLen) {
+                    hasChange = true;
+                    updatedCount += (initialLen - newCheckItems.length);
+                }
+            }
+
+            if (hasChange) {
+                return { ...review, checkItems: newCheckItems };
+            }
+            return review;
+        });
+
+        if (updatedCount > 0) {
+            props.onBatchUpdateDailyReviewItems(updatedReviews);
+            setBatchResult(`✅ 成功${batchTab === 'rename' ? '重命名' : '删除'}了 ${updatedCount} 条日课记录`);
+            setTimeout(() => {
+                setShowBatchModal(false);
+                setBatchResult(null);
+                setBatchTargetContent('');
+                setBatchNewContent('');
+                setBatchStep('input');
+                setScanCount(0);
+            }, 1500);
+        } else {
+            setBatchResult('⚠️ 执行过程中未找到记录 (可能已被修改)');
+            setBatchStep('input');
+            setTimeout(() => setBatchResult(null), 2000);
+        }
+    };
+
+
     return (
         <div className="fixed inset-0 z-50 bg-[#fdfbf7] flex flex-col font-serif animate-in slide-in-from-right duration-300 pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">
             {/* Header */}
@@ -151,6 +257,13 @@ export const CheckTemplateManageView: React.FC<CheckTemplateManageViewProps> = (
                             >
                                 <PlusCircle size={14} />
                                 <span>新建模板</span>
+                            </button>
+                            <button
+                                onClick={() => setShowBatchModal(true)}
+                                className="ml-2 flex items-center gap-1 px-3 py-1.5 bg-white border border-stone-200 text-stone-600 text-xs font-bold rounded-lg hover:bg-stone-50 active:scale-95 transition-all"
+                            >
+                                <Database size={14} />
+                                <span>批量修改数据</span>
                             </button>
                         </div>
 
@@ -302,6 +415,95 @@ export const CheckTemplateManageView: React.FC<CheckTemplateManageViewProps> = (
                     </div>
                 )}
             </div>
+
+            {/* Batch Modify Modal */}
+            {showBatchModal && (
+                <div className="fixed inset-0 z-[60] bg-black/50 flex items-center justify-center p-4">
+                    <div className="bg-white rounded-2xl w-full max-w-sm shadow-xl animate-in fade-in zoom-in-95 duration-200 overflow-hidden">
+                        <div className="p-4 border-b border-stone-100 flex justify-between items-center bg-stone-50/50">
+                            <h3 className="font-bold text-stone-800">批量修改历史日课</h3>
+                            <button onClick={() => setShowBatchModal(false)} className="text-stone-400 hover:text-stone-600">
+                                <X size={20} />
+                            </button>
+                        </div>
+
+                        <div className="flex border-b border-stone-100">
+                            <button
+                                onClick={() => setBatchTab('rename')}
+                                className={`flex-1 py-3 text-sm font-bold transition-colors ${batchTab === 'rename' ? 'text-stone-800 border-b-2 border-stone-800' : 'text-stone-400 hover:text-stone-600'}`}
+                            >
+                                批量重命名
+                            </button>
+                            <button
+                                onClick={() => setBatchTab('delete')}
+                                className={`flex-1 py-3 text-sm font-bold transition-colors ${batchTab === 'delete' ? 'text-red-600 border-b-2 border-red-600' : 'text-stone-400 hover:text-stone-600'}`}
+                            >
+                                批量删除
+                            </button>
+                        </div>
+
+                        <div className="p-5 space-y-4">
+                            <div className="bg-amber-50 text-amber-700 text-xs p-3 rounded-xl flex gap-2 items-start">
+                                <AlertCircle size={14} className="shrink-0 mt-0.5" />
+                                <p>此操作将遍历所有历史日报，修改或删除指定的日课条目。请谨慎操作，一旦修改无法批量撤销。</p>
+                            </div>
+
+                            <div>
+                                <label className="block text-xs font-bold text-stone-500 mb-1.5 uppercase tracking-wider">
+                                    目标日课名称
+                                </label>
+                                <input
+                                    type="text"
+                                    value={batchTargetContent}
+                                    onChange={(e) => setBatchTargetContent(e.target.value)}
+                                    className="w-full bg-stone-50 border border-stone-200 rounded-xl px-4 py-2 text-sm outline-none focus:border-stone-400 transition-all font-serif"
+                                    placeholder="例如：早起喝水"
+                                    autoFocus
+                                />
+                            </div>
+
+                            {batchTab === 'rename' && (
+                                <div>
+                                    <label className="block text-xs font-bold text-stone-500 mb-1.5 uppercase tracking-wider">
+                                        重命名为
+                                    </label>
+                                    <input
+                                        type="text"
+                                        value={batchNewContent}
+                                        onChange={(e) => setBatchNewContent(e.target.value)}
+                                        className="w-full bg-stone-50 border border-stone-200 rounded-xl px-4 py-2 text-sm outline-none focus:border-stone-400 transition-all font-serif"
+                                        placeholder="例如：早起"
+                                    />
+                                </div>
+                            )}
+
+                            {batchResult && (
+                                <div className={`text-center text-sm font-bold py-2 ${batchResult.includes('成功') ? 'text-green-600' : 'text-stone-400'}`}>
+                                    {batchResult}
+                                </div>
+                            )}
+
+                            <button
+                                onClick={handleBatchProcess}
+                                disabled={!batchTargetContent.trim() || (batchTab === 'rename' && !batchNewContent.trim())}
+                                className={`w-full py-2.5 rounded-xl text-sm font-bold text-white shadow-lg transition-all active:scale-[0.98] flex items-center justify-center gap-2 ${batchTab === 'delete'
+                                    ? 'bg-red-500 hover:bg-red-600 shadow-red-200'
+                                    : 'bg-stone-800 hover:bg-stone-700 shadow-stone-200'
+                                    } disabled:opacity-50 disabled:cursor-not-allowed`}
+                            >
+                                {batchStep === 'input' ? (
+                                    <span>🔍 扫描匹配项</span>
+                                ) : (
+                                    <>
+                                        {batchTab === 'rename' ? <Edit2 size={14} /> : <Trash2 size={14} />}
+                                        {batchTab === 'rename' ? `确认重命名 (${scanCount})` : `确认删除 (${scanCount})`}
+                                    </>
+                                )}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             <ConfirmModal
                 isOpen={!!deletingTemplateId}
