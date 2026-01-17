@@ -61,6 +61,7 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({ initialTodo, c
 
   // Timeline / Calendar State
   const [displayDate, setDisplayDate] = useState(new Date());
+  const [viewMode, setViewMode] = useState<'month' | 'all'>('month');
 
   const selectedCategory = todoCategories?.find(c => c.id === selectedCategoryId) || currentCategory;
 
@@ -148,6 +149,8 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({ initialTodo, c
     const d = new Date(log.startTime);
     return d.getMonth() === displayMonth && d.getFullYear() === displayYear;
   }), [linkedLogs, displayMonth, displayYear]);
+
+  const logsToDisplay = viewMode === 'month' ? monthLogs : linkedLogs;
 
   const monthSeconds = monthLogs.reduce((acc, curr) => acc + curr.duration, 0);
   const monthHours = Math.floor(monthSeconds / 3600);
@@ -529,17 +532,48 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({ initialTodo, c
 
             {/* History List - Timeline Style */}
             <div className="mt-8">
-              <div className="flex items-center gap-2 mb-6">
-                <Clock size={16} className="text-stone-400" />
-                <span className="text-xs font-bold text-stone-400 uppercase tracking-widest">History</span>
+              <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center gap-2">
+                  <Clock size={16} className="text-stone-400" />
+                  <span className="text-xs font-bold text-stone-400 uppercase tracking-widest">
+                    {viewMode === 'month'
+                      ? `History (${displayMonth + 1}/${displayYear})`
+                      : `History (All)`
+                    }
+                  </span>
+                </div>
+
+                {/* Toggle Button */}
+                <div className="flex bg-stone-100/50 p-0.5 rounded-lg">
+                  <button
+                    onClick={() => setViewMode('all')}
+                    className={`px-3 py-1 text-[10px] font-bold rounded-md transition-all ${viewMode === 'all'
+                      ? 'bg-white text-stone-900 shadow-sm'
+                      : 'text-stone-400 hover:text-stone-600'
+                      }`}
+                  >
+                    全部
+                  </button>
+                  <button
+                    onClick={() => setViewMode('month')}
+                    className={`px-3 py-1 text-[10px] font-bold rounded-md transition-all ${viewMode === 'month'
+                      ? 'bg-white text-stone-900 shadow-sm'
+                      : 'text-stone-400 hover:text-stone-600'
+                      }`}
+                  >
+                    {displayMonth + 1}月
+                  </button>
+                </div>
               </div>
 
-              {monthLogs.length === 0 ? (
-                <div className="text-center text-stone-400 text-xs italic py-8 border border-dashed border-stone-200 rounded-2xl">No records found.</div>
+              {logsToDisplay.length === 0 ? (
+                <div className="text-center text-stone-400 text-xs italic py-8 border border-dashed border-stone-200 rounded-2xl">
+                  {viewMode === 'month' ? 'No records found in this month.' : 'No records found.'}
+                </div>
               ) : (
                 (() => {
                   const groups: { [key: string]: Log[] } = {};
-                  monthLogs.forEach(log => {
+                  logsToDisplay.forEach(log => {
                     const d = new Date(log.startTime);
                     const key = d.toDateString();
                     if (!groups[key]) groups[key] = [];

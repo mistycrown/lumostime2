@@ -27,9 +27,10 @@ interface AddLogModalProps {
   scopes: Scope[];
   autoLinkRules?: AutoLinkRule[];
   lastLogEndTime?: number;
+  autoFocusNote?: boolean;
 }
 
-export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialStartTime, initialEndTime, onClose, onSave, onDelete, categories, todos, todoCategories, scopes, autoLinkRules = [], lastLogEndTime }) => {
+export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialStartTime, initialEndTime, onClose, onSave, onDelete, categories, todos, todoCategories, scopes, autoLinkRules = [], lastLogEndTime, autoFocusNote = true }) => {
   const [selectedCategoryId, setSelectedCategoryId] = useState<string>(categories[0].id);
   const [selectedActivityId, setSelectedActivityId] = useState<string>(categories[0].activities[0].id);
   const [note, setNote] = useState('');
@@ -359,7 +360,7 @@ export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialSta
 
   // Auto-focus note on new log
   useEffect(() => {
-    if (!initialLog && noteRef.current) {
+    if (!initialLog && noteRef.current && autoFocusNote) {
       setTimeout(() => {
         noteRef.current?.focus();
         noteRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });

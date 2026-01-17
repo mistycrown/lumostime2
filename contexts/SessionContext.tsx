@@ -21,7 +21,7 @@ interface SessionContextType {
         categoryId: string,
         autoLinkRules: AutoLinkRule[],
         todoId?: string,
-        scopeId?: string,
+        scopeIdOrIds?: string | string[],
         note?: string
     ) => void;
 
@@ -59,13 +59,19 @@ export const SessionProvider: React.FC<SessionProviderProps> = ({ children, spli
         categoryId: string,
         autoLinkRules: AutoLinkRule[],
         todoId?: string,
-        scopeId?: string,
+        scopeIdOrIds?: string | string[],
         note?: string
     ) => {
-        let appliedScopeIds: string[] | undefined = scopeId ? [scopeId] : undefined;
+        let appliedScopeIds: string[] | undefined;
+
+        if (Array.isArray(scopeIdOrIds)) {
+            appliedScopeIds = scopeIdOrIds;
+        } else if (scopeIdOrIds) {
+            appliedScopeIds = [scopeIdOrIds];
+        }
 
         // 应用自动关联规则
-        if (!scopeId && autoLinkRules.length > 0) {
+        if ((!appliedScopeIds || appliedScopeIds.length === 0) && autoLinkRules.length > 0) {
             const matchingRules = autoLinkRules.filter(rule => rule.activityId === activity.id);
             if (matchingRules.length > 0) {
                 appliedScopeIds = matchingRules.map(rule => rule.scopeId);

@@ -94,6 +94,7 @@ export const DailyReviewView: React.FC<DailyReviewViewProps> = ({
     const [editingCheckItemId, setEditingCheckItemId] = useState<string | null>(null);
     const [editingCheckItemText, setEditingCheckItemText] = useState('');
     const [isClearCheckConfirmOpen, setIsClearCheckConfirmOpen] = useState(false);
+    const [isReloadConfirmOpen, setIsReloadConfirmOpen] = useState(false);
 
     // Sync state when review prop changes (e.g. deletion and re-creation)
     useEffect(() => {
@@ -159,6 +160,33 @@ export const DailyReviewView: React.FC<DailyReviewViewProps> = ({
         onUpdateReview({ ...review, checkItems: [], updatedAt: Date.now() });
         setIsClearCheckConfirmOpen(false);
         addToast('success', '日课已清空');
+    };
+
+    const confirmReloadFromTemplate = () => {
+        // 1. Get functional templates
+        const dailyTemplates = checkTemplates
+            .filter(t => t.enabled && t.isDaily)
+            .sort((a, b) => a.order - b.order);
+
+        // 2. Map to CheckItems
+        const newItems: CheckItem[] = [];
+        dailyTemplates.forEach(template => {
+            template.items.forEach(item => {
+                newItems.push({
+                    id: crypto.randomUUID(),
+                    category: template.title,
+                    content: item.content,
+                    icon: item.icon,
+                    isCompleted: false
+                });
+            });
+        });
+
+        // 3. Update state
+        setCheckItems(newItems);
+        onUpdateReview({ ...review, checkItems: newItems, updatedAt: Date.now() });
+        setIsReloadConfirmOpen(false);
+        addToast('success', '已重新导入模板');
     };
 
     // 格式化日期
@@ -699,18 +727,25 @@ export const DailyReviewView: React.FC<DailyReviewViewProps> = ({
                             </div>
                         )}
 
-                        {/* Clear Button */}
-                        {checkItems.length > 0 && (
-                            <div className="mt-12 mb-8 flex justify-center">
+                        <div className="mt-12 mb-8 flex flex-col items-center gap-4">
+                            <button
+                                onClick={() => setIsReloadConfirmOpen(true)}
+                                className="flex items-center gap-2 text-stone-400 hover:text-stone-600 transition-colors text-sm"
+                            >
+                                <RefreshCw size={14} />
+                                <span>重新从模板导入</span>
+                            </button>
+
+                            {checkItems.length > 0 && (
                                 <button
                                     onClick={() => setIsClearCheckConfirmOpen(true)}
                                     className="flex items-center gap-2 text-stone-400 hover:text-red-500 transition-colors text-sm"
                                 >
-                                    <Trash2 size={16} />
+                                    <Trash2 size={14} />
                                     <span>清空当日日课</span>
                                 </button>
-                            </div>
-                        )}
+                            )}
+                        </div>
 
                         <ConfirmModal
                             isOpen={isClearCheckConfirmOpen}
@@ -721,6 +756,17 @@ export const DailyReviewView: React.FC<DailyReviewViewProps> = ({
                             confirmText="清空"
                             cancelText="取消"
                             type="danger"
+                        />
+
+                        <ConfirmModal
+                            isOpen={isReloadConfirmOpen}
+                            onClose={() => setIsReloadConfirmOpen(false)}
+                            onConfirm={confirmReloadFromTemplate}
+                            title="重新导入模板"
+                            description="确定要重新导入日课模板吗？这将覆盖当前的所有日课条目（包括已完成状态）。"
+                            confirmText="重新导入"
+                            cancelText="取消"
+                            type="info"
                         />
                     </div>
                 )}

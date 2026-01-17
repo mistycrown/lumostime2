@@ -130,6 +130,8 @@ interface SettingsViewProps {
     onUpdateFilters?: (filters: Filter[]) => void;
     categoriesData?: Category[];
     onEditLog?: (log: Log) => void;
+    autoFocusNote?: boolean;
+    onToggleAutoFocusNote?: () => void;
 }
 
 const AI_PRESETS = {
@@ -151,7 +153,7 @@ const AI_PRESETS = {
     }
 };
 
-export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, onImport, onReset, onClearData, onToast, syncData, onSyncUpdate, startWeekOnSunday, onToggleStartWeekOnSunday, onOpenAutoLink, onOpenSearch, minIdleTimeThreshold = 1, onSetMinIdleTimeThreshold, defaultView = 'RECORD', onSetDefaultView, reviewTemplates = [], onUpdateReviewTemplates, checkTemplates = [], onUpdateCheckTemplates, dailyReviewTime, onSetDailyReviewTime, weeklyReviewTime, onSetWeeklyReviewTime, monthlyReviewTime, onSetMonthlyReviewTime, customNarrativeTemplates, onUpdateCustomNarrativeTemplates, userPersonalInfo, onSetUserPersonalInfo, logs = [], todos = [], scopes = [], currentDate = new Date(), dailyReviews = [], weeklyReviews = [], monthlyReviews = [], todoCategories = [], filters = [], onUpdateFilters, categoriesData = [], onEditLog }) => {
+export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, onImport, onReset, onClearData, onToast, syncData, onSyncUpdate, startWeekOnSunday, onToggleStartWeekOnSunday, onOpenAutoLink, onOpenSearch, minIdleTimeThreshold = 1, onSetMinIdleTimeThreshold, defaultView = 'RECORD', onSetDefaultView, reviewTemplates = [], onUpdateReviewTemplates, checkTemplates = [], onUpdateCheckTemplates, dailyReviewTime, onSetDailyReviewTime, weeklyReviewTime, onSetWeeklyReviewTime, monthlyReviewTime, onSetMonthlyReviewTime, customNarrativeTemplates, onUpdateCustomNarrativeTemplates, userPersonalInfo, onSetUserPersonalInfo, logs = [], todos = [], scopes = [], currentDate = new Date(), dailyReviews = [], weeklyReviews = [], monthlyReviews = [], todoCategories = [], filters = [], onUpdateFilters, categoriesData = [], onEditLog, autoFocusNote, onToggleAutoFocusNote }) => {
     const [activeSubmenu, setActiveSubmenu] = useState<'main' | 'data' | 'cloud' | 'ai' | 'preferences' | 'guide' | 'nfc' | 'templates' | 'check_templates' | 'narrative_prompt' | 'auto_record' | 'autolink' | 'obsidian_export' | 'filters'>('main');
     const [webdavConfig, setWebdavConfig] = useState<WebDAVConfig | null>(null);
     const [isSyncing, setIsSyncing] = useState(false);
@@ -877,6 +879,8 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
                                 </div>
                             </div>
 
+
+
                             {/* Model Name */}
                             <div>
                                 <label className="text-xs font-bold text-stone-400 uppercase ml-1">模型名称 (Model)</label>
@@ -1275,13 +1279,10 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
                 </div>
 
                 <div className="p-4 space-y-4">
-                    <div className="bg-white rounded-2xl p-6 shadow-sm space-y-4">
-                        <div className="flex items-center gap-3 text-stone-600 mb-2">
-                            <Settings size={24} />
-                            <h3 className="font-bold text-lg">界面与显示</h3>
-                        </div>
+                    <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
 
-                        <div className="flex items-center justify-between py-2 border-b border-stone-100 last:border-0">
+                        {/* Start Week Toggle */}
+                        <div className="flex items-center justify-between p-4 border-b border-stone-100 last:border-0 hover:bg-stone-50 transition-colors">
                             <div>
                                 <h4 className="font-bold text-stone-700">从周日开始</h4>
                                 <p className="text-xs text-stone-400 mt-1">日历视图每周第一天将设为周日</p>
@@ -1296,7 +1297,8 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
                             </button>
                         </div>
 
-                        <div className="flex items-center justify-between py-2 border-b border-stone-100">
+                        {/* Daily Review Time */}
+                        <div className="flex items-center justify-between p-4 border-b border-stone-100 hover:bg-stone-50 transition-colors">
                             <div>
                                 <h4 className="font-bold text-stone-700">每日回顾时间</h4>
                                 <p className="text-xs text-stone-400 mt-1">到达该时间后，时间轴将显示今日回顾节点</p>
@@ -1315,7 +1317,8 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
                             />
                         </div>
 
-                        <div className="flex items-center justify-between py-2 border-b border-stone-100">
+                        {/* Weekly Review Time */}
+                        <div className="flex items-center justify-between p-4 border-b border-stone-100 hover:bg-stone-50 transition-colors">
                             <div>
                                 <h4 className="font-bold text-stone-700">每周回顾时间</h4>
                                 <p className="text-xs text-stone-400 mt-1">到达该时间后，时间轴将在每周最后一天显示本周回顾节点</p>
@@ -1338,7 +1341,8 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
                             </div>
                         </div>
 
-                        <div className="flex items-center justify-between py-2 border-b border-stone-100">
+                        {/* Monthly Review Time */}
+                        <div className="flex items-center justify-between p-4 border-b border-stone-100 hover:bg-stone-50 transition-colors">
                             <div>
                                 <h4 className="font-bold text-stone-700">每月回顾时间</h4>
                                 <p className="text-xs text-stone-400 mt-1">到达该时间后，时间轴将在每月最后一天显示本月回顾节点</p>
@@ -1361,7 +1365,25 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
                             </div>
                         </div>
 
-                        <div className="flex items-center justify-between py-2">
+                        {/* Auto-focus Note Toggle */}
+                        <div className="flex items-center justify-between p-4 border-b border-stone-100 hover:bg-stone-50 transition-colors">
+                            <div>
+                                <h4 className="font-bold text-stone-700">自动聚焦备注</h4>
+                                <p className="text-xs text-stone-400 mt-1">新建记录或专注时自动弹出键盘</p>
+                            </div>
+                            <label className="relative inline-flex items-center cursor-pointer">
+                                <input
+                                    type="checkbox"
+                                    checked={autoFocusNote}
+                                    onChange={onToggleAutoFocusNote}
+                                    className="sr-only peer"
+                                />
+                                <div className="w-11 h-6 bg-stone-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-stone-800"></div>
+                            </label>
+                        </div>
+
+                        {/* Min Idle Time Config */}
+                        <div className="flex items-center justify-between p-4 border-b border-stone-100 hover:bg-stone-50 transition-colors">
                             <div>
                                 <h4 className="font-bold text-stone-700">最小空闲时间隐藏阈值</h4>
                                 <p className="text-xs text-stone-400 mt-1">小于此分钟数的空闲时间将不显示（分钟）</p>
@@ -1383,7 +1405,8 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
                             </div>
                         </div>
 
-                        <div className="flex items-center justify-between py-2 border-t border-stone-100 relative z-10">
+                        {/* Default View Config */}
+                        <div className="flex items-center justify-between p-4 border-t border-stone-100 relative z-10 hover:bg-stone-50 transition-colors">
                             <div>
                                 <h4 className="font-bold text-stone-700">启动默认页</h4>
                                 <p className="text-xs text-stone-400 mt-1">应用启动时默认显示的页面</p>

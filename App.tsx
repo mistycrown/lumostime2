@@ -33,6 +33,7 @@ import { TodoDetailModal } from './components/TodoDetailModal';
 import { GoalEditor } from './components/GoalEditor';
 import { BottomNavigation } from './components/BottomNavigation';
 import { ModalManager } from './components/ModalManager';
+import { ConfirmModal } from './components/ConfirmModal';
 import { Activity, ActiveSession, AppView, Log, TodoItem, TodoCategory, Category, Goal, AutoLinkRule, DailyReview, WeeklyReview, MonthlyReview, ReviewTemplate, NarrativeTemplate, Filter } from './types';
 import { INITIAL_LOGS, INITIAL_TODOS, MOCK_TODO_CATEGORIES, VIEW_TITLES, CATEGORIES, SCOPES, INITIAL_GOALS, DEFAULT_REVIEW_TEMPLATES, DEFAULT_USER_PERSONAL_INFO, INITIAL_DAILY_REVIEWS, DEFAULT_CHECK_TEMPLATES } from './constants';
 import { ToastMessage, ToastType } from './components/Toast';
@@ -99,7 +100,8 @@ const AppContent: React.FC = () => {
     userPersonalInfo, setUserPersonalInfo,
     filters, setFilters,
     lastSyncTime, setLastSyncTime, updateLastSyncTime,
-    dataLastModified, setDataLastModified, isRestoring
+    dataLastModified, setDataLastModified, isRestoring,
+    autoFocusNote, setAutoFocusNote
   } = useSettings();
   const {
     reviewTemplates, setReviewTemplates,
@@ -211,8 +213,8 @@ const AppContent: React.FC = () => {
 
 
   // Session 管理适配器（为保持调用兼容性）
-  const handleStartActivity = (activity: Activity, categoryId: string, todoId?: string, scopeId?: string, note?: string) => {
-    startActivity(activity, categoryId, autoLinkRules, todoId, scopeId, note);
+  const handleStartActivity = (activity: Activity, categoryId: string, todoId?: string, scopeIdOrIds?: string | string[], note?: string) => {
+    startActivity(activity, categoryId, autoLinkRules, todoId, scopeIdOrIds, note);
   };
 
   const handleStopActivity = (sessionId: string, finalSessionData?: ActiveSession) => {
@@ -515,7 +517,7 @@ const AppContent: React.FC = () => {
       const act = cat?.activities.find(a => a.id === todo.linkedActivityId);
 
       if (cat && act) {
-        handleStartActivity(act, cat.id, todo.id, todo.defaultScopeIds?.[0]);
+        handleStartActivity(act, cat.id, todo.id, todo.defaultScopeIds);
         return;
       }
     }
@@ -552,8 +554,36 @@ const AppContent: React.FC = () => {
   };
 
   const handleDeleteTodo = (id: string) => {
+    // Check if any logs are linked to this todo
+    const linkedLogs = logs.filter(l => l.linkedTodoId === id);
+    if (linkedLogs.length > 0) {
+      setTodoToDeleteId(id);
+      setIsDeleteTodoConfirmOpen(true);
+      return;
+    }
+
     setTodos(prev => prev.filter(t => t.id !== id));
     closeTodoModal();
+  };
+
+  const handleConfirmDeleteTodo = () => {
+    if (!todoToDeleteId) return;
+
+    // 1. Unlink logs
+    setLogs(prev => prev.map(l =>
+      l.linkedTodoId === todoToDeleteId
+        ? { ...l, linkedTodoId: undefined }
+        : l
+    ));
+
+    // 2. Delete Todo
+    setTodos(prev => prev.filter(t => t.id !== todoToDeleteId));
+
+    // 3. Cleanup
+    setTodoToDeleteId(null);
+    setIsDeleteTodoConfirmOpen(false);
+    closeTodoModal(); // Ensure edit modal is closed too if open
+    addToast('success', 'Task deleted (history preserved)');
   };
 
   const handleUpdateTodoData = (newCategories: TodoCategory[], newTodos: TodoItem[]) => {
@@ -1133,6 +1163,10 @@ const AppContent: React.FC = () => {
     isStatsFullScreen, isTodoManaging, isTagsManaging,
     currentView, selectedTagId, selectedCategoryId
   ]);
+
+  // State for Safe Deletion
+  const [isDeleteTodoConfirmOpen, setIsDeleteTodoConfirmOpen] = useState(false);
+  const [todoToDeleteId, setTodoToDeleteId] = useState<string | null>(null);
 
   // --- Todo Duplication ---
   const handleDuplicateTodo = (todo: TodoItem) => {
@@ -2079,6 +2113,8 @@ const AppContent: React.FC = () => {
             onUpdateFilters={setFilters}
             categoriesData={categories}
             onEditLog={openEditModal}
+            autoFocusNote={autoFocusNote}
+            onToggleAutoFocusNote={() => setAutoFocusNote(prev => !prev)}
           />
         )}
 
@@ -2195,13 +2231,28 @@ const AppContent: React.FC = () => {
           onClickSession={(s) => setFocusDetailSessionId(s.id)}
           onUpdateSession={handleUpdateSession}
           onCloseFocusDetail={() => setFocusDetailSessionId(null)}
-
+          autoFocusNote={autoFocusNote}
           // Common
           categories={categories}
           scopes={scopes}
           autoLinkRules={autoLinkRules}
           logs={logs}
           todos={todos}
+        />
+
+        {/* Delete Confirmation Modal for Todo */}
+        <ConfirmModal
+          isOpen={isDeleteTodoConfirmOpen}
+          onClose={() => {
+            setIsDeleteTodoConfirmOpen(false);
+            setTodoToDeleteId(null);
+          }}
+          onConfirm={handleConfirmDeleteTodo}
+          title="删除待办事项"
+          description="该待办事项关联了历史专注记录。删除待办将保留这些记录，但会解除它们的关联。确定要继续吗？"
+          confirmText="确认删除"
+          cancelText="取消"
+          type="danger"
         />
       </main>
 

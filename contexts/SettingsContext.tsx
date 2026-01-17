@@ -21,6 +21,10 @@ interface SettingsContextType {
     autoLinkRules: AutoLinkRule[];
     setAutoLinkRules: React.Dispatch<React.SetStateAction<AutoLinkRule[]>>;
 
+    // 交互偏好
+    autoFocusNote: boolean;
+    setAutoFocusNote: React.Dispatch<React.SetStateAction<boolean>>;
+
     // 应用规则
     appRules: { [packageName: string]: string };
     setAppRules: React.Dispatch<React.SetStateAction<{ [packageName: string]: string }>>;
@@ -140,6 +144,15 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
         localStorage.setItem('lumostime_autoLinkRules', JSON.stringify(autoLinkRules));
     }, [autoLinkRules]);
 
+    const [autoFocusNote, setAutoFocusNote] = useState<boolean>(() => {
+        const stored = localStorage.getItem('lumostime_auto_focus_note');
+        return stored !== 'false'; // Default to true
+    });
+
+    useEffect(() => {
+        localStorage.setItem('lumostime_auto_focus_note', autoFocusNote.toString());
+    }, [autoFocusNote]);
+
     useEffect(() => {
         localStorage.setItem('lumostime_custom_narrative_templates', JSON.stringify(customNarrativeTemplates));
     }, [customNarrativeTemplates]);
@@ -166,6 +179,8 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
             setDefaultView,
             autoLinkRules,
             setAutoLinkRules,
+            autoFocusNote,
+            setAutoFocusNote,
             appRules,
             setAppRules,
             customNarrativeTemplates,
