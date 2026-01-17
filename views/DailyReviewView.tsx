@@ -996,6 +996,7 @@ export const DailyReviewView: React.FC<DailyReviewViewProps> = ({
                 onClose={() => setIsStyleModalOpen(false)}
                 onSelect={handleSelectStyle}
                 customTemplates={customNarrativeTemplates}
+                period="daily"
             />
 
             {/* Delete Confirmation Modal */}

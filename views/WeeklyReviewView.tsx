@@ -811,6 +811,7 @@ export const WeeklyReviewView: React.FC<WeeklyReviewViewProps> = ({
                 onClose={() => setIsStyleModalOpen(false)}
                 onSelect={handleSelectStyle}
                 customTemplates={customNarrativeTemplates}
+                period="weekly"
             />
 
             {/* Delete Confirmation Modal */}

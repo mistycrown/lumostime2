@@ -9,6 +9,7 @@
  */
 import { DailyReview, Scope } from '../types';
 import { aiService } from './aiService';
+import { Solar } from 'lunar-javascript';
 
 
 export const narrativeService = {
@@ -114,10 +115,67 @@ Data Provided (${periodLabel}):
 `;
         }
 
+        // --- GLOBAL FORMATTING RULES (Applies to ALL templates) ---
+        // These rules are appended last to ensure they override any specific template looseness
+        const GLOBAL_COSMIC_RULES = `
+\n\n*** GLOBAL SYSTEM INSTRUCTIONS (MUST FOLLOW) ***
+全局输出要求：
+1. 使用Markdown格式。
+2. 第一行必须是标题，不包含任何前缀。标题的格式为【固定icon】+【具体标题内容】。固定icon将在人设提示词中给出。
+3. 最后一部分必须且只能是一个引用块 (Blockquote, >)，内容必须短小精悍。
+4. 禁止使用 "根据数据..."、"通过分析..." 等废话作为开头，直接进入叙事或分析。
+5. 禁止使用多余的比喻句、形容词、引号、破折号，请尽量像人那样写作。打破总结的模板，使句式丰富多样。
+6. 你写的内容需要通顺易懂，态度谦虚真诚，突出自然真实，不要过度夸张。
+`;
+        promptTemplate += GLOBAL_COSMIC_RULES;
+
         // Append specific instructions to the USER PROMPT to enforce the style
         // (We append it to ensure it overrides earlier "Diary" instructions in the template)
         if (writingInstructions) {
             promptTemplate += `\n\n${writingInstructions}`;
+        }
+
+        // --- INJECT LUNAR DATA (For Cyber Almanac) ---
+        if (promptTemplate.includes('${lunar_data}')) {
+            try {
+                // Ensure date string is parsed correctly (DailyReview date is YYYY-MM-DD)
+                const dateStr = (review as any).date;
+                let solar: Solar;
+
+                if (dateStr && typeof dateStr === 'string' && dateStr.includes('-')) {
+                    const parts = dateStr.split('-');
+                    if (parts.length === 3) {
+                        solar = Solar.fromYmd(parseInt(parts[0]), parseInt(parts[1]), parseInt(parts[2]));
+                    } else {
+                        solar = Solar.fromDate(new Date());
+                    }
+                } else {
+                    solar = Solar.fromDate(new Date());
+                }
+
+                const lunar = solar.getLunar();
+                const nextSolar = solar.next(1);
+                const nextLunar = nextSolar.getLunar();
+
+                const lunarDataStr = `
+【今日 (${solar.toYmd()})】
+阴历：${lunar.toString()}
+八字：${lunar.getBaZi().join(' ')}
+五行：${lunar.getBaZiWuXing().join(' ')}
+纳音：${lunar.getBaZiNaYin().join(' ')}
+星宿：${lunar.getXiu()}宿${lunar.getXiuLuck()}
+
+【明日 (${nextSolar.toYmd()})】
+阴历：${nextLunar.toString()}
+八字：${nextLunar.getBaZi().join(' ')}
+五行：${nextLunar.getBaZiWuXing().join(' ')}
+纳音：${nextLunar.getBaZiNaYin().join(' ')}
+星宿：${nextLunar.getXiu()}宿${nextLunar.getXiuLuck()}
+`;
+                promptTemplate = promptTemplate.replace('${lunar_data}', lunarDataStr);
+            } catch (e) {
+                console.error('Failed to inject lunar data', e);
+            }
         }
 
         // Replace placeholders
