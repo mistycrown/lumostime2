@@ -689,6 +689,8 @@ const AppContent: React.FC = () => {
     localStorage.setItem('lumostime_autoLinkRules', JSON.stringify(autoLinkRules));
   }, [autoLinkRules]);
 
+
+
   //--- History Navigation Logic for Scope Detail ---
   useEffect(() => {
     // Only handle if selectedScopeId is set
@@ -2088,6 +2090,7 @@ const AppContent: React.FC = () => {
             onSetDefaultView={setDefaultView}
             reviewTemplates={reviewTemplates}
             onUpdateReviewTemplates={setReviewTemplates}
+            onUpdateDailyReviews={setDailyReviews}
             dailyReviewTime={dailyReviewTime}
             onSetDailyReviewTime={setDailyReviewTime}
             weeklyReviewTime={weeklyReviewTime}
