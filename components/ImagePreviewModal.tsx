@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { X, ZoomIn, ZoomOut, RotateCcw, Trash2, ImageOff } from 'lucide-react';
 import { TransformWrapper, TransformComponent } from 'react-zoom-pan-pinch';
+import { ConfirmModal } from './ConfirmModal';
 
 interface ImagePreviewModalProps {
     imageUrl: string | null | undefined;
@@ -10,8 +11,19 @@ interface ImagePreviewModalProps {
 }
 
 export const ImagePreviewModal: React.FC<ImagePreviewModalProps> = ({ imageUrl, onClose, onDelete }) => {
+    const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
+    
     // Treat null/undefined as "Closed"
     if (imageUrl === null || imageUrl === undefined) return null;
+
+    const handleDeleteClick = () => {
+        setIsDeleteConfirmOpen(true);
+    };
+
+    const handleConfirmDelete = () => {
+        setIsDeleteConfirmOpen(false);
+        onDelete?.();
+    };
 
     const content = (
         <div
@@ -32,9 +44,7 @@ export const ImagePreviewModal: React.FC<ImagePreviewModalProps> = ({ imageUrl, 
                         <button
                             onClick={(e) => {
                                 e.stopPropagation();
-                                if (confirm('Delete this image?')) {
-                                    onDelete();
-                                }
+                                handleDeleteClick();
                             }}
                             className="p-2 bg-white/10 hover:bg-red-500/80 text-white rounded-full backdrop-blur-sm transition-colors mr-2"
                             title="Delete"
@@ -88,9 +98,7 @@ export const ImagePreviewModal: React.FC<ImagePreviewModalProps> = ({ imageUrl, 
                                             <button
                                                 onClick={(e) => {
                                                     e.stopPropagation();
-                                                    if (confirm('Delete this image?')) {
-                                                        onDelete();
-                                                    }
+                                                    handleDeleteClick();
                                                 }}
                                                 className="p-2 bg-white/10 hover:bg-red-500/80 text-white rounded-full backdrop-blur-sm transition-colors mr-2"
                                             >
@@ -132,9 +140,7 @@ export const ImagePreviewModal: React.FC<ImagePreviewModalProps> = ({ imageUrl, 
                                 <button
                                     onClick={(e) => {
                                         e.stopPropagation();
-                                        if (confirm('Delete this broken reference?')) {
-                                            onDelete();
-                                        }
+                                        handleDeleteClick();
                                     }}
                                     className="px-4 py-2 bg-red-500/20 hover:bg-red-500/40 text-red-200 border border-red-500/30 rounded-lg transition-colors flex items-center gap-2"
                                 >
@@ -161,6 +167,18 @@ export const ImagePreviewModal: React.FC<ImagePreviewModalProps> = ({ imageUrl, 
                     animation: fadeIn 0.15s ease-out;
                 }
             `}</style>
+            
+            {/* 删除确认模态框 */}
+            <ConfirmModal
+                isOpen={isDeleteConfirmOpen}
+                onClose={() => setIsDeleteConfirmOpen(false)}
+                onConfirm={handleConfirmDelete}
+                title="确认删除图片"
+                description={imageUrl ? "确定要删除这张图片吗？此操作无法撤销！" : "确定要删除这个图片引用吗？"}
+                confirmText="删除"
+                cancelText="取消"
+                type="danger"
+            />
         </div>
     );
 

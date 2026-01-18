@@ -53,7 +53,8 @@ import {
     Edit,
     Search,
     Link,
-    Smartphone
+    Smartphone,
+    ImageIcon
 } from 'lucide-react';
 import { webdavService, WebDAVConfig } from '../services/webdavService';
 import { NfcService } from '../services/NfcService';
@@ -74,6 +75,7 @@ import { ObsidianExportView } from './ObsidianExportView';
 import { getFilterStats } from '../utils/filterUtils';
 import { FilterDetailView } from './FilterDetailView';
 import excelExportService from '../services/excelExportService';
+import { imageCleanupService } from '../services/imageCleanupService';
 
 import { NARRATIVE_TEMPLATES } from '../constants';
 // @ts-ignore
@@ -159,6 +161,12 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
     const [activeSubmenu, setActiveSubmenu] = useState<'main' | 'data' | 'cloud' | 'ai' | 'preferences' | 'guide' | 'nfc' | 'templates' | 'check_templates' | 'narrative_prompt' | 'auto_record' | 'autolink' | 'obsidian_export' | 'filters'>('main');
     const [webdavConfig, setWebdavConfig] = useState<WebDAVConfig | null>(null);
     const [isSyncing, setIsSyncing] = useState(false);
+    
+    // 图片清理相关状态
+    const [isCheckingImages, setIsCheckingImages] = useState(false);
+    const [isCleaningImages, setIsCleaningImages] = useState(false);
+    const [imageCleanupReport, setImageCleanupReport] = useState<string>('');
+    const [isImageCleanupConfirmOpen, setIsImageCleanupConfirmOpen] = useState(false);
 
     // Sync local user info when prop changes
     useEffect(() => {
@@ -426,6 +434,10 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
             if (data) {
                 onSyncUpdate(data);
                 onToast('success', 'Data restored from cloud successfully!');
+                // 同步完成后关闭设置页面，自动刷新到脉络页面
+                setTimeout(() => {
+                    onClose();
+                }, 1000); // 延迟1秒让用户看到成功提示
             }
         } catch (error) {
             console.error(error);
@@ -612,6 +624,64 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
         onUpdateFilters?.(updatedFilters);
         setDeletingFilterId(null);
         onToast('success', '筛选器已删除');
+    };
+
+    // 图片清理功能
+    const handleCheckUnreferencedImages = async () => {
+        if (isCheckingImages) return;
+        
+        setIsCheckingImages(true);
+        try {
+            const report = await imageCleanupService.generateCleanupReport(logs || []);
+            setImageCleanupReport(report);
+            onToast('success', '图片检查完成');
+        } catch (error: any) {
+            console.error('检查图片失败:', error);
+            onToast('error', `检查图片失败: ${error?.message}`);
+        } finally {
+            setIsCheckingImages(false);
+        }
+    };
+
+    const handleCleanupImages = async (dryRun: boolean = false) => {
+        if (isCleaningImages) return;
+        
+        if (!dryRun) {
+            // 显示确认模态框而不是默认的 confirm
+            setIsImageCleanupConfirmOpen(true);
+            return;
+        }
+        
+        await executeImageCleanup(dryRun);
+    };
+
+    const executeImageCleanup = async (dryRun: boolean = false) => {
+        setIsCleaningImages(true);
+        try {
+            const result = await imageCleanupService.cleanupUnreferencedImages(logs || [], {
+                deleteLocal: true,
+                deleteRemote: true,
+                dryRun
+            });
+            
+            if (dryRun) {
+                onToast('info', `试运行完成：发现 ${result.unreferencedImages.length} 个未引用图片`);
+            } else {
+                onToast('success', `清理完成：删除了 ${result.deletedLocal} 个本地图片，${result.deletedRemote} 个远程图片`);
+                // 重新生成报告
+                await handleCheckUnreferencedImages();
+            }
+        } catch (error: any) {
+            console.error('清理图片失败:', error);
+            onToast('error', `清理图片失败: ${error?.message}`);
+        } finally {
+            setIsCleaningImages(false);
+        }
+    };
+
+    const handleConfirmImageCleanup = () => {
+        setIsImageCleanupConfirmOpen(false);
+        executeImageCleanup(false);
     };
 
 
@@ -1276,7 +1346,78 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
                             todoCategories={todoCategories}
                         />
                     </div>
+
+                    {/* 图片清理卡片 */}
+                    <div className="bg-white rounded-2xl p-6 shadow-sm space-y-4">
+                        <div className="flex items-center gap-3 text-stone-800 mb-2">
+                            <ImageIcon size={24} />
+                            <h3 className="font-bold text-lg">图片清理</h3>
+                        </div>
+                        <p className="text-sm text-stone-500 mb-4 leading-relaxed">
+                            检查并清理未被专注记录引用的图片，释放存储空间
+                        </p>
+
+                        <div className="grid grid-cols-1 gap-3">
+                            <button
+                                onClick={handleCheckUnreferencedImages}
+                                disabled={isCheckingImages}
+                                className="flex items-center justify-center gap-2 w-full py-3 bg-white border border-stone-200 text-stone-800 rounded-xl font-medium active:scale-[0.98] transition-transform disabled:opacity-50 disabled:cursor-not-allowed hover:bg-stone-50"
+                            >
+                                {isCheckingImages ? (
+                                    <>
+                                        <div className="w-4 h-4 border-2 border-stone-400 border-t-transparent rounded-full animate-spin" />
+                                        检查中...
+                                    </>
+                                ) : (
+                                    <>
+                                        <Search size={18} />
+                                        检查未引用图片
+                                    </>
+                                )}
+                            </button>
+
+                            <button
+                                onClick={() => handleCleanupImages(false)}
+                                disabled={isCleaningImages}
+                                className="flex items-center justify-center gap-2 w-full py-3 bg-white border border-stone-200 text-stone-800 rounded-xl font-medium active:scale-[0.98] transition-transform disabled:opacity-50 disabled:cursor-not-allowed hover:bg-stone-50"
+                            >
+                                {isCleaningImages ? (
+                                    <>
+                                        <div className="w-4 h-4 border-2 border-stone-400 border-t-transparent rounded-full animate-spin" />
+                                        清理中...
+                                    </>
+                                ) : (
+                                    <>
+                                        <Trash2 size={18} />
+                                        执行清理（删除图片）
+                                    </>
+                                )}
+                            </button>
+                        </div>
+
+                        {/* 显示清理报告 */}
+                        {imageCleanupReport && (
+                            <div className="mt-4 p-4 bg-stone-50 rounded-xl">
+                                <h4 className="font-medium text-stone-700 mb-2">清理报告</h4>
+                                <div className="text-sm text-stone-600 whitespace-pre-line max-h-40 overflow-y-auto">
+                                    {imageCleanupReport}
+                                </div>
+                            </div>
+                        )}
+                    </div>
                 </div>
+
+                {/* 图片清理确认模态框 */}
+                <ConfirmModal
+                    isOpen={isImageCleanupConfirmOpen}
+                    onClose={() => setIsImageCleanupConfirmOpen(false)}
+                    onConfirm={handleConfirmImageCleanup}
+                    title="确认删除图片"
+                    description="确定要删除所有未引用的图片吗？此操作将同时删除本地和远程图片，且无法撤销！"
+                    confirmText="删除"
+                    cancelText="取消"
+                    type="danger"
+                />
             </div>
         );
     }

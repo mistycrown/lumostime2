@@ -21,16 +21,62 @@ import { imageService } from '../services/imageService';
 // Image Thumbnail Component
 const TimelineImage: React.FC<{ filename: string, className?: string, useThumbnail?: boolean }> = ({ filename, className = "w-16 h-16", useThumbnail = false }) => {
     const [src, setSrc] = useState<string>('');
+    const [error, setError] = useState<string>('');
 
     React.useEffect(() => {
-        imageService.getImageUrl(filename, useThumbnail ? 'thumbnail' : 'original').then(setSrc);
+        const loadImage = async () => {
+            try {
+                console.log(`[TimelineImage] 尝试加载图片: ${filename}, useThumbnail: ${useThumbnail}`);
+                const url = await imageService.getImageUrl(filename, useThumbnail ? 'thumbnail' : 'original');
+                console.log(`[TimelineImage] 获取到图片URL: ${filename} -> ${url ? '成功' : '失败'}`);
+                
+                if (url) {
+                    setSrc(url);
+                    setError('');
+                } else {
+                    setError('图片URL为空');
+                    console.warn(`[TimelineImage] 图片URL为空: ${filename}`);
+                }
+            } catch (err: any) {
+                console.error(`[TimelineImage] 加载图片失败: ${filename}`, err);
+                setError(`加载失败: ${err.message}`);
+            }
+        };
+        
+        loadImage();
     }, [filename, useThumbnail]);
 
-    if (!src) return null;
+    if (error) {
+        console.warn(`[TimelineImage] 显示错误占位符: ${filename} - ${error}`);
+        return (
+            <div className={`${className} rounded-lg border border-red-200 bg-red-50 flex items-center justify-center shrink-0`}>
+                <span className="text-red-400 text-xs">❌</span>
+            </div>
+        );
+    }
+
+    if (!src) {
+        return (
+            <div className={`${className} rounded-lg border border-stone-200 bg-stone-100 flex items-center justify-center shrink-0`}>
+                <span className="text-stone-400 text-xs">📷</span>
+            </div>
+        );
+    }
 
     return (
         <div className={`${className} rounded-lg overflow-hidden border border-stone-200 shrink-0`}>
-            <img src={src} alt="img" className="w-full h-full object-cover" />
+            <img 
+                src={src} 
+                alt="img" 
+                className="w-full h-full object-cover"
+                onError={() => {
+                    console.error(`[TimelineImage] 图片加载失败: ${filename}, src: ${src}`);
+                    setError('图片加载失败');
+                }}
+                onLoad={() => {
+                    console.log(`[TimelineImage] 图片加载成功: ${filename}`);
+                }}
+            />
         </div>
     );
 };
@@ -727,12 +773,17 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ logs, todos, scopes,
                                         {item.logData.images && item.logData.images.length > 0 && (
                                             <div className="flex items-center gap-2 mt-3 overflow-x-auto no-scrollbar pb-1">
                                                 {/* If > 3 images, show first 2 then +N. If <= 3, show all. */}
-                                                {(item.logData.images.length > 3
-                                                    ? item.logData.images.slice(0, 2)
-                                                    : item.logData.images
-                                                ).map(img => (
-                                                    <TimelineImage key={img} filename={img} className="w-16 h-16 shadow-sm" useThumbnail={true} />
-                                                ))}
+                                                {(() => {
+                                                    const imagesToShow = item.logData.images.length > 3
+                                                        ? item.logData.images.slice(0, 2)
+                                                        : item.logData.images;
+                                                    
+                                                    console.log(`[TimelineView] 渲染图片组: 记录ID=${item.logData.id}, 总图片=${item.logData.images.length}, 显示图片=`, imagesToShow);
+                                                    
+                                                    return imagesToShow.map(img => (
+                                                        <TimelineImage key={img} filename={img} className="w-16 h-16 shadow-sm" useThumbnail={true} />
+                                                    ));
+                                                })()}
 
                                                 {item.logData.images.length > 3 && (
                                                     <div className="w-16 h-16 rounded-xl bg-stone-100 flex items-center justify-center border border-stone-200 text-stone-400 font-bold text-sm">

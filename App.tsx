@@ -794,7 +794,7 @@ const AppContent: React.FC = () => {
           // addToast('info', 'Updating data from cloud...'); 
           const data = await webdavService.downloadData();
           if (data) {
-            handleSyncDataUpdate(data);
+            await handleSyncDataUpdate(data);
             updateLastSyncTime();
             // addToast('success', 'Sync complete');
           }
@@ -1112,6 +1112,29 @@ const AppContent: React.FC = () => {
     document.addEventListener('visibilitychange', handleVisibilityChange);
     return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
   }, [logs, todos, categories, todoCategories, scopes, goals, autoLinkRules, reviewTemplates, dailyReviews, weeklyReviews, monthlyReviews, customNarrativeTemplates, userPersonalInfo]);
+
+  // 3.5. Image Deletion Auto-Sync
+  useEffect(() => {
+    const handleImageDeleted = async (event: CustomEvent) => {
+      const config = webdavService.getConfig();
+      if (!config) return;
+
+      console.log('[App] 检测到图片删除，触发同步:', event.detail.filename);
+      
+      // 延迟一点时间确保删除操作完成，然后触发图片同步
+      setTimeout(async () => {
+        try {
+          await handleImageSync();
+          console.log('[App] 图片删除同步完成');
+        } catch (error) {
+          console.error('[App] 图片删除同步失败:', error);
+        }
+      }, 1000);
+    };
+
+    window.addEventListener('imageDeleted', handleImageDeleted as EventListener);
+    return () => window.removeEventListener('imageDeleted', handleImageDeleted as EventListener);
+  }, []);
 
   // 4. Hardware Back Button Handling
   useEffect(() => {
@@ -1811,8 +1834,22 @@ const AppContent: React.FC = () => {
     return VIEW_TITLES[currentView];
   };
 
-  const handleSyncDataUpdate = (data: any) => {
+  const handleSyncDataUpdate = async (data: any) => {
     isRestoring.current = true;
+    
+    // 在更新数据前，获取当前被引用的图片列表
+    const oldReferencedImages = new Set<string>();
+    logs.forEach(log => {
+      if (log.images && Array.isArray(log.images)) {
+        log.images.forEach(imageName => {
+          if (imageName && typeof imageName === 'string') {
+            oldReferencedImages.add(imageName);
+          }
+        });
+      }
+    });
+    
+    // 更新数据状态
     if (data.logs) setLogs(data.logs);
     if (data.categories) setCategories(data.categories);
     if (data.todos) setTodos(data.todos);
@@ -1830,6 +1867,76 @@ const AppContent: React.FC = () => {
 
     if (data.timestamp) {
       setDataLastModified(data.timestamp);
+    }
+    
+    // 数据更新后，检查并清理不再被引用的本地图片
+    if (data.logs) {
+      try {
+        await cleanupOrphanedImagesAfterSync(data.logs, oldReferencedImages);
+      } catch (error) {
+        console.error('[App] 清理孤儿图片失败:', error);
+      }
+    }
+  };
+
+  // 清理同步后的孤儿图片
+  const cleanupOrphanedImagesAfterSync = async (newLogs: any[], oldReferencedImages: Set<string>) => {
+    try {
+      // 获取新数据中被引用的图片
+      const newReferencedImages = new Set<string>();
+      newLogs.forEach(log => {
+        if (log.images && Array.isArray(log.images)) {
+          log.images.forEach(imageName => {
+            if (imageName && typeof imageName === 'string') {
+              newReferencedImages.add(imageName);
+              // 同时保护对应的缩略图
+              newReferencedImages.add(`thumb_${imageName}`);
+            }
+          });
+        }
+      });
+
+      // 获取本地所有图片
+      const localImages = await imageService.listImages();
+      
+      // 找出在旧数据中被引用，但在新数据中不再被引用的图片
+      const imagesToDelete: string[] = [];
+      
+      for (const imageName of oldReferencedImages) {
+        if (!newReferencedImages.has(imageName)) {
+          // 这个图片在新数据中不再被引用，需要删除
+          if (localImages.includes(imageName)) {
+            imagesToDelete.push(imageName);
+          }
+          // 同时检查对应的缩略图
+          const thumbName = `thumb_${imageName}`;
+          if (localImages.includes(thumbName)) {
+            imagesToDelete.push(thumbName);
+          }
+        }
+      }
+
+      if (imagesToDelete.length > 0) {
+        console.log(`[App] 发现 ${imagesToDelete.length} 个需要清理的孤儿图片:`, imagesToDelete);
+        
+        // 删除这些孤儿图片（不记录删除操作，因为这是同步清理）
+        let deletedCount = 0;
+        for (const imageName of imagesToDelete) {
+          try {
+            await syncService.forceDeleteLocalFile(imageName);
+            console.log(`[App] 清理孤儿图片成功: ${imageName}`);
+            deletedCount++;
+          } catch (error) {
+            console.warn(`[App] 清理孤儿图片失败: ${imageName}`, error);
+          }
+        }
+        
+        if (deletedCount > 0) {
+          addToast('info', `已清理 ${deletedCount} 个未引用的图片`);
+        }
+      }
+    } catch (error) {
+      console.error('[App] 孤儿图片清理过程失败:', error);
     }
   };
 
@@ -1900,7 +2007,7 @@ const AppContent: React.FC = () => {
       if (cloudTimestamp > localTimestamp) {
         // Cloud is newer, download
         if (cloudData) {
-          handleSyncDataUpdate(cloudData);
+          await handleSyncDataUpdate(cloudData);
           addToast('success', `Downloaded from cloud (${new Date(cloudTimestamp).toLocaleDateString()})`);
         }
       } else {
@@ -1912,7 +2019,32 @@ const AppContent: React.FC = () => {
       // Sync Images
       await handleImageSync();
 
+      // 调试：列出同步后的本地图片
+      try {
+        const localImages = await imageService.listImages();
+        console.log(`[App] 同步完成后本地图片列表:`, localImages);
+        
+        // Web环境下额外检查IndexedDB
+        if (typeof window !== 'undefined' && !window.Capacitor?.isNativePlatform()) {
+          const indexedDBImages = await imageService.debugListIndexedDBImages();
+          console.log(`[App] IndexedDB中的图片:`, indexedDBImages);
+        }
+      } catch (error) {
+        console.error('[App] 调试信息获取失败:', error);
+      }
+
       addToast('success', 'Sync complete');
+      
+      // 强制刷新脉络页面 - 通过微调当前日期来触发重新渲染
+      if (currentView === AppView.TIMELINE) {
+        const tempDate = new Date(currentDate);
+        tempDate.setMilliseconds(tempDate.getMilliseconds() + 1);
+        setCurrentDate(tempDate);
+        // 立即恢复原始日期，但这会触发组件重新渲染
+        setTimeout(() => {
+          setCurrentDate(new Date(currentDate));
+        }, 10);
+      }
     } catch (error) {
       console.error("Sync failed", error);
       addToast('error', 'Sync failed');
