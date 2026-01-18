@@ -75,44 +75,61 @@ class ImageService {
      * Get a usable URL for the image
      */
     async getImageUrl(filename: string, type: 'original' | 'thumbnail' = 'original'): Promise<string> {
+        console.log(`[ImageService] getImageUrl 请求: ${filename}, type: ${type}`);
+        
         let targetFilename = filename;
         if (type === 'thumbnail') {
             const thumbName = `thumb_${filename}`;
             const exists = await this.checkFileExists(thumbName);
+            console.log(`[ImageService] 缩略图检查: ${thumbName} exists: ${exists}`);
             if (exists) {
                 targetFilename = thumbName;
             }
         }
 
+        console.log(`[ImageService] 目标文件名: ${targetFilename}`);
+
         if (Capacitor.isNativePlatform()) {
+            console.log(`[ImageService] Native平台，获取文件URI: images/${targetFilename}`);
             const uri = await Filesystem.getUri({
                 path: `images/${targetFilename}`,
                 directory: Directory.Data,
             });
-            return Capacitor.convertFileSrc(uri.uri);
+            const convertedSrc = Capacitor.convertFileSrc(uri.uri);
+            console.log(`[ImageService] Native URI: ${uri.uri} -> ${convertedSrc}`);
+            return convertedSrc;
         } else {
+            console.log(`[ImageService] Web平台，从IndexedDB获取: ${targetFilename}`);
             // Web: Retrieve Blob from IDB and create ObjectURL
             const db = await this.dbPromise;
-            if (!db) throw new Error('IndexedDB not initialized');
+            if (!db) {
+                console.error(`[ImageService] IndexedDB未初始化`);
+                throw new Error('IndexedDB not initialized');
+            }
 
             return new Promise((resolve, reject) => {
                 const transaction = db.transaction([STORE_NAME], 'readonly');
                 const store = transaction.objectStore(STORE_NAME);
                 const request = store.get(targetFilename);
+                
                 request.onsuccess = () => {
                     const blob = request.result;
+                    console.log(`[ImageService] IndexedDB查询结果: ${targetFilename} -> ${blob ? '找到' : '未找到'}`);
+                    
                     if (blob) {
-                        resolve(URL.createObjectURL(blob));
+                        const objectUrl = URL.createObjectURL(blob);
+                        console.log(`[ImageService] 创建ObjectURL成功: ${targetFilename} -> ${objectUrl}`);
+                        resolve(objectUrl);
                     } else {
-                        // Fallback to original if thumbnail was requested but not found (and check failed/raciness)
-                        // But we already did checkFileExists? 
-                        // For Web, checkFileExists checks DB.
-                        // But if we are here, it means we tried to get `targetFilename`.
-                        console.warn(`Image not found: ${targetFilename}`);
+                        console.warn(`[ImageService] 图片未找到: ${targetFilename}`);
                         resolve('');
                     }
                 };
-                request.onerror = () => reject(request.error);
+                
+                request.onerror = () => {
+                    console.error(`[ImageService] IndexedDB查询错误: ${targetFilename}`, request.error);
+                    reject(request.error);
+                };
             });
         }
     }
@@ -151,6 +168,13 @@ class ImageService {
                 transaction.oncomplete = () => resolve();
                 transaction.onerror = () => reject(transaction.error);
             });
+        }
+
+        // 触发全局事件通知图片已删除，需要同步
+        if (typeof window !== 'undefined') {
+            window.dispatchEvent(new CustomEvent('imageDeleted', { 
+                detail: { filename } 
+            }));
         }
     }
 
@@ -283,14 +307,19 @@ class ImageService {
      * Save synced image content
      */
     async writeImage(filename: string, data: ArrayBuffer | string | Blob): Promise<void> {
+        console.log(`[ImageService] writeImage 开始: ${filename}, 数据类型: ${data instanceof ArrayBuffer ? 'ArrayBuffer' : data instanceof Blob ? 'Blob' : 'string'}`);
+        
         if (Capacitor.isNativePlatform()) {
+            console.log(`[ImageService] Native平台写入: ${filename}`);
             // If data is ArrayBuffer, convert to Base64?
             // Filesystem.writeFile expects string for data. 
             // If it's ArrayBuffer, we need to convert.
             let writeData = data;
             if (data instanceof ArrayBuffer) {
+                console.log(`[ImageService] 转换ArrayBuffer为Base64: ${filename}`);
                 writeData = Buffer.from(data).toString('base64');
             } else if (data instanceof Blob) {
+                console.log(`[ImageService] 转换Blob为Base64: ${filename}`);
                 writeData = await this.blobToBase64(data as Blob);
             }
 
@@ -300,31 +329,78 @@ class ImageService {
                 directory: Directory.Data,
                 // recursive: true // directory should exist
             });
+            console.log(`[ImageService] Native写入完成: ${filename}`);
         } else {
+            console.log(`[ImageService] Web平台写入到IndexedDB: ${filename}`);
             const db = await this.dbPromise;
-            if (!db) throw new Error('IndexedDB not initialized');
+            if (!db) {
+                console.error(`[ImageService] IndexedDB未初始化`);
+                throw new Error('IndexedDB not initialized');
+            }
 
             // Convert to Blob if it is ArrayBuffer
             let blob: Blob;
             if (data instanceof Blob) {
+                console.log(`[ImageService] 数据已是Blob: ${filename}`);
                 blob = data;
             } else if (data instanceof ArrayBuffer) {
-                blob = new Blob([data]);
+                console.log(`[ImageService] 转换ArrayBuffer为Blob: ${filename}, size: ${data.byteLength}`);
+                // 根据文件扩展名推断MIME类型
+                const mimeType = this.getMimeTypeFromFilename(filename);
+                console.log(`[ImageService] 推断MIME类型: ${filename} -> ${mimeType}`);
+                blob = new Blob([data], { type: mimeType });
             } else {
+                console.log(`[ImageService] 从Base64字符串创建Blob: ${filename}`);
                 // base64 string
                 const response = await fetch(data as string);
                 blob = await response.blob();
             }
 
+            console.log(`[ImageService] 准备存储Blob到IndexedDB: ${filename}, size: ${blob.size}, type: ${blob.type}`);
+
             return new Promise((resolve, reject) => {
                 const transaction = db.transaction([STORE_NAME], 'readwrite');
                 const store = transaction.objectStore(STORE_NAME);
                 const request = store.put(blob, filename);
-                request.onsuccess = () => resolve();
-                request.onerror = () => reject(request.error);
+                
+                request.onsuccess = () => {
+                    console.log(`[ImageService] IndexedDB写入成功: ${filename}`);
+                    resolve();
+                };
+                
+                request.onerror = () => {
+                    console.error(`[ImageService] IndexedDB写入失败: ${filename}`, request.error);
+                    reject(request.error);
+                };
             });
         }
     }
+
+    /**
+     * 根据文件名推断MIME类型
+     */
+    private getMimeTypeFromFilename(filename: string): string {
+        const ext = filename.toLowerCase().split('.').pop();
+        switch (ext) {
+            case 'jpg':
+            case 'jpeg':
+                return 'image/jpeg';
+            case 'png':
+                return 'image/png';
+            case 'gif':
+                return 'image/gif';
+            case 'webp':
+                return 'image/webp';
+            case 'bmp':
+                return 'image/bmp';
+            case 'svg':
+                return 'image/svg+xml';
+            default:
+                console.warn(`[ImageService] 未知图片格式: ${ext}, 使用默认MIME类型`);
+                return 'image/jpeg'; // 默认为JPEG
+        }
+    }
+
     // --- Tombstone Methods for Sync ---
 
     private trackDeletion(filename: string) {
@@ -361,6 +437,39 @@ class ImageService {
 
     clearDeletedImage(filename: string) {
         this.clearDeletedImages([filename]);
+    }
+
+    /**
+     * 调试方法：列出IndexedDB中的所有图片（仅Web环境）
+     */
+    async debugListIndexedDBImages(): Promise<string[]> {
+        if (Capacitor.isNativePlatform()) {
+            console.log('[ImageService] Native平台，使用 listImages() 代替');
+            return this.listImages();
+        }
+
+        const db = await this.dbPromise;
+        if (!db) {
+            console.error('[ImageService] IndexedDB未初始化');
+            return [];
+        }
+
+        return new Promise((resolve, reject) => {
+            const transaction = db.transaction([STORE_NAME], 'readonly');
+            const store = transaction.objectStore(STORE_NAME);
+            const request = store.getAllKeys();
+            
+            request.onsuccess = () => {
+                const keys = request.result as string[];
+                console.log(`[ImageService] IndexedDB中的图片:`, keys);
+                resolve(keys);
+            };
+            
+            request.onerror = () => {
+                console.error('[ImageService] 获取IndexedDB键列表失败:', request.error);
+                reject(request.error);
+            };
+        });
     }
 }
 
