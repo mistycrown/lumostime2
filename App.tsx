@@ -173,6 +173,7 @@ const AppContent: React.FC = () => {
   } = useCategoryScope();
 
   const [isSyncing, setIsSyncing] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0); // 用于强制刷新Timeline
   const lastPromptTimeRef = useRef(0);
   const hasCleanedImagesRef = useRef(false);
 
@@ -799,6 +800,21 @@ const AppContent: React.FC = () => {
             // addToast('success', 'Sync complete');
           }
         }
+
+        // 启动时也检查图片同步
+        try {
+          console.log('[App] 启动时检查图片同步...');
+          const imageResult = await syncService.syncImages();
+          if (imageResult.downloaded > 0) {
+            console.log(`[App] 启动时下载了 ${imageResult.downloaded} 张图片`);
+          }
+          if (imageResult.uploaded > 0) {
+            console.log(`[App] 启动时上传了 ${imageResult.uploaded} 张图片`);
+          }
+        } catch (imageError: any) {
+          console.warn('[App] 启动时图片同步失败:', imageError.message);
+          // 图片同步失败不影响数据同步
+        }
       } catch (e) {
         console.error('Startup sync check failed', e);
       }
@@ -1113,7 +1129,7 @@ const AppContent: React.FC = () => {
     return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
   }, [logs, todos, categories, todoCategories, scopes, goals, autoLinkRules, reviewTemplates, dailyReviews, weeklyReviews, monthlyReviews, customNarrativeTemplates, userPersonalInfo]);
 
-  // 3.5. Image Deletion Auto-Sync
+  // 3.5. Image Changes Auto-Sync
   useEffect(() => {
     const handleImageDeleted = async (event: CustomEvent) => {
       const config = webdavService.getConfig();
@@ -1132,8 +1148,34 @@ const AppContent: React.FC = () => {
       }, 1000);
     };
 
+    const handleImageUploaded = async (event: CustomEvent) => {
+      const config = webdavService.getConfig();
+      if (!config) return;
+
+      console.log('[App] 检测到图片上传，触发同步:', event.detail.filename);
+      
+      // 延迟一点时间确保上传操作完成，然后触发图片同步
+      setTimeout(async () => {
+        try {
+          await handleImageSync();
+          console.log('[App] 图片上传同步完成');
+        } catch (error) {
+          console.error('[App] 图片上传同步失败:', error);
+          // 如果是 /images 文件夹不存在的错误，显示友好提示
+          if (error.message && error.message.includes('/images')) {
+            addToast('error', '图片同步失败：请在WebDAV根目录下创建 "images" 文件夹');
+          }
+        }
+      }, 2000); // 上传后稍微延迟长一点
+    };
+
     window.addEventListener('imageDeleted', handleImageDeleted as EventListener);
-    return () => window.removeEventListener('imageDeleted', handleImageDeleted as EventListener);
+    window.addEventListener('imageUploaded', handleImageUploaded as EventListener);
+    
+    return () => {
+      window.removeEventListener('imageDeleted', handleImageDeleted as EventListener);
+      window.removeEventListener('imageUploaded', handleImageUploaded as EventListener);
+    };
   }, []);
 
   // 4. Hardware Back Button Handling
@@ -1627,6 +1669,7 @@ const AppContent: React.FC = () => {
       case AppView.TIMELINE:
         return (
           <TimelineView
+            key={`timeline-${refreshKey}`} // 添加key来强制重新渲染
             logs={logs}
             todos={todos}
             categories={categories}
@@ -1835,6 +1878,7 @@ const AppContent: React.FC = () => {
   };
 
   const handleSyncDataUpdate = async (data: any) => {
+    console.log('[App] 开始更新同步数据...');
     isRestoring.current = true;
     
     // 在更新数据前，获取当前被引用的图片列表
@@ -1849,10 +1893,21 @@ const AppContent: React.FC = () => {
       }
     });
     
-    // 更新数据状态
-    if (data.logs) setLogs(data.logs);
-    if (data.categories) setCategories(data.categories);
-    if (data.todos) setTodos(data.todos);
+    // 批量更新数据状态 - 使用Promise确保所有状态更新完成
+    const updatePromises: Promise<void>[] = [];
+    
+    if (data.logs) {
+      console.log(`[App] 更新logs: ${data.logs.length} 条记录`);
+      setLogs(data.logs);
+    }
+    if (data.categories) {
+      console.log(`[App] 更新categories: ${data.categories.length} 个分类`);
+      setCategories(data.categories);
+    }
+    if (data.todos) {
+      console.log(`[App] 更新todos: ${data.todos.length} 个待办`);
+      setTodos(data.todos);
+    }
     if (data.todoCategories) setTodoCategories(data.todoCategories);
     if (data.scopes) setScopes(data.scopes);
     if (data.goals) setGoals(data.goals);
@@ -1869,6 +1924,9 @@ const AppContent: React.FC = () => {
       setDataLastModified(data.timestamp);
     }
     
+    // 等待一个渲染周期，确保状态更新完成
+    await new Promise(resolve => setTimeout(resolve, 10));
+    
     // 数据更新后，检查并清理不再被引用的本地图片
     if (data.logs) {
       try {
@@ -1876,6 +1934,14 @@ const AppContent: React.FC = () => {
       } catch (error) {
         console.error('[App] 清理孤儿图片失败:', error);
       }
+    }
+    
+    console.log('[App] 同步数据更新完成');
+    
+    // 触发Timeline刷新（如果当前在Timeline页面）
+    if (currentView === AppView.TIMELINE) {
+      setRefreshKey(prev => prev + 1);
+      console.log('[App] 数据更新后触发Timeline刷新');
     }
   };
 
@@ -1954,6 +2020,12 @@ const AppContent: React.FC = () => {
         console.error('Image sync errors:', result.errors);
         addToast('error', `Image sync had ${result.errors.length} errors`);
       }
+      
+      // 如果有图片变化，触发Timeline刷新
+      if ((result.uploaded > 0 || result.downloaded > 0 || result.deletedRemote > 0) && currentView === AppView.TIMELINE) {
+        console.log('[App] 图片同步有变化，触发Timeline刷新');
+        setRefreshKey(prev => prev + 1);
+      }
     } catch (e) {
       console.error('Image sync error', e);
     }
@@ -2008,6 +2080,8 @@ const AppContent: React.FC = () => {
         // Cloud is newer, download
         if (cloudData) {
           await handleSyncDataUpdate(cloudData);
+          // 等待一个React渲染周期，确保状态更新完成
+          await new Promise(resolve => setTimeout(resolve, 50));
           addToast('success', `Downloaded from cloud (${new Date(cloudTimestamp).toLocaleDateString()})`);
         }
       } else {
@@ -2035,15 +2109,15 @@ const AppContent: React.FC = () => {
 
       addToast('success', 'Sync complete');
       
-      // 强制刷新脉络页面 - 通过微调当前日期来触发重新渲染
+      // 强制刷新Timeline页面 - 确保在所有异步操作完成后执行
       if (currentView === AppView.TIMELINE) {
-        const tempDate = new Date(currentDate);
-        tempDate.setMilliseconds(tempDate.getMilliseconds() + 1);
-        setCurrentDate(tempDate);
-        // 立即恢复原始日期，但这会触发组件重新渲染
-        setTimeout(() => {
-          setCurrentDate(new Date(currentDate));
-        }, 10);
+        // 等待所有状态更新完成
+        await new Promise(resolve => setTimeout(resolve, 100));
+        
+        // 通过更新refreshKey强制Timeline重新渲染
+        setRefreshKey(prev => prev + 1);
+        
+        console.log('[App] Timeline页面刷新完成');
       }
     } catch (error) {
       console.error("Sync failed", error);

@@ -492,66 +492,13 @@ export class WebDAVService {
                 console.error(`[WebDAV] ✗ 原生上传失败: ${filename}`);
                 console.error('[WebDAV] Native Error Details:', JSON.stringify(error, null, 2));
                 
-                // 如果是 409 错误，尝试不同的解决方案
+                // 如果是 409 错误或其他错误，不再自动创建目录，直接报错
                 if (error?.status === 409) {
-                    console.log(`[WebDAV] HTTP 409 冲突 - 尝试不同的解决方案`);
-                    
-                    // 策略1: 优先尝试创建目录后重试 /images/ 路径（保持跨平台兼容性）
-                    try {
-                        console.log(`[WebDAV] 尝试创建目录后重试 /images/ 路径`);
-                        await this.createDirectory('/images');
-                        
-                        console.log(`[WebDAV] 目录创建完成，重试上传到 /images/: ${filename}`);
-                        
-                        // 重试原始上传到 /images/ 目录
-                        const retryResponse = await new Promise((resolve, reject) => {
-                            HTTP.put(url, uint8Data, {
-                                'Authorization': `Basic ${auth}`,
-                                'Content-Type': 'image/jpeg'
-                            }, resolve, reject);
-                        });
-                        
-                        if (retryResponse.status === 200 || retryResponse.status === 201 || retryResponse.status === 204) {
-                            console.log(`[WebDAV] ✓ /images/ 目录上传成功: ${filename}, Status: ${retryResponse.status}`);
-                            return true;
-                        }
-                        
-                    } catch (retryError: any) {
-                        console.error(`[WebDAV] /images/ 目录重试失败: ${filename}`, JSON.stringify(retryError, null, 2));
-                    }
-                    
-                    // 策略2: 如果 /images/ 目录仍然失败，回退到根目录（兼容性保证）
-                    try {
-                        const rootUrl = this.config.url.endsWith('/') ? `${this.config.url}${filename}` : `${this.config.url}/${filename}`;
-                        console.log(`[WebDAV] /images/ 目录失败，回退到根目录: ${rootUrl}`);
-                        
-                        const rootResponse = await new Promise((resolve, reject) => {
-                            HTTP.put(rootUrl, uint8Data, {
-                                'Authorization': `Basic ${auth}`,
-                                'Content-Type': 'image/jpeg'
-                            }, resolve, reject);
-                        });
-                        
-                        if (rootResponse.status === 200 || rootResponse.status === 201 || rootResponse.status === 204) {
-                            console.log(`[WebDAV] ✓ 根目录上传成功: ${filename}, Status: ${rootResponse.status}`);
-                            console.warn(`[WebDAV] ⚠️ 注意：图片保存在根目录，可能影响跨平台同步`);
-                            return true;
-                        }
-                    } catch (rootError: any) {
-                        console.warn(`[WebDAV] 根目录上传也失败:`, JSON.stringify(rootError, null, 2));
-                    }
+                    console.log(`[WebDAV] HTTP 409 冲突 - 可能是 /images 目录不存在`);
+                    throw new Error(`图片上传失败：请确保WebDAV根目录下存在 "images" 文件夹。错误详情: ${error.message || 'HTTP 409'}`);
                 }
                 
-                // 提供更详细的错误信息
-                if (error?.status === 409) {
-                    console.error(`[WebDAV] HTTP 409 冲突 - 可能原因: 目录不存在或文件已存在但无法覆盖`);
-                } else if (error?.status === 404) {
-                    console.error(`[WebDAV] HTTP 404 - 路径不存在，请检查 WebDAV 服务器配置`);
-                } else if (error?.status === 403) {
-                    console.error(`[WebDAV] HTTP 403 - 权限不足，请检查认证信息`);
-                }
-                
-                throw error;
+                throw new Error(`图片上传失败: ${error.message || 'Unknown error'}`);
             }
         }
 
@@ -625,24 +572,23 @@ export class WebDAVService {
     async downloadImage(filename: string): Promise<ArrayBuffer> {
         if (!this.client) throw new Error('WebDAV not configured');
         
-        // Try downloading from /images/ directory first, then fallback to root
-        const paths = [`/images/${filename}`, `/${filename}`];
+        // 只从 /images/ 目录下载，不再fallback到根目录
+        const path = `/images/${filename}`;
         
-        for (const path of paths) {
-            try {
-                console.log(`[WebDAV] 尝试从路径下载: ${path}`);
-                const buffer = await this.client.getFileContents(path, { format: 'binary' });
-                console.log(`[WebDAV] ✓ 图片下载成功: ${filename} from ${path}`);
-                return buffer as ArrayBuffer;
-            } catch (error: any) {
-                console.warn(`[WebDAV] 从 ${path} 下载失败:`, error?.message);
-                // Continue to next path
+        try {
+            console.log(`[WebDAV] 尝试从路径下载: ${path}`);
+            const buffer = await this.client.getFileContents(path, { format: 'binary' });
+            console.log(`[WebDAV] ✓ 图片下载成功: ${filename} from ${path}`);
+            return buffer as ArrayBuffer;
+        } catch (error: any) {
+            console.error(`[WebDAV] 从 ${path} 下载失败:`, error?.message);
+            
+            if (error?.status === 404) {
+                throw new Error(`图片不存在: ${filename}。请确保图片已上传到 /images/ 目录。`);
             }
+            
+            throw new Error(`图片下载失败: ${filename} - ${error?.message || 'Unknown error'}`);
         }
-        
-        // If all paths failed
-        console.error(`[WebDAV] ✗ 所有路径下载失败: ${filename}`);
-        throw new Error(`Image not found: ${filename}`);
     }
 }
 

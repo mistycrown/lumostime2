@@ -68,6 +68,13 @@ class ImageService {
             console.warn('Thumbnail generation failed', e);
         }
 
+        // 触发全局事件通知图片已上传，需要同步
+        if (typeof window !== 'undefined') {
+            window.dispatchEvent(new CustomEvent('imageUploaded', { 
+                detail: { filename } 
+            }));
+        }
+
         return filename;
     }
 

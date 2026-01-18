@@ -33,8 +33,16 @@ export const syncService = {
             if (onProgress) onProgress('正在初始化图片同步...');
             console.log('[Sync] 开始同步图片...');
 
-            // 1. Ensure remote directory exists
-            await webdavService.createDirectory('/images');
+            // 1. Check if remote /images directory exists (不自动创建)
+            try {
+                await webdavService.getDirectoryContents('/images');
+                console.log('[Sync] ✓ /images 目录存在');
+            } catch (error) {
+                const errorMsg = '图片同步失败：云端缺少 /images 文件夹。请在WebDAV根目录下手动创建 "images" 文件夹后重试。';
+                console.error('[Sync] ✗ /images 目录不存在');
+                result.errors.push(errorMsg);
+                throw new Error(errorMsg);
+            }
 
             // 2. Handle Deletions first
             const deletedImages = await imageService.getDeletedImages();
