@@ -11,6 +11,7 @@ import React, { useMemo } from 'react';
 import { Log, Category } from '../types';
 import { CalendarWidget } from './CalendarWidget';
 import { Clock, Zap } from 'lucide-react';
+import { TimelineImage } from './TimelineImage';
 
 interface DetailTimelineCardProps {
     // 数据
@@ -330,6 +331,7 @@ export const DetailTimelineCard: React.FC<DetailTimelineCardProps> = ({
                                                             {log.note}
                                                         </p>
                                                     )}
+
                                                     {/* 自定义元数据渲染 */}
                                                     {renderLogMetadata ? (
                                                         renderLogMetadata(log)
@@ -349,6 +351,23 @@ export const DetailTimelineCard: React.FC<DetailTimelineCardProps> = ({
                                                                     </>
                                                                 )}
                                                             </span>
+                                                        </div>
+                                                    )}
+
+                                                    {/* Images */}
+                                                    {log.images && log.images.length > 0 && (
+                                                        <div className="flex gap-2 mt-2 mb-1 overflow-x-auto pb-1 no-scrollbar">
+                                                            {(log.images.length > 3
+                                                                ? log.images.slice(0, 2)
+                                                                : log.images
+                                                            ).map(img => (
+                                                                <TimelineImage key={img} filename={img} className="w-16 h-16 shadow-sm" useThumbnail={true} />
+                                                            ))}
+                                                            {log.images.length > 3 && (
+                                                                <div className="w-16 h-16 rounded-xl bg-stone-100 flex items-center justify-center border border-stone-200 text-stone-400 font-bold text-sm shrink-0">
+                                                                    +{log.images.length - 2}
+                                                                </div>
+                                                            )}
                                                         </div>
                                                     )}
                                                 </div>

@@ -13,6 +13,7 @@ import { ScopeAssociation } from './ScopeAssociation';
 import { X, Trash2, Link as LinkIcon, CheckCircle2, TrendingUp, BarChart3, List, Plus, Minus, Clock, Save, MoreHorizontal, ChevronLeft, Check, ChevronDown, Zap, Circle } from 'lucide-react';
 import { CalendarWidget } from './CalendarWidget';
 import { FocusCharts } from './FocusCharts';
+import { TimelineImage } from './TimelineImage';
 
 interface TodoDetailModalProps {
   initialTodo?: TodoItem | null;
@@ -409,63 +410,127 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({ initialTodo, c
         {activeTab === '時間線' && (
           <div className="space-y-6 animate-in slide-in-from-right-4 fade-in">
             {/* Calendar Card */}
-            <div className="bg-white rounded-2xl p-0 border border-stone-100 shadow-[0_4px_20px_rgba(0,0,0,0.02)] overflow-hidden">
-
-              <div className="border-b border-stone-100/50">
-                <CalendarWidget
-                  currentDate={displayDate}
-                  onDateChange={setDisplayDate}
-                  logs={linkedLogs}
-                  isExpanded={true}
-                  onExpandToggle={() => { }}
-                  disableSelection={true}
-                  customScale={
-                    (heatmapMin !== undefined || heatmapMax !== undefined)
-                      ? { min: (heatmapMin || 30) * 60, max: (heatmapMax || 240) * 60 }
-                      : undefined
-                  }
-                />
-              </div>
-              <div className="px-6 pb-6 pt-4 flex flex-wrap gap-y-4 items-end justify-between border-t border-stone-50">
-                <div>
-                  <div className="text-[10px] uppercase tracking-widest text-stone-400 mb-1 font-bold">Total Time</div>
-                  <div className="text-2xl font-bold text-stone-900 font-mono">
-                    {totalHours}<span className="text-base text-stone-400 mx-1 font-sans">h</span>{totalMins}<span className="text-base text-stone-400 ml-1 font-sans">m</span>
-                    <span className="text-lg text-stone-300 mx-2 font-sans">/</span>
-                    <span className="text-lg font-bold text-stone-600">
-                      {monthHours}<span className="text-sm text-stone-400 mx-1 font-sans">h</span>{monthMins}<span className="text-sm text-stone-400 ml-1 font-sans">m</span>
-                    </span>
-                  </div>
-                  {(() => {
-                    const totalDays = new Set(linkedLogs.map(l => new Date(l.startTime).toDateString())).size;
-                    const monthDays = new Set(monthLogs.map(l => new Date(l.startTime).toDateString())).size;
-                    return (
-                      <div className="text-[10px] font-bold text-stone-500 bg-stone-100 px-2 py-1 rounded inline-block mt-1">
-                        Recorded {totalDays} days / {monthDays} days
-                      </div>
-                    );
-                  })()}
+            {/* Top Stats Card (Conditional) */}
+            {viewMode === 'month' ? (
+              <div className="bg-white rounded-2xl p-0 border border-stone-100 shadow-[0_4px_20px_rgba(0,0,0,0.02)] overflow-hidden">
+                <div className="border-b border-stone-100/50">
+                  <CalendarWidget
+                    currentDate={displayDate}
+                    onDateChange={setDisplayDate}
+                    logs={linkedLogs}
+                    isExpanded={true}
+                    onExpandToggle={() => { }}
+                    disableSelection={true}
+                    customScale={
+                      (heatmapMin !== undefined || heatmapMax !== undefined)
+                        ? { min: (heatmapMin || 30) * 60, max: (heatmapMax || 240) * 60 }
+                        : undefined
+                    }
+                  />
                 </div>
-                <div className="text-right ml-auto">
-                  <div className="text-[10px] uppercase tracking-widest text-stone-400 mb-1 font-bold">Avg. Daily</div>
-                  <div className="text-xl font-bold text-stone-700 font-mono">
+                <div className="px-6 pb-6 pt-4 flex flex-wrap gap-y-4 items-end justify-between border-t border-stone-50">
+                  <div>
+                    <div className="text-[10px] uppercase tracking-widest text-stone-400 mb-1 font-bold">Total Time</div>
+                    <div className="text-2xl font-bold text-stone-900 font-mono">
+                      {totalHours}<span className="text-base text-stone-400 mx-1 font-sans">h</span>{totalMins}<span className="text-base text-stone-400 ml-1 font-sans">m</span>
+                      <span className="text-lg text-stone-300 mx-2 font-sans">/</span>
+                      <span className="text-lg font-bold text-stone-600">
+                        {monthHours}<span className="text-sm text-stone-400 mx-1 font-sans">h</span>{monthMins}<span className="text-sm text-stone-400 ml-1 font-sans">m</span>
+                      </span>
+                    </div>
                     {(() => {
                       const totalDays = new Set(linkedLogs.map(l => new Date(l.startTime).toDateString())).size;
                       const monthDays = new Set(monthLogs.map(l => new Date(l.startTime).toDateString())).size;
-                      const avgTotal = totalDays > 0 ? Math.round(totalSeconds / 60 / totalDays) : 0;
-                      const avgMonth = monthDays > 0 ? Math.round(monthSeconds / 60 / monthDays) : 0;
                       return (
-                        <>
-                          {avgTotal}m
-                          <span className="text-base text-stone-400 mx-2 font-sans">/</span>
-                          <span className="text-base font-bold text-stone-600">{avgMonth}m</span>
-                        </>
+                        <div className="text-[10px] font-bold text-stone-500 bg-stone-100 px-2 py-1 rounded inline-block mt-1">
+                          Recorded {totalDays} days / {monthDays} days
+                        </div>
                       );
                     })()}
                   </div>
+                  <div className="text-right ml-auto">
+                    <div className="text-[10px] uppercase tracking-widest text-stone-400 mb-1 font-bold">Avg. Daily</div>
+                    <div className="text-xl font-bold text-stone-700 font-mono">
+                      {(() => {
+                        const totalDays = new Set(linkedLogs.map(l => new Date(l.startTime).toDateString())).size;
+                        const monthDays = new Set(monthLogs.map(l => new Date(l.startTime).toDateString())).size;
+                        const avgTotal = totalDays > 0 ? Math.round(totalSeconds / 60 / totalDays) : 0;
+                        const avgMonth = monthDays > 0 ? Math.round(monthSeconds / 60 / monthDays) : 0;
+                        return (
+                          <>
+                            {avgTotal}m
+                            <span className="text-base text-stone-400 mx-2 font-sans">/</span>
+                            <span className="text-base font-bold text-stone-600">{avgMonth}m</span>
+                          </>
+                        );
+                      })()}
+                    </div>
+                  </div>
                 </div>
               </div>
-            </div>
+            ) : (
+              // All View Summary (Matches DetailTimelineCard layout)
+              <div className="bg-white rounded-2xl p-6 border border-stone-100 shadow-[0_4px_20px_rgba(0,0,0,0.02)] mb-8">
+                <div className="flex items-start justify-around">
+                  {/* Total Duration */}
+                  <div className="flex flex-col items-center gap-2">
+                    <span className="text-xs font-bold text-stone-900 tracking-wider">累计投入</span>
+                    <div className="flex items-baseline text-stone-800">
+                      <span className="text-3xl font-black font-mono tracking-tight">{totalHours}</span>
+                      <span className="text-sm font-bold opacity-60 ml-0.5 mr-1 text-stone-400">h</span>
+                      <span className="text-xl font-bold font-mono tracking-tight">{totalMins}</span>
+                      <span className="text-xs font-bold opacity-60 ml-0.5 text-stone-400">m</span>
+                    </div>
+                  </div>
+
+                  {/* Divider */}
+                  <div className="w-px h-10 bg-stone-200/50 mt-1"></div>
+
+                  {/* Count */}
+                  <div className="flex flex-col items-center gap-2">
+                    <span className="text-xs font-bold text-stone-900 tracking-wider">累计次数</span>
+                    <div className="flex items-baseline text-stone-800">
+                      <span className="text-3xl font-black font-mono tracking-tight">{linkedLogs.length}</span>
+                    </div>
+                  </div>
+
+                  {/* Divider */}
+                  <div className="w-px h-10 bg-stone-200/50 mt-1"></div>
+
+                  {/* Avg Duration */}
+                  <div className="flex flex-col items-center gap-2">
+                    <span className="text-xs font-bold text-stone-900 tracking-wider">平均时长</span>
+                    <div className="flex items-baseline text-stone-800">
+                      {(() => {
+                        const avgDurationMins = linkedLogs.length > 0
+                          ? Math.round(totalSeconds / linkedLogs.length / 60)
+                          : 0;
+                        const avgDurationH = Math.floor(avgDurationMins / 60);
+                        const avgDurationM = avgDurationMins % 60;
+
+                        return avgDurationH > 0 ? (
+                          <>
+                            <span className="text-3xl font-black font-mono tracking-tight">{avgDurationH}</span>
+                            <span className="text-sm font-bold opacity-60 ml-0.5 mr-1 text-stone-400">h</span>
+                            {avgDurationM > 0 && (
+                              <>
+                                <span className="text-xl font-bold font-mono tracking-tight">{avgDurationM}</span>
+                                <span className="text-xs font-bold opacity-60 ml-0.5 text-stone-400">m</span>
+                              </>
+                            )}
+                          </>
+                        ) : (
+                          <>
+                            <span className="text-3xl font-black font-mono tracking-tight">{avgDurationM}</span>
+                            <span className="text-sm font-bold opacity-60 ml-0.5 text-stone-400">m</span>
+                          </>
+                        );
+                      })()}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Unit Progress Card (Ink Grid Style) */}
             {isProgress && (
@@ -696,6 +761,23 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({ initialTodo, c
                                         );
                                       })}
                                     </div>
+
+                                    {/* Images */}
+                                    {log.images && log.images.length > 0 && (
+                                      <div className="flex gap-2 mt-2 mb-1 overflow-x-auto pb-1 no-scrollbar w-full">
+                                        {(log.images.length > 3
+                                          ? log.images.slice(0, 2)
+                                          : log.images
+                                        ).map(img => (
+                                          <TimelineImage key={img} filename={img} className="w-16 h-16 shadow-sm" useThumbnail={true} />
+                                        ))}
+                                        {log.images.length > 3 && (
+                                          <div className="w-16 h-16 rounded-xl bg-stone-100 flex items-center justify-center border border-stone-200 text-stone-400 font-bold text-sm shrink-0">
+                                            +{log.images.length - 2}
+                                          </div>
+                                        )}
+                                      </div>
+                                    )}
                                   </div>
                                 </div>
                               );

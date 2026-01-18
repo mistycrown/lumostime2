@@ -9,10 +9,12 @@
  */
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { Category, Log, TodoItem, TodoCategory, Scope, AutoLinkRule } from '../types';
-import { X, Trash2, TrendingUp, Plus, Minus, Lightbulb, CheckCircle2, Clock } from 'lucide-react';
+import { X, Trash2, TrendingUp, Plus, Minus, Lightbulb, CheckCircle2, Clock, Camera, Image as ImageIcon } from 'lucide-react';
 import { TodoAssociation } from '../components/TodoAssociation';
 import { ScopeAssociation } from '../components/ScopeAssociation';
 import { FocusScoreSelector } from '../components/FocusScoreSelector';
+import { imageService } from '../services/imageService';
+import { ImagePreviewModal } from './ImagePreviewModal';
 
 interface AddLogModalProps {
   initialLog?: Log | null;
@@ -20,7 +22,9 @@ interface AddLogModalProps {
   initialEndTime?: number;
   onClose: () => void;
   onSave: (log: Log) => void;
+
   onDelete?: (id: string) => void;
+  onImageRemove?: (logId: string, filename: string) => void;
   categories: Category[];
   todos: TodoItem[];
   todoCategories: TodoCategory[];
@@ -30,7 +34,7 @@ interface AddLogModalProps {
   autoFocusNote?: boolean;
 }
 
-export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialStartTime, initialEndTime, onClose, onSave, onDelete, categories, todos, todoCategories, scopes, autoLinkRules = [], lastLogEndTime, autoFocusNote = true }) => {
+export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialStartTime, initialEndTime, onClose, onSave, onDelete, onImageRemove, categories, todos, todoCategories, scopes, autoLinkRules = [], lastLogEndTime, autoFocusNote = true }) => {
   const [selectedCategoryId, setSelectedCategoryId] = useState<string>(categories[0].id);
   const [selectedActivityId, setSelectedActivityId] = useState<string>(categories[0].activities[0].id);
   const [note, setNote] = useState('');
@@ -40,6 +44,9 @@ export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialSta
   const [progressIncrement, setProgressIncrement] = useState(0);
   const [focusScore, setFocusScore] = useState<number | undefined>(undefined);
   const [scopeIds, setScopeIds] = useState<string[] | undefined>(undefined);
+  const [images, setImages] = useState<string[]>([]);
+  const [imageUrls, setImageUrls] = useState<Record<string, string>>({});
+  const [previewFilename, setPreviewFilename] = useState<string | null>(null);
 
   // --- TIME STATE (New Logic) ---
   const [trackStartTime, setTrackStartTime] = useState<number>(0);
@@ -67,6 +74,7 @@ export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialSta
       setProgressIncrement(initialLog.progressIncrement || 0);
       setFocusScore(initialLog.focusScore);
       setScopeIds(initialLog.scopeIds);
+      setImages(initialLog.images || []);
 
       // Sync Todo Category
       // (Logic moved to TodoAssociation)
@@ -85,6 +93,7 @@ export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialSta
       setProgressIncrement(0);
       setFocusScore(undefined);
       setScopeIds(undefined);
+      setImages([]);
 
     } else {
       // Scenario 3: New Button -> Default 1 Hour duration ending Now
@@ -103,6 +112,7 @@ export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialSta
       setProgressIncrement(0);
       setFocusScore(undefined);
       setScopeIds(undefined);
+      setImages([]);
 
     }
 
@@ -272,6 +282,68 @@ export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialSta
     }
   };
 
+  // --- Image Logic ---
+  useEffect(() => {
+    const loadUrls = async () => {
+      const newUrls: Record<string, string> = {};
+      const missingImgs: string[] = [];
+      let changed = false;
+
+      for (const img of images) {
+        if (!imageUrls[img]) {
+          const url = await imageService.getImageUrl(img);
+          if (!url) {
+            missingImgs.push(img);
+          } else {
+            newUrls[img] = url;
+            changed = true;
+          }
+        } else if (imageUrls[img] === '') {
+          // Double check if existing empty url needs removal
+          missingImgs.push(img);
+        }
+      }
+
+      // Auto-remove missing images
+      if (missingImgs.length > 0) {
+        console.log('Auto-removing missing images:', missingImgs);
+        setImages(prev => prev.filter(i => !missingImgs.includes(i)));
+      }
+
+      if (changed) {
+        setImageUrls(prev => ({ ...prev, ...newUrls }));
+      }
+    };
+    if (images.length > 0) loadUrls();
+  }, [images, imageUrls]);
+
+  const handleAddImage = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files.length > 0) {
+      const file = e.target.files[0];
+      try {
+        const filename = await imageService.saveImage(file);
+        setImages(prev => [...prev, filename]);
+      } catch (err) {
+        console.error('Failed to save image', err);
+      }
+    }
+  };
+
+  const handleDeleteImage = async (filename: string) => {
+    try {
+      await imageService.deleteImage(filename);
+      setImages(prev => prev.filter(img => img !== filename));
+
+      // Immediately remove reference from global log state if editing an existing log
+      if (initialLog && onImageRemove) {
+        onImageRemove(initialLog.id, filename);
+      }
+    } catch (err) {
+      console.error('Failed to delete image', err);
+    }
+  };
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const selectedCategory = categories.find(c => c.id === selectedCategoryId) || categories[0];
   const linkedTodo = todos.find(t => t.id === linkedTodoId);
@@ -344,6 +416,7 @@ export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialSta
       progressIncrement: linkedTodoId && progressIncrement ? progressIncrement : undefined,
       focusScore: focusScore,
       scopeIds: scopeIds,
+      images: images,
     };
     onSave(newLog);
   };
@@ -836,6 +909,56 @@ export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialSta
             />
           </div>
 
+          {/* Image Attachments */}
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-xs font-bold text-stone-400 uppercase tracking-widest">Images</span>
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                className="text-stone-500 hover:text-stone-800 transition-colors"
+              >
+                <Plus size={18} />
+              </button>
+              <input
+                type="file"
+                ref={fileInputRef}
+                className="hidden"
+                accept="image/*"
+                onChange={handleAddImage}
+              />
+            </div>
+
+            {images.length > 0 ? (
+              <div className="flex flex-wrap gap-3 pb-2">
+                {images.map(img => (
+                  <div key={img} className="relative group flex-shrink-0">
+                    <div
+                      className="w-20 h-20 rounded-xl overflow-hidden border border-stone-200 cursor-zoom-in"
+                      onClick={() => setPreviewFilename(img)}
+                    >
+                      {imageUrls[img] ? (
+                        <img src={imageUrls[img]} alt="attachment" className="w-full h-full object-cover" />
+                      ) : (
+                        <div className="w-full h-full bg-stone-100 flex items-center justify-center">
+                          <ImageIcon size={20} className="text-stone-300" />
+                        </div>
+                      )}
+                    </div>
+                    {/* Hover Delete Button Removed */}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div
+                onClick={() => fileInputRef.current?.click()}
+                className="w-full py-4 border border-dashed border-stone-200 rounded-xl flex items-center justify-center gap-2 text-stone-400 hover:text-stone-600 hover:bg-stone-50 cursor-pointer transition-colors"
+              >
+                <Camera size={18} />
+                <span className="text-sm">Add Photos</span>
+              </div>
+            )}
+          </div>
+
         </div>
 
         {/* Footer */}
@@ -866,6 +989,18 @@ export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialSta
           animation: slideUp 0.3s cubic-bezier(0.32, 0.72, 0, 1);
         }
       `}</style>
+
+      {/* Full Screen Image Preview */}
+      <ImagePreviewModal
+        imageUrl={previewFilename ? (imageUrls[previewFilename] || '') : null}
+        onClose={() => setPreviewFilename(null)}
+        onDelete={() => {
+          if (previewFilename) {
+            handleDeleteImage(previewFilename);
+            setPreviewFilename(null);
+          }
+        }}
+      />
     </div >
   );
 };

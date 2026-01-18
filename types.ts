@@ -107,6 +107,7 @@ export interface Log {
   scopeIds?: string[]; // NEW: Link to multiple Scopes (领域) - changed from scopeId
   progressIncrement?: number; // New: Units of progress contributed by this session
   focusScore?: number; // 1-5
+  images?: string[]; // (NEW) Array of image filenames/identifiers
 }
 
 export interface TodoCategory {

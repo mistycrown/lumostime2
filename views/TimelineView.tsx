@@ -11,11 +11,29 @@ import React, { useMemo, useState, useRef } from 'react';
 import { Log, Activity, TodoItem, Category, TodoCategory, Scope, DailyReview, ReviewTemplate, WeeklyReview, MonthlyReview, AutoLinkRule } from '../types';
 import { CATEGORIES } from '../constants';
 import * as LucideIcons from 'lucide-react';
-import { Plus, MoreHorizontal, BarChart2, ArrowUp, ArrowDown, Sparkles, RefreshCw, Zap, Share, Timer, Clock } from 'lucide-react';
+import { Plus, MoreHorizontal, BarChart2, ArrowUp, ArrowDown, Sparkles, RefreshCw, Zap, Share, Timer, Clock, Image as ImageIcon } from 'lucide-react';
 import { CalendarWidget } from '../components/CalendarWidget';
 import { AIBatchModal } from '../components/AIBatchModal';
 import { ParsedTimeEntry } from '../services/aiService';
 import { ToastType } from '../components/Toast';
+import { imageService } from '../services/imageService';
+
+// Image Thumbnail Component
+const TimelineImage: React.FC<{ filename: string, className?: string, useThumbnail?: boolean }> = ({ filename, className = "w-16 h-16", useThumbnail = false }) => {
+    const [src, setSrc] = useState<string>('');
+
+    React.useEffect(() => {
+        imageService.getImageUrl(filename, useThumbnail ? 'thumbnail' : 'original').then(setSrc);
+    }, [filename, useThumbnail]);
+
+    if (!src) return null;
+
+    return (
+        <div className={`${className} rounded-lg overflow-hidden border border-stone-200 shrink-0`}>
+            <img src={src} alt="img" className="w-full h-full object-cover" />
+        </div>
+    );
+};
 
 // Helper to render dynamic icon
 const DynamicIcon: React.FC<{ name: string; size?: number; className?: string }> = ({ name, size = 16, className }) => {
@@ -701,7 +719,28 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ logs, todos, scopes,
                                                     ))}
                                                 </>
                                             )}
+
+                                            {/* Image Indicator / Thumbnails (Moved to bottom) */}
                                         </div>
+
+                                        {/* Images Row */}
+                                        {item.logData.images && item.logData.images.length > 0 && (
+                                            <div className="flex items-center gap-2 mt-3 overflow-x-auto no-scrollbar pb-1">
+                                                {/* If > 3 images, show first 2 then +N. If <= 3, show all. */}
+                                                {(item.logData.images.length > 3
+                                                    ? item.logData.images.slice(0, 2)
+                                                    : item.logData.images
+                                                ).map(img => (
+                                                    <TimelineImage key={img} filename={img} className="w-16 h-16 shadow-sm" useThumbnail={true} />
+                                                ))}
+
+                                                {item.logData.images.length > 3 && (
+                                                    <div className="w-16 h-16 rounded-xl bg-stone-100 flex items-center justify-center border border-stone-200 text-stone-400 font-bold text-sm">
+                                                        +{item.logData.images.length - 2}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
                             );
@@ -812,172 +851,172 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ logs, todos, scopes,
                                     </div>
                                 );
                             })}
+                        </>
+                    )}
 
-                            {/* Weekly Review Node */}
-                            {weeklyReviewData.shouldShow && (
-                                <>
-                                    <div className="relative pl-8 mt-6 animate-in slide-in-from-bottom-2 duration-500">
-                                        {/* Time Marker */}
-                                        <div className="absolute -left-[60px] top-0.5 w-[45px] text-right">
-                                            <span className="text-xs font-bold text-purple-400 font-mono">Week</span>
+                    {/* Weekly Review Node */}
+                    {weeklyReviewData.shouldShow && (
+                        <>
+                            <div className="relative pl-8 mt-6 animate-in slide-in-from-bottom-2 duration-500">
+                                {/* Time Marker */}
+                                <div className="absolute -left-[60px] top-0.5 w-[45px] text-right">
+                                    <span className="text-xs font-bold text-purple-400 font-mono">Week</span>
+                                </div>
+
+                                {/* Timeline Dot */}
+                                <div className="absolute -left-[5px] top-3 w-2.5 h-2.5 rounded-full bg-purple-400 border-2 border-[#faf9f6] z-10" />
+
+                                {/* Content: Simple Text Button */}
+                                <button
+                                    onClick={() => onOpenWeeklyReview?.(weeklyReviewData.weekStart, weeklyReviewData.weekEnd)}
+                                    className="text-left hover:text-purple-600 transition-colors group"
+                                >
+                                    <h3 className="font-bold text-stone-900 text-lg group-hover:text-purple-600 transition-colors">
+                                        {weeklyReviewData.weeklyReview ? '本周小结' : '为本周作个小结吧！'}
+                                    </h3>
+                                </button>
+                            </div>
+
+                            {/* Synced Template Content (Weekly) - Using Snapshot */}
+                            {weeklyReviewData.weeklyReview?.templateSnapshot?.filter(t => t.syncToTimeline).map((template) => {
+                                const hasAnswers = template.questions.some(q =>
+                                    weeklyReviewData.weeklyReview!.answers?.some(a => a.questionId === q.id && a.answer) || (q.type === 'rating' && weeklyReviewData.weeklyReview!.answers?.some(a => a.questionId === q.id))
+                                );
+
+                                if (!hasAnswers) return null;
+
+                                return (
+                                    <div key={template.id} className="relative pl-8 mt-6 animate-in slide-in-from-bottom-2 duration-500">
+                                        {/* Time Marker - Template Title */}
+                                        <div className="absolute -left-[60px] top-0.5 w-[45px] text-right flex flex-col items-end">
+                                            <span className="text-xs font-bold text-stone-500 leading-tight">
+                                                {template.title.replace(/[\p{Emoji_Presentation}\p{Extended_Pictographic}]/u, '')}
+                                            </span>
                                         </div>
 
                                         {/* Timeline Dot */}
-                                        <div className="absolute -left-[5px] top-3 w-2.5 h-2.5 rounded-full bg-purple-400 border-2 border-[#faf9f6] z-10" />
+                                        <div className="absolute -left-[5px] top-1.5 w-2.5 h-2.5 rounded-full bg-stone-300 border-2 border-[#faf9f6] z-10" />
 
-                                        {/* Content: Simple Text Button */}
-                                        <button
-                                            onClick={() => onOpenWeeklyReview?.(weeklyReviewData.weekStart, weeklyReviewData.weekEnd)}
-                                            className="text-left hover:text-purple-600 transition-colors group"
-                                        >
-                                            <h3 className="font-bold text-stone-900 text-lg group-hover:text-purple-600 transition-colors">
-                                                {weeklyReviewData.weeklyReview ? '本周小结' : '为本周作个小结吧！'}
-                                            </h3>
-                                        </button>
-                                    </div>
+                                        {/* Content Wrapper */}
+                                        <div className="space-y-4">
+                                            <div className="space-y-3" style={{ paddingTop: '2px' }}>
+                                                {template.questions.map(q => {
+                                                    const answer = weeklyReviewData.weeklyReview!.answers?.find(a => a.questionId === q.id);
+                                                    if (!answer || (q.type !== 'rating' && !answer.answer)) return null;
 
-                                    {/* Synced Template Content (Weekly) - Using Snapshot */}
-                                    {weeklyReviewData.weeklyReview?.templateSnapshot?.filter(t => t.syncToTimeline).map((template) => {
-                                        const hasAnswers = template.questions.some(q =>
-                                            weeklyReviewData.weeklyReview!.answers?.some(a => a.questionId === q.id && a.answer) || (q.type === 'rating' && weeklyReviewData.weeklyReview!.answers?.some(a => a.questionId === q.id))
-                                        );
+                                                    return (
+                                                        <div key={q.id} className="group">
+                                                            <div className="mb-1.5 flex items-start gap-2">
+                                                                <div className="w-1.5 h-1.5 mt-1.5 rounded-full bg-stone-300 shrink-0"></div>
+                                                                <h4 className="text-sm font-normal text-stone-600 leading-snug flex-1">
+                                                                    {q.question}
+                                                                </h4>
+                                                            </div>
 
-                                        if (!hasAnswers) return null;
-
-                                        return (
-                                            <div key={template.id} className="relative pl-8 mt-6 animate-in slide-in-from-bottom-2 duration-500">
-                                                {/* Time Marker - Template Title */}
-                                                <div className="absolute -left-[60px] top-0.5 w-[45px] text-right flex flex-col items-end">
-                                                    <span className="text-xs font-bold text-stone-500 leading-tight">
-                                                        {template.title.replace(/[\p{Emoji_Presentation}\p{Extended_Pictographic}]/u, '')}
-                                                    </span>
-                                                </div>
-
-                                                {/* Timeline Dot */}
-                                                <div className="absolute -left-[5px] top-1.5 w-2.5 h-2.5 rounded-full bg-stone-300 border-2 border-[#faf9f6] z-10" />
-
-                                                {/* Content Wrapper */}
-                                                <div className="space-y-4">
-                                                    <div className="space-y-3" style={{ paddingTop: '2px' }}>
-                                                        {template.questions.map(q => {
-                                                            const answer = weeklyReviewData.weeklyReview!.answers?.find(a => a.questionId === q.id);
-                                                            if (!answer || (q.type !== 'rating' && !answer.answer)) return null;
-
-                                                            return (
-                                                                <div key={q.id} className="group">
-                                                                    <div className="mb-1.5 flex items-start gap-2">
-                                                                        <div className="w-1.5 h-1.5 mt-1.5 rounded-full bg-stone-300 shrink-0"></div>
-                                                                        <h4 className="text-sm font-normal text-stone-600 leading-snug flex-1">
-                                                                            {q.question}
-                                                                        </h4>
-                                                                    </div>
-
-                                                                    {q.type === 'rating' ? (
-                                                                        <div className="flex items-center gap-1" style={{ marginLeft: '14px' }}>
-                                                                            {Array.from({ length: parseInt(typeof answer.answer === 'string' ? answer.answer : String(answer.answer)) || 0 }).map((_, i) => (
-                                                                                <span key={i} className={q.colorId ? `text-${q.colorId}-500` : "text-amber-500"}>
-                                                                                    <DynamicIcon name={q.icon || 'star'} size={18} />
-                                                                                </span>
-                                                                            ))}
-                                                                        </div>
-                                                                    ) : (
-                                                                        <div className="text-sm text-stone-500 leading-relaxed font-light whitespace-pre-wrap" style={{ marginLeft: '14px' }}>
-                                                                            {answer.answer}
-                                                                        </div>
-                                                                    )}
+                                                            {q.type === 'rating' ? (
+                                                                <div className="flex items-center gap-1" style={{ marginLeft: '14px' }}>
+                                                                    {Array.from({ length: parseInt(typeof answer.answer === 'string' ? answer.answer : String(answer.answer)) || 0 }).map((_, i) => (
+                                                                        <span key={i} className={q.colorId ? `text-${q.colorId}-500` : "text-amber-500"}>
+                                                                            <DynamicIcon name={q.icon || 'star'} size={18} />
+                                                                        </span>
+                                                                    ))}
                                                                 </div>
-                                                            );
-                                                        })}
-                                                    </div>
-                                                </div>
+                                                            ) : (
+                                                                <div className="text-sm text-stone-500 leading-relaxed font-light whitespace-pre-wrap" style={{ marginLeft: '14px' }}>
+                                                                    {answer.answer}
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    );
+                                                })}
                                             </div>
-                                        );
-                                    })}
-                                </>
-                            )}
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </>
+                    )}
 
-                            {/* Monthly Review Node (New) */}
-                            {monthlyReviewData.shouldShow && (
-                                <>
-                                    <div className="relative pl-8 mt-6 animate-in slide-in-from-bottom-2 duration-500">
-                                        {/* Time Marker */}
-                                        <div className="absolute -left-[60px] top-0.5 w-[45px] text-right">
-                                            <span className="text-xs font-bold text-pink-400 font-mono">Month</span>
+                    {/* Monthly Review Node (New) */}
+                    {monthlyReviewData.shouldShow && (
+                        <>
+                            <div className="relative pl-8 mt-6 animate-in slide-in-from-bottom-2 duration-500">
+                                {/* Time Marker */}
+                                <div className="absolute -left-[60px] top-0.5 w-[45px] text-right">
+                                    <span className="text-xs font-bold text-pink-400 font-mono">Month</span>
+                                </div>
+
+                                {/* Timeline Dot */}
+                                <div className="absolute -left-[5px] top-3 w-2.5 h-2.5 rounded-full bg-pink-400 border-2 border-[#faf9f6] z-10" />
+
+                                {/* Content: Simple Text Button */}
+                                <button
+                                    onClick={() => onOpenMonthlyReview?.(monthlyReviewData.monthStart, monthlyReviewData.monthEnd)}
+                                    className="text-left hover:text-pink-600 transition-colors group"
+                                >
+                                    <h3 className="font-bold text-stone-900 text-lg group-hover:text-pink-600 transition-colors">
+                                        {monthlyReviewData.monthlyReview ? '本月小结' : '为本月作个小结吧！'}
+                                    </h3>
+                                </button>
+                            </div>
+
+                            {/* Synced Template Content (Monthly) - Using Snapshot */}
+                            {monthlyReviewData.monthlyReview?.templateSnapshot?.filter(t => t.syncToTimeline).map((template) => {
+                                const hasAnswers = template.questions.some(q =>
+                                    monthlyReviewData.monthlyReview!.answers?.some(a => a.questionId === q.id && a.answer) || (q.type === 'rating' && monthlyReviewData.monthlyReview!.answers?.some(a => a.questionId === q.id))
+                                );
+
+                                if (!hasAnswers) return null;
+
+                                return (
+                                    <div key={template.id} className="relative pl-8 mt-6 animate-in slide-in-from-bottom-2 duration-500">
+                                        {/* Time Marker - Template Title */}
+                                        <div className="absolute -left-[60px] top-0.5 w-[45px] text-right flex flex-col items-end">
+                                            <span className="text-xs font-bold text-stone-500 leading-tight">
+                                                {template.title.replace(/[\p{Emoji_Presentation}\p{Extended_Pictographic}]/u, '')}
+                                            </span>
                                         </div>
 
                                         {/* Timeline Dot */}
-                                        <div className="absolute -left-[5px] top-3 w-2.5 h-2.5 rounded-full bg-pink-400 border-2 border-[#faf9f6] z-10" />
+                                        <div className="absolute -left-[5px] top-1.5 w-2.5 h-2.5 rounded-full bg-stone-300 border-2 border-[#faf9f6] z-10" />
 
-                                        {/* Content: Simple Text Button */}
-                                        <button
-                                            onClick={() => onOpenMonthlyReview?.(monthlyReviewData.monthStart, monthlyReviewData.monthEnd)}
-                                            className="text-left hover:text-pink-600 transition-colors group"
-                                        >
-                                            <h3 className="font-bold text-stone-900 text-lg group-hover:text-pink-600 transition-colors">
-                                                {monthlyReviewData.monthlyReview ? '本月小结' : '为本月作个小结吧！'}
-                                            </h3>
-                                        </button>
-                                    </div>
+                                        {/* Content Wrapper */}
+                                        <div className="space-y-4">
+                                            <div className="space-y-3" style={{ paddingTop: '2px' }}>
+                                                {template.questions.map(q => {
+                                                    const answer = monthlyReviewData.monthlyReview!.answers?.find(a => a.questionId === q.id);
+                                                    if (!answer || (q.type !== 'rating' && !answer.answer)) return null;
 
-                                    {/* Synced Template Content (Monthly) - Using Snapshot */}
-                                    {monthlyReviewData.monthlyReview?.templateSnapshot?.filter(t => t.syncToTimeline).map((template) => {
-                                        const hasAnswers = template.questions.some(q =>
-                                            monthlyReviewData.monthlyReview!.answers?.some(a => a.questionId === q.id && a.answer) || (q.type === 'rating' && monthlyReviewData.monthlyReview!.answers?.some(a => a.questionId === q.id))
-                                        );
+                                                    return (
+                                                        <div key={q.id} className="group">
+                                                            <div className="mb-1.5 flex items-start gap-2">
+                                                                <div className="w-1.5 h-1.5 mt-1.5 rounded-full bg-stone-300 shrink-0"></div>
+                                                                <h4 className="text-sm font-normal text-stone-600 leading-snug flex-1">
+                                                                    {q.question}
+                                                                </h4>
+                                                            </div>
 
-                                        if (!hasAnswers) return null;
-
-                                        return (
-                                            <div key={template.id} className="relative pl-8 mt-6 animate-in slide-in-from-bottom-2 duration-500">
-                                                {/* Time Marker - Template Title */}
-                                                <div className="absolute -left-[60px] top-0.5 w-[45px] text-right flex flex-col items-end">
-                                                    <span className="text-xs font-bold text-stone-500 leading-tight">
-                                                        {template.title.replace(/[\p{Emoji_Presentation}\p{Extended_Pictographic}]/u, '')}
-                                                    </span>
-                                                </div>
-
-                                                {/* Timeline Dot */}
-                                                <div className="absolute -left-[5px] top-1.5 w-2.5 h-2.5 rounded-full bg-stone-300 border-2 border-[#faf9f6] z-10" />
-
-                                                {/* Content Wrapper */}
-                                                <div className="space-y-4">
-                                                    <div className="space-y-3" style={{ paddingTop: '2px' }}>
-                                                        {template.questions.map(q => {
-                                                            const answer = monthlyReviewData.monthlyReview!.answers?.find(a => a.questionId === q.id);
-                                                            if (!answer || (q.type !== 'rating' && !answer.answer)) return null;
-
-                                                            return (
-                                                                <div key={q.id} className="group">
-                                                                    <div className="mb-1.5 flex items-start gap-2">
-                                                                        <div className="w-1.5 h-1.5 mt-1.5 rounded-full bg-stone-300 shrink-0"></div>
-                                                                        <h4 className="text-sm font-normal text-stone-600 leading-snug flex-1">
-                                                                            {q.question}
-                                                                        </h4>
-                                                                    </div>
-
-                                                                    {q.type === 'rating' ? (
-                                                                        <div className="flex items-center gap-1" style={{ marginLeft: '14px' }}>
-                                                                            {Array.from({ length: parseInt(typeof answer.answer === 'string' ? answer.answer : String(answer.answer)) || 0 }).map((_, i) => (
-                                                                                <span key={i} className={q.colorId ? `text-${q.colorId}-500` : "text-amber-500"}>
-                                                                                    <DynamicIcon name={q.icon || 'star'} size={18} />
-                                                                                </span>
-                                                                            ))}
-                                                                        </div>
-                                                                    ) : (
-                                                                        <div className="text-sm text-stone-500 leading-relaxed font-light whitespace-pre-wrap" style={{ marginLeft: '14px' }}>
-                                                                            {answer.answer}
-                                                                        </div>
-                                                                    )}
+                                                            {q.type === 'rating' ? (
+                                                                <div className="flex items-center gap-1" style={{ marginLeft: '14px' }}>
+                                                                    {Array.from({ length: parseInt(typeof answer.answer === 'string' ? answer.answer : String(answer.answer)) || 0 }).map((_, i) => (
+                                                                        <span key={i} className={q.colorId ? `text-${q.colorId}-500` : "text-amber-500"}>
+                                                                            <DynamicIcon name={q.icon || 'star'} size={18} />
+                                                                        </span>
+                                                                    ))}
                                                                 </div>
-                                                            );
-                                                        })}
-                                                    </div>
-                                                </div>
+                                                            ) : (
+                                                                <div className="text-sm text-stone-500 leading-relaxed font-light whitespace-pre-wrap" style={{ marginLeft: '14px' }}>
+                                                                    {answer.answer}
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    );
+                                                })}
                                             </div>
-                                        );
-                                    })}
-                                </>
-                            )}
+                                        </div>
+                                    </div>
+                                );
+                            })}
                         </>
                     )}
 

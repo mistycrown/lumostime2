@@ -41,6 +41,8 @@ import { webdavService } from './services/webdavService';
 import { splitLogByDays } from './utils/logUtils';
 import { ParsedTimeEntry, aiService } from './services/aiService';
 import { narrativeService } from './services/narrativeService';
+import { imageService } from './services/imageService';
+import { syncService } from './services/syncService';
 import { UpdateService } from './services/updateService';
 import { NfcService } from './services/NfcService';
 import { NARRATIVE_TEMPLATES } from './constants';
@@ -172,6 +174,7 @@ const AppContent: React.FC = () => {
 
   const [isSyncing, setIsSyncing] = useState(false);
   const lastPromptTimeRef = useRef(0);
+  const hasCleanedImagesRef = useRef(false);
 
   // Load app rules on mount
   useEffect(() => {
@@ -188,6 +191,37 @@ const AppContent: React.FC = () => {
     };
     loadAppRules();
   }, []);
+
+  // Auto-cleanup deleted images from logs on load
+  useEffect(() => {
+    const cleanLogs = async () => {
+      // Only run once when logs are loaded
+      if (hasCleanedImagesRef.current || logs.length === 0) return;
+
+      try {
+        const validImages = new Set(await imageService.listImages());
+        let changed = false;
+        const newLogs = logs.map(log => {
+          if (!log.images || log.images.length === 0) return log;
+          const valid = log.images.filter(img => validImages.has(img));
+          if (valid.length !== log.images.length) {
+            changed = true;
+            return { ...log, images: valid };
+          }
+          return log;
+        });
+
+        if (changed) {
+          console.log('🧹 [Auto-Cleanup] Removed invalid image references from logs.');
+          setLogs(newLogs);
+        }
+        hasCleanedImagesRef.current = true;
+      } catch (e) {
+        console.error('Auto-cleanup failed', e);
+      }
+    };
+    cleanLogs();
+  }, [logs]);
 
   // Check for Updates on Mount
   useEffect(() => {
@@ -304,7 +338,14 @@ const AppContent: React.FC = () => {
       }));
     }
 
-    // 3. 删除日志
+    // 3. 删除关联图片 (Clean up attached images)
+    if (logToDelete?.images && logToDelete.images.length > 0) {
+      logToDelete.images.forEach(img => {
+        imageService.deleteImage(img).catch(err => console.error('Failed to cleanup image file:', img, err));
+      });
+    }
+
+    // 4. 删除日志
     setLogs(prev => prev.filter(l => l.id !== id));
     closeModal();
   };
@@ -1313,6 +1354,14 @@ const AppContent: React.FC = () => {
     ));
   };
 
+  const handleLogImageRemove = (logId: string, filename: string) => {
+    setLogs(prev => prev.map(log =>
+      log.id === logId && log.images && log.images.includes(filename)
+        ? { ...log, images: log.images.filter(img => img !== filename) }
+        : log
+    ));
+  };
+
   const handleDeleteReview = () => {
     if (!currentReviewDate) return;
     const dateStr = getLocalDateStr(currentReviewDate);
@@ -1784,6 +1833,25 @@ const AppContent: React.FC = () => {
     }
   };
 
+
+  const handleImageSync = async () => {
+    try {
+      console.log('Starting Image Sync...');
+      const result = await syncService.syncImages((msg) => console.log(msg));
+
+      if (result.uploaded > 0) addToast('success', `Uploaded ${result.uploaded} images`);
+      if (result.downloaded > 0) addToast('success', `Downloaded ${result.downloaded} images`);
+      if (result.deletedRemote > 0) addToast('success', `Deleted ${result.deletedRemote} remote images`);
+
+      if (result.errors.length > 0) {
+        console.error('Image sync errors:', result.errors);
+        addToast('error', `Image sync had ${result.errors.length} errors`);
+      }
+    } catch (e) {
+      console.error('Image sync error', e);
+    }
+  };
+
   const handleQuickSync = async (e: React.MouseEvent) => {
     e.stopPropagation();
     setIsSyncing(true);
@@ -1838,8 +1906,13 @@ const AppContent: React.FC = () => {
       } else {
         // Local is newer or equal, upload
         await webdavService.uploadData(localData);
-        addToast('success', 'Uploaded to cloud');
+        // addToast('success', 'Uploaded to cloud');
       }
+
+      // Sync Images
+      await handleImageSync();
+
+      addToast('success', 'Sync complete');
     } catch (error) {
       console.error("Sync failed", error);
       addToast('error', 'Sync failed');
@@ -2197,6 +2270,7 @@ const AppContent: React.FC = () => {
           onCloseAddLog={closeModal}
           onSaveLog={handleSaveLog}
           onDeleteLog={handleDeleteLog}
+          onImageRemove={handleLogImageRemove}
           lastLogEndTime={(() => {
             if (logs.length === 0) return undefined;
             const currentStartTime = editingLog?.startTime || Date.now();
