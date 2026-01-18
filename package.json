@@ -14,11 +14,13 @@
     "electron:build": "vite build && electron-builder"
   },
   "dependencies": {
+    "@awesome-cordova-plugins/core": "^8.1.0",
     "@awesome-cordova-plugins/http": "^8.1.0",
     "@capacitor/android": "^7.4.4",
     "@capacitor/app": "^7.1.0",
     "@capacitor/cli": "^7.4.4",
     "@capacitor/core": "^7.4.4",
+    "@capacitor/filesystem": "^7.1.6",
     "@google/genai": "^1.31.0",
     "@supabase/supabase-js": "^2.86.2",
     "@tailwindcss/typography": "^0.5.19",
@@ -31,6 +33,7 @@
     "react": "^19.2.1",
     "react-dom": "^19.2.1",
     "react-markdown": "^10.1.0",
+    "react-zoom-pan-pinch": "^3.7.0",
     "remark-breaks": "^4.0.0",
     "remark-gfm": "^4.0.1",
     "rxjs": "^7.8.2",

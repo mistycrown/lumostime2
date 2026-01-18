@@ -26,6 +26,7 @@ interface ModalManagerProps {
     onCloseAddLog: () => void;
     onSaveLog: (log: Log) => void;
     onDeleteLog: (id: string) => void;
+    onImageRemove?: (logId: string, filename: string) => void;
     lastLogEndTime?: number;
 
     // TodoDetailModal
@@ -73,6 +74,7 @@ export const ModalManager: React.FC<ModalManagerProps> = ({
     onCloseAddLog,
     onSaveLog,
     onDeleteLog,
+    onImageRemove,
     lastLogEndTime,
 
     isTodoModalOpen,
@@ -144,6 +146,7 @@ export const ModalManager: React.FC<ModalManagerProps> = ({
                     onClose={onCloseAddLog}
                     onSave={onSaveLog}
                     onDelete={onDeleteLog}
+                    onImageRemove={onImageRemove}
                     categories={categories}
                     todos={todos}
                     todoCategories={todoCategories}
