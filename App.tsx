@@ -176,6 +176,7 @@ const AppContent: React.FC = () => {
   const [refreshKey, setRefreshKey] = useState(0); // 用于强制刷新Timeline
   const lastPromptTimeRef = useRef(0);
   const hasCleanedImagesRef = useRef(false);
+  const imageSyncTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Load app rules on mount
   useEffect(() => {
@@ -880,6 +881,7 @@ const AppContent: React.FC = () => {
         console.log('[App] 图片列表上传完成');
       } catch (error) {
         console.error('[App] 图片列表上传失败:', error);
+        addToast('warning', '图片列表同步失败，请稍后手动同步');
       }
     };
 
@@ -1167,8 +1169,13 @@ const AppContent: React.FC = () => {
 
       console.log('[App] 检测到图片删除，触发同步:', event.detail.filename);
       
+      // 清除之前的定时器（防抖）
+      if (imageSyncTimeoutRef.current) {
+        clearTimeout(imageSyncTimeoutRef.current);
+      }
+      
       // 延迟一点时间确保删除操作完成，然后触发图片同步
-      setTimeout(async () => {
+      imageSyncTimeoutRef.current = setTimeout(async () => {
         try {
           const imageList = imageService.getReferencedImagesList();
           await handleImageSync(imageList);
@@ -1176,7 +1183,7 @@ const AppContent: React.FC = () => {
         } catch (error) {
           console.error('[App] 图片删除同步失败:', error);
         }
-      }, 1000);
+      }, 2000); // 2秒防抖
     };
 
     const handleImageUploaded = async (event: CustomEvent) => {
@@ -1185,8 +1192,13 @@ const AppContent: React.FC = () => {
 
       console.log('[App] 检测到图片上传，触发同步:', event.detail.filename);
       
+      // 清除之前的定时器（防抖）
+      if (imageSyncTimeoutRef.current) {
+        clearTimeout(imageSyncTimeoutRef.current);
+      }
+      
       // 延迟一点时间确保上传操作完成，然后触发图片同步
-      setTimeout(async () => {
+      imageSyncTimeoutRef.current = setTimeout(async () => {
         try {
           const imageList = imageService.getReferencedImagesList();
           await handleImageSync(imageList);
@@ -1198,7 +1210,7 @@ const AppContent: React.FC = () => {
             addToast('error', '图片同步失败：请在WebDAV根目录下创建 "images" 文件夹');
           }
         }
-      }, 2000); // 上传后稍微延迟长一点
+      }, 3000); // 3秒防抖（上传后稍微延迟长一点）
     };
 
     window.addEventListener('imageDeleted', handleImageDeleted as EventListener);
@@ -1207,6 +1219,10 @@ const AppContent: React.FC = () => {
     return () => {
       window.removeEventListener('imageDeleted', handleImageDeleted as EventListener);
       window.removeEventListener('imageUploaded', handleImageUploaded as EventListener);
+      // 清理定时器
+      if (imageSyncTimeoutRef.current) {
+        clearTimeout(imageSyncTimeoutRef.current);
+      }
     };
   }, []);
 

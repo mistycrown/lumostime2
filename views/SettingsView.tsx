@@ -1278,22 +1278,14 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
     if (activeSubmenu === 'data') {
         return (
             <div className="fixed inset-0 z-50 bg-[#fdfbf7] flex flex-col font-serif animate-in slide-in-from-right duration-300 pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">
-                <div
-                    className="flex items-center px-4 border-b border-stone-100 bg-[#fdfbf7]/80 backdrop-blur-md shrink-0 z-10 gap-3 sticky top-0 box-border"
-                    style={{
-                        height: 'calc(3.5rem + env(safe-area-inset-top))',
-                        paddingTop: 'env(safe-area-inset-top)'
-                    }}
-                >
+                <div className="flex items-center gap-3 px-4 h-14 border-b border-stone-100 bg-[#fdfbf7]/80 backdrop-blur-md sticky top-0">
                     <button
                         onClick={() => setActiveSubmenu('main')}
-                        className="p-2 -ml-2 rounded-full hover:bg-stone-100 active:scale-95 transition-transform"
+                        className="text-stone-400 hover:text-stone-600 p-1"
                     >
-                        <ChevronLeft size={20} className="text-stone-500" />
+                        <ChevronLeft size={24} />
                     </button>
-                    <div className="flex-1">
-                        <h1 className="text-lg font-bold text-stone-800">数据导出导入</h1>
-                    </div>
+                    <span className="text-stone-800 font-bold text-lg">数据导出导入</span>
                 </div>
 
                 <div className="p-4 space-y-4 overflow-y-auto pb-40">
@@ -1351,7 +1343,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
                                     }`}
                             >
                                 <Trash2 size={18} />
-                                {confirmClear ? "确认清空？将被永久删除" : "清空所有数据 (记录/待办/目标/领域)"}
+                                {confirmClear ? "确认清空？将被永久删除" : "清空所有数据"}
                             </button>
                         </div>
                     </div>
@@ -1400,7 +1392,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
                                 ) : (
                                     <>
                                         <RefreshCw size={18} />
-                                        修复图片列表（推荐）
+                                        修复图片列表
                                     </>
                                 )}
                             </button>
