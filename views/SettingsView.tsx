@@ -57,6 +57,7 @@ import {
     ImageIcon
 } from 'lucide-react';
 import { webdavService, WebDAVConfig } from '../services/webdavService';
+import { imageService } from '../services/imageService';
 import { NfcService } from '../services/NfcService';
 import { aiService, AIConfig } from '../services/aiService';
 import { UpdateService, VersionInfo } from '../services/updateService';
@@ -627,6 +628,34 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
     };
 
     // 图片清理功能
+    const handleFixImageList = async () => {
+        if (isCheckingImages) return;
+        
+        setIsCheckingImages(true);
+        try {
+            const result = await imageService.cleanupUnreferencedImages(logs || []);
+            
+            // 上传修复后的列表到云端
+            const imageList = imageService.getReferencedImagesList();
+            await webdavService.uploadImageList(imageList);
+            
+            onToast('success', `修复完成：保留 ${result.kept} 个，清理 ${result.cleaned} 个`);
+            
+            // 生成报告
+            setImageCleanupReport(
+                `✓ 修复完成\n\n` +
+                `保留的图片: ${result.kept} 个\n` +
+                `清理的图片: ${result.cleaned} 个\n\n` +
+                `图片列表已更新并同步到云端`
+            );
+        } catch (error: any) {
+            console.error('修复图片列表失败:', error);
+            onToast('error', `修复失败: ${error?.message}`);
+        } finally {
+            setIsCheckingImages(false);
+        }
+    };
+
     const handleCheckUnreferencedImages = async () => {
         if (isCheckingImages) return;
         
@@ -1351,13 +1380,31 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
                     <div className="bg-white rounded-2xl p-6 shadow-sm space-y-4">
                         <div className="flex items-center gap-3 text-stone-800 mb-2">
                             <ImageIcon size={24} />
-                            <h3 className="font-bold text-lg">图片清理</h3>
+                            <h3 className="font-bold text-lg">图片管理</h3>
                         </div>
                         <p className="text-sm text-stone-500 mb-4 leading-relaxed">
                             检查并清理未被专注记录引用的图片，释放存储空间
                         </p>
 
                         <div className="grid grid-cols-1 gap-3">
+                            <button
+                                onClick={handleFixImageList}
+                                disabled={isCheckingImages}
+                                className="flex items-center justify-center gap-2 w-full py-3 bg-blue-500 text-white rounded-xl font-medium active:scale-[0.98] transition-transform disabled:opacity-50 disabled:cursor-not-allowed hover:bg-blue-600"
+                            >
+                                {isCheckingImages ? (
+                                    <>
+                                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                                        修复中...
+                                    </>
+                                ) : (
+                                    <>
+                                        <RefreshCw size={18} />
+                                        修复图片列表（推荐）
+                                    </>
+                                )}
+                            </button>
+
                             <button
                                 onClick={handleCheckUnreferencedImages}
                                 disabled={isCheckingImages}
