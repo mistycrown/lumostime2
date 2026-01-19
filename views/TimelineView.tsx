@@ -19,14 +19,14 @@ import { ToastType } from '../components/Toast';
 import { imageService } from '../services/imageService';
 
 // Image Thumbnail Component
-const TimelineImage: React.FC<{ filename: string, className?: string, useThumbnail?: boolean }> = ({ filename, className = "w-16 h-16", useThumbnail = false }) => {
+const TimelineImage: React.FC<{ filename: string, className?: string, useThumbnail?: boolean, refreshKey?: number }> = ({ filename, className = "w-16 h-16", useThumbnail = false, refreshKey = 0 }) => {
     const [src, setSrc] = useState<string>('');
     const [error, setError] = useState<string>('');
 
     React.useEffect(() => {
         const loadImage = async () => {
             try {
-                console.log(`[TimelineImage] 尝试加载图片: ${filename}, useThumbnail: ${useThumbnail}`);
+                console.log(`[TimelineImage] 尝试加载图片: ${filename}, useThumbnail: ${useThumbnail}, refreshKey: ${refreshKey}`);
                 const url = await imageService.getImageUrl(filename, useThumbnail ? 'thumbnail' : 'original');
                 console.log(`[TimelineImage] 获取到图片URL: ${filename} -> ${url ? '成功' : '失败'}`);
                 
@@ -44,7 +44,7 @@ const TimelineImage: React.FC<{ filename: string, className?: string, useThumbna
         };
         
         loadImage();
-    }, [filename, useThumbnail]);
+    }, [filename, useThumbnail, refreshKey]); // 添加refreshKey到依赖
 
     if (error) {
         console.warn(`[TimelineImage] 显示错误占位符: ${filename} - ${error}`);
@@ -111,6 +111,7 @@ interface TimelineViewProps {
     scopes: Scope[];
     minIdleTimeThreshold?: number;
     onQuickPunch?: () => void;
+    refreshKey?: number; // 添加refreshKey用于强制刷新图片
     // Daily Review
     dailyReview?: DailyReview;
     onOpenDailyReview?: () => void;
@@ -143,7 +144,7 @@ interface TimelineItem {
     };
 }
 
-export const TimelineView: React.FC<TimelineViewProps> = ({ logs, todos, scopes, onAddLog, onEditLog, categories, currentDate, onDateChange, onShowStats, onBatchAddLogs, onSync, isSyncing, todoCategories, onToast, startWeekOnSunday = false, autoLinkRules = [], minIdleTimeThreshold = 1, onQuickPunch, dailyReview, onOpenDailyReview, templates = [], dailyReviewTime = '22:00', weeklyReviews = [], onOpenWeeklyReview, weeklyReviewTime = '0-2200', monthlyReviews = [], onOpenMonthlyReview, monthlyReviewTime = '0-2200' }) => {
+export const TimelineView: React.FC<TimelineViewProps> = ({ logs, todos, scopes, onAddLog, onEditLog, categories, currentDate, onDateChange, onShowStats, onBatchAddLogs, onSync, isSyncing, todoCategories, onToast, startWeekOnSunday = false, autoLinkRules = [], minIdleTimeThreshold = 1, onQuickPunch, refreshKey = 0, dailyReview, onOpenDailyReview, templates = [], dailyReviewTime = '22:00', weeklyReviews = [], onOpenWeeklyReview, weeklyReviewTime = '0-2200', monthlyReviews = [], onOpenMonthlyReview, monthlyReviewTime = '0-2200' }) => {
     const [isCalendarExpanded, setIsCalendarExpanded] = useState(false);
     const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>(() => {
         const saved = localStorage.getItem('lumos_timeline_sort');
@@ -781,7 +782,7 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ logs, todos, scopes,
                                                     console.log(`[TimelineView] 渲染图片组: 记录ID=${item.logData.id}, 总图片=${item.logData.images.length}, 显示图片=`, imagesToShow);
                                                     
                                                     return imagesToShow.map(img => (
-                                                        <TimelineImage key={img} filename={img} className="w-16 h-16 shadow-sm" useThumbnail={true} />
+                                                        <TimelineImage key={img} filename={img} className="w-16 h-16 shadow-sm" useThumbnail={true} refreshKey={refreshKey} />
                                                     ));
                                                 })()}
 

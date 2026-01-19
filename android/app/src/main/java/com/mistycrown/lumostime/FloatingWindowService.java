@@ -547,7 +547,7 @@ public class FloatingWindowService extends Service {
                 return;
             }
 
-            // 空闲状态: 打开应用;lk][poryti\]=p-
+            // 空闲状态: 打开应用
             Log.d(TAG, "🎯 悬浮球点击: 空闲状态 -> 打开应用");
             Intent intent = getPackageManager().getLaunchIntentForPackage(getPackageName());
             if (intent != null) {
