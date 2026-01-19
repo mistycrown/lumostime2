@@ -199,6 +199,20 @@ export class ImageCleanupService {
     ): Promise<CleanupResult> {
         const { deleteLocal = true, deleteRemote = true, dryRun = false } = options;
         
+        // 如果需要删除远程图片，检查WebDAV配置
+        if (deleteRemote) {
+            const config = webdavService.getConfig();
+            if (!config) {
+                console.log('[ImageCleanup] WebDAV未配置，跳过远程删除');
+                // 修改选项，只进行本地删除
+                return this.cleanupUnreferencedImages(logs, { 
+                    deleteLocal, 
+                    deleteRemote: false, 
+                    dryRun 
+                });
+            }
+        }
+        
         const result: CleanupResult = {
             totalImages: 0,
             referencedImages: 0,

@@ -590,6 +590,103 @@ export class WebDAVService {
             throw new Error(`图片下载失败: ${filename} - ${error?.message || 'Unknown error'}`);
         }
     }
+
+    /**
+     * 上传图片引用列表（独立文件）
+     */
+    async uploadImageList(imageList: string[]): Promise<boolean> {
+        if (!this.config && !this.client) throw new Error('WebDAV not configured');
+
+        try {
+            const data = {
+                images: imageList,
+                timestamp: Date.now(),
+                version: '1.0.0'
+            };
+            const content = JSON.stringify(data, null, 2);
+            const filename = 'lumostime_images.json';
+
+            // NATIVE: Use put method with Uint8Array for WebDAV
+            if (Capacitor.isNativePlatform() && this.config) {
+                console.log(`[WebDAV] Mobile Upload Image List: ${filename}, size: ${content.length}`);
+                const url = this.config.url.endsWith('/') ? `${this.config.url}${filename}` : `${this.config.url}/${filename}`;
+                const auth = Buffer.from(`${this.config.username}:${this.config.password}`).toString('base64');
+
+                // Convert string to Uint8Array
+                const encoder = new TextEncoder();
+                const uint8Data = encoder.encode(content);
+
+                // Set data serializer to raw for binary data
+                HTTP.setDataSerializer('raw');
+
+                // Use put method for WebDAV PUT request
+                const response = await new Promise((resolve, reject) => {
+                    HTTP.put(url, uint8Data, {
+                        'Authorization': `Basic ${auth}`,
+                        'Content-Type': 'application/json; charset=utf-8'
+                    }, resolve, reject);
+                });
+
+                console.log(`[WebDAV] ✓ 图片列表上传成功: ${imageList.length} 个图片, status: ${response.status}`);
+                return response.status === 200 || response.status === 201 || response.status === 204;
+            }
+
+            // Browser/Electron fallback
+            await this.client!.putFileContents(`/${filename}`, content, { overwrite: true });
+            console.log(`[WebDAV] ✓ 图片列表上传成功: ${imageList.length} 个图片`);
+            return true;
+        } catch (e) {
+            console.error('[WebDAV] 图片列表上传失败', e);
+            throw e;
+        }
+    }
+
+    /**
+     * 下载图片引用列表（独立文件）
+     */
+    async downloadImageList(): Promise<{ images: string[], timestamp: number } | null> {
+        if (!this.config && !this.client) throw new Error('WebDAV not configured');
+
+        const filename = 'lumostime_images.json';
+
+        try {
+            // NATIVE: Use native HTTP on mobile
+            if (Capacitor.isNativePlatform() && this.config) {
+                const url = this.config.url.endsWith('/') ? `${this.config.url}${filename}` : `${this.config.url}/${filename}`;
+                const auth = Buffer.from(`${this.config.username}:${this.config.password}`).toString('base64');
+                const response = await HTTP.sendRequest(url, {
+                    method: 'get',
+                    headers: { 'Authorization': `Basic ${auth}` },
+                    timeout: 30000
+                });
+                const content = typeof response.data === 'string' ? response.data : JSON.stringify(response.data);
+                const data = JSON.parse(content);
+                console.log(`[WebDAV] ✓ 图片列表下载成功: ${data.images?.length || 0} 个图片, 时间戳: ${new Date(data.timestamp).toLocaleString()}`);
+                return data;
+            }
+
+            // Browser/Electron fallback
+            const content = await this.client!.getFileContents(`/${filename}`, { format: 'text' });
+            const data = JSON.parse(content as string);
+            console.log(`[WebDAV] ✓ 图片列表下载成功: ${data.images?.length || 0} 个图片, 时间戳: ${new Date(data.timestamp).toLocaleString()}`);
+            return data;
+        } catch (e) {
+            console.log('[WebDAV] 图片列表文件不存在或下载失败');
+            return null;
+        }
+    }
+
+    /**
+     * 获取图片列表文件的时间戳
+     */
+    async getImageListTimestamp(): Promise<number> {
+        try {
+            const data = await this.downloadImageList();
+            return data?.timestamp || 0;
+        } catch (e) {
+            return 0;
+        }
+    }
 }
 
 export const webdavService = new WebDAVService();

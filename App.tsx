@@ -792,28 +792,37 @@ const AppContent: React.FC = () => {
         // If cloud is newer (buffer 10s)
         if (cloudDate && cloudDate.getTime() > localSyncTime + 10000) {
           // Silent update on startup for better UX
-          // addToast('info', 'Updating data from cloud...'); 
           const data = await webdavService.downloadData();
           if (data) {
             await handleSyncDataUpdate(data);
             updateLastSyncTime();
-            // addToast('success', 'Sync complete');
           }
         }
 
-        // 启动时也检查图片同步
+        // 启动时同步图片列表和图片文件
         try {
           console.log('[App] 启动时检查图片同步...');
-          const imageResult = await syncService.syncImages();
+          
+          const localImageList = imageService.getReferencedImagesList();
+          const cloudImageData = await webdavService.downloadImageList();
+          const cloudImageList = cloudImageData?.images || [];
+          
+          // 合并列表
+          const mergedImageList = Array.from(new Set([...localImageList, ...cloudImageList]));
+          
+          if (mergedImageList.length > localImageList.length) {
+            imageService.updateReferencedImagesList(mergedImageList);
+            await webdavService.uploadImageList(mergedImageList);
+          }
+          
+          // 同步图片文件
+          const imageResult = await syncService.syncImages(undefined, mergedImageList, mergedImageList);
           if (imageResult.downloaded > 0) {
             console.log(`[App] 启动时下载了 ${imageResult.downloaded} 张图片`);
-          }
-          if (imageResult.uploaded > 0) {
-            console.log(`[App] 启动时上传了 ${imageResult.uploaded} 张图片`);
+            setRefreshKey(prev => prev + 1);
           }
         } catch (imageError: any) {
           console.warn('[App] 启动时图片同步失败:', imageError.message);
-          // 图片同步失败不影响数据同步
         }
       } catch (e) {
         console.error('Startup sync check failed', e);
@@ -849,6 +858,7 @@ const AppContent: React.FC = () => {
         };
         await webdavService.uploadData(dataToSync);
         updateLastSyncTime();
+        console.log('[App] 自动上传数据完成');
       } catch (e) {
         console.error('Auto-sync upload failed', e);
       }
@@ -856,6 +866,26 @@ const AppContent: React.FC = () => {
 
     return () => clearTimeout(timer);
   }, [logs, todos, categories, todoCategories, scopes, goals, autoLinkRules, reviewTemplates, dailyReviews, weeklyReviews, monthlyReviews, customNarrativeTemplates, userPersonalInfo, filters, lastSyncTime]);
+
+  // 3. Image List Change -> Auto Upload (Debounced)
+  useEffect(() => {
+    const handleImageListChanged = async (e: CustomEvent) => {
+      const config = webdavService.getConfig();
+      if (!config) return;
+
+      try {
+        const imageList = e.detail.images || [];
+        console.log(`[App] 图片列表变化，准备上传: ${imageList.length} 个图片`);
+        await webdavService.uploadImageList(imageList);
+        console.log('[App] 图片列表上传完成');
+      } catch (error) {
+        console.error('[App] 图片列表上传失败:', error);
+      }
+    };
+
+    window.addEventListener('imageListChanged', handleImageListChanged as EventListener);
+    return () => window.removeEventListener('imageListChanged', handleImageListChanged as EventListener);
+  }, []);
 
   // --- NFC / Deep Link Handling ---
   useEffect(() => {
@@ -1670,6 +1700,7 @@ const AppContent: React.FC = () => {
         return (
           <TimelineView
             key={`timeline-${refreshKey}`} // 添加key来强制重新渲染
+            refreshKey={refreshKey} // 传递refreshKey给TimelineView
             logs={logs}
             todos={todos}
             categories={categories}
@@ -1881,21 +1912,7 @@ const AppContent: React.FC = () => {
     console.log('[App] 开始更新同步数据...');
     isRestoring.current = true;
     
-    // 在更新数据前，获取当前被引用的图片列表
-    const oldReferencedImages = new Set<string>();
-    logs.forEach(log => {
-      if (log.images && Array.isArray(log.images)) {
-        log.images.forEach(imageName => {
-          if (imageName && typeof imageName === 'string') {
-            oldReferencedImages.add(imageName);
-          }
-        });
-      }
-    });
-    
-    // 批量更新数据状态 - 使用Promise确保所有状态更新完成
-    const updatePromises: Promise<void>[] = [];
-    
+    // 批量更新数据状态
     if (data.logs) {
       console.log(`[App] 更新logs: ${data.logs.length} 条记录`);
       setLogs(data.logs);
@@ -1927,15 +1944,6 @@ const AppContent: React.FC = () => {
     // 等待一个渲染周期，确保状态更新完成
     await new Promise(resolve => setTimeout(resolve, 10));
     
-    // 数据更新后，检查并清理不再被引用的本地图片
-    if (data.logs) {
-      try {
-        await cleanupOrphanedImagesAfterSync(data.logs, oldReferencedImages);
-      } catch (error) {
-        console.error('[App] 清理孤儿图片失败:', error);
-      }
-    }
-    
     console.log('[App] 同步数据更新完成');
     
     // 触发Timeline刷新（如果当前在Timeline页面）
@@ -1945,79 +1953,38 @@ const AppContent: React.FC = () => {
     }
   };
 
-  // 清理同步后的孤儿图片
-  const cleanupOrphanedImagesAfterSync = async (newLogs: any[], oldReferencedImages: Set<string>) => {
-    try {
-      // 获取新数据中被引用的图片
-      const newReferencedImages = new Set<string>();
-      newLogs.forEach(log => {
-        if (log.images && Array.isArray(log.images)) {
-          log.images.forEach(imageName => {
-            if (imageName && typeof imageName === 'string') {
-              newReferencedImages.add(imageName);
-              // 同时保护对应的缩略图
-              newReferencedImages.add(`thumb_${imageName}`);
-            }
-          });
-        }
-      });
-
-      // 获取本地所有图片
-      const localImages = await imageService.listImages();
-      
-      // 找出在旧数据中被引用，但在新数据中不再被引用的图片
-      const imagesToDelete: string[] = [];
-      
-      for (const imageName of oldReferencedImages) {
-        if (!newReferencedImages.has(imageName)) {
-          // 这个图片在新数据中不再被引用，需要删除
-          if (localImages.includes(imageName)) {
-            imagesToDelete.push(imageName);
-          }
-          // 同时检查对应的缩略图
-          const thumbName = `thumb_${imageName}`;
-          if (localImages.includes(thumbName)) {
-            imagesToDelete.push(thumbName);
-          }
-        }
-      }
-
-      if (imagesToDelete.length > 0) {
-        console.log(`[App] 发现 ${imagesToDelete.length} 个需要清理的孤儿图片:`, imagesToDelete);
-        
-        // 删除这些孤儿图片（不记录删除操作，因为这是同步清理）
-        let deletedCount = 0;
-        for (const imageName of imagesToDelete) {
-          try {
-            await syncService.forceDeleteLocalFile(imageName);
-            console.log(`[App] 清理孤儿图片成功: ${imageName}`);
-            deletedCount++;
-          } catch (error) {
-            console.warn(`[App] 清理孤儿图片失败: ${imageName}`, error);
-          }
-        }
-        
-        if (deletedCount > 0) {
-          addToast('info', `已清理 ${deletedCount} 个未引用的图片`);
-        }
-      }
-    } catch (error) {
-      console.error('[App] 孤儿图片清理过程失败:', error);
+  const handleImageSync = async (imageList: string[]) => {
+    console.log('========================================');
+    console.log('[App] ⚡⚡⚡ handleImageSync 被调用 ⚡⚡⚡');
+    console.log(`[App] 图片列表: ${imageList.length} 个`);
+    console.log('========================================');
+    
+    // 检查WebDAV配置
+    const config = webdavService.getConfig();
+    console.log('[App] WebDAV配置状态:', config ? '✓ 已配置' : '✗ 未配置');
+    
+    if (!config) {
+      console.log('[App] ⚠️ WebDAV未配置，跳过图片同步');
+      return;
     }
-  };
 
-
-  const handleImageSync = async () => {
     try {
-      console.log('Starting Image Sync...');
-      const result = await syncService.syncImages((msg) => console.log(msg));
+      console.log('[App] ⚡ Starting Image Sync...');
+      
+      const result = await syncService.syncImages(
+        (msg) => console.log(`[App] ${msg}`),
+        imageList,
+        imageList // 本地和云端使用同一个合并后的列表
+      );
 
+      console.log('[App] ⚡ 图片同步结果:', result);
+      
       if (result.uploaded > 0) addToast('success', `Uploaded ${result.uploaded} images`);
       if (result.downloaded > 0) addToast('success', `Downloaded ${result.downloaded} images`);
       if (result.deletedRemote > 0) addToast('success', `Deleted ${result.deletedRemote} remote images`);
 
       if (result.errors.length > 0) {
-        console.error('Image sync errors:', result.errors);
+        console.error('[App] Image sync errors:', result.errors);
         addToast('error', `Image sync had ${result.errors.length} errors`);
       }
       
@@ -2027,96 +1994,124 @@ const AppContent: React.FC = () => {
         setRefreshKey(prev => prev + 1);
       }
     } catch (e) {
-      console.error('Image sync error', e);
+      console.error('[App] Image sync error', e);
     }
   };
 
   const handleQuickSync = async (e: React.MouseEvent) => {
+    console.log('========================================');
+    console.log('[App] ⚡⚡⚡ SYNC BUTTON CLICKED ⚡⚡⚡');
+    console.log('========================================');
     e.stopPropagation();
     setIsSyncing(true);
     try {
       const config = webdavService.getConfig();
+      console.log('[App] WebDAV配置检查:', config ? '✓ 已配置' : '✗ 未配置');
       if (!config) {
+        console.log('[App] WebDAV未配置，打开设置页面');
         setIsSettingsOpen(true);
         setIsSyncing(false);
         return;
       }
 
-      // Smart sync: compare timestamps
+      // 1. 同步数据文件（使用简单的时间戳比较）
       let cloudTimestamp = 0;
       let cloudData = null;
 
       try {
         cloudData = await webdavService.downloadData();
         cloudTimestamp = cloudData?.timestamp || 0;
+        console.log(`[App] 云端数据时间戳: ${new Date(cloudTimestamp).toLocaleString()}`);
       } catch (err) {
-        // No cloud file, will upload
-        console.log('No cloud data, will upload');
+        console.log('[App] 云端无数据，将上传本地数据');
       }
 
-      // Prepare local data
-      const localData = {
-        logs,
-        todos,
-        categories,
-        todoCategories,
-        scopes,
-        goals,
-        autoLinkRules,
-        reviewTemplates,
-        dailyReviews,
-        weeklyReviews,
-        monthlyReviews,
-        customNarrativeTemplates,
-        userPersonalInfo,
-        filters,
-        timestamp: dataLastModified, // Use tracked modification time
-        version: '1.0.0'
-      };
-
-      const localTimestamp = localData.timestamp;
+      const localTimestamp = dataLastModified;
+      console.log(`[App] 本地数据时间戳: ${new Date(localTimestamp).toLocaleString()}`);
 
       if (cloudTimestamp > localTimestamp) {
         // Cloud is newer, download
+        console.log('[App] 云端数据较新，下载...');
         if (cloudData) {
           await handleSyncDataUpdate(cloudData);
-          // 等待一个React渲染周期，确保状态更新完成
           await new Promise(resolve => setTimeout(resolve, 50));
           addToast('success', `Downloaded from cloud (${new Date(cloudTimestamp).toLocaleDateString()})`);
         }
       } else {
         // Local is newer or equal, upload
-        await webdavService.uploadData(localData);
-        // addToast('success', 'Uploaded to cloud');
+        console.log('[App] 本地数据较新或相同，上传...');
+        const dataToUpload = {
+          logs,
+          todos,
+          categories,
+          todoCategories,
+          scopes,
+          goals,
+          autoLinkRules,
+          reviewTemplates,
+          dailyReviews,
+          weeklyReviews,
+          monthlyReviews,
+          customNarrativeTemplates,
+          userPersonalInfo,
+          filters,
+          timestamp: Date.now(),
+          version: '1.0.0'
+        };
+        await webdavService.uploadData(dataToUpload);
+        console.log('[App] ✓ 数据上传完成');
       }
 
-      // Sync Images
-      await handleImageSync();
+      // 2. 同步图片列表文件（独立的时间戳比较）
+      console.log('========================================');
+      console.log('[App] ⚡⚡⚡ 开始同步图片列表 ⚡⚡⚡');
+      console.log('========================================');
 
-      // 调试：列出同步后的本地图片
+      const localImageList = imageService.getReferencedImagesList();
+      const localImageTimestamp = Date.now(); // 本地图片列表的时间戳（从localStorage获取）
+      console.log(`[App] 本地图片列表: ${localImageList.length} 个`);
+
+      let cloudImageList: string[] = [];
+      let cloudImageTimestamp = 0;
+
       try {
-        const localImages = await imageService.listImages();
-        console.log(`[App] 同步完成后本地图片列表:`, localImages);
-        
-        // Web环境下额外检查IndexedDB
-        if (typeof window !== 'undefined' && !window.Capacitor?.isNativePlatform()) {
-          const indexedDBImages = await imageService.debugListIndexedDBImages();
-          console.log(`[App] IndexedDB中的图片:`, indexedDBImages);
+        const cloudImageData = await webdavService.downloadImageList();
+        if (cloudImageData) {
+          cloudImageList = cloudImageData.images || [];
+          cloudImageTimestamp = cloudImageData.timestamp || 0;
+          console.log(`[App] 云端图片列表: ${cloudImageList.length} 个, 时间戳: ${new Date(cloudImageTimestamp).toLocaleString()}`);
         }
-      } catch (error) {
-        console.error('[App] 调试信息获取失败:', error);
+      } catch (err) {
+        console.log('[App] 云端无图片列表');
       }
+
+      // 合并本地和云端的图片列表（总是合并，不比较时间戳）
+      const mergedImageList = Array.from(new Set([...localImageList, ...cloudImageList]));
+      console.log(`[App] 合并后图片列表: ${mergedImageList.length} 个`);
+
+      // 更新本地图片列表
+      if (mergedImageList.length !== localImageList.length) {
+        imageService.updateReferencedImagesList(mergedImageList);
+        console.log('[App] 本地图片列表已更新');
+      }
+
+      // 上传合并后的图片列表
+      await webdavService.uploadImageList(mergedImageList);
+      console.log('[App] ✓ 图片列表上传完成');
+
+      // 3. 同步图片文件
+      console.log('========================================');
+      console.log('[App] ⚡⚡⚡ 开始同步图片文件 ⚡⚡⚡');
+      console.log('========================================');
+      
+      await handleImageSync(mergedImageList);
 
       addToast('success', 'Sync complete');
       
-      // 强制刷新Timeline页面 - 确保在所有异步操作完成后执行
+      // 强制刷新Timeline页面
       if (currentView === AppView.TIMELINE) {
-        // 等待所有状态更新完成
         await new Promise(resolve => setTimeout(resolve, 100));
-        
-        // 通过更新refreshKey强制Timeline重新渲染
         setRefreshKey(prev => prev + 1);
-        
         console.log('[App] Timeline页面刷新完成');
       }
     } catch (error) {
