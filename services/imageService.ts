@@ -6,7 +6,7 @@
  * @description Handles saving, retrieving, and deleting images. 
  * Uses Capacitor Filesystem for Native/Electron, and IndexedDB for Web fallback.
  */
-import { Filesystem, Directory, Encoding } from '@capacitor/filesystem';
+import { Filesystem, Directory } from '@capacitor/filesystem';
 import { Capacitor } from '@capacitor/core';
 
 // DB Configuration for Web Fallback
@@ -76,7 +76,7 @@ class ImageService {
         // 确保初始化完成
         await this.ensureInit();
         
-        const filename = `${Date.now()}_${Math.random().toString(36).substr(2, 9)}.jpg`;
+        const filename = `${Date.now()}_${Math.random().toString(36).substring(2, 11)}.jpg`;
         console.log(`[ImageService] 生成文件名: ${filename}`);
 
         // 1. Save Original
@@ -681,8 +681,20 @@ class ImageService {
     removeFromReferencedList(filename: string): void {
         try {
             let list = this.getReferencedImagesList();
+            const originalLength = list.length;
             list = list.filter(f => f !== filename && f !== `thumb_${filename}`);
-            this.updateReferencedImagesList(list);
+            
+            if (list.length !== originalLength) {
+                this.updateReferencedImagesList(list);
+                console.log(`[ImageService] 从引用列表移除: ${filename}, 剩余: ${list.length}`);
+                
+                // 触发图片列表变化事件
+                if (typeof window !== 'undefined') {
+                    window.dispatchEvent(new CustomEvent('imageListChanged', { 
+                        detail: { images: list } 
+                    }));
+                }
+            }
         } catch (e) {
             console.error('[ImageService] 从引用列表移除失败', e);
         }
@@ -706,6 +718,14 @@ class ImageService {
         const list = Array.from(referencedSet);
         this.updateReferencedImagesList(list);
         console.log(`[ImageService] 重建引用列表: ${list.length} 个图片`);
+        
+        // 触发图片列表变化事件
+        if (typeof window !== 'undefined') {
+            window.dispatchEvent(new CustomEvent('imageListChanged', { 
+                detail: { images: list } 
+            }));
+        }
+        
         return list;
     }
 
@@ -782,6 +802,13 @@ class ImageService {
         
         console.log('[ImageService] ========== 清理完成 ==========');
         console.log(`[ImageService] 保留: ${referencedImages.size} 个, 清理: ${deletedCount} 个`);
+        
+        // 触发图片列表变化事件（如果有清理操作）
+        if (unreferencedImages.length > 0 && typeof window !== 'undefined') {
+            window.dispatchEvent(new CustomEvent('imageListChanged', { 
+                detail: { images: Array.from(referencedImages) } 
+            }));
+        }
         
         return {
             cleaned: deletedCount,
