@@ -1170,7 +1170,8 @@ const AppContent: React.FC = () => {
       // 延迟一点时间确保删除操作完成，然后触发图片同步
       setTimeout(async () => {
         try {
-          await handleImageSync();
+          const imageList = imageService.getReferencedImagesList();
+          await handleImageSync(imageList);
           console.log('[App] 图片删除同步完成');
         } catch (error) {
           console.error('[App] 图片删除同步失败:', error);
@@ -1187,7 +1188,8 @@ const AppContent: React.FC = () => {
       // 延迟一点时间确保上传操作完成，然后触发图片同步
       setTimeout(async () => {
         try {
-          await handleImageSync();
+          const imageList = imageService.getReferencedImagesList();
+          await handleImageSync(imageList);
           console.log('[App] 图片上传同步完成');
         } catch (error) {
           console.error('[App] 图片上传同步失败:', error);

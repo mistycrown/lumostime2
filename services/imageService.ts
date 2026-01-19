@@ -710,6 +710,86 @@ class ImageService {
     }
 
     /**
+     * 清理未引用的图片（从列表和文件系统中删除）
+     */
+    async cleanupUnreferencedImages(logs: any[]): Promise<{ cleaned: number, kept: number }> {
+        console.log('[ImageService] ========== 开始清理未引用的图片 ==========');
+        
+        // 1. 从logs重建正确的引用列表
+        const referencedImages = new Set<string>();
+        logs.forEach(log => {
+            if (log.images && Array.isArray(log.images)) {
+                log.images.forEach((img: string) => {
+                    if (img && typeof img === 'string') {
+                        referencedImages.add(img);
+                        referencedImages.add(`thumb_${img}`);
+                    }
+                });
+            }
+        });
+        
+        console.log(`[ImageService] Logs中引用的图片: ${referencedImages.size} 个`);
+        
+        // 2. 获取当前列表中的所有图片
+        const currentList = this.getReferencedImagesList();
+        console.log(`[ImageService] 当前列表中的图片: ${currentList.length} 个`);
+        
+        // 3. 找出未被引用的图片
+        const unreferencedImages = currentList.filter(img => !referencedImages.has(img));
+        console.log(`[ImageService] 未引用的图片: ${unreferencedImages.length} 个`, unreferencedImages);
+        
+        // 4. 从列表中移除未引用的图片
+        if (unreferencedImages.length > 0) {
+            this.updateReferencedImagesList(Array.from(referencedImages));
+            console.log(`[ImageService] ✓ 已从列表中移除 ${unreferencedImages.length} 个未引用的图片`);
+        }
+        
+        // 5. 获取本地实际存在的文件
+        const localFiles = await this.listImages();
+        console.log(`[ImageService] 本地文件: ${localFiles.length} 个`);
+        
+        // 6. 找出本地存在但未被引用的文件
+        const filesToDelete = localFiles.filter(file => !referencedImages.has(file));
+        console.log(`[ImageService] 需要删除的文件: ${filesToDelete.length} 个`, filesToDelete);
+        
+        // 7. 删除这些文件
+        let deletedCount = 0;
+        for (const filename of filesToDelete) {
+            try {
+                if (Capacitor.isNativePlatform()) {
+                    await Filesystem.deleteFile({
+                        path: `images/${filename}`,
+                        directory: Directory.Data,
+                    });
+                } else {
+                    const db = await this.dbPromise;
+                    if (db) {
+                        await new Promise<void>((resolve, reject) => {
+                            const transaction = db.transaction([STORE_NAME], 'readwrite');
+                            const store = transaction.objectStore(STORE_NAME);
+                            store.delete(filename);
+                            transaction.oncomplete = () => resolve();
+                            transaction.onerror = () => reject(transaction.error);
+                        });
+                    }
+                }
+                deletedCount++;
+                console.log(`[ImageService] ✓ 已删除: ${filename}`);
+            } catch (error) {
+                console.warn(`[ImageService] 删除失败: ${filename}`, error);
+            }
+        }
+        
+        console.log('[ImageService] ========== 清理完成 ==========');
+        console.log(`[ImageService] 保留: ${referencedImages.size} 个, 清理: ${deletedCount} 个`);
+        
+        return {
+            cleaned: deletedCount,
+            kept: referencedImages.size
+        };
+    }
+
+    /**
      * 调试方法：测试图片读写功能（仅移动端）
      */
     async debugTestImageReadWrite(filename: string): Promise<void> {
