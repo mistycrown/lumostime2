@@ -77,6 +77,7 @@ import { getFilterStats } from '../utils/filterUtils';
 import { FilterDetailView } from './FilterDetailView';
 import excelExportService from '../services/excelExportService';
 import { imageCleanupService } from '../services/imageCleanupService';
+import { BatchFocusRecordManageView } from './BatchFocusRecordManageView';
 
 import { NARRATIVE_TEMPLATES } from '../constants';
 // @ts-ignore
@@ -159,7 +160,7 @@ const AI_PRESETS = {
 };
 
 export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, onImport, onReset, onClearData, onToast, syncData, onSyncUpdate, startWeekOnSunday, onToggleStartWeekOnSunday, onOpenAutoLink, onOpenSearch, minIdleTimeThreshold = 1, onSetMinIdleTimeThreshold, defaultView = 'RECORD', onSetDefaultView, reviewTemplates = [], onUpdateReviewTemplates, onUpdateDailyReviews, checkTemplates = [], onUpdateCheckTemplates, dailyReviewTime, onSetDailyReviewTime, weeklyReviewTime, onSetWeeklyReviewTime, monthlyReviewTime, onSetMonthlyReviewTime, customNarrativeTemplates, onUpdateCustomNarrativeTemplates, userPersonalInfo, onSetUserPersonalInfo, logs = [], todos = [], scopes = [], currentDate = new Date(), dailyReviews = [], weeklyReviews = [], monthlyReviews = [], todoCategories = [], filters = [], onUpdateFilters, categoriesData = [], onEditLog, autoFocusNote, onToggleAutoFocusNote }) => {
-    const [activeSubmenu, setActiveSubmenu] = useState<'main' | 'data' | 'cloud' | 'ai' | 'preferences' | 'guide' | 'nfc' | 'templates' | 'check_templates' | 'narrative_prompt' | 'auto_record' | 'autolink' | 'obsidian_export' | 'filters'>('main');
+    const [activeSubmenu, setActiveSubmenu] = useState<'main' | 'data' | 'cloud' | 'ai' | 'preferences' | 'guide' | 'nfc' | 'templates' | 'check_templates' | 'narrative_prompt' | 'auto_record' | 'autolink' | 'obsidian_export' | 'filters' | 'batch_manage'>('main');
     const [webdavConfig, setWebdavConfig] = useState<WebDAVConfig | null>(null);
     const [isSyncing, setIsSyncing] = useState(false);
     
@@ -2124,6 +2125,23 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
         );
     }
 
+    if (activeSubmenu === 'batch_manage') {
+        return (
+            <BatchFocusRecordManageView
+                onBack={() => setActiveSubmenu('main')}
+                logs={logs}
+                onUpdateLogs={(updatedLogs) => {
+                    onSyncUpdate({ ...syncData, logs: updatedLogs });
+                }}
+                categories={categories || []}
+                scopes={scopes || []}
+                todos={todos || []}
+                todoCategories={todoCategories || []}
+                onToast={onToast}
+            />
+        );
+    }
+
     return (
         <div className="fixed inset-0 z-50 bg-[#fdfbf7] flex flex-col font-serif animate-in slide-in-from-right duration-300 pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">
             {/* Header */}
@@ -2224,6 +2242,11 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
                     <h3 className="text-[10px] font-bold text-stone-400 uppercase tracking-wider pl-2">数据与同步</h3>
                     <div className="bg-white rounded-2xl overflow-hidden shadow-[0_2px_10px_rgba(0,0,0,0.03)]">
                         <MenuItem
+                            icon={<Edit2 size={18} className="text-blue-500" />}
+                            label="批量管理记录"
+                            onClick={() => setActiveSubmenu('batch_manage')}
+                        />
+                        <MenuItem
                             icon={<Cloud size={18} />}
                             label="WebDAV 云同步"
                             onClick={() => setActiveSubmenu('cloud')}
@@ -2231,6 +2254,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
                         <MenuItem
                             icon={<Database size={18} />}
                             label="数据导出导入 (包含重置)"
+                            isLast={!isElectronEnvironment()}
                             onClick={() => setActiveSubmenu('data')}
                         />
                         {isElectronEnvironment() && (

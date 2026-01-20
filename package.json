@@ -43,16 +43,19 @@
   },
   "devDependencies": {
     "@capacitor/assets": "^3.0.5",
-    "@types/node": "^22.14.0",
+    "@types/node": "^22.19.7",
     "@vercel/node": "^3.0.0",
     "@vitejs/plugin-react": "^5.0.0",
+    "@vitest/ui": "^4.0.17",
     "electron": "^39.2.6",
     "electron-builder": "^26.0.12",
+    "fast-check": "^4.5.3",
     "rimraf": "^6.1.2",
     "typescript": "~5.8.2",
     "vite": "^6.2.0",
     "vite-plugin-electron": "^0.29.0",
-    "vite-plugin-electron-renderer": "^0.14.6"
+    "vite-plugin-electron-renderer": "^0.14.6",
+    "vitest": "^4.0.17"
   },
   "build": {
     "appId": "com.lumostime.app",
