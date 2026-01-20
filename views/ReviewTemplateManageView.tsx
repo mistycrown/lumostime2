@@ -104,7 +104,6 @@ const TemplateList: React.FC<{
         const newTemplate: ReviewTemplate = {
             id: crypto.randomUUID(),
             title: '📝 新模板',
-            enabled: true,
             questions: [],
             isSystem: false,
             order: templates.length + 1,
