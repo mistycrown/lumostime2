@@ -255,7 +255,7 @@ export const DailyReviewView: React.FC<DailyReviewViewProps> = ({
     const templatesForDisplay = useMemo(() => {
         return review.templateSnapshot ||
             templates
-                .filter(t => t.enabled && t.isDailyTemplate)
+                .filter(t => t.isDailyTemplate)
                 .sort((a, b) => a.order - b.order);
     }, [review.templateSnapshot, templates]);
 

@@ -1416,7 +1416,7 @@ const AppContent: React.FC = () => {
     if (!review) {
       // 创建模板快照
       const templateSnapshot = reviewTemplates
-        .filter(t => t.enabled && t.isDailyTemplate)
+        .filter(t => t.isDailyTemplate)
         .sort((a, b) => a.order - b.order)
         .map(t => ({
           id: t.id,
@@ -1507,7 +1507,7 @@ const AppContent: React.FC = () => {
     if (!review) {
       // 创建模板快照
       const templateSnapshot = reviewTemplates
-        .filter(t => t.enabled && t.isWeeklyTemplate)
+        .filter(t => t.isWeeklyTemplate)
         .sort((a, b) => a.order - b.order)
         .map(t => ({
           id: t.id,
@@ -1570,7 +1570,7 @@ const AppContent: React.FC = () => {
     if (!review) {
       // 创建模板快照
       const templateSnapshot = reviewTemplates
-        .filter(t => t.enabled && t.isMonthlyTemplate)
+        .filter(t => t.isMonthlyTemplate)
         .sort((a, b) => a.order - b.order)
         .map(t => ({
           id: t.id,

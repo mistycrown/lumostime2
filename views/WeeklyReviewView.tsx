@@ -173,7 +173,7 @@ export const WeeklyReviewView: React.FC<WeeklyReviewViewProps> = ({
     const templatesForDisplay = useMemo(() => {
         return review.templateSnapshot ||
             templates
-                .filter(t => t.enabled && t.isWeeklyTemplate)
+                .filter(t => t.isWeeklyTemplate)
                 .sort((a, b) => a.order - b.order);
     }, [review.templateSnapshot, templates]);
 

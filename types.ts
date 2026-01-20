@@ -195,7 +195,6 @@ export interface ReviewTemplate {
   questions: ReviewQuestion[];
   isSystem: boolean; // 是否系统预设
   order: number;
-  enabled: boolean; // 是否启用
   isDailyTemplate: boolean;         // 是否用于每日回顾
   isWeeklyTemplate?: boolean;       // 是否用于周回顾
   isMonthlyTemplate?: boolean;      // 是否用于月回顾
