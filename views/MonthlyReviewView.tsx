@@ -158,7 +158,7 @@ export const MonthlyReviewView: React.FC<MonthlyReviewViewProps> = ({
         // 如果快照不存在,回退到全局templates (兼容旧数据)
         const templatesToUse = review.templateSnapshot ||
             templates
-                .filter(t => t.enabled && t.isMonthlyTemplate)
+                .filter(t => t.isMonthlyTemplate)
                 .sort((a, b) => a.order - b.order);
 
         return templatesToUse.flatMap(t => t.questions);
@@ -168,7 +168,7 @@ export const MonthlyReviewView: React.FC<MonthlyReviewViewProps> = ({
     const templatesForDisplay = useMemo(() => {
         return review.templateSnapshot ||
             templates
-                .filter(t => t.enabled && t.isMonthlyTemplate)
+                .filter(t => t.isMonthlyTemplate)
                 .sort((a, b) => a.order - b.order);
     }, [review.templateSnapshot, templates]);
 
