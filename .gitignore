@@ -28,7 +28,7 @@ dist-ssr
 
 # Vercel
 .vercel
-
+.kiro/
 # Android Signing Keys (重要：不要提交到 Git)
 *.jks
 *.keystore
