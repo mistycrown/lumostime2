@@ -27,6 +27,7 @@ import { DailyReviewView } from './views/DailyReviewView'; // 新增：每日回
 import { WeeklyReviewView } from './views/WeeklyReviewView'; // 新增：每周回顾
 import { MonthlyReviewView } from './views/MonthlyReviewView'; // 新增：每月回顾
 import { ReviewHubView } from './views/ReviewHubView'; // 新增：复盘汇总
+import { JournalView } from './views/JournalView'; // 新增：日记页面
 import { TimerFloating } from './components/TimerFloating';
 import { AddLogModal } from './components/AddLogModal';
 import { TodoDetailModal } from './components/TodoDetailModal';
@@ -65,7 +66,8 @@ import {
   Layout,
   BookOpen,
   BookMarked,
-  Target
+  Target,
+  FileText
 } from 'lucide-react';
 import { App as CapacitorApp } from '@capacitor/app';
 import { Capacitor } from '@capacitor/core';
@@ -128,6 +130,7 @@ const AppContent: React.FC = () => {
     currentView, setCurrentView,
     isSettingsOpen, setIsSettingsOpen,
     isAutoLinkOpen, setIsAutoLinkOpen,
+    isJournalMode, setIsJournalMode,
     isSearchOpen, setIsSearchOpen,
     isStatsFullScreen, setIsStatsFullScreen,
     statsTitle, setStatsTitle,
@@ -1768,21 +1771,21 @@ const AppContent: React.FC = () => {
           />
         );
       case AppView.REVIEW:
-        return (
+        return isJournalMode ? (
+          <JournalView
+            dailyReviews={dailyReviews}
+            logs={logs}
+            onOpenDailyReview={(date) => {
+              handleOpenDailyReview(date);
+            }}
+          />
+        ) : (
           <ReviewHubView
             logs={logs}
             dailyReviews={dailyReviews}
             weeklyReviews={weeklyReviews}
             monthlyReviews={monthlyReviews}
             onOpenDailyReview={(date) => {
-              // Must handle potential time zone issues if creating from calendar
-              // But keeping it simple: just use date object
-              // We need to set setCurrentReviewDate
-              // Also need to check if review exists? ReviewHub handles logic,
-              // here we just open the view.
-              // If review doesn't exist, DailyReviewView handles creation?
-              // Wait, DailyReviewView takes a 'review' object.
-              // So if new, we need logic similar to handleOpenDailyReview but for specific date.
               handleOpenDailyReview(date);
             }}
             onOpenWeeklyReview={handleOpenWeeklyReview}
@@ -1914,7 +1917,7 @@ const AppContent: React.FC = () => {
       return 'Tags';
     }
     if (currentView === AppView.REVIEW) {
-      return 'My Chronicle';
+      return isJournalMode ? '日记' : 'My Chronicle';
     }
     if (currentView === AppView.SCOPE) {
       if (selectedScopeId) return 'Scope Details';
@@ -2260,6 +2263,17 @@ const AppContent: React.FC = () => {
               {currentView === AppView.TAGS ? <Target size={24} /> : <Tag size={24} />}
             </button>
           )}
+
+        {/* Global Floating Action Button for Review/Journal Toggle */}
+        {currentView === AppView.REVIEW && !isDailyReviewOpen && !isWeeklyReviewOpen && !isMonthlyReviewOpen && (
+          <button
+            onClick={() => setIsJournalMode(!isJournalMode)}
+            className="fixed bottom-[calc(4.5rem+env(safe-area-inset-bottom))] right-6 w-14 h-14 bg-stone-900 rounded-full text-white shadow-2xl flex items-center justify-center active:scale-90 transition-transform z-40 border border-stone-800"
+            aria-label={isJournalMode ? "Switch to Archive" : "Switch to Journal"}
+          >
+            {isJournalMode ? <BookOpen size={24} /> : <FileText size={24} />}
+          </button>
+        )}
 
         {/* Full Screen Settings Overlay */}
         {isSettingsOpen && (

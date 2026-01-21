@@ -40,6 +40,10 @@ interface NavigationContextType {
     isMonthlyReviewOpen: boolean;
     setIsMonthlyReviewOpen: (open: boolean) => void;
 
+    // 档案页面模式切换
+    isJournalMode: boolean;
+    setIsJournalMode: (mode: boolean) => void;
+
     // 导航选择状态
     selectedTagId: string | null;
     setSelectedTagId: (id: string | null) => void;
@@ -129,6 +133,9 @@ export const NavigationProvider: React.FC<NavigationProviderProps> = ({
     const [isWeeklyReviewOpen, setIsWeeklyReviewOpen] = useState(false);
     const [isMonthlyReviewOpen, setIsMonthlyReviewOpen] = useState(false);
 
+    // 档案页面模式切换
+    const [isJournalMode, setIsJournalMode] = useState(false);
+
     // 导航选择状态
     const [selectedTagId, setSelectedTagId] = useState<string | null>(null);
     const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
@@ -187,6 +194,8 @@ export const NavigationProvider: React.FC<NavigationProviderProps> = ({
             setIsWeeklyReviewOpen,
             isMonthlyReviewOpen,
             setIsMonthlyReviewOpen,
+            isJournalMode,
+            setIsJournalMode,
             selectedTagId,
             setSelectedTagId,
             selectedCategoryId,
