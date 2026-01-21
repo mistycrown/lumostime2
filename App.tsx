@@ -1782,6 +1782,9 @@ const AppContent: React.FC = () => {
             onOpenDailyReview={(date) => {
               handleOpenDailyReview(date);
             }}
+            onEditLog={openEditModal}
+            onOpenWeeklyReview={handleOpenWeeklyReview}
+            onOpenMonthlyReview={handleOpenMonthlyReview}
           />
         ) : (
           <ReviewHubView

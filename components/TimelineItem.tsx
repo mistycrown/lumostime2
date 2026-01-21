@@ -42,9 +42,10 @@ interface TimelineItemProps {
     isLast: boolean;
     isFirstOfDay?: boolean;  // 是否是当天第一条
     onAddComment: (entryId: string, text: string) => void;
+    onClick?: () => void;
 }
 
-const TimelineItem: React.FC<TimelineItemProps> = ({ entry, isLast, isFirstOfDay = true, onAddComment }) => {
+const TimelineItem: React.FC<TimelineItemProps> = ({ entry, isLast, isFirstOfDay = true, onAddComment, onClick }) => {
     const [isCommenting, setIsCommenting] = useState(false);
     const [commentText, setCommentText] = useState('');
 
@@ -137,7 +138,14 @@ const TimelineItem: React.FC<TimelineItemProps> = ({ entry, isLast, isFirstOfDay
     const hasMetadata = (entry.relatedTodos?.length || 0) + (entry.tags?.length || 0) + (entry.domains?.length || 0) > 0;
 
     return (
-        <div className="flex w-full group relative mb-8 pl-4 md:pl-6">
+        <div
+            className={`flex w-full group relative mb-8 pl-4 md:pl-6 transition-colors rounded-lg ${onClick ? 'cursor-pointer' : ''}`}
+            onClick={(e) => {
+                // Prevent click if clicking on comment form or interactive elements
+                if ((e.target as HTMLElement).closest('button') || (e.target as HTMLElement).closest('input')) return;
+                onClick?.();
+            }}
+        >
             {/* Node Icon (positioned absolutely on the left edge of parent group) */}
             <div className="absolute -left-[11px] top-0 z-20 flex items-center justify-center">
                 {renderNodeIcon()}
