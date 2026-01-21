@@ -29,6 +29,9 @@ export interface DiaryEntry {
     tags?: string[];          // # Tags
     domains?: string[];       // % Domains/Areas
     relatedTodos?: string[];  // @ Todos/Contexts
+
+    // Display control
+    isFirstOfDay?: boolean;   // Whether this is the first entry of its day
 }
 
 export const MOCK_ENTRIES: DiaryEntry[] = [

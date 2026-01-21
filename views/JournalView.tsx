@@ -13,21 +13,30 @@ import { DiaryEntry, MOCK_ENTRIES, MONTHS, Comment } from './journalTypes';
 import TimelineItem from '../components/TimelineItem';
 import { Search, Menu, PenLine, ChevronDown, ChevronLeft, ChevronRight, SlidersHorizontal, Image as ImageIcon, AlignLeft, X } from 'lucide-react';
 
+import { useCategoryScope } from '../contexts/CategoryScopeContext';
+import { useData } from '../contexts/DataContext';
+import { Comment as GlobalComment, Scope } from '../types';
+
 interface JournalViewProps {
     dailyReviews: DailyReview[];
     logs: Log[];
     onOpenDailyReview: (date: Date) => void;
+    todos: any[];  // TodoItem[]
+    scopes: Scope[];
 }
 
 export const JournalView: React.FC<JournalViewProps> = ({
     dailyReviews,
     logs,
     onOpenDailyReview,
+    todos,
+    scopes
 }) => {
-    // MOCK DATA STATE
-    const [entries, setEntries] = useState<DiaryEntry[]>(MOCK_ENTRIES);
-    // Default to January 2024 for demo purposes
-    const [selectedDate, setSelectedDate] = useState(new Date(2024, 0, 1));
+    const { categories } = useCategoryScope();
+    const { setLogs } = useData();
+
+    // Default to Today
+    const [selectedDate, setSelectedDate] = useState(new Date());
     const [isMonthPickerOpen, setIsMonthPickerOpen] = useState(false);
     const [isFilterOpen, setIsFilterOpen] = useState(false);
 
@@ -52,9 +61,96 @@ export const JournalView: React.FC<JournalViewProps> = ({
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, []);
 
-    // Filter entries based on selected Month/Year AND filter configs
+    // Transform and Filter entries
     const filteredEntries = useMemo(() => {
-        return entries.filter(entry => {
+        const diaryEntries: DiaryEntry[] = [];
+
+        // 1. Process Logs
+        logs.forEach(log => {
+            // Resolve Title
+            let title = log.title;
+            let content = log.note || '';
+
+            // Get category and activity
+            const cat = categories.find(c => c.id === log.categoryId);
+            const act = cat?.activities.find(a => a.id === log.activityId);
+
+            // 1. Check for #Title# in content
+            const titleMatch = content.match(/#([^#]+)#/);
+            if (titleMatch) {
+                title = titleMatch[1];
+            } else if (act) {
+                title = act.name;
+            } else if (!title || title === 'Unknown') {
+                if (cat) title = cat.name;
+            }
+
+            // Get linked todo
+            const linkedTodo = todos.find(t => t.id === log.linkedTodoId);
+
+            // Get linked scopes
+            const linkedScopes = log.scopeIds?.map(id => scopes.find(s => s.id === id)).filter(Boolean) as Scope[] || [];
+
+            diaryEntries.push({
+                id: log.id,
+                type: 'normal',
+                date: new Date(log.startTime).toISOString(),
+                title: title,
+                content: content,
+                media: log.images?.map(img => ({ type: 'image', url: img })),
+                comments: log.comments?.map(c => ({
+                    id: c.id,
+                    text: c.content,
+                    createdAt: new Date(c.createdAt).toISOString(),
+                    author: 'Me'
+                })) || [],
+                // Complete metadata like TimelineView
+                tags: cat && act ? [`${cat.icon} ${cat.name} / ${act.icon} ${act.name}`] : [title || 'Log'],
+                relatedTodos: linkedTodo ? [linkedTodo.title] : undefined,
+                domains: linkedScopes.length > 0 ? linkedScopes.map(s => `${s.icon} ${s.name}`) : undefined
+            });
+        });
+
+        // 2. Process Daily Reviews
+        dailyReviews.forEach(review => {
+            // Parse Narrative Logic (mirrors ReviewHubView)
+            let title = 'Daily Reflection';
+            let content = '...';
+
+            if (review.narrative) {
+                // 1. Get Title (First Line, remove markdown headers)
+                const cleanNarrative = review.narrative.replace(/^#+\s*/, '').trim();
+                const lines = cleanNarrative.split('\n');
+                title = lines[0].trim() || 'Daily Reflection';
+
+                // 2. Get Content (Last Blockquote)
+                const quoteRegex = /(?:^|\n)>\s*(.*?)(?=(?:\n\n|$))/gs;
+                const matches = [...review.narrative.matchAll(quoteRegex)];
+
+                if (matches.length > 0) {
+                    content = matches[matches.length - 1][1].replace(/\n>\s*/g, '\n').trim();
+                } else {
+                    // Fallback: Body lines (truncated)
+                    const bodyText = lines.slice(1).join('\n').trim();
+                    content = bodyText.length > 100 ? bodyText.slice(0, 100) + '...' : bodyText;
+                }
+            } else if (review.answers) {
+                // Fallback for no narrative but answers
+                content = review.answers.map(a => `${a.question}\n${a.answer}`).join('\n\n');
+            }
+
+            diaryEntries.push({
+                id: review.id,
+                type: 'daily_summary',
+                date: `${review.date}T23:59:59`, // End of day
+                title: title,
+                content: content || 'Tap to view details...',
+                comments: []
+            });
+        });
+
+        // 3. Filter and Sort
+        const sorted = diaryEntries.filter(entry => {
             const d = new Date(entry.date);
             const matchesDate = d.getMonth() === selectedDate.getMonth() &&
                 d.getFullYear() === selectedDate.getFullYear();
@@ -64,26 +160,44 @@ export const JournalView: React.FC<JournalViewProps> = ({
 
             return matchesDate && matchesMedia && matchesLength;
         }).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-    }, [entries, selectedDate, filterHasMedia, filterMinLength]);
+
+        // 4. Group by day and mark first entries
+        const groupedByDay: { date: string; entries: DiaryEntry[] }[] = [];
+
+        sorted.forEach(entry => {
+            const dateStr = new Date(entry.date).toDateString();
+            const lastGroup = groupedByDay[groupedByDay.length - 1];
+
+            if (!lastGroup || lastGroup.date !== dateStr) {
+                // New day group
+                groupedByDay.push({ date: dateStr, entries: [entry] });
+            } else {
+                // Add to existing group
+                lastGroup.entries.push(entry);
+            }
+        });
+
+        return groupedByDay;
+
+    }, [logs, dailyReviews, categories, selectedDate, filterHasMedia, filterMinLength, todos, scopes]);
 
     const handleAddComment = useCallback((entryId: string, text: string) => {
-        const newComment: Comment = {
+        const newComment: GlobalComment = {
             id: Date.now().toString(),
-            text,
-            createdAt: new Date().toISOString(),
-            author: 'Me',
+            content: text,
+            createdAt: Date.now(),
         };
 
-        setEntries(prev => prev.map(entry => {
-            if (entry.id === entryId) {
+        setLogs(prev => prev.map(log => {
+            if (log.id === entryId) {
                 return {
-                    ...entry,
-                    comments: [...(entry.comments || []), newComment]
+                    ...log,
+                    comments: [...(log.comments || []), newComment]
                 };
             }
-            return entry;
+            return log;
         }));
-    }, []);
+    }, [setLogs]);
 
     const handleMonthSelect = (monthIndex: number) => {
         const newDate = new Date(selectedDate);
@@ -150,64 +264,12 @@ export const JournalView: React.FC<JournalViewProps> = ({
                             )}
                         </div>
 
-                        {/* Stats & Filter Trigger */}
-                        <div className="relative text-right" ref={filterRef}>
-                            <button
-                                onClick={() => setIsFilterOpen(!isFilterOpen)}
-                                className="group flex items-center justify-end gap-2 hover:opacity-70 transition-opacity"
-                            >
-                                <div className="flex flex-col items-end">
-                                    <span className="text-3xl font-serif text-gray-900 leading-none">{filteredEntries.length}</span>
-                                    <div className="flex items-center gap-1 text-xs font-bold text-gray-400 tracking-wider uppercase mt-1">
-                                        <span>Entries</span>
-                                        <SlidersHorizontal className="w-3 h-3" />
-                                    </div>
-                                </div>
-                            </button>
-
-                            {/* Filter Popup */}
-                            {isFilterOpen && (
-                                <div className="absolute top-full right-0 mt-4 bg-white shadow-xl border border-gray-100 rounded-xl p-5 z-40 w-64 animate-in fade-in zoom-in-95 duration-200">
-                                    <div className="flex justify-between items-center mb-4">
-                                        <span className="text-xs font-bold text-gray-400 tracking-widest uppercase">Filter</span>
-                                        <button onClick={() => setIsFilterOpen(false)} className="text-gray-400 hover:text-gray-900">
-                                            <X className="w-4 h-4" />
-                                        </button>
-                                    </div>
-
-                                    {/* Filter: Has Media */}
-                                    <div className="flex items-center justify-between mb-4">
-                                        <div className="flex items-center gap-2 text-sm text-gray-700">
-                                            <ImageIcon className="w-4 h-4" />
-                                            <span>With Photos</span>
-                                        </div>
-                                        <button
-                                            onClick={() => setFilterHasMedia(!filterHasMedia)}
-                                            className={`w-10 h-5 rounded-full relative transition-colors duration-300 ${filterHasMedia ? 'bg-gray-900' : 'bg-gray-200'}`}
-                                        >
-                                            <div className={`absolute top-1 w-3 h-3 bg-white rounded-full transition-all duration-300 ${filterHasMedia ? 'left-6' : 'left-1'}`}></div>
-                                        </button>
-                                    </div>
-
-                                    {/* Filter: Min Length */}
-                                    <div className="space-y-2">
-                                        <div className="flex items-center gap-2 text-sm text-gray-700">
-                                            <AlignLeft className="w-4 h-4" />
-                                            <span>Min. Words</span>
-                                            <span className="ml-auto text-xs font-bold text-gray-500">{filterMinLength} chars</span>
-                                        </div>
-                                        <input
-                                            type="range"
-                                            min="0"
-                                            max="500"
-                                            step="10"
-                                            value={filterMinLength}
-                                            onChange={(e) => setFilterMinLength(parseInt(e.target.value))}
-                                            className="w-full h-1 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-gray-900"
-                                        />
-                                    </div>
-                                </div>
-                            )}
+                        {/* Stats Display */}
+                        <div className="text-right">
+                            <div className="flex flex-col items-end">
+                                <span className="text-3xl font-serif text-gray-900 leading-none">{filteredEntries.length}</span>
+                                <span className="text-xs font-bold text-gray-400 tracking-wider uppercase mt-1">Entries</span>
+                            </div>
                         </div>
                     </div>
 
@@ -225,14 +287,38 @@ export const JournalView: React.FC<JournalViewProps> = ({
                 <div className="relative">
                     {filteredEntries.length > 0 ? (
                         <div className="flex flex-col">
-                            {filteredEntries.map((entry, index) => (
-                                <TimelineItem
-                                    key={entry.id}
-                                    entry={entry}
-                                    isLast={index === filteredEntries.length - 1}
-                                    onAddComment={handleAddComment}
-                                />
-                            ))}
+                            {filteredEntries.map((dayGroup, groupIndex) => {
+                                const dateObj = new Date(dayGroup.date);
+                                const day = dateObj.getDate().toString();
+                                const month = dateObj.toLocaleDateString('en-US', { month: 'short' }).toUpperCase();
+
+                                return (
+                                    <div key={dayGroup.date} className="flex w-full mb-6">
+                                        {/* Left: Sticky Date */}
+                                        <div className="relative w-12 flex-shrink-0">
+                                            <div className="sticky top-6 pr-3 text-right">
+                                                <span className="block font-serif text-xl md:text-2xl text-gray-900 font-semibold leading-none">{day}</span>
+                                                <span className="block font-sans text-[10px] font-bold text-subtle tracking-widest mt-1">{month}</span>
+                                            </div>
+                                            {/* Vertical line */}
+                                            <div className="absolute top-0 right-0 w-px bg-gray-200 h-full" />
+                                        </div>
+
+                                        {/* Right: Entries for this day */}
+                                        <div className="flex-1 flex flex-col">
+                                            {dayGroup.entries.map((entry, entryIndex) => (
+                                                <TimelineItem
+                                                    key={entry.id}
+                                                    entry={entry}
+                                                    isLast={groupIndex === filteredEntries.length - 1 && entryIndex === dayGroup.entries.length - 1}
+                                                    isFirstOfDay={entryIndex === 0}
+                                                    onAddComment={handleAddComment}
+                                                />
+                                            ))}
+                                        </div>
+                                    </div>
+                                );
+                            })}
 
                             {/* End of Feed Indicator */}
                             <div className="mt-12 flex flex-col items-center justify-center gap-2 text-gray-300">
@@ -257,16 +343,17 @@ export const JournalView: React.FC<JournalViewProps> = ({
                                 </button>
                             )}
                         </div>
-                    )}
-                </div>
-            </main>
+                    )
+                    }
+                </div >
+            </main >
 
             {/* Floating Action Button - Mock */}
-            <div className="fixed bottom-24 right-6 z-40 md:hidden">
+            < div className="fixed bottom-24 right-6 z-40 md:hidden" >
                 <button className="bg-ink text-white p-4 rounded-full shadow-lg hover:scale-105 transition-transform flex items-center justify-center" onClick={() => onOpenDailyReview(new Date())}>
                     <PenLine className="w-6 h-6" />
                 </button>
-            </div>
-        </div>
+            </div >
+        </div >
     );
 };
