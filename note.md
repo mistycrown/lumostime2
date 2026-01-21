@@ -52,11 +52,6 @@ D:\2026 ai_assist\lumostime\static\my-chronicle-timeline
 每个条目标题字体模仿：<h3 class="text-lg font-bold leading-tight text-stone-900">上课开会</h3>
 正文字体模仿<p class="text-sm text-stone-500 leading-relaxed mb-2 font-light whitespace-pre-wrap">修改摘要</p>
 
-注意看下面这个，调整格式ui边距字体大小之类的
-
-<div class="relative pl-8 animate-in slide-in-from-bottom-2 duration-500"><div class="absolute -left-[60px] top-0 w-[45px] text-right flex flex-col items-end"><span class="text-sm font-bold text-stone-800 leading-none font-mono">09:00 </span><span class="text-[10px] font-medium text-stone-400 mt-1">2h 0 m</span></div><div class="absolute -left-[5px] top-1.5 w-2.5 h-2.5 rounded-full bg-stone-900 border-2 border-[#faf9f6] z-10"></div><div class="cursor-pointer active:opacity-70 transition-opacity"><div class="flex items-center gap-2 mb-1"><h3 class="text-lg font-bold leading-tight text-stone-900">书籍文献</h3><span class="text-sm font-bold text-stone-400 font-mono flex items-center gap-0.5"><svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-zap" aria-hidden="true"><path d="M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z"></path></svg>4</span></div><p class="text-sm text-stone-500 leading-relaxed mb-2 font-light whitespace-pre-wrap">资本论第4章</p><div class="flex flex-wrap items-center gap-2 mt-1"><span class="text-[10px] font-medium text-stone-500 border border-stone-200 px-2 py-0.5 rounded flex items-center gap-1 bg-stone-50/30"><span class="text-stone-400 font-bold">@</span><span class="line-clamp-1">阅读《资本论》第一卷</span><span class="font-mono text-stone-400 ml-0.5">+20</span></span><span class="text-[10px] font-medium text-stone-500 border border-stone-200 px-2 py-0.5 rounded flex items-center gap-1 bg-stone-50/30"><span class="font-bold">#</span><span>🎓</span><span class="flex items-center"><span>学习</span><span class="mx-1 text-stone-300">/</span><span class="mr-1">📖</span><span class="text-stone-500">书籍文献</span></span></span><span class="text-[10px] font-medium text-stone-500 border border-stone-200 px-2 py-0.5 rounded flex items-center gap-1 bg-stone-50/30"><span class="text-stone-400 font-bold">%</span><span>🚩</span><span>专业输入</span></span></div><div class="flex items-center gap-2 mt-3 overflow-x-auto no-scrollbar pb-1"><div class="w-16 h-16 shadow-sm rounded-lg overflow-hidden border border-stone-200 shrink-0"><img alt="img" class="w-full h-full object-cover" src="blob:http://localhost:3002/427e5bb5-5593-4c7b-92a1-cedb3d401a02"></div></div></div></div>
-
-
 
 第二，要模仿这个来展示标签、待办、领域信息，现在的每个条目只展示了二级标签，没有展示一级标签、待办、领域。请模仿脉络页的条目是怎么写的。
 不要改动现有的ui
@@ -67,6 +62,11 @@ D:\2026 ai_assist\lumostime\static\my-chronicle-timeline
 My Chronicle更名为  Chronicle
 日记 更名为 Memoir 
 
+/html/body/div/div[1]/main/div[1]/main将这个组件的上 padding 改成 10。 
+<span class="text-xs font-bold text-gray-400 tracking-[0.2em] uppercase block mb-1">Timeline</span>删除这个组件。 
+
+现在的时间线页面没有显示周报，只有日报。 
+日报周报和普通节点应该用时间线竖线上面的小圆点进行区分。 日报的小圆点变成小月亮，周报小圆点变成小星星。
 
 
 

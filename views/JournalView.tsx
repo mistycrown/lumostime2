@@ -8,7 +8,7 @@
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
 import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
-import { DailyReview, Log } from '../types';
+import { DailyReview, Log, WeeklyReview, MonthlyReview } from '../types';
 import { DiaryEntry, MOCK_ENTRIES, MONTHS, Comment } from './journalTypes';
 import TimelineItem from '../components/TimelineItem';
 import { Search, Menu, PenLine, ChevronDown, ChevronLeft, ChevronRight, SlidersHorizontal, Image as ImageIcon, AlignLeft, X } from 'lucide-react';
@@ -19,6 +19,8 @@ import { Comment as GlobalComment, Scope } from '../types';
 
 interface JournalViewProps {
     dailyReviews: DailyReview[];
+    weeklyReviews: WeeklyReview[];   // Add WeeklyReview
+    monthlyReviews: MonthlyReview[]; // Add MonthlyReview
     logs: Log[];
     onOpenDailyReview: (date: Date) => void;
     todos: any[];  // TodoItem[]
@@ -27,6 +29,8 @@ interface JournalViewProps {
 
 export const JournalView: React.FC<JournalViewProps> = ({
     dailyReviews,
+    weeklyReviews,
+    monthlyReviews,
     logs,
     onOpenDailyReview,
     todos,
@@ -75,7 +79,7 @@ export const JournalView: React.FC<JournalViewProps> = ({
             const cat = categories.find(c => c.id === log.categoryId);
             const act = cat?.activities.find(a => a.id === log.activityId);
 
-            // 1. Check for #Title# in content
+            // Check for #Title# in content
             const titleMatch = content.match(/#([^#]+)#/);
             if (titleMatch) {
                 title = titleMatch[1];
@@ -87,7 +91,6 @@ export const JournalView: React.FC<JournalViewProps> = ({
 
             // Get linked todo
             const linkedTodo = todos.find(t => t.id === log.linkedTodoId);
-
             // Get linked scopes
             const linkedScopes = log.scopeIds?.map(id => scopes.find(s => s.id === id)).filter(Boolean) as Scope[] || [];
 
@@ -104,52 +107,91 @@ export const JournalView: React.FC<JournalViewProps> = ({
                     createdAt: new Date(c.createdAt).toISOString(),
                     author: 'Me'
                 })) || [],
-                // Complete metadata like TimelineView
                 tags: cat && act ? [`${cat.icon} ${cat.name} / ${act.icon} ${act.name}`] : [title || 'Log'],
                 relatedTodos: linkedTodo ? [linkedTodo.title] : undefined,
                 domains: linkedScopes.length > 0 ? linkedScopes.map(s => `${s.icon} ${s.name}`) : undefined
             });
         });
 
-        // 2. Process Daily Reviews
-        dailyReviews.forEach(review => {
-            // Parse Narrative Logic (mirrors ReviewHubView)
-            let title = 'Daily Reflection';
+        // Helper to parse narrative
+        const parseNarrative = (narrative: string, defaultTitle: string) => {
+            let title = defaultTitle;
             let content = '...';
 
-            if (review.narrative) {
-                // 1. Get Title (First Line, remove markdown headers)
-                const cleanNarrative = review.narrative.replace(/^#+\s*/, '').trim();
+            if (narrative) {
+                // Get Title (First Line)
+                const cleanNarrative = narrative.replace(/^#+\s*/, '').trim();
                 const lines = cleanNarrative.split('\n');
-                title = lines[0].trim() || 'Daily Reflection';
+                title = lines[0].trim() || defaultTitle;
 
-                // 2. Get Content (Last Blockquote)
+                // Get Content (Last Blockquote or truncated body)
                 const quoteRegex = /(?:^|\n)>\s*(.*?)(?=(?:\n\n|$))/gs;
-                const matches = [...review.narrative.matchAll(quoteRegex)];
+                const matches = [...narrative.matchAll(quoteRegex)];
 
                 if (matches.length > 0) {
                     content = matches[matches.length - 1][1].replace(/\n>\s*/g, '\n').trim();
                 } else {
-                    // Fallback: Body lines (truncated)
                     const bodyText = lines.slice(1).join('\n').trim();
                     content = bodyText.length > 100 ? bodyText.slice(0, 100) + '...' : bodyText;
                 }
-            } else if (review.answers) {
-                // Fallback for no narrative but answers
-                content = review.answers.map(a => `${a.question}\n${a.answer}`).join('\n\n');
             }
+            return { title, content };
+        };
+
+        // 2. Process Daily Reviews
+        dailyReviews.forEach(review => {
+            const { title, content } = parseNarrative(review.narrative || '', 'Daily Reflection');
+            const finalContent = content === '...' && review.answers
+                ? JSON.stringify(review.answers)
+                : content;
 
             diaryEntries.push({
                 id: review.id,
                 type: 'daily_summary',
-                date: `${review.date}T23:59:59`, // End of day
+                date: `${review.date}T23:59:59`,
                 title: title,
-                content: content || 'Tap to view details...',
+                content: finalContent || 'Tap to view details...',
                 comments: []
             });
         });
 
-        // 3. Filter and Sort
+        // 3. Process Weekly Reviews
+        weeklyReviews.forEach(review => {
+            // Calculate week number or just use date range for title default
+            const d = new Date(review.weekStartDate);
+            // Default Title: "Week of <Date>"
+            const defaultTitle = `Week of ${d.toLocaleDateString()}`;
+            const { title, content } = parseNarrative(review.narrative || '', defaultTitle);
+
+            diaryEntries.push({
+                id: review.id,
+                type: 'weekly_summary',
+                date: `${review.weekEndDate}T23:59:59`, // End of week
+                title: title,
+                content: content || 'Weekly review details...',
+                comments: []
+            });
+        });
+
+        // 4. Process Monthly Reviews
+        monthlyReviews.forEach(review => {
+            const d = new Date(review.monthStartDate);
+            const monthName = MONTHS[d.getMonth()];
+            const defaultTitle = `${monthName} Review`;
+
+            const { title, content } = parseNarrative(review.narrative || '', defaultTitle);
+
+            diaryEntries.push({
+                id: review.id,
+                type: 'monthly_summary',
+                date: `${review.monthEndDate}T23:59:59`, // End of month
+                title: title,
+                content: content || 'Monthly review details...',
+                comments: []
+            });
+        });
+
+        // 5. Filter and Sort
         const sorted = diaryEntries.filter(entry => {
             const d = new Date(entry.date);
             const matchesDate = d.getMonth() === selectedDate.getMonth() &&
@@ -161,25 +203,21 @@ export const JournalView: React.FC<JournalViewProps> = ({
             return matchesDate && matchesMedia && matchesLength;
         }).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
-        // 4. Group by day and mark first entries
+        // 6. Group by day
         const groupedByDay: { date: string; entries: DiaryEntry[] }[] = [];
-
         sorted.forEach(entry => {
             const dateStr = new Date(entry.date).toDateString();
             const lastGroup = groupedByDay[groupedByDay.length - 1];
-
             if (!lastGroup || lastGroup.date !== dateStr) {
-                // New day group
                 groupedByDay.push({ date: dateStr, entries: [entry] });
             } else {
-                // Add to existing group
                 lastGroup.entries.push(entry);
             }
         });
 
         return groupedByDay;
 
-    }, [logs, dailyReviews, categories, selectedDate, filterHasMedia, filterMinLength, todos, scopes]);
+    }, [logs, dailyReviews, weeklyReviews, monthlyReviews, categories, selectedDate, filterHasMedia, filterMinLength, todos, scopes]);
 
     const handleAddComment = useCallback((entryId: string, text: string) => {
         const newComment: GlobalComment = {
