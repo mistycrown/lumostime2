@@ -173,24 +173,6 @@ export const JournalView: React.FC<JournalViewProps> = ({
             });
         });
 
-        // 4. Process Monthly Reviews
-        monthlyReviews.forEach(review => {
-            const d = new Date(review.monthStartDate);
-            const monthName = MONTHS[d.getMonth()];
-            const defaultTitle = `${monthName} Review`;
-
-            const { title, content } = parseNarrative(review.narrative || '', defaultTitle);
-
-            diaryEntries.push({
-                id: review.id,
-                type: 'monthly_summary',
-                date: `${review.monthEndDate}T23:59:59`, // End of month
-                title: title,
-                content: content || 'Monthly review details...',
-                comments: []
-            });
-        });
-
         // 5. Filter and Sort
         const sorted = diaryEntries.filter(entry => {
             const d = new Date(entry.date);

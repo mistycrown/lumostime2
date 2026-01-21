@@ -29,7 +29,7 @@ const TimelineImage: React.FC<{ filename: string, className?: string, useThumbna
                 console.log(`[TimelineImage] 尝试加载图片: ${filename}, useThumbnail: ${useThumbnail}, refreshKey: ${refreshKey}`);
                 const url = await imageService.getImageUrl(filename, useThumbnail ? 'thumbnail' : 'original');
                 console.log(`[TimelineImage] 获取到图片URL: ${filename} -> ${url ? '成功' : '失败'}`);
-                
+
                 if (url) {
                     setSrc(url);
                     setError('');
@@ -42,7 +42,7 @@ const TimelineImage: React.FC<{ filename: string, className?: string, useThumbna
                 setError(`加载失败: ${err.message}`);
             }
         };
-        
+
         loadImage();
     }, [filename, useThumbnail, refreshKey]); // 添加refreshKey到依赖
 
@@ -65,9 +65,9 @@ const TimelineImage: React.FC<{ filename: string, className?: string, useThumbna
 
     return (
         <div className={`${className} rounded-lg overflow-hidden border border-stone-200 shrink-0`}>
-            <img 
-                src={src} 
-                alt="img" 
+            <img
+                src={src}
+                alt="img"
                 className="w-full h-full object-cover"
                 onError={() => {
                     console.error(`[TimelineImage] 图片加载失败: ${filename}, src: ${src}`);
@@ -778,9 +778,9 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ logs, todos, scopes,
                                                     const imagesToShow = item.logData.images.length > 3
                                                         ? item.logData.images.slice(0, 2)
                                                         : item.logData.images;
-                                                    
+
                                                     console.log(`[TimelineView] 渲染图片组: 记录ID=${item.logData.id}, 总图片=${item.logData.images.length}, 显示图片=`, imagesToShow);
-                                                    
+
                                                     return imagesToShow.map(img => (
                                                         <TimelineImage key={img} filename={img} className="w-16 h-16 shadow-sm" useThumbnail={true} refreshKey={refreshKey} />
                                                     ));
@@ -830,7 +830,7 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ logs, todos, scopes,
                                     </div>
 
                                     {/* Timeline Dot */}
-                                    <div className="absolute -left-[5px] top-3 w-2.5 h-2.5 rounded-full bg-amber-400 border-2 border-[#faf9f6] z-10" />
+                                    <div className="absolute -left-[5px] top-1.5 w-2.5 h-2.5 rounded-full bg-amber-400 border-2 border-[#faf9f6] z-10" />
 
                                     {/* Content: Simple Text Button */}
                                     <button
@@ -916,7 +916,7 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ logs, todos, scopes,
                                 </div>
 
                                 {/* Timeline Dot */}
-                                <div className="absolute -left-[5px] top-3 w-2.5 h-2.5 rounded-full bg-purple-400 border-2 border-[#faf9f6] z-10" />
+                                <div className="absolute -left-[5px] top-1.5 w-2.5 h-2.5 rounded-full bg-purple-400 border-2 border-[#faf9f6] z-10" />
 
                                 {/* Content: Simple Text Button */}
                                 <button
@@ -999,7 +999,7 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ logs, todos, scopes,
                                 </div>
 
                                 {/* Timeline Dot */}
-                                <div className="absolute -left-[5px] top-3 w-2.5 h-2.5 rounded-full bg-pink-400 border-2 border-[#faf9f6] z-10" />
+                                <div className="absolute -left-[5px] top-1.5 w-2.5 h-2.5 rounded-full bg-pink-400 border-2 border-[#faf9f6] z-10" />
 
                                 {/* Content: Simple Text Button */}
                                 <button

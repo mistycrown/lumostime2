@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { DiaryEntry } from '../views/journalTypes';
-import { MessageSquarePlus, MoreHorizontal, Send, Moon, Star, Bookmark } from 'lucide-react';
+import { MessageSquarePlus, MoreHorizontal, MessageCircle, Heart, Share2, Bookmark, Moon, Star, Send } from 'lucide-react';
 import { imageService } from '../services/imageService';
 
 // Helper component for async image loading
@@ -109,14 +109,12 @@ const TimelineItem: React.FC<TimelineItemProps> = ({ entry, isLast, isFirstOfDay
     const renderNodeIcon = () => {
         switch (type) {
             case 'daily_summary':
-                return <div className="bg-white z-10 p-1"><Moon className="w-3 h-3 text-gray-900 fill-current" /></div>;
+                return <div className="bg-white z-10 p-1"><Moon className="w-3 h-3 text-purple-600 fill-current" /></div>;
             case 'weekly_summary':
-                return <div className="bg-white z-10 p-1"><Star className="w-3 h-3 text-gray-900 fill-current" /></div>;
-            case 'monthly_summary':
-                return <div className="bg-white z-10 p-1"><Bookmark className="w-4 h-4 text-gray-900 fill-current" /></div>;
+                return <div className="bg-white z-10 p-1"><Star className="w-3 h-3 text-amber-500 fill-current" /></div>;
             default:
                 // Normal dot
-                return <div className="w-2 h-2 rounded-full bg-gray-900 ring-4 ring-white z-10"></div>;
+                return <div className="w-2.5 h-2.5 mt-1.5 ml-1.5 rounded-full bg-stone-900 border-2 border-white z-10" />;
         }
     };
 
@@ -130,7 +128,9 @@ const TimelineItem: React.FC<TimelineItemProps> = ({ entry, isLast, isFirstOfDay
     return (
         <div className="flex w-full group relative mb-8 pl-4 md:pl-6">
             {/* Node Icon (positioned absolutely on the left edge of parent group) */}
-            <div className="absolute -left-[5px] top-1.5 w-2.5 h-2.5 rounded-full bg-stone-900 border-2 border-white z-10" />
+            <div className="absolute -left-[11px] top-0 z-20 flex items-center justify-center">
+                {renderNodeIcon()}
+            </div>
 
             {/* Content */}
             <div className={containerClasses}>
