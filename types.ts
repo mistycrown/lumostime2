@@ -94,6 +94,13 @@ export interface ActiveSession {
   focusScore?: number; // 1-5
 }
 
+// 评论接口
+export interface Comment {
+  id: string;
+  content: string;
+  createdAt: number; // 时间戳
+}
+
 export interface Log {
   id: string;
   activityId: string;
@@ -108,6 +115,7 @@ export interface Log {
   progressIncrement?: number; // New: Units of progress contributed by this session
   focusScore?: number; // 1-5
   images?: string[]; // (NEW) Array of image filenames/identifiers
+  comments?: Comment[]; // (NEW) 评论列表
 }
 
 export interface TodoCategory {

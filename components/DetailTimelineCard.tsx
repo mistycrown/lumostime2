@@ -10,7 +10,7 @@
 import React, { useMemo } from 'react';
 import { Log, Category } from '../types';
 import { CalendarWidget } from './CalendarWidget';
-import { Clock, Zap } from 'lucide-react';
+import { Clock, Zap, MessageCircle } from 'lucide-react';
 import { TimelineImage } from './TimelineImage';
 
 interface DetailTimelineCardProps {
@@ -319,12 +319,20 @@ export const DetailTimelineCard: React.FC<DetailTimelineCardProps> = ({
                                                         <span className="text-lg font-bold text-stone-900 leading-tight">
                                                             {activity?.name || category?.name || 'Unknown Activity'}
                                                         </span>
-                                                        {log.focusScore && log.focusScore > 0 && (
-                                                            <span className="text-sm font-bold text-stone-400 font-mono flex items-center gap-0.5">
-                                                                <Zap size={12} fill="currentColor" />
-                                                                {log.focusScore}
-                                                            </span>
-                                                        )}
+                                                        <div className="flex items-center gap-2">
+                                                            {log.focusScore && log.focusScore > 0 && (
+                                                                <span className="text-sm font-bold text-stone-400 font-mono flex items-center gap-0.5">
+                                                                    <Zap size={12} fill="currentColor" />
+                                                                    {log.focusScore}
+                                                                </span>
+                                                            )}
+                                                            {log.comments && log.comments.length > 0 && (
+                                                                <span className="text-xs font-bold text-stone-400 font-mono flex items-center gap-0.5">
+                                                                    <MessageCircle size={10} />
+                                                                    {log.comments.length}
+                                                                </span>
+                                                            )}
+                                                        </div>
                                                     </div>
                                                     {log.note && (
                                                         <p className="text-sm text-stone-500 font-light leading-relaxed mb-2 whitespace-pre-wrap">

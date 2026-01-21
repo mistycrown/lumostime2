@@ -8,11 +8,12 @@
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
 import React, { useState, useMemo, useEffect, useRef } from 'react';
-import { Category, Log, TodoItem, TodoCategory, Scope, AutoLinkRule } from '../types';
+import { Category, Log, TodoItem, TodoCategory, Scope, AutoLinkRule, Comment } from '../types';
 import { X, Trash2, TrendingUp, Plus, Minus, Lightbulb, CheckCircle2, Clock, Camera, Image as ImageIcon } from 'lucide-react';
 import { TodoAssociation } from '../components/TodoAssociation';
 import { ScopeAssociation } from '../components/ScopeAssociation';
 import { FocusScoreSelector } from '../components/FocusScoreSelector';
+import { CommentSection } from '../components/CommentSection';
 import { imageService } from '../services/imageService';
 import { ImagePreviewModal } from './ImagePreviewModal';
 
@@ -47,6 +48,7 @@ export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialSta
   const [images, setImages] = useState<string[]>([]);
   const [imageUrls, setImageUrls] = useState<Record<string, string>>({});
   const [previewFilename, setPreviewFilename] = useState<string | null>(null);
+  const [comments, setComments] = useState<Comment[]>([]);
 
   // --- TIME STATE (New Logic) ---
   const [trackStartTime, setTrackStartTime] = useState<number>(0);
@@ -75,6 +77,7 @@ export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialSta
       setFocusScore(initialLog.focusScore);
       setScopeIds(initialLog.scopeIds);
       setImages(initialLog.images || []);
+      setComments(initialLog.comments || []);
 
       // Sync Todo Category
       // (Logic moved to TodoAssociation)
@@ -94,6 +97,7 @@ export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialSta
       setFocusScore(undefined);
       setScopeIds(undefined);
       setImages([]);
+      setComments([]);
 
     } else {
       // Scenario 3: New Button -> Default 1 Hour duration ending Now
@@ -113,6 +117,7 @@ export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialSta
       setFocusScore(undefined);
       setScopeIds(undefined);
       setImages([]);
+      setComments([]);
 
     }
 
@@ -345,6 +350,30 @@ export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialSta
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // 处理添加评论
+  const handleAddComment = (content: string) => {
+    const newComment: Comment = {
+      id: crypto.randomUUID(),
+      content,
+      createdAt: Date.now()
+    };
+    setComments(prev => [...prev, newComment]);
+  };
+
+  // 处理编辑评论
+  const handleEditComment = (commentId: string, content: string) => {
+    setComments(prev => prev.map(comment => 
+      comment.id === commentId 
+        ? { ...comment, content }
+        : comment
+    ));
+  };
+
+  // 处理删除评论
+  const handleDeleteComment = (commentId: string) => {
+    setComments(prev => prev.filter(comment => comment.id !== commentId));
+  };
+
   const selectedCategory = categories.find(c => c.id === selectedCategoryId) || categories[0];
   const linkedTodo = todos.find(t => t.id === linkedTodoId);
 
@@ -417,6 +446,7 @@ export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialSta
       focusScore: focusScore,
       scopeIds: scopeIds,
       images: images,
+      comments: comments.length > 0 ? comments : undefined,
     };
     onSave(newLog);
   };
@@ -957,6 +987,16 @@ export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialSta
                 <span className="text-sm">Add Photos</span>
               </div>
             )}
+          </div>
+
+          {/* Comments Section */}
+          <div>
+            <CommentSection
+              comments={comments}
+              onAddComment={handleAddComment}
+              onEditComment={handleEditComment}
+              onDeleteComment={handleDeleteComment}
+            />
           </div>
 
         </div>

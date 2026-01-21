@@ -17,6 +17,10 @@ git push --force
 待开发功能：
 领域没有设置热力图阈值的地方？(不紧急)
 随机引导模板功能。
+# 1.0.7
+
+D:\2026 ai_assist\lumostime\static\my-chronicle-timeline
+这个文件夹里面是一个日记页面组件的设计草稿。 
 
 
 # 1.0.6
