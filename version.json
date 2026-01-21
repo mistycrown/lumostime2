@@ -2,6 +2,6 @@
     "version": "1.0.6",
     "versionCode": 6,
     "updateUrl": "https://github.com/mistycrown/lumostime2/releases/latest",
-    "releaseNotes": "v1.0.6\\n• 增加批量修改历史记录的功能。\\n• 修复引导提问不生效的问题。\\n• 移除回顾模板中多余的enabled字段。\\n• 优化模板配置逻辑。",
+    "releaseNotes": "v1.0.6\n• 增加批量修改历史记录的功能。\n• 修复引导提问不生效的问题。\n• 移除回顾模板中多余的enabled字段。\n• 优化模板配置逻辑。",
     "forceUpdate": false
 }
