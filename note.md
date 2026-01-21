@@ -39,6 +39,37 @@ D:\2026 ai_assist\lumostime\static\my-chronicle-timeline
 日期、备注的内容、图片，还有开始的时间、评论，这些字段在专注记录数据里面都是有的。 
 但是现在因为备注是没有标题的，所以要设定一个标题语法。也就是说，用户在专注记录的备注里面，如果输入了这样一个标题的语法，那么就自动识别为标题。 暂时定为#标题#，也就是用两个井号包裹标题。如果识别到了标题，那就是把它作为标题；如果没有识别到标题，就把标签的名字，也就是活动的名字、二级标签的名字，给它作为标题。 
 
+日总结和周总结的标题和内容，请你参考一下档案页里面逻辑。标题就是AI叙事的标题  
+
+就是AI叙事的第一行。 内容就是ai叙事最后的引用格式文字。
+
+第一。不需要生成重复的左边的日期时间戳。  
+只需要在每一天的第一条生成一个就行了。 
+第二，要模仿这个来展示标签、待办、领域信息，现在的每个条目都不对
+
+
+
+每个条目标题字体模仿：<h3 class="text-lg font-bold leading-tight text-stone-900">上课开会</h3>
+正文字体模仿<p class="text-sm text-stone-500 leading-relaxed mb-2 font-light whitespace-pre-wrap">修改摘要</p>
+
+注意看下面这个，调整格式ui边距字体大小之类的
+
+<div class="relative pl-8 animate-in slide-in-from-bottom-2 duration-500"><div class="absolute -left-[60px] top-0 w-[45px] text-right flex flex-col items-end"><span class="text-sm font-bold text-stone-800 leading-none font-mono">09:00 </span><span class="text-[10px] font-medium text-stone-400 mt-1">2h 0 m</span></div><div class="absolute -left-[5px] top-1.5 w-2.5 h-2.5 rounded-full bg-stone-900 border-2 border-[#faf9f6] z-10"></div><div class="cursor-pointer active:opacity-70 transition-opacity"><div class="flex items-center gap-2 mb-1"><h3 class="text-lg font-bold leading-tight text-stone-900">书籍文献</h3><span class="text-sm font-bold text-stone-400 font-mono flex items-center gap-0.5"><svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-zap" aria-hidden="true"><path d="M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z"></path></svg>4</span></div><p class="text-sm text-stone-500 leading-relaxed mb-2 font-light whitespace-pre-wrap">资本论第4章</p><div class="flex flex-wrap items-center gap-2 mt-1"><span class="text-[10px] font-medium text-stone-500 border border-stone-200 px-2 py-0.5 rounded flex items-center gap-1 bg-stone-50/30"><span class="text-stone-400 font-bold">@</span><span class="line-clamp-1">阅读《资本论》第一卷</span><span class="font-mono text-stone-400 ml-0.5">+20</span></span><span class="text-[10px] font-medium text-stone-500 border border-stone-200 px-2 py-0.5 rounded flex items-center gap-1 bg-stone-50/30"><span class="font-bold">#</span><span>🎓</span><span class="flex items-center"><span>学习</span><span class="mx-1 text-stone-300">/</span><span class="mr-1">📖</span><span class="text-stone-500">书籍文献</span></span></span><span class="text-[10px] font-medium text-stone-500 border border-stone-200 px-2 py-0.5 rounded flex items-center gap-1 bg-stone-50/30"><span class="text-stone-400 font-bold">%</span><span>🚩</span><span>专业输入</span></span></div><div class="flex items-center gap-2 mt-3 overflow-x-auto no-scrollbar pb-1"><div class="w-16 h-16 shadow-sm rounded-lg overflow-hidden border border-stone-200 shrink-0"><img alt="img" class="w-full h-full object-cover" src="blob:http://localhost:3002/427e5bb5-5593-4c7b-92a1-cedb3d401a02"></div></div></div></div>
+
+
+
+第二，要模仿这个来展示标签、待办、领域信息，现在的每个条目只展示了二级标签，没有展示一级标签、待办、领域。请模仿脉络页的条目是怎么写的。
+不要改动现有的ui
+
+删除页面右上角的 "Enters" 的 Filter 功能。 
+
+
+My Chronicle更名为  Chronicle
+日记 更名为 Memoir 
+
+
+
+
 # 1.0.6
 更新前先备份数据
 

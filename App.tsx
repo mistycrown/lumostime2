@@ -806,19 +806,19 @@ const AppContent: React.FC = () => {
         // 启动时同步图片列表和图片文件
         try {
           console.log('[App] 启动时检查图片同步...');
-          
+
           const localImageList = imageService.getReferencedImagesList();
           const cloudImageData = await webdavService.downloadImageList();
           const cloudImageList = cloudImageData?.images || [];
-          
+
           // 合并列表
           const mergedImageList = Array.from(new Set([...localImageList, ...cloudImageList]));
-          
+
           if (mergedImageList.length > localImageList.length) {
             imageService.updateReferencedImagesList(mergedImageList);
             await webdavService.uploadImageList(mergedImageList);
           }
-          
+
           // 同步图片文件
           const imageResult = await syncService.syncImages(undefined, mergedImageList, mergedImageList);
           if (imageResult.downloaded > 0) {
@@ -1171,12 +1171,12 @@ const AppContent: React.FC = () => {
       if (!config) return;
 
       console.log('[App] 检测到图片删除，触发同步:', event.detail.filename);
-      
+
       // 清除之前的定时器（防抖）
       if (imageSyncTimeoutRef.current) {
         clearTimeout(imageSyncTimeoutRef.current);
       }
-      
+
       // 延迟一点时间确保删除操作完成，然后触发图片同步
       imageSyncTimeoutRef.current = setTimeout(async () => {
         try {
@@ -1194,12 +1194,12 @@ const AppContent: React.FC = () => {
       if (!config) return;
 
       console.log('[App] 检测到图片上传，触发同步:', event.detail.filename);
-      
+
       // 清除之前的定时器（防抖）
       if (imageSyncTimeoutRef.current) {
         clearTimeout(imageSyncTimeoutRef.current);
       }
-      
+
       // 延迟一点时间确保上传操作完成，然后触发图片同步
       imageSyncTimeoutRef.current = setTimeout(async () => {
         try {
@@ -1218,7 +1218,7 @@ const AppContent: React.FC = () => {
 
     window.addEventListener('imageDeleted', handleImageDeleted as EventListener);
     window.addEventListener('imageUploaded', handleImageUploaded as EventListener);
-    
+
     return () => {
       window.removeEventListener('imageDeleted', handleImageDeleted as EventListener);
       window.removeEventListener('imageUploaded', handleImageUploaded as EventListener);
@@ -1775,6 +1775,8 @@ const AppContent: React.FC = () => {
           <JournalView
             dailyReviews={dailyReviews}
             logs={logs}
+            todos={todos}
+            scopes={scopes}
             onOpenDailyReview={(date) => {
               handleOpenDailyReview(date);
             }}
@@ -1932,7 +1934,7 @@ const AppContent: React.FC = () => {
   const handleSyncDataUpdate = async (data: any) => {
     console.log('[App] 开始更新同步数据...');
     isRestoring.current = true;
-    
+
     // 批量更新数据状态
     if (data.logs) {
       console.log(`[App] 更新logs: ${data.logs.length} 条记录`);
@@ -1961,12 +1963,12 @@ const AppContent: React.FC = () => {
     if (data.timestamp) {
       setDataLastModified(data.timestamp);
     }
-    
+
     // 等待一个渲染周期，确保状态更新完成
     await new Promise(resolve => setTimeout(resolve, 10));
-    
+
     console.log('[App] 同步数据更新完成');
-    
+
     // 触发Timeline刷新（如果当前在Timeline页面）
     if (currentView === AppView.TIMELINE) {
       setRefreshKey(prev => prev + 1);
@@ -1979,11 +1981,11 @@ const AppContent: React.FC = () => {
     console.log('[App] ⚡⚡⚡ handleImageSync 被调用 ⚡⚡⚡');
     console.log(`[App] 图片列表: ${imageList.length} 个`);
     console.log('========================================');
-    
+
     // 检查WebDAV配置
     const config = webdavService.getConfig();
     console.log('[App] WebDAV配置状态:', config ? '✓ 已配置' : '✗ 未配置');
-    
+
     if (!config) {
       console.log('[App] ⚠️ WebDAV未配置，跳过图片同步');
       return;
@@ -1991,7 +1993,7 @@ const AppContent: React.FC = () => {
 
     try {
       console.log('[App] ⚡ Starting Image Sync...');
-      
+
       const result = await syncService.syncImages(
         (msg) => console.log(`[App] ${msg}`),
         imageList,
@@ -1999,7 +2001,7 @@ const AppContent: React.FC = () => {
       );
 
       console.log('[App] ⚡ 图片同步结果:', result);
-      
+
       if (result.uploaded > 0) addToast('success', `Uploaded ${result.uploaded} images`);
       if (result.downloaded > 0) addToast('success', `Downloaded ${result.downloaded} images`);
       if (result.deletedRemote > 0) addToast('success', `Deleted ${result.deletedRemote} remote images`);
@@ -2008,7 +2010,7 @@ const AppContent: React.FC = () => {
         console.error('[App] Image sync errors:', result.errors);
         addToast('error', `Image sync had ${result.errors.length} errors`);
       }
-      
+
       // 如果有图片变化，触发Timeline刷新
       if ((result.uploaded > 0 || result.downloaded > 0 || result.deletedRemote > 0) && currentView === AppView.TIMELINE) {
         console.log('[App] 图片同步有变化，触发Timeline刷新');
@@ -2124,11 +2126,11 @@ const AppContent: React.FC = () => {
       console.log('========================================');
       console.log('[App] ⚡⚡⚡ 开始同步图片文件 ⚡⚡⚡');
       console.log('========================================');
-      
+
       await handleImageSync(mergedImageList);
 
       addToast('success', 'Sync complete');
-      
+
       // 强制刷新Timeline页面
       if (currentView === AppView.TIMELINE) {
         await new Promise(resolve => setTimeout(resolve, 100));
