@@ -291,6 +291,7 @@ export interface MonthlyReview {
   narrativeUpdatedAt?: number;
   isEdited?: boolean; // 叙事是否被手动编辑过
   templateSnapshot?: ReviewTemplateSnapshot[]; // 创建时的模板快照
+  cite?: string; // 用户自定义的本月引言
 }
 
 

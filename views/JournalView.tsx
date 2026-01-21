@@ -208,6 +208,18 @@ export const JournalView: React.FC<JournalViewProps> = ({
 
     }, [logs, dailyReviews, weeklyReviews, monthlyReviews, categories, selectedDate, filterHasMedia, filterMinLength, todos, scopes]);
 
+    // Get Current Month's Cite
+    const currentMonthCite = useMemo(() => {
+        const start = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1);
+        // Find review that matches this month
+        // MonthlyReview stores monthStartDate as YYYY-MM-DD string
+        const review = monthlyReviews.find(r => {
+            const rDate = new Date(r.monthStartDate);
+            return rDate.getFullYear() === start.getFullYear() && rDate.getMonth() === start.getMonth();
+        });
+        return review?.cite;
+    }, [monthlyReviews, selectedDate]);
+
     const handleAddComment = useCallback((entryId: string, text: string) => {
         const newComment: GlobalComment = {
             id: Date.now().toString(),
@@ -273,7 +285,7 @@ export const JournalView: React.FC<JournalViewProps> = ({
                                 onClick={() => setIsMonthPickerOpen(!isMonthPickerOpen)}
                                 className="flex items-center gap-2 group hover:opacity-70 transition-opacity"
                             >
-                                <h2 className="text-4xl font-serif text-gray-900">{MONTHS[selectedDate.getMonth()]}</h2>
+                                <h2 className="text-3xl font-serif text-gray-900">{MONTHS[selectedDate.getMonth()]}</h2>
                                 <ChevronDown className={`w-5 h-5 text-gray-400 transition-transform duration-300 ${isMonthPickerOpen ? 'rotate-180' : ''}`} />
                             </button>
 
@@ -324,8 +336,8 @@ export const JournalView: React.FC<JournalViewProps> = ({
                             }}
                             className="bg-white p-6 md:p-8 rounded-xl shadow-[0_2px_20px_rgba(0,0,0,0.03)] border border-gray-100 mb-8 cursor-pointer hover:shadow-md transition-shadow group"
                         >
-                            <p className="font-serif text-lg md:text-xl text-gray-600 italic leading-relaxed group-hover:text-gray-900 transition-colors">
-                                "Every moment is a memory waiting to happen."
+                            <p className="font-serif text-lg md:text-xl text-gray-600 leading-relaxed group-hover:text-gray-900 transition-colors">
+                                "{currentMonthCite || "Every moment is a memory waiting to happen."}"
                             </p>
                         </div>
                     )}
