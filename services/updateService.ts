@@ -58,8 +58,8 @@ export class UpdateService {
                 throw new Error('无效的Gitee API响应格式');
             }
 
-            // 解码base64
-            const decodedContent = atob(apiResponse.content);
+            // 解码base64 (处理中文字符)
+            const decodedContent = decodeURIComponent(escape(atob(apiResponse.content)));
             const data: VersionInfo = JSON.parse(decodedContent);
 
             console.log('[UpdateService] 成功获取版本信息:', data);
