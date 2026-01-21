@@ -38,7 +38,7 @@ interface MonthlyReviewViewProps {
     onClose?: () => void;
 }
 
-type TabType = 'data' | 'guide' | 'narrative';
+type TabType = 'data' | 'guide' | 'narrative' | 'cite';
 
 // Helper to extract emoji
 const getTemplateDisplayInfo = (title: string) => {
@@ -74,6 +74,7 @@ export const MonthlyReviewView: React.FC<MonthlyReviewViewProps> = ({
     const [activeTab, setActiveTab] = useState<TabType>('data');
     const [answers, setAnswers] = useState<ReviewAnswer[]>(review.answers || []);
     const [narrative, setNarrative] = useState(review.narrative || '');
+    const [cite, setCite] = useState(review.cite || '');
     const [isEditing, setIsEditing] = useState(false);
     const [isGenerating, setIsGenerating] = useState(false);
     const [editedNarrative, setEditedNarrative] = useState('');
@@ -207,6 +208,17 @@ export const MonthlyReviewView: React.FC<MonthlyReviewViewProps> = ({
         const updatedReview = {
             ...review,
             templateSnapshot: updatedSnapshot,
+            updatedAt: Date.now()
+        };
+        onUpdateReview(updatedReview);
+    };
+
+    // Update Cite
+    const handleCiteChange = (newCite: string) => {
+        setCite(newCite);
+        const updatedReview = {
+            ...review,
+            cite: newCite,
             updatedAt: Date.now()
         };
         onUpdateReview(updatedReview);
@@ -622,7 +634,7 @@ export const MonthlyReviewView: React.FC<MonthlyReviewViewProps> = ({
 
             {/* Tab Navigation */}
             <div className="flex gap-6 border-b border-stone-200 mb-8 overflow-x-auto no-scrollbar">
-                {(['data', 'guide', 'narrative'] as TabType[]).map(tab => (
+                {(['data', 'guide', 'narrative', 'cite'] as TabType[]).map(tab => (
                     <button
                         key={tab}
                         onClick={() => setActiveTab(tab)}
@@ -631,7 +643,7 @@ export const MonthlyReviewView: React.FC<MonthlyReviewViewProps> = ({
                             : 'text-stone-400 hover:text-stone-600'
                             }`}
                     >
-                        {{ data: '数据', guide: '引导', narrative: '叙事' }[tab]}
+                        {{ data: '数据', guide: '引导', narrative: '叙事', cite: '引言' }[tab]}
                     </button>
                 ))}
             </div>
@@ -664,189 +676,218 @@ export const MonthlyReviewView: React.FC<MonthlyReviewViewProps> = ({
                     </div>
                 )}
 
+                {/* 4. Cite Tab */}
+                {activeTab === 'cite' && (
+                    <div className="animate-in fade-in duration-300 pb-24">
+                        <div className="bg-white rounded-2xl p-6 shadow-sm border border-stone-100">
+                            <label className="block text-sm font-bold text-stone-700 mb-4">
+                                本月引言 / 主题
+                            </label>
+                            <textarea
+                                value={cite}
+                                onChange={(e) => handleCiteChange(e.target.value)}
+                                className="w-full bg-[#faf9f6] border border-stone-200 rounded-xl p-4 text-stone-800 outline-none focus:border-stone-400 focus:bg-white transition-all resize-none text-lg font-serif italic leading-relaxed text-center placeholder-stone-300"
+                                rows={6}
+                                placeholder="输入一句能代表这个月的话..."
+                            />
+                            <p className="text-xs text-stone-400 mt-4 text-center">
+                                这句话将显示在 Memoir 页面顶部的引用卡片中
+                            </p>
+                        </div>
+                    </div>
+                )}
+
                 {/* 2. Guide Tab */}
-                {activeTab === 'guide' && (
-                    <div className="space-y-6 animate-in fade-in duration-300 pb-40">
-                        {enabledQuestions.length === 0 ? (
-                            <div className="text-center py-12">
-                                <p className="text-stone-400">暂无配置的月报模板</p>
-                                <p className="text-xs text-stone-300 mt-2">请在设置中添加月报模板</p>
-                            </div>
-                        ) : (
-                            isReadingMode ? (
-                                // Reading Mode (Optimized Receipt Style) - 无开关
-                                <div className="space-y-8 px-1">
-                                    {templatesForDisplay.map((template, idx, arr) => {
+                {
+                    activeTab === 'guide' && (
+                        <div className="space-y-6 animate-in fade-in duration-300 pb-40">
+                            {enabledQuestions.length === 0 ? (
+                                <div className="text-center py-12">
+                                    <p className="text-stone-400">暂无配置的月报模板</p>
+                                    <p className="text-xs text-stone-300 mt-2">请在设置中添加月报模板</p>
+                                </div>
+                            ) : (
+                                isReadingMode ? (
+                                    // Reading Mode (Optimized Receipt Style) - 无开关
+                                    <div className="space-y-8 px-1">
+                                        {templatesForDisplay.map((template, idx, arr) => {
+                                            const { emoji, text } = getTemplateDisplayInfo(template.title);
+                                            return (
+                                                <div key={template.id}>
+                                                    <div className="space-y-6 mb-8">
+                                                        <h3 className="text-base font-bold text-stone-900 flex items-center gap-2">
+                                                            {emoji && <span className="text-xl">{emoji}</span>}
+                                                            <span>{text}</span>
+                                                        </h3>
+                                                        <div className="space-y-8 pl-1">
+                                                            {template.questions.map(q => renderReadingQuestion(q))}
+                                                        </div>
+                                                    </div>
+                                                    {/* Divider */}
+                                                    {idx < arr.length - 1 && (
+                                                        <div className="h-px bg-stone-100" />
+                                                    )}
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                ) : (
+                                    // Edit Mode (Card Style)
+                                    templatesForDisplay.map(template => {
                                         const { emoji, text } = getTemplateDisplayInfo(template.title);
                                         return (
-                                            <div key={template.id}>
-                                                <div className="space-y-6 mb-8">
+                                            <div key={template.id} className="bg-white rounded-2xl p-5 shadow-sm">
+                                                <div className="flex items-center justify-between mb-4">
                                                     <h3 className="text-base font-bold text-stone-900 flex items-center gap-2">
                                                         {emoji && <span className="text-xl">{emoji}</span>}
                                                         <span>{text}</span>
                                                     </h3>
-                                                    <div className="space-y-8 pl-1">
-                                                        {template.questions.map(q => renderReadingQuestion(q))}
-                                                    </div>
+                                                    {/* syncToTimeline 开关 */}
+                                                    <button
+                                                        onClick={() => toggleTemplateSyncToTimeline(template.id)}
+                                                        className={`w-8 h-8 rounded-full flex items-center justify-center transition-colors ${template.syncToTimeline
+                                                            ? 'bg-stone-800 text-white'
+                                                            : 'bg-stone-100 text-stone-400'
+                                                            }`}
+                                                        title={template.syncToTimeline ? '已同步到时间轴' : '未同步到时间轴'}
+                                                    >
+                                                        <Calendar size={16} />
+                                                    </button>
                                                 </div>
-                                                {/* Divider */}
-                                                {idx < arr.length - 1 && (
-                                                    <div className="h-px bg-stone-100" />
-                                                )}
+                                                <div className="space-y-6">
+                                                    {template.questions.map(q => (
+                                                        <div key={q.id}>
+                                                            {renderQuestion(q)}
+                                                        </div>
+                                                    ))}
+                                                </div>
                                             </div>
                                         );
-                                    })}
-                                </div>
-                            ) : (
-                                // Edit Mode (Card Style)
-                                templatesForDisplay.map(template => {
-                                    const { emoji, text } = getTemplateDisplayInfo(template.title);
-                                    return (
-                                        <div key={template.id} className="bg-white rounded-2xl p-5 shadow-sm">
-                                            <div className="flex items-center justify-between mb-4">
-                                                <h3 className="text-base font-bold text-stone-900 flex items-center gap-2">
-                                                    {emoji && <span className="text-xl">{emoji}</span>}
-                                                    <span>{text}</span>
-                                                </h3>
-                                                {/* syncToTimeline 开关 */}
-                                                <button
-                                                    onClick={() => toggleTemplateSyncToTimeline(template.id)}
-                                                    className={`w-8 h-8 rounded-full flex items-center justify-center transition-colors ${template.syncToTimeline
-                                                        ? 'bg-stone-800 text-white'
-                                                        : 'bg-stone-100 text-stone-400'
-                                                        }`}
-                                                    title={template.syncToTimeline ? '已同步到时间轴' : '未同步到时间轴'}
-                                                >
-                                                    <Calendar size={16} />
-                                                </button>
-                                            </div>
-                                            <div className="space-y-6">
-                                                {template.questions.map(q => (
-                                                    <div key={q.id}>
-                                                        {renderQuestion(q)}
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        </div>
-                                    );
-                                })
-                            )
-                        )}
-                    </div>
-                )}
+                                    })
+                                )
+                            )}
+                        </div>
+                    )
+                }
 
                 {/* 3. Narrative Tab */}
-                {activeTab === 'narrative' && (
-                    <div className="space-y-4 animate-in fade-in duration-300 relative min-h-[50vh] pb-40">
-                        {!narrative && !isEditing ? (
-                            <div className="flex flex-col gap-1 py-8">
-                                {/* Option 1: New Narrative */}
-                                <button
-                                    onClick={() => {
-                                        setEditedNarrative('');
-                                        setIsEditing(true);
-                                    }}
-                                    className="w-full py-4 text-stone-400 hover:text-stone-600 transition-colors flex items-center justify-center gap-2 text-sm font-medium"
-                                >
-                                    <Edit3 size={16} />
-                                    <span>新建叙事</span>
-                                </button>
-
-                                {/* Option 2: AI Create */}
-                                <button
-                                    onClick={handleGenerateNarrative}
-                                    disabled={isGenerating}
-                                    className="w-full py-4 text-stone-600 hover:text-stone-900 transition-colors flex items-center justify-center gap-2 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-                                >
-                                    {isGenerating ? (
-                                        <>
-                                            <RefreshCw size={16} className="animate-spin" />
-                                            AI正在撰写中...
-                                        </>
-                                    ) : (
-                                        <>
-                                            <div className="bg-stone-800 text-white p-1.5 rounded-lg">
-                                                <Sparkles size={14} />
-                                            </div>
-                                            <span>与AI共创叙事</span>
-                                        </>
-                                    )}
-                                </button>
-                            </div>
-                        ) : (
-                            <>
-                                {isEditing ? (
-                                    <div className="mb-24">
-                                        <textarea
-                                            value={editedNarrative}
-                                            onChange={(e) => setEditedNarrative(e.target.value)}
-                                            className="w-full bg-white border border-stone-200 rounded-2xl p-6 text-stone-800 outline-none resize-none text-[15px] leading-relaxed shadow-sm block"
-                                            rows={24}
-                                            placeholder="在此开始写作..."
-                                        />
-                                    </div>
-                                ) : (
-                                    <div className="px-1 prose prose-stone max-w-none text-[15px] leading-relaxed prose-headings:font-bold prose-headings:text-stone-800 prose-headings:my-5 prose-strong:text-stone-900 mb-24">
-                                        <ReactMarkdown
-                                            remarkPlugins={[remarkGfm, remarkBreaks]}
-                                            components={{
-                                                h1: ({ node, ...props }) => <h1 className="text-xl font-bold text-stone-900 mt-8 mb-4 flex items-center gap-2" {...props} />,
-                                                h2: ({ node, ...props }) => <h2 className="text-lg font-bold text-stone-800 mt-6 mb-3 flex items-center gap-2" {...props} />,
-                                                h3: ({ node, ...props }) => <h3 className="text-base font-bold text-stone-800 mt-5 mb-2" {...props} />,
-                                                p: ({ node, ...props }) => <p className="mb-6 last:mb-0" {...props} />,
-                                                blockquote: ({ node, ...props }) => <blockquote className="border-l-4 border-stone-300 pl-4 italic text-stone-600 my-6 font-serif bg-stone-50 py-2 pr-2 rounded-r" {...props} />,
-                                                ul: ({ node, ...props }) => <ul className="list-disc pl-5 my-4 space-y-1 text-stone-700" {...props} />,
-                                                ol: ({ node, ...props }) => <ol className="list-decimal pl-5 my-4 space-y-1 text-stone-700" {...props} />,
-                                                li: ({ node, ...props }) => <li className="pl-1" {...props} />,
-                                                hr: ({ node, ...props }) => <hr className="my-10 border-stone-300" {...props} />
-                                            }}
-                                        >
-                                            {narrative}
-                                        </ReactMarkdown>
-                                    </div>
-                                )}
-
-                                {/* Delete Narrative Button */}
-                                <div className="flex justify-center pt-4 opacity-50 hover:opacity-100 transition-opacity">
+                {
+                    activeTab === 'narrative' && (
+                        <div className="space-y-4 animate-in fade-in duration-300 relative min-h-[50vh] pb-40">
+                            {!narrative && !isEditing ? (
+                                <div className="flex flex-col gap-1 py-8">
+                                    {/* Option 1: New Narrative */}
                                     <button
-                                        onClick={handleDeleteNarrative}
-                                        className="text-red-400 hover:text-red-500 text-xs flex items-center gap-1 px-4 py-2"
+                                        onClick={() => {
+                                            setEditedNarrative('');
+                                            setIsEditing(true);
+                                        }}
+                                        className="w-full py-4 text-stone-400 hover:text-stone-600 transition-colors flex items-center justify-center gap-2 text-sm font-medium"
                                     >
-                                        <Trash2 size={14} />
-                                        <span>删除叙事</span>
+                                        <Edit3 size={16} />
+                                        <span>新建叙事</span>
+                                    </button>
+
+                                    {/* Option 2: AI Create */}
+                                    <button
+                                        onClick={handleGenerateNarrative}
+                                        disabled={isGenerating}
+                                        className="w-full py-4 text-stone-600 hover:text-stone-900 transition-colors flex items-center justify-center gap-2 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                                    >
+                                        {isGenerating ? (
+                                            <>
+                                                <RefreshCw size={16} className="animate-spin" />
+                                                AI正在撰写中...
+                                            </>
+                                        ) : (
+                                            <>
+                                                <div className="bg-stone-800 text-white p-1.5 rounded-lg">
+                                                    <Sparkles size={14} />
+                                                </div>
+                                                <span>与AI共创叙事</span>
+                                            </>
+                                        )}
                                     </button>
                                 </div>
-                            </>
-                        )}
-                    </div>
-                )}
-            </div>
+                            ) : (
+                                <>
+                                    {isEditing ? (
+                                        <div className="mb-24">
+                                            <textarea
+                                                value={editedNarrative}
+                                                onChange={(e) => setEditedNarrative(e.target.value)}
+                                                className="w-full bg-white border border-stone-200 rounded-2xl p-6 text-stone-800 outline-none resize-none text-[15px] leading-relaxed shadow-sm block"
+                                                rows={24}
+                                                placeholder="在此开始写作..."
+                                            />
+                                        </div>
+                                    ) : (
+                                        <div className="px-1 prose prose-stone max-w-none text-[15px] leading-relaxed prose-headings:font-bold prose-headings:text-stone-800 prose-headings:my-5 prose-strong:text-stone-900 mb-24">
+                                            <ReactMarkdown
+                                                remarkPlugins={[remarkGfm, remarkBreaks]}
+                                                components={{
+                                                    h1: ({ node, ...props }) => <h1 className="text-xl font-bold text-stone-900 mt-8 mb-4 flex items-center gap-2" {...props} />,
+                                                    h2: ({ node, ...props }) => <h2 className="text-lg font-bold text-stone-800 mt-6 mb-3 flex items-center gap-2" {...props} />,
+                                                    h3: ({ node, ...props }) => <h3 className="text-base font-bold text-stone-800 mt-5 mb-2" {...props} />,
+                                                    p: ({ node, ...props }) => <p className="mb-6 last:mb-0" {...props} />,
+                                                    blockquote: ({ node, ...props }) => <blockquote className="border-l-4 border-stone-300 pl-4 italic text-stone-600 my-6 font-serif bg-stone-50 py-2 pr-2 rounded-r" {...props} />,
+                                                    ul: ({ node, ...props }) => <ul className="list-disc pl-5 my-4 space-y-1 text-stone-700" {...props} />,
+                                                    ol: ({ node, ...props }) => <ol className="list-decimal pl-5 my-4 space-y-1 text-stone-700" {...props} />,
+                                                    li: ({ node, ...props }) => <li className="pl-1" {...props} />,
+                                                    hr: ({ node, ...props }) => <hr className="my-10 border-stone-300" {...props} />
+                                                }}
+                                            >
+                                                {narrative}
+                                            </ReactMarkdown>
+                                        </div>
+                                    )}
+
+                                    {/* Delete Narrative Button */}
+                                    <div className="flex justify-center pt-4 opacity-50 hover:opacity-100 transition-opacity">
+                                        <button
+                                            onClick={handleDeleteNarrative}
+                                            className="text-red-400 hover:text-red-500 text-xs flex items-center gap-1 px-4 py-2"
+                                        >
+                                            <Trash2 size={14} />
+                                            <span>删除叙事</span>
+                                        </button>
+                                    </div>
+                                </>
+                            )}
+                        </div>
+                    )
+                }
+            </div >
 
             {/* Floating Action Button for Guide Tab */}
-            {activeTab === 'guide' && enabledQuestions.length > 0 && (
-                <button
-                    onClick={toggleReadingMode}
-                    className="fixed bottom-16 right-6 w-14 h-14 bg-stone-900 rounded-full text-white shadow-2xl flex items-center justify-center active:scale-90 transition-transform z-40 border border-stone-800"
-                >
-                    {isReadingMode ? <Edit3 size={24} /> : <LucideIcons.BookOpen size={24} />}
-                </button>
-            )}
+            {
+                activeTab === 'guide' && enabledQuestions.length > 0 && (
+                    <button
+                        onClick={toggleReadingMode}
+                        className="fixed bottom-16 right-6 w-14 h-14 bg-stone-900 rounded-full text-white shadow-2xl flex items-center justify-center active:scale-90 transition-transform z-40 border border-stone-800"
+                    >
+                        {isReadingMode ? <Edit3 size={24} /> : <LucideIcons.BookOpen size={24} />}
+                    </button>
+                )
+            }
 
             {/* Floating Action Button for Narrative Tab */}
-            {activeTab === 'narrative' && (narrative || isEditing) && (
-                <button
-                    onClick={() => {
-                        if (isEditing) handleSaveNarrative();
-                        else {
-                            setEditedNarrative(narrative);
-                            setIsEditing(true);
-                        }
-                    }}
-                    className="fixed bottom-16 right-6 w-14 h-14 bg-stone-900 rounded-full text-white shadow-2xl flex items-center justify-center active:scale-90 transition-transform z-40 border border-stone-800"
-                >
-                    {isEditing ? <LucideIcons.Check size={24} /> : <Edit3 size={24} />}
-                </button>
-            )}
+            {
+                activeTab === 'narrative' && (narrative || isEditing) && (
+                    <button
+                        onClick={() => {
+                            if (isEditing) handleSaveNarrative();
+                            else {
+                                setEditedNarrative(narrative);
+                                setIsEditing(true);
+                            }
+                        }}
+                        className="fixed bottom-16 right-6 w-14 h-14 bg-stone-900 rounded-full text-white shadow-2xl flex items-center justify-center active:scale-90 transition-transform z-40 border border-stone-800"
+                    >
+                        {isEditing ? <LucideIcons.Check size={24} /> : <Edit3 size={24} />}
+                    </button>
+                )
+            }
 
             {/* Confirm Delete Modal */}
             <ConfirmModal
@@ -868,7 +909,7 @@ export const MonthlyReviewView: React.FC<MonthlyReviewViewProps> = ({
                 customTemplates={customNarrativeTemplates}
                 period="monthly"
             />
-        </div>
+        </div >
     );
 };
 
