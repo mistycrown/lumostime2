@@ -155,7 +155,7 @@ const TimelineItem: React.FC<TimelineItemProps> = ({ entry, isLast, isFirstOfDay
             <div className={containerClasses}>
                 {/* Header info */}
                 <div className="flex items-baseline justify-between">
-                    <div className="flex items-center gap-3 text-subtle text-xs font-sans tracking-wide">
+                    <div className="flex items-center gap-3 text-stone-400 text-[10px] font-sans tracking-wide">
                         {!isSummary && <span>{timeDisplay}</span>}
                     </div>
                 </div>

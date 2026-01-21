@@ -31,6 +31,10 @@ export interface DiaryEntry {
     domains?: string[];       // % Domains/Areas
     relatedTodos?: string[];  // @ Todos/Contexts
 
+    // Internal IDs for filtering
+    activityId?: string;
+    scopeIds?: string[];
+
     // Display control
     isFirstOfDay?: boolean;   // Whether this is the first entry of its day
 }

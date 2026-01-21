@@ -54,7 +54,8 @@ import {
     Search,
     Link,
     Smartphone,
-    ImageIcon
+    ImageIcon,
+    AlignLeft
 } from 'lucide-react';
 import { webdavService, WebDAVConfig } from '../services/webdavService';
 import { imageService } from '../services/imageService';
@@ -75,6 +76,7 @@ import { AutoLinkView } from './AutoLinkView';
 import { ObsidianExportView } from './ObsidianExportView';
 import { getFilterStats } from '../utils/filterUtils';
 import { FilterDetailView } from './FilterDetailView';
+import { MemoirSettingsView } from './MemoirSettingsView';
 import excelExportService from '../services/excelExportService';
 import { imageCleanupService } from '../services/imageCleanupService';
 import { BatchFocusRecordManageView } from './BatchFocusRecordManageView';
@@ -160,10 +162,10 @@ const AI_PRESETS = {
 };
 
 export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, onImport, onReset, onClearData, onToast, syncData, onSyncUpdate, startWeekOnSunday, onToggleStartWeekOnSunday, onOpenAutoLink, onOpenSearch, minIdleTimeThreshold = 1, onSetMinIdleTimeThreshold, defaultView = 'RECORD', onSetDefaultView, reviewTemplates = [], onUpdateReviewTemplates, onUpdateDailyReviews, checkTemplates = [], onUpdateCheckTemplates, dailyReviewTime, onSetDailyReviewTime, weeklyReviewTime, onSetWeeklyReviewTime, monthlyReviewTime, onSetMonthlyReviewTime, customNarrativeTemplates, onUpdateCustomNarrativeTemplates, userPersonalInfo, onSetUserPersonalInfo, logs = [], todos = [], scopes = [], currentDate = new Date(), dailyReviews = [], weeklyReviews = [], monthlyReviews = [], todoCategories = [], filters = [], onUpdateFilters, categoriesData = [], onEditLog, autoFocusNote, onToggleAutoFocusNote }) => {
-    const [activeSubmenu, setActiveSubmenu] = useState<'main' | 'data' | 'cloud' | 'ai' | 'preferences' | 'guide' | 'nfc' | 'templates' | 'check_templates' | 'narrative_prompt' | 'auto_record' | 'autolink' | 'obsidian_export' | 'filters' | 'batch_manage'>('main');
+    const [activeSubmenu, setActiveSubmenu] = useState<'main' | 'data' | 'cloud' | 'ai' | 'preferences' | 'guide' | 'nfc' | 'templates' | 'check_templates' | 'narrative_prompt' | 'auto_record' | 'autolink' | 'obsidian_export' | 'filters' | 'memoir_filter' | 'batch_manage'>('main');
     const [webdavConfig, setWebdavConfig] = useState<WebDAVConfig | null>(null);
     const [isSyncing, setIsSyncing] = useState(false);
-    
+
     // 图片清理相关状态
     const [isCheckingImages, setIsCheckingImages] = useState(false);
     const [isCleaningImages, setIsCleaningImages] = useState(false);
@@ -631,17 +633,17 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
     // 图片清理功能
     const handleFixImageList = async () => {
         if (isCheckingImages) return;
-        
+
         setIsCheckingImages(true);
         try {
             const result = await imageService.cleanupUnreferencedImages(logs || []);
-            
+
             // 上传修复后的列表到云端
             const imageList = imageService.getReferencedImagesList();
             await webdavService.uploadImageList(imageList);
-            
+
             onToast('success', `修复完成：保留 ${result.kept} 个，清理 ${result.cleaned} 个`);
-            
+
             // 生成报告
             setImageCleanupReport(
                 `✓ 修复完成\n\n` +
@@ -659,7 +661,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
 
     const handleCheckUnreferencedImages = async () => {
         if (isCheckingImages) return;
-        
+
         setIsCheckingImages(true);
         try {
             const report = await imageCleanupService.generateCleanupReport(logs || []);
@@ -675,13 +677,13 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
 
     const handleCleanupImages = async (dryRun: boolean = false) => {
         if (isCleaningImages) return;
-        
+
         if (!dryRun) {
             // 显示确认模态框而不是默认的 confirm
             setIsImageCleanupConfirmOpen(true);
             return;
         }
-        
+
         await executeImageCleanup(dryRun);
     };
 
@@ -693,7 +695,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
                 deleteRemote: true,
                 dryRun
             });
-            
+
             if (dryRun) {
                 onToast('info', `试运行完成：发现 ${result.unreferencedImages.length} 个未引用图片`);
             } else {
@@ -716,6 +718,10 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
 
 
     // Filters子页面
+    if (activeSubmenu === 'memoir_filter') {
+        return <MemoirSettingsView onBack={() => setActiveSubmenu('main')} />;
+    }
+
     if (activeSubmenu === 'filters') {
         // 如果选中了筛选器,显示详情页
         if (selectedFilter) {
@@ -2188,6 +2194,11 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
                             icon={<Nfc size={18} className="text-orange-500" />}
                             label="NFC Tags"
                             onClick={() => setActiveSubmenu('nfc')}
+                        />
+                        <MenuItem
+                            icon={<AlignLeft size={18} className="text-purple-500" />}
+                            label="Memoir 筛选条件"
+                            onClick={() => setActiveSubmenu('memoir_filter')}
                         />
                         <MenuItem
                             icon={<Settings size={18} />}
