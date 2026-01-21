@@ -327,3 +327,11 @@ export interface ParsedFilterCondition {
   notes: string[][];               // 无符号的全文备注关键词组 (外层AND, 内层OR)
 }
 
+// Memoir 筛选配置
+export interface MemoirFilterConfig {
+  hasImage: boolean;           // 是否带有图片
+  minNoteLength: number;       // 备注最小字数
+  relatedTagIds: string[];     // 关联标签 ID（Activity ID）
+  relatedScopeIds: string[];   // 关联领域 ID
+}
+

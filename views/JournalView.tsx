@@ -11,8 +11,9 @@ import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react'
 import { DailyReview, Log, WeeklyReview, MonthlyReview } from '../types';
 import { DiaryEntry, MOCK_ENTRIES, MONTHS, Comment } from './journalTypes';
 import TimelineItem from '../components/TimelineItem';
-import { Search, Menu, PenLine, ChevronDown, ChevronLeft, ChevronRight, SlidersHorizontal, Image as ImageIcon, AlignLeft, X } from 'lucide-react';
+import { Search, Menu, PenLine, ChevronDown, ChevronLeft, ChevronRight, SlidersHorizontal, Image as ImageIcon, AlignLeft, X, FilterX } from 'lucide-react';
 
+import { useSettings } from '../contexts/SettingsContext';
 import { useCategoryScope } from '../contexts/CategoryScopeContext';
 import { useData } from '../contexts/DataContext';
 import { Comment as GlobalComment, Scope } from '../types';
@@ -44,25 +45,22 @@ export const JournalView: React.FC<JournalViewProps> = ({
 }) => {
     const { categories } = useCategoryScope();
     const { setLogs } = useData();
+    const { memoirFilterConfig } = useSettings();
 
     // Default to Today
     const [selectedDate, setSelectedDate] = useState(new Date());
     const [isMonthPickerOpen, setIsMonthPickerOpen] = useState(false);
-    const [isFilterOpen, setIsFilterOpen] = useState(false);
 
-    // Filter States
-    const [filterHasMedia, setFilterHasMedia] = useState(false);
-    const [filterMinLength, setFilterMinLength] = useState(0);
+    // DEPRECATED LOCAL FILTERS:
+    // const [isFilterOpen, setIsFilterOpen] = useState(false);
+    // const [filterHasMedia, setFilterHasMedia] = useState(false);
+    // const [filterMinLength, setFilterMinLength] = useState(0);
 
-    const filterRef = useRef<HTMLDivElement>(null);
     const monthPickerRef = useRef<HTMLDivElement>(null);
 
     // Close popups when clicking outside
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
-            if (filterRef.current && !filterRef.current.contains(event.target as Node)) {
-                setIsFilterOpen(false);
-            }
             if (monthPickerRef.current && !monthPickerRef.current.contains(event.target as Node)) {
                 setIsMonthPickerOpen(false);
             }
@@ -115,6 +113,8 @@ export const JournalView: React.FC<JournalViewProps> = ({
                     author: 'Me'
                 })) || [],
                 tags: cat && act ? [`${cat.icon} ${cat.name} / ${act.icon} ${act.name}`] : [title || 'Log'],
+                activityId: log.activityId, // Added for filtering
+                scopeIds: log.scopeIds,     // Added for filtering
                 relatedTodos: linkedTodo ? [linkedTodo.title] : undefined,
                 domains: linkedScopes.length > 0 ? linkedScopes.map(s => `${s.icon} ${s.name}`) : undefined
             });
@@ -147,17 +147,18 @@ export const JournalView: React.FC<JournalViewProps> = ({
 
         // 2. Process Daily Reviews
         dailyReviews.forEach(review => {
-            const { title, content } = parseNarrative(review.narrative || '', 'Daily Reflection');
-            const finalContent = content === '...' && review.answers
-                ? JSON.stringify(review.answers)
-                : content;
+            const { title, content } = parseNarrative(review.narrative || '', review.date);
+
+            // User Policy: If no content (or just '...'), show '...'
+            // Title should be the Date
+            const finalContent = (!content || content === '...') ? '...' : content;
 
             diaryEntries.push({
                 id: review.id,
                 type: 'daily_summary',
                 date: `${review.date}T23:59:59`,
-                title: title,
-                content: finalContent || 'Tap to view details...',
+                title: title === 'Daily Reflection' ? review.date : title, // Default title fallback to Date if it was just "Daily Reflection"
+                content: finalContent,
                 comments: []
             });
         });
@@ -170,12 +171,16 @@ export const JournalView: React.FC<JournalViewProps> = ({
             const defaultTitle = `Week of ${d.toLocaleDateString()}`;
             const { title, content } = parseNarrative(review.narrative || '', defaultTitle);
 
+            // User Policy: If no content, show date range
+            const dateRange = `${review.weekStartDate} ~ ${review.weekEndDate}`;
+            const finalContent = (!content || content === '...') ? dateRange : content;
+
             diaryEntries.push({
                 id: review.id,
                 type: 'weekly_summary',
                 date: `${review.weekEndDate}T23:59:59`, // End of week
                 title: title,
-                content: content || 'Weekly review details...',
+                content: finalContent,
                 comments: []
             });
         });
@@ -186,11 +191,48 @@ export const JournalView: React.FC<JournalViewProps> = ({
             const matchesDate = d.getMonth() === selectedDate.getMonth() &&
                 d.getFullYear() === selectedDate.getFullYear();
 
-            const matchesMedia = filterHasMedia ? (entry.media && entry.media.length > 0) : true;
-            const matchesLength = filterMinLength > 0 ? entry.content.length >= filterMinLength : true;
+            // --- Apply Global Memoir Filter ---
+            // User Request: Daily/Weekly reports should always be shown.
+            // So if type is not 'normal', we bypass the filtering steps.
+            if (entry.type !== 'normal') return matchesDate;
 
-            return matchesDate && matchesMedia && matchesLength;
-        }).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+            const { hasImage, minNoteLength, relatedTagIds, relatedScopeIds } = memoirFilterConfig;
+
+            // 1. Has Image
+            if (hasImage && (!entry.media || entry.media.length === 0)) return false;
+
+            // 2. Min Length
+            if (minNoteLength > 0 && entry.content.length < minNoteLength) return false;
+
+            // 3. Related Tags
+            if (relatedTagIds && relatedTagIds.length > 0) {
+                // @ts-ignore
+                if (!entry.activityId || !relatedTagIds.includes(entry.activityId)) return false;
+            }
+
+            // 4. Related Scopes
+            if (relatedScopeIds && relatedScopeIds.length > 0) {
+                // @ts-ignore
+                const ids = entry.scopeIds || [];
+                const hasShared = ids.some(id => relatedScopeIds.includes(id));
+                if (!hasShared) return false;
+            }
+
+            return matchesDate;
+        }).sort((a, b) => {
+            const timeDiff = new Date(b.date).getTime() - new Date(a.date).getTime();
+            if (timeDiff !== 0) return timeDiff;
+
+            // Tie-breaker: Monthly > Weekly > Daily > Normal
+            // Since we sort descending (b - a), higher priority should be larger value to appear first.
+            const getPriority = (type?: string) => {
+                if (type === 'monthly_summary') return 4;
+                if (type === 'weekly_summary') return 3;
+                if (type === 'daily_summary') return 2;
+                return 1;
+            };
+            return getPriority(b.type) - getPriority(a.type);
+        });
 
         // 6. Group by day
         const groupedByDay: { date: string; entries: DiaryEntry[] }[] = [];
@@ -206,7 +248,7 @@ export const JournalView: React.FC<JournalViewProps> = ({
 
         return groupedByDay;
 
-    }, [logs, dailyReviews, weeklyReviews, monthlyReviews, categories, selectedDate, filterHasMedia, filterMinLength, todos, scopes]);
+    }, [logs, dailyReviews, weeklyReviews, monthlyReviews, categories, selectedDate, memoirFilterConfig, todos, scopes]);
 
     // Get Current Month's Cite
     const currentMonthCite = useMemo(() => {
@@ -395,13 +437,18 @@ export const JournalView: React.FC<JournalViewProps> = ({
                                 <PenLine className="w-6 h-6 opacity-30" />
                             </div>
                             <p className="font-serif text-lg italic">No stories found for this period.</p>
-                            {(filterHasMedia || filterMinLength > 0) && (
-                                <button
-                                    onClick={() => { setFilterHasMedia(false); setFilterMinLength(0); }}
-                                    className="mt-4 text-xs font-bold uppercase tracking-widest text-ink border-b border-ink"
-                                >
-                                    Clear Filters
-                                </button>
+                            <p className="font-serif text-lg italic">No stories found for this period.</p>
+
+                            {(memoirFilterConfig.hasImage || memoirFilterConfig.minNoteLength > 0 || memoirFilterConfig.relatedTagIds.length > 0 || memoirFilterConfig.relatedScopeIds.length > 0) && (
+                                <div className="mt-4 flex flex-col items-center gap-2">
+                                    <span className="text-xs text-stone-400">Filters are active</span>
+                                    <div className="flex flex-wrap gap-1 justify-center">
+                                        {memoirFilterConfig.hasImage && <span className="bg-stone-100 px-2 py-0.5 rounded text-[10px] text-stone-500">Image</span>}
+                                        {memoirFilterConfig.minNoteLength > 0 && <span className="bg-stone-100 px-2 py-0.5 rounded text-[10px] text-stone-500">Min {memoirFilterConfig.minNoteLength} chars</span>}
+                                        {memoirFilterConfig.relatedTagIds.length > 0 && <span className="bg-stone-100 px-2 py-0.5 rounded text-[10px] text-stone-500">Tags ({memoirFilterConfig.relatedTagIds.length})</span>}
+                                        {memoirFilterConfig.relatedScopeIds.length > 0 && <span className="bg-stone-100 px-2 py-0.5 rounded text-[10px] text-stone-500">Domains ({memoirFilterConfig.relatedScopeIds.length})</span>}
+                                    </div>
+                                </div>
                             )}
                         </div>
                     )

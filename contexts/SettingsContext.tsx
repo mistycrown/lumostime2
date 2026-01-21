@@ -3,7 +3,7 @@
  * @description 管理应用设置和用户偏好（不包括 Review 系统，Review 由 ReviewContext 管理）
  */
 import React, { createContext, useContext, useState, useEffect, ReactNode, useRef } from 'react';
-import { AppView, AutoLinkRule, Filter, NarrativeTemplate } from '../types';
+import { AppView, AutoLinkRule, Filter, NarrativeTemplate, MemoirFilterConfig } from '../types';
 import { DEFAULT_USER_PERSONAL_INFO } from '../constants';
 
 interface SettingsContextType {
@@ -39,6 +39,10 @@ interface SettingsContextType {
     // 筛选器
     filters: Filter[];
     setFilters: React.Dispatch<React.SetStateAction<Filter[]>>;
+
+    // Memoir 筛选配置
+    memoirFilterConfig: MemoirFilterConfig;
+    setMemoirFilterConfig: React.Dispatch<React.SetStateAction<MemoirFilterConfig>>;
 
     // 同步相关
     lastSyncTime: number;
@@ -112,6 +116,17 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
         return stored ? JSON.parse(stored) : [];
     });
 
+    // Memoir 筛选配置
+    const [memoirFilterConfig, setMemoirFilterConfig] = useState<MemoirFilterConfig>(() => {
+        const stored = localStorage.getItem('lumostime_memoir_filter_config');
+        return stored ? JSON.parse(stored) : {
+            hasImage: false,
+            minNoteLength: 0,
+            relatedTagIds: [],
+            relatedScopeIds: []
+        };
+    });
+
     // 同步相关
     const [lastSyncTime, setLastSyncTime] = useState<number>(() => {
         const saved = localStorage.getItem('lumos_last_sync_time');
@@ -166,6 +181,10 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
     }, [filters]);
 
     useEffect(() => {
+        localStorage.setItem('lumostime_memoir_filter_config', JSON.stringify(memoirFilterConfig));
+    }, [memoirFilterConfig]);
+
+    useEffect(() => {
         localStorage.setItem('lumos_data_last_modified', dataLastModified.toString());
     }, [dataLastModified]);
 
@@ -189,6 +208,8 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
             setUserPersonalInfo,
             filters,
             setFilters,
+            memoirFilterConfig,
+            setMemoirFilterConfig,
             lastSyncTime,
             setLastSyncTime,
             updateLastSyncTime,
