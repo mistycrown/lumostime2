@@ -25,6 +25,9 @@ interface JournalViewProps {
     onOpenDailyReview: (date: Date) => void;
     todos: any[];  // TodoItem[]
     scopes: Scope[];
+    onEditLog: (log: Log) => void;
+    onOpenWeeklyReview: (start: Date, end: Date) => void;
+    onOpenMonthlyReview: (start: Date, end: Date) => void;
 }
 
 export const JournalView: React.FC<JournalViewProps> = ({
@@ -34,7 +37,10 @@ export const JournalView: React.FC<JournalViewProps> = ({
     logs,
     onOpenDailyReview,
     todos,
-    scopes
+    scopes,
+    onEditLog,
+    onOpenWeeklyReview,
+    onOpenMonthlyReview
 }) => {
     const { categories } = useCategoryScope();
     const { setLogs } = useData();
@@ -220,6 +226,24 @@ export const JournalView: React.FC<JournalViewProps> = ({
         }));
     }, [setLogs]);
 
+    // Handle Entry Click
+    const handleEntryClick = (entry: DiaryEntry) => {
+        if (entry.type === 'normal') {
+            const log = logs.find(l => l.id === entry.id);
+            if (log) {
+                onEditLog(log);
+            }
+        } else if (entry.type === 'daily_summary') {
+            // entry.date is set to T23:59:59, so we can use it
+            onOpenDailyReview(new Date(entry.date));
+        } else if (entry.type === 'weekly_summary') {
+            const review = weeklyReviews.find(r => r.id === entry.id);
+            if (review) {
+                onOpenWeeklyReview(new Date(review.weekStartDate), new Date(review.weekEndDate));
+            }
+        }
+    };
+
     const handleMonthSelect = (monthIndex: number) => {
         const newDate = new Date(selectedDate);
         newDate.setMonth(monthIndex);
@@ -290,10 +314,17 @@ export const JournalView: React.FC<JournalViewProps> = ({
                         </div>
                     </div>
 
-                    {/* Quote or Summary Card */}
+                    {/* Quote or Summary Card - Click to Open Monthly Review */}
                     {filteredEntries.length > 0 && (
-                        <div className="bg-white p-6 md:p-8 rounded-xl shadow-[0_2px_20px_rgba(0,0,0,0.03)] border border-gray-100 mb-8">
-                            <p className="font-serif text-lg md:text-xl text-gray-600 italic leading-relaxed">
+                        <div
+                            onClick={() => {
+                                const start = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1);
+                                const end = new Date(selectedDate.getFullYear(), selectedDate.getMonth() + 1, 0);
+                                onOpenMonthlyReview(start, end);
+                            }}
+                            className="bg-white p-6 md:p-8 rounded-xl shadow-[0_2px_20px_rgba(0,0,0,0.03)] border border-gray-100 mb-8 cursor-pointer hover:shadow-md transition-shadow group"
+                        >
+                            <p className="font-serif text-lg md:text-xl text-gray-600 italic leading-relaxed group-hover:text-gray-900 transition-colors">
                                 "Every moment is a memory waiting to happen."
                             </p>
                         </div>
@@ -330,6 +361,7 @@ export const JournalView: React.FC<JournalViewProps> = ({
                                                     isLast={groupIndex === filteredEntries.length - 1 && entryIndex === dayGroup.entries.length - 1}
                                                     isFirstOfDay={entryIndex === 0}
                                                     onAddComment={handleAddComment}
+                                                    onClick={() => handleEntryClick(entry)}
                                                 />
                                             ))}
                                         </div>
