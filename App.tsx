@@ -1921,7 +1921,7 @@ const AppContent: React.FC = () => {
       return 'Tags';
     }
     if (currentView === AppView.REVIEW) {
-      return isJournalMode ? '日记' : 'My Chronicle';
+      return isJournalMode ? 'Memoir' : 'Chronicle';
     }
     if (currentView === AppView.SCOPE) {
       if (selectedScopeId) return 'Scope Details';

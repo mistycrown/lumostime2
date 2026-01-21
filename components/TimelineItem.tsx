@@ -51,7 +51,18 @@ const TimelineItem: React.FC<TimelineItemProps> = ({ entry, isLast, isFirstOfDay
     const dateObj = new Date(entry.date);
     const day = dateObj.getDate().toString().padStart(2, '0');
     const month = dateObj.toLocaleString('en-US', { month: 'short' }).toUpperCase();
-    const time = dateObj.toLocaleString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+
+    // Format Time Range (24h)
+    const formatTime24 = (isoString: string) => {
+        const d = new Date(isoString);
+        return d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false });
+    };
+
+    const startTimeStr = formatTime24(entry.date);
+    const endTimeStr = entry.endDate ? formatTime24(entry.endDate) : '';
+
+    // e.g. "09:00 - 10:30" or just "09:00" if no end date
+    const timeDisplay = endTimeStr ? `${startTimeStr} - ${endTimeStr}` : startTimeStr;
 
     const type = entry.type || 'normal';
     const isSummary = type !== 'normal';
@@ -121,7 +132,7 @@ const TimelineItem: React.FC<TimelineItemProps> = ({ entry, isLast, isFirstOfDay
     // Background style for summary cards
     const containerClasses = isSummary
         ? "bg-paper-dark/60 rounded-xl p-5 border border-dashed border-gray-300 relative w-full"
-        : "flex flex-col gap-1 w-full";
+        : "flex flex-col gap-1 w-full pl-[5px]";
 
     const hasMetadata = (entry.relatedTodos?.length || 0) + (entry.tags?.length || 0) + (entry.domains?.length || 0) > 0;
 
@@ -137,7 +148,7 @@ const TimelineItem: React.FC<TimelineItemProps> = ({ entry, isLast, isFirstOfDay
                 {/* Header info */}
                 <div className="flex items-baseline justify-between">
                     <div className="flex items-center gap-3 text-subtle text-xs font-sans tracking-wide">
-                        {!isSummary && <span>{time}</span>}
+                        {!isSummary && <span>{timeDisplay}</span>}
                     </div>
                 </div>
 

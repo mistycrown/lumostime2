@@ -703,7 +703,9 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ logs, todos, scopes,
                                     </div>
 
                                     {/* Timeline Dot */}
-                                    <div className="absolute -left-[5px] top-1.5 w-2.5 h-2.5 rounded-full bg-stone-900 border-2 border-[#faf9f6] z-10" />
+                                    <div className="absolute -left-[11px] top-0 z-20 flex items-center justify-center">
+                                        <div className="w-2.5 h-2.5 mt-1.5 ml-1.5 rounded-full bg-stone-900 border-2 border-[#faf9f6] z-10" />
+                                    </div>
 
                                     {/* Content Item */}
                                     <div

@@ -575,7 +575,7 @@ export const VIEW_TITLES: Record<AppView, string> = {
   [AppView.TAGS]: '标签管理',
   [AppView.SCOPE]: '领域',
   [AppView.TODO]: 'TODO',
-  [AppView.REVIEW]: 'My Chronicle',
+  [AppView.REVIEW]: 'Chronicle',
   [AppView.SETTINGS]: '设置',
 };
 

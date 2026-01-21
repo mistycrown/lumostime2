@@ -17,7 +17,8 @@ export type EntryType = 'normal' | 'daily_summary' | 'weekly_summary' | 'monthly
 export interface DiaryEntry {
     id: string;
     type?: EntryType; // Defaults to 'normal' if undefined
-    date: string; // ISO date string for sorting
+    date: string; // ISO date string for sorting (Start Time)
+    endDate?: string; // ISO date string (End Time)
     title?: string;
     content: string;
     location?: string;

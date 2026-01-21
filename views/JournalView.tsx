@@ -98,6 +98,7 @@ export const JournalView: React.FC<JournalViewProps> = ({
                 id: log.id,
                 type: 'normal',
                 date: new Date(log.startTime).toISOString(),
+                endDate: new Date(log.endTime).toISOString(),
                 title: title,
                 content: content,
                 media: log.images?.map(img => ({ type: 'image', url: img })),
@@ -235,13 +236,13 @@ export const JournalView: React.FC<JournalViewProps> = ({
     return (
         <div className="flex flex-col h-full bg-white overflow-y-auto overflow-x-hidden pb-safe scrollbar-hide font-sans selection:bg-gray-200 selection:text-black">
             {/* Main Content Area */}
-            <main className="max-w-2xl mx-auto px-4 md:px-6 pt-10 pb-24 min-h-[80vh] w-full">
+            <main className="max-w-2xl mx-auto px-4 md:px-6 pt-[10px] pb-24 min-h-[80vh] w-full">
 
                 {/* Intro / Stats Area / Month Selector */}
                 <div className="mb-12 pl-2 pr-0 relative">
                     <div className="flex justify-between items-end border-b border-gray-200 pb-4 mb-8">
                         <div className="relative" ref={monthPickerRef}>
-                            <span className="text-xs font-bold text-gray-400 tracking-[0.2em] uppercase block mb-1">Timeline</span>
+
 
                             {/* Month Trigger */}
                             <button
@@ -284,12 +285,8 @@ export const JournalView: React.FC<JournalViewProps> = ({
                             )}
                         </div>
 
-                        {/* Stats Display */}
+                        {/* Stats Display Removed */}
                         <div className="text-right">
-                            <div className="flex flex-col items-end">
-                                <span className="text-3xl font-serif text-gray-900 leading-none">{filteredEntries.length}</span>
-                                <span className="text-xs font-bold text-gray-400 tracking-wider uppercase mt-1">Entries</span>
-                            </div>
                         </div>
                     </div>
 
