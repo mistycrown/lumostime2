@@ -35,6 +35,7 @@ Specialized input controls.
 - `CustomSelect.tsx`: Styled dropdown.
 - `ScopeAssociation.tsx`: Tag selection grid.
 - `TodoAssociation.tsx`: Todo linking selector.
+- `CommentSection.tsx`: Comment system for focus logs.
 
 ## Display Items
 Small, atomic display components.
