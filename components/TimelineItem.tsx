@@ -122,8 +122,8 @@ const TimelineItem: React.FC<TimelineItemProps> = ({ entry, isLast, isFirstOfDay
 
     // Background style for summary cards
     const containerClasses = isSummary
-        ? "bg-paper-dark/60 rounded-xl p-5 border border-dashed border-gray-300 relative"
-        : "flex flex-col gap-2";
+        ? "bg-paper-dark/60 rounded-xl p-5 border border-dashed border-gray-300 relative w-full"
+        : "flex flex-col gap-1 w-full";
 
     const hasMetadata = (entry.relatedTodos?.length || 0) + (entry.tags?.length || 0) + (entry.domains?.length || 0) > 0;
 
@@ -149,41 +149,41 @@ const TimelineItem: React.FC<TimelineItemProps> = ({ entry, isLast, isFirstOfDay
                     if (!displayTitle) return null;
 
                     return (
-                        <h3 className={`font-serif text-gray-900 font-medium leading-tight ${isSummary ? 'text-lg mt-1' : 'text-xl md:text-2xl mt-1'}`}>
+                        <h3 className={`text-gray-900 font-bold leading-tight ${isSummary ? 'text-lg' : 'text-lg'}`} style={{ fontFamily: '"Noto Serif SC", serif' }}>
                             {displayTitle}
                         </h3>
                     );
                 })()}
 
                 {/* Body Text */}
-                <p className={`font-sans text-sm md:text-base text-gray-700 leading-relaxed whitespace-pre-line font-light ${isSummary ? 'mt-2 text-gray-600' : 'mt-1'}`}>
+                <p className={`text-sm text-stone-500 leading-relaxed whitespace-pre-wrap font-light ${isSummary ? 'mt-2' : 'mb-1'}`} style={{ fontFamily: '"Noto Serif SC", serif' }}>
                     {entry.content}
                 </p>
 
                 {/* Metadata Chips: @ (Todo), # (Tags), % (Domain) - HIDDEN FOR SUMMARIES */}
                 {!isSummary && hasMetadata && (
-                    <div className="flex flex-wrap gap-2 mt-3">
+                    <div className="flex flex-wrap items-center gap-2">
                         {/* @ Todos / Mentions */}
                         {entry.relatedTodos?.map((todo, i) => (
-                            <span key={`todo-${i}`} className="inline-flex items-center px-2.5 py-1 rounded-md border border-gray-200 bg-transparent text-xs text-gray-600 font-sans tracking-wide hover:border-gray-300 transition-colors cursor-pointer">
-                                <span className="text-gray-400 mr-1.5 font-bold">@</span>
-                                {todo}
+                            <span key={`todo-${i}`} className="text-[10px] font-medium text-stone-500 border border-stone-200 px-2 py-0.5 rounded flex items-center gap-1 bg-stone-50/30">
+                                <span className="text-stone-400 font-bold">@</span>
+                                <span className="line-clamp-1">{todo}</span>
                             </span>
                         ))}
 
                         {/* # Tags */}
                         {entry.tags?.map((tag, i) => (
-                            <span key={`tag-${i}`} className="inline-flex items-center px-2.5 py-1 rounded-md border border-gray-200 bg-transparent text-xs text-gray-600 font-sans tracking-wide hover:border-gray-300 transition-colors cursor-pointer">
-                                <span className="text-gray-400 mr-1.5 font-bold">#</span>
-                                {tag}
+                            <span key={`tag-${i}`} className="text-[10px] font-medium text-stone-500 border border-stone-200 px-2 py-0.5 rounded flex items-center gap-1 bg-stone-50/30">
+                                <span className="font-bold">#</span>
+                                <span>{tag}</span>
                             </span>
                         ))}
 
                         {/* % Domains */}
                         {entry.domains?.map((domain, i) => (
-                            <span key={`domain-${i}`} className="inline-flex items-center px-2.5 py-1 rounded-md border border-gray-200 bg-transparent text-xs text-gray-600 font-sans tracking-wide hover:border-gray-300 transition-colors cursor-pointer">
-                                <span className="text-gray-400 mr-1.5 font-bold">%</span>
-                                {domain}
+                            <span key={`domain-${i}`} className="text-[10px] font-medium text-stone-500 border border-stone-200 px-2 py-0.5 rounded flex items-center gap-1 bg-stone-50/30">
+                                <span className="text-stone-400 font-bold">%</span>
+                                <span>{domain}</span>
                             </span>
                         ))}
                     </div>
@@ -196,10 +196,10 @@ const TimelineItem: React.FC<TimelineItemProps> = ({ entry, isLast, isFirstOfDay
                 {!isSummary && (
                     <>
                         {/* Divider Line */}
-                        <div className="w-full border-t border-dashed border-gray-200 mt-3" />
+                        <div className="w-full border-t border-dashed border-gray-200 mt-2" />
 
                         {/* Action Buttons */}
-                        <div className="flex items-center justify-end pt-2">
+                        <div className="flex items-center justify-end pt-1">
                             <button
                                 onClick={() => setIsCommenting(!isCommenting)}
                                 className="text-gray-300 hover:text-gray-900 transition-colors"
@@ -237,9 +237,9 @@ const TimelineItem: React.FC<TimelineItemProps> = ({ entry, isLast, isFirstOfDay
                         {entry.comments.map((comment) => (
                             <div key={comment.id} className="flex gap-3 text-sm group/comment">
                                 <div className="w-1 h-auto bg-gray-300 rounded-full my-1 opacity-50"></div>
-                                <div className="flex-1">
-                                    <p className="text-gray-800 font-sans leading-relaxed">{comment.text}</p>
-                                    <span className="text-[10px] text-gray-400 uppercase tracking-wider font-bold mt-1 block">
+                                <div className="flex flex-col gap-1">
+                                    <p className="text-sm text-stone-500 leading-relaxed font-light" style={{ fontFamily: '"Noto Serif SC", serif' }}>{comment.text}</p>
+                                    <span className="text-[10px] text-gray-400 uppercase tracking-wider font-bold">
                                         {new Date(comment.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                     </span>
                                 </div>

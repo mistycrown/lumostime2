@@ -1774,6 +1774,8 @@ const AppContent: React.FC = () => {
         return isJournalMode ? (
           <JournalView
             dailyReviews={dailyReviews}
+            weeklyReviews={weeklyReviews}
+            monthlyReviews={monthlyReviews}
             logs={logs}
             todos={todos}
             scopes={scopes}
