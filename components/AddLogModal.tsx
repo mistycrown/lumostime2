@@ -9,7 +9,7 @@
  */
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { Category, Log, TodoItem, TodoCategory, Scope, AutoLinkRule, Comment } from '../types';
-import { X, Trash2, TrendingUp, Plus, Minus, Lightbulb, CheckCircle2, Clock, Camera, Image as ImageIcon } from 'lucide-react';
+import { X, Trash2, TrendingUp, Plus, Minus, Lightbulb, CheckCircle2, Clock, Camera, Image as ImageIcon, Maximize2, Minimize2 } from 'lucide-react';
 import { TodoAssociation } from '../components/TodoAssociation';
 import { ScopeAssociation } from '../components/ScopeAssociation';
 import { FocusScoreSelector } from '../components/FocusScoreSelector';
@@ -49,6 +49,7 @@ export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialSta
   const [imageUrls, setImageUrls] = useState<Record<string, string>>({});
   const [previewFilename, setPreviewFilename] = useState<string | null>(null);
   const [comments, setComments] = useState<Comment[]>([]);
+  const [isNoteExpanded, setIsNoteExpanded] = useState(false);
 
   // --- TIME STATE (New Logic) ---
   const [trackStartTime, setTrackStartTime] = useState<number>(0);
@@ -929,7 +930,28 @@ export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialSta
 
           {/* Note Input */}
           <div>
-            <span className="text-xs font-bold text-stone-400 uppercase tracking-widest mb-2 block">Note</span>
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-xs font-bold text-stone-400 uppercase tracking-widest">Note</span>
+              <button
+                onClick={() => {
+                  const textarea = noteRef.current;
+                  if (textarea) {
+                    const isExpanded = textarea.style.minHeight === '200px';
+                    textarea.style.minHeight = isExpanded ? '100px' : '200px';
+                    textarea.style.transition = 'min-height 0.3s ease';
+                  }
+                }}
+                className="text-stone-400 hover:text-stone-600 transition-colors p-1 rounded-md hover:bg-stone-100"
+                title="扩展/收缩输入框"
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="15,3 21,3 21,9"></polyline>
+                  <polyline points="9,21 3,21 3,15"></polyline>
+                  <line x1="21" y1="3" x2="14" y2="10"></line>
+                  <line x1="3" y1="21" x2="10" y2="14"></line>
+                </svg>
+              </button>
+            </div>
             <textarea
               ref={noteRef}
               value={note}
