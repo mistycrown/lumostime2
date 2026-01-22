@@ -4,6 +4,7 @@
  */
 import React, { createContext, useContext, useState, ReactNode } from 'react';
 import { AppView, Log, TodoItem, Goal } from '../types';
+import { useSettings } from './SettingsContext';
 
 interface NavigationContextType {
     // 主视图
@@ -116,6 +117,26 @@ export const NavigationProvider: React.FC<NavigationProviderProps> = ({
         return initialView || (saved as AppView) || AppView.RECORD;
     });
 
+    const { defaultArchiveView, defaultIndexView } = useSettings();
+
+    // Wrapper for setting view to handle default preferences
+    const handleSetCurrentView = (view: AppView) => {
+        // Handle Index Page Preference
+        if (view === AppView.TAGS) {
+            if (defaultIndexView === 'SCOPE') {
+                setCurrentView(AppView.SCOPE);
+                return;
+            }
+        }
+
+        // Handle Archive Page Preference (Reset to default on entry)
+        if (view === AppView.REVIEW) {
+            setIsJournalMode(defaultArchiveView === 'MEMOIR');
+        }
+
+        setCurrentView(view);
+    };
+
     // 模态框状态
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
     const [isAutoLinkOpen, setIsAutoLinkOpen] = useState(false);
@@ -134,7 +155,11 @@ export const NavigationProvider: React.FC<NavigationProviderProps> = ({
     const [isMonthlyReviewOpen, setIsMonthlyReviewOpen] = useState(false);
 
     // 档案页面模式切换
-    const [isJournalMode, setIsJournalMode] = useState(false);
+    const [isJournalMode, setIsJournalMode] = useState(() => defaultArchiveView === 'MEMOIR');
+
+    // Update isJournalMode if defaultArchiveView changes (optional, but good for immediate feedback if settings changed while in view)
+    // Actually, let's NOT auto-switch if user is already looking at it, only on entry (handled above).
+    // But we should ensure initial state is correct.
 
     // 导航选择状态
     const [selectedTagId, setSelectedTagId] = useState<string | null>(null);
@@ -167,7 +192,7 @@ export const NavigationProvider: React.FC<NavigationProviderProps> = ({
     return (
         <NavigationContext.Provider value={{
             currentView,
-            setCurrentView,
+            setCurrentView: handleSetCurrentView,
             isSettingsOpen,
             setIsSettingsOpen,
             isAutoLinkOpen,
