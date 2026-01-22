@@ -548,21 +548,7 @@ export const WeeklyReviewView: React.FC<WeeklyReviewViewProps> = ({
     return (
         <div className="h-full bg-[#faf9f6] flex flex-col overflow-hidden px-7 pt-4">
             {/* Date Display Section */}
-            {/* Header - Navigation Bar */}
-            <header className="h-14 flex items-center justify-between px-5 bg-[#fdfbf7] border-b border-stone-100 shrink-0 z-30 mb-4 -mx-7 -mt-4">
-                <div className="w-8 flex items-center">
-                    <button
-                        onClick={onClose}
-                        className="text-stone-400 hover:text-stone-600 transition-colors"
-                    >
-                        <ChevronLeft size={24} />
-                    </button>
-                </div>
-                <h1 className="text-lg font-bold text-stone-700 tracking-wide">Weekly Review</h1>
-                <div className="w-8"></div>
-            </header>
-
-            {/* Sub-Header - Date & Actions */}
+            {/* Date Display Section */}
             <div className="mb-6 flex items-center justify-between">
                 <div>
                     <h1 className="text-2xl font-bold text-stone-900 flex items-center gap-3">

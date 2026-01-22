@@ -1932,6 +1932,7 @@ const AppContent: React.FC = () => {
 
   const getHeaderTitle = () => {
     if (isDailyReviewOpen) return 'Daily Review';
+    if (isWeeklyReviewOpen) return 'Weekly Review';
     if (isMonthlyReviewOpen) return 'Monthly Review';
     if (currentView === AppView.TAGS) {
       if (selectedTagId) return 'Tag Details';
@@ -2173,8 +2174,8 @@ const AppContent: React.FC = () => {
       {!isSettingsOpen && (currentView !== AppView.TIMELINE || isDailyReviewOpen) && !isStatsFullScreen &&
         !(currentView === AppView.TODO && isTodoManaging) &&
         !(currentView === AppView.TAGS && isTagsManaging) &&
-        // Hide header for REVIEW view (Memoir/Chronicle use their own headers)
-        currentView !== AppView.REVIEW &&
+        // Hide header for REVIEW view (Memoir/Chronicle use their own headers) UNLESS a modal review is open
+        (currentView !== AppView.REVIEW || isDailyReviewOpen || isWeeklyReviewOpen || isMonthlyReviewOpen) &&
         !(currentView === AppView.SCOPE && isScopeManaging) && (
           <header className={`flex items-center justify-between px-5 border-b border-stone-100 shrink-0 z-30 transition-all duration-300 ${isHeaderScrolled
             ? 'h-12 bg-stone-50/90 backdrop-blur-md shadow-sm'
@@ -2196,12 +2197,19 @@ const AppContent: React.FC = () => {
                 (currentView === AppView.SCOPE && selectedScopeId) ||
                 currentView === AppView.STATS ||
                 isDailyReviewOpen ||
+                isWeeklyReviewOpen ||
                 isMonthlyReviewOpen) && (
                   <button
                     onClick={() => {
                       if (isDailyReviewOpen) {
                         setIsDailyReviewOpen(false);
                         setCurrentReviewDate(null);
+                        if (isOpenedFromSearch) {
+                          setIsSearchOpen(true);
+                          setIsOpenedFromSearch(false);
+                        }
+                      } else if (isWeeklyReviewOpen) {
+                        handleCloseWeeklyReview();
                         if (isOpenedFromSearch) {
                           setIsSearchOpen(true);
                           setIsOpenedFromSearch(false);
@@ -2230,7 +2238,7 @@ const AppContent: React.FC = () => {
             <h1 className="text-lg font-bold text-stone-700 tracking-wide">
               {getHeaderTitle()}
             </h1>
-            {(isDailyReviewOpen || isMonthlyReviewOpen) ? (
+            {(isDailyReviewOpen || isWeeklyReviewOpen || isMonthlyReviewOpen) ? (
               <div className="w-8" />
             ) : currentView === AppView.RECORD ? (
               <button
