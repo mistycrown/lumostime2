@@ -6,6 +6,9 @@ import React, { createContext, useContext, useState, useEffect, ReactNode, useRe
 import { AppView, AutoLinkRule, Filter, NarrativeTemplate, MemoirFilterConfig } from '../types';
 import { DEFAULT_USER_PERSONAL_INFO } from '../constants';
 
+export type DefaultArchiveView = 'CHRONICLE' | 'MEMOIR';
+export type DefaultIndexView = 'TAGS' | 'SCOPE';
+
 interface SettingsContextType {
     // 基础偏好设置
     startWeekOnSunday: boolean;
@@ -16,6 +19,12 @@ interface SettingsContextType {
 
     defaultView: AppView;
     setDefaultView: React.Dispatch<React.SetStateAction<AppView>>;
+
+    defaultArchiveView: DefaultArchiveView;
+    setDefaultArchiveView: React.Dispatch<React.SetStateAction<DefaultArchiveView>>;
+
+    defaultIndexView: DefaultIndexView;
+    setDefaultIndexView: React.Dispatch<React.SetStateAction<DefaultIndexView>>;
 
     // 自动关联规则
     autoLinkRules: AutoLinkRule[];
@@ -76,6 +85,16 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
     const [defaultView, setDefaultView] = useState<AppView>(() => {
         const saved = localStorage.getItem('lumos_default_view');
         return (saved as AppView) || AppView.RECORD;
+    });
+
+    const [defaultArchiveView, setDefaultArchiveView] = useState<DefaultArchiveView>(() => {
+        const saved = localStorage.getItem('lumos_default_archive_view');
+        return (saved as DefaultArchiveView) || 'CHRONICLE';
+    });
+
+    const [defaultIndexView, setDefaultIndexView] = useState<DefaultIndexView>(() => {
+        const saved = localStorage.getItem('lumos_default_index_view');
+        return (saved as DefaultIndexView) || 'TAGS';
     });
 
     // 自动关联规则
@@ -156,6 +175,14 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
     }, [defaultView]);
 
     useEffect(() => {
+        localStorage.setItem('lumos_default_archive_view', defaultArchiveView);
+    }, [defaultArchiveView]);
+
+    useEffect(() => {
+        localStorage.setItem('lumos_default_index_view', defaultIndexView);
+    }, [defaultIndexView]);
+
+    useEffect(() => {
         localStorage.setItem('lumostime_autoLinkRules', JSON.stringify(autoLinkRules));
     }, [autoLinkRules]);
 
@@ -196,6 +223,10 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
             setMinIdleTimeThreshold,
             defaultView,
             setDefaultView,
+            defaultArchiveView,
+            setDefaultArchiveView,
+            defaultIndexView,
+            setDefaultIndexView,
             autoLinkRules,
             setAutoLinkRules,
             autoFocusNote,

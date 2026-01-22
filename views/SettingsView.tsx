@@ -70,6 +70,7 @@ import { ReviewTemplateManageView } from './ReviewTemplateManageView';
 import { CheckTemplateManageView } from './CheckTemplateManageView';
 import { ConfirmModal } from '../components/ConfirmModal';
 import { ReviewTemplate, NarrativeTemplate, Log, TodoItem, Scope, DailyReview, WeeklyReview, MonthlyReview, TodoCategory, Filter, Category, CheckTemplate } from '../types';
+import { DefaultArchiveView, DefaultIndexView } from '../contexts/SettingsContext';
 import FocusNotification from '../plugins/FocusNotificationPlugin';
 import { AutoRecordSettingsView } from './AutoRecordSettingsView';
 import { AutoLinkView } from './AutoLinkView';
@@ -102,6 +103,10 @@ interface SettingsViewProps {
     onSetMinIdleTimeThreshold?: (val: number) => void;
     defaultView?: string;
     onSetDefaultView?: (view: any) => void;
+    defaultArchiveView?: DefaultArchiveView;
+    onSetDefaultArchiveView?: (view: DefaultArchiveView) => void;
+    defaultIndexView?: DefaultIndexView;
+    onSetDefaultIndexView?: (view: DefaultIndexView) => void;
     // Daily Review Templates
     reviewTemplates?: ReviewTemplate[];
     onUpdateReviewTemplates?: (templates: ReviewTemplate[]) => void;
@@ -161,7 +166,7 @@ const AI_PRESETS = {
     }
 };
 
-export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, onImport, onReset, onClearData, onToast, syncData, onSyncUpdate, startWeekOnSunday, onToggleStartWeekOnSunday, onOpenAutoLink, onOpenSearch, minIdleTimeThreshold = 1, onSetMinIdleTimeThreshold, defaultView = 'RECORD', onSetDefaultView, reviewTemplates = [], onUpdateReviewTemplates, onUpdateDailyReviews, checkTemplates = [], onUpdateCheckTemplates, dailyReviewTime, onSetDailyReviewTime, weeklyReviewTime, onSetWeeklyReviewTime, monthlyReviewTime, onSetMonthlyReviewTime, customNarrativeTemplates, onUpdateCustomNarrativeTemplates, userPersonalInfo, onSetUserPersonalInfo, logs = [], todos = [], scopes = [], currentDate = new Date(), dailyReviews = [], weeklyReviews = [], monthlyReviews = [], todoCategories = [], filters = [], onUpdateFilters, categoriesData = [], onEditLog, autoFocusNote, onToggleAutoFocusNote }) => {
+export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, onImport, onReset, onClearData, onToast, syncData, onSyncUpdate, startWeekOnSunday, onToggleStartWeekOnSunday, onOpenAutoLink, onOpenSearch, minIdleTimeThreshold = 1, onSetMinIdleTimeThreshold, defaultView = 'RECORD', onSetDefaultView, defaultArchiveView = 'CHRONICLE', onSetDefaultArchiveView, defaultIndexView = 'TAGS', onSetDefaultIndexView, reviewTemplates = [], onUpdateReviewTemplates, onUpdateDailyReviews, checkTemplates = [], onUpdateCheckTemplates, dailyReviewTime, onSetDailyReviewTime, weeklyReviewTime, onSetWeeklyReviewTime, monthlyReviewTime, onSetMonthlyReviewTime, customNarrativeTemplates, onUpdateCustomNarrativeTemplates, userPersonalInfo, onSetUserPersonalInfo, logs = [], todos = [], scopes = [], currentDate = new Date(), dailyReviews = [], weeklyReviews = [], monthlyReviews = [], todoCategories = [], filters = [], onUpdateFilters, categoriesData = [], onEditLog, autoFocusNote, onToggleAutoFocusNote }) => {
     const [activeSubmenu, setActiveSubmenu] = useState<'main' | 'data' | 'cloud' | 'ai' | 'preferences' | 'guide' | 'nfc' | 'templates' | 'check_templates' | 'narrative_prompt' | 'auto_record' | 'autolink' | 'obsidian_export' | 'filters' | 'memoir_filter' | 'batch_manage'>('main');
     const [webdavConfig, setWebdavConfig] = useState<WebDAVConfig | null>(null);
     const [isSyncing, setIsSyncing] = useState(false);
@@ -1481,7 +1486,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
                     <span className="text-stone-800 font-bold text-lg">偏好设置</span>
                 </div>
 
-                <div className="p-4 space-y-4">
+                <div className="flex-1 overflow-y-auto p-4 space-y-4 pb-40">
                     <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
 
                         {/* Start Week Toggle */}
@@ -1663,6 +1668,58 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
                                         </div>
                                     </>
                                 )}
+                            </div>
+                        </div>
+
+                        {/* Default Archive Page Config */}
+                        <div className="flex items-center justify-between p-4 border-t border-stone-100 relative z-10 hover:bg-stone-50 transition-colors">
+                            <div>
+                                <h4 className="font-bold text-stone-700">档案页默认页面</h4>
+                                <p className="text-xs text-stone-400 mt-1">进入档案页时默认显示的视图</p>
+                            </div>
+                            <div className="flex items-center gap-1 bg-stone-100 p-1 rounded-lg">
+                                <button
+                                    onClick={() => onSetDefaultArchiveView?.('CHRONICLE')}
+                                    className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all ${defaultArchiveView === 'CHRONICLE'
+                                        ? 'bg-white text-stone-800 shadow-sm'
+                                        : 'text-stone-400 hover:text-stone-600'}`}
+                                >
+                                    Chronicle
+                                </button>
+                                <button
+                                    onClick={() => onSetDefaultArchiveView?.('MEMOIR')}
+                                    className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all ${defaultArchiveView === 'MEMOIR'
+                                        ? 'bg-white text-stone-800 shadow-sm'
+                                        : 'text-stone-400 hover:text-stone-600'}`}
+                                >
+                                    Memoir
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Default Index Page Config */}
+                        <div className="flex items-center justify-between p-4 border-t border-stone-100 relative z-10 hover:bg-stone-50 transition-colors">
+                            <div>
+                                <h4 className="font-bold text-stone-700">索引页默认页面</h4>
+                                <p className="text-xs text-stone-400 mt-1">进入索引页时默认显示的视图</p>
+                            </div>
+                            <div className="flex items-center gap-1 bg-stone-100 p-1 rounded-lg">
+                                <button
+                                    onClick={() => onSetDefaultIndexView?.('TAGS')}
+                                    className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all ${defaultIndexView === 'TAGS'
+                                        ? 'bg-white text-stone-800 shadow-sm'
+                                        : 'text-stone-400 hover:text-stone-600'}`}
+                                >
+                                    Tags
+                                </button>
+                                <button
+                                    onClick={() => onSetDefaultIndexView?.('SCOPE')}
+                                    className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all ${defaultIndexView === 'SCOPE'
+                                        ? 'bg-white text-stone-800 shadow-sm'
+                                        : 'text-stone-400 hover:text-stone-600'}`}
+                                >
+                                    Scopes
+                                </button>
                             </div>
                         </div>
                     </div>

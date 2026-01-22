@@ -100,6 +100,8 @@ const AppContent: React.FC = () => {
     startWeekOnSunday, setStartWeekOnSunday,
     minIdleTimeThreshold, setMinIdleTimeThreshold,
     defaultView, setDefaultView,
+    defaultArchiveView, setDefaultArchiveView,
+    defaultIndexView, setDefaultIndexView,
     autoLinkRules, setAutoLinkRules,
     appRules, setAppRules,
     customNarrativeTemplates, setCustomNarrativeTemplates,
@@ -2427,6 +2429,10 @@ const AppContent: React.FC = () => {
             onSetMinIdleTimeThreshold={setMinIdleTimeThreshold}
             defaultView={defaultView}
             onSetDefaultView={setDefaultView}
+            defaultArchiveView={defaultArchiveView}
+            onSetDefaultArchiveView={setDefaultArchiveView}
+            defaultIndexView={defaultIndexView}
+            onSetDefaultIndexView={setDefaultIndexView}
             reviewTemplates={reviewTemplates}
             onUpdateReviewTemplates={setReviewTemplates}
             onUpdateDailyReviews={setDailyReviews}
