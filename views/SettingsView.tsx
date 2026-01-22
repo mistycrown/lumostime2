@@ -311,32 +311,94 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
         if (aiTestStatus !== 'idle') setAiTestStatus('idle');
     }, [aiConfigForm]);
 
-    const fileInputRef = useRef<HTMLInputElement>(null);
+    // S3配置表单变化时自动保存到localStorage（作为草稿）
+    useEffect(() => {
+        if (s3ConfigForm.bucketName || s3ConfigForm.region || s3ConfigForm.secretId || s3ConfigForm.secretKey) {
+            console.log('[SettingsView] 保存S3配置草稿到localStorage');
+            localStorage.setItem('lumos_s3_draft_bucket', s3ConfigForm.bucketName);
+            localStorage.setItem('lumos_s3_draft_region', s3ConfigForm.region);
+            localStorage.setItem('lumos_s3_draft_secret_id', s3ConfigForm.secretId);
+            localStorage.setItem('lumos_s3_draft_secret_key', s3ConfigForm.secretKey);
+            localStorage.setItem('lumos_s3_draft_endpoint', s3ConfigForm.endpoint || '');
+        }
+    }, [s3ConfigForm]);
+
+    // 组件挂载时加载草稿配置
+    useEffect(() => {
+        // 如果没有正式配置，尝试加载草稿配置
+        if (!s3Config) {
+            const draftBucket = localStorage.getItem('lumos_s3_draft_bucket');
+            const draftRegion = localStorage.getItem('lumos_s3_draft_region');
+            const draftSecretId = localStorage.getItem('lumos_s3_draft_secret_id');
+            const draftSecretKey = localStorage.getItem('lumos_s3_draft_secret_key');
+            const draftEndpoint = localStorage.getItem('lumos_s3_draft_endpoint');
+            
+            if (draftBucket || draftRegion || draftSecretId || draftSecretKey) {
+                console.log('[SettingsView] 加载S3配置草稿');
+                setS3ConfigForm({
+                    bucketName: draftBucket || '',
+                    region: draftRegion || '',
+                    secretId: draftSecretId || '',
+                    secretKey: draftSecretKey || '',
+                    endpoint: draftEndpoint || ''
+                });
+            }
+        }
+    }, [s3Config]);
 
     useEffect(() => {
+        // 加载WebDAV配置
         const config = webdavService.getConfig();
         if (config) {
             setWebdavConfig(config);
             setConfigForm(config);
         }
 
-        const s3Config = s3Service.getConfig();
-        if (s3Config) {
-            setS3Config(s3Config);
-            setS3ConfigForm(s3Config);
-        }
+        // 加载S3配置 - 添加更可靠的加载机制
+        const loadS3Config = () => {
+            const s3Config = s3Service.getConfig();
+            console.log('[SettingsView] 加载S3配置:', s3Config);
+            
+            if (s3Config) {
+                setS3Config(s3Config);
+                setS3ConfigForm(s3Config);
+                console.log('[SettingsView] S3配置已加载到表单');
+            } else {
+                // 如果服务中没有配置，尝试直接从localStorage加载
+                const bucketName = localStorage.getItem('lumos_cos_bucket');
+                const region = localStorage.getItem('lumos_cos_region');
+                const secretId = localStorage.getItem('lumos_cos_secret_id');
+                const secretKey = localStorage.getItem('lumos_cos_secret_key');
+                const endpoint = localStorage.getItem('lumos_cos_endpoint');
+                
+                if (bucketName && region && secretId && secretKey) {
+                    const fallbackConfig = {
+                        bucketName,
+                        region,
+                        secretId,
+                        secretKey,
+                        endpoint: endpoint || ''
+                    };
+                    console.log('[SettingsView] 从localStorage加载S3配置:', fallbackConfig);
+                    setS3Config(fallbackConfig);
+                    setS3ConfigForm(fallbackConfig);
+                }
+            }
+        };
 
+        // 立即尝试加载
+        loadS3Config();
+        
+        // 如果第一次加载失败，延迟再试一次
+        const timer = setTimeout(loadS3Config, 100);
+
+        // 加载AI配置
         const aiConfig = aiService.getConfig();
         if (aiConfig) {
             setAiConfigForm(aiConfig);
-            // Try to infer preset (simple heuristic or default to openai)
-            // We could store 'lastUsedPreset' in localStorage too if we wanted perfection, 
-            // but let's just leave it neutral or default.
         }
 
-        // Initial load of the default preset's profile if user hasn't set anything? 
-        // Actually, let's just ensure if they click a preset, it loads correctly.
-        // On mount, we show whatever is "Active" (last saved).
+        return () => clearTimeout(timer);
     }, []);
 
     const handlePresetChange = (key: string) => {
@@ -418,10 +480,14 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
     };
 
     const handleDisconnect = () => {
+        // 只清理服务中的活跃连接，保留localStorage中的配置缓存
         webdavService.clearConfig();
         setWebdavConfig(null);
-        setConfigForm({ url: '', username: '', password: '' });
-        onToast('info', 'Disconnected from WebDAV server');
+        // 保留表单中的配置信息，不清空
+        // setConfigForm({ url: '', username: '', password: '' });
+        
+        console.log('[SettingsView] WebDAV连接已断开，但保留配置缓存供下次使用');
+        onToast('info', 'Disconnected from WebDAV server (configuration saved)');
     };
 
     const handleSyncUpload = async () => {
@@ -489,6 +555,13 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
 
         if (success) {
             setS3Config(s3ConfigForm);
+            // 保存成功后清理草稿
+            localStorage.removeItem('lumos_s3_draft_bucket');
+            localStorage.removeItem('lumos_s3_draft_region');
+            localStorage.removeItem('lumos_s3_draft_secret_id');
+            localStorage.removeItem('lumos_s3_draft_secret_key');
+            localStorage.removeItem('lumos_s3_draft_endpoint');
+            console.log('[SettingsView] S3配置保存成功，清理草稿');
             onToast('success', 'Connected to Tencent Cloud COS successfully!');
         } else {
             s3Service.clearConfig();
@@ -498,10 +571,14 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
     };
 
     const handleS3Disconnect = () => {
+        // 只清理服务中的活跃连接，保留localStorage中的配置缓存
         s3Service.clearConfig();
         setS3Config(null);
-        setS3ConfigForm({ bucketName: '', region: '', secretId: '', secretKey: '', endpoint: '' });
-        onToast('info', 'Disconnected from Tencent Cloud COS');
+        // 保留表单中的配置信息，不清空
+        // setS3ConfigForm({ bucketName: '', region: '', secretId: '', secretKey: '', endpoint: '' });
+        
+        console.log('[SettingsView] S3连接已断开，但保留配置缓存供下次使用');
+        onToast('info', 'Disconnected from Tencent Cloud COS (configuration saved)');
     };
 
     const handleS3SyncUpload = async () => {
@@ -1250,6 +1327,23 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
                                         <LogOut size={16} />
                                         Disconnect
                                     </button>
+                                    
+                                    {/* 完全清理配置按钮 */}
+                                    <button
+                                        onClick={() => {
+                                            if (confirm('确定要完全清理WebDAV配置吗？这将删除所有保存的配置信息，下次需要重新输入。')) {
+                                                webdavService.clearAllConfig();
+                                                setWebdavConfig(null);
+                                                setConfigForm({ url: '', username: '', password: '' });
+                                                console.log('[SettingsView] WebDAV配置已完全清理');
+                                                onToast('info', 'WebDAV configuration completely cleared');
+                                            }
+                                        }}
+                                        className="flex items-center justify-center gap-2 w-full py-2 mt-1 text-red-300 hover:text-red-400 hover:bg-red-50 rounded-lg transition-colors text-xs"
+                                    >
+                                        <Trash2 size={14} />
+                                        完全清理配置
+                                    </button>
                                 </div>
                             </div>
                         ) : (
@@ -1386,6 +1480,29 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
                                         <LogOut size={16} />
                                         Disconnect
                                     </button>
+                                    
+                                    {/* 完全清理配置按钮 */}
+                                    <button
+                                        onClick={() => {
+                                            if (confirm('确定要完全清理S3配置吗？这将删除所有保存的配置信息，下次需要重新输入。')) {
+                                                s3Service.clearAllConfig();
+                                                setS3Config(null);
+                                                setS3ConfigForm({ bucketName: '', region: '', secretId: '', secretKey: '', endpoint: '' });
+                                                // 同时清理草稿
+                                                localStorage.removeItem('lumos_s3_draft_bucket');
+                                                localStorage.removeItem('lumos_s3_draft_region');
+                                                localStorage.removeItem('lumos_s3_draft_secret_id');
+                                                localStorage.removeItem('lumos_s3_draft_secret_key');
+                                                localStorage.removeItem('lumos_s3_draft_endpoint');
+                                                console.log('[SettingsView] S3配置已完全清理');
+                                                onToast('info', 'S3 configuration completely cleared');
+                                            }
+                                        }}
+                                        className="flex items-center justify-center gap-2 w-full py-2 mt-1 text-red-300 hover:text-red-400 hover:bg-red-50 rounded-lg transition-colors text-xs"
+                                    >
+                                        <Trash2 size={14} />
+                                        完全清理配置
+                                    </button>
                                 </div>
                             </div>
                         ) : (
@@ -1521,6 +1638,26 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
                                         <Settings size={16} />
                                         查看CORS配置示例
                                     </button>
+                                    
+                                    {/* 清理草稿按钮 */}
+                                    {(s3ConfigForm.bucketName || s3ConfigForm.region || s3ConfigForm.secretId || s3ConfigForm.secretKey) && !s3Config && (
+                                        <button
+                                            onClick={() => {
+                                                setS3ConfigForm({ bucketName: '', region: '', secretId: '', secretKey: '', endpoint: '' });
+                                                localStorage.removeItem('lumos_s3_draft_bucket');
+                                                localStorage.removeItem('lumos_s3_draft_region');
+                                                localStorage.removeItem('lumos_s3_draft_secret_id');
+                                                localStorage.removeItem('lumos_s3_draft_secret_key');
+                                                localStorage.removeItem('lumos_s3_draft_endpoint');
+                                                console.log('[SettingsView] 手动清理S3配置草稿');
+                                                onToast('info', '已清理配置草稿');
+                                            }}
+                                            className="flex items-center justify-center gap-2 w-full py-2 mt-1 text-stone-500 hover:text-stone-600 hover:bg-stone-50 rounded-lg transition-colors text-xs"
+                                        >
+                                            <Trash2 size={14} />
+                                            清理草稿
+                                        </button>
+                                    )}
                                     
                                     <p className="text-[10px] text-center text-stone-400 mt-3">
                                         Your credentials are stored locally on your device.

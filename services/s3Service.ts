@@ -9,6 +9,7 @@
  */
 // @ts-ignore
 import COS from 'cos-js-sdk-v5';
+import { Capacitor } from '@capacitor/core';
 
 // S3 Configuration Interface (now for Tencent Cloud COS)
 export interface S3Config {
@@ -61,11 +62,66 @@ export class S3Service {
                 SecretId: this.config.secretId,
                 SecretKey: this.config.secretKey,
             });
-            
+
             console.log('[COS] Client initialized successfully');
         } catch (error) {
             console.error('[COS] Failed to initialize client:', error);
             this.client = null;
+        }
+    }
+
+    /**
+     * 调试日志输出方法（支持移动端）
+     */
+    private debugLog(message: string, data?: any) {
+        const timestamp = new Date().toISOString();
+
+        let logData = '';
+        if (data !== undefined && data !== null) {
+            try {
+                if (data instanceof Error) {
+                    logData = JSON.stringify({
+                        name: data.name,
+                        message: data.message,
+                        code: (data as any).code,
+                        statusCode: (data as any).statusCode,
+                        stack: data.stack?.split('\n').slice(0, 3).join('\n')
+                    }, null, 2);
+                } else if (typeof data === 'object') {
+                    const seen = new WeakSet();
+                    logData = JSON.stringify(data, (key, value) => {
+                        if (typeof value === 'object' && value !== null) {
+                            if (seen.has(value)) {
+                                return '[Circular]';
+                            }
+                            seen.add(value);
+                        }
+                        return value;
+                    }, 2);
+                } else {
+                    logData = String(data);
+                }
+            } catch (e) {
+                logData = '[序列化失败: ' + String(e) + ']';
+            }
+        }
+
+        const fullMessage = `[COS-DEBUG] ${timestamp} ${message}${logData ? '\n' + logData : ''}`;
+        console.log(fullMessage);
+
+        if (Capacitor.isNativePlatform()) {
+            try {
+                const nativeMessage = `[COS-NATIVE] ${message}${logData ? '\n' + logData : ''}`;
+                if (message.includes('ERROR') || message.includes('失败')) {
+                    console.error(nativeMessage);
+                } else if (message.includes('WARN') || message.includes('警告')) {
+                    console.warn(nativeMessage);
+                } else {
+                    console.info(nativeMessage);
+                }
+            } catch (e) {
+                // 忽略原生日志错误
+            }
         }
     }
 
@@ -107,14 +163,14 @@ export class S3Service {
             console.log('[COS] Testing connection to bucket:', this.config!.bucketName);
             console.log('[COS] Region:', this.config!.region);
             console.log('[COS] SecretId:', this.config!.secretId.substring(0, 10) + '...');
-            
+
             this.client.headBucket({
                 Bucket: this.config.bucketName,
                 Region: this.config.region
             }, (err: any, data: any) => {
                 if (err) {
                     console.error('[COS] Connection test failed:', err);
-                    
+
                     // Provide more specific error messages
                     if (err.code === 'NoSuchBucket') {
                         console.error('[COS] Bucket does not exist:', this.config!.bucketName);
@@ -135,7 +191,7 @@ export class S3Service {
                         console.error(`[COS] 错误代码: ${err.code}`);
                         console.error(`[COS] 错误消息: ${err.message}`);
                     }
-                    
+
                     resolve(false);
                 } else {
                     console.log('[COS] ✓ Connection test passed');
@@ -151,10 +207,10 @@ export class S3Service {
      */
     async statFile(filename: string = 'lumostime_backup.json'): Promise<Date | null> {
         if (!this.config || !this.client) return null;
-        
+
         return new Promise((resolve) => {
             console.log(`[COS] Getting file stats: ${filename}`);
-            
+
             this.client.headObject({
                 Bucket: this.config!.bucketName,
                 Region: this.config!.region,
@@ -166,8 +222,8 @@ export class S3Service {
                     }
                     resolve(null);
                 } else {
-                    const lastModified = data.headers && data.headers['last-modified'] 
-                        ? new Date(data.headers['last-modified']) 
+                    const lastModified = data.headers && data.headers['last-modified']
+                        ? new Date(data.headers['last-modified'])
                         : null;
                     resolve(lastModified);
                 }
@@ -182,26 +238,31 @@ export class S3Service {
         if (!this.config || !this.client) throw new Error('COS not configured');
 
         const content = JSON.stringify(data, null, 2);
-        
+        // 在Capacitor环境下，将字符串转换为Blob对象
+        const contentBlob = new Blob([content], { type: 'application/json' });
+
         return new Promise((resolve, reject) => {
-            console.log(`[COS] Uploading data: ${filename}, size: ${content.length} bytes`);
-            
+            this.debugLog(`上传数据: ${filename}`, {
+                size: content.length,
+                blobSize: contentBlob.size,
+                isNative: Capacitor.isNativePlatform()
+            });
+
             this.client.putObject({
                 Bucket: this.config!.bucketName,
                 Region: this.config!.region,
                 Key: filename,
-                Body: content,
-                ContentType: 'application/json',
-                Metadata: {
-                    'uploaded-by': 'lumostime',
-                    'version': '1.0.0'
+                Body: contentBlob,
+                Headers: {
+                    'Content-Length': String(contentBlob.size),
+                    'Content-Type': 'application/json'
                 }
             }, (err: any, data: any) => {
                 if (err) {
-                    console.error(`[COS] Upload failed: ${filename}`, err);
+                    this.debugLog(`ERROR: 数据上传失败 ${filename}`, err);
                     reject(err);
                 } else {
-                    console.log(`[COS] ✓ Upload completed: ${filename}`);
+                    this.debugLog(`✓ 数据上传成功: ${filename}`);
                     resolve(true);
                 }
             });
@@ -216,7 +277,7 @@ export class S3Service {
 
         return new Promise((resolve, reject) => {
             console.log(`[COS] Downloading data: ${filename}`);
-            
+
             this.client.getObject({
                 Bucket: this.config!.bucketName,
                 Region: this.config!.region,
@@ -249,10 +310,10 @@ export class S3Service {
         return new Promise(async (resolve, reject) => {
             try {
                 console.log(`[COS] Uploading image: ${filename}`);
-                
+
                 let body: Blob | string;
                 let contentType = 'image/jpeg';
-                
+
                 if (buffer instanceof ArrayBuffer) {
                     // Convert ArrayBuffer to Blob
                     body = new Blob([buffer], { type: contentType });
@@ -282,7 +343,7 @@ export class S3Service {
                 } else {
                     throw new Error('Unsupported buffer type');
                 }
-                
+
                 this.client.putObject({
                     Bucket: this.config!.bucketName,
                     Region: this.config!.region,
@@ -316,7 +377,7 @@ export class S3Service {
 
         return new Promise((resolve, reject) => {
             console.log(`[COS] Downloading image: ${filename}`);
-            
+
             this.client.getObject({
                 Bucket: this.config!.bucketName,
                 Region: this.config!.region,
@@ -324,7 +385,7 @@ export class S3Service {
             }, (err: any, data: any) => {
                 if (err) {
                     console.error(`[COS] Image download failed: ${filename}`, err);
-                    
+
                     if (err.code === 'NoSuchKey') {
                         reject(new Error(`Image not found: ${filename}`));
                     } else {
@@ -335,7 +396,7 @@ export class S3Service {
                         // Convert the response body to ArrayBuffer
                         const body = data.Body;
                         let arrayBuffer: ArrayBuffer;
-                        
+
                         if (body instanceof ArrayBuffer) {
                             arrayBuffer = body;
                         } else if (body instanceof Uint8Array) {
@@ -353,7 +414,7 @@ export class S3Service {
                             const uint8Array = new Uint8Array(body);
                             arrayBuffer = uint8Array.buffer;
                         }
-                        
+
                         console.log(`[COS] ✓ Image download completed: ${filename}, size: ${arrayBuffer.byteLength} bytes`);
                         resolve(arrayBuffer);
                     } catch (conversionError) {
@@ -373,7 +434,7 @@ export class S3Service {
 
         return new Promise((resolve) => {
             console.log(`[COS] Deleting image: ${filename}`);
-            
+
             this.client.deleteObject({
                 Bucket: this.config!.bucketName,
                 Region: this.config!.region,
@@ -402,25 +463,36 @@ export class S3Service {
                 timestamp: Date.now(),
                 version: '1.0.0'
             };
-            
+
             const filename = 'lumostime_images.json';
-            console.log(`[COS] Uploading image list: ${imageList.length} images`);
-            
+            const bodyContent = JSON.stringify(data, null, 2);
+            // 在Capacitor环境下，将字符串转换为Blob对象
+            const bodyBlob = new Blob([bodyContent], { type: 'application/json' });
+
+            this.debugLog(`上传图片列表: ${imageList.length}张图片`, {
+                filename,
+                bodyLength: bodyContent.length,
+                bodyBlobSize: bodyBlob.size,
+                bucket: this.config!.bucketName,
+                region: this.config!.region,
+                isNative: Capacitor.isNativePlatform()
+            });
+
             this.client.putObject({
                 Bucket: this.config!.bucketName,
                 Region: this.config!.region,
                 Key: filename,
-                Body: JSON.stringify(data, null, 2),
-                ContentType: 'application/json',
-                Metadata: {
-                    'uploaded-by': 'lumostime'
+                Body: bodyBlob,
+                Headers: {
+                    'Content-Length': String(bodyBlob.size),
+                    'Content-Type': 'application/json'
                 }
             }, (err: any, data: any) => {
                 if (err) {
-                    console.error('[COS] Image list upload failed', err);
+                    this.debugLog('ERROR: 图片列表上传失败', err);
                     reject(err);
                 } else {
-                    console.log(`[COS] ✓ Image list uploaded: ${filename}`);
+                    this.debugLog(`✓ 图片列表上传成功: ${filename}`);
                     resolve(true);
                 }
             });
@@ -437,7 +509,7 @@ export class S3Service {
 
         return new Promise((resolve, reject) => {
             console.log(`[COS] Downloading image list: ${filename}`);
-            
+
             this.client.getObject({
                 Bucket: this.config!.bucketName,
                 Region: this.config!.region,
@@ -455,7 +527,7 @@ export class S3Service {
                     try {
                         const content = data.Body;
                         const parsedData = JSON.parse(content);
-                        
+
                         console.log(`[COS] ✓ Image list downloaded: ${parsedData.images?.length || 0} images`);
                         resolve(parsedData);
                     } catch (parseError) {
@@ -496,7 +568,7 @@ export class S3Service {
 
         return new Promise((resolve) => {
             console.log(`[COS] Listing objects with prefix: ${path}`);
-            
+
             this.client.getBucket({
                 Bucket: this.config!.bucketName,
                 Region: this.config!.region,

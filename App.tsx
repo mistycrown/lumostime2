@@ -2070,21 +2070,31 @@ const AppContent: React.FC = () => {
     e.stopPropagation();
     setIsSyncing(true);
     try {
-      const config = webdavService.getConfig();
-      console.log('[App] WebDAV配置检查:', config ? '✓ 已配置' : '✗ 未配置');
-      if (!config) {
-        console.log('[App] WebDAV未配置，打开设置页面');
+      // 检查存储服务配置（优先S3，然后WebDAV）
+      const webdavConfig = webdavService.getConfig();
+      const s3Config = s3Service.getConfig();
+      
+      console.log('[App] WebDAV配置检查:', webdavConfig ? '✓ 已配置' : '✗ 未配置');
+      console.log('[App] S3配置检查:', s3Config ? '✓ 已配置' : '✗ 未配置');
+      
+      if (!webdavConfig && !s3Config) {
+        console.log('[App] 没有配置任何存储服务，打开设置页面');
         setIsSettingsOpen(true);
         setIsSyncing(false);
         return;
       }
+
+      // 选择活跃的存储服务（优先S3）
+      const activeService = s3Config ? s3Service : webdavService;
+      const serviceName = s3Config ? 'S3/COS' : 'WebDAV';
+      console.log(`[App] 使用存储服务: ${serviceName}`);
 
       // 1. 同步数据文件（使用简单的时间戳比较）
       let cloudTimestamp = 0;
       let cloudData = null;
 
       try {
-        cloudData = await webdavService.downloadData();
+        cloudData = await activeService.downloadData();
         cloudTimestamp = cloudData?.timestamp || 0;
         console.log(`[App] 云端数据时间戳: ${new Date(cloudTimestamp).toLocaleString()}`);
       } catch (err) {
@@ -2123,7 +2133,7 @@ const AppContent: React.FC = () => {
           timestamp: Date.now(),
           version: '1.0.0'
         };
-        await webdavService.uploadData(dataToUpload);
+        await activeService.uploadData(dataToUpload);
         console.log('[App] ✓ 数据上传完成');
       }
 
@@ -2140,7 +2150,7 @@ const AppContent: React.FC = () => {
       let cloudImageTimestamp = 0;
 
       try {
-        const cloudImageData = await webdavService.downloadImageList();
+        const cloudImageData = await activeService.downloadImageList();
         if (cloudImageData) {
           cloudImageList = cloudImageData.images || [];
           cloudImageTimestamp = cloudImageData.timestamp || 0;
@@ -2161,7 +2171,7 @@ const AppContent: React.FC = () => {
       }
 
       // 上传合并后的图片列表
-      await webdavService.uploadImageList(mergedImageList);
+      await activeService.uploadImageList(mergedImageList);
       console.log('[App] ✓ 图片列表上传完成');
 
       // 3. 同步图片文件
