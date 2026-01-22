@@ -142,9 +142,17 @@ export const JournalView: React.FC<JournalViewProps> = ({
     // Transform and Filter entries
     const filteredEntries = useMemo(() => {
         const diaryEntries: DiaryEntry[] = [];
+        const targetYear = selectedDate.getFullYear();
+        const targetMonth = selectedDate.getMonth();
+
+        // Helper to truncate title
+        const truncateTitle = (t: string) => t.length > 12 ? t.slice(0, 12) + '...' : t;
 
         // 1. Process Logs
         logs.forEach(log => {
+            const dateObj = new Date(log.startTime);
+            if (dateObj.getFullYear() !== targetYear || dateObj.getMonth() !== targetMonth) return;
+
             // Resolve Title
             let title = log.title;
             let content = log.note || '';
@@ -219,6 +227,9 @@ export const JournalView: React.FC<JournalViewProps> = ({
 
         // 2. Process Daily Reviews
         dailyReviews.forEach(review => {
+            const dateObj = new Date(review.date);
+            if (dateObj.getFullYear() !== targetYear || dateObj.getMonth() !== targetMonth) return;
+
             const { title, content } = parseNarrative(review.narrative || '', review.date);
 
             // User Policy: If no content (or just '...'), show '...'
@@ -239,6 +250,9 @@ export const JournalView: React.FC<JournalViewProps> = ({
 
         // 3. Process Weekly Reviews
         weeklyReviews.forEach(review => {
+            const dateObj = new Date(review.weekEndDate);
+            if (dateObj.getFullYear() !== targetYear || dateObj.getMonth() !== targetMonth) return;
+
             // Calculate week number or just use date range for title default
             const d = new Date(review.weekStartDate);
             // Default Title: "Week of <Date>"
@@ -249,7 +263,8 @@ export const JournalView: React.FC<JournalViewProps> = ({
             const dateRange = `${review.weekStartDate} ~ ${review.weekEndDate}`;
             const hasContent = content && content !== '...';
 
-            const finalTitle = hasContent ? title : dateRange;
+            const rawTitle = hasContent ? title : dateRange;
+            const finalTitle = truncateTitle(rawTitle);
             const finalContent = hasContent ? content : '...';
 
             diaryEntries.push({
@@ -470,7 +485,7 @@ export const JournalView: React.FC<JournalViewProps> = ({
         <div className="flex flex-col h-full bg-[#faf9f6] relative">
             {/* Sticky Header - 标题栏随滚动缩小 */}
             <header className={`sticky top-0 z-40 transition-all duration-300 ${isScrolled
-                ? 'bg-stone-50/90 backdrop-blur-md shadow-sm py-2'
+                ? 'bg-[#faf9f6]/90 backdrop-blur-md shadow-sm py-2'
                 : 'bg-transparent py-4'
                 }`}>
                 <div className="max-w-xl mx-auto px-6">
