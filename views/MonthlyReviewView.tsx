@@ -601,19 +601,7 @@ export const MonthlyReviewView: React.FC<MonthlyReviewViewProps> = ({
 
     return (
         <div className="h-full bg-[#faf9f6] overflow-y-auto no-scrollbar pb-24 px-7 pt-4">
-            {/* Top Header (User Requested Style) */}
-            <header className="h-14 flex items-center justify-between px-5 bg-[#fdfbf7] border-b border-stone-100 shrink-0 z-30 mb-4 -mx-7 -mt-4">
-                <div className="w-8 flex items-center">
-                    <button
-                        onClick={onClose} // Use onClose passed from props or define it
-                        className="text-stone-400 hover:text-stone-600 transition-colors"
-                    >
-                        <ChevronLeft size={24} />
-                    </button>
-                </div>
-                <h1 className="text-lg font-bold text-stone-700 tracking-wide">Monthly Review</h1>
-                <div className="w-8"></div>
-            </header>
+            {/* Date Display Section */}
 
             {/* Date Display Section */}
             <div className="mb-6 flex items-center justify-between">
