@@ -17,12 +17,17 @@ import { Log, Filter, ParsedFilterCondition, Category, Scope, TodoItem, TodoCate
  * - %关键词: 匹配领域名称
  * - @关键词: 匹配代办标题
  * - 关键词: 匹配备注全文
- * - | 符号: 表示OR关系 (同一条件内)
- * - 空格: 表示AND关系 (不同条件间)
+ * - OR: 逻辑或 (不区分大小写, 用于连接同类型条件)
+ * - 空格: 逻辑与 (默认)
+ * 
+ * 特性:
+ * - 前缀继承: "#工作 OR 学习" 等同于 "#工作 OR #学习"
+ * - 结合性: OR 的优先级高于空格 (实现为分组逻辑)
+ * - 混合: "%健康 瑜伽 OR 冥想" -> (领域包含健康) AND (备注包含瑜伽 OR 冥想)
  * 
  * @example
- * parseFilterExpression("瑜伽|跑步 #运动 %健康|%工作")
- * // 返回: { tags: [["运动"]], scopes: [["健康", "工作"]], todos: [], notes: [["瑜伽", "跑步"]] }
+ * parseFilterExpression("#运动 OR 学习 %健康")
+ * // 返回: { tags: [["运动", "学习"]], scopes: [["健康"]], ... }
  */
 export function parseFilterExpression(expression: string): ParsedFilterCondition {
     const condition: ParsedFilterCondition = {
@@ -36,37 +41,65 @@ export function parseFilterExpression(expression: string): ParsedFilterCondition
         return condition;
     }
 
-    // 按空格分割表达式
-    const parts = expression.trim().split(/\s+/);
+    // 1. Tokenize: 按空格分割
+    // 处理可能的多余空格
+    const tokens = expression.trim().split(/\s+/);
 
-    for (const part of parts) {
-        if (!part) continue;
+    // 帮助函数: 识别类型并提取内容
+    // Returns: { type: 'tags'|'scopes'|'todos'|'notes', content: string }
+    const parseToken = (token: string) => {
+        if (token.startsWith('#')) return { type: 'tags' as const, content: token.substring(1) };
+        if (token.startsWith('%')) return { type: 'scopes' as const, content: token.substring(1) };
+        if (token.startsWith('@')) return { type: 'todos' as const, content: token.substring(1) };
+        return { type: 'notes' as const, content: token };
+    };
 
-        if (part.startsWith('#')) {
-            // 标签筛选 - 支持 | 分隔的OR逻辑
-            const keywords = part.substring(1).split('|').filter(k => k.trim());
-            if (keywords.length > 0) {
-                condition.tags.push(keywords);
+    let pendingOR = false;
+    let lastType: 'tags' | 'scopes' | 'todos' | 'notes' | null = null;
+
+    for (const token of tokens) {
+        if (!token) continue;
+
+        // 检查 OR 关键字 (不区分大小写)
+        if (token.toUpperCase() === 'OR') {
+            pendingOR = true;
+            continue;
+        }
+
+        const current = parseToken(token);
+
+        // 确定生效的类型 (处理前缀继承)
+        let effectiveType = current.type;
+
+        // 处理 OR 逻辑
+        if (pendingOR && lastType) {
+            // 前缀继承: 如果当前词无前缀(notes)，且上一个词不是notes，则继承上一个词的类型
+            if (current.type === 'notes' && lastType !== 'notes') {
+                effectiveType = lastType;
             }
-        } else if (part.startsWith('%')) {
-            // 领域筛选 - 支持 | 分隔的OR逻辑
-            const keywords = part.substring(1).split('|').filter(k => k.trim());
-            if (keywords.length > 0) {
-                condition.scopes.push(keywords);
-            }
-        } else if (part.startsWith('@')) {
-            // 代办筛选 - 支持 | 分隔的OR逻辑
-            const keywords = part.substring(1).split('|').filter(k => k.trim());
-            if (keywords.length > 0) {
-                condition.todos.push(keywords);
+
+            // 如果类型一致，则合并到上一个分组 (实现 OR 逻辑)
+            if (effectiveType === lastType) {
+                const groupList = condition[effectiveType];
+                if (groupList.length > 0) {
+                    const lastGroup = groupList[groupList.length - 1];
+                    lastGroup.push(current.content);
+                } else {
+                    // 理论上不会走到这里，作为防御
+                    groupList.push([current.content]);
+                }
+            } else {
+                // 类型不一致，跨类型OR暂不支持，降级为 AND (新分组)
+                condition[effectiveType].push([current.content]);
             }
         } else {
-            // 全文备注筛选 - 支持 | 分隔的OR逻辑
-            const keywords = part.split('|').filter(k => k.trim());
-            if (keywords.length > 0) {
-                condition.notes.push(keywords);
-            }
+            // AND 逻辑: 开启新分组
+            condition[effectiveType].push([current.content]);
         }
+
+        // 更新状态
+        lastType = effectiveType;
+        pendingOR = false; // 重置 OR 标志
     }
 
     return condition;
@@ -85,7 +118,7 @@ export interface FilterContext {
 /**
  * 检查单条 Log 是否匹配筛选条件
  * - 不同条件之间: AND 关系 (所有条件必须满足)
- * - 同一条件内部 (| 分隔): OR 关系 (满足任一即可)
+ * - 同一条件内部 (OR 分隔): OR 关系 (满足任一即可)
  * - 每个关键词: 包含匹配 (不区分大小写)
  */
 export function matchesFilter(
