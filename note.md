@@ -32,6 +32,9 @@ s3同步功能
 
 
 # 20260121
+在设置页的偏好设置中，增加两个选项。 
+
+
 右下角悬浮按钮切换到memoir的icon变成，audio-waveform
 切换到 Chronicle的按钮变成book-heart
 

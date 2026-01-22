@@ -222,10 +222,10 @@ export const ReviewHubView: React.FC<ReviewHubViewProps> = ({
     }, [sortedDailyReviews, visibleCount]);
 
     return (
-        <div className="flex flex-col h-full bg-white relative">
+        <div className="flex flex-col h-full bg-[#faf9f6] relative">
             {/* Sticky Header - 标题栏随滚动缩小 */}
             <header className={`sticky top-0 z-40 transition-all duration-300 ${isScrolled
-                ? 'bg-white/90 backdrop-blur-md shadow-sm py-2'
+                ? 'bg-[#faf9f6]/90 backdrop-blur-md shadow-sm py-2'
                 : 'bg-transparent py-4'
                 }`}>
                 <div className="max-w-xl mx-auto px-6">
@@ -372,7 +372,7 @@ export const ReviewHubView: React.FC<ReviewHubViewProps> = ({
                                 const weekdayStr = dateObj.toLocaleDateString('en-US', { weekday: 'short' }).toUpperCase(); // Short weekday (THU)
 
                                 const style = getDailyStyle(d.date);
-                                let contentClass = "bg-[#f9f9f9] border border-transparent";
+                                let contentClass = "bg-white border border-stone-100 shadow-sm";
                                 let tagClass = "border border-stone-900 bg-white text-stone-900";
 
                                 // Tag label now shows Weekday instead of Style Name
@@ -384,7 +384,7 @@ export const ReviewHubView: React.FC<ReviewHubViewProps> = ({
                                     contentClass = "bg-white border-2 border-stone-900 shadow-[4px_4px_0_rgba(0,0,0,1)]";
                                     tagClass = "bg-stone-900 text-white border-stone-900";
                                 } else if (style === 'game') {
-                                    contentClass = "bg-white border-2 border-dashed border-stone-400";
+                                    contentClass = "bg-white border-2 border-dashed border-stone-300 shadow-sm";
                                 }
 
                                 return (
