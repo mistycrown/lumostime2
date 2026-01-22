@@ -140,8 +140,8 @@ export const MemoirSettingsView: React.FC<MemoirSettingsViewProps> = ({ onBack }
                                         key={act.id}
                                         onClick={() => toggleTag(act.id)}
                                         className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all ${isSelected
-                                                ? 'bg-stone-800 text-white shadow-md'
-                                                : 'bg-stone-50 text-stone-600 hover:bg-stone-100 border border-stone-100'
+                                            ? 'bg-stone-800 text-white shadow-md'
+                                            : 'bg-stone-50 text-stone-600 hover:bg-stone-100 border border-stone-100'
                                             }`}
                                     >
                                         <span>{act.icon}</span>
@@ -174,8 +174,8 @@ export const MemoirSettingsView: React.FC<MemoirSettingsViewProps> = ({ onBack }
                                     key={scope.id}
                                     onClick={() => toggleScope(scope.id)}
                                     className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all ${isSelected
-                                            ? 'bg-stone-800 text-white shadow-md'
-                                            : 'bg-stone-50 text-stone-600 hover:bg-stone-100 border border-stone-100'
+                                        ? 'bg-stone-800 text-white shadow-md'
+                                        : 'bg-stone-50 text-stone-600 hover:bg-stone-100 border border-stone-100'
                                         }`}
                                 >
                                     <span className="text-sm">{scope.icon}</span>

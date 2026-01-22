@@ -31,12 +31,36 @@ s3同步功能
 
 
 # 20260121
-悬浮按钮切换到memoir的icon变成，audio-waveform
+右下角悬浮按钮切换到memoir的icon变成，audio-waveform
 切换到 Chronicle的按钮变成book-heart
 
 使用#标题#匹配到标题之后，条目备注就不要显示这一串字符了。
 
+使用暖灰色（Stone/Warm Gray）作为主基调，模拟纸张的质感，营造温暖、复古但现代的氛围。
+顶部标题栏和下面的内容背景保持一样的颜色。
 
+下滑，标题栏流畅地缩小和变窄，从这样变成这样
+<header class="sticky top-0 z-40 transition-all duration-300 bg-transparent py-4"><div class="max-w-xl mx-auto px-6"><div class="flex flex-col items-center"><h1 class="font-serif text-stone-800 font-bold transition-all duration-300 text-2xl mb-1">Memoir</h1></div></div></header>
+
+<header class="sticky top-0 z-40 transition-all duration-300 bg-stone-50/90 backdrop-blur-md shadow-sm py-2"><div class="max-w-xl mx-auto px-6"><div class="flex flex-col items-center"><h1 class="font-serif text-stone-800 font-bold transition-all duration-300 text-lg">Memoir</h1></div></div></header>
+
+筛选条件设置是否显示周报、日报。
+
+点击左侧的日期，新建日报。
+
+标题字号放小，15px。
+
+读取不到标题和内容的日报：
+标题为日期，如2026/12/1
+内容为省略号。
+
+读取不到标题和内容的周报：
+标题为日期范围，如2026/12/1-2026/12/7
+内容为省略号。
+
+记录详情的输入框可以伸展
+
+---
 
 在设置页面增加一个设置页，内容是： 
 memoir的筛选条件。筛选条件：

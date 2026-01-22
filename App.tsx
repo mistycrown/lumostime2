@@ -67,7 +67,9 @@ import {
   BookOpen,
   BookMarked,
   Target,
-  FileText
+  FileText,
+  AudioWaveform,
+  BookHeart
 } from 'lucide-react';
 import { App as CapacitorApp } from '@capacitor/app';
 import { Capacitor } from '@capacitor/core';
@@ -2278,7 +2280,7 @@ const AppContent: React.FC = () => {
             className="fixed bottom-[calc(4.5rem+env(safe-area-inset-bottom))] right-6 w-14 h-14 bg-stone-900 rounded-full text-white shadow-2xl flex items-center justify-center active:scale-90 transition-transform z-40 border border-stone-800"
             aria-label={isJournalMode ? "Switch to Archive" : "Switch to Journal"}
           >
-            {isJournalMode ? <BookOpen size={24} /> : <FileText size={24} />}
+            {isJournalMode ? <BookHeart size={24} /> : <AudioWaveform size={24} />}
           </button>
         )}
 

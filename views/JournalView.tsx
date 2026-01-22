@@ -87,6 +87,8 @@ export const JournalView: React.FC<JournalViewProps> = ({
             const titleMatch = content.match(/#([^#]+)#/);
             if (titleMatch) {
                 title = titleMatch[1];
+                // 移除备注中的#标题#字符串
+                content = content.replace(/#[^#]+#/, '').trim();
             } else if (act) {
                 title = act.name;
             } else if (!title || title === 'Unknown') {
@@ -318,22 +320,27 @@ export const JournalView: React.FC<JournalViewProps> = ({
 
                 {/* Intro / Stats Area / Month Selector */}
                 <div className="mb-12 pl-2 pr-0 relative">
-                    <div className="flex justify-between items-end border-b border-gray-200 pb-4 mb-8">
-                        <div className="relative" ref={monthPickerRef}>
-
-
-                            {/* Month Trigger */}
-                            <button
+                    {/* New Month Picker UI */}
+                    <div className="flex items-end gap-4 mb-8 pt-6 px-1 select-none">
+                        <div className="flex flex-col relative group cursor-pointer" ref={monthPickerRef}>
+                            <div
                                 onClick={() => setIsMonthPickerOpen(!isMonthPickerOpen)}
-                                className="flex items-center gap-2 group hover:opacity-70 transition-opacity"
+                                className="flex flex-col"
                             >
-                                <h2 className="text-3xl font-serif text-gray-900">{MONTHS[selectedDate.getMonth()]}</h2>
-                                <ChevronDown className={`w-5 h-5 text-gray-400 transition-transform duration-300 ${isMonthPickerOpen ? 'rotate-180' : ''}`} />
-                            </button>
+                                <div className="flex items-center gap-2">
+                                    <span className="text-xs font-bold text-stone-400 font-sans tracking-wide">{selectedDate.getFullYear()}年</span>
+                                </div>
+                                <div className="flex items-center gap-1">
+                                    <h2 className="text-3xl font-serif font-bold text-stone-800 group-hover:text-stone-600 transition-colors">
+                                        {selectedDate.getMonth() + 1}月
+                                    </h2>
+                                    <ChevronDown className={`w-5 h-5 text-stone-300 group-hover:text-stone-500 transition-colors mt-1.5 ${isMonthPickerOpen ? 'rotate-180' : ''}`} />
+                                </div>
+                            </div>
 
                             {/* Month Picker Dropdown */}
                             {isMonthPickerOpen && (
-                                <div className="absolute top-full left-0 mt-4 bg-white shadow-xl border border-gray-100 rounded-xl p-4 z-40 w-72 animate-in fade-in zoom-in-95 duration-200">
+                                <div className="absolute top-full left-0 mt-4 bg-white shadow-xl border border-gray-100 rounded-xl p-4 z-40 w-72 animate-in fade-in zoom-in-95 duration-200 cursor-default" onClick={(e) => e.stopPropagation()}>
                                     {/* Year Switcher */}
                                     <div className="flex items-center justify-between mb-4 border-b border-gray-100 pb-2">
                                         <button onClick={() => changeYear(-1)} className="p-1 hover:bg-gray-100 rounded-full text-gray-500">
@@ -362,10 +369,7 @@ export const JournalView: React.FC<JournalViewProps> = ({
                                 </div>
                             )}
                         </div>
-
-                        {/* Stats Display Removed */}
-                        <div className="text-right">
-                        </div>
+                        <div className="h-px bg-stone-200 flex-1 mb-3"></div>
                     </div>
 
                     {/* Quote or Summary Card - Click to Open Monthly Review */}
@@ -376,11 +380,13 @@ export const JournalView: React.FC<JournalViewProps> = ({
                                 const end = new Date(selectedDate.getFullYear(), selectedDate.getMonth() + 1, 0);
                                 onOpenMonthlyReview(start, end);
                             }}
-                            className="bg-white p-6 md:p-8 rounded-xl shadow-[0_2px_20px_rgba(0,0,0,0.03)] border border-gray-100 mb-8 cursor-pointer hover:shadow-md transition-shadow group"
+                            className="relative p-8 mb-10 overflow-hidden bg-white rounded-2xl shadow-[0_2px_15px_-3px_rgba(0,0,0,0.05)] border border-stone-100/50 cursor-pointer group"
                         >
-                            <p className="font-serif text-lg md:text-xl text-gray-600 leading-relaxed group-hover:text-gray-900 transition-colors">
+                            <div className="absolute top-2 left-4 text-8xl font-serif text-stone-50 select-none pointer-events-none">“</div>
+                            <p className="relative z-10 text-xl font-serif text-stone-600 italic text-center leading-relaxed">
                                 "{currentMonthCite || "Every moment is a memory waiting to happen."}"
                             </p>
+                            <div className="w-8 h-0.5 bg-stone-200 mx-auto mt-6 rounded-full"></div>
                         </div>
                     )}
                 </div>
