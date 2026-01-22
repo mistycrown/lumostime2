@@ -168,10 +168,174 @@ const AI_PRESETS = {
     }
 };
 
+interface ExcelExportCardProps {
+    logs: Log[];
+    categories: Category[];
+    todos: TodoItem[];
+    todoCategories: TodoCategory[];
+    scopes: Scope[];
+    onToast: (type: ToastType, message: string) => void;
+}
+
+const ExcelExportCardContent: React.FC<ExcelExportCardProps> = ({ logs, categories, todos, todoCategories, scopes, onToast }) => {
+    const [startDate, setStartDate] = useState<string>(() => {
+        const d = new Date();
+        d.setDate(d.getDate() - 30);
+        return d.toISOString().split('T')[0];
+    });
+    const [endDate, setEndDate] = useState<string>(new Date().toISOString().split('T')[0]);
+
+    const handleExport = () => {
+        try {
+            excelExportService.exportLogsToExcel(
+                logs,
+                categories,
+                todos,
+                todoCategories,
+                scopes,
+                new Date(startDate),
+                new Date(endDate)
+            );
+            onToast('success', 'Excel导出成功');
+        } catch (error) {
+            console.error('Export failed:', error);
+            onToast('error', '导出失败，请重试');
+        }
+    };
+
+    return (
+        <div className="space-y-3">
+            <div className="flex items-center gap-2">
+                <input
+                    type="date"
+                    value={startDate}
+                    onChange={(e) => setStartDate(e.target.value)}
+                    className="flex-1 bg-stone-50 border-none rounded-lg px-3 py-2 text-sm text-stone-700 outline-none focus:ring-2 focus:ring-stone-200"
+                />
+                <span className="text-stone-400">-</span>
+                <input
+                    type="date"
+                    value={endDate}
+                    onChange={(e) => setEndDate(e.target.value)}
+                    className="flex-1 bg-stone-50 border-none rounded-lg px-3 py-2 text-sm text-stone-700 outline-none focus:ring-2 focus:ring-stone-200"
+                />
+            </div>
+            <button
+                onClick={handleExport}
+                className="flex items-center justify-center gap-2 w-full py-3 bg-green-600 text-white rounded-xl font-medium active:scale-[0.98] transition-transform shadow-lg shadow-green-100/50 hover:bg-green-700"
+            >
+                <FileSpreadsheet size={18} />
+                导出Excel报表
+            </button>
+        </div>
+    );
+};
+
 export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, onImport, onReset, onClearData, onToast, syncData, onSyncUpdate, startWeekOnSunday, onToggleStartWeekOnSunday, onOpenAutoLink, onOpenSearch, minIdleTimeThreshold = 1, onSetMinIdleTimeThreshold, defaultView = 'RECORD', onSetDefaultView, defaultArchiveView = 'CHRONICLE', onSetDefaultArchiveView, defaultIndexView = 'TAGS', onSetDefaultIndexView, reviewTemplates = [], onUpdateReviewTemplates, onUpdateDailyReviews, checkTemplates = [], onUpdateCheckTemplates, dailyReviewTime, onSetDailyReviewTime, weeklyReviewTime, onSetWeeklyReviewTime, monthlyReviewTime, onSetMonthlyReviewTime, customNarrativeTemplates, onUpdateCustomNarrativeTemplates, userPersonalInfo, onSetUserPersonalInfo, logs = [], todos = [], scopes = [], currentDate = new Date(), dailyReviews = [], weeklyReviews = [], monthlyReviews = [], todoCategories = [], filters = [], onUpdateFilters, categoriesData = [], onEditLog, autoFocusNote, onToggleAutoFocusNote }) => {
     const [activeSubmenu, setActiveSubmenu] = useState<'main' | 'data' | 'cloud' | 's3' | 'ai' | 'preferences' | 'guide' | 'nfc' | 'templates' | 'check_templates' | 'narrative_prompt' | 'auto_record' | 'autolink' | 'obsidian_export' | 'filters' | 'memoir_filter' | 'batch_manage'>('main');
+    const fileInputRef = useRef<HTMLInputElement>(null);
     const [webdavConfig, setWebdavConfig] = useState<WebDAVConfig | null>(null);
     const [s3Config, setS3Config] = useState<S3Config | null>(null);
+
+    // Data Management State
+    const [confirmReset, setConfirmReset] = useState(false);
+    const [confirmClear, setConfirmClear] = useState(false);
+
+    const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0];
+        if (file) {
+            onImport(file);
+            if (fileInputRef.current) {
+                fileInputRef.current.value = '';
+            }
+        }
+    };
+
+    const handleResetClick = () => {
+        if (confirmReset) {
+            onReset();
+            setConfirmReset(false);
+        } else {
+            setConfirmReset(true);
+            setTimeout(() => setConfirmReset(false), 3000);
+        }
+    };
+
+    const handleClearClick = () => {
+        if (confirmClear) {
+            onClearData();
+            setConfirmClear(false);
+        } else {
+            setConfirmClear(true);
+            setTimeout(() => setConfirmClear(false), 3000);
+        }
+    };
+
+    const handleFixImageList = async () => {
+        if (!confirm('这将根据现有记录重建图片引用列表，建议在同步前执行。是否继续？')) {
+            return;
+        }
+
+        setIsCheckingImages(true);
+        try {
+            const list = await imageService.rebuildReferencedListFromLogs(logs);
+            onToast('success', `图片列表重建完成，当前引用 ${list.length} 张图片`);
+        } catch (error: any) {
+            console.error('修复图片列表失败:', error);
+            onToast('error', `修复失败: ${error.message}`);
+        } finally {
+            setIsCheckingImages(false);
+        }
+    };
+
+    const handleCheckUnreferencedImages = async () => {
+        setIsCheckingImages(true);
+        setImageCleanupReport('');
+        try {
+            const report = await imageCleanupService.generateCleanupReport(logs);
+            setImageCleanupReport(report);
+            onToast('success', '检查完成');
+        } catch (error: any) {
+            console.error('检查未引用图片失败:', error);
+            onToast('error', `检查失败: ${error.message}`);
+        } finally {
+            setIsCheckingImages(false);
+        }
+    };
+
+    const handleCleanupImages = (confirm: boolean) => {
+        if (!confirm) {
+            setIsImageCleanupConfirmOpen(true);
+            return;
+        }
+    };
+
+    const handleConfirmImageCleanup = async () => {
+        setIsImageCleanupConfirmOpen(false);
+        setIsCleaningImages(true);
+        try {
+            const result = await imageCleanupService.cleanupUnreferencedImages(logs, {
+                deleteLocal: true,
+                deleteRemote: true // Assuming we want to sync delete
+            });
+
+            let message = `清理完成: 本地-${result.deletedLocal}, 远程-${result.deletedRemote}`;
+            if (result.errors.length > 0) {
+                message += `, 失败-${result.errors.length}`;
+            }
+
+            onToast('success', message);
+
+            // Refresh report
+            handleCheckUnreferencedImages();
+
+        } catch (error: any) {
+            console.error('清理图片失败:', error);
+            onToast('error', `清理失败: ${error.message}`);
+        } finally {
+            setIsCleaningImages(false);
+        }
+    };
     const [isSyncing, setIsSyncing] = useState(false);
 
     // 图片清理相关状态
@@ -332,7 +496,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
             const draftSecretId = localStorage.getItem('lumos_s3_draft_secret_id');
             const draftSecretKey = localStorage.getItem('lumos_s3_draft_secret_key');
             const draftEndpoint = localStorage.getItem('lumos_s3_draft_endpoint');
-            
+
             if (draftBucket || draftRegion || draftSecretId || draftSecretKey) {
                 console.log('[SettingsView] 加载S3配置草稿');
                 setS3ConfigForm({
@@ -358,7 +522,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
         const loadS3Config = () => {
             const s3Config = s3Service.getConfig();
             console.log('[SettingsView] 加载S3配置:', s3Config);
-            
+
             if (s3Config) {
                 setS3Config(s3Config);
                 setS3ConfigForm(s3Config);
@@ -370,7 +534,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
                 const secretId = localStorage.getItem('lumos_cos_secret_id');
                 const secretKey = localStorage.getItem('lumos_cos_secret_key');
                 const endpoint = localStorage.getItem('lumos_cos_endpoint');
-                
+
                 if (bucketName && region && secretId && secretKey) {
                     const fallbackConfig = {
                         bucketName,
@@ -388,7 +552,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
 
         // 立即尝试加载
         loadS3Config();
-        
+
         // 如果第一次加载失败，延迟再试一次
         const timer = setTimeout(loadS3Config, 100);
 
@@ -485,7 +649,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
         setWebdavConfig(null);
         // 保留表单中的配置信息，不清空
         // setConfigForm({ url: '', username: '', password: '' });
-        
+
         console.log('[SettingsView] WebDAV连接已断开，但保留配置缓存供下次使用');
         onToast('info', 'Disconnected from WebDAV server (configuration saved)');
     };
@@ -538,18 +702,18 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
             onToast('error', 'Please fill in all required fields');
             return;
         }
-        
+
         // 检查SecretId和SecretKey是否相同
         if (s3ConfigForm.secretId === s3ConfigForm.secretKey) {
             onToast('error', 'SecretId和SecretKey不能相同！请输入正确的SecretKey');
             return;
         }
-        
+
         setIsSyncing(true);
-        
+
         // 保存配置
         s3Service.saveConfig(s3ConfigForm);
-        
+
         // 测试连接
         const success = await s3Service.checkConnection();
 
@@ -576,7 +740,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
         setS3Config(null);
         // 保留表单中的配置信息，不清空
         // setS3ConfigForm({ bucketName: '', region: '', secretId: '', secretKey: '', endpoint: '' });
-        
+
         console.log('[SettingsView] S3连接已断开，但保留配置缓存供下次使用');
         onToast('info', 'Disconnected from Tencent Cloud COS (configuration saved)');
     };
@@ -592,7 +756,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
                 version: '1.0.0'
             };
             await s3Service.uploadData(dataToSync);
-            
+
             // 2. Sync images
             const localImageList = imageService.getReferencedImagesList();
             if (localImageList.length > 0) {
@@ -602,9 +766,9 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
                     localImageList,
                     localImageList
                 );
-                
+
                 if (imageResult.uploaded > 0 || imageResult.errors.length > 0) {
-                    const message = imageResult.errors.length > 0 
+                    const message = imageResult.errors.length > 0
                         ? `Data uploaded. Images: ${imageResult.uploaded} uploaded, ${imageResult.errors.length} errors`
                         : `Data and ${imageResult.uploaded} images uploaded to COS successfully!`;
                     onToast(imageResult.errors.length > 0 ? 'warning' : 'success', message);
@@ -632,28 +796,28 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
             const data = await s3Service.downloadData();
             if (data) {
                 onSyncUpdate(data);
-                
+
                 // 2. Sync images after data is updated
                 try {
                     // Get image list from downloaded data
                     const cloudImageData = await s3Service.downloadImageList();
                     const cloudImageList = cloudImageData?.images || [];
                     const localImageList = imageService.getReferencedImagesList();
-                    
+
                     // Merge and update local image list
                     const mergedImageList = Array.from(new Set([...localImageList, ...cloudImageList]));
                     if (mergedImageList.length > 0) {
                         imageService.updateReferencedImagesList(mergedImageList);
-                        
+
                         console.log(`[Settings] 开始从 COS 同步 ${mergedImageList.length} 张图片...`);
                         const imageResult = await syncService.syncImages(
                             undefined, // no progress callback in settings
                             mergedImageList,
                             mergedImageList
                         );
-                        
+
                         if (imageResult.downloaded > 0 || imageResult.errors.length > 0) {
-                            const message = imageResult.errors.length > 0 
+                            const message = imageResult.errors.length > 0
                                 ? `Data restored. Images: ${imageResult.downloaded} downloaded, ${imageResult.errors.length} errors`
                                 : `Data and ${imageResult.downloaded} images restored from COS successfully!`;
                             onToast(imageResult.errors.length > 0 ? 'warning' : 'success', message);
@@ -667,7 +831,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
                     console.warn('[Settings] 图片同步失败:', imageError);
                     onToast('warning', 'Data restored but image sync failed');
                 }
-                
+
                 // 同步完成后关闭设置页面，自动刷新到脉络页面
                 setTimeout(() => {
                     onClose();
@@ -1327,7 +1491,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
                                         <LogOut size={16} />
                                         Disconnect
                                     </button>
-                                    
+
                                     {/* 完全清理配置按钮 */}
                                     <button
                                         onClick={() => {
@@ -1480,7 +1644,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
                                         <LogOut size={16} />
                                         Disconnect
                                     </button>
-                                    
+
                                     {/* 完全清理配置按钮 */}
                                     <button
                                         onClick={() => {
@@ -1583,12 +1747,12 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
                                                 onChange={e => setS3ConfigForm(prev => ({ ...prev, secretKey: e.target.value }))}
                                             />
                                         </div>
-                                        {s3ConfigForm.secretId && s3ConfigForm.secretKey && 
-                                         s3ConfigForm.secretId === s3ConfigForm.secretKey && (
-                                            <p className="text-xs text-red-500 mt-1 ml-1">
-                                                ⚠️ SecretId和SecretKey不能相同！请输入不同的SecretKey
-                                            </p>
-                                        )}
+                                        {s3ConfigForm.secretId && s3ConfigForm.secretKey &&
+                                            s3ConfigForm.secretId === s3ConfigForm.secretKey && (
+                                                <p className="text-xs text-red-500 mt-1 ml-1">
+                                                    ⚠️ SecretId和SecretKey不能相同！请输入不同的SecretKey
+                                                </p>
+                                            )}
                                     </div>
 
                                     <div>
@@ -1619,7 +1783,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
                                         )}
                                         {isSyncing ? "Connecting..." : "Save & Connect"}
                                     </button>
-                                    
+
                                     {/* CORS配置帮助按钮 */}
                                     <button
                                         onClick={() => {
@@ -1638,7 +1802,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
                                         <Settings size={16} />
                                         查看CORS配置示例
                                     </button>
-                                    
+
                                     {/* 清理草稿按钮 */}
                                     {(s3ConfigForm.bucketName || s3ConfigForm.region || s3ConfigForm.secretId || s3ConfigForm.secretKey) && !s3Config && (
                                         <button
@@ -1658,7 +1822,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
                                             清理草稿
                                         </button>
                                     )}
-                                    
+
                                     <p className="text-[10px] text-center text-stone-400 mt-3">
                                         Your credentials are stored locally on your device.
                                     </p>
