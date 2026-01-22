@@ -933,30 +933,20 @@ export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialSta
             <div className="flex items-center justify-between mb-2">
               <span className="text-xs font-bold text-stone-400 uppercase tracking-widest">Note</span>
               <button
-                onClick={() => {
-                  const textarea = noteRef.current;
-                  if (textarea) {
-                    const isExpanded = textarea.style.minHeight === '200px';
-                    textarea.style.minHeight = isExpanded ? '100px' : '200px';
-                    textarea.style.transition = 'min-height 0.3s ease';
-                  }
-                }}
-                className="text-stone-400 hover:text-stone-600 transition-colors p-1 rounded-md hover:bg-stone-100"
-                title="扩展/收缩输入框"
+                onClick={() => setIsNoteExpanded(!isNoteExpanded)}
+                className="text-stone-400 hover:text-stone-600 transition-all duration-200 p-1 rounded-md hover:bg-stone-100"
+                title={isNoteExpanded ? "收缩输入框" : "扩展输入框"}
               >
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <polyline points="15,3 21,3 21,9"></polyline>
-                  <polyline points="9,21 3,21 3,15"></polyline>
-                  <line x1="21" y1="3" x2="14" y2="10"></line>
-                  <line x1="3" y1="21" x2="10" y2="14"></line>
-                </svg>
+                {isNoteExpanded ? <Minimize2 size={16} /> : <Minimize2 size={16} className="rotate-180" />}
               </button>
             </div>
             <textarea
               ref={noteRef}
               value={note}
               onChange={e => setNote(e.target.value)}
-              className="w-full bg-white border border-stone-200 rounded-2xl p-4 text-stone-800 text-sm min-h-[100px] shadow-sm focus:outline-none focus:ring-1 focus:ring-stone-900 focus:border-stone-900 transition-all resize-none placeholder:text-stone-300 font-serif"
+              className={`w-full bg-white border border-stone-200 rounded-2xl p-4 text-stone-800 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-stone-900 focus:border-stone-900 resize-none placeholder:text-stone-300 font-serif transition-[height] duration-150 ease-out ${
+                isNoteExpanded ? 'h-[300px]' : 'h-[100px]'
+              }`}
               placeholder="Add a note..."
             />
           </div>
