@@ -179,6 +179,7 @@ const AppContent: React.FC = () => {
 
   const [isSyncing, setIsSyncing] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0); // 用于强制刷新Timeline
+  const [isHeaderScrolled, setIsHeaderScrolled] = useState(false); // 全局标题栏滚动状态
   const lastPromptTimeRef = useRef(0);
   const hasCleanedImagesRef = useRef(false);
   const imageSyncTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -247,6 +248,18 @@ const AppContent: React.FC = () => {
       }
     };
     checkUpdates();
+  }, []);
+
+  // 全局滚动监听:标题栏收缩效果
+  useEffect(() => {
+    const handleScroll = () => {
+      // 监听整个窗口的滚动
+      const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
+      setIsHeaderScrolled(scrollTop > 50);
+    };
+
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
 
@@ -2160,10 +2173,13 @@ const AppContent: React.FC = () => {
       {!isSettingsOpen && (currentView !== AppView.TIMELINE || isDailyReviewOpen) && !isStatsFullScreen &&
         !(currentView === AppView.TODO && isTodoManaging) &&
         !(currentView === AppView.TAGS && isTagsManaging) &&
-        // Show header for Review Hub main page, hide for Weekly/Monthly detail views
-        !(currentView === AppView.REVIEW && (isWeeklyReviewOpen || isMonthlyReviewOpen)) &&
+        // Hide header for REVIEW view (Memoir/Chronicle use their own headers)
+        currentView !== AppView.REVIEW &&
         !(currentView === AppView.SCOPE && isScopeManaging) && (
-          <header className="h-14 flex items-center justify-between px-5 bg-[#fdfbf7] border-b border-stone-100 shrink-0 z-30">
+          <header className={`flex items-center justify-between px-5 border-b border-stone-100 shrink-0 z-30 transition-all duration-300 ${isHeaderScrolled
+            ? 'h-12 bg-stone-50/90 backdrop-blur-md shadow-sm'
+            : currentView === AppView.REVIEW ? 'h-14 bg-[#faf9f6]' : 'h-14 bg-[#fdfbf7]'
+            }`}>
             <div className="w-8 flex items-center">
               {(currentView === AppView.TODO || currentView === AppView.RECORD) && !isDailyReviewOpen && !isMonthlyReviewOpen && (
                 <button

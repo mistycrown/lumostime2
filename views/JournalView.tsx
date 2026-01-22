@@ -50,6 +50,7 @@ export const JournalView: React.FC<JournalViewProps> = ({
     // Default to Today
     const [selectedDate, setSelectedDate] = useState(new Date());
     const [isMonthPickerOpen, setIsMonthPickerOpen] = useState(false);
+    const [isScrolled, setIsScrolled] = useState(false); // 滚动状态
 
     // DEPRECATED LOCAL FILTERS:
     // const [isFilterOpen, setIsFilterOpen] = useState(false);
@@ -57,6 +58,7 @@ export const JournalView: React.FC<JournalViewProps> = ({
     // const [filterMinLength, setFilterMinLength] = useState(0);
 
     const monthPickerRef = useRef<HTMLDivElement>(null);
+    const scrollContainerRef = useRef<HTMLDivElement>(null); // 滚动容器ref
 
     // Close popups when clicking outside
     useEffect(() => {
@@ -67,6 +69,21 @@ export const JournalView: React.FC<JournalViewProps> = ({
         };
         document.addEventListener('mousedown', handleClickOutside);
         return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
+
+    // 滚动监听:标题栏缩小效果
+    useEffect(() => {
+        const container = scrollContainerRef.current;
+        if (!container) return;
+
+        const handleScroll = () => {
+            const scrollTop = container.scrollTop;
+            // 只要有任何滚动就触发收缩
+            setIsScrolled(scrollTop > 0);
+        };
+
+        container.addEventListener('scroll', handleScroll);
+        return () => container.removeEventListener('scroll', handleScroll);
     }, []);
 
     // Transform and Filter entries
@@ -314,160 +331,179 @@ export const JournalView: React.FC<JournalViewProps> = ({
     };
 
     return (
-        <div className="flex flex-col h-full bg-white overflow-y-auto overflow-x-hidden pb-safe scrollbar-hide font-sans selection:bg-gray-200 selection:text-black">
-            {/* Main Content Area */}
-            <main className="max-w-2xl mx-auto px-4 md:px-6 pt-[10px] pb-24 min-h-[80vh] w-full">
-
-                {/* Intro / Stats Area / Month Selector */}
-                <div className="mb-12 pl-2 pr-0 relative">
-                    {/* New Month Picker UI */}
-                    <div className="flex items-end gap-4 mb-8 pt-6 px-1 select-none">
-                        <div className="flex flex-col relative group cursor-pointer" ref={monthPickerRef}>
-                            <div
-                                onClick={() => setIsMonthPickerOpen(!isMonthPickerOpen)}
-                                className="flex flex-col"
-                            >
-                                <div className="flex items-center gap-2">
-                                    <span className="text-xs font-bold text-stone-400 font-sans tracking-wide">{selectedDate.getFullYear()}年</span>
-                                </div>
-                                <div className="flex items-center gap-1">
-                                    <h2 className="text-3xl font-serif font-bold text-stone-800 group-hover:text-stone-600 transition-colors">
-                                        {selectedDate.getMonth() + 1}月
-                                    </h2>
-                                    <ChevronDown className={`w-5 h-5 text-stone-300 group-hover:text-stone-500 transition-colors mt-1.5 ${isMonthPickerOpen ? 'rotate-180' : ''}`} />
-                                </div>
-                            </div>
-
-                            {/* Month Picker Dropdown */}
-                            {isMonthPickerOpen && (
-                                <div className="absolute top-full left-0 mt-4 bg-white shadow-xl border border-gray-100 rounded-xl p-4 z-40 w-72 animate-in fade-in zoom-in-95 duration-200 cursor-default" onClick={(e) => e.stopPropagation()}>
-                                    {/* Year Switcher */}
-                                    <div className="flex items-center justify-between mb-4 border-b border-gray-100 pb-2">
-                                        <button onClick={() => changeYear(-1)} className="p-1 hover:bg-gray-100 rounded-full text-gray-500">
-                                            <ChevronLeft className="w-5 h-5" />
-                                        </button>
-                                        <span className="font-serif text-lg font-bold text-gray-900">{selectedDate.getFullYear()}</span>
-                                        <button onClick={() => changeYear(1)} className="p-1 hover:bg-gray-100 rounded-full text-gray-500">
-                                            <ChevronRight className="w-5 h-5" />
-                                        </button>
-                                    </div>
-                                    {/* Month Grid */}
-                                    <div className="grid grid-cols-3 gap-2">
-                                        {MONTHS.map((m, idx) => (
-                                            <button
-                                                key={m}
-                                                onClick={() => handleMonthSelect(idx)}
-                                                className={`text-sm py-2 px-1 rounded-md transition-colors ${selectedDate.getMonth() === idx
-                                                    ? 'bg-gray-900 text-white font-bold'
-                                                    : 'text-gray-600 hover:bg-gray-100'
-                                                    }`}
-                                            >
-                                                {m.slice(0, 3)}
-                                            </button>
-                                        ))}
-                                    </div>
-                                </div>
-                            )}
-                        </div>
-                        <div className="h-px bg-stone-200 flex-1 mb-3"></div>
+        <div className="flex flex-col h-full bg-[#faf9f6] relative">
+            {/* Sticky Header - 标题栏随滚动缩小 */}
+            <header className={`sticky top-0 z-40 transition-all duration-300 ${isScrolled
+                ? 'bg-stone-50/90 backdrop-blur-md shadow-sm py-2'
+                : 'bg-transparent py-4'
+                }`}>
+                <div className="max-w-xl mx-auto px-6">
+                    <div className="flex flex-col items-center">
+                        <h1 className={`font-serif text-stone-800 font-bold transition-all duration-300 ${isScrolled ? 'text-[16px]' : 'text-[18px] mb-1'
+                            }`}>
+                            Memoir
+                        </h1>
                     </div>
-
-                    {/* Quote or Summary Card - Click to Open Monthly Review */}
-                    {filteredEntries.length > 0 && (
-                        <div
-                            onClick={() => {
-                                const start = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1);
-                                const end = new Date(selectedDate.getFullYear(), selectedDate.getMonth() + 1, 0);
-                                onOpenMonthlyReview(start, end);
-                            }}
-                            className="relative p-8 mb-10 overflow-hidden bg-white rounded-2xl shadow-[0_2px_15px_-3px_rgba(0,0,0,0.05)] border border-stone-100/50 cursor-pointer group"
-                        >
-                            <div className="absolute top-2 left-4 text-8xl font-serif text-stone-50 select-none pointer-events-none">“</div>
-                            <p className="relative z-10 text-xl font-serif text-stone-600 italic text-center leading-relaxed">
-                                "{currentMonthCite || "Every moment is a memory waiting to happen."}"
-                            </p>
-                            <div className="w-8 h-0.5 bg-stone-200 mx-auto mt-6 rounded-full"></div>
-                        </div>
-                    )}
                 </div>
+            </header>
 
-                {/* Timeline Section */}
-                <div className="relative">
-                    {filteredEntries.length > 0 ? (
-                        <div className="flex flex-col">
-                            {filteredEntries.map((dayGroup, groupIndex) => {
-                                const dateObj = new Date(dayGroup.date);
-                                const day = dateObj.getDate().toString();
-                                const month = dateObj.toLocaleDateString('en-US', { month: 'short' }).toUpperCase();
+            {/* Scrollable Content Area */}
+            <div
+                ref={scrollContainerRef}
+                className="flex-1 overflow-y-auto overflow-x-hidden pb-safe scrollbar-hide font-sans selection:bg-gray-200 selection:text-black"
+            >
+                <main className="max-w-2xl mx-auto px-4 md:px-6 pt-[10px] pb-24 min-h-[80vh] w-full">
 
-                                return (
-                                    <div key={dayGroup.date} className="flex w-full mb-6">
-                                        {/* Left: Sticky Date */}
-                                        <div className="relative w-12 flex-shrink-0">
-                                            <div className="sticky top-6 pr-3 text-right">
-                                                <span className="block font-serif text-xl md:text-2xl text-gray-900 font-semibold leading-none">{day}</span>
-                                                <span className="block font-sans text-[10px] font-bold text-subtle tracking-widest mt-1">{month}</span>
-                                            </div>
-                                            {/* Vertical line */}
-                                            <div className="absolute top-0 right-0 w-px bg-gray-200 h-full" />
+                    {/* Intro / Stats Area / Month Selector */}
+                    <div className="mb-12 pl-2 pr-0 relative">
+                        {/* New Month Picker UI */}
+                        <div className="flex items-end gap-4 mb-8 pt-6 px-1 select-none">
+                            <div className="flex flex-col relative group cursor-pointer" ref={monthPickerRef}>
+                                <div
+                                    onClick={() => setIsMonthPickerOpen(!isMonthPickerOpen)}
+                                    className="flex flex-col"
+                                >
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-xs font-bold text-stone-400 font-sans tracking-wide">{selectedDate.getFullYear()}年</span>
+                                    </div>
+                                    <div className="flex items-center gap-1">
+                                        <h2 className="text-3xl font-serif font-bold text-stone-800 group-hover:text-stone-600 transition-colors">
+                                            {selectedDate.getMonth() + 1}月
+                                        </h2>
+                                        <ChevronDown className={`w-5 h-5 text-stone-300 group-hover:text-stone-500 transition-colors mt-1.5 ${isMonthPickerOpen ? 'rotate-180' : ''}`} />
+                                    </div>
+                                </div>
+
+                                {/* Month Picker Dropdown */}
+                                {isMonthPickerOpen && (
+                                    <div className="absolute top-full left-0 mt-4 bg-white shadow-xl border border-gray-100 rounded-xl p-4 z-40 w-72 animate-in fade-in zoom-in-95 duration-200 cursor-default" onClick={(e) => e.stopPropagation()}>
+                                        {/* Year Switcher */}
+                                        <div className="flex items-center justify-between mb-4 border-b border-gray-100 pb-2">
+                                            <button onClick={() => changeYear(-1)} className="p-1 hover:bg-gray-100 rounded-full text-gray-500">
+                                                <ChevronLeft className="w-5 h-5" />
+                                            </button>
+                                            <span className="font-serif text-lg font-bold text-gray-900">{selectedDate.getFullYear()}</span>
+                                            <button onClick={() => changeYear(1)} className="p-1 hover:bg-gray-100 rounded-full text-gray-500">
+                                                <ChevronRight className="w-5 h-5" />
+                                            </button>
                                         </div>
-
-                                        {/* Right: Entries for this day */}
-                                        <div className="flex-1 flex flex-col">
-                                            {dayGroup.entries.map((entry, entryIndex) => (
-                                                <TimelineItem
-                                                    key={entry.id}
-                                                    entry={entry}
-                                                    isLast={groupIndex === filteredEntries.length - 1 && entryIndex === dayGroup.entries.length - 1}
-                                                    isFirstOfDay={entryIndex === 0}
-                                                    onAddComment={handleAddComment}
-                                                    onClick={() => handleEntryClick(entry)}
-                                                />
+                                        {/* Month Grid */}
+                                        <div className="grid grid-cols-3 gap-2">
+                                            {MONTHS.map((m, idx) => (
+                                                <button
+                                                    key={m}
+                                                    onClick={() => handleMonthSelect(idx)}
+                                                    className={`text-sm py-2 px-1 rounded-md transition-colors ${selectedDate.getMonth() === idx
+                                                        ? 'bg-gray-900 text-white font-bold'
+                                                        : 'text-gray-600 hover:bg-gray-100'
+                                                        }`}
+                                                >
+                                                    {m.slice(0, 3)}
+                                                </button>
                                             ))}
                                         </div>
                                     </div>
-                                );
-                            })}
-
-                            {/* End of Feed Indicator */}
-                            <div className="mt-12 flex flex-col items-center justify-center gap-2 text-gray-300">
-                                <div className="w-1 h-1 rounded-full bg-gray-300"></div>
-                                <div className="w-1 h-1 rounded-full bg-gray-300"></div>
-                                <div className="w-1 h-1 rounded-full bg-gray-300"></div>
-                                <span className="text-xs font-serif italic mt-2">End of {MONTHS[selectedDate.getMonth()]} {selectedDate.getFullYear()}</span>
+                                )}
                             </div>
+                            <div className="h-px bg-stone-200 flex-1 mb-3"></div>
                         </div>
-                    ) : (
-                        <div className="flex flex-col items-center justify-center py-20 text-gray-400">
-                            <div className="w-16 h-16 rounded-full bg-gray-100 flex items-center justify-center mb-4">
-                                <PenLine className="w-6 h-6 opacity-30" />
-                            </div>
-                            <p className="font-serif text-lg italic">No stories found for this period.</p>
-                            <p className="font-serif text-lg italic">No stories found for this period.</p>
 
-                            {(memoirFilterConfig.hasImage || memoirFilterConfig.minNoteLength > 0 || memoirFilterConfig.relatedTagIds.length > 0 || memoirFilterConfig.relatedScopeIds.length > 0) && (
-                                <div className="mt-4 flex flex-col items-center gap-2">
-                                    <span className="text-xs text-stone-400">Filters are active</span>
-                                    <div className="flex flex-wrap gap-1 justify-center">
-                                        {memoirFilterConfig.hasImage && <span className="bg-stone-100 px-2 py-0.5 rounded text-[10px] text-stone-500">Image</span>}
-                                        {memoirFilterConfig.minNoteLength > 0 && <span className="bg-stone-100 px-2 py-0.5 rounded text-[10px] text-stone-500">Min {memoirFilterConfig.minNoteLength} chars</span>}
-                                        {memoirFilterConfig.relatedTagIds.length > 0 && <span className="bg-stone-100 px-2 py-0.5 rounded text-[10px] text-stone-500">Tags ({memoirFilterConfig.relatedTagIds.length})</span>}
-                                        {memoirFilterConfig.relatedScopeIds.length > 0 && <span className="bg-stone-100 px-2 py-0.5 rounded text-[10px] text-stone-500">Domains ({memoirFilterConfig.relatedScopeIds.length})</span>}
-                                    </div>
+                        {/* Quote or Summary Card - Click to Open Monthly Review */}
+                        {filteredEntries.length > 0 && (
+                            <div
+                                onClick={() => {
+                                    const start = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1);
+                                    const end = new Date(selectedDate.getFullYear(), selectedDate.getMonth() + 1, 0);
+                                    onOpenMonthlyReview(start, end);
+                                }}
+                                className="relative p-8 mb-10 overflow-hidden bg-white rounded-2xl shadow-[0_2px_15px_-3px_rgba(0,0,0,0.05)] border border-stone-100/50 cursor-pointer group"
+                            >
+                                <div className="absolute top-2 left-4 text-8xl font-serif text-stone-50 select-none pointer-events-none">“</div>
+                                <p className="relative z-10 text-[17px] font-serif text-stone-600 italic text-center leading-relaxed">
+                                    "{currentMonthCite || "Every moment is a memory waiting to happen."}"
+                                </p>
+                                <div className="w-8 h-0.5 bg-stone-200 mx-auto mt-6 rounded-full"></div>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Timeline Section */}
+                    <div className="relative">
+                        {filteredEntries.length > 0 ? (
+                            <div className="flex flex-col">
+                                {filteredEntries.map((dayGroup, groupIndex) => {
+                                    const dateObj = new Date(dayGroup.date);
+                                    const day = dateObj.getDate().toString();
+                                    const month = dateObj.toLocaleDateString('en-US', { month: 'short' }).toUpperCase();
+
+                                    return (
+                                        <div key={dayGroup.date} className="flex w-full mb-6">
+                                            {/* Left: Sticky Date */}
+                                            <div className="relative w-12 flex-shrink-0">
+                                                <div className="sticky top-6 pr-3 text-right">
+                                                    <span className="block font-serif text-xl md:text-2xl text-gray-900 font-semibold leading-none">{day}</span>
+                                                    <span className="block font-sans text-[10px] font-bold text-subtle tracking-widest mt-1">{month}</span>
+                                                </div>
+                                                {/* Vertical line */}
+                                                <div className="absolute top-0 right-0 w-px bg-gray-200 h-full" />
+                                            </div>
+
+                                            {/* Right: Entries for this day */}
+                                            <div className="flex-1 flex flex-col">
+                                                {dayGroup.entries.map((entry, entryIndex) => (
+                                                    <TimelineItem
+                                                        key={entry.id}
+                                                        entry={entry}
+                                                        isLast={groupIndex === filteredEntries.length - 1 && entryIndex === dayGroup.entries.length - 1}
+                                                        isFirstOfDay={entryIndex === 0}
+                                                        onAddComment={handleAddComment}
+                                                        onClick={() => handleEntryClick(entry)}
+                                                    />
+                                                ))}
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+
+                                {/* End of Feed Indicator */}
+                                <div className="mt-12 flex flex-col items-center justify-center gap-2 text-gray-300">
+                                    <div className="w-1 h-1 rounded-full bg-gray-300"></div>
+                                    <div className="w-1 h-1 rounded-full bg-gray-300"></div>
+                                    <div className="w-1 h-1 rounded-full bg-gray-300"></div>
+                                    <span className="text-xs font-serif italic mt-2">End of {MONTHS[selectedDate.getMonth()]} {selectedDate.getFullYear()}</span>
                                 </div>
-                            )}
-                        </div>
-                    )
-                    }
-                </div >
-            </main >
+                            </div>
+                        ) : (
+                            <div className="flex flex-col items-center justify-center py-20 text-gray-400">
+                                <div className="w-16 h-16 rounded-full bg-gray-100 flex items-center justify-center mb-4">
+                                    <PenLine className="w-6 h-6 opacity-30" />
+                                </div>
+                                <p className="font-serif text-lg italic">No stories found for this period.</p>
+                                <p className="font-serif text-lg italic">No stories found for this period.</p>
+
+                                {(memoirFilterConfig.hasImage || memoirFilterConfig.minNoteLength > 0 || memoirFilterConfig.relatedTagIds.length > 0 || memoirFilterConfig.relatedScopeIds.length > 0) && (
+                                    <div className="mt-4 flex flex-col items-center gap-2">
+                                        <span className="text-xs text-stone-400">Filters are active</span>
+                                        <div className="flex flex-wrap gap-1 justify-center">
+                                            {memoirFilterConfig.hasImage && <span className="bg-stone-100 px-2 py-0.5 rounded text-[10px] text-stone-500">Image</span>}
+                                            {memoirFilterConfig.minNoteLength > 0 && <span className="bg-stone-100 px-2 py-0.5 rounded text-[10px] text-stone-500">Min {memoirFilterConfig.minNoteLength} chars</span>}
+                                            {memoirFilterConfig.relatedTagIds.length > 0 && <span className="bg-stone-100 px-2 py-0.5 rounded text-[10px] text-stone-500">Tags ({memoirFilterConfig.relatedTagIds.length})</span>}
+                                            {memoirFilterConfig.relatedScopeIds.length > 0 && <span className="bg-stone-100 px-2 py-0.5 rounded text-[10px] text-stone-500">Domains ({memoirFilterConfig.relatedScopeIds.length})</span>}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+                    </div>
+                </main>
+            </div>
 
             {/* Floating Action Button - Mock */}
-            < div className="fixed bottom-24 right-6 z-40 md:hidden" >
+            <div className="fixed bottom-24 right-6 z-40 md:hidden">
                 <button className="bg-ink text-white p-4 rounded-full shadow-lg hover:scale-105 transition-transform flex items-center justify-center" onClick={() => onOpenDailyReview(new Date())}>
                     <PenLine className="w-6 h-6" />
                 </button>
-            </div >
-        </div >
+            </div>
+        </div>
     );
 };
