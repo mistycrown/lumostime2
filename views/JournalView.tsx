@@ -35,7 +35,8 @@ const DateNavigationSidebar: React.FC<{
     entries: { date: string; entries: any[] }[];
     activeDay: string | null;
     onDateClick: (dateStr: string) => void;
-}> = ({ entries, activeDay, onDateClick }) => {
+    visible: boolean;
+}> = ({ entries, activeDay, onDateClick, visible }) => {
     // Extract unique days
     const days = useMemo(() => {
         return entries.map(g => {
@@ -47,15 +48,32 @@ const DateNavigationSidebar: React.FC<{
         });
     }, [entries]);
 
+    // Auto-scroll active day into view
+    const containerRef = useRef<HTMLDivElement>(null);
+    useEffect(() => {
+        if (activeDay && containerRef.current) {
+            // Find the button for activeDay
+            const activeBtn = Array.from(containerRef.current.children).find(child =>
+                child.textContent?.includes(activeDay.padStart(2, '0'))
+            );
+            if (activeBtn) {
+                activeBtn.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+        }
+    }, [activeDay]);
+
     return (
-        <div className="fixed right-1 top-1/2 -translate-y-1/2 z-50 flex flex-col items-center gap-3 py-4 rounded-full bg-stone-50/50 backdrop-blur-[2px]">
+        <div
+            ref={containerRef}
+            className={`fixed right-0 top-1/2 -translate-y-1/2 z-50 flex flex-col items-center gap-3 py-4 rounded-l-xl h-[216px] overflow-y-auto no-scrollbar scroll-smooth transition-opacity duration-300 ${visible ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
+        >
             {days.map(({ dayStr }) => {
                 const isActive = activeDay === dayStr;
                 return (
                     <button
                         key={dayStr}
                         onClick={() => onDateClick(dayStr)}
-                        className="group relative flex items-center justify-center w-8 h-4 select-none touch-manipulation"
+                        className="group relative flex items-center justify-center w-6 h-4 select-none touch-manipulation shrink-0"
                     >
                         <span className={`
                font-serif text-[10px] transition-all duration-300
@@ -119,6 +137,7 @@ export const JournalView: React.FC<JournalViewProps> = ({
 
     // 滚动监听:标题栏缩小效果 & Date Sidebar Active State
     const [activeDay, setActiveDay] = useState<string | null>(null);
+    const [showSidebar, setShowSidebar] = useState(false);
 
     // Transform and Filter entries
     const filteredEntries = useMemo(() => {
@@ -310,6 +329,7 @@ export const JournalView: React.FC<JournalViewProps> = ({
         const handleScroll = () => {
             const scrollTop = container.scrollTop;
             setIsScrolled(scrollTop > 0);
+            setShowSidebar(scrollTop > 10);
 
             // Determine active day
             // Find the day section that is closest to the top of the viewport
@@ -461,9 +481,9 @@ export const JournalView: React.FC<JournalViewProps> = ({
             {/* Scrollable Content Area */}
             <div
                 ref={scrollContainerRef}
-                className="flex-1 overflow-y-auto overflow-x-hidden pb-safe scrollbar-hide font-sans selection:bg-gray-200 selection:text-black"
+                className="flex-1 overflow-y-auto overflow-x-hidden pb-safe no-scrollbar font-sans selection:bg-gray-200 selection:text-black"
             >
-                <main className="max-w-2xl mx-auto px-4 md:px-6 pt-[10px] pb-24 min-h-[80vh] w-full">
+                <main className="max-w-2xl mx-auto pl-4 pr-[25px] pt-[10px] pb-24 min-h-[80vh] w-full">
 
                     {/* Intro / Stats Area / Month Selector */}
                     <div className="mb-12 pl-2 pr-0 relative">
@@ -629,6 +649,7 @@ export const JournalView: React.FC<JournalViewProps> = ({
                                 el.scrollIntoView({ behavior: 'smooth', block: 'start' });
                             }
                         }}
+                        visible={showSidebar}
                     />
                 )
             }
