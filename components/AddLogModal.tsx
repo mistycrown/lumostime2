@@ -945,7 +945,7 @@ export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialSta
               value={note}
               onChange={e => setNote(e.target.value)}
               className={`w-full bg-white border border-stone-200 rounded-2xl p-4 text-stone-800 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-stone-900 focus:border-stone-900 resize-none placeholder:text-stone-300 font-serif transition-[height] duration-150 ease-out ${
-                isNoteExpanded ? 'h-[300px]' : 'h-[100px]'
+                isNoteExpanded ? 'h-[400px]' : 'h-[100px]'
               }`}
               placeholder="Add a note..."
             />

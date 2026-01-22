@@ -8,8 +8,9 @@
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
 import React, { useEffect, useState } from 'react';
-import { ActiveSession, TodoItem } from '../types';
+import { ActiveSession, TodoItem, AppView } from '../types';
 import { StopCircle, X, CheckCircle2 } from 'lucide-react';
+import { useNavigation } from '../contexts/NavigationContext';
 
 interface TimerFloatingProps {
   sessions: ActiveSession[];
@@ -27,6 +28,8 @@ const SingleTimer: React.FC<{
   onClick: () => void;
 }> = ({ session, todo, onStop, onCancel, onClick }) => {
   const [elapsed, setElapsed] = useState(0);
+  const [isCollapsed, setIsCollapsed] = useState(false);
+  const { currentView } = useNavigation();
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -35,6 +38,13 @@ const SingleTimer: React.FC<{
     return () => clearInterval(interval);
   }, [session.startTime]);
 
+  // 监听页面切换，非记录页时自动收缩
+  useEffect(() => {
+    if (currentView !== AppView.RECORD && !isCollapsed) {
+      setIsCollapsed(true);
+    }
+  }, [currentView, isCollapsed]);
+
   const formatTime = (seconds: number) => {
     const h = Math.floor(seconds / 3600);
     const m = Math.floor((seconds % 3600) / 60);
@@ -42,44 +52,71 @@ const SingleTimer: React.FC<{
     return `${h > 0 ? h + ':' : ''}${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
   };
 
+  const toggleCollapse = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setIsCollapsed(!isCollapsed);
+  };
+
   return (
     <div
       onClick={onClick}
-      className="bg-white/95 backdrop-blur-sm text-stone-800 p-4 rounded-[2rem] shadow-[0_8px_30px_rgb(0,0,0,0.12)] border border-stone-100 flex items-center justify-between cursor-pointer active:scale-[0.99] transition-all"
+      className={`relative bg-white/95 backdrop-blur-sm text-stone-800 shadow-[0_8px_30px_rgb(0,0,0,0.12)] flex items-center cursor-pointer active:scale-[0.99] transition-all duration-500 ease-out overflow-hidden ${
+        isCollapsed 
+          ? 'w-[5.5rem] h-[5.5rem] rounded-full justify-center items-center p-0' 
+          : 'pl-[1.75rem] pr-4 py-4 justify-between rounded-full h-[5.5rem]'
+      }`}
+      style={{
+        border: '2px solid rgba(255, 255, 255, 0.8)',
+        boxShadow: '0 8px 30px rgba(0,0,0,0.12), inset 0 1px 0 rgba(255,255,255,0.8), 0 0 0 1px rgba(0,0,0,0.05)'
+      }}
     >
-      <div className="flex items-center gap-3">
-        <div className="w-10 h-10 rounded-full bg-orange-50 flex items-center justify-center text-xl shadow-inner shrink-0">
+      {isCollapsed ? (
+        <div 
+          onClick={toggleCollapse}
+          className="w-10 h-10 rounded-full bg-orange-50 flex items-center justify-center text-xl shadow-inner hover:bg-orange-100 transition-colors cursor-pointer"
+        >
           {session.activityIcon}
         </div>
-        <div className="flex flex-col min-w-0">
-          <div className="flex items-center gap-2">
-            <span className="font-semibold text-sm text-stone-700 truncate">{session.activityName}</span>
-            {todo && (
-              <span className="text-[10px] bg-stone-100 text-stone-500 px-1.5 py-0.5 rounded-full truncate max-w-[100px]">
-                @{todo.title}
+      ) : (
+        <>
+          <div className="flex items-center gap-3 relative">
+            <div 
+              onClick={toggleCollapse}
+              className="w-10 h-10 rounded-full bg-orange-50 flex items-center justify-center text-xl shadow-inner shrink-0 hover:bg-orange-100 transition-colors cursor-pointer absolute left-0"
+            >
+              {session.activityIcon}
+            </div>
+            <div className="flex flex-col min-w-0 transition-all duration-500 ease-out ml-[3.25rem]">
+              <div className="flex items-center gap-2">
+                <span className="font-semibold text-sm text-stone-700 truncate">{session.activityName}</span>
+                {todo && (
+                  <span className="text-[10px] bg-stone-100 text-stone-500 px-1.5 py-0.5 rounded-full truncate max-w-[100px]">
+                    @{todo.title}
+                  </span>
+                )}
+              </div>
+              <span className="text-xl font-mono font-medium text-orange-500 tabular-nums tracking-tight leading-none mt-0.5">
+                {formatTime(elapsed)}
               </span>
-            )}
+            </div>
           </div>
-          <span className="text-xl font-mono font-medium text-orange-500 tabular-nums tracking-tight leading-none mt-0.5">
-            {formatTime(elapsed)}
-          </span>
-        </div>
-      </div>
 
-      <div className="flex items-center gap-2 pl-4 border-l border-stone-100 ml-2" onClick={e => e.stopPropagation()}>
-        <button
-          onClick={onCancel}
-          className="p-2 text-stone-300 hover:text-stone-500 hover:bg-stone-100 rounded-full transition-colors"
-        >
-          <X size={20} />
-        </button>
-        <button
-          onClick={onStop}
-          className="p-2 text-orange-400 hover:text-orange-600 hover:bg-orange-50 rounded-full transition-colors"
-        >
-          <CheckCircle2 size={24} />
-        </button>
-      </div>
+          <div className="flex items-center gap-2 pl-4 border-l border-stone-100 ml-2 transition-all duration-500 ease-out" onClick={e => e.stopPropagation()}>
+            <button
+              onClick={onCancel}
+              className="p-2 text-stone-300 hover:text-stone-500 hover:bg-stone-100 rounded-full transition-colors"
+            >
+              <X size={20} />
+            </button>
+            <button
+              onClick={onStop}
+              className="p-2 text-orange-400 hover:text-orange-600 hover:bg-orange-50 rounded-full transition-colors"
+            >
+              <CheckCircle2 size={24} />
+            </button>
+          </div>
+        </>
+      )}
     </div>
   );
 };
