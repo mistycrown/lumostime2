@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>腾讯云COS简单连接测试</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        input {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            box-sizing: border-box;
+        }
+        button {
+            background: #007cba;
+            color: white;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            margin-right: 10px;
+        }
+        button:hover {
+            background: #005a87;
+        }
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        .log {
+            background: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 5px;
+            padding: 15px;
+            margin-top: 20px;
+            font-family: monospace;
+            white-space: pre-wrap;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .success { color: #28a745; }
+        .error { color: #dc3545; }
+        .info { color: #17a2b8; }
+        .warning { color: #ffc107; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>腾讯云COS简单连接测试</h1>
+        <p>这个测试使用原生fetch API，避免AWS SDK的复杂性</p>
+        
+        <div class="form-group">
+            <label>存储桶名称:</label>
+            <input type="text" id="bucketName" value="lumostime-1315858561" placeholder="bucketname-appid">
+        </div>
+        
+        <div class="form-group">
+            <label>地域:</label>
+            <input type="text" id="region" value="ap-chongqing" placeholder="ap-chongqing">
+        </div>
+        
+        <div class="form-group">
+            <label>自定义端点:</label>
+            <input type="text" id="endpoint" value="https://cos.ap-chongqing.myqcloud.com" placeholder="https://cos.ap-chongqing.myqcloud.com">
+        </div>
+        
+        <button onclick="testCORS()" id="corsBtn">测试CORS</button>
+        <button onclick="testBucketAccess()" id="accessBtn">测试存储桶访问</button>
+        <button onclick="clearLog()">清空日志</button>
+        
+        <div id="log" class="log"></div>
+    </div>
+
+    <script>
+        function log(message, type = 'info') {
+            const logElement = document.getElementById('log');
+            const timestamp = new Date().toLocaleTimeString();
+            const className = type === 'error' ? 'error' : type === 'success' ? 'success' : type === 'warning' ? 'warning' : 'info';
+            logElement.innerHTML += `<span class="${className}">[${timestamp}] ${message}</span>\n`;
+            logElement.scrollTop = logElement.scrollHeight;
+            console.log(`[${timestamp}] ${message}`);
+        }
+        
+        function clearLog() {
+            document.getElementById('log').innerHTML = '';
+        }
+        
+        function getConfig() {
+            return {
+                bucketName: document.getElementById('bucketName').value.trim(),
+                region: document.getElementById('region').value.trim(),
+                endpoint: document.getElementById('endpoint').value.trim()
+            };
+        }
+        
+        async function testCORS() {
+            const corsBtn = document.getElementById('corsBtn');
+            corsBtn.disabled = true;
+            corsBtn.textContent = '测试中...';
+            
+            try {
+                const config = getConfig();
+                const url = `${config.endpoint}/${config.bucketName}/`;
+                
+                log('开始测试CORS配置...', 'info');
+                log(`测试URL: ${url}`, 'info');
+                
+                // 发送OPTIONS请求测试CORS
+                const response = await fetch(url, {
+                    method: 'OPTIONS',
+                    headers: {
+                        'Origin': window.location.origin,
+                        'Access-Control-Request-Method': 'GET',
+                        'Access-Control-Request-Headers': 'authorization,content-type'
+                    }
+                });
+                
+                log(`OPTIONS响应状态: ${response.status}`, response.status === 200 ? 'success' : 'error');
+                
+                // 检查CORS头部
+                const corsHeaders = {
+                    'Access-Control-Allow-Origin': response.headers.get('Access-Control-Allow-Origin'),
+                    'Access-Control-Allow-Methods': response.headers.get('Access-Control-Allow-Methods'),
+                    'Access-Control-Allow-Headers': response.headers.get('Access-Control-Allow-Headers'),
+                    'Access-Control-Expose-Headers': response.headers.get('Access-Control-Expose-Headers')
+                };
+                
+                log('CORS响应头部:', 'info');
+                Object.entries(corsHeaders).forEach(([key, value]) => {
+                    if (value) {
+                        log(`  ${key}: ${value}`, 'success');
+                    } else {
+                        log(`  ${key}: 未设置`, 'warning');
+                    }
+                });
+                
+                if (response.status === 200) {
+                    log('✓ CORS配置测试通过！', 'success');
+                } else {
+                    log('✗ CORS配置可能有问题', 'error');
+                }
+                
+            } catch (error) {
+                log('✗ CORS测试失败', 'error');
+                log(`错误: ${error.message}`, 'error');
+                
+                if (error.message.includes('CORS')) {
+                    log('这是CORS错误，说明浏览器阻止了跨域请求', 'error');
+                    log('请检查腾讯云COS控制台的CORS配置', 'error');
+                } else if (error.message.includes('Failed to fetch')) {
+                    log('网络请求失败，可能是网络问题或端点不正确', 'error');
+                }
+                
+                console.error('详细错误信息:', error);
+            } finally {
+                corsBtn.disabled = false;
+                corsBtn.textContent = '测试CORS';
+            }
+        }
+        
+        async function testBucketAccess() {
+            const accessBtn = document.getElementById('accessBtn');
+            accessBtn.disabled = true;
+            accessBtn.textContent = '测试中...';
+            
+            try {
+                const config = getConfig();
+                const url = `${config.endpoint}/${config.bucketName}/`;
+                
+                log('开始测试存储桶访问...', 'info');
+                log(`测试URL: ${url}`, 'info');
+                
+                // 发送GET请求测试存储桶访问
+                const response = await fetch(url, {
+                    method: 'GET',
+                    headers: {
+                        'Origin': window.location.origin
+                    }
+                });
+                
+                log(`GET响应状态: ${response.status}`, 'info');
+                
+                if (response.status === 200) {
+                    log('✓ 存储桶访问成功！', 'success');
+                    
+                    // 尝试读取响应内容
+                    try {
+                        const text = await response.text();
+                        if (text.includes('<?xml')) {
+                            log('响应包含XML内容，这是正常的S3响应', 'success');
+                        }
+                    } catch (e) {
+                        log('无法读取响应内容，但状态码正常', 'info');
+                    }
+                    
+                } else if (response.status === 403) {
+                    log('✗ 403 Forbidden - 权限被拒绝', 'error');
+                    log('可能的原因:', 'error');
+                    log('1. 存储桶不允许匿名访问（这是正常的）', 'info');
+                    log('2. 需要使用有效的认证信息', 'info');
+                    log('3. CORS配置不正确', 'error');
+                    
+                } else if (response.status === 404) {
+                    log('✗ 404 Not Found - 存储桶不存在', 'error');
+                    log('请检查存储桶名称和地域是否正确', 'error');
+                    
+                } else {
+                    log(`✗ 意外的响应状态: ${response.status}`, 'error');
+                }
+                
+                // 显示响应头部
+                log('响应头部:', 'info');
+                for (const [key, value] of response.headers.entries()) {
+                    log(`  ${key}: ${value}`, 'info');
+                }
+                
+            } catch (error) {
+                log('✗ 存储桶访问测试失败', 'error');
+                log(`错误: ${error.message}`, 'error');
+                
+                if (error.message.includes('CORS')) {
+                    log('这是CORS错误，说明浏览器阻止了跨域请求', 'error');
+                    log('请检查腾讯云COS控制台的CORS配置', 'error');
+                    log('', 'error');
+                    log('推荐的CORS配置:', 'info');
+                    log('来源Origin: *', 'info');
+                    log('方法Methods: GET,PUT,POST,DELETE,HEAD', 'info');
+                    log('Allow-Headers: *', 'info');
+                    log('Expose-Headers: ETag,Content-Length,x-cos-request-id', 'info');
+                } else if (error.message.includes('Failed to fetch')) {
+                    log('网络请求失败，可能是:', 'error');
+                    log('1. 网络连接问题', 'error');
+                    log('2. 端点URL不正确', 'error');
+                    log('3. 防火墙或代理阻止了请求', 'error');
+                }
+                
+                console.error('详细错误信息:', error);
+            } finally {
+                accessBtn.disabled = false;
+                accessBtn.textContent = '测试存储桶访问';
+            }
+        }
+        
+        // 页面加载完成后的初始化
+        window.addEventListener('load', function() {
+            log('页面加载完成，准备测试腾讯云COS连接', 'info');
+            log('这个测试不需要AWS SDK，使用原生fetch API', 'info');
+            log('', 'info');
+            log('测试步骤:', 'info');
+            log('1. 先点击"测试CORS"检查跨域配置', 'info');
+            log('2. 再点击"测试存储桶访问"检查基本连接', 'info');
+            log('', 'info');
+        });
+    </script>
+</body>
+</html>

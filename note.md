@@ -18,7 +18,7 @@ git push --force
 领域没有设置热力图阈值的地方？(不紧急)
 随机引导模板功能。
 s3同步功能
-整理下标题栏的逻辑。（不太紧急）
+整理下标题栏的逻辑。（不紧急）
 
 
 # 1.0.7
@@ -31,7 +31,24 @@ s3同步功能
 
 # 20260122
 
+配置教程：
+[【ios福音】obsidian第三方同步方案(remotely插件+腾讯云cos)-保姆级教程 - 知乎](https://zhuanlan.zhihu.com/p/479961754)
+
 我希望悬浮窗的完整状态，它的高度在56Px左右，就是稍微减矮一点。  
+
+// 测试腾讯云COS连接
+const testConfig = {
+  bucketName: 'lumostime-1315858561',
+  region: 'ap-chongqing',
+  accessKeyId: 'AKIDunejnz6BLUVM3e5LTQKKDf0BLLSZjkru',
+  secretAccessKey: ' ', // 替换为你的实际SecretKey
+  endpoint: 'https://cos.ap-chongqing.myqcloud.com'
+};
+
+console.log('测试配置:', testConfig);
+
+
+
 
 # 20260121
 在设置页的偏好设置中，增加两个选项。 在启动默认页的下方，以开关切换的形式去呈现内容，就是档案页的默认页面和索引页的默认页面。

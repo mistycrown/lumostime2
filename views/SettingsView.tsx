@@ -58,7 +58,9 @@ import {
     AlignLeft
 } from 'lucide-react';
 import { webdavService, WebDAVConfig } from '../services/webdavService';
+import { s3Service, S3Config } from '../services/s3Service';
 import { imageService } from '../services/imageService';
+import { syncService } from '../services/syncService';
 import { NfcService } from '../services/NfcService';
 import { aiService, AIConfig } from '../services/aiService';
 import { UpdateService, VersionInfo } from '../services/updateService';
@@ -167,8 +169,9 @@ const AI_PRESETS = {
 };
 
 export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, onImport, onReset, onClearData, onToast, syncData, onSyncUpdate, startWeekOnSunday, onToggleStartWeekOnSunday, onOpenAutoLink, onOpenSearch, minIdleTimeThreshold = 1, onSetMinIdleTimeThreshold, defaultView = 'RECORD', onSetDefaultView, defaultArchiveView = 'CHRONICLE', onSetDefaultArchiveView, defaultIndexView = 'TAGS', onSetDefaultIndexView, reviewTemplates = [], onUpdateReviewTemplates, onUpdateDailyReviews, checkTemplates = [], onUpdateCheckTemplates, dailyReviewTime, onSetDailyReviewTime, weeklyReviewTime, onSetWeeklyReviewTime, monthlyReviewTime, onSetMonthlyReviewTime, customNarrativeTemplates, onUpdateCustomNarrativeTemplates, userPersonalInfo, onSetUserPersonalInfo, logs = [], todos = [], scopes = [], currentDate = new Date(), dailyReviews = [], weeklyReviews = [], monthlyReviews = [], todoCategories = [], filters = [], onUpdateFilters, categoriesData = [], onEditLog, autoFocusNote, onToggleAutoFocusNote }) => {
-    const [activeSubmenu, setActiveSubmenu] = useState<'main' | 'data' | 'cloud' | 'ai' | 'preferences' | 'guide' | 'nfc' | 'templates' | 'check_templates' | 'narrative_prompt' | 'auto_record' | 'autolink' | 'obsidian_export' | 'filters' | 'memoir_filter' | 'batch_manage'>('main');
+    const [activeSubmenu, setActiveSubmenu] = useState<'main' | 'data' | 'cloud' | 's3' | 'ai' | 'preferences' | 'guide' | 'nfc' | 'templates' | 'check_templates' | 'narrative_prompt' | 'auto_record' | 'autolink' | 'obsidian_export' | 'filters' | 'memoir_filter' | 'batch_manage'>('main');
     const [webdavConfig, setWebdavConfig] = useState<WebDAVConfig | null>(null);
+    const [s3Config, setS3Config] = useState<S3Config | null>(null);
     const [isSyncing, setIsSyncing] = useState(false);
 
     // 图片清理相关状态
@@ -260,6 +263,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
     // UI States
     const [isDefaultViewDropdownOpen, setIsDefaultViewDropdownOpen] = useState(false);
     const [configForm, setConfigForm] = useState<WebDAVConfig>({ url: '', username: '', password: '' });
+    const [s3ConfigForm, setS3ConfigForm] = useState<S3Config>({ bucketName: '', region: '', secretId: '', secretKey: '', endpoint: '' });
     const [confirmReset, setConfirmReset] = useState(false);
     const [confirmClear, setConfirmClear] = useState(false);
 
@@ -314,6 +318,12 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
         if (config) {
             setWebdavConfig(config);
             setConfigForm(config);
+        }
+
+        const s3Config = s3Service.getConfig();
+        if (s3Config) {
+            setS3Config(s3Config);
+            setS3ConfigForm(s3Config);
         }
 
         const aiConfig = aiService.getConfig();
@@ -451,6 +461,144 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
         } catch (error) {
             console.error(error);
             onToast('error', 'Failed to download data.');
+        } finally {
+            setIsSyncing(false);
+        }
+    };
+
+    // S3 处理函数
+    const handleS3SaveConfig = async () => {
+        if (!s3ConfigForm.bucketName || !s3ConfigForm.region || !s3ConfigForm.secretId || !s3ConfigForm.secretKey) {
+            onToast('error', 'Please fill in all required fields');
+            return;
+        }
+        
+        // 检查SecretId和SecretKey是否相同
+        if (s3ConfigForm.secretId === s3ConfigForm.secretKey) {
+            onToast('error', 'SecretId和SecretKey不能相同！请输入正确的SecretKey');
+            return;
+        }
+        
+        setIsSyncing(true);
+        
+        // 保存配置
+        s3Service.saveConfig(s3ConfigForm);
+        
+        // 测试连接
+        const success = await s3Service.checkConnection();
+
+        if (success) {
+            setS3Config(s3ConfigForm);
+            onToast('success', 'Connected to Tencent Cloud COS successfully!');
+        } else {
+            s3Service.clearConfig();
+            onToast('error', 'COS connection failed. Please check your credentials.');
+        }
+        setIsSyncing(false);
+    };
+
+    const handleS3Disconnect = () => {
+        s3Service.clearConfig();
+        setS3Config(null);
+        setS3ConfigForm({ bucketName: '', region: '', secretId: '', secretKey: '', endpoint: '' });
+        onToast('info', 'Disconnected from Tencent Cloud COS');
+    };
+
+    const handleS3SyncUpload = async () => {
+        if (!s3Config) return;
+        setIsSyncing(true);
+        try {
+            // 1. Upload main data
+            const dataToSync = {
+                ...syncData,
+                timestamp: Date.now(),
+                version: '1.0.0'
+            };
+            await s3Service.uploadData(dataToSync);
+            
+            // 2. Sync images
+            const localImageList = imageService.getReferencedImagesList();
+            if (localImageList.length > 0) {
+                console.log(`[Settings] 开始同步 ${localImageList.length} 张图片到 COS...`);
+                const imageResult = await syncService.syncImages(
+                    undefined, // no progress callback in settings
+                    localImageList,
+                    localImageList
+                );
+                
+                if (imageResult.uploaded > 0 || imageResult.errors.length > 0) {
+                    const message = imageResult.errors.length > 0 
+                        ? `Data uploaded. Images: ${imageResult.uploaded} uploaded, ${imageResult.errors.length} errors`
+                        : `Data and ${imageResult.uploaded} images uploaded to COS successfully!`;
+                    onToast(imageResult.errors.length > 0 ? 'warning' : 'success', message);
+                } else {
+                    onToast('success', 'Data uploaded to COS successfully!');
+                }
+            } else {
+                onToast('success', 'Data uploaded to COS successfully!');
+            }
+        } catch (error) {
+            console.error(error);
+            onToast('error', 'Failed to upload data to COS.');
+        } finally {
+            setIsSyncing(false);
+        }
+    };
+
+    const handleS3SyncDownload = async () => {
+        if (!s3Config) return;
+        if (!window.confirm("This will overwrite your current local data with the COS version. Are you sure?")) return;
+
+        setIsSyncing(true);
+        try {
+            // 1. Download main data
+            const data = await s3Service.downloadData();
+            if (data) {
+                onSyncUpdate(data);
+                
+                // 2. Sync images after data is updated
+                try {
+                    // Get image list from downloaded data
+                    const cloudImageData = await s3Service.downloadImageList();
+                    const cloudImageList = cloudImageData?.images || [];
+                    const localImageList = imageService.getReferencedImagesList();
+                    
+                    // Merge and update local image list
+                    const mergedImageList = Array.from(new Set([...localImageList, ...cloudImageList]));
+                    if (mergedImageList.length > 0) {
+                        imageService.updateReferencedImagesList(mergedImageList);
+                        
+                        console.log(`[Settings] 开始从 COS 同步 ${mergedImageList.length} 张图片...`);
+                        const imageResult = await syncService.syncImages(
+                            undefined, // no progress callback in settings
+                            mergedImageList,
+                            mergedImageList
+                        );
+                        
+                        if (imageResult.downloaded > 0 || imageResult.errors.length > 0) {
+                            const message = imageResult.errors.length > 0 
+                                ? `Data restored. Images: ${imageResult.downloaded} downloaded, ${imageResult.errors.length} errors`
+                                : `Data and ${imageResult.downloaded} images restored from COS successfully!`;
+                            onToast(imageResult.errors.length > 0 ? 'warning' : 'success', message);
+                        } else {
+                            onToast('success', 'Data restored from COS successfully!');
+                        }
+                    } else {
+                        onToast('success', 'Data restored from COS successfully!');
+                    }
+                } catch (imageError) {
+                    console.warn('[Settings] 图片同步失败:', imageError);
+                    onToast('warning', 'Data restored but image sync failed');
+                }
+                
+                // 同步完成后关闭设置页面，自动刷新到脉络页面
+                setTimeout(() => {
+                    onClose();
+                }, 1000); // 延迟1秒让用户看到成功提示
+            }
+        } catch (error) {
+            console.error(error);
+            onToast('error', 'Failed to download data from COS.');
         } finally {
             setIsSyncing(false);
         }
@@ -1180,7 +1328,211 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
         );
     }
 
+    if (activeSubmenu === 's3') {
+        return (
+            <div className="fixed inset-0 z-50 bg-[#fdfbf7] flex flex-col font-serif animate-in slide-in-from-right duration-300 pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">
+                <div className="flex items-center gap-3 px-4 h-14 border-b border-stone-100 bg-[#fdfbf7]/80 backdrop-blur-md sticky top-0">
+                    <button
+                        onClick={() => setActiveSubmenu('main')}
+                        className="text-stone-400 hover:text-stone-600 p-1"
+                    >
+                        <ChevronLeft size={24} />
+                    </button>
+                    <span className="text-stone-800 font-bold text-lg">S3 Sync</span>
+                </div>
 
+                <div className="p-4 space-y-4 overflow-y-auto pb-40">
+                    <div className="bg-white rounded-2xl p-6 shadow-sm space-y-4">
+                        <div className="flex items-center gap-3 text-stone-600 mb-2">
+                            <Cloud size={24} />
+                            <h3 className="font-bold text-lg">Amazon S3 Storage</h3>
+                        </div>
+
+                        {s3Config ? (
+                            <div className="space-y-6">
+                                <div className="flex items-center gap-3 p-3 bg-green-50 text-green-700 rounded-xl border border-green-100">
+                                    <CheckCircle2 size={20} className="shrink-0" />
+                                    <div className="overflow-hidden">
+                                        <p className="font-medium truncate">{s3Config.bucketName}</p>
+                                        <p className="text-xs opacity-80">Region: {s3Config.region}</p>
+                                    </div>
+                                </div>
+
+                                <div className="grid grid-cols-2 gap-3">
+                                    <button
+                                        onClick={handleS3SyncUpload}
+                                        disabled={isSyncing}
+                                        className="flex flex-col items-center justify-center gap-2 py-4 bg-stone-800 text-white rounded-xl font-medium active:scale-[0.98] transition-transform disabled:opacity-70"
+                                    >
+                                        <Upload size={20} className={isSyncing ? "animate-pulse" : ""} />
+                                        <span>Upload to COS</span>
+                                    </button>
+
+                                    <button
+                                        onClick={handleS3SyncDownload}
+                                        disabled={isSyncing}
+                                        className="flex flex-col items-center justify-center gap-2 py-4 bg-white border border-stone-200 text-stone-700 rounded-xl font-medium active:scale-[0.98] transition-transform hover:bg-stone-50 disabled:opacity-70"
+                                    >
+                                        <Download size={20} className={isSyncing ? "animate-pulse" : ""} />
+                                        <span>Restore from COS</span>
+                                    </button>
+                                </div>
+
+                                <div className="pt-4 border-t border-stone-100">
+                                    <button
+                                        onClick={handleS3Disconnect}
+                                        className="flex items-center justify-center gap-2 w-full py-2 text-red-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors text-sm"
+                                    >
+                                        <LogOut size={16} />
+                                        Disconnect
+                                    </button>
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="space-y-4">
+                                <p className="text-sm text-stone-500 leading-relaxed">
+                                    Connect to Tencent Cloud COS to sync your data securely.
+                                </p>
+
+                                {/* CORS配置提示 */}
+                                <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
+                                    <div className="flex items-start gap-2">
+                                        <AlertCircle size={16} className="text-amber-600 mt-0.5 flex-shrink-0" />
+                                        <div className="text-xs text-amber-800">
+                                            <p className="font-medium mb-1">腾讯云COS CORS配置要求：</p>
+                                            <ul className="space-y-1 text-[11px]">
+                                                <li>• <strong>AllowedOrigins</strong>: * 或您的域名</li>
+                                                <li>• <strong>AllowedMethods</strong>: GET, PUT, POST, DELETE, HEAD</li>
+                                                <li>• <strong>AllowedHeaders</strong>: *</li>
+                                                <li>• <strong>ExposeHeaders</strong>: ETag, Content-Length, x-cos-*</li>
+                                                <li>• <strong>MaxAgeSeconds</strong>: 3600</li>
+                                            </ul>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="space-y-3">
+                                    <div>
+                                        <label className="text-xs font-bold text-stone-400 uppercase ml-1">Bucket Name</label>
+                                        <div className="flex items-center gap-2 bg-stone-50 px-3 py-2 rounded-xl mt-1 focus-within:ring-2 focus-within:ring-stone-200 transition-all">
+                                            <Database size={18} className="text-stone-400" />
+                                            <input
+                                                type="text"
+                                                placeholder="lumostime-1315858561 (存储桶名-APPID)"
+                                                className="flex-1 bg-transparent border-none outline-none text-stone-700 placeholder:text-stone-300 text-sm"
+                                                value={s3ConfigForm.bucketName}
+                                                onChange={e => setS3ConfigForm(prev => ({ ...prev, bucketName: e.target.value }))}
+                                            />
+                                        </div>
+                                    </div>
+
+                                    <div>
+                                        <label className="text-xs font-bold text-stone-400 uppercase ml-1">Region</label>
+                                        <div className="flex items-center gap-2 bg-stone-50 px-3 py-2 rounded-xl mt-1 focus-within:ring-2 focus-within:ring-stone-200 transition-all">
+                                            <Globe size={18} className="text-stone-400" />
+                                            <input
+                                                type="text"
+                                                placeholder="ap-chongqing (腾讯云地域)"
+                                                className="flex-1 bg-transparent border-none outline-none text-stone-700 placeholder:text-stone-300 text-sm"
+                                                value={s3ConfigForm.region}
+                                                onChange={e => setS3ConfigForm(prev => ({ ...prev, region: e.target.value }))}
+                                            />
+                                        </div>
+                                    </div>
+
+                                    <div>
+                                        <label className="text-xs font-bold text-stone-400 uppercase ml-1">SecretId (Access Key ID)</label>
+                                        <div className="flex items-center gap-2 bg-stone-50 px-3 py-2 rounded-xl mt-1 focus-within:ring-2 focus-within:ring-stone-200 transition-all">
+                                            <User size={18} className="text-stone-400" />
+                                            <input
+                                                type="text"
+                                                placeholder="AKIDunejnz6BLUVM3e5LTQKKDf0BLLSZjkru (腾讯云SecretId)"
+                                                className="flex-1 bg-transparent border-none outline-none text-stone-700 placeholder:text-stone-300 text-sm"
+                                                value={s3ConfigForm.secretId}
+                                                onChange={e => setS3ConfigForm(prev => ({ ...prev, secretId: e.target.value }))}
+                                            />
+                                        </div>
+                                    </div>
+
+                                    <div>
+                                        <label className="text-xs font-bold text-stone-400 uppercase ml-1">SecretKey (Secret Access Key)</label>
+                                        <div className="flex items-center gap-2 bg-stone-50 px-3 py-2 rounded-xl mt-1 focus-within:ring-2 focus-within:ring-stone-200 transition-all">
+                                            <div className="w-[18px] flex justify-center"><Server size={14} className="text-stone-400" /></div>
+                                            <input
+                                                type="password"
+                                                placeholder="腾讯云SecretKey (与SecretId不同的长字符串)"
+                                                className="flex-1 bg-transparent border-none outline-none text-stone-700 placeholder:text-stone-300 text-sm"
+                                                value={s3ConfigForm.secretKey}
+                                                onChange={e => setS3ConfigForm(prev => ({ ...prev, secretKey: e.target.value }))}
+                                            />
+                                        </div>
+                                        {s3ConfigForm.secretId && s3ConfigForm.secretKey && 
+                                         s3ConfigForm.secretId === s3ConfigForm.secretKey && (
+                                            <p className="text-xs text-red-500 mt-1 ml-1">
+                                                ⚠️ SecretId和SecretKey不能相同！请输入不同的SecretKey
+                                            </p>
+                                        )}
+                                    </div>
+
+                                    <div>
+                                        <label className="text-xs font-bold text-stone-400 uppercase ml-1">Custom Endpoint (Optional)</label>
+                                        <div className="flex items-center gap-2 bg-stone-50 px-3 py-2 rounded-xl mt-1 focus-within:ring-2 focus-within:ring-stone-200 transition-all">
+                                            <Link size={18} className="text-stone-400" />
+                                            <input
+                                                type="text"
+                                                placeholder="https://cos.ap-chongqing.myqcloud.com (腾讯云COS)"
+                                                className="flex-1 bg-transparent border-none outline-none text-stone-700 placeholder:text-stone-300 text-sm"
+                                                value={s3ConfigForm.endpoint || ''}
+                                                onChange={e => setS3ConfigForm(prev => ({ ...prev, endpoint: e.target.value }))}
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="pt-2">
+                                    <button
+                                        onClick={handleS3SaveConfig}
+                                        disabled={isSyncing}
+                                        className="flex items-center justify-center gap-2 w-full py-3 bg-stone-800 text-white rounded-xl font-medium active:scale-[0.98] transition-transform shadow-lg shadow-stone-200 disabled:opacity-70"
+                                    >
+                                        {isSyncing ? (
+                                            <RefreshCw size={18} className="animate-spin" />
+                                        ) : (
+                                            <Save size={18} />
+                                        )}
+                                        {isSyncing ? "Connecting..." : "Save & Connect"}
+                                    </button>
+                                    
+                                    {/* CORS配置帮助按钮 */}
+                                    <button
+                                        onClick={() => {
+                                            const corsConfig = {
+                                                "AllowedOrigins": ["*"],
+                                                "AllowedMethods": ["GET", "PUT", "POST", "DELETE", "HEAD"],
+                                                "AllowedHeaders": ["*"],
+                                                "ExposeHeaders": ["ETag", "Content-Length", "x-cos-*"],
+                                                "MaxAgeSeconds": 3600
+                                            };
+                                            console.log('腾讯云COS CORS配置示例:', JSON.stringify(corsConfig, null, 2));
+                                            onToast('info', '已在控制台输出CORS配置示例，请复制到腾讯云COS控制台');
+                                        }}
+                                        className="flex items-center justify-center gap-2 w-full py-2 mt-2 text-stone-600 hover:text-stone-700 hover:bg-stone-50 rounded-lg transition-colors text-sm"
+                                    >
+                                        <Settings size={16} />
+                                        查看CORS配置示例
+                                    </button>
+                                    
+                                    <p className="text-[10px] text-center text-stone-400 mt-3">
+                                        Your credentials are stored locally on your device.
+                                    </p>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            </div>
+        );
+    }
 
     const handleSaveUserInfo = () => {
         onSetUserPersonalInfo?.(localUserInfo);
@@ -2318,6 +2670,11 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
                             icon={<Cloud size={18} />}
                             label="WebDAV 云同步"
                             onClick={() => setActiveSubmenu('cloud')}
+                        />
+                        <MenuItem
+                            icon={<Database size={18} className="text-orange-500" />}
+                            label="S3 云同步"
+                            onClick={() => setActiveSubmenu('s3')}
                         />
                         <MenuItem
                             icon={<Database size={18} />}

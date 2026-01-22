@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>腾讯云COS官方SDK测试</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        input {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            box-sizing: border-box;
+        }
+        button {
+            background: #007cba;
+            color: white;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            margin-right: 10px;
+        }
+        button:hover {
+            background: #005a87;
+        }
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        .log {
+            background: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 5px;
+            padding: 15px;
+            margin-top: 20px;
+            font-family: monospace;
+            white-space: pre-wrap;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .success { color: #28a745; }
+        .error { color: #dc3545; }
+        .info { color: #17a2b8; }
+        .warning { color: #ffc107; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>腾讯云COS官方SDK测试</h1>
+        <p>使用腾讯云COS官方JavaScript SDK进行测试</p>
+        
+        <div class="form-group">
+            <label>存储桶名称:</label>
+            <input type="text" id="bucketName" value="lumostime-1315858561" placeholder="bucketname-appid">
+        </div>
+        
+        <div class="form-group">
+            <label>地域:</label>
+            <input type="text" id="region" value="ap-chongqing" placeholder="ap-chongqing">
+        </div>
+        
+        <div class="form-group">
+            <label>SecretId:</label>
+            <input type="text" id="secretId" value="AKIDunejnz6BLUVM3e5LTQKKDf0BLLSZjkru" placeholder="AKID开头的字符串">
+        </div>
+        
+        <div class="form-group">
+            <label>SecretKey:</label>
+            <input type="password" id="secretKey" value="0sb9a5Zv6EE6oLhsshLrDNMDtOp7GF3j" placeholder="长字符串">
+        </div>
+        
+        <button onclick="testConnection()" id="testBtn">测试连接</button>
+        <button onclick="testUpload()" id="uploadBtn">测试上传</button>
+        <button onclick="testList()" id="listBtn">测试列表</button>
+        <button onclick="clearLog()">清空日志</button>
+        
+        <div id="log" class="log"></div>
+    </div>
+
+    <!-- 使用腾讯云COS官方SDK -->
+    <script src="https://unpkg.com/cos-js-sdk-v5/dist/cos-js-sdk-v5.min.js"></script>
+    <script>
+        let cos = null;
+        
+        function log(message, type = 'info') {
+            const logElement = document.getElementById('log');
+            const timestamp = new Date().toLocaleTimeString();
+            const className = type === 'error' ? 'error' : type === 'success' ? 'success' : type === 'warning' ? 'warning' : 'info';
+            logElement.innerHTML += `<span class="${className}">[${timestamp}] ${message}</span>\n`;
+            logElement.scrollTop = logElement.scrollHeight;
+            console.log(`[${timestamp}] ${message}`);
+        }
+        
+        function clearLog() {
+            document.getElementById('log').innerHTML = '';
+        }
+        
+        function getConfig() {
+            return {
+                bucketName: document.getElementById('bucketName').value.trim(),
+                region: document.getElementById('region').value.trim(),
+                secretId: document.getElementById('secretId').value.trim(),
+                secretKey: document.getElementById('secretKey').value.trim()
+            };
+        }
+        
+        function initializeCOS() {
+            const config = getConfig();
+            
+            if (!config.bucketName || !config.region || !config.secretId || !config.secretKey) {
+                log('请填写所有必需字段', 'error');
+                return false;
+            }
+            
+            if (config.secretId === config.secretKey) {
+                log('SecretId和SecretKey不能相同！', 'error');
+                return false;
+            }
+            
+            try {
+                cos = new COS({
+                    SecretId: config.secretId,
+                    SecretKey: config.secretKey,
+                });
+                
+                log('✓ COS客户端初始化成功', 'success');
+                log(`存储桶: ${config.bucketName}`);
+                log(`地域: ${config.region}`);
+                log(`SecretId: ${config.secretId.substring(0, 10)}...`);
+                
+                return true;
+            } catch (error) {
+                log('✗ COS客户端初始化失败', 'error');
+                log(`错误: ${error.message}`, 'error');
+                return false;
+            }
+        }
+        
+        async function testConnection() {
+            const testBtn = document.getElementById('testBtn');
+            testBtn.disabled = true;
+            testBtn.textContent = '测试中...';
+            
+            try {
+                if (!initializeCOS()) {
+                    return;
+                }
+                
+                const config = getConfig();
+                log('开始测试连接...', 'info');
+                
+                // 使用HeadBucket测试连接
+                cos.headBucket({
+                    Bucket: config.bucketName,
+                    Region: config.region
+                }, function(err, data) {
+                    if (err) {
+                        log('✗ 连接测试失败', 'error');
+                        log(`错误代码: ${err.code}`, 'error');
+                        log(`错误消息: ${err.message}`, 'error');
+                        
+                        if (err.code === 'AccessDenied') {
+                            log('', 'error');
+                            log('AccessDenied错误可能的原因:', 'error');
+                            log('1. SecretId或SecretKey不正确', 'error');
+                            log('2. API密钥权限不足', 'error');
+                            log('3. 存储桶权限设置问题', 'error');
+                        } else if (err.code === 'NoSuchBucket') {
+                            log('存储桶不存在，请检查存储桶名称和地域', 'error');
+                        }
+                        
+                        console.error('详细错误信息:', err);
+                    } else {
+                        log('✓ 连接测试成功！', 'success');
+                        log(`状态码: ${data.statusCode}`, 'success');
+                        log('存储桶访问正常', 'success');
+                    }
+                    
+                    testBtn.disabled = false;
+                    testBtn.textContent = '测试连接';
+                });
+                
+            } catch (error) {
+                log('✗ 连接测试异常', 'error');
+                log(`错误: ${error.message}`, 'error');
+                console.error('详细错误信息:', error);
+                
+                testBtn.disabled = false;
+                testBtn.textContent = '测试连接';
+            }
+        }
+        
+        async function testUpload() {
+            const uploadBtn = document.getElementById('uploadBtn');
+            uploadBtn.disabled = true;
+            uploadBtn.textContent = '测试中...';
+            
+            try {
+                if (!initializeCOS()) {
+                    return;
+                }
+                
+                const config = getConfig();
+                log('开始测试上传...', 'info');
+                
+                const testData = JSON.stringify({
+                    test: true,
+                    timestamp: Date.now(),
+                    message: 'This is a test file from Tencent COS SDK'
+                }, null, 2);
+                
+                cos.putObject({
+                    Bucket: config.bucketName,
+                    Region: config.region,
+                    Key: 'test-cos-sdk.json',
+                    Body: testData,
+                    ContentType: 'application/json'
+                }, function(err, data) {
+                    if (err) {
+                        log('✗ 上传测试失败', 'error');
+                        log(`错误代码: ${err.code}`, 'error');
+                        log(`错误消息: ${err.message}`, 'error');
+                        console.error('详细错误信息:', err);
+                    } else {
+                        log('✓ 上传测试成功！', 'success');
+                        log(`ETag: ${data.ETag}`, 'success');
+                        log('测试文件: test-cos-sdk.json', 'info');
+                        log(`状态码: ${data.statusCode}`, 'success');
+                    }
+                    
+                    uploadBtn.disabled = false;
+                    uploadBtn.textContent = '测试上传';
+                });
+                
+            } catch (error) {
+                log('✗ 上传测试异常', 'error');
+                log(`错误: ${error.message}`, 'error');
+                console.error('详细错误信息:', error);
+                
+                uploadBtn.disabled = false;
+                uploadBtn.textContent = '测试上传';
+            }
+        }
+        
+        async function testList() {
+            const listBtn = document.getElementById('listBtn');
+            listBtn.disabled = true;
+            listBtn.textContent = '测试中...';
+            
+            try {
+                if (!initializeCOS()) {
+                    return;
+                }
+                
+                const config = getConfig();
+                log('开始测试列出对象...', 'info');
+                
+                cos.getBucket({
+                    Bucket: config.bucketName,
+                    Region: config.region,
+                    MaxKeys: 10
+                }, function(err, data) {
+                    if (err) {
+                        log('✗ 列出对象失败', 'error');
+                        log(`错误代码: ${err.code}`, 'error');
+                        log(`错误消息: ${err.message}`, 'error');
+                        console.error('详细错误信息:', err);
+                    } else {
+                        log('✓ 列出对象成功！', 'success');
+                        log(`对象数量: ${data.Contents ? data.Contents.length : 0}`, 'success');
+                        
+                        if (data.Contents && data.Contents.length > 0) {
+                            log('前几个对象:', 'info');
+                            data.Contents.slice(0, 5).forEach(obj => {
+                                log(`  - ${obj.Key} (${obj.Size} bytes)`, 'info');
+                            });
+                        } else {
+                            log('存储桶为空', 'info');
+                        }
+                    }
+                    
+                    listBtn.disabled = false;
+                    listBtn.textContent = '测试列表';
+                });
+                
+            } catch (error) {
+                log('✗ 列出对象异常', 'error');
+                log(`错误: ${error.message}`, 'error');
+                console.error('详细错误信息:', error);
+                
+                listBtn.disabled = false;
+                listBtn.textContent = '测试列表';
+            }
+        }
+        
+        // 页面加载完成后的初始化
+        window.addEventListener('load', function() {
+            log('页面加载完成，使用腾讯云COS官方SDK', 'info');
+            log('这个SDK专门为腾讯云COS设计，兼容性更好', 'success');
+            log('', 'info');
+            log('测试步骤:', 'info');
+            log('1. 确认配置信息正确', 'info');
+            log('2. 点击"测试连接"验证基本连接', 'info');
+            log('3. 点击"测试上传"验证写入权限', 'info');
+            log('4. 点击"测试列表"验证读取权限', 'info');
+            log('', 'info');
+        });
+    </script>
+</body>
+</html>

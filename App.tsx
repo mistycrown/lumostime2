@@ -39,6 +39,7 @@ import { Activity, ActiveSession, AppView, Log, TodoItem, TodoCategory, Category
 import { INITIAL_LOGS, INITIAL_TODOS, MOCK_TODO_CATEGORIES, VIEW_TITLES, CATEGORIES, SCOPES, INITIAL_GOALS, DEFAULT_REVIEW_TEMPLATES, DEFAULT_USER_PERSONAL_INFO, INITIAL_DAILY_REVIEWS, DEFAULT_CHECK_TEMPLATES } from './constants';
 import { ToastMessage, ToastType } from './components/Toast';
 import { webdavService } from './services/webdavService';
+import { s3Service } from './services/s3Service';
 import { splitLogByDays } from './utils/logUtils';
 import { ParsedTimeEntry, aiService } from './services/aiService';
 import { narrativeService } from './services/narrativeService';
@@ -824,23 +825,35 @@ const AppContent: React.FC = () => {
         try {
           console.log('[App] 启动时检查图片同步...');
 
-          const localImageList = imageService.getReferencedImagesList();
-          const cloudImageData = await webdavService.downloadImageList();
-          const cloudImageList = cloudImageData?.images || [];
+          // 检查存储服务配置
+          const webdavConfig = webdavService.getConfig();
+          const s3Config = s3Service.getConfig();
+          
+          if (webdavConfig || s3Config) {
+            const activeService = s3Config ? s3Service : webdavService;
+            const serviceName = s3Config ? 'S3/COS' : 'WebDAV';
+            console.log(`[App] 使用存储服务: ${serviceName}`);
 
-          // 合并列表
-          const mergedImageList = Array.from(new Set([...localImageList, ...cloudImageList]));
+            const localImageList = imageService.getReferencedImagesList();
+            const cloudImageData = await activeService.downloadImageList();
+            const cloudImageList = cloudImageData?.images || [];
 
-          if (mergedImageList.length > localImageList.length) {
-            imageService.updateReferencedImagesList(mergedImageList);
-            await webdavService.uploadImageList(mergedImageList);
-          }
+            // 合并列表
+            const mergedImageList = Array.from(new Set([...localImageList, ...cloudImageList]));
 
-          // 同步图片文件
-          const imageResult = await syncService.syncImages(undefined, mergedImageList, mergedImageList);
-          if (imageResult.downloaded > 0) {
-            console.log(`[App] 启动时下载了 ${imageResult.downloaded} 张图片`);
-            setRefreshKey(prev => prev + 1);
+            if (mergedImageList.length > localImageList.length) {
+              imageService.updateReferencedImagesList(mergedImageList);
+              await activeService.uploadImageList(mergedImageList);
+            }
+
+            // 同步图片文件
+            const imageResult = await syncService.syncImages(undefined, mergedImageList, mergedImageList);
+            if (imageResult.downloaded > 0) {
+              console.log(`[App] 启动时下载了 ${imageResult.downloaded} 张图片`);
+              setRefreshKey(prev => prev + 1);
+            }
+          } else {
+            console.log('[App] 没有配置存储服务，跳过启动时图片同步');
           }
         } catch (imageError: any) {
           console.warn('[App] 启动时图片同步失败:', imageError.message);
@@ -2005,14 +2018,20 @@ const AppContent: React.FC = () => {
     console.log(`[App] 图片列表: ${imageList.length} 个`);
     console.log('========================================');
 
-    // 检查WebDAV配置
-    const config = webdavService.getConfig();
-    console.log('[App] WebDAV配置状态:', config ? '✓ 已配置' : '✗ 未配置');
+    // 检查存储服务配置（WebDAV 或 S3/COS）
+    const webdavConfig = webdavService.getConfig();
+    const s3Config = s3Service.getConfig();
+    
+    console.log('[App] WebDAV配置状态:', webdavConfig ? '✓ 已配置' : '✗ 未配置');
+    console.log('[App] S3/COS配置状态:', s3Config ? '✓ 已配置' : '✗ 未配置');
 
-    if (!config) {
-      console.log('[App] ⚠️ WebDAV未配置，跳过图片同步');
+    if (!webdavConfig && !s3Config) {
+      console.log('[App] ⚠️ 没有配置任何存储服务，跳过图片同步');
       return;
     }
+
+    const activeService = s3Config ? 'S3/COS' : 'WebDAV';
+    console.log(`[App] 使用存储服务: ${activeService}`);
 
     try {
       console.log('[App] ⚡ Starting Image Sync...');
