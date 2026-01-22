@@ -39,24 +39,40 @@ s3同步功能
 使用暖灰色（Stone/Warm Gray）作为主基调，模拟纸张的质感，营造温暖、复古但现代的氛围。
 顶部标题栏和下面的内容背景保持一样的颜色。
 
-下滑，标题栏流畅地缩小和变窄，从这样变成这样
+下滑的时候，标题栏流畅地缩小和变窄，从这样变成这样
 <header class="sticky top-0 z-40 transition-all duration-300 bg-transparent py-4"><div class="max-w-xl mx-auto px-6"><div class="flex flex-col items-center"><h1 class="font-serif text-stone-800 font-bold transition-all duration-300 text-2xl mb-1">Memoir</h1></div></div></header>
 
 <header class="sticky top-0 z-40 transition-all duration-300 bg-stone-50/90 backdrop-blur-md shadow-sm py-2"><div class="max-w-xl mx-auto px-6"><div class="flex flex-col items-center"><h1 class="font-serif text-stone-800 font-bold transition-all duration-300 text-lg">Memoir</h1></div></div></header>
+
+时间线上的星星和月亮有白色背景，请删除。
+
+引言部分的文字改成17px（"'Every moment is a memory waiting to happen."）
+
+标题 momeir Chronicle 的字号在大的时候是18 px，小的时候是16px。
+
+每个条目的标题字号放小，16px。
+
+读取不到标题和内容的日报：
+标题为日期，如2026/12/1
+内容为省略号。
+读取不到标题和内容的周报：
+标题为日期范围，如2026/12/1-2026/12/7
+内容为省略号。
+
+按照这个组件修改顶部的日期切换栏，复制粘贴ui样式，不要修改。
+```
+<div class="flex items-end gap-3 mb-8 pt-6 px-1 select-none"><div class="flex flex-col relative group cursor-pointer shrink-0"><div class="flex items-center gap-2"><span class="text-xs font-bold text-stone-400 font-sans tracking-wide">2024年</span></div><div class="flex items-center gap-1"><h2 class="text-3xl font-serif font-bold text-stone-800 group-hover:text-stone-600 transition-colors">1月</h2><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-chevron-down text-stone-300 group-hover:text-stone-500 transition-colors mt-1.5" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></div></div><div class="h-px bg-stone-200 flex-1 mb-3"></div><div class="flex items-center gap-1 mb-1 shrink-0 bg-stone-100/60 p-1 rounded-lg border border-stone-100"><button class="px-2.5 py-1 text-[11px] font-medium text-stone-500 hover:text-stone-800 hover:bg-white/80 rounded-md transition-all">昨日</button><button class="px-2.5 py-1 text-[11px] font-bold text-stone-800 bg-white shadow-sm border border-stone-200/50 rounded-md">今日</button><div class="w-px h-3 bg-stone-300/40 mx-0.5"></div><button class="px-2.5 py-1 text-[11px] font-medium text-stone-500 hover:text-stone-800 hover:bg-white/80 rounded-md transition-all">上周</button><button class="px-2.5 py-1 text-[11px] font-medium text-stone-500 hover:text-stone-800 hover:bg-white/80 rounded-md transition-all">本周</button></div></div>
+```
+
 
 筛选条件设置是否显示周报、日报。
 
 点击左侧的日期，新建日报。
 
-标题字号放小，15px。
 
-读取不到标题和内容的日报：
-标题为日期，如2026/12/1
-内容为省略号。
 
-读取不到标题和内容的周报：
-标题为日期范围，如2026/12/1-2026/12/7
-内容为省略号。
+
+
 
 记录详情的输入框可以伸展
 

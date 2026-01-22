@@ -121,9 +121,9 @@ const TimelineItem: React.FC<TimelineItemProps> = ({ entry, isLast, isFirstOfDay
     const renderNodeIcon = () => {
         switch (type) {
             case 'daily_summary':
-                return <div className="bg-white z-10 p-1"><Moon className="w-3 h-3 text-purple-600 fill-current" /></div>;
+                return <Moon className="w-3 h-3 text-purple-600 fill-current z-10" />;
             case 'weekly_summary':
-                return <div className="bg-white z-10 p-1"><Star className="w-3 h-3 text-amber-500 fill-current" /></div>;
+                return <Star className="w-3 h-3 text-amber-500 fill-current z-10" />;
             default:
                 // Normal dot
                 return <div className="w-2.5 h-2.5 mt-1.5 ml-1.5 rounded-full bg-stone-900 border-2 border-white z-10" />;
@@ -168,7 +168,7 @@ const TimelineItem: React.FC<TimelineItemProps> = ({ entry, isLast, isFirstOfDay
                     if (!displayTitle) return null;
 
                     return (
-                        <h3 className={`text-gray-900 font-bold leading-tight ${isSummary ? 'text-lg' : 'text-lg'}`} style={{ fontFamily: '"Noto Serif SC", serif' }}>
+                        <h3 className={`text-gray-900 font-bold leading-tight ${isSummary ? 'text-[16px]' : 'text-[16px]'}`} style={{ fontFamily: '"Noto Serif SC", serif' }}>
                             {displayTitle}
                         </h3>
                     );
