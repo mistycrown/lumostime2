@@ -60,10 +60,63 @@ s3同步功能
 内容为省略号。
 
 按照这个组件修改顶部的日期切换栏，复制粘贴ui样式，不要修改。
+
+点击“昨日”按钮可以跳转到昨天的日回顾。 
+
+点击“今日”按钮可以跳转到今日的日回顾。 
+
+“上周”可以跳转到上周的周回顾。 
+
+“本周”可以跳转到本周的周回顾。 
+
+如果没有，就新建。 
+
+如果有，就打开。 
+
 ```
 <div class="flex items-end gap-3 mb-8 pt-6 px-1 select-none"><div class="flex flex-col relative group cursor-pointer shrink-0"><div class="flex items-center gap-2"><span class="text-xs font-bold text-stone-400 font-sans tracking-wide">2024年</span></div><div class="flex items-center gap-1"><h2 class="text-3xl font-serif font-bold text-stone-800 group-hover:text-stone-600 transition-colors">1月</h2><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-chevron-down text-stone-300 group-hover:text-stone-500 transition-colors mt-1.5" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></div></div><div class="h-px bg-stone-200 flex-1 mb-3"></div><div class="flex items-center gap-1 mb-1 shrink-0 bg-stone-100/60 p-1 rounded-lg border border-stone-100"><button class="px-2.5 py-1 text-[11px] font-medium text-stone-500 hover:text-stone-800 hover:bg-white/80 rounded-md transition-all">昨日</button><button class="px-2.5 py-1 text-[11px] font-bold text-stone-800 bg-white shadow-sm border border-stone-200/50 rounded-md">今日</button><div class="w-px h-3 bg-stone-300/40 mx-0.5"></div><button class="px-2.5 py-1 text-[11px] font-medium text-stone-500 hover:text-stone-800 hover:bg-white/80 rounded-md transition-all">上周</button><button class="px-2.5 py-1 text-[11px] font-medium text-stone-500 hover:text-stone-800 hover:bg-white/80 rounded-md transition-all">本周</button></div></div>
 ```
 
+按照这个，在整个画面的右边的中间加一个悬浮的框，切换导航栏。 
+在屏幕的最右侧（紧贴边缘），渲染一条极细的、隐约可见的垂直线
+只显示有记录的日期：比如只有 15号、14号、12号，而不是把1-31号全列出来
+当前位置高亮：随着页面滚动，当前可视区域对应的日期节点会变大、变深色
+点击跳转：点击右侧的某个日期数字，页面平滑滚动（Smooth Scroll）到对应的条目。
+
+
+```
+<div class="fixed right-1 top-1/2 -translate-y-1/2 z-50 flex flex-col items-center gap-3 py-4 rounded-full bg-stone-50/50 backdrop-blur-[2px]"><button class="group relative flex items-center justify-center w-8 h-4 select-none touch-manipulation"><span class="
+               font-serif text-[10px] transition-all duration-300
+               text-stone-300 font-medium group-hover:text-stone-500
+             ">15</span><div class="
+               absolute -left-1 w-1 h-1 rounded-full bg-stone-900 transition-all duration-300
+               opacity-0 scale-0
+             "></div></button><button class="group relative flex items-center justify-center w-8 h-4 select-none touch-manipulation"><span class="
+               font-serif text-[10px] transition-all duration-300
+               text-stone-300 font-medium group-hover:text-stone-500
+             ">14</span><div class="
+               absolute -left-1 w-1 h-1 rounded-full bg-stone-900 transition-all duration-300
+               opacity-0 scale-0
+             "></div></button><button class="group relative flex items-center justify-center w-8 h-4 select-none touch-manipulation"><span class="
+               font-serif text-[10px] transition-all duration-300
+               text-stone-300 font-medium group-hover:text-stone-500
+             ">12</span><div class="
+               absolute -left-1 w-1 h-1 rounded-full bg-stone-900 transition-all duration-300
+               opacity-0 scale-0
+             "></div></button><button class="group relative flex items-center justify-center w-8 h-4 select-none touch-manipulation"><span class="
+               font-serif text-[10px] transition-all duration-300
+               text-stone-300 font-medium group-hover:text-stone-500
+             ">10</span><div class="
+               absolute -left-1 w-1 h-1 rounded-full bg-stone-900 transition-all duration-300
+               opacity-0 scale-0
+             "></div></button><button class="group relative flex items-center justify-center w-8 h-4 select-none touch-manipulation"><span class="
+               font-serif text-[10px] transition-all duration-300
+               text-stone-900 font-bold scale-150 origin-right
+             ">08</span><div class="
+               absolute -left-1 w-1 h-1 rounded-full bg-stone-900 transition-all duration-300
+               opacity-100 scale-100
+             "></div></button></div>
+```
 
 筛选条件设置是否显示周报、日报。
 

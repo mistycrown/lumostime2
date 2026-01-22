@@ -11,7 +11,7 @@ import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react'
 import { DailyReview, Log, WeeklyReview, MonthlyReview } from '../types';
 import { DiaryEntry, MOCK_ENTRIES, MONTHS, Comment } from './journalTypes';
 import TimelineItem from '../components/TimelineItem';
-import { Search, Menu, PenLine, ChevronDown, ChevronLeft, ChevronRight, SlidersHorizontal, Image as ImageIcon, AlignLeft, X, FilterX } from 'lucide-react';
+import { Search, Menu, PenLine, ChevronDown, ChevronLeft, ChevronRight, SlidersHorizontal, Image as ImageIcon, AlignLeft, X, FilterX, AudioWaveform } from 'lucide-react';
 
 import { useSettings } from '../contexts/SettingsContext';
 import { useCategoryScope } from '../contexts/CategoryScopeContext';
@@ -330,6 +330,48 @@ export const JournalView: React.FC<JournalViewProps> = ({
         setSelectedDate(newDate);
     };
 
+    // --- Date Helpers for Switcher ---
+    const addDays = (date: Date, days: number) => {
+        const result = new Date(date);
+        result.setDate(result.getDate() + days);
+        return result;
+    };
+
+    const getWeekRange = (date: Date) => {
+        const d = new Date(date);
+        // Assuming Monday start (ISO 8601) or adjust based on preference
+        // 0 is Sunday, 1 is Monday
+        const day = d.getDay();
+        const diff = d.getDate() - day + (day === 0 ? -6 : 1); // adjust when day is sunday
+        const start = new Date(d.setDate(diff));
+        start.setHours(0, 0, 0, 0);
+
+        const end = new Date(start);
+        end.setDate(end.getDate() + 6);
+        end.setHours(23, 59, 59, 999);
+
+        return { start, end };
+    };
+
+    // Calculate dynamic dates
+    const today = new Date();
+    const yesterday = addDays(today, -1);
+
+    // Actions
+    const openYesterday = () => onOpenDailyReview(yesterday);
+    const openToday = () => onOpenDailyReview(today);
+
+    const openLastWeek = () => {
+        const lastWeek = addDays(today, -7);
+        const { start, end } = getWeekRange(lastWeek);
+        onOpenWeeklyReview(start, end);
+    };
+
+    const openThisWeek = () => {
+        const { start, end } = getWeekRange(today);
+        onOpenWeeklyReview(start, end);
+    };
+
     return (
         <div className="flex flex-col h-full bg-[#faf9f6] relative">
             {/* Sticky Header - 标题栏随滚动缩小 */}
@@ -406,6 +448,14 @@ export const JournalView: React.FC<JournalViewProps> = ({
                                 )}
                             </div>
                             <div className="h-px bg-stone-200 flex-1 mb-3"></div>
+
+                            <div className="flex items-center gap-1 mb-1 shrink-0 bg-stone-100/60 p-1 rounded-lg border border-stone-100">
+                                <button onClick={openYesterday} className="px-2.5 py-1 text-[11px] font-medium text-stone-500 hover:text-stone-800 hover:bg-white/80 rounded-md transition-all">昨日</button>
+                                <button onClick={openToday} className="px-2.5 py-1 text-[11px] font-bold text-stone-800 bg-white shadow-sm border border-stone-200/50 rounded-md">今日</button>
+                                <div className="w-px h-3 bg-stone-300/40 mx-0.5"></div>
+                                <button onClick={openLastWeek} className="px-2.5 py-1 text-[11px] font-medium text-stone-500 hover:text-stone-800 hover:bg-white/80 rounded-md transition-all">上周</button>
+                                <button onClick={openThisWeek} className="px-2.5 py-1 text-[11px] font-medium text-stone-500 hover:text-stone-800 hover:bg-white/80 rounded-md transition-all">本周</button>
+                            </div>
                         </div>
 
                         {/* Quote or Summary Card - Click to Open Monthly Review */}
