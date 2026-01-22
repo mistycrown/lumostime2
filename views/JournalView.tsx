@@ -488,20 +488,20 @@ export const JournalView: React.FC<JournalViewProps> = ({
                     {/* Intro / Stats Area / Month Selector */}
                     <div className="mb-12 pl-2 pr-0 relative">
                         {/* New Month Picker UI */}
-                        <div className="flex items-end gap-4 mb-8 pt-6 px-1 select-none">
+                        <div className="flex items-end gap-4 mb-6 pt-0 px-1 select-none">
                             <div className="flex flex-col relative group cursor-pointer" ref={monthPickerRef}>
                                 <div
                                     onClick={() => setIsMonthPickerOpen(!isMonthPickerOpen)}
                                     className="flex flex-col"
                                 >
                                     <div className="flex items-center gap-2">
-                                        <span className="text-xs font-bold text-stone-400 font-sans tracking-wide">{selectedDate.getFullYear()}年</span>
+                                        <span className="text-[10px] font-bold text-stone-400 font-sans tracking-wide">{selectedDate.getFullYear()}年</span>
                                     </div>
                                     <div className="flex items-center gap-1">
-                                        <h2 className="text-3xl font-serif font-bold text-stone-800 group-hover:text-stone-600 transition-colors">
+                                        <h2 className="text-2xl font-serif font-bold text-stone-800 group-hover:text-stone-600 transition-colors">
                                             {selectedDate.getMonth() + 1}月
                                         </h2>
-                                        <ChevronDown className={`w-5 h-5 text-stone-300 group-hover:text-stone-500 transition-colors mt-1.5 ${isMonthPickerOpen ? 'rotate-180' : ''}`} />
+                                        <ChevronDown className={`w-4 h-4 text-stone-300 group-hover:text-stone-500 transition-colors mt-1.5 ${isMonthPickerOpen ? 'rotate-180' : ''}`} />
                                     </div>
                                 </div>
 
@@ -539,11 +539,11 @@ export const JournalView: React.FC<JournalViewProps> = ({
                             <div className="h-px bg-stone-200 flex-1 mb-3"></div>
 
                             <div className="flex items-center gap-1 mb-1 shrink-0 bg-stone-100/60 p-1 rounded-lg border border-stone-100">
-                                <button onClick={openYesterday} className="px-2.5 py-1 text-[11px] font-medium text-stone-500 hover:text-stone-800 hover:bg-white/80 rounded-md transition-all">昨日</button>
-                                <button onClick={openToday} className="px-2.5 py-1 text-[11px] font-bold text-stone-800 bg-white shadow-sm border border-stone-200/50 rounded-md">今日</button>
+                                <button onClick={openYesterday} className="px-2.5 py-1 text-[10px] font-medium text-stone-500 hover:text-stone-800 hover:bg-white/80 rounded-md transition-all">昨日</button>
+                                <button onClick={openToday} className="px-2.5 py-1 text-[10px] font-medium text-stone-500 hover:text-stone-800 hover:bg-white/80 rounded-md transition-all">今日</button>
                                 <div className="w-px h-3 bg-stone-300/40 mx-0.5"></div>
-                                <button onClick={openLastWeek} className="px-2.5 py-1 text-[11px] font-medium text-stone-500 hover:text-stone-800 hover:bg-white/80 rounded-md transition-all">上周</button>
-                                <button onClick={openThisWeek} className="px-2.5 py-1 text-[11px] font-medium text-stone-500 hover:text-stone-800 hover:bg-white/80 rounded-md transition-all">本周</button>
+                                <button onClick={openLastWeek} className="px-2.5 py-1 text-[10px] font-medium text-stone-500 hover:text-stone-800 hover:bg-white/80 rounded-md transition-all">上周</button>
+                                <button onClick={openThisWeek} className="px-2.5 py-1 text-[10px] font-medium text-stone-500 hover:text-stone-800 hover:bg-white/80 rounded-md transition-all">本周</button>
                             </div>
                         </div>
 
