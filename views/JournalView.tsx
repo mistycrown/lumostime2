@@ -31,6 +31,36 @@ interface JournalViewProps {
     onOpenMonthlyReview: (start: Date, end: Date) => void;
 }
 
+/**
+ * 解析 Review 的 narrative 字段，提取标题和内容
+ * @param narrative - Review 的 narrative markdown 文本
+ * @param defaultTitle - 默认标题（如果无法从 narrative 提取）
+ * @returns 包含 title 和 content 的对象
+ */
+const parseNarrative = (narrative: string, defaultTitle: string) => {
+    let title = defaultTitle;
+    let content = '...';
+
+    if (narrative) {
+        // Get Title (First Line)
+        const cleanNarrative = narrative.replace(/^#+\s*/, '').trim();
+        const lines = cleanNarrative.split('\n');
+        title = lines[0].trim() || defaultTitle;
+
+        // Get Content (Last Blockquote or truncated body)
+        const quoteRegex = /(?:^|\n)>\s*(.*?)(?=(?:\n\n|$))/gs;
+        const matches = [...narrative.matchAll(quoteRegex)];
+
+        if (matches.length > 0) {
+            content = matches[matches.length - 1][1].replace(/\n>\s*/g, '\n').trim();
+        } else {
+            const bodyText = lines.slice(1).join('\n').trim();
+            content = bodyText.length > 100 ? bodyText.slice(0, 100) + '...' : bodyText;
+        }
+    }
+    return { title, content };
+};
+
 const DateNavigationSidebar: React.FC<{
     entries: { date: string; entries: any[] }[];
     activeDay: string | null;
@@ -116,10 +146,7 @@ export const JournalView: React.FC<JournalViewProps> = ({
     const [isMonthPickerOpen, setIsMonthPickerOpen] = useState(false);
     const [isScrolled, setIsScrolled] = useState(false); // 滚动状态
 
-    // DEPRECATED LOCAL FILTERS:
-    // const [isFilterOpen, setIsFilterOpen] = useState(false);
-    // const [filterHasMedia, setFilterHasMedia] = useState(false);
-    // const [filterMinLength, setFilterMinLength] = useState(0);
+
 
     const monthPickerRef = useRef<HTMLDivElement>(null);
     const scrollContainerRef = useRef<HTMLDivElement>(null); // 滚动容器ref
@@ -144,9 +171,6 @@ export const JournalView: React.FC<JournalViewProps> = ({
         const diaryEntries: DiaryEntry[] = [];
         const targetYear = selectedDate.getFullYear();
         const targetMonth = selectedDate.getMonth();
-
-        // Helper to truncate title
-        const truncateTitle = (t: string) => t.length > 12 ? t.slice(0, 12) + '...' : t;
 
         // 1. Process Logs
         logs.forEach(log => {
@@ -200,30 +224,7 @@ export const JournalView: React.FC<JournalViewProps> = ({
             });
         });
 
-        // Helper to parse narrative
-        const parseNarrative = (narrative: string, defaultTitle: string) => {
-            let title = defaultTitle;
-            let content = '...';
 
-            if (narrative) {
-                // Get Title (First Line)
-                const cleanNarrative = narrative.replace(/^#+\s*/, '').trim();
-                const lines = cleanNarrative.split('\n');
-                title = lines[0].trim() || defaultTitle;
-
-                // Get Content (Last Blockquote or truncated body)
-                const quoteRegex = /(?:^|\n)>\s*(.*?)(?=(?:\n\n|$))/gs;
-                const matches = [...narrative.matchAll(quoteRegex)];
-
-                if (matches.length > 0) {
-                    content = matches[matches.length - 1][1].replace(/\n>\s*/g, '\n').trim();
-                } else {
-                    const bodyText = lines.slice(1).join('\n').trim();
-                    content = bodyText.length > 100 ? bodyText.slice(0, 100) + '...' : bodyText;
-                }
-            }
-            return { title, content };
-        };
 
         // 2. Process Daily Reviews
         dailyReviews.forEach(review => {
@@ -263,8 +264,7 @@ export const JournalView: React.FC<JournalViewProps> = ({
             const dateRange = `${review.weekStartDate} ~ ${review.weekEndDate}`;
             const hasContent = content && content !== '...';
 
-            const rawTitle = hasContent ? title : dateRange;
-            const finalTitle = truncateTitle(rawTitle);
+            const finalTitle = hasContent ? title : dateRange;
             const finalContent = hasContent ? content : '...';
 
             diaryEntries.push({
