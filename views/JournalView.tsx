@@ -31,6 +31,52 @@ interface JournalViewProps {
     onOpenMonthlyReview: (start: Date, end: Date) => void;
 }
 
+const DateNavigationSidebar: React.FC<{
+    entries: { date: string; entries: any[] }[];
+    activeDay: string | null;
+    onDateClick: (dateStr: string) => void;
+}> = ({ entries, activeDay, onDateClick }) => {
+    // Extract unique days
+    const days = useMemo(() => {
+        return entries.map(g => {
+            const d = new Date(g.date);
+            return {
+                dayStr: d.getDate().toString(),
+                fullDate: g.date
+            };
+        });
+    }, [entries]);
+
+    return (
+        <div className="fixed right-1 top-1/2 -translate-y-1/2 z-50 flex flex-col items-center gap-3 py-4 rounded-full bg-stone-50/50 backdrop-blur-[2px]">
+            {days.map(({ dayStr }) => {
+                const isActive = activeDay === dayStr;
+                return (
+                    <button
+                        key={dayStr}
+                        onClick={() => onDateClick(dayStr)}
+                        className="group relative flex items-center justify-center w-8 h-4 select-none touch-manipulation"
+                    >
+                        <span className={`
+               font-serif text-[10px] transition-all duration-300
+               ${isActive
+                                ? 'text-stone-900 font-bold scale-150 origin-right'
+                                : 'text-stone-300 font-medium group-hover:text-stone-500'}
+             `}>
+                            {dayStr.padStart(2, '0')}
+                        </span>
+                        <div className={`
+               absolute -left-1 w-1 h-1 rounded-full bg-stone-900 transition-all duration-300
+               ${isActive ? 'opacity-100 scale-100' : 'opacity-0 scale-0'}
+             `}></div>
+                    </button>
+                );
+            })}
+        </div>
+    );
+};
+
+
 export const JournalView: React.FC<JournalViewProps> = ({
     dailyReviews,
     weeklyReviews,
@@ -71,20 +117,8 @@ export const JournalView: React.FC<JournalViewProps> = ({
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, []);
 
-    // 滚动监听:标题栏缩小效果
-    useEffect(() => {
-        const container = scrollContainerRef.current;
-        if (!container) return;
-
-        const handleScroll = () => {
-            const scrollTop = container.scrollTop;
-            // 只要有任何滚动就触发收缩
-            setIsScrolled(scrollTop > 0);
-        };
-
-        container.addEventListener('scroll', handleScroll);
-        return () => container.removeEventListener('scroll', handleScroll);
-    }, []);
+    // 滚动监听:标题栏缩小效果 & Date Sidebar Active State
+    const [activeDay, setActiveDay] = useState<string | null>(null);
 
     // Transform and Filter entries
     const filteredEntries = useMemo(() => {
@@ -268,6 +302,41 @@ export const JournalView: React.FC<JournalViewProps> = ({
         return groupedByDay;
 
     }, [logs, dailyReviews, weeklyReviews, monthlyReviews, categories, selectedDate, memoirFilterConfig, todos, scopes]);
+
+    useEffect(() => {
+        const container = scrollContainerRef.current;
+        if (!container) return;
+
+        const handleScroll = () => {
+            const scrollTop = container.scrollTop;
+            setIsScrolled(scrollTop > 0);
+
+            // Determine active day
+            // Find the day section that is closest to the top of the viewport
+            const dayElements = document.querySelectorAll('[id^="journal-day-"]');
+            let currentActive = null;
+            let minDistance = Infinity;
+
+            dayElements.forEach((el) => {
+                const rect = el.getBoundingClientRect();
+                // Distance from top (approx 100px offset for header)
+                const distance = Math.abs(rect.top - 100);
+                if (distance < minDistance) {
+                    minDistance = distance;
+                    currentActive = el.id.replace('journal-day-', '');
+                }
+            });
+
+            if (currentActive) {
+                setActiveDay(currentActive);
+            }
+        };
+
+        container.addEventListener('scroll', handleScroll);
+        // Initial check
+        handleScroll();
+        return () => container.removeEventListener('scroll', handleScroll);
+    }, [filteredEntries]);
 
     // Get Current Month's Cite
     const currentMonthCite = useMemo(() => {
@@ -487,7 +556,7 @@ export const JournalView: React.FC<JournalViewProps> = ({
                                     const month = dateObj.toLocaleDateString('en-US', { month: 'short' }).toUpperCase();
 
                                     return (
-                                        <div key={dayGroup.date} className="flex w-full mb-6">
+                                        <div key={dayGroup.date} id={`journal-day-${day}`} className="flex w-full mb-6 scroll-mt-24">
                                             {/* Left: Sticky Date */}
                                             <div className="relative w-12 flex-shrink-0">
                                                 <div className="sticky top-6 pr-3 text-right">
@@ -548,12 +617,31 @@ export const JournalView: React.FC<JournalViewProps> = ({
                 </main>
             </div>
 
+            {/* Date Navigation Sidebar */}
+            {
+                filteredEntries.length > 0 && (
+                    <DateNavigationSidebar
+                        entries={filteredEntries}
+                        activeDay={activeDay}
+                        onDateClick={(dateStr) => {
+                            const el = document.getElementById(`journal-day-${dateStr}`);
+                            if (el) {
+                                el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                            }
+                        }}
+                    />
+                )
+            }
+
+            {/* Right Edge Line */}
+            <div className="fixed top-0 right-0 bottom-0 w-[1px] bg-stone-200/50 z-40 pointer-events-none" />
+
             {/* Floating Action Button - Mock */}
             <div className="fixed bottom-24 right-6 z-40 md:hidden">
                 <button className="bg-ink text-white p-4 rounded-full shadow-lg hover:scale-105 transition-transform flex items-center justify-center" onClick={() => onOpenDailyReview(new Date())}>
                     <PenLine className="w-6 h-6" />
                 </button>
             </div>
-        </div>
+        </div >
     );
 };
