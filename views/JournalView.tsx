@@ -223,13 +223,15 @@ export const JournalView: React.FC<JournalViewProps> = ({
 
             // User Policy: If no content (or just '...'), show '...'
             // Title should be the Date
-            const finalContent = (!content || content === '...') ? '...' : content;
+            const hasContent = content && content !== '...';
+            const finalTitle = hasContent ? (title === 'Daily Reflection' ? review.date : title) : review.date;
+            const finalContent = hasContent ? content : '...';
 
             diaryEntries.push({
                 id: review.id,
                 type: 'daily_summary',
                 date: `${review.date}T23:59:59`,
-                title: title === 'Daily Reflection' ? review.date : title, // Default title fallback to Date if it was just "Daily Reflection"
+                title: finalTitle,
                 content: finalContent,
                 comments: []
             });
@@ -243,15 +245,18 @@ export const JournalView: React.FC<JournalViewProps> = ({
             const defaultTitle = `Week of ${d.toLocaleDateString()}`;
             const { title, content } = parseNarrative(review.narrative || '', defaultTitle);
 
-            // User Policy: If no content, show date range
+            // User Policy: If no content, use date range as title, '...' as content
             const dateRange = `${review.weekStartDate} ~ ${review.weekEndDate}`;
-            const finalContent = (!content || content === '...') ? dateRange : content;
+            const hasContent = content && content !== '...';
+
+            const finalTitle = hasContent ? title : dateRange;
+            const finalContent = hasContent ? content : '...';
 
             diaryEntries.push({
                 id: review.id,
                 type: 'weekly_summary',
                 date: `${review.weekEndDate}T23:59:59`, // End of week
-                title: title,
+                title: finalTitle,
                 content: finalContent,
                 comments: []
             });
@@ -657,12 +662,7 @@ export const JournalView: React.FC<JournalViewProps> = ({
             {/* Right Edge Line */}
             <div className="fixed top-0 right-0 bottom-0 w-[1px] bg-stone-200/50 z-40 pointer-events-none" />
 
-            {/* Floating Action Button - Mock */}
-            <div className="fixed bottom-24 right-6 z-40 md:hidden">
-                <button className="bg-ink text-white p-4 rounded-full shadow-lg hover:scale-105 transition-transform flex items-center justify-center" onClick={() => onOpenDailyReview(new Date())}>
-                    <PenLine className="w-6 h-6" />
-                </button>
-            </div>
+
         </div >
     );
 };

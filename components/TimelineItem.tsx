@@ -121,12 +121,12 @@ const TimelineItem: React.FC<TimelineItemProps> = ({ entry, isLast, isFirstOfDay
     const renderNodeIcon = () => {
         switch (type) {
             case 'daily_summary':
-                return <Moon className="w-3 h-3 ml-1 text-purple-600 fill-current z-10" />;
+                return <Moon className="w-4 h-4 p-0.5 ml-0.5 mt-1.5 text-purple-600 fill-current bg-[#faf9f6] rounded-full z-10" />;
             case 'weekly_summary':
-                return <Star className="w-3 h-3 ml-1 text-amber-500 fill-current z-10" />;
+                return <Star className="w-4 h-4 p-0.5 ml-0.5 mt-1.5 text-amber-500 fill-current bg-[#faf9f6] rounded-full z-10" />;
             default:
                 // Normal dot
-                return <div className="w-2.5 h-2.5 mt-1.5 ml-1.5 rounded-full bg-stone-900 border-2 border-white z-10" />;
+                return <div className="w-2.5 h-2.5 mt-1.5 ml-1.5 rounded-full bg-stone-900 border-2 border-[#faf9f6] z-10" />;
         }
     };
 

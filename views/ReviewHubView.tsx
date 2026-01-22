@@ -146,8 +146,8 @@ export const ReviewHubView: React.FC<ReviewHubViewProps> = ({
     // --- Render Helpers ---
 
     // Component: Section Title
-    const SectionTitle = ({ title, onAdd }: { title: string; onAdd?: () => void }) => (
-        <div className="flex items-center mt-8 mb-4">
+    const SectionTitle = ({ title, onAdd, className = "mt-8" }: { title: string; onAdd?: () => void; className?: string }) => (
+        <div className={`flex items-center mb-4 ${className}`}>
             <span className="text-xs font-bold text-stone-500 uppercase tracking-[2px]">{title}</span>
             <div className="flex-1 h-px bg-stone-200 ml-3" />
             {onAdd && (
@@ -246,7 +246,7 @@ export const ReviewHubView: React.FC<ReviewHubViewProps> = ({
                 <div className="md:max-w-xl md:mx-auto w-full px-5 pt-2 pb-20">
 
                     {/* Section 1: Monthly Insight (Carousel) */}
-                    <SectionTitle title="Monthly Reviews" onAdd={handleAddCurrentMonthly} />
+                    <SectionTitle title="Monthly Reviews" onAdd={handleAddCurrentMonthly} className="mt-1" />
 
                     {sortedMonthlyReviews.length === 0 ? (
                         <div className="p-6 text-center border bg-stone-50 rounded-lg text-stone-400 text-sm">
