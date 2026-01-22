@@ -170,11 +170,20 @@ export class WebDAVService {
     }
 
     clearConfig() {
+        // 只清理内存中的配置和客户端，保留localStorage中的配置缓存
+        this.client = null;
+        this.config = null;
+        console.log('[WebDAV] 连接已断开，但配置缓存已保留');
+    }
+
+    // 新增：完全清理配置的方法（包括localStorage）
+    clearAllConfig() {
         localStorage.removeItem(STORAGE_KEY_URL);
         localStorage.removeItem(STORAGE_KEY_USER);
         localStorage.removeItem(STORAGE_KEY_PASS);
         this.client = null;
         this.config = null;
+        console.log('[WebDAV] 所有配置已完全清理');
     }
 
     async checkConnection(): Promise<boolean> {

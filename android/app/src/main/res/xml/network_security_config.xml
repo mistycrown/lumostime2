@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<network-security-config>
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="true">cos.ap-chongqing.myqcloud.com</domain>
+        <domain includeSubdomains="true">cos.ap-beijing.myqcloud.com</domain>
+        <domain includeSubdomains="true">cos.ap-shanghai.myqcloud.com</domain>
+        <domain includeSubdomains="true">cos.ap-guangzhou.myqcloud.com</domain>
+        <domain includeSubdomains="true">cos.ap-nanjing.myqcloud.com</domain>
+        <domain includeSubdomains="true">cos.ap-tianjin.myqcloud.com</domain>
+        <domain includeSubdomains="true">cos.ap-shenzhen-fsi.myqcloud.com</domain>
+        <domain includeSubdomains="true">cos.ap-beijing-fsi.myqcloud.com</domain>
+        <domain includeSubdomains="true">cos.ap-shanghai-fsi.myqcloud.com</domain>
+        <domain includeSubdomains="true">cos.ap-shenzhen.myqcloud.com</domain>
+        <domain includeSubdomains="true">cos.ap-chengdu.myqcloud.com</domain>
+        <domain includeSubdomains="true">cos.ap-hongkong.myqcloud.com</domain>
+        <domain includeSubdomains="true">cos.ap-singapore.myqcloud.com</domain>
+        <domain includeSubdomains="true">cos.ap-mumbai.myqcloud.com</domain>
+        <domain includeSubdomains="true">cos.ap-seoul.myqcloud.com</domain>
+        <domain includeSubdomains="true">cos.ap-bangkok.myqcloud.com</domain>
+        <domain includeSubdomains="true">cos.ap-tokyo.myqcloud.com</domain>
+        <domain includeSubdomains="true">cos.us-east-1.myqcloud.com</domain>
+        <domain includeSubdomains="true">cos.us-west-1.myqcloud.com</domain>
+        <domain includeSubdomains="true">cos.eu-frankfurt.myqcloud.com</domain>
+        <domain includeSubdomains="true">cos.eu-moscow.myqcloud.com</domain>
+        <domain includeSubdomains="true">myqcloud.com</domain>
+    </domain-config>
+    <base-config cleartextTrafficPermitted="true">
+        <trust-anchors>
+            <certificates src="system"/>
+        </trust-anchors>
+    </base-config>
+</network-security-config>
