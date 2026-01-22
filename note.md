@@ -35,6 +35,7 @@ s3同步功能
 右下角悬浮按钮切换到memoir的icon变成，audio-waveform
 切换到 Chronicle的按钮变成book-heart
 
+减小monthly reviews 上面边距
 使用#标题#匹配到标题之后，条目备注就不要显示这一串字符了。
 
 使用暖灰色（Stone/Warm Gray）作为主基调，模拟纸张的质感，营造温暖、复古但现代的氛围。
