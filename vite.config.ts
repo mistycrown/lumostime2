@@ -41,7 +41,7 @@ export default defineConfig(({ mode }) => {
     },
     resolve: {
       alias: {
-        '@': path.resolve(__dirname, '.'),
+        '@': path.resolve(__dirname, 'src'),
         buffer: 'buffer', // Force use of buffer package
       }
     }
