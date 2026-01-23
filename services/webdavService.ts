@@ -230,7 +230,7 @@ export class WebDAVService {
 
     async createDirectory(path: string): Promise<boolean> {
         console.log(`[WebDAV] 创建目录: ${path}`);
-        
+
         if (!this.client && !this.config) {
             console.error('[WebDAV] ✗ 客户端未初始化');
             return false;
@@ -250,9 +250,9 @@ export class WebDAVService {
                 const tempUrl = `${dirUrl}${tempFileName}`;
                 const emptyData = new Uint8Array(1);
                 emptyData[0] = 32; // 空格字符
-                
+
                 HTTP.setDataSerializer('raw');
-                
+
                 try {
                     // 上传临时文件（这会自动创建目录）
                     const uploadResponse = await new Promise((resolve, reject) => {
@@ -282,7 +282,7 @@ export class WebDAVService {
                     }
                 } catch (error: any) {
                     console.warn(`[WebDAV] 临时文件方法失败:`, JSON.stringify(error, null, 2));
-                    
+
                     // 如果是 409 错误，可能目录已存在
                     if (error?.status === 409) {
                         console.log(`[WebDAV] ℹ 目录可能已存在: ${path}`);
@@ -323,7 +323,7 @@ export class WebDAVService {
 
     async getDirectoryContents(path: string): Promise<any[]> {
         console.log(`[WebDAV] 获取目录内容: ${path}`);
-        
+
         // 移动端：由于 PROPFIND 不被支持，返回空数组并依赖上传时的错误处理
         if (Capacitor.isNativePlatform() && this.config) {
             console.log('[WebDAV] 移动端跳过目录列表获取 (PROPFIND 不支持)');
@@ -436,6 +436,28 @@ export class WebDAVService {
         }
     }
 
+    private async normalizeToUint8Array(buffer: ArrayBuffer | string | Blob): Promise<Uint8Array> {
+        if (buffer instanceof ArrayBuffer) {
+            return new Uint8Array(buffer);
+        } else if (buffer instanceof Blob) {
+            const arrayBuffer = await buffer.arrayBuffer();
+            return new Uint8Array(arrayBuffer);
+        } else if (typeof buffer === 'string') {
+            const base64Data = buffer.startsWith('data:') ? buffer.split(',')[1] : buffer;
+            try {
+                const binaryString = atob(base64Data);
+                const bytes = new Uint8Array(binaryString.length);
+                for (let i = 0; i < binaryString.length; i++) {
+                    bytes[i] = binaryString.charCodeAt(i);
+                }
+                return bytes;
+            } catch (e) {
+                throw new Error('Invalid Base64 string');
+            }
+        }
+        throw new Error(`Unsupported buffer type: ${typeof buffer}`);
+    }
+
     async uploadImage(filename: string, buffer: ArrayBuffer | string | Blob): Promise<boolean> {
         console.log(`[WebDAV] 开始上传图片: ${filename}`);
         if (!this.config && !this.client) {
@@ -443,147 +465,55 @@ export class WebDAVService {
             throw new Error('WebDAV not configured');
         }
 
-        // NATIVE: Use put method with Uint8Array for WebDAV image upload
-        if (Capacitor.isNativePlatform() && this.config) {
-            const url = this.config.url.endsWith('/') ? `${this.config.url}images/${filename}` : `${this.config.url}/images/${filename}`;
-            const auth = Buffer.from(`${this.config.username}:${this.config.password}`).toString('base64');
-
-            // Convert data to Uint8Array for advanced-http plugin
-            let uint8Data: Uint8Array;
-            
-            if (buffer instanceof ArrayBuffer) {
-                uint8Data = new Uint8Array(buffer);
-            } else if (buffer instanceof Blob) {
-                // Convert Blob to ArrayBuffer first
-                console.log('[WebDAV] 检测到 Blob，转换为 ArrayBuffer...');
-                const arrayBuffer = await buffer.arrayBuffer();
-                uint8Data = new Uint8Array(arrayBuffer);
-            } else if (typeof buffer === 'string' && buffer.startsWith('data:')) {
-                // Convert base64 data URL to Uint8Array
-                const base64Data = buffer.split(',')[1] || buffer;
-                const binaryString = atob(base64Data);
-                uint8Data = new Uint8Array(binaryString.length);
-                for (let i = 0; i < binaryString.length; i++) {
-                    uint8Data[i] = binaryString.charCodeAt(i);
-                }
-            } else if (typeof buffer === 'string') {
-                // Convert base64 string to Uint8Array
-                const binaryString = atob(buffer);
-                uint8Data = new Uint8Array(binaryString.length);
-                for (let i = 0; i < binaryString.length; i++) {
-                    uint8Data[i] = binaryString.charCodeAt(i);
-                }
-            } else {
-                console.error('[WebDAV] ✗ 移动端不支持的数据类型:', typeof buffer, buffer?.constructor?.name);
-                throw new Error(`Unsupported buffer type: ${typeof buffer} (${buffer?.constructor?.name})`);
-            }
-
-            console.log(`[WebDAV] 转换为 Uint8Array，大小: ${uint8Data.length} bytes`);
-
-            // Set data serializer to raw for binary data
-            HTTP.setDataSerializer('raw');
-
-            try {
-                console.log('[WebDAV] 使用原生HTTP插件上传图片...');
-                
-                // Use put method for WebDAV PUT request
-                const response = await new Promise((resolve, reject) => {
-                    HTTP.put(url, uint8Data, {
-                        'Authorization': `Basic ${auth}`,
-                        'Content-Type': 'image/jpeg'
-                    }, resolve, reject);
-                });
-
-                console.log(`[WebDAV] ✓ 原生上传成功: ${filename}, Status: ${response.status}`);
-                return response.status === 200 || response.status === 201 || response.status === 204;
-
-            } catch (error: any) {
-                console.error(`[WebDAV] ✗ 原生上传失败: ${filename}`);
-                console.error('[WebDAV] Native Error Details:', JSON.stringify(error, null, 2));
-                
-                // 如果是 409 错误或其他错误，不再自动创建目录，直接报错
-                if (error?.status === 409) {
-                    console.log(`[WebDAV] HTTP 409 冲突 - 可能是 /images 目录不存在`);
-                    throw new Error(`图片上传失败：请确保WebDAV根目录下存在 "images" 文件夹。错误详情: ${error.message || 'HTTP 409'}`);
-                }
-                
-                throw new Error(`图片上传失败: ${error.message || 'Unknown error'}`);
-            }
-        }
-
-        // Web/Electron Logic
-        const targetPath = `/images/${filename}`;
-        console.log(`[WebDAV] 目标路径: ${targetPath}`);
-
-        // Convert data to proper format for webdav library
-        let uploadData: ArrayBuffer;
-
-        if (buffer instanceof ArrayBuffer) {
-            uploadData = buffer;
-            console.log(`[WebDAV] (Web) 使用 ArrayBuffer，大小: ${uploadData.byteLength} bytes`);
-        } else if (buffer instanceof Blob) {
-            console.log('[WebDAV] (Web) 检测到 Blob，开始转换...');
-            try {
-                uploadData = await buffer.arrayBuffer();
-                console.log(`[WebDAV] (Web) ✓ Blob转换完成, ArrayBuffer大小: ${uploadData.byteLength} bytes`);
-            } catch (e) {
-                console.error('[WebDAV] ✗ Blob转换失败:', e);
-                throw new Error('Failed to convert Blob to ArrayBuffer');
-            }
-        } else if (typeof buffer === 'string' && buffer.startsWith('data:')) {
-            console.log('[WebDAV] (Web) 检测到Base64 data URL, 开始转换...');
-            try {
-                const base64Data = buffer.split(',')[1] || buffer;
-                const binaryString = atob(base64Data);
-                const bytes = new Uint8Array(binaryString.length);
-                for (let i = 0; i < binaryString.length; i++) {
-                    bytes[i] = binaryString.charCodeAt(i);
-                }
-                uploadData = bytes.buffer;
-                console.log(`[WebDAV] (Web) ✓ 转换完成, ArrayBuffer大小: ${uploadData.byteLength} bytes`);
-            } catch (e) {
-                console.error('[WebDAV] ✗ Base64转换失败:', e);
-                throw new Error('Invalid Base64 image data');
-            }
-        } else if (typeof buffer === 'string') {
-            // Handle plain base64 string (without data: prefix)
-            console.log('[WebDAV] (Web) 检测到Base64字符串, 开始转换...');
-            try {
-                const binaryString = atob(buffer);
-                const bytes = new Uint8Array(binaryString.length);
-                for (let i = 0; i < binaryString.length; i++) {
-                    bytes[i] = binaryString.charCodeAt(i);
-                }
-                uploadData = bytes.buffer;
-                console.log(`[WebDAV] (Web) ✓ Base64转换完成, ArrayBuffer大小: ${uploadData.byteLength} bytes`);
-            } catch (e) {
-                console.error('[WebDAV] ✗ Base64转换失败:', e);
-                throw new Error('Invalid Base64 image data');
-            }
-        } else {
-            console.error('[WebDAV] ✗ 不支持的数据类型:', typeof buffer, buffer?.constructor?.name);
-            console.error('[WebDAV] 数据详情:', buffer);
-            throw new Error(`Unsupported buffer type: ${typeof buffer} (${buffer?.constructor?.name})`);
-        }
-
         try {
-            console.log('[WebDAV] (Web) 调用putFileContents...');
-            await this.client!.putFileContents(targetPath, uploadData, { overwrite: true });
+            // 统一转换为 Uint8Array
+            const uint8Data = await this.normalizeToUint8Array(buffer);
+            console.log(`[WebDAV] 数据准备完成，大小: ${uint8Data.length} bytes`);
+
+            // NATIVE: Use native HTTP plugin
+            if (Capacitor.isNativePlatform() && this.config) {
+                const url = this.config.url.endsWith('/') ? `${this.config.url}images/${filename}` : `${this.config.url}/images/${filename}`;
+                const auth = Buffer.from(`${this.config.username}:${this.config.password}`).toString('base64');
+
+                HTTP.setDataSerializer('raw');
+
+                try {
+                    const response = await new Promise<any>((resolve, reject) => {
+                        HTTP.put(url, uint8Data, {
+                            'Authorization': `Basic ${auth}`,
+                            'Content-Type': 'image/jpeg'
+                        }, resolve, reject);
+                    });
+
+                    console.log(`[WebDAV] ✓ 原生上传成功: ${filename}, Status: ${response.status}`);
+                    return response.status === 200 || response.status === 201 || response.status === 204;
+                } catch (error: any) {
+                    if (error?.status === 409) {
+                        throw new Error(`图片上传失败：请确保WebDAV根目录下存在 "images" 文件夹 (HTTP 409)`);
+                    }
+                    throw new Error(`原生上传失败: ${error.message || JSON.stringify(error)}`);
+                }
+            }
+
+            // WEB/ELECTRON: Use webdav client
+            // webdav client accepts ArrayBuffer directly
+            const targetPath = `/images/${filename}`;
+            await this.client!.putFileContents(targetPath, uint8Data.buffer, { overwrite: true });
             console.log(`[WebDAV] ✓ 图片上传成功: ${filename}`);
             return true;
+
         } catch (error: any) {
-            console.error(`[WebDAV] ✗ 图片上传失败: ${filename}`);
-            console.error('[WebDAV] Error:', error);
+            console.error(`[WebDAV] ✗ 图片上传失败: ${filename}`, error);
             throw error;
         }
     }
 
     async downloadImage(filename: string): Promise<ArrayBuffer> {
         if (!this.client) throw new Error('WebDAV not configured');
-        
+
         // 只从 /images/ 目录下载，不再fallback到根目录
         const path = `/images/${filename}`;
-        
+
         try {
             console.log(`[WebDAV] 尝试从路径下载: ${path}`);
             const buffer = await this.client.getFileContents(path, { format: 'binary' });
@@ -591,11 +521,11 @@ export class WebDAVService {
             return buffer as ArrayBuffer;
         } catch (error: any) {
             console.error(`[WebDAV] 从 ${path} 下载失败:`, error?.message);
-            
+
             if (error?.status === 404) {
                 throw new Error(`图片不存在: ${filename}。请确保图片已上传到 /images/ 目录。`);
             }
-            
+
             throw new Error(`图片下载失败: ${filename} - ${error?.message || 'Unknown error'}`);
         }
     }

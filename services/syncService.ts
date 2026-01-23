@@ -67,11 +67,7 @@ export const syncService = {
         localReferencedImages?: string[],
         cloudReferencedImages?: string[]
     ): Promise<SyncResult> => {
-        console.log('========================================');
-        console.log('[Sync] ⚡⚡⚡ syncImages 函数被调用 ⚡⚡⚡');
-        console.log(`[Sync] 本地引用列表: ${localReferencedImages ? localReferencedImages.length : 0} 个`);
-        console.log(`[Sync] 云端引用列表: ${cloudReferencedImages ? cloudReferencedImages.length : 0} 个`);
-        console.log('========================================');
+        console.log(`[Sync] syncImages: 本地引用 ${localReferencedImages?.length || 0}, 云端引用 ${cloudReferencedImages?.length || 0}`);
 
         const result: SyncResult = { uploaded: 0, downloaded: 0, deletedRemote: 0, errors: [] };
 
@@ -84,7 +80,7 @@ export const syncService = {
 
         try {
             if (onProgress) onProgress('正在初始化图片同步...');
-            console.log('[Sync] ⚡ 开始同步图片...');
+            if (onProgress) onProgress('正在初始化图片同步...');
 
             // 1. 对于WebDAV，检查云端 /images 目录是否存在
             if (storageService === webdavService) {
@@ -159,7 +155,7 @@ export const syncService = {
                 }
             }
 
-            console.log('[Sync] ========== 开始分析上传/下载需求 ==========');
+
 
             // 6. 分析上传需求：本地有 && 被引用 && (云端可能没有)
             const toUpload: string[] = [];
@@ -189,10 +185,8 @@ export const syncService = {
 
             console.log(`[Sync] 需要下载: ${toDownload.length} 个`);
             if (toDownload.length > 0) {
-                console.log(`[Sync] 下载列表:`, toDownload.slice(0, 10), toDownload.length > 10 ? '...' : '');
+                console.log(`[Sync] 下载列表: ${toDownload.slice(0, 5).join(', ')}${toDownload.length > 5 ? '...' : ''}`);
             }
-
-            console.log('[Sync] ========== 分析完成，开始执行 ==========');
 
             // 8. 执行上传
             for (const filename of toUpload) {
@@ -242,8 +236,7 @@ export const syncService = {
             }
 
             if (onProgress) onProgress('图片同步完成');
-            console.log('[Sync] ========== 图片同步结束 ==========');
-            console.log('[Sync] 结果:', result);
+            console.log('[Sync] 图片同步结果:', result);
 
         } catch (error: any) {
             console.error('[Sync] 图片同步总流程错误', error);
