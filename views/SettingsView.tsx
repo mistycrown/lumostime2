@@ -1795,7 +1795,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
                                             <User size={18} className="text-stone-400" />
                                             <input
                                                 type="text"
-                                                placeholder="AKIDunejnz6BLUVM3e5LTQKKDf0BLLSZjkru (腾讯云SecretId)"
+                                                placeholder="AKID... (腾讯云SecretId)"
                                                 className="flex-1 bg-transparent border-none outline-none text-stone-700 placeholder:text-stone-300 text-sm"
                                                 value={s3ConfigForm.secretId}
                                                 onChange={e => setS3ConfigForm(prev => ({ ...prev, secretId: e.target.value }))}
