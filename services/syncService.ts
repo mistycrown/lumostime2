@@ -100,13 +100,49 @@ export const syncService = {
 
             // 2. 确定最终的引用列表（合并本地和云端）
             const localSet = new Set(localReferencedImages || []);
-            const cloudSet = new Set(cloudReferencedImages || []);
-            const mergedSet = new Set([...localSet, ...cloudSet]);
+
+            // [Fix] 对于 S3/COS，不要信任 list json，而是直接扫描存储桶中的实际文件
+            // 这是为了防止 list json 说"有图片"但实际 bucket 里没有的情况 (Zombie List)
+            let actualCloudFiles: Set<string> | null = null;
+            if (storageService === s3Service) {
+                try {
+                    console.log('[Sync] S3/COS: 正在扫描云端实际文件列表...');
+                    // s3Service.getDirectoryContents 返回的是 COS SDK 的 Contents 数组，包含 Key
+                    const contents = await s3Service.getDirectoryContents('images');
+                    if (Array.isArray(contents)) {
+                        actualCloudFiles = new Set(contents.map((item: any) => {
+                            // Key format: "images/filename.jpg"
+                            return item.Key.replace(/^images\//, '');
+                        }));
+                        console.log(`[Sync] ✓ S3/COS 实际扫描结果: ${actualCloudFiles.size} 个文件`);
+                    }
+                } catch (e) {
+                    console.warn('[Sync] S3/COS 扫描失败，回退到使用 list json', e);
+                }
+            }
+
+            // 如果成功扫描到了实际文件，就使用实际文件作为 cloudSet (Source of Truth)
+            // 否则 (WebDAV 或 扫描失败) 继续使用 cloudReferencedImages (来自 JSON)
+            const cloudSet = actualCloudFiles || new Set(cloudReferencedImages || []);
+
+            const mergedSet = new Set([...localSet, ...(cloudReferencedImages || [])]); // Update mergedSet strictly from intention sets?
+            // Wait, mergedSet defines "What we WANT to track".
+            // If actualCloudFiles has files NOT in local or list (orphans), we might ignore them here or sync them down?
+            // Current logic: mergedSet = local U (list json).
+            // We want to upload if inside mergedSet AND (not in actualCloud).
+
+            // Re-evaluating mergedSet:
+            // mergedSet is the "Union of all known references".
+            // If I just want to upload what I have locally, I iterate 'mergedSet'.
+            // If 'actualCloudFiles' is used for the exclusion check, it works.
 
             console.log('[Sync] ========== 引用列表分析 ==========');
             console.log(`[Sync] 本地引用: ${localSet.size} 个`);
-            console.log(`[Sync] 云端引用: ${cloudSet.size} 个`);
-            console.log(`[Sync] 合并后: ${mergedSet.size} 个`);
+            console.log(`[Sync] 云端引用 (JSON): ${(cloudReferencedImages || []).length} 个`);
+            if (actualCloudFiles) {
+                console.log(`[Sync] 云端实际: ${actualCloudFiles.size} 个 (作为判定依据)`);
+            }
+            console.log(`[Sync] 合并后计划: ${mergedSet.size} 个`);
 
             // 3. 获取本地实际存在的文件
             const localFiles = await imageService.listImages();
