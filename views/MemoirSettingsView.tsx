@@ -73,8 +73,8 @@ export const MemoirSettingsView: React.FC<MemoirSettingsViewProps> = ({ onBack }
                             <ImageIcon size={20} />
                         </div>
                         <div>
-                            <h4 className="font-bold text-stone-800">是否带有图片</h4>
-                            <p className="text-xs text-stone-400">仅显示包含图片的专注记录</p>
+                            <h4 className="font-bold text-stone-800">是否带有图片 (优先显示)</h4>
+                            <p className="text-xs text-stone-400">开启后，带有图片的记录将忽略下方筛选条件直接显示</p>
                         </div>
                     </div>
                     <label className="relative inline-flex items-center cursor-pointer">
@@ -188,7 +188,7 @@ export const MemoirSettingsView: React.FC<MemoirSettingsViewProps> = ({ onBack }
                 </div>
 
                 <div className="text-center text-xs text-stone-400 pt-4 pb-8">
-                    只有同时满足以上四个条件的专注记录，才会在 Memoir 界面显示。
+                    如果开启“是否带有图片”，则带有图片的记录将直接显示（豁免其他条件）；否则需同时满足以上勾选的条件。
                 </div>
 
             </div>

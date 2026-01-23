@@ -290,8 +290,12 @@ export const JournalView: React.FC<JournalViewProps> = ({
 
             const { hasImage, minNoteLength, relatedTagIds, relatedScopeIds } = memoirFilterConfig;
 
-            // 1. Has Image
-            if (hasImage && (!entry.media || entry.media.length === 0)) return false;
+            // 1. Has Image Exception Logic
+            // If 'Has Image' is checked, and the entry HAS an image, 
+            // it acts as a "bypass ticket" (OR logic) for the remaining filters.
+            if (hasImage && entry.media && entry.media.length > 0) {
+                return true;
+            }
 
             // 2. Min Length
             if (minNoteLength > 0 && entry.content.length < minNoteLength) return false;
