@@ -27,7 +27,7 @@ export const syncService = {
     getActiveStorageService(): StorageService | null {
         const webdavConfig = webdavService.getConfig();
         const s3Config = s3Service.getConfig();
-        
+
         if (s3Config) {
             console.log('[Sync] 使用 S3/COS 存储服务');
             return s3Service as StorageService;
@@ -35,7 +35,7 @@ export const syncService = {
             console.log('[Sync] 使用 WebDAV 存储服务');
             return webdavService as StorageService;
         }
-        
+
         console.log('[Sync] 没有配置任何存储服务');
         return null;
     },
@@ -44,7 +44,7 @@ export const syncService = {
     forceDeleteLocalFile: async (filename: string): Promise<void> => {
         const { Filesystem, Directory } = await import('@capacitor/filesystem');
         const { Capacitor } = await import('@capacitor/core');
-        
+
         if (Capacitor.isNativePlatform()) {
             await Filesystem.deleteFile({
                 path: `images/${filename}`,
@@ -63,7 +63,7 @@ export const syncService = {
      * @param cloudReferencedImages 云端引用的图片列表（从云端数据中获取）
      */
     syncImages: async (
-        onProgress?: (message: string) => void, 
+        onProgress?: (message: string) => void,
         localReferencedImages?: string[],
         cloudReferencedImages?: string[]
     ): Promise<SyncResult> => {
@@ -72,7 +72,7 @@ export const syncService = {
         console.log(`[Sync] 本地引用列表: ${localReferencedImages ? localReferencedImages.length : 0} 个`);
         console.log(`[Sync] 云端引用列表: ${cloudReferencedImages ? cloudReferencedImages.length : 0} 个`);
         console.log('========================================');
-        
+
         const result: SyncResult = { uploaded: 0, downloaded: 0, deletedRemote: 0, errors: [] };
 
         // 获取活跃的存储服务
@@ -106,12 +106,12 @@ export const syncService = {
             const localSet = new Set(localReferencedImages || []);
             const cloudSet = new Set(cloudReferencedImages || []);
             const mergedSet = new Set([...localSet, ...cloudSet]);
-            
+
             console.log('[Sync] ========== 引用列表分析 ==========');
             console.log(`[Sync] 本地引用: ${localSet.size} 个`);
             console.log(`[Sync] 云端引用: ${cloudSet.size} 个`);
             console.log(`[Sync] 合并后: ${mergedSet.size} 个`);
-            
+
             // 3. 获取本地实际存在的文件
             const localFiles = await imageService.listImages();
             const localFileSet = new Set(localFiles);
@@ -120,13 +120,13 @@ export const syncService = {
             // 4. 处理删除操作
             const deletedImages = imageService.getDeletedImages();
             const justDeletedFiles = new Set<string>();
-            
+
             if (deletedImages.length > 0) {
                 if (onProgress) onProgress(`正在同步删除 ${deletedImages.length} 张图片...`);
                 console.log(`[Sync] 处理本地删除记录: ${deletedImages.length} 个`);
 
                 deletedImages.forEach(filename => justDeletedFiles.add(filename));
-                
+
                 for (const filename of deletedImages) {
                     try {
                         const success = await storageService.deleteImage(filename);
@@ -138,7 +138,7 @@ export const syncService = {
                         console.warn(`[Sync] 远程删除失败 (可能已不存在): ${filename}`, e);
                     }
                 }
-                
+
                 imageService.clearDeletedImages(deletedImages);
                 console.log(`[Sync] 已清除 ${deletedImages.length} 个删除记录`);
             }
@@ -166,13 +166,13 @@ export const syncService = {
             for (const filename of mergedSet) {
                 // 跳过刚删除的
                 if (justDeletedFiles.has(filename)) continue;
-                
-                // 本地有这个文件，需要上传
-                if (localFileSet.has(filename)) {
+
+                // 本地有这个文件，且云端没有，才需要上传
+                if (localFileSet.has(filename) && !cloudSet.has(filename)) {
                     toUpload.push(filename);
                 }
             }
-            
+
             console.log(`[Sync] 需要上传: ${toUpload.length} 个`);
             if (toUpload.length > 0) {
                 console.log(`[Sync] 上传列表:`, toUpload.slice(0, 10), toUpload.length > 10 ? '...' : '');
@@ -186,7 +186,7 @@ export const syncService = {
                     toDownload.push(filename);
                 }
             }
-            
+
             console.log(`[Sync] 需要下载: ${toDownload.length} 个`);
             if (toDownload.length > 0) {
                 console.log(`[Sync] 下载列表:`, toDownload.slice(0, 10), toDownload.length > 10 ? '...' : '');
@@ -216,10 +216,10 @@ export const syncService = {
                 try {
                     const buffer = await storageService.downloadImage(filename);
                     console.log(`[Sync] 存储服务下载完成: ${filename}, 大小: ${buffer.byteLength} bytes`);
-                    
+
                     await imageService.writeImage(filename, buffer);
                     console.log(`[Sync] 本地写入完成: ${filename}`);
-                    
+
                     result.downloaded++;
                     console.log(`[Sync] ✓ 下载完成: ${filename}`);
                 } catch (err: any) {
