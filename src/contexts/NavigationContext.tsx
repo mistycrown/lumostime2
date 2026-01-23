@@ -88,6 +88,14 @@ interface NavigationContextType {
     setGoalScopeId: (id: string) => void;
     initialLogTimes: { start?: number; end?: number } | null;
     setInitialLogTimes: (times: { start?: number; end?: number } | null) => void;
+
+    // Session Focus Detail
+    focusDetailSessionId: string | null;
+    setFocusDetailSessionId: (id: string | null) => void;
+
+    // Global Date State
+    currentDate: Date;
+    setCurrentDate: (date: Date) => void;
 }
 
 const NavigationContext = createContext<NavigationContextType | undefined>(undefined);
@@ -189,6 +197,9 @@ export const NavigationProvider: React.FC<NavigationProviderProps> = ({
     const [goalScopeId, setGoalScopeId] = useState<string>('');
     const [initialLogTimes, setInitialLogTimes] = useState<{ start?: number; end?: number } | null>(null);
 
+    const [focusDetailSessionId, setFocusDetailSessionId] = useState<string | null>(null);
+    const [currentDate, setCurrentDate] = useState<Date>(new Date());
+
     return (
         <NavigationContext.Provider value={{
             currentView,
@@ -256,7 +267,11 @@ export const NavigationProvider: React.FC<NavigationProviderProps> = ({
             goalScopeId,
             setGoalScopeId,
             initialLogTimes,
-            setInitialLogTimes
+            setInitialLogTimes,
+            focusDetailSessionId,
+            setFocusDetailSessionId,
+            currentDate,
+            setCurrentDate
         }}>
             {children}
         </NavigationContext.Provider>

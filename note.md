@@ -23,6 +23,7 @@ memoir和Chronicle在宽屏上的自适应。
 全屏统计视图的异常。
 筛选条件是否显示日报周报
 s3配置界面的引导
+memoir 点击评论会撑开宽度，而且，也许放在左边会好一点，不会和悬浮滚动条打架
 
 # 1.0.7
 增加专注记录评论功能。
@@ -32,6 +33,29 @@ s3配置界面的引导
 增加记录详情页扩展输入框的功能。
 增加计时悬浮窗收缩、扩展的功能。
 增加S3云同步功能。
+
+
+# 20260123
+代码结构重构已完成。
+
+我执行了以下操作：
+
+创建 src 目录：将 api, assets, components, contexts, icons, plugins, services, utils, views 文件夹以及 App.tsx, index.tsx, types.ts, constants.ts 移动到了 src/ 下。
+更新配置：
+tsconfig.json: 添加了 paths 映射 (@/* -> src/*) 并包含了 src 目录。
+vite.config.ts: 更新了 @ 别名指向 src。
+index.html: 更新了入口文件路径为 /src/index.tsx，并移除了无效的 /index.css 引用。
+
+---
+
+App.tsx 瘦身与拆分 (优先级：高)
+App.tsx 目前有 2700多行，承载了过多的职责（路由管理、全局状态初始化、各个模块的业务逻辑、Deep Link 监听等）。这使得代码难以阅读和维护。 建议：
+
+提取自定义 Hooks：将业务逻辑（如日志管理 useLogManager、Todo管理 useTodoManager、Sync逻辑）提取到单独的 Hook 文件中。
+拆分路由组件：将主视图的渲染逻辑提取为 MainLayout 或 AppRoutes 组件。
+Context 优化：虽然已经使用了 Context，但 App.tsx 中仍有大量 useState 和回调函数透传，可以进一步下沉到对应的 Context 中
+
+
 
 
 # 20260122
