@@ -94,7 +94,7 @@ export const SessionProvider: React.FC<SessionProviderProps> = ({ children, spli
 
         // Android 浮动窗口更新
         if (Capacitor.getPlatform() === 'android') {
-            const floatingWindowEnabled = localStorage.getItem('cfg_floating_window_enabled') === 'true';
+            const floatingWindowEnabled = localStorage.getItem('floating_window_enabled') === 'true';
             if (floatingWindowEnabled && newSession && newSession.startTime) {
                 FocusNotification.updateFloatingWindow({
                     icon: activity.icon,
@@ -157,9 +157,12 @@ export const SessionProvider: React.FC<SessionProviderProps> = ({ children, spli
             setFocusDetailSessionId(null);
         }
 
-        // Android 浮动窗口恢复
+        // Android 浮动窗口恢复 - 仅在用户启用悬浮球时更新
         if (Capacitor.getPlatform() === 'android') {
-            FocusNotification.updateFloatingWindow({ isFocusing: false }).catch(() => { });
+            const floatingWindowEnabled = localStorage.getItem('floating_window_enabled') === 'true';
+            if (floatingWindowEnabled) {
+                FocusNotification.updateFloatingWindow({ isFocusing: false }).catch(() => { });
+            }
         }
     };
 
@@ -169,9 +172,12 @@ export const SessionProvider: React.FC<SessionProviderProps> = ({ children, spli
             setFocusDetailSessionId(null);
         }
 
-        // Android 浮动窗口恢复
+        // Android 浮动窗口恢复 - 仅在用户启用悬浮球时更新
         if (Capacitor.getPlatform() === 'android') {
-            FocusNotification.updateFloatingWindow({ isFocusing: false }).catch(() => { });
+            const floatingWindowEnabled = localStorage.getItem('floating_window_enabled') === 'true';
+            if (floatingWindowEnabled) {
+                FocusNotification.updateFloatingWindow({ isFocusing: false }).catch(() => { });
+            }
         }
     };
 
