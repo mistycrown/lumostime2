@@ -73,57 +73,7 @@ export class S3Service {
     /**
      * 调试日志输出方法（支持移动端）
      */
-    private debugLog(message: string, data?: any) {
-        const timestamp = new Date().toISOString();
 
-        let logData = '';
-        if (data !== undefined && data !== null) {
-            try {
-                if (data instanceof Error) {
-                    logData = JSON.stringify({
-                        name: data.name,
-                        message: data.message,
-                        code: (data as any).code,
-                        statusCode: (data as any).statusCode,
-                        stack: data.stack?.split('\n').slice(0, 3).join('\n')
-                    }, null, 2);
-                } else if (typeof data === 'object') {
-                    const seen = new WeakSet();
-                    logData = JSON.stringify(data, (key, value) => {
-                        if (typeof value === 'object' && value !== null) {
-                            if (seen.has(value)) {
-                                return '[Circular]';
-                            }
-                            seen.add(value);
-                        }
-                        return value;
-                    }, 2);
-                } else {
-                    logData = String(data);
-                }
-            } catch (e) {
-                logData = '[序列化失败: ' + String(e) + ']';
-            }
-        }
-
-        const fullMessage = `[COS-DEBUG] ${timestamp} ${message}${logData ? '\n' + logData : ''}`;
-        console.log(fullMessage);
-
-        if (Capacitor.isNativePlatform()) {
-            try {
-                const nativeMessage = `[COS-NATIVE] ${message}${logData ? '\n' + logData : ''}`;
-                if (message.includes('ERROR') || message.includes('失败')) {
-                    console.error(nativeMessage);
-                } else if (message.includes('WARN') || message.includes('警告')) {
-                    console.warn(nativeMessage);
-                } else {
-                    console.info(nativeMessage);
-                }
-            } catch (e) {
-                // 忽略原生日志错误
-            }
-        }
-    }
 
     saveConfig(config: S3Config) {
         this.config = config;
@@ -242,11 +192,7 @@ export class S3Service {
         const contentBlob = new Blob([content], { type: 'application/json' });
 
         return new Promise((resolve, reject) => {
-            this.debugLog(`上传数据: ${filename}`, {
-                size: content.length,
-                blobSize: contentBlob.size,
-                isNative: Capacitor.isNativePlatform()
-            });
+            console.log(`[COS] 上传数据: ${filename}`);
 
             this.client.putObject({
                 Bucket: this.config!.bucketName,
@@ -259,10 +205,10 @@ export class S3Service {
                 }
             }, (err: any, data: any) => {
                 if (err) {
-                    this.debugLog(`ERROR: 数据上传失败 ${filename}`, err);
+                    console.error(`[COS] ERROR: 数据上传失败 ${filename}`, err);
                     reject(err);
                 } else {
-                    this.debugLog(`✓ 数据上传成功: ${filename}`);
+                    console.log(`[COS] ✓ 数据上传成功: ${filename}`);
                     resolve(true);
                 }
             });
@@ -477,14 +423,7 @@ export class S3Service {
             // 在Capacitor环境下，将字符串转换为Blob对象
             const bodyBlob = new Blob([bodyContent], { type: 'application/json' });
 
-            this.debugLog(`上传图片列表: ${imageList.length}张图片`, {
-                filename,
-                bodyLength: bodyContent.length,
-                bodyBlobSize: bodyBlob.size,
-                bucket: this.config!.bucketName,
-                region: this.config!.region,
-                isNative: Capacitor.isNativePlatform()
-            });
+            console.log(`[COS] 上传图片列表: ${imageList.length}张图片`);
 
             this.client.putObject({
                 Bucket: this.config!.bucketName,
@@ -497,10 +436,10 @@ export class S3Service {
                 }
             }, (err: any, data: any) => {
                 if (err) {
-                    this.debugLog('ERROR: 图片列表上传失败', err);
+                    console.error('[COS] ERROR: 图片列表上传失败', err);
                     reject(err);
                 } else {
-                    this.debugLog(`✓ 图片列表上传成功: ${filename}`);
+                    console.log(`[COS] ✓ 图片列表上传成功: ${filename}`);
                     resolve(true);
                 }
             });
