@@ -177,15 +177,116 @@ interface ExcelExportCardProps {
     onToast: (type: ToastType, message: string) => void;
 }
 
-const ExcelExportCardContent: React.FC<ExcelExportCardProps> = ({ logs, categories, todos, todoCategories, scopes, onToast }) => {
-    const [startDate, setStartDate] = useState<string>(() => {
-        const d = new Date();
-        d.setDate(d.getDate() - 30);
-        return d.toISOString().split('T')[0];
-    });
-    const [endDate, setEndDate] = useState<string>(new Date().toISOString().split('T')[0]);
+const ExcelExportCardContent: React.FC<{
+    logs: Log[];
+    categories: Category[];
+    todos: TodoItem[];
+    todoCategories: TodoCategory[];
+    scopes: Scope[];
+    onToast: (type: ToastType, message: string) => void;
+}> = ({ logs, categories, todos, todoCategories, scopes, onToast }) => {
+    const [excelStartDate, setExcelStartDate] = useState(new Date());
+    const [excelEndDate, setExcelEndDate] = useState(new Date());
+    const [excelStartInput, setExcelStartInput] = useState('');
+    const [excelEndInput, setExcelEndInput] = useState('');
+    const [isExportingExcel, setIsExportingExcel] = useState(false);
 
-    const handleExport = () => {
+    // 格式化日期为8位字符串 YYYYMMDD
+    const formatDateTo8Digits = (date: Date): string => {
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        return `${year}${month}${day}`;
+    };
+
+    // 解析8位字符串为日期
+    const parse8DigitsToDate = (str: string): Date | null => {
+        if (str.length !== 8) return null;
+        const year = parseInt(str.substring(0, 4));
+        const month = parseInt(str.substring(4, 6)) - 1;
+        const day = parseInt(str.substring(6, 8));
+        const date = new Date(year, month, day);
+        if (isNaN(date.getTime())) return null;
+        return date;
+    };
+
+    // 初始化日期
+    useEffect(() => {
+        const today = new Date();
+        setExcelStartInput(formatDateTo8Digits(today));
+        setExcelEndInput(formatDateTo8Digits(today));
+    }, []);
+
+    // Excel导出快捷日期范围选择
+    const setExcelQuickRange = (type: string) => {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+
+        let newStartDate: Date;
+        let newEndDate: Date;
+
+        switch (type) {
+            case 'today':
+                newStartDate = today;
+                newEndDate = today;
+                break;
+            case 'yesterday':
+                const yesterday = new Date(today);
+                yesterday.setDate(yesterday.getDate() - 1);
+                newStartDate = yesterday;
+                newEndDate = yesterday;
+                break;
+            case 'thisWeek':
+                const thisWeekStart = new Date(today);
+                const dayOfWeek = today.getDay();
+                const daysFromMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+                thisWeekStart.setDate(today.getDate() - daysFromMonday);
+                newStartDate = thisWeekStart;
+                newEndDate = today;
+                break;
+            case 'lastWeek':
+                const lastWeekEnd = new Date(today);
+                const currentDayOfWeek = today.getDay();
+                const daysToLastSunday = currentDayOfWeek === 0 ? 0 : currentDayOfWeek;
+                lastWeekEnd.setDate(today.getDate() - daysToLastSunday - 1);
+                const lastWeekStart = new Date(lastWeekEnd);
+                lastWeekStart.setDate(lastWeekEnd.getDate() - 6);
+                newStartDate = lastWeekStart;
+                newEndDate = lastWeekEnd;
+                break;
+            case 'thisMonth':
+                const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
+                newStartDate = monthStart;
+                newEndDate = today;
+                break;
+            case 'lastMonth':
+                const lastMonthStart = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+                const lastMonthEnd = new Date(today.getFullYear(), today.getMonth(), 0);
+                newStartDate = lastMonthStart;
+                newEndDate = lastMonthEnd;
+                break;
+            case 'thisYear':
+                const yearStart = new Date(today.getFullYear(), 0, 1);
+                newStartDate = yearStart;
+                newEndDate = today;
+                break;
+            case 'all':
+                newStartDate = new Date(2020, 0, 1);
+                newEndDate = today;
+                break;
+            default:
+                return;
+        }
+
+        setExcelStartDate(newStartDate);
+        setExcelEndDate(newEndDate);
+        setExcelStartInput(formatDateTo8Digits(newStartDate));
+        setExcelEndInput(formatDateTo8Digits(newEndDate));
+    };
+
+    // 执行Excel导出
+    const handleExcelExport = () => {
+        setIsExportingExcel(true);
         try {
             excelExportService.exportLogsToExcel(
                 logs,
@@ -193,41 +294,105 @@ const ExcelExportCardContent: React.FC<ExcelExportCardProps> = ({ logs, categori
                 todos,
                 todoCategories,
                 scopes,
-                new Date(startDate),
-                new Date(endDate)
+                excelStartDate,
+                excelEndDate
             );
             onToast('success', 'Excel导出成功');
-        } catch (error) {
-            console.error('Export failed:', error);
-            onToast('error', '导出失败，请重试');
+        } catch (error: any) {
+            console.error('Excel导出失败:', error);
+            onToast('error', `Excel导出失败: ${error.message}`);
+        } finally {
+            setIsExportingExcel(false);
         }
     };
 
     return (
-        <div className="space-y-3">
-            <div className="flex items-center gap-2">
-                <input
-                    type="date"
-                    value={startDate}
-                    onChange={(e) => setStartDate(e.target.value)}
-                    className="flex-1 bg-stone-50 border-none rounded-lg px-3 py-2 text-sm text-stone-700 outline-none focus:ring-2 focus:ring-stone-200"
-                />
-                <span className="text-stone-400">-</span>
-                <input
-                    type="date"
-                    value={endDate}
-                    onChange={(e) => setEndDate(e.target.value)}
-                    className="flex-1 bg-stone-50 border-none rounded-lg px-3 py-2 text-sm text-stone-700 outline-none focus:ring-2 focus:ring-stone-200"
-                />
+        <>
+            {/* 时间范围 */}
+            <div className="space-y-3">
+                <p className="text-xs font-bold text-stone-400 uppercase tracking-widest px-1">时间范围</p>
+                <div className="flex items-center gap-2">
+                    <div className="flex-1">
+                        <label className="text-xs text-stone-400 mb-1 block px-1">起始时间</label>
+                        <input
+                            type="text"
+                            placeholder="20251229"
+                            maxLength={8}
+                            value={excelStartInput}
+                            onChange={(e) => {
+                                const value = e.target.value.replace(/\D/g, '');
+                                setExcelStartInput(value);
+                                if (value.length === 8) {
+                                    const date = parse8DigitsToDate(value);
+                                    if (date) {
+                                        setExcelStartDate(date);
+                                    }
+                                }
+                            }}
+                            className="w-full bg-white border border-stone-200 rounded-lg px-3 py-2 text-sm font-mono text-stone-800 focus:outline-none focus:ring-2 focus:ring-stone-300 focus:border-stone-300"
+                        />
+                    </div>
+                    <span className="text-stone-300 mt-5">-</span>
+                    <div className="flex-1">
+                        <label className="text-xs text-stone-400 mb-1 block px-1">结束时间</label>
+                        <input
+                            type="text"
+                            placeholder="20251229"
+                            maxLength={8}
+                            value={excelEndInput}
+                            onChange={(e) => {
+                                const value = e.target.value.replace(/\D/g, '');
+                                setExcelEndInput(value);
+                                if (value.length === 8) {
+                                    const date = parse8DigitsToDate(value);
+                                    if (date) {
+                                        setExcelEndDate(date);
+                                    }
+                                }
+                            }}
+                            className="w-full bg-white border border-stone-200 rounded-lg px-3 py-2 text-sm font-mono text-stone-800 focus:outline-none focus:ring-2 focus:ring-stone-300 focus:border-stone-300"
+                        />
+                    </div>
+                </div>
             </div>
+
+            {/* 快捷按钮 */}
+            <div className="space-y-2">
+                <p className="text-xs font-bold text-stone-400 uppercase">快捷选择</p>
+                <div className="flex flex-wrap gap-2">
+                    <button onClick={() => setExcelQuickRange('today')} className="px-3 py-1.5 text-xs font-medium bg-stone-100 hover:bg-stone-200 text-stone-700 rounded-lg transition-colors">今天</button>
+                    <button onClick={() => setExcelQuickRange('yesterday')} className="px-3 py-1.5 text-xs font-medium bg-stone-100 hover:bg-stone-200 text-stone-700 rounded-lg transition-colors">昨天</button>
+                    <button onClick={() => setExcelQuickRange('thisWeek')} className="px-3 py-1.5 text-xs font-medium bg-stone-100 hover:bg-stone-200 text-stone-700 rounded-lg transition-colors">本周</button>
+                    <button onClick={() => setExcelQuickRange('lastWeek')} className="px-3 py-1.5 text-xs font-medium bg-stone-100 hover:bg-stone-200 text-stone-700 rounded-lg transition-colors">上周</button>
+                    <button onClick={() => setExcelQuickRange('thisMonth')} className="px-3 py-1.5 text-xs font-medium bg-stone-100 hover:bg-stone-200 text-stone-700 rounded-colors">本月</button>
+                    <button onClick={() => setExcelQuickRange('lastMonth')} className="px-3 py-1.5 text-xs font-medium bg-stone-100 hover:bg-stone-200 text-stone-700 rounded-lg transition-colors">上月</button>
+                    <button onClick={() => setExcelQuickRange('thisYear')} className="px-3 py-1.5 text-xs font-medium bg-stone-100 hover:bg-stone-200 text-stone-700 rounded-lg transition-colors">今年</button>
+                    <button onClick={() => setExcelQuickRange('all')} className="px-3 py-1.5 text-xs font-medium bg-stone-100 hover:bg-stone-200 text-stone-700 rounded-lg transition-colors">全部</button>
+                </div>
+            </div>
+
+            {/* 导出按钮 */}
             <button
-                onClick={handleExport}
-                className="flex items-center justify-center gap-2 w-full py-3 bg-green-600 text-white rounded-xl font-medium active:scale-[0.98] transition-transform shadow-lg shadow-green-100/50 hover:bg-green-700"
+                onClick={handleExcelExport}
+                disabled={isExportingExcel}
+                className={`flex items-center justify-center gap-2 w-full py-3 rounded-xl font-medium active:scale-[0.98] transition-all shadow-lg ${isExportingExcel
+                    ? 'bg-stone-400 text-white cursor-not-allowed'
+                    : 'bg-stone-800 text-white shadow-stone-300 hover:bg-stone-900'
+                    }`}
             >
-                <FileSpreadsheet size={18} />
-                导出Excel报表
+                {isExportingExcel ? (
+                    <>
+                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                        导出中...
+                    </>
+                ) : (
+                    <>
+                        <FileSpreadsheet size={18} />
+                        导出Excel
+                    </>
+                )}
             </button>
-        </div>
+        </>
     );
 };
 
@@ -236,6 +401,15 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
     const fileInputRef = useRef<HTMLInputElement>(null);
     const [webdavConfig, setWebdavConfig] = useState<WebDAVConfig | null>(null);
     const [s3Config, setS3Config] = useState<S3Config | null>(null);
+    // Floating Window State
+    const [floatingWindowEnabled, setFloatingWindowEnabled] = useState(false);
+    const [configForm, setConfigForm] = useState<WebDAVConfig>({ url: '', username: '', password: '' });
+    const [s3ConfigForm, setS3ConfigForm] = useState<S3Config>({ bucketName: '', region: '', secretId: '', secretKey: '', endpoint: '' });
+
+    // UI State
+    const [localUserInfo, setLocalUserInfo] = useState(userPersonalInfo || '');
+    const [isDefaultViewDropdownOpen, setIsDefaultViewDropdownOpen] = useState(false);
+
 
     // Data Management State
     const [confirmReset, setConfirmReset] = useState(false);
@@ -383,58 +557,10 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
         return typeof window !== 'undefined' && !!(window as any).ipcRenderer;
     };
 
-    // Floating Window State
-    const [floatingWindowEnabled, setFloatingWindowEnabled] = useState(() => {
-        return localStorage.getItem('cfg_floating_window_enabled') === 'true';
-    });
-
-    const handleToggleFloatingWindow = async () => {
-        // @ts-ignore
-        if (window.Capacitor?.getPlatform() !== 'android') {
-            onToast('info', '仅支持 Android 设备');
-            return;
-        }
-
-        if (!floatingWindowEnabled) {
-            try {
-                const res = await FocusNotification.checkFloatingPermission();
-                if (res.granted) {
-                    await FocusNotification.startFloatingWindow();
-                    setFloatingWindowEnabled(true);
-                    localStorage.setItem('cfg_floating_window_enabled', 'true');
-                    onToast('success', '悬浮球已开启');
-                } else {
-                    await FocusNotification.requestFloatingPermission();
-                    onToast('info', '请授予悬浮窗权限后重试');
-                }
-            } catch (e) {
-                console.error(e);
-                onToast('error', '开启失败');
-            }
-        } else {
-            try {
-                await FocusNotification.stopFloatingWindow();
-                setFloatingWindowEnabled(false);
-                localStorage.setItem('cfg_floating_window_enabled', 'false');
-            } catch (e) {
-                console.error(e);
-            }
-        }
-    };
 
 
-
-    // UI States
-    const [isDefaultViewDropdownOpen, setIsDefaultViewDropdownOpen] = useState(false);
-    const [configForm, setConfigForm] = useState<WebDAVConfig>({ url: '', username: '', password: '' });
-    const [s3ConfigForm, setS3ConfigForm] = useState<S3Config>({ bucketName: '', region: '', secretId: '', secretKey: '', endpoint: '' });
-    const [confirmReset, setConfirmReset] = useState(false);
-    const [confirmClear, setConfirmClear] = useState(false);
-
-    // AI Config State
-    const [localUserInfo, setLocalUserInfo] = useState(userPersonalInfo || '');
-    const [showAddTemplateModal, setShowAddTemplateModal] = useState(false);
     const [editingTemplate, setEditingTemplate] = useState<NarrativeTemplate | null>(null);
+    const [showAddTemplateModal, setShowAddTemplateModal] = useState(false);
 
     // Modal State for Narrative Templates
     const [modalTitle, setModalTitle] = useState('');
@@ -486,6 +612,56 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
             localStorage.setItem('lumos_s3_draft_endpoint', s3ConfigForm.endpoint || '');
         }
     }, [s3ConfigForm]);
+
+    // Initialize Floating Window State
+    useEffect(() => {
+        const checkFloatingStatus = async () => {
+            if (Capacitor.isNativePlatform()) {
+                const savedState = localStorage.getItem('floating_window_enabled');
+                if (savedState === 'true') {
+                    setFloatingWindowEnabled(true);
+                    // Optionally sync actual state if needed, but for now trust localStorage or plugin
+                }
+            }
+        };
+        checkFloatingStatus();
+    }, []);
+
+    const handleToggleFloatingWindow = async () => {
+        if (!Capacitor.isNativePlatform()) {
+            onToast('error', '悬浮球仅支持 Android 设备');
+            return;
+        }
+
+        const newState = !floatingWindowEnabled;
+        setFloatingWindowEnabled(newState);
+        localStorage.setItem('floating_window_enabled', String(newState));
+
+        try {
+            if (newState) {
+                const { granted } = await FocusNotification.checkFloatingPermission();
+                if (granted) {
+                    await FocusNotification.startFloatingWindow();
+                    onToast('success', '悬浮球已开启');
+                } else {
+                    await FocusNotification.requestFloatingPermission();
+                    // Permission result handling requires app resume usually, 
+                    // but for simplicity we rely on user manually granting and retrying or plugin handling it.
+                    // The plugin requestFloatingPermission typically opens settings.
+                    onToast('info', '请在设置中授予悬浮窗权限');
+                }
+            } else {
+                await FocusNotification.stopFloatingWindow();
+                onToast('success', '悬浮球已关闭');
+            }
+        } catch (error) {
+            console.error('Toggle floating window error:', error);
+            onToast('error', '操作失败');
+            // Revert state on error
+            setFloatingWindowEnabled(!newState);
+            localStorage.setItem('floating_window_enabled', String(!newState));
+        }
+    };
 
     // 组件挂载时加载草稿配置
     useEffect(() => {
@@ -583,32 +759,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
         }
     };
 
-    const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-        const file = event.target.files?.[0];
-        if (file) {
-            onImport(file);
-        }
-    };
 
-    const handleResetClick = () => {
-        if (confirmReset) {
-            onReset();
-            setConfirmReset(false);
-        } else {
-            setConfirmReset(true);
-            setTimeout(() => setConfirmReset(false), 3000);
-        }
-    };
-
-    const handleClearClick = () => {
-        if (confirmClear) {
-            onClearData();
-            setConfirmClear(false);
-        } else {
-            setConfirmClear(true);
-            setTimeout(() => setConfirmClear(false), 3000);
-        }
-    };
 
     const handleSaveConfig = async () => {
         if (!configForm.url) {
@@ -1025,90 +1176,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
     };
 
     // 图片清理功能
-    const handleFixImageList = async () => {
-        if (isCheckingImages) return;
 
-        setIsCheckingImages(true);
-        try {
-            const result = await imageService.cleanupUnreferencedImages(logs || []);
-
-            // 上传修复后的列表到云端
-            const imageList = imageService.getReferencedImagesList();
-            await webdavService.uploadImageList(imageList);
-
-            onToast('success', `修复完成：保留 ${result.kept} 个，清理 ${result.cleaned} 个`);
-
-            // 生成报告
-            setImageCleanupReport(
-                `✓ 修复完成\n\n` +
-                `保留的图片: ${result.kept} 个\n` +
-                `清理的图片: ${result.cleaned} 个\n\n` +
-                `图片列表已更新并同步到云端`
-            );
-        } catch (error: any) {
-            console.error('修复图片列表失败:', error);
-            onToast('error', `修复失败: ${error?.message}`);
-        } finally {
-            setIsCheckingImages(false);
-        }
-    };
-
-    const handleCheckUnreferencedImages = async () => {
-        if (isCheckingImages) return;
-
-        setIsCheckingImages(true);
-        try {
-            const report = await imageCleanupService.generateCleanupReport(logs || []);
-            setImageCleanupReport(report);
-            onToast('success', '图片检查完成');
-        } catch (error: any) {
-            console.error('检查图片失败:', error);
-            onToast('error', `检查图片失败: ${error?.message}`);
-        } finally {
-            setIsCheckingImages(false);
-        }
-    };
-
-    const handleCleanupImages = async (dryRun: boolean = false) => {
-        if (isCleaningImages) return;
-
-        if (!dryRun) {
-            // 显示确认模态框而不是默认的 confirm
-            setIsImageCleanupConfirmOpen(true);
-            return;
-        }
-
-        await executeImageCleanup(dryRun);
-    };
-
-    const executeImageCleanup = async (dryRun: boolean = false) => {
-        setIsCleaningImages(true);
-        try {
-            const result = await imageCleanupService.cleanupUnreferencedImages(logs || [], {
-                deleteLocal: true,
-                deleteRemote: true,
-                dryRun
-            });
-
-            if (dryRun) {
-                onToast('info', `试运行完成：发现 ${result.unreferencedImages.length} 个未引用图片`);
-            } else {
-                onToast('success', `清理完成：删除了 ${result.deletedLocal} 个本地图片，${result.deletedRemote} 个远程图片`);
-                // 重新生成报告
-                await handleCheckUnreferencedImages();
-            }
-        } catch (error: any) {
-            console.error('清理图片失败:', error);
-            onToast('error', `清理图片失败: ${error?.message}`);
-        } finally {
-            setIsCleaningImages(false);
-        }
-    };
-
-    const handleConfirmImageCleanup = () => {
-        setIsImageCleanupConfirmOpen(false);
-        executeImageCleanup(false);
-    };
 
 
     // Filters子页面
@@ -1649,7 +1717,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
                                     <button
                                         onClick={() => {
                                             if (confirm('确定要完全清理S3配置吗？这将删除所有保存的配置信息，下次需要重新输入。')) {
-                                                s3Service.clearAllConfig();
+                                                s3Service.clearConfig();
                                                 setS3Config(null);
                                                 setS3ConfigForm({ bucketName: '', region: '', secretId: '', secretKey: '', endpoint: '' });
                                                 // 同时清理草稿
@@ -3154,225 +3222,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
     );
 };
 
-// Excel导出卡片内容组件
-const ExcelExportCardContent: React.FC<{
-    logs: Log[];
-    categories: Category[];
-    todos: TodoItem[];
-    todoCategories: TodoCategory[];
-    scopes: Scope[];
-    onToast: (type: ToastType, message: string) => void;
-}> = ({ logs, categories, todos, todoCategories, scopes, onToast }) => {
-    const [excelStartDate, setExcelStartDate] = useState(new Date());
-    const [excelEndDate, setExcelEndDate] = useState(new Date());
-    const [excelStartInput, setExcelStartInput] = useState('');
-    const [excelEndInput, setExcelEndInput] = useState('');
-    const [isExportingExcel, setIsExportingExcel] = useState(false);
 
-    // 格式化日期为8位字符串 YYYYMMDD
-    const formatDateTo8Digits = (date: Date): string => {
-        const year = date.getFullYear();
-        const month = String(date.getMonth() + 1).padStart(2, '0');
-        const day = String(date.getDate()).padStart(2, '0');
-        return `${year}${month}${day}`;
-    };
-
-    // 解析8位字符串为日期
-    const parse8DigitsToDate = (str: string): Date | null => {
-        if (str.length !== 8) return null;
-        const year = parseInt(str.substring(0, 4));
-        const month = parseInt(str.substring(4, 6)) - 1;
-        const day = parseInt(str.substring(6, 8));
-        const date = new Date(year, month, day);
-        if (isNaN(date.getTime())) return null;
-        return date;
-    };
-
-    // 初始化日期
-    useEffect(() => {
-        const today = new Date();
-        setExcelStartInput(formatDateTo8Digits(today));
-        setExcelEndInput(formatDateTo8Digits(today));
-    }, []);
-
-    // Excel导出快捷日期范围选择
-    const setExcelQuickRange = (type: string) => {
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-
-        let newStartDate: Date;
-        let newEndDate: Date;
-
-        switch (type) {
-            case 'today':
-                newStartDate = today;
-                newEndDate = today;
-                break;
-            case 'yesterday':
-                const yesterday = new Date(today);
-                yesterday.setDate(yesterday.getDate() - 1);
-                newStartDate = yesterday;
-                newEndDate = yesterday;
-                break;
-            case 'thisWeek':
-                const thisWeekStart = new Date(today);
-                const dayOfWeek = today.getDay();
-                const daysFromMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
-                thisWeekStart.setDate(today.getDate() - daysFromMonday);
-                newStartDate = thisWeekStart;
-                newEndDate = today;
-                break;
-            case 'lastWeek':
-                const lastWeekEnd = new Date(today);
-                const currentDayOfWeek = today.getDay();
-                const daysToLastSunday = currentDayOfWeek === 0 ? 0 : currentDayOfWeek;
-                lastWeekEnd.setDate(today.getDate() - daysToLastSunday - 1);
-                const lastWeekStart = new Date(lastWeekEnd);
-                lastWeekStart.setDate(lastWeekEnd.getDate() - 6);
-                newStartDate = lastWeekStart;
-                newEndDate = lastWeekEnd;
-                break;
-            case 'thisMonth':
-                const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
-                newStartDate = monthStart;
-                newEndDate = today;
-                break;
-            case 'lastMonth':
-                const lastMonthStart = new Date(today.getFullYear(), today.getMonth() - 1, 1);
-                const lastMonthEnd = new Date(today.getFullYear(), today.getMonth(), 0);
-                newStartDate = lastMonthStart;
-                newEndDate = lastMonthEnd;
-                break;
-            case 'thisYear':
-                const yearStart = new Date(today.getFullYear(), 0, 1);
-                newStartDate = yearStart;
-                newEndDate = today;
-                break;
-            case 'all':
-                newStartDate = new Date(2020, 0, 1);
-                newEndDate = today;
-                break;
-            default:
-                return;
-        }
-
-        setExcelStartDate(newStartDate);
-        setExcelEndDate(newEndDate);
-        setExcelStartInput(formatDateTo8Digits(newStartDate));
-        setExcelEndInput(formatDateTo8Digits(newEndDate));
-    };
-
-    // 执行Excel导出
-    const handleExcelExport = () => {
-        setIsExportingExcel(true);
-        try {
-            excelExportService.exportLogsToExcel(
-                logs,
-                categories,
-                todos,
-                todoCategories,
-                scopes,
-                excelStartDate,
-                excelEndDate
-            );
-            onToast('success', 'Excel导出成功');
-        } catch (error: any) {
-            console.error('Excel导出失败:', error);
-            onToast('error', `Excel导出失败: ${error.message}`);
-        } finally {
-            setIsExportingExcel(false);
-        }
-    };
-
-    return (
-        <>
-            {/* 时间范围 */}
-            <div className="space-y-3">
-                <p className="text-xs font-bold text-stone-400 uppercase tracking-widest px-1">时间范围</p>
-                <div className="flex items-center gap-2">
-                    <div className="flex-1">
-                        <label className="text-xs text-stone-400 mb-1 block px-1">起始时间</label>
-                        <input
-                            type="text"
-                            placeholder="20251229"
-                            maxLength={8}
-                            value={excelStartInput}
-                            onChange={(e) => {
-                                const value = e.target.value.replace(/\D/g, '');
-                                setExcelStartInput(value);
-                                if (value.length === 8) {
-                                    const date = parse8DigitsToDate(value);
-                                    if (date) {
-                                        setExcelStartDate(date);
-                                    }
-                                }
-                            }}
-                            className="w-full bg-white border border-stone-200 rounded-lg px-3 py-2 text-sm font-mono text-stone-800 focus:outline-none focus:ring-2 focus:ring-stone-300 focus:border-stone-300"
-                        />
-                    </div>
-                    <span className="text-stone-300 mt-5">-</span>
-                    <div className="flex-1">
-                        <label className="text-xs text-stone-400 mb-1 block px-1">结束时间</label>
-                        <input
-                            type="text"
-                            placeholder="20251229"
-                            maxLength={8}
-                            value={excelEndInput}
-                            onChange={(e) => {
-                                const value = e.target.value.replace(/\D/g, '');
-                                setExcelEndInput(value);
-                                if (value.length === 8) {
-                                    const date = parse8DigitsToDate(value);
-                                    if (date) {
-                                        setExcelEndDate(date);
-                                    }
-                                }
-                            }}
-                            className="w-full bg-white border border-stone-200 rounded-lg px-3 py-2 text-sm font-mono text-stone-800 focus:outline-none focus:ring-2 focus:ring-stone-300 focus:border-stone-300"
-                        />
-                    </div>
-                </div>
-            </div>
-
-            {/* 快捷按钮 */}
-            <div className="space-y-2">
-                <p className="text-xs font-bold text-stone-400 uppercase">快捷选择</p>
-                <div className="flex flex-wrap gap-2">
-                    <button onClick={() => setExcelQuickRange('today')} className="px-3 py-1.5 text-xs font-medium bg-stone-100 hover:bg-stone-200 text-stone-700 rounded-lg transition-colors">今天</button>
-                    <button onClick={() => setExcelQuickRange('yesterday')} className="px-3 py-1.5 text-xs font-medium bg-stone-100 hover:bg-stone-200 text-stone-700 rounded-lg transition-colors">昨天</button>
-                    <button onClick={() => setExcelQuickRange('thisWeek')} className="px-3 py-1.5 text-xs font-medium bg-stone-100 hover:bg-stone-200 text-stone-700 rounded-lg transition-colors">本周</button>
-                    <button onClick={() => setExcelQuickRange('lastWeek')} className="px-3 py-1.5 text-xs font-medium bg-stone-100 hover:bg-stone-200 text-stone-700 rounded-lg transition-colors">上周</button>
-                    <button onClick={() => setExcelQuickRange('thisMonth')} className="px-3 py-1.5 text-xs font-medium bg-stone-100 hover:bg-stone-200 text-stone-700 rounded-colors">本月</button>
-                    <button onClick={() => setExcelQuickRange('lastMonth')} className="px-3 py-1.5 text-xs font-medium bg-stone-100 hover:bg-stone-200 text-stone-700 rounded-lg transition-colors">上月</button>
-                    <button onClick={() => setExcelQuickRange('thisYear')} className="px-3 py-1.5 text-xs font-medium bg-stone-100 hover:bg-stone-200 text-stone-700 rounded-lg transition-colors">今年</button>
-                    <button onClick={() => setExcelQuickRange('all')} className="px-3 py-1.5 text-xs font-medium bg-stone-100 hover:bg-stone-200 text-stone-700 rounded-lg transition-colors">全部</button>
-                </div>
-            </div>
-
-            {/* 导出按钮 */}
-            <button
-                onClick={handleExcelExport}
-                disabled={isExportingExcel}
-                className={`flex items-center justify-center gap-2 w-full py-3 rounded-xl font-medium active:scale-[0.98] transition-all shadow-lg ${isExportingExcel
-                    ? 'bg-stone-400 text-white cursor-not-allowed'
-                    : 'bg-stone-800 text-white shadow-stone-300 hover:bg-stone-900'
-                    }`}
-            >
-                {isExportingExcel ? (
-                    <>
-                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                        导出中...
-                    </>
-                ) : (
-                    <>
-                        <FileSpreadsheet size={18} />
-                        导出Excel
-                    </>
-                )}
-            </button>
-        </>
-    );
-};
 
 const MenuItem: React.FC<{ icon: React.ReactNode, label: string, isLast?: boolean, onClick?: () => void }> = ({ icon, label, isLast, onClick }) => (
     <div

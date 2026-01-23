@@ -381,7 +381,8 @@ export class S3Service {
             this.client.getObject({
                 Bucket: this.config!.bucketName,
                 Region: this.config!.region,
-                Key: `images/${filename}`
+                Key: `images/${filename}`,
+                DataType: 'blob'
             }, (err: any, data: any) => {
                 if (err) {
                     console.error(`[COS] Image download failed: ${filename}`, err);
@@ -399,6 +400,13 @@ export class S3Service {
 
                         if (body instanceof ArrayBuffer) {
                             arrayBuffer = body;
+                        } else if (body instanceof Blob) {
+                            // Convert Blob to ArrayBuffer
+                            const reader = new FileReader();
+                            reader.onload = () => resolve(reader.result as ArrayBuffer);
+                            reader.onerror = () => reject(new Error('Failed to read blob'));
+                            reader.readAsArrayBuffer(body);
+                            return;
                         } else if (body instanceof Uint8Array) {
                             arrayBuffer = body.buffer.slice(body.byteOffset, body.byteOffset + body.byteLength) as ArrayBuffer;
                         } else if (typeof body === 'string') {
