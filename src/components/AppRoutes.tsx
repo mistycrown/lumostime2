@@ -1,0 +1,402 @@
+import React, { useState } from 'react';
+import { AppView, Category, DailyReview, WeeklyReview, MonthlyReview, Log, TodoItem, TodoCategory } from '../types';
+import { useNavigation } from '../contexts/NavigationContext';
+import { useData } from '../contexts/DataContext';
+import { useCategoryScope } from '../contexts/CategoryScopeContext';
+import { useReview } from '../contexts/ReviewContext';
+import { useSettings } from '../contexts/SettingsContext';
+import { useToast } from '../contexts/ToastContext';
+import { useGoalManager } from '../hooks/useGoalManager';
+import { useReviewManager } from '../hooks/useReviewManager';
+import { aiService } from '../services/aiService';
+
+// Views
+import { DailyReviewView } from '../views/DailyReviewView';
+import { WeeklyReviewView } from '../views/WeeklyReviewView';
+import { MonthlyReviewView } from '../views/MonthlyReviewView';
+import { RecordView } from '../views/RecordView';
+import { TimelineView } from '../views/TimelineView';
+import { StatsView } from '../views/StatsView';
+import { JournalView } from '../views/JournalView';
+import { ReviewHubView } from '../views/ReviewHubView';
+import { TagDetailView } from '../views/TagDetailView';
+import { CategoryDetailView } from '../views/CategoryDetailView';
+import { TagsView } from '../views/TagsView';
+import { TodoBatchManageView } from '../views/TodoBatchManageView';
+import { TodoView } from '../views/TodoView';
+import { ScopeDetailView } from '../views/ScopeDetailView';
+import { ScopeManageView } from '../views/ScopeManageView';
+import { ScopeView } from '../views/ScopeView';
+
+// Props Interface to receive all handlers
+// Minimized Props Interface
+interface AppRoutesProps {
+    refreshKey: number;
+    isSyncing: boolean;
+    handleQuickSync: (e: any) => void;
+    setStatsTitle: (title: string) => void;
+
+    // Log/Todo specific handlers that might not be in managers yet or need app-level state
+    // Actually, TodoManager and LogManager should be here or in Context?
+    // For now, let's assume we still pass the high-level log/todo handlers from App.tsx 
+    // IF specific Custom Hooks are not instantiated here. 
+    // But wait, App.tsx has useTodoManager, useLogManager.
+    // We should move those here too? 
+    // If we move ALL managers here, AppRoutes becomes the "Controller".
+    // Let's stick to moving Goal/Review first.
+
+    // Keeping core Log/Todo handlers for now to avoid breaking too much at once
+    handleStartActivity: (activity: any, categoryId: string, todoId?: string, scopeIdOrIds?: string | string[], note?: string) => void;
+    openAddModal: (start?: number, end?: number) => void;
+    openEditModal: (log: Log) => void;
+    handleBatchAddLogs: (entries: any[]) => void;
+    handleQuickPunch: () => void;
+
+    openEditTodoModal: (todo: TodoItem) => void;
+    openAddTodoModal: (catId: string) => void;
+    handleToggleTodo: (id: string) => void;
+    handleStartTodoFocus: (todo: TodoItem) => void;
+    handleBatchAddTodos: (todos: Partial<TodoItem>[]) => void;
+    handleDuplicateTodo: (todo: TodoItem) => void;
+    handleUpdateTodoData: (cats: TodoCategory[], todos: TodoItem[]) => void;
+
+    // We can remove Goal/Review/Tag/Category handlers as they will be handled internally
+}
+
+export const AppRoutes: React.FC<AppRoutesProps> = ({
+    handleStartActivity,
+    openAddModal, openEditModal, handleBatchAddLogs, handleQuickPunch,
+    openEditTodoModal, openAddTodoModal, handleToggleTodo, handleStartTodoFocus, handleBatchAddTodos, handleDuplicateTodo, handleUpdateTodoData,
+    refreshKey, isSyncing, handleQuickSync,
+    setStatsTitle
+}) => {
+    const {
+        currentView, setCurrentView,
+        isSettingsOpen,
+        isDailyReviewOpen, currentReviewDate,
+        isWeeklyReviewOpen, currentWeeklyReviewStart, currentWeeklyReviewEnd,
+        isMonthlyReviewOpen, currentMonthlyReviewStart, currentMonthlyReviewEnd,
+        isStatsFullScreen, setIsStatsFullScreen,
+        isTodoManaging, setIsTodoManaging,
+        isTagsManaging, setIsTagsManaging,
+        isScopeManaging, setIsScopeManaging,
+        selectedTagId, selectedCategoryId, selectedScopeId, setSelectedScopeId,
+        isJournalMode,
+        currentDate, setCurrentDate
+    } = useNavigation();
+
+
+    const { logs, todos, todoCategories, setLogs, setTodos, setTodoCategories } = useData(); // Added setters
+    const { categories, scopes, goals, setScopes, setGoals, handleUpdateActivity, handleCategoryChange, handleUpdateCategory, handleUpdateCategories } = useCategoryScope();
+    const { dailyReviews, weeklyReviews, monthlyReviews, setDailyReviews, setWeeklyReviews, setMonthlyReviews, reviewTemplates, checkTemplates, dailyReviewTime, weeklyReviewTime, monthlyReviewTime } = useReview();
+    const { userPersonalInfo, autoLinkRules, customNarrativeTemplates, startWeekOnSunday, minIdleTimeThreshold } = useSettings();
+    const { addToast } = useToast();
+
+    // Import hooks
+    const { handleSaveGoal, handleDeleteGoal, handleArchiveGoal } = useGoalManager();
+
+    // We need to instantiate ReviewManager here.
+    // Note: useReviewManager requires many args.
+    const {
+        handleDeleteReview, handleUpdateReview, handleGenerateNarrative,
+        handleDeleteWeeklyReview, handleUpdateWeeklyReview, handleGenerateWeeklyNarrative,
+        handleDeleteMonthlyReview, handleUpdateMonthlyReview, handleGenerateMonthlyNarrative,
+        handleOpenDailyReview, handleOpenWeeklyReview, handleOpenMonthlyReview,
+        handleCloseWeeklyReview, handleCloseMonthlyReview
+    } = useReviewManager();
+
+    const { setSelectedTagId, setSelectedCategoryId } = useNavigation();
+    const handleSelectTag = (id: string) => setSelectedTagId(id);
+
+    // Helper to get local YYYY-MM-DD string
+    const getLocalDateStr = (d: Date) => {
+        const year = d.getFullYear();
+        const month = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+    };
+
+    if (isSettingsOpen) return null;
+
+    // Daily Review has priority
+    if (isDailyReviewOpen && currentReviewDate) {
+        const dateStr = getLocalDateStr(currentReviewDate);
+        const review = dailyReviews.find(r => r.date === dateStr);
+        // During creation, it might be added to state asynchronously, but handleOpenDailyReview adds it synchronously usually.
+        // If undefined, return null or spinner
+        if (!review) return null;
+
+        return (
+            <DailyReviewView
+                review={review}
+                date={currentReviewDate}
+                templates={reviewTemplates}
+                categories={categories}
+                logs={logs}
+                todos={todos}
+                todoCategories={todoCategories}
+                scopes={scopes}
+                customNarrativeTemplates={customNarrativeTemplates}
+                onDelete={handleDeleteReview}
+                onUpdateReview={handleUpdateReview}
+                onGenerateNarrative={handleGenerateNarrative}
+                addToast={addToast}
+                checkTemplates={checkTemplates}
+            />
+        );
+    }
+
+    // Weekly Review
+    if (isWeeklyReviewOpen && currentWeeklyReviewStart && currentWeeklyReviewEnd) {
+        const weekStartStr = getLocalDateStr(currentWeeklyReviewStart);
+        const weekEndStr = getLocalDateStr(currentWeeklyReviewEnd);
+        const review = weeklyReviews.find(r => r.weekStartDate === weekStartStr && r.weekEndDate === weekEndStr);
+        if (!review) return null;
+
+        return (
+            <WeeklyReviewView
+                review={review}
+                weekStartDate={currentWeeklyReviewStart}
+                weekEndDate={currentWeeklyReviewEnd}
+                templates={reviewTemplates}
+                categories={categories}
+                logs={logs}
+                todos={todos}
+                todoCategories={todoCategories}
+                scopes={scopes}
+                dailyReviews={dailyReviews}
+                customNarrativeTemplates={customNarrativeTemplates}
+                onDelete={handleDeleteWeeklyReview}
+                onUpdateReview={handleUpdateWeeklyReview}
+                onGenerateNarrative={handleGenerateWeeklyNarrative}
+                onClose={handleCloseWeeklyReview}
+                addToast={addToast}
+            />
+        );
+    }
+
+    // Monthly Review
+    if (isMonthlyReviewOpen && currentMonthlyReviewStart && currentMonthlyReviewEnd) {
+        const monthStartStr = getLocalDateStr(currentMonthlyReviewStart);
+        const monthEndStr = getLocalDateStr(currentMonthlyReviewEnd);
+        const review = monthlyReviews.find(r => r.monthStartDate === monthStartStr && r.monthEndDate === monthEndStr);
+        if (!review) return null;
+
+        return (
+            <MonthlyReviewView
+                review={review}
+                monthStartDate={currentMonthlyReviewStart}
+                monthEndDate={currentMonthlyReviewEnd}
+                templates={reviewTemplates}
+                categories={categories}
+                logs={logs}
+                todos={todos}
+                todoCategories={todoCategories}
+                scopes={scopes}
+                dailyReviews={dailyReviews}
+                customNarrativeTemplates={customNarrativeTemplates}
+                onDelete={handleDeleteMonthlyReview}
+                onUpdateReview={handleUpdateMonthlyReview}
+                onGenerateNarrative={handleGenerateMonthlyNarrative}
+                addToast={addToast}
+                onClose={handleCloseMonthlyReview}
+            />
+        );
+    }
+
+    switch (currentView) {
+        case AppView.RECORD:
+            return <RecordView onStartActivity={handleStartActivity} categories={categories} />;
+        case AppView.TIMELINE:
+            return (
+                <TimelineView
+                    key={`timeline-${refreshKey}`}
+                    refreshKey={refreshKey}
+                    logs={logs}
+                    todos={todos}
+                    categories={categories}
+                    onAddLog={openAddModal}
+                    onEditLog={openEditModal}
+                    currentDate={currentDate}
+                    onDateChange={setCurrentDate}
+                    onShowStats={() => setCurrentView(AppView.STATS)}
+                    onBatchAddLogs={handleBatchAddLogs}
+                    onSync={handleQuickSync}
+                    isSyncing={isSyncing}
+                    todoCategories={todoCategories}
+                    onToast={addToast}
+                    startWeekOnSunday={startWeekOnSunday}
+                    autoLinkRules={autoLinkRules}
+                    scopes={scopes}
+                    minIdleTimeThreshold={minIdleTimeThreshold}
+                    onQuickPunch={handleQuickPunch}
+                    dailyReview={dailyReviews.find(r => r.date === getLocalDateStr(currentDate))}
+                    onOpenDailyReview={handleOpenDailyReview}
+                    templates={reviewTemplates}
+                    dailyReviewTime={dailyReviewTime}
+                    weeklyReviews={weeklyReviews}
+                    onOpenWeeklyReview={handleOpenWeeklyReview}
+                    weeklyReviewTime={weeklyReviewTime}
+                    monthlyReviews={monthlyReviews}
+                    onOpenMonthlyReview={handleOpenMonthlyReview}
+                    monthlyReviewTime={monthlyReviewTime}
+                />
+            );
+        case AppView.STATS:
+            return (
+                <StatsView
+                    logs={logs}
+                    categories={categories}
+                    currentDate={currentDate}
+                    onBack={() => setCurrentView(AppView.TIMELINE)}
+                    onDateChange={setCurrentDate}
+                    isFullScreen={isStatsFullScreen}
+                    onToggleFullScreen={() => setIsStatsFullScreen(!isStatsFullScreen)}
+                    onToast={addToast}
+                    onTitleChange={setStatsTitle}
+                    todos={todos}
+                    todoCategories={todoCategories}
+                    scopes={scopes}
+                    dailyReviews={dailyReviews}
+                />
+            );
+        case AppView.REVIEW:
+            return isJournalMode ? (
+                <JournalView
+                    dailyReviews={dailyReviews}
+                    weeklyReviews={weeklyReviews}
+                    monthlyReviews={monthlyReviews}
+                    logs={logs}
+                    todos={todos}
+                    scopes={scopes}
+                    onOpenDailyReview={handleOpenDailyReview}
+                    onEditLog={openEditModal}
+                    onOpenWeeklyReview={handleOpenWeeklyReview}
+                    onOpenMonthlyReview={handleOpenMonthlyReview}
+                />
+            ) : (
+                <ReviewHubView
+                    logs={logs}
+                    dailyReviews={dailyReviews}
+                    weeklyReviews={weeklyReviews}
+                    monthlyReviews={monthlyReviews}
+                    onOpenDailyReview={handleOpenDailyReview}
+                    onOpenWeeklyReview={handleOpenWeeklyReview}
+                    onOpenMonthlyReview={handleOpenMonthlyReview}
+                />
+            );
+        case AppView.TAGS:
+            if (selectedTagId) {
+                return (
+                    <TagDetailView
+                        tagId={selectedTagId}
+                        logs={logs}
+                        todos={todos}
+                        onToggleTodo={handleToggleTodo}
+                        categories={categories}
+                        onUpdateActivity={handleUpdateActivity}
+                        onCategoryChange={handleCategoryChange}
+                        onEditLog={openEditModal}
+                        onEditTodo={openEditTodoModal}
+                        scopes={scopes}
+                    />
+                );
+            }
+            if (selectedCategoryId) {
+                return (
+                    <CategoryDetailView
+                        categoryId={selectedCategoryId}
+                        logs={logs}
+                        categories={categories}
+                        todos={todos}
+                        onUpdateCategory={handleUpdateCategory}
+                        onEditLog={openEditModal}
+                        onEditTodo={openEditTodoModal}
+                        scopes={scopes}
+                    />
+                );
+            }
+            return (
+                <TagsView
+                    logs={logs}
+                    onSelectTag={setSelectedTagId}
+                    onSelectCategory={setSelectedCategoryId}
+                    categories={categories}
+                    onUpdateCategories={handleUpdateCategories}
+                    isManaging={isTagsManaging}
+                    onStopManaging={() => setIsTagsManaging(false)}
+                />
+            );
+        case AppView.TODO:
+            if (isTodoManaging) {
+                return (
+                    <TodoBatchManageView
+                        onBack={() => setIsTodoManaging(false)}
+                        categories={todoCategories}
+                        todos={todos}
+                        onSave={handleUpdateTodoData}
+                    />
+                );
+            }
+            return (
+                <TodoView
+                    todos={todos}
+                    categories={todoCategories}
+                    activityCategories={categories}
+                    scopes={scopes}
+                    onToggleTodo={handleToggleTodo}
+                    onEditTodo={openEditTodoModal}
+                    onAddTodo={openAddTodoModal}
+                    onStartFocus={handleStartTodoFocus}
+                    onBatchAddTodos={handleBatchAddTodos}
+                    onDuplicateTodo={handleDuplicateTodo}
+                    autoLinkRules={autoLinkRules}
+                />
+            );
+        case AppView.SCOPE:
+            if (selectedScopeId) {
+                const selectedScope = scopes.find(s => s.id === selectedScopeId);
+                if (!selectedScope) return null;
+                return (
+                    <ScopeDetailView
+                        scope={selectedScope}
+                        logs={logs}
+                        categories={categories}
+                        todos={todos}
+                        goals={goals}
+                        onBack={() => setSelectedScopeId(null)}
+                        onUpdate={(updatedScope) => {
+                            setScopes(prev => prev.map(s => s.id === updatedScope.id ? updatedScope : s));
+                        }}
+                        onEditLog={openEditModal}
+                        onEditGoal={handleSaveGoal}
+                        onDeleteGoal={handleDeleteGoal}
+                        onArchiveGoal={handleArchiveGoal}
+                        onAddGoal={() => handleSaveGoal({ scopeId: selectedScope.id } as any)} // Assuming handleSaveGoal handles creation or partial
+                        onEditTodo={openEditTodoModal}
+                    />
+                );
+            }
+            if (isScopeManaging) {
+                return (
+                    <ScopeManageView
+                        scopes={scopes}
+                        onUpdate={(updatedScopes) => setScopes(updatedScopes)}
+                        onBack={() => setIsScopeManaging(false)}
+                    />
+                );
+            }
+            return (
+                <ScopeView
+                    scopes={scopes}
+                    logs={logs}
+                    goals={goals}
+                    todos={todos}
+                    onScopeClick={(id) => setSelectedScopeId(id)}
+                    onManageClick={() => setIsScopeManaging(true)}
+                />
+            );
+        default:
+            return null;
+    }
+};

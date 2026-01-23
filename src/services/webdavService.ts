@@ -255,21 +255,17 @@ export class WebDAVService {
 
                 try {
                     // 上传临时文件（这会自动创建目录）
-                    const uploadResponse = await new Promise((resolve, reject) => {
-                        HTTP.put(tempUrl, emptyData, {
-                            'Authorization': `Basic ${auth}`,
-                            'Content-Type': 'text/plain'
-                        }, resolve, reject);
+                    const uploadResponse = await HTTP.put(tempUrl, emptyData, {
+                        'Authorization': `Basic ${auth}`,
+                        'Content-Type': 'text/plain'
                     });
 
                     console.log(`[WebDAV] 临时文件上传状态: ${uploadResponse.status}`);
 
                     // 立即删除临时文件
                     try {
-                        const deleteResponse = await new Promise((resolve, reject) => {
-                            HTTP.delete(tempUrl, {}, {
-                                'Authorization': `Basic ${auth}`
-                            }, resolve, reject);
+                        const deleteResponse = await HTTP.delete(tempUrl, {}, {
+                            'Authorization': `Basic ${auth}`
                         });
                         console.log(`[WebDAV] ✓ 临时文件已删除，状态: ${deleteResponse.status}`);
                     } catch (deleteError: any) {
@@ -380,11 +376,9 @@ export class WebDAVService {
                 HTTP.setDataSerializer('raw');
 
                 // Use put method for WebDAV PUT request
-                const response = await new Promise((resolve, reject) => {
-                    HTTP.put(url, uint8Data, {
-                        'Authorization': `Basic ${auth}`,
-                        'Content-Type': 'application/json; charset=utf-8'
-                    }, resolve, reject);
+                const response = await HTTP.put(url, uint8Data, {
+                    'Authorization': `Basic ${auth}`,
+                    'Content-Type': 'application/json; charset=utf-8'
                 });
 
                 console.log(`[WebDAV] Upload Success: status ${response.status}`);
@@ -478,11 +472,9 @@ export class WebDAVService {
                 HTTP.setDataSerializer('raw');
 
                 try {
-                    const response = await new Promise<any>((resolve, reject) => {
-                        HTTP.put(url, uint8Data, {
-                            'Authorization': `Basic ${auth}`,
-                            'Content-Type': 'image/jpeg'
-                        }, resolve, reject);
+                    const response = await HTTP.put(url, uint8Data, {
+                        'Authorization': `Basic ${auth}`,
+                        'Content-Type': 'image/jpeg'
                     });
 
                     console.log(`[WebDAV] ✓ 原生上传成功: ${filename}, Status: ${response.status}`);
@@ -559,11 +551,9 @@ export class WebDAVService {
                 HTTP.setDataSerializer('raw');
 
                 // Use put method for WebDAV PUT request
-                const response = await new Promise((resolve, reject) => {
-                    HTTP.put(url, uint8Data, {
-                        'Authorization': `Basic ${auth}`,
-                        'Content-Type': 'application/json; charset=utf-8'
-                    }, resolve, reject);
+                const response = await HTTP.put(url, uint8Data, {
+                    'Authorization': `Basic ${auth}`,
+                    'Content-Type': 'application/json; charset=utf-8'
                 });
 
                 console.log(`[WebDAV] ✓ 图片列表上传成功: ${imageList.length} 个图片, status: ${response.status}`);
