@@ -123,7 +123,7 @@ export const NavigationProvider: React.FC<NavigationProviderProps> = ({
     const handleSetCurrentView = (view: AppView) => {
         // Handle Index Page Preference
         if (view === AppView.TAGS) {
-            if (defaultIndexView === 'SCOPE') {
+            if (defaultIndexView === 'SCOPE' && currentView !== AppView.SCOPE) {
                 setCurrentView(AppView.SCOPE);
                 return;
             }
