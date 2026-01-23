@@ -101,13 +101,21 @@ export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialSta
       setComments([]);
 
     } else {
-      // Scenario 3: New Button -> Default 1 Hour duration ending Now
+      // Scenario 3: New Button -> Use lastLogEndTime as start if available, otherwise default 1 hour
       const now = Date.now();
-      const oneHourAgo = now - 60 * 60 * 1000;
+      let startTime: number;
 
-      tStart = oneHourAgo;
+      if (lastLogEndTime) {
+        // Use last log's end time as start time
+        startTime = lastLogEndTime;
+      } else {
+        // Default to 1 hour ago if no previous logs
+        startTime = now - 60 * 60 * 1000;
+      }
+
+      tStart = startTime;
       tEnd = now;
-      cStart = oneHourAgo;
+      cStart = startTime;
       cEnd = now;
 
       setSelectedCategoryId(categories[0].id);

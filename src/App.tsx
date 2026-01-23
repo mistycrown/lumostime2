@@ -28,7 +28,6 @@ import { ConfirmModal } from './components/ConfirmModal';
 import { SearchView } from './views/SearchView';
 import { FocusDetailView } from './views/FocusDetailView';
 import { BottomNavigation } from './components/BottomNavigation';
-import { ModalManager } from './components/ModalManager';
 import { AutoLinkView } from './views/AutoLinkView';
 
 import { useLogManager } from './hooks/useLogManager';
@@ -50,9 +49,7 @@ if (typeof window !== 'undefined') {
   window.Buffer = window.Buffer || Buffer;
 }
 
-import { SettingsView } from './views/SettingsView'; // Added import
-
-// ...
+import { SettingsView } from './views/SettingsView';
 
 const AppContent: React.FC = () => {
   // Use Contexts
@@ -69,26 +66,30 @@ const AppContent: React.FC = () => {
     autoFocusNote, setAutoFocusNote
   } = useSettings();
 
-  const { addToast } = useToast(); // Needs useToast hook
+  const { addToast } = useToast();
 
   const {
     isAddModalOpen, setIsAddModalOpen,
     isTodoModalOpen,
     isGoalEditorOpen,
     isAutoLinkOpen, setIsAutoLinkOpen,
-    isSettingsOpen, setIsSettingsOpen, // Added
-    isSearchOpen, setIsSearchOpen, // Added setter
-    initialLogTimes,
+    isSettingsOpen, setIsSettingsOpen,
+    isSearchOpen, setIsSearchOpen,
+    isDailyReviewOpen,
+    isWeeklyReviewOpen,
+    isMonthlyReviewOpen,
+    selectedTagId, setSelectedTagId,
+    selectedCategoryId, setSelectedCategoryId,
+    selectedScopeId, setSelectedScopeId,
     editingLog,
     editingTodo,
     editingGoal,
-    todoCategoryToAdd,
     goalScopeId,
     focusDetailSessionId, setFocusDetailSessionId,
     statsTitle, setStatsTitle,
     currentView, setCurrentView
   } = useNavigation();
-  const { handleUpdateCategories, handleUpdateCategory, handleUpdateActivity, handleCategoryChange, categories, scopes, goals, setCategories, setScopes, setGoals } = useCategoryScope();
+  const { categories, scopes, goals, setCategories, setScopes, setGoals } = useCategoryScope();
   const { startActivity, stopActivity, cancelSession, activeSessions } = useSession();
   const { logs, todos, todoCategories, setLogs, setTodos, setTodoCategories } = useData();
   const {
@@ -146,10 +147,6 @@ const AppContent: React.FC = () => {
   useHardwareBackButton();
 
   const [sessionToStop, setSessionToStop] = React.useState<string | null>(null);
-  const { setSelectedTagId, setSelectedCategoryId } = useNavigation();
-
-
-
   // Wrappers for Session Actions to match original signature (injecting autoLinkRules)
   const handleStartActivityWrapper = (activity: any, categoryId: string, todoId?: string, scopeIdOrIds?: string | string[], note?: string) => {
     startActivity(activity, categoryId, autoLinkRules, todoId, scopeIdOrIds, note);
@@ -177,14 +174,14 @@ const AppContent: React.FC = () => {
       isHeaderScrolled={isHeaderScrolled}
       isSyncing={syncManager.isSyncing}
       onQuickSync={syncManager.handleQuickSync}
-      handleBackFromTag={() => { /* Handled in MainLayout internal button click logic currently, or passed if needed */ }}
-      handleBackFromScope={() => { /* Handled in MainLayout */ }}
-      handleCloseDailyReview={() => reviewManager.handleDeleteReview()} // Actually close is just setting state, delete is what was mapped in header back
-      /* Wait, MainLayout Header back button calls logic directly from useNavigation for close.
-         The props handleBackFromTag etc are just for reference or specific overrides if needed.
-         Actually MainLayout implements the back button logic internally using useNavigation.
-         We only need to pass specific handlers if they differ.
-      */
+      handleBackFromTag={() => {
+        setSelectedTagId(null);
+        setSelectedCategoryId(null);
+      }}
+      handleBackFromScope={() => {
+        setSelectedScopeId(null);
+      }}
+      handleCloseDailyReview={() => reviewManager.handleDeleteReview()}
       handleCloseWeeklyReview={reviewManager.handleCloseWeeklyReview}
       handleCloseMonthlyReview={reviewManager.handleCloseMonthlyReview}
       statsTitle={statsTitle}
@@ -208,56 +205,59 @@ const AppContent: React.FC = () => {
         handleDuplicateTodo={todoManager.handleDuplicateTodo}
         handleUpdateTodoData={todoManager.handleUpdateTodoData}
 
-        // Category/Tag Handlers
-        // AppRoutes handles basic tag/category selection via Context/internal logic now?
-        // Wait, AppRoutes definition STILL expects handleSelectTag/handleSelectCategory?
-        // Checking AppRoutes.tsx: Interface: No, I removed them.
-        // Interface has: handleUpdateActivity, handleCategoryChange etc -> Check diff.
-        // I REMOVED handleCategoryChange, handleUpdateCategory... from interface in AppRoutes.tsx logic?
-        // Let's assume I did. If compilation fails, I will add them back.
-        // Based on plan: "We can remove Goal/Review/Tag/Category handlers".
-
-        // Goals
-        // Removed from AppRoutes interface
-
-        // Reviews
-        // Removed from AppRoutes interface
-
         // Misc
         refreshKey={syncManager.refreshKey}
         isSyncing={syncManager.isSyncing}
         handleQuickSync={syncManager.handleQuickSync}
         setStatsTitle={setStatsTitle}
       />
-
-      {/* Persistent Components */}
       <BottomNavigation
         currentView={currentView}
         onViewChange={setCurrentView}
-        isVisible={!focusDetailSessionId}
+        isVisible={
+          !focusDetailSessionId &&
+          !isDailyReviewOpen &&
+          !isWeeklyReviewOpen &&
+          !isMonthlyReviewOpen &&
+          !selectedTagId &&
+          !selectedCategoryId &&
+          !selectedScopeId
+        }
       />
-      {/* ModalManager Removed - Modals are rendered inline */}
 
       {/* Modals */}
-      {isAddModalOpen && (
-        <AddLogModal
-          initialLog={editingLog}
-          onClose={logManager.closeModal}
-          onSave={logManager.handleSaveLog}
-          onDelete={logManager.handleDeleteLog}
-          onImageRemove={logManager.handleLogImageRemove}
-          categories={categories}
-          todos={todos}
-          todoCategories={todoCategories}
-          scopes={scopes}
-          autoLinkRules={autoLinkRules}
-        />
-      )}
+      {isAddModalOpen && (() => {
+        const { initialLogTimes } = useNavigation();
+        const { logs } = useData();
+        
+        // Calculate lastLogEndTime
+        const sortedLogs = [...logs].sort((a, b) => b.endTime - a.endTime);
+        const lastLogEndTime = sortedLogs.length > 0 ? sortedLogs[0].endTime : undefined;
+        
+        return (
+          <AddLogModal
+            initialLog={editingLog}
+            initialStartTime={initialLogTimes?.start}
+            initialEndTime={initialLogTimes?.end}
+            lastLogEndTime={lastLogEndTime}
+            onClose={logManager.closeModal}
+            onSave={logManager.handleSaveLog}
+            onDelete={logManager.handleDeleteLog}
+            onImageRemove={logManager.handleLogImageRemove}
+            categories={categories}
+            todos={todos}
+            todoCategories={todoCategories}
+            scopes={scopes}
+            autoLinkRules={autoLinkRules}
+            autoFocusNote={autoFocusNote}
+          />
+        );
+      })()}
 
       {isTodoModalOpen && (
         <TodoDetailModal
           initialTodo={editingTodo}
-          currentCategory={todoCategories[0]} // Needs update logic
+          currentCategory={todoCategories[0]}
           onClose={todoManager.closeTodoModal}
           onSave={todoManager.handleSaveTodo}
           onDelete={todoManager.handleDeleteTodo}
@@ -330,14 +330,7 @@ const AppContent: React.FC = () => {
               setFocusDetailSessionId(null);
             }}
             onUpdate={(updated) => {
-              // In useSession or activeSessions context, we might need a way to update session state in real-time?
-              // FocusDetailView usually maintains its own state or updates context.
-              // If onUpdate is expected:
-              // setActiveSessions(prev => prev.map(s => s.id === updated.id ? updated : s));
-              // But set activeSessions is in context? useSession exposes it?
-              // useSession exposes activeSessions. Does it expose setActiveSessions? No.
-              // It exposes updateSession(id, updates).
-              // I should check useSession.
+              // Session updates handled by context
             }}
           />
         );
@@ -351,8 +344,8 @@ const AppContent: React.FC = () => {
           todos={todos}
           todoCategories={todoCategories}
           scopes={scopes}
-          goals={goals} // Provide goals
-          dailyReviews={dailyReviews} // Pass arrays from useReview
+          goals={goals}
+          dailyReviews={dailyReviews}
           weeklyReviews={weeklyReviews}
           monthlyReviews={monthlyReviews}
           onClose={searchManager.handleCloseSearch}
@@ -424,10 +417,7 @@ const AppContent: React.FC = () => {
           syncData={{}}
 
           // Settings Props
-
           onOpenAutoLink={() => setIsAutoLinkOpen(true)}
-
-
           startWeekOnSunday={startWeekOnSunday}
           onToggleStartWeekOnSunday={() => setStartWeekOnSunday(!startWeekOnSunday)}
 
@@ -499,74 +489,12 @@ const AppContent: React.FC = () => {
   );
 };
 
-// Helper state for simple confirmation modal
-// Since we can't use useState inside the component body freely without re-renders if logic was complex, but here it is fine.
-// Put this inside AppContent
-// We missed `sessionToStop` state which was in App.tsx? 
-// Checking App.tsx original: `const [sessionToStop, setSessionToStop] = useState<string | null>(null);`
-// We need to add this to AppContent.
-
 const App: React.FC = () => {
   return (
     <ToastProvider>
       <DataProvider>
         <SettingsProvider>
           <ReviewProvider>
-            {/* CategoryScopeProvider needs activeSessions and logs for sync check? 
-                Actually it usually accepts them. 
-                But activeSessions come from SessionProvider? 
-                Wait, SessionProvider is INSIDE CategoryScopeProvider in original hierarchy? 
-                No, SessionProvider provides activeSessions. 
-                So SessionProvider must be OUTSIDE CategoryScopeProvider if we pass activeSessions prop.
-                OR CategoryScopeProvider uses useSession?
-                Let's check hierarchy.
-                Original:
-                CategoryScopeProvider (activeSessions, setActiveSessions, logs, setLogs) -> SessionProvider (splitLogByDays)
-                
-                Wait, if CategoryScopeProvider NEEDS activeSessions, it must get them from Parent OR Context.
-                If SessionProvider is child, CategoryScopeProvider cannot get session from context.
-                So `activeSessions` must be passed as props from App (state)?
-                But App removed state!
-                
-                So:
-                1. Provider Order: DataProvider (logs) -> SessionProvider (activeSessions) -> CategoryScopeProvider (uses hook?)
-                
-                Check SessionProvider: It defines activeSessions state.
-                Check CategoryScopeProvider: It takes props `activeSessions`.
-                
-                So SessionProvider MUST be parent.
-                
-                Correct Hierarchy:
-                DataProvider
-                  SettingsProvider
-                    ReviewProvider
-                      SessionProvider
-                        NavigationProvider (Wait, Nav uses Session?)
-                        CategoryScopeProvider (Uses Session via props?)
-                
-                If CategoryScopeProvider takes props, I must consume SessionContext before rendering it.
-                But `App` component is just Providers wrapper.
-                Create an inner component `AppProviders`?
-                
-                This is why I need `AppContent`!
-                `AppContent` is inside all providers.
-                BUT `CategoryScopeProvider` is WRAPPED around `AppContent`.
-                So `AppContent` handles UI.
-                
-                So `CategoryScopeProvider` must be inside `SessionProvider`.
-                
-                Hierarchy in App.tsx:
-                Toast -> Data -> Settings -> Review -> Session -> Navigation -> CategoryScope -> AppContent.
-                
-                So at `CategoryScopeProvider` level (line 338), we are inside `SessionProvider`.
-                So we can use `useSession()`? 
-                No, we can't call hooks inside the return JSX of `App`.
-                
-                We need an intermediate component `CategoryScopeWrapper`.
-                OR
-                Does `CategoryScopeProvider` accept NO props and use context?
-                Let's check `CategoryScopeContext.tsx`.
-            */}
             <SessionProvider splitLogByDays={splitLogByDays}>
               <NavigationProvider>
                 <CategoryScopeProviderWithData>
@@ -584,24 +512,12 @@ const App: React.FC = () => {
 // Wrapper to inject data into CategoryScopeProvider
 const CategoryScopeProviderWithData: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { activeSessions, setActiveSessions } = useSession();
-  const { logs, setLogs } = useData(); // We need setLogs too?
-
-  // CategoryScopeProvider definition (checked earlier):
-  // activeSessions, setActiveSessions, logs, setLogs.
-
-  // Check useData():
-  // It returns logs, setLogs ...
-
-  // Check useSession()
-  // It returns activeSessions... does it return setActiveSessions? 
-  // It likely returns `setActiveSessions` if it was exposed.
-  // If not, we found a gap.
-  // Assuming useSession exposes it or we need to update SessionContext.
+  const { logs, setLogs } = useData();
 
   return (
     <CategoryScopeProvider
       activeSessions={activeSessions}
-      setActiveSessions={setActiveSessions as any} // Cast if type mismatch or missing
+      setActiveSessions={setActiveSessions as any}
       logs={logs}
       setLogs={setLogs}
     >

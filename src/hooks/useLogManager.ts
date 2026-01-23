@@ -166,8 +166,10 @@ export const useLogManager = () => {
     const openAddModal = (startTime?: number, endTime?: number) => {
         setEditingLog(null);
         if (startTime && endTime) {
+            // Gap filling: use provided times
             setInitialLogTimes({ start: startTime, end: endTime });
         } else {
+            // New log from button: calculate smart defaults
             const dayStart = new Date(currentDate);
             dayStart.setHours(0, 0, 0, 0);
 
@@ -184,6 +186,7 @@ export const useLogManager = () => {
                 dayEnd.setHours(23, 59, 59, 999);
             }
 
+            // Find the last log on the current day
             const logsOnDay = logs.filter(log =>
                 log.endTime >= dayStart.getTime() &&
                 log.endTime <= dayEnd.getTime()
@@ -192,6 +195,7 @@ export const useLogManager = () => {
             let newStart = dayStart.getTime();
 
             if (logsOnDay.length > 0) {
+                // Use the end time of the last log on this day
                 newStart = logsOnDay.reduce((max, log) => Math.max(max, log.endTime), dayStart.getTime());
             }
 
