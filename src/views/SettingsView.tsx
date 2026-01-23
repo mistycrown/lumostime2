@@ -57,6 +57,7 @@ import {
     ImageIcon,
     AlignLeft
 } from 'lucide-react';
+import { Capacitor } from '@capacitor/core';
 import { webdavService, WebDAVConfig } from '../services/webdavService';
 import { s3Service, S3Config } from '../services/s3Service';
 import { imageService } from '../services/imageService';
@@ -86,7 +87,7 @@ import { BatchFocusRecordManageView } from './BatchFocusRecordManageView';
 
 import { NARRATIVE_TEMPLATES } from '../constants';
 // @ts-ignore
-import userGuideContent from '../USER_GUIDE.md?raw';
+import userGuideContent from '../../USER_GUIDE.md?raw';
 
 interface SettingsViewProps {
     onClose: () => void;
