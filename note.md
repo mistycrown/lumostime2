@@ -45,7 +45,7 @@ git push --force
 const testConfig = {
   bucketName: 'lumostime-1315858561',
   region: 'ap-chongqing',
-  accessKeyId: 'AKIDunejnz6BLUVM3e5LTQKKDf0BLLSZjkru',
+  accessKeyId: '',
   secretAccessKey: ' ', // 替换为你的实际SecretKey
   endpoint: 'https://cos.ap-chongqing.myqcloud.com'
 };
