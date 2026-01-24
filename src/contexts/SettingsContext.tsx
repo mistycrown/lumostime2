@@ -140,7 +140,7 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
         const stored = localStorage.getItem('lumostime_memoir_filter_config');
         return stored ? JSON.parse(stored) : {
             hasImage: false,
-            minNoteLength: 0,
+            minNoteLength: 40,
             relatedTagIds: [],
             relatedScopeIds: [],
             showDailyReviews: true,
