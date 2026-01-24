@@ -17,6 +17,8 @@ import { Minimize2, Share, PieChart, Grid, Calendar, ChevronLeft, ChevronRight, 
 import { ToastType } from '../components/Toast';
 import { MonthHeatmap } from '../components/MonthHeatmap';
 
+import { ConfirmModal } from '../components/ConfirmModal';
+
 interface StatsViewProps {
   logs: Log[];
   categories: Category[];
@@ -66,6 +68,10 @@ export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentD
   const toggleExclusion = (id: string) => {
     setExcludedCategoryIds(prev => prev.includes(id) ? prev.filter(c => c !== id) : [...prev, id]);
   };
+
+  // 复制失败/手动复制确认模态框状态
+  const [copyFailureModal, setCopyFailureModal] = useState<{ isOpen: boolean, text: string }>({ isOpen: false, text: '' });
+
 
   // 日期导航函数
   const handleNavigateDate = (direction: 'prev' | 'next') => {
@@ -388,7 +394,54 @@ export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentD
       });
     }
 
-    navigator.clipboard.writeText(text).then(() => onToast?.('success', '已复制')).catch(() => onToast?.('error', '复制失败'));
+    // Instead of direct copy, open modal
+    setCopyFailureModal({ isOpen: true, text: text });
+  };
+
+  const executeCopy = (text: string) => {
+    // Try standard API first
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(() => {
+        onToast?.('success', '已复制到剪贴板');
+      }).catch((err) => {
+        console.warn('Clipboard API failed, trying fallback...', err);
+        fallbackCopyText(text);
+      });
+    } else {
+      // Fallback for older browsers/WebViews
+      fallbackCopyText(text);
+    }
+  };
+
+  const fallbackCopyText = (text: string) => {
+    try {
+      const textArea = document.createElement("textarea");
+      textArea.value = text;
+
+      // Avoid scrolling to bottom
+      textArea.style.top = "0";
+      textArea.style.left = "0";
+      textArea.style.position = "fixed";
+      textArea.style.opacity = "0";
+
+      document.body.appendChild(textArea);
+      textArea.focus();
+      textArea.select();
+
+      const successful = document.execCommand('copy');
+      document.body.removeChild(textArea);
+
+      if (successful) {
+        onToast?.('success', '已复制到剪贴板');
+      } else {
+        // onToast?.('error', '复制失败，请手动复制');
+        setCopyFailureModal({ isOpen: true, text: text });
+      }
+    } catch (err) {
+      console.error('Fallback copy failed', err);
+      // onToast?.('error', '复制失败，请检查权限');
+      setCopyFailureModal({ isOpen: true, text: text });
+    }
   };
 
   const matrixData = useMemo(() => {
@@ -1291,6 +1344,20 @@ export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentD
                   </div>
                 </div>
               )}
+
+
+              {/* Bottom Export (Moved inside Pie View) */}
+              {!isFullScreen && (
+                <div className="flex justify-center pt-8 mt-4 mb-4">
+                  <button
+                    onClick={handleExportStats}
+                    className="flex items-center gap-1 text-stone-400 hover:text-stone-600 transition-colors text-xs font-medium"
+                  >
+                    <Share size={12} />
+                    <span>导出统计文本</span>
+                  </button>
+                </div>
+              )}
             </div>
           )}
 
@@ -1930,18 +1997,23 @@ export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentD
         </div>
 
         {/* Bottom Export */}
-        {viewType === 'pie' && !isFullScreen && (
-          <div className="px-5 pb-8">
-            <button
-              onClick={handleExportStats}
-              className="flex items-center gap-1 text-stone-400 hover:text-stone-600 transition-colors text-xs font-medium"
-            >
-              <Share size={12} />
-              <span>导出统计文本</span>
-            </button>
-          </div>
-        )}
+
       </div>
+
+
+      <ConfirmModal
+        isOpen={copyFailureModal.isOpen}
+        onClose={() => setCopyFailureModal({ ...copyFailureModal, isOpen: false })}
+        onConfirm={() => {
+          executeCopy(copyFailureModal.text);
+          setCopyFailureModal({ ...copyFailureModal, isOpen: false });
+        }}
+        title="导出统计文本"
+        description={copyFailureModal.text}
+        confirmText="复制内容"
+        cancelText="关闭"
+        type="info"
+      />
     </div >
   );
 };
