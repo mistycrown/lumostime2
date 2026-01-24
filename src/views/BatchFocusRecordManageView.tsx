@@ -46,25 +46,25 @@ interface OperationParams {
  */
 function parseDate8Digit(dateStr: string): Date | null {
     if (!dateStr || dateStr.length !== 8) return null;
-    
+
     const year = parseInt(dateStr.substring(0, 4), 10);
     const month = parseInt(dateStr.substring(4, 6), 10);
     const day = parseInt(dateStr.substring(6, 8), 10);
-    
+
     // Validate date components
     if (isNaN(year) || isNaN(month) || isNaN(day)) return null;
     if (month < 1 || month > 12) return null;
     if (day < 1 || day > 31) return null;
-    
+
     const date = new Date(year, month - 1, day);
-    
+
     // Check if date is valid (handles invalid dates like Feb 30)
-    if (date.getFullYear() !== year || 
-        date.getMonth() !== month - 1 || 
+    if (date.getFullYear() !== year ||
+        date.getMonth() !== month - 1 ||
         date.getDate() !== day) {
         return null;
     }
-    
+
     return date;
 }
 
@@ -121,15 +121,15 @@ function getCombinedFilteredLogs(
 ): Log[] {
     // 1. First apply time range filtering
     let filtered = filterByTimeRange(logs, startDate, endDate);
-    
+
     // 2. If there's a filter expression, apply filterUtils logic
     if (filterExpression.trim()) {
         const condition = parseFilterExpression(filterExpression);
-        filtered = filtered.filter(log => 
+        filtered = filtered.filter(log =>
             matchesFilter(log, condition, context)
         );
     }
-    
+
     return filtered;
 }
 
@@ -152,7 +152,7 @@ function addScopeToLogs(
 
         // Get current scopes (or empty array if undefined)
         const currentScopes = log.scopeIds || [];
-        
+
         // Add new scopes, avoiding duplicates using Set
         const newScopes = [...new Set([...currentScopes, ...scopeIds])];
 
@@ -179,7 +179,7 @@ function removeScopeFromLogs(
 
         // Get current scopes (or empty array if undefined)
         const currentScopes = log.scopeIds || [];
-        
+
         // Remove specified scopes
         const newScopes = currentScopes.filter(id => !scopeIds.includes(id));
 
@@ -209,15 +209,15 @@ function replaceScopeInLogs(
 
         // Get current scopes (or empty array if undefined)
         const currentScopes = log.scopeIds || [];
-        
+
         // Skip if log doesn't contain source scope
         if (!currentScopes.includes(sourceScopeId)) return log;
 
         // Replace source scope with target scope
-        const newScopes = currentScopes.map(id => 
+        const newScopes = currentScopes.map(id =>
             id === sourceScopeId ? targetScopeId : id
         );
-        
+
         // Remove duplicates using Set
         const uniqueScopes = [...new Set(newScopes)];
 
@@ -241,7 +241,7 @@ function linkTodoToLogs(
     return logs.map(log => {
         // Skip unselected logs
         if (!selectedIds.has(log.id)) return log;
-        
+
         // Set the linkedTodoId (overwrites existing)
         return { ...log, linkedTodoId: todoId };
     });
@@ -261,7 +261,7 @@ function unlinkTodoFromLogs(
     return logs.map(log => {
         // Skip unselected logs
         if (!selectedIds.has(log.id)) return log;
-        
+
         // Remove the linkedTodoId
         return { ...log, linkedTodoId: undefined };
     });
@@ -285,10 +285,10 @@ function changeActivityInLogs(
     return logs.map(log => {
         // Skip unselected logs
         if (!selectedIds.has(log.id)) return log;
-        
+
         // Update both activityId and categoryId
-        return { 
-            ...log, 
+        return {
+            ...log,
             activityId: activityId,
             categoryId: categoryId
         };
@@ -313,7 +313,7 @@ function formatDateTime(timestamp: number): string {
 function formatDuration(seconds: number): string {
     const hours = Math.floor(seconds / 3600);
     const minutes = Math.floor((seconds % 3600) / 60);
-    
+
     if (hours > 0) {
         return `${hours}h ${minutes}m`;
     }
@@ -332,10 +332,10 @@ interface RecordItemProps {
     onToggle: () => void;
 }
 
-const RecordItem: React.FC<RecordItemProps> = ({ 
-    log, 
-    categories, 
-    scopes, 
+const RecordItem: React.FC<RecordItemProps> = ({
+    log,
+    categories,
+    scopes,
     todos,
     isSelected,
     onToggle
@@ -343,24 +343,23 @@ const RecordItem: React.FC<RecordItemProps> = ({
     // Find category and activity
     const category = categories.find(c => c.id === log.categoryId);
     const activity = category?.activities.find(a => a.id === log.activityId);
-    
+
     // Find linked scopes
     const linkedScopes = log.scopeIds
         ?.map(scopeId => scopes.find(s => s.id === scopeId))
         .filter((s): s is Scope => s !== undefined) || [];
-    
+
     // Find linked todo
-    const linkedTodo = log.linkedTodoId 
+    const linkedTodo = log.linkedTodoId
         ? todos.find(t => t.id === log.linkedTodoId)
         : undefined;
-    
+
     return (
-        <div 
-            className={`rounded-xl p-4 space-y-3 transition-all cursor-pointer ${
-                isSelected 
-                    ? 'bg-stone-50/50 border-2 border-stone-300 shadow-sm' 
-                    : 'bg-stone-50/10 hover:bg-stone-50/30'
-            }`}
+        <div
+            className={`rounded-xl p-4 space-y-3 transition-all cursor-pointer ${isSelected
+                ? 'bg-stone-50/50 border-2 border-stone-300 shadow-sm'
+                : 'bg-stone-50/10 hover:bg-stone-50/30'
+                }`}
             onClick={onToggle}
         >
             {/* Time and Duration */}
@@ -374,7 +373,7 @@ const RecordItem: React.FC<RecordItemProps> = ({
                     {formatDuration(log.duration)}
                 </span>
             </div>
-            
+
             {/* Activity and Category - Combined with # */}
             <div className="flex items-center gap-2">
                 <span className="text-lg">{activity?.icon || '📝'}</span>
@@ -382,7 +381,7 @@ const RecordItem: React.FC<RecordItemProps> = ({
                     {activity?.name || '未知活动'}
                 </span>
             </div>
-            
+
             {/* Tags Row: Category (#), Scopes (%), Todo (@) - All in one line */}
             <div className="flex flex-wrap items-center gap-2">
                 {/* Category Tag */}
@@ -397,7 +396,7 @@ const RecordItem: React.FC<RecordItemProps> = ({
                         </span>
                     </span>
                 )}
-                
+
                 {/* Scopes */}
                 {linkedScopes.map(scope => (
                     <span
@@ -409,7 +408,7 @@ const RecordItem: React.FC<RecordItemProps> = ({
                         <span>{scope.name}</span>
                     </span>
                 ))}
-                
+
                 {/* Todo */}
                 {linkedTodo && (
                     <span className="text-[10px] font-medium text-stone-500 border border-stone-200 px-2 py-0.5 rounded flex items-center gap-1 bg-stone-50/30">
@@ -418,14 +417,14 @@ const RecordItem: React.FC<RecordItemProps> = ({
                     </span>
                 )}
             </div>
-            
+
             {/* Note - Direct on background without border */}
             {log.note && (
                 <div className="text-xs text-stone-500 line-clamp-2">
                     {log.note}
                 </div>
             )}
-            
+
             {/* Focus Score */}
             {log.focusScore !== undefined && (
                 <div className="flex items-center gap-1 text-xs text-stone-500">
@@ -454,7 +453,7 @@ const RecordListHeader: React.FC<RecordListHeaderProps> = ({
     onDeselectAll
 }) => {
     const allSelected = selectedCount === totalCount && totalCount > 0;
-    
+
     return (
         <div className="flex items-center justify-between mb-2 pb-3 border-b border-stone-100">
             <div className="flex items-center gap-3">
@@ -465,7 +464,7 @@ const RecordListHeader: React.FC<RecordListHeaderProps> = ({
                     已选 <span className="font-semibold text-stone-700">{selectedCount}</span> / {totalCount} 条
                 </span>
             </div>
-            
+
             <div className="flex items-center gap-2">
                 {allSelected ? (
                     <button
@@ -527,7 +526,7 @@ const RecordListSection: React.FC<RecordListSectionProps> = ({
             </div>
         );
     }
-    
+
     return (
         <div className="bg-white rounded-2xl p-6 shadow-sm space-y-4">
             <RecordListHeader
@@ -536,7 +535,7 @@ const RecordListSection: React.FC<RecordListSectionProps> = ({
                 onSelectAll={onSelectAll}
                 onDeselectAll={onDeselectAll}
             />
-            
+
             <div className="space-y-3 max-h-[500px] overflow-y-auto">
                 {logs.map(log => (
                     <RecordItem
@@ -586,7 +585,7 @@ const ScopeSelector: React.FC<ScopeSelectorProps> = ({
             <label className="block text-sm font-medium text-stone-700">
                 选择领域 (可多选)
             </label>
-            
+
             {activeScopes.length === 0 ? (
                 <div className="text-sm text-stone-400 py-4 text-center">
                     暂无可用领域
@@ -599,11 +598,10 @@ const ScopeSelector: React.FC<ScopeSelectorProps> = ({
                             <div
                                 key={scope.id}
                                 onClick={() => handleToggleScope(scope.id)}
-                                className={`flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-all ${
-                                    isSelected
-                                        ? 'border-2 border-stone-300 bg-stone-50/50'
-                                        : 'bg-stone-50/10 hover:bg-stone-50/30'
-                                }`}
+                                className={`flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-all ${isSelected
+                                    ? 'border-2 border-stone-300 bg-stone-50/50'
+                                    : 'bg-stone-50/10 hover:bg-stone-50/30'
+                                    }`}
                             >
                                 <span className="text-lg">{scope.icon}</span>
                                 <span className="text-sm font-medium text-stone-700 flex-1">
@@ -614,7 +612,7 @@ const ScopeSelector: React.FC<ScopeSelectorProps> = ({
                     })}
                 </div>
             )}
-            
+
             {selectedScopeIds.length > 0 && (
                 <p className="text-xs text-stone-500">
                     已选择 {selectedScopeIds.length} 个领域
@@ -667,7 +665,7 @@ const ScopeReplaceSelector: React.FC<ScopeReplaceSelectorProps> = ({
             <label className="block text-sm font-medium text-stone-700">
                 替换领域设置
             </label>
-            
+
             {/* Source Scope Selection */}
             <div className="space-y-2">
                 <CustomSelect
@@ -717,7 +715,7 @@ const TodoSelector: React.FC<TodoSelectorProps> = ({
 }) => {
     // Group todos by category and filter out completed ones
     const activeTodos = todos.filter(todo => !todo.isCompleted);
-    
+
     // Create options grouped by category
     const todoOptions = activeTodos.map(todo => {
         const category = todoCategories.find(c => c.id === todo.categoryId);
@@ -742,7 +740,7 @@ const TodoSelector: React.FC<TodoSelectorProps> = ({
             <label className="block text-sm font-medium text-stone-700">
                 选择待办任务
             </label>
-            
+
             {activeTodos.length === 0 ? (
                 <div className="text-sm text-stone-400 py-4 text-center">
                     暂无可用的待办任务
@@ -756,7 +754,7 @@ const TodoSelector: React.FC<TodoSelectorProps> = ({
                     placeholder="请选择待办任务"
                 />
             )}
-            
+
             {selectedTodoId && (
                 <div className="text-xs text-stone-500 bg-stone-50 p-3 rounded-lg">
                     <p>将为所有选中记录关联此待办任务</p>
@@ -828,7 +826,7 @@ const ActivitySelector: React.FC<ActivitySelectorProps> = ({
             <label className="block text-sm font-medium text-stone-700">
                 选择新标签
             </label>
-            
+
             {activityOptions.length === 0 ? (
                 <div className="text-sm text-stone-400 py-4 text-center">
                     暂无可用标签
@@ -842,7 +840,7 @@ const ActivitySelector: React.FC<ActivitySelectorProps> = ({
                     placeholder="请选择标签"
                 />
             )}
-            
+
             {selectedActivityId && selectedCategoryId && (
                 <div className="text-xs text-stone-500 bg-stone-50 p-3 rounded-lg">
                     <p>将把所有选中记录的标签更改为此标签</p>
@@ -893,7 +891,7 @@ const OperationSection: React.FC<OperationSectionProps> = ({
     return (
         <div className="bg-white rounded-2xl p-6 shadow-sm space-y-4">
             <h3 className="text-base font-semibold text-stone-800 mb-4">批量操作</h3>
-            
+
             {/* Operation Type Selector */}
             <div className="space-y-3">
                 <CustomSelect
@@ -932,13 +930,13 @@ const OperationSection: React.FC<OperationSectionProps> = ({
                         scopes={scopes}
                         sourceScopeId={operationParams?.sourceScopeId}
                         targetScopeId={operationParams?.targetScopeId}
-                        onSourceChange={(sourceScopeId) => onOperationParamsChange({ 
-                            ...operationParams, 
-                            sourceScopeId 
+                        onSourceChange={(sourceScopeId) => onOperationParamsChange({
+                            ...operationParams,
+                            sourceScopeId
                         })}
-                        onTargetChange={(targetScopeId) => onOperationParamsChange({ 
-                            ...operationParams, 
-                            targetScopeId 
+                        onTargetChange={(targetScopeId) => onOperationParamsChange({
+                            ...operationParams,
+                            targetScopeId
                         })}
                     />
                 </div>
@@ -969,9 +967,9 @@ const OperationSection: React.FC<OperationSectionProps> = ({
                         categories={categories}
                         selectedActivityId={operationParams?.activityId}
                         selectedCategoryId={operationParams?.categoryId}
-                        onChange={(activityId, categoryId) => onOperationParamsChange({ 
-                            activityId, 
-                            categoryId 
+                        onChange={(activityId, categoryId) => onOperationParamsChange({
+                            activityId,
+                            categoryId
                         })}
                     />
                 </div>
@@ -982,25 +980,24 @@ const OperationSection: React.FC<OperationSectionProps> = ({
                 <button
                     onClick={onExecute}
                     disabled={
-                        !operationType || 
-                        selectedCount === 0 || 
+                        !operationType ||
+                        selectedCount === 0 ||
                         ((operationType === 'add_scope' || operationType === 'remove_scope') && (!operationParams?.scopeIds || operationParams.scopeIds.length === 0)) ||
                         (operationType === 'replace_scope' && (!operationParams?.sourceScopeId || !operationParams?.targetScopeId)) ||
                         (operationType === 'link_todo' && !operationParams?.todoId) ||
                         (operationType === 'change_activity' && (!operationParams?.activityId || !operationParams?.categoryId))
                         // unlink_todo doesn't need any parameters, so no additional condition needed
                     }
-                    className={`w-full py-3 rounded-xl font-medium transition-colors ${
-                        !operationType || 
-                        selectedCount === 0 || 
+                    className={`w-full py-3 rounded-xl font-medium transition-colors ${!operationType ||
+                        selectedCount === 0 ||
                         ((operationType === 'add_scope' || operationType === 'remove_scope') && (!operationParams?.scopeIds || operationParams.scopeIds.length === 0)) ||
                         (operationType === 'replace_scope' && (!operationParams?.sourceScopeId || !operationParams?.targetScopeId)) ||
                         (operationType === 'link_todo' && !operationParams?.todoId) ||
                         (operationType === 'change_activity' && (!operationParams?.activityId || !operationParams?.categoryId))
                         // unlink_todo doesn't need any parameters, so no additional condition needed
-                            ? 'bg-stone-100 text-stone-400 cursor-not-allowed'
-                            : 'bg-stone-600 text-white hover:bg-stone-700'
-                    }`}
+                        ? 'bg-stone-100 text-stone-400 cursor-not-allowed'
+                        : 'bg-stone-600 text-white hover:bg-stone-700'
+                        }`}
                 >
                     执行操作 ({selectedCount} 条记录)
                 </button>
@@ -1029,6 +1026,9 @@ export const BatchFocusRecordManageView: React.FC<BatchFocusRecordManageViewProp
     // State for record selection (Task 5.1)
     const [selectedLogIds, setSelectedLogIds] = useState<Set<string>>(new Set());
 
+    // State for manual search trigger
+    const [isSearched, setIsSearched] = useState(false);
+
     // State for batch operations (Task 6)
     const [operationType, setOperationType] = useState<OperationType | null>(null);
     const [operationParams, setOperationParams] = useState<OperationParams | null>(null);
@@ -1046,13 +1046,14 @@ export const BatchFocusRecordManageView: React.FC<BatchFocusRecordManageViewProp
             todos,
             todoCategories
         };
-        
+
         // Apply combined filtering (time range + filter expression)
+        if (!isSearched) return [];
         const filtered = getCombinedFilteredLogs(logs, startDate, endDate, filterExpression, context);
-        
+
         // Sort by startTime in descending order (most recent first)
         return filtered.sort((a, b) => b.startTime - a.startTime);
-    }, [logs, startDate, endDate, filterExpression, categories, scopes, todos, todoCategories]);
+    }, [logs, startDate, endDate, filterExpression, categories, scopes, todos, todoCategories, isSearched]);
 
     // Default select all filtered records (Task 5.1 - Requirement 2.3)
     useEffect(() => {
@@ -1109,17 +1110,17 @@ export const BatchFocusRecordManageView: React.FC<BatchFocusRecordManageViewProp
             setShowConfirmModal(false);
             return;
         }
-        
+
         if (operationType === 'replace_scope' && (!operationParams?.sourceScopeId || !operationParams?.targetScopeId)) {
             setShowConfirmModal(false);
             return;
         }
-        
+
         if (operationType === 'link_todo' && !operationParams?.todoId) {
             setShowConfirmModal(false);
             return;
         }
-        
+
         if (operationType === 'change_activity' && (!operationParams?.activityId || !operationParams?.categoryId)) {
             setShowConfirmModal(false);
             return;
@@ -1155,7 +1156,7 @@ export const BatchFocusRecordManageView: React.FC<BatchFocusRecordManageViewProp
                     ?.map(id => scopes.find(s => s.id === id)?.name)
                     .filter(Boolean)
                     .join('、') || '';
-                
+
                 const operationText = operationType === 'add_scope' ? '添加领域' : '移除领域';
                 successMessage = `成功为 ${selectedLogIds.size} 条记录${operationText}: ${scopeNames}`;
             } else if (operationType === 'replace_scope') {
@@ -1173,7 +1174,7 @@ export const BatchFocusRecordManageView: React.FC<BatchFocusRecordManageViewProp
                 const activityName = activity ? `${category?.name} / ${activity.name}` : '未知标签';
                 successMessage = `成功为 ${selectedLogIds.size} 条记录更改标签为: ${activityName}`;
             }
-            
+
             onToast('success', successMessage);
 
             // Close modal and reset operation state
@@ -1214,7 +1215,7 @@ export const BatchFocusRecordManageView: React.FC<BatchFocusRecordManageViewProp
                 {/* Filter Section */}
                 <div className="bg-white rounded-2xl p-6 shadow-sm space-y-4">
                     <h3 className="text-base font-semibold text-stone-800 mb-4">筛选条件</h3>
-                    
+
                     {/* Time Range Filter */}
                     <div className="space-y-3">
                         <label className="block text-sm font-medium text-stone-700">
@@ -1234,18 +1235,18 @@ export const BatchFocusRecordManageView: React.FC<BatchFocusRecordManageViewProp
                                     onChange={(e) => {
                                         const value = e.target.value.replace(/\D/g, '').slice(0, 8);
                                         setStartDate(value);
+                                        setIsSearched(false);
                                     }}
-                                    className={`w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 ${
-                                        startDateValid 
-                                            ? 'border-stone-200 focus:ring-stone-300' 
-                                            : 'border-red-300 focus:ring-red-300'
-                                    }`}
+                                    className={`w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 ${startDateValid
+                                        ? 'border-stone-200 focus:ring-stone-300'
+                                        : 'border-red-300 focus:ring-red-300'
+                                        }`}
                                 />
                                 {!startDateValid && (
                                     <p className="text-xs text-red-500 mt-1">请输入8位数字</p>
                                 )}
                             </div>
-                            
+
                             {/* End Date */}
                             <div>
                                 <label className="block text-xs text-stone-500 mb-1">
@@ -1259,12 +1260,12 @@ export const BatchFocusRecordManageView: React.FC<BatchFocusRecordManageViewProp
                                     onChange={(e) => {
                                         const value = e.target.value.replace(/\D/g, '').slice(0, 8);
                                         setEndDate(value);
+                                        setIsSearched(false);
                                     }}
-                                    className={`w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 ${
-                                        endDateValid 
-                                            ? 'border-stone-200 focus:ring-stone-300' 
-                                            : 'border-red-300 focus:ring-red-300'
-                                    }`}
+                                    className={`w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 ${endDateValid
+                                        ? 'border-stone-200 focus:ring-stone-300'
+                                        : 'border-red-300 focus:ring-red-300'
+                                        }`}
                                 />
                                 {!endDateValid && (
                                     <p className="text-xs text-red-500 mt-1">请输入8位数字</p>
@@ -1292,7 +1293,10 @@ export const BatchFocusRecordManageView: React.FC<BatchFocusRecordManageViewProp
                             <textarea
                                 placeholder="输入筛选表达式，如: #运动 %健康 @任务名 备注关键词"
                                 value={filterExpression}
-                                onChange={(e) => setFilterExpression(e.target.value)}
+                                onChange={(e) => {
+                                    setFilterExpression(e.target.value);
+                                    setIsSearched(false);
+                                }}
                                 rows={2}
                                 className="w-full px-3 py-2 border border-stone-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-stone-300 resize-none"
                             />
@@ -1300,34 +1304,48 @@ export const BatchFocusRecordManageView: React.FC<BatchFocusRecordManageViewProp
                                 <p>语法: #活动 %领域 @待办 备注关键词 | 用OR表示或关系</p>
                             </div>
                         </div>
+
+                        {/* Search Button */}
+                        <div className="pt-3 border-t border-stone-100 flex justify-end">
+                            <button
+                                onClick={() => setIsSearched(true)}
+                                className="px-6 py-2 bg-stone-800 text-white text-sm font-bold rounded-xl shadow-md active:scale-95 transition-all"
+                            >
+                                检索记录
+                            </button>
+                        </div>
                     </div>
                 </div>
 
                 {/* Placeholder for future sections */}
-                <RecordListSection
-                    logs={filteredLogs}
-                    categories={categories}
-                    scopes={scopes}
-                    todos={todos}
-                    selectedIds={selectedLogIds}
-                    onToggleSelect={handleToggleSelect}
-                    onSelectAll={handleSelectAll}
-                    onDeselectAll={handleDeselectAll}
-                />
+                {isSearched && (
+                    <RecordListSection
+                        logs={filteredLogs}
+                        categories={categories}
+                        scopes={scopes}
+                        todos={todos}
+                        selectedIds={selectedLogIds}
+                        onToggleSelect={handleToggleSelect}
+                        onSelectAll={handleSelectAll}
+                        onDeselectAll={handleDeselectAll}
+                    />
+                )}
 
                 {/* Operation Section (Task 6.1) */}
-                <OperationSection
-                    operationType={operationType}
-                    operationParams={operationParams}
-                    onOperationTypeChange={handleOperationTypeChange}
-                    onOperationParamsChange={handleOperationParamsChange}
-                    onExecute={handleExecuteClick}
-                    selectedCount={selectedLogIds.size}
-                    categories={categories}
-                    scopes={scopes}
-                    todos={todos}
-                    todoCategories={todoCategories}
-                />
+                {isSearched && (
+                    <OperationSection
+                        operationType={operationType}
+                        operationParams={operationParams}
+                        onOperationTypeChange={handleOperationTypeChange}
+                        onOperationParamsChange={handleOperationParamsChange}
+                        onExecute={handleExecuteClick}
+                        selectedCount={selectedLogIds.size}
+                        categories={categories}
+                        scopes={scopes}
+                        todos={todos}
+                        todoCategories={todoCategories}
+                    />
+                )}
             </div>
 
             {/* Confirm Modal (Task 6.4) */}
@@ -1338,40 +1356,34 @@ export const BatchFocusRecordManageView: React.FC<BatchFocusRecordManageViewProp
                 title="确认批量操作"
                 description={
                     operationType === 'add_scope' && operationParams?.scopeIds
-                        ? `即将为 ${selectedLogIds.size} 条记录添加领域: ${
-                            operationParams.scopeIds
-                                .map(id => scopes.find(s => s.id === id)?.name)
-                                .filter(Boolean)
-                                .join('、')
+                        ? `即将为 ${selectedLogIds.size} 条记录添加领域: ${operationParams.scopeIds
+                            .map(id => scopes.find(s => s.id === id)?.name)
+                            .filter(Boolean)
+                            .join('、')
                         }`
                         : operationType === 'remove_scope' && operationParams?.scopeIds
-                        ? `即将为 ${selectedLogIds.size} 条记录移除领域: ${
-                            operationParams.scopeIds
+                            ? `即将为 ${selectedLogIds.size} 条记录移除领域: ${operationParams.scopeIds
                                 .map(id => scopes.find(s => s.id === id)?.name)
                                 .filter(Boolean)
                                 .join('、')
-                        }`
-                        : operationType === 'replace_scope' && operationParams?.sourceScopeId && operationParams?.targetScopeId
-                        ? `即将为 ${selectedLogIds.size} 条记录替换领域: ${
-                            scopes.find(s => s.id === operationParams.sourceScopeId)?.name
-                        } → ${
-                            scopes.find(s => s.id === operationParams.targetScopeId)?.name
-                        }`
-                        : operationType === 'link_todo' && operationParams?.todoId
-                        ? `即将为 ${selectedLogIds.size} 条记录关联待办: ${
-                            todos.find(t => t.id === operationParams.todoId)?.title
-                        }`
-                        : operationType === 'unlink_todo'
-                        ? `即将为 ${selectedLogIds.size} 条记录取消待办关联`
-                        : operationType === 'change_activity' && operationParams?.activityId && operationParams?.categoryId
-                        ? `即将为 ${selectedLogIds.size} 条记录更改标签为: ${
-                            (() => {
-                                const category = categories.find(c => c.id === operationParams.categoryId);
-                                const activity = category?.activities.find(a => a.id === operationParams.activityId);
-                                return activity ? `${category?.name} / ${activity.name}` : '未知标签';
-                            })()
-                        }`
-                        : `即将对 ${selectedLogIds.size} 条记录执行操作，是否继续？`
+                            }`
+                            : operationType === 'replace_scope' && operationParams?.sourceScopeId && operationParams?.targetScopeId
+                                ? `即将为 ${selectedLogIds.size} 条记录替换领域: ${scopes.find(s => s.id === operationParams.sourceScopeId)?.name
+                                } → ${scopes.find(s => s.id === operationParams.targetScopeId)?.name
+                                }`
+                                : operationType === 'link_todo' && operationParams?.todoId
+                                    ? `即将为 ${selectedLogIds.size} 条记录关联待办: ${todos.find(t => t.id === operationParams.todoId)?.title
+                                    }`
+                                    : operationType === 'unlink_todo'
+                                        ? `即将为 ${selectedLogIds.size} 条记录取消待办关联`
+                                        : operationType === 'change_activity' && operationParams?.activityId && operationParams?.categoryId
+                                            ? `即将为 ${selectedLogIds.size} 条记录更改标签为: ${(() => {
+                                                const category = categories.find(c => c.id === operationParams.categoryId);
+                                                const activity = category?.activities.find(a => a.id === operationParams.activityId);
+                                                return activity ? `${category?.name} / ${activity.name}` : '未知标签';
+                                            })()
+                                            }`
+                                            : `即将对 ${selectedLogIds.size} 条记录执行操作，是否继续？`
                 }
                 confirmText="确认执行"
                 cancelText="取消"

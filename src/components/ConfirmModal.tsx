@@ -72,9 +72,9 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
 
                     <h3 className="text-xl font-bold text-stone-800 mb-3">{title}</h3>
 
-                    <p className="text-stone-500 leading-relaxed">
+                    <div className="text-stone-500 leading-relaxed whitespace-pre-wrap text-left text-sm max-h-[50vh] overflow-y-auto w-full bg-stone-50 p-3 rounded-lg border border-stone-100 select-all">
                         {description}
-                    </p>
+                    </div>
                 </div>
 
                 {/* Footer Buttons */}

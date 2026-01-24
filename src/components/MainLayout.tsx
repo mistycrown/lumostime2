@@ -95,7 +95,7 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
         <div className={`h-screen w-screen flex flex-col ${currentView === AppView.TIMELINE ? 'bg-white' : 'bg-[#fdfbf7]'} text-stone-800 overflow-hidden select-none font-serif relative pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]`}>
 
             {/* Top Header Bar */}
-            {!isSettingsOpen && (currentView !== AppView.TIMELINE || isDailyReviewOpen) && !isStatsFullScreen &&
+            {!isSettingsOpen && (currentView !== AppView.TIMELINE || isDailyReviewOpen || isWeeklyReviewOpen || isMonthlyReviewOpen) && !isStatsFullScreen &&
                 !(currentView === AppView.TODO && isTodoManaging) &&
                 !(currentView === AppView.TAGS && isTagsManaging) &&
                 !(currentView === AppView.SCOPE && isScopeManaging) &&

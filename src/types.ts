@@ -333,5 +333,7 @@ export interface MemoirFilterConfig {
   minNoteLength: number;       // 备注最小字数
   relatedTagIds: string[];     // 关联标签 ID（Activity ID）
   relatedScopeIds: string[];   // 关联领域 ID
+  showDailyReviews?: boolean;  // 新增：显示每日回顾
+  showWeeklyReviews?: boolean; // 新增：显示每周回顾
 }
 

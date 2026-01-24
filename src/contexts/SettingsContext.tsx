@@ -142,7 +142,9 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
             hasImage: false,
             minNoteLength: 0,
             relatedTagIds: [],
-            relatedScopeIds: []
+            relatedScopeIds: [],
+            showDailyReviews: true,
+            showWeeklyReviews: true
         };
     });
 
