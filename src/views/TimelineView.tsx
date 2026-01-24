@@ -17,6 +17,8 @@ import { AIBatchModal } from '../components/AIBatchModal';
 import { ParsedTimeEntry } from '../services/aiService';
 import { ToastType } from '../components/Toast';
 import { imageService } from '../services/imageService';
+import { ImagePreviewModal } from '../components/ImagePreviewModal';
+import { ConfirmModal } from '../components/ConfirmModal';
 
 // Image Thumbnail Component
 const TimelineImage: React.FC<{ filename: string, className?: string, useThumbnail?: boolean, refreshKey?: number }> = ({ filename, className = "w-16 h-16", useThumbnail = false, refreshKey = 0 }) => {
@@ -150,6 +152,8 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ logs, todos, scopes,
         const saved = localStorage.getItem('lumos_timeline_sort');
         return (saved === 'asc' || saved === 'desc') ? saved : 'asc';
     });
+    const [previewImage, setPreviewImage] = useState<string | null>(null);
+    const [copyFailureModal, setCopyFailureModal] = useState<{ isOpen: boolean; text: string }>({ isOpen: false, text: '' });
 
     React.useEffect(() => {
         localStorage.setItem('lumos_timeline_sort', sortOrder);
@@ -208,26 +212,20 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ logs, todos, scopes,
             if (weeklyReview) {
                 shouldShow = true;
             } else {
-                // 如果是今天，检查是否到达设定时间
+                // 检查是否到达设定时间
+                // 解析weeklyReviewTime (格式: "0-2200"，0表示最后一天，2200是时间)
+                const timeStr = (weeklyReviewTime || '0-2200').split('-')[1] || '2200';
+                const targetHour = parseInt(timeStr.substring(0, 2));
+                const targetMinute = parseInt(timeStr.substring(2, 4));
+
+                // 构造触发时间：周结束日期的目标时间
+                const triggerTime = new Date(weekEnd);
+                triggerTime.setHours(targetHour, targetMinute, 0, 0);
+
                 const now = new Date();
-                const nowStr = now.getFullYear() + '-' + (now.getMonth() + 1).toString().padStart(2, '0') + '-' + now.getDate().toString().padStart(2, '0');
-                const isToday = currentStr === nowStr;
 
-                if (isToday) {
-                    // 解析weeklyReviewTime (格式: "0-2200"，0表示最后一天，2200是时间)
-                    const timeStr = (weeklyReviewTime || '0-2200').split('-')[1] || '2200';
-                    const targetHour = parseInt(timeStr.substring(0, 2));
-                    const targetMinute = parseInt(timeStr.substring(2, 4));
-
-                    const currentHour = now.getHours();
-                    const currentMinute = now.getMinutes();
-
-                    // 检查是否到达设定的时间
-                    if (currentHour > targetHour || (currentHour === targetHour && currentMinute >= targetMinute)) {
-                        shouldShow = true;
-                    }
-                } else {
-                    // 历史日期，总是显示
+                // 只有当前时间超过触发时间才显示 (涵盖了过去的时间总是显示，未来的时间不显示)
+                if (now.getTime() >= triggerTime.getTime()) {
                     shouldShow = true;
                 }
             }
@@ -271,26 +269,20 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ logs, todos, scopes,
             if (monthlyReview) {
                 shouldShow = true;
             } else {
-                // 如果是今天，检查是否到达设定时间
+                // 检查是否到达设定时间
+                // 解析monthlyReviewTime (格式: "0-2200"，0表示最后一天，2200是时间)
+                const timeStr = (monthlyReviewTime || '0-2200').split('-')[1] || '2200';
+                const targetHour = parseInt(timeStr.substring(0, 2));
+                const targetMinute = parseInt(timeStr.substring(2, 4));
+
+                // 构造触发时间：月结束日期的目标时间
+                const triggerTime = new Date(monthEnd);
+                triggerTime.setHours(targetHour, targetMinute, 0, 0);
+
                 const now = new Date();
-                const nowStr = now.getFullYear() + '-' + (now.getMonth() + 1).toString().padStart(2, '0') + '-' + now.getDate().toString().padStart(2, '0');
-                const isToday = currentStr === nowStr;
 
-                if (isToday) {
-                    // 解析monthlyReviewTime (格式: "0-2200"，0表示最后一天，2200是时间)
-                    const timeStr = (monthlyReviewTime || '0-2200').split('-')[1] || '2200';
-                    const targetHour = parseInt(timeStr.substring(0, 2));
-                    const targetMinute = parseInt(timeStr.substring(2, 4));
-
-                    const currentHour = now.getHours();
-                    const currentMinute = now.getMinutes();
-
-                    // 检查是否到达设定的时间
-                    if (currentHour > targetHour || (currentHour === targetHour && currentMinute >= targetMinute)) {
-                        shouldShow = true;
-                    }
-                } else {
-                    // 历史日期，总是显示
+                // 只有当前时间超过触发时间才显示
+                if (now.getTime() >= triggerTime.getTime()) {
                     shouldShow = true;
                 }
             }
@@ -518,10 +510,8 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ logs, todos, scopes,
         // 3. Base requirement: Must have timeline items (per existing logic)
         if (dayTimeline.length === 0) return false;
 
-        // 4. If NOT Today (History), always show (if it meets above reqs)
-        if (!isToday(currentDate)) return true;
-
-        // 5. If Today, check time
+        // 4. Time Check (Unified logic for Past/Today/Future)
+        // Parse target time
         let targetHour = 22;
         let targetMinute = 0;
         const timeStr = dailyReviewTime || '22:00';
@@ -535,11 +525,11 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ logs, todos, scopes,
             targetMinute = parseInt(timeStr.substring(2, 4));
         }
 
-        const now = new Date();
-        const currentHour = now.getHours();
-        const currentMinute = now.getMinutes();
+        const triggerTime = new Date(currentDate);
+        triggerTime.setHours(targetHour, targetMinute, 0, 0);
 
-        return (currentHour > targetHour || (currentHour === targetHour && currentMinute >= targetMinute));
+        const now = new Date();
+        return now.getTime() >= triggerTime.getTime();
     }, [dailyReview, onOpenDailyReview, dayTimeline.length, currentDate, dailyReviewTime]);
 
     const formatTime = (ts: number) => {
@@ -611,25 +601,72 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ logs, todos, scopes,
             const todo = todos.find(t => t.id === log.linkedTodoId);
             const scopes_list = log.scopeIds?.map(id => scopes.find(s => s.id === id)).filter(Boolean) || [];
 
-            const content = log.note ? ` ${log.note} ` : '';
-            text += `- ${sTime} - ${eTime} (${mins}m) ** [${cat?.name || '未知'}/${act?.name || '未知'}] ** ${content} `;
+            const content = log.note ? log.note.split('\n').map(line => `> ${line}`).join('\n') : '> (无备注)';
 
-            if (log.focusScore && log.focusScore > 0) text += ` ⚡️${log.focusScore} `;
-            if (todo) text += ` @${todo.title} `;
+            // Format: 09:26 - 10:30 (64m) #[Category]/[Activity] @Todo %Scope
+            text += `${sTime} - ${eTime} (${mins}m)  # [${cat?.name || '未知'}/${act?.name || '未知'}]`;
+
+            if (todo) text += ` @${todo.title}`;
             // 只有进度待办才显示进度增量和进度比例
             if (todo?.isProgress) {
                 if (log.progressIncrement && log.progressIncrement > 0) text += ` + ${log.progressIncrement} `;
                 text += `（${(todo.completedUnits || 0)}/${todo.totalAmount}）`;
             }
             if (scopes_list.length > 0) text += ` %${scopes_list.map(s => s.name).join(', ')}`;
+            if (log.focusScore && log.focusScore > 0) text += ` ⚡️${log.focusScore}`;
+
             text += '\n';
+            if (content) text += `${content}\n`;
+            text += '\n'; // Empty line separator
         });
 
-        navigator.clipboard.writeText(text).then(() => {
-            onToast?.('success', '已复制到剪贴板');
-        }).catch(() => {
-            onToast?.('error', '复制失败');
-        });
+        setCopyFailureModal({ isOpen: true, text: text });
+    };
+
+    const executeCopy = (text: string) => {
+        // Try standard API first
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(text).then(() => {
+                onToast?.('success', '已复制到剪贴板');
+            }).catch((err) => {
+                console.warn('Clipboard API failed, trying fallback...', err);
+                fallbackCopyText(text);
+            });
+        } else {
+            // Fallback for older browsers/WebViews
+            fallbackCopyText(text);
+        }
+    };
+
+    const fallbackCopyText = (text: string) => {
+        try {
+            const textArea = document.createElement("textarea");
+            textArea.value = text;
+
+            // Avoid scrolling to bottom
+            textArea.style.top = "0";
+            textArea.style.left = "0";
+            textArea.style.position = "fixed";
+            textArea.style.opacity = "0";
+
+            document.body.appendChild(textArea);
+            textArea.focus();
+            textArea.select();
+
+            const successful = document.execCommand('copy');
+            document.body.removeChild(textArea);
+
+            if (successful) {
+                onToast?.('success', '已复制到剪贴板');
+            } else {
+                // onToast?.('error', '复制失败，请手动复制');
+                setCopyFailureModal({ isOpen: true, text: text });
+            }
+        } catch (err) {
+            console.error('Fallback copy failed', err);
+            // onToast?.('error', '复制失败，请检查权限');
+            setCopyFailureModal({ isOpen: true, text: text });
+        }
     };
 
     return (
@@ -784,7 +821,17 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ logs, todos, scopes,
                                                     console.log(`[TimelineView] 渲染图片组: 记录ID=${item.logData.id}, 总图片=${item.logData.images.length}, 显示图片=`, imagesToShow);
 
                                                     return imagesToShow.map(img => (
-                                                        <TimelineImage key={img} filename={img} className="w-16 h-16 shadow-sm" useThumbnail={true} refreshKey={refreshKey} />
+                                                        <div
+                                                            key={img}
+                                                            onClick={async (e) => {
+                                                                e.stopPropagation();
+                                                                const url = await imageService.getImageUrl(img, 'original');
+                                                                if (url) setPreviewImage(url);
+                                                            }}
+                                                            className="cursor-zoom-in"
+                                                        >
+                                                            <TimelineImage filename={img} className="w-16 h-16 shadow-sm" useThumbnail={true} refreshKey={refreshKey} />
+                                                        </div>
                                                     ));
                                                 })()}
 
@@ -1187,6 +1234,28 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ logs, todos, scopes,
                     />
                 )
             }
+            <ImagePreviewModal
+                imageUrl={previewImage}
+                onClose={() => setPreviewImage(null)}
+            />
+
+            <ConfirmModal
+                isOpen={copyFailureModal.isOpen}
+                onClose={() => setCopyFailureModal({ ...copyFailureModal, isOpen: false })}
+                onConfirm={() => {
+                    executeCopy(copyFailureModal.text);
+                    // Don't close immediately so user can still manually copy if needed? 
+                    // Or close for better UX? Let's close.
+                    // Actually, if it fails silently, closing is bad. 
+                    // But standard UX is to close. User can reopen.
+                    setCopyFailureModal({ ...copyFailureModal, isOpen: false });
+                }}
+                title="导出内容"
+                description={copyFailureModal.text}
+                confirmText="复制内容"
+                cancelText="关闭"
+                type="info"
+            />
         </div >
     );
 };

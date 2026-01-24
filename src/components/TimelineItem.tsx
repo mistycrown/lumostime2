@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { DiaryEntry } from '../views/journalTypes';
 import { MessageSquarePlus, MoreHorizontal, MessageCircle, Heart, Share2, Bookmark, Moon, Star, Send } from 'lucide-react';
 import { imageService } from '../services/imageService';
+import { ImagePreviewModal } from './ImagePreviewModal';
 
 // Helper component for async image loading
 const TimelineImage: React.FC<{ src: string; alt: string; className: string }> = ({ src, alt, className }) => {
@@ -48,6 +49,7 @@ interface TimelineItemProps {
 const TimelineItem: React.FC<TimelineItemProps> = ({ entry, isLast, isFirstOfDay = true, onAddComment, onClick }) => {
     const [isCommenting, setIsCommenting] = useState(false);
     const [commentText, setCommentText] = useState('');
+    const [previewImage, setPreviewImage] = useState<string | null>(null);
 
     const dateObj = new Date(entry.date);
     const day = dateObj.getDate().toString().padStart(2, '0');
@@ -84,11 +86,19 @@ const TimelineItem: React.FC<TimelineItemProps> = ({ entry, isLast, isFirstOfDay
 
         if (entry.media.length === 1) {
             return (
-                <div className="mt-4 rounded-lg overflow-hidden shadow-sm border border-gray-100">
+                <div
+                    className="mt-4 rounded-lg overflow-hidden shadow-sm border border-gray-100 cursor-zoom-in"
+                    onClick={async (e) => {
+                        e.stopPropagation();
+                        // Resolve URL before showing
+                        const url = await imageService.getImageUrl(entry.media![0].url);
+                        if (url) setPreviewImage(url);
+                    }}
+                >
                     <TimelineImage
                         src={entry.media[0].url}
                         alt="memory"
-                        className="w-full h-auto max-h-[500px] object-cover transition-transform hover:scale-105 duration-700"
+                        className="w-full h-auto max-h-[500px] object-cover transition-transform hover:scale-105 duration-700 cursor-zoom-in"
                     />
                 </div>
             );
@@ -98,7 +108,15 @@ const TimelineItem: React.FC<TimelineItemProps> = ({ entry, isLast, isFirstOfDay
             return (
                 <div className="mt-4 grid grid-cols-2 gap-2">
                     {entry.media.map((m, i) => (
-                        <div key={i} className="rounded-lg overflow-hidden aspect-[3/4] shadow-sm border border-gray-100">
+                        <div
+                            key={i}
+                            className="rounded-lg overflow-hidden aspect-[3/4] shadow-sm border border-gray-100 cursor-zoom-in"
+                            onClick={async (e) => {
+                                e.stopPropagation();
+                                const url = await imageService.getImageUrl(m.url);
+                                if (url) setPreviewImage(url);
+                            }}
+                        >
                             <TimelineImage src={m.url} alt={`memory-${i}`} className="w-full h-full object-cover" />
                         </div>
                     ))}
@@ -109,7 +127,15 @@ const TimelineItem: React.FC<TimelineItemProps> = ({ entry, isLast, isFirstOfDay
         return (
             <div className="mt-4 grid grid-cols-3 gap-1.5">
                 {entry.media.map((m, i) => (
-                    <div key={i} className="rounded-md overflow-hidden aspect-square shadow-sm border border-gray-100">
+                    <div
+                        key={i}
+                        className="rounded-md overflow-hidden aspect-square shadow-sm border border-gray-100 cursor-zoom-in"
+                        onClick={async (e) => {
+                            e.stopPropagation();
+                            const url = await imageService.getImageUrl(m.url);
+                            if (url) setPreviewImage(url);
+                        }}
+                    >
                         <TimelineImage src={m.url} alt={`memory-${i}`} className="w-full h-full object-cover" />
                     </div>
                 ))}
@@ -218,7 +244,7 @@ const TimelineItem: React.FC<TimelineItemProps> = ({ entry, isLast, isFirstOfDay
                         <div className="w-full border-t border-dashed border-gray-200 mt-2" />
 
                         {/* Action Buttons */}
-                        <div className="flex items-center justify-end pt-1">
+                        <div className="flex items-center justify-start pt-1">
                             <button
                                 onClick={() => setIsCommenting(!isCommenting)}
                                 className="text-gray-300 hover:text-gray-900 transition-colors"
@@ -231,14 +257,14 @@ const TimelineItem: React.FC<TimelineItemProps> = ({ entry, isLast, isFirstOfDay
 
                 {/* Append/Comment Input Area - HIDDEN FOR SUMMARIES */}
                 {!isSummary && isCommenting && (
-                    <form onSubmit={handleSubmitComment} className="mt-2 flex gap-2 animate-in fade-in slide-in-from-top-2 duration-200">
+                    <form onSubmit={handleSubmitComment} className="mt-2 flex gap-2 animate-in fade-in slide-in-from-top-2 duration-200 w-full max-w-full">
                         <input
                             autoFocus
                             type="text"
                             value={commentText}
                             onChange={(e) => setCommentText(e.target.value)}
                             placeholder="Add a timestamped note..."
-                            className="flex-1 bg-white border border-gray-200 rounded-lg px-4 py-2 text-sm focus:outline-none focus:border-gray-900 transition-colors font-sans"
+                            className="flex-1 min-w-0 bg-white border border-gray-200 rounded-lg px-4 py-2 text-sm focus:outline-none focus:border-gray-900 transition-colors font-sans"
                         />
                         <button
                             type="submit"
@@ -267,6 +293,11 @@ const TimelineItem: React.FC<TimelineItemProps> = ({ entry, isLast, isFirstOfDay
                     </div>
                 )}
             </div>
+
+            <ImagePreviewModal
+                imageUrl={previewImage}
+                onClose={() => setPreviewImage(null)}
+            />
         </div>
     );
 };

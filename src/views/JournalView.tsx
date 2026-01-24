@@ -283,12 +283,23 @@ export const JournalView: React.FC<JournalViewProps> = ({
             const matchesDate = d.getMonth() === selectedDate.getMonth() &&
                 d.getFullYear() === selectedDate.getFullYear();
 
-            // --- Apply Global Memoir Filter ---
-            // User Request: Daily/Weekly reports should always be shown.
-            // So if type is not 'normal', we bypass the filtering steps.
-            if (entry.type !== 'normal') return matchesDate;
+            const { hasImage, minNoteLength, relatedTagIds, relatedScopeIds, showDailyReviews, showWeeklyReviews } = memoirFilterConfig;
 
-            const { hasImage, minNoteLength, relatedTagIds, relatedScopeIds } = memoirFilterConfig;
+            // --- Apply Global Memoir Filter ---
+
+            // 0. Review Visibility
+            if (entry.type === 'daily_summary') {
+                // Default to true if undefined
+                return showDailyReviews ?? true;
+            }
+            if (entry.type === 'weekly_summary') {
+                return showWeeklyReviews ?? true;
+            }
+
+            // User Request: Daily/Weekly reports should always be shown (Previous logic).
+            // Now we respect the toggles above.
+            // So if type is not 'normal', we bypass the remaining log-specific filters.
+            if (entry.type !== 'normal') return matchesDate;
 
             // 1. Has Image Exception Logic
             // If 'Has Image' is checked, and the entry HAS an image, 

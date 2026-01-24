@@ -12,7 +12,8 @@ interface ImagePreviewModalProps {
 
 export const ImagePreviewModal: React.FC<ImagePreviewModalProps> = ({ imageUrl, onClose, onDelete }) => {
     const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
-    
+    const [rotation, setRotation] = useState(0);
+
     // Treat null/undefined as "Closed"
     if (imageUrl === null || imageUrl === undefined) return null;
 
@@ -80,18 +81,6 @@ export const ImagePreviewModal: React.FC<ImagePreviewModalProps> = ({ imageUrl, 
                     >
                         {({ zoomIn, zoomOut, resetTransform }) => (
                             <>
-                                {/* Connect external buttons to TransformWrapper controls via Ref or Context is hard without ref. 
-                                    Actually react-zoom-pan-pinch children render function provides these. 
-                                    I need to move controls INSIDE this block. 
-                                    My previous implementation was WRONG because controls were outside TransformWrapper?
-                                    Wait, in Step 497 controls WERE inside.
-                                    Here I moved them outside to handle "No Image" case.
-                                    If No Image, I don't need Zoom controls.
-                                    If Image, I need them.
-                                    So I should structure it:
-                                    If Image -> TransformWrapper -> Controls (inside) + Image
-                                    If No Image -> Controls (Delete/Close) + Error Message
-                                */}
                                 <div className="absolute inset-0 pointer-events-none z-[60]">
                                     <div className="absolute top-[calc(1rem+env(safe-area-inset-top))] right-4 z-50 flex items-center gap-2 pointer-events-auto">
                                         {onDelete && (
@@ -111,20 +100,35 @@ export const ImagePreviewModal: React.FC<ImagePreviewModalProps> = ({ imageUrl, 
                                         <button onClick={() => zoomOut()} className="p-2 bg-white/10 hover:bg-white/20 text-white rounded-full backdrop-blur-sm transition-colors">
                                             <ZoomOut size={20} />
                                         </button>
-                                        <button onClick={() => resetTransform()} className="p-2 bg-white/10 hover:bg-white/20 text-white rounded-full backdrop-blur-sm transition-colors">
+                                        <button
+                                            onClick={() => setRotation(r => r - 90)}
+                                            className="p-2 bg-white/10 hover:bg-white/20 text-white rounded-full backdrop-blur-sm transition-colors"
+                                        >
                                             <RotateCcw size={20} />
                                         </button>
-                                        <button onClick={(e) => { e.stopPropagation(); onClose(); }} className="p-2 bg-white/10 hover:bg-white/20 text-white hover:text-red-400 rounded-full backdrop-blur-sm transition-colors ml-2">
+                                        <button
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                setRotation(0);
+                                                onClose();
+                                            }}
+                                            className="p-2 bg-white/10 hover:bg-white/20 text-white hover:text-red-400 rounded-full backdrop-blur-sm transition-colors ml-2"
+                                        >
                                             <X size={20} />
                                         </button>
                                     </div>
                                 </div>
 
-                                <TransformComponent wrapperClass="w-full h-full" contentClass="w-full h-full flex items-center justify-center">
+                                <TransformComponent wrapperClass="w-full h-full !overflow-visible" contentClass="w-full h-full flex items-center justify-center">
                                     <img
                                         src={imageUrl}
                                         alt="Preview"
-                                        className="max-w-none w-auto h-auto max-h-[90vh] object-contain shadow-2xl"
+                                        className="max-w-none w-auto h-auto object-contain shadow-2xl transition-transform duration-200"
+                                        style={{
+                                            transform: `rotate(${rotation}deg)`,
+                                            maxHeight: Math.abs(rotation % 180) === 90 ? '90vw' : '90vh',
+                                            maxWidth: Math.abs(rotation % 180) === 90 ? '90vh' : '90vw'
+                                        }}
                                     />
                                 </TransformComponent>
                             </>
@@ -167,7 +171,7 @@ export const ImagePreviewModal: React.FC<ImagePreviewModalProps> = ({ imageUrl, 
                     animation: fadeIn 0.15s ease-out;
                 }
             `}</style>
-            
+
             {/* 删除确认模态框 */}
             <ConfirmModal
                 isOpen={isDeleteConfirmOpen}

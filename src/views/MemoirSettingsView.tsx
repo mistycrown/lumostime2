@@ -66,6 +66,53 @@ export const MemoirSettingsView: React.FC<MemoirSettingsViewProps> = ({ onBack }
 
             <div className="flex-1 overflow-y-auto p-4 space-y-6">
 
+                {/* 0. NEW: Content Toggles */}
+                <div className="bg-white rounded-2xl p-4 shadow-sm space-y-4">
+                    <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-full bg-stone-100 flex items-center justify-center text-stone-600">
+                                <AlignLeft size={20} />
+                            </div>
+                            <div>
+                                <h4 className="font-bold text-stone-800">显示每日回顾</h4>
+                                <p className="text-xs text-stone-400">是否在时间流中显示每日总结</p>
+                            </div>
+                        </div>
+                        <label className="relative inline-flex items-center cursor-pointer">
+                            <input
+                                type="checkbox"
+                                checked={config.showDailyReviews ?? true}
+                                onChange={(e) => setConfig({ ...config, showDailyReviews: e.target.checked })}
+                                className="sr-only peer"
+                            />
+                            <div className="w-11 h-6 bg-stone-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-stone-800"></div>
+                        </label>
+                    </div>
+
+                    <div className="h-px bg-stone-100" />
+
+                    <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-full bg-stone-100 flex items-center justify-center text-stone-600">
+                                <AlignLeft size={20} />
+                            </div>
+                            <div>
+                                <h4 className="font-bold text-stone-800">显示每周回顾</h4>
+                                <p className="text-xs text-stone-400">是否在时间流中显示每周总结</p>
+                            </div>
+                        </div>
+                        <label className="relative inline-flex items-center cursor-pointer">
+                            <input
+                                type="checkbox"
+                                checked={config.showWeeklyReviews ?? true}
+                                onChange={(e) => setConfig({ ...config, showWeeklyReviews: e.target.checked })}
+                                className="sr-only peer"
+                            />
+                            <div className="w-11 h-6 bg-stone-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-stone-800"></div>
+                        </label>
+                    </div>
+                </div>
+
                 {/* 1. Has Image */}
                 <div className="bg-white rounded-2xl p-4 shadow-sm flex items-center justify-between">
                     <div className="flex items-center gap-3">

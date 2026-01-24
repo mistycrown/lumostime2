@@ -1080,21 +1080,15 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
     const handleCheckUpdate = async () => {
         setIsCheckingUpdate(true);
         try {
-            const latestVersion = await UpdateService.checkNeedsUpdate();
+            // 总是获取最新版本信息并显示模态框
+            const versionData = await UpdateService.checkForUpdates();
 
-            if (latestVersion) {
-                // 有新版本可用
-                setUpdateInfo(latestVersion);
+            if (versionData) {
+                setUpdateInfo(versionData);
                 setShowUpdateModal(true);
             } else {
-                const versionData = await UpdateService.checkForUpdates();
-                if (versionData) {
-                    // 已是最新版本
-                    onToast('success', `当前已是最新版本 v${UpdateService.getCurrentVersion()}`);
-                } else {
-                    // 检查失败
-                    onToast('error', '检查更新失败，请稍后重试');
-                }
+                // 检查失败
+                onToast('error', '检查更新失败，请稍后重试');
             }
         } catch (error) {
             console.error('检查更新出错:', error);
@@ -1672,7 +1666,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
                     <div className="bg-white rounded-2xl p-6 shadow-sm space-y-4">
                         <div className="flex items-center gap-3 text-stone-600 mb-2">
                             <Cloud size={24} />
-                            <h3 className="font-bold text-lg">Amazon S3 Storage</h3>
+                            <h3 className="font-bold text-lg">Tencent Cloud COS</h3>
                         </div>
 
                         {s3Config ? (
@@ -1744,22 +1738,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
                                     Connect to Tencent Cloud COS to sync your data securely.
                                 </p>
 
-                                {/* CORS配置提示 */}
-                                <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
-                                    <div className="flex items-start gap-2">
-                                        <AlertCircle size={16} className="text-amber-600 mt-0.5 flex-shrink-0" />
-                                        <div className="text-xs text-amber-800">
-                                            <p className="font-medium mb-1">腾讯云COS CORS配置要求：</p>
-                                            <ul className="space-y-1 text-[11px]">
-                                                <li>• <strong>AllowedOrigins</strong>: * 或您的域名</li>
-                                                <li>• <strong>AllowedMethods</strong>: GET, PUT, POST, DELETE, HEAD</li>
-                                                <li>• <strong>AllowedHeaders</strong>: *</li>
-                                                <li>• <strong>ExposeHeaders</strong>: ETag, Content-Length, x-cos-*</li>
-                                                <li>• <strong>MaxAgeSeconds</strong>: 3600</li>
-                                            </ul>
-                                        </div>
-                                    </div>
-                                </div>
+
 
                                 <div className="space-y-3">
                                     <div>
@@ -1768,7 +1747,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
                                             <Database size={18} className="text-stone-400" />
                                             <input
                                                 type="text"
-                                                placeholder="lumostime-1315858561 (存储桶名-APPID)"
+                                                placeholder="your-bucket-name-1250000000"
                                                 className="flex-1 bg-transparent border-none outline-none text-stone-700 placeholder:text-stone-300 text-sm"
                                                 value={s3ConfigForm.bucketName}
                                                 onChange={e => setS3ConfigForm(prev => ({ ...prev, bucketName: e.target.value }))}
@@ -1782,7 +1761,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
                                             <Globe size={18} className="text-stone-400" />
                                             <input
                                                 type="text"
-                                                placeholder="ap-chongqing (腾讯云地域)"
+                                                placeholder="ap-beijing"
                                                 className="flex-1 bg-transparent border-none outline-none text-stone-700 placeholder:text-stone-300 text-sm"
                                                 value={s3ConfigForm.region}
                                                 onChange={e => setS3ConfigForm(prev => ({ ...prev, region: e.target.value }))}
@@ -1796,7 +1775,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
                                             <User size={18} className="text-stone-400" />
                                             <input
                                                 type="text"
-                                                placeholder="AKID... (腾讯云SecretId)"
+                                                placeholder="请输入 SecretId"
                                                 className="flex-1 bg-transparent border-none outline-none text-stone-700 placeholder:text-stone-300 text-sm"
                                                 value={s3ConfigForm.secretId}
                                                 onChange={e => setS3ConfigForm(prev => ({ ...prev, secretId: e.target.value }))}
@@ -1810,7 +1789,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
                                             <div className="w-[18px] flex justify-center"><Server size={14} className="text-stone-400" /></div>
                                             <input
                                                 type="password"
-                                                placeholder="腾讯云SecretKey (与SecretId不同的长字符串)"
+                                                placeholder="请输入 SecretKey"
                                                 className="flex-1 bg-transparent border-none outline-none text-stone-700 placeholder:text-stone-300 text-sm"
                                                 value={s3ConfigForm.secretKey}
                                                 onChange={e => setS3ConfigForm(prev => ({ ...prev, secretKey: e.target.value }))}
@@ -1824,19 +1803,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
                                             )}
                                     </div>
 
-                                    <div>
-                                        <label className="text-xs font-bold text-stone-400 uppercase ml-1">Custom Endpoint (Optional)</label>
-                                        <div className="flex items-center gap-2 bg-stone-50 px-3 py-2 rounded-xl mt-1 focus-within:ring-2 focus-within:ring-stone-200 transition-all">
-                                            <Link size={18} className="text-stone-400" />
-                                            <input
-                                                type="text"
-                                                placeholder="https://cos.ap-chongqing.myqcloud.com (腾讯云COS)"
-                                                className="flex-1 bg-transparent border-none outline-none text-stone-700 placeholder:text-stone-300 text-sm"
-                                                value={s3ConfigForm.endpoint || ''}
-                                                onChange={e => setS3ConfigForm(prev => ({ ...prev, endpoint: e.target.value }))}
-                                            />
-                                        </div>
-                                    </div>
+
                                 </div>
 
                                 <div className="pt-2">
@@ -1853,24 +1820,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
                                         {isSyncing ? "Connecting..." : "Save & Connect"}
                                     </button>
 
-                                    {/* CORS配置帮助按钮 */}
-                                    <button
-                                        onClick={() => {
-                                            const corsConfig = {
-                                                "AllowedOrigins": ["*"],
-                                                "AllowedMethods": ["GET", "PUT", "POST", "DELETE", "HEAD"],
-                                                "AllowedHeaders": ["*"],
-                                                "ExposeHeaders": ["ETag", "Content-Length", "x-cos-*"],
-                                                "MaxAgeSeconds": 3600
-                                            };
-                                            console.log('腾讯云COS CORS配置示例:', JSON.stringify(corsConfig, null, 2));
-                                            onToast('info', '已在控制台输出CORS配置示例，请复制到腾讯云COS控制台');
-                                        }}
-                                        className="flex items-center justify-center gap-2 w-full py-2 mt-2 text-stone-600 hover:text-stone-700 hover:bg-stone-50 rounded-lg transition-colors text-sm"
-                                    >
-                                        <Settings size={16} />
-                                        查看CORS配置示例
-                                    </button>
+
 
                                     {/* 清理草稿按钮 */}
                                     {(s3ConfigForm.bucketName || s3ConfigForm.region || s3ConfigForm.secretId || s3ConfigForm.secretKey) && !s3Config && (
@@ -2918,7 +2868,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
                 onUpdateLogs={(updatedLogs) => {
                     onSyncUpdate({ ...syncData, logs: updatedLogs });
                 }}
-                categories={categories || []}
+                categories={categoriesData || []}
                 scopes={scopes || []}
                 todos={todos || []}
                 todoCategories={todoCategories || []}
@@ -3098,11 +3048,17 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
                     <div className="bg-white rounded-2xl w-full max-w-md shadow-xl animate-in fade-in zoom-in-95 duration-200">
                         <div className="p-6 space-y-4">
                             <div className="flex items-center gap-3">
-                                <div className="w-12 h-12 rounded-full bg-blue-100 flex items-center justify-center">
-                                    <ArrowUpCircle size={24} className="text-blue-600" />
+                                <div className={`w-12 h-12 rounded-full flex items-center justify-center ${UpdateService.compareVersions(UpdateService.getCurrentVersion(), updateInfo.version) ? 'bg-blue-100' : 'bg-green-100'}`}>
+                                    {UpdateService.compareVersions(UpdateService.getCurrentVersion(), updateInfo.version) ? (
+                                        <ArrowUpCircle size={24} className="text-blue-600" />
+                                    ) : (
+                                        <CheckCircle2 size={24} className="text-green-600" />
+                                    )}
                                 </div>
                                 <div>
-                                    <h3 className="font-bold text-lg text-stone-800">发现新版本</h3>
+                                    <h3 className="font-bold text-lg text-stone-800">
+                                        {UpdateService.compareVersions(UpdateService.getCurrentVersion(), updateInfo.version) ? '发现新版本' : '当前已是最新版本'}
+                                    </h3>
                                     <p className="text-sm text-stone-500">v{updateInfo.version}</p>
                                 </div>
                             </div>
@@ -3115,7 +3071,9 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
                                     </div>
                                     <div className="flex justify-between items-center">
                                         <span className="text-xs font-bold text-stone-400">最新版本</span>
-                                        <span className="text-sm font-bold text-blue-600">v{updateInfo.version}</span>
+                                        <span className={`text-sm font-bold ${UpdateService.compareVersions(UpdateService.getCurrentVersion(), updateInfo.version) ? 'text-blue-600' : 'text-green-600'}`}>
+                                            v{updateInfo.version}
+                                        </span>
                                     </div>
                                 </div>
 
@@ -3132,18 +3090,29 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
                             </div>
 
                             <div className="flex gap-3 pt-2">
-                                <button
-                                    onClick={() => setShowUpdateModal(false)}
-                                    className="flex-1 py-3 px-4 text-sm font-medium text-stone-600 bg-stone-100 hover:bg-stone-200 rounded-xl transition-colors"
-                                >
-                                    稍后提醒
-                                </button>
-                                <button
-                                    onClick={handleDownloadUpdate}
-                                    className="flex-1 py-3 px-4 text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-xl shadow-lg shadow-blue-200 transition-all active:scale-[0.98]"
-                                >
-                                    立即下载
-                                </button>
+                                {UpdateService.compareVersions(UpdateService.getCurrentVersion(), updateInfo.version) ? (
+                                    <>
+                                        <button
+                                            onClick={() => setShowUpdateModal(false)}
+                                            className="flex-1 py-3 px-4 text-sm font-medium text-stone-600 bg-stone-100 hover:bg-stone-200 rounded-xl transition-colors"
+                                        >
+                                            稍后提醒
+                                        </button>
+                                        <button
+                                            onClick={handleDownloadUpdate}
+                                            className="flex-1 py-3 px-4 text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-xl shadow-lg shadow-blue-200 transition-all active:scale-[0.98]"
+                                        >
+                                            立即下载
+                                        </button>
+                                    </>
+                                ) : (
+                                    <button
+                                        onClick={() => setShowUpdateModal(false)}
+                                        className="flex-1 py-3 px-4 text-sm font-bold text-stone-600 bg-stone-100 hover:bg-stone-200 rounded-xl transition-colors"
+                                    >
+                                        关闭
+                                    </button>
+                                )}
                             </div>
                         </div>
                     </div>
