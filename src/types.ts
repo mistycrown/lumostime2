@@ -116,6 +116,7 @@ export interface Log {
   focusScore?: number; // 1-5
   images?: string[]; // (NEW) Array of image filenames/identifiers
   comments?: Comment[]; // (NEW) 评论列表
+  reactions?: string[]; // (NEW) 反应列表 (Emoji list)
 }
 
 export interface TodoCategory {

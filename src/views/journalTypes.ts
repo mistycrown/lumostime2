@@ -24,6 +24,7 @@ export interface DiaryEntry {
     location?: string;
     media?: Media[];
     comments?: Comment[];
+    reactions?: string[];
     mood?: string;
 
     // Metadata fields

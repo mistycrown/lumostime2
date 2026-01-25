@@ -4,6 +4,8 @@ import { MessageSquarePlus, MoreHorizontal, MessageCircle, Heart, Share2, Bookma
 import { imageService } from '../services/imageService';
 import { ImagePreviewModal } from './ImagePreviewModal';
 
+import { ReactionPicker, ReactionList } from './ReactionComponents';
+
 // Helper component for async image loading
 const TimelineImage: React.FC<{ src: string; alt: string; className: string }> = ({ src, alt, className }) => {
     const [imgUrl, setImgUrl] = useState<string>('');
@@ -43,10 +45,11 @@ interface TimelineItemProps {
     isLast: boolean;
     isFirstOfDay?: boolean;  // 是否是当天第一条
     onAddComment: (entryId: string, text: string) => void;
+    onToggleReaction?: (entryId: string, emoji: string) => void;
     onClick?: () => void;
 }
 
-const TimelineItem: React.FC<TimelineItemProps> = ({ entry, isLast, isFirstOfDay = true, onAddComment, onClick }) => {
+const TimelineItem: React.FC<TimelineItemProps> = ({ entry, isLast, isFirstOfDay = true, onAddComment, onToggleReaction, onClick }) => {
     const [isCommenting, setIsCommenting] = useState(false);
     const [commentText, setCommentText] = useState('');
     const [previewImage, setPreviewImage] = useState<string | null>(null);
@@ -244,13 +247,25 @@ const TimelineItem: React.FC<TimelineItemProps> = ({ entry, isLast, isFirstOfDay
                         <div className="w-full border-t border-dashed border-gray-200 mt-2" />
 
                         {/* Action Buttons */}
-                        <div className="flex items-center justify-start pt-1">
+                        {/* Action Buttons & Reactions */}
+                        <div className="flex items-center justify-start gap-2 pt-1 flex-wrap">
                             <button
                                 onClick={() => setIsCommenting(!isCommenting)}
                                 className="text-gray-300 hover:text-gray-900 transition-colors"
                             >
                                 <MoreHorizontal className="w-5 h-5" />
                             </button>
+                            <ReactionPicker
+                                onSelect={(emoji) => onToggleReaction?.(entry.id, emoji)}
+                                currentReactions={entry.reactions}
+                            />
+
+                            {/* Reactions List Inline */}
+                            <ReactionList
+                                reactions={entry.reactions}
+                                onToggle={(emoji) => onToggleReaction?.(entry.id, emoji)}
+                                className="ml-0"
+                            />
                         </div>
                     </>
                 )}

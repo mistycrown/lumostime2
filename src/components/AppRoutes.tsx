@@ -108,6 +108,10 @@ export const AppRoutes: React.FC<AppRoutesProps> = ({
     const { setSelectedTagId, setSelectedCategoryId } = useNavigation();
     const handleSelectTag = (id: string) => setSelectedTagId(id);
 
+    const handleUpdateLog = (updatedLog: Log) => {
+        setLogs(prev => prev.map(l => l.id === updatedLog.id ? updatedLog : l));
+    };
+
     // Helper to get local YYYY-MM-DD string
     const getLocalDateStr = (d: Date) => {
         const year = d.getFullYear();
@@ -217,6 +221,7 @@ export const AppRoutes: React.FC<AppRoutesProps> = ({
                     categories={categories}
                     onAddLog={openAddModal}
                     onEditLog={openEditModal}
+                    onUpdateLog={handleUpdateLog}
                     currentDate={currentDate}
                     onDateChange={setCurrentDate}
                     onShowStats={() => setCurrentView(AppView.STATS)}

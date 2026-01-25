@@ -19,6 +19,7 @@ import { ToastType } from '../components/Toast';
 import { imageService } from '../services/imageService';
 import { ImagePreviewModal } from '../components/ImagePreviewModal';
 import { ConfirmModal } from '../components/ConfirmModal';
+import { ReactionPicker, ReactionList } from '../components/ReactionComponents';
 
 // Image Thumbnail Component
 const TimelineImage: React.FC<{ filename: string, className?: string, useThumbnail?: boolean, refreshKey?: number }> = ({ filename, className = "w-16 h-16", useThumbnail = false, refreshKey = 0 }) => {
@@ -99,6 +100,7 @@ interface TimelineViewProps {
     categories: Category[];
     onAddLog: (startTime?: number, endTime?: number) => void;
     onEditLog: (log: Log) => void;
+    onUpdateLog: (log: Log) => void; // Silent update (e.g. for reactions)
     currentDate: Date;
     onDateChange: (date: Date) => void;
     onShowStats: () => void;
@@ -146,7 +148,7 @@ interface TimelineItem {
     };
 }
 
-export const TimelineView: React.FC<TimelineViewProps> = ({ logs, todos, scopes, onAddLog, onEditLog, categories, currentDate, onDateChange, onShowStats, onBatchAddLogs, onSync, isSyncing, todoCategories, onToast, startWeekOnSunday = false, autoLinkRules = [], minIdleTimeThreshold = 1, onQuickPunch, refreshKey = 0, dailyReview, onOpenDailyReview, templates = [], dailyReviewTime = '22:00', weeklyReviews = [], onOpenWeeklyReview, weeklyReviewTime = '0-2200', monthlyReviews = [], onOpenMonthlyReview, monthlyReviewTime = '0-2200' }) => {
+export const TimelineView: React.FC<TimelineViewProps> = ({ logs, todos, scopes, onAddLog, onEditLog, onUpdateLog, categories, currentDate, onDateChange, onShowStats, onBatchAddLogs, onSync, isSyncing, todoCategories, onToast, startWeekOnSunday = false, autoLinkRules = [], minIdleTimeThreshold = 1, onQuickPunch, refreshKey = 0, dailyReview, onOpenDailyReview, templates = [], dailyReviewTime = '22:00', weeklyReviews = [], onOpenWeeklyReview, weeklyReviewTime = '0-2200', monthlyReviews = [], onOpenMonthlyReview, monthlyReviewTime = '0-2200' }) => {
     const [isCalendarExpanded, setIsCalendarExpanded] = useState(false);
     const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>(() => {
         const saved = localStorage.getItem('lumos_timeline_sort');
@@ -805,36 +807,19 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ logs, todos, scopes,
                                                     ))}
                                                 </>
                                             )}
-
-                                            {/* Image Indicator / Thumbnails (Moved to bottom) */}
                                         </div>
 
-                                        {/* Images Row */}
+                                        {/* Images */}
                                         {item.logData.images && item.logData.images.length > 0 && (
-                                            <div className="flex items-center gap-2 mt-3 overflow-x-auto no-scrollbar pb-1">
-                                                {/* If > 3 images, show first 2 then +N. If <= 3, show all. */}
-                                                {(() => {
-                                                    const imagesToShow = item.logData.images.length > 3
-                                                        ? item.logData.images.slice(0, 2)
-                                                        : item.logData.images;
-
-                                                    console.log(`[TimelineView] 渲染图片组: 记录ID=${item.logData.id}, 总图片=${item.logData.images.length}, 显示图片=`, imagesToShow);
-
-                                                    return imagesToShow.map(img => (
-                                                        <div
-                                                            key={img}
-                                                            onClick={async (e) => {
-                                                                e.stopPropagation();
-                                                                const url = await imageService.getImageUrl(img, 'original');
-                                                                if (url) setPreviewImage(url);
-                                                            }}
-                                                            className="cursor-zoom-in"
-                                                        >
-                                                            <TimelineImage filename={img} className="w-16 h-16 shadow-sm" useThumbnail={true} refreshKey={refreshKey} />
-                                                        </div>
-                                                    ));
-                                                })()}
-
+                                            <div className="flex gap-2 mt-2 mb-1 overflow-x-auto pb-1 no-scrollbar" onClick={(e) => e.stopPropagation()}>
+                                                {(item.logData.images.length > 3
+                                                    ? item.logData.images.slice(0, 2)
+                                                    : item.logData.images
+                                                ).map(img => (
+                                                    <div key={img} onClick={() => setPreviewImage(img)} className="cursor-zoom-in transition-transform hover:scale-105">
+                                                        <TimelineImage filename={img} className="w-16 h-16 shadow-sm" useThumbnail={true} refreshKey={refreshKey} />
+                                                    </div>
+                                                ))}
                                                 {item.logData.images.length > 3 && (
                                                     <div className="w-16 h-16 rounded-xl bg-stone-100 flex items-center justify-center border border-stone-200 text-stone-400 font-bold text-sm">
                                                         +{item.logData.images.length - 2}

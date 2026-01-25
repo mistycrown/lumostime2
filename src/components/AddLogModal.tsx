@@ -16,6 +16,7 @@ import { FocusScoreSelector } from '../components/FocusScoreSelector';
 import { CommentSection } from '../components/CommentSection';
 import { imageService } from '../services/imageService';
 import { ImagePreviewModal } from './ImagePreviewModal';
+import { ReactionPicker, ReactionList } from './ReactionComponents';
 
 interface AddLogModalProps {
   initialLog?: Log | null;
@@ -49,6 +50,7 @@ export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialSta
   const [imageUrls, setImageUrls] = useState<Record<string, string>>({});
   const [previewFilename, setPreviewFilename] = useState<string | null>(null);
   const [comments, setComments] = useState<Comment[]>([]);
+  const [reactions, setReactions] = useState<string[]>([]);
   const [isNoteExpanded, setIsNoteExpanded] = useState(false);
 
   // --- TIME STATE (New Logic) ---
@@ -77,8 +79,11 @@ export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialSta
       setProgressIncrement(initialLog.progressIncrement || 0);
       setFocusScore(initialLog.focusScore);
       setScopeIds(initialLog.scopeIds);
+      setFocusScore(initialLog.focusScore);
+      setScopeIds(initialLog.scopeIds);
       setImages(initialLog.images || []);
       setComments(initialLog.comments || []);
+      setReactions(initialLog.reactions || []);
 
       // Sync Todo Category
       // (Logic moved to TodoAssociation)
@@ -99,6 +104,7 @@ export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialSta
       setScopeIds(undefined);
       setImages([]);
       setComments([]);
+      setReactions([]);
 
     } else {
       // Scenario 3: New Button -> Use lastLogEndTime as start if available, otherwise default 1 hour
@@ -127,6 +133,7 @@ export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialSta
       setScopeIds(undefined);
       setImages([]);
       setComments([]);
+      setReactions([]);
 
     }
 
@@ -371,8 +378,8 @@ export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialSta
 
   // 处理编辑评论
   const handleEditComment = (commentId: string, content: string) => {
-    setComments(prev => prev.map(comment => 
-      comment.id === commentId 
+    setComments(prev => prev.map(comment =>
+      comment.id === commentId
         ? { ...comment, content }
         : comment
     ));
@@ -381,6 +388,15 @@ export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialSta
   // 处理删除评论
   const handleDeleteComment = (commentId: string) => {
     setComments(prev => prev.filter(comment => comment.id !== commentId));
+  };
+
+  const handleToggleReaction = (emoji: string) => {
+    setReactions(prev => {
+      if (prev.includes(emoji)) {
+        return prev.filter(r => r !== emoji);
+      }
+      return [...prev, emoji];
+    });
   };
 
   const selectedCategory = categories.find(c => c.id === selectedCategoryId) || categories[0];
@@ -456,6 +472,7 @@ export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialSta
       scopeIds: scopeIds,
       images: images,
       comments: comments.length > 0 ? comments : undefined,
+      reactions: reactions.length > 0 ? reactions : undefined,
     };
     onSave(newLog);
   };
@@ -952,9 +969,8 @@ export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialSta
               ref={noteRef}
               value={note}
               onChange={e => setNote(e.target.value)}
-              className={`w-full bg-white border border-stone-200 rounded-2xl p-4 text-stone-800 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-stone-900 focus:border-stone-900 resize-none placeholder:text-stone-300 font-serif transition-[height] duration-150 ease-out ${
-                isNoteExpanded ? 'h-[400px]' : 'h-[100px]'
-              }`}
+              className={`w-full bg-white border border-stone-200 rounded-2xl p-4 text-stone-800 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-stone-900 focus:border-stone-900 resize-none placeholder:text-stone-300 font-serif transition-[height] duration-150 ease-out ${isNoteExpanded ? 'h-[400px]' : 'h-[100px]'
+                }`}
               placeholder="Add a note..."
             />
           </div>
@@ -1007,6 +1023,28 @@ export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialSta
                 <span className="text-sm">Add Photos</span>
               </div>
             )}
+          </div>
+
+          {/* Reactions Section */}
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-xs font-bold text-stone-400 uppercase tracking-widest">Reactions</span>
+              <ReactionPicker
+                onSelect={handleToggleReaction}
+                currentReactions={reactions}
+                align="right"
+              />
+            </div>
+            {reactions.length > 0 ? (
+              <ReactionList
+                reactions={reactions}
+                onToggle={handleToggleReaction}
+                className="mt-2"
+              />
+            ) : (
+              <div className="text-xs text-stone-300 italic pt-1 pb-2">No reactions yet</div>
+            )}
+
           </div>
 
           {/* Comments Section */}
