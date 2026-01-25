@@ -3,7 +3,7 @@ import { Smile, Plus } from 'lucide-react';
 import confetti from 'canvas-confetti';
 
 // Updated emoji list for different effects
-export const REACTIONS = ['🎉', '❤️', '⭐', '🔥', '❄️', '🚀'];
+export const REACTIONS = ['🎉', '❤️', '🔥', '❄️', '✨', '🌸'];
 
 interface ReactionPickerProps {
     onSelect: (emoji: string) => void;
@@ -36,7 +36,7 @@ export const ReactionPicker: React.FC<ReactionPickerProps> = ({ onSelect, curren
     const isInlineSlideLeft = align === 'inline-slide-left';
 
     // Popup positioning classes
-    let popupClasses = "absolute top-8 z-50 animate-in fade-in zoom-in-95 duration-200 bg-white border border-stone-100 shadow-xl rounded-full p-1.5 flex gap-0.5 items-center min-w-max";
+    let popupClasses = "absolute top-8 z-50 animate-in fade-in zoom-in-95 duration-200 bg-white border border-stone-100 shadow-xl rounded-full p-1.5 flex gap-4 items-center min-w-max";
     if (align === 'right') {
         popupClasses += " right-0";
     } else if (align === 'center') {
@@ -89,36 +89,7 @@ export const ReactionPicker: React.FC<ReactionPickerProps> = ({ onSelect, curren
                 });
                 break;
 
-            case '⭐': // Stars (Star Shape)
-                confetti({
-                    origin,
-                    spread: 360,
-                    ticks: 80,
-                    gravity: 0,
-                    decay: 0.96,
-                    startVelocity: 20,
-                    shapes: ['star'],
-                    colors: ['#FFE400', '#FFBD00', '#E89400', '#FFCA6C', '#FDFFB8'],
-                    zIndex: 9999,
-                    particleCount: 30,
-                    scalar: 1.2
-                });
-                // Secondary burst
-                confetti({
-                    origin,
-                    spread: 360,
-                    ticks: 60,
-                    gravity: 0,
-                    decay: 0.96,
-                    startVelocity: 20,
-                    shapes: ['circle'],
-                    colors: ['#FFE400', '#FFBD00', '#E89400', '#FFCA6C', '#FDFFB8'],
-                    zIndex: 9999,
-                    particleCount: 10,
-                    scalar: 0.75,
-                    flat: true
-                });
-                break;
+
 
             case '🔥': // Fire (Directional + Colors)
                 confetti({
@@ -154,7 +125,7 @@ export const ReactionPicker: React.FC<ReactionPickerProps> = ({ onSelect, curren
                             x: Math.random(),
                             y: (Math.random() * skew) - 0.2
                         },
-                        colors: ['#ffffff', '#87CEEB', '#00BFFF', '#1E90FF'],
+                        colors: ['#c4eeffff'], // Light Blues
                         shapes: ['circle'],
                         gravity: randomInRange(0.4, 0.6),
                         scalar: randomInRange(0.4, 1),
@@ -169,32 +140,42 @@ export const ReactionPicker: React.FC<ReactionPickerProps> = ({ onSelect, curren
                 }());
                 break;
 
-            case '🚀': // Rocket (School Pride Style)
-                const end = Date.now() + (2 * 1000);
-                const colors = ['#bb0000', '#ffffff'];
+            case '✨': // Sparkles (Golden Burst)
+                confetti({
+                    origin,
+                    particleCount: 30,
+                    spread: 80,
+                    startVelocity: 35,
+                    ticks: 50,
+                    gravity: 0.5,
+                    shapes: ['star'],
+                    colors: ['#FFD700', '#FFFACD', '#FFFFFF', '#E0FFFF'],
+                    zIndex: 9999
+                });
+                break;
+
+            case '🌸': // Blossom (Pink Petals falling)
+                const flowerEnd = Date.now() + (3 * 1000);
                 (function frame() {
                     confetti({
-                        particleCount: 2,
+                        particleCount: 3,
                         angle: 60,
                         spread: 55,
-                        origin: { x: 0 },
-                        colors: colors,
+                        origin: { x: Math.random(), y: 0 },
+                        colors: ['#FFB7C5', '#FF69B4', '#FFF0F5'],
+                        shapes: ['circle'],
+                        scalar: 0.8,
+                        drift: 0.5,
+                        gravity: 0.8,
                         zIndex: 9999
                     });
-                    confetti({
-                        particleCount: 2,
-                        angle: 120,
-                        spread: 55,
-                        origin: { x: 1 },
-                        colors: colors,
-                        zIndex: 9999
-                    });
-
-                    if (Date.now() < end) {
+                    if (Date.now() < flowerEnd) {
                         requestAnimationFrame(frame);
                     }
                 }());
                 break;
+
+
 
             default:
                 const genericShape = confetti.shapeFromText ? confetti.shapeFromText({ text: emoji, scalar: 2 }) : 'circle';
@@ -220,7 +201,7 @@ export const ReactionPicker: React.FC<ReactionPickerProps> = ({ onSelect, curren
                         onSelect(emoji);
                         setIsOpen(false);
                     }}
-                    className="w-7 h-7 flex-shrink-0 flex items-center justify-center text-base hover:scale-125 transition-transform rounded-full hover:bg-stone-50"
+                    className="w-4 h-4 flex-shrink-0 flex items-center justify-center text-xs hover:scale-125 transition-transform rounded-full hover:bg-stone-50"
                 >
                     {emoji}
                 </button>
@@ -239,7 +220,7 @@ export const ReactionPicker: React.FC<ReactionPickerProps> = ({ onSelect, curren
                         ${isOpen ? 'w-auto opacity-100 mr-1.5' : 'w-0 opacity-0'}
                     `}
                 >
-                    <div className="flex items-center gap-0.5">
+                    <div className="flex items-center gap-4">
                         {renderButtons()}
                     </div>
                 </div>
@@ -247,7 +228,7 @@ export const ReactionPicker: React.FC<ReactionPickerProps> = ({ onSelect, curren
 
             <button
                 onClick={() => setIsOpen(!isOpen)}
-                className={`p-1.5 text-stone-400 hover:text-stone-600 hover:bg-stone-100 rounded-full transition-colors flex items-center justify-center ${isOpen && (isInlineSlide || isInlineSlideLeft) ? 'bg-stone-100 text-stone-600' : ''}`}
+                className={`p-1.5 text-stone-300 hover:text-stone-600 hover:bg-stone-100 rounded-full transition-colors flex items-center justify-center ${isOpen && (isInlineSlide || isInlineSlideLeft) ? 'bg-stone-100 text-stone-600' : ''}`}
                 title="Add Reaction"
             >
                 <Smile size={16} />
@@ -257,7 +238,7 @@ export const ReactionPicker: React.FC<ReactionPickerProps> = ({ onSelect, curren
             {isInlineSlide && (
                 <div
                     className={`
-                        flex items-center gap-0.5 overflow-hidden transition-all duration-300 ease-out origin-left
+                        flex items-center gap-4 overflow-hidden transition-all duration-300 ease-out origin-left
                         ${isOpen ? 'w-auto opacity-100 ml-1.5' : 'w-0 opacity-0'}
                     `}
                 >
@@ -277,7 +258,7 @@ export const ReactionPicker: React.FC<ReactionPickerProps> = ({ onSelect, curren
                                 onSelect(emoji);
                                 setIsOpen(false);
                             }}
-                            className={`w-7 h-7 flex items-center justify-center text-base hover:scale-125 transition-transform rounded-full hover:bg-stone-50 ${currentReactions.includes(emoji) ? 'bg-stone-100' : ''}`}
+                            className={`w-5 h-5 flex items-center justify-center text-xs hover:scale-125 transition-transform rounded-full hover:bg-stone-50 ${currentReactions.includes(emoji) ? 'bg-stone-100' : ''}`}
                         >
                             {emoji}
                         </button>
@@ -312,7 +293,7 @@ export const ReactionList: React.FC<ReactionListProps> = ({ reactions = [], onTo
                     className="inline-flex items-center gap-1 px-2 py-0.5 bg-stone-50 border border-stone-200 rounded-full text-xs hover:bg-stone-100 transition-colors cursor-pointer group select-none"
                     title="Remove reaction"
                 >
-                    <span className="text-sm group-hover:scale-110 transition-transform block">{emoji}</span>
+                    <span className="text-[10px] group-hover:scale-110 transition-transform block">{emoji}</span>
                     {count > 1 && <span className="font-bold text-stone-500">{count}</span>}
                 </button>
             ))}
