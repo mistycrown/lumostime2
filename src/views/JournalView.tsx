@@ -220,7 +220,8 @@ export const JournalView: React.FC<JournalViewProps> = ({
                 activityId: log.activityId, // Added for filtering
                 scopeIds: log.scopeIds,     // Added for filtering
                 relatedTodos: linkedTodo ? [linkedTodo.title] : undefined,
-                domains: linkedScopes.length > 0 ? linkedScopes.map(s => `${s.icon} ${s.name}`) : undefined
+                domains: linkedScopes.length > 0 ? linkedScopes.map(s => `${s.icon} ${s.name}`) : undefined,
+                reactions: log.reactions
             });
         });
 
@@ -441,6 +442,34 @@ export const JournalView: React.FC<JournalViewProps> = ({
         }
     };
 
+    const handleToggleReaction = useCallback((entryId: string, emoji: string) => {
+        setLogs(prev => prev.map(log => {
+            if (log.id === entryId) {
+                const currentReactions = log.reactions || [];
+                // If exists, remove it (toggle); otherwise add it
+                // Logic: Does the array already contain THIS emoji?
+                // Actually GitHub reactions are "toggle per user". 
+                // Since this is a single user app, simply toggling presence is enough.
+                // However, user might want to add multiple distinct emojis.
+                // So if "Thumbs Up" is there, remove it. If not, add it.
+                // But avoid duplicates of same emoji.
+
+                let newReactions;
+                if (currentReactions.includes(emoji)) {
+                    newReactions = currentReactions.filter(r => r !== emoji);
+                } else {
+                    newReactions = [...currentReactions, emoji];
+                }
+
+                return {
+                    ...log,
+                    reactions: newReactions
+                };
+            }
+            return log;
+        }));
+    }, [setLogs]);
+
     const handleMonthSelect = (monthIndex: number) => {
         const newDate = new Date(selectedDate);
         newDate.setMonth(monthIndex);
@@ -631,6 +660,7 @@ export const JournalView: React.FC<JournalViewProps> = ({
                                                         isLast={groupIndex === filteredEntries.length - 1 && entryIndex === dayGroup.entries.length - 1}
                                                         isFirstOfDay={entryIndex === 0}
                                                         onAddComment={handleAddComment}
+                                                        onToggleReaction={handleToggleReaction}
                                                         onClick={() => handleEntryClick(entry)}
                                                     />
                                                 ))}
