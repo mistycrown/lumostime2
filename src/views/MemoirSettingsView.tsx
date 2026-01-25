@@ -6,7 +6,7 @@
  * @description Provides a UI to configure global filters for the Memoir (Journal) view: Has Image, Min Length, Related Tags, Related Domains.
  */
 import React, { useState, useEffect } from 'react';
-import { ChevronLeft, ImageIcon, AlignLeft, Tag, Crosshair, Check, X } from 'lucide-react';
+import { ChevronLeft, ImageIcon, AlignLeft, Tag, Crosshair, Check, X, Sparkles } from 'lucide-react';
 import { useSettings } from '../contexts/SettingsContext';
 import { useCategoryScope } from '../contexts/CategoryScopeContext';
 import { CustomSelect } from '../components/CustomSelect'; // Assuming this exists or using native select if not suitable
@@ -129,6 +129,28 @@ export const MemoirSettingsView: React.FC<MemoirSettingsViewProps> = ({ onBack }
                             type="checkbox"
                             checked={config.hasImage}
                             onChange={(e) => setConfig({ ...config, hasImage: e.target.checked })}
+                            className="sr-only peer"
+                        />
+                        <div className="w-11 h-6 bg-stone-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-stone-800"></div>
+                    </label>
+                </div>
+
+                {/* 1.5. Has Reaction (NEW) */}
+                <div className="bg-white rounded-2xl p-4 shadow-sm flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-full bg-stone-100 flex items-center justify-center text-stone-600">
+                            <Sparkles size={20} />
+                        </div>
+                        <div>
+                            <h4 className="font-bold text-stone-800">是否带有Reaction (优先显示)</h4>
+                            <p className="text-xs text-stone-400">开启后，带有Reaction的记录将忽略下方筛选条件直接显示</p>
+                        </div>
+                    </div>
+                    <label className="relative inline-flex items-center cursor-pointer">
+                        <input
+                            type="checkbox"
+                            checked={config.hasReaction ?? false}
+                            onChange={(e) => setConfig({ ...config, hasReaction: e.target.checked })}
                             className="sr-only peer"
                         />
                         <div className="w-11 h-6 bg-stone-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-stone-800"></div>

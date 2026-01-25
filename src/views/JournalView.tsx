@@ -309,6 +309,12 @@ export const JournalView: React.FC<JournalViewProps> = ({
                 return true;
             }
 
+            // 1.5 Has Reaction Logic (NEW)
+            // Same exemption logic: If enabled and has reactions, show it.
+            if (memoirFilterConfig.hasReaction && entry.reactions && entry.reactions.length > 0) {
+                return true;
+            }
+
             // 2. Min Length
             if (minNoteLength > 0 && entry.content.length < minNoteLength) return false;
 
