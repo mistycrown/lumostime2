@@ -258,6 +258,7 @@ const TimelineItem: React.FC<TimelineItemProps> = ({ entry, isLast, isFirstOfDay
                             <ReactionPicker
                                 onSelect={(emoji) => onToggleReaction?.(entry.id, emoji)}
                                 currentReactions={entry.reactions}
+                                align="inline-slide"
                             />
 
                             {/* Reactions List Inline */}

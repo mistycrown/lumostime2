@@ -1030,9 +1030,9 @@ export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialSta
             <div className="flex items-center justify-between mb-2">
               <span className="text-xs font-bold text-stone-400 uppercase tracking-widest">Reactions</span>
               <ReactionPicker
-                onSelect={handleToggleReaction}
+                onSelect={(emoji) => handleToggleReaction(emoji)}
                 currentReactions={reactions}
-                align="right"
+                align="inline-slide-left"
               />
             </div>
             {reactions.length > 0 ? (
