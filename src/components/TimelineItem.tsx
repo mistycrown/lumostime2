@@ -162,7 +162,7 @@ const TimelineItem: React.FC<TimelineItemProps> = ({ entry, isLast, isFirstOfDay
     // Background style for summary cards
     const containerClasses = isSummary
         ? "bg-paper-dark/60 rounded-xl p-5 border border-dashed border-gray-300 relative w-full"
-        : "flex flex-col gap-1 w-full pl-[5px]";
+        : "flex flex-col gap-1 w-full pl-[5px] min-w-0";
 
     const hasMetadata = (entry.relatedTodos?.length || 0) + (entry.tags?.length || 0) + (entry.domains?.length || 0) > 0;
 
@@ -273,7 +273,7 @@ const TimelineItem: React.FC<TimelineItemProps> = ({ entry, isLast, isFirstOfDay
 
                 {/* Append/Comment Input Area - HIDDEN FOR SUMMARIES */}
                 {!isSummary && isCommenting && (
-                    <form onSubmit={handleSubmitComment} className="mt-2 flex gap-2 animate-in fade-in slide-in-from-top-2 duration-200 w-full max-w-full">
+                    <form onSubmit={handleSubmitComment} className="mt-2 flex gap-2 animate-in fade-in slide-in-from-top-2 duration-200 w-[90%] max-w-[90%]">
                         <input
                             autoFocus
                             type="text"
