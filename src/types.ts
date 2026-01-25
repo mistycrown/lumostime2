@@ -331,6 +331,7 @@ export interface ParsedFilterCondition {
 // Memoir 筛选配置
 export interface MemoirFilterConfig {
   hasImage: boolean;           // 是否带有图片
+  hasReaction?: boolean;       // 是否带有反应
   minNoteLength: number;       // 备注最小字数
   relatedTagIds: string[];     // 关联标签 ID（Activity ID）
   relatedScopeIds: string[];   // 关联领域 ID

@@ -300,8 +300,17 @@ const TimelineItem: React.FC<TimelineItemProps> = ({ entry, isLast, isFirstOfDay
                                 <div className="w-1 h-auto bg-gray-300 rounded-full my-1 opacity-50"></div>
                                 <div className="flex flex-col gap-1">
                                     <p className="text-sm text-stone-500 leading-relaxed font-light" style={{ fontFamily: '"Noto Serif SC", serif' }}>{comment.text}</p>
-                                    <span className="text-[10px] text-gray-400 uppercase tracking-wider font-bold">
-                                        {new Date(comment.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                    <span className="text-[10px] text-stone-300 font-sans tracking-wide mt-0.5">
+                                        {(() => {
+                                            const d = new Date(comment.createdAt);
+                                            // Format: YYYY/MM/DD HH:mm
+                                            const datePart = d.toLocaleDateString('en-US', { month: '2-digit', day: '2-digit' }).replace('/', '-');
+                                            const timePart = d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false });
+                                            // Determine format to use. If it's today, maybe just time? User asked for date.
+                                            // User said: "It currently only shows time point, not date".
+                                            // So I will show "MM-DD HH:mm".
+                                            return `${datePart} ${timePart}`;
+                                        })()}
                                     </span>
                                 </div>
                             </div>
