@@ -87,7 +87,8 @@ const AppContent: React.FC = () => {
     goalScopeId,
     focusDetailSessionId, setFocusDetailSessionId,
     statsTitle, setStatsTitle,
-    currentView, setCurrentView
+    currentView, setCurrentView,
+    initialLogTimes
   } = useNavigation();
   const { categories, scopes, goals, setCategories, setScopes, setGoals } = useCategoryScope();
   const { startActivity, stopActivity, cancelSession, activeSessions } = useSession();
@@ -169,6 +170,13 @@ const AppContent: React.FC = () => {
   useFloatingWindow(handleStopActivityWrapper);
   useAppDetection(handleStartActivityWrapper);
 
+  // Calculate lastLogEndTime for AddLogModal
+  const lastLogEndTime = React.useMemo(() => {
+    if (!logs.length) return undefined;
+    const sortedLogs = [...logs].sort((a, b) => b.endTime - a.endTime);
+    return sortedLogs[0].endTime;
+  }, [logs]);
+
   return (
     <MainLayout
       isHeaderScrolled={isHeaderScrolled}
@@ -226,33 +234,26 @@ const AppContent: React.FC = () => {
       />
 
       {/* Modals */}
-      {isAddModalOpen && (() => {
-        const { initialLogTimes } = useNavigation();
-        const { logs } = useData();
-        
-        // Calculate lastLogEndTime
-        const sortedLogs = [...logs].sort((a, b) => b.endTime - a.endTime);
-        const lastLogEndTime = sortedLogs.length > 0 ? sortedLogs[0].endTime : undefined;
-        
-        return (
-          <AddLogModal
-            initialLog={editingLog}
-            initialStartTime={initialLogTimes?.start}
-            initialEndTime={initialLogTimes?.end}
-            lastLogEndTime={lastLogEndTime}
-            onClose={logManager.closeModal}
-            onSave={logManager.handleSaveLog}
-            onDelete={logManager.handleDeleteLog}
-            onImageRemove={logManager.handleLogImageRemove}
-            categories={categories}
-            todos={todos}
-            todoCategories={todoCategories}
-            scopes={scopes}
-            autoLinkRules={autoLinkRules}
-            autoFocusNote={autoFocusNote}
-          />
-        );
-      })()}
+
+
+      {isAddModalOpen && (
+        <AddLogModal
+          initialLog={editingLog}
+          initialStartTime={initialLogTimes?.start}
+          initialEndTime={initialLogTimes?.end}
+          lastLogEndTime={lastLogEndTime}
+          onClose={logManager.closeModal}
+          onSave={logManager.handleSaveLog}
+          onDelete={logManager.handleDeleteLog}
+          onImageRemove={logManager.handleLogImageRemove}
+          categories={categories}
+          todos={todos}
+          todoCategories={todoCategories}
+          scopes={scopes}
+          autoLinkRules={autoLinkRules}
+          autoFocusNote={autoFocusNote}
+        />
+      )}
 
       {isTodoModalOpen && (
         <TodoDetailModal
