@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { DiaryEntry } from '../views/journalTypes';
-import { MessageSquarePlus, MoreHorizontal, MessageCircle, Heart, Share2, Bookmark, Moon, Star, Send } from 'lucide-react';
+import { MessageSquarePlus, AudioLines, MessageCircle, Heart, Share2, Bookmark, Moon, Star, Send } from 'lucide-react';
 import { imageService } from '../services/imageService';
 import { ImagePreviewModal } from './ImagePreviewModal';
 
@@ -251,9 +251,9 @@ const TimelineItem: React.FC<TimelineItemProps> = ({ entry, isLast, isFirstOfDay
                         <div className="flex items-center justify-start gap-2 pt-1 flex-wrap">
                             <button
                                 onClick={() => setIsCommenting(!isCommenting)}
-                                className="text-gray-300 hover:text-gray-900 transition-colors"
+                                className="text-stone-300 hover:text-stone-600 transition-colors"
                             >
-                                <MoreHorizontal className="w-5 h-5" />
+                                <AudioLines className="w-4 h-4" />
                             </button>
                             <ReactionPicker
                                 onSelect={(emoji) => onToggleReaction?.(entry.id, emoji)}
@@ -285,7 +285,7 @@ const TimelineItem: React.FC<TimelineItemProps> = ({ entry, isLast, isFirstOfDay
                         <button
                             type="submit"
                             disabled={!commentText.trim()}
-                            className="bg-gray-900 text-white p-2 rounded-lg hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                            className="bg-gray-900 text-white w-[36px] h-[36px] flex items-center justify-center rounded-lg hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex-shrink-0"
                         >
                             <Send className="w-4 h-4" />
                         </button>
