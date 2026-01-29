@@ -73,7 +73,10 @@ import { ReviewTemplateManageView } from './ReviewTemplateManageView';
 import { CheckTemplateManageView } from './CheckTemplateManageView';
 import { ConfirmModal } from '../components/ConfirmModal';
 import { ReviewTemplate, NarrativeTemplate, Log, TodoItem, Scope, DailyReview, WeeklyReview, MonthlyReview, TodoCategory, Filter, Category, CheckTemplate } from '../types';
-import { DefaultArchiveView, DefaultIndexView } from '../contexts/SettingsContext';
+import { DefaultArchiveView, DefaultIndexView, useSettings } from '../contexts/SettingsContext';
+import { useData } from '../contexts/DataContext';
+import { useCategoryScope } from '../contexts/CategoryScopeContext';
+import { useReview } from '../contexts/ReviewContext';
 import FocusNotification from '../plugins/FocusNotificationPlugin';
 import { AutoRecordSettingsView } from './AutoRecordSettingsView';
 import { AutoLinkView } from './AutoLinkView';
@@ -398,6 +401,12 @@ const ExcelExportCardContent: React.FC<{
 };
 
 export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, onImport, onReset, onClearData, onToast, syncData, onSyncUpdate, startWeekOnSunday, onToggleStartWeekOnSunday, onOpenAutoLink, onOpenSearch, minIdleTimeThreshold = 1, onSetMinIdleTimeThreshold, defaultView = 'RECORD', onSetDefaultView, defaultArchiveView = 'CHRONICLE', onSetDefaultArchiveView, defaultIndexView = 'TAGS', onSetDefaultIndexView, reviewTemplates = [], onUpdateReviewTemplates, onUpdateDailyReviews, checkTemplates = [], onUpdateCheckTemplates, dailyReviewTime, onSetDailyReviewTime, weeklyReviewTime, onSetWeeklyReviewTime, monthlyReviewTime, onSetMonthlyReviewTime, customNarrativeTemplates, onUpdateCustomNarrativeTemplates, userPersonalInfo, onSetUserPersonalInfo, logs = [], todos = [], scopes = [], currentDate = new Date(), dailyReviews = [], weeklyReviews = [], monthlyReviews = [], todoCategories = [], filters = [], onUpdateFilters, categoriesData = [], onEditLog, autoFocusNote, onToggleAutoFocusNote }) => {
+    // Hooks for full data access during backup
+    const { logs: ctxLogs, todos: ctxTodos, todoCategories: ctxTodoCategories } = useData();
+    const { categories: ctxCategories, scopes: ctxScopes, goals: ctxGoals } = useCategoryScope();
+    const { autoLinkRules: ctxAutoLinkRules, userPersonalInfo: ctxUserPersonalInfo, filters: ctxFilters, customNarrativeTemplates: ctxCustomNarrativeTemplates, updateDataLastModified } = useSettings();
+    const { dailyReviews: ctxDailyReviews, weeklyReviews: ctxWeeklyReviews, monthlyReviews: ctxMonthlyReviews, reviewTemplates: ctxReviewTemplates } = useReview();
+
     const [activeSubmenu, setActiveSubmenu] = useState<'main' | 'data' | 'cloud' | 's3' | 'ai' | 'preferences' | 'guide' | 'nfc' | 'templates' | 'check_templates' | 'narrative_prompt' | 'auto_record' | 'autolink' | 'obsidian_export' | 'filters' | 'memoir_filter' | 'batch_manage'>('main');
     const fileInputRef = useRef<HTMLInputElement>(null);
     const [webdavConfig, setWebdavConfig] = useState<WebDAVConfig | null>(null);
@@ -780,17 +789,9 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
 
         if (success) {
             setWebdavConfig(config);
-            onToast('success', 'Connected to WebDAV server successfully!');
+            onToast('success', 'WebDAV连接成功');
         } else {
-            webdavService.clearConfig();
-            onToast('error', 'Connection failed.');
-            // @ts-ignore
-            if (window.webdavLastError) {
-                // @ts-ignore
-                alert('WebDAV Error:\n' + window.webdavLastError);
-            } else {
-                alert('Connection failed. Please check your URL and credentials.');
-            }
+            alert('连接失败，请检查 URL 和凭据。');
         }
         setIsSyncing(false);
     };
@@ -799,27 +800,34 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
         // 只清理服务中的活跃连接，保留localStorage中的配置缓存
         webdavService.clearConfig();
         setWebdavConfig(null);
-        // 保留表单中的配置信息，不清空
-        // setConfigForm({ url: '', username: '', password: '' });
 
         console.log('[SettingsView] WebDAV连接已断开，但保留配置缓存供下次使用');
-        onToast('info', 'Disconnected from WebDAV server (configuration saved)');
+        onToast('info', '已断开 WebDAV 服务器连接 (配置已保存)');
     };
 
     const handleSyncUpload = async () => {
         if (!webdavConfig) return;
         setIsSyncing(true);
         try {
+            const localData = getFullLocalData();
+            if (!localData.logs || !localData.todos) {
+                console.error('[Settings] Critical: Logs or Todos are undefined in upload payload!', localData);
+                alert('Error: Local data is seemingly empty (undefined). Upload aborted.');
+                setIsSyncing(false);
+                return;
+            }
+            const uploadTimestamp = Date.now();
             const dataToSync = {
-                ...syncData,
-                timestamp: Date.now(),
+                ...localData,
+                timestamp: uploadTimestamp,
                 version: '1.0.0'
             };
             await webdavService.uploadData(dataToSync);
-            onToast('success', 'Data uploaded successfully!');
+            updateDataLastModified();
+            onToast('success', '数据已成功上传至云端');
         } catch (error) {
             console.error(error);
-            onToast('error', 'Failed to upload data.');
+            onToast('error', '数据上传失败');
         } finally {
             setIsSyncing(false);
         }
@@ -827,14 +835,36 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
 
     const handleSyncDownload = async () => {
         if (!webdavConfig) return;
-        if (!window.confirm("This will overwrite your current local data with the cloud version. Are you sure?")) return;
+        if (!window.confirm("这将使用云端版本覆盖当前本地数据。首先会将当前本地数据的备份上传到云端的 'backups/' 目录。确定吗？")) return;
 
         setIsSyncing(true);
         try {
+            // 0. Backup Local Data to Cloud
+            try {
+                const localData = getFullLocalData();
+                if (!localData.logs || !localData.todos) {
+                    console.error('[Settings] Critical: Logs or Todos are undefined in backup payload!', localData);
+                    alert('Error: Local data is seemingly empty (undefined). Backup aborted to prevent overwriting cloud with empty data.');
+                    setIsSyncing(false);
+                    return;
+                }
+                const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+                const backupFilename = `backups/local_backup_${timestamp}.json`;
+                onToast('info', `正在备份本地数据到 ${backupFilename}...`);
+                await webdavService.uploadData(localData, backupFilename);
+                onToast('success', '本地数据备份成功');
+            } catch (backupError: any) {
+                console.error('[Settings] Cloud backup failed:', backupError);
+                if (!window.confirm(`云端备份失败: ${backupError.message || '未知错误'}. 是否继续还原? (警告: 当前本地数据将丢失)`)) {
+                    setIsSyncing(false);
+                    return;
+                }
+            }
+
             const data = await webdavService.downloadData();
             if (data) {
                 onSyncUpdate(data);
-                onToast('success', 'Data restored from cloud successfully!');
+                onToast('success', '从云端恢复数据成功');
                 // 同步完成后关闭设置页面，自动刷新到脉络页面
                 setTimeout(() => {
                     onClose();
@@ -842,7 +872,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
             }
         } catch (error) {
             console.error(error);
-            onToast('error', 'Failed to download data.');
+            onToast('error', '从云端下载数据失败');
         } finally {
             setIsSyncing(false);
         }
@@ -851,13 +881,13 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
     // S3 处理函数
     const handleS3SaveConfig = async () => {
         if (!s3ConfigForm.bucketName || !s3ConfigForm.region || !s3ConfigForm.secretId || !s3ConfigForm.secretKey) {
-            onToast('error', 'Please fill in all required fields');
+            onToast('error', '请填写所有必填项');
             return;
         }
 
         // 检查SecretId和SecretKey是否相同
         if (s3ConfigForm.secretId === s3ConfigForm.secretKey) {
-            onToast('error', 'SecretId和SecretKey不能相同！请输入正确的SecretKey');
+            onToast('error', 'SecretId 和 SecretKey 不能相同！请输入正确的 SecretKey');
             return;
         }
 
@@ -878,10 +908,10 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
             localStorage.removeItem('lumos_s3_draft_secret_key');
             localStorage.removeItem('lumos_s3_draft_endpoint');
             console.log('[SettingsView] S3配置保存成功，清理草稿');
-            onToast('success', 'Connected to Tencent Cloud COS successfully!');
+            onToast('success', '腾讯云 COS 连接成功');
         } else {
             s3Service.clearConfig();
-            onToast('error', 'COS connection failed. Please check your credentials.');
+            onToast('error', 'COS 连接失败，请检查凭据');
         }
         setIsSyncing(false);
     };
@@ -890,11 +920,9 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
         // 只清理服务中的活跃连接，保留localStorage中的配置缓存
         s3Service.clearConfig();
         setS3Config(null);
-        // 保留表单中的配置信息，不清空
-        // setS3ConfigForm({ bucketName: '', region: '', secretId: '', secretKey: '', endpoint: '' });
 
         console.log('[SettingsView] S3连接已断开，但保留配置缓存供下次使用');
-        onToast('info', 'Disconnected from Tencent Cloud COS (configuration saved)');
+        onToast('info', '已断开与腾讯云 COS 的连接 (配置已保存)');
     };
 
     const handleS3SyncUpload = async () => {
@@ -902,12 +930,21 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
         setIsSyncing(true);
         try {
             // 1. Upload main data
+            const localData = getFullLocalData();
+            if (!localData.logs || !localData.todos) {
+                console.error('[Settings] Critical: Logs or Todos are undefined in upload payload!', localData);
+                alert('Error: Local data is seemingly empty (undefined). Upload aborted.');
+                setIsSyncing(false);
+                return;
+            }
+            const uploadTimestamp = Date.now();
             const dataToSync = {
-                ...syncData,
-                timestamp: Date.now(),
+                ...localData,
+                timestamp: uploadTimestamp,
                 version: '1.0.0'
             };
             await s3Service.uploadData(dataToSync);
+            updateDataLastModified();
 
             // 2. Sync images
             const localImageList = imageService.getReferencedImagesList();
@@ -921,29 +958,79 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
 
                 if (imageResult.uploaded > 0 || imageResult.errors.length > 0) {
                     const message = imageResult.errors.length > 0
-                        ? `Data uploaded. Images: ${imageResult.uploaded} uploaded, ${imageResult.errors.length} errors`
-                        : `Data and ${imageResult.uploaded} images uploaded to COS successfully!`;
+                        ? `数据已上传。图片: ${imageResult.uploaded} 张上传成功, ${imageResult.errors.length} 张失败`
+                        : `数据及 ${imageResult.uploaded} 张图片已成功上传至 COS！`;
                     onToast(imageResult.errors.length > 0 ? 'warning' : 'success', message);
                 } else {
-                    onToast('success', 'Data uploaded to COS successfully!');
+                    onToast('success', '数据已成功上传至 COS！');
                 }
             } else {
-                onToast('success', 'Data uploaded to COS successfully!');
+                onToast('success', '数据已成功上传至 COS！');
             }
         } catch (error) {
             console.error(error);
-            onToast('error', 'Failed to upload data to COS.');
+            onToast('error', '上传数据至 COS 失败');
         } finally {
             setIsSyncing(false);
         }
     };
 
+    const getFullLocalData = () => {
+        const localData = {
+            logs: ctxLogs,
+            todos: ctxTodos,
+            categories: ctxCategories,
+            todoCategories: ctxTodoCategories,
+            scopes: ctxScopes,
+            goals: ctxGoals,
+            autoLinkRules: ctxAutoLinkRules,
+            reviewTemplates: ctxReviewTemplates,
+            dailyReviews: ctxDailyReviews,
+            weeklyReviews: ctxWeeklyReviews,
+            monthlyReviews: ctxMonthlyReviews,
+            customNarrativeTemplates: ctxCustomNarrativeTemplates,
+            userPersonalInfo: ctxUserPersonalInfo,
+            filters: ctxFilters,
+            version: '1.0.0',
+            timestamp: Date.now()
+        };
+        console.log('[SettingsView] getFullLocalData:', {
+            logsCount: localData.logs?.length,
+            todosCount: localData.todos?.length,
+            isLogsUndefined: localData.logs === undefined,
+            dataKeys: Object.keys(localData)
+        });
+        return localData;
+    };
+
     const handleS3SyncDownload = async () => {
         if (!s3Config) return;
-        if (!window.confirm("This will overwrite your current local data with the COS version. Are you sure?")) return;
+        if (!window.confirm("这将使用 COS 版本覆盖当前本地数据。首先会将当前本地数据的备份上传到云端的 'backups/' 目录。确定吗？")) return;
 
         setIsSyncing(true);
         try {
+            // 0. Backup Local Data to Cloud
+            try {
+                const localData = getFullLocalData();
+                if (!localData.logs || !localData.todos) {
+                    console.error('[Settings] Critical: Logs or Todos are undefined in backup payload!', localData);
+                    alert('错误：本地数据似乎为空 (undefined)。已中止备份以防止用空数据覆盖云端。');
+                    setIsSyncing(false);
+                    return;
+                }
+                const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+                const backupFilename = `backups/local_backup_${timestamp}.json`;
+                onToast('info', `正在备份本地数据到 ${backupFilename}...`);
+                await s3Service.uploadData(localData, backupFilename);
+                onToast('success', '本地数据备份成功');
+            } catch (backupError: any) {
+                console.error('[Settings] Cloud backup failed:', backupError);
+                if (!window.confirm(`云端备份失败：${backupError.message || '未知错误'}. 是否继续还原？(警告：当前本地数据将丢失)`)) {
+                    setIsSyncing(false);
+                    return;
+                }
+            }
+
             // 1. Download main data
             const data = await s3Service.downloadData();
             if (data) {
@@ -970,28 +1057,23 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
 
                         if (imageResult.downloaded > 0 || imageResult.errors.length > 0) {
                             const message = imageResult.errors.length > 0
-                                ? `Data restored. Images: ${imageResult.downloaded} downloaded, ${imageResult.errors.length} errors`
-                                : `Data and ${imageResult.downloaded} images restored from COS successfully!`;
+                                ? `数据已还原。图片: ${imageResult.downloaded} 张下载成功，${imageResult.errors.length} 张失败`
+                                : `数据及 ${imageResult.downloaded} 张图片已成功从 COS 还原！`;
                             onToast(imageResult.errors.length > 0 ? 'warning' : 'success', message);
                         } else {
-                            onToast('success', 'Data restored from COS successfully!');
+                            onToast('success', '从 COS 恢复数据成功！');
                         }
                     } else {
-                        onToast('success', 'Data restored from COS successfully!');
+                        onToast('success', '从 COS 恢复数据成功！');
                     }
                 } catch (imageError) {
                     console.warn('[Settings] 图片同步失败:', imageError);
-                    onToast('warning', 'Data restored but image sync failed');
+                    onToast('warning', '数据已恢复，但图片同步失败');
                 }
-
-                // 同步完成后关闭设置页面，自动刷新到脉络页面
-                setTimeout(() => {
-                    onClose();
-                }, 1000); // 延迟1秒让用户看到成功提示
             }
         } catch (error) {
             console.error(error);
-            onToast('error', 'Failed to download data from COS.');
+            onToast('error', '从 COS 下载数据失败');
         } finally {
             setIsSyncing(false);
         }

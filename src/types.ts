@@ -147,6 +147,15 @@ export interface TodoItem {
   heatmapMax?: number;
 }
 
+export interface ParsedTimeEntry {
+  categoryName: string;
+  activityName: string;
+  startTime: string | number | Date;
+  endTime: string | number | Date;
+  description: string;
+  scopeIds?: string[];
+}
+
 export enum AppView {
   RECORD = 'RECORD',
   TIMELINE = 'TIMELINE',

@@ -5,6 +5,7 @@ import { imageService } from '../services/imageService';
 import { useNavigation } from '../contexts/NavigationContext';
 import { useCategoryScope } from '../contexts/CategoryScopeContext';
 import { useToast } from '../contexts/ToastContext';
+import { useSettings } from '../contexts/SettingsContext';
 
 export const useLogManager = () => {
     const { logs, setLogs, setTodos } = useData();
@@ -16,6 +17,7 @@ export const useLogManager = () => {
     } = useNavigation();
     const { categories } = useCategoryScope();
     const { addToast } = useToast();
+    const { updateDataLastModified } = useSettings();
 
     // Helper to close modal (local needed if we want to bundle actions)
     const closeModal = () => {
@@ -63,6 +65,7 @@ export const useLogManager = () => {
             }
             return [log, ...prev];
         });
+        updateDataLastModified();
         closeModal();
     };
 
@@ -88,6 +91,7 @@ export const useLogManager = () => {
         }
 
         setLogs(prev => prev.filter(l => l.id !== id));
+        updateDataLastModified();
         if (shouldCloseModal) closeModal();
     };
 
@@ -130,6 +134,7 @@ export const useLogManager = () => {
         };
 
         setLogs(prev => [newLog, ...prev]);
+        updateDataLastModified();
         addToast('success', 'Quick Punch Recorded!');
     };
 
@@ -160,6 +165,7 @@ export const useLogManager = () => {
         });
 
         setLogs(prev => [...newLogs, ...prev]);
+        updateDataLastModified();
         addToast('success', `Successfully backfilled ${newLogs.length} logs!`);
     };
 
@@ -216,6 +222,7 @@ export const useLogManager = () => {
                 ? { ...log, images: log.images.filter(img => img !== filename) }
                 : log
         ));
+        updateDataLastModified();
     };
 
     return {

@@ -17,8 +17,8 @@ export const useTodoManager = () => {
         setIsTodoManaging
     } = useNavigation();
     const { addToast } = useToast();
-    const { startActivity } = useSession(); // Assuming useSession is accessible
-    const { autoLinkRules } = useSettings();
+    const { startActivity } = useSession();
+    const { autoLinkRules, updateDataLastModified } = useSettings();
 
     /* 
      * NOTE: useSession's startActivity usage in App.tsx had a wrapper:
@@ -83,6 +83,7 @@ export const useTodoManager = () => {
             }
             return [todo, ...prev];
         });
+        updateDataLastModified();
     };
 
     const handleDeleteTodo = (id: string) => {
@@ -111,6 +112,7 @@ export const useTodoManager = () => {
         setTodoToDeleteId(null);
         setIsDeleteTodoConfirmOpen(false);
         closeTodoModal();
+        updateDataLastModified();
         addToast('success', 'Task deleted (history preserved)');
     };
 
@@ -118,6 +120,7 @@ export const useTodoManager = () => {
         setTodoCategories(newCategories);
         setTodos(newTodos);
         setIsTodoManaging(false);
+        updateDataLastModified();
     };
 
     const handleDuplicateTodo = (todo: TodoItem) => {
@@ -129,6 +132,7 @@ export const useTodoManager = () => {
             completedUnits: 0,
         };
         setTodos(prev => [newTodo, ...prev]);
+        updateDataLastModified();
         addToast('success', 'Task duplicated');
     };
 
@@ -147,6 +151,7 @@ export const useTodoManager = () => {
         } as TodoItem));
 
         setTodos(prev => [...newTodos, ...prev]);
+        updateDataLastModified();
         addToast('success', `${newTodos.length} tasks added`);
     };
 

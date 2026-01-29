@@ -27,7 +27,7 @@ export const useReviewManager = () => {
         currentDate
     } = useNavigation();
     const { scopes } = useCategoryScope();
-    const { userPersonalInfo } = useSettings();
+    const { userPersonalInfo, updateDataLastModified } = useSettings();
     const { addToast } = useToast();
 
     // --- Daily Review Handlers ---
@@ -80,10 +80,12 @@ export const useReviewManager = () => {
 
         setCurrentReviewDate(dateToUse);
         setIsDailyReviewOpen(true);
+        updateDataLastModified();
     };
 
     const handleUpdateReview = (updatedReview: DailyReview) => {
         setDailyReviews(prev => prev.map(r => r.id === updatedReview.id ? updatedReview : r));
+        updateDataLastModified();
     };
 
     const handleDeleteReview = () => {
@@ -92,6 +94,7 @@ export const useReviewManager = () => {
         setDailyReviews(prev => prev.filter(r => r.date !== dateStr));
         setIsDailyReviewOpen(false);
         setCurrentReviewDate(null);
+        updateDataLastModified();
     };
 
     const handleGenerateNarrative = async (review: DailyReview, statsText: string, timelineText: string, promptTemplate?: string): Promise<string> => {
@@ -132,6 +135,7 @@ export const useReviewManager = () => {
         setCurrentWeeklyReviewStart(weekStart);
         setCurrentWeeklyReviewEnd(weekEnd);
         setIsWeeklyReviewOpen(true);
+        updateDataLastModified();
     };
 
     const handleCloseWeeklyReview = () => {
@@ -142,6 +146,7 @@ export const useReviewManager = () => {
 
     const handleUpdateWeeklyReview = (updatedReview: WeeklyReview) => {
         setWeeklyReviews(prev => prev.map(r => r.id === updatedReview.id ? updatedReview : r));
+        updateDataLastModified();
     };
 
     const handleDeleteWeeklyReview = () => {
@@ -150,6 +155,7 @@ export const useReviewManager = () => {
         const weekEndStr = getLocalDateStr(currentWeeklyReviewEnd);
         setWeeklyReviews(prev => prev.filter(r => !(r.weekStartDate === weekStartStr && r.weekEndDate === weekEndStr)));
         handleCloseWeeklyReview();
+        updateDataLastModified();
         addToast('success', '周报已删除');
     };
 
@@ -191,6 +197,7 @@ export const useReviewManager = () => {
         setCurrentMonthlyReviewStart(monthStart);
         setCurrentMonthlyReviewEnd(monthEnd);
         setIsMonthlyReviewOpen(true);
+        updateDataLastModified();
     };
 
     const handleCloseMonthlyReview = () => {
@@ -201,6 +208,7 @@ export const useReviewManager = () => {
 
     const handleUpdateMonthlyReview = (updatedReview: MonthlyReview) => {
         setMonthlyReviews(prev => prev.map(r => r.id === updatedReview.id ? updatedReview : r));
+        updateDataLastModified();
     };
 
     const handleDeleteMonthlyReview = () => {
@@ -209,6 +217,7 @@ export const useReviewManager = () => {
         const monthEndStr = getLocalDateStr(currentMonthlyReviewEnd);
         setMonthlyReviews(prev => prev.filter(r => !(r.monthStartDate === monthStartStr && r.monthEndDate === monthEndStr)));
         handleCloseMonthlyReview();
+        updateDataLastModified();
         addToast('success', '月报已删除');
     };
 
