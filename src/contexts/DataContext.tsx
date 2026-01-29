@@ -2,7 +2,7 @@
  * @file DataContext.tsx
  * @description 管理应用核心数据状态（logs, todos, todoCategories）及其持久化逻辑
  */
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef, ReactNode } from 'react';
 import { Log, TodoItem, TodoCategory } from '../types';
 import { INITIAL_LOGS, INITIAL_TODOS, MOCK_TODO_CATEGORIES } from '../constants';
 
@@ -18,6 +18,13 @@ interface DataContextType {
     // Todo Categories 状态
     todoCategories: TodoCategory[];
     setTodoCategories: React.Dispatch<React.SetStateAction<TodoCategory[]>>;
+
+    // Local Modification Timestamp
+    localDataTimestamp: number;
+    setLocalDataTimestamp: React.Dispatch<React.SetStateAction<number>>;
+
+    // Control Function
+    skipNextTimestampUpdate: () => void;
 }
 
 const DataContext = createContext<DataContextType | undefined>(undefined);
@@ -57,6 +64,22 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         return stored ? JSON.parse(stored) : MOCK_TODO_CATEGORIES;
     });
 
+    // Local Timestamp State
+    const [localDataTimestamp, setLocalDataTimestamp] = useState<number>(() => {
+        const stored = localStorage.getItem('lumostime_local_timestamp');
+        return stored ? Number(stored) : Date.now();
+    });
+
+    // Control ref to prevent timestamp updates during restore
+    const shouldUpdateTimestamp = useRef(true);
+
+    const skipNextTimestampUpdate = () => {
+        shouldUpdateTimestamp.current = false;
+    };
+
+    // Refs to skip initial render updates
+    const isFirstRun = useRef(true);
+
     // 持久化 logs 到 localStorage
     useEffect(() => {
         localStorage.setItem('lumostime_logs', JSON.stringify(logs));
@@ -72,6 +95,28 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         localStorage.setItem('lumostime_todoCategories', JSON.stringify(todoCategories));
     }, [todoCategories]);
 
+    // 监控数据变化并更新时间戳
+    useEffect(() => {
+        if (isFirstRun.current) {
+            isFirstRun.current = false;
+            return;
+        }
+
+        // Check if we should update timestamp
+        if (!shouldUpdateTimestamp.current) {
+            // Reset and skip
+            // console.log('[DataContext] Skipping timestamp update (Restore mode)');
+            shouldUpdateTimestamp.current = true;
+            return;
+        }
+
+        // 任何数据变化都更新时间戳
+        const now = Date.now();
+        setLocalDataTimestamp(now);
+        localStorage.setItem('lumostime_local_timestamp', now.toString());
+        // console.log('[DataContext] Data changed, updated local timestamp:', now);
+    }, [logs, todos, todoCategories]);
+
     return (
         <DataContext.Provider value={{
             logs,
@@ -79,7 +124,10 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             todos,
             setTodos,
             todoCategories,
-            setTodoCategories
+            setTodoCategories,
+            localDataTimestamp,
+            setLocalDataTimestamp,
+            skipNextTimestampUpdate
         }}>
             {children}
         </DataContext.Provider>
