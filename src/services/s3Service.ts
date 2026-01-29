@@ -63,7 +63,7 @@ export class S3Service {
                 SecretKey: this.config.secretKey,
             });
 
-            console.log('[COS] Client initialized successfully');
+            // console.log('[COS] Client initialized successfully');
         } catch (error) {
             console.error('[COS] Failed to initialize client:', error);
             this.client = null;
@@ -144,8 +144,8 @@ export class S3Service {
 
                     resolve(false);
                 } else {
-                    console.log('[COS] ✓ Connection test passed');
-                    console.log(`[COS] Status: ${data.statusCode}`);
+                    // console.log('[COS] ✓ Connection test passed');
+                    // console.log(`[COS] Status: ${data.statusCode}`);
                     resolve(true);
                 }
             });
@@ -159,7 +159,8 @@ export class S3Service {
         if (!this.config || !this.client) return null;
 
         return new Promise((resolve) => {
-            console.log(`[COS] Getting file stats: ${filename}`);
+            // console.log(`[COS] Getting file stats: ${filename}`);
+
 
             this.client.headObject({
                 Bucket: this.config!.bucketName,
@@ -192,7 +193,8 @@ export class S3Service {
         const contentBlob = new Blob([content], { type: 'application/json' });
 
         return new Promise((resolve, reject) => {
-            console.log(`[COS] 上传数据: ${filename}`);
+            // console.log(`[COS] 上传数据: ${filename}`);
+
 
             this.client.putObject({
                 Bucket: this.config!.bucketName,
@@ -208,7 +210,7 @@ export class S3Service {
                     console.error(`[COS] ERROR: 数据上传失败 ${filename}`, err);
                     reject(err);
                 } else {
-                    console.log(`[COS] ✓ 数据上传成功: ${filename}`);
+                    // console.log(`[COS] ✓ 数据上传成功: ${filename}`);
                     resolve(true);
                 }
             });
@@ -222,7 +224,8 @@ export class S3Service {
         if (!this.config || !this.client) throw new Error('COS not configured');
 
         return new Promise((resolve, reject) => {
-            console.log(`[COS] Downloading data: ${filename}`);
+            // console.log(`[COS] Downloading data: ${filename}`);
+
 
             this.client.getObject({
                 Bucket: this.config!.bucketName,
@@ -235,7 +238,7 @@ export class S3Service {
                 } else {
                     try {
                         const content = data.Body;
-                        console.log(`[COS] ✓ Download completed: ${filename}, size: ${content.length} bytes`);
+                        // console.log(`[COS] ✓ Download completed: ${filename}, size: ${content.length} bytes`);
                         const parsedData = JSON.parse(content);
                         resolve(parsedData);
                     } catch (parseError) {
@@ -255,7 +258,8 @@ export class S3Service {
 
         return new Promise(async (resolve, reject) => {
             try {
-                console.log(`[COS] Uploading image: ${filename}`);
+                // console.log(`[COS] Uploading image: ${filename}`);
+
 
                 let body: Blob | string;
                 let contentType = 'image/jpeg';
@@ -304,7 +308,7 @@ export class S3Service {
                         console.error(`[COS] Image upload failed: ${filename}`, err);
                         reject(err);
                     } else {
-                        console.log(`[COS] ✓ Image upload completed: ${filename}`);
+                        // console.log(`[COS] ✓ Image upload completed: ${filename}`);
                         resolve(true);
                     }
                 });
@@ -322,7 +326,8 @@ export class S3Service {
         if (!this.config || !this.client) throw new Error('COS not configured');
 
         return new Promise((resolve, reject) => {
-            console.log(`[COS] Downloading image: ${filename}`);
+            // console.log(`[COS] Downloading image: ${filename}`);
+
 
             this.client.getObject({
                 Bucket: this.config!.bucketName,
@@ -369,7 +374,7 @@ export class S3Service {
                             arrayBuffer = uint8Array.buffer;
                         }
 
-                        console.log(`[COS] ✓ Image download completed: ${filename}, size: ${arrayBuffer.byteLength} bytes`);
+                        // console.log(`[COS] ✓ Image download completed: ${filename}, size: ${arrayBuffer.byteLength} bytes`);
                         resolve(arrayBuffer);
                     } catch (conversionError) {
                         console.error(`[COS] Failed to convert image data: ${filename}`, conversionError);
@@ -398,7 +403,7 @@ export class S3Service {
                     console.error(`[COS] Image deletion failed: ${filename}`, err);
                     resolve(false);
                 } else {
-                    console.log(`[COS] ✓ Image deleted: ${filename}`);
+                    // console.log(`[COS] ✓ Image deleted: ${filename}`);
                     resolve(true);
                 }
             });
@@ -423,7 +428,7 @@ export class S3Service {
             // 在Capacitor环境下，将字符串转换为Blob对象
             const bodyBlob = new Blob([bodyContent], { type: 'application/json' });
 
-            console.log(`[COS] 上传图片列表: ${imageList.length}张图片`);
+            // console.log(`[COS] 上传图片列表: ${imageList.length}张图片`);
 
             this.client.putObject({
                 Bucket: this.config!.bucketName,
@@ -439,7 +444,7 @@ export class S3Service {
                     console.error('[COS] ERROR: 图片列表上传失败', err);
                     reject(err);
                 } else {
-                    console.log(`[COS] ✓ 图片列表上传成功: ${filename}`);
+                    // console.log(`[COS] ✓ 图片列表上传成功: ${filename}`);
                     resolve(true);
                 }
             });
@@ -455,7 +460,7 @@ export class S3Service {
         const filename = 'lumostime_images.json';
 
         return new Promise((resolve, reject) => {
-            console.log(`[COS] Downloading image list: ${filename}`);
+            // console.log(`[COS] Downloading image list: ${filename}`);
 
             this.client.getObject({
                 Bucket: this.config!.bucketName,
@@ -464,7 +469,7 @@ export class S3Service {
             }, (err: any, data: any) => {
                 if (err) {
                     if (err.code === 'NoSuchKey') {
-                        console.log('[COS] Image list file not found');
+                        // console.log('[COS] Image list file not found');
                         resolve(null);
                     } else {
                         console.error('[COS] Image list download failed', err);
@@ -475,7 +480,7 @@ export class S3Service {
                         const content = data.Body;
                         const parsedData = JSON.parse(content);
 
-                        console.log(`[COS] ✓ Image list downloaded: ${parsedData.images?.length || 0} images`);
+                        // console.log(`[COS] ✓ Image list downloaded: ${parsedData.images?.length || 0} images`);
                         resolve(parsedData);
                     } catch (parseError) {
                         console.error('[COS] Failed to parse image list JSON', parseError);
@@ -503,7 +508,7 @@ export class S3Service {
      */
     async createDirectory(path: string): Promise<boolean> {
         // COS doesn't have directories, objects are stored with keys that can contain "/"
-        console.log(`[COS] Directory creation not needed for COS: ${path}`);
+        // console.log(`[COS] Directory creation not needed for COS: ${path}`);
         return true;
     }
 
@@ -514,7 +519,8 @@ export class S3Service {
         if (!this.config || !this.client) return [];
 
         return new Promise((resolve) => {
-            console.log(`[COS] Listing objects with prefix: ${path}`);
+            // console.log(`[COS] Listing objects with prefix: ${path}`);
+
 
             this.client.getBucket({
                 Bucket: this.config!.bucketName,

@@ -29,14 +29,14 @@ export const syncService = {
         const s3Config = s3Service.getConfig();
 
         if (s3Config) {
-            console.log('[Sync] 使用 S3/COS 存储服务');
+            // console.log('[Sync] 使用 S3/COS 存储服务');
             return s3Service as StorageService;
         } else if (webdavConfig) {
-            console.log('[Sync] 使用 WebDAV 存储服务');
+            // console.log('[Sync] 使用 WebDAV 存储服务');
             return webdavService as StorageService;
         }
 
-        console.log('[Sync] 没有配置任何存储服务');
+        // console.log('[Sync] 没有配置任何存储服务');
         return null;
     },
 
@@ -67,7 +67,7 @@ export const syncService = {
         localReferencedImages?: string[],
         cloudReferencedImages?: string[]
     ): Promise<SyncResult> => {
-        console.log(`[Sync] syncImages: 本地引用 ${localReferencedImages?.length || 0}, 云端引用 ${cloudReferencedImages?.length || 0}`);
+        // console.log(`[Sync] syncImages: 本地引用 ${localReferencedImages?.length || 0}, 云端引用 ${cloudReferencedImages?.length || 0}`);
 
         const result: SyncResult = { uploaded: 0, downloaded: 0, deletedRemote: 0, errors: [] };
 
@@ -79,7 +79,6 @@ export const syncService = {
         }
 
         try {
-            if (onProgress) onProgress('正在初始化图片同步...');
             if (onProgress) onProgress('正在初始化图片同步...');
 
             // 1. 对于WebDAV，检查云端 /images 目录是否存在
@@ -95,7 +94,7 @@ export const syncService = {
                 }
             } else {
                 // S3/COS 不需要预先创建目录
-                console.log('[Sync] ✓ S3/COS 存储，无需检查目录');
+                // console.log('[Sync] ✓ S3/COS 存储，无需检查目录');
             }
 
             // 2. 确定最终的引用列表（合并本地和云端）
@@ -106,7 +105,7 @@ export const syncService = {
             let actualCloudFiles: Set<string> | null = null;
             if (storageService === s3Service) {
                 try {
-                    console.log('[Sync] S3/COS: 正在扫描云端实际文件列表...');
+                    // console.log('[Sync] S3/COS: 正在扫描云端实际文件列表...');
                     // s3Service.getDirectoryContents 返回的是 COS SDK 的 Contents 数组，包含 Key
                     const contents = await s3Service.getDirectoryContents('images');
                     if (Array.isArray(contents)) {
@@ -114,7 +113,7 @@ export const syncService = {
                             // Key format: "images/filename.jpg"
                             return item.Key.replace(/^images\//, '');
                         }));
-                        console.log(`[Sync] ✓ S3/COS 实际扫描结果: ${actualCloudFiles.size} 个文件`);
+                        // console.log(`[Sync] ✓ S3/COS 实际扫描结果: ${actualCloudFiles.size} 个文件`);
                     }
                 } catch (e) {
                     console.warn('[Sync] S3/COS 扫描失败，回退到使用 list json', e);
@@ -125,29 +124,20 @@ export const syncService = {
             // 否则 (WebDAV 或 扫描失败) 继续使用 cloudReferencedImages (来自 JSON)
             const cloudSet = actualCloudFiles || new Set(cloudReferencedImages || []);
 
-            const mergedSet = new Set([...localSet, ...(cloudReferencedImages || [])]); // Update mergedSet strictly from intention sets?
-            // Wait, mergedSet defines "What we WANT to track".
-            // If actualCloudFiles has files NOT in local or list (orphans), we might ignore them here or sync them down?
-            // Current logic: mergedSet = local U (list json).
-            // We want to upload if inside mergedSet AND (not in actualCloud).
+            const mergedSet = new Set([...localSet, ...(cloudReferencedImages || [])]);
 
-            // Re-evaluating mergedSet:
-            // mergedSet is the "Union of all known references".
-            // If I just want to upload what I have locally, I iterate 'mergedSet'.
-            // If 'actualCloudFiles' is used for the exclusion check, it works.
-
-            console.log('[Sync] ========== 引用列表分析 ==========');
-            console.log(`[Sync] 本地引用: ${localSet.size} 个`);
-            console.log(`[Sync] 云端引用 (JSON): ${(cloudReferencedImages || []).length} 个`);
-            if (actualCloudFiles) {
-                console.log(`[Sync] 云端实际: ${actualCloudFiles.size} 个 (作为判定依据)`);
-            }
-            console.log(`[Sync] 合并后计划: ${mergedSet.size} 个`);
+            // console.log('[Sync] ========== 引用列表分析 ==========');
+            // console.log(`[Sync] 本地引用: ${localSet.size} 个`);
+            // console.log(`[Sync] 云端引用 (JSON): ${(cloudReferencedImages || []).length} 个`);
+            // if (actualCloudFiles) {
+            //     console.log(`[Sync] 云端实际: ${actualCloudFiles.size} 个 (作为判定依据)`);
+            // }
+            // console.log(`[Sync] 合并后计划: ${mergedSet.size} 个`);
 
             // 3. 获取本地实际存在的文件
             const localFiles = await imageService.listImages();
             const localFileSet = new Set(localFiles);
-            console.log(`[Sync] 本地实际文件: ${localFiles.length} 个`);
+            // console.log(`[Sync] 本地实际文件: ${localFiles.length} 个`);
 
             // 4. 处理删除操作
             const deletedImages = imageService.getDeletedImages();
@@ -191,8 +181,6 @@ export const syncService = {
                 }
             }
 
-
-
             // 6. 分析上传需求：本地有 && 被引用 && (云端可能没有)
             const toUpload: string[] = [];
             for (const filename of mergedSet) {
@@ -205,7 +193,7 @@ export const syncService = {
                 }
             }
 
-            console.log(`[Sync] 需要上传: ${toUpload.length} 个`);
+            // console.log(`[Sync] 需要上传: ${toUpload.length} 个`);
             if (toUpload.length > 0) {
                 console.log(`[Sync] 上传列表:`, toUpload.slice(0, 10), toUpload.length > 10 ? '...' : '');
             }
@@ -219,7 +207,7 @@ export const syncService = {
                 }
             }
 
-            console.log(`[Sync] 需要下载: ${toDownload.length} 个`);
+            // console.log(`[Sync] 需要下载: ${toDownload.length} 个`);
             if (toDownload.length > 0) {
                 console.log(`[Sync] 下载列表: ${toDownload.slice(0, 5).join(', ')}${toDownload.length > 5 ? '...' : ''}`);
             }
@@ -245,10 +233,10 @@ export const syncService = {
                 console.log(`[Sync] 下载: ${filename}`);
                 try {
                     const buffer = await storageService.downloadImage(filename);
-                    console.log(`[Sync] 存储服务下载完成: ${filename}, 大小: ${buffer.byteLength} bytes`);
+                    // console.log(`[Sync] 存储服务下载完成: ${filename}, 大小: ${buffer.byteLength} bytes`);
 
                     await imageService.writeImage(filename, buffer);
-                    console.log(`[Sync] 本地写入完成: ${filename}`);
+                    // console.log(`[Sync] 本地写入完成: ${filename}`);
 
                     result.downloaded++;
                     console.log(`[Sync] ✓ 下载完成: ${filename}`);
@@ -258,13 +246,15 @@ export const syncService = {
                 }
             }
 
-            // 10. 上传图片引用列表
+            // 10. 上传图片引用列表 (在 useSyncManager 里通常已经上传了，但这里保留作为完整流程的一部分，或者可以 conditional)
+            // 用户抱怨重复上传，但这里是 syncService，它被设计为独立流程。
+            // 暂时注释掉日志，逻辑保留
             if (mergedSet.size > 0) {
                 try {
                     if (onProgress) onProgress('正在同步图片列表...');
                     const imageList = Array.from(mergedSet);
                     await storageService.uploadImageList(imageList);
-                    console.log(`[Sync] ✓ 图片列表上传成功: ${imageList.length} 个图片`);
+                    // console.log(`[Sync] ✓ 图片列表上传成功: ${imageList.length} 个图片`);
                 } catch (err: any) {
                     console.error(`[Sync] ✗ 图片列表上传失败:`, err);
                     result.errors.push(`Image list upload failed: ${err.message}`);
@@ -272,7 +262,7 @@ export const syncService = {
             }
 
             if (onProgress) onProgress('图片同步完成');
-            console.log('[Sync] 图片同步结果:', result);
+            // console.log('[Sync] 图片同步结果:', result);
 
         } catch (error: any) {
             console.error('[Sync] 图片同步总流程错误', error);

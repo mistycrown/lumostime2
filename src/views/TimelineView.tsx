@@ -816,7 +816,15 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ logs, todos, scopes,
                                                     ? item.logData.images.slice(0, 2)
                                                     : item.logData.images
                                                 ).map(img => (
-                                                    <div key={img} onClick={() => setPreviewImage(img)} className="cursor-zoom-in transition-transform hover:scale-105">
+                                                    <div
+                                                        key={img}
+                                                        onClick={async (e) => {
+                                                            e.stopPropagation();
+                                                            const url = await imageService.getImageUrl(img, 'original');
+                                                            if (url) setPreviewImage(url);
+                                                        }}
+                                                        className="cursor-zoom-in transition-transform hover:scale-105"
+                                                    >
                                                         <TimelineImage filename={img} className="w-16 h-16 shadow-sm" useThumbnail={true} refreshKey={refreshKey} />
                                                     </div>
                                                 ))}
