@@ -755,6 +755,16 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ logs, todos, scopes,
                                             <h3 className={`text-lg font-bold leading-tight ${!item.logData.activity ? 'text-stone-500 italic' : 'text-stone-900'}`}>
                                                 {item.logData.activity?.name || item.logData.title || "未命名记录"}
                                             </h3>
+
+                                            {/* Reactions */}
+                                            {item.logData.reactions && item.logData.reactions.length > 0 && (
+                                                <div className="flex items-center -space-x-1 ml-0.5">
+                                                    {Array.from(new Set(item.logData.reactions)).map((emoji, idx) => (
+                                                        <span key={idx} className="text-sm scale-90">{emoji}</span>
+                                                    ))}
+                                                </div>
+                                            )}
+
                                             {item.logData.focusScore && item.logData.focusScore > 0 && (
                                                 <span className="text-sm font-bold text-stone-400 font-mono flex items-center gap-0.5">
                                                     <Zap size={12} fill="currentColor" />
