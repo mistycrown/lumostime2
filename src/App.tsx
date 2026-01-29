@@ -152,7 +152,14 @@ const AppContent: React.FC = () => {
   const handleStartActivityWrapper = (activity: any, categoryId: string, todoId?: string, scopeIdOrIds?: string | string[], note?: string) => {
     startActivity(activity, categoryId, autoLinkRules, todoId, scopeIdOrIds, note);
   };
-  const handleStopActivityWrapper = (sessionId: string) => stopActivity(sessionId);
+  const handleStopActivityWrapper = (sessionId: string) => {
+    stopActivity(
+      sessionId,
+      undefined,
+      (logs) => logs.forEach(l => logManager.handleSaveLog(l)),
+      todoManager.updateTodoProgress
+    );
+  };
 
   const handleSelectDailyReviewWrapper = (dateStr: string) => {
     reviewManager.handleOpenDailyReview(new Date(dateStr));
