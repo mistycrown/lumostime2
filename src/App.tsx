@@ -434,6 +434,11 @@ const AppContent: React.FC = () => {
           defaultIndexView={defaultIndexView}
           onSetDefaultIndexView={setDefaultIndexView}
 
+          onOpenSearch={() => {
+            setIsSearchOpen(true);
+            setIsSettingsOpen(false);
+          }}
+
           autoFocusNote={autoFocusNote}
           onToggleAutoFocusNote={() => setAutoFocusNote(!autoFocusNote)}
 
