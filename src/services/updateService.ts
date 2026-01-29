@@ -34,7 +34,7 @@ export class UpdateService {
      */
     private static async fetchVersionFromGiteeAPI(): Promise<VersionInfo | null> {
         try {
-            console.log('[UpdateService] 正在从Gitee API获取版本信息...');
+            // console.log('[UpdateService] 正在从Gitee API获取版本信息...');
 
             const options = {
                 url: this.GITEE_API_URL,
@@ -62,7 +62,7 @@ export class UpdateService {
             const decodedContent = decodeURIComponent(escape(atob(apiResponse.content)));
             const data: VersionInfo = JSON.parse(decodedContent);
 
-            console.log('[UpdateService] 成功获取版本信息:', data);
+            // console.log('[UpdateService] 成功获取版本信息:', data);
             return data;
         } catch (error: any) {
             console.error('[UpdateService] Gitee API获取失败:', error.message);
@@ -77,7 +77,7 @@ export class UpdateService {
      */
     private static async fetchVersionFromUrl(url: string): Promise<VersionInfo | null> {
         try {
-            console.log('[UpdateService] 正在从以下地址获取版本信息:', url);
+            // console.log('[UpdateService] 正在从以下地址获取版本信息:', url);
 
             const options = {
                 url: url,
@@ -96,7 +96,7 @@ export class UpdateService {
             }
 
             const data: VersionInfo = response.data;
-            console.log('[UpdateService] 成功获取版本信息:', data);
+            // console.log('[UpdateService] 成功获取版本信息:', data);
             return data;
         } catch (error: any) {
             console.error('[UpdateService] 从', url, '获取失败:', error.message);
@@ -109,23 +109,23 @@ export class UpdateService {
      * @returns 版本信息对象,如果检查失败返回 null
      */
     static async checkForUpdates(): Promise<VersionInfo | null> {
-        console.log('[UpdateService] 开始检查更新...');
+        // console.log('[UpdateService] 开始检查更新...');
 
         // 优先尝试Gitee API(国内用户)
         let versionInfo = await this.fetchVersionFromGiteeAPI();
 
         if (versionInfo) {
-            console.log('[UpdateService] ✓ 从Gitee API获取成功');
+            // console.log('[UpdateService] ✓ 从Gitee API获取成功');
             return versionInfo;
         }
 
-        console.log('[UpdateService] Gitee镜像访问失败,尝试GitHub源...');
+        // console.log('[UpdateService] Gitee镜像访问失败,尝试GitHub源...');
 
         // Fallback到GitHub
         versionInfo = await this.fetchVersionFromUrl(this.GITHUB_UPDATE_URL);
 
         if (versionInfo) {
-            console.log('[UpdateService] ✓ 从GitHub源获取成功');
+            // console.log('[UpdateService] ✓ 从GitHub源获取成功');
             return versionInfo;
         }
 
@@ -177,7 +177,7 @@ export class UpdateService {
             return null;
         }
 
-        console.log('[UpdateService] checkNeedsUpdate: 当前版本:', this.CURRENT_VERSION, '最新版本:', latestVersion.version);
+        // console.log('[UpdateService] checkNeedsUpdate: 当前版本:', this.CURRENT_VERSION, '最新版本:', latestVersion.version);
 
         // 验证version字段
         if (!latestVersion.version) {
