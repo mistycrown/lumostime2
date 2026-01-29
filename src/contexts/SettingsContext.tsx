@@ -62,6 +62,8 @@ interface SettingsContextType {
     setDataLastModified: React.Dispatch<React.SetStateAction<number>>;
     updateDataLastModified: () => void;
     isRestoring: React.MutableRefObject<boolean>;
+    isSyncing: boolean;
+    setIsSyncing: React.Dispatch<React.SetStateAction<boolean>>;
 }
 
 const SettingsContext = createContext<SettingsContextType | undefined>(undefined);
@@ -162,6 +164,7 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
     });
 
     const isRestoring = useRef(false);
+    const [isSyncing, setIsSyncing] = useState(false);
 
     const updateLastSyncTime = () => {
         const now = Date.now();
@@ -255,7 +258,9 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
                 setDataLastModified(now);
                 localStorage.setItem('lumos_data_last_modified', now.toString());
             },
-            isRestoring
+            isRestoring,
+            isSyncing,
+            setIsSyncing
         }}>
             {children}
         </SettingsContext.Provider>
