@@ -319,6 +319,15 @@ export const DetailTimelineCard: React.FC<DetailTimelineCardProps> = ({
                                                         <span className="text-lg font-bold text-stone-900 leading-tight">
                                                             {activity?.name || category?.name || 'Unknown Activity'}
                                                         </span>
+
+                                                        {/* Reactions */}
+                                                        {log.reactions && log.reactions.length > 0 && (
+                                                            <div className="flex items-center -space-x-1 ml-0.5">
+                                                                {Array.from(new Set(log.reactions)).map((emoji, idx) => (
+                                                                    <span key={idx} className="text-sm scale-90">{emoji}</span>
+                                                                ))}
+                                                            </div>
+                                                        )}
                                                         <div className="flex items-center gap-2">
                                                             {log.focusScore && log.focusScore > 0 && (
                                                                 <span className="text-sm font-bold text-stone-400 font-mono flex items-center gap-0.5">
