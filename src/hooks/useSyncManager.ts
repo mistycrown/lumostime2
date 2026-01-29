@@ -190,7 +190,7 @@ export const useSyncManager = () => {
                     if (mode === 'startup') updateLastSyncTime();
 
                     dataSyncStatus = 'restored';
-                    dataSyncMsg = `已还原云端数据 (${new Date(cloudTimestamp).toLocaleDateString()})`;
+                    dataSyncMsg = `已下载云端数据 (${new Date(cloudTimestamp).toLocaleDateString()})`;
                 }
             }
             else if (localTimestamp > cloudTimestamp) {
@@ -291,7 +291,7 @@ export const useSyncManager = () => {
                     addToast(toastType, finalMsg);
                 }
             } else if (mode === 'startup' && dataSyncStatus === 'restored') {
-                addToast('success', '启动同步：已从云端恢复较新数据');
+                addToast('success', '启动同步：已下载云端数据');
             }
 
             if ((currentView === AppView.TIMELINE) || (mode === 'startup' && dataSyncStatus === 'restored')) {
@@ -320,6 +320,12 @@ export const useSyncManager = () => {
 
     // 2. Data Auto Sync
     const isFirstRun = useRef(true);
+    const isSyncingRef = useRef(isSyncing);
+
+    useEffect(() => {
+        isSyncingRef.current = isSyncing;
+    }, [isSyncing]);
+
     useEffect(() => {
         if (isFirstRun.current) {
             isFirstRun.current = false;
@@ -328,7 +334,7 @@ export const useSyncManager = () => {
 
         const timer = setTimeout(async () => {
             // Prevent auto-sync if a manual/startup sync is in progress
-            if (isSyncing) return;
+            if (isSyncingRef.current) return;
 
             const webdavConfig = webdavService.getConfig();
             const s3Config = s3Service.getConfig();
@@ -337,6 +343,8 @@ export const useSyncManager = () => {
 
             const activeService = s3Config ? s3Service : webdavService;
 
+            setIsSyncing(true);
+            const startTime = Date.now();
             try {
                 const localData = getFullLocalData();
                 // Simple validation for auto-sync
@@ -357,6 +365,12 @@ export const useSyncManager = () => {
                 // console.log('[App] Auto-sync completed');
             } catch (e) {
                 console.error('Auto-sync upload failed', e);
+            } finally {
+                const elapsed = Date.now() - startTime;
+                if (elapsed < 1000) {
+                    await new Promise(resolve => setTimeout(resolve, 1000 - elapsed));
+                }
+                setIsSyncing(false);
             }
         }, 2000); // Debounce reduced to 2s for responsiveness
         return () => clearTimeout(timer);
