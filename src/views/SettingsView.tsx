@@ -1759,9 +1759,15 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
                             </div>
                         ) : (
                             <div className="space-y-4">
-                                <p className="text-sm text-stone-500 leading-relaxed">
-                                    Connect to any WebDAV compatible storage (e.g., Nextcloud, Nutstore) to sync your data.
-                                </p>
+                                <div className="text-sm text-stone-500 leading-relaxed space-y-2">
+                                    <p>Connect to any WebDAV compatible storage (e.g., Nextcloud, Nutstore).</p>
+                                    <div className="bg-blue-50 text-blue-700 p-3 rounded-xl text-xs space-y-1">
+                                        <p className="font-bold">⚠️ 配置说明：</p>
+                                        <p>1. 请在网盘根目录新建 <b>Lumostime</b> 文件夹。</p>
+                                        <p>2. 在 Lumostime 文件夹内新建 <b>backups</b> 和 <b>images</b> 两个子文件夹。</p>
+                                        <p>3. 下方 URL 请填写到 Lumostime 文件夹层级。</p>
+                                    </div>
+                                </div>
 
                                 <div className="space-y-3">
                                     <div>
@@ -1770,7 +1776,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
                                             <Globe size={18} className="text-stone-400" />
                                             <input
                                                 type="text"
-                                                placeholder="https://dav.example.com/dav"
+                                                placeholder="https://dav.jianguoyun.com/dav/Lumostime"
                                                 className="flex-1 bg-transparent border-none outline-none text-stone-700 placeholder:text-stone-300 text-sm"
                                                 value={configForm.url}
                                                 onChange={e => setConfigForm(prev => ({ ...prev, url: e.target.value }))}
