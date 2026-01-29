@@ -29,9 +29,9 @@ const TimelineImage: React.FC<{ filename: string, className?: string, useThumbna
     React.useEffect(() => {
         const loadImage = async () => {
             try {
-                console.log(`[TimelineImage] 尝试加载图片: ${filename}, useThumbnail: ${useThumbnail}, refreshKey: ${refreshKey}`);
+                // console.log(`[TimelineImage] 尝试加载图片: ${filename}, useThumbnail: ${useThumbnail}, refreshKey: ${refreshKey}`);
                 const url = await imageService.getImageUrl(filename, useThumbnail ? 'thumbnail' : 'original');
-                console.log(`[TimelineImage] 获取到图片URL: ${filename} -> ${url ? '成功' : '失败'}`);
+                // console.log(`[TimelineImage] 获取到图片URL: ${filename} -> ${url ? '成功' : '失败'}`);
 
                 if (url) {
                     setSrc(url);
@@ -77,7 +77,7 @@ const TimelineImage: React.FC<{ filename: string, className?: string, useThumbna
                     setError('图片加载失败');
                 }}
                 onLoad={() => {
-                    console.log(`[TimelineImage] 图片加载成功: ${filename}`);
+                    // console.log(`[TimelineImage] 图片加载成功: ${filename}`);
                 }}
             />
         </div>

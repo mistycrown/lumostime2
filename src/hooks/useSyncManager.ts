@@ -38,39 +38,43 @@ export const useSyncManager = () => {
 
     // --- Helpers ---
     const handleSyncDataUpdate = async (data: any) => {
-        console.log('[App] 开始更新同步数据...');
+        // console.log('[App] 开始更新同步数据...');
         isRestoring.current = true;
 
-        // CRITICAL: Tell DataContext to IGNORE the next timestamp update
-        // because we are about to programmatically set data from cloud.
-        skipNextTimestampUpdate();
+        try {
+            // CRITICAL: Tell DataContext to IGNORE the next timestamp update
+            // because we are about to programmatically set data from cloud.
+            skipNextTimestampUpdate();
 
-        if (data.logs) setLogs(data.logs);
-        if (data.categories) setCategories(data.categories);
-        if (data.todos) setTodos(data.todos);
-        if (data.todoCategories) setTodoCategories(data.todoCategories);
-        if (data.scopes) setScopes(data.scopes);
-        if (data.goals) setGoals(data.goals);
-        if (data.autoLinkRules) setAutoLinkRules(data.autoLinkRules);
-        if (data.reviewTemplates) setReviewTemplates(data.reviewTemplates);
-        if (data.dailyReviews) setDailyReviews(data.dailyReviews);
-        if (data.weeklyReviews) setWeeklyReviews(data.weeklyReviews);
-        if (data.monthlyReviews) setMonthlyReviews(data.monthlyReviews);
-        if (data.customNarrativeTemplates) setCustomNarrativeTemplates(data.customNarrativeTemplates);
-        if (data.userPersonalInfo) setUserPersonalInfo(data.userPersonalInfo);
-        if (data.filters) setFilters(data.filters);
+            if (data.logs) setLogs(data.logs);
+            if (data.categories) setCategories(data.categories);
+            if (data.todos) setTodos(data.todos);
+            if (data.todoCategories) setTodoCategories(data.todoCategories);
+            if (data.scopes) setScopes(data.scopes);
+            if (data.goals) setGoals(data.goals);
+            if (data.autoLinkRules) setAutoLinkRules(data.autoLinkRules);
+            if (data.reviewTemplates) setReviewTemplates(data.reviewTemplates);
+            if (data.dailyReviews) setDailyReviews(data.dailyReviews);
+            if (data.weeklyReviews) setWeeklyReviews(data.weeklyReviews);
+            if (data.monthlyReviews) setMonthlyReviews(data.monthlyReviews);
+            if (data.customNarrativeTemplates) setCustomNarrativeTemplates(data.customNarrativeTemplates);
+            if (data.userPersonalInfo) setUserPersonalInfo(data.userPersonalInfo);
+            if (data.filters) setFilters(data.filters);
 
-        if (data.timestamp) {
-            // Manually set the timestamp to match cloud
-            setDataLastModified(data.timestamp);
-            setLocalDataTimestamp(data.timestamp);
-        }
+            if (data.timestamp) {
+                // Manually set the timestamp to match cloud
+                setDataLastModified(data.timestamp);
+                setLocalDataTimestamp(data.timestamp);
+            }
 
-        await new Promise(resolve => setTimeout(resolve, 10));
+            await new Promise(resolve => setTimeout(resolve, 10));
 
-        console.log('[App] 同步数据更新完成');
-        if (currentView === AppView.TIMELINE) {
-            setRefreshKey(prev => prev + 1);
+            // console.log('[App] 同步数据更新完成');
+            if (currentView === AppView.TIMELINE) {
+                setRefreshKey(prev => prev + 1);
+            }
+        } finally {
+            isRestoring.current = false;
         }
     };
 
@@ -82,7 +86,7 @@ export const useSyncManager = () => {
 
         try {
             const result = await syncService.syncImages(
-                (msg) => console.log(`[App] ${msg}`),
+                (msg) => { }, // console.log(`[App] ${msg}`),
                 imageList,
                 imageList
             );
@@ -163,18 +167,18 @@ export const useSyncManager = () => {
             // Use the authoritative local timestamp
             const localTimestamp = localDataTimestamp;
 
-            console.log(`[Sync][${mode}] Time check:`, {
+            /* console.log(`[Sync][${mode}] Time check:`, {
                 localTimestamp: localTimestamp,
                 cloudTimestamp: cloudTimestamp,
                 diff: cloudTimestamp - localTimestamp,
                 dateLocal: new Date(localTimestamp).toLocaleString(),
                 dateCloud: new Date(cloudTimestamp).toLocaleString()
-            });
+            }); */
 
             // 3-Way Logic
             if (cloudTimestamp > localTimestamp) {
                 // Case 1: Cloud is Newer -> Restore
-                console.log('[Sync] Cloud is newer. Performing safety backup before restore...');
+                console.log('[Sync] Cloud is newer. Restoring...');
                 if (cloudData) {
                     const backupSuccess = await backupLocalData(activeService, mode === 'startup' ? 'startup_backup' : 'pre_restore');
                     if (!backupSuccess) {
@@ -197,7 +201,7 @@ export const useSyncManager = () => {
                 // For safety, let's allow upload if Manual, but maybe skip/silent for startup to avoid startup lag?
                 // Let's keep it consistent: Sync means Sync.
 
-                console.log('[Sync] Local is newer. Uploading...');
+                // console.log('[Sync] Local is newer. Uploading...');
                 const localData = getFullLocalData();
 
                 // Safety check
@@ -218,7 +222,7 @@ export const useSyncManager = () => {
             }
             else {
                 // Case 3: Equal
-                console.log('[Sync] Timestamps are equal. Data is consistent.');
+                // console.log('[Sync] Timestamps are equal. Data is consistent.');
                 dataSyncStatus = 'equal';
                 dataSyncMsg = '数据已是一致';
             }
@@ -242,13 +246,13 @@ export const useSyncManager = () => {
                 !mergedImageList.every(img => cloudImageList.includes(img));
 
             if (dataSyncStatus === 'uploaded' || isCloudListOutdated) {
-                console.log('[Sync] Updating cloud image list...');
+                // console.log('[Sync] Updating cloud image list...');
                 try {
                     if (mode === 'startup') imageService.updateReferencedImagesList(mergedImageList);
                     await activeService.uploadImageList(mergedImageList);
                 } catch (e) { console.warn('Image list update failed', e); }
             } else {
-                console.log('[Sync] Cloud image list is up to date, skipping upload.');
+                // console.log('[Sync] Cloud image list is up to date, skipping upload.');
             }
 
             // 3. Sync Image Files

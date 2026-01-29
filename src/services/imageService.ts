@@ -43,13 +43,13 @@ class ImageService {
         } else {
             // Ensure directory exists on native
             try {
-                console.log('[ImageService] 创建images目录...');
+                // console.log('[ImageService] 创建images目录...');
                 await Filesystem.mkdir({
                     path: 'images',
                     directory: Directory.Data,
                     recursive: true
                 });
-                console.log('[ImageService] ✓ images目录已创建或已存在');
+                // console.log('[ImageService] ✓ images目录已创建或已存在');
             } catch (e: any) {
                 console.log('[ImageService] images目录创建结果:', e.message);
                 // Ignore if already exists
@@ -70,24 +70,24 @@ class ImageService {
      * Save an image file and return the unique filename
      */
     async saveImage(file: Blob | File): Promise<string> {
-        console.log(`[ImageService] ========== saveImage 开始 ==========`);
-        console.log(`[ImageService] 文件类型: ${file.type}, 大小: ${file.size} bytes`);
-        
+        // console.log(`[ImageService] ========== saveImage 开始 ==========`);
+        // console.log(`[ImageService] 文件类型: ${file.type}, 大小: ${file.size} bytes`);
+
         // 确保初始化完成
         await this.ensureInit();
-        
+
         const filename = `${Date.now()}_${Math.random().toString(36).substring(2, 11)}.jpg`;
-        console.log(`[ImageService] 生成文件名: ${filename}`);
+        // console.log(`[ImageService] 生成文件名: ${filename}`);
 
         // 1. Save Original
         try {
-            console.log(`[ImageService] 开始保存原图: ${filename}`);
+            // console.log(`[ImageService] 开始保存原图: ${filename}`);
             await this.writeImage(filename, file);
-            console.log(`[ImageService] ✓ 原图保存成功: ${filename}`);
-            
+            // console.log(`[ImageService] ✓ 原图保存成功: ${filename}`);
+
             // 验证文件是否真的存在
             const exists = await this.checkFileExists(filename);
-            console.log(`[ImageService] 原图存在性验证: ${filename} -> ${exists}`);
+            // console.log(`[ImageService] 原图存在性验证: ${filename} -> ${exists}`);
             if (!exists) {
                 throw new Error(`原图保存后验证失败: ${filename}`);
             }
@@ -98,34 +98,34 @@ class ImageService {
 
         // 2. Generate & Save Thumbnail (Best effort)
         try {
-            console.log(`[ImageService] 开始生成缩略图: thumb_${filename}`);
+            // console.log(`[ImageService] 开始生成缩略图: thumb_${filename}`);
             const thumbBlob = await this.generateThumbnail(file);
-            console.log(`[ImageService] 缩略图生成成功，大小: ${thumbBlob.size} bytes`);
-            
+            // console.log(`[ImageService] 缩略图生成成功，大小: ${thumbBlob.size} bytes`);
+
             await this.writeImage(`thumb_${filename}`, thumbBlob);
-            console.log(`[ImageService] ✓ 缩略图保存成功: thumb_${filename}`);
-            
+            // console.log(`[ImageService] ✓ 缩略图保存成功: thumb_${filename}`);
+
             // 验证缩略图是否存在
             const thumbExists = await this.checkFileExists(`thumb_${filename}`);
-            console.log(`[ImageService] 缩略图存在性验证: thumb_${filename} -> ${thumbExists}`);
+            // console.log(`[ImageService] 缩略图存在性验证: thumb_${filename} -> ${thumbExists}`);
         } catch (e) {
             console.error(`[ImageService] ✗ 缩略图生成/保存失败: thumb_${filename}`, e);
             // 缩略图失败不影响主流程
         }
 
         // 3. 添加到引用列表
-        console.log(`[ImageService] 添加到引用列表: ${filename}`);
+        // console.log(`[ImageService] 添加到引用列表: ${filename}`);
         this.addToReferencedList(filename);
 
         // 4. 触发全局事件通知图片已上传，需要同步
         if (typeof window !== 'undefined') {
-            window.dispatchEvent(new CustomEvent('imageUploaded', { 
-                detail: { filename } 
+            window.dispatchEvent(new CustomEvent('imageUploaded', {
+                detail: { filename }
             }));
-            console.log(`[ImageService] ✓ 触发imageUploaded事件: ${filename}`);
+            // console.log(`[ImageService] ✓ 触发imageUploaded事件: ${filename}`);
         }
 
-        console.log(`[ImageService] ========== saveImage 完成: ${filename} ==========`);
+        console.log(`[ImageService] saveImage 完成: ${filename}`);
         return filename;
     }
 
@@ -135,28 +135,28 @@ class ImageService {
     async getImageUrl(filename: string, type: 'original' | 'thumbnail' = 'original'): Promise<string> {
         // 确保初始化完成
         await this.ensureInit();
-        
-        console.log(`[ImageService] getImageUrl 请求: ${filename}, type: ${type}`);
-        
+
+        // console.log(`[ImageService] getImageUrl 请求: ${filename}, type: ${type}`);
+
         let targetFilename = filename;
         if (type === 'thumbnail') {
             const thumbName = `thumb_${filename}`;
             const exists = await this.checkFileExists(thumbName);
-            console.log(`[ImageService] 缩略图检查: ${thumbName} exists: ${exists}`);
+            // console.log(`[ImageService] 缩略图检查: ${thumbName} exists: ${exists}`);
             if (exists) {
                 targetFilename = thumbName;
             }
         }
 
-        console.log(`[ImageService] 目标文件名: ${targetFilename}`);
+        // console.log(`[ImageService] 目标文件名: ${targetFilename}`);
 
         if (Capacitor.isNativePlatform()) {
-            console.log(`[ImageService] Native平台，获取文件URI: images/${targetFilename}`);
+            // console.log(`[ImageService] Native平台，获取文件URI: images/${targetFilename}`);
             try {
                 // 首先检查文件是否存在
                 const fileExists = await this.checkFileExists(targetFilename);
                 if (!fileExists) {
-                    console.warn(`[ImageService] 文件不存在: ${targetFilename}`);
+                    // console.warn(`[ImageService] 文件不存在: ${targetFilename}`);
                     return '';
                 }
 
@@ -169,7 +169,7 @@ class ImageService {
 
                 // 当不指定encoding时，Capacitor返回Base64字符串
                 const base64String = typeof fileResult.data === 'string' ? fileResult.data : '';
-                console.log(`[ImageService] 读取文件成功: ${targetFilename}, 数据长度: ${base64String.length}`);
+                // console.log(`[ImageService] 读取文件成功: ${targetFilename}, 数据长度: ${base64String.length}`);
 
                 // 确保数据是Base64格式，如果不是则添加data URL前缀
                 let base64Data = base64String;
@@ -177,17 +177,17 @@ class ImageService {
                     // 根据文件扩展名推断MIME类型
                     const mimeType = this.getMimeTypeFromFilename(targetFilename);
                     base64Data = `data:${mimeType};base64,${base64Data}`;
-                    console.log(`[ImageService] 添加data URL前缀: ${mimeType}`);
+                    // console.log(`[ImageService] 添加data URL前缀: ${mimeType}`);
                 }
 
-                console.log(`[ImageService] Native返回Base64 Data URL: ${targetFilename}`);
+                // console.log(`[ImageService] Native返回Base64 Data URL: ${targetFilename}`);
                 return base64Data;
             } catch (error) {
                 console.error(`[ImageService] Native读取文件失败: ${targetFilename}`, error);
                 return '';
             }
         } else {
-            console.log(`[ImageService] Web平台，从IndexedDB获取: ${targetFilename}`);
+            // console.log(`[ImageService] Web平台，从IndexedDB获取: ${targetFilename}`);
             // Web: Retrieve Blob from IDB and create ObjectURL
             const db = await this.dbPromise;
             if (!db) {
@@ -199,21 +199,21 @@ class ImageService {
                 const transaction = db.transaction([STORE_NAME], 'readonly');
                 const store = transaction.objectStore(STORE_NAME);
                 const request = store.get(targetFilename);
-                
+
                 request.onsuccess = () => {
                     const blob = request.result;
-                    console.log(`[ImageService] IndexedDB查询结果: ${targetFilename} -> ${blob ? '找到' : '未找到'}`);
-                    
+                    // console.log(`[ImageService] IndexedDB查询结果: ${targetFilename} -> ${blob ? '找到' : '未找到'}`);
+
                     if (blob) {
                         const objectUrl = URL.createObjectURL(blob);
-                        console.log(`[ImageService] 创建ObjectURL成功: ${targetFilename} -> ${objectUrl}`);
+                        // console.log(`[ImageService] 创建ObjectURL成功: ${targetFilename} -> ${objectUrl}`);
                         resolve(objectUrl);
                     } else {
                         console.warn(`[ImageService] 图片未找到: ${targetFilename}`);
                         resolve('');
                     }
                 };
-                
+
                 request.onerror = () => {
                     console.error(`[ImageService] IndexedDB查询错误: ${targetFilename}`, request.error);
                     reject(request.error);
@@ -228,7 +228,7 @@ class ImageService {
     async deleteImage(filename: string): Promise<void> {
         // 确保初始化完成
         await this.ensureInit();
-        
+
         // 1. Track deletion for sync (Original)
         this.trackDeletion(filename);
         // Track deletion for sync (Thumbnail)
@@ -267,14 +267,14 @@ class ImageService {
 
         // 4. 触发全局事件通知图片已删除，需要同步
         if (typeof window !== 'undefined') {
-            window.dispatchEvent(new CustomEvent('imageDeleted', { 
-                detail: { filename } 
+            window.dispatchEvent(new CustomEvent('imageDeleted', {
+                detail: { filename }
             }));
         }
     }
 
     private blobToBase64(blob: Blob): Promise<string> {
-        console.log(`[ImageService] blobToBase64 开始，Blob大小: ${blob.size} bytes`);
+        // console.log(`[ImageService] blobToBase64 开始，Blob大小: ${blob.size} bytes`);
         return new Promise((resolve, reject) => {
             const reader = new FileReader();
             reader.onerror = (error) => {
@@ -283,7 +283,7 @@ class ImageService {
             };
             reader.onload = () => {
                 if (typeof reader.result === 'string') {
-                    console.log(`[ImageService] blobToBase64 成功，结果长度: ${reader.result.length}`);
+                    // console.log(`[ImageService] blobToBase64 成功，结果长度: ${reader.result.length}`);
                     resolve(reader.result);
                 } else {
                     console.error(`[ImageService] FileReader结果不是字符串:`, typeof reader.result);
@@ -302,37 +302,37 @@ class ImageService {
     // --- Helper Methods ---
 
     private async generateThumbnail(file: Blob | File): Promise<Blob> {
-        console.log(`[ImageService] generateThumbnail 开始，文件大小: ${file.size} bytes`);
+        // console.log(`[ImageService] generateThumbnail 开始，文件大小: ${file.size} bytes`);
         return new Promise((resolve, reject) => {
             const img = new Image();
             img.onload = () => {
-                console.log(`[ImageService] 图片加载成功，尺寸: ${img.width}x${img.height}`);
+                // console.log(`[ImageService] 图片加载成功，尺寸: ${img.width}x${img.height}`);
                 const canvas = document.createElement('canvas');
                 const MAX_WIDTH = 300; // Efficient size for mobile lists
                 const scale = MAX_WIDTH / img.width;
 
                 if (scale >= 1) {
-                    console.log(`[ImageService] 图片已经很小，不需要缩放`);
+                    // console.log(`[ImageService] 图片已经很小，不需要缩放`);
                     resolve(file); // Don't upscale or duplicate small images
                     return;
                 }
 
                 canvas.width = MAX_WIDTH;
                 canvas.height = img.height * scale;
-                console.log(`[ImageService] 缩略图尺寸: ${canvas.width}x${canvas.height}`);
-                
+                // console.log(`[ImageService] 缩略图尺寸: ${canvas.width}x${canvas.height}`);
+
                 const ctx = canvas.getContext('2d');
                 if (!ctx) {
                     console.error(`[ImageService] Canvas context获取失败`);
                     reject(new Error('Canvas context failed'));
                     return;
                 }
-                
+
                 try {
                     ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
                     canvas.toBlob(blob => {
                         if (blob) {
-                            console.log(`[ImageService] 缩略图生成成功，大小: ${blob.size} bytes`);
+                            // console.log(`[ImageService] 缩略图生成成功，大小: ${blob.size} bytes`);
                             resolve(blob);
                         } else {
                             console.error(`[ImageService] toBlob返回null`);
@@ -350,7 +350,7 @@ class ImageService {
             };
             try {
                 img.src = URL.createObjectURL(file);
-                console.log(`[ImageService] 创建ObjectURL成功: ${img.src.substring(0, 50)}...`);
+                // console.log(`[ImageService] 创建ObjectURL成功: ${img.src.substring(0, 50)}...`);
             } catch (e) {
                 console.error(`[ImageService] createObjectURL异常:`, e);
                 reject(e);
@@ -390,7 +390,7 @@ class ImageService {
     async listImages(): Promise<string[]> {
         // 确保初始化完成
         await this.ensureInit();
-        
+
         if (Capacitor.isNativePlatform()) {
             try {
                 const result = await Filesystem.readdir({
@@ -420,16 +420,16 @@ class ImageService {
     async readImage(filename: string): Promise<ArrayBuffer | string | Blob> {
         // 确保初始化完成
         await this.ensureInit();
-        
+
         if (Capacitor.isNativePlatform()) {
-            console.log(`[ImageService] Native读取图片用于同步: ${filename}`);
+            // console.log(`[ImageService] Native读取图片用于同步: ${filename}`);
             const result = await Filesystem.readFile({
                 path: `images/${filename}`,
                 directory: Directory.Data
                 // 不指定encoding，Capacitor会返回Base64字符串
             });
             const base64String = typeof result.data === 'string' ? result.data : '';
-            console.log(`[ImageService] Native读取完成: ${filename}, 数据长度: ${base64String.length}`);
+            // console.log(`[ImageService] Native读取完成: ${filename}, 数据长度: ${base64String.length}`);
             // result.data is Base64 string
             return base64String;
         } else {
@@ -451,27 +451,27 @@ class ImageService {
     async writeImage(filename: string, data: ArrayBuffer | string | Blob): Promise<void> {
         // 确保初始化完成
         await this.ensureInit();
-        
-        console.log(`[ImageService] writeImage 开始: ${filename}, 数据类型: ${data instanceof ArrayBuffer ? 'ArrayBuffer' : data instanceof Blob ? 'Blob' : 'string'}`);
-        
+
+        // console.log(`[ImageService] writeImage 开始: ${filename}, 数据类型: ${data instanceof ArrayBuffer ? 'ArrayBuffer' : data instanceof Blob ? 'Blob' : 'string'}`);
+
         if (Capacitor.isNativePlatform()) {
-            console.log(`[ImageService] Native平台写入: ${filename}`);
-            
+            // console.log(`[ImageService] Native平台写入: ${filename}`);
+
             try {
                 // Filesystem.writeFile expects string for data. 
                 // For Base64 data, we should NOT specify encoding
                 let writeData = data;
                 if (data instanceof ArrayBuffer) {
-                    console.log(`[ImageService] 转换ArrayBuffer为Base64: ${filename}, size: ${data.byteLength}`);
+                    // console.log(`[ImageService] 转换ArrayBuffer为Base64: ${filename}, size: ${data.byteLength}`);
                     // 转换为纯Base64字符串（不包含data:前缀）
                     writeData = Buffer.from(data).toString('base64');
-                    console.log(`[ImageService] Base64长度: ${(writeData as string).length}`);
+                    // console.log(`[ImageService] Base64长度: ${(writeData as string).length}`);
                 } else if (data instanceof Blob) {
-                    console.log(`[ImageService] 转换Blob为Base64: ${filename}`);
+                    // console.log(`[ImageService] 转换Blob为Base64: ${filename}`);
                     const dataUrl = await this.blobToBase64(data as Blob);
                     // 移除data:image/jpeg;base64,前缀，只保留纯Base64
                     writeData = dataUrl.split(',')[1] || dataUrl;
-                    console.log(`[ImageService] Blob转Base64完成，长度: ${(writeData as string).length}`);
+                    // console.log(`[ImageService] Blob转Base64完成，长度: ${(writeData as string).length}`);
                 }
 
                 // 对于Base64数据，不指定encoding，让Capacitor自动处理
@@ -483,7 +483,7 @@ class ImageService {
                     // 不指定encoding，Capacitor会将其视为Base64数据
                 });
                 console.log(`[ImageService] ✓ Native写入成功: ${filename}`);
-                
+
                 // 验证文件是否真的写入成功
                 try {
                     const stat = await Filesystem.stat({
@@ -504,7 +504,7 @@ class ImageService {
                 throw error;
             }
         } else {
-            console.log(`[ImageService] Web平台写入到IndexedDB: ${filename}`);
+            // console.log(`[ImageService] Web平台写入到IndexedDB: ${filename}`);
             const db = await this.dbPromise;
             if (!db) {
                 console.error(`[ImageService] IndexedDB未初始化`);
@@ -535,12 +535,12 @@ class ImageService {
                 const transaction = db.transaction([STORE_NAME], 'readwrite');
                 const store = transaction.objectStore(STORE_NAME);
                 const request = store.put(blob, filename);
-                
+
                 request.onsuccess = () => {
-                    console.log(`[ImageService] IndexedDB写入成功: ${filename}`);
+                    // console.log(`[ImageService] IndexedDB写入成功: ${filename}`);
                     resolve();
                 };
-                
+
                 request.onerror = () => {
                     console.error(`[ImageService] IndexedDB写入失败: ${filename}`, request.error);
                     reject(request.error);
@@ -613,7 +613,7 @@ class ImageService {
     }
 
     // --- Referenced Images List Management ---
-    
+
     /**
      * 获取当前的引用图片列表
      */
@@ -633,7 +633,7 @@ class ImageService {
     updateReferencedImagesList(images: string[]): void {
         try {
             localStorage.setItem(REFERENCED_IMAGES_KEY, JSON.stringify(images));
-            console.log(`[ImageService] 更新引用列表: ${images.length} 个图片`);
+            // console.log(`[ImageService] 更新引用列表: ${images.length} 个图片`);
         } catch (e) {
             console.error('[ImageService] 更新引用列表失败', e);
         }
@@ -646,27 +646,27 @@ class ImageService {
         try {
             const list = this.getReferencedImagesList();
             let updated = false;
-            
+
             if (!list.includes(filename)) {
                 list.push(filename);
                 updated = true;
             }
-            
+
             // 同时添加缩略图
             const thumbName = `thumb_${filename}`;
             if (!list.includes(thumbName)) {
                 list.push(thumbName);
                 updated = true;
             }
-            
+
             if (updated) {
                 this.updateReferencedImagesList(list);
-                console.log(`[ImageService] 添加到引用列表: ${filename}, 当前总数: ${list.length}`);
-                
+                // console.log(`[ImageService] 添加到引用列表: ${filename}, 当前总数: ${list.length}`);
+
                 // 触发图片列表变化事件
                 if (typeof window !== 'undefined') {
-                    window.dispatchEvent(new CustomEvent('imageListChanged', { 
-                        detail: { images: list } 
+                    window.dispatchEvent(new CustomEvent('imageListChanged', {
+                        detail: { images: list }
                     }));
                 }
             }
@@ -683,15 +683,15 @@ class ImageService {
             let list = this.getReferencedImagesList();
             const originalLength = list.length;
             list = list.filter(f => f !== filename && f !== `thumb_${filename}`);
-            
+
             if (list.length !== originalLength) {
                 this.updateReferencedImagesList(list);
-                console.log(`[ImageService] 从引用列表移除: ${filename}, 剩余: ${list.length}`);
-                
+                // console.log(`[ImageService] 从引用列表移除: ${filename}, 剩余: ${list.length}`);
+
                 // 触发图片列表变化事件
                 if (typeof window !== 'undefined') {
-                    window.dispatchEvent(new CustomEvent('imageListChanged', { 
-                        detail: { images: list } 
+                    window.dispatchEvent(new CustomEvent('imageListChanged', {
+                        detail: { images: list }
                     }));
                 }
             }
@@ -717,15 +717,15 @@ class ImageService {
         });
         const list = Array.from(referencedSet);
         this.updateReferencedImagesList(list);
-        console.log(`[ImageService] 重建引用列表: ${list.length} 个图片`);
-        
+        // console.log(`[ImageService] 重建引用列表: ${list.length} 个图片`);
+
         // 触发图片列表变化事件
         if (typeof window !== 'undefined') {
-            window.dispatchEvent(new CustomEvent('imageListChanged', { 
-                detail: { images: list } 
+            window.dispatchEvent(new CustomEvent('imageListChanged', {
+                detail: { images: list }
             }));
         }
-        
+
         return list;
     }
 
@@ -734,7 +734,7 @@ class ImageService {
      */
     async cleanupUnreferencedImages(logs: any[]): Promise<{ cleaned: number, kept: number }> {
         console.log('[ImageService] ========== 开始清理未引用的图片 ==========');
-        
+
         // 1. 从logs重建正确的引用列表
         const referencedImages = new Set<string>();
         logs.forEach(log => {
@@ -747,31 +747,31 @@ class ImageService {
                 });
             }
         });
-        
-        console.log(`[ImageService] Logs中引用的图片: ${referencedImages.size} 个`);
-        
+
+        // console.log(`[ImageService] Logs中引用的图片: ${referencedImages.size} 个`);
+
         // 2. 获取当前列表中的所有图片
         const currentList = this.getReferencedImagesList();
-        console.log(`[ImageService] 当前列表中的图片: ${currentList.length} 个`);
-        
+        // console.log(`[ImageService] 当前列表中的图片: ${currentList.length} 个`);
+
         // 3. 找出未被引用的图片
         const unreferencedImages = currentList.filter(img => !referencedImages.has(img));
-        console.log(`[ImageService] 未引用的图片: ${unreferencedImages.length} 个`, unreferencedImages);
-        
+        // console.log(`[ImageService] 未引用的图片: ${unreferencedImages.length} 个`, unreferencedImages);
+
         // 4. 从列表中移除未引用的图片
         if (unreferencedImages.length > 0) {
             this.updateReferencedImagesList(Array.from(referencedImages));
-            console.log(`[ImageService] ✓ 已从列表中移除 ${unreferencedImages.length} 个未引用的图片`);
+            // console.log(`[ImageService] ✓ 已从列表中移除 ${unreferencedImages.length} 个未引用的图片`);
         }
-        
+
         // 5. 获取本地实际存在的文件
         const localFiles = await this.listImages();
-        console.log(`[ImageService] 本地文件: ${localFiles.length} 个`);
-        
+        // console.log(`[ImageService] 本地文件: ${localFiles.length} 个`);
+
         // 6. 找出本地存在但未被引用的文件
         const filesToDelete = localFiles.filter(file => !referencedImages.has(file));
-        console.log(`[ImageService] 需要删除的文件: ${filesToDelete.length} 个`, filesToDelete);
-        
+        // console.log(`[ImageService] 需要删除的文件: ${filesToDelete.length} 个`, filesToDelete);
+
         // 7. 删除这些文件
         let deletedCount = 0;
         for (const filename of filesToDelete) {
@@ -794,22 +794,22 @@ class ImageService {
                     }
                 }
                 deletedCount++;
-                console.log(`[ImageService] ✓ 已删除: ${filename}`);
+                // console.log(`[ImageService] ✓ 已删除: ${filename}`);
             } catch (error) {
                 console.warn(`[ImageService] 删除失败: ${filename}`, error);
             }
         }
-        
+
         console.log('[ImageService] ========== 清理完成 ==========');
         console.log(`[ImageService] 保留: ${referencedImages.size} 个, 清理: ${deletedCount} 个`);
-        
+
         // 触发图片列表变化事件（如果有清理操作）
         if (unreferencedImages.length > 0 && typeof window !== 'undefined') {
-            window.dispatchEvent(new CustomEvent('imageListChanged', { 
-                detail: { images: Array.from(referencedImages) } 
+            window.dispatchEvent(new CustomEvent('imageListChanged', {
+                detail: { images: Array.from(referencedImages) }
             }));
         }
-        
+
         return {
             cleaned: deletedCount,
             kept: referencedImages.size
@@ -827,11 +827,11 @@ class ImageService {
 
         try {
             console.log(`[ImageService] ========== 开始测试图片读写: ${filename} ==========`);
-            
+
             // 1. 检查文件是否存在
             const exists = await this.checkFileExists(filename);
             console.log(`[ImageService] 1. 文件存在检查: ${filename} -> ${exists}`);
-            
+
             if (!exists) {
                 console.log(`[ImageService] 文件不存在，跳过测试: ${filename}`);
                 return;
@@ -859,7 +859,7 @@ class ImageService {
                 console.log(`[ImageService]    - URL开头: ${imageUrl.substring(0, 100)}...`);
                 console.log(`[ImageService]    - 是否是Data URL: ${imageUrl.startsWith('data:')}`);
             }
-            
+
             console.log(`[ImageService] ========== 测试完成: ${filename} ==========`);
 
         } catch (error) {
@@ -873,23 +873,23 @@ class ImageService {
      */
     async debugTestImageSync(): Promise<void> {
         console.log('[ImageService] ========== 开始完整图片同步测试 ==========');
-        
+
         try {
             // 1. 检查初始化状态
             await this.ensureInit();
             console.log('[ImageService] ✓ 初始化完成');
-            
+
             // 2. 列出所有本地图片
             const localImages = await this.listImages();
             console.log(`[ImageService] 本地图片数量: ${localImages.length}`);
             console.log(`[ImageService] 本地图片列表:`, localImages);
-            
+
             // 3. 测试前3张图片的读写
             const testImages = localImages.slice(0, 3);
             for (const img of testImages) {
                 await this.debugTestImageReadWrite(img);
             }
-            
+
             console.log('[ImageService] ========== 完整图片同步测试完成 ==========');
         } catch (error) {
             console.error('[ImageService] ========== 完整图片同步测试失败 ==========');
@@ -916,13 +916,13 @@ class ImageService {
             const transaction = db.transaction([STORE_NAME], 'readonly');
             const store = transaction.objectStore(STORE_NAME);
             const request = store.getAllKeys();
-            
+
             request.onsuccess = () => {
                 const keys = request.result as string[];
                 console.log(`[ImageService] IndexedDB中的图片:`, keys);
                 resolve(keys);
             };
-            
+
             request.onerror = () => {
                 console.error('[ImageService] 获取IndexedDB键列表失败:', request.error);
                 reject(request.error);
