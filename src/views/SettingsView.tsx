@@ -527,6 +527,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
     const [isCleaningImages, setIsCleaningImages] = useState(false);
     const [imageCleanupReport, setImageCleanupReport] = useState<string>('');
     const [isImageCleanupConfirmOpen, setIsImageCleanupConfirmOpen] = useState(false);
+    const [isCleaningBackups, setIsCleaningBackups] = useState(false);
 
     // Sync local user info when prop changes
     useEffect(() => {
@@ -1253,6 +1254,107 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
     };
 
     // 图片清理功能
+
+
+
+    const handleCleanupCloudBackups = async () => {
+        const webdavConfig = webdavService.getConfig();
+        const s3Config = s3Service.getConfig();
+        const activeService = s3Config ? s3Service : (webdavConfig ? webdavService : null);
+
+        if (!activeService) {
+            onToast('error', '未连接云端服务 (WebDAV 或 S3)');
+            return;
+        }
+
+        if (!confirm('确定要清理云端备份吗？\n\n这将检查 "backups" 文件夹，只保留最新的一个备份文件，其余的将被永久删除。\n此操作不可撤销。')) {
+            return;
+        }
+
+        setIsCleaningBackups(true);
+        try {
+            // 1. Check/List files in 'backups'
+            let contents: any[] = [];
+            try {
+                // Try 'backups' first
+                contents = await activeService.getDirectoryContents?.('backups') || [];
+                // If empty, it might be because some WebDAV servers need trailing slash or handle paths differently
+                if (contents.length === 0) {
+                    contents = await activeService.getDirectoryContents?.('backups/') || [];
+                }
+            } catch (e) {
+                console.error('List backups failed:', e);
+                // Try trailing slash if first attempt failed
+                contents = await activeService.getDirectoryContents?.('backups/') || [];
+            }
+
+            if (!contents || contents.length === 0) {
+                onToast('info', '云端 backups 文件夹为空或无法读取');
+                setIsCleaningBackups(false);
+                return;
+            }
+
+            // Unify format
+            let backupFiles: { key: string, time: number, name: string }[] = [];
+
+            if (s3Config) {
+                // S3
+                backupFiles = contents
+                    .filter((item: any) => item.Key && !item.Key.endsWith('/'))
+                    .map((item: any) => ({
+                        key: item.Key,
+                        time: new Date(item.LastModified).getTime(),
+                        name: item.Key.split('/').pop() || item.Key
+                    }));
+            } else {
+                // WebDAV
+                backupFiles = contents
+                    .filter((item: any) => item.type === 'file')
+                    .map((item: any) => ({
+                        key: item.filename,
+                        time: new Date(item.lastmod).getTime(),
+                        name: item.basename || item.filename.split('/').pop()
+                    }));
+            }
+
+            // Only consider .json files to be safe
+            backupFiles = backupFiles.filter(f => f.name.toLowerCase().endsWith('.json'));
+
+            if (backupFiles.length <= 1) {
+                onToast('info', `无需清理：当前仅发现 ${backupFiles.length} 个备份文件`);
+                setIsCleaningBackups(false);
+                return;
+            }
+
+            // 2. Sort descending (Newest first)
+            backupFiles.sort((a, b) => b.time - a.time);
+
+            // 3. Keep first
+            const latest = backupFiles[0];
+            const toDelete = backupFiles.slice(1);
+
+            console.log(`[Backups] Keeping latest: ${latest.name}, Deleting ${toDelete.length} old backups`);
+
+            // 4. Delete others
+            let deletedCount = 0;
+            for (const file of toDelete) {
+                try {
+                    const success = await activeService.deleteFile(file.key);
+                    if (success) deletedCount++;
+                } catch (e) {
+                    console.error(`Failed to delete ${file.key}`, e);
+                }
+            }
+
+            onToast('success', `清理完成：已保留 ${latest.name}，删除了 ${deletedCount} 个历史备份`);
+
+        } catch (error: any) {
+            console.error('Cleanup failed:', error);
+            onToast('error', `清理失败: ${error.message}`);
+        } finally {
+            setIsCleaningBackups(false);
+        }
+    };
 
 
 
@@ -2114,6 +2216,39 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
                         </div>
                     </div>
 
+
+                    {/* 云端备份清理卡片 */}
+                    <div className="bg-white rounded-2xl p-6 shadow-sm space-y-4">
+                        <div className="flex items-center gap-3 text-stone-600 mb-2">
+                            <Cloud size={24} />
+                            <h3 className="font-bold text-lg">云端备份清理</h3>
+                        </div>
+                        <p className="text-sm text-stone-500 mb-4 leading-relaxed">
+                            检查云端存储（WebDAV/S3）的 backups 文件夹，保留最新的一个备份，清理所有旧备份以节省空间。
+                        </p>
+
+                        <button
+                            onClick={handleCleanupCloudBackups}
+                            disabled={isCleaningBackups}
+                            className={`flex items-center justify-center gap-2 w-full py-3 rounded-xl font-medium active:scale-[0.98] transition-transform ${isCleaningBackups
+                                ? 'bg-stone-400 text-white cursor-not-allowed'
+                                : 'bg-white border border-stone-200 text-stone-800 hover:bg-stone-50'
+                                }`}
+                        >
+                            {isCleaningBackups ? (
+                                <>
+                                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                                    清理中...
+                                </>
+                            ) : (
+                                <>
+                                    <Trash2 size={18} />
+                                    清理旧备份（只保留最新）
+                                </>
+                            )}
+                        </button>
+                    </div>
+
                     {/* Excel导出卡片 */}
                     <div className="bg-white rounded-2xl p-6 shadow-sm space-y-4">
                         <div className="flex items-center gap-3 text-stone-600 mb-2">
@@ -2223,7 +2358,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
                     cancelText="取消"
                     type="danger"
                 />
-            </div>
+            </div >
         );
     }
 
