@@ -388,22 +388,32 @@ export class S3Service {
     /**
      * Delete image from COS
      */
+    /**
+     * Delete image from COS
+     */
     async deleteImage(filename: string): Promise<boolean> {
+        return this.deleteFile(`images/${filename}`);
+    }
+
+    /**
+     * Delete generic file from COS
+     */
+    async deleteFile(key: string): Promise<boolean> {
         if (!this.config || !this.client) return false;
 
         return new Promise((resolve) => {
-            console.log(`[COS] Deleting image: ${filename}`);
+            console.log(`[COS] Deleting file: ${key}`);
 
             this.client.deleteObject({
                 Bucket: this.config!.bucketName,
                 Region: this.config!.region,
-                Key: `images/${filename}`
+                Key: key
             }, (err: any, data: any) => {
                 if (err) {
-                    console.error(`[COS] Image deletion failed: ${filename}`, err);
+                    console.error(`[COS] File deletion failed: ${key}`, err);
                     resolve(false);
                 } else {
-                    // console.log(`[COS] ✓ Image deleted: ${filename}`);
+                    // console.log(`[COS] ✓ File deleted: ${key}`);
                     resolve(true);
                 }
             });

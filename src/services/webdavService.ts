@@ -342,9 +342,14 @@ export class WebDAVService {
     }
 
     async deleteImage(filename: string): Promise<boolean> {
+        return this.deleteFile(`/images/${filename}`);
+    }
+
+    async deleteFile(path: string): Promise<boolean> {
         if (!this.client) return false;
         try {
-            await this.client.deleteFile(`/images/${filename}`);
+            console.log(`[WebDAV] Deleting file: ${path}`);
+            await this.client.deleteFile(path);
             return true;
         } catch (error) {
             console.error('WebDAV Delete Error:', error);

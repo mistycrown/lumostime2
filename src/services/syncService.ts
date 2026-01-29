@@ -20,6 +20,7 @@ interface StorageService {
     getImageListTimestamp(): Promise<number>;
     createDirectory?(path: string): Promise<boolean>;
     getDirectoryContents?(path: string): Promise<any[]>;
+    deleteFile(path: string): Promise<boolean>;
 }
 
 export const syncService = {
