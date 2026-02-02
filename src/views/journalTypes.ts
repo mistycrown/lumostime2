@@ -30,7 +30,7 @@ export interface DiaryEntry {
     // Metadata fields
     tags?: string[];          // # Tags
     domains?: string[];       // % Domains/Areas
-    relatedTodos?: string[];  // @ Todos/Contexts
+    relatedTodos?: RelatedTodo[];  // @ Todos/Contexts
 
     // Internal IDs for filtering
     activityId?: string;
@@ -38,6 +38,14 @@ export interface DiaryEntry {
 
     // Display control
     isFirstOfDay?: boolean;   // Whether this is the first entry of its day
+}
+
+export interface RelatedTodo {
+    title: string;
+    isProgress?: boolean;
+    progressIncrement?: number;
+    completedUnits?: number;
+    totalAmount?: number;
 }
 
 export const MOCK_ENTRIES: DiaryEntry[] = [
@@ -75,7 +83,7 @@ export const MOCK_ENTRIES: DiaryEntry[] = [
         title: 'Thesis Writing',
         content: 'Submitted the first draft of chapter 4. It felt rough, but getting it out of my head was the most important step.',
         mood: 'Relieved',
-        relatedTodos: ['Cultural Geometry Writing'],
+        relatedTodos: [{ title: 'Cultural Geometry Writing' }],
         tags: ['🎓 Learning', '✒️ Writing'],
         domains: ['🏛️ PhD Topic'],
         comments: []
@@ -96,7 +104,7 @@ export const MOCK_ENTRIES: DiaryEntry[] = [
         content: 'Found a small exhibit tucked away in the alley. The lighting was exquisite. Minimalist structures casting long, dramatic shadows.',
         location: 'Modern Art Museum',
         tags: ['Art', 'Inspiration'],
-        relatedTodos: ['Visit Downtown Gallery'],
+        relatedTodos: [{ title: 'Visit Downtown Gallery' }],
         media: [
             { type: 'image', url: 'https://picsum.photos/800/800?random=3' }
         ],

@@ -236,7 +236,8 @@ const AppContent: React.FC = () => {
           !isMonthlyReviewOpen &&
           !selectedTagId &&
           !selectedCategoryId &&
-          !selectedScopeId
+          !selectedScopeId &&
+          currentView !== 'STATS'
         }
       />
 

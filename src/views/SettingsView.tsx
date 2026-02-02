@@ -2136,7 +2136,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
         return <ObsidianExportView
             onBack={() => setActiveSubmenu('main')}
             logs={logs}
-            categories={categories || []}
+            categories={categoriesData || categories || []}
             todos={todos}
             scopes={scopes}
             currentDate={currentDate}
