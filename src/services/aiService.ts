@@ -383,7 +383,11 @@ JSON Output Schema:
                 if (data.error) throw new Error(data.error.message);
 
                 const content = data.choices[0].message.content;
-                return aiService.cleanAndParseJSON(content) as AIParsedTodo[];
+                const parsed = aiService.cleanAndParseJSON(content) as any[];
+                return parsed.map(item => ({
+                    ...item,
+                    defaultScopeIds: item.defaultScopeIds || item.scopeIds || []
+                })) as AIParsedTodo[];
             }
 
             if (config.provider === 'gemini') {
@@ -409,7 +413,10 @@ JSON Output Schema:
                 const content = data.candidates?.[0]?.content?.parts?.[0]?.text;
                 if (!content) throw new Error('No content in Gemini response');
 
-                return aiService.cleanAndParseJSON(content) as AIParsedTodo[];
+                return (aiService.cleanAndParseJSON(content) as any[]).map(item => ({
+                    ...item,
+                    defaultScopeIds: item.defaultScopeIds || item.scopeIds || []
+                })) as AIParsedTodo[];
             }
 
             return [];

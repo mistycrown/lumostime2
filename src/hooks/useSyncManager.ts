@@ -153,7 +153,11 @@ export const useSyncManager = () => {
             let dataSyncStatus: 'restored' | 'uploaded' | 'equal' | 'error' = 'equal';
             let dataSyncMsg = '';
 
-            // 1. Sync Data
+            // 1. 获取本地时间戳
+            const localTimestamp = localDataTimestamp;
+            console.log(`[Sync][Step 1] 获取本地时间戳: ${localTimestamp} (${new Date(localTimestamp).toLocaleString()})`);
+
+            // 1. Sync Data - 获取云端时间戳
             let cloudTimestamp = 0;
             let cloudData: any = null;
 
@@ -163,21 +167,15 @@ export const useSyncManager = () => {
             } catch (err) {
                 console.log('[App] 云端无数据，准备上传本地数据');
             }
+            console.log(`[Sync][Step 1] 获取云端时间戳: ${cloudTimestamp} (${new Date(cloudTimestamp).toLocaleString()})`);
 
-            // Use the authoritative local timestamp
-            const localTimestamp = localDataTimestamp;
+            // 2. 比较时间戳
+            console.log(`[Sync][Step 2] 比较时间戳: 本地=${localTimestamp} vs 云端=${cloudTimestamp}, 差值=${localTimestamp - cloudTimestamp}ms`);
 
-            /* console.log(`[Sync][${mode}] Time check:`, {
-                localTimestamp: localTimestamp,
-                cloudTimestamp: cloudTimestamp,
-                diff: cloudTimestamp - localTimestamp,
-                dateLocal: new Date(localTimestamp).toLocaleString(),
-                dateCloud: new Date(cloudTimestamp).toLocaleString()
-            }); */
-
-            // 3-Way Logic
+            // 3. 执行操作
             if (cloudTimestamp > localTimestamp) {
                 // Case 1: Cloud is Newer -> Restore
+                console.log('[Sync][Step 3] 判定: 云端较新 -> 执行下载恢复');
                 console.log('[Sync] Cloud is newer. Restoring...');
                 if (cloudData) {
                     const backupSuccess = await backupLocalData(activeService, mode === 'startup' ? 'startup_backup' : 'pre_restore');
@@ -195,6 +193,7 @@ export const useSyncManager = () => {
             }
             else if (localTimestamp > cloudTimestamp) {
                 // Case 2: Local is Newer -> Upload
+                console.log('[Sync][Step 3] 判定: 本地较新 -> 执行上传覆盖');
                 // NOTE: For startup, we might want to be passive, but keeping logic consistent is safer.
                 // However, usually startup sync is "Pull Only".
                 // If local is newer on startup, it means we worked offline. We should probably silent upload or just do nothing and let auto-sync handle it.
@@ -222,6 +221,7 @@ export const useSyncManager = () => {
             }
             else {
                 // Case 3: Equal
+                console.log('[Sync][Step 3] 判定: 时间戳一致 -> 无需同步数据');
                 // console.log('[Sync] Timestamps are equal. Data is consistent.');
                 dataSyncStatus = 'equal';
                 dataSyncMsg = '数据已是一致';
@@ -447,10 +447,15 @@ export const useSyncManager = () => {
 
                 if (webdavConfig || s3Config) {
                     const activeService = s3Config ? s3Service : webdavService;
+                    const localData = getFullLocalData(); // Get current state
+
+                    // Use the tracking timestamp (localDataTimestamp), NOT Date.now()
+                    // This ensures we only upload a "newer" timestamp if data actually changed.
                     const dataToSync = {
-                        ...getFullLocalData(),
-                        timestamp: Date.now()
+                        ...localData,
+                        timestamp: localData.timestamp
                     };
+
                     activeService.uploadData(dataToSync).catch(console.error);
                 }
             }

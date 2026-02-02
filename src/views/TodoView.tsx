@@ -305,14 +305,25 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, categories, activityC
   };
 
   const handleAISave = (tasks: ParsedTask[]) => {
-    const newTodos: Partial<TodoItem>[] = tasks.map(t => ({
-      title: t.title,
-      categoryId: t.categoryId,
-      linkedActivityId: t.linkedActivityId,
-      linkedCategoryId: t.linkedCategoryId,
-      defaultScopeIds: t.defaultScopeIds,
-      isCompleted: false
-    }));
+    const newTodos: Partial<TodoItem>[] = tasks.map(t => {
+      // Auto-infer linkedCategoryId if missing but linkedActivityId exists
+      let finalLinkedCategoryId = t.linkedCategoryId;
+      if (t.linkedActivityId && !finalLinkedCategoryId) {
+        const foundCat = activityCategories.find(c => c.activities.some(a => a.id === t.linkedActivityId));
+        if (foundCat) {
+          finalLinkedCategoryId = foundCat.id;
+        }
+      }
+
+      return {
+        title: t.title,
+        categoryId: t.categoryId,
+        linkedActivityId: t.linkedActivityId,
+        linkedCategoryId: finalLinkedCategoryId,
+        defaultScopeIds: t.defaultScopeIds,
+        isCompleted: false
+      };
+    });
     onBatchAddTodos?.(newTodos);
     setIsAIConfirmOpen(false);
   };
