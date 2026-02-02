@@ -188,7 +188,16 @@ export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentD
       const endDate = new Date(startDate);
       endDate.setDate(startDate.getDate() + 6);
 
-      return `${formatDateShort(startDate)} - ${formatDateShort(endDate)}`;
+      const startMonth = startDate.getMonth() + 1;
+      const startDay = startDate.getDate();
+      const endMonth = endDate.getMonth() + 1;
+      const endDay = endDate.getDate();
+
+      if (startMonth === endMonth) {
+        return `${startMonth}月${startDay}日 - ${endDay}日`;
+      } else {
+        return `${startMonth}月${startDay}日 - ${endMonth}月${endDay}日`;
+      }
     } else if (rangeType === 'month') {
       // 月视图：显示年月，如「2025年12月」
       return `${date.getFullYear()}年${date.getMonth() + 1}月`;

@@ -215,7 +215,10 @@ const TimelineItem: React.FC<TimelineItemProps> = ({ entry, isLast, isFirstOfDay
                         {entry.relatedTodos?.map((todo, i) => (
                             <span key={`todo-${i}`} className="text-[10px] font-medium text-stone-500 border border-stone-200 px-2 py-0.5 rounded flex items-center gap-1 bg-stone-50/30">
                                 <span className="text-stone-400 font-bold">@</span>
-                                <span className="line-clamp-1">{todo}</span>
+                                <span className="line-clamp-1">{todo.title}</span>
+                                {todo.isProgress && todo.progressIncrement && todo.progressIncrement > 0 && (
+                                    <span className="font-mono text-stone-400 ml-0.5">+{todo.progressIncrement}</span>
+                                )}
                             </span>
                         ))}
 

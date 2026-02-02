@@ -219,7 +219,13 @@ export const JournalView: React.FC<JournalViewProps> = ({
                 tags: cat && act ? [`${cat.icon} ${cat.name} / ${act.icon} ${act.name}`] : [title || 'Log'],
                 activityId: log.activityId, // Added for filtering
                 scopeIds: log.scopeIds,     // Added for filtering
-                relatedTodos: linkedTodo ? [linkedTodo.title] : undefined,
+                relatedTodos: linkedTodo ? [{
+                    title: linkedTodo.title,
+                    isProgress: linkedTodo.isProgress,
+                    progressIncrement: log.progressIncrement,
+                    completedUnits: linkedTodo.completedUnits,
+                    totalAmount: linkedTodo.totalAmount
+                }] : undefined,
                 domains: linkedScopes.length > 0 ? linkedScopes.map(s => `${s.icon} ${s.name}`) : undefined,
                 reactions: log.reactions
             });
