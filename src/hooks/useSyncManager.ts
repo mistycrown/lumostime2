@@ -256,10 +256,24 @@ export const useSyncManager = () => {
 
             const mergedImageList = Array.from(new Set([...localImageList, ...cloudImageList]));
 
-            // Image list upload is now handled inside syncService.syncImages
-
             // 3. Sync Image Files
             const imageResult = await handleImageSync(mergedImageList);
+
+            // [Fixed Sequence] Update Image List JSON AFTER actual files are synced
+            // This prevents the "Zombie List" issue on mobile WebDAV where list says file exists but upload failed.
+
+            // Re-calculate outdated status (logic moved here)
+            const isCloudListOutdated = mergedImageList.length !== cloudImageList.length ||
+                !mergedImageList.every(img => cloudImageList.includes(img));
+
+            if (dataSyncStatus === 'uploaded' || isCloudListOutdated || imageResult.uploaded > 0 || imageResult.deletedRemote > 0) {
+                try {
+                    // Update list only if we are reasonably sure things are consistent
+                    if (mode === 'startup') imageService.updateReferencedImagesList(mergedImageList);
+                    await activeService.uploadImageList(mergedImageList);
+                    // console.log('[Sync] Image list JSON updated');
+                } catch (e) { console.warn('Image list update failed', e); }
+            }
 
             // 4. Construct Final Feedback (Only for Manual Mode)
             if (mode === 'manual') {
@@ -305,6 +319,10 @@ export const useSyncManager = () => {
                 // Auto mode: Silent, no toast
             }
 
+            // If sync completed successfully, we can clear the pending auto-sync flag
+            // because we just synced everything (including whatever latest changes triggered the flag)
+            pendingAutoSyncRef.current = false;
+
             if ((currentView === AppView.TIMELINE) || (mode === 'startup' && dataSyncStatus === 'restored')) {
                 await new Promise(resolve => setTimeout(resolve, 100));
                 setRefreshKey(prev => prev + 1);
@@ -316,9 +334,13 @@ export const useSyncManager = () => {
         } finally {
             setIsSyncing(false);
             syncLock.current = false;
-            // Clear pending auto sync if we just finished a sync (any kind)
-            if (mode !== 'auto') {
-                // Actually, we should probably clear it regardless, or manage it carefully.
+
+            // [Retry Logic] If an auto-sync was requested WHILE we were syncing, trigger it now
+            // But only if we are not already in a recursive loop (simple check)
+            if (pendingAutoSyncRef.current) {
+                console.log('[Sync] Pending auto-sync detected after sync finished. Retrying...');
+                // Use setTimeout to break the stack and allow state updates
+                setTimeout(() => performSync('auto'), 1000);
             }
         }
     };
