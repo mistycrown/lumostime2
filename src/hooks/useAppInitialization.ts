@@ -1,4 +1,4 @@
-请再次检查一下同步逻辑import { useEffect, useRef } from 'react';
+import { useEffect, useRef } from 'react';
 import { Capacitor } from '@capacitor/core';
 import { useSettings } from '../contexts/SettingsContext';
 import { useToast } from '../contexts/ToastContext';
