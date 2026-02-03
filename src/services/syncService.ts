@@ -124,11 +124,9 @@ export const syncService = {
                     }));
                     // console.log(`[Sync] ✓ 云端实际扫描结果: ${actualCloudFiles.size} 个文件`);
                 } else if (Array.isArray(contents) && contents.length === 0) {
-                    // 可能是空目录，也可能是移动端WebDAV不支持PROPFIND返回了[]
-                    // 这种情况下，如果返回空数组，暂时认为是有效的（空目录），
-                    // 但为了安全起见，如果是 WebDAV 且在移动端(无法区分是空还是不支持)，可能需要策略。
-                    // 现有的 webdavService 在移动端返回 []。
-                    // 如果我们信任 []，那么会认为云端没有文件，从而触发上传。这通常是正确的（自我修复）。
+                    // Empty directory (or supported empty response)
+                    console.log('[Sync] ✓ Cloud directory scanned and is empty.');
+                    actualCloudFiles = new Set();
                 }
             } catch (e) {
                 console.warn('[Sync] 云端扫描失败或不支持，回退到使用 list json', e);

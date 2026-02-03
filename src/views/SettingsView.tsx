@@ -702,20 +702,28 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
     useEffect(() => {
         // 加载WebDAV配置
         const config = webdavService.getConfig();
+        const manualWebdavDisconnect = localStorage.getItem('lumos_webdav_manual_disconnect');
+
         if (config) {
-            setWebdavConfig(config);
             setConfigForm(config);
+            if (manualWebdavDisconnect !== 'true') {
+                setWebdavConfig(config);
+            }
         }
 
         // 加载S3配置 - 添加更可靠的加载机制
         const loadS3Config = () => {
             const s3Config = s3Service.getConfig();
+            const manualS3Disconnect = localStorage.getItem('lumos_s3_manual_disconnect');
+
             console.log('[SettingsView] 加载S3配置:', s3Config);
 
             if (s3Config) {
-                setS3Config(s3Config);
                 setS3ConfigForm(s3Config);
                 console.log('[SettingsView] S3配置已加载到表单');
+                if (manualS3Disconnect !== 'true') {
+                    setS3Config(s3Config);
+                }
             } else {
                 // 如果服务中没有配置，尝试直接从localStorage加载
                 const bucketName = localStorage.getItem('lumos_cos_bucket');
@@ -733,8 +741,10 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
                         endpoint: endpoint || ''
                     };
                     console.log('[SettingsView] 从localStorage加载S3配置:', fallbackConfig);
-                    setS3Config(fallbackConfig);
                     setS3ConfigForm(fallbackConfig);
+                    if (manualS3Disconnect !== 'true') {
+                        setS3Config(fallbackConfig);
+                    }
                 }
             }
         };
@@ -788,6 +798,8 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
 
         // Test connection
         webdavService.saveConfig(config);
+        localStorage.removeItem('lumos_webdav_manual_disconnect'); // Clear manual disconnect flag on intentional connect
+
         const success = await webdavService.checkConnection();
 
         if (success) {
@@ -803,6 +815,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
         // 只清理服务中的活跃连接，保留localStorage中的配置缓存
         webdavService.clearConfig();
         setWebdavConfig(null);
+        localStorage.setItem('lumos_webdav_manual_disconnect', 'true');
 
         console.log('[SettingsView] WebDAV连接已断开，但保留配置缓存供下次使用');
         onToast('info', '已断开 WebDAV 服务器连接 (配置已保存)');
@@ -911,6 +924,8 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
 
         if (success) {
             setS3Config(s3ConfigForm);
+            localStorage.removeItem('lumos_s3_manual_disconnect'); // Clear manual disconnect flag
+
             // 保存成功后清理草稿
             localStorage.removeItem('lumos_s3_draft_bucket');
             localStorage.removeItem('lumos_s3_draft_region');
@@ -920,7 +935,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
             console.log('[SettingsView] S3配置保存成功，清理草稿');
             onToast('success', '腾讯云 COS 连接成功');
         } else {
-            s3Service.clearConfig();
+            s3Service.disconnect();
             onToast('error', message || 'COS 连接失败，请检查凭据');
         }
         setIsSyncing(false);
@@ -928,8 +943,17 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
 
     const handleS3Disconnect = () => {
         // 只清理服务中的活跃连接，保留localStorage中的配置缓存
-        s3Service.clearConfig();
+        s3Service.disconnect();
         setS3Config(null);
+        localStorage.setItem('lumos_s3_manual_disconnect', 'true');
+
+        // Reload form from config (in case it was cleared from state but exists in localStorage)
+        // Actually svService.disconnect doesn't clear localStorage, so we can just reload form from it next time or now.
+        // We already have s3ConfigForm populated usually, but let's Ensure it.
+        const s3Config = s3Service.getConfig();
+        // Note: s3Service.disconnect() clears valid config instance, so getConfig() returns null.
+        // But localStorage persists.
+        // The form should stay as is.
 
         console.log('[SettingsView] S3连接已断开，但保留配置缓存供下次使用');
         onToast('info', '已断开与腾讯云 COS 的连接 (配置已保存)');
@@ -977,9 +1001,9 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
             } else {
                 onToast('success', '数据已成功上传至 COS！');
             }
-        } catch (error) {
-            console.error(error);
-            onToast('error', '上传数据至 COS 失败');
+        } catch (error: any) {
+            console.error('S3 Upload Error:', error);
+            onToast('error', `上传数据至 COS 失败: ${error.message || '未知错误'}`);
         } finally {
             setIsSyncing(false);
         }
@@ -1061,8 +1085,8 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
                         console.log(`[Settings] 开始从 COS 同步 ${mergedImageList.length} 张图片...`);
                         const imageResult = await syncService.syncImages(
                             undefined, // no progress callback in settings
-                            mergedImageList,
-                            mergedImageList
+                            localImageList,
+                            [] // [Fix] Don't assume cloud has these images. Pass empty to force check/upload.
                         );
 
                         if (imageResult.downloaded > 0 || imageResult.errors.length > 0) {

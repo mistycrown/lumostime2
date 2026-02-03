@@ -101,14 +101,18 @@ export class S3Service {
         return this.config;
     }
 
-    clearConfig() {
+    disconnect() {
+        this.config = null;
+        this.client = null;
+    }
+
+    clearStorage() {
         localStorage.removeItem(STORAGE_KEY_BUCKET);
         localStorage.removeItem(STORAGE_KEY_REGION);
         localStorage.removeItem(STORAGE_KEY_SECRET_ID);
         localStorage.removeItem(STORAGE_KEY_SECRET_KEY);
         localStorage.removeItem(STORAGE_KEY_ENDPOINT);
-        this.config = null;
-        this.client = null;
+        this.disconnect();
     }
 
     /**
@@ -312,6 +316,11 @@ export class S3Service {
                 }, (err: any, data: any) => {
                     if (err) {
                         console.error(`[COS] Image upload failed: ${filename}`, err);
+                        // Enhance error object with more context
+                        if (err && typeof err === 'object') {
+                            err.message = `COS Upload Failed: ${err.message || 'Unknown Error'} (Code: ${err.code || 'N/A'}, Status: ${err.statusCode || 'N/A'})`;
+                            err.filename = filename;
+                        }
                         reject(err);
                     } else {
                         // console.log(`[COS] ✓ Image upload completed: ${filename}`);

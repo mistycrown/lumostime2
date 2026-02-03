@@ -401,6 +401,14 @@ export const useSyncManager = () => {
             return;
         }
 
+        // [Fix] Do not set pending flag if we are currently restoring from cloud.
+        // Data changes during restore are NOT user actions and should not trigger auto-sync.
+        if (isRestoring.current || isSyncingRef.current) {
+            // Note: isSyncingRef might be too broad if we want to allow user edits during sync to queue up.
+            // But definitely isRestoring should block it.
+            if (isRestoring.current) return;
+        }
+
         // Set pending flag immediately when data changes
         pendingAutoSyncRef.current = true;
 
