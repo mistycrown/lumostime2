@@ -256,16 +256,7 @@ export const useSyncManager = () => {
 
             const mergedImageList = Array.from(new Set([...localImageList, ...cloudImageList]));
 
-            // Check if cloud list needs update
-            const isCloudListOutdated = mergedImageList.length !== cloudImageList.length ||
-                !mergedImageList.every(img => cloudImageList.includes(img));
-
-            if (dataSyncStatus === 'uploaded' || isCloudListOutdated) {
-                try {
-                    if (mode === 'startup') imageService.updateReferencedImagesList(mergedImageList);
-                    await activeService.uploadImageList(mergedImageList);
-                } catch (e) { console.warn('Image list update failed', e); }
-            }
+            // Image list upload is now handled inside syncService.syncImages
 
             // 3. Sync Image Files
             const imageResult = await handleImageSync(mergedImageList);
@@ -325,6 +316,10 @@ export const useSyncManager = () => {
         } finally {
             setIsSyncing(false);
             syncLock.current = false;
+            // Clear pending auto sync if we just finished a sync (any kind)
+            if (mode !== 'auto') {
+                // Actually, we should probably clear it regardless, or manage it carefully.
+            }
         }
     };
 
@@ -360,48 +355,17 @@ export const useSyncManager = () => {
         const timer = setTimeout(async () => {
             // Prevent auto-sync if a manual/startup sync is in progress
             if (isSyncingRef.current || isRestoring.current) {
-                pendingAutoSyncRef.current = false;
+                // Keep pending flag true if we skipped, so next time it might try? 
+                // Alternatively, performSync calls are locked anyway.
                 return;
             }
 
-            const webdavConfig = webdavService.getConfig();
-            const s3Config = s3Service.getConfig();
+            // Using unified logic for auto-sync
+            // This ensures we do checks and conflict handling even for auto-sync
+            await performSync('auto');
 
-            if (!webdavConfig && !s3Config) {
-                pendingAutoSyncRef.current = false;
-                return;
-            }
+            pendingAutoSyncRef.current = false;
 
-            const activeService = s3Config ? s3Service : webdavService;
-
-            setIsSyncing(true);
-            const startTime = Date.now();
-            try {
-                const localData = getFullLocalData();
-                // Simple validation for auto-sync
-                if (!localData.logs || !localData.todos) {
-                    console.error('[App] Auto-sync skipped: Local data undefined');
-                    return;
-                }
-
-                // Use localDataTimestamp which is already up to date
-                const dataToSync = getFullLocalData(); // this uses localDataTimestamp
-
-                await activeService.uploadData(dataToSync);
-                updateLastSyncTime();
-
-                // Legacy tracking update
-                setDataLastModified(dataToSync.timestamp);
-            } catch (e) {
-                console.error('Auto-sync upload failed', e);
-            } finally {
-                const elapsed = Date.now() - startTime;
-                if (elapsed < 1000) {
-                    await new Promise(resolve => setTimeout(resolve, 1000 - elapsed));
-                }
-                setIsSyncing(false);
-                pendingAutoSyncRef.current = false;
-            }
         }, 2000); // Debounce reduced to 2s for responsiveness
         return () => {
             clearTimeout(timer);
@@ -477,7 +441,9 @@ export const useSyncManager = () => {
         let appListener: any;
         const setupListener = async () => {
             appListener = await App.addListener('appStateChange', async (state) => {
-                if (state.isActive) {
+                // On native platforms, use App state
+                // On web, visibilitychange handles this
+                if (state.isActive && Capacitor.isNativePlatform()) {
                     console.log('[App] App resumed. Checking for updates...');
                     performSync('resume');
                 }

@@ -101,24 +101,36 @@ export const syncService = {
             // 2. 确定最终的引用列表（合并本地和云端）
             const localSet = new Set(localReferencedImages || []);
 
-            // [Fix] 对于 S3/COS，不要信任 list json，而是直接扫描存储桶中的实际文件
-            // 这是为了防止 list json 说"有图片"但实际 bucket 里没有的情况 (Zombie List)
+            // [Unified] 尝试扫描云端实际文件列表
+            // 这是为了防止 list json 说"有图片"但实际 bucket/folder 里没有的情况 (Zombie List)
+            // 同时也作为 WebDAV 和 S3 的统一逻辑：优先信任实际文件系统
             let actualCloudFiles: Set<string> | null = null;
-            if (storageService === s3Service) {
-                try {
-                    // console.log('[Sync] S3/COS: 正在扫描云端实际文件列表...');
-                    // s3Service.getDirectoryContents 返回的是 COS SDK 的 Contents 数组，包含 Key
-                    const contents = await s3Service.getDirectoryContents('images');
-                    if (Array.isArray(contents)) {
-                        actualCloudFiles = new Set(contents.map((item: any) => {
-                            // Key format: "images/filename.jpg"
-                            return item.Key.replace(/^images\//, '');
-                        }));
-                        // console.log(`[Sync] ✓ S3/COS 实际扫描结果: ${actualCloudFiles.size} 个文件`);
-                    }
-                } catch (e) {
-                    console.warn('[Sync] S3/COS 扫描失败，回退到使用 list json', e);
+
+            try {
+                // console.log('[Sync] 正在扫描云端实际文件列表...');
+                // getDirectoryContents 返回文件列表对象数组
+                const contents = await storageService.getDirectoryContents!('images');
+                if (Array.isArray(contents) && contents.length > 0) {
+                    actualCloudFiles = new Set(contents.map((item: any) => {
+                        // 统一处理 Key/Path，确保去掉前缀
+                        // S3 format: "images/filename.jpg"
+                        // WebDAV format: "/images/filename.jpg" or "filename.jpg" (depends on client)
+                        const rawName = item.filename || item.basename || item.Key || item; // 兼容不同库的返回结构
+
+                        // 简单的文件名提取逻辑
+                        const parts = String(rawName).split('/');
+                        return parts[parts.length - 1];
+                    }));
+                    // console.log(`[Sync] ✓ 云端实际扫描结果: ${actualCloudFiles.size} 个文件`);
+                } else if (Array.isArray(contents) && contents.length === 0) {
+                    // 可能是空目录，也可能是移动端WebDAV不支持PROPFIND返回了[]
+                    // 这种情况下，如果返回空数组，暂时认为是有效的（空目录），
+                    // 但为了安全起见，如果是 WebDAV 且在移动端(无法区分是空还是不支持)，可能需要策略。
+                    // 现有的 webdavService 在移动端返回 []。
+                    // 如果我们信任 []，那么会认为云端没有文件，从而触发上传。这通常是正确的（自我修复）。
                 }
+            } catch (e) {
+                console.warn('[Sync] 云端扫描失败或不支持，回退到使用 list json', e);
             }
 
             // 如果成功扫描到了实际文件，就使用实际文件作为 cloudSet (Source of Truth)
