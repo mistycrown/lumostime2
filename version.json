@@ -1,7 +1,7 @@
 {
-    "version": "1.0.6",
-    "versionCode": 6,
+    "version": "1.0.7",
+    "versionCode": 7,
     "updateUrl": "https://github.com/mistycrown/lumostime2/releases/latest",
-    "releaseNotes": "v1.0.6\n• 增加批量修改历史记录的功能。\n• 修复引导提问不生效的问题。\n• 移除回顾模板中多余的enabled字段。\n• 优化模板配置逻辑。",
+    "releaseNotes": "v1.0.7\n• 增加专注记录评论、reaction功能。\n• 增加Memoir页面 (日记/档案)。\n• 增加档案页/索引页的默认页面设置。\n• 增加S3云同步功能。\n• 增加记录详情页扩展输入框、计时悬浮窗收缩功能。\n• 增加时间线缩略图点击查看大图功能。\n• 增加手动复制导出当日时间轴、统计数据功能。\n• 修复更新检测、跨月周矩阵视图题头重复问题。\n• 修复AI添加待办无法保存标签的问题。",
     "forceUpdate": false
 }

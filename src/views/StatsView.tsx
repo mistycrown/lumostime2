@@ -16,6 +16,7 @@ import { COLOR_OPTIONS } from '../constants';
 import { Minimize2, Share, PieChart, Grid, Calendar, ChevronLeft, ChevronRight, TrendingUp, TrendingDown, CheckCircle2 } from 'lucide-react';
 import { ToastType } from '../components/Toast';
 import { MonthHeatmap } from '../components/MonthHeatmap';
+import { usePrivacy } from '../contexts/PrivacyContext';
 
 import { ConfirmModal } from '../components/ConfirmModal';
 
@@ -57,6 +58,7 @@ interface CategoryStat extends Category {
 }
 
 export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentDate, onBack, onDateChange, isFullScreen, onToggleFullScreen, onToast, onTitleChange, todos, todoCategories, scopes, dailyReviews = [], hideControls = false, hideRangeControls = false, hideDateNavigation = false, forcedView, forcedRange, allowedViews = ['pie', 'matrix', 'line', 'schedule', 'check'] }) => {
+  const { isPrivacyMode } = usePrivacy();
   const [viewType, setViewType] = useState<ViewType>(forcedView || 'pie');
   const [pieRange, setPieRange] = useState<PieRange>(forcedRange || 'day');
   const [scheduleRange, setScheduleRange] = useState<ScheduleRange>(
@@ -911,8 +913,8 @@ export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentD
                   <span className="font-bold text-[11px] leading-tight block truncate">{act?.name || cat?.name}</span>
                   {l.note && (
                     <span
-                      className="text-[10px] opacity-80 mt-0.5 font-light leading-snug break-all line-clamp-3 overflow-hidden text-ellipsis display-box box-orient-vertical"
-                      title={l.note}
+                      className={`text-[10px] opacity-80 mt-0.5 font-light leading-snug break-all line-clamp-3 overflow-hidden text-ellipsis display-box box-orient-vertical ${isPrivacyMode ? 'blur-sm select-none transition-all duration-500' : 'transition-all duration-500'}`}
+                      title={isPrivacyMode ? '' : l.note}
                       style={{ display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical' }}
                     >
                       {l.note}
@@ -985,7 +987,7 @@ export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentD
                             <span className={`font-bold block w-full leading-tight truncate ${h < 20 ? 'text-[9px]' : 'text-[11px]'}`}>{act?.name}</span>
                             {showNote && (
                               <span
-                                className="text-[10px] opacity-75 w-full block mt-0.5 leading-snug break-all overflow-hidden text-ellipsis"
+                                className={`text-[10px] opacity-75 w-full block mt-0.5 leading-snug break-all overflow-hidden text-ellipsis ${isPrivacyMode ? 'blur-sm select-none transition-all duration-500' : 'transition-all duration-500'}`}
                                 style={{ display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}
                               >
                                 {l.note}

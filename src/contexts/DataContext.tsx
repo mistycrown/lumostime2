@@ -24,7 +24,7 @@ interface DataContextType {
     setLocalDataTimestamp: React.Dispatch<React.SetStateAction<number>>;
 
     // Control Function
-    skipNextTimestampUpdate: () => void;
+    disableTimestampUpdateRef: React.MutableRefObject<boolean>;
 }
 
 const DataContext = createContext<DataContextType | undefined>(undefined);
@@ -71,11 +71,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     });
 
     // Control ref to prevent timestamp updates during restore
-    const shouldUpdateTimestamp = useRef(true);
-
-    const skipNextTimestampUpdate = () => {
-        shouldUpdateTimestamp.current = false;
-    };
+    const disableTimestampUpdateRef = useRef(false);
 
     // Refs to skip initial render updates
     const isFirstRun = useRef(true);
@@ -103,10 +99,9 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         }
 
         // Check if we should update timestamp
-        if (!shouldUpdateTimestamp.current) {
-            // Reset and skip
-            // console.log('[DataContext] Skipping timestamp update (Restore mode)');
-            shouldUpdateTimestamp.current = true;
+        if (disableTimestampUpdateRef.current) {
+            // Skip update if disabled
+            console.log('[DataContext] Skipping timestamp update (locked during restore)');
             return;
         }
 
@@ -114,7 +109,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         const now = Date.now();
         setLocalDataTimestamp(now);
         localStorage.setItem('lumostime_local_timestamp', now.toString());
-        // console.log('[DataContext] Data changed, updated local timestamp:', now);
+        console.log(`[DataContext] Data changed, updated local timestamp: ${localDataTimestamp} -> ${now} (${new Date(now).toLocaleTimeString()})`);
     }, [logs, todos, todoCategories]);
 
     return (
@@ -127,7 +122,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             setTodoCategories,
             localDataTimestamp,
             setLocalDataTimestamp,
-            skipNextTimestampUpdate
+            disableTimestampUpdateRef
         }}>
             {children}
         </DataContext.Provider>

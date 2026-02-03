@@ -87,6 +87,7 @@ import { MemoirSettingsView } from './MemoirSettingsView';
 import excelExportService from '../services/excelExportService';
 import { imageCleanupService } from '../services/imageCleanupService';
 import { BatchFocusRecordManageView } from './BatchFocusRecordManageView';
+import { usePrivacy } from '../contexts/PrivacyContext';
 
 import { NARRATIVE_TEMPLATES } from '../constants';
 // @ts-ignore
@@ -401,6 +402,7 @@ const ExcelExportCardContent: React.FC<{
 };
 
 export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, onImport, onReset, onClearData, onToast, syncData, onSyncUpdate, startWeekOnSunday, onToggleStartWeekOnSunday, onOpenAutoLink, onOpenSearch, minIdleTimeThreshold = 1, onSetMinIdleTimeThreshold, defaultView = 'RECORD', onSetDefaultView, defaultArchiveView = 'CHRONICLE', onSetDefaultArchiveView, defaultIndexView = 'TAGS', onSetDefaultIndexView, reviewTemplates = [], onUpdateReviewTemplates, onUpdateDailyReviews, checkTemplates = [], onUpdateCheckTemplates, dailyReviewTime, onSetDailyReviewTime, weeklyReviewTime, onSetWeeklyReviewTime, monthlyReviewTime, onSetMonthlyReviewTime, customNarrativeTemplates, onUpdateCustomNarrativeTemplates, userPersonalInfo, onSetUserPersonalInfo, logs = [], todos = [], scopes = [], currentDate = new Date(), dailyReviews = [], weeklyReviews = [], monthlyReviews = [], todoCategories = [], filters = [], onUpdateFilters, categoriesData = [], onEditLog, autoFocusNote, onToggleAutoFocusNote }) => {
+    const { isPrivacyMode } = usePrivacy();
     // Hooks for full data access during backup
     const { logs: ctxLogs, todos: ctxTodos, todoCategories: ctxTodoCategories } = useData();
     const { categories: ctxCategories, scopes: ctxScopes, goals: ctxGoals } = useCategoryScope();
@@ -2841,7 +2843,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
                         </div>
 
                         <textarea
-                            className="w-full h-32 bg-stone-50 border border-stone-200 rounded-xl p-4 text-xs text-stone-600 outline-none focus:border-stone-400 resize-none leading-relaxed"
+                            className={`w-full h-32 bg-stone-50 border border-stone-200 rounded-xl p-4 text-xs text-stone-600 outline-none focus:border-stone-400 resize-none leading-relaxed ${isPrivacyMode ? 'blur-sm select-none transition-all duration-500' : 'transition-all duration-500'}`}
                             value={localUserInfo}
                             onChange={(e) => setLocalUserInfo(e.target.value)}
                             placeholder="例如：我是一名正在攻读博士学位的研究生..."
@@ -3008,7 +3010,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
                                         <label className="block text-xs font-bold text-stone-600">叙事风格描述 (Narrative Persona)</label>
                                     </div>
                                     <textarea
-                                        className="w-full h-48 bg-stone-50 border border-stone-200 rounded-xl p-4 text-xs font-mono text-stone-600 outline-none focus:border-stone-400 resize-none leading-relaxed"
+                                        className={`w-full h-48 bg-stone-50 border border-stone-200 rounded-xl p-4 text-xs font-mono text-stone-600 outline-none focus:border-stone-400 resize-none leading-relaxed ${isPrivacyMode ? 'blur-sm select-none transition-all duration-500' : 'transition-all duration-500'}`}
                                         placeholder="例如：你是一个幽默的脱口秀演员，请用夸张和调侃的语气点评我今天的时间记录..."
                                         value={modalPrompt}
                                         onChange={e => setModalPrompt(e.target.value)}

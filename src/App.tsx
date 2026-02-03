@@ -17,6 +17,7 @@ import { ReviewProvider, useReview } from './contexts/ReviewContext';
 import { SessionProvider, useSession } from './contexts/SessionContext';
 import { NavigationProvider, useNavigation } from './contexts/NavigationContext';
 import { CategoryScopeProvider, useCategoryScope } from './contexts/CategoryScopeContext';
+import { PrivacyProvider } from './contexts/PrivacyContext';
 
 import { MainLayout } from './components/MainLayout';
 import { AppRoutes } from './components/AppRoutes';
@@ -75,7 +76,8 @@ const AppContent: React.FC = () => {
     isAutoLinkOpen, setIsAutoLinkOpen,
     isSettingsOpen, setIsSettingsOpen,
     isSearchOpen, setIsSearchOpen,
-    isDailyReviewOpen,
+    isDailyReviewOpen, setIsDailyReviewOpen,
+    currentReviewDate, setCurrentReviewDate,
     isWeeklyReviewOpen,
     isMonthlyReviewOpen,
     selectedTagId, setSelectedTagId,
@@ -196,7 +198,10 @@ const AppContent: React.FC = () => {
       handleBackFromScope={() => {
         setSelectedScopeId(null);
       }}
-      handleCloseDailyReview={() => reviewManager.handleDeleteReview()}
+      handleCloseDailyReview={() => {
+        setIsDailyReviewOpen(false);
+        setCurrentReviewDate(null);
+      }}
       handleCloseWeeklyReview={reviewManager.handleCloseWeeklyReview}
       handleCloseMonthlyReview={reviewManager.handleCloseMonthlyReview}
       statsTitle={statsTitle}
@@ -512,7 +517,9 @@ const App: React.FC = () => {
             <SessionProvider splitLogByDays={splitLogByDays}>
               <NavigationProvider>
                 <CategoryScopeProviderWithData>
-                  <AppContent />
+                  <PrivacyProvider>
+                    <AppContent />
+                  </PrivacyProvider>
                 </CategoryScopeProviderWithData>
               </NavigationProvider>
             </SessionProvider>
