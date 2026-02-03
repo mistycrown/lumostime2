@@ -172,6 +172,35 @@ export const useSyncManager = () => {
 
             const activeService = s3Config ? s3Service : webdavService;
 
+            // [Pre-check] Verify connection before attempting sync
+            // This prevents infinite loops on Auth errors and avoids unnecessary retries when offline
+            if (activeService.checkConnection) {
+                try {
+                    // console.log(`[Sync] Checking connection for ${mode} sync...`);
+                    // Note: s3Service returns { success: boolean, message?: string }, webdavService returns boolean
+                    const result = await activeService.checkConnection();
+                    const isConnected = (typeof result === 'object' && 'success' in result) ? result.success : !!result;
+
+                    if (!isConnected) {
+                        console.warn(`[Sync] Connection check failed. Aborting ${mode} sync.`);
+
+                        if (mode === 'manual') {
+                            const msg = (typeof result === 'object' && result.message) ? result.message : '连接测试失败，请检查网络或配置';
+                            addToast('error', msg);
+                        } else {
+                            // For auto/startup/resume, fail silently or log
+                            // console.log(`[Sync] Skipped ${mode}: Connection unestablished`);
+                        }
+                        return; // Abort sync
+                    }
+                    // console.log(`[Sync] Connection verified.`);
+                } catch (err) {
+                    console.error(`[Sync] Connection check exception:`, err);
+                    if (mode === 'manual') addToast('error', '连接检查出错');
+                    return;
+                }
+            }
+
             // Track status
             let dataSyncStatus: 'restored' | 'uploaded' | 'equal' | 'error' = 'equal';
             let dataSyncMsg = '';
