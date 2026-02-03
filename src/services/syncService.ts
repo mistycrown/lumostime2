@@ -21,6 +21,7 @@ interface StorageService {
     createDirectory?(path: string): Promise<boolean>;
     getDirectoryContents?(path: string): Promise<any[]>;
     deleteFile(path: string): Promise<boolean>;
+    checkConnection?(): Promise<boolean | { success: boolean; message?: string }>;
 }
 
 export const syncService = {
