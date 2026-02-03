@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+请再次检查一下同步逻辑import { useEffect, useRef } from 'react';
 import { Capacitor } from '@capacitor/core';
 import { useSettings } from '../contexts/SettingsContext';
 import { useToast } from '../contexts/ToastContext';
@@ -49,6 +49,7 @@ export const useAppInitialization = () => {
     }, []);
 
     // Auto-cleanup deleted images from logs on load
+    /* 
     useEffect(() => {
         const cleanLogs = async () => {
             // Only run once when logs are loaded
@@ -78,4 +79,5 @@ export const useAppInitialization = () => {
         };
         cleanLogs();
     }, [logs]);
+    */
 };

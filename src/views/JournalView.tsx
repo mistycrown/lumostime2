@@ -236,7 +236,10 @@ export const JournalView: React.FC<JournalViewProps> = ({
         // 2. Process Daily Reviews
         dailyReviews.forEach(review => {
             const dateObj = new Date(review.date);
-            if (dateObj.getFullYear() !== targetYear || dateObj.getMonth() !== targetMonth) return;
+
+            if (dateObj.getFullYear() !== targetYear || dateObj.getMonth() !== targetMonth) {
+                return;
+            }
 
             const { title, content } = parseNarrative(review.narrative || '', review.date);
 
@@ -246,14 +249,16 @@ export const JournalView: React.FC<JournalViewProps> = ({
             const finalTitle = hasContent ? (title === 'Daily Reflection' ? review.date : title) : review.date;
             const finalContent = hasContent ? content : '...';
 
-            diaryEntries.push({
+            const entry: DiaryEntry = {
                 id: review.id,
                 type: 'daily_summary',
                 date: `${review.date}T23:59:59`,
                 title: finalTitle,
                 content: finalContent,
                 comments: []
-            });
+            };
+
+            diaryEntries.push(entry);
         });
 
         // 3. Process Weekly Reviews
@@ -296,11 +301,11 @@ export const JournalView: React.FC<JournalViewProps> = ({
 
             // 0. Review Visibility
             if (entry.type === 'daily_summary') {
-                // Default to true if undefined
-                return showDailyReviews ?? true;
+                return (showDailyReviews ?? true) && matchesDate;
             }
             if (entry.type === 'weekly_summary') {
-                return showWeeklyReviews ?? true;
+                // Check both toggle AND date match
+                return (showWeeklyReviews ?? true) && matchesDate;
             }
 
             // User Request: Daily/Weekly reports should always be shown (Previous logic).
@@ -694,7 +699,6 @@ export const JournalView: React.FC<JournalViewProps> = ({
                                 <div className="w-16 h-16 rounded-full bg-gray-100 flex items-center justify-center mb-4">
                                     <PenLine className="w-6 h-6 opacity-30" />
                                 </div>
-                                <p className="font-serif text-lg italic">No stories found for this period.</p>
                                 <p className="font-serif text-lg italic">No stories found for this period.</p>
 
                                 {(memoirFilterConfig.hasImage || memoirFilterConfig.minNoteLength > 0 || memoirFilterConfig.relatedTagIds.length > 0 || memoirFilterConfig.relatedScopeIds.length > 0) && (

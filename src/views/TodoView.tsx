@@ -15,6 +15,7 @@ import { PlayCircle, CheckCircle2, Circle, Plus, MoreHorizontal, Settings2, Chev
 import { AITodoInputModal } from '../components/AITodoInputModal';
 import { AITodoConfirmModal, ParsedTask } from '../components/AITodoConfirmModal';
 import { aiService, AIParsedTodo } from '../services/aiService';
+import { usePrivacy } from '../contexts/PrivacyContext';
 
 interface TodoViewProps {
   todos: TodoItem[];
@@ -100,6 +101,8 @@ const SwipeableTodoItem: React.FC<{
     ? []
     : todo.defaultScopeIds.map(id => scopes.find(s => s.id === id)).filter(Boolean) as Scope[];
 
+  const { isPrivacyMode } = usePrivacy();
+
   return (
     <div className={`relative overflow-hidden select-none touch-pan-y group ${viewMode === 'compact' ? 'mb-0' : 'mb-3 rounded-2xl'}`}>
       {/* Background Actions (Right Swipe -> Duplicate) */}
@@ -143,7 +146,7 @@ const SwipeableTodoItem: React.FC<{
         {/* Content (Click to Edit) */}
         <div className={`flex-1 cursor-pointer ${todo.isCompleted ? 'opacity-60' : ''} ${viewMode === 'compact' ? 'flex items-center gap-2 min-w-0' : 'py-0.5'}`} onClick={() => onEdit(todo)}>
           <div className="flex items-center gap-2 flex-1 min-w-0">
-            <div className={`font-bold leading-tight ${todo.isCompleted ? 'text-stone-400 line-through' : 'text-stone-800'} ${viewMode === 'compact' ? 'text-sm truncate' : 'text-base'}`}>
+            <div className={`font-bold leading-tight ${todo.isCompleted ? 'text-stone-400 line-through' : 'text-stone-800'} ${viewMode === 'compact' ? 'text-sm truncate' : 'text-base'} transition-all duration-500`}>
               {todo.title}
             </div>
 
@@ -180,7 +183,7 @@ const SwipeableTodoItem: React.FC<{
 
           {/* Note - Hide in Compact Mode */}
           {viewMode === 'loose' && todo.note && (
-            <div className="text-xs text-stone-400 mt-1 line-clamp-1">{todo.note}</div>
+            <div className={`text-xs text-stone-400 mt-1 line-clamp-1 ${isPrivacyMode ? 'blur-sm select-none transition-all duration-500' : 'transition-all duration-500'}`}>{todo.note}</div>
           )}
 
           {/* Linked Tags/Scopes */}

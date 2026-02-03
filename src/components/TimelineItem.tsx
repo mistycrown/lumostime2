@@ -3,6 +3,7 @@ import { DiaryEntry } from '../views/journalTypes';
 import { MessageSquarePlus, AudioLines, MessageCircle, Heart, Share2, Bookmark, Moon, Star, Send } from 'lucide-react';
 import { imageService } from '../services/imageService';
 import { ImagePreviewModal } from './ImagePreviewModal';
+import { usePrivacy } from '../contexts/PrivacyContext';
 
 import { ReactionPicker, ReactionList } from './ReactionComponents';
 
@@ -159,6 +160,8 @@ const TimelineItem: React.FC<TimelineItemProps> = ({ entry, isLast, isFirstOfDay
         }
     };
 
+    const { isPrivacyMode } = usePrivacy();
+
     // Background style for summary cards
     const containerClasses = isSummary
         ? "bg-paper-dark/60 rounded-xl p-5 border border-dashed border-gray-300 relative w-full"
@@ -197,14 +200,14 @@ const TimelineItem: React.FC<TimelineItemProps> = ({ entry, isLast, isFirstOfDay
                     if (!displayTitle) return null;
 
                     return (
-                        <h3 className={`text-gray-900 font-bold leading-tight ${isSummary ? 'text-[16px]' : 'text-[16px]'}`} style={{ fontFamily: '"Noto Serif SC", serif' }}>
+                        <h3 className={`text-gray-900 font-bold leading-tight ${isSummary ? 'text-[16px]' : 'text-[16px]'} transition-all duration-500`} style={{ fontFamily: '"Noto Serif SC", serif' }}>
                             {displayTitle}
                         </h3>
                     );
                 })()}
 
                 {/* Body Text */}
-                <p className={`text-sm text-stone-500 leading-relaxed whitespace-pre-wrap font-light ${isSummary ? 'mt-2' : 'mb-1'}`} style={{ fontFamily: '"Noto Serif SC", serif' }}>
+                <p className={`text-sm text-stone-500 leading-relaxed whitespace-pre-wrap font-light ${isSummary ? 'mt-2' : 'mb-1'} ${isPrivacyMode ? 'blur-sm select-none transition-all duration-500' : 'transition-all duration-500'}`} style={{ fontFamily: '"Noto Serif SC", serif' }}>
                     {entry.content}
                 </p>
 

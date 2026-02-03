@@ -1,4 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
+import { App } from '@capacitor/app';
+import { Capacitor } from '@capacitor/core';
 import { useData } from '../contexts/DataContext';
 import { useSettings } from '../contexts/SettingsContext';
 import { useCategoryScope } from '../contexts/CategoryScopeContext';
@@ -12,7 +14,8 @@ import { syncService } from '../services/syncService';
 import { AppView } from '../types';
 
 export const useSyncManager = () => {
-    const { logs, setLogs, todos, setTodos, todoCategories, setTodoCategories, localDataTimestamp, setLocalDataTimestamp, skipNextTimestampUpdate } = useData();
+    // Access Contexts at the top level
+    const { logs, setLogs, todos, setTodos, todoCategories, setTodoCategories, localDataTimestamp, setLocalDataTimestamp, disableTimestampUpdateRef } = useData();
     const {
         autoLinkRules, setAutoLinkRules,
         customNarrativeTemplates, setCustomNarrativeTemplates,
@@ -20,7 +23,7 @@ export const useSyncManager = () => {
         filters, setFilters,
         lastSyncTime, updateLastSyncTime,
         dataLastModified, setDataLastModified, isRestoring,
-        isSyncing, setIsSyncing // Use global sync state
+        isSyncing, setIsSyncing
     } = useSettings();
     const { categories, setCategories, scopes, setScopes, goals, setGoals } = useCategoryScope();
     const {
@@ -40,12 +43,9 @@ export const useSyncManager = () => {
     const handleSyncDataUpdate = async (data: any) => {
         // console.log('[App] 开始更新同步数据...');
         isRestoring.current = true;
+        disableTimestampUpdateRef.current = true;
 
         try {
-            // CRITICAL: Tell DataContext to IGNORE the next timestamp update
-            // because we are about to programmatically set data from cloud.
-            skipNextTimestampUpdate();
-
             if (data.logs) setLogs(data.logs);
             if (data.categories) setCategories(data.categories);
             if (data.todos) setTodos(data.todos);
@@ -63,8 +63,11 @@ export const useSyncManager = () => {
 
             if (data.timestamp) {
                 // Manually set the timestamp to match cloud
+                // CRITICAL: Must update both state AND localStorage synchronously
                 setDataLastModified(data.timestamp);
                 setLocalDataTimestamp(data.timestamp);
+                localStorage.setItem('lumostime_local_timestamp', data.timestamp.toString());
+                console.log(`[Sync] Updated local timestamp to match cloud: ${data.timestamp} (${new Date(data.timestamp).toLocaleString()})`);
             }
 
             await new Promise(resolve => setTimeout(resolve, 10));
@@ -75,6 +78,13 @@ export const useSyncManager = () => {
             }
         } finally {
             isRestoring.current = false;
+            // Delay re-enabling timestamp updates to ensure all state effects have processed
+            setTimeout(() => {
+                disableTimestampUpdateRef.current = false;
+                // Re-sync localStorage after unlock to prevent any race condition overwrites
+                const currentTimestamp = localStorage.getItem('lumostime_local_timestamp');
+                console.log(`[Sync] Unlocked timestamp updates. Current localStorage value: ${currentTimestamp}`);
+            }, 500);
         }
     };
 
@@ -123,9 +133,7 @@ export const useSyncManager = () => {
             const localData = getFullLocalData();
             const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
             const backupFilename = `backups/${prefix}_${timestamp}.json`;
-            console.log(`[Sync] Backing up local data to ${backupFilename}...`);
             await activeService.uploadData(localData, backupFilename);
-            console.log('[Sync] Local data backed up successfully');
             return true;
         } catch (error) {
             console.error('[Sync] Backup failed:', error);
@@ -133,11 +141,21 @@ export const useSyncManager = () => {
         }
     };
 
+    const syncLock = useRef(false);
+
     /**
-     * Core Sync Logic Shared by Manual Trigger and Startup Trigger
+     * Core Sync Logic - Unified for all sync triggers
+     * @param mode 'startup' = App launch | 'resume' = App resume/tab visible | 'manual' = User click | 'auto' = Auto-sync
      */
-    const performSync = async (mode: 'manual' | 'startup') => {
+    const performSync = async (mode: 'startup' | 'resume' | 'manual' | 'auto') => {
+        if (syncLock.current || isSyncing) {
+            console.log(`[Sync] Skipped ${mode} sync: Already syncing.`);
+            return;
+        }
+
+        syncLock.current = true;
         setIsSyncing(true);
+
         try {
             const webdavConfig = webdavService.getConfig();
             const s3Config = s3Service.getConfig();
@@ -176,31 +194,30 @@ export const useSyncManager = () => {
             if (cloudTimestamp > localTimestamp) {
                 // Case 1: Cloud is Newer -> Restore
                 console.log('[Sync][Step 3] 判定: 云端较新 -> 执行下载恢复');
-                console.log('[Sync] Cloud is newer. Restoring...');
-                if (cloudData) {
-                    const backupSuccess = await backupLocalData(activeService, mode === 'startup' ? 'startup_backup' : 'pre_restore');
-                    if (!backupSuccess) {
-                        if (mode === 'manual') addToast('error', '备份失败，为保护本地数据已取消还原');
-                        return;
+
+                // Check if there's a pending auto-sync (user just made changes)
+                if (mode === 'startup' && pendingAutoSyncRef.current) {
+                    console.log('[Sync] Skipping cloud restore: Auto-sync pending (user just made changes)');
+                    dataSyncStatus = 'equal';
+                    dataSyncMsg = '检测到本地变更，跳过云端恢复';
+                } else {
+                    if (cloudData) {
+                        const backupSuccess = await backupLocalData(activeService, mode === 'startup' ? 'startup_backup' : 'pre_restore');
+                        if (!backupSuccess) {
+                            if (mode === 'manual') addToast('error', '备份失败，为保护本地数据已取消还原');
+                            return;
+                        }
+                        await handleSyncDataUpdate(cloudData);
+
+                        if (mode === 'startup') updateLastSyncTime();
+
+                        dataSyncStatus = 'restored';
+                        dataSyncMsg = `已下载云端数据 (${new Date(cloudTimestamp).toLocaleDateString()})`;
                     }
-                    await handleSyncDataUpdate(cloudData);
-
-                    if (mode === 'startup') updateLastSyncTime();
-
-                    dataSyncStatus = 'restored';
-                    dataSyncMsg = `已下载云端数据 (${new Date(cloudTimestamp).toLocaleDateString()})`;
                 }
             }
             else if (localTimestamp > cloudTimestamp) {
                 // Case 2: Local is Newer -> Upload
-                console.log('[Sync][Step 3] 判定: 本地较新 -> 执行上传覆盖');
-                // NOTE: For startup, we might want to be passive, but keeping logic consistent is safer.
-                // However, usually startup sync is "Pull Only".
-                // If local is newer on startup, it means we worked offline. We should probably silent upload or just do nothing and let auto-sync handle it.
-                // For safety, let's allow upload if Manual, but maybe skip/silent for startup to avoid startup lag?
-                // Let's keep it consistent: Sync means Sync.
-
-                // console.log('[Sync] Local is newer. Uploading...');
                 const localData = getFullLocalData();
 
                 // Safety check
@@ -221,8 +238,6 @@ export const useSyncManager = () => {
             }
             else {
                 // Case 3: Equal
-                console.log('[Sync][Step 3] 判定: 时间戳一致 -> 无需同步数据');
-                // console.log('[Sync] Timestamps are equal. Data is consistent.');
                 dataSyncStatus = 'equal';
                 dataSyncMsg = '数据已是一致';
             }
@@ -246,13 +261,10 @@ export const useSyncManager = () => {
                 !mergedImageList.every(img => cloudImageList.includes(img));
 
             if (dataSyncStatus === 'uploaded' || isCloudListOutdated) {
-                // console.log('[Sync] Updating cloud image list...');
                 try {
                     if (mode === 'startup') imageService.updateReferencedImagesList(mergedImageList);
                     await activeService.uploadImageList(mergedImageList);
                 } catch (e) { console.warn('Image list update failed', e); }
-            } else {
-                // console.log('[Sync] Cloud image list is up to date, skipping upload.');
             }
 
             // 3. Sync Image Files
@@ -267,6 +279,7 @@ export const useSyncManager = () => {
                 const imageSyncMsg = imageActions.length > 0
                     ? imageActions.join('，')
                     : (imageResult.errors.length > 0 ? '图片同步出错' : '图片一致');
+
 
                 // Combine messages
                 if (dataSyncStatus === 'equal' && imageActions.length === 0 && imageResult.errors.length === 0) {
@@ -291,7 +304,14 @@ export const useSyncManager = () => {
                     addToast(toastType, finalMsg);
                 }
             } else if (mode === 'startup' && dataSyncStatus === 'restored') {
+                // Startup mode: Only toast when restored
                 addToast('success', '启动同步：已下载云端数据');
+            } else if (mode === 'resume' && (dataSyncStatus === 'restored' || dataSyncStatus === 'uploaded')) {
+                // Resume mode: Toast when data changed
+                const msg = dataSyncStatus === 'restored' ? '已下载云端数据' : '已上传本地数据';
+                addToast('success', msg);
+            } else if (mode === 'auto') {
+                // Auto mode: Silent, no toast
             }
 
             if ((currentView === AppView.TIMELINE) || (mode === 'startup' && dataSyncStatus === 'restored')) {
@@ -304,6 +324,7 @@ export const useSyncManager = () => {
             if (mode === 'manual') addToast('error', '同步失败，请检查网络或配置');
         } finally {
             setIsSyncing(false);
+            syncLock.current = false;
         }
     };
 
@@ -321,6 +342,7 @@ export const useSyncManager = () => {
     // 2. Data Auto Sync
     const isFirstRun = useRef(true);
     const isSyncingRef = useRef(isSyncing);
+    const pendingAutoSyncRef = useRef(false); // Track if auto-sync is pending
 
     useEffect(() => {
         isSyncingRef.current = isSyncing;
@@ -332,14 +354,23 @@ export const useSyncManager = () => {
             return;
         }
 
+        // Set pending flag immediately when data changes
+        pendingAutoSyncRef.current = true;
+
         const timer = setTimeout(async () => {
             // Prevent auto-sync if a manual/startup sync is in progress
-            if (isSyncingRef.current) return;
+            if (isSyncingRef.current || isRestoring.current) {
+                pendingAutoSyncRef.current = false;
+                return;
+            }
 
             const webdavConfig = webdavService.getConfig();
             const s3Config = s3Service.getConfig();
 
-            if (!webdavConfig && !s3Config) return;
+            if (!webdavConfig && !s3Config) {
+                pendingAutoSyncRef.current = false;
+                return;
+            }
 
             const activeService = s3Config ? s3Service : webdavService;
 
@@ -361,8 +392,6 @@ export const useSyncManager = () => {
 
                 // Legacy tracking update
                 setDataLastModified(dataToSync.timestamp);
-
-                // console.log('[App] Auto-sync completed');
             } catch (e) {
                 console.error('Auto-sync upload failed', e);
             } finally {
@@ -371,9 +400,13 @@ export const useSyncManager = () => {
                     await new Promise(resolve => setTimeout(resolve, 1000 - elapsed));
                 }
                 setIsSyncing(false);
+                pendingAutoSyncRef.current = false;
             }
         }, 2000); // Debounce reduced to 2s for responsiveness
-        return () => clearTimeout(timer);
+        return () => {
+            clearTimeout(timer);
+            // Don't clear the pending flag here, only clear it when sync completes or is skipped
+        };
     }, [logs, todos, categories, todoCategories, scopes, goals, autoLinkRules, reviewTemplates, dailyReviews, weeklyReviews, monthlyReviews, customNarrativeTemplates, userPersonalInfo, filters]); // Removed lastSyncTime to prevent potential loops
 
     // 3. Image Auto Sync Listeners
@@ -438,31 +471,69 @@ export const useSyncManager = () => {
         };
     }, []);
 
-    // 4. Visibility Auto Sync
+    // 4. App LifeCycle Auto Sync (Resume & Hide)
     useEffect(() => {
+        // A. Resume (Foreground) -> Check for Cloud Updates
+        let appListener: any;
+        const setupListener = async () => {
+            appListener = await App.addListener('appStateChange', async (state) => {
+                if (state.isActive) {
+                    console.log('[App] App resumed. Checking for updates...');
+                    performSync('resume');
+                }
+            });
+        };
+        setupListener();
+
+        // B. Hide (Background) -> Upload Local Changes (Smart Sync)
         const handleVisibilityChange = () => {
+            // Web Visibility API
             if (document.visibilityState === 'hidden') {
                 const webdavConfig = webdavService.getConfig();
                 const s3Config = s3Service.getConfig();
 
                 if (webdavConfig || s3Config) {
                     const activeService = s3Config ? s3Service : webdavService;
-                    const localData = getFullLocalData(); // Get current state
+                    const localData = getFullLocalData(); // Includes current localData.timestamp
 
-                    // Use the tracking timestamp (localDataTimestamp), NOT Date.now()
-                    // This ensures we only upload a "newer" timestamp if data actually changed.
-                    const dataToSync = {
-                        ...localData,
-                        timestamp: localData.timestamp
-                    };
+                    // Smart Sync: Only upload if local data is NEWER than the last synced version
+                    // Note: dataLastModified tracks the timestamp of the last successful sync/save
+                    // localData.timestamp tracks the time of the last local edit
+                    console.log(`[Sync] Background triggered. Local: ${localData.timestamp}, LastSynced: ${dataLastModified}`);
 
-                    activeService.uploadData(dataToSync).catch(console.error);
+                    if (localData.timestamp > dataLastModified) {
+                        console.log('[Sync] New local changes detected. Uploading...');
+                        const dataToSync = {
+                            ...localData,
+                            timestamp: localData.timestamp // Ensure we upload the tracking timestamp
+                        };
+                        activeService.uploadData(dataToSync).then(() => {
+                            console.log('[Sync] Background upload success. Updating last modified.');
+                            // Update dataLastModified to match what we just uploaded
+                            // This prevents duplicate uploads next time if no changes occur
+                            setDataLastModified(localData.timestamp);
+                        }).catch(console.error);
+                    } else {
+                        console.log('[Sync] No new changes. Skipping background upload.');
+                    }
+                }
+            } else if (document.visibilityState === 'visible') {
+                // On Web, switching tabs back to visible should also check (similar to App Resume)
+                // But on Mobile, 'appStateChange' handles this better.
+                // We can leave this for Web or just let it be.
+                if (!Capacitor.isNativePlatform()) {
+                    console.log('[App] Tab visible. Checking for updates...');
+                    performSync('resume');
                 }
             }
         };
         document.addEventListener('visibilitychange', handleVisibilityChange);
-        return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
-    }, [logs, todos, categories, todoCategories, scopes, goals, autoLinkRules, reviewTemplates, dailyReviews, weeklyReviews, monthlyReviews, customNarrativeTemplates, userPersonalInfo]);
+
+        return () => {
+            if (appListener) appListener.remove();
+            document.removeEventListener('visibilitychange', handleVisibilityChange);
+        };
+    }, [logs, todos, categories, todoCategories, scopes, goals, autoLinkRules, reviewTemplates, dailyReviews, weeklyReviews, monthlyReviews, customNarrativeTemplates, userPersonalInfo, dataLastModified]); // Add dataLastModified dependancy
 
     return {
         isSyncing,
