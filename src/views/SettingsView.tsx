@@ -896,11 +896,18 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
 
         setIsSyncing(true);
 
-        // 保存配置
-        s3Service.saveConfig(s3ConfigForm);
+        // 保存配置 (Trim whitespaces)
+        const cleanConfig = {
+            bucketName: s3ConfigForm.bucketName.trim(),
+            region: s3ConfigForm.region.trim(),
+            secretId: s3ConfigForm.secretId.trim(),
+            secretKey: s3ConfigForm.secretKey.trim(),
+            endpoint: s3ConfigForm.endpoint ? s3ConfigForm.endpoint.trim() : ''
+        };
+        s3Service.saveConfig(cleanConfig);
 
         // 测试连接
-        const success = await s3Service.checkConnection();
+        const { success, message } = await s3Service.checkConnection();
 
         if (success) {
             setS3Config(s3ConfigForm);
@@ -914,7 +921,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
             onToast('success', '腾讯云 COS 连接成功');
         } else {
             s3Service.clearConfig();
-            onToast('error', 'COS 连接失败，请检查凭据');
+            onToast('error', message || 'COS 连接失败，请检查凭据');
         }
         setIsSyncing(false);
     };

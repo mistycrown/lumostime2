@@ -76,12 +76,20 @@ export class S3Service {
 
 
     saveConfig(config: S3Config) {
+        // Trim inputs to prevent copy-paste whitespace errors
+        config.bucketName = config.bucketName.trim();
+        config.region = config.region.trim();
+        config.secretId = config.secretId.trim();
+        config.secretKey = config.secretKey.trim();
+
         this.config = config;
         localStorage.setItem(STORAGE_KEY_BUCKET, config.bucketName);
         localStorage.setItem(STORAGE_KEY_REGION, config.region);
         localStorage.setItem(STORAGE_KEY_SECRET_ID, config.secretId);
         localStorage.setItem(STORAGE_KEY_SECRET_KEY, config.secretKey);
+
         if (config.endpoint) {
+            config.endpoint = config.endpoint.trim();
             localStorage.setItem(STORAGE_KEY_ENDPOINT, config.endpoint);
         } else {
             localStorage.removeItem(STORAGE_KEY_ENDPOINT);
@@ -106,8 +114,11 @@ export class S3Service {
     /**
      * Test COS connection by attempting to access the bucket
      */
-    async checkConnection(): Promise<boolean> {
-        if (!this.config || !this.client) return false;
+    /**
+     * Test COS connection by attempting to access the bucket
+     */
+    async checkConnection(): Promise<{ success: boolean; message?: string }> {
+        if (!this.config || !this.client) return { success: false, message: '请先保存配置' };
 
         return new Promise((resolve) => {
             console.log('[COS] Testing connection to bucket:', this.config!.bucketName);
@@ -115,38 +126,33 @@ export class S3Service {
             console.log('[COS] SecretId:', this.config!.secretId.substring(0, 10) + '...');
 
             this.client.headBucket({
-                Bucket: this.config.bucketName,
-                Region: this.config.region
+                Bucket: this.config!.bucketName,
+                Region: this.config!.region
             }, (err: any, data: any) => {
                 if (err) {
                     console.error('[COS] Connection test failed:', err);
+                    console.error(`[COS] Error details - simple code: ${err.code}, message: ${err.message}, statusCode: ${err.statusCode}`);
+
+                    let message = `连接失败: ${err.message || err.code}`;
 
                     // Provide more specific error messages
-                    if (err.code === 'NoSuchBucket') {
-                        console.error('[COS] Bucket does not exist:', this.config!.bucketName);
-                        console.error('[COS] 解决方案: 请检查存储桶名称是否正确，确保包含APPID后缀');
+                    if (err.statusCode === 403 || err.code === 'AccessDenied') {
+                        message = '权限拒绝(403): 请检查SecretId/Key是否正确，且拥有Bucket读写权限';
+                    } else if (err.code === 'NoSuchBucket') {
+                        message = '存储桶不存在: 请检查名称是否正确(需包含APPID后缀)及区域是否匹配';
                     } else if (err.code === 'InvalidAccessKeyId') {
-                        console.error('[COS] Invalid SecretId');
-                        console.error('[COS] 解决方案: 请检查SecretId是否正确');
+                        message = '无效的SecretId: 请检查账号ID是否正确';
                     } else if (err.code === 'SignatureDoesNotMatch') {
-                        console.error('[COS] Invalid SecretKey');
-                        console.error('[COS] 解决方案: 请检查SecretKey是否正确，确保没有多余空格');
-                    } else if (err.code === 'AccessDenied') {
-                        console.error('[COS] Access denied');
-                        console.error('[COS] 腾讯云COS常见问题:');
-                        console.error('[COS] 1. 检查SecretId和SecretKey是否正确');
-                        console.error('[COS] 2. 确保API密钥有访问权限');
-                        console.error('[COS] 3. 检查存储桶权限设置');
-                    } else {
-                        console.error(`[COS] 错误代码: ${err.code}`);
-                        console.error(`[COS] 错误消息: ${err.message}`);
+                        message = '签名不匹配: 请检查SecretKey是否正确';
+                    } else if (err.code === 'Error' && !err.message) {
+                        message = '连接失败(通用错误): 可能是跨域(CORS)或网络问题，请检查控制台';
                     }
 
-                    resolve(false);
+                    resolve({ success: false, message });
                 } else {
                     // console.log('[COS] ✓ Connection test passed');
                     // console.log(`[COS] Status: ${data.statusCode}`);
-                    resolve(true);
+                    resolve({ success: true });
                 }
             });
         });

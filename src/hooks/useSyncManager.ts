@@ -157,6 +157,11 @@ export const useSyncManager = () => {
         setIsSyncing(true);
 
         try {
+            // [Fix] Clear pending flag immediately when starting sync.
+            // If new changes happen *during* sync, useEffect will set it to true again,
+            // allowing the finally block to catch them. This prevents infinite loops on error.
+            pendingAutoSyncRef.current = false;
+
             const webdavConfig = webdavService.getConfig();
             const s3Config = s3Service.getConfig();
 
@@ -318,10 +323,6 @@ export const useSyncManager = () => {
             } else if (mode === 'auto') {
                 // Auto mode: Silent, no toast
             }
-
-            // If sync completed successfully, we can clear the pending auto-sync flag
-            // because we just synced everything (including whatever latest changes triggered the flag)
-            pendingAutoSyncRef.current = false;
 
             if ((currentView === AppView.TIMELINE) || (mode === 'startup' && dataSyncStatus === 'restored')) {
                 await new Promise(resolve => setTimeout(resolve, 100));
