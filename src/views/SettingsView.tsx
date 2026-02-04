@@ -270,6 +270,12 @@ const SponsorshipPreviewView: React.FC<{ onBack: () => void, onToast: (type: Toa
 
                             <div className="space-y-2">
                                 <h2 className="text-2xl font-bold text-stone-800">感谢您的支持</h2>
+                                {supporterId && (
+                                    <div className="inline-flex items-center gap-2 bg-amber-50 text-amber-700 px-3 py-1 rounded-full text-sm font-medium">
+                                        <span className="w-2 h-2 bg-amber-400 rounded-full"></span>
+                                        支持者 #{supporterId}
+                                    </div>
+                                )}
                                 <p className="text-stone-500">您的慷慨不仅是一杯咖啡，更是对 LumosTime 的认可</p>
                             </div>
 
