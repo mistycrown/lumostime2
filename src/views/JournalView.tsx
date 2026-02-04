@@ -150,12 +150,19 @@ export const JournalView: React.FC<JournalViewProps> = ({
 
 
     const monthPickerRef = useRef<HTMLDivElement>(null);
+    const monthPickerDropdownRef = useRef<HTMLDivElement>(null); // 新增：下拉菜单的 ref
     const scrollContainerRef = useRef<HTMLDivElement>(null); // 滚动容器ref
 
     // Close popups when clicking outside
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
-            if (monthPickerRef.current && !monthPickerRef.current.contains(event.target as Node)) {
+            // 检查点击是否在触发按钮或下拉菜单内
+            if (
+                monthPickerRef.current && 
+                !monthPickerRef.current.contains(event.target as Node) &&
+                monthPickerDropdownRef.current &&
+                !monthPickerDropdownRef.current.contains(event.target as Node)
+            ) {
                 setIsMonthPickerOpen(false);
             }
         };
@@ -545,6 +552,45 @@ export const JournalView: React.FC<JournalViewProps> = ({
 
     return (
         <div className="flex flex-col h-full bg-[#faf9f6] relative">
+            {/* Month Picker Dropdown - Portal to avoid stacking context issues */}
+            {isMonthPickerOpen && (
+                <div 
+                    ref={monthPickerDropdownRef}
+                    className="fixed mt-4 bg-white shadow-xl border border-gray-100 rounded-xl p-4 z-[9999] w-72 animate-in fade-in zoom-in-95 duration-200 cursor-default" 
+                    style={{
+                        top: monthPickerRef.current ? `${monthPickerRef.current.getBoundingClientRect().bottom + 16}px` : '0',
+                        left: monthPickerRef.current ? `${monthPickerRef.current.getBoundingClientRect().left}px` : '0'
+                    }}
+                    onClick={(e) => e.stopPropagation()}
+                >
+                    {/* Year Switcher */}
+                    <div className="flex items-center justify-between mb-4 border-b border-gray-100 pb-2">
+                        <button onClick={() => changeYear(-1)} className="p-1 hover:bg-gray-100 rounded-full text-gray-500">
+                            <ChevronLeft className="w-5 h-5" />
+                        </button>
+                        <span className="font-serif text-lg font-bold text-gray-900">{selectedDate.getFullYear()}</span>
+                        <button onClick={() => changeYear(1)} className="p-1 hover:bg-gray-100 rounded-full text-gray-500">
+                            <ChevronRight className="w-5 h-5" />
+                        </button>
+                    </div>
+                    {/* Month Grid */}
+                    <div className="grid grid-cols-3 gap-2">
+                        {MONTHS.map((m, idx) => (
+                            <button
+                                key={m}
+                                onClick={() => handleMonthSelect(idx)}
+                                className={`text-sm py-2 px-1 rounded-md transition-colors ${selectedDate.getMonth() === idx
+                                    ? 'bg-gray-900 text-white font-bold'
+                                    : 'text-gray-600 hover:bg-gray-100'
+                                    }`}
+                            >
+                                {m.slice(0, 3)}
+                            </button>
+                        ))}
+                    </div>
+                </div>
+            )}
+
             {/* Sticky Header - 标题栏随滚动缩小 */}
             <header className={`sticky top-0 z-40 transition-all duration-300 ${isScrolled
                 ? 'bg-[#faf9f6]/90 backdrop-blur-md shadow-sm py-2'
@@ -571,10 +617,10 @@ export const JournalView: React.FC<JournalViewProps> = ({
                 >
 
                     {/* Intro / Stats Area / Month Selector */}
-                    <div className="mb-12 pl-2 pr-0 relative z-[60]">
+                    <div className="mb-12 pl-2 pr-0 relative">
                         {/* New Month Picker UI */}
                         <div className="flex items-end gap-4 mb-6 pt-0 px-1 select-none">
-                            <div className="flex flex-col relative group cursor-pointer z-[60]" ref={monthPickerRef}>
+                            <div className="flex flex-col relative group cursor-pointer" ref={monthPickerRef}>
                                 <div
                                     onClick={() => setIsMonthPickerOpen(!isMonthPickerOpen)}
                                     className="flex flex-col"
@@ -589,42 +635,6 @@ export const JournalView: React.FC<JournalViewProps> = ({
                                         <ChevronDown className={`w-4 h-4 text-stone-300 group-hover:text-stone-500 transition-colors mt-1.5 ${isMonthPickerOpen ? 'rotate-180' : ''}`} />
                                     </div>
                                 </div>
-
-                                {/* Month Picker Dropdown */}
-                                {isMonthPickerOpen && (
-                                    <div className="fixed mt-4 bg-white shadow-xl border border-gray-100 rounded-xl p-4 z-[100] w-72 animate-in fade-in zoom-in-95 duration-200 cursor-default" 
-                                         style={{
-                                             top: monthPickerRef.current ? `${monthPickerRef.current.getBoundingClientRect().bottom + 16}px` : '0',
-                                             left: monthPickerRef.current ? `${monthPickerRef.current.getBoundingClientRect().left}px` : '0'
-                                         }}
-                                         onClick={(e) => e.stopPropagation()}>
-                                        {/* Year Switcher */}
-                                        <div className="flex items-center justify-between mb-4 border-b border-gray-100 pb-2">
-                                            <button onClick={() => changeYear(-1)} className="p-1 hover:bg-gray-100 rounded-full text-gray-500">
-                                                <ChevronLeft className="w-5 h-5" />
-                                            </button>
-                                            <span className="font-serif text-lg font-bold text-gray-900">{selectedDate.getFullYear()}</span>
-                                            <button onClick={() => changeYear(1)} className="p-1 hover:bg-gray-100 rounded-full text-gray-500">
-                                                <ChevronRight className="w-5 h-5" />
-                                            </button>
-                                        </div>
-                                        {/* Month Grid */}
-                                        <div className="grid grid-cols-3 gap-2">
-                                            {MONTHS.map((m, idx) => (
-                                                <button
-                                                    key={m}
-                                                    onClick={() => handleMonthSelect(idx)}
-                                                    className={`text-sm py-2 px-1 rounded-md transition-colors ${selectedDate.getMonth() === idx
-                                                        ? 'bg-gray-900 text-white font-bold'
-                                                        : 'text-gray-600 hover:bg-gray-100'
-                                                        }`}
-                                                >
-                                                    {m.slice(0, 3)}
-                                                </button>
-                                            ))}
-                                        </div>
-                                    </div>
-                                )}
                             </div>
                             <div className="h-px bg-stone-200 flex-1 mb-3"></div>
 
@@ -704,7 +714,7 @@ export const JournalView: React.FC<JournalViewProps> = ({
                                 </div>
                             </div>
                         ) : (
-                            <div className="flex flex-col items-center justify-center py-20 text-gray-400 relative z-0">
+                            <div className="flex flex-col items-center justify-center py-20 text-gray-400">
                                 <div className="w-16 h-16 rounded-full bg-gray-100 flex items-center justify-center mb-4">
                                     <PenLine className="w-6 h-6 opacity-30" />
                                 </div>
