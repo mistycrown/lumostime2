@@ -428,7 +428,22 @@ const AppContent: React.FC = () => {
           weeklyReviews={weeklyReviews}
           monthlyReviews={monthlyReviews}
           currentDate={new Date()}
-          syncData={{}}
+          syncData={{
+            logs,
+            todos,
+            categories,
+            todoCategories,
+            scopes,
+            goals,
+            autoLinkRules,
+            reviewTemplates,
+            dailyReviews,
+            weeklyReviews,
+            monthlyReviews,
+            customNarrativeTemplates,
+            userPersonalInfo,
+            filters
+          }}
 
           // Settings Props
           onOpenAutoLink={() => setIsAutoLinkOpen(true)}

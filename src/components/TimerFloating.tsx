@@ -139,7 +139,9 @@ const SingleTimer: React.FC<{
           ? 5  // 收缩后最低层级
           : currentView === AppView.RECORD || currentView === AppView.TODO
             ? 40  // 记录页和待办页保持高层级
-            : 10  // 其他页面使用低层级
+            : currentView === AppView.TIMELINE
+              ? 45  // 脉络页使用最高层级，确保在所有元素之上
+              : 10  // 其他页面使用低层级
       }}
     >
       {isCollapsed ? (
@@ -214,12 +216,14 @@ const SingleTimer: React.FC<{
 export const TimerFloating: React.FC<TimerFloatingProps> = ({ sessions, todos, onStop, onCancel, onClick }) => {
   if (sessions.length === 0) return null;
 
-  // 需要获取当前页面信息来决定 z-index
-  // 由于这里无法直接访问 NavigationContext，我们通过第一个 session 的组件来推断
-  // 或者通过其他方式传递页面信息
+  // 获取当前页面信息来决定外层容器的 z-index
+  const { currentView } = useNavigation();
+  
+  // 计算外层容器的 z-index
+  const containerZIndex = currentView === AppView.TIMELINE ? 50 : 10;
   
   return (
-    <div className="fixed bottom-[calc(4.5rem+env(safe-area-inset-bottom))] left-4 right-4 md:left-4 md:right-4 flex flex-col-reverse gap-6 animate-in slide-in-from-bottom-5" style={{ zIndex: 10 }}>
+    <div className="fixed bottom-[calc(4.5rem+env(safe-area-inset-bottom))] left-4 right-4 md:left-4 md:right-4 flex flex-col-reverse gap-6 animate-in slide-in-from-bottom-5" style={{ zIndex: containerZIndex }}>
       {sessions.map(session => (
         <SingleTimer
           key={session.id}
