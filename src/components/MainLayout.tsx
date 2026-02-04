@@ -92,7 +92,7 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
     };
 
     return (
-        <div className={`h-screen w-screen flex flex-col text-stone-800 overflow-hidden select-none font-serif relative pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]`}>
+        <div className={`h-screen w-screen flex flex-col text-stone-800 overflow-hidden select-none font-serif relative pb-[env(safe-area-inset-bottom)]`}>
 
             {/* Top Header Bar */}
             {!isSettingsOpen && (currentView !== AppView.TIMELINE || isDailyReviewOpen || isWeeklyReviewOpen || isMonthlyReviewOpen) && !isStatsFullScreen &&
@@ -102,9 +102,9 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
                 // Hide header for REVIEW view (Memoir/Chronicle use their own headers) UNLESS a modal review is open
                 (currentView !== AppView.REVIEW || isDailyReviewOpen || isWeeklyReviewOpen || isMonthlyReviewOpen) && (
                     <header 
-                        className={`flex items-center justify-between px-5 border-b border-stone-100 shrink-0 z-30 transition-all duration-300 ${isHeaderScrolled
-                            ? 'h-12 bg-[#faf9f6]/90 backdrop-blur-md shadow-sm'
-                            : currentView === AppView.REVIEW ? 'h-14 bg-[#faf9f6]/80 backdrop-blur-sm' : 'h-14 bg-[#faf9f6]/80 backdrop-blur-sm'
+                        className={`flex items-center justify-between px-5 border-b border-stone-100 shrink-0 z-30 transition-all duration-300 pt-[env(safe-area-inset-top)] ${isHeaderScrolled
+                            ? 'h-[calc(3rem+env(safe-area-inset-top))] bg-[#faf9f6]/90 backdrop-blur-md shadow-sm'
+                            : currentView === AppView.REVIEW ? 'h-[calc(3.5rem+env(safe-area-inset-top))] bg-[#faf9f6]/80 backdrop-blur-sm' : 'h-[calc(3.5rem+env(safe-area-inset-top))] bg-[#faf9f6]/80 backdrop-blur-sm'
                         }`}
                     >
                         <div className="w-8 flex items-center">

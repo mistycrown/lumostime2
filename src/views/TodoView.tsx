@@ -418,7 +418,7 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, categories, activityC
       
       {/* Left Sidebar - Todo Categories */}
       <div
-        className={`flex-shrink-0 flex flex-col overflow-y-auto pt-6 pb-20 md:pl-1 pl-1 pr-2 no-scrollbar z-0 transition-all duration-300 relative ${isSidebarOpen ? 'w-auto md:min-w-[12rem]' : 'w-16 items-center'}`}
+        className={`flex-shrink-0 flex flex-col overflow-y-auto pt-6 pb-20 pl-0 pr-2 no-scrollbar z-0 transition-all duration-300 relative ${isSidebarOpen ? 'w-auto md:min-w-[12rem]' : 'w-16 items-center'}`}
       >
         <div className="flex-1 w-full">
           {categories.map((category) => {
@@ -428,7 +428,7 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, categories, activityC
                 key={category.id}
                 onClick={() => setSelectedCategoryId(category.id)}
                 className={`
-                  flex items-center gap-2 px-4 py-4 md:py-3 mb-1 transition-all duration-200 text-left relative rounded-r-2xl md:rounded-xl group w-full
+                  flex items-center gap-2 px-4 py-4 md:py-3 mb-1 transition-all duration-200 text-left relative rounded-r-2xl group w-full
                   ${isSelected
                     ? 'text-stone-900 font-bold bg-white shadow-[2px_2px_10px_rgba(0,0,0,0.02)] z-10'
                     : 'text-stone-600 hover:text-stone-800'
@@ -438,7 +438,7 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, categories, activityC
                 title={!isSidebarOpen ? category.name : undefined}
               >
                 {isSelected && (
-                  <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-5 bg-stone-900 rounded-r-full md:hidden"></div>
+                  <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-5 bg-stone-900 rounded-r-full"></div>
                 )}
                 <span className={`text-xl ${isSelected ? 'opacity-100' : 'opacity-100'}`}>
                   {category.icon}

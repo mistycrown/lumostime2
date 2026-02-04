@@ -225,17 +225,15 @@ export const ReviewHubView: React.FC<ReviewHubViewProps> = ({
     return (
         <div className="flex flex-col h-full bg-[#faf9f6] relative">
             {/* Sticky Header - 标题栏随滚动缩小 */}
-            <header className={`sticky top-0 z-40 transition-all duration-300 ${isScrolled
-                ? 'bg-[#faf9f6]/90 backdrop-blur-md shadow-sm py-2'
-                : 'bg-[#faf9f6]/80 backdrop-blur-sm py-4'
+            <header className={`sticky top-0 z-40 transition-all duration-300 pt-[env(safe-area-inset-top)] ${isScrolled
+                ? 'bg-[#faf9f6]/90 backdrop-blur-md shadow-sm h-[calc(3rem+env(safe-area-inset-top))]'
+                : 'bg-[#faf9f6]/80 backdrop-blur-sm h-[calc(3.5rem+env(safe-area-inset-top))]'
                 }`}>
-                <div className="max-w-xl mx-auto px-6">
-                    <div className="flex flex-col items-center">
-                        <h1 className={`font-serif text-stone-800 font-bold transition-all duration-300 ${isScrolled ? 'text-[16px]' : 'text-[18px] mb-1'
-                            }`}>
-                            Chronicle
-                        </h1>
-                    </div>
+                <div className="max-w-xl mx-auto px-6 h-full flex items-center justify-center">
+                    <h1 className={`font-serif text-stone-800 font-bold transition-all duration-300 ${isScrolled ? 'text-[16px]' : 'text-[18px]'
+                        }`}>
+                        Chronicle
+                    </h1>
                 </div>
             </header>
 
