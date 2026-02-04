@@ -21,8 +21,10 @@
             android:label="@string/title_activity_main"
             android:theme="@style/AppTheme.NoActionBarLaunch"
             android:launchMode="singleTask"
-            android:exported="true">
-            <intent-filter>
+            android:exported="true"
+            android:enabled="true">
+            <!-- 主 Activity 的启动器入口，当使用默认图标时显示 -->
+            <intent-filter android:priority="0">
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
@@ -50,7 +52,7 @@
             android:label="@string/app_name"
             android:enabled="false"
             android:exported="true">
-            <intent-filter>
+            <intent-filter android:priority="1">
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>

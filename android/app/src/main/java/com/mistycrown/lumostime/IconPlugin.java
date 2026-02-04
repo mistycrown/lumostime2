@@ -143,8 +143,11 @@ public class IconPlugin extends Plugin {
             ComponentName mainActivity = new ComponentName(packageName, 
                 "com.mistycrown.lumostime.MainActivity");
             
+            // 重要修复：主 Activity 始终保持启用状态，只控制 alias 的显示
+            // 这样可以避免重新安装时找不到 MainActivity 的问题
+            
             if (iconId.equals("default")) {
-                // 选择默认图标：启用主 Activity，禁用所有 alias
+                // 选择默认图标：确保主 Activity 启用，禁用所有 alias
                 packageManager.setComponentEnabledSetting(
                     mainActivity,
                     PackageManager.COMPONENT_ENABLED_STATE_ENABLED,
@@ -164,10 +167,11 @@ public class IconPlugin extends Plugin {
                     );
                 }
             } else {
-                // 选择其他图标：禁用主 Activity，启用对应的 alias
+                // 选择其他图标：保持主 Activity 启用但隐藏，启用对应的 alias
+                // 注意：这里不禁用主 Activity，而是让 alias 优先显示
                 packageManager.setComponentEnabledSetting(
                     mainActivity,
-                    PackageManager.COMPONENT_ENABLED_STATE_DISABLED,
+                    PackageManager.COMPONENT_ENABLED_STATE_ENABLED,
                     PackageManager.DONT_KILL_APP
                 );
                 
@@ -232,6 +236,47 @@ public class IconPlugin extends Plugin {
     }
 
     @PluginMethod
+    public void initializeIconState(PluginCall call) {
+        try {
+            // 在应用启动时确保至少有一个入口点是启用的
+            String currentIcon = getContext().getSharedPreferences("lumos_settings", 0)
+                .getString("current_icon", "default");
+            
+            PackageManager packageManager = getContext().getPackageManager();
+            String packageName = getContext().getPackageName();
+            
+            // 检查当前设置的图标是否正确启用
+            if (currentIcon.equals("default")) {
+                // 确保主 Activity 启用
+                ComponentName mainActivity = new ComponentName(packageName, 
+                    "com.mistycrown.lumostime.MainActivity");
+                packageManager.setComponentEnabledSetting(
+                    mainActivity,
+                    PackageManager.COMPONENT_ENABLED_STATE_ENABLED,
+                    PackageManager.DONT_KILL_APP
+                );
+            } else {
+                // 确保对应的 alias 启用
+                String activityAlias = getActivityAlias(currentIcon);
+                ComponentName componentName = new ComponentName(packageName, activityAlias);
+                packageManager.setComponentEnabledSetting(
+                    componentName,
+                    PackageManager.COMPONENT_ENABLED_STATE_ENABLED,
+                    PackageManager.DONT_KILL_APP
+                );
+            }
+            
+            JSObject result = new JSObject();
+            result.put("success", true);
+            result.put("currentIcon", currentIcon);
+            call.resolve(result);
+            
+        } catch (Exception e) {
+            call.reject("初始化图标状态失败: " + e.getMessage());
+        }
+    }
+
+    @PluginMethod
     public void refreshLauncher(PluginCall call) {
         refreshLauncher();
         
@@ -240,11 +285,6 @@ public class IconPlugin extends Plugin {
         result.put("message", "启动器刷新请求已发送");
         call.resolve(result);
     }
-
-    /**
-     * 强制刷新启动器显示
-     * 通过多种方法尝试让启动器更新图标显示
-     */
     private void refreshLauncher() {
         try {
             // 方法1: 发送启动器刷新广播
