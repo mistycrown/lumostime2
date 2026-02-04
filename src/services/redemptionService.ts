@@ -1,5 +1,4 @@
-import { sha256 } from '../utils/crypto';
-import { MASTER_KEYS } from '../constants/redemptionHashes';
+import { TRANSFORM_PARAMS } from '../constants/redemptionHashes';
 
 /**
  * 兑换码验证结果接口
@@ -11,63 +10,97 @@ export interface RedemptionResult {
 }
 
 /**
- * 将用户ID编码成看起来随机的字符串
- * 使用HMAC确保安全性和一致性
+ * 真正可逆的编码算法
  */
-async function encodeUserId(userId: number, masterKey: string): Promise<string> {
-  // 使用Web Crypto API的HMAC
-  const encoder = new TextEncoder();
-  const message = `USER_${userId.toString().padStart(6, '0')}_LUMOS`;
+function encodeUserId(userId: number, masterKeyIndex: number): string {
+  const params = TRANSFORM_PARAMS[masterKeyIndex];
   
-  const key = await crypto.subtle.importKey(
-    'raw',
-    encoder.encode(masterKey),
-    { name: 'HMAC', hash: 'SHA-256' },
-    false,
-    ['sign']
-  );
+  // 简单的可逆变换
+  // 1. 乘法变换
+  let num = userId * params.multiplier;
   
-  const signature = await crypto.subtle.sign('HMAC', key, encoder.encode(message));
+  // 2. 加法变换  
+  num = num + params.offset;
   
-  // 转换为base32并取前8位
-  const bytes = new Uint8Array(signature.slice(0, 6));
-  const base32 = btoa(String.fromCharCode(...bytes))
-    .replace(/\+/g, '-')
-    .replace(/\//g, '_')
-    .replace(/=/g, '')
-    .toUpperCase()
-    .slice(0, 8);
+  // 3. 异或变换
+  num = num ^ params.xor;
   
-  return base32;
+  // 4. 添加密钥索引信息（用于快速识别）
+  num = (num << 4) | masterKeyIndex;  // 最后4位存储密钥索引
+  
+  // 转换为8位十六进制
+  const encoded = (num & 0xFFFFFFFF).toString(16).toUpperCase().padStart(8, '0');
+  return encoded;
 }
 
 /**
- * 解码兑换码并验证其合法性
+ * 真正的逆向解码（瞬间完成！）
  */
-async function decodeAndVerify(code: string, masterKeys: string[]): Promise<{ isValid: boolean; userId?: number; masterKey?: string }> {
-  if (!code.startsWith("LUMOS-")) {
-    return { isValid: false };
-  }
-  
+function decodeUserId(encoded: string): { userId: number; keyIndex: number } | null {
   try {
-    // 解析兑换码格式: LUMOS-{ENCODED_ID}
-    const encodedPart = code.slice(6); // 去掉 "LUMOS-" 前缀
+    let num = parseInt(encoded, 16);
     
-    // 尝试每个主密钥
-    for (const masterKey of masterKeys) {
-      // 尝试不同的用户ID（限制搜索范围以提高性能）
-      for (let userId = 1; userId <= 10000; userId++) { // 限制搜索范围
-        const expectedEncoded = await encodeUserId(userId, masterKey);
-        if (expectedEncoded === encodedPart) {
-          return { isValid: true, userId, masterKey };
-        }
-      }
+    // 1. 提取密钥索引（最后4位）
+    const keyIndex = num & 0xF;
+    if (keyIndex >= TRANSFORM_PARAMS.length) {
+      return null;
     }
     
-    return { isValid: false };
+    // 2. 去除密钥索引位
+    num = num >> 4;
+    
+    // 3. 获取对应参数
+    const params = TRANSFORM_PARAMS[keyIndex];
+    
+    // 4. 逆向变换
+    // 逆向异或
+    num = num ^ params.xor;
+    
+    // 逆向加法
+    num = num - params.offset;
+    
+    // 逆向乘法（除法）
+    if (num % params.multiplier !== 0) {
+      return null;  // 无效兑换码
+    }
+    
+    const userId = num / params.multiplier;
+    
+    // 5. 验证用户ID合理性
+    if (userId < 1 || userId > 1000000 || !Number.isInteger(userId)) {
+      return null;
+    }
+    
+    return { userId, keyIndex };
+    
   } catch (error) {
-    console.error('Decode error:', error);
-    return { isValid: false };
+    return null;
+  }
+}
+
+/**
+ * 优化版本：使用预计算缓存加速解码
+ */
+class FastDecoder {
+  private static cache = new Map<string, { userId: number; keyIndex: number }>();
+  
+  static decode(encoded: string): { userId: number; keyIndex: number } | null {
+    // 检查缓存
+    if (this.cache.has(encoded)) {
+      return this.cache.get(encoded)!;
+    }
+    
+    // 计算并缓存结果
+    const result = decodeUserId(encoded);
+    if (result) {
+      this.cache.set(encoded, result);
+    }
+    
+    return result;
+  }
+  
+  static clearCache() {
+    this.cache.clear();
   }
 }
 
@@ -77,9 +110,13 @@ async function decodeAndVerify(code: string, masterKeys: string[]): Promise<{ is
  */
 export class RedemptionService {
   private readonly STORAGE_KEY = 'lumos_sponsorship_code';
+  private readonly VERIFIED_KEY = 'lumos_verified_user_id';
+  
+  // 内存缓存，避免重复计算
+  private verificationCache = new Map<string, number>();
 
   /**
-   * 验证兑换码
+   * 验证兑换码（超快版本）
    * @param code - 用户输入的兑换码
    * @returns Promise<RedemptionResult> - 验证结果
    */
@@ -88,24 +125,44 @@ export class RedemptionService {
       // 输入标准化：去除空格、转换大写
       const normalizedCode = code.trim().toUpperCase();
 
-      // 使用算法验证兑换码
-      const result = await decodeAndVerify(normalizedCode, MASTER_KEYS);
+      // 1. 检查内存缓存
+      if (this.verificationCache.has(normalizedCode)) {
+        const userId = this.verificationCache.get(normalizedCode)!;
+        return {
+          success: true,
+          supporterId: userId,
+        };
+      }
 
-      if (result.isValid && result.userId) {
-        // 验证成功
+      // 2. 检查格式
+      if (!normalizedCode.startsWith("LUMOS-")) {
+        return {
+          success: false,
+          error: '兑换码格式错误',
+        };
+      }
+
+      // 3. 提取编码部分
+      const encodedPart = normalizedCode.slice(6); // 去掉 "LUMOS-"
+      
+      // 4. 快速解码（只需要5次计算！）
+      const result = FastDecoder.decode(encodedPart);
+
+      if (result && result.userId) {
+        // 缓存验证结果
+        this.verificationCache.set(normalizedCode, result.userId);
+
         return {
           success: true,
           supporterId: result.userId,
         };
       } else {
-        // 验证失败
         return {
           success: false,
           error: '兑换码无效，请检查后重试',
         };
       }
     } catch (error) {
-      // 验证过程中出错
       console.error('Verification error:', error);
       return {
         success: false,
@@ -115,16 +172,18 @@ export class RedemptionService {
   }
 
   /**
-   * 保存验证成功的兑换码
+   * 保存验证成功的兑换码和用户ID
    * @param code - 兑换码
+   * @param userId - 用户ID
    */
-  saveCode(code: string): void {
+  saveCode(code: string, userId?: number): void {
     try {
       localStorage.setItem(this.STORAGE_KEY, code);
+      if (userId) {
+        localStorage.setItem(this.VERIFIED_KEY, userId.toString());
+      }
     } catch (error) {
-      // LocalStorage 不可用时的降级处理
       console.warn('LocalStorage not available, using session-only mode:', error);
-      // 可以在这里添加内存存储作为降级方案
     }
   }
 
@@ -136,46 +195,67 @@ export class RedemptionService {
     try {
       return localStorage.getItem(this.STORAGE_KEY);
     } catch (error) {
-      // LocalStorage 不可用时的降级处理
       console.warn('LocalStorage not available:', error);
       return null;
     }
   }
 
   /**
-   * 清除已保存的兑换码
+   * 获取已验证的用户ID（避免重复验证）
+   * @returns number | null - 已验证的用户ID或null
+   */
+  getVerifiedUserId(): number | null {
+    try {
+      const userId = localStorage.getItem(this.VERIFIED_KEY);
+      return userId ? parseInt(userId, 10) : null;
+    } catch (error) {
+      console.warn('LocalStorage not available:', error);
+      return null;
+    }
+  }
+
+  /**
+   * 清除已保存的兑换码和验证状态
    */
   clearSavedCode(): void {
     try {
       localStorage.removeItem(this.STORAGE_KEY);
+      localStorage.removeItem(this.VERIFIED_KEY);
+      this.verificationCache.clear();
+      FastDecoder.clearCache();
     } catch (error) {
-      // LocalStorage 不可用时的降级处理
       console.warn('LocalStorage not available:', error);
     }
   }
 
   /**
-   * 检查是否已验证
-   * @returns Promise<boolean> - 是否已验证
+   * 检查是否已验证（超快版本）
+   * @returns Promise<{ isVerified: boolean; userId?: number }> - 验证状态和用户ID
    */
-  async isVerified(): Promise<boolean> {
-    // 获取已保存的兑换码
+  async isVerified(): Promise<{ isVerified: boolean; userId?: number }> {
+    // 1. 首先检查是否有已验证的用户ID（瞬间返回）
+    const verifiedUserId = this.getVerifiedUserId();
+    if (verifiedUserId) {
+      return { isVerified: true, userId: verifiedUserId };
+    }
+
+    // 2. 如果没有缓存的用户ID，检查是否有保存的兑换码
     const savedCode = this.getSavedCode();
-
     if (!savedCode) {
-      return false;
+      return { isVerified: false };
     }
 
-    // 如果存在，自动验证
+    // 3. 验证保存的兑换码（现在很快了！）
     const result = await this.verifyCode(savedCode);
-
-    // 如果验证失败，清除保存的兑换码
-    if (!result.success) {
+    
+    if (result.success && result.supporterId) {
+      // 保存验证结果以避免下次重复验证
+      this.saveCode(savedCode, result.supporterId);
+      return { isVerified: true, userId: result.supporterId };
+    } else {
+      // 如果验证失败，清除保存的数据
       this.clearSavedCode();
-      return false;
+      return { isVerified: false };
     }
-
-    // 返回验证状态
-    return true;
   }
 }

@@ -164,16 +164,10 @@ const SponsorshipPreviewView: React.FC<{ onBack: () => void, onToast: (type: Toa
 
     useEffect(() => {
         const checkVerification = async () => {
-            const verified = await redemptionService.isVerified();
-            if (verified) {
+            const result = await redemptionService.isVerified();
+            if (result.isVerified && result.userId) {
                 setIsRedeemed(true);
-                const savedCode = redemptionService.getSavedCode();
-                if (savedCode) {
-                    const result = await redemptionService.verifyCode(savedCode);
-                    if (result.success) {
-                        setSupporterId(result.supporterId);
-                    }
-                }
+                setSupporterId(result.userId);
             }
         };
         checkVerification();
@@ -189,7 +183,7 @@ const SponsorshipPreviewView: React.FC<{ onBack: () => void, onToast: (type: Toa
         try {
             const result = await redemptionService.verifyCode(redemptionCode);
             if (result.success) {
-                redemptionService.saveCode(redemptionCode);
+                redemptionService.saveCode(redemptionCode, result.supporterId);
                 setIsRedeemed(true);
                 setSupporterId(result.supporterId);
                 onToast('success', '验证成功！');
