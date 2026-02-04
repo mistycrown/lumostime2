@@ -71,7 +71,7 @@ export const ScopeView: React.FC<ScopeViewProps> = ({
 
     return (
         <div 
-            className="h-full bg-[#faf9f6] overflow-y-auto pb-24"
+            className="h-full bg-[#faf9f6] overflow-y-auto pb-24 no-scrollbar"
             id="scopes-content"
         >
             {/* Scope Cards */}

@@ -97,6 +97,16 @@
       /* Firefox */
     }
 
+    /* Alias for no-scrollbar */
+    .scrollbar-hide::-webkit-scrollbar {
+      display: none;
+    }
+
+    .scrollbar-hide {
+      -ms-overflow-style: none;
+      scrollbar-width: none;
+    }
+
     /* 背景伪元素样式 */
     .bg-with-gradient::before,
     .bg-with-image::before {

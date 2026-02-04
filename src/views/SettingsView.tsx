@@ -167,7 +167,6 @@ const SponsorshipPreviewView: React.FC<{ onBack: () => void, onToast: (type: Toa
     const [supporterId, setSupporterId] = useState<number | undefined>(undefined);
     const [selectedIcon, setSelectedIcon] = useState('default');
     const [selectedTheme, setSelectedTheme] = useState('default');
-    const [selectedStyle, setSelectedStyle] = useState('default');
     const [isChangingIcon, setIsChangingIcon] = useState(false);
     const [showDebugInfo, setShowDebugInfo] = useState(false);
     const redemptionService = new RedemptionService();
@@ -268,12 +267,12 @@ const SponsorshipPreviewView: React.FC<{ onBack: () => void, onToast: (type: Toa
         { id: 'lavender', name: '薰衣草', color: '#8b5cf6', description: '优雅紫色主题' },
     ];
 
-    // 精进风格选项
-    const styleOptions = [
-        { id: 'default', name: '标准', icon: '📝', description: '经典界面风格' },
-        { id: 'cute', name: '可爱', icon: '🌸', description: '增加可爱元素和动画' },
-        { id: 'minimal', name: '极简', icon: '⚪', description: '简洁专注的设计' },
-        { id: 'retro', name: '复古', icon: '📼', description: '怀旧复古风格' },
+    // 时间小友选项
+    const timePalOptions = [
+        { id: 'pal1', icon: '🐱' },
+        { id: 'pal2', icon: '🐶' },
+        { id: 'pal3', icon: '🐰' },
+        { id: 'pal4', icon: '🦊' },
     ];
 
     return (
@@ -340,7 +339,6 @@ const SponsorshipPreviewView: React.FC<{ onBack: () => void, onToast: (type: Toa
                                 </div>
                                 <div className="flex-1">
                                     <h3 className="text-lg font-bold text-stone-800 mb-1">专属赞助徽章</h3>
-                                    <p className="text-sm text-stone-500">您是第 {supporterId || '1'} 号赞助者</p>
                                     <div className="flex items-center gap-2 mt-2">
                                         <span className="w-2 h-2 bg-amber-400 rounded-full animate-pulse"></span>
                                         <span className="text-xs text-amber-600 font-medium">感谢您的支持</span>
@@ -358,7 +356,6 @@ const SponsorshipPreviewView: React.FC<{ onBack: () => void, onToast: (type: Toa
                                     </div>
                                     <div>
                                         <h3 className="text-lg font-bold text-stone-800">应用图标</h3>
-                                        <p className="text-sm text-stone-500">选择你喜欢的图标风格</p>
                                     </div>
                                 </div>
                                 
@@ -429,32 +426,24 @@ const SponsorshipPreviewView: React.FC<{ onBack: () => void, onToast: (type: Toa
                         {/* 背景图片切换卡片 */}
                         <BackgroundSelector onToast={onToast} />
 
-                        {/* 精进风格卡片 */}
+                        {/* 时间小友卡片 */}
                         <div className="bg-white rounded-2xl p-6 shadow-sm">
                             <div className="flex items-center gap-3 mb-4">
-                                <div className="w-8 h-8 bg-green-50 rounded-lg flex items-center justify-center">
-                                    <span className="text-green-600 text-lg">✨</span>
+                                <div className="w-8 h-8 bg-amber-50 rounded-lg flex items-center justify-center">
+                                    <span className="text-amber-600 text-lg">🐾</span>
                                 </div>
                                 <div>
-                                    <h3 className="text-lg font-bold text-stone-800">精进风格</h3>
-                                    <p className="text-sm text-stone-500">个性化界面体验</p>
+                                    <h3 className="text-lg font-bold text-stone-800">时间小友</h3>
                                 </div>
                             </div>
                             
-                            <div className="grid grid-cols-2 gap-3">
-                                {styleOptions.map((style) => (
+                            <div className="grid grid-cols-4 gap-2">
+                                {timePalOptions.map((pal) => (
                                     <button
-                                        key={style.id}
-                                        onClick={() => setSelectedStyle(style.id)}
-                                        className={`p-4 rounded-xl border-2 transition-all ${
-                                            selectedStyle === style.id
-                                                ? 'border-green-400 bg-green-50'
-                                                : 'border-stone-200 hover:border-stone-300'
-                                        }`}
+                                        key={pal.id}
+                                        className="aspect-square rounded-lg border-2 border-stone-200 hover:border-stone-300 transition-all flex items-center justify-center bg-stone-50"
                                     >
-                                        <div className="text-2xl mb-2">{style.icon}</div>
-                                        <div className="text-sm font-medium text-stone-700">{style.name}</div>
-                                        <div className="text-xs text-stone-500 mt-1">{style.description}</div>
+                                        <span className="text-2xl">{pal.icon}</span>
                                     </button>
                                 ))}
                             </div>
