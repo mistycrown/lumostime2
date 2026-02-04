@@ -571,10 +571,10 @@ export const JournalView: React.FC<JournalViewProps> = ({
                 >
 
                     {/* Intro / Stats Area / Month Selector */}
-                    <div className="mb-12 pl-2 pr-0 relative">
+                    <div className="mb-12 pl-2 pr-0 relative z-[60]">
                         {/* New Month Picker UI */}
                         <div className="flex items-end gap-4 mb-6 pt-0 px-1 select-none">
-                            <div className="flex flex-col relative group cursor-pointer" ref={monthPickerRef}>
+                            <div className="flex flex-col relative group cursor-pointer z-[60]" ref={monthPickerRef}>
                                 <div
                                     onClick={() => setIsMonthPickerOpen(!isMonthPickerOpen)}
                                     className="flex flex-col"
@@ -592,7 +592,12 @@ export const JournalView: React.FC<JournalViewProps> = ({
 
                                 {/* Month Picker Dropdown */}
                                 {isMonthPickerOpen && (
-                                    <div className="absolute top-full left-0 mt-4 bg-white shadow-xl border border-gray-100 rounded-xl p-4 z-40 w-72 animate-in fade-in zoom-in-95 duration-200 cursor-default" onClick={(e) => e.stopPropagation()}>
+                                    <div className="fixed mt-4 bg-white shadow-xl border border-gray-100 rounded-xl p-4 z-[100] w-72 animate-in fade-in zoom-in-95 duration-200 cursor-default" 
+                                         style={{
+                                             top: monthPickerRef.current ? `${monthPickerRef.current.getBoundingClientRect().bottom + 16}px` : '0',
+                                             left: monthPickerRef.current ? `${monthPickerRef.current.getBoundingClientRect().left}px` : '0'
+                                         }}
+                                         onClick={(e) => e.stopPropagation()}>
                                         {/* Year Switcher */}
                                         <div className="flex items-center justify-between mb-4 border-b border-gray-100 pb-2">
                                             <button onClick={() => changeYear(-1)} className="p-1 hover:bg-gray-100 rounded-full text-gray-500">
@@ -699,7 +704,7 @@ export const JournalView: React.FC<JournalViewProps> = ({
                                 </div>
                             </div>
                         ) : (
-                            <div className="flex flex-col items-center justify-center py-20 text-gray-400">
+                            <div className="flex flex-col items-center justify-center py-20 text-gray-400 relative z-0">
                                 <div className="w-16 h-16 rounded-full bg-gray-100 flex items-center justify-center mb-4">
                                     <PenLine className="w-6 h-6 opacity-30" />
                                 </div>
