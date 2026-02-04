@@ -31,7 +31,15 @@ const SingleTimer: React.FC<{
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isBorderAnimating, setIsBorderAnimating] = useState(false);
   const [isManuallyExpanded, setIsManuallyExpanded] = useState(false);
+  const [windowWidth, setWindowWidth] = useState(window.innerWidth);
   const { currentView } = useNavigation();
+
+  // 监听窗口宽度变化
+  useEffect(() => {
+    const handleResize = () => setWindowWidth(window.innerWidth);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -117,6 +125,10 @@ const SingleTimer: React.FC<{
   // const shouldReduceWidth = currentView !== AppView.RECORD && currentView !== AppView.TODO;
   // const isTimelinePage = currentView === AppView.TIMELINE;
 
+  // 响应式逻辑：窄屏时隐藏取消按钮
+  const isNarrowScreen = windowWidth < 380; // 设定阈值为380px
+  const shouldHideCancelButton = currentView === AppView.TIMELINE && isNarrowScreen;
+
   return (
     <div
       onClick={onClick}
@@ -129,7 +141,7 @@ const SingleTimer: React.FC<{
               currentView === AppView.RECORD || currentView === AppView.TODO
                 ? 'px-4 py-3 justify-between w-full'                          // 记录页和待办页：100%宽度
                 : currentView === AppView.TIMELINE
-                  ? 'pl-[1.75rem] pr-1 py-3 justify-between w-[65%]'          // 脉络页：65%宽度
+                  ? 'pl-3 pr-1 py-3 justify-between w-[60%]'                 // 脉络页：减少左边距，保持65%宽度
                   : 'pl-[1.75rem] pr-2 py-3 justify-between w-[80%]'          // 其他页面：80%宽度
             }`
       }`}
@@ -165,13 +177,21 @@ const SingleTimer: React.FC<{
             <div 
               onClick={toggleCollapse}
               className={`w-10 h-10 rounded-full bg-orange-50 flex items-center justify-center text-xl shadow-inner shrink-0 hover:bg-orange-100 transition-colors cursor-pointer ${
-                currentView !== AppView.RECORD && currentView !== AppView.TODO ? 'absolute left-0' : ''
+                currentView !== AppView.RECORD && currentView !== AppView.TODO 
+                  ? currentView === AppView.TIMELINE 
+                    ? 'absolute left-0'  // 脉络页面：icon 贴左边
+                    : 'absolute left-0'  // 其他页面：保持原位置
+                  : ''
               }`}
             >
               {session.activityIcon}
             </div>
             <div className={`flex flex-col min-w-0 transition-all duration-500 ease-out ${
-              currentView !== AppView.RECORD && currentView !== AppView.TODO ? 'ml-[3.25rem]' : ''
+              currentView !== AppView.RECORD && currentView !== AppView.TODO 
+                ? currentView === AppView.TIMELINE
+                  ? 'ml-11'  // 脉络页面：减少左边距
+                  : 'ml-[3.25rem]'  // 其他页面：保持原边距
+                : ''
             }`}>
               <div className="flex items-center gap-2">
                 <span className="font-semibold text-sm text-stone-700 truncate">{session.activityName}</span>
@@ -194,12 +214,15 @@ const SingleTimer: React.FC<{
                 ? 'pl-1 ml-0.5 gap-1'         // 脉络页：最紧凑
                 : 'pl-2 ml-1'                  // 其他页面：中等间距
           }`} onClick={e => e.stopPropagation()}>
-            <button
-              onClick={onCancel}
-              className="p-2 text-stone-300 hover:text-stone-500 hover:bg-stone-100 rounded-full transition-colors"
-            >
-              <X size={20} />
-            </button>
+            {/* 取消按钮 - 在窄屏脉络页面时隐藏 */}
+            {!shouldHideCancelButton && (
+              <button
+                onClick={onCancel}
+                className="p-2 text-stone-300 hover:text-stone-500 hover:bg-stone-100 rounded-full transition-colors"
+              >
+                <X size={20} />
+              </button>
+            )}
             <button
               onClick={onStop}
               className="p-2 text-orange-400 hover:text-orange-600 hover:bg-orange-50 rounded-full transition-colors"
