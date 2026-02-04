@@ -7,9 +7,10 @@
  * 
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Category, Activity } from '../types';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { backgroundService } from '../services/backgroundService';
 
 
 interface RecordViewProps {
@@ -20,6 +21,34 @@ interface RecordViewProps {
 export const RecordView: React.FC<RecordViewProps> = ({ onStartActivity, categories }) => {
   const [selectedCategoryId, setSelectedCategoryId] = useState<string>('recent');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [backgroundUrl, setBackgroundUrl] = useState<string>('');
+  const [backgroundOpacity, setBackgroundOpacity] = useState<number>(0.1);
+
+  useEffect(() => {
+    const updateBackground = () => {
+      const bg = backgroundService.getCurrentBackgroundOption();
+      const opacity = backgroundService.getBackgroundOpacity();
+      setBackgroundUrl(bg?.url || '');
+      setBackgroundOpacity(opacity);
+    };
+    
+    updateBackground();
+    
+    // 监听localStorage变化
+    const handleStorageChange = () => {
+      updateBackground();
+    };
+    
+    window.addEventListener('storage', handleStorageChange);
+    
+    // 定期检查背景变化
+    const interval = setInterval(updateBackground, 500);
+    
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+      clearInterval(interval);
+    };
+  }, []);
 
   // Fallback to first category if selected one is not found (e.g. was deleted)
   // Or if 'recent' is not implemented yet, just default to first.
@@ -27,12 +56,23 @@ export const RecordView: React.FC<RecordViewProps> = ({ onStartActivity, categor
   const selectedCategory = categories.find(c => c.id === selectedCategoryId) || categories[0];
 
   return (
-    <div className="flex h-full bg-[#faf9f6]">
+    <div 
+      className="flex h-full relative"
+      style={{
+        backgroundImage: backgroundUrl && backgroundUrl !== '' ? `url(${backgroundUrl})` : 'none',
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+        backgroundRepeat: 'no-repeat',
+        backgroundColor: backgroundUrl && backgroundUrl !== '' ? 'transparent' : '#faf9f6'
+      }}
+    >
       {/* Left Sidebar - Categories */}
       {/* w-auto allows it to grow with text, max-w to prevent taking over too much space on tablets */}
       <div
-        className={`flex-shrink-0 flex flex-col overflow-y-auto pt-6 pb-20 md:pl-4 pl-0 pr-2 no-scrollbar border-r border-stone-100 bg-[#faf9f6]/80 backdrop-blur-md z-10 transition-all duration-300 ${isSidebarOpen ? 'w-auto md:max-w-[14rem]' : 'w-16 items-center'}`}
+        className={`flex-shrink-0 flex flex-col overflow-y-auto pt-6 pb-20 md:pl-4 pl-0 pr-2 no-scrollbar z-0 transition-all duration-300 relative ${isSidebarOpen ? 'w-auto md:max-w-[14rem]' : 'w-16 items-center'}`}
       >
+        {/* 半透明背景层 */}
+        <div className="absolute inset-0 bg-[#faf9f6]/50 backdrop-blur-md -z-10"></div>
         <div className="flex-1 w-full">
           {categories.map((category) => {
             const isSelected = selectedCategoryId === category.id;
@@ -44,7 +84,7 @@ export const RecordView: React.FC<RecordViewProps> = ({ onStartActivity, categor
                   flex items-center gap-2 px-4 py-4 md:py-3 mb-1 transition-all duration-200 text-left relative rounded-r-2xl md:rounded-xl group w-full
                   ${isSelected
                     ? 'text-stone-900 font-bold bg-white shadow-[2px_2px_10px_rgba(0,0,0,0.02)] z-10'
-                    : 'text-stone-400 hover:text-stone-600'
+                    : 'text-stone-600 hover:text-stone-800'
                   }
                   ${!isSidebarOpen && 'justify-center px-0'}
                 `}
@@ -53,7 +93,7 @@ export const RecordView: React.FC<RecordViewProps> = ({ onStartActivity, categor
                 {isSelected && (
                   <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-5 bg-stone-900 rounded-r-full md:hidden"></div>
                 )}
-                <span className={`text-xl flex-shrink-0 transition-opacity ${isSelected ? 'opacity-100' : 'opacity-70'}`}>
+                <span className={`text-xl flex-shrink-0 ${isSelected ? 'opacity-100' : 'opacity-100'}`}>
                   {category.icon}
                 </span>
                 {/* whitespace-nowrap ensures text never wraps */}
@@ -71,7 +111,7 @@ export const RecordView: React.FC<RecordViewProps> = ({ onStartActivity, categor
         <button
           onClick={() => setIsSidebarOpen(!isSidebarOpen)}
           className={`
-            mt-4 mx-auto p-2 rounded-full text-stone-400 hover:bg-white hover:text-stone-600 transition-all active:scale-95
+            mt-4 mx-auto p-2 rounded-full text-stone-600 hover:bg-white hover:text-stone-800 transition-all active:scale-95
             ${!isSidebarOpen ? 'bg-transparent' : 'self-end mr-4'}
           `}
         >
@@ -81,9 +121,28 @@ export const RecordView: React.FC<RecordViewProps> = ({ onStartActivity, categor
 
       {/* Right Content - Activity Grid */}
       <div 
-        className="flex-1 overflow-hidden flex flex-col p-5 md:p-10 bg-white md:bg-transparent rounded-tl-[2rem] md:rounded-none shadow-[-5px_0_20px_rgba(0,0,0,0.02)] md:shadow-none z-0 ml-[-10px] md:ml-0"
+        className="flex-1 overflow-hidden flex flex-col p-5 md:p-10 rounded-tl-[2rem] shadow-[-5px_0_20px_rgba(0,0,0,0.08)] z-10 ml-[-10px] relative"
         id="record-content"
       >
+        {/* 主体部分的背景图片层 */}
+        {backgroundUrl && backgroundUrl !== '' && (
+          <div 
+            className="absolute inset-0 -z-20 rounded-tl-[2rem]"
+            style={{
+              backgroundImage: `url(${backgroundUrl})`,
+              backgroundSize: 'cover',
+              backgroundPosition: 'center',
+              backgroundRepeat: 'no-repeat'
+            }}
+          />
+        )}
+        {/* 半透明白色遮罩层 - 透明度根据用户设置动态调整 */}
+        <div 
+          className="absolute inset-0 -z-10 backdrop-blur-sm rounded-tl-[2rem]"
+          style={{
+            backgroundColor: `rgba(255, 255, 255, ${1 - backgroundOpacity})`
+          }}
+        />
 
         {/* Header (Category Title) */}
         <div className="mb-8 md:mb-10 flex items-center gap-4 mt-2 md:mt-0">

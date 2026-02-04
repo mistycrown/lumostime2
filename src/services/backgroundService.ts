@@ -18,6 +18,41 @@ const PRESET_BACKGROUNDS: BackgroundOption[] = [
         type: 'preset',
         url: '',
     },
+    {
+        id: 'preset_1',
+        name: '预设背景 1',
+        type: 'preset',
+        url: '/background/0e35b64ef5a347c98ea6d9d1f45a215d~tplv-tb4s082cfz-aigc_resize_1080_1080.webp',
+        thumbnail: '/background/0e35b64ef5a347c98ea6d9d1f45a215d~tplv-tb4s082cfz-aigc_resize_1080_1080.webp',
+    },
+    {
+        id: 'preset_2',
+        name: '预设背景 2',
+        type: 'preset',
+        url: '/background/2ca9862eb0fb44fe9a076a0563498bae~tplv-tb4s082cfz-aigc_resize_1080_1080.webp',
+        thumbnail: '/background/2ca9862eb0fb44fe9a076a0563498bae~tplv-tb4s082cfz-aigc_resize_1080_1080.webp',
+    },
+    {
+        id: 'preset_3',
+        name: '预设背景 3',
+        type: 'preset',
+        url: '/background/526147b517c248ea8b50c17fd1399b4e~tplv-tb4s082cfz-aigc_resize_1080_1080.webp',
+        thumbnail: '/background/526147b517c248ea8b50c17fd1399b4e~tplv-tb4s082cfz-aigc_resize_1080_1080.webp',
+    },
+    {
+        id: 'preset_4',
+        name: '预设背景 4',
+        type: 'preset',
+        url: '/background/785634cc1f1749dbb30302bedef70d1b~tplv-tb4s082cfz-aigc_resize_1080_1080.webp',
+        thumbnail: '/background/785634cc1f1749dbb30302bedef70d1b~tplv-tb4s082cfz-aigc_resize_1080_1080.webp',
+    },
+    {
+        id: 'preset_5',
+        name: '预设背景 5',
+        type: 'preset',
+        url: '/background/7ca9d3b7c1634155a9ee4d2ffa4e658a~tplv-tb4s082cfz-aigc_resize_1080_1080.webp',
+        thumbnail: '/background/7ca9d3b7c1634155a9ee4d2ffa4e658a~tplv-tb4s082cfz-aigc_resize_1080_1080.webp',
+    },
 ];
 
 const STORAGE_KEY = 'lumos_custom_backgrounds';

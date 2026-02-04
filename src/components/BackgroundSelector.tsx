@@ -134,7 +134,6 @@ export const BackgroundSelector: React.FC<BackgroundSelectorProps> = ({ onToast 
                 </div>
                 <div>
                     <h3 className="text-lg font-bold text-stone-800">更换背景图片</h3>
-                    <p className="text-sm text-stone-500">选择预设背景或添加自定义图片</p>
                 </div>
             </div>
 
