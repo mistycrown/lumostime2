@@ -60,10 +60,15 @@ const TARGET_ELEMENTS = [
     'memoir-content',      // Memoir页面  
     'scopes-content',      // Scopes页面
     'tags-content',        // Tags页面
-    'chronicle-content'    // Chronicle页面
+    'chronicle-content',   // Chronicle页面
+    'todo-content',        // Todo页面
+    'record-content'       // Record页面
 ];
 
 class BackgroundService {
+    private lastFoundElements?: string;
+    private isApplying = false; // 防止重复应用
+
     /**
      * 获取所有背景选项（预设 + 自定义）
      */
@@ -207,46 +212,102 @@ class BackgroundService {
      * 直接应用背景到目标DOM元素
      */
     applyBackgroundToElements(): void {
-        const background = this.getCurrentBackgroundOption();
-        const opacity = this.getBackgroundOpacity();
+        // 防止重复应用
+        if (this.isApplying) {
+            return;
+        }
         
-        console.log('🖼️ Applying background to elements:', { background: background?.id, opacity });
+        this.isApplying = true;
         
-        TARGET_ELEMENTS.forEach(elementId => {
-            const element = document.getElementById(elementId);
-            if (!element) {
-                console.log(`🖼️ Element not found: ${elementId}`);
-                return;
-            }
+        try {
+            const background = this.getCurrentBackgroundOption();
+            const opacity = this.getBackgroundOpacity();
             
-            // 清除之前的背景样式
-            element.style.removeProperty('background');
-            element.style.removeProperty('background-image');
-            element.style.removeProperty('background-size');
-            element.style.removeProperty('background-position');
-            element.style.removeProperty('background-repeat');
-            element.classList.remove('bg-with-gradient', 'bg-with-image');
+            console.log('🖼️ Applying background to elements:', { background: background?.id, opacity });
             
-            if (!background || background.id === 'default') {
-                console.log(`🖼️ Removing background from ${elementId}`);
-                return;
-            }
-            
-            if (background.url.startsWith('linear-gradient')) {
-                // 渐变背景
-                console.log(`🖼️ Applying gradient background to ${elementId}`);
-                element.style.background = background.url;
-                element.style.opacity = opacity.toString();
-            } else {
-                // 图片背景
-                console.log(`🖼️ Applying image background to ${elementId}`);
-                element.style.backgroundImage = `url(${background.url})`;
-                element.style.backgroundSize = 'cover';
-                element.style.backgroundPosition = 'center';
-                element.style.backgroundRepeat = 'no-repeat';
-                element.style.opacity = opacity.toString();
-            }
-        });
+            TARGET_ELEMENTS.forEach(elementId => {
+                const element = document.getElementById(elementId);
+                if (!element) {
+                    return;
+                }
+                
+                console.log(`🖼️ Processing element: ${elementId}`);
+                
+                // 移除之前的背景层
+                const existingBgLayer = element.querySelector('.bg-layer');
+                if (existingBgLayer) {
+                    existingBgLayer.remove();
+                }
+                
+                if (!background || background.id === 'default') {
+                    console.log(`🖼️ Removing background from ${elementId}`);
+                    return;
+                }
+                
+                // 确保元素有相对定位
+                const computedStyle = getComputedStyle(element);
+                if (computedStyle.position === 'static') {
+                    element.style.position = 'relative';
+                }
+                
+                // 创建背景层 div
+                const bgLayer = document.createElement('div');
+                bgLayer.className = 'bg-layer';
+                bgLayer.style.cssText = `
+                    position: absolute;
+                    top: 0;
+                    left: 0;
+                    right: 0;
+                    bottom: 0;
+                    z-index: 0;
+                    pointer-events: none;
+                    opacity: ${opacity};
+                `;
+                
+                if (background.url.startsWith('linear-gradient')) {
+                    // 渐变背景
+                    console.log(`🖼️ Applying gradient background to ${elementId}`);
+                    bgLayer.style.background = background.url;
+                } else {
+                    // 图片背景
+                    console.log(`🖼️ Applying image background to ${elementId}`);
+                    bgLayer.style.backgroundImage = `url(${background.url})`;
+                    bgLayer.style.backgroundSize = 'cover';
+                    bgLayer.style.backgroundPosition = 'center';
+                    bgLayer.style.backgroundRepeat = 'no-repeat';
+                }
+                
+                // 将背景层插入到元素的第一个子元素之前
+                element.insertBefore(bgLayer, element.firstChild);
+                
+                // 确保元素的直接子元素有正确的 z-index
+                Array.from(element.children).forEach((child) => {
+                    if (child !== bgLayer && child instanceof HTMLElement) {
+                        const childStyle = getComputedStyle(child);
+                        if (childStyle.position === 'static') {
+                            child.style.position = 'relative';
+                        }
+                        if (!child.style.zIndex || child.style.zIndex === 'auto') {
+                            child.style.zIndex = '1';
+                        }
+                    }
+                });
+                
+                console.log(`🖼️ Added background layer for ${elementId}`);
+            });
+        } finally {
+            setTimeout(() => {
+                this.isApplying = false;
+            }, 100);
+        }
+    }
+
+    /**
+     * 手动触发背景应用（用于调试）
+     */
+    forceApplyBackground(): void {
+        console.log('🖼️ Force applying background...');
+        this.applyBackgroundToElements();
     }
 
     /**
@@ -263,20 +324,88 @@ class BackgroundService {
         }, 500);
         
         // 监听页面变化，重新应用背景
-        const observer = new MutationObserver(() => {
-            setTimeout(() => {
-                this.applyBackgroundToElements();
-            }, 100);
+        const observer = new MutationObserver((mutations) => {
+            let shouldReapply = false;
+            mutations.forEach(mutation => {
+                // 忽略 head 中的变化和我们自己添加的背景层
+                if (mutation.target === document.head || 
+                    (mutation.target as Element).closest?.('head') ||
+                    (mutation.target as Element).classList?.contains('bg-layer') ||
+                    (mutation.target as Element).querySelector?.('.bg-layer') === mutation.addedNodes[0]) {
+                    return;
+                }
+                
+                // 检查是否有目标元素被添加
+                if (mutation.type === 'childList') {
+                    mutation.addedNodes.forEach(node => {
+                        if (node.nodeType === Node.ELEMENT_NODE) {
+                            const element = node as Element;
+                            // 忽略背景层
+                            if (element.classList?.contains('bg-layer')) {
+                                return;
+                            }
+                            // 检查是否是目标元素或包含目标元素
+                            if (TARGET_ELEMENTS.some(id => 
+                                element.id === id || element.querySelector(`#${id}`)
+                            )) {
+                                shouldReapply = true;
+                                console.log('🖼️ Target element detected:', element.id || 'container');
+                            }
+                        }
+                    });
+                }
+            });
+            
+            if (shouldReapply) {
+                console.log('🖼️ Target elements detected, reapplying background');
+                setTimeout(() => {
+                    this.applyBackgroundToElements();
+                }, 100);
+            }
         });
         
-        // 观察body的子元素变化
+        // 只观察body的变化，不观察head
         if (document.body) {
             observer.observe(document.body, {
                 childList: true,
                 subtree: true
             });
         }
+        
+        // 监听路由变化（React Router或其他路由系统）
+        window.addEventListener('popstate', () => {
+            console.log('🖼️ Route change detected, reapplying background');
+            setTimeout(() => {
+                this.applyBackgroundToElements();
+            }, 200);
+        });
+        
+        // 监听hash变化
+        window.addEventListener('hashchange', () => {
+            console.log('🖼️ Hash change detected, reapplying background');
+            setTimeout(() => {
+                this.applyBackgroundToElements();
+            }, 200);
+        });
+        
+        // 定期检查并重新应用背景（作为备用机制）
+        setInterval(() => {
+            // 只在有新元素出现时才重新应用
+            const currentElements = TARGET_ELEMENTS.filter(id => document.getElementById(id));
+            const currentElementsStr = currentElements.join(',');
+            
+            if (!this.lastFoundElements || this.lastFoundElements !== currentElementsStr) {
+                console.log('🖼️ New elements detected:', currentElements);
+                this.lastFoundElements = currentElementsStr;
+                this.applyBackgroundToElements();
+            }
+        }, 500); // 减少到500ms，更快响应
     }
 }
 
 export const backgroundService = new BackgroundService();
+
+// 在开发环境中暴露到全局，便于调试
+if (typeof window !== 'undefined') {
+    (window as any).backgroundService = backgroundService;
+}
