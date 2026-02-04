@@ -101,6 +101,426 @@
             </intent-filter>
         </activity-alias>
 
+        <!-- 图标别名 - 装饰艺术 -->
+        <activity-alias
+            android:name=".MainActivityArtDeco"
+            android:targetActivity=".MainActivity"
+            android:icon="@mipmap/ic_launcher_art_deco"
+            android:roundIcon="@mipmap/ic_launcher_art_deco_round"
+            android:label="@string/app_name"
+            android:enabled="false"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <!-- 图标别名 - 蓝图 -->
+        <activity-alias
+            android:name=".MainActivityBlueprint"
+            android:targetActivity=".MainActivity"
+            android:icon="@mipmap/ic_launcher_blueprint"
+            android:roundIcon="@mipmap/ic_launcher_blueprint_round"
+            android:label="@string/app_name"
+            android:enabled="false"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <!-- 图标别名 - 黑板 -->
+        <activity-alias
+            android:name=".MainActivityChalkboard"
+            android:targetActivity=".MainActivity"
+            android:icon="@mipmap/ic_launcher_chalkboard"
+            android:roundIcon="@mipmap/ic_launcher_chalkboard_round"
+            android:label="@string/app_name"
+            android:enabled="false"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <!-- 图标别名 - 圣诞 -->
+        <activity-alias
+            android:name=".MainActivityChristmas"
+            android:targetActivity=".MainActivity"
+            android:icon="@mipmap/ic_launcher_christmas"
+            android:roundIcon="@mipmap/ic_launcher_christmas_round"
+            android:label="@string/app_name"
+            android:enabled="false"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <!-- 图标别名 - 刺绣 -->
+        <activity-alias
+            android:name=".MainActivityEmbroidery"
+            android:targetActivity=".MainActivity"
+            android:icon="@mipmap/ic_launcher_embroidery"
+            android:roundIcon="@mipmap/ic_launcher_embroidery_round"
+            android:label="@string/app_name"
+            android:enabled="false"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <!-- 图标别名 - 涂鸦 -->
+        <activity-alias
+            android:name=".MainActivityGraffiti"
+            android:targetActivity=".MainActivity"
+            android:icon="@mipmap/ic_launcher_graffiti"
+            android:roundIcon="@mipmap/ic_launcher_graffiti_round"
+            android:label="@string/app_name"
+            android:enabled="false"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <!-- 图标别名 - 乐高 -->
+        <activity-alias
+            android:name=".MainActivityLego"
+            android:targetActivity=".MainActivity"
+            android:icon="@mipmap/ic_launcher_lego"
+            android:roundIcon="@mipmap/ic_launcher_lego_round"
+            android:label="@string/app_name"
+            android:enabled="false"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <!-- 图标别名 - 折纸 -->
+        <activity-alias
+            android:name=".MainActivityOrigami"
+            android:targetActivity=".MainActivity"
+            android:icon="@mipmap/ic_launcher_origami"
+            android:roundIcon="@mipmap/ic_launcher_origami_round"
+            android:label="@string/app_name"
+            android:enabled="false"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <!-- 图标别名 - 点彩 -->
+        <activity-alias
+            android:name=".MainActivityPointillism"
+            android:targetActivity=".MainActivity"
+            android:icon="@mipmap/ic_launcher_pointillism"
+            android:roundIcon="@mipmap/ic_launcher_pointillism_round"
+            android:label="@string/app_name"
+            android:enabled="false"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <!-- 图标别名 - 波普艺术 -->
+        <activity-alias
+            android:name=".MainActivityPopArt"
+            android:targetActivity=".MainActivity"
+            android:icon="@mipmap/ic_launcher_pop_art"
+            android:roundIcon="@mipmap/ic_launcher_pop_art_round"
+            android:label="@string/app_name"
+            android:enabled="false"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <!-- 图标别名 - 彩色玻璃 -->
+        <activity-alias
+            android:name=".MainActivityStainedGlass"
+            android:targetActivity=".MainActivity"
+            android:icon="@mipmap/ic_launcher_stained_glass"
+            android:roundIcon="@mipmap/ic_launcher_stained_glass_round"
+            android:label="@string/app_name"
+            android:enabled="false"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <!-- 图标别名 - 浮世绘 -->
+        <activity-alias
+            android:name=".MainActivityUkiyoE"
+            android:targetActivity=".MainActivity"
+            android:icon="@mipmap/ic_launcher_ukiyo_e"
+            android:roundIcon="@mipmap/ic_launcher_ukiyo_e_round"
+            android:label="@string/app_name"
+            android:enabled="false"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <!-- 图标别名 - 简约 -->
+        <activity-alias
+            android:name=".MainActivitySimple"
+            android:targetActivity=".MainActivity"
+            android:icon="@mipmap/ic_launcher_simple"
+            android:roundIcon="@mipmap/ic_launcher_simple_round"
+            android:label="@string/app_name"
+            android:enabled="false"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <!-- 图标别名 - 猫咪 -->
+        <activity-alias
+            android:name=".MainActivityCat"
+            android:targetActivity=".MainActivity"
+            android:icon="@mipmap/ic_launcher_cat"
+            android:roundIcon="@mipmap/ic_launcher_cat_round"
+            android:label="@string/app_name"
+            android:enabled="false"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <!-- 图标别名 - 狐狸 -->
+        <activity-alias
+            android:name=".MainActivityFox"
+            android:targetActivity=".MainActivity"
+            android:icon="@mipmap/ic_launcher_fox"
+            android:roundIcon="@mipmap/ic_launcher_fox_round"
+            android:label="@string/app_name"
+            android:enabled="false"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <!-- 图标别名 - 青蛙 -->
+        <activity-alias
+            android:name=".MainActivityFrog"
+            android:targetActivity=".MainActivity"
+            android:icon="@mipmap/ic_launcher_frog"
+            android:roundIcon="@mipmap/ic_launcher_frog_round"
+            android:label="@string/app_name"
+            android:enabled="false"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <!-- 图标别名 - 熊猫 -->
+        <activity-alias
+            android:name=".MainActivityPanda"
+            android:targetActivity=".MainActivity"
+            android:icon="@mipmap/ic_launcher_panda"
+            android:roundIcon="@mipmap/ic_launcher_panda_round"
+            android:label="@string/app_name"
+            android:enabled="false"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <!-- 图标别名 - 爱心 -->
+        <activity-alias
+            android:name=".MainActivityHeart"
+            android:targetActivity=".MainActivity"
+            android:icon="@mipmap/ic_launcher_heart"
+            android:roundIcon="@mipmap/ic_launcher_heart_round"
+            android:label="@string/app_name"
+            android:enabled="false"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <!-- 图标别名 - 月亮 -->
+        <activity-alias
+            android:name=".MainActivityMoon"
+            android:targetActivity=".MainActivity"
+            android:icon="@mipmap/ic_launcher_moon"
+            android:roundIcon="@mipmap/ic_launcher_moon_round"
+            android:label="@string/app_name"
+            android:enabled="false"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <!-- 图标别名 - 蘑菇 -->
+        <activity-alias
+            android:name=".MainActivityMushroom"
+            android:targetActivity=".MainActivity"
+            android:icon="@mipmap/ic_launcher_mushroom"
+            android:roundIcon="@mipmap/ic_launcher_mushroom_round"
+            android:label="@string/app_name"
+            android:enabled="false"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <!-- 图标别名 - 植物 -->
+        <activity-alias
+            android:name=".MainActivityPlant"
+            android:targetActivity=".MainActivity"
+            android:icon="@mipmap/ic_launcher_plant"
+            android:roundIcon="@mipmap/ic_launcher_plant_round"
+            android:label="@string/app_name"
+            android:enabled="false"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <!-- 图标别名 - 海洋 -->
+        <activity-alias
+            android:name=".MainActivitySea"
+            android:targetActivity=".MainActivity"
+            android:icon="@mipmap/ic_launcher_sea"
+            android:roundIcon="@mipmap/ic_launcher_sea_round"
+            android:label="@string/app_name"
+            android:enabled="false"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <!-- 图标别名 - 结绳 -->
+        <activity-alias
+            android:name=".MainActivityKnot"
+            android:targetActivity=".MainActivity"
+            android:icon="@mipmap/ic_launcher_knot"
+            android:roundIcon="@mipmap/ic_launcher_knot_round"
+            android:label="@string/app_name"
+            android:enabled="false"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <!-- 图标别名 - 笔记本 -->
+        <activity-alias
+            android:name=".MainActivityBijiaso"
+            android:targetActivity=".MainActivity"
+            android:icon="@mipmap/ic_launcher_bijiaso"
+            android:roundIcon="@mipmap/ic_launcher_bijiaso_round"
+            android:label="@string/app_name"
+            android:enabled="false"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <!-- 图标别名 - 彩蛋 -->
+        <activity-alias
+            android:name=".MainActivityCdqm"
+            android:targetActivity=".MainActivity"
+            android:icon="@mipmap/ic_launcher_cdqm"
+            android:roundIcon="@mipmap/ic_launcher_cdqm_round"
+            android:label="@string/app_name"
+            android:enabled="false"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <!-- 图标别名 - 创意 -->
+        <activity-alias
+            android:name=".MainActivityCiww"
+            android:targetActivity=".MainActivity"
+            android:icon="@mipmap/ic_launcher_ciww"
+            android:roundIcon="@mipmap/ic_launcher_ciww_round"
+            android:label="@string/app_name"
+            android:enabled="false"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <!-- 图标别名 - 紫外线 -->
+        <activity-alias
+            android:name=".MainActivityUvcd"
+            android:targetActivity=".MainActivity"
+            android:icon="@mipmap/ic_launcher_uvcd"
+            android:roundIcon="@mipmap/ic_launcher_uvcd_round"
+            android:label="@string/app_name"
+            android:enabled="false"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <!-- 图标别名 - 抽象 -->
+        <activity-alias
+            android:name=".MainActivityWjugjp"
+            android:targetActivity=".MainActivity"
+            android:icon="@mipmap/ic_launcher_wjugjp"
+            android:roundIcon="@mipmap/ic_launcher_wjugjp_round"
+            android:label="@string/app_name"
+            android:enabled="false"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.fileprovider"
