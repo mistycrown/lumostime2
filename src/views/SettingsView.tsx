@@ -379,8 +379,8 @@ const SponsorshipPreviewView: React.FC<{ onBack: () => void, onToast: (type: Toa
                                 )}
                             </div>
                             
-                            {/* 图标网格 - 6列布局 */}
-                            <div className="grid grid-cols-6 gap-2">
+                            {/* 图标网格 - 自适应布局 */}
+                            <div className="grid gap-2" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(60px, 1fr))' }}>
                                 {iconOptions.map((option) => (
                                     <button
                                         key={option.id}
