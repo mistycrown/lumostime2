@@ -93,7 +93,7 @@ export const AppRoutes: React.FC<AppRoutesProps> = ({
     const { addToast } = useToast();
 
     // Import hooks
-    const { handleSaveGoal, handleDeleteGoal, handleArchiveGoal } = useGoalManager();
+    const { handleAddGoal, handleEditGoal, handleSaveGoal, handleDeleteGoal, handleArchiveGoal } = useGoalManager();
 
     // We need to instantiate ReviewManager here.
     // Note: useReviewManager requires many args.
@@ -374,10 +374,10 @@ export const AppRoutes: React.FC<AppRoutesProps> = ({
                             setScopes(prev => prev.map(s => s.id === updatedScope.id ? updatedScope : s));
                         }}
                         onEditLog={openEditModal}
-                        onEditGoal={handleSaveGoal}
+                        onEditGoal={handleEditGoal}
                         onDeleteGoal={handleDeleteGoal}
                         onArchiveGoal={handleArchiveGoal}
-                        onAddGoal={() => handleSaveGoal({ scopeId: selectedScope.id } as any)} // Assuming handleSaveGoal handles creation or partial
+                        onAddGoal={() => handleAddGoal(selectedScope.id)}
                         onEditTodo={openEditTodoModal}
                     />
                 );
