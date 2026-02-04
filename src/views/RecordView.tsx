@@ -59,20 +59,30 @@ export const RecordView: React.FC<RecordViewProps> = ({ onStartActivity, categor
     <div 
       className="flex h-full relative"
       style={{
-        backgroundImage: backgroundUrl && backgroundUrl !== '' ? `url(${backgroundUrl})` : 'none',
-        backgroundSize: 'cover',
-        backgroundPosition: 'center',
-        backgroundRepeat: 'no-repeat',
         backgroundColor: backgroundUrl && backgroundUrl !== '' ? 'transparent' : '#faf9f6'
       }}
     >
+      {/* 背景图片层 */}
+      {backgroundUrl && backgroundUrl !== '' && (
+        <div 
+          className="absolute inset-0 -z-20"
+          style={{
+            backgroundImage: `url(${backgroundUrl})`,
+            backgroundSize: 'cover',
+            backgroundPosition: 'center',
+            backgroundRepeat: 'no-repeat'
+          }}
+        />
+      )}
+      
+      {/* 全局半透明遮罩层 - 覆盖整个下半部分 */}
+      <div className="absolute inset-0 bg-[#faf9f6]/50 backdrop-blur-md -z-10"></div>
+      
       {/* Left Sidebar - Categories */}
       {/* w-auto allows it to grow with text, max-w to prevent taking over too much space on tablets */}
       <div
         className={`flex-shrink-0 flex flex-col overflow-y-auto pt-6 pb-20 md:pl-4 pl-0 pr-2 no-scrollbar z-0 transition-all duration-300 relative ${isSidebarOpen ? 'w-auto md:max-w-[14rem]' : 'w-16 items-center'}`}
       >
-        {/* 半透明背景层 */}
-        <div className="absolute inset-0 bg-[#faf9f6]/50 backdrop-blur-md -z-10"></div>
         <div className="flex-1 w-full">
           {categories.map((category) => {
             const isSelected = selectedCategoryId === category.id;
