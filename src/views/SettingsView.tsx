@@ -92,7 +92,9 @@ import { usePrivacy } from '../contexts/PrivacyContext';
 import { RedemptionService } from '../services/redemptionService';
 
 import { IconPreview } from '../components/IconPreview';
+import { BackgroundSelector } from '../components/BackgroundSelector';
 import { ICON_OPTIONS } from '../services/iconService';
+import { backgroundService } from '../services/backgroundService';
 import { NARRATIVE_TEMPLATES } from '../constants';
 // @ts-ignore
 import userGuideContent from '../../USER_GUIDE.md?raw';
@@ -380,7 +382,7 @@ const SponsorshipPreviewView: React.FC<{ onBack: () => void, onToast: (type: Toa
                             </div>
                             
                             {/* 图标网格 - 自适应布局 */}
-                            <div className="grid gap-2" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(60px, 1fr))' }}>
+                            <div className="grid gap-1" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(60px, 1fr))' }}>
                                 {iconOptions.map((option) => (
                                     <button
                                         key={option.id}
@@ -424,42 +426,8 @@ const SponsorshipPreviewView: React.FC<{ onBack: () => void, onToast: (type: Toa
                             )}
                         </div>
 
-                        {/* 主题切换卡片 */}
-                        <div className="bg-white rounded-2xl p-6 shadow-sm">
-                            <div className="flex items-center gap-3 mb-4">
-                                <div className="w-8 h-8 bg-purple-50 rounded-lg flex items-center justify-center">
-                                    <span className="text-purple-600 text-lg">🎨</span>
-                                </div>
-                                <div>
-                                    <h3 className="text-lg font-bold text-stone-800">主题颜色</h3>
-                                    <p className="text-sm text-stone-500">更换应用整体色调</p>
-                                </div>
-                            </div>
-                            
-                            <div className="grid grid-cols-5 gap-3">
-                                {themeOptions.map((theme) => (
-                                    <button
-                                        key={theme.id}
-                                        onClick={() => setSelectedTheme(theme.id)}
-                                        className={`aspect-square rounded-xl border-2 transition-all relative ${
-                                            selectedTheme === theme.id
-                                                ? 'border-stone-400 ring-2 ring-stone-200'
-                                                : 'border-stone-200 hover:border-stone-300'
-                                        }`}
-                                        style={{ backgroundColor: theme.color }}
-                                    >
-                                        {selectedTheme === theme.id && (
-                                            <div className="absolute inset-0 flex items-center justify-center">
-                                                <Check size={16} className="text-white drop-shadow-lg" />
-                                            </div>
-                                        )}
-                                        <div className="absolute -bottom-6 left-1/2 transform -translate-x-1/2 text-xs text-stone-600 whitespace-nowrap">
-                                            {theme.name}
-                                        </div>
-                                    </button>
-                                ))}
-                            </div>
-                        </div>
+                        {/* 背景图片切换卡片 */}
+                        <BackgroundSelector onToast={onToast} />
 
                         {/* 精进风格卡片 */}
                         <div className="bg-white rounded-2xl p-6 shadow-sm">

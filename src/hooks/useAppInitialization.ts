@@ -5,6 +5,7 @@ import { useToast } from '../contexts/ToastContext';
 import AppUsage from '../plugins/AppUsagePlugin';
 import { imageService } from '../services/imageService';
 import { UpdateService } from '../services/updateService';
+import { backgroundService } from '../services/backgroundService';
 import { useData } from '../contexts/DataContext';
 
 export const useAppInitialization = () => {
@@ -46,6 +47,12 @@ export const useAppInitialization = () => {
             }
         };
         checkUpdates();
+    }, []);
+
+    // Initialize background service
+    useEffect(() => {
+        backgroundService.init();
+        console.log('🖼️ Background service initialized');
     }, []);
 
     // Auto-cleanup deleted images from logs on load
