@@ -254,11 +254,11 @@ class BackgroundService {
                 const bgLayer = document.createElement('div');
                 bgLayer.className = 'bg-layer';
                 bgLayer.style.cssText = `
-                    position: absolute;
+                    position: fixed;
                     top: 0;
                     left: 0;
                     right: 0;
-                    bottom: 0;
+                    height: 100vh;
                     z-index: 0;
                     pointer-events: none;
                     opacity: ${opacity};
@@ -269,11 +269,11 @@ class BackgroundService {
                     console.log(`🖼️ Applying gradient background to ${elementId}`);
                     bgLayer.style.background = background.url;
                 } else {
-                    // 图片背景
+                    // 图片背景 - 固定位置，填满屏幕
                     console.log(`🖼️ Applying image background to ${elementId}`);
                     bgLayer.style.backgroundImage = `url(${background.url})`;
-                    bgLayer.style.backgroundSize = 'cover';
-                    bgLayer.style.backgroundPosition = 'center';
+                    bgLayer.style.backgroundSize = 'cover'; // 填满屏幕，保持比例
+                    bgLayer.style.backgroundPosition = 'center center'; // 居中显示
                     bgLayer.style.backgroundRepeat = 'no-repeat';
                 }
                 
