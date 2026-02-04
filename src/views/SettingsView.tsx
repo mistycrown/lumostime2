@@ -48,6 +48,7 @@ import {
     Target,
     Edit2,
     PlusCircle,
+    Check,
     FileSpreadsheet,
     Sparkles,
     Edit,
@@ -160,6 +161,9 @@ const SponsorshipPreviewView: React.FC<{ onBack: () => void, onToast: (type: Toa
     const [isRedeemed, setIsRedeemed] = useState(false);
     const [isVerifying, setIsVerifying] = useState(false);
     const [supporterId, setSupporterId] = useState<number | undefined>(undefined);
+    const [selectedIcon, setSelectedIcon] = useState('default');
+    const [selectedTheme, setSelectedTheme] = useState('default');
+    const [selectedStyle, setSelectedStyle] = useState('default');
     const redemptionService = new RedemptionService();
 
     useEffect(() => {
@@ -205,6 +209,31 @@ const SponsorshipPreviewView: React.FC<{ onBack: () => void, onToast: (type: Toa
         onToast('success', '已重置');
     };
 
+    // 应用图标选项
+    const iconOptions = [
+        { id: 'default', name: '默认', preview: '⏰', description: '经典时钟图标' },
+        { id: 'minimal', name: '极简', preview: '◯', description: '简约圆形设计' },
+        { id: 'gradient', name: '渐变', preview: '🌅', description: '彩色渐变效果' },
+        { id: 'dark', name: '暗黑', preview: '🌙', description: '深色主题图标' },
+    ];
+
+    // 主题选项
+    const themeOptions = [
+        { id: 'default', name: '默认', color: '#a8a29e', description: '温暖石色主题' },
+        { id: 'ocean', name: '海洋', color: '#0ea5e9', description: '清新蓝色主题' },
+        { id: 'forest', name: '森林', color: '#22c55e', description: '自然绿色主题' },
+        { id: 'sunset', name: '日落', color: '#f97316', description: '温暖橙色主题' },
+        { id: 'lavender', name: '薰衣草', color: '#8b5cf6', description: '优雅紫色主题' },
+    ];
+
+    // 精进风格选项
+    const styleOptions = [
+        { id: 'default', name: '标准', icon: '📝', description: '经典界面风格' },
+        { id: 'cute', name: '可爱', icon: '🌸', description: '增加可爱元素和动画' },
+        { id: 'minimal', name: '极简', icon: '⚪', description: '简洁专注的设计' },
+        { id: 'retro', name: '复古', icon: '📼', description: '怀旧复古风格' },
+    ];
+
     return (
         <div className="fixed inset-0 z-50 bg-[#fdfbf7] flex flex-col font-serif animate-in slide-in-from-right duration-300 pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">
             <div className="flex items-center gap-3 px-4 h-14 border-b border-stone-100 bg-[#fdfbf7]/80 backdrop-blur-md sticky top-0 z-10">
@@ -214,7 +243,7 @@ const SponsorshipPreviewView: React.FC<{ onBack: () => void, onToast: (type: Toa
                 >
                     <ChevronLeft size={24} />
                 </button>
-                <span className="text-stone-800 font-bold text-lg">新赞赏页面预览</span>
+                <span className="text-stone-800 font-bold text-lg">赞赏功能</span>
             </div>
 
             <div className="flex-1 overflow-y-auto px-5 py-6 pb-40">
@@ -225,7 +254,7 @@ const SponsorshipPreviewView: React.FC<{ onBack: () => void, onToast: (type: Toa
                                 <Coffee size={24} />
                             </div>
                             <h3 className="font-bold text-lg text-stone-800">请输入兑换码</h3>
-                            <p className="text-sm text-stone-500">该功能目前仅供内部测试</p>
+                            <p className="text-sm text-stone-500">解锁专属赞赏功能</p>
                         </div>
 
                         <div className="space-y-3">
@@ -252,51 +281,133 @@ const SponsorshipPreviewView: React.FC<{ onBack: () => void, onToast: (type: Toa
                                         验证中...
                                     </span>
                                 ) : (
-                                    '进入'
+                                    '解锁功能'
                                 )}
                             </button>
                         </div>
                     </div>
                 ) : (
                     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-                        <div className="bg-white rounded-3xl p-8 shadow-sm text-center space-y-6 border border-amber-50 relative overflow-hidden">
+                        {/* 专属徽章卡片 */}
+                        <div className="bg-white rounded-2xl p-6 shadow-sm border border-amber-50 relative overflow-hidden">
                             <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-amber-300 via-orange-400 to-amber-300" />
-
-                            <div className="space-y-2">
-                                <h2 className="text-2xl font-bold text-stone-800">感谢您的支持</h2>
-                                {supporterId && (
-                                    <div className="inline-flex items-center gap-2 bg-amber-50 text-amber-700 px-3 py-1 rounded-full text-sm font-medium">
-                                        <span className="w-2 h-2 bg-amber-400 rounded-full"></span>
-                                        支持者 #{supporterId}
-                                    </div>
-                                )}
-                                <p className="text-stone-500">您的慷慨不仅是一杯咖啡，更是对 LumosTime 的认可</p>
-                            </div>
-
-                            {/* Placeholder for QR Codes */}
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 py-4">
-                                <div className="aspect-square bg-stone-50 rounded-2xl border-2 border-dashed border-stone-200 flex items-center justify-center text-stone-300 flex-col gap-2">
-                                    <div className="w-10 h-10 rounded-full bg-stone-100 flex items-center justify-center">
-                                        <span className="font-bold text-lg">?</span>
-                                    </div>
-                                    <span className="text-xs">微信支付 (待添加)</span>
+                            
+                            <div className="flex items-center gap-4">
+                                <div className="w-16 h-16 bg-gradient-to-br from-amber-400 to-orange-500 rounded-full flex items-center justify-center text-white text-2xl font-bold shadow-lg">
+                                    #{supporterId || '001'}
                                 </div>
-                                <div className="aspect-square bg-stone-50 rounded-2xl border-2 border-dashed border-stone-200 flex items-center justify-center text-stone-300 flex-col gap-2">
-                                    <div className="w-10 h-10 rounded-full bg-stone-100 flex items-center justify-center">
-                                        <span className="font-bold text-lg">?</span>
+                                <div className="flex-1">
+                                    <h3 className="text-lg font-bold text-stone-800 mb-1">专属赞助徽章</h3>
+                                    <p className="text-sm text-stone-500">您是第 {supporterId || '1'} 号赞助者</p>
+                                    <div className="flex items-center gap-2 mt-2">
+                                        <span className="w-2 h-2 bg-amber-400 rounded-full animate-pulse"></span>
+                                        <span className="text-xs text-amber-600 font-medium">感谢您的支持</span>
                                     </div>
-                                    <span className="text-xs">支付宝 (待添加)</span>
                                 </div>
-                            </div>
-
-                            <div className="text-center">
-                                <p className="text-xs text-stone-400 italic">
-                                    "每一行代码都倾注了热爱，感谢有你同行。"
-                                </p>
                             </div>
                         </div>
 
-                        <div className="flex justify-center">
+                        {/* 应用图标切换卡片 */}
+                        <div className="bg-white rounded-2xl p-6 shadow-sm">
+                            <div className="flex items-center gap-3 mb-4">
+                                <div className="w-8 h-8 bg-blue-50 rounded-lg flex items-center justify-center">
+                                    <span className="text-blue-600 text-lg">📱</span>
+                                </div>
+                                <div>
+                                    <h3 className="text-lg font-bold text-stone-800">应用图标</h3>
+                                    <p className="text-sm text-stone-500">自定义手机和电脑端图标</p>
+                                </div>
+                            </div>
+                            
+                            <div className="grid grid-cols-2 gap-3">
+                                {iconOptions.map((option) => (
+                                    <button
+                                        key={option.id}
+                                        onClick={() => setSelectedIcon(option.id)}
+                                        className={`p-4 rounded-xl border-2 transition-all ${
+                                            selectedIcon === option.id
+                                                ? 'border-blue-400 bg-blue-50'
+                                                : 'border-stone-200 hover:border-stone-300'
+                                        }`}
+                                    >
+                                        <div className="text-2xl mb-2">{option.preview}</div>
+                                        <div className="text-sm font-medium text-stone-700">{option.name}</div>
+                                        <div className="text-xs text-stone-500 mt-1">{option.description}</div>
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+
+                        {/* 主题切换卡片 */}
+                        <div className="bg-white rounded-2xl p-6 shadow-sm">
+                            <div className="flex items-center gap-3 mb-4">
+                                <div className="w-8 h-8 bg-purple-50 rounded-lg flex items-center justify-center">
+                                    <span className="text-purple-600 text-lg">🎨</span>
+                                </div>
+                                <div>
+                                    <h3 className="text-lg font-bold text-stone-800">主题颜色</h3>
+                                    <p className="text-sm text-stone-500">更换应用整体色调</p>
+                                </div>
+                            </div>
+                            
+                            <div className="grid grid-cols-5 gap-3">
+                                {themeOptions.map((theme) => (
+                                    <button
+                                        key={theme.id}
+                                        onClick={() => setSelectedTheme(theme.id)}
+                                        className={`aspect-square rounded-xl border-2 transition-all relative ${
+                                            selectedTheme === theme.id
+                                                ? 'border-stone-400 ring-2 ring-stone-200'
+                                                : 'border-stone-200 hover:border-stone-300'
+                                        }`}
+                                        style={{ backgroundColor: theme.color }}
+                                    >
+                                        {selectedTheme === theme.id && (
+                                            <div className="absolute inset-0 flex items-center justify-center">
+                                                <Check size={16} className="text-white drop-shadow-lg" />
+                                            </div>
+                                        )}
+                                        <div className="absolute -bottom-6 left-1/2 transform -translate-x-1/2 text-xs text-stone-600 whitespace-nowrap">
+                                            {theme.name}
+                                        </div>
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+
+                        {/* 精进风格卡片 */}
+                        <div className="bg-white rounded-2xl p-6 shadow-sm">
+                            <div className="flex items-center gap-3 mb-4">
+                                <div className="w-8 h-8 bg-green-50 rounded-lg flex items-center justify-center">
+                                    <span className="text-green-600 text-lg">✨</span>
+                                </div>
+                                <div>
+                                    <h3 className="text-lg font-bold text-stone-800">精进风格</h3>
+                                    <p className="text-sm text-stone-500">个性化界面体验</p>
+                                </div>
+                            </div>
+                            
+                            <div className="grid grid-cols-2 gap-3">
+                                {styleOptions.map((style) => (
+                                    <button
+                                        key={style.id}
+                                        onClick={() => setSelectedStyle(style.id)}
+                                        className={`p-4 rounded-xl border-2 transition-all ${
+                                            selectedStyle === style.id
+                                                ? 'border-green-400 bg-green-50'
+                                                : 'border-stone-200 hover:border-stone-300'
+                                        }`}
+                                    >
+                                        <div className="text-2xl mb-2">{style.icon}</div>
+                                        <div className="text-sm font-medium text-stone-700">{style.name}</div>
+                                        <div className="text-xs text-stone-500 mt-1">{style.description}</div>
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+
+                        {/* 测试用重置按钮 */}
+                        <div className="flex justify-center pt-4">
                             <button
                                 onClick={handleClearCode}
                                 className="text-xs text-stone-300 hover:text-stone-500 px-4 py-2"
