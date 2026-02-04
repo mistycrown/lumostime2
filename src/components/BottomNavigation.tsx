@@ -5,6 +5,7 @@
 import React, { useState, useEffect } from 'react';
 import { AppView } from '../types';
 import { navigationDecorationService } from '../services/navigationDecorationService';
+import { NavigationDecorationDebugger } from './NavigationDecorationDebugger';
 
 interface BottomNavigationProps {
     currentView: AppView;
