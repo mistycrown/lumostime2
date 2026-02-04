@@ -15,6 +15,7 @@ public class MainActivity extends BridgeActivity {
         registerPlugin(LumosNfcPlugin.class);
         registerPlugin(FocusNotificationPlugin.class); // 注册专注通知插件
         registerPlugin(AppUsagePlugin.class);
+        registerPlugin(IconPlugin.class); // 注册图标切换插件
         super.onCreate(savedInstanceState);
     }
 }

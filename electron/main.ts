@@ -172,3 +172,25 @@ ipcMain.handle('write-obsidian-file', async (_, { filePath, content }) => {
         throw new Error(`文件写入失败: ${error.message}`)
     }
 })
+
+// 图标更新: 更新应用图标
+ipcMain.on('update-app-icon', (_, iconPath) => {
+    try {
+        if (win) {
+            const fullIconPath = path.join(process.env.VITE_PUBLIC, iconPath);
+            console.log('更新应用图标:', fullIconPath);
+            
+            // 更新窗口图标
+            win.setIcon(fullIconPath);
+            
+            // 更新任务栏图标 (Windows)
+            if (process.platform === 'win32') {
+                win.setOverlayIcon(fullIconPath, 'LumosTime');
+            }
+            
+            console.log('✅ 应用图标更新成功');
+        }
+    } catch (error: any) {
+        console.error('❌ 更新应用图标失败:', error);
+    }
+});

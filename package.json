@@ -11,7 +11,10 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "electron:build": "vite build && electron-builder"
+    "electron:build": "vite build && electron-builder",
+    "install-image-deps": "node scripts/install-image-deps.js",
+    "process-icons": "node scripts/process-icon-corners.js",
+    "restore-icons": "node scripts/process-icon-corners.js --restore"
   },
   "dependencies": {
     "@awesome-cordova-plugins/core": "^8.1.0",
