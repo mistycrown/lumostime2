@@ -88,6 +88,7 @@ import excelExportService from '../services/excelExportService';
 import { imageCleanupService } from '../services/imageCleanupService';
 import { BatchFocusRecordManageView } from './BatchFocusRecordManageView';
 import { usePrivacy } from '../contexts/PrivacyContext';
+import { RedemptionService } from '../services/redemptionService';
 
 import { NARRATIVE_TEMPLATES } from '../constants';
 // @ts-ignore
@@ -153,6 +154,162 @@ interface SettingsViewProps {
     autoFocusNote?: boolean;
     onToggleAutoFocusNote?: () => void;
 }
+
+const SponsorshipPreviewView: React.FC<{ onBack: () => void, onToast: (type: ToastType, message: string) => void }> = ({ onBack, onToast }) => {
+    const [redemptionCode, setRedemptionCode] = useState('');
+    const [isRedeemed, setIsRedeemed] = useState(false);
+    const [isVerifying, setIsVerifying] = useState(false);
+    const [supporterId, setSupporterId] = useState<number | undefined>(undefined);
+    const redemptionService = new RedemptionService();
+
+    useEffect(() => {
+        const checkVerification = async () => {
+            const verified = await redemptionService.isVerified();
+            if (verified) {
+                setIsRedeemed(true);
+                const savedCode = redemptionService.getSavedCode();
+                if (savedCode) {
+                    const result = await redemptionService.verifyCode(savedCode);
+                    if (result.success) {
+                        setSupporterId(result.supporterId);
+                    }
+                }
+            }
+        };
+        checkVerification();
+    }, []);
+
+    const handleRedeem = async () => {
+        if (!redemptionCode.trim()) {
+            onToast('error', '请输入兑换码');
+            return;
+        }
+
+        setIsVerifying(true);
+        try {
+            const result = await redemptionService.verifyCode(redemptionCode);
+            if (result.success) {
+                redemptionService.saveCode(redemptionCode);
+                setIsRedeemed(true);
+                setSupporterId(result.supporterId);
+                onToast('success', '验证成功！');
+            } else {
+                onToast('error', result.error || '兑换码无效');
+            }
+        } catch (error) {
+            onToast('error', '验证失败，请重试');
+        } finally {
+            setIsVerifying(false);
+        }
+    };
+
+    const handleClearCode = () => {
+        redemptionService.clearSavedCode();
+        setIsRedeemed(false);
+        setRedemptionCode('');
+        setSupporterId(undefined);
+        onToast('success', '已重置');
+    };
+
+    return (
+        <div className="fixed inset-0 z-50 bg-[#fdfbf7] flex flex-col font-serif animate-in slide-in-from-right duration-300 pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">
+            <div className="flex items-center gap-3 px-4 h-14 border-b border-stone-100 bg-[#fdfbf7]/80 backdrop-blur-md sticky top-0 z-10">
+                <button
+                    onClick={onBack}
+                    className="text-stone-400 hover:text-stone-600 p-1"
+                >
+                    <ChevronLeft size={24} />
+                </button>
+                <span className="text-stone-800 font-bold text-lg">新赞赏页面预览</span>
+            </div>
+
+            <div className="flex-1 overflow-y-auto px-5 py-6 pb-40">
+                {!isRedeemed ? (
+                    <div className="bg-white rounded-2xl p-6 shadow-sm space-y-6 max-w-sm mx-auto mt-10">
+                        <div className="text-center space-y-2">
+                            <div className="w-12 h-12 bg-amber-50 rounded-full flex items-center justify-center mx-auto text-amber-500">
+                                <Coffee size={24} />
+                            </div>
+                            <h3 className="font-bold text-lg text-stone-800">请输入兑换码</h3>
+                            <p className="text-sm text-stone-500">该功能目前仅供内部测试</p>
+                        </div>
+
+                        <div className="space-y-3">
+                            <input
+                                type="text"
+                                value={redemptionCode}
+                                onChange={(e) => setRedemptionCode(e.target.value)}
+                                placeholder="输入兑换码..."
+                                className="w-full bg-stone-50 border border-stone-200 rounded-xl px-4 py-3 text-sm outline-none focus:border-amber-400 focus:ring-1 focus:ring-amber-400 transition-all text-center tracking-widest font-mono"
+                                disabled={isVerifying}
+                            />
+                            <button
+                                onClick={handleRedeem}
+                                disabled={isVerifying}
+                                className={`w-full font-bold py-3 rounded-xl transition-all shadow-lg shadow-stone-200 ${
+                                    isVerifying
+                                        ? 'bg-stone-400 text-white cursor-not-allowed'
+                                        : 'bg-stone-800 text-white hover:bg-stone-900 active:scale-[0.98]'
+                                }`}
+                            >
+                                {isVerifying ? (
+                                    <span className="flex items-center justify-center gap-2">
+                                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                                        验证中...
+                                    </span>
+                                ) : (
+                                    '进入'
+                                )}
+                            </button>
+                        </div>
+                    </div>
+                ) : (
+                    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                        <div className="bg-white rounded-3xl p-8 shadow-sm text-center space-y-6 border border-amber-50 relative overflow-hidden">
+                            <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-amber-300 via-orange-400 to-amber-300" />
+
+                            <div className="space-y-2">
+                                <h2 className="text-2xl font-bold text-stone-800">感谢您的支持</h2>
+                                <p className="text-stone-500">您的慷慨不仅是一杯咖啡，更是对 LumosTime 的认可</p>
+                            </div>
+
+                            {/* Placeholder for QR Codes */}
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 py-4">
+                                <div className="aspect-square bg-stone-50 rounded-2xl border-2 border-dashed border-stone-200 flex items-center justify-center text-stone-300 flex-col gap-2">
+                                    <div className="w-10 h-10 rounded-full bg-stone-100 flex items-center justify-center">
+                                        <span className="font-bold text-lg">?</span>
+                                    </div>
+                                    <span className="text-xs">微信支付 (待添加)</span>
+                                </div>
+                                <div className="aspect-square bg-stone-50 rounded-2xl border-2 border-dashed border-stone-200 flex items-center justify-center text-stone-300 flex-col gap-2">
+                                    <div className="w-10 h-10 rounded-full bg-stone-100 flex items-center justify-center">
+                                        <span className="font-bold text-lg">?</span>
+                                    </div>
+                                    <span className="text-xs">支付宝 (待添加)</span>
+                                </div>
+                            </div>
+
+                            <div className="text-center">
+                                <p className="text-xs text-stone-400 italic">
+                                    "每一行代码都倾注了热爱，感谢有你同行。"
+                                </p>
+                            </div>
+                        </div>
+
+                        <div className="flex justify-center">
+                            <button
+                                onClick={handleClearCode}
+                                className="text-xs text-stone-300 hover:text-stone-500 px-4 py-2"
+                            >
+                                [测试用] 清除兑换码状态
+                            </button>
+                        </div>
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+};
 
 const AI_PRESETS = {
     gemini: {
@@ -409,7 +566,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
     const { autoLinkRules: ctxAutoLinkRules, userPersonalInfo: ctxUserPersonalInfo, filters: ctxFilters, customNarrativeTemplates: ctxCustomNarrativeTemplates, updateDataLastModified } = useSettings();
     const { dailyReviews: ctxDailyReviews, weeklyReviews: ctxWeeklyReviews, monthlyReviews: ctxMonthlyReviews, reviewTemplates: ctxReviewTemplates } = useReview();
 
-    const [activeSubmenu, setActiveSubmenu] = useState<'main' | 'data' | 'cloud' | 's3' | 'ai' | 'preferences' | 'guide' | 'nfc' | 'templates' | 'check_templates' | 'narrative_prompt' | 'auto_record' | 'autolink' | 'obsidian_export' | 'filters' | 'memoir_filter' | 'batch_manage'>('main');
+    const [activeSubmenu, setActiveSubmenu] = useState<'main' | 'data' | 'cloud' | 's3' | 'ai' | 'preferences' | 'guide' | 'nfc' | 'templates' | 'check_templates' | 'narrative_prompt' | 'auto_record' | 'autolink' | 'obsidian_export' | 'filters' | 'memoir_filter' | 'batch_manage' | 'sponsorship_preview'>('main');
     const fileInputRef = useRef<HTMLInputElement>(null);
     const [webdavConfig, setWebdavConfig] = useState<WebDAVConfig | null>(null);
     const [s3Config, setS3Config] = useState<S3Config | null>(null);
@@ -3133,6 +3290,10 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
         );
     }
 
+    if (activeSubmenu === 'sponsorship_preview') {
+        return <SponsorshipPreviewView onBack={() => setActiveSubmenu('main')} onToast={onToast} />;
+    }
+
     return (
         <div className="fixed inset-0 z-50 bg-[#fdfbf7] flex flex-col font-serif animate-in slide-in-from-right duration-300 pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">
             {/* Header */}
@@ -3286,8 +3447,13 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
                         <MenuItem
                             icon={<Coffee size={18} className="text-amber-600" />}
                             label="请我喝杯咖啡 ☕"
-                            isLast
                             onClick={() => setShowDonationModal(true)}
+                        />
+                        <MenuItem
+                            icon={<Coffee size={18} className="text-pink-500" />}
+                            label="新赞赏页面 (Preview)"
+                            isLast
+                            onClick={() => setActiveSubmenu('sponsorship_preview')}
                         />
                     </div>
                 </div>
