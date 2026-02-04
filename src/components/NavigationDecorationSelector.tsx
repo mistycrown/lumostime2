@@ -62,48 +62,32 @@ export const NavigationDecorationSelector: React.FC<NavigationDecorationSelector
                     <span className="text-green-600 text-lg">🎋</span>
                 </div>
                 <div>
-                    <h3 className="text-lg font-bold text-stone-800">标题栏样式</h3>
-                    <p className="text-xs text-stone-500 mt-0.5">为导航栏添加装饰效果</p>
+                    <h3 className="text-lg font-bold text-stone-800">导航栏样式</h3>
                 </div>
             </div>
 
             {/* 装饰选项网格 */}
-            <div className="grid grid-cols-5 gap-3">
+            <div className="flex flex-wrap gap-2">
                 {decorations.map((decoration) => (
-                    <div
+                    <button
                         key={decoration.id}
-                        className="relative"
+                        onClick={() => handleDecorationSelect(decoration.id)}
+                        className={`relative w-16 h-16 rounded-lg border-2 transition-all overflow-hidden ${
+                            currentDecoration === decoration.id
+                                ? 'border-stone-400 ring-2 ring-stone-200'
+                                : 'border-stone-200 hover:border-stone-300'
+                        }`}
                     >
-                        <button
-                            onClick={() => handleDecorationSelect(decoration.id)}
-                            className={`w-full aspect-square rounded-lg border-2 transition-all overflow-hidden ${
-                                currentDecoration === decoration.id
-                                    ? 'border-stone-400 ring-2 ring-stone-200'
-                                    : 'border-stone-200 hover:border-stone-300'
-                            }`}
-                        >
-                            {renderDecorationPreview(decoration)}
-                            
-                            {/* 选中状态指示器 */}
-                            {currentDecoration === decoration.id && (
-                                <div className="absolute top-1 right-1 w-5 h-5 bg-stone-800 rounded-full flex items-center justify-center shadow-lg z-10">
-                                    <Check size={12} className="text-white" />
-                                </div>
-                            )}
-                        </button>
+                        {renderDecorationPreview(decoration)}
                         
-                        {/* 装饰名称 */}
-                        <p className="text-xs text-stone-500 text-center mt-1.5 truncate">
-                            {decoration.name}
-                        </p>
-                    </div>
+                        {/* 选中状态指示器 */}
+                        {currentDecoration === decoration.id && (
+                            <div className="absolute top-1 right-1 w-5 h-5 bg-stone-800 rounded-full flex items-center justify-center shadow-lg z-10">
+                                <Check size={12} className="text-white" />
+                            </div>
+                        )}
+                    </button>
                 ))}
-            </div>
-
-            {/* 提示信息 */}
-            <div className="text-xs text-stone-500 bg-stone-50 rounded-lg p-3 mt-4">
-                <p>• 装饰效果会显示在底部导航栏上方</p>
-                <p>• 选择"默认"可关闭装饰效果</p>
             </div>
         </div>
     );

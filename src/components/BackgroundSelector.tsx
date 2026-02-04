@@ -138,31 +138,27 @@ export const BackgroundSelector: React.FC<BackgroundSelectorProps> = ({ onToast 
             </div>
 
             {/* 背景选项网格 */}
-            <div className="grid grid-cols-4 gap-3 mb-4">
+            <div className="flex flex-wrap gap-2 mb-4">
                 {backgrounds.map((background) => (
-                    <div
+                    <button
                         key={background.id}
-                        className="relative"
+                        onClick={() => handleBackgroundSelect(background.id)}
+                        className={`relative w-16 h-20 rounded-lg border-2 transition-all overflow-hidden ${
+                            currentBackground === background.id
+                                ? 'border-stone-400 ring-2 ring-stone-200'
+                                : 'border-stone-200 hover:border-stone-300'
+                        }`}
                     >
-                        <button
-                            onClick={() => handleBackgroundSelect(background.id)}
-                            className={`w-full aspect-[3/4] rounded-lg border-2 transition-all overflow-hidden ${
-                                currentBackground === background.id
-                                    ? 'border-stone-400 ring-2 ring-stone-200'
-                                    : 'border-stone-200 hover:border-stone-300'
-                            }`}
-                        >
-                            {renderBackgroundPreview(background)}
-                            
-                            {/* 选中状态指示器 */}
-                            {currentBackground === background.id && (
-                                <div className="absolute top-1 right-1 w-5 h-5 bg-stone-800 rounded-full flex items-center justify-center shadow-lg">
-                                    <Check size={12} className="text-white" />
-                                </div>
-                            )}
-                        </button>
+                        {renderBackgroundPreview(background)}
+                        
+                        {/* 选中状态指示器 */}
+                        {currentBackground === background.id && (
+                            <div className="absolute top-1 right-1 w-5 h-5 bg-stone-800 rounded-full flex items-center justify-center shadow-lg">
+                                <Check size={12} className="text-white" />
+                            </div>
+                        )}
 
-                        {/* 删除按钮（仅自定义背景） - 移到外层 */}
+                        {/* 删除按钮（仅自定义背景） */}
                         {background.type === 'custom' && (
                             <button
                                 onClick={(e) => handleDeleteBackground(background.id, e)}
@@ -171,20 +167,20 @@ export const BackgroundSelector: React.FC<BackgroundSelectorProps> = ({ onToast 
                                 <X size={10} className="text-white" />
                             </button>
                         )}
-                    </div>
+                    </button>
                 ))}
 
                 {/* 添加自定义背景按钮 */}
                 <button
                     onClick={() => fileInputRef.current?.click()}
                     disabled={isUploading}
-                    className="aspect-[3/4] rounded-lg border-2 border-dashed border-stone-300 hover:border-stone-400 transition-all flex flex-col items-center justify-center gap-2 text-stone-500 hover:text-stone-600"
+                    className="w-16 h-20 rounded-lg border-2 border-dashed border-stone-300 hover:border-stone-400 transition-all flex flex-col items-center justify-center gap-1 text-stone-500 hover:text-stone-600"
                 >
                     {isUploading ? (
                         <div className="w-4 h-4 border-2 border-stone-400 border-t-transparent rounded-full animate-spin" />
                     ) : (
                         <>
-                            <Plus size={20} />
+                            <Plus size={16} />
                             <span className="text-xs">添加</span>
                         </>
                     )}
