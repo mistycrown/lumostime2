@@ -27,8 +27,8 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
     if (!isVisible) return null;
 
     const bgColor = (currentView === AppView.TIMELINE || currentView === AppView.TAGS)
-        ? 'bg-[#faf9f6]'
-        : 'bg-white';
+        ? 'bg-[#faf9f6]/80 backdrop-blur-md'
+        : 'bg-white/80 backdrop-blur-md';
 
     return (
         <nav className={`fixed bottom-0 left-0 w-full h-12 md:h-16 box-content border-t border-stone-100 flex justify-around items-center z-30 pb-[env(safe-area-inset-bottom)] ${bgColor}`}>

@@ -129,14 +129,14 @@ const SwipeableTodoItem: React.FC<{
       {/* Foreground Content */}
       <div
         className={`
-          relative z-10 flex gap-3 transition-transform duration-200 bg-white
+          relative z-10 flex gap-3 transition-transform duration-200
           ${viewMode === 'compact'
             ? 'p-3 border-b border-stone-100 min-h-[3.5rem] items-center'
             : 'p-4 rounded-2xl border min-h-[5rem] mb-0 items-start'
           }
           ${todo.isCompleted
-            ? (viewMode === 'compact' ? 'bg-stone-50/50' : 'bg-stone-50 border-stone-100') // Compact completed style
-            : (viewMode === 'compact' ? 'bg-white' : 'bg-white border-stone-100 shadow-sm')
+            ? (viewMode === 'compact' ? 'bg-stone-50/50' : 'bg-stone-50/80 backdrop-blur-md border-stone-100') // Compact completed style
+            : (viewMode === 'compact' ? 'bg-white' : 'bg-white/80 backdrop-blur-md border-stone-100 shadow-sm')
           }
         `}
         style={{ transform: `translateX(${translateX}px)` }}
@@ -368,7 +368,7 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, categories, activityC
     <div className="flex h-full bg-[#faf9f6]">
       {/* Left Sidebar - Todo Categories */}
       <div
-        className={`flex-shrink-0 flex flex-col overflow-y-auto pt-6 pb-20 md:pl-4 pl-0 pr-2 no-scrollbar border-r border-stone-100 bg-[#faf9f6] z-10 transition-all duration-300 ${isSidebarOpen ? 'w-auto md:min-w-[12rem]' : 'w-16 items-center'}`}
+        className={`flex-shrink-0 flex flex-col overflow-y-auto pt-6 pb-20 md:pl-4 pl-0 pr-2 no-scrollbar border-r border-stone-100 bg-[#faf9f6]/80 backdrop-blur-md z-10 transition-all duration-300 ${isSidebarOpen ? 'w-auto md:min-w-[12rem]' : 'w-16 items-center'}`}
       >
         <div className="flex-1 w-full">
           {categories.map((category) => {

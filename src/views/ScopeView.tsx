@@ -95,7 +95,7 @@ export const ScopeView: React.FC<ScopeViewProps> = ({
                         return (
                             <div
                                 key={scope.id}
-                                className="bg-white rounded-xl p-4 border border-stone-100 shadow-sm hover:shadow-md transition-all"
+                                className="bg-white/80 backdrop-blur-md rounded-xl p-4 border border-stone-100 shadow-sm hover:shadow-md transition-all"
                             >
                                 <div
                                     onClick={() => onScopeClick(scope.id)}

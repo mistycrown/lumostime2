@@ -117,7 +117,7 @@ export const CalendarWidget: React.FC<CalendarWidgetProps> = ({ currentDate, onD
     return (
         <div className={hideTopBar
             ? "z-20 transition-all duration-500 ease-in-out overflow-hidden flex flex-col shrink-0"
-            : "bg-white z-20 shadow-sm transition-all duration-500 ease-in-out overflow-hidden flex flex-col shrink-0 border-b border-stone-200"
+            : "bg-white/80 backdrop-blur-md z-20 shadow-sm transition-all duration-500 ease-in-out overflow-hidden flex flex-col shrink-0 border-b border-stone-200"
         }>
 
             {/* Top Bar - 详情页面模式下隐藏 */}

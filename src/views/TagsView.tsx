@@ -131,7 +131,7 @@ export const TagsView: React.FC<TagsViewProps> = ({ logs, onSelectTag, onSelectC
                                  <div
                                     key={act.id}
                                     onClick={() => onSelectTag(act.id)}
-                                    className="flex items-center justify-between bg-white border border-stone-100 rounded-lg px-4 py-3 cursor-pointer active:scale-[0.98] transition-all"
+                                    className="flex items-center justify-between bg-white/80 backdrop-blur-md border border-stone-100 rounded-lg px-4 py-3 cursor-pointer active:scale-[0.98] transition-all"
                                  >
                                     <div className="flex items-center gap-3">
                                        <span className="text-stone-300 font-light text-sm">#</span>
