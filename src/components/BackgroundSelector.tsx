@@ -4,7 +4,7 @@
  */
 
 import React, { useState, useRef, useEffect } from 'react';
-import { Plus, Trash2, Check, Upload, X } from 'lucide-react';
+import { Plus, Check, X } from 'lucide-react';
 import { backgroundService, BackgroundOption } from '../services/backgroundService';
 import { ToastType } from './Toast';
 
@@ -15,7 +15,7 @@ interface BackgroundSelectorProps {
 export const BackgroundSelector: React.FC<BackgroundSelectorProps> = ({ onToast }) => {
     const [backgrounds, setBackgrounds] = useState<BackgroundOption[]>([]);
     const [currentBackground, setCurrentBackground] = useState<string>('default');
-    const [backgroundOpacity, setBackgroundOpacity] = useState<number>(0.8);
+    const [backgroundOpacity, setBackgroundOpacity] = useState<number>(0.1);
     const [isUploading, setIsUploading] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -88,6 +88,7 @@ export const BackgroundSelector: React.FC<BackgroundSelectorProps> = ({ onToast 
             }
         };
     }, []);
+
     const handleDeleteBackground = (backgroundId: string, event: React.MouseEvent) => {
         event.stopPropagation();
         
@@ -191,29 +192,6 @@ export const BackgroundSelector: React.FC<BackgroundSelectorProps> = ({ onToast 
                 </button>
             </div>
 
-            {/* 透明度调节 */}
-            {currentBackground !== 'default' && (
-                <div className="mt-4 p-4 bg-stone-50 rounded-lg">
-                    <div className="flex items-center justify-between mb-3">
-                        <label className="text-sm font-medium text-stone-700">背景透明度</label>
-                        <span className="text-xs text-stone-500">{Math.round(backgroundOpacity * 100)}%</span>
-                    </div>
-                    <input
-                        type="range"
-                        min="0.1"
-                        max="1"
-                        step="0.1"
-                        value={backgroundOpacity}
-                        onChange={handleOpacityChange}
-                        className="w-full h-2 bg-stone-200 rounded-lg appearance-none cursor-pointer focus:outline-none focus:ring-2 focus:ring-stone-400"
-                    />
-                    <div className="flex justify-between text-xs text-stone-400 mt-1">
-                        <span>透明</span>
-                        <span>不透明</span>
-                    </div>
-                </div>
-            )}
-
             {/* 隐藏的文件输入 */}
             <input
                 ref={fileInputRef}
@@ -223,9 +201,38 @@ export const BackgroundSelector: React.FC<BackgroundSelectorProps> = ({ onToast 
                 className="hidden"
             />
 
+            {/* 透明度调节 - 仅在非默认背景时显示 */}
+            {currentBackground !== 'default' && (
+                <div className="mb-4 bg-stone-50 rounded-lg p-4">
+                    <div className="flex items-center justify-between mb-2">
+                        <label className="text-sm font-medium text-stone-700">
+                            背景透明度
+                        </label>
+                        <span className="text-sm font-semibold text-stone-600">
+                            {Math.round(backgroundOpacity * 100)}%
+                        </span>
+                    </div>
+                    <input
+                        type="range"
+                        min="0"
+                        max="0.4"
+                        step="0.02"
+                        value={backgroundOpacity}
+                        onChange={handleOpacityChange}
+                        className="w-full h-2 bg-stone-200 rounded-lg appearance-none cursor-pointer slider"
+                        style={{
+                            background: `linear-gradient(to right, #57534e 0%, #57534e ${(backgroundOpacity / 0.4) * 100}%, #e7e5e4 ${(backgroundOpacity / 0.4) * 100}%, #e7e5e4 100%)`
+                        }}
+                    />
+                    <div className="flex justify-between text-xs text-stone-400 mt-1">
+                        <span>0%</span>
+                        <span>40%</span>
+                    </div>
+                </div>
+            )}
+
             {/* 提示信息 */}
             <div className="text-xs text-stone-500 bg-stone-50 rounded-lg p-3">
-                <p>• 支持 JPG、PNG、GIF 等图片格式</p>
                 <p>• 图片大小不超过 5MB</p>
                 <p>• 自定义图片仅保存在本地，不会同步到云端</p>
             </div>

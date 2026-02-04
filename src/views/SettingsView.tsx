@@ -3616,7 +3616,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
                         />
                         <MenuItem
                             icon={<Coffee size={18} className="text-pink-500" />}
-                            label="新赞赏页面 (Preview)"
+                            label="这里还在开发中 (Preview)"
                             isLast
                             onClick={() => setActiveSubmenu('sponsorship_preview')}
                         />

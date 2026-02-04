@@ -640,7 +640,7 @@ export const JournalView: React.FC<JournalViewProps> = ({
                                     const end = new Date(selectedDate.getFullYear(), selectedDate.getMonth() + 1, 0);
                                     onOpenMonthlyReview(start, end);
                                 }}
-                                className="relative p-8 mb-10 overflow-hidden bg-white rounded-2xl shadow-[0_2px_15px_-3px_rgba(0,0,0,0.05)] border border-stone-100/50 cursor-pointer group"
+                                className="relative p-8 mb-10 overflow-hidden bg-white/80 backdrop-blur-md rounded-2xl shadow-[0_2px_15px_-3px_rgba(0,0,0,0.05)] border border-stone-100/50 cursor-pointer group"
                             >
                                 <div className="absolute top-2 left-4 text-8xl font-serif text-stone-50 select-none pointer-events-none">“</div>
                                 <p className="relative z-10 text-[17px] font-serif text-stone-600 italic text-center leading-relaxed">

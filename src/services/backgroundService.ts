@@ -18,36 +18,6 @@ const PRESET_BACKGROUNDS: BackgroundOption[] = [
         type: 'preset',
         url: '',
     },
-    {
-        id: 'gradient-sunset',
-        name: '日落渐变',
-        type: 'preset',
-        url: 'linear-gradient(135deg, #ff9a9e 0%, #fecfef 50%, #fecfef 100%)',
-    },
-    {
-        id: 'gradient-ocean',
-        name: '海洋渐变',
-        type: 'preset',
-        url: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-    },
-    {
-        id: 'gradient-forest',
-        name: '森林渐变',
-        type: 'preset',
-        url: 'linear-gradient(135deg, #11998e 0%, #38ef7d 100%)',
-    },
-    {
-        id: 'gradient-lavender',
-        name: '薰衣草渐变',
-        type: 'preset',
-        url: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)',
-    },
-    {
-        id: 'gradient-warm',
-        name: '温暖渐变',
-        type: 'preset',
-        url: 'linear-gradient(135deg, #fa709a 0%, #fee140 100%)',
-    },
 ];
 
 const STORAGE_KEY = 'lumos_custom_backgrounds';
@@ -180,11 +150,11 @@ class BackgroundService {
      * 设置背景透明度
      */
     setBackgroundOpacity(opacity: number): void {
-        // 确保透明度在0-1之间
-        const clampedOpacity = Math.max(0, Math.min(1, opacity));
+        // 确保透明度在0-0.4之间
+        const clampedOpacity = Math.max(0, Math.min(0.4, opacity));
         const currentOpacity = this.getBackgroundOpacity();
         
-        if (Math.abs(currentOpacity - clampedOpacity) < 0.01) {
+        if (Math.abs(currentOpacity - clampedOpacity) < 0.001) {
             return; // 如果透明度变化很小，不触发更新
         }
         
@@ -199,7 +169,7 @@ class BackgroundService {
      */
     getBackgroundOpacity(): number {
         const stored = localStorage.getItem(BACKGROUND_OPACITY_KEY);
-        return stored ? parseFloat(stored) : 0.8; // 默认透明度为0.8
+        return stored ? parseFloat(stored) : 0.1; // 默认透明度为10%
     }
 
     getCurrentBackgroundOption(): BackgroundOption | null {

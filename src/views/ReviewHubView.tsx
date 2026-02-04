@@ -267,7 +267,7 @@ export const ReviewHubView: React.FC<ReviewHubViewProps> = ({
                                     <article
                                         key={m.id}
                                         onClick={() => onOpenMonthlyReview(new Date(m.monthStartDate), new Date(m.monthEndDate))}
-                                        className="flex-none w-[90%] snap-center bg-white border border-stone-900 border-t-[4px] border-t-stone-900 rounded-lg p-6 relative shadow-[2px_2px_10px_rgba(0,0,0,0.05)] active:scale-[0.98] transition-transform"
+                                        className="flex-none w-[90%] snap-center bg-white/80 backdrop-blur-md border border-stone-900 border-t-[4px] border-t-stone-900 rounded-lg p-6 relative shadow-[2px_2px_10px_rgba(0,0,0,0.05)] active:scale-[0.98] transition-transform"
                                     >
                                         <div className="mb-4">
                                             <div className="flex justify-between items-center mb-1">
@@ -333,8 +333,8 @@ export const ReviewHubView: React.FC<ReviewHubViewProps> = ({
                                         onClick={() => onOpenWeeklyReview(new Date(w.weekStartDate), new Date(w.weekEndDate))}
                                         className={`snap-start flex-none w-[calc(50%-6px)] rounded-2xl p-4 h-[140px] flex flex-col justify-between relative overflow-hidden border transition-all active:scale-95
                  ${isDark
-                                                ? 'bg-stone-900 text-white border-stone-900'
-                                                : 'bg-white text-stone-900 border-stone-200'}
+                                                ? 'bg-stone-900/80 backdrop-blur-md text-white border-stone-900'
+                                                : 'bg-white/80 backdrop-blur-md text-stone-900 border-stone-200'}
                `}
                                     >
                                         <div className="flex justify-between items-center">
@@ -374,19 +374,19 @@ export const ReviewHubView: React.FC<ReviewHubViewProps> = ({
                                 const weekdayStr = dateObj.toLocaleDateString('en-US', { weekday: 'short' }).toUpperCase(); // Short weekday (THU)
 
                                 const style = getDailyStyle(d.date);
-                                let contentClass = "bg-white border border-stone-100 shadow-sm";
-                                let tagClass = "border border-stone-900 bg-white text-stone-900";
+                                let contentClass = "bg-white/80 backdrop-blur-md border border-stone-100 shadow-sm";
+                                let tagClass = "border border-stone-900 bg-white/80 backdrop-blur-sm text-stone-900";
 
                                 // Tag label now shows Weekday instead of Style Name
                                 let tagLabel = weekdayStr;
 
                                 if (style === 'stoic') {
-                                    contentClass = "bg-white border-4 border-double border-stone-900";
+                                    contentClass = "bg-white/80 backdrop-blur-md border-4 border-double border-stone-900";
                                 } else if (style === 'director') {
-                                    contentClass = "bg-white border-2 border-stone-900 shadow-[4px_4px_0_rgba(0,0,0,1)]";
-                                    tagClass = "bg-stone-900 text-white border-stone-900";
+                                    contentClass = "bg-white/80 backdrop-blur-md border-2 border-stone-900 shadow-[4px_4px_0_rgba(0,0,0,1)]";
+                                    tagClass = "bg-stone-900/80 backdrop-blur-sm text-white border-stone-900";
                                 } else if (style === 'game') {
-                                    contentClass = "bg-white border-2 border-dashed border-stone-300 shadow-sm";
+                                    contentClass = "bg-white/80 backdrop-blur-md border-2 border-dashed border-stone-300 shadow-sm";
                                 }
 
                                 return (
