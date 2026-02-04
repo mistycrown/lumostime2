@@ -138,7 +138,7 @@ export const BackgroundSelector: React.FC<BackgroundSelectorProps> = ({ onToast 
             </div>
 
             {/* 背景选项网格 */}
-            <div className="grid grid-cols-3 gap-3 mb-4">
+            <div className="grid grid-cols-4 gap-3 mb-4">
                 {backgrounds.map((background) => (
                     <div
                         key={background.id}
@@ -146,7 +146,7 @@ export const BackgroundSelector: React.FC<BackgroundSelectorProps> = ({ onToast 
                     >
                         <button
                             onClick={() => handleBackgroundSelect(background.id)}
-                            className={`w-full aspect-video rounded-lg border-2 transition-all overflow-hidden ${
+                            className={`w-full aspect-[3/4] rounded-lg border-2 transition-all overflow-hidden ${
                                 currentBackground === background.id
                                     ? 'border-stone-400 ring-2 ring-stone-200'
                                     : 'border-stone-200 hover:border-stone-300'
@@ -171,11 +171,6 @@ export const BackgroundSelector: React.FC<BackgroundSelectorProps> = ({ onToast 
                                 <X size={10} className="text-white" />
                             </button>
                         )}
-
-                        {/* 背景名称 */}
-                        <div className="absolute bottom-0 left-0 right-0 bg-black/50 text-white text-xs p-1 text-center">
-                            {background.name}
-                        </div>
                     </div>
                 ))}
 
@@ -183,14 +178,14 @@ export const BackgroundSelector: React.FC<BackgroundSelectorProps> = ({ onToast 
                 <button
                     onClick={() => fileInputRef.current?.click()}
                     disabled={isUploading}
-                    className="aspect-video rounded-lg border-2 border-dashed border-stone-300 hover:border-stone-400 transition-all flex flex-col items-center justify-center gap-2 text-stone-500 hover:text-stone-600"
+                    className="aspect-[3/4] rounded-lg border-2 border-dashed border-stone-300 hover:border-stone-400 transition-all flex flex-col items-center justify-center gap-2 text-stone-500 hover:text-stone-600"
                 >
                     {isUploading ? (
                         <div className="w-4 h-4 border-2 border-stone-400 border-t-transparent rounded-full animate-spin" />
                     ) : (
                         <>
                             <Plus size={20} />
-                            <span className="text-xs">添加图片</span>
+                            <span className="text-xs">添加</span>
                         </>
                     )}
                 </button>

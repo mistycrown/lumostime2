@@ -227,7 +227,7 @@ export const ReviewHubView: React.FC<ReviewHubViewProps> = ({
             {/* Sticky Header - 标题栏随滚动缩小 */}
             <header className={`sticky top-0 z-40 transition-all duration-300 ${isScrolled
                 ? 'bg-[#faf9f6]/90 backdrop-blur-md shadow-sm py-2'
-                : 'bg-transparent py-4'
+                : 'bg-[#faf9f6]/80 backdrop-blur-sm py-4'
                 }`}>
                 <div className="max-w-xl mx-auto px-6">
                     <div className="flex flex-col items-center">
