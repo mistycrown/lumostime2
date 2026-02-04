@@ -223,15 +223,11 @@ class BackgroundService {
             const background = this.getCurrentBackgroundOption();
             const opacity = this.getBackgroundOpacity();
             
-            console.log('🖼️ Applying background to elements:', { background: background?.id, opacity });
-            
             TARGET_ELEMENTS.forEach(elementId => {
                 const element = document.getElementById(elementId);
                 if (!element) {
                     return;
                 }
-                
-                console.log(`🖼️ Processing element: ${elementId}`);
                 
                 // 移除之前的背景层
                 const existingBgLayer = element.querySelector('.bg-layer');
@@ -240,7 +236,6 @@ class BackgroundService {
                 }
                 
                 if (!background || background.id === 'default') {
-                    console.log(`🖼️ Removing background from ${elementId}`);
                     return;
                 }
                 
@@ -266,11 +261,9 @@ class BackgroundService {
                 
                 if (background.url.startsWith('linear-gradient')) {
                     // 渐变背景
-                    console.log(`🖼️ Applying gradient background to ${elementId}`);
                     bgLayer.style.background = background.url;
                 } else {
                     // 图片背景 - 固定位置，填满屏幕
-                    console.log(`🖼️ Applying image background to ${elementId}`);
                     bgLayer.style.backgroundImage = `url(${background.url})`;
                     bgLayer.style.backgroundSize = 'cover'; // 填满屏幕，保持比例
                     bgLayer.style.backgroundPosition = 'center center'; // 居中显示
@@ -292,8 +285,6 @@ class BackgroundService {
                         }
                     }
                 });
-                
-                console.log(`🖼️ Added background layer for ${elementId}`);
             });
         } finally {
             setTimeout(() => {
@@ -315,12 +306,10 @@ class BackgroundService {
      */
     init(): void {
         const currentBackground = this.getCurrentBackground();
-        console.log('🖼️ Background service initializing with background:', currentBackground);
         
         // 延迟执行确保DOM已经准备好
         setTimeout(() => {
             this.applyBackgroundToElements();
-            console.log('🖼️ Background service initialized and applied');
         }, 500);
         
         // 监听页面变化，重新应用背景
@@ -349,7 +338,6 @@ class BackgroundService {
                                 element.id === id || element.querySelector(`#${id}`)
                             )) {
                                 shouldReapply = true;
-                                console.log('🖼️ Target element detected:', element.id || 'container');
                             }
                         }
                     });
@@ -357,7 +345,6 @@ class BackgroundService {
             });
             
             if (shouldReapply) {
-                console.log('🖼️ Target elements detected, reapplying background');
                 setTimeout(() => {
                     this.applyBackgroundToElements();
                 }, 100);
@@ -374,7 +361,6 @@ class BackgroundService {
         
         // 监听路由变化（React Router或其他路由系统）
         window.addEventListener('popstate', () => {
-            console.log('🖼️ Route change detected, reapplying background');
             setTimeout(() => {
                 this.applyBackgroundToElements();
             }, 200);
@@ -382,7 +368,6 @@ class BackgroundService {
         
         // 监听hash变化
         window.addEventListener('hashchange', () => {
-            console.log('🖼️ Hash change detected, reapplying background');
             setTimeout(() => {
                 this.applyBackgroundToElements();
             }, 200);
@@ -395,7 +380,6 @@ class BackgroundService {
             const currentElementsStr = currentElements.join(',');
             
             if (!this.lastFoundElements || this.lastFoundElements !== currentElementsStr) {
-                console.log('🖼️ New elements detected:', currentElements);
                 this.lastFoundElements = currentElementsStr;
                 this.applyBackgroundToElements();
             }
