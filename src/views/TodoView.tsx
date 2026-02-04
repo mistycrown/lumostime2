@@ -16,7 +16,7 @@ import { AITodoInputModal } from '../components/AITodoInputModal';
 import { AITodoConfirmModal, ParsedTask } from '../components/AITodoConfirmModal';
 import { aiService, AIParsedTodo } from '../services/aiService';
 import { usePrivacy } from '../contexts/PrivacyContext';
-import { useBackgroundStyle } from '../hooks/useBackgroundStyle';
+
 
 interface TodoViewProps {
   todos: TodoItem[];
@@ -258,7 +258,6 @@ const SwipeableTodoItem: React.FC<{
 export const TodoView: React.FC<TodoViewProps> = ({ todos, categories, activityCategories, scopes, onToggleTodo, onEditTodo, onAddTodo, onStartFocus, onDuplicateTodo, onBatchAddTodos, autoLinkRules = [] }) => {
   const [selectedCategoryId, setSelectedCategoryId] = useState<string>(categories[0]?.id || '');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const backgroundStyle = useBackgroundStyle();
 
   // AI States
   const [isAIInputOpen, setIsAIInputOpen] = useState(false);
@@ -424,8 +423,8 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, categories, activityC
 
       {/* Right Content - Task List */}
       <div 
-        className={`flex-1 overflow-hidden flex flex-col p-5 md:p-10 bg-white md:bg-transparent rounded-tl-[2rem] md:rounded-none shadow-[-5px_0_20px_rgba(0,0,0,0.02)] md:shadow-none z-0 ml-[-10px] md:ml-0 ${backgroundStyle.className}`}
-        style={backgroundStyle.style}
+        className="flex-1 overflow-hidden flex flex-col p-5 md:p-10 bg-white md:bg-transparent rounded-tl-[2rem] md:rounded-none shadow-[-5px_0_20px_rgba(0,0,0,0.02)] md:shadow-none z-0 ml-[-10px] md:ml-0"
+        id="todo-content"
       >
 
         {/* Header */}
