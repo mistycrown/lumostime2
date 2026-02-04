@@ -93,6 +93,7 @@ import { RedemptionService } from '../services/redemptionService';
 
 import { IconPreview } from '../components/IconPreview';
 import { BackgroundSelector } from '../components/BackgroundSelector';
+import { NavigationDecorationSelector } from '../components/NavigationDecorationSelector';
 import { ICON_OPTIONS } from '../services/iconService';
 import { backgroundService } from '../services/backgroundService';
 import { NARRATIVE_TEMPLATES } from '../constants';
@@ -425,6 +426,9 @@ const SponsorshipPreviewView: React.FC<{ onBack: () => void, onToast: (type: Toa
 
                         {/* 背景图片切换卡片 */}
                         <BackgroundSelector onToast={onToast} />
+
+                        {/* 标题栏样式卡片 */}
+                        <NavigationDecorationSelector onToast={onToast} />
 
                         {/* 时间小友卡片 */}
                         <div className="bg-white rounded-2xl p-6 shadow-sm">
