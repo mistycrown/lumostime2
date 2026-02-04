@@ -93,7 +93,7 @@ const AppContent: React.FC = () => {
     initialLogTimes
   } = useNavigation();
   const { categories, scopes, goals, setCategories, setScopes, setGoals } = useCategoryScope();
-  const { startActivity, stopActivity, cancelSession, activeSessions } = useSession();
+  const { startActivity, stopActivity, cancelSession, activeSessions, setActiveSessions } = useSession();
   const { logs, todos, todoCategories, setLogs, setTodos, setTodoCategories } = useData();
   const {
     dailyReviews, weeklyReviews, monthlyReviews, setDailyReviews, setWeeklyReviews, setMonthlyReviews,
@@ -344,7 +344,10 @@ const AppContent: React.FC = () => {
               setFocusDetailSessionId(null);
             }}
             onUpdate={(updated) => {
-              // Session updates handled by context
+              // Update the session in activeSessions
+              setActiveSessions(prev => prev.map(s => 
+                s.id === updated.id ? updated : s
+              ));
             }}
           />
         );
