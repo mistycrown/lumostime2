@@ -1,0 +1,22 @@
+/* 图标圆角样式 */
+.icon-rounded {
+    border-radius: 22% !important;
+    overflow: hidden;
+}
+
+.icon-rounded img {
+    border-radius: 22%;
+}
+
+/* 不同尺寸的圆角 */
+.icon-rounded-small {
+    border-radius: 18% !important;
+}
+
+.icon-rounded-medium {
+    border-radius: 22% !important;
+}
+
+.icon-rounded-large {
+    border-radius: 26% !important;
+}

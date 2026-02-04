@@ -91,6 +91,8 @@ import { BatchFocusRecordManageView } from './BatchFocusRecordManageView';
 import { usePrivacy } from '../contexts/PrivacyContext';
 import { RedemptionService } from '../services/redemptionService';
 
+import { IconPreview } from '../components/IconPreview';
+import { ICON_OPTIONS } from '../services/iconService';
 import { NARRATIVE_TEMPLATES } from '../constants';
 // @ts-ignore
 import userGuideContent from '../../USER_GUIDE.md?raw';
@@ -164,6 +166,8 @@ const SponsorshipPreviewView: React.FC<{ onBack: () => void, onToast: (type: Toa
     const [selectedIcon, setSelectedIcon] = useState('default');
     const [selectedTheme, setSelectedTheme] = useState('default');
     const [selectedStyle, setSelectedStyle] = useState('default');
+    const [isChangingIcon, setIsChangingIcon] = useState(false);
+    const [showDebugInfo, setShowDebugInfo] = useState(false);
     const redemptionService = new RedemptionService();
 
     useEffect(() => {
@@ -175,6 +179,18 @@ const SponsorshipPreviewView: React.FC<{ onBack: () => void, onToast: (type: Toa
             }
         };
         checkVerification();
+
+        // 加载当前图标设置
+        const loadCurrentIcon = async () => {
+            try {
+                const { iconService } = await import('../services/iconService');
+                const currentIcon = iconService.getCurrentIcon();
+                setSelectedIcon(currentIcon);
+            } catch (error) {
+                console.error('加载当前图标失败:', error);
+            }
+        };
+        loadCurrentIcon();
     }, []);
 
     const handleRedeem = async () => {
@@ -209,13 +225,37 @@ const SponsorshipPreviewView: React.FC<{ onBack: () => void, onToast: (type: Toa
         onToast('success', '已重置');
     };
 
-    // 应用图标选项
-    const iconOptions = [
-        { id: 'default', name: '默认', preview: '⏰', description: '经典时钟图标' },
-        { id: 'minimal', name: '极简', preview: '◯', description: '简约圆形设计' },
-        { id: 'gradient', name: '渐变', preview: '🌅', description: '彩色渐变效果' },
-        { id: 'dark', name: '暗黑', preview: '🌙', description: '深色主题图标' },
-    ];
+    const handleIconChange = async (iconId: string) => {
+        if (!isRedeemed) {
+            onToast('error', '请先验证赞赏码');
+            return;
+        }
+
+        setIsChangingIcon(true);
+        try {
+            const { iconService } = await import('../services/iconService');
+            const result = await iconService.setIcon(iconId);
+            
+            if (result.success) {
+                setSelectedIcon(iconId);
+                onToast('success', result.message);
+            } else {
+                onToast('error', result.message);
+            }
+        } catch (error: any) {
+            console.error('切换图标失败:', error);
+            onToast('error', error.message || '切换图标失败');
+        } finally {
+            setIsChangingIcon(false);
+        }
+    };
+
+    const handleShowDebugInfo = async () => {
+        // 删除调试功能，保留空函数避免错误
+    };
+
+    // 应用图标选项 - 使用iconService中的完整列表
+    const iconOptions = ICON_OPTIONS;
 
     // 主题选项
     const themeOptions = [
@@ -309,33 +349,79 @@ const SponsorshipPreviewView: React.FC<{ onBack: () => void, onToast: (type: Toa
 
                         {/* 应用图标切换卡片 */}
                         <div className="bg-white rounded-2xl p-6 shadow-sm">
-                            <div className="flex items-center gap-3 mb-4">
-                                <div className="w-8 h-8 bg-blue-50 rounded-lg flex items-center justify-center">
-                                    <span className="text-blue-600 text-lg">📱</span>
+                            <div className="flex items-center justify-between mb-6">
+                                <div className="flex items-center gap-3">
+                                    <div className="w-8 h-8 bg-blue-50 rounded-lg flex items-center justify-center">
+                                        <span className="text-blue-600 text-lg">📱</span>
+                                    </div>
+                                    <div>
+                                        <h3 className="text-lg font-bold text-stone-800">应用图标</h3>
+                                        <p className="text-sm text-stone-500">选择你喜欢的图标风格</p>
+                                    </div>
                                 </div>
-                                <div>
-                                    <h3 className="text-lg font-bold text-stone-800">应用图标</h3>
-                                    <p className="text-sm text-stone-500">自定义手机和电脑端图标</p>
-                                </div>
+                                
+                                {/* 手动刷新按钮 - 仅Android显示 */}
+                                {isRedeemed && Capacitor.isNativePlatform() && (
+                                    <button
+                                        onClick={async () => {
+                                            try {
+                                                const { iconService } = await import('../services/iconService');
+                                                const result = await iconService.refreshLauncher();
+                                                onToast(result.success ? 'success' : 'info', result.message);
+                                            } catch (error: any) {
+                                                onToast('error', '刷新失败: ' + error.message);
+                                            }
+                                        }}
+                                        className="px-3 py-1.5 text-xs font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors"
+                                    >
+                                        刷新启动器
+                                    </button>
+                                )}
                             </div>
                             
-                            <div className="grid grid-cols-2 gap-3">
+                            {/* 图标网格 - 6列布局 */}
+                            <div className="grid grid-cols-6 gap-2">
                                 {iconOptions.map((option) => (
                                     <button
                                         key={option.id}
-                                        onClick={() => setSelectedIcon(option.id)}
-                                        className={`p-4 rounded-xl border-2 transition-all ${
-                                            selectedIcon === option.id
-                                                ? 'border-blue-400 bg-blue-50'
-                                                : 'border-stone-200 hover:border-stone-300'
+                                        onClick={() => handleIconChange(option.id)}
+                                        disabled={isChangingIcon || !isRedeemed}
+                                        className={`relative p-1 rounded-xl transition-all hover:bg-stone-50 ${
+                                            !isRedeemed ? 'opacity-50 cursor-not-allowed' : ''
+                                        } ${
+                                            isChangingIcon ? 'opacity-70' : ''
                                         }`}
                                     >
-                                        <div className="text-2xl mb-2">{option.preview}</div>
-                                        <div className="text-sm font-medium text-stone-700">{option.name}</div>
-                                        <div className="text-xs text-stone-500 mt-1">{option.description}</div>
+                                        {isChangingIcon && selectedIcon === option.id && (
+                                            <div className="absolute inset-0 flex items-center justify-center bg-white/80 rounded-xl">
+                                                <div className="w-3 h-3 border-2 border-stone-400 border-t-transparent rounded-full animate-spin" />
+                                            </div>
+                                        )}
+                                        
+                                        {/* 图标预览 */}
+                                        <IconPreview 
+                                            iconId={option.id}
+                                            iconName={option.name}
+                                            size="medium"
+                                        />
+                                        
+                                        {/* 选中状态指示器 */}
+                                        {selectedIcon === option.id && (
+                                            <div className="absolute -top-1 -right-1 w-5 h-5 bg-stone-800 rounded-full flex items-center justify-center shadow-lg">
+                                                <Check size={12} className="text-white" />
+                                            </div>
+                                        )}
                                     </button>
                                 ))}
                             </div>
+                            
+                            {!isRedeemed && (
+                                <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-xl">
+                                    <p className="text-xs text-amber-700 text-center">
+                                        🔒 请先验证赞赏码以解锁图标切换功能
+                                    </p>
+                                </div>
+                            )}
                         </div>
 
                         {/* 主题切换卡片 */}
