@@ -126,8 +126,10 @@ const SingleTimer: React.FC<{
   // const isTimelinePage = currentView === AppView.TIMELINE;
 
   // 响应式逻辑：窄屏时隐藏取消按钮
-  const isNarrowScreen = windowWidth < 380; // 设定阈值为380px
-  const shouldHideCancelButton = currentView === AppView.TIMELINE && isNarrowScreen;
+  const isNarrowScreen = windowWidth < 450; // 设定阈值为450px
+  const shouldHideCancelButton = (currentView === AppView.TIMELINE || 
+                                  currentView === AppView.REVIEW || 
+                                  currentView === AppView.SCOPE) && isNarrowScreen;
 
   return (
     <div
@@ -142,6 +144,8 @@ const SingleTimer: React.FC<{
                 ? 'px-4 py-3 justify-between w-full'                          // 记录页和待办页：100%宽度
                 : currentView === AppView.TIMELINE
                   ? 'pl-3 pr-1 py-3 justify-between w-[60%]'                 // 脉络页：减少左边距，保持65%宽度
+                : currentView === AppView.REVIEW || currentView === AppView.SCOPE
+                  ? 'pl-3 pr-2 py-3 justify-between w-[75%]'                 // 档案页和索引页：只调整左边距，保持原宽度
                   : 'pl-[1.75rem] pr-2 py-3 justify-between w-[80%]'          // 其他页面：80%宽度
             }`
       }`}
@@ -151,8 +155,8 @@ const SingleTimer: React.FC<{
           ? 5  // 收缩后最低层级
           : currentView === AppView.RECORD || currentView === AppView.TODO
             ? 40  // 记录页和待办页保持高层级
-            : currentView === AppView.TIMELINE
-              ? 45  // 脉络页使用最高层级，确保在所有元素之上
+            : currentView === AppView.TIMELINE || currentView === AppView.REVIEW
+              ? 50  // 脉络页和档案页使用最高层级，确保在所有元素之上
               : 10  // 其他页面使用低层级
       }}
     >
@@ -171,17 +175,21 @@ const SingleTimer: React.FC<{
         <>
           <div className={`flex items-center ${
             currentView === AppView.RECORD || currentView === AppView.TODO 
-              ? 'gap-4' 
-              : 'gap-3 relative'
+              ? 'gap-4'  // 记录页和待办页：保持原有间距
+              : currentView === AppView.TIMELINE
+                ? 'gap-2 relative'  // 脉络页：适当增加间距，但不要太多
+                : currentView === AppView.REVIEW || currentView === AppView.SCOPE
+                  ? 'gap-4 relative'  // 档案页和索引页：与记录页保持一致的间距
+                  : 'gap-3 relative'  // 其他页面：中等间距
           }`}>
             <div 
               onClick={toggleCollapse}
               className={`w-10 h-10 rounded-full bg-orange-50 flex items-center justify-center text-xl shadow-inner shrink-0 hover:bg-orange-100 transition-colors cursor-pointer ${
                 currentView !== AppView.RECORD && currentView !== AppView.TODO 
-                  ? currentView === AppView.TIMELINE 
-                    ? 'absolute left-0'  // 脉络页面：icon 贴左边
-                    : 'absolute left-0'  // 其他页面：保持原位置
-                  : ''
+                  ? currentView === AppView.REVIEW || currentView === AppView.SCOPE
+                    ? 'absolute left-0'  // 档案页和索引页：需要绝对定位
+                    : 'absolute left-0'  // 其他页面：也需要绝对定位
+                  : ''  // 记录页和待办页：不需要绝对定位
               }`}
             >
               {session.activityIcon}
@@ -189,8 +197,10 @@ const SingleTimer: React.FC<{
             <div className={`flex flex-col min-w-0 transition-all duration-500 ease-out ${
               currentView !== AppView.RECORD && currentView !== AppView.TODO 
                 ? currentView === AppView.TIMELINE
-                  ? 'ml-11'  // 脉络页面：减少左边距
-                  : 'ml-[3.25rem]'  // 其他页面：保持原边距
+                  ? 'ml-12'  // 脉络页：适当增加间距
+                  : currentView === AppView.REVIEW || currentView === AppView.SCOPE
+                    ? 'ml-14'  // 档案页和索引页：给 icon 留出足够空间，并保持舒适间距
+                    : 'ml-[3.25rem]'  // 其他页面：保持原边距
                 : ''
             }`}>
               <div className="flex items-center gap-2">
@@ -210,8 +220,8 @@ const SingleTimer: React.FC<{
           <div className={`flex items-center gap-2 border-l border-stone-100 transition-all duration-500 ease-out ${
             currentView === AppView.RECORD || currentView === AppView.TODO
               ? 'pl-4 ml-2'                    // 记录页和待办页：完整间距
-              : currentView === AppView.TIMELINE 
-                ? 'pl-1 ml-0.5 gap-1'         // 脉络页：最紧凑
+              : currentView === AppView.TIMELINE || currentView === AppView.REVIEW || currentView === AppView.SCOPE
+                ? 'pl-1 ml-0.5 gap-1'         // 脉络页、档案页、索引页：最紧凑
                 : 'pl-2 ml-1'                  // 其他页面：中等间距
           }`} onClick={e => e.stopPropagation()}>
             {/* 取消按钮 - 在窄屏脉络页面时隐藏 */}
@@ -243,7 +253,7 @@ export const TimerFloating: React.FC<TimerFloatingProps> = ({ sessions, todos, o
   const { currentView } = useNavigation();
   
   // 计算外层容器的 z-index
-  const containerZIndex = currentView === AppView.TIMELINE ? 50 : 10;
+  const containerZIndex = currentView === AppView.TIMELINE || currentView === AppView.REVIEW ? 50 : 10;
   
   return (
     <div className="fixed bottom-[calc(4.5rem+env(safe-area-inset-bottom))] left-4 right-4 md:left-4 md:right-4 flex flex-col-reverse gap-6 animate-in slide-in-from-bottom-5" style={{ zIndex: containerZIndex }}>
