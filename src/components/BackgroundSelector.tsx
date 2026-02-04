@@ -15,12 +15,14 @@ interface BackgroundSelectorProps {
 export const BackgroundSelector: React.FC<BackgroundSelectorProps> = ({ onToast }) => {
     const [backgrounds, setBackgrounds] = useState<BackgroundOption[]>([]);
     const [currentBackground, setCurrentBackground] = useState<string>('default');
+    const [backgroundOpacity, setBackgroundOpacity] = useState<number>(0.8);
     const [isUploading, setIsUploading] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     useEffect(() => {
         loadBackgrounds();
         setCurrentBackground(backgroundService.getCurrentBackground());
+        setBackgroundOpacity(backgroundService.getBackgroundOpacity());
     }, []);
 
     const loadBackgrounds = () => {
@@ -66,6 +68,26 @@ export const BackgroundSelector: React.FC<BackgroundSelectorProps> = ({ onToast 
         }
     };
 
+    const handleOpacityChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+        const opacity = parseFloat(event.target.value);
+        setBackgroundOpacity(opacity);
+        
+        // 使用防抖来避免频繁触发
+        clearTimeout(opacityTimeoutRef.current);
+        opacityTimeoutRef.current = setTimeout(() => {
+            backgroundService.setBackgroundOpacity(opacity);
+        }, 100);
+    };
+
+    const opacityTimeoutRef = useRef<NodeJS.Timeout | undefined>(undefined);
+
+    useEffect(() => {
+        return () => {
+            if (opacityTimeoutRef.current) {
+                clearTimeout(opacityTimeoutRef.current);
+            }
+        };
+    }, []);
     const handleDeleteBackground = (backgroundId: string, event: React.MouseEvent) => {
         event.stopPropagation();
         
@@ -118,29 +140,33 @@ export const BackgroundSelector: React.FC<BackgroundSelectorProps> = ({ onToast 
             {/* 背景选项网格 */}
             <div className="grid grid-cols-3 gap-3 mb-4">
                 {backgrounds.map((background) => (
-                    <button
+                    <div
                         key={background.id}
-                        onClick={() => handleBackgroundSelect(background.id)}
-                        className={`relative aspect-video rounded-lg border-2 transition-all overflow-hidden ${
-                            currentBackground === background.id
-                                ? 'border-stone-400 ring-2 ring-stone-200'
-                                : 'border-stone-200 hover:border-stone-300'
-                        }`}
+                        className="relative"
                     >
-                        {renderBackgroundPreview(background)}
-                        
-                        {/* 选中状态指示器 */}
-                        {currentBackground === background.id && (
-                            <div className="absolute top-1 right-1 w-5 h-5 bg-stone-800 rounded-full flex items-center justify-center shadow-lg">
-                                <Check size={12} className="text-white" />
-                            </div>
-                        )}
+                        <button
+                            onClick={() => handleBackgroundSelect(background.id)}
+                            className={`w-full aspect-video rounded-lg border-2 transition-all overflow-hidden ${
+                                currentBackground === background.id
+                                    ? 'border-stone-400 ring-2 ring-stone-200'
+                                    : 'border-stone-200 hover:border-stone-300'
+                            }`}
+                        >
+                            {renderBackgroundPreview(background)}
+                            
+                            {/* 选中状态指示器 */}
+                            {currentBackground === background.id && (
+                                <div className="absolute top-1 right-1 w-5 h-5 bg-stone-800 rounded-full flex items-center justify-center shadow-lg">
+                                    <Check size={12} className="text-white" />
+                                </div>
+                            )}
+                        </button>
 
-                        {/* 删除按钮（仅自定义背景） */}
+                        {/* 删除按钮（仅自定义背景） - 移到外层 */}
                         {background.type === 'custom' && (
                             <button
                                 onClick={(e) => handleDeleteBackground(background.id, e)}
-                                className="absolute top-1 left-1 w-5 h-5 bg-red-500 hover:bg-red-600 rounded-full flex items-center justify-center shadow-lg transition-colors"
+                                className="absolute top-1 left-1 w-5 h-5 bg-red-500 hover:bg-red-600 rounded-full flex items-center justify-center shadow-lg transition-colors z-10"
                             >
                                 <X size={10} className="text-white" />
                             </button>
@@ -150,7 +176,7 @@ export const BackgroundSelector: React.FC<BackgroundSelectorProps> = ({ onToast 
                         <div className="absolute bottom-0 left-0 right-0 bg-black/50 text-white text-xs p-1 text-center">
                             {background.name}
                         </div>
-                    </button>
+                    </div>
                 ))}
 
                 {/* 添加自定义背景按钮 */}
@@ -169,6 +195,29 @@ export const BackgroundSelector: React.FC<BackgroundSelectorProps> = ({ onToast 
                     )}
                 </button>
             </div>
+
+            {/* 透明度调节 */}
+            {currentBackground !== 'default' && (
+                <div className="mt-4 p-4 bg-stone-50 rounded-lg">
+                    <div className="flex items-center justify-between mb-3">
+                        <label className="text-sm font-medium text-stone-700">背景透明度</label>
+                        <span className="text-xs text-stone-500">{Math.round(backgroundOpacity * 100)}%</span>
+                    </div>
+                    <input
+                        type="range"
+                        min="0.1"
+                        max="1"
+                        step="0.1"
+                        value={backgroundOpacity}
+                        onChange={handleOpacityChange}
+                        className="w-full h-2 bg-stone-200 rounded-lg appearance-none cursor-pointer focus:outline-none focus:ring-2 focus:ring-stone-400"
+                    />
+                    <div className="flex justify-between text-xs text-stone-400 mt-1">
+                        <span>透明</span>
+                        <span>不透明</span>
+                    </div>
+                </div>
+            )}
 
             {/* 隐藏的文件输入 */}
             <input

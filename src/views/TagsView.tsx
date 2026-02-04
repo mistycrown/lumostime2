@@ -12,6 +12,7 @@ import { Log, Category } from '../types';
 import { ChevronDown, ChevronRight, Settings2 } from 'lucide-react';
 import { BatchManageView } from './BatchManageView';
 
+
 interface TagsViewProps {
    logs: Log[];
    onSelectTag: (tagId: string) => void;
@@ -58,7 +59,10 @@ export const TagsView: React.FC<TagsViewProps> = ({ logs, onSelectTag, onSelectC
    }
 
    return (
-      <div className="h-full bg-[#faf9f6] overflow-y-auto no-scrollbar pb-24 px-4 pt-4">
+      <div 
+         className="h-full bg-[#faf9f6] overflow-y-auto no-scrollbar pb-24 px-4 pt-4"
+         id="tags-content"
+      >
 
          <div className="flex justify-between items-center px-2 mb-4 text-[10px] text-stone-400 font-bold uppercase tracking-widest">
             <span>Main Categories</span>

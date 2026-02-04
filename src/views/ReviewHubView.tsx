@@ -11,6 +11,7 @@ import React, { useMemo } from 'react';
 import * as LucideIcons from 'lucide-react';
 import { DailyReview, WeeklyReview, MonthlyReview, Log } from '../types';
 
+
 interface ReviewHubViewProps {
     dailyReviews: DailyReview[];
     weeklyReviews: WeeklyReview[];
@@ -242,6 +243,7 @@ export const ReviewHubView: React.FC<ReviewHubViewProps> = ({
             <div
                 ref={scrollContainerRef}
                 className="flex-1 overflow-y-auto overflow-x-hidden pb-safe scrollbar-hide"
+                id="chronicle-content"
             >
                 <div className="md:max-w-xl md:mx-auto w-full px-5 pt-2 pb-20">
 

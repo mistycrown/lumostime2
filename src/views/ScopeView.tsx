@@ -12,6 +12,7 @@ import { Scope, Goal, Log, TodoItem } from '../types';
 import { GoalCard } from '../components/GoalCard';
 import { Settings2 } from 'lucide-react';
 
+
 interface ScopeViewProps {
     scopes: Scope[];
     logs: Log[];
@@ -69,7 +70,10 @@ export const ScopeView: React.FC<ScopeViewProps> = ({
     };
 
     return (
-        <div className="h-full bg-[#faf9f6] overflow-y-auto pb-24">
+        <div 
+            className="h-full bg-[#faf9f6] overflow-y-auto pb-24"
+            id="scopes-content"
+        >
             {/* Scope Cards */}
             <div className="p-6 space-y-3">
                 {activeScopes.length === 0 ? (
