@@ -29,6 +29,8 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
     const [currentDecoration, setCurrentDecoration] = useState<string>('default');
     const [decorationUrl, setDecorationUrl] = useState<string>('');
     const [decorationOffsetY, setDecorationOffsetY] = useState<string>('bottom');
+    const [debugOffsetY, setDebugOffsetY] = useState<string>('bottom');
+    const [showDebugger, setShowDebugger] = useState(false);
 
     useEffect(() => {
         // 初始化装饰
@@ -37,6 +39,7 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
         const decoration = navigationDecorationService.getDecorationById(decorationId);
         setDecorationUrl(decoration?.url || '');
         setDecorationOffsetY(decoration?.offsetY || 'bottom');
+        setDebugOffsetY(decoration?.offsetY || 'bottom');
 
         // 监听装饰变化
         const handleDecorationChange = (event: CustomEvent) => {
@@ -45,13 +48,34 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
             const decoration = navigationDecorationService.getDecorationById(decorationId);
             setDecorationUrl(decoration?.url || '');
             setDecorationOffsetY(decoration?.offsetY || 'bottom');
+            setDebugOffsetY(decoration?.offsetY || 'bottom');
         };
 
         window.addEventListener('navigationDecorationChange', handleDecorationChange as EventListener);
+        
+        // 注册全局调试函数
+        (window as any).enableNavDecoDebug = () => {
+            setShowDebugger(true);
+        };
+
+        (window as any).disableNavDecoDebug = () => {
+            setShowDebugger(false);
+        };
+
         return () => {
             window.removeEventListener('navigationDecorationChange', handleDecorationChange as EventListener);
+            delete (window as any).enableNavDecoDebug;
+            delete (window as any).disableNavDecoDebug;
         };
     }, []);
+
+    const handleDebugOffsetChange = (newOffset: string) => {
+        setDebugOffsetY(newOffset);
+    };
+
+    const handleCloseDebugger = () => {
+        setShowDebugger(false);
+    };
 
     if (!isVisible) return null;
 
@@ -59,24 +83,28 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
         ? 'bg-[#faf9f6]/80 backdrop-blur-md'
         : 'bg-white/80 backdrop-blur-md';
 
+    // 使用调试偏移值（如果正在调试）或默认偏移值
+    const activeOffsetY = debugOffsetY;
+
     return (
-        <div className="fixed bottom-0 left-0 w-full z-30">
-            {/* 装饰层 - 仅在非默认时显示 */}
-            {currentDecoration !== 'default' && decorationUrl && (
-                <div 
-                    className="absolute bottom-0 left-0 w-full h-40 md:h-48 pointer-events-none z-10"
-                    style={{
-                        backgroundImage: `url(${decorationUrl})`,
-                        backgroundRepeat: 'repeat-x',
-                        backgroundPosition: `center ${decorationOffsetY}`,
-                        backgroundSize: 'auto 80px',
-                        opacity: 0.6
-                    }}
-                />
-            )}
-            
-            {/* 导航栏 */}
-            <nav className={`relative h-12 md:h-16 box-content border-t border-stone-100 flex justify-around items-center pb-[env(safe-area-inset-bottom)] ${bgColor}`}>
+        <>
+            <div className="fixed bottom-0 left-0 w-full z-30">
+                {/* 装饰层 - 仅在非默认时显示 */}
+                {currentDecoration !== 'default' && decorationUrl && (
+                    <div 
+                        className="absolute bottom-0 left-0 w-full h-40 md:h-48 pointer-events-none z-10"
+                        style={{
+                            backgroundImage: `url(${decorationUrl})`,
+                            backgroundRepeat: 'repeat-x',
+                            backgroundPosition: `center ${activeOffsetY}`,
+                            backgroundSize: 'auto 80px',
+                            opacity: 0.6
+                        }}
+                    />
+                )}
+                
+                {/* 导航栏 */}
+                <nav className={`relative h-12 md:h-16 box-content border-t border-stone-100 flex justify-around items-center pb-[env(safe-area-inset-bottom)] ${bgColor}`}>
                 {NAV_ITEMS.map((item) => {
                     const isActive = currentView === item.view;
                     return (
@@ -93,5 +121,16 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
                 })}
             </nav>
         </div>
+
+        {/* 调试工具 */}
+        {showDebugger && currentDecoration !== 'default' && decorationUrl && (
+            <NavigationDecorationDebugger
+                currentDecorationId={currentDecoration}
+                currentOffset={decorationOffsetY}
+                onOffsetChange={handleDebugOffsetChange}
+                onClose={handleCloseDebugger}
+            />
+        )}
+        </>
     );
 };

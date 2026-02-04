@@ -4,7 +4,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { Check } from 'lucide-react';
+import { Check, Settings } from 'lucide-react';
 import { navigationDecorationService, NavigationDecorationOption } from '../services/navigationDecorationService';
 import { ToastType } from './Toast';
 
@@ -25,6 +25,15 @@ export const NavigationDecorationSelector: React.FC<NavigationDecorationSelector
         navigationDecorationService.setCurrentDecoration(decorationId);
         setCurrentDecoration(decorationId);
         onToast('success', '标题栏样式已更换');
+    };
+
+    const handleOpenDebugger = () => {
+        if (currentDecoration === 'default') {
+            onToast('info', '请先选择一个装饰样式');
+            return;
+        }
+        (window as any).enableNavDecoDebug?.();
+        onToast('success', '调试工具已开启');
     };
 
     const renderDecorationPreview = (decoration: NavigationDecorationOption) => {
@@ -57,13 +66,24 @@ export const NavigationDecorationSelector: React.FC<NavigationDecorationSelector
 
     return (
         <div className="bg-white rounded-2xl p-6 shadow-sm">
-            <div className="flex items-center gap-3 mb-4">
-                <div className="w-8 h-8 bg-green-50 rounded-lg flex items-center justify-center">
-                    <span className="text-green-600 text-lg">🎋</span>
+            <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 bg-green-50 rounded-lg flex items-center justify-center">
+                        <span className="text-green-600 text-lg">🎋</span>
+                    </div>
+                    <div>
+                        <h3 className="text-lg font-bold text-stone-800">导航栏样式</h3>
+                    </div>
                 </div>
-                <div>
-                    <h3 className="text-lg font-bold text-stone-800">导航栏样式</h3>
-                </div>
+                
+                {/* 调试按钮 */}
+                <button
+                    onClick={handleOpenDebugger}
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-stone-600 bg-stone-100 hover:bg-stone-200 rounded-lg transition-colors"
+                >
+                    <Settings size={14} />
+                    <span>调试</span>
+                </button>
             </div>
 
             {/* 装饰选项网格 */}

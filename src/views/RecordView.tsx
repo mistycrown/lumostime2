@@ -81,7 +81,7 @@ export const RecordView: React.FC<RecordViewProps> = ({ onStartActivity, categor
       {/* Left Sidebar - Categories */}
       {/* w-auto allows it to grow with text, max-w to prevent taking over too much space on tablets */}
       <div
-        className={`flex-shrink-0 flex flex-col overflow-y-auto pt-6 pb-20 md:pl-4 pl-1 pr-2 no-scrollbar z-0 transition-all duration-300 relative ${isSidebarOpen ? 'w-auto md:max-w-[14rem]' : 'w-16 items-center'}`}
+        className={`flex-shrink-0 flex flex-col overflow-y-auto pt-6 pb-20 md:pl-1 pl-1 pr-2 no-scrollbar z-0 transition-all duration-300 relative ${isSidebarOpen ? 'w-auto md:max-w-[14rem]' : 'w-16 items-center'}`}
       >
         <div className="flex-1 w-full">
           {categories.map((category) => {
