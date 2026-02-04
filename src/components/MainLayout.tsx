@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { RefreshCw, ChevronLeft, Settings as SettingsIcon, Settings2, Maximize2, Target, Tag, AudioWaveform, BookHeart } from 'lucide-react';
 import { AppView } from '../types';
 import { VIEW_TITLES, INITIAL_LOGS, INITIAL_TODOS, CATEGORIES, SCOPES, MOCK_TODO_CATEGORIES, DEFAULT_REVIEW_TEMPLATES, DEFAULT_CHECK_TEMPLATES } from '../constants';
@@ -9,6 +9,7 @@ import { useReview } from '../contexts/ReviewContext';
 import { useSettings } from '../contexts/SettingsContext';
 import { useToast } from '../contexts/ToastContext';
 import { SettingsView } from '../views/SettingsView';
+import { backgroundService } from '../services/backgroundService';
 
 interface MainLayoutProps {
     children: React.ReactNode;
@@ -92,7 +93,7 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
     };
 
     return (
-        <div className={`h-screen w-screen flex flex-col ${currentView === AppView.TIMELINE ? 'bg-white' : 'bg-[#fdfbf7]'} text-stone-800 overflow-hidden select-none font-serif relative pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]`}>
+        <div className={`h-screen w-screen flex flex-col text-stone-800 overflow-hidden select-none font-serif relative pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]`}>
 
             {/* Top Header Bar */}
             {!isSettingsOpen && (currentView !== AppView.TIMELINE || isDailyReviewOpen || isWeeklyReviewOpen || isMonthlyReviewOpen) && !isStatsFullScreen &&
@@ -103,7 +104,7 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
                 (currentView !== AppView.REVIEW || isDailyReviewOpen || isWeeklyReviewOpen || isMonthlyReviewOpen) && (
                     <header className={`flex items-center justify-between px-5 border-b border-stone-100 shrink-0 z-30 transition-all duration-300 ${isHeaderScrolled
                         ? 'h-12 bg-stone-50/90 backdrop-blur-md shadow-sm'
-                        : currentView === AppView.REVIEW ? 'h-14 bg-[#faf9f6]' : 'h-14 bg-[#fdfbf7]'
+                        : currentView === AppView.REVIEW ? 'h-14 bg-stone-50/30 backdrop-blur-sm' : 'h-14 bg-stone-50/30 backdrop-blur-sm'
                         }`}>
                         <div className="w-8 flex items-center">
                             {(currentView === AppView.TODO || currentView === AppView.RECORD) && !isDailyReviewOpen && !isMonthlyReviewOpen && !isWeeklyReviewOpen && (

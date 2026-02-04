@@ -1,6 +1,6 @@
 /**
  * @file backgroundService.ts
- * @description 背景图片管理服务，支持预设背景和自定义背景图片
+ * @description 背景图片管理服务，支持预设背景和自定义背景图片，直接操作DOM元素
  */
 
 export interface BackgroundOption {
@@ -52,6 +52,16 @@ const PRESET_BACKGROUNDS: BackgroundOption[] = [
 
 const STORAGE_KEY = 'lumos_custom_backgrounds';
 const CURRENT_BACKGROUND_KEY = 'lumos_current_background';
+const BACKGROUND_OPACITY_KEY = 'lumos_background_opacity';
+
+// 需要应用背景的页面元素ID
+const TARGET_ELEMENTS = [
+    'timeline-content',    // Timeline页面
+    'memoir-content',      // Memoir页面  
+    'scopes-content',      // Scopes页面
+    'tags-content',        // Tags页面
+    'chronicle-content'    // Chronicle页面
+];
 
 class BackgroundService {
     /**
@@ -143,14 +153,15 @@ class BackgroundService {
      * 设置当前背景
      */
     setCurrentBackground(backgroundId: string): void {
+        const currentId = this.getCurrentBackground();
+        if (currentId === backgroundId) {
+            return; // 如果是相同的背景，不触发更新
+        }
+        
         localStorage.setItem(CURRENT_BACKGROUND_KEY, backgroundId);
         
-        // 触发背景变更事件
-        if (typeof window !== 'undefined') {
-            window.dispatchEvent(new CustomEvent('backgroundChanged', {
-                detail: { backgroundId }
-            }));
-        }
+        // 立即应用背景到所有目标元素
+        this.applyBackgroundToElements();
     }
 
     /**
@@ -161,8 +172,31 @@ class BackgroundService {
     }
 
     /**
-     * 获取当前背景选项
+     * 设置背景透明度
      */
+    setBackgroundOpacity(opacity: number): void {
+        // 确保透明度在0-1之间
+        const clampedOpacity = Math.max(0, Math.min(1, opacity));
+        const currentOpacity = this.getBackgroundOpacity();
+        
+        if (Math.abs(currentOpacity - clampedOpacity) < 0.01) {
+            return; // 如果透明度变化很小，不触发更新
+        }
+        
+        localStorage.setItem(BACKGROUND_OPACITY_KEY, clampedOpacity.toString());
+        
+        // 立即应用透明度到所有目标元素
+        this.applyBackgroundToElements();
+    }
+
+    /**
+     * 获取背景透明度
+     */
+    getBackgroundOpacity(): number {
+        const stored = localStorage.getItem(BACKGROUND_OPACITY_KEY);
+        return stored ? parseFloat(stored) : 0.8; // 默认透明度为0.8
+    }
+
     getCurrentBackgroundOption(): BackgroundOption | null {
         const currentId = this.getCurrentBackground();
         const allBackgrounds = this.getAllBackgrounds();
@@ -170,46 +204,76 @@ class BackgroundService {
     }
 
     /**
-     * 应用背景到页面
+     * 直接应用背景到目标DOM元素
      */
-    applyBackground(backgroundId?: string): void {
-        const id = backgroundId || this.getCurrentBackground();
-        const background = this.getAllBackgrounds().find(bg => bg.id === id);
+    applyBackgroundToElements(): void {
+        const background = this.getCurrentBackgroundOption();
+        const opacity = this.getBackgroundOpacity();
         
-        if (!background) return;
-
-        const body = document.body;
+        console.log('🖼️ Applying background to elements:', { background: background?.id, opacity });
         
-        if (background.id === 'default') {
-            // 默认背景
-            body.style.background = '';
-            body.style.backgroundImage = '';
-        } else if (background.url.startsWith('linear-gradient')) {
-            // 渐变背景
-            body.style.background = background.url;
-            body.style.backgroundImage = '';
-        } else {
-            // 图片背景
-            body.style.background = '';
-            body.style.backgroundImage = `url(${background.url})`;
-            body.style.backgroundSize = 'cover';
-            body.style.backgroundPosition = 'center';
-            body.style.backgroundRepeat = 'no-repeat';
-            body.style.backgroundAttachment = 'fixed';
-        }
+        TARGET_ELEMENTS.forEach(elementId => {
+            const element = document.getElementById(elementId);
+            if (!element) {
+                console.log(`🖼️ Element not found: ${elementId}`);
+                return;
+            }
+            
+            // 清除之前的背景样式
+            element.style.removeProperty('background');
+            element.style.removeProperty('background-image');
+            element.style.removeProperty('background-size');
+            element.style.removeProperty('background-position');
+            element.style.removeProperty('background-repeat');
+            element.classList.remove('bg-with-gradient', 'bg-with-image');
+            
+            if (!background || background.id === 'default') {
+                console.log(`🖼️ Removing background from ${elementId}`);
+                return;
+            }
+            
+            if (background.url.startsWith('linear-gradient')) {
+                // 渐变背景
+                console.log(`🖼️ Applying gradient background to ${elementId}`);
+                element.style.background = background.url;
+                element.style.opacity = opacity.toString();
+            } else {
+                // 图片背景
+                console.log(`🖼️ Applying image background to ${elementId}`);
+                element.style.backgroundImage = `url(${background.url})`;
+                element.style.backgroundSize = 'cover';
+                element.style.backgroundPosition = 'center';
+                element.style.backgroundRepeat = 'no-repeat';
+                element.style.opacity = opacity.toString();
+            }
+        });
     }
 
     /**
      * 初始化背景服务
      */
     init(): void {
-        // 应用当前背景
-        this.applyBackground();
+        const currentBackground = this.getCurrentBackground();
+        console.log('🖼️ Background service initializing with background:', currentBackground);
         
-        // 监听背景变更事件
-        if (typeof window !== 'undefined') {
-            window.addEventListener('backgroundChanged', (event: any) => {
-                this.applyBackground(event.detail.backgroundId);
+        // 延迟执行确保DOM已经准备好
+        setTimeout(() => {
+            this.applyBackgroundToElements();
+            console.log('🖼️ Background service initialized and applied');
+        }, 500);
+        
+        // 监听页面变化，重新应用背景
+        const observer = new MutationObserver(() => {
+            setTimeout(() => {
+                this.applyBackgroundToElements();
+            }, 100);
+        });
+        
+        // 观察body的子元素变化
+        if (document.body) {
+            observer.observe(document.body, {
+                childList: true,
+                subtree: true
             });
         }
     }

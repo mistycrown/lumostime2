@@ -21,6 +21,7 @@ import { ImagePreviewModal } from '../components/ImagePreviewModal';
 import { ConfirmModal } from '../components/ConfirmModal';
 import { ReactionPicker, ReactionList } from '../components/ReactionComponents';
 
+
 // Image Thumbnail Component
 const TimelineImage: React.FC<{ filename: string, className?: string, useThumbnail?: boolean, refreshKey?: number }> = ({ filename, className = "w-16 h-16", useThumbnail = false, refreshKey = 0 }) => {
     const [src, setSrc] = useState<string>('');
@@ -724,7 +725,10 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ logs, todos, scopes,
             </div>
 
             {/* Timeline List */}
-            <div className="flex-1 overflow-y-auto px-7 py-6 pb-24 no-scrollbar">
+            <div 
+                className="flex-1 overflow-y-auto px-7 py-6 pb-24 no-scrollbar"
+                id="timeline-content"
+            >
                 <div className="relative border-l border-stone-300 ml-[70px] space-y-6">
 
                     {dayTimeline.map((item) => {

@@ -2517,7 +2517,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
                     <span className="text-stone-800 font-bold text-lg">数据导出导入</span>
                 </div>
 
-                <div className="p-4 space-y-4 overflow-y-auto pb-40">
+                <div className="flex-1 overflow-y-auto p-4 space-y-4 pb-40">
                     <div className="bg-white rounded-2xl p-6 shadow-sm space-y-4">
                         <div className="flex items-center gap-3 text-stone-600 mb-2">
                             <Database size={24} />

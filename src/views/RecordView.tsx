@@ -10,6 +10,7 @@
 import React, { useState } from 'react';
 import { Category, Activity } from '../types';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { useBackgroundStyle } from '../hooks/useBackgroundStyle';
 
 interface RecordViewProps {
   onStartActivity: (activity: Activity, categoryId: string) => void;
@@ -18,6 +19,7 @@ interface RecordViewProps {
 
 export const RecordView: React.FC<RecordViewProps> = ({ onStartActivity, categories }) => {
   const [selectedCategoryId, setSelectedCategoryId] = useState<string>('recent');
+  const backgroundStyle = useBackgroundStyle();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   // Fallback to first category if selected one is not found (e.g. was deleted)
@@ -79,7 +81,10 @@ export const RecordView: React.FC<RecordViewProps> = ({ onStartActivity, categor
       </div>
 
       {/* Right Content - Activity Grid */}
-      <div className="flex-1 overflow-hidden flex flex-col p-5 md:p-10 bg-white md:bg-transparent rounded-tl-[2rem] md:rounded-none shadow-[-5px_0_20px_rgba(0,0,0,0.02)] md:shadow-none z-0 ml-[-10px] md:ml-0">
+      <div 
+        className={`flex-1 overflow-hidden flex flex-col p-5 md:p-10 bg-white md:bg-transparent rounded-tl-[2rem] md:rounded-none shadow-[-5px_0_20px_rgba(0,0,0,0.02)] md:shadow-none z-0 ml-[-10px] md:ml-0 ${backgroundStyle.className}`}
+        style={backgroundStyle.style}
+      >
 
         {/* Header (Category Title) */}
         <div className="mb-8 md:mb-10 flex items-center gap-4 mt-2 md:mt-0">

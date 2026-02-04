@@ -18,6 +18,7 @@ import { useCategoryScope } from '../contexts/CategoryScopeContext';
 import { useData } from '../contexts/DataContext';
 import { Comment as GlobalComment, Scope } from '../types';
 
+
 interface JournalViewProps {
     dailyReviews: DailyReview[];
     weeklyReviews: WeeklyReview[];   // Add WeeklyReview
@@ -564,7 +565,10 @@ export const JournalView: React.FC<JournalViewProps> = ({
                 ref={scrollContainerRef}
                 className="flex-1 overflow-y-auto overflow-x-hidden pb-safe no-scrollbar font-sans selection:bg-gray-200 selection:text-black"
             >
-                <main className="max-w-2xl mx-auto pl-4 pr-[25px] pt-[10px] pb-24 min-h-[80vh] w-full">
+                <main 
+                    className="max-w-2xl mx-auto pl-4 pr-[25px] pt-[10px] pb-24 min-h-[80vh] w-full"
+                    id="memoir-content"
+                >
 
                     {/* Intro / Stats Area / Month Selector */}
                     <div className="mb-12 pl-2 pr-0 relative">
