@@ -139,20 +139,55 @@ public class IconPlugin extends Plugin {
             PackageManager packageManager = getContext().getPackageManager();
             String packageName = getContext().getPackageName();
             
-            // 禁用所有图标别名
-            for (String availableIcon : AVAILABLE_ICONS) {
-                String activityAlias = getActivityAlias(availableIcon);
-                ComponentName componentName = new ComponentName(packageName, activityAlias);
-                
-                int newState = availableIcon.equals(iconId) ? 
-                    PackageManager.COMPONENT_ENABLED_STATE_ENABLED : 
-                    PackageManager.COMPONENT_ENABLED_STATE_DISABLED;
-                    
+            // 1. 处理主 MainActivity（默认图标）
+            ComponentName mainActivity = new ComponentName(packageName, 
+                "com.mistycrown.lumostime.MainActivity");
+            
+            if (iconId.equals("default")) {
+                // 选择默认图标：启用主 Activity，禁用所有 alias
                 packageManager.setComponentEnabledSetting(
-                    componentName,
-                    newState,
+                    mainActivity,
+                    PackageManager.COMPONENT_ENABLED_STATE_ENABLED,
                     PackageManager.DONT_KILL_APP
                 );
+                
+                // 禁用所有 alias
+                for (String availableIcon : AVAILABLE_ICONS) {
+                    if (availableIcon.equals("default")) continue;
+                    
+                    String activityAlias = getActivityAlias(availableIcon);
+                    ComponentName componentName = new ComponentName(packageName, activityAlias);
+                    packageManager.setComponentEnabledSetting(
+                        componentName,
+                        PackageManager.COMPONENT_ENABLED_STATE_DISABLED,
+                        PackageManager.DONT_KILL_APP
+                    );
+                }
+            } else {
+                // 选择其他图标：禁用主 Activity，启用对应的 alias
+                packageManager.setComponentEnabledSetting(
+                    mainActivity,
+                    PackageManager.COMPONENT_ENABLED_STATE_DISABLED,
+                    PackageManager.DONT_KILL_APP
+                );
+                
+                // 处理所有 alias
+                for (String availableIcon : AVAILABLE_ICONS) {
+                    if (availableIcon.equals("default")) continue;
+                    
+                    String activityAlias = getActivityAlias(availableIcon);
+                    ComponentName componentName = new ComponentName(packageName, activityAlias);
+                    
+                    int newState = availableIcon.equals(iconId) ? 
+                        PackageManager.COMPONENT_ENABLED_STATE_ENABLED : 
+                        PackageManager.COMPONENT_ENABLED_STATE_DISABLED;
+                        
+                    packageManager.setComponentEnabledSetting(
+                        componentName,
+                        newState,
+                        PackageManager.DONT_KILL_APP
+                    );
+                }
             }
             
             // 保存当前图标设置
