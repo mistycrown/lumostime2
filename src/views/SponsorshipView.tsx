@@ -74,65 +74,53 @@ const TimePalSettingsCard: React.FC<{ categories: Category[] }> = ({ categories 
                 <div className="w-8 h-8 bg-purple-50 rounded-lg flex items-center justify-center">
                     <span className="text-purple-600 text-lg">🐾</span>
                 </div>
-                <div>
-                    <h3 className="text-lg font-bold text-stone-800">时光小友</h3>
-                    <p className="text-xs text-stone-500 mt-0.5">选择你的专属小伙伴</p>
-                </div>
+                <h3 className="text-lg font-bold text-stone-800">时光小友</h3>
             </div>
 
-            {/* 选择小动物 */}
-            <div>
-                <p className="text-sm text-stone-500 mb-4 leading-relaxed">
-                    选择一个陪伴你的时光小友
-                </p>
+            {/* 选择小动物 - 使用与背景选择器相同的格子大小 */}
+            <div className="flex flex-wrap gap-2">
+                {TIMEPAL_OPTIONS.map(option => {
+                    const isSelected = selectedType === option.type;
+                    return (
+                        <button
+                            key={option.type}
+                            onClick={() => handleSelectType(option.type)}
+                            className={`relative w-16 h-20 rounded-lg border-2 transition-all overflow-hidden ${
+                                isSelected
+                                    ? 'border-stone-400 ring-2 ring-stone-200'
+                                    : 'border-stone-200 hover:border-stone-300'
+                            }`}
+                        >
+                            {/* 预览图 */}
+                            <div className="w-full h-full flex items-center justify-center p-1">
+                                <img
+                                    src={option.preview}
+                                    alt={option.name}
+                                    className="w-full h-full object-contain"
+                                    onError={(e) => {
+                                        const fallbackEmojis: Record<TimePalType, string> = {
+                                            cat: '🐱',
+                                            dog: '🐶',
+                                            rabbit: '🐰'
+                                        };
+                                        e.currentTarget.style.display = 'none';
+                                        const parent = e.currentTarget.parentElement;
+                                        if (parent) {
+                                            parent.innerHTML = `<span class="text-3xl">${fallbackEmojis[option.type]}</span>`;
+                                        }
+                                    }}
+                                />
+                            </div>
 
-                <div className="grid grid-cols-3 gap-4">
-                    {TIMEPAL_OPTIONS.map(option => {
-                        const isSelected = selectedType === option.type;
-                        return (
-                            <button
-                                key={option.type}
-                                onClick={() => handleSelectType(option.type)}
-                                className={`
-                                    relative flex flex-col items-center gap-3 p-4 rounded-xl border-2 transition-all
-                                    ${isSelected
-                                        ? 'border-amber-400 bg-amber-50/50'
-                                        : 'border-stone-200 bg-white hover:border-stone-300'}
-                                `}
-                            >
-                                {/* 选中标记 */}
-                                {isSelected && (
-                                    <div className="absolute top-2 right-2 w-5 h-5 bg-amber-400 rounded-full flex items-center justify-center">
-                                        <span className="text-white text-xs">✓</span>
-                                    </div>
-                                )}
-
-                                {/* 预览图 */}
-                                <div className="w-20 h-20 rounded-xl overflow-hidden flex items-center justify-center">
-                                    <img
-                                        src={option.preview}
-                                        alt={option.name}
-                                        className="w-full h-full object-cover"
-                                        onError={(e) => {
-                                            const fallbackEmojis: Record<TimePalType, string> = {
-                                                cat: '🐱',
-                                                dog: '🐶',
-                                                rabbit: '🐰'
-                                            };
-                                            e.currentTarget.style.display = 'none';
-                                            e.currentTarget.parentElement!.innerHTML = `<span class="text-5xl">${fallbackEmojis[option.type]}</span>`;
-                                        }}
-                                    />
+                            {/* 选中标记 - 黑色对勾 */}
+                            {isSelected && (
+                                <div className="absolute top-1 right-1 w-5 h-5 bg-stone-800 rounded-full flex items-center justify-center shadow-lg">
+                                    <Check size={12} className="text-white" />
                                 </div>
-
-                                {/* 名称 */}
-                                <span className={`text-sm font-medium ${isSelected ? 'text-amber-600' : 'text-stone-600'}`}>
-                                    {option.name}
-                                </span>
-                            </button>
-                        );
-                    })}
-                </div>
+                            )}
+                        </button>
+                    );
+                })}
             </div>
 
             {/* 统计时长设置 */}
@@ -257,11 +245,6 @@ const TimePalSettingsCard: React.FC<{ categories: Category[] }> = ({ categories 
                         )}
                     </>
                 )}
-            </div>
-
-            {/* 说明文字 */}
-            <div className="text-center text-xs text-stone-400">
-                时光小友会根据你的专注时长显示不同形态
             </div>
         </div>
     );

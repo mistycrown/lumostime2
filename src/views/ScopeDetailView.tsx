@@ -29,6 +29,7 @@ interface ScopeDetailViewProps {
     onEditLog?: (log: Log) => void;
     onEditGoal?: (goal: Goal) => void;
     onEditTodo?: (todo: TodoItem) => void;
+    onToggleTodo?: (id: string) => void;
     onDeleteGoal?: (goalId: string) => void;
     onArchiveGoal?: (goalId: string) => void;
     onAddGoal?: () => void;
@@ -45,6 +46,7 @@ export const ScopeDetailView: React.FC<ScopeDetailViewProps> = ({
     onEditLog,
     onEditGoal,
     onEditTodo,
+    onToggleTodo,
     onDeleteGoal,
     onArchiveGoal,
     onAddGoal
@@ -259,10 +261,18 @@ export const ScopeDetailView: React.FC<ScopeDetailViewProps> = ({
                                                 onClick={() => onEditTodo?.(todo)}
                                                 className="group flex items-center gap-3 py-2 border-b border-stone-100 last:border-0 hover:bg-stone-50 md:-mx-2 md:px-2 transition-colors cursor-pointer"
                                             >
-                                                <div className={`w-4 h-4 shrink-0 rounded-[4px] border-2 flex items-center justify-center transition-colors ${todo.isCompleted ? 'bg-stone-900 border-stone-900' : 'border-stone-300 group-hover:border-stone-400'
-                                                    }`}>
-                                                    {todo.isCompleted && <span className="text-white text-[10px]">✓</span>}
-                                                </div>
+                                                <button 
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        onToggleTodo?.(todo.id);
+                                                    }} 
+                                                    className="shrink-0 transition-colors"
+                                                >
+                                                    <div className={`w-4 h-4 shrink-0 rounded-[4px] border-2 flex items-center justify-center transition-colors ${todo.isCompleted ? 'bg-stone-900 border-stone-900' : 'border-stone-300 group-hover:border-stone-400'
+                                                        }`}>
+                                                        {todo.isCompleted && <span className="text-white text-[10px]">✓</span>}
+                                                    </div>
+                                                </button>
                                                 <span className={`flex-1 font-medium truncate min-w-0 ${todo.isCompleted ? 'line-through text-stone-300' : 'text-stone-700'}`}>
                                                     {todo.title}
                                                 </span>

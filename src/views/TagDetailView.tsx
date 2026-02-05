@@ -609,7 +609,13 @@ export const TagDetailView: React.FC<TagDetailViewProps> = ({ tagId, logs, todos
                                  <div key={todo.id}
                                     onClick={() => onEditTodo?.(todo)}
                                     className="group flex items-center gap-3 py-2 border-b border-stone-100 last:border-0 hover:bg-stone-50 md:-mx-2 md:px-2 transition-colors cursor-pointer">
-                                    <button onClick={() => onToggleTodo(todo.id)} className="shrink-0 transition-colors">
+                                    <button 
+                                       onClick={(e) => {
+                                          e.stopPropagation();
+                                          onToggleTodo(todo.id);
+                                       }} 
+                                       className="shrink-0 transition-colors"
+                                    >
                                        <div className={`w-4 h-4 shrink-0 rounded-[4px] border-2 flex items-center justify-center transition-colors ${todo.isCompleted ? 'bg-stone-900 border-stone-900' : 'border-stone-300 group-hover:border-stone-400'}`}>
                                           {todo.isCompleted && <span className="text-white text-[10px]">✓</span>}
                                        </div>

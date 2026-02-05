@@ -320,6 +320,7 @@ export const AppRoutes: React.FC<AppRoutesProps> = ({
                         onUpdateCategory={handleUpdateCategory}
                         onEditLog={openEditModal}
                         onEditTodo={openEditTodoModal}
+                        onToggleTodo={handleToggleTodo}
                         scopes={scopes}
                     />
                 );
@@ -382,6 +383,7 @@ export const AppRoutes: React.FC<AppRoutesProps> = ({
                         onArchiveGoal={handleArchiveGoal}
                         onAddGoal={() => handleAddGoal(selectedScope.id)}
                         onEditTodo={openEditTodoModal}
+                        onToggleTodo={handleToggleTodo}
                     />
                 );
             }
