@@ -9,27 +9,37 @@ export interface NavigationDecorationOption {
     url: string;
     thumbnail?: string;
     offsetY?: string; // 垂直偏移值，如 '0px', '-10px', '50%' 等
+    offsetX?: string; // 水平偏移值，默认为 'center'
+    scale?: number;   // 缩放比例，默认 1 (100%)
+    opacity?: number; // 透明度，默认 0.6
 }
 
 const STORAGE_KEY = 'navigation_decoration';
-const CUSTOM_OFFSET_KEY = 'navigation_decoration_custom_offsets';
+const CUSTOM_SETTINGS_KEY = 'navigation_decoration_custom_settings';
+
+interface NavigationDecorationSettings {
+    offsetY?: string;
+    offsetX?: string;
+    scale?: number;
+    opacity?: number;
+}
 
 class NavigationDecorationService {
     private decorations: NavigationDecorationOption[] = [
-        { id: 'default', name: '默认', url: '', offsetY: 'bottom' },
-        { id: 'distant_mountain', name: '远山', url: '/dchh/distant_mountain.png', offsetY: '71px' },
-        { id: 'little_prince', name: '小王子', url: '/dchh/little_prince.png', offsetY: '71px' },
-        { id: 'book', name: '书本', url: '/dchh/book.png', offsetY: '71px' },
-        { id: 'cloud', name: '云朵', url: '/dchh/cloud.png', offsetY: '71px' },
-        { id: 'coffee', name: '咖啡', url: '/dchh/coffee.png', offsetY: '71px' },
-        { id: 'fish', name: '鱼', url: '/dchh/fish.png', offsetY: '71px' },
-        { id: 'flower', name: '花朵', url: '/dchh/flower.png', offsetY: '71px' },
-        { id: 'grass', name: '草地', url: '/dchh/grass.png', offsetY: '71px' },
-        { id: 'ink', name: '水墨', url: '/dchh/ink.png', offsetY: '71px' },
-        { id: 'light', name: '灯光', url: '/dchh/light.png', offsetY: '71px' },
-        { id: 'mushroom', name: '蘑菇', url: '/dchh/mushroom.png', offsetY: '71px' },
-        { id: 'plant', name: '植物1', url: '/dchh/plant.png', offsetY: '71px' },
-        { id: 'plant2', name: '植物2', url: '/dchh/plant2.png', offsetY: '71px' },
+        { id: 'default', name: '默认', url: '', offsetY: 'bottom', offsetX: 'center', scale: 1, opacity: 0.6 },
+        { id: 'distant_mountain', name: '远山', url: '/dchh/distant_mountain.png', offsetY: '71px', offsetX: 'center', scale: 1, opacity: 0.6 },
+        { id: 'little_prince', name: '小王子', url: '/dchh/little_prince.png', offsetY: '71px', offsetX: 'center', scale: 1, opacity: 0.6 },
+        { id: 'book', name: '书本', url: '/dchh/book.png', offsetY: '71px', offsetX: 'center', scale: 1, opacity: 0.6 },
+        { id: 'cloud', name: '云朵', url: '/dchh/cloud.png', offsetY: '71px', offsetX: 'center', scale: 1, opacity: 0.6 },
+        { id: 'coffee', name: '咖啡', url: '/dchh/coffee.png', offsetY: '71px', offsetX: 'center', scale: 1, opacity: 0.6 },
+        { id: 'fish', name: '鱼', url: '/dchh/fish.png', offsetY: '71px', offsetX: 'center', scale: 1, opacity: 0.6 },
+        { id: 'flower', name: '花朵', url: '/dchh/flower.png', offsetY: '71px', offsetX: 'center', scale: 1, opacity: 0.6 },
+        { id: 'grass', name: '草地', url: '/dchh/grass.png', offsetY: '71px', offsetX: 'center', scale: 1, opacity: 0.6 },
+        { id: 'ink', name: '水墨', url: '/dchh/ink.png', offsetY: '71px', offsetX: 'center', scale: 1, opacity: 0.6 },
+        { id: 'light', name: '灯光', url: '/dchh/light.png', offsetY: '71px', offsetX: 'center', scale: 1, opacity: 0.6 },
+        { id: 'mushroom', name: '蘑菇', url: '/dchh/mushroom.png', offsetY: '71px', offsetX: 'center', scale: 1, opacity: 0.6 },
+        { id: 'plant1', name: '植物1', url: '/dchh/plant.png', offsetY: '71px', offsetX: 'center', scale: 1, opacity: 0.6 },
+        { id: 'plant2', name: '植物2', url: '/dchh/plant2.png', offsetY: '71px', offsetX: 'center', scale: 1, opacity: 0.6 },
     ];
 
     getAllDecorations(): NavigationDecorationOption[] {
@@ -52,29 +62,27 @@ class NavigationDecorationService {
         const decoration = this.decorations.find(d => d.id === id);
         if (!decoration) return undefined;
 
-        // 检查是否有自定义偏移值
-        const customOffsets = this.getCustomOffsets();
-        if (customOffsets[id]) {
+        // 检查是否有自定义设置
+        const customSettings = this.getCustomSettings();
+        if (customSettings[id]) {
             return {
                 ...decoration,
-                offsetY: customOffsets[id]
+                ...customSettings[id]
             };
         }
 
         return decoration;
     }
 
-    // 获取所有自定义偏移值
-    getCustomOffsets(): Record<string, string> {
-        const stored = localStorage.getItem(CUSTOM_OFFSET_KEY);
-        return stored ? JSON.parse(stored) : {};
-    }
-
-    // 保存自定义偏移值
-    saveCustomOffset(decorationId: string, offsetY: string): void {
-        const customOffsets = this.getCustomOffsets();
-        customOffsets[decorationId] = offsetY;
-        localStorage.setItem(CUSTOM_OFFSET_KEY, JSON.stringify(customOffsets));
+    // 保存自定义设置
+    saveCustomSettings(decorationId: string, settings: NavigationDecorationSettings): void {
+        const customSettings = this.getCustomSettings();
+        // Merge with existing settings
+        customSettings[decorationId] = {
+            ...customSettings[decorationId],
+            ...settings
+        };
+        localStorage.setItem(CUSTOM_SETTINGS_KEY, JSON.stringify(customSettings));
 
         // 触发更新事件
         window.dispatchEvent(new CustomEvent('navigationDecorationChange', {
@@ -82,11 +90,18 @@ class NavigationDecorationService {
         }));
     }
 
+    // 获取所有自定义设置
+    getCustomSettings(): Record<string, NavigationDecorationSettings> {
+        const stored = localStorage.getItem(CUSTOM_SETTINGS_KEY);
+        // Fallback backward compatibility for older 'custom_offsets' key if needed, or just ignore
+        return stored ? JSON.parse(stored) : {};
+    }
+
     // 获取特定装饰的偏移值（优先使用自定义值）
     getOffsetY(decorationId: string): string {
-        const customOffsets = this.getCustomOffsets();
-        if (customOffsets[decorationId]) {
-            return customOffsets[decorationId];
+        const customSettings = this.getCustomSettings();
+        if (customSettings[decorationId]?.offsetY) {
+            return customSettings[decorationId].offsetY!;
         }
 
         const decoration = this.decorations.find(d => d.id === decorationId);
