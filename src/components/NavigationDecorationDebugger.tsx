@@ -22,7 +22,7 @@ export const NavigationDecorationDebugger: React.FC<NavigationDecorationDebugger
 }) => {
     // Current settings state
     const [offsetY, setOffsetY] = useState(0);
-    const [offsetX, setOffsetX] = useState(50); // % default
+    const [offsetX, setOffsetX] = useState(0); // px default (改为像素)
     const [scale, setScale] = useState(100); // % default
     const [opacity, setOpacity] = useState(60); // % default (0.6 * 100)
 
@@ -45,15 +45,20 @@ export const NavigationDecorationDebugger: React.FC<NavigationDecorationDebugger
             }
             setOffsetY(yVal);
 
-            // Parse Offset X
-            let xVal = 50;
+            // Parse Offset X - 改为像素
+            let xVal = 0;
             if (deco.offsetX === 'left') xVal = 0;
-            else if (deco.offsetX === 'right') xVal = 100;
-            else if (deco.offsetX === 'center') xVal = 50;
+            else if (deco.offsetX === 'right') xVal = 100; // 暂时保留，但会转换为px
+            else if (deco.offsetX === 'center') xVal = 0;
             else if (deco.offsetX) {
-                // assume % for X mostly
-                const match = deco.offsetX.match(/^(-?\d+)%$/);
-                if (match) xVal = parseInt(match[1]);
+                // 尝试解析像素值
+                const pxMatch = deco.offsetX.match(/^(-?\d+)px$/);
+                if (pxMatch) {
+                    xVal = parseInt(pxMatch[1]);
+                } else {
+                    // 如果是百分比，转换为0（居中）
+                    xVal = 0;
+                }
             }
             setOffsetX(xVal);
 
@@ -67,7 +72,7 @@ export const NavigationDecorationDebugger: React.FC<NavigationDecorationDebugger
     useEffect(() => {
         // Construct styles
         const newOffsetY = offsetY === 0 ? 'bottom' : `${offsetY}px`;
-        const newOffsetX = `${offsetX}%`;
+        const newOffsetX = `${offsetX}px`; // 改为像素
         const newScale = scale / 100;
         const newOpacity = opacity / 100;
 
@@ -102,7 +107,7 @@ export const NavigationDecorationDebugger: React.FC<NavigationDecorationDebugger
     const handleSave = () => {
         const settings = {
             offsetY: offsetY === 0 ? 'bottom' : `${offsetY}px`,
-            offsetX: `${offsetX}%`,
+            offsetX: `${offsetX}px`, // 改为像素
             scale: scale / 100,
             opacity: opacity / 100
         };
@@ -133,14 +138,14 @@ export const NavigationDecorationDebugger: React.FC<NavigationDecorationDebugger
     const handleReset = () => {
         // 恢复默认值
         setOffsetY(0);
-        setOffsetX(50);
+        setOffsetX(0); // 改为0px
         setScale(100);
         setOpacity(60);
         
         // 清除保存的自定义设置
         navigationDecorationService.saveCustomSettings(activeId, {
             offsetY: 'bottom',
-            offsetX: '50%',
+            offsetX: '0px', // 改为像素
             scale: 1,
             opacity: 0.6
         });
@@ -204,13 +209,13 @@ export const NavigationDecorationDebugger: React.FC<NavigationDecorationDebugger
                 <div className="space-y-2">
                     <div className="flex justify-between text-[11px] text-stone-500 mb-1">
                         <span className="flex items-center gap-1 font-medium"><Move size={11} /> 水平位置</span>
-                        <span className="font-mono font-bold text-stone-700">{offsetX}%</span>
+                        <span className="font-mono font-bold text-stone-700">{offsetX}px</span>
                     </div>
                     <div className="grid grid-cols-4 gap-1.5">
-                        <button onClick={() => setOffsetX(v => Math.max(-100, v - 5))} className="bg-stone-100 hover:bg-stone-200 rounded py-1.5 text-xs font-medium text-stone-600 transition-colors">-5</button>
-                        <button onClick={() => setOffsetX(v => Math.max(-100, v - 1))} className="bg-stone-100 hover:bg-stone-200 rounded py-1.5 text-xs font-medium text-stone-600 transition-colors">-1</button>
-                        <button onClick={() => setOffsetX(v => Math.min(200, v + 1))} className="bg-stone-100 hover:bg-stone-200 rounded py-1.5 text-xs font-medium text-stone-600 transition-colors">+1</button>
-                        <button onClick={() => setOffsetX(v => Math.min(200, v + 5))} className="bg-stone-100 hover:bg-stone-200 rounded py-1.5 text-xs font-medium text-stone-600 transition-colors">+5</button>
+                        <button onClick={() => setOffsetX(v => v - 5)} className="bg-stone-100 hover:bg-stone-200 rounded py-1.5 text-xs font-medium text-stone-600 transition-colors">-5</button>
+                        <button onClick={() => setOffsetX(v => v - 1)} className="bg-stone-100 hover:bg-stone-200 rounded py-1.5 text-xs font-medium text-stone-600 transition-colors">-1</button>
+                        <button onClick={() => setOffsetX(v => v + 1)} className="bg-stone-100 hover:bg-stone-200 rounded py-1.5 text-xs font-medium text-stone-600 transition-colors">+1</button>
+                        <button onClick={() => setOffsetX(v => v + 5)} className="bg-stone-100 hover:bg-stone-200 rounded py-1.5 text-xs font-medium text-stone-600 transition-colors">+5</button>
                     </div>
                 </div>
 

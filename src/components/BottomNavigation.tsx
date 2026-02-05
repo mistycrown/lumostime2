@@ -32,7 +32,7 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
     const [decorationUrl, setDecorationUrl] = useState<string>('');
     const [settings, setSettings] = useState({
         offsetY: 'bottom',
-        offsetX: 'center',
+        offsetX: '0px',
         scale: 1,
         opacity: 0.6
     });
@@ -46,7 +46,7 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
 
             const baseSettings = {
                 offsetY: decoration?.offsetY || 'bottom',
-                offsetX: decoration?.offsetX || 'center',
+                offsetX: decoration?.offsetX || '0px',
                 scale: decoration?.scale || 1,
                 opacity: decoration?.opacity ?? 0.6
             };

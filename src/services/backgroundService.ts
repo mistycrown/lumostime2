@@ -46,6 +46,13 @@ const PRESET_BACKGROUNDS: BackgroundOption[] = [
         url: '/background/green.webp',
         thumbnail: '/background/green.webp',
     },
+    {
+        id: 'green2',
+        name: '绿意2',
+        type: 'preset',
+        url: '/background/green2.png',
+        thumbnail: '/background/green2.png',
+    },
 ];
 
 const STORAGE_KEY = 'lumos_custom_backgrounds';

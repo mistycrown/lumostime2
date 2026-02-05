@@ -121,20 +121,14 @@ export const TimePalCard: React.FC<TimePalCardProps> = ({ logs, currentDate, cat
         // 计算总专注时长（已完成的记录）
         let totalSeconds = 0;
         dayLogs.forEach(log => {
-            const category = categories.find(c => c.id === log.categoryId);
-            const activity = category?.activities.find(a => a.id === log.activityId);
-            
             // 如果启用了筛选，只统计选中的标签
             if (isFilterEnabled && filterActivityIds.length > 0) {
                 if (filterActivityIds.includes(log.activityId)) {
                     totalSeconds += log.duration;
                 }
             } else {
-                // 否则统计所有启用了专注度追踪的活动
-                const isFocusEnabled = activity?.enableFocusScore ?? category?.enableFocusScore ?? false;
-                if (isFocusEnabled) {
-                    totalSeconds += log.duration;
-                }
+                // 如果关闭限定标签功能，统计所有已记录的时间
+                totalSeconds += log.duration;
             }
         });
 
@@ -143,16 +137,13 @@ export const TimePalCard: React.FC<TimePalCardProps> = ({ logs, currentDate, cat
             activeSessions.forEach(session => {
                 // 检查会话是否在当天
                 if (session.startTime >= startOfDay.getTime() && session.startTime <= endOfDay.getTime()) {
-                    const category = categories.find(c => c.id === session.categoryId);
-                    const activity = category?.activities.find(a => a.id === session.activityId);
-                    
                     // 应用相同的筛选逻辑
                     let shouldCount = false;
                     if (isFilterEnabled && filterActivityIds.length > 0) {
                         shouldCount = filterActivityIds.includes(session.activityId);
                     } else {
-                        const isFocusEnabled = activity?.enableFocusScore ?? category?.enableFocusScore ?? false;
-                        shouldCount = isFocusEnabled;
+                        // 如果关闭限定标签功能，统计所有会话
+                        shouldCount = true;
                     }
                     
                     if (shouldCount) {
@@ -194,7 +185,7 @@ export const TimePalCard: React.FC<TimePalCardProps> = ({ logs, currentDate, cat
 
     return (
         <div className="mb-4">
-            <div className="bg-gradient-to-br from-white to-stone-50 rounded-2xl border border-stone-200 p-4 flex items-center gap-4 transition-shadow" style={{ boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.05)' }}>
+            <div className="bg-gradient-to-br from-white/70 to-stone-50/70 rounded-2xl border border-stone-200 p-4 flex items-center gap-4 transition-shadow" style={{ boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.05)' }}>
                 {/* 左侧：小动物图片（可点击切换） */}
                 <button 
                     onClick={switchTimePal}
@@ -217,7 +208,7 @@ export const TimePalCard: React.FC<TimePalCardProps> = ({ logs, currentDate, cat
 
                 {/* 右侧：专注时长和状态 */}
                 <div className="flex-1 flex flex-col justify-center min-w-0">
-                    <div className="text-3xl font-bold font-mono text-stone-800 tracking-tight leading-none">
+                    <div className="text-2xl font-bold font-mono text-stone-800 tracking-tight leading-none">
                         {timeDisplay}
                     </div>
                     <div className="mt-1.5 text-xs text-stone-500 leading-relaxed">
