@@ -4,7 +4,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { ChevronUp, ChevronDown, ChevronLeft, ChevronRight, X, Save, ZoomIn, Sun, Move } from 'lucide-react';
+import { ChevronUp, ChevronDown, ChevronLeft, ChevronRight, X, Save, ZoomIn, Sun, Move, RotateCcw } from 'lucide-react';
 import { navigationDecorationService } from '../services/navigationDecorationService';
 
 interface NavigationDecorationDebuggerProps {
@@ -130,106 +130,129 @@ export const NavigationDecorationDebugger: React.FC<NavigationDecorationDebugger
         navigationDecorationService.setCurrentDecoration(newId); // This triggers the main change event
     };
 
+    const handleReset = () => {
+        // 恢复默认值
+        setOffsetY(0);
+        setOffsetX(50);
+        setScale(100);
+        setOpacity(60);
+        
+        // 清除保存的自定义设置
+        navigationDecorationService.saveCustomSettings(activeId, {
+            offsetY: 'bottom',
+            offsetX: '50%',
+            scale: 1,
+            opacity: 0.6
+        });
+    };
+
     return (
-        <div className="fixed bottom-28 right-4 z-50 bg-white/95 backdrop-blur rounded-xl shadow-2xl border border-stone-200 p-3 w-64 animate-in fade-in slide-in-from-bottom-4">
+        <div className="fixed bottom-28 right-4 z-50 bg-white/95 backdrop-blur rounded-xl shadow-2xl border border-stone-200 p-4 w-72 animate-in fade-in slide-in-from-bottom-4">
             {/* Header */}
-            <div className="flex items-center justify-between mb-3 border-b border-stone-100 pb-2">
-                <h3 className="text-xs font-bold text-stone-800 flex items-center gap-1">
+            <div className="flex items-center justify-between mb-4 border-b border-stone-100 pb-3">
+                <h3 className="text-sm font-bold text-stone-800 flex items-center gap-1.5">
                     <span className="w-2 h-2 rounded-full bg-amber-400"></span>
                     样式调试
                 </h3>
-                <button onClick={onClose} className="text-stone-400 hover:text-stone-600">
-                    <X size={14} />
-                </button>
+                <div className="flex items-center gap-1">
+                    <button 
+                        onClick={handleReset} 
+                        className="p-1.5 text-stone-400 hover:text-stone-600 hover:bg-stone-100 rounded-lg transition-colors"
+                        title="重置"
+                    >
+                        <RotateCcw size={14} />
+                    </button>
+                    <button 
+                        onClick={onClose} 
+                        className="p-1.5 text-stone-400 hover:text-stone-600 hover:bg-stone-100 rounded-lg transition-colors"
+                    >
+                        <X size={14} />
+                    </button>
+                </div>
             </div>
 
             {/* Switcher */}
-            <div className="flex items-center justify-between bg-stone-50 rounded-lg p-1 mb-3">
-                <button onClick={() => handleSwitch('prev')} className="p-1 hover:bg-white rounded shadow-sm text-stone-600 transition-all">
+            <div className="flex items-center justify-between bg-stone-50 rounded-lg p-2 mb-4">
+                <button onClick={() => handleSwitch('prev')} className="p-1.5 hover:bg-white rounded shadow-sm text-stone-600 transition-all">
                     <ChevronLeft size={16} />
                 </button>
-                <span className="text-xs font-mono font-medium truncate max-w-[100px] text-center">
+                <span className="text-xs font-mono font-medium truncate max-w-[120px] text-center">
                     {activeId}
                 </span>
-                <button onClick={() => handleSwitch('next')} className="p-1 hover:bg-white rounded shadow-sm text-stone-600 transition-all">
+                <button onClick={() => handleSwitch('next')} className="p-1.5 hover:bg-white rounded shadow-sm text-stone-600 transition-all">
                     <ChevronRight size={16} />
                 </button>
             </div>
 
-            {/* Controls Grid */}
-            <div className="grid grid-cols-2 gap-3 mb-3">
+            {/* Controls */}
+            <div className="space-y-4 mb-4">
                 {/* Vertical Offset (Y) */}
-                <div className="space-y-1">
-                    <div className="flex justify-between text-[10px] text-stone-500">
-                        <span className="flex items-center gap-1"><Move size={10} className="rotate-90" /> 垂直偏移</span>
-                        <span className="font-mono">{offsetY}px</span>
+                <div className="space-y-2">
+                    <div className="flex justify-between text-[11px] text-stone-500 mb-1">
+                        <span className="flex items-center gap-1 font-medium"><Move size={11} className="rotate-90" /> 垂直偏移</span>
+                        <span className="font-mono font-bold text-stone-700">{offsetY}px</span>
                     </div>
-                    <div className="flex gap-1">
-                        <button onClick={() => setOffsetY(v => v - 1)} className="flex-1 bg-stone-100 hover:bg-stone-200 rounded py-1 text-xs">-</button>
-                        <button onClick={() => setOffsetY(v => v + 1)} className="flex-1 bg-stone-100 hover:bg-stone-200 rounded py-1 text-xs">+</button>
+                    <div className="grid grid-cols-4 gap-1.5">
+                        <button onClick={() => setOffsetY(v => v - 5)} className="bg-stone-100 hover:bg-stone-200 rounded py-1.5 text-xs font-medium text-stone-600 transition-colors">-5</button>
+                        <button onClick={() => setOffsetY(v => v - 1)} className="bg-stone-100 hover:bg-stone-200 rounded py-1.5 text-xs font-medium text-stone-600 transition-colors">-1</button>
+                        <button onClick={() => setOffsetY(v => v + 1)} className="bg-stone-100 hover:bg-stone-200 rounded py-1.5 text-xs font-medium text-stone-600 transition-colors">+1</button>
+                        <button onClick={() => setOffsetY(v => v + 5)} className="bg-stone-100 hover:bg-stone-200 rounded py-1.5 text-xs font-medium text-stone-600 transition-colors">+5</button>
                     </div>
                 </div>
 
                 {/* Horizontal Offset (X) */}
-                <div className="space-y-1">
-                    <div className="flex justify-between text-[10px] text-stone-500">
-                        <span className="flex items-center gap-1"><Move size={10} /> 水平位置</span>
-                        <span className="font-mono">{offsetX}%</span>
+                <div className="space-y-2">
+                    <div className="flex justify-between text-[11px] text-stone-500 mb-1">
+                        <span className="flex items-center gap-1 font-medium"><Move size={11} /> 水平位置</span>
+                        <span className="font-mono font-bold text-stone-700">{offsetX}%</span>
                     </div>
-                    <input
-                        type="range" min="0" max="100" step="1"
-                        value={offsetX} onChange={(e) => setOffsetX(Number(e.target.value))}
-                        className="w-full h-1.5 bg-stone-200 rounded-lg appearance-none cursor-pointer"
-                    />
+                    <div className="grid grid-cols-4 gap-1.5">
+                        <button onClick={() => setOffsetX(v => Math.max(-100, v - 5))} className="bg-stone-100 hover:bg-stone-200 rounded py-1.5 text-xs font-medium text-stone-600 transition-colors">-5</button>
+                        <button onClick={() => setOffsetX(v => Math.max(-100, v - 1))} className="bg-stone-100 hover:bg-stone-200 rounded py-1.5 text-xs font-medium text-stone-600 transition-colors">-1</button>
+                        <button onClick={() => setOffsetX(v => Math.min(200, v + 1))} className="bg-stone-100 hover:bg-stone-200 rounded py-1.5 text-xs font-medium text-stone-600 transition-colors">+1</button>
+                        <button onClick={() => setOffsetX(v => Math.min(200, v + 5))} className="bg-stone-100 hover:bg-stone-200 rounded py-1.5 text-xs font-medium text-stone-600 transition-colors">+5</button>
+                    </div>
                 </div>
 
                 {/* Scale */}
-                <div className="space-y-1">
-                    <div className="flex justify-between text-[10px] text-stone-500">
-                        <span className="flex items-center gap-1"><ZoomIn size={10} /> 缩放</span>
-                        <span className="font-mono">{scale}%</span>
+                <div className="space-y-2">
+                    <div className="flex justify-between text-[11px] text-stone-500 mb-1">
+                        <span className="flex items-center gap-1 font-medium"><ZoomIn size={11} /> 缩放</span>
+                        <span className="font-mono font-bold text-stone-700">{scale}%</span>
                     </div>
-                    <input
-                        type="range" min="10" max="200" step="5"
-                        value={scale} onChange={(e) => setScale(Number(e.target.value))}
-                        className="w-full h-1.5 bg-stone-200 rounded-lg appearance-none cursor-pointer"
-                    />
+                    <div className="grid grid-cols-4 gap-1.5">
+                        <button onClick={() => setScale(v => Math.max(10, v - 5))} className="bg-stone-100 hover:bg-stone-200 rounded py-1.5 text-xs font-medium text-stone-600 transition-colors">-5</button>
+                        <button onClick={() => setScale(v => Math.max(10, v - 1))} className="bg-stone-100 hover:bg-stone-200 rounded py-1.5 text-xs font-medium text-stone-600 transition-colors">-1</button>
+                        <button onClick={() => setScale(v => Math.min(300, v + 1))} className="bg-stone-100 hover:bg-stone-200 rounded py-1.5 text-xs font-medium text-stone-600 transition-colors">+1</button>
+                        <button onClick={() => setScale(v => Math.min(300, v + 5))} className="bg-stone-100 hover:bg-stone-200 rounded py-1.5 text-xs font-medium text-stone-600 transition-colors">+5</button>
+                    </div>
                 </div>
 
                 {/* Opacity */}
-                <div className="space-y-1">
-                    <div className="flex justify-between text-[10px] text-stone-500">
-                        <span className="flex items-center gap-1"><Sun size={10} /> 透明度</span>
-                        <span className="font-mono">{opacity}%</span>
+                <div className="space-y-2">
+                    <div className="flex justify-between text-[11px] text-stone-500 mb-1">
+                        <span className="flex items-center gap-1 font-medium"><Sun size={11} /> 透明度</span>
+                        <span className="font-mono font-bold text-stone-700">{opacity}%</span>
                     </div>
-                    <input
-                        type="range" min="0" max="100" step="5"
-                        value={opacity} onChange={(e) => setOpacity(Number(e.target.value))}
-                        className="w-full h-1.5 bg-stone-200 rounded-lg appearance-none cursor-pointer"
-                    />
+                    <div className="grid grid-cols-4 gap-1.5">
+                        <button onClick={() => setOpacity(v => Math.max(0, v - 5))} className="bg-stone-100 hover:bg-stone-200 rounded py-1.5 text-xs font-medium text-stone-600 transition-colors">-5</button>
+                        <button onClick={() => setOpacity(v => Math.max(0, v - 1))} className="bg-stone-100 hover:bg-stone-200 rounded py-1.5 text-xs font-medium text-stone-600 transition-colors">-1</button>
+                        <button onClick={() => setOpacity(v => Math.min(100, v + 1))} className="bg-stone-100 hover:bg-stone-200 rounded py-1.5 text-xs font-medium text-stone-600 transition-colors">+1</button>
+                        <button onClick={() => setOpacity(v => Math.min(100, v + 5))} className="bg-stone-100 hover:bg-stone-200 rounded py-1.5 text-xs font-medium text-stone-600 transition-colors">+5</button>
+                    </div>
                 </div>
-            </div>
-
-            {/* Quick Adjust Buttons Row */}
-            <div className="flex gap-2 mb-3">
-                <button onClick={() => setOffsetY(v => v - 5)} className="flex-1 py-1 text-[10px] bg-stone-50 hover:bg-stone-100 rounded text-stone-600 border border-stone-100">
-                    ↑ 5px
-                </button>
-                <button onClick={() => setOffsetY(v => v + 5)} className="flex-1 py-1 text-[10px] bg-stone-50 hover:bg-stone-100 rounded text-stone-600 border border-stone-100">
-                    ↓ 5px
-                </button>
             </div>
 
             {/* Save Button */}
             <button
                 onClick={handleSave}
                 disabled={isSaved}
-                className={`w-full flex items-center justify-center gap-1.5 rounded-lg py-2 transition-all text-xs font-bold shadow-sm ${isSaved
+                className={`w-full flex items-center justify-center gap-2 rounded-lg py-2.5 transition-all text-sm font-bold shadow-sm ${isSaved
                         ? 'bg-green-100 text-green-700 border border-green-200'
                         : 'bg-stone-800 text-white hover:bg-stone-900 hover:shadow-md'
                     }`}
             >
-                <Save size={12} />
+                <Save size={14} />
                 <span>{isSaved ? '已保存设置' : '保存当前状态'}</span>
             </button>
         </div>
