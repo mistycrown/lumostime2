@@ -4,7 +4,7 @@
  */
 
 // 时光小友类型
-export type TimePalType = 'cat' | 'dog' | 'rabbit' | 'monkey' | 'prince';
+export type TimePalType = 'cat' | 'dog' | 'rabbit' | 'monkey' | 'prince' | 'chibi';
 
 // 时光小友选项配置
 export interface TimePalOption {
@@ -45,6 +45,12 @@ export const TIMEPAL_OPTIONS: TimePalOption[] = [
         name: '小王子', 
         preview: '/time_pal_origin/prince/1.png',
         emoji: '🤴'
+    },
+    { 
+        type: 'chibi', 
+        name: 'Q版', 
+        preview: '/time_pal_origin/chibi/1.png',
+        emoji: '👧'
     },
 ];
 
