@@ -43,22 +43,14 @@ export const TIMEPAL_OPTIONS: TimePalOption[] = [
     { 
         type: 'prince', 
         name: '小王子', 
-        preview: '/time_pal_origin/prince/生成手绘小王子插画.png',
+        preview: '/time_pal_origin/prince/1.png',
         emoji: '🤴'
     },
 ];
 
 // 获取时光小友图片路径
 export const getTimePalImagePath = (type: TimePalType, level: number): string => {
-    // prince 类型使用特殊的文件名格式
-    if (type === 'prince') {
-        if (level === 1) {
-            return `/time_pal_origin/prince/生成手绘小王子插画.png`;
-        } else {
-            return `/time_pal_origin/prince/生成手绘小王子插画 (${level - 1}).png`;
-        }
-    }
-    // 其他类型使用数字命名
+    // 所有类型现在都使用统一的数字命名
     return `/time_pal_origin/${type}/${level}.png`;
 };
 

@@ -214,7 +214,7 @@ export const ScopeDetailView: React.FC<ScopeDetailViewProps> = ({
                     const match = activityColorClass.match(/(?:text|bg)-([a-z]+)-/);
                     const colorName = match ? match[1] : 'stone';
                     const option = COLOR_OPTIONS.find(opt => opt.id === colorName);
-                    return option ? option.hex : '#78716c';
+                    return option ? option.lightHex : '#e7e5e4';
                 })(),
                 icon: act?.icon
             };

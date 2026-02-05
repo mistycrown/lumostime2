@@ -197,7 +197,7 @@ export const TagDetailView: React.FC<TagDetailViewProps> = ({ tagId, logs, todos
                const colorName = match ? match[1] : (colorClass.startsWith('#') ? 'custom' : 'stone');
                if (colorName === 'custom') return colorClass;
                const option = COLOR_OPTIONS.find(opt => opt.id === colorName);
-               return option ? option.hex : '#78716c';
+               return option ? option.lightHex : '#e7e5e4';
             })(),
             icon: scope?.icon
          };

@@ -5,7 +5,7 @@
  */
 import React, { useMemo, useState, useEffect } from 'react';
 import { Log, Category, ActiveSession } from '../types';
-import { TIMEPAL_MOTIVATIONAL_QUOTES } from '../constants/timePalQuotes';
+import { getRandomQuote } from '../constants/timePalQuotes';
 import { TimePalType, getAllTimePalTypes, getTimePalImagePath, getTimePalEmoji } from '../constants/timePalConfig';
 
 interface TimePalCardProps {
@@ -42,11 +42,6 @@ const getFormDescription = (level: number): string => {
         '超级无敌'
     ];
     return descriptions[level - 1] || descriptions[0];
-};
-
-// 获取随机励志语录
-const getRandomQuote = (): string => {
-    return TIMEPAL_MOTIVATIONAL_QUOTES[Math.floor(Math.random() * TIMEPAL_MOTIVATIONAL_QUOTES.length)];
 };
 
 export const TimePalCard: React.FC<TimePalCardProps> = ({ logs, currentDate, categories, activeSessions = [] }) => {
@@ -206,15 +201,15 @@ export const TimePalCard: React.FC<TimePalCardProps> = ({ logs, currentDate, cat
                     className="shrink-0 active:scale-95 transition-transform"
                     title="点击切换小动物"
                 >
-                    <div className="w-20 h-20 rounded-xl overflow-hidden flex items-center justify-center animate-bounce-gentle">
+                    <div className={`w-20 h-20 rounded-xl overflow-hidden flex items-center justify-center animate-level-${formLevel}`}>
                         <img 
                             src={imageUrl} 
                             alt="时光小友" 
-                            className="w-full h-full object-cover animate-wiggle"
+                            className="w-full h-full object-cover"
                             onError={(e) => {
                                 // 如果图片加载失败，显示占位符
                                 e.currentTarget.style.display = 'none';
-                                e.currentTarget.parentElement!.innerHTML = `<span class="text-4xl animate-wiggle">${getTimePalEmoji(timePalType)}</span>`;
+                                e.currentTarget.parentElement!.innerHTML = `<span class="text-4xl">${getTimePalEmoji(timePalType)}</span>`;
                             }}
                         />
                     </div>
@@ -246,35 +241,127 @@ export const TimePalCard: React.FC<TimePalCardProps> = ({ logs, currentDate, cat
                 </div>
             </div>
             
-            {/* 添加自定义动画样式 */}
+            {/* 添加自定义动画样式 - 5个等级的不同动画 */}
             <style>{`
-                @keyframes bounce-gentle {
-                    0%, 100% {
-                        transform: scale(1) translateY(0);
-                    }
-                    50% {
-                        transform: scale(1.05) translateY(-2px);
-                    }
-                }
-                
-                @keyframes wiggle {
+                /* Level 1: 刚刚苏醒 - 轻微左右摇晃 */
+                @keyframes level-1-animation {
                     0%, 100% {
                         transform: rotate(0deg);
                     }
                     25% {
-                        transform: rotate(-3deg);
+                        transform: rotate(-1.5deg);
                     }
                     75% {
-                        transform: rotate(3deg);
+                        transform: rotate(1.5deg);
                     }
                 }
                 
-                .animate-bounce-gentle {
-                    animation: bounce-gentle 3s ease-in-out infinite;
+                .animate-level-1 {
+                    animation: level-1-animation 3.5s ease-in-out infinite;
                 }
                 
-                .animate-wiggle {
-                    animation: wiggle 4s ease-in-out infinite;
+                /* Level 2: 精神饱满 - 左右摇晃 + 轻微缩放 */
+                @keyframes level-2-animation {
+                    0%, 100% {
+                        transform: rotate(0deg) scale(1);
+                    }
+                    25% {
+                        transform: rotate(-2deg) scale(1.02);
+                    }
+                    50% {
+                        transform: rotate(0deg) scale(1.03);
+                    }
+                    75% {
+                        transform: rotate(2deg) scale(1.02);
+                    }
+                }
+                
+                .animate-level-2 {
+                    animation: level-2-animation 3s ease-in-out infinite;
+                }
+                
+                /* Level 3: 活力四射 - 更大的摇晃 + 明显缩放 */
+                @keyframes level-3-animation {
+                    0%, 100% {
+                        transform: rotate(0deg) scale(1) translateY(0);
+                    }
+                    20% {
+                        transform: rotate(-3deg) scale(1.03) translateY(-1px);
+                    }
+                    40% {
+                        transform: rotate(3deg) scale(1.05) translateY(-2px);
+                    }
+                    60% {
+                        transform: rotate(-3deg) scale(1.03) translateY(-1px);
+                    }
+                    80% {
+                        transform: rotate(3deg) scale(1.05) translateY(-2px);
+                    }
+                }
+                
+                .animate-level-3 {
+                    animation: level-3-animation 2.5s ease-in-out infinite;
+                }
+                
+                /* Level 4: 元气满满 - 弹跳 + 摇晃 */
+                @keyframes level-4-animation {
+                    0%, 100% {
+                        transform: rotate(0deg) scale(1) translateY(0);
+                    }
+                    15% {
+                        transform: rotate(-4deg) scale(1.04) translateY(-2px);
+                    }
+                    30% {
+                        transform: rotate(4deg) scale(1.06) translateY(-3px);
+                    }
+                    45% {
+                        transform: rotate(-4deg) scale(1.04) translateY(-2px);
+                    }
+                    60% {
+                        transform: rotate(4deg) scale(1.06) translateY(-3px);
+                    }
+                    75% {
+                        transform: rotate(0deg) scale(1.03) translateY(-1px);
+                    }
+                }
+                
+                .animate-level-4 {
+                    animation: level-4-animation 2s ease-in-out infinite;
+                }
+                
+                /* Level 5: 超级无敌 - 快速弹跳 + Q弹效果 */
+                @keyframes level-5-animation {
+                    0%, 100% {
+                        transform: rotate(0deg) scale(1) translateY(0);
+                    }
+                    10% {
+                        transform: rotate(-5deg) scale(1.05) translateY(-2px);
+                    }
+                    20% {
+                        transform: rotate(5deg) scale(1.07) translateY(-4px);
+                    }
+                    30% {
+                        transform: rotate(-5deg) scale(1.05) translateY(-2px);
+                    }
+                    40% {
+                        transform: rotate(5deg) scale(1.07) translateY(-4px);
+                    }
+                    50% {
+                        transform: rotate(-5deg) scale(1.05) translateY(-2px);
+                    }
+                    60% {
+                        transform: rotate(5deg) scale(1.07) translateY(-4px);
+                    }
+                    70% {
+                        transform: rotate(0deg) scale(1.04) translateY(-1px);
+                    }
+                    80% {
+                        transform: rotate(0deg) scale(1.02) translateY(0);
+                    }
+                }
+                
+                .animate-level-5 {
+                    animation: level-5-animation 1.8s cubic-bezier(0.45, 0.05, 0.55, 0.95) infinite;
                 }
             `}</style>
         </div>

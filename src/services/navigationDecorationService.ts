@@ -40,6 +40,7 @@ class NavigationDecorationService {
         { id: 'mushroom', name: '蘑菇', url: '/dchh/mushroom.png', offsetY: '71px', offsetX: 'center', scale: 1, opacity: 0.6 },
         { id: 'plant', name: '植物1', url: '/dchh/plant.png', offsetY: '71px', offsetX: 'center', scale: 1, opacity: 0.6 },
         { id: 'plant2', name: '植物2', url: '/dchh/plant2.png', offsetY: '71px', offsetX: 'center', scale: 1, opacity: 0.6 },
+        { id: 'sea', name: '海洋', url: '/dchh/sea.png', offsetY: '71px', offsetX: 'center', scale: 1, opacity: 0.6 },
     ];
 
     getAllDecorations(): NavigationDecorationOption[] {

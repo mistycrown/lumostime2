@@ -102,12 +102,12 @@ export const CategoryDetailView: React.FC<CategoryDetailViewProps> = ({ category
                 label: scope ? scope.name : 'unscoped',
                 value: duration,
                 color: (() => {
-                    if (!scope || scId === 'uncategorized') return '#78716c'; // Default stone color
+                    if (!scope || scId === 'uncategorized') return '#e7e5e4'; // Default stone light color
                     const colorClass = scope.themeColor || '';
                     const match = colorClass.match(/(?:text|bg)-([a-z]+)-/);
                     const colorName = match ? match[1] : 'stone';
                     const option = COLOR_OPTIONS.find(opt => opt.id === colorName);
-                    return option ? option.hex : '#78716c';
+                    return option ? option.lightHex : '#e7e5e4';
                 })(),
                 icon: scope?.icon
             };
