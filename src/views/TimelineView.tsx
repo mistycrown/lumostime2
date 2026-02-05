@@ -118,6 +118,7 @@ interface TimelineViewProps {
     minIdleTimeThreshold?: number;
     onQuickPunch?: () => void;
     refreshKey?: number; // 添加refreshKey用于强制刷新图片
+    activeSessions?: any[]; // 新增：正在进行的会话
     // Daily Review
     dailyReview?: DailyReview;
     onOpenDailyReview?: () => void;
@@ -150,7 +151,7 @@ interface TimelineItem {
     };
 }
 
-export const TimelineView: React.FC<TimelineViewProps> = ({ logs, todos, scopes, onAddLog, onEditLog, onUpdateLog, categories, currentDate, onDateChange, onShowStats, onBatchAddLogs, onSync, isSyncing, todoCategories, onToast, startWeekOnSunday = false, autoLinkRules = [], minIdleTimeThreshold = 1, onQuickPunch, refreshKey = 0, dailyReview, onOpenDailyReview, templates = [], dailyReviewTime = '22:00', weeklyReviews = [], onOpenWeeklyReview, weeklyReviewTime = '0-2200', monthlyReviews = [], onOpenMonthlyReview, monthlyReviewTime = '0-2200' }) => {
+export const TimelineView: React.FC<TimelineViewProps> = ({ logs, todos, scopes, onAddLog, onEditLog, onUpdateLog, categories, currentDate, onDateChange, onShowStats, onBatchAddLogs, onSync, isSyncing, todoCategories, onToast, startWeekOnSunday = false, autoLinkRules = [], minIdleTimeThreshold = 1, onQuickPunch, refreshKey = 0, activeSessions = [], dailyReview, onOpenDailyReview, templates = [], dailyReviewTime = '22:00', weeklyReviews = [], onOpenWeeklyReview, weeklyReviewTime = '0-2200', monthlyReviews = [], onOpenMonthlyReview, monthlyReviewTime = '0-2200' }) => {
     const [isCalendarExpanded, setIsCalendarExpanded] = useState(false);
     const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>(() => {
         const saved = localStorage.getItem('lumos_timeline_sort');
@@ -737,6 +738,7 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ logs, todos, scopes,
                             logs={logs}
                             currentDate={currentDate}
                             categories={categories}
+                            activeSessions={activeSessions}
                         />
                     </div>
 

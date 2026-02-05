@@ -1,6 +1,12 @@
 /**
  * @file TimePalSettingsView.tsx
  * @description 时光小友设置页面
+ * 
+ * 功能：
+ * 1. 选择小动物类型（猫咪、小狗、兔子）
+ * 2. 统计时长设置 - 限定标签筛选（仅统计选中活动标签的时间）
+ * 
+ * 标签筛选逻辑与 GoalEditor.tsx 保持一致
  */
 import React, { useState, useEffect } from 'react';
 import { ArrowLeft } from 'lucide-react';
@@ -230,42 +236,38 @@ export const TimePalSettingsView: React.FC<TimePalSettingsViewProps> = ({ onBack
                                         </div>
                                     )}
 
-                                    {/* 已选择的标签 */}
+                                    {/* Clear 按钮 */}
                                     {filterActivityIds.length > 0 && (
-                                        <div className="mt-4 pt-4 border-t border-stone-100">
-                                            <div className="flex items-center justify-between mb-2">
-                                                <span className="text-xs font-medium text-stone-400">
-                                                    已选择：
-                                                </span>
-                                                <button
-                                                    type="button"
-                                                    onClick={() => setFilterActivityIds([])}
-                                                    className="text-xs font-medium text-stone-400 hover:text-red-400 transition-colors"
-                                                >
-                                                    Clear
-                                                </button>
-                                            </div>
-                                            <div className="flex flex-wrap gap-2">
-                                                {filterActivityIds.map(actId => {
-                                                    const activity = categories
-                                                        .flatMap(c => c.activities)
-                                                        .find(a => a.id === actId);
-                                                    if (!activity) return null;
-                                                    return (
-                                                        <span
-                                                            key={actId}
-                                                            className="inline-flex items-center gap-1 px-2 py-1 bg-stone-100 text-stone-600 rounded-lg text-xs"
-                                                        >
-                                                            <span>{activity.icon}</span>
-                                                            <span>{activity.name}</span>
-                                                        </span>
-                                                    );
-                                                })}
-                                            </div>
+                                        <div className="flex justify-end mt-2">
+                                            <button
+                                                type="button"
+                                                onClick={() => setFilterActivityIds([])}
+                                                className="text-xs font-medium text-stone-400 hover:text-red-400 transition-colors"
+                                            >
+                                                Clear
+                                            </button>
+                                        </div>
+                                    )}
+
+                                    {/* 已选择标签提示 */}
+                                    {filterActivityIds.length > 0 && (
+                                        <div className="mt-3 text-xs text-stone-500 animate-in fade-in">
+                                            <span className="font-medium">已选择：</span>
+                                            {filterActivityIds.map((actId, index) => {
+                                                const activity = categories
+                                                    .flatMap(c => c.activities)
+                                                    .find(a => a.id === actId);
+                                                return activity ? (
+                                                    <span key={actId}>
+                                                        {activity.icon} {activity.name}{index < filterActivityIds.length - 1 ? '、' : ''}
+                                                    </span>
+                                                ) : null;
+                                            })}
                                         </div>
                                     )}
                                 </>
                             )}
+
                         </div>
                     </div>
                 </div>

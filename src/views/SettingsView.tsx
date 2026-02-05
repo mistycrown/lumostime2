@@ -947,7 +947,13 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
     }
 
     if (activeSubmenu === 'sponsorship_preview') {
-        return <SponsorshipView onBack={() => setActiveSubmenu('main')} onToast={onToast} />;
+        return (
+            <SponsorshipView 
+                onBack={() => setActiveSubmenu('main')} 
+                onToast={onToast}
+                categories={categoriesData}
+            />
+        );
     }
 
     return (
