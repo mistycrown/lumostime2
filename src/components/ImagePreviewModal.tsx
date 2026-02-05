@@ -47,27 +47,44 @@ export const ImagePreviewModal: React.FC<ImagePreviewModalProps> = ({ imageUrl, 
                                 e.stopPropagation();
                                 handleDeleteClick();
                             }}
-                            className="p-2 bg-white/10 hover:bg-red-500/80 text-white rounded-full backdrop-blur-sm transition-colors mr-2"
+                            className="p-2 bg-white/10 hover:bg-red-500/80 text-white rounded-full backdrop-blur-sm transition-colors mr-2 [&>svg]:stroke-[2.5]"
+                            style={{ WebkitTextStroke: '0.5px black', paintOrder: 'stroke fill' }}
                             title="Delete"
                         >
-                            <Trash2 size={20} />
+                            <Trash2 size={20} style={{ filter: 'drop-shadow(0 0 0.5px black)' }} />
                         </button>
                     )}
                     {imageUrl && (
                         <>
-                            <button onClick={(e) => e.stopPropagation()} className="zoom-in-btn p-2 bg-white/10 hover:bg-white/20 text-white rounded-full backdrop-blur-sm transition-colors">
-                                <ZoomIn size={20} />
+                            <button 
+                                onClick={(e) => e.stopPropagation()} 
+                                className="zoom-in-btn p-2 bg-white/10 hover:bg-white/20 text-white rounded-full backdrop-blur-sm transition-colors [&>svg]:stroke-[2.5]"
+                                style={{ WebkitTextStroke: '0.5px black', paintOrder: 'stroke fill' }}
+                            >
+                                <ZoomIn size={20} style={{ filter: 'drop-shadow(0 0 0.5px black)' }} />
                             </button>
-                            <button onClick={(e) => e.stopPropagation()} className="zoom-out-btn p-2 bg-white/10 hover:bg-white/20 text-white rounded-full backdrop-blur-sm transition-colors">
-                                <ZoomOut size={20} />
+                            <button 
+                                onClick={(e) => e.stopPropagation()} 
+                                className="zoom-out-btn p-2 bg-white/10 hover:bg-white/20 text-white rounded-full backdrop-blur-sm transition-colors [&>svg]:stroke-[2.5]"
+                                style={{ WebkitTextStroke: '0.5px black', paintOrder: 'stroke fill' }}
+                            >
+                                <ZoomOut size={20} style={{ filter: 'drop-shadow(0 0 0.5px black)' }} />
                             </button>
-                            <button onClick={(e) => e.stopPropagation()} className="reset-btn p-2 bg-white/10 hover:bg-white/20 text-white rounded-full backdrop-blur-sm transition-colors">
-                                <RotateCcw size={20} />
+                            <button 
+                                onClick={(e) => e.stopPropagation()} 
+                                className="reset-btn p-2 bg-white/10 hover:bg-white/20 text-white rounded-full backdrop-blur-sm transition-colors [&>svg]:stroke-[2.5]"
+                                style={{ WebkitTextStroke: '0.5px black', paintOrder: 'stroke fill' }}
+                            >
+                                <RotateCcw size={20} style={{ filter: 'drop-shadow(0 0 0.5px black)' }} />
                             </button>
                         </>
                     )}
-                    <button onClick={(e) => { e.stopPropagation(); onClose(); }} className="p-2 bg-white/10 hover:bg-white/20 text-white hover:text-red-400 rounded-full backdrop-blur-sm transition-colors ml-2">
-                        <X size={20} />
+                    <button 
+                        onClick={(e) => { e.stopPropagation(); onClose(); }} 
+                        className="p-2 bg-white/10 hover:bg-white/20 text-white hover:text-red-400 rounded-full backdrop-blur-sm transition-colors ml-2 [&>svg]:stroke-[2.5]"
+                        style={{ WebkitTextStroke: '0.5px black', paintOrder: 'stroke fill' }}
+                    >
+                        <X size={20} style={{ filter: 'drop-shadow(0 0 0.5px black)' }} />
                     </button>
                 </div>
 
@@ -89,22 +106,32 @@ export const ImagePreviewModal: React.FC<ImagePreviewModalProps> = ({ imageUrl, 
                                                     e.stopPropagation();
                                                     handleDeleteClick();
                                                 }}
-                                                className="p-2 bg-white/10 hover:bg-red-500/80 text-white rounded-full backdrop-blur-sm transition-colors mr-2"
+                                                className="p-2 bg-white/10 hover:bg-red-500/80 text-white rounded-full backdrop-blur-sm transition-colors mr-2 [&>svg]:stroke-[2.5]"
+                                                style={{ WebkitTextStroke: '0.5px black', paintOrder: 'stroke fill' }}
                                             >
-                                                <Trash2 size={20} />
+                                                <Trash2 size={20} style={{ filter: 'drop-shadow(0 0 0.5px black)' }} />
                                             </button>
                                         )}
-                                        <button onClick={() => zoomIn()} className="p-2 bg-white/10 hover:bg-white/20 text-white rounded-full backdrop-blur-sm transition-colors">
-                                            <ZoomIn size={20} />
+                                        <button 
+                                            onClick={() => zoomIn()} 
+                                            className="p-2 bg-white/10 hover:bg-white/20 text-white rounded-full backdrop-blur-sm transition-colors [&>svg]:stroke-[2.5]"
+                                            style={{ WebkitTextStroke: '0.5px black', paintOrder: 'stroke fill' }}
+                                        >
+                                            <ZoomIn size={20} style={{ filter: 'drop-shadow(0 0 0.5px black)' }} />
                                         </button>
-                                        <button onClick={() => zoomOut()} className="p-2 bg-white/10 hover:bg-white/20 text-white rounded-full backdrop-blur-sm transition-colors">
-                                            <ZoomOut size={20} />
+                                        <button 
+                                            onClick={() => zoomOut()} 
+                                            className="p-2 bg-white/10 hover:bg-white/20 text-white rounded-full backdrop-blur-sm transition-colors [&>svg]:stroke-[2.5]"
+                                            style={{ WebkitTextStroke: '0.5px black', paintOrder: 'stroke fill' }}
+                                        >
+                                            <ZoomOut size={20} style={{ filter: 'drop-shadow(0 0 0.5px black)' }} />
                                         </button>
                                         <button
                                             onClick={() => setRotation(r => r - 90)}
-                                            className="p-2 bg-white/10 hover:bg-white/20 text-white rounded-full backdrop-blur-sm transition-colors"
+                                            className="p-2 bg-white/10 hover:bg-white/20 text-white rounded-full backdrop-blur-sm transition-colors [&>svg]:stroke-[2.5]"
+                                            style={{ WebkitTextStroke: '0.5px black', paintOrder: 'stroke fill' }}
                                         >
-                                            <RotateCcw size={20} />
+                                            <RotateCcw size={20} style={{ filter: 'drop-shadow(0 0 0.5px black)' }} />
                                         </button>
                                         <button
                                             onClick={(e) => {
@@ -112,9 +139,10 @@ export const ImagePreviewModal: React.FC<ImagePreviewModalProps> = ({ imageUrl, 
                                                 setRotation(0);
                                                 onClose();
                                             }}
-                                            className="p-2 bg-white/10 hover:bg-white/20 text-white hover:text-red-400 rounded-full backdrop-blur-sm transition-colors ml-2"
+                                            className="p-2 bg-white/10 hover:bg-white/20 text-white hover:text-red-400 rounded-full backdrop-blur-sm transition-colors ml-2 [&>svg]:stroke-[2.5]"
+                                            style={{ WebkitTextStroke: '0.5px black', paintOrder: 'stroke fill' }}
                                         >
-                                            <X size={20} />
+                                            <X size={20} style={{ filter: 'drop-shadow(0 0 0.5px black)' }} />
                                         </button>
                                     </div>
                                 </div>
