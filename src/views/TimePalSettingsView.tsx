@@ -3,7 +3,7 @@
  * @description 时光小友设置页面
  * 
  * 功能：
- * 1. 选择小动物类型（猫咪、小狗、兔子）
+ * 1. 选择小动物类型
  * 2. 统计时长设置 - 限定标签筛选（仅统计选中活动标签的时间）
  * 
  * 标签筛选逻辑与 GoalEditor.tsx 保持一致
@@ -11,19 +11,12 @@
 import React, { useState, useEffect } from 'react';
 import { ArrowLeft } from 'lucide-react';
 import { Category } from '../types';
+import { TIMEPAL_OPTIONS, TimePalType, getTimePalEmoji } from '../constants/timePalConfig';
 
 interface TimePalSettingsViewProps {
     onBack: () => void;
     categories: Category[];
 }
-
-type TimePalType = 'cat' | 'dog' | 'rabbit';
-
-const TIMEPAL_OPTIONS: { type: TimePalType; name: string; preview: string }[] = [
-    { type: 'cat', name: '猫咪', preview: '/time_pal_origin/cat/kou/1.png' },
-    { type: 'dog', name: '小狗', preview: '/time_pal_origin/dog/kou/1.png' },
-    { type: 'rabbit', name: '兔子', preview: '/time_pal_origin/rabbit/kou/1.png' },
-];
 
 export const TimePalSettingsView: React.FC<TimePalSettingsViewProps> = ({ onBack, categories }) => {
     // 当前选择的小动物类型
@@ -117,13 +110,8 @@ export const TimePalSettingsView: React.FC<TimePalSettingsViewProps> = ({ onBack
                                             alt={option.name}
                                             className="w-full h-full object-cover"
                                             onError={(e) => {
-                                                const fallbackEmojis: Record<TimePalType, string> = {
-                                                    cat: '🐱',
-                                                    dog: '🐶',
-                                                    rabbit: '🐰'
-                                                };
                                                 e.currentTarget.style.display = 'none';
-                                                e.currentTarget.parentElement!.innerHTML = `<span class="text-5xl">${fallbackEmojis[option.type]}</span>`;
+                                                e.currentTarget.parentElement!.innerHTML = `<span class="text-5xl">${getTimePalEmoji(option.type)}</span>`;
                                             }}
                                         />
                                     </div>

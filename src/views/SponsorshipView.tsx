@@ -12,21 +12,13 @@ import { BackgroundSelector } from '../components/BackgroundSelector';
 import { NavigationDecorationSelector } from '../components/NavigationDecorationSelector';
 import { ICON_OPTIONS } from '../services/iconService';
 import { Category } from '../types';
+import { TIMEPAL_OPTIONS, TimePalType, getTimePalEmoji } from '../constants/timePalConfig';
 
 interface SponsorshipViewProps {
     onBack: () => void;
     onToast: (type: ToastType, message: string) => void;
     categories: Category[];
 }
-
-// 时光小友类型
-type TimePalType = 'cat' | 'dog' | 'rabbit';
-
-const TIMEPAL_OPTIONS: { type: TimePalType; name: string; preview: string }[] = [
-    { type: 'cat', name: '猫咪', preview: '/time_pal_origin/cat/kou/1.png' },
-    { type: 'dog', name: '小狗', preview: '/time_pal_origin/dog/kou/1.png' },
-    { type: 'rabbit', name: '兔子', preview: '/time_pal_origin/rabbit/kou/1.png' },
-];
 
 // 时光小友设置卡片组件
 const TimePalSettingsCard: React.FC<{ categories: Category[] }> = ({ categories }) => {
@@ -98,15 +90,10 @@ const TimePalSettingsCard: React.FC<{ categories: Category[] }> = ({ categories 
                                     alt={option.name}
                                     className="w-full h-full object-contain"
                                     onError={(e) => {
-                                        const fallbackEmojis: Record<TimePalType, string> = {
-                                            cat: '🐱',
-                                            dog: '🐶',
-                                            rabbit: '🐰'
-                                        };
                                         e.currentTarget.style.display = 'none';
                                         const parent = e.currentTarget.parentElement;
                                         if (parent) {
-                                            parent.innerHTML = `<span class="text-3xl">${fallbackEmojis[option.type]}</span>`;
+                                            parent.innerHTML = `<span class="text-3xl">${getTimePalEmoji(option.type)}</span>`;
                                         }
                                     }}
                                 />

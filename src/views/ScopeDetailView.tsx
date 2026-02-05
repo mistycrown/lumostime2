@@ -785,7 +785,7 @@ export const ScopeDetailView: React.FC<ScopeDetailViewProps> = ({
                 const archivedCount = archivedGoals.length;
 
                 return (
-                    <div className="space-y-4 max-w-3xl">
+                    <div className="space-y-4 max-w-3xl mx-auto">
                         {/* 未归档目标列表 */}
                         {activeGoals.length === 0 && archivedCount === 0 ? (
                             <div className="bg-white rounded-2xl p-12 border border-dashed border-stone-200 text-center">
