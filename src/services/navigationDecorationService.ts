@@ -38,7 +38,7 @@ class NavigationDecorationService {
         { id: 'ink', name: '水墨', url: '/dchh/ink.png', offsetY: '71px', offsetX: 'center', scale: 1, opacity: 0.6 },
         { id: 'light', name: '灯光', url: '/dchh/light.png', offsetY: '71px', offsetX: 'center', scale: 1, opacity: 0.6 },
         { id: 'mushroom', name: '蘑菇', url: '/dchh/mushroom.png', offsetY: '71px', offsetX: 'center', scale: 1, opacity: 0.6 },
-        { id: 'plant1', name: '植物1', url: '/dchh/plant.png', offsetY: '71px', offsetX: 'center', scale: 1, opacity: 0.6 },
+        { id: 'plant', name: '植物1', url: '/dchh/plant.png', offsetY: '71px', offsetX: 'center', scale: 1, opacity: 0.6 },
         { id: 'plant2', name: '植物2', url: '/dchh/plant2.png', offsetY: '71px', offsetX: 'center', scale: 1, opacity: 0.6 },
     ];
 

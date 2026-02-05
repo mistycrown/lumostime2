@@ -261,16 +261,6 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
 
                         {/* 4. 导航栏样式卡片 */}
                         <NavigationDecorationSelector onToast={onToast} />
-
-                        {/* 测试用重置按钮 */}
-                        <div className="flex justify-center pt-4">
-                            <button
-                                onClick={handleClearCode}
-                                className="text-xs text-stone-300 hover:text-stone-500 px-4 py-2"
-                            >
-                                清除兑换码状态
-                            </button>
-                        </div>
                     </div>
                 )}
 
