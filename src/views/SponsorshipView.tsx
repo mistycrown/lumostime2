@@ -3,7 +3,7 @@
  * @description 赞赏功能页面 - 包含兑换码验证、专属徽章、应用图标、背景图片、导航栏样式等功能
  */
 import React, { useState, useEffect } from 'react';
-import { ChevronLeft, Coffee, Check } from 'lucide-react';
+import { ChevronLeft, Coffee, Check, X } from 'lucide-react';
 import { Capacitor } from '@capacitor/core';
 import { ToastType } from '../components/Toast';
 import { RedemptionService } from '../services/redemptionService';
@@ -25,6 +25,7 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
     const [selectedIcon, setSelectedIcon] = useState('default');
     const [isChangingIcon, setIsChangingIcon] = useState(false);
     const redemptionService = new RedemptionService();
+    const [showDonationModal, setShowDonationModal] = useState(false);
 
     useEffect(() => {
         const checkVerification = async () => {
@@ -91,7 +92,7 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
         try {
             const { iconService } = await import('../services/iconService');
             const result = await iconService.setIcon(iconId);
-            
+
             if (result.success) {
                 setSelectedIcon(iconId);
                 onToast('success', result.message);
@@ -146,11 +147,10 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
                             <button
                                 onClick={handleRedeem}
                                 disabled={isVerifying}
-                                className={`w-full font-bold py-3 rounded-xl transition-all shadow-lg shadow-stone-200 ${
-                                    isVerifying
-                                        ? 'bg-stone-400 text-white cursor-not-allowed'
-                                        : 'bg-stone-800 text-white hover:bg-stone-900 active:scale-[0.98]'
-                                }`}
+                                className={`w-full font-bold py-3 rounded-xl transition-all shadow-lg shadow-stone-200 ${isVerifying
+                                    ? 'bg-stone-400 text-white cursor-not-allowed'
+                                    : 'bg-stone-800 text-white hover:bg-stone-900 active:scale-[0.98]'
+                                    }`}
                             >
                                 {isVerifying ? (
                                     <span className="flex items-center justify-center gap-2">
@@ -169,7 +169,7 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
                         {/* 1. 专属徽章卡片 */}
                         <div className="bg-white rounded-2xl p-6 shadow-sm border border-amber-50 relative overflow-hidden">
                             <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-amber-300 via-orange-400 to-amber-300" />
-                            
+
                             <div className="flex items-center gap-4">
                                 <div className="w-16 h-16 bg-gradient-to-br from-amber-400 to-orange-500 rounded-full flex items-center justify-center text-white text-2xl font-bold shadow-lg">
                                     #{supporterId || '001'}
@@ -195,7 +195,7 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
                                         <h3 className="text-lg font-bold text-stone-800">应用图标</h3>
                                     </div>
                                 </div>
-                                
+
                                 {/* 手动刷新按钮 - 仅Android显示 */}
                                 {isRedeemed && Capacitor.isNativePlatform() && (
                                     <button
@@ -214,7 +214,7 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
                                     </button>
                                 )}
                             </div>
-                            
+
                             {/* 图标网格 */}
                             <div className="grid gap-2" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(48px, 1fr))' }}>
                                 {iconOptions.map((option) => (
@@ -222,24 +222,22 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
                                         key={option.id}
                                         onClick={() => handleIconChange(option.id)}
                                         disabled={isChangingIcon || !isRedeemed}
-                                        className={`relative w-12 h-12 rounded-xl transition-all hover:bg-stone-50 ${
-                                            !isRedeemed ? 'opacity-50 cursor-not-allowed' : ''
-                                        } ${
-                                            isChangingIcon ? 'opacity-70' : ''
-                                        }`}
+                                        className={`relative w-12 h-12 rounded-xl transition-all hover:bg-stone-50 ${!isRedeemed ? 'opacity-50 cursor-not-allowed' : ''
+                                            } ${isChangingIcon ? 'opacity-70' : ''
+                                            }`}
                                     >
                                         {isChangingIcon && selectedIcon === option.id && (
                                             <div className="absolute inset-0 flex items-center justify-center bg-white/80 rounded-xl">
                                                 <div className="w-3 h-3 border-2 border-stone-400 border-t-transparent rounded-full animate-spin" />
                                             </div>
                                         )}
-                                        
-                                        <IconPreview 
+
+                                        <IconPreview
                                             iconId={option.id}
                                             iconName={option.name}
                                             size="medium"
                                         />
-                                        
+
                                         {selectedIcon === option.id && (
                                             <div className="absolute top-1 right-1 w-5 h-5 bg-stone-800 rounded-full flex items-center justify-center shadow-lg">
                                                 <Check size={12} className="text-white" />
@@ -248,7 +246,7 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
                                     </button>
                                 ))}
                             </div>
-                            
+
                             {!isRedeemed && (
                                 <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-xl">
                                     <p className="text-xs text-amber-700 text-center">
@@ -275,7 +273,85 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
                         </div>
                     </div>
                 )}
+
+                {/* Feed Me Card - Always Visible */}
+                <div className="pt-8 pb-4 space-y-4">
+                    <div
+                        className="bg-white rounded-2xl p-4 shadow-sm active:scale-[0.98] transition-transform cursor-pointer"
+                        onClick={() => setShowDonationModal(true)}
+                    >
+                        <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 bg-amber-50 rounded-full flex items-center justify-center text-amber-500">
+                                <Coffee size={20} />
+                            </div>
+                            <div className="flex-1">
+                                <h3 className="font-bold text-stone-800">投喂我</h3>
+                                <p className="text-xs text-stone-500">您的支持是我最大的动力</p>
+                            </div>
+                            <div className="bg-amber-100 px-3 py-1 rounded-full text-[10px] font-bold text-amber-600">
+                                如果是真爱
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
+            {/* Donation Modal */}
+            {showDonationModal && (
+                <div
+                    className="fixed inset-0 z-[60] bg-black/50 flex items-center justify-center p-4"
+                    onClick={() => setShowDonationModal(false)}
+                >
+                    <div
+                        className="bg-white rounded-2xl w-full max-w-md shadow-xl animate-in fade-in zoom-in-95 duration-200"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <div className="p-6 space-y-4">
+                            {/* Header */}
+                            <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-3">
+                                    <div className="w-12 h-12 rounded-full bg-amber-100 flex items-center justify-center">
+                                        <Coffee size={24} className="text-amber-600" />
+                                    </div>
+                                    <div>
+                                        <h3 className="font-bold text-lg text-stone-800">感谢支持</h3>
+                                        <p className="text-sm text-stone-500">您的支持是我最大的动力</p>
+                                    </div>
+                                </div>
+                                <button
+                                    onClick={() => setShowDonationModal(false)}
+                                    className="p-1 text-stone-400 hover:text-stone-600 rounded-lg hover:bg-stone-100 transition-colors"
+                                >
+                                    <X size={24} />
+                                </button>
+                            </div>
+
+                            {/* QR Code Image */}
+                            <div className="flex justify-center">
+                                <div className="bg-stone-50 p-4 rounded-2xl">
+                                    <img
+                                        src="/sponsorship_qr.jpg"
+                                        alt="赞赏码"
+                                        className="w-64 h-64 object-contain rounded-xl"
+                                    />
+                                </div>
+                            </div>
+
+                            {/* Footer Message */}
+                            <div className="text-center space-y-2">
+                                <p className="text-sm text-stone-600">扫码支持开发者</p>
+                            </div>
+
+                            {/* Close Button */}
+                            <button
+                                onClick={() => setShowDonationModal(false)}
+                                className="w-full py-3 px-4 text-sm font-medium text-stone-600 bg-stone-100 hover:bg-stone-200 rounded-xl transition-colors"
+                            >
+                                关闭
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };
