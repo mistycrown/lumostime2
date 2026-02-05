@@ -6,6 +6,7 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import { Log, Category, ActiveSession } from '../types';
 import { TIMEPAL_MOTIVATIONAL_QUOTES } from '../constants/timePalQuotes';
+import { TimePalType, getAllTimePalTypes, getTimePalImagePath, getTimePalEmoji } from '../constants/timePalConfig';
 
 interface TimePalCardProps {
     logs: Log[];
@@ -13,9 +14,6 @@ interface TimePalCardProps {
     categories: Category[];
     activeSessions?: ActiveSession[]; // 新增：正在进行的会话
 }
-
-// 时光小友类型
-type TimePalType = 'cat' | 'dog' | 'rabbit';
 
 // 根据专注时长计算形态等级 (1-5)
 const calculateFormLevel = (focusHours: number): number => {
@@ -99,7 +97,7 @@ export const TimePalCard: React.FC<TimePalCardProps> = ({ logs, currentDate, cat
 
     // 切换小动物类型
     const switchTimePal = () => {
-        const types: TimePalType[] = ['cat', 'dog', 'rabbit'];
+        const types = getAllTimePalTypes();
         const currentIndex = types.indexOf(timePalType);
         const nextType = types[(currentIndex + 1) % types.length];
         setTimePalType(nextType);
@@ -181,11 +179,7 @@ export const TimePalCard: React.FC<TimePalCardProps> = ({ logs, currentDate, cat
     }, [logs, currentDate, categories, activeSessions, currentTime]);
 
     // 获取小动物图片路径
-    const getTimePalImage = (type: TimePalType, level: number): string => {
-        return `/time_pal_origin/${type}/kou/${level}.png`;
-    };
-
-    const imageUrl = getTimePalImage(timePalType, formLevel);
+    const imageUrl = getTimePalImagePath(timePalType, formLevel);
     const timeDisplay = formatDuration(totalFocusSeconds);
     const formDesc = getFormDescription(formLevel);
     const quote = useMemo(() => getRandomQuote(), [currentDate]); // 每天固定一个语录
@@ -219,13 +213,8 @@ export const TimePalCard: React.FC<TimePalCardProps> = ({ logs, currentDate, cat
                             className="w-full h-full object-cover animate-wiggle"
                             onError={(e) => {
                                 // 如果图片加载失败，显示占位符
-                                const fallbackEmojis: Record<TimePalType, string> = {
-                                    cat: '🐱',
-                                    dog: '🐶',
-                                    rabbit: '🐰'
-                                };
                                 e.currentTarget.style.display = 'none';
-                                e.currentTarget.parentElement!.innerHTML = `<span class="text-4xl animate-wiggle">${fallbackEmojis[timePalType]}</span>`;
+                                e.currentTarget.parentElement!.innerHTML = `<span class="text-4xl animate-wiggle">${getTimePalEmoji(timePalType)}</span>`;
                             }}
                         />
                     </div>
@@ -236,13 +225,9 @@ export const TimePalCard: React.FC<TimePalCardProps> = ({ logs, currentDate, cat
                     <div className="text-3xl font-bold font-mono text-stone-800 tracking-tight leading-none">
                         {timeDisplay}
                     </div>
-                    <div className="flex items-center gap-2 mt-1.5">
-                        <span className="text-xs text-amber-600 font-medium">
-                            {formDesc}
-                        </span>
-                        <span className="text-xs text-stone-400">
-                            · {quote}
-                        </span>
+                    <div className="mt-1.5 text-xs text-stone-500 leading-relaxed">
+                        <span className="text-amber-600 font-medium">{formDesc}</span>
+                        <span> · {quote}</span>
                     </div>
                 </div>
 
