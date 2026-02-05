@@ -1,15 +1,17 @@
 /**
  * @file TimePalCard.tsx
  * @description 时光小友卡片 - 根据当日专注时长显示不同形态的小动物
+ * 支持实时同步正在进行的计时
  */
 import React, { useMemo, useState, useEffect } from 'react';
-import { Log, Category } from '../types';
+import { Log, Category, ActiveSession } from '../types';
 import { TIMEPAL_MOTIVATIONAL_QUOTES } from '../constants/timePalQuotes';
 
 interface TimePalCardProps {
     logs: Log[];
     currentDate: Date;
     categories: Category[];
+    activeSessions?: ActiveSession[]; // 新增：正在进行的会话
 }
 
 // 时光小友类型
@@ -49,12 +51,25 @@ const getRandomQuote = (): string => {
     return TIMEPAL_MOTIVATIONAL_QUOTES[Math.floor(Math.random() * TIMEPAL_MOTIVATIONAL_QUOTES.length)];
 };
 
-export const TimePalCard: React.FC<TimePalCardProps> = ({ logs, currentDate, categories }) => {
+export const TimePalCard: React.FC<TimePalCardProps> = ({ logs, currentDate, categories, activeSessions = [] }) => {
     // 从 localStorage 读取用户选择的小动物类型
     const [timePalType, setTimePalType] = useState<TimePalType>(() => {
         const saved = localStorage.getItem('lumostime_timepal_type');
         return (saved as TimePalType) || 'cat';
     });
+
+    // 实时计时器状态 - 用于更新正在进行的会话时长
+    const [currentTime, setCurrentTime] = useState(Date.now());
+
+    // 每秒更新一次当前时间，用于实时显示正在进行的计时
+    useEffect(() => {
+        if (activeSessions.length > 0) {
+            const interval = setInterval(() => {
+                setCurrentTime(Date.now());
+            }, 1000);
+            return () => clearInterval(interval);
+        }
+    }, [activeSessions.length]);
 
     // 监听 localStorage 变化，实现跨组件同步
     useEffect(() => {
@@ -110,7 +125,7 @@ export const TimePalCard: React.FC<TimePalCardProps> = ({ logs, currentDate, cat
         const filterActivityIdsStr = localStorage.getItem('lumostime_timepal_filter_activities');
         const filterActivityIds: string[] = filterActivityIdsStr ? JSON.parse(filterActivityIdsStr) : [];
 
-        // 计算总专注时长
+        // 计算总专注时长（已完成的记录）
         let totalSeconds = 0;
         dayLogs.forEach(log => {
             const category = categories.find(c => c.id === log.categoryId);
@@ -130,6 +145,32 @@ export const TimePalCard: React.FC<TimePalCardProps> = ({ logs, currentDate, cat
             }
         });
 
+        // 计算正在进行的会话时长
+        if (activeSessions.length > 0) {
+            activeSessions.forEach(session => {
+                // 检查会话是否在当天
+                if (session.startTime >= startOfDay.getTime() && session.startTime <= endOfDay.getTime()) {
+                    const category = categories.find(c => c.id === session.categoryId);
+                    const activity = category?.activities.find(a => a.id === session.activityId);
+                    
+                    // 应用相同的筛选逻辑
+                    let shouldCount = false;
+                    if (isFilterEnabled && filterActivityIds.length > 0) {
+                        shouldCount = filterActivityIds.includes(session.activityId);
+                    } else {
+                        const isFocusEnabled = activity?.enableFocusScore ?? category?.enableFocusScore ?? false;
+                        shouldCount = isFocusEnabled;
+                    }
+                    
+                    if (shouldCount) {
+                        // 计算从开始到现在的时长（秒）
+                        const sessionDuration = Math.floor((currentTime - session.startTime) / 1000);
+                        totalSeconds += sessionDuration;
+                    }
+                }
+            });
+        }
+
         const focusHours = totalSeconds / 3600;
         const level = calculateFormLevel(focusHours);
 
@@ -137,7 +178,7 @@ export const TimePalCard: React.FC<TimePalCardProps> = ({ logs, currentDate, cat
             totalFocusSeconds: totalSeconds,
             formLevel: level
         };
-    }, [logs, currentDate, categories]);
+    }, [logs, currentDate, categories, activeSessions, currentTime]);
 
     // 获取小动物图片路径
     const getTimePalImage = (type: TimePalType, level: number): string => {

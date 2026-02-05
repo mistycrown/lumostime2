@@ -6,6 +6,7 @@ import { useCategoryScope } from '../contexts/CategoryScopeContext';
 import { useReview } from '../contexts/ReviewContext';
 import { useSettings } from '../contexts/SettingsContext';
 import { useToast } from '../contexts/ToastContext';
+import { useSession } from '../contexts/SessionContext';
 import { useGoalManager } from '../hooks/useGoalManager';
 import { useReviewManager } from '../hooks/useReviewManager';
 import { aiService } from '../services/aiService';
@@ -91,6 +92,7 @@ export const AppRoutes: React.FC<AppRoutesProps> = ({
     const { dailyReviews, weeklyReviews, monthlyReviews, setDailyReviews, setWeeklyReviews, setMonthlyReviews, reviewTemplates, checkTemplates, dailyReviewTime, weeklyReviewTime, monthlyReviewTime } = useReview();
     const { userPersonalInfo, autoLinkRules, customNarrativeTemplates, startWeekOnSunday, minIdleTimeThreshold } = useSettings();
     const { addToast } = useToast();
+    const { activeSessions } = useSession();
 
     // Import hooks
     const { handleAddGoal, handleEditGoal, handleSaveGoal, handleDeleteGoal, handleArchiveGoal } = useGoalManager();
@@ -235,6 +237,7 @@ export const AppRoutes: React.FC<AppRoutesProps> = ({
                     scopes={scopes}
                     minIdleTimeThreshold={minIdleTimeThreshold}
                     onQuickPunch={handleQuickPunch}
+                    activeSessions={activeSessions}
                     dailyReview={dailyReviews.find(r => r.date === getLocalDateStr(currentDate))}
                     onOpenDailyReview={handleOpenDailyReview}
                     templates={reviewTemplates}
