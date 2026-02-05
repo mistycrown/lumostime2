@@ -30,50 +30,64 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
     const { defaultIndexView } = useSettings();
     const [currentDecoration, setCurrentDecoration] = useState<string>('default');
     const [decorationUrl, setDecorationUrl] = useState<string>('');
-    const [decorationOffsetY, setDecorationOffsetY] = useState<string>('bottom');
-    const [debugOffsetY, setDebugOffsetY] = useState<string>('bottom');
+    const [settings, setSettings] = useState({
+        offsetY: 'bottom',
+        offsetX: 'center',
+        scale: 1,
+        opacity: 0.6
+    });
     const [showDebugger, setShowDebugger] = useState(false);
 
     useEffect(() => {
-        // 初始化装饰
-        const decorationId = navigationDecorationService.getCurrentDecoration();
-        setCurrentDecoration(decorationId);
-        const decoration = navigationDecorationService.getDecorationById(decorationId);
-        setDecorationUrl(decoration?.url || '');
-        setDecorationOffsetY(decoration?.offsetY || 'bottom');
-        setDebugOffsetY(decoration?.offsetY || 'bottom');
-
-        // 监听装饰变化
-        const handleDecorationChange = (event: CustomEvent) => {
-            const { decorationId } = event.detail;
+        const updateState = (decorationId: string, overrideSettings?: any) => {
             setCurrentDecoration(decorationId);
             const decoration = navigationDecorationService.getDecorationById(decorationId);
             setDecorationUrl(decoration?.url || '');
-            setDecorationOffsetY(decoration?.offsetY || 'bottom');
-            setDebugOffsetY(decoration?.offsetY || 'bottom');
+
+            const baseSettings = {
+                offsetY: decoration?.offsetY || 'bottom',
+                offsetX: decoration?.offsetX || 'center',
+                scale: decoration?.scale || 1,
+                opacity: decoration?.opacity ?? 0.6
+            };
+
+            setSettings({ ...baseSettings, ...overrideSettings });
+        };
+
+        // Initialize
+        updateState(navigationDecorationService.getCurrentDecoration());
+
+        // Listen for changes
+        const handleDecorationChange = (event: CustomEvent) => {
+            updateState(event.detail.decorationId);
+        };
+
+        // Listen for live preview
+        const handlePreview = (event: CustomEvent) => {
+            const { id, settings: previewSettings } = event.detail;
+            if (id) {
+                // If ID matches, simply override settings.
+                // If ID changed (prev/next in debugger), we need to update URL too.
+                const decoration = navigationDecorationService.getDecorationById(id);
+                setDecorationUrl(decoration?.url || '');
+                setCurrentDecoration(id);
+                setSettings(previewSettings);
+            }
         };
 
         window.addEventListener('navigationDecorationChange', handleDecorationChange as EventListener);
+        window.addEventListener('navigationDecorationPreview', handlePreview as EventListener);
 
-        // 注册全局调试函数
-        (window as any).enableNavDecoDebug = () => {
-            setShowDebugger(true);
-        };
-
-        (window as any).disableNavDecoDebug = () => {
-            setShowDebugger(false);
-        };
+        (window as any).enableNavDecoDebug = () => setShowDebugger(true);
+        (window as any).disableNavDecoDebug = () => setShowDebugger(false);
 
         return () => {
             window.removeEventListener('navigationDecorationChange', handleDecorationChange as EventListener);
+            window.removeEventListener('navigationDecorationPreview', handlePreview as EventListener);
             delete (window as any).enableNavDecoDebug;
             delete (window as any).disableNavDecoDebug;
         };
     }, []);
-
-    const handleDebugOffsetChange = (newOffset: string) => {
-        setDebugOffsetY(newOffset);
-    };
 
     const handleCloseDebugger = () => {
         setShowDebugger(false);
@@ -85,8 +99,15 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
         ? 'bg-[#faf9f6]/80 backdrop-blur-md'
         : 'bg-white/80 backdrop-blur-md';
 
-    // 使用调试偏移值（如果正在调试）或默认偏移值
-    const activeOffsetY = debugOffsetY;
+    // Calculate dynamic styles
+    const navStyle: React.CSSProperties = {};
+    if (currentDecoration !== 'default' && decorationUrl) {
+        navStyle.backgroundImage = `url(${decorationUrl})`;
+        navStyle.backgroundRepeat = 'repeat-x';
+        navStyle.backgroundPosition = `${settings.offsetX} ${settings.offsetY}`;
+        navStyle.backgroundSize = `auto ${settings.scale * 80}px`; // Base height 80px * scale
+        navStyle.opacity = settings.opacity;
+    }
 
     return (
         <>
@@ -95,13 +116,7 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
                 {currentDecoration !== 'default' && decorationUrl && (
                     <div
                         className="absolute bottom-0 left-0 w-full h-40 md:h-48 pointer-events-none z-10"
-                        style={{
-                            backgroundImage: `url(${decorationUrl})`,
-                            backgroundRepeat: 'repeat-x',
-                            backgroundPosition: `center ${activeOffsetY}`,
-                            backgroundSize: 'auto 80px',
-                            opacity: 0.6
-                        }}
+                        style={navStyle}
                     />
                 )}
 
@@ -131,11 +146,9 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
             </div>
 
             {/* 调试工具 */}
-            {showDebugger && currentDecoration !== 'default' && decorationUrl && (
+            {showDebugger && (
                 <NavigationDecorationDebugger
                     currentDecorationId={currentDecoration}
-                    currentOffset={decorationOffsetY}
-                    onOffsetChange={handleDebugOffsetChange}
                     onClose={handleCloseDebugger}
                 />
             )}
