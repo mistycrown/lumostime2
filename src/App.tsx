@@ -272,6 +272,7 @@ const AppContent: React.FC = () => {
           scopes={scopes}
           autoLinkRules={autoLinkRules}
           autoFocusNote={autoFocusNote}
+          allLogs={logs}
         />
       )}
 
