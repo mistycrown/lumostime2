@@ -14,7 +14,8 @@
     "electron:build": "vite build && electron-builder",
     "install-image-deps": "node scripts/install-image-deps.js",
     "process-icons": "node scripts/process-icon-corners.js",
-    "restore-icons": "node scripts/process-icon-corners.js --restore"
+    "restore-icons": "node scripts/process-icon-corners.js --restore",
+    "optimize-images": "node scripts/optimize-images.js"
   },
   "dependencies": {
     "@awesome-cordova-plugins/core": "^8.1.0",
@@ -57,6 +58,7 @@
     "electron-builder": "^26.0.12",
     "fast-check": "^4.5.3",
     "rimraf": "^6.1.2",
+    "sharp": "^0.34.5",
     "typescript": "~5.8.2",
     "vite": "^6.2.0",
     "vite-plugin-electron": "^0.29.0",
@@ -69,6 +71,14 @@
     "directories": {
       "output": "release"
     },
+    "files": [
+      "dist/**/*",
+      "dist-electron/**/*",
+      "package.json"
+    ],
+    "asarUnpack": [
+      "dist/assets/**/*"
+    ],
     "win": {
       "target": [
         "nsis"
