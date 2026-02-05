@@ -348,3 +348,5 @@ export interface MemoirFilterConfig {
   showWeeklyReviews?: boolean; // 新增：显示每周回顾
 }
 
+
+export type SearchType = 'record' | 'category' | 'activity' | 'todo' | 'scope' | 'review';

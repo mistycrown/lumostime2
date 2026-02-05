@@ -3,7 +3,7 @@
  * @description 统一管理应用的所有导航和模态状态
  */
 import React, { createContext, useContext, useState, ReactNode } from 'react';
-import { AppView, Log, TodoItem, Goal } from '../types';
+import { AppView, Log, TodoItem, Goal, SearchType } from '../types';
 import { useSettings } from './SettingsContext';
 
 interface NavigationContextType {
@@ -18,6 +18,15 @@ interface NavigationContextType {
     setIsAutoLinkOpen: (open: boolean) => void;
     isSearchOpen: boolean;
     setIsSearchOpen: (open: boolean) => void;
+
+    // Search Persistence
+    searchQuery: string;
+    setSearchQuery: (query: string) => void;
+    searchMode: 'all' | 'partial';
+    setSearchMode: (mode: 'all' | 'partial') => void;
+    selectedSearchTypes: SearchType[];
+    setSelectedSearchTypes: (types: SearchType[]) => void;
+
     isStatsFullScreen: boolean;
     setIsStatsFullScreen: (open: boolean) => void;
     isAddModalOpen: boolean;
@@ -129,14 +138,6 @@ export const NavigationProvider: React.FC<NavigationProviderProps> = ({
 
     // Wrapper for setting view to handle default preferences
     const handleSetCurrentView = (view: AppView) => {
-        // Handle Index Page Preference
-        if (view === AppView.TAGS) {
-            if (defaultIndexView === 'SCOPE' && currentView !== AppView.SCOPE) {
-                setCurrentView(AppView.SCOPE);
-                return;
-            }
-        }
-
         // Handle Archive Page Preference (Reset to default on entry)
         if (view === AppView.REVIEW) {
             setIsJournalMode(defaultArchiveView === 'MEMOIR');
@@ -149,6 +150,12 @@ export const NavigationProvider: React.FC<NavigationProviderProps> = ({
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
     const [isAutoLinkOpen, setIsAutoLinkOpen] = useState(false);
     const [isSearchOpen, setIsSearchOpen] = useState(false);
+
+    // Search Persistence State
+    const [searchQuery, setSearchQuery] = useState('');
+    const [searchMode, setSearchMode] = useState<'all' | 'partial'>('all');
+    const [selectedSearchTypes, setSelectedSearchTypes] = useState<SearchType[]>([]);
+
     const [isStatsFullScreen, setIsStatsFullScreen] = useState(false);
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
     const [isTodoModalOpen, setIsTodoModalOpen] = useState(false);
@@ -210,6 +217,12 @@ export const NavigationProvider: React.FC<NavigationProviderProps> = ({
             setIsAutoLinkOpen,
             isSearchOpen,
             setIsSearchOpen,
+            searchQuery,
+            setSearchQuery,
+            searchMode,
+            setSearchMode,
+            selectedSearchTypes,
+            setSelectedSearchTypes,
             isStatsFullScreen,
             setIsStatsFullScreen,
             isAddModalOpen,

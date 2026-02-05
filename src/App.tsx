@@ -90,7 +90,8 @@ const AppContent: React.FC = () => {
     focusDetailSessionId, setFocusDetailSessionId,
     statsTitle, setStatsTitle,
     currentView, setCurrentView,
-    initialLogTimes
+    initialLogTimes,
+    setReturnToSearch
   } = useNavigation();
   const { categories, scopes, goals, setCategories, setScopes, setGoals } = useCategoryScope();
   const { startActivity, stopActivity, cancelSession, activeSessions, setActiveSessions } = useSession();
@@ -164,13 +165,19 @@ const AppContent: React.FC = () => {
   };
 
   const handleSelectDailyReviewWrapper = (dateStr: string) => {
+    setReturnToSearch(true);
+    setIsSearchOpen(false);
     reviewManager.handleOpenDailyReview(new Date(dateStr));
   };
   const handleSelectWeeklyReviewWrapper = (id: string) => {
+    setReturnToSearch(true);
+    setIsSearchOpen(false);
     const r = weeklyReviews.find(r => r.id === id);
     if (r) reviewManager.handleOpenWeeklyReview(new Date(r.weekStartDate), new Date(r.weekEndDate));
   };
   const handleSelectMonthlyReviewWrapper = (id: string) => {
+    setReturnToSearch(true);
+    setIsSearchOpen(false);
     const r = monthlyReviews.find(r => r.id === id);
     if (r) reviewManager.handleOpenMonthlyReview(new Date(r.monthStartDate), new Date(r.monthEndDate));
   };
@@ -345,7 +352,7 @@ const AppContent: React.FC = () => {
             }}
             onUpdate={(updated) => {
               // Update the session in activeSessions
-              setActiveSessions(prev => prev.map(s => 
+              setActiveSessions(prev => prev.map(s =>
                 s.id === updated.id ? updated : s
               ));
             }}

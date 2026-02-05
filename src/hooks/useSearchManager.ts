@@ -57,6 +57,8 @@ export const useSearchManager = () => {
     };
 
     const handleSelectSearchTodoWrapper = (todo: TodoItem, openEditTodoModal: (todo: TodoItem) => void) => {
+        setReturnToSearch(true);
+        setIsSearchOpen(false);
         setCurrentView(AppView.TODO);
         setTimeout(() => openEditTodoModal(todo), 100);
     };
