@@ -2,7 +2,7 @@
  * @file TimePalCard.tsx
  * @description 时光小友卡片 - 根据当日专注时长显示不同形态的小动物
  */
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { Log, Category } from '../types';
 import { TIMEPAL_MOTIVATIONAL_QUOTES } from '../constants/timePalQuotes';
 
@@ -56,6 +56,32 @@ export const TimePalCard: React.FC<TimePalCardProps> = ({ logs, currentDate, cat
         return (saved as TimePalType) || 'cat';
     });
 
+    // 监听 localStorage 变化，实现跨组件同步
+    useEffect(() => {
+        const handleStorageChange = () => {
+            const saved = localStorage.getItem('lumostime_timepal_type');
+            if (saved) {
+                setTimePalType(saved as TimePalType);
+            }
+        };
+
+        window.addEventListener('storage', handleStorageChange);
+        
+        // 也监听自定义事件（用于同一页面内的更新）
+        const handleCustomChange = () => {
+            const saved = localStorage.getItem('lumostime_timepal_type');
+            if (saved) {
+                setTimePalType(saved as TimePalType);
+            }
+        };
+        window.addEventListener('timepal-type-changed', handleCustomChange);
+
+        return () => {
+            window.removeEventListener('storage', handleStorageChange);
+            window.removeEventListener('timepal-type-changed', handleCustomChange);
+        };
+    }, []);
+
     // 切换小动物类型
     const switchTimePal = () => {
         const types: TimePalType[] = ['cat', 'dog', 'rabbit'];
@@ -63,6 +89,8 @@ export const TimePalCard: React.FC<TimePalCardProps> = ({ logs, currentDate, cat
         const nextType = types[(currentIndex + 1) % types.length];
         setTimePalType(nextType);
         localStorage.setItem('lumostime_timepal_type', nextType);
+        // 触发自定义事件通知其他组件
+        window.dispatchEvent(new Event('timepal-type-changed'));
     };
 
     // 计算当日专注时长
@@ -77,17 +105,28 @@ export const TimePalCard: React.FC<TimePalCardProps> = ({ logs, currentDate, cat
             return log.startTime >= startOfDay.getTime() && log.startTime <= endOfDay.getTime();
         });
 
-        // 计算总专注时长（只统计启用了专注度的活动）
+        // 读取筛选配置
+        const isFilterEnabled = localStorage.getItem('lumostime_timepal_filter_enabled') === 'true';
+        const filterActivityIdsStr = localStorage.getItem('lumostime_timepal_filter_activities');
+        const filterActivityIds: string[] = filterActivityIdsStr ? JSON.parse(filterActivityIdsStr) : [];
+
+        // 计算总专注时长
         let totalSeconds = 0;
         dayLogs.forEach(log => {
             const category = categories.find(c => c.id === log.categoryId);
             const activity = category?.activities.find(a => a.id === log.activityId);
             
-            // 检查是否启用专注度追踪
-            const isFocusEnabled = activity?.enableFocusScore ?? category?.enableFocusScore ?? false;
-            
-            if (isFocusEnabled) {
-                totalSeconds += log.duration;
+            // 如果启用了筛选，只统计选中的标签
+            if (isFilterEnabled && filterActivityIds.length > 0) {
+                if (filterActivityIds.includes(log.activityId)) {
+                    totalSeconds += log.duration;
+                }
+            } else {
+                // 否则统计所有启用了专注度追踪的活动
+                const isFocusEnabled = activity?.enableFocusScore ?? category?.enableFocusScore ?? false;
+                if (isFocusEnabled) {
+                    totalSeconds += log.duration;
+                }
             }
         });
 
@@ -110,8 +149,16 @@ export const TimePalCard: React.FC<TimePalCardProps> = ({ logs, currentDate, cat
     const formDesc = getFormDescription(formLevel);
     const quote = useMemo(() => getRandomQuote(), [currentDate]); // 每天固定一个语录
 
-    // 如果没有专注时长，不显示卡片
-    if (totalFocusSeconds === 0) {
+    // 检查是否是今天
+    const isToday = useMemo(() => {
+        const today = new Date();
+        return currentDate.getFullYear() === today.getFullYear() &&
+               currentDate.getMonth() === today.getMonth() &&
+               currentDate.getDate() === today.getDate();
+    }, [currentDate]);
+
+    // 如果不是今天，或者没有专注时长，不显示卡片
+    if (!isToday || totalFocusSeconds === 0) {
         return null;
     }
 
