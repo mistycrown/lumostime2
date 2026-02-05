@@ -50,8 +50,8 @@ const PRESET_BACKGROUNDS: BackgroundOption[] = [
         id: 'green2',
         name: '绿意2',
         type: 'preset',
-        url: '/background/green2.png',
-        thumbnail: '/background/green2.png',
+        url: '/background/green2.webp',
+        thumbnail: '/background/green2.webp',
     },
 ];
 
