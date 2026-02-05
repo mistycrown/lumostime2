@@ -154,6 +154,7 @@ export const ModalManager: React.FC<ModalManagerProps> = ({
                     autoLinkRules={autoLinkRules}
                     lastLogEndTime={lastLogEndTime}
                     autoFocusNote={autoFocusNote}
+                    allLogs={logs}
                 />
             )}
 

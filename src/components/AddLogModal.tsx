@@ -34,9 +34,10 @@ interface AddLogModalProps {
   autoLinkRules?: AutoLinkRule[];
   lastLogEndTime?: number;
   autoFocusNote?: boolean;
+  allLogs?: Log[]; // 添加所有日志用于计算上一条记录
 }
 
-export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialStartTime, initialEndTime, onClose, onSave, onDelete, onImageRemove, categories, todos, todoCategories, scopes, autoLinkRules = [], lastLogEndTime, autoFocusNote = true }) => {
+export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialStartTime, initialEndTime, onClose, onSave, onDelete, onImageRemove, categories, todos, todoCategories, scopes, autoLinkRules = [], lastLogEndTime, autoFocusNote = true, allLogs = [] }) => {
   const [selectedCategoryId, setSelectedCategoryId] = useState<string>(categories[0].id);
   const [selectedActivityId, setSelectedActivityId] = useState<string>(categories[0].activities[0].id);
   const [note, setNote] = useState('');
@@ -142,6 +143,42 @@ export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialSta
     setCurrentStartTime(cStart);
     setCurrentEndTime(cEnd);
   }, [initialLog, initialStartTime, initialEndTime, categories, todos, todoCategories]);
+
+  // 计算真正的"上一条记录"的结束时间
+  const previousLogEndTime = useMemo(() => {
+    if (!allLogs || allLogs.length === 0) return lastLogEndTime;
+    
+    // 获取当前记录的开始时间作为参考点
+    const referenceTime = currentStartTime || trackStartTime || Date.now();
+    
+    // 获取参考时间的日期（当天0点）
+    const referenceDate = new Date(referenceTime);
+    referenceDate.setHours(0, 0, 0, 0);
+    const dayStartTime = referenceDate.getTime();
+    
+    // 过滤出在参考时间之前结束的所有记录
+    const previousLogs = allLogs.filter(log => {
+      // 如果是编辑模式，排除当前正在编辑的记录
+      if (initialLog && log.id === initialLog.id) return false;
+      // 只要结束时间在参考时间之前的记录
+      return log.endTime <= referenceTime;
+    });
+    
+    // 如果没有之前的记录，返回 lastLogEndTime
+    if (previousLogs.length === 0) return lastLogEndTime;
+    
+    // 找到结束时间最接近参考时间的记录
+    const sortedPreviousLogs = previousLogs.sort((a, b) => b.endTime - a.endTime);
+    const closestLog = sortedPreviousLogs[0];
+    
+    // 检查最近的记录是否在同一天
+    // 如果不在同一天（即当天没有更早的记录），返回当天0点
+    if (closestLog.endTime < dayStartTime) {
+      return dayStartTime;
+    }
+    
+    return closestLog.endTime;
+  }, [allLogs, currentStartTime, trackStartTime, initialLog, lastLogEndTime]);
 
   // Unified Suggestion State
   const [suggestions, setSuggestions] = useState<{
@@ -659,8 +696,8 @@ export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialSta
 
                 <button
                   onClick={() => {
-                    if (lastLogEndTime) {
-                      setCurrentStartTime(lastLogEndTime);
+                    if (previousLogEndTime) {
+                      setCurrentStartTime(previousLogEndTime);
                     } else {
                       // Fallback to now if no last log
                       handleSetStartToNow();
