@@ -17,9 +17,19 @@ const CUSTOM_OFFSET_KEY = 'navigation_decoration_custom_offsets';
 class NavigationDecorationService {
     private decorations: NavigationDecorationOption[] = [
         { id: 'default', name: '默认', url: '', offsetY: 'bottom' },
-        { id: 'bamboo', name: '竹子', url: '/dchh/未标题-1.png', offsetY: '97px' },
-        { id: 'watercolor1', name: '水彩1', url: '/dchh/watercolor-trailing.png', offsetY: '71px' },
-        { id: 'pattern', name: '图案', url: '/dchh/Snipaste_2026-02-04_20-58-18.png', offsetY: '71px' },
+        { id: 'distant_mountain', name: '远山', url: '/dchh/distant_mountain.png', offsetY: '71px' },
+        { id: 'little_prince', name: '小王子', url: '/dchh/little_prince.png', offsetY: '71px' },
+        { id: 'book', name: '书本', url: '/dchh/book.png', offsetY: '71px' },
+        { id: 'cloud', name: '云朵', url: '/dchh/cloud.png', offsetY: '71px' },
+        { id: 'coffee', name: '咖啡', url: '/dchh/coffee.png', offsetY: '71px' },
+        { id: 'fish', name: '鱼', url: '/dchh/fish.png', offsetY: '71px' },
+        { id: 'flower', name: '花朵', url: '/dchh/flower.png', offsetY: '71px' },
+        { id: 'grass', name: '草地', url: '/dchh/grass.png', offsetY: '71px' },
+        { id: 'ink', name: '水墨', url: '/dchh/ink.png', offsetY: '71px' },
+        { id: 'light', name: '灯光', url: '/dchh/light.png', offsetY: '71px' },
+        { id: 'mushroom', name: '蘑菇', url: '/dchh/mushroom.png', offsetY: '71px' },
+        { id: 'plant', name: '植物1', url: '/dchh/plant.png', offsetY: '71px' },
+        { id: 'plant2', name: '植物2', url: '/dchh/plant2.png', offsetY: '71px' },
     ];
 
     getAllDecorations(): NavigationDecorationOption[] {
@@ -33,8 +43,8 @@ class NavigationDecorationService {
     setCurrentDecoration(decorationId: string): void {
         localStorage.setItem(STORAGE_KEY, decorationId);
         // 触发自定义事件通知导航栏更新
-        window.dispatchEvent(new CustomEvent('navigationDecorationChange', { 
-            detail: { decorationId } 
+        window.dispatchEvent(new CustomEvent('navigationDecorationChange', {
+            detail: { decorationId }
         }));
     }
 
@@ -65,10 +75,10 @@ class NavigationDecorationService {
         const customOffsets = this.getCustomOffsets();
         customOffsets[decorationId] = offsetY;
         localStorage.setItem(CUSTOM_OFFSET_KEY, JSON.stringify(customOffsets));
-        
+
         // 触发更新事件
-        window.dispatchEvent(new CustomEvent('navigationDecorationChange', { 
-            detail: { decorationId } 
+        window.dispatchEvent(new CustomEvent('navigationDecorationChange', {
+            detail: { decorationId }
         }));
     }
 
@@ -78,7 +88,7 @@ class NavigationDecorationService {
         if (customOffsets[decorationId]) {
             return customOffsets[decorationId];
         }
-        
+
         const decoration = this.decorations.find(d => d.id === decorationId);
         return decoration?.offsetY || 'bottom';
     }

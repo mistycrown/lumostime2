@@ -19,39 +19,32 @@ const PRESET_BACKGROUNDS: BackgroundOption[] = [
         url: '',
     },
     {
-        id: 'preset_1',
-        name: '预设背景 1',
+        id: 'little_prince',
+        name: '小王子',
         type: 'preset',
-        url: '/background/0e35b64ef5a347c98ea6d9d1f45a215d~tplv-tb4s082cfz-aigc_resize_1080_1080.webp',
-        thumbnail: '/background/0e35b64ef5a347c98ea6d9d1f45a215d~tplv-tb4s082cfz-aigc_resize_1080_1080.webp',
+        url: '/background/little_prince.webp',
+        thumbnail: '/background/little_prince.webp',
     },
     {
-        id: 'preset_2',
-        name: '预设背景 2',
+        id: 'bank',
+        name: '河岸',
         type: 'preset',
-        url: '/background/2ca9862eb0fb44fe9a076a0563498bae~tplv-tb4s082cfz-aigc_resize_1080_1080.webp',
-        thumbnail: '/background/2ca9862eb0fb44fe9a076a0563498bae~tplv-tb4s082cfz-aigc_resize_1080_1080.webp',
+        url: '/background/bank.webp',
+        thumbnail: '/background/bank.webp',
     },
     {
-        id: 'preset_3',
-        name: '预设背景 3',
+        id: 'bird',
+        name: '飞鸟',
         type: 'preset',
-        url: '/background/526147b517c248ea8b50c17fd1399b4e~tplv-tb4s082cfz-aigc_resize_1080_1080.webp',
-        thumbnail: '/background/526147b517c248ea8b50c17fd1399b4e~tplv-tb4s082cfz-aigc_resize_1080_1080.webp',
+        url: '/background/bird.webp',
+        thumbnail: '/background/bird.webp',
     },
     {
-        id: 'preset_4',
-        name: '预设背景 4',
+        id: 'green',
+        name: '绿意',
         type: 'preset',
-        url: '/background/785634cc1f1749dbb30302bedef70d1b~tplv-tb4s082cfz-aigc_resize_1080_1080.webp',
-        thumbnail: '/background/785634cc1f1749dbb30302bedef70d1b~tplv-tb4s082cfz-aigc_resize_1080_1080.webp',
-    },
-    {
-        id: 'preset_5',
-        name: '预设背景 5',
-        type: 'preset',
-        url: '/background/7ca9d3b7c1634155a9ee4d2ffa4e658a~tplv-tb4s082cfz-aigc_resize_1080_1080.webp',
-        thumbnail: '/background/7ca9d3b7c1634155a9ee4d2ffa4e658a~tplv-tb4s082cfz-aigc_resize_1080_1080.webp',
+        url: '/background/green.webp',
+        thumbnail: '/background/green.webp',
     },
 ];
 
@@ -121,7 +114,7 @@ class BackgroundService {
 
                     const customBackgrounds = this.getCustomBackgrounds();
                     customBackgrounds.push(customBackground);
-                    
+
                     localStorage.setItem(STORAGE_KEY, JSON.stringify(customBackgrounds));
                     resolve(customBackground);
                 } catch (error) {
@@ -140,16 +133,16 @@ class BackgroundService {
         try {
             const customBackgrounds = this.getCustomBackgrounds();
             const filteredBackgrounds = customBackgrounds.filter(bg => bg.id !== backgroundId);
-            
+
             if (filteredBackgrounds.length !== customBackgrounds.length) {
                 localStorage.setItem(STORAGE_KEY, JSON.stringify(filteredBackgrounds));
-                
+
                 // 如果删除的是当前背景，重置为默认
                 const currentBackground = this.getCurrentBackground();
                 if (currentBackground === backgroundId) {
                     this.setCurrentBackground('default');
                 }
-                
+
                 return true;
             }
             return false;
@@ -167,9 +160,9 @@ class BackgroundService {
         if (currentId === backgroundId) {
             return; // 如果是相同的背景，不触发更新
         }
-        
+
         localStorage.setItem(CURRENT_BACKGROUND_KEY, backgroundId);
-        
+
         // 立即应用背景到所有目标元素
         this.applyBackgroundToElements();
     }
@@ -188,13 +181,13 @@ class BackgroundService {
         // 确保透明度在0-0.4之间
         const clampedOpacity = Math.max(0, Math.min(0.4, opacity));
         const currentOpacity = this.getBackgroundOpacity();
-        
+
         if (Math.abs(currentOpacity - clampedOpacity) < 0.001) {
             return; // 如果透明度变化很小，不触发更新
         }
-        
+
         localStorage.setItem(BACKGROUND_OPACITY_KEY, clampedOpacity.toString());
-        
+
         // 立即应用透明度到所有目标元素
         this.applyBackgroundToElements();
     }
@@ -221,35 +214,35 @@ class BackgroundService {
         if (this.isApplying) {
             return;
         }
-        
+
         this.isApplying = true;
-        
+
         try {
             const background = this.getCurrentBackgroundOption();
             const opacity = this.getBackgroundOpacity();
-            
+
             TARGET_ELEMENTS.forEach(elementId => {
                 const element = document.getElementById(elementId);
                 if (!element) {
                     return;
                 }
-                
+
                 // 移除之前的背景层
                 const existingBgLayer = element.querySelector('.bg-layer');
                 if (existingBgLayer) {
                     existingBgLayer.remove();
                 }
-                
+
                 if (!background || background.id === 'default') {
                     return;
                 }
-                
+
                 // 确保元素有相对定位
                 const computedStyle = getComputedStyle(element);
                 if (computedStyle.position === 'static') {
                     element.style.position = 'relative';
                 }
-                
+
                 // 创建背景层 div
                 const bgLayer = document.createElement('div');
                 bgLayer.className = 'bg-layer';
@@ -263,7 +256,7 @@ class BackgroundService {
                     pointer-events: none;
                     opacity: ${opacity};
                 `;
-                
+
                 if (background.url.startsWith('linear-gradient')) {
                     // 渐变背景
                     bgLayer.style.background = background.url;
@@ -274,10 +267,10 @@ class BackgroundService {
                     bgLayer.style.backgroundPosition = 'center center'; // 居中显示
                     bgLayer.style.backgroundRepeat = 'no-repeat';
                 }
-                
+
                 // 将背景层插入到元素的第一个子元素之前
                 element.insertBefore(bgLayer, element.firstChild);
-                
+
                 // 确保元素的直接子元素有正确的 z-index
                 Array.from(element.children).forEach((child) => {
                     if (child !== bgLayer && child instanceof HTMLElement) {
@@ -311,24 +304,24 @@ class BackgroundService {
      */
     init(): void {
         const currentBackground = this.getCurrentBackground();
-        
+
         // 延迟执行确保DOM已经准备好
         setTimeout(() => {
             this.applyBackgroundToElements();
         }, 500);
-        
+
         // 监听页面变化，重新应用背景
         const observer = new MutationObserver((mutations) => {
             let shouldReapply = false;
             mutations.forEach(mutation => {
                 // 忽略 head 中的变化和我们自己添加的背景层
-                if (mutation.target === document.head || 
+                if (mutation.target === document.head ||
                     (mutation.target as Element).closest?.('head') ||
                     (mutation.target as Element).classList?.contains('bg-layer') ||
                     (mutation.target as Element).querySelector?.('.bg-layer') === mutation.addedNodes[0]) {
                     return;
                 }
-                
+
                 // 检查是否有目标元素被添加
                 if (mutation.type === 'childList') {
                     mutation.addedNodes.forEach(node => {
@@ -339,7 +332,7 @@ class BackgroundService {
                                 return;
                             }
                             // 检查是否是目标元素或包含目标元素
-                            if (TARGET_ELEMENTS.some(id => 
+                            if (TARGET_ELEMENTS.some(id =>
                                 element.id === id || element.querySelector(`#${id}`)
                             )) {
                                 shouldReapply = true;
@@ -348,14 +341,14 @@ class BackgroundService {
                     });
                 }
             });
-            
+
             if (shouldReapply) {
                 setTimeout(() => {
                     this.applyBackgroundToElements();
                 }, 100);
             }
         });
-        
+
         // 只观察body的变化，不观察head
         if (document.body) {
             observer.observe(document.body, {
@@ -363,27 +356,27 @@ class BackgroundService {
                 subtree: true
             });
         }
-        
+
         // 监听路由变化（React Router或其他路由系统）
         window.addEventListener('popstate', () => {
             setTimeout(() => {
                 this.applyBackgroundToElements();
             }, 200);
         });
-        
+
         // 监听hash变化
         window.addEventListener('hashchange', () => {
             setTimeout(() => {
                 this.applyBackgroundToElements();
             }, 200);
         });
-        
+
         // 定期检查并重新应用背景（作为备用机制）
         setInterval(() => {
             // 只在有新元素出现时才重新应用
             const currentElements = TARGET_ELEMENTS.filter(id => document.getElementById(id));
             const currentElementsStr = currentElements.join(',');
-            
+
             if (!this.lastFoundElements || this.lastFoundElements !== currentElementsStr) {
                 this.lastFoundElements = currentElementsStr;
                 this.applyBackgroundToElements();
