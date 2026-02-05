@@ -20,6 +20,7 @@ import { imageService } from '../services/imageService';
 import { ImagePreviewModal } from '../components/ImagePreviewModal';
 import { ConfirmModal } from '../components/ConfirmModal';
 import { ReactionPicker, ReactionList } from '../components/ReactionComponents';
+import { TimePalCard } from '../components/TimePalCard';
 
 
 // Image Thumbnail Component
@@ -730,6 +731,14 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ logs, todos, scopes,
                 id="timeline-content"
             >
                 <div className="relative border-l border-stone-300 ml-[70px] space-y-6">
+                    {/* 时光小友卡片 */}
+                    <div className="pl-8 -ml-[70px] mb-6">
+                        <TimePalCard 
+                            logs={logs}
+                            currentDate={currentDate}
+                            categories={categories}
+                        />
+                    </div>
 
                     {dayTimeline.map((item) => {
                         if (item.type === 'log' && item.logData) {
