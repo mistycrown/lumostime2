@@ -44,7 +44,9 @@ const SwipeableTodoItem: React.FC<{
   onStartFocus: (todo: TodoItem) => void;
   onDuplicate: (todo: TodoItem) => void;
   viewMode: 'loose' | 'compact';
-}> = ({ todo, categories, activityCategories, scopes, onToggle, onEdit, onStartFocus, onDuplicate, viewMode }) => {
+  isFirst?: boolean;
+  isLast?: boolean;
+}> = ({ todo, categories, activityCategories, scopes, onToggle, onEdit, onStartFocus, onDuplicate, viewMode, isFirst = false, isLast = false }) => {
   const [touchStart, setTouchStart] = useState<number | null>(null);
   const [translateX, setTranslateX] = useState(0);
 
@@ -105,11 +107,20 @@ const SwipeableTodoItem: React.FC<{
 
   const { isPrivacyMode } = usePrivacy();
 
+  // 计算圆角样式
+  const getRoundedClass = () => {
+    if (viewMode !== 'compact') return 'rounded-2xl';
+    if (isFirst && isLast) return 'rounded-xl';
+    if (isFirst) return 'rounded-t-xl';
+    if (isLast) return 'rounded-b-xl';
+    return '';
+  };
+
   return (
-    <div className={`relative overflow-hidden select-none touch-pan-y group ${viewMode === 'compact' ? 'mb-0' : 'mb-3 rounded-2xl'}`}>
+    <div className={`relative overflow-hidden select-none touch-pan-y group ${viewMode === 'compact' ? `mb-0 ${getRoundedClass()}` : 'mb-3 rounded-2xl'}`}>
       {/* Background Actions (Right Swipe -> Duplicate) */}
       <div
-        className={`absolute inset-0 bg-blue-500 flex items-center justify-start pl-6 text-white font-bold tracking-wider z-0 transition-opacity duration-200 ${viewMode === 'compact' ? '' : 'rounded-2xl'}`}
+        className={`absolute inset-0 bg-blue-500 flex items-center justify-start pl-6 text-white font-bold tracking-wider z-0 transition-opacity duration-200 ${viewMode === 'compact' ? getRoundedClass() : 'rounded-2xl'}`}
         style={{ opacity: translateX > 0 ? 1 : 0 }}
       >
         <span className="flex items-center gap-2">
@@ -119,7 +130,7 @@ const SwipeableTodoItem: React.FC<{
 
       {/* Background Actions (Left Swipe -> Complete/Uncomplete) */}
       <div
-        className={`absolute inset-0 flex items-center justify-end pr-6 text-white font-bold tracking-wider z-0 transition-opacity duration-200 ${todo.isCompleted ? 'bg-stone-400' : 'bg-green-500'} ${viewMode === 'compact' ? '' : 'rounded-2xl'}`}
+        className={`absolute inset-0 flex items-center justify-end pr-6 text-white font-bold tracking-wider z-0 transition-opacity duration-200 ${todo.isCompleted ? 'bg-stone-400' : 'bg-green-500'} ${viewMode === 'compact' ? getRoundedClass() : 'rounded-2xl'}`}
         style={{ opacity: translateX < 0 ? 1 : 0 }}
       >
         <span className="flex items-center gap-2">
@@ -132,7 +143,7 @@ const SwipeableTodoItem: React.FC<{
         className={`
           relative z-10 flex gap-3 transition-transform duration-200
           ${viewMode === 'compact'
-            ? 'p-3 border-b border-stone-100 min-h-[3.5rem] items-center'
+            ? `p-3 border-b border-stone-100 min-h-[3.5rem] items-center ${getRoundedClass()}`
             : 'p-4 rounded-2xl border min-h-[5rem] mb-0 items-start'
           }
           ${todo.isCompleted
@@ -521,7 +532,7 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, categories, activityC
 
         {/* Task List */}
         <div className="flex-1 overflow-y-auto pb-24 no-scrollbar">
-          {filteredTodos.map(todo => (
+          {filteredTodos.map((todo, index) => (
             <SwipeableTodoItem
               key={todo.id}
               todo={todo}
@@ -533,6 +544,8 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, categories, activityC
               onStartFocus={onStartFocus}
               onDuplicate={onDuplicateTodo}
               viewMode={viewMode}
+              isFirst={index === 0}
+              isLast={index === filteredTodos.length - 1}
             />
           ))}
 
