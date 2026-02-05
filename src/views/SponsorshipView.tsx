@@ -43,6 +43,25 @@ const TimePalSettingsCard: React.FC<{ categories: Category[] }> = ({ categories 
     // 当前选择的分类 ID（用于展开活动列表）
     const [selectedCategoryId, setSelectedCategoryId] = useState<string>('');
 
+    // 自定义名言功能
+    const [customQuotesEnabled, setCustomQuotesEnabled] = useState<boolean>(() => {
+        const saved = localStorage.getItem('lumostime_timepal_custom_quotes_enabled');
+        return saved === 'true';
+    });
+
+    const [customQuotes, setCustomQuotes] = useState<string>(() => {
+        const saved = localStorage.getItem('lumostime_timepal_custom_quotes');
+        if (saved) {
+            try {
+                const quotes = JSON.parse(saved) as string[];
+                return quotes.join('\n');
+            } catch (e) {
+                return '';
+            }
+        }
+        return '';
+    });
+
     // 保存小动物类型
     const handleSelectType = (type: TimePalType) => {
         setSelectedType(type);
@@ -58,6 +77,18 @@ const TimePalSettingsCard: React.FC<{ categories: Category[] }> = ({ categories 
     useEffect(() => {
         localStorage.setItem('lumostime_timepal_filter_activities', JSON.stringify(filterActivityIds));
     }, [filterActivityIds]);
+
+    // 保存自定义名言设置
+    useEffect(() => {
+        localStorage.setItem('lumostime_timepal_custom_quotes_enabled', customQuotesEnabled.toString());
+    }, [customQuotesEnabled]);
+
+    const handleCustomQuotesChange = (value: string) => {
+        setCustomQuotes(value);
+        // 将文本按行分割，过滤空行
+        const quotesArray = value.split('\n').map(q => q.trim()).filter(q => q.length > 0);
+        localStorage.setItem('lumostime_timepal_custom_quotes', JSON.stringify(quotesArray));
+    };
 
     return (
         <div className="bg-white rounded-2xl p-6 shadow-sm space-y-6">
@@ -231,6 +262,51 @@ const TimePalSettingsCard: React.FC<{ categories: Category[] }> = ({ categories 
                             </div>
                         )}
                     </>
+                )}
+            </div>
+
+            {/* 自定义名言设置 */}
+            <div className="pt-4 border-t border-stone-100">
+                <div className="flex items-center justify-between mb-2">
+                    <label className="text-xs font-medium text-stone-400 uppercase tracking-wider">
+                        自定义名言
+                        <span className="text-stone-300 ml-1">（可选）</span>
+                    </label>
+                    {/* Toggle 开关 */}
+                    <button
+                        type="button"
+                        onClick={() => {
+                            setCustomQuotesEnabled(!customQuotesEnabled);
+                            if (customQuotesEnabled) {
+                                // 关闭时清空自定义名言
+                                setCustomQuotes('');
+                                localStorage.removeItem('lumostime_timepal_custom_quotes');
+                            }
+                        }}
+                        className={`px-3 py-1 rounded-full text-[10px] font-bold transition-all ${customQuotesEnabled
+                            ? 'bg-stone-900 text-white'
+                            : 'bg-stone-100 text-stone-500 hover:bg-stone-200'
+                            }`}
+                    >
+                        {customQuotesEnabled ? '已开启' : '关闭'}
+                    </button>
+                </div>
+                <p className="text-xs text-stone-500 mb-3">
+                    开启后使用自定义名言，每行一句
+                </p>
+
+                {customQuotesEnabled && (
+                    <div className="animate-in slide-in-from-top-2">
+                        <textarea
+                            value={customQuotes}
+                            onChange={(e) => handleCustomQuotesChange(e.target.value)}
+                            placeholder="输入你的名言，每行一句&#10;例如：&#10;种一棵树最好的时间是十年前，其次是现在&#10;万物皆有裂痕，那是光照进来的地方"
+                            className="w-full h-32 bg-stone-50 border border-stone-200 rounded-lg px-3 py-2 text-xs outline-none focus:border-stone-400 focus:ring-1 focus:ring-stone-400 transition-all resize-none"
+                        />
+                        <div className="mt-2 text-xs text-stone-400">
+                            已输入 {customQuotes.split('\n').filter(q => q.trim().length > 0).length} 条名言
+                        </div>
+                    </div>
                 )}
             </div>
         </div>
