@@ -9,7 +9,8 @@
  */
 import React, { useState, useMemo } from 'react';
 import { Search, X, ChevronLeft, FileText } from 'lucide-react';
-import { Log, Category, TodoItem, TodoCategory, Scope, Goal, DailyReview, WeeklyReview, MonthlyReview } from '../types';
+import { Log, Category, TodoItem, TodoCategory, Scope, Goal, DailyReview, WeeklyReview, MonthlyReview, SearchType } from '../types';
+import { useNavigation } from '../contexts/NavigationContext';
 
 interface SearchViewProps {
     logs: Log[];
@@ -32,7 +33,7 @@ interface SearchViewProps {
     onSelectMonthlyReview: (id: string, monthStr: string) => void;
 }
 
-type SearchType = 'record' | 'category' | 'activity' | 'todo' | 'scope' | 'review';
+
 
 export const SearchView: React.FC<SearchViewProps> = ({
     logs,
@@ -54,15 +55,17 @@ export const SearchView: React.FC<SearchViewProps> = ({
     onSelectWeeklyReview,
     onSelectMonthlyReview
 }) => {
-    const [query, setQuery] = useState('');
-    const [searchMode, setSearchMode] = useState<'all' | 'partial'>('all');
-    const [selectedTypes, setSelectedTypes] = useState<SearchType[]>([]);
+    const {
+        searchQuery: query, setSearchQuery: setQuery,
+        searchMode, setSearchMode,
+        selectedSearchTypes: selectedTypes, setSelectedSearchTypes: setSelectedTypes
+    } = useNavigation();
 
     const toggleType = (type: SearchType) => {
-        setSelectedTypes(prev =>
-            prev.includes(type)
-                ? prev.filter(t => t !== type)
-                : [...prev, type]
+        setSelectedTypes(
+            selectedTypes.includes(type)
+                ? selectedTypes.filter(t => t !== type)
+                : [...selectedTypes, type]
         );
     };
 

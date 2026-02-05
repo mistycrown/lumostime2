@@ -68,8 +68,7 @@ import { aiService, AIConfig } from '../services/aiService';
 import { UpdateService, VersionInfo } from '../services/updateService';
 import { CustomSelect } from '../components/CustomSelect';
 import { ToastType } from '../components/Toast';
-import ReactMarkdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
+
 import { ReviewTemplateManageView } from './ReviewTemplateManageView';
 import { CheckTemplateManageView } from './CheckTemplateManageView';
 import { ConfirmModal } from '../components/ConfirmModal';
@@ -82,8 +81,7 @@ import FocusNotification from '../plugins/FocusNotificationPlugin';
 import { AutoRecordSettingsView } from './AutoRecordSettingsView';
 import { AutoLinkView } from './AutoLinkView';
 import { ObsidianExportView } from './ObsidianExportView';
-import { getFilterStats } from '../utils/filterUtils';
-import { FilterDetailView } from './FilterDetailView';
+
 import { MemoirSettingsView } from './MemoirSettingsView';
 import excelExportService from '../services/excelExportService';
 import { imageCleanupService } from '../services/imageCleanupService';
@@ -93,8 +91,13 @@ import { RedemptionService } from '../services/redemptionService';
 
 import { SponsorshipView } from './SponsorshipView';
 import { NARRATIVE_TEMPLATES } from '../constants';
-// @ts-ignore
-import userGuideContent from '../../USER_GUIDE.md?raw';
+import { AISettingsView } from './settings/AISettingsView';
+import { PreferencesSettingsView } from './settings/PreferencesSettingsView';
+import { NarrativeSettingsView } from './settings/NarrativeSettingsView';
+import { NFCSettingsView } from './settings/NFCSettingsView';
+
+import { UserGuideView } from './settings/UserGuideView';
+import { FiltersSettingsView } from './settings/FiltersSettingsView';
 
 interface SettingsViewProps {
     onClose: () => void;
@@ -157,24 +160,6 @@ interface SettingsViewProps {
     onToggleAutoFocusNote?: () => void;
 }
 
-const AI_PRESETS = {
-    gemini: {
-        name: 'Gemini',
-        config: { provider: 'gemini', baseUrl: 'https://generativelanguage.googleapis.com/v1beta/models', modelName: 'gemini-2.5-flash' }
-    },
-    deepseek: {
-        name: 'DeepSeek',
-        config: { provider: 'openai', baseUrl: 'https://api.deepseek.com', modelName: 'deepseek-chat' }
-    },
-    siliconflow: {
-        name: '硅基流动',
-        config: { provider: 'openai', baseUrl: 'https://api.siliconflow.cn/v1', modelName: 'deepseek-ai/deepseek-v3' }
-    },
-    openai: {
-        name: 'OpenAI (兼容)',
-        config: { provider: 'openai', baseUrl: 'https://api.openai.com/v1', modelName: 'gpt-4o-mini' }
-    }
-};
 
 interface ExcelExportCardProps {
     logs: Log[];
@@ -422,7 +407,6 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
     const [s3ConfigForm, setS3ConfigForm] = useState<S3Config>({ bucketName: '', region: '', secretId: '', secretKey: '', endpoint: '' });
 
     // UI State
-    const [localUserInfo, setLocalUserInfo] = useState(userPersonalInfo || '');
     const [isDefaultViewDropdownOpen, setIsDefaultViewDropdownOpen] = useState(false);
 
 
@@ -539,54 +523,12 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
         // We handle local user info state inside the specific submenu render to avoid conflicts
     }, [userPersonalInfo]);
 
-    // NFC State
-    const [isWritingNfc, setIsWritingNfc] = useState(false);
-    const [nfcSelectedCatId, setNfcSelectedCatId] = useState<string>('');
-    const [nfcSelectedActId, setNfcSelectedActId] = useState<string>('');
 
-    const handleWriteNfc = async (uri: string) => {
-        setIsWritingNfc(true);
-        try {
-            const success = await NfcService.writeTag(uri);
-            if (success) {
-                onToast('success', 'NFC Tag Written Successfully!');
-            }
-        } catch (e: any) {
-            console.error(e);
-            if (e.message && e.message.includes('Session stopped')) {
-                // Cancelled
-            } else {
-                onToast('error', 'Write Failed: ' + (e.message || 'Unknown'));
-            }
-        } finally {
-            setIsWritingNfc(false);
-        }
-    };
-
-    const handleCancelNfc = async () => {
-        await NfcService.cancelWrite();
-        setIsWritingNfc(false);
-    };
-
-    // 检测是否在 Electron 环境
     const isElectronEnvironment = () => {
         return typeof window !== 'undefined' && !!(window as any).ipcRenderer;
     };
 
 
-
-    const [editingTemplate, setEditingTemplate] = useState<NarrativeTemplate | null>(null);
-    const [showAddTemplateModal, setShowAddTemplateModal] = useState(false);
-
-    // Modal State for Narrative Templates
-    const [modalTitle, setModalTitle] = useState('');
-    const [modalDesc, setModalDesc] = useState('');
-    const [modalPrompt, setModalPrompt] = useState('');
-    const [modalError, setModalError] = useState('');
-    const [modalIsDaily, setModalIsDaily] = useState(true);
-    const [modalIsWeekly, setModalIsWeekly] = useState(false);
-    const [modalIsMonthly, setModalIsMonthly] = useState(false);
-    const [deletingTemplateId, setDeletingTemplateId] = useState<string | null>(null);
 
     // Update Check State
     const [isCheckingUpdate, setIsCheckingUpdate] = useState(false);
@@ -596,26 +538,8 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
     // Donation Modal State
     const [showDonationModal, setShowDonationModal] = useState(false);
 
-    // Filters State
-    const [showAddFilterModal, setShowAddFilterModal] = useState(false);
-    const [editingFilter, setEditingFilter] = useState<Filter | null>(null);
-    const [filterName, setFilterName] = useState('');
-    const [filterExpression, setFilterExpression] = useState('');
-    const [deletingFilterId, setDeletingFilterId] = useState<string | null>(null);
-    const [selectedFilter, setSelectedFilter] = useState<Filter | null>(null);
 
 
-    useEffect(() => {
-        setLocalUserInfo(userPersonalInfo || '');
-    }, [userPersonalInfo]);
-    const [aiConfigForm, setAiConfigForm] = useState<AIConfig>({ provider: 'openai', apiKey: '', baseUrl: '', modelName: '' });
-    const [activePreset, setActivePreset] = useState<string>('openai');
-    const [aiTestStatus, setAiTestStatus] = useState<'idle' | 'testing' | 'success' | 'error'>('idle');
-
-    // Reset status when config changes
-    useEffect(() => {
-        if (aiTestStatus !== 'idle') setAiTestStatus('idle');
-    }, [aiConfigForm]);
 
     // S3配置表单变化时自动保存到localStorage（作为草稿）
     useEffect(() => {
@@ -758,34 +682,8 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
         // 如果第一次加载失败，延迟再试一次
         const timer = setTimeout(loadS3Config, 100);
 
-        // 加载AI配置
-        const aiConfig = aiService.getConfig();
-        if (aiConfig) {
-            setAiConfigForm(aiConfig);
-        }
-
         return () => clearTimeout(timer);
     }, []);
-
-    const handlePresetChange = (key: string) => {
-        setActivePreset(key);
-        // Load saved profile for this preset
-        const savedProfile = aiService.getProfile(key);
-        if (savedProfile) {
-            setAiConfigForm(savedProfile);
-        } else {
-            // Load default
-            const preset = AI_PRESETS[key as keyof typeof AI_PRESETS];
-            if (preset) {
-                setAiConfigForm({
-                    ...preset.config as AIConfig,
-                    apiKey: '' // Clear key for new preset
-                });
-            }
-        }
-    };
-
-
 
     const handleSaveConfig = async () => {
         if (!configForm.url) {
@@ -1171,31 +1069,6 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
         onToast('success', 'Generated 50 demo logs');
     };
 
-    const handleSaveAIConfig = async () => {
-        if (!aiConfigForm.apiKey) {
-            onToast('error', 'API Key is required');
-            return;
-        }
-
-        setAiTestStatus('testing');
-
-        // Save to Profile AND Active Config
-        aiService.saveProfile(activePreset, aiConfigForm);
-        aiService.saveConfig(aiConfigForm);
-
-        try {
-            const success = await aiService.checkConnection(aiConfigForm);
-            setAiTestStatus(success ? 'success' : 'error');
-
-            // Auto-revert success to idle after 2s for better UX (optional, but nice)
-            if (success) {
-                setTimeout(() => setAiTestStatus(prev => prev === 'success' ? 'idle' : prev), 2000);
-            }
-        } catch (e) {
-            setAiTestStatus('error');
-        }
-    };
-
     const handleCheckUpdate = async () => {
         setIsCheckingUpdate(true);
         try {
@@ -1225,69 +1098,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
         }
     };
 
-    // Filter 处理函数
-    const handleAddFilter = () => {
-        setEditingFilter(null);
-        setFilterName('');
-        setFilterExpression('');
-        setShowAddFilterModal(true);
-    };
 
-    const handleEditFilter = (filter: Filter) => {
-        setEditingFilter(filter);
-        setFilterName(filter.name);
-        setFilterExpression(filter.filterExpression);
-        setShowAddFilterModal(true);
-    };
-
-    const handleSaveFilter = () => {
-        if (!filterName.trim()) {
-            onToast('error', '请输入筛选器名称');
-            return;
-        }
-        if (!filterExpression.trim()) {
-            onToast('error', '请输入筛选条件');
-            return;
-        }
-
-        const updatedFilters = [...(filters || [])];
-        if (editingFilter) {
-            // 编辑现有筛选器
-            const index = updatedFilters.findIndex(f => f.id === editingFilter.id);
-            if (index !== -1) {
-                updatedFilters[index] = {
-                    ...editingFilter,
-                    name: filterName.trim(),
-                    filterExpression: filterExpression.trim()
-                };
-            }
-        } else {
-            // 新建筛选器
-            const newFilter: Filter = {
-                id: crypto.randomUUID(),
-                name: filterName.trim(),
-                filterExpression: filterExpression.trim(),
-                createdAt: Date.now()
-            };
-            updatedFilters.push(newFilter);
-        }
-
-        onUpdateFilters?.(updatedFilters);
-        setShowAddFilterModal(false);
-        onToast('success', editingFilter ? '筛选器已更新' : '筛选器已创建');
-    };
-
-    const handleDeleteFilter = (id: string) => {
-        setDeletingFilterId(id);
-    };
-
-    const confirmDeleteFilter = () => {
-        if (!deletingFilterId) return;
-        const updatedFilters = (filters || []).filter(f => f.id !== deletingFilterId);
-        onUpdateFilters?.(updatedFilters);
-        setDeletingFilterId(null);
-        onToast('success', '筛选器已删除');
-    };
 
     // 图片清理功能
 
@@ -1400,193 +1211,19 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
     }
 
     if (activeSubmenu === 'filters') {
-        // 如果选中了筛选器,显示详情页
-        if (selectedFilter) {
-            return (
-                <FilterDetailView
-                    filter={selectedFilter}
-                    logs={logs || []}
-                    categories={categoriesData || []}
-                    scopes={scopes || []}
-                    todos={todos || []}
-                    todoCategories={todoCategories || []}
-                    onClose={() => setSelectedFilter(null)}
-                    onEditLog={(log) => {
-                        onEditLog?.(log);
-                    }}
-                />
-            );
-        }
-
         return (
-            <div className="fixed inset-0 z-50 bg-[#fdfbf7] flex flex-col font-serif animate-in slide-in-from-right duration-300 pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">
-                <div className="flex items-center gap-3 px-4 h-14 border-b border-stone-100 bg-[#fdfbf7]/80 backdrop-blur-md sticky top-0">
-                    <button
-                        onClick={() => setActiveSubmenu('main')}
-                        className="text-stone-400 hover:text-stone-600 p-1"
-                    >
-                        <ChevronLeft size={24} />
-                    </button>
-                    <span className="text-stone-800 font-bold text-lg">自定义筛选器</span>
-                </div>
-
-                <div className="p-4 space-y-4 overflow-y-auto pb-40">
-                    <div className="flex justify-end mb-2">
-                        <button
-                            onClick={handleAddFilter}
-                            className="flex items-center gap-1 px-3 py-1.5 bg-stone-800 text-white text-xs font-bold rounded-lg hover:bg-stone-700 active:scale-95 transition-all"
-                        >
-                            <PlusCircle size={14} />
-                            <span>新建</span>
-                        </button>
-                    </div>
-
-                    {(filters || []).length === 0 ? (
-                        <div className="p-12 text-center text-stone-400 bg-white rounded-2xl shadow-sm">
-                            <span className="text-4xl block mb-3 opacity-30 text-stone-800">※</span>
-                            <p className="text-sm">还没有自定义筛选器</p>
-                            <p className="text-xs mt-1">点击右上角"新建"创建第一个筛选器</p>
-                        </div>
-                    ) : (
-                        <div>
-                            {(filters || []).map((filter, idx) => {
-                                // 计算筛选统计
-                                const stats = getFilterStats(
-                                    logs,
-                                    filter,
-                                    {
-                                        categories: categoriesData,
-                                        scopes,
-                                        todos,
-                                        todoCategories
-                                    }
-                                );
-
-                                const hours = Math.floor(stats.totalDuration / 3600);
-                                const minutes = Math.floor((stats.totalDuration % 3600) / 60);
-                                const timeStr = hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m`;
-
-                                return (
-                                    <div
-                                        key={filter.id}
-                                        className="bg-white rounded-2xl p-4 shadow-sm mb-3 hover:bg-stone-50 transition-colors cursor-pointer"
-                                        onClick={() => setSelectedFilter(filter)}
-                                    >
-                                        <div className="flex items-start justify-between gap-3">
-                                            <div className="flex-1 min-w-0">
-                                                <div className="flex items-center gap-2 mb-1">
-                                                    <span className="text-stone-800 font-bold text-base flex-shrink-0">※</span>
-                                                    <h4 className="font-bold text-stone-800 text-sm">{filter.name}</h4>
-                                                </div>
-                                                <p className="text-xs text-stone-500 font-mono break-all mb-2">
-                                                    {filter.filterExpression}
-                                                </p>
-                                                <div className="flex items-center gap-3 text-[10px] text-stone-400">
-                                                    <span>{stats.count} 条记录</span>
-                                                    <span>•</span>
-                                                    <span>{timeStr}</span>
-                                                </div>
-                                            </div>
-                                            <div className="flex items-center gap-2 flex-shrink-0">
-                                                <button
-                                                    onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        handleEditFilter(filter);
-                                                    }}
-                                                    className="p-1.5 text-stone-400 hover:text-stone-600 hover:bg-stone-100 rounded-lg"
-                                                >
-                                                    <Edit2 size={16} />
-                                                </button>
-                                                <button
-                                                    onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        handleDeleteFilter(filter.id);
-                                                    }}
-                                                    className="p-1.5 text-stone-400 hover:text-red-500 hover:bg-red-50 rounded-lg"
-                                                >
-                                                    <Trash2 size={16} />
-                                                </button>
-                                            </div>
-                                        </div>
-                                    </div>
-                                );
-                            })}
-                        </div>
-                    )}
-
-                </div>
-
-                {/* 新建/编辑筛选器 Modal */}
-                {showAddFilterModal && (
-                    <div className="fixed inset-0 z-[60] bg-black/50 flex items-center justify-center p-4">
-                        <div className="bg-white rounded-2xl w-full max-w-lg shadow-xl animate-in fade-in zoom-in-95 duration-200">
-                            <div className="flex items-center justify-between p-4 border-b border-stone-100">
-                                <h3 className="font-bold text-lg text-stone-800">
-                                    {editingFilter ? '编辑筛选器' : '新建筛选器'}
-                                </h3>
-                                <button onClick={() => setShowAddFilterModal(false)} className="p-1 text-stone-400 hover:text-stone-600">
-                                    <X size={24} />
-                                </button>
-                            </div>
-
-                            <div className="p-4 space-y-4">
-                                <div>
-                                    <label className="block text-xs font-bold text-stone-600 mb-1.5">筛选器名称</label>
-                                    <input
-                                        type="text"
-                                        className="w-full bg-stone-50 border border-stone-200 rounded-xl px-4 py-2.5 text-sm text-stone-800 outline-none focus:border-stone-400"
-                                        placeholder="例如:瑜伽训练"
-                                        value={filterName}
-                                        onChange={e => setFilterName(e.target.value)}
-                                        autoFocus
-                                    />
-                                </div>
-
-                                <div>
-                                    <label className="block text-xs font-bold text-stone-600 mb-1.5">筛选表达式</label>
-                                    <input
-                                        type="text"
-                                        className="w-full bg-stone-50 border border-stone-200 rounded-xl px-4 py-2.5 text-sm text-stone-800 font-mono outline-none focus:border-stone-400"
-                                        placeholder="例如:瑜伽 OR 跑步 #运动 %健康 OR 工作"
-                                        value={filterExpression}
-                                        onChange={e => setFilterExpression(e.target.value)}
-                                    />
-                                    <p className="text-[10px] text-stone-400 mt-1.5">
-                                        # 标签, % 领域, @ 代办, 无符号=备注, OR 表示"或"
-                                    </p>
-                                </div>
-                            </div>
-
-                            <div className="p-4 border-t border-stone-100 flex justify-end gap-3">
-                                <button
-                                    onClick={() => setShowAddFilterModal(false)}
-                                    className="px-4 py-2 text-sm font-bold text-stone-500 hover:bg-stone-100 rounded-xl transition-colors"
-                                >
-                                    取消
-                                </button>
-                                <button
-                                    onClick={handleSaveFilter}
-                                    className="px-6 py-2 text-sm font-bold text-white bg-stone-800 hover:bg-stone-700 rounded-xl shadow-md transition-colors"
-                                >
-                                    保存
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                )}
-
-                {/* 删除确认 Modal */}
-                <ConfirmModal
-                    isOpen={!!deletingFilterId}
-                    onClose={() => setDeletingFilterId(null)}
-                    onConfirm={confirmDeleteFilter}
-                    title="删除筛选器"
-                    description="确定要删除这个筛选器吗?此操作无法撤销。"
-                    confirmText="删除"
-                    cancelText="取消"
-                    type="danger"
-                />
-            </div>
+            <FiltersSettingsView
+                onBack={() => setActiveSubmenu('main')}
+                onToast={onToast}
+                filters={filters}
+                onUpdateFilters={(newFilters) => onUpdateFilters?.(newFilters)}
+                logs={logs}
+                categories={categoriesData || []}
+                scopes={scopes || []}
+                todos={todos || []}
+                todoCategories={todoCategories || []}
+                onEditLog={onEditLog}
+            />
         );
     }
 
@@ -1603,117 +1240,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
     }
 
     if (activeSubmenu === 'ai') {
-        return (
-            <div className="fixed inset-0 z-50 bg-[#fdfbf7] flex flex-col font-serif animate-in slide-in-from-right duration-300 pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">
-                <div className="flex items-center gap-3 px-4 h-14 border-b border-stone-100 bg-[#fdfbf7]/80 backdrop-blur-md sticky top-0">
-                    <button
-                        onClick={() => setActiveSubmenu('main')}
-                        className="text-stone-400 hover:text-stone-600 p-1"
-                    >
-                        <ChevronLeft size={24} />
-                    </button>
-                    <span className="text-stone-800 font-bold text-lg">AI API</span>
-                </div>
-
-                <div className="p-4 space-y-4 overflow-y-auto pb-40">
-                    <div className="bg-white rounded-2xl p-6 shadow-sm space-y-6">
-
-                        <div className="space-y-4">
-                            {/* Preset Select */}
-                            <div>
-                                <label className="text-xs font-bold text-stone-400 uppercase ml-1">快速预设 (Presets)</label>
-                                <div className="grid grid-cols-2 gap-2 mt-2">
-                                    {(Object.entries(AI_PRESETS) as [string, typeof AI_PRESETS.gemini][]).map(([key, preset]) => (
-                                        <button
-                                            key={key}
-                                            onClick={() => handlePresetChange(key)}
-                                            className={`py-3 px-2 rounded-xl text-xs font-bold border transition-all truncate ${activePreset === key
-                                                ? 'bg-stone-800 text-white border-stone-800 shadow-md'
-                                                : 'bg-white text-stone-600 border-stone-200 hover:border-purple-300 hover:text-purple-600'
-                                                } active:scale-[0.98]`}
-                                        >
-                                            {preset.name}
-                                        </button>
-                                    ))}
-                                </div>
-                            </div>
-
-                            {/* Base URL */}
-                            <div>
-                                <label className="text-xs font-bold text-stone-400 uppercase ml-1">接口地址 (Base URL)</label>
-                                <div className="flex items-center gap-2 bg-stone-50 px-3 py-2 rounded-xl mt-1 focus-within:ring-2 focus-within:ring-stone-200 transition-all">
-                                    <Globe size={18} className="text-stone-400" />
-                                    <input
-                                        type="text"
-                                        placeholder={aiConfigForm.provider === 'openai' ? "https://api.siliconflow.cn/v1" : "https://generativelanguage.googleapis.com/v1beta/models"}
-                                        className="flex-1 bg-transparent border-none outline-none text-stone-700 placeholder:text-stone-300 text-sm"
-                                        value={aiConfigForm.baseUrl}
-                                        onChange={e => setAiConfigForm(prev => ({ ...prev, baseUrl: e.target.value }))}
-                                        disabled={aiConfigForm.provider === 'gemini'}
-                                    />
-                                </div>
-                            </div>
-
-                            {/* API Key */}
-                            <div>
-                                <label className="text-xs font-bold text-stone-400 uppercase ml-1">API 密钥 (Key)</label>
-                                <div className="flex items-center gap-2 bg-stone-50 px-3 py-2 rounded-xl mt-1 focus-within:ring-2 focus-within:ring-stone-200 transition-all">
-                                    <div className="w-[18px] flex justify-center"><Server size={14} className="text-stone-400" /></div>
-                                    <input
-                                        type="password"
-                                        placeholder="sk-..."
-                                        className="flex-1 bg-transparent border-none outline-none text-stone-700 placeholder:text-stone-300 text-sm"
-                                        value={aiConfigForm.apiKey}
-                                        onChange={e => setAiConfigForm(prev => ({ ...prev, apiKey: e.target.value }))}
-                                    />
-                                </div>
-                            </div>
-
-
-
-                            {/* Model Name */}
-                            <div>
-                                <label className="text-xs font-bold text-stone-400 uppercase ml-1">模型名称 (Model)</label>
-                                <div className="flex items-center gap-2 bg-stone-50 px-3 py-2 rounded-xl mt-1 focus-within:ring-2 focus-within:ring-stone-200 transition-all">
-                                    <Bot size={18} className="text-stone-400" />
-                                    <input
-                                        type="text"
-                                        placeholder="deepseek-ai/deepseek-v3"
-                                        className="flex-1 bg-transparent border-none outline-none text-stone-700 placeholder:text-stone-300 text-sm"
-                                        value={aiConfigForm.modelName}
-                                        onChange={e => setAiConfigForm(prev => ({ ...prev, modelName: e.target.value }))}
-                                    />
-                                </div>
-                            </div>
-                        </div>
-
-                        <div className="pt-4">
-                            <button
-                                onClick={handleSaveAIConfig}
-                                disabled={aiTestStatus === 'testing'}
-                                className={`flex items-center justify-center gap-2 w-full py-3 rounded-xl font-medium active:scale-[0.98] transition-all shadow-lg shadow-stone-200 disabled:opacity-70 ${aiTestStatus === 'success' ? 'bg-green-600 text-white' :
-                                    aiTestStatus === 'error' ? 'bg-red-500 text-white' :
-                                        'bg-stone-800 text-white'
-                                    }`}
-                            >
-                                {aiTestStatus === 'testing' && <RefreshCw size={18} className="animate-spin" />}
-                                {aiTestStatus === 'success' && <CheckCircle2 size={18} />}
-                                {aiTestStatus === 'error' && <AlertCircle size={18} />}
-                                {aiTestStatus === 'idle' && <Save size={18} />}
-
-                                {aiTestStatus === 'testing' && "测试中..."}
-                                {aiTestStatus === 'success' && "连接成功"}
-                                {aiTestStatus === 'error' && "连接失败 - 请检查配置"}
-                                {aiTestStatus === 'idle' && "保存并测试连接"}
-                            </button>
-                            <p className="text-[10px] text-center text-stone-400 mt-3">
-                                隐私说明：您的输入和标签将发送至配置的 AI 服务商，本地服务器不存储任何数据。
-                            </p>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        );
+        return <AISettingsView onBack={() => setActiveSubmenu('main')} onToast={onToast} />;
     }
 
     if (activeSubmenu === 'cloud') {
@@ -1938,7 +1465,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
                                     <button
                                         onClick={() => {
                                             if (confirm('确定要完全清理S3配置吗？这将删除所有保存的配置信息，下次需要重新输入。')) {
-                                                s3Service.clearConfig();
+                                                s3Service.clearStorage();
                                                 setS3Config(null);
                                                 setS3ConfigForm({ bucketName: '', region: '', secretId: '', secretKey: '', endpoint: '' });
                                                 // 同时清理草稿
@@ -2080,80 +1607,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
         );
     }
 
-    const handleSaveUserInfo = () => {
-        onSetUserPersonalInfo?.(localUserInfo);
-        onToast('success', '个人信息已保存');
-    };
 
-    const handleAddTemplate = () => {
-        setEditingTemplate(null);
-        setModalTitle('');
-        setModalDesc('');
-        setModalPrompt('');
-        setModalIsDaily(true);
-        setModalIsWeekly(false);
-        setModalIsMonthly(false);
-        setModalError('');
-        setShowAddTemplateModal(true);
-    };
-
-    const handleEditTemplate = (template: NarrativeTemplate) => {
-        setEditingTemplate(template);
-        setModalTitle(template.title);
-        setModalDesc(template.description);
-        setModalPrompt(template.prompt);
-        setModalIsDaily(template.isDaily !== false);
-        setModalIsWeekly(template.isWeekly === true);
-        setModalIsMonthly(template.isMonthly === true);
-        setModalError('');
-        setShowAddTemplateModal(true);
-    };
-
-    const handleDeleteTemplate = (id: string) => {
-        setDeletingTemplateId(id);
-    };
-
-    const confirmDeleteTemplate = () => {
-        if (!deletingTemplateId) return;
-
-        const newTemplates = (customNarrativeTemplates || []).filter(t => t.id !== deletingTemplateId);
-        onUpdateCustomNarrativeTemplates?.(newTemplates);
-        setDeletingTemplateId(null);
-        onToast('success', '模板已删除');
-    };
-
-    const handleSaveTemplate = () => {
-        if (!modalTitle.trim()) {
-            setModalError('标题不能为空');
-            return;
-        }
-        if (!modalPrompt.trim()) {
-            setModalError('提示词不能为空');
-            return;
-        }
-
-        const newTemplate: NarrativeTemplate = {
-            id: editingTemplate ? editingTemplate.id : `custom_${Date.now()}`,
-            title: modalTitle.trim(),
-            description: modalDesc.trim(),
-            prompt: modalPrompt,
-            isCustom: true,
-            isDaily: modalIsDaily,
-            isWeekly: modalIsWeekly,
-            isMonthly: modalIsMonthly
-        };
-
-        let updatedTemplates = [...(customNarrativeTemplates || [])];
-        if (editingTemplate) {
-            updatedTemplates = updatedTemplates.map(t => t.id === editingTemplate.id ? newTemplate : t);
-        } else {
-            updatedTemplates.push(newTemplate);
-        }
-
-        onUpdateCustomNarrativeTemplates?.(updatedTemplates);
-        setShowAddTemplateModal(false);
-        onToast('success', editingTemplate ? '模板已更新' : '新模板已创建');
-    };
 
     const { categories } = syncData;
 
@@ -2406,686 +1860,55 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
 
     if (activeSubmenu === 'preferences') {
         return (
-            <div className="fixed inset-0 z-50 bg-[#fdfbf7] flex flex-col font-serif animate-in slide-in-from-right duration-300 pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">
-                <div className="flex items-center gap-3 px-4 h-14 border-b border-stone-100 bg-[#fdfbf7]/80 backdrop-blur-md sticky top-0">
-                    <button
-                        onClick={() => setActiveSubmenu('main')}
-                        className="text-stone-400 hover:text-stone-600 p-1"
-                    >
-                        <ChevronLeft size={24} />
-                    </button>
-                    <span className="text-stone-800 font-bold text-lg">偏好设置</span>
-                </div>
-
-                <div className="flex-1 overflow-y-auto p-4 space-y-4 pb-40">
-                    <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
-
-                        {/* Start Week Toggle */}
-                        <div className="flex items-center justify-between p-4 border-b border-stone-100 last:border-0 hover:bg-stone-50 transition-colors">
-                            <div>
-                                <h4 className="font-bold text-stone-700">从周日开始</h4>
-                                <p className="text-xs text-stone-400 mt-1">日历视图每周第一天将设为周日</p>
-                            </div>
-                            <button
-                                onClick={onToggleStartWeekOnSunday}
-                                className={`w-12 h-7 rounded-full transition-colors flex items-center px-1 ${startWeekOnSunday ? 'bg-stone-800' : 'bg-stone-200'
-                                    }`}
-                            >
-                                <div className={`w-5 h-5 bg-white rounded-full shadow-sm transition-transform ${startWeekOnSunday ? 'translate-x-5' : 'translate-x-0'
-                                    }`} />
-                            </button>
-                        </div>
-
-                        {/* Daily Review Time */}
-                        <div className="flex items-center justify-between p-4 border-b border-stone-100 hover:bg-stone-50 transition-colors">
-                            <div>
-                                <h4 className="font-bold text-stone-700">每日回顾时间</h4>
-                                <p className="text-xs text-stone-400 mt-1">到达该时间后，时间轴将显示今日回顾节点</p>
-                            </div>
-                            <input
-                                type="text"
-                                inputMode="numeric"
-                                maxLength={4}
-                                value={(dailyReviewTime || '22:00').replace(':', '')}
-                                onChange={(e) => {
-                                    const val = e.target.value.replace(/[^0-9]/g, '');
-                                    onSetDailyReviewTime?.(val);
-                                }}
-                                onFocus={(e) => e.target.select()}
-                                className="bg-stone-100 border-none rounded-lg px-3 py-1.5 text-sm font-bold text-stone-700 focus:outline-none focus:ring-0 focus:bg-stone-200 transition-colors w-20 text-center tracking-widest font-mono"
-                            />
-                        </div>
-
-                        {/* Weekly Review Time */}
-                        <div className="flex items-center justify-between p-4 border-b border-stone-100 hover:bg-stone-50 transition-colors">
-                            <div>
-                                <h4 className="font-bold text-stone-700">每周回顾时间</h4>
-                                <p className="text-xs text-stone-400 mt-1">到达该时间后，时间轴将在每周最后一天显示本周回顾节点</p>
-                            </div>
-                            <div className="flex items-center gap-2">
-                                <input
-                                    type="text"
-                                    inputMode="numeric"
-                                    maxLength={4}
-                                    placeholder="2200"
-                                    value={(weeklyReviewTime || '0-2200').split('-')[1] || '2200'}
-                                    onChange={(e) => {
-                                        const val = e.target.value.replace(/[^0-9]/g, '');
-                                        // 周报时间格式：总是存储为"0-<time>"，0表示最后一天
-                                        onSetWeeklyReviewTime?.(`0-${val}`);
-                                    }}
-                                    onFocus={(e) => e.target.select()}
-                                    className="bg-stone-100 border-none rounded-lg px-3 py-1.5 text-sm font-bold text-stone-700 focus:outline-none focus:ring-0 focus:bg-stone-200 transition-colors w-20 text-center tracking-widest font-mono"
-                                />
-                            </div>
-                        </div>
-
-                        {/* Monthly Review Time */}
-                        <div className="flex items-center justify-between p-4 border-b border-stone-100 hover:bg-stone-50 transition-colors">
-                            <div>
-                                <h4 className="font-bold text-stone-700">每月回顾时间</h4>
-                                <p className="text-xs text-stone-400 mt-1">到达该时间后，时间轴将在每月最后一天显示本月回顾节点</p>
-                            </div>
-                            <div className="flex items-center gap-2">
-                                <input
-                                    type="text"
-                                    inputMode="numeric"
-                                    maxLength={4}
-                                    placeholder="2200"
-                                    value={(monthlyReviewTime || '0-2200').split('-')[1] || '2200'}
-                                    onChange={(e) => {
-                                        const val = e.target.value.replace(/[^0-9]/g, '');
-                                        // 月报时间格式：总是存储为"0-<time>"，0表示最后一天
-                                        onSetMonthlyReviewTime?.(`0-${val}`);
-                                    }}
-                                    onFocus={(e) => e.target.select()}
-                                    className="bg-stone-100 border-none rounded-lg px-3 py-1.5 text-sm font-bold text-stone-700 focus:outline-none focus:ring-0 focus:bg-stone-200 transition-colors w-20 text-center tracking-widest font-mono"
-                                />
-                            </div>
-                        </div>
-
-                        {/* Auto-focus Note Toggle */}
-                        <div className="flex items-center justify-between p-4 border-b border-stone-100 hover:bg-stone-50 transition-colors">
-                            <div>
-                                <h4 className="font-bold text-stone-700">自动聚焦备注</h4>
-                                <p className="text-xs text-stone-400 mt-1">新建记录或专注时自动弹出键盘</p>
-                            </div>
-                            <label className="relative inline-flex items-center cursor-pointer">
-                                <input
-                                    type="checkbox"
-                                    checked={autoFocusNote}
-                                    onChange={onToggleAutoFocusNote}
-                                    className="sr-only peer"
-                                />
-                                <div className="w-11 h-6 bg-stone-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-stone-800"></div>
-                            </label>
-                        </div>
-
-                        {/* Min Idle Time Config */}
-                        <div className="flex items-center justify-between p-4 border-b border-stone-100 hover:bg-stone-50 transition-colors">
-                            <div>
-                                <h4 className="font-bold text-stone-700">最小空闲时间隐藏阈值</h4>
-                                <p className="text-xs text-stone-400 mt-1">小于此分钟数的空闲时间将不显示（分钟）</p>
-                            </div>
-                            <div className="flex items-center bg-stone-100 rounded-lg overflow-hidden">
-                                <button
-                                    className="p-2 hover:bg-stone-200 transition-colors"
-                                    onClick={() => onSetMinIdleTimeThreshold?.(Math.max(0, (minIdleTimeThreshold || 1) - 1))}
-                                >
-                                    <ChevronLeft size={16} />
-                                </button>
-                                <span className="w-8 text-center text-sm font-bold font-mono">{minIdleTimeThreshold}</span>
-                                <button
-                                    className="p-2 hover:bg-stone-200 transition-colors"
-                                    onClick={() => onSetMinIdleTimeThreshold?.((minIdleTimeThreshold || 1) + 1)}
-                                >
-                                    <ChevronRight size={16} />
-                                </button>
-                            </div>
-                        </div>
-
-                        {/* Default View Config */}
-                        <div className="flex items-center justify-between p-4 border-t border-stone-100 relative z-10 hover:bg-stone-50 transition-colors">
-                            <div>
-                                <h4 className="font-bold text-stone-700">启动默认页</h4>
-                                <p className="text-xs text-stone-400 mt-1">应用启动时默认显示的页面</p>
-                            </div>
-                            <div className="relative">
-                                <button
-                                    onClick={() => setIsDefaultViewDropdownOpen(!isDefaultViewDropdownOpen)}
-                                    className="flex items-center gap-2 bg-stone-100 hover:bg-stone-200 text-stone-700 text-sm font-bold px-4 py-2 rounded-lg transition-colors"
-                                >
-                                    <span>
-                                        {defaultView === 'RECORD' && '记录'}
-                                        {defaultView === 'TODO' && '待办'}
-                                        {defaultView === 'TIMELINE' && '脉络'}
-                                        {defaultView === 'REVIEW' && '档案'}
-                                        {defaultView === 'TAGS' && '索引'}
-                                        {defaultView === 'STATS' && '统计页'}
-                                        {/* Fallback for legacy 'SCOPE' or others if set */}
-                                        {defaultView === 'SCOPE' && '领域'}
-                                    </span>
-                                    <ChevronDown size={14} className={`transition-transform ${isDefaultViewDropdownOpen ? 'rotate-180' : ''}`} />
-                                </button>
-
-                                {isDefaultViewDropdownOpen && (
-                                    <>
-                                        {/* Backdrop to close */}
-                                        <div className="fixed inset-0 z-10" onClick={() => setIsDefaultViewDropdownOpen(false)} />
-
-                                        {/* Dropdown Menu - Opens Upwards */}
-                                        <div className="absolute right-0 bottom-full mb-2 w-32 bg-white rounded-xl shadow-xl border border-stone-100 overflow-hidden z-20 flex flex-col py-1 animate-in fade-in zoom-in-95 duration-200 origin-bottom-right">
-                                            {[
-                                                { label: '记录', value: 'RECORD' },
-                                                { label: '待办', value: 'TODO' },
-                                                { label: '脉络', value: 'TIMELINE' },
-                                                { label: '档案', value: 'REVIEW' },
-                                                { label: '索引', value: 'TAGS' },
-                                                { label: '统计页', value: 'STATS' }
-                                            ].map(opt => (
-                                                <button
-                                                    key={opt.value}
-                                                    onClick={() => {
-                                                        onSetDefaultView?.(opt.value);
-                                                        setIsDefaultViewDropdownOpen(false);
-                                                    }}
-                                                    className={`px-4 py-2.5 text-left text-sm font-medium transition-colors hover:bg-stone-50 flex items-center justify-between ${defaultView === opt.value ? 'text-stone-900 bg-stone-50' : 'text-stone-500'
-                                                        }`}
-                                                >
-                                                    {opt.label}
-                                                    {defaultView === opt.value && <div className="w-1.5 h-1.5 rounded-full bg-stone-800" />}
-                                                </button>
-                                            ))}
-                                        </div>
-                                    </>
-                                )}
-                            </div>
-                        </div>
-
-                        {/* Default Archive Page Config */}
-                        <div className="flex items-center justify-between p-4 border-t border-stone-100 relative z-10 hover:bg-stone-50 transition-colors">
-                            <div>
-                                <h4 className="font-bold text-stone-700">档案页默认页面</h4>
-                                <p className="text-xs text-stone-400 mt-1">进入档案页时默认显示的视图</p>
-                            </div>
-                            <div className="flex items-center gap-1 bg-stone-100 p-1 rounded-lg">
-                                <button
-                                    onClick={() => onSetDefaultArchiveView?.('CHRONICLE')}
-                                    className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all ${defaultArchiveView === 'CHRONICLE'
-                                        ? 'bg-white text-stone-800 shadow-sm'
-                                        : 'text-stone-400 hover:text-stone-600'}`}
-                                >
-                                    Chronicle
-                                </button>
-                                <button
-                                    onClick={() => onSetDefaultArchiveView?.('MEMOIR')}
-                                    className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all ${defaultArchiveView === 'MEMOIR'
-                                        ? 'bg-white text-stone-800 shadow-sm'
-                                        : 'text-stone-400 hover:text-stone-600'}`}
-                                >
-                                    Memoir
-                                </button>
-                            </div>
-                        </div>
-
-                        {/* Default Index Page Config */}
-                        <div className="flex items-center justify-between p-4 border-t border-stone-100 relative z-10 hover:bg-stone-50 transition-colors">
-                            <div>
-                                <h4 className="font-bold text-stone-700">索引页默认页面</h4>
-                                <p className="text-xs text-stone-400 mt-1">进入索引页时默认显示的视图</p>
-                            </div>
-                            <div className="flex items-center gap-1 bg-stone-100 p-1 rounded-lg">
-                                <button
-                                    onClick={() => onSetDefaultIndexView?.('TAGS')}
-                                    className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all ${defaultIndexView === 'TAGS'
-                                        ? 'bg-white text-stone-800 shadow-sm'
-                                        : 'text-stone-400 hover:text-stone-600'}`}
-                                >
-                                    Tags
-                                </button>
-                                <button
-                                    onClick={() => onSetDefaultIndexView?.('SCOPE')}
-                                    className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all ${defaultIndexView === 'SCOPE'
-                                        ? 'bg-white text-stone-800 shadow-sm'
-                                        : 'text-stone-400 hover:text-stone-600'}`}
-                                >
-                                    Scopes
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
+            <PreferencesSettingsView
+                onBack={() => setActiveSubmenu('main')}
+                onToast={onToast}
+                startWeekOnSunday={startWeekOnSunday}
+                onToggleStartWeekOnSunday={onToggleStartWeekOnSunday}
+                dailyReviewTime={dailyReviewTime}
+                onSetDailyReviewTime={onSetDailyReviewTime}
+                weeklyReviewTime={weeklyReviewTime}
+                onSetWeeklyReviewTime={onSetWeeklyReviewTime}
+                monthlyReviewTime={monthlyReviewTime}
+                onSetMonthlyReviewTime={onSetMonthlyReviewTime}
+                autoFocusNote={autoFocusNote}
+                onToggleAutoFocusNote={onToggleAutoFocusNote}
+                minIdleTimeThreshold={minIdleTimeThreshold}
+                onSetMinIdleTimeThreshold={onSetMinIdleTimeThreshold}
+                defaultView={defaultView}
+                onSetDefaultView={onSetDefaultView}
+                defaultArchiveView={defaultArchiveView}
+                onSetDefaultArchiveView={onSetDefaultArchiveView}
+                defaultIndexView={defaultIndexView}
+                onSetDefaultIndexView={onSetDefaultIndexView}
+            />
         );
     }
 
     if (activeSubmenu === 'guide') {
-        return (
-            <div className="fixed inset-0 z-50 bg-[#fdfbf7] flex flex-col font-serif animate-in slide-in-from-right duration-300 pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">
-                <div className="flex items-center gap-3 px-4 h-14 border-b border-stone-100 bg-[#fdfbf7]/80 backdrop-blur-md sticky top-0 z-10">
-                    <button
-                        onClick={() => setActiveSubmenu('main')}
-                        className="text-stone-400 hover:text-stone-600 p-1"
-                    >
-                        <ChevronLeft size={24} />
-                    </button>
-                    <span className="text-stone-800 font-bold text-lg">用户指南</span>
-                </div>
-
-                <div className="flex-1 overflow-y-auto px-5 py-6 pb-40">
-                    <div className="markdown-content">
-                        <ReactMarkdown
-                            remarkPlugins={[remarkGfm]}
-                            components={{
-                                h1: ({ node, ...props }) => <h1 className="text-2xl font-bold text-stone-800 mb-4 mt-0" {...props} />,
-                                h2: ({ node, ...props }) => <h2 className="text-xl font-bold text-stone-800 mt-8 mb-3" {...props} />,
-                                h3: ({ node, ...props }) => <h3 className="text-base font-bold text-stone-800 mt-6 mb-2" {...props} />,
-                                p: ({ node, ...props }) => <p className="text-stone-600 leading-relaxed my-3 text-sm" {...props} />,
-                                ul: ({ node, ...props }) => <ul className="my-3 space-y-1.5 list-disc pl-6" {...props} />,
-                                ol: ({ node, ...props }) => <ol className="my-3 space-y-1.5 list-decimal pl-6" {...props} />,
-                                li: ({ node, ...props }) => <li className="text-stone-600 text-sm" {...props} />,
-                                strong: ({ node, ...props }) => <strong className="text-stone-800 font-bold" {...props} />,
-                                code: ({ node, inline, className, children, ...props }: any) =>
-                                    inline
-                                        ? <code className="text-stone-700 bg-stone-100 px-1.5 py-0.5 rounded text-xs" {...props}>{children}</code>
-                                        : <code className="block bg-stone-50 border border-stone-200 rounded-xl p-4 text-xs" {...props}>{children}</code>,
-                                blockquote: ({ node, ...props }) => <blockquote className="border-l-4 border-stone-300 pl-4 italic text-stone-500 my-4" {...props} />,
-                                hr: ({ node, ...props }) => <hr className="border-stone-100 my-6" {...props} />,
-                            }}
-                        >
-                            {userGuideContent}
-                        </ReactMarkdown>
-                    </div>
-                </div>
-            </div>
-        )
-
+        return <UserGuideView onBack={() => setActiveSubmenu('main')} />;
     }
 
     if (activeSubmenu === 'nfc') {
         return (
-            <div className="fixed inset-0 z-50 bg-[#fdfbf7] flex flex-col font-serif animate-in slide-in-from-right duration-300 pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">
-                <div className="flex items-center gap-3 px-4 h-14 border-b border-stone-100 bg-[#fdfbf7]/80 backdrop-blur-md sticky top-0 z-10">
-                    <button
-                        onClick={() => setActiveSubmenu('main')}
-                        className="text-stone-400 hover:text-stone-600 p-1"
-                    >
-                        <ChevronLeft size={24} />
-                    </button>
-                    <span className="text-stone-800 font-bold text-lg">NFC Tags</span>
-                </div>
-
-                <div className="flex-1 overflow-y-auto px-5 py-6 pb-40 space-y-6">
-                    {isWritingNfc ? (
-                        <div className="flex flex-col items-center justify-center p-12 bg-white rounded-3xl shadow-lg border border-stone-100 animate-in fade-in zoom-in">
-                            <div className="w-20 h-20 bg-blue-50 rounded-full flex items-center justify-center mb-6 animate-pulse">
-                                <Nfc size={40} className="text-blue-500" />
-                            </div>
-                            <h3 className="text-xl font-bold text-stone-800 mb-2">Ready to Scan</h3>
-                            <p className="text-stone-500 text-center mb-8">
-                                Hold your phone near an NFC tag to write.
-                            </p>
-                            <button
-                                onClick={handleCancelNfc}
-                                className="px-8 py-3 bg-stone-100 text-stone-600 rounded-xl font-bold active:scale-95 transition-all"
-                            >
-                                Cancel
-                            </button>
-                        </div>
-                    ) : (
-                        <>
-                            {/* Quick Actions */}
-                            <div className="bg-white rounded-2xl p-6 shadow-sm space-y-4">
-                                <div className="flex items-center gap-3 mb-2">
-                                    <div className="w-10 h-10 rounded-full bg-orange-100 flex items-center justify-center text-orange-600">
-                                        <Crosshair size={20} />
-                                    </div>
-                                    <div>
-                                        <h3 className="font-bold text-stone-800">快速打点 (Quick Punch)</h3>
-                                        <p className="text-xs text-stone-400">Write a tag to instantly record a "Quick Punch".</p>
-                                    </div>
-                                </div>
-                                <button
-                                    onClick={() => handleWriteNfc("lumostime://record?action=quick_punch")}
-                                    className="w-full py-3 bg-stone-800 text-white rounded-xl font-bold shadow-lg shadow-stone-200 active:scale-[0.98] transition-all"
-                                >
-                                    Write Quick Punch Tag
-                                </button>
-                            </div>
-
-                            {/* Specific Activity */}
-                            <div className="bg-white rounded-2xl p-6 shadow-sm space-y-4">
-                                <div className="flex items-center gap-3 mb-2">
-                                    <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-600">
-                                        <Tag size={20} />
-                                    </div>
-                                    <div>
-                                        <h3 className="font-bold text-stone-800">指定活动 (Start Activity)</h3>
-                                        <p className="text-xs text-stone-400">Write a tag to start a specific activity.</p>
-                                    </div>
-                                </div>
-
-                                {/* Category Select */}
-                                <CustomSelect
-                                    label="Category (活动分类)"
-                                    placeholder="Select Category..."
-                                    value={nfcSelectedCatId}
-                                    onChange={(val) => {
-                                        setNfcSelectedCatId(val);
-                                        setNfcSelectedActId('');
-                                    }}
-                                    options={syncData.categories?.map((cat: any) => ({
-                                        value: cat.id,
-                                        label: cat.name,
-                                        icon: <span className="text-lg">{cat.icon}</span>
-                                    })) || []}
-                                />
-
-                                {/* Activity Select */}
-                                <CustomSelect
-                                    label="Activity (具体活动)"
-                                    placeholder="Select Activity..."
-                                    value={nfcSelectedActId}
-                                    onChange={(val) => setNfcSelectedActId(val)}
-                                    disabled={!nfcSelectedCatId}
-                                    options={
-                                        syncData.categories
-                                            ?.find((c: any) => c.id === nfcSelectedCatId)
-                                            ?.activities.map((act: any) => ({
-                                                value: act.id,
-                                                label: act.name,
-                                                icon: <span className="text-lg">{act.icon}</span>
-                                            })) || []
-                                    }
-                                />
-
-                                <button
-                                    disabled={!nfcSelectedCatId || !nfcSelectedActId}
-                                    onClick={() => handleWriteNfc(`lumostime://record?action=start&cat_id=${nfcSelectedCatId}&act_id=${nfcSelectedActId}`)}
-                                    className="w-full py-3 bg-blue-600 text-white rounded-xl font-bold shadow-lg shadow-blue-200 active:scale-[0.98] transition-all disabled:opacity-50 disabled:shadow-none"
-                                >
-                                    Write Activity Tag
-                                </button>
-                            </div>
-
-                            {/* Read/Test Tag */}
-                            <div className="bg-white rounded-2xl p-6 shadow-sm space-y-4 border border-stone-100">
-                                <div className="flex items-center gap-3 mb-2">
-                                    <div className="w-10 h-10 rounded-full bg-stone-100 flex items-center justify-center text-stone-600">
-                                        <Search size={20} />
-                                    </div>
-                                    <div>
-                                        <h3 className="font-bold text-stone-800">读取测试 (Read / Test)</h3>
-                                        <p className="text-xs text-stone-400">Scan a tag to see its content.</p>
-                                    </div>
-                                </div>
-                                <div className="p-4 bg-stone-50 rounded-xl text-xs text-stone-500 text-center border border-dashed border-stone-200">
-                                    Hold phone near ANY tag to read it. <br />
-                                    (Check Toast message for result)
-                                </div>
-                            </div>
-
-                            {/* Clear Tag */}
-                            <div className="bg-white rounded-2xl p-6 shadow-sm space-y-4 border border-red-100">
-                                <div className="flex items-center gap-3 mb-2">
-                                    <div className="w-10 h-10 rounded-full bg-red-50 flex items-center justify-center text-red-500">
-                                        <Trash2 size={20} />
-                                    </div>
-                                    <div>
-                                        <h3 className="font-bold text-stone-800">Clear Tag (Format)</h3>
-                                        <p className="text-xs text-stone-400">Remove all data from a tag.</p>
-                                    </div>
-                                </div>
-                                <button
-                                    onClick={() => handleWriteNfc("lumostime://clear")}
-                                    className="w-full py-3 bg-red-50 text-red-500 border border-red-100 rounded-xl font-bold active:scale-[0.98] transition-all"
-                                >
-                                    Erase Tag Content
-                                </button>
-                            </div>
-                        </>
-                    )}
-                </div>
-            </div>
-        )
+            <NFCSettingsView
+                onBack={() => setActiveSubmenu('main')}
+                onToast={onToast}
+                categories={syncData.categories || []}
+            />
+        );
     }
 
     if (activeSubmenu === 'narrative_prompt') {
         return (
-            <div className="fixed inset-0 z-50 bg-[#fdfbf7] flex flex-col font-serif animate-in slide-in-from-right duration-300 pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">
-                <div className="flex items-center gap-3 px-4 h-14 border-b border-stone-100 bg-[#fdfbf7]/80 backdrop-blur-md sticky top-0 z-10">
-                    <button
-                        onClick={() => setActiveSubmenu('main')}
-                        className="text-stone-400 hover:text-stone-600 p-1"
-                    >
-                        <ChevronLeft size={24} />
-                    </button>
-                    <span className="text-stone-800 font-bold text-lg">AI 叙事设定</span>
-                </div>
-
-                <div className="flex-1 overflow-y-auto p-4 pb-40">
-                    {/* User Personal Info Section */}
-                    <div className="bg-white rounded-2xl p-6 shadow-sm space-y-4 mb-4">
-                        <div className="flex items-center gap-2 mb-2">
-                            <div className="w-10 h-10 rounded-xl bg-amber-50 flex items-center justify-center text-amber-500">
-                                <User size={20} />
-                            </div>
-                            <div>
-                                <h4 className="font-bold text-stone-800 text-[15px]">个人信息</h4>
-                                <p className="text-xs text-stone-400 mt-0.5">让 AI 了解你的背景，生成更贴合的叙事</p>
-                            </div>
-                        </div>
-
-                        <textarea
-                            className={`w-full h-32 bg-stone-50 border border-stone-200 rounded-xl p-4 text-xs text-stone-600 outline-none focus:border-stone-400 resize-none leading-relaxed ${isPrivacyMode ? 'blur-sm select-none transition-all duration-500' : 'transition-all duration-500'}`}
-                            value={localUserInfo}
-                            onChange={(e) => setLocalUserInfo(e.target.value)}
-                            placeholder="例如：我是一名正在攻读博士学位的研究生..."
-                            maxLength={2000}
-                        />
-
-                        <div className="flex justify-end">
-                            <button
-                                onClick={handleSaveUserInfo}
-                                disabled={localUserInfo === (userPersonalInfo || '')}
-                                className={`text-sm font-bold px-4 py-2 rounded-lg transition-colors ${localUserInfo !== (userPersonalInfo || '')
-                                    ? 'bg-stone-800 text-white'
-                                    : 'bg-stone-100 text-stone-400'
-                                    }`}
-                            >
-                                保存信息
-                            </button>
-                        </div>
-                    </div>
-
-                    {/* Custom Templates List */}
-                    <div className="bg-white rounded-2xl p-6 shadow-sm space-y-4">
-                        <div className="flex items-center justify-between mb-2">
-                            <div className="flex items-center gap-2">
-                                <div className="w-10 h-10 rounded-xl bg-indigo-50 flex items-center justify-center text-indigo-500">
-                                    <Sparkles size={20} />
-                                </div>
-                                <div>
-                                    <h4 className="font-bold text-stone-800 text-[15px]">自定义叙事模板</h4>
-                                    <p className="text-xs text-stone-400 mt-0.5">管理你自己创建的叙事风格</p>
-                                </div>
-                            </div>
-                            <button
-                                onClick={handleAddTemplate}
-                                className="px-3 py-1.5 bg-stone-800 text-white text-xs font-bold rounded-lg flex items-center gap-1 hover:bg-stone-700 transition-colors"
-                            >
-                                <PlusCircle size={14} />
-                                新建模板
-                            </button>
-                        </div>
-
-                        <div className="space-y-3">
-                            {(!customNarrativeTemplates || customNarrativeTemplates.length === 0) && (
-                                <div className="text-center py-8 text-stone-400 text-xs bg-stone-50 rounded-xl border border-dashed border-stone-200">
-                                    还没有创建自定义模板<br />点击右上角创建你的专属风格
-                                </div>
-                            )}
-
-                            {customNarrativeTemplates?.map(template => (
-                                <div key={template.id} className="p-4 bg-stone-50 rounded-xl border border-stone-100 flex items-start justify-between group hover:border-stone-300 transition-colors">
-                                    <div>
-                                        <h5 className="font-bold text-stone-800 text-sm">{template.title}</h5>
-                                        <div className="flex flex-wrap gap-1 mt-1">
-                                            {/* Legacy compatibility: default to Daily if undefined */}
-                                            {(template.isDaily !== false) && (
-                                                <span className="text-[10px] px-1.5 py-0.5 bg-stone-100 text-stone-500 rounded border border-stone-200">每日</span>
-                                            )}
-                                            {template.isWeekly && (
-                                                <span className="text-[10px] px-1.5 py-0.5 bg-stone-100 text-stone-500 rounded border border-stone-200">每周</span>
-                                            )}
-                                            {template.isMonthly && (
-                                                <span className="text-[10px] px-1.5 py-0.5 bg-stone-100 text-stone-500 rounded border border-stone-200">每月</span>
-                                            )}
-                                        </div>
-                                        <p className="text-xs text-stone-500 mt-1 line-clamp-2">{template.description}</p>
-                                    </div>
-                                    <div className="flex items-center gap-2 opacity-100 md:opacity-0 group-hover:opacity-100 transition-opacity">
-                                        <button
-                                            onClick={() => handleEditTemplate(template)}
-                                            className="p-1.5 text-stone-400 hover:text-stone-600 hover:bg-stone-200 rounded-lg"
-                                        >
-                                            <Edit2 size={16} />
-                                        </button>
-                                        <button
-                                            onClick={() => handleDeleteTemplate(template.id)}
-                                            className="p-1.5 text-stone-400 hover:text-red-500 hover:bg-red-50 rounded-lg"
-                                        >
-                                            <Trash2 size={16} />
-                                        </button>
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-                </div>
-
-                {/* Add/Edit Modal Overlay */}
-                {showAddTemplateModal && (
-                    <div className="fixed inset-0 z-[60] bg-black/50 flex items-center justify-center p-4">
-                        <div className="bg-white rounded-2xl w-full max-w-lg shadow-xl animate-in fade-in zoom-in-95 duration-200 flex flex-col max-h-[90vh]">
-                            <div className="flex items-center justify-between p-4 border-b border-stone-100">
-                                <h3 className="font-bold text-lg text-stone-800">
-                                    {editingTemplate ? '编辑模板' : '创建新模板'}
-                                </h3>
-                                <button onClick={() => setShowAddTemplateModal(false)} className="p-1 text-stone-400 hover:text-stone-600">
-                                    <X size={24} />
-                                </button>
-                            </div>
-
-                            <div className="p-4 space-y-4 overflow-y-auto flex-1">
-                                <div>
-                                    <label className="block text-xs font-bold text-stone-600 mb-1.5">模板名称</label>
-                                    <input
-                                        type="text"
-                                        className="w-full bg-stone-50 border border-stone-200 rounded-xl px-4 py-2.5 text-sm text-stone-800 outline-none focus:border-stone-400"
-                                        placeholder="例如：发朋友圈风格"
-                                        value={modalTitle}
-                                        onChange={e => setModalTitle(e.target.value)}
-                                    />
-                                </div>
-
-                                <div>
-                                    <label className="block text-xs font-bold text-stone-600 mb-1.5">简短描述</label>
-                                    <input
-                                        type="text"
-                                        className="w-full bg-stone-50 border border-stone-200 rounded-xl px-4 py-2.5 text-sm text-stone-800 outline-none focus:border-stone-400"
-                                        placeholder="例如：emoji多一点，语气轻松"
-                                        value={modalDesc}
-                                        onChange={e => setModalDesc(e.target.value)}
-                                    />
-                                </div>
-
-                                <div>
-                                    <label className="block text-xs font-bold text-stone-600 mb-1.5">适用周期 (Applicability)</label>
-                                    <div className="grid grid-cols-3 gap-2">
-                                        <button
-                                            type="button"
-                                            onClick={() => setModalIsDaily(!modalIsDaily)}
-                                            className={`px-2 py-3 rounded-xl text-xs font-bold text-center border transition-all flex items-center justify-center gap-1.5 truncate ${modalIsDaily
-                                                ? 'bg-stone-900 text-white border-stone-900 shadow-md transform scale-[1.02]'
-                                                : 'bg-stone-50 text-stone-500 border-stone-100 hover:bg-stone-100'
-                                                }`}
-                                        >
-                                            <span className="text-sm">☀️</span>
-                                            <span className="truncate">每日</span>
-                                        </button>
-                                        <button
-                                            type="button"
-                                            onClick={() => setModalIsWeekly(!modalIsWeekly)}
-                                            className={`px-2 py-3 rounded-xl text-xs font-bold text-center border transition-all flex items-center justify-center gap-1.5 truncate ${modalIsWeekly
-                                                ? 'bg-stone-900 text-white border-stone-900 shadow-md transform scale-[1.02]'
-                                                : 'bg-stone-50 text-stone-500 border-stone-100 hover:bg-stone-100'
-                                                }`}
-                                        >
-                                            <span className="text-sm">📅</span>
-                                            <span className="truncate">每周</span>
-                                        </button>
-                                        <button
-                                            type="button"
-                                            onClick={() => setModalIsMonthly(!modalIsMonthly)}
-                                            className={`px-2 py-3 rounded-xl text-xs font-bold text-center border transition-all flex items-center justify-center gap-1.5 truncate ${modalIsMonthly
-                                                ? 'bg-stone-900 text-white border-stone-900 shadow-md transform scale-[1.02]'
-                                                : 'bg-stone-50 text-stone-500 border-stone-100 hover:bg-stone-100'
-                                                }`}
-                                        >
-                                            <span className="text-sm">🌙</span>
-                                            <span className="truncate">每月</span>
-                                        </button>
-                                    </div>
-                                </div>
-
-                                <div>
-                                    <div className="flex justify-between items-center mb-1.5">
-                                        <label className="block text-xs font-bold text-stone-600">叙事风格描述 (Narrative Persona)</label>
-                                    </div>
-                                    <textarea
-                                        className={`w-full h-48 bg-stone-50 border border-stone-200 rounded-xl p-4 text-xs font-mono text-stone-600 outline-none focus:border-stone-400 resize-none leading-relaxed ${isPrivacyMode ? 'blur-sm select-none transition-all duration-500' : 'transition-all duration-500'}`}
-                                        placeholder="例如：你是一个幽默的脱口秀演员，请用夸张和调侃的语气点评我今天的时间记录..."
-                                        value={modalPrompt}
-                                        onChange={e => setModalPrompt(e.target.value)}
-                                    />
-                                </div>
-
-                                {modalError && (
-                                    <div className="text-red-500 text-xs font-bold px-1">{modalError}</div>
-                                )}
-                            </div>
-
-                            <div className="p-4 border-t border-stone-100 flex justify-end gap-3">
-                                <button
-                                    onClick={() => setShowAddTemplateModal(false)}
-                                    className="px-4 py-2 text-sm font-bold text-stone-500 hover:bg-stone-100 rounded-xl transition-colors"
-                                >
-                                    取消
-                                </button>
-                                <button
-                                    onClick={handleSaveTemplate}
-                                    className="px-6 py-2 text-sm font-bold text-white bg-stone-800 hover:bg-stone-700 rounded-xl shadow-md transition-colors"
-                                >
-                                    保存
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                )}
-
-                {/* Delete Confirmation Modal */}
-                <ConfirmModal
-                    isOpen={!!deletingTemplateId}
-                    onClose={() => setDeletingTemplateId(null)}
-                    onConfirm={confirmDeleteTemplate}
-                    title="删除自定义叙事"
-                    description="确定要删除这个叙事风格吗？此操作无法撤销。"
-                    confirmText="删除"
-                    cancelText="取消"
-                    type="danger"
-                />
-            </div>
+            <NarrativeSettingsView
+                onBack={() => setActiveSubmenu('main')}
+                onToast={onToast}
+                userPersonalInfo={userPersonalInfo}
+                onSetUserPersonalInfo={onSetUserPersonalInfo}
+                customNarrativeTemplates={customNarrativeTemplates}
+                onUpdateCustomNarrativeTemplates={onUpdateCustomNarrativeTemplates}
+            />
         );
     }
 
@@ -3445,17 +2268,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
                 </div>
             )}
 
-            {/* Delete Confirmation Modal for Custom Templates */}
-            <ConfirmModal
-                isOpen={!!deletingTemplateId}
-                onClose={() => setDeletingTemplateId(null)}
-                onConfirm={confirmDeleteTemplate}
-                title="删除自定义叙事"
-                description="确定要删除这个叙事风格吗？此操作无法撤销。"
-                confirmText="删除"
-                cancelText="取消"
-                type="danger"
-            />
+
         </div>
     );
 };

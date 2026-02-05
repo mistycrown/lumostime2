@@ -51,7 +51,8 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
         isTagsManaging, setIsTagsManaging,
         isScopeManaging, setIsScopeManaging,
         selectedTagId, selectedCategoryId, selectedScopeId,
-        isJournalMode, setIsJournalMode
+        isJournalMode, setIsJournalMode,
+        returnToSearch, setReturnToSearch
     } = useNavigation();
 
     const {
@@ -101,11 +102,11 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
                 !(currentView === AppView.SCOPE && isScopeManaging) &&
                 // Hide header for REVIEW view (Memoir/Chronicle use their own headers) UNLESS a modal review is open
                 (currentView !== AppView.REVIEW || isDailyReviewOpen || isWeeklyReviewOpen || isMonthlyReviewOpen) && (
-                    <header 
+                    <header
                         className={`flex items-center justify-between px-5 border-b border-stone-100 shrink-0 z-30 transition-all duration-300 pt-[env(safe-area-inset-top)] ${isHeaderScrolled
                             ? 'h-[calc(3rem+env(safe-area-inset-top))] bg-[#faf9f6]/90 backdrop-blur-md shadow-sm'
                             : currentView === AppView.REVIEW ? 'h-[calc(3.5rem+env(safe-area-inset-top))] bg-[#faf9f6]/80 backdrop-blur-sm' : 'h-[calc(3.5rem+env(safe-area-inset-top))] bg-[#faf9f6]/80 backdrop-blur-sm'
-                        }`}
+                            }`}
                     >
                         <div className="w-8 flex items-center">
                             {(currentView === AppView.TODO || currentView === AppView.RECORD) && !isDailyReviewOpen && !isMonthlyReviewOpen && !isWeeklyReviewOpen && (
@@ -127,6 +128,21 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
                                 isMonthlyReviewOpen) && (
                                     <button
                                         onClick={() => {
+                                            if (returnToSearch) {
+                                                // Re-open Search
+                                                setIsSearchOpen(true);
+                                                setReturnToSearch(false);
+
+                                                // Also close the specific view to be clean (optional, but good for state)
+                                                if (isDailyReviewOpen) handleCloseDailyReview();
+                                                else if (isWeeklyReviewOpen) handleCloseWeeklyReview();
+                                                else if (isMonthlyReviewOpen) handleCloseMonthlyReview();
+                                                else if (currentView === AppView.STATS) setCurrentView(AppView.TIMELINE);
+                                                else if (currentView === AppView.SCOPE) handleBackFromScope();
+                                                else handleBackFromTag();
+                                                return;
+                                            }
+
                                             if (isDailyReviewOpen) {
                                                 handleCloseDailyReview();
                                             } else if (isWeeklyReviewOpen) {
