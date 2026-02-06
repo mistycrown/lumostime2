@@ -6,7 +6,7 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import { Log, Category, ActiveSession } from '../types';
 import { getRandomQuote } from '../constants/timePalQuotes';
-import { TimePalType, getAllTimePalTypes, getTimePalImagePath, getTimePalEmoji } from '../constants/timePalConfig';
+import { TimePalType, getAllTimePalTypes, getTimePalImagePath, getTimePalImagePathFallback, getTimePalEmoji } from '../constants/timePalConfig';
 
 interface TimePalCardProps {
     logs: Log[];
@@ -54,6 +54,11 @@ export const TimePalCard: React.FC<TimePalCardProps> = ({ logs, currentDate, cat
     // 实时计时器状态 - 用于更新正在进行的会话时长
     const [currentTime, setCurrentTime] = useState(Date.now());
 
+    // 调试模式状态
+    const [debugMode, setDebugMode] = useState(false);
+    const [debugFocusSeconds, setDebugFocusSeconds] = useState(0);
+    const [debugLevel, setDebugLevel] = useState(1);
+
     // 每秒更新一次当前时间，用于实时显示正在进行的计时
     useEffect(() => {
         if (activeSessions.length > 0) {
@@ -84,9 +89,22 @@ export const TimePalCard: React.FC<TimePalCardProps> = ({ logs, currentDate, cat
         };
         window.addEventListener('timepal-type-changed', handleCustomChange);
 
+        // 监听调试模式事件
+        const handleDebugMode = (event: CustomEvent) => {
+            const { enabled, type, level, focusHours } = event.detail;
+            setDebugMode(enabled);
+            if (enabled) {
+                setTimePalType(type);
+                setDebugLevel(level);
+                setDebugFocusSeconds(focusHours * 3600);
+            }
+        };
+        window.addEventListener('timepal-debug-mode', handleDebugMode as EventListener);
+
         return () => {
             window.removeEventListener('storage', handleStorageChange);
             window.removeEventListener('timepal-type-changed', handleCustomChange);
+            window.removeEventListener('timepal-debug-mode', handleDebugMode as EventListener);
         };
     }, []);
 
@@ -103,6 +121,14 @@ export const TimePalCard: React.FC<TimePalCardProps> = ({ logs, currentDate, cat
 
     // 计算当日专注时长
     const { totalFocusSeconds, formLevel } = useMemo(() => {
+        // 如果是调试模式，直接返回调试数据
+        if (debugMode) {
+            return {
+                totalFocusSeconds: debugFocusSeconds,
+                formLevel: debugLevel
+            };
+        }
+
         const startOfDay = new Date(currentDate);
         startOfDay.setHours(0, 0, 0, 0);
         const endOfDay = new Date(currentDate);
@@ -162,10 +188,18 @@ export const TimePalCard: React.FC<TimePalCardProps> = ({ logs, currentDate, cat
             totalFocusSeconds: totalSeconds,
             formLevel: level
         };
-    }, [logs, currentDate, categories, activeSessions, currentTime]);
+    }, [logs, currentDate, categories, activeSessions, currentTime, debugMode, debugFocusSeconds, debugLevel]);
 
-    // 获取小动物图片路径
-    const imageUrl = getTimePalImagePath(timePalType, formLevel);
+    // 获取小动物图片路径（优先 PNG，降级到 webp）
+    const [imageUrl, setImageUrl] = useState(() => getTimePalImagePath(timePalType, formLevel));
+    const [imageError, setImageError] = useState(false);
+    
+    // 当类型或等级变化时，重置图片 URL 和错误状态
+    useEffect(() => {
+        setImageUrl(getTimePalImagePath(timePalType, formLevel));
+        setImageError(false);
+    }, [timePalType, formLevel]);
+    
     const timeDisplay = formatDuration(totalFocusSeconds);
     const formDesc = getFormDescription(formLevel);
     const quote = useMemo(() => getRandomQuote(), [currentDate]); // 每天固定一个语录
@@ -178,14 +212,20 @@ export const TimePalCard: React.FC<TimePalCardProps> = ({ logs, currentDate, cat
                currentDate.getDate() === today.getDate();
     }, [currentDate]);
 
-    // 如果不是今天，或者没有专注时长，不显示卡片
-    if (!isToday || totalFocusSeconds === 0) {
+    // 如果不是今天，或者没有专注时长（且不在调试模式），不显示卡片
+    if (!isToday || (totalFocusSeconds === 0 && !debugMode)) {
         return null;
     }
 
     return (
         <div className="mb-4">
-            <div className="bg-gradient-to-br from-white/70 to-stone-50/70 rounded-2xl border border-stone-200 p-4 flex items-center gap-4 transition-shadow" style={{ boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.05)' }}>
+            <div className={`relative bg-gradient-to-br from-white/70 to-stone-50/70 rounded-2xl border ${debugMode ? 'border-amber-400 shadow-amber-100' : 'border-stone-200'} p-4 flex items-center gap-4 transition-shadow`} style={{ boxShadow: debugMode ? '0 4px 12px 0 rgba(251, 191, 36, 0.15)' : '0 1px 3px 0 rgba(0, 0, 0, 0.05)' }}>
+                {/* 调试模式标识 */}
+                {debugMode && (
+                    <div className="absolute top-2 right-2 bg-amber-400 text-white text-[9px] font-bold px-2 py-0.5 rounded-full">
+                        调试
+                    </div>
+                )}
                 {/* 左侧：小动物图片（可点击切换） */}
                 <button 
                     onClick={switchTimePal}
@@ -193,16 +233,24 @@ export const TimePalCard: React.FC<TimePalCardProps> = ({ logs, currentDate, cat
                     title="点击切换小动物"
                 >
                     <div className={`w-20 h-20 rounded-xl overflow-hidden flex items-center justify-center animate-level-${formLevel}`}>
-                        <img 
-                            src={imageUrl} 
-                            alt="时光小友" 
-                            className="w-full h-full object-cover"
-                            onError={(e) => {
-                                // 如果图片加载失败，显示占位符
-                                e.currentTarget.style.display = 'none';
-                                e.currentTarget.parentElement!.innerHTML = `<span class="text-4xl">${getTimePalEmoji(timePalType)}</span>`;
-                            }}
-                        />
+                        {!imageError ? (
+                            <img 
+                                src={imageUrl} 
+                                alt="时光小友" 
+                                className="w-full h-full object-cover"
+                                onError={(e) => {
+                                    // 如果 PNG 加载失败，尝试 webp 格式
+                                    if (imageUrl.endsWith('.png')) {
+                                        setImageUrl(getTimePalImagePathFallback(timePalType, formLevel));
+                                    } else {
+                                        // webp 也失败了，显示 emoji 占位符
+                                        setImageError(true);
+                                    }
+                                }}
+                            />
+                        ) : (
+                            <span className="text-4xl">{getTimePalEmoji(timePalType)}</span>
+                        )}
                     </div>
                 </button>
 

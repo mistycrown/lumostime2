@@ -5,7 +5,7 @@
 import React, { useState, useEffect } from 'react';
 import { AppView } from '../types';
 import { useSettings } from '../contexts/SettingsContext';
-import { navigationDecorationService } from '../services/navigationDecorationService';
+import { navigationDecorationService, getNavigationDecorationFallbackUrl } from '../services/navigationDecorationService';
 import { NavigationDecorationDebugger } from './NavigationDecorationDebugger';
 
 interface BottomNavigationProps {
@@ -30,6 +30,7 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
     const { defaultIndexView } = useSettings();
     const [currentDecoration, setCurrentDecoration] = useState<string>('default');
     const [decorationUrl, setDecorationUrl] = useState<string>('');
+    const [imageError, setImageError] = useState<boolean>(false);
     const [settings, setSettings] = useState({
         offsetY: 'bottom',
         offsetX: '0px',
@@ -43,6 +44,7 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
             setCurrentDecoration(decorationId);
             const decoration = navigationDecorationService.getDecorationById(decorationId);
             setDecorationUrl(decoration?.url || '');
+            setImageError(false); // 重置错误状态
 
             const baseSettings = {
                 offsetY: decoration?.offsetY || 'bottom',
@@ -113,11 +115,27 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
         <>
             <div className="fixed bottom-0 left-0 w-full z-30">
                 {/* 装饰层 - 仅在非默认时显示 */}
-                {currentDecoration !== 'default' && decorationUrl && (
+                {currentDecoration !== 'default' && decorationUrl && !imageError && (
                     <div
                         className="absolute bottom-0 left-0 w-full h-40 md:h-48 pointer-events-none z-10"
                         style={navStyle}
-                    />
+                    >
+                        {/* 隐藏的 img 标签用于检测图片加载错误 */}
+                        <img
+                            src={decorationUrl}
+                            alt=""
+                            style={{ display: 'none' }}
+                            onError={() => {
+                                // 如果 PNG 加载失败，尝试 webp 格式
+                                if (decorationUrl.endsWith('.png')) {
+                                    setDecorationUrl(getNavigationDecorationFallbackUrl(decorationUrl));
+                                } else {
+                                    // webp 也失败了，隐藏装饰
+                                    setImageError(true);
+                                }
+                            }}
+                        />
+                    </div>
                 )}
 
                 {/* 导航栏 */}
