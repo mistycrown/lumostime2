@@ -324,34 +324,57 @@ class IconService {
      * 设置桌面端图标
      */
     private async setDesktopIcon(iconOption: IconOption): Promise<void> {
-        if (!iconOption.desktopIcon) return;
+        console.log('[iconService] setDesktopIcon 开始');
+        console.log('[iconService] iconOption:', iconOption);
+        
+        if (!iconOption.desktopIcon) {
+            console.log('[iconService] ❌ 没有desktopIcon配置');
+            return;
+        }
+
+        console.log('[iconService] 准备更新favicon:', iconOption.desktopIcon);
 
         // 更新favicon
         const favicon = document.querySelector('link[rel="icon"]') as HTMLLinkElement;
+        console.log('[iconService] 当前favicon元素:', favicon);
+        
         if (favicon) {
+            const oldHref = favicon.href;
             favicon.href = iconOption.desktopIcon;
+            console.log('[iconService] ✓ favicon已更新');
+            console.log('[iconService]   旧路径:', oldHref);
+            console.log('[iconService]   新路径:', favicon.href);
         } else {
             // 如果没有favicon，创建一个
+            console.log('[iconService] 创建新的favicon元素');
             const newFavicon = document.createElement('link');
             newFavicon.rel = 'icon';
             newFavicon.href = iconOption.desktopIcon;
             document.head.appendChild(newFavicon);
+            console.log('[iconService] ✓ 新favicon已创建并添加');
         }
 
         // 更新其他相关的图标链接
         const appleTouchIcon = document.querySelector('link[rel="apple-touch-icon"]') as HTMLLinkElement;
         if (appleTouchIcon) {
             appleTouchIcon.href = iconOption.desktopIcon;
+            console.log('[iconService] ✓ apple-touch-icon已更新');
         }
 
         // 如果是Electron环境，通知主进程更新应用图标
         if ((window as any).ipcRenderer) {
+            console.log('[iconService] 检测到Electron环境，通知主进程');
             try {
                 (window as any).ipcRenderer.send('update-app-icon', iconOption.desktopIcon);
+                console.log('[iconService] ✓ Electron IPC消息已发送');
             } catch (error) {
-                console.warn('Electron图标更新失败:', error);
+                console.warn('[iconService] ❌ Electron图标更新失败:', error);
             }
+        } else {
+            console.log('[iconService] 非Electron环境，跳过IPC通知');
         }
+        
+        console.log('[iconService] setDesktopIcon 完成');
     }
 
     /**

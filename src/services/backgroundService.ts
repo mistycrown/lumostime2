@@ -276,10 +276,26 @@ class BackgroundService {
                     bgLayer.style.background = background.url;
                 } else {
                     // 图片背景 - 固定位置，填满屏幕
-                    bgLayer.style.backgroundImage = `url(${background.url})`;
+                    // 优先尝试 PNG，如果失败则降级到 webp
+                    const imageUrl = background.url;
+                    bgLayer.style.backgroundImage = `url(${imageUrl})`;
                     bgLayer.style.backgroundSize = 'cover'; // 填满屏幕，保持比例
                     bgLayer.style.backgroundPosition = 'center center'; // 居中显示
                     bgLayer.style.backgroundRepeat = 'no-repeat';
+                    
+                    // 添加图片加载错误处理
+                    const testImg = new Image();
+                    testImg.onload = () => {
+                        // 图片加载成功，不需要做任何事
+                    };
+                    testImg.onerror = () => {
+                        // PNG 加载失败，尝试 webp
+                        if (imageUrl.endsWith('.png')) {
+                            const webpUrl = imageUrl.replace('.png', '.webp');
+                            bgLayer.style.backgroundImage = `url(${webpUrl})`;
+                        }
+                    };
+                    testImg.src = imageUrl;
                 }
 
                 // 将背景层插入到元素的第一个子元素之前

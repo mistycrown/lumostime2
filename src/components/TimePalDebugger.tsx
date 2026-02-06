@@ -40,6 +40,25 @@ export const TimePalDebugger: React.FC<TimePalDebuggerProps> = ({ onClose }) => 
         return 5;
     };
 
+    // 实时应用调试状态（任何变化都立即生效）
+    useEffect(() => {
+        // 保存类型
+        localStorage.setItem('lumostime_timepal_type', currentType);
+        
+        // 触发调试模式事件，传递模拟的专注时长
+        window.dispatchEvent(new CustomEvent('timepal-debug-mode', {
+            detail: {
+                enabled: true,
+                type: currentType,
+                level: currentLevel,
+                focusHours: debugFocusHours
+            }
+        }));
+
+        // 触发类型变化事件
+        window.dispatchEvent(new Event('timepal-type-changed'));
+    }, [currentType, currentLevel, debugFocusHours]);
+
     // 更新等级时同步专注时长
     useEffect(() => {
         setDebugFocusHours(getLevelFocusHours(currentLevel));
@@ -60,27 +79,6 @@ export const TimePalDebugger: React.FC<TimePalDebuggerProps> = ({ onClose }) => 
 
         const newType = types[newIdx];
         setCurrentType(newType);
-        localStorage.setItem('lumostime_timepal_type', newType);
-        window.dispatchEvent(new Event('timepal-type-changed'));
-    };
-
-    // 应用调试状态
-    const applyDebugState = () => {
-        // 保存类型
-        localStorage.setItem('lumostime_timepal_type', currentType);
-        
-        // 触发调试模式事件，传递模拟的专注时长
-        window.dispatchEvent(new CustomEvent('timepal-debug-mode', {
-            detail: {
-                enabled: true,
-                type: currentType,
-                level: currentLevel,
-                focusHours: debugFocusHours
-            }
-        }));
-
-        // 触发类型变化事件
-        window.dispatchEvent(new Event('timepal-type-changed'));
     };
 
     // 退出调试模式
@@ -109,7 +107,7 @@ export const TimePalDebugger: React.FC<TimePalDebuggerProps> = ({ onClose }) => 
     };
 
     return (
-        <div className="fixed top-20 right-4 z-50 bg-white/95 backdrop-blur rounded-xl shadow-2xl border border-amber-200 p-4 w-72 animate-in fade-in slide-in-from-top-4">
+        <div className="fixed bottom-20 left-4 z-50 bg-white/95 backdrop-blur rounded-xl shadow-2xl border border-amber-200 p-4 w-72 animate-in fade-in slide-in-from-bottom-4">
             {/* Header */}
             <div className="flex items-center justify-between mb-4 border-b border-amber-100 pb-3">
                 <h3 className="text-sm font-bold text-stone-800 flex items-center gap-1.5">
@@ -212,17 +210,9 @@ export const TimePalDebugger: React.FC<TimePalDebuggerProps> = ({ onClose }) => 
                 </div>
             </div>
 
-            {/* 应用按钮 */}
-            <button
-                onClick={applyDebugState}
-                className="w-full flex items-center justify-center gap-2 rounded-lg py-2.5 transition-all text-sm font-bold shadow-sm bg-amber-400 text-white hover:bg-amber-500 hover:shadow-md"
-            >
-                <span>应用调试状态</span>
-            </button>
-
             {/* 提示信息 */}
             <div className="mt-3 text-[10px] text-stone-400 text-center leading-relaxed">
-                调试模式下，时光小友会显示模拟的状态
+                调试模式下，时光小友会实时显示模拟的状态
             </div>
         </div>
     );

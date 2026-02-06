@@ -21,6 +21,7 @@ import { ImagePreviewModal } from '../components/ImagePreviewModal';
 import { ConfirmModal } from '../components/ConfirmModal';
 import { ReactionPicker, ReactionList } from '../components/ReactionComponents';
 import { TimePalCard } from '../components/TimePalCard';
+import { TimePalDebugger } from '../components/TimePalDebugger';
 
 
 // Image Thumbnail Component
@@ -159,10 +160,29 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ logs, todos, scopes,
     });
     const [previewImage, setPreviewImage] = useState<string | null>(null);
     const [copyFailureModal, setCopyFailureModal] = useState<{ isOpen: boolean; text: string }>({ isOpen: false, text: '' });
+    const [showTimePalDebugger, setShowTimePalDebugger] = useState(false);
 
     React.useEffect(() => {
         localStorage.setItem('lumos_timeline_sort', sortOrder);
     }, [sortOrder]);
+
+    // 监听 TimePal 调试器的开关
+    React.useEffect(() => {
+        // 在 window 上暴露开启/关闭调试器的函数
+        (window as any).enableTimePalDebug = () => {
+            setShowTimePalDebugger(true);
+            console.log('✅ TimePal 调试器已开启');
+        };
+        (window as any).disableTimePalDebug = () => {
+            setShowTimePalDebugger(false);
+            console.log('❌ TimePal 调试器已关闭');
+        };
+
+        return () => {
+            delete (window as any).enableTimePalDebug;
+            delete (window as any).disableTimePalDebug;
+        };
+    }, []);
 
     const [isAIModalOpen, setIsAIModalOpen] = useState(false);
 
@@ -1274,6 +1294,11 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ logs, todos, scopes,
                 cancelText="关闭"
                 type="info"
             />
+
+            {/* TimePal 调试器 */}
+            {showTimePalDebugger && (
+                <TimePalDebugger onClose={() => setShowTimePalDebugger(false)} />
+            )}
         </div >
     );
 };
