@@ -11,7 +11,7 @@
 import React, { useState, useEffect } from 'react';
 import { ArrowLeft } from 'lucide-react';
 import { Category } from '../types';
-import { TIMEPAL_OPTIONS, TimePalType, getTimePalEmoji, getTimePalImagePathFallback } from '../constants/timePalConfig';
+import { TIMEPAL_OPTIONS, TimePalType, getTimePalEmoji, getTimePalImagePath, getTimePalImagePathFallback } from '../constants/timePalConfig';
 
 interface TimePalSettingsViewProps {
     onBack: () => void;
@@ -28,10 +28,11 @@ export const TimePalSettingsView: React.FC<TimePalSettingsViewProps> = ({ onBack
     // 图片加载错误状态（用于降级到 webp）
     const [imageErrors, setImageErrors] = useState<Record<string, boolean>>({});
     const [imageSources, setImageSources] = useState<Record<string, string>>(() => {
-        // 初始化所有预览图为 PNG 格式
+        // 使用 getTimePalImagePath 获取 PNG 路径（与 TimePalCard 一致）
         const sources: Record<string, string> = {};
         TIMEPAL_OPTIONS.forEach(option => {
-            sources[option.type] = option.preview.replace('.webp', '.png');
+            // 使用等级 1 的图片作为预览
+            sources[option.type] = getTimePalImagePath(option.type, 1);
         });
         return sources;
     });
@@ -93,7 +94,9 @@ export const TimePalSettingsView: React.FC<TimePalSettingsViewProps> = ({ onBack
                         选择一个陪伴你的时光小友
                     </p>
 
-                    <div className="grid grid-cols-3 gap-4">
+                    <div className="grid gap-4" style={{ 
+                        gridTemplateColumns: 'repeat(auto-fit, minmax(80px, 1fr))'
+                    }}>
                         {TIMEPAL_OPTIONS.map(option => {
                             const isSelected = selectedType === option.type;
                             return (
@@ -101,7 +104,7 @@ export const TimePalSettingsView: React.FC<TimePalSettingsViewProps> = ({ onBack
                                     key={option.type}
                                     onClick={() => handleSelectType(option.type)}
                                     className={`
-                                        relative flex flex-col items-center gap-3 p-4 rounded-xl border-2 transition-all
+                                        relative flex flex-col items-center gap-2 p-3 rounded-xl border-2 transition-all
                                         ${isSelected
                                             ? 'border-amber-400 bg-amber-50/50'
                                             : 'border-stone-200 bg-white hover:border-stone-300'}
@@ -115,18 +118,18 @@ export const TimePalSettingsView: React.FC<TimePalSettingsViewProps> = ({ onBack
                                     )}
 
                                     {/* 预览图 */}
-                                    <div className="w-20 h-20 rounded-xl overflow-hidden flex items-center justify-center">
+                                    <div className="w-full aspect-square rounded-xl overflow-hidden flex items-center justify-center">
                                         {!imageErrors[option.type] ? (
                                             <img
                                                 src={imageSources[option.type]}
                                                 alt={option.name}
                                                 className="w-full h-full object-cover"
-                                                onError={(e) => {
+                                                onError={() => {
                                                     // 如果 PNG 加载失败，尝试 webp 格式
                                                     if (imageSources[option.type].endsWith('.png')) {
                                                         setImageSources(prev => ({
                                                             ...prev,
-                                                            [option.type]: option.preview
+                                                            [option.type]: getTimePalImagePathFallback(option.type, 1)
                                                         }));
                                                     } else {
                                                         // webp 也失败了，显示 emoji 占位符
@@ -138,12 +141,12 @@ export const TimePalSettingsView: React.FC<TimePalSettingsViewProps> = ({ onBack
                                                 }}
                                             />
                                         ) : (
-                                            <span className="text-5xl">{getTimePalEmoji(option.type)}</span>
+                                            <span className="text-4xl">{getTimePalEmoji(option.type)}</span>
                                         )}
                                     </div>
 
                                     {/* 名称 */}
-                                    <span className={`text-sm font-medium ${isSelected ? 'text-amber-600' : 'text-stone-600'}`}>
+                                    <span className={`text-xs font-medium text-center leading-tight ${isSelected ? 'text-amber-600' : 'text-stone-600'}`}>
                                         {option.name}
                                     </span>
                                 </button>

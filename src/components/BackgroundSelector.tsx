@@ -178,12 +178,14 @@ export const BackgroundSelector: React.FC<BackgroundSelectorProps> = ({ onToast 
             </div>
 
             {/* 背景选项网格 */}
-            <div className="flex flex-wrap gap-2 mb-4">
+            <div className="grid gap-2 mb-4" style={{ 
+                gridTemplateColumns: 'repeat(auto-fit, minmax(64px, 1fr))'
+            }}>
                 {backgrounds.map((background) => (
                     <button
                         key={background.id}
                         onClick={() => handleBackgroundSelect(background.id)}
-                        className={`relative w-16 h-20 rounded-lg border-2 transition-all overflow-hidden ${
+                        className={`relative aspect-[4/5] rounded-lg border-2 transition-all overflow-hidden ${
                             currentBackground === background.id
                                 ? 'border-stone-400 ring-2 ring-stone-200'
                                 : 'border-stone-200 hover:border-stone-300'
@@ -214,7 +216,7 @@ export const BackgroundSelector: React.FC<BackgroundSelectorProps> = ({ onToast 
                 <button
                     onClick={() => fileInputRef.current?.click()}
                     disabled={isUploading}
-                    className="w-16 h-20 rounded-lg border-2 border-dashed border-stone-300 hover:border-stone-400 transition-all flex flex-col items-center justify-center gap-1 text-stone-500 hover:text-stone-600"
+                    className="aspect-[4/5] rounded-lg border-2 border-dashed border-stone-300 hover:border-stone-400 transition-all flex flex-col items-center justify-center gap-1 text-stone-500 hover:text-stone-600"
                 >
                     {isUploading ? (
                         <div className="w-4 h-4 border-2 border-stone-400 border-t-transparent rounded-full animate-spin" />

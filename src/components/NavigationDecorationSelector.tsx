@@ -121,12 +121,14 @@ export const NavigationDecorationSelector: React.FC<NavigationDecorationSelector
             </div>
 
             {/* 装饰选项网格 */}
-            <div className="flex flex-wrap gap-2">
+            <div className="grid gap-2" style={{ 
+                gridTemplateColumns: 'repeat(auto-fit, minmax(64px, 1fr))'
+            }}>
                 {decorations.map((decoration) => (
                     <button
                         key={decoration.id}
                         onClick={() => handleDecorationSelect(decoration.id)}
-                        className={`relative w-16 h-16 rounded-lg border-2 transition-all overflow-hidden ${
+                        className={`relative aspect-square rounded-lg border-2 transition-all overflow-hidden ${
                             currentDecoration === decoration.id
                                 ? 'border-stone-400 ring-2 ring-stone-200'
                                 : 'border-stone-200 hover:border-stone-300'

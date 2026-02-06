@@ -326,9 +326,13 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
     useEffect(() => {
         const checkVerification = async () => {
             const result = await redemptionService.isVerified();
+            console.log('[SponsorshipView] 验证状态检查:', result);
             if (result.isVerified && result.userId) {
                 setIsRedeemed(true);
                 setSupporterId(result.userId);
+                console.log('[SponsorshipView] ✓ 用户已验证，ID:', result.userId);
+            } else {
+                console.log('[SponsorshipView] ❌ 用户未验证');
             }
         };
         checkVerification();
@@ -339,11 +343,24 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
                 const { iconService } = await import('../services/iconService');
                 const currentIcon = iconService.getCurrentIcon();
                 setSelectedIcon(currentIcon);
+                console.log('[SponsorshipView] 当前图标:', currentIcon);
             } catch (error) {
                 console.error('加载当前图标失败:', error);
             }
         };
         loadCurrentIcon();
+
+        // 添加全局调试函数
+        (window as any).debugIconSwitch = () => {
+            console.log('========== 图标切换调试信息 ==========');
+            console.log('isRedeemed:', isRedeemed);
+            console.log('isChangingIcon:', isChangingIcon);
+            console.log('selectedIcon:', selectedIcon);
+            console.log('supporterId:', supporterId);
+            console.log('redemptionCode:', redemptionCode);
+            console.log('=====================================');
+        };
+        console.log('[SponsorshipView] 调试命令已注册: window.debugIconSwitch()');
     }, []);
 
     const handleRedeem = async () => {
@@ -379,7 +396,14 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
     };
 
     const handleIconChange = async (iconId: string) => {
+        console.log('[SponsorshipView] ========== 图标切换开始 ==========');
+        console.log('[SponsorshipView] 点击的图标ID:', iconId);
+        console.log('[SponsorshipView] isRedeemed状态:', isRedeemed);
+        console.log('[SponsorshipView] isChangingIcon状态:', isChangingIcon);
+        console.log('[SponsorshipView] 当前选中图标:', selectedIcon);
+        
         if (!isRedeemed) {
+            console.log('[SponsorshipView] ❌ 未验证赞赏码，操作被阻止');
             onToast('error', '请先验证赞赏码');
             return;
         }
@@ -387,19 +411,26 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
         setIsChangingIcon(true);
         try {
             const { iconService } = await import('../services/iconService');
+            console.log('[SponsorshipView] ✓ iconService已加载');
+            console.log('[SponsorshipView] 开始调用setIcon:', iconId);
+            
             const result = await iconService.setIcon(iconId);
+            console.log('[SponsorshipView] setIcon返回结果:', result);
 
             if (result.success) {
+                console.log('[SponsorshipView] ✓ 图标切换成功');
                 setSelectedIcon(iconId);
                 onToast('success', result.message);
             } else {
+                console.log('[SponsorshipView] ❌ 图标切换失败:', result.message);
                 onToast('error', result.message);
             }
         } catch (error: any) {
-            console.error('切换图标失败:', error);
+            console.error('[SponsorshipView] ❌ 切换图标异常:', error);
             onToast('error', error.message || '切换图标失败');
         } finally {
             setIsChangingIcon(false);
+            console.log('[SponsorshipView] ========== 图标切换结束 ==========');
         }
     };
 
@@ -516,9 +547,14 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
                                 {iconOptions.map((option) => (
                                     <button
                                         key={option.id}
-                                        onClick={() => handleIconChange(option.id)}
+                                        onClick={(e) => {
+                                            console.log('[Button] 按钮被点击:', option.id);
+                                            console.log('[Button] 事件对象:', e);
+                                            console.log('[Button] disabled状态:', isChangingIcon || !isRedeemed);
+                                            handleIconChange(option.id);
+                                        }}
                                         disabled={isChangingIcon || !isRedeemed}
-                                        className={`relative w-12 h-12 rounded-xl transition-all hover:bg-stone-50 ${!isRedeemed ? 'opacity-50 cursor-not-allowed' : ''
+                                        className={`relative aspect-square rounded-xl transition-all hover:bg-stone-50 ${!isRedeemed ? 'opacity-50 cursor-not-allowed' : ''
                                             } ${isChangingIcon ? 'opacity-70' : ''
                                             }`}
                                     >
