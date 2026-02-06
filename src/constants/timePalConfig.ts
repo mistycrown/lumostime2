@@ -5,10 +5,10 @@
 
 // 时光小友类型
 export type TimePalType = 
-    | 'cat' | 'dog' | 'rabbit' | 'monkey' | 'prince' | 'chibi'
+    | 'cat' | 'dog' | 'rabbit' | 'monkey' | 'prince' | 'chibi' | 'girl'
     // 新增类型
-    | 'buddist' | 'cat2' | 'dog2' | 'Ghost' | 'girl2' | 'girl3' | 'girl4'
-    | 'mouse' | 'panda' | 'pigen' | 'prince2' | 'rabbit2' | 'renzhe' | 'taoist';
+    | 'buddist' | 'cat2' | 'dog2' | 'dog3' | 'Ghost' | 'girl2' | 'girl3' | 'girl4'
+    | 'gui' | 'mouse' | 'panda' | 'pigen' | 'prince2' | 'rabbit2' | 'renzhe' | 'taoist' | 'zombis';
 
 // 时光小友选项配置
 export interface TimePalOption {
@@ -57,6 +57,12 @@ export const TIMEPAL_OPTIONS: TimePalOption[] = [
         preview: '/time_pal_origin/chibi/1.webp',
         emoji: '👧'
     },
+    { 
+        type: 'girl', 
+        name: '女孩', 
+        preview: '/time_pal_origin/girl/1.webp',
+        emoji: '👧'
+    },
     // 新增类型
     { 
         type: 'buddist', 
@@ -74,6 +80,12 @@ export const TIMEPAL_OPTIONS: TimePalOption[] = [
         type: 'dog2', 
         name: '小狗2', 
         preview: '/time_pal_origin/dog2/1.webp',
+        emoji: '🐕'
+    },
+    { 
+        type: 'dog3', 
+        name: '小狗3', 
+        preview: '/time_pal_origin/dog3/1.webp',
         emoji: '🐕'
     },
     { 
@@ -99,6 +111,12 @@ export const TIMEPAL_OPTIONS: TimePalOption[] = [
         name: '女孩4', 
         preview: '/time_pal_origin/girl4/1.webp',
         emoji: '👧'
+    },
+    { 
+        type: 'gui', 
+        name: '鬼怪', 
+        preview: '/time_pal_origin/gui/1.webp',
+        emoji: '👹'
     },
     { 
         type: 'mouse', 
@@ -141,6 +159,12 @@ export const TIMEPAL_OPTIONS: TimePalOption[] = [
         name: '道士', 
         preview: '/time_pal_origin/taoist/1.webp',
         emoji: '🧙'
+    },
+    { 
+        type: 'zombis', 
+        name: '僵尸', 
+        preview: '/time_pal_origin/zombis/1.webp',
+        emoji: '🧟'
     },
 ];
 
