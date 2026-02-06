@@ -56,7 +56,8 @@ import {
     Link,
     Smartphone,
     ImageIcon,
-    AlignLeft
+    AlignLeft,
+    Fish
 } from 'lucide-react';
 import { Capacitor } from '@capacitor/core';
 import { webdavService, WebDAVConfig } from '../services/webdavService';
@@ -1107,8 +1108,8 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
                             onClick={() => setActiveSubmenu('guide')}
                         />
                         <MenuItem
-                            icon={<Coffee size={18} className="text-pink-500" />}
-                            label="这里还在开发中 (Preview)"
+                            icon={<Fish size={18} className="text-pink-500" />}
+                            label="投喂小鱼干"
                             isLast
                             onClick={() => setActiveSubmenu('sponsorship_preview')}
                         />
