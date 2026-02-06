@@ -17,11 +17,17 @@ const DIRS_TO_CONVERT = [
     'public/background',
     'public/dchh',
     'public/time_pal_origin',
-    'public/icon_style'
 ];
+
+// 应用图标目录（特殊处理：压缩为小尺寸 PNG）
+const ICON_DIR = 'public/icon_style';
 
 // WebP 质量设置 (0-100, 推荐 80-90)
 const WEBP_QUALITY = 85;
+
+// 应用图标 PNG 设置
+const ICON_PNG_SIZE = 256; // 图标尺寸
+const ICON_PNG_QUALITY = 90; // PNG 质量
 
 // 备份目录
 const BACKUP_DIR = path.join(rootDir, 'static', 'png_backup');
@@ -42,6 +48,62 @@ async function backupPngFile(pngPath) {
     } catch (error) {
         console.error(`❌ 备份失败: ${pngPath}`, error.message);
         return false;
+    }
+}
+
+async function convertIconPngToOptimizedPng(pngPath) {
+    try {
+        const optimizedPath = pngPath; // 直接覆盖原文件
+        const tempPath = pngPath + '.tmp';
+        
+        const stats = await fs.stat(pngPath);
+        const originalSize = stats.size;
+
+        // 先备份 PNG 文件
+        const backupSuccess = await backupPngFile(pngPath);
+        if (!backupSuccess) {
+            console.log(`⚠️  备份失败，跳过优化: ${path.relative(rootDir, pngPath)}`);
+            return { error: true };
+        }
+
+        // 转换为优化的 PNG（小尺寸 + 高压缩）
+        await sharp(pngPath)
+            .resize(ICON_PNG_SIZE, ICON_PNG_SIZE, {
+                fit: 'contain',
+                background: { r: 0, g: 0, b: 0, alpha: 0 }
+            })
+            .png({
+                compressionLevel: 9,  // 最高压缩
+                quality: ICON_PNG_QUALITY,
+                palette: true,        // 使用调色板
+                effort: 10            // 最大压缩努力
+            })
+            .toFile(tempPath);
+
+        // 替换原文件
+        await fs.rename(tempPath, optimizedPath);
+
+        const newStats = await fs.stat(optimizedPath);
+        const newSize = newStats.size;
+        const reduction = ((originalSize - newSize) / originalSize * 100).toFixed(1);
+
+        console.log(`✅ ${path.relative(rootDir, pngPath)}`);
+        console.log(`   ${(originalSize / 1024).toFixed(1)} KB → ${(newSize / 1024).toFixed(1)} KB (减少 ${reduction}%)`);
+
+        // 删除同名的 WebP 文件（如果存在）
+        const webpPath = pngPath.replace(/\.png$/i, '.webp');
+        try {
+            await fs.access(webpPath);
+            await fs.unlink(webpPath);
+            console.log(`   🗑️  已删除旧的 WebP 文件`);
+        } catch {
+            // WebP 文件不存在，忽略
+        }
+
+        return { originalSize, newSize, reduction };
+    } catch (error) {
+        console.error(`❌ 优化失败: ${pngPath}`, error.message);
+        return { error: true };
     }
 }
 
@@ -80,6 +142,10 @@ async function convertPngToWebp(pngPath) {
         console.log(`✅ ${path.relative(rootDir, pngPath)}`);
         console.log(`   ${(originalSize / 1024).toFixed(1)} KB → ${(newSize / 1024).toFixed(1)} KB (减少 ${reduction}%)`);
 
+        // 删除原始 PNG 文件
+        await fs.unlink(pngPath);
+        console.log(`   🗑️  已删除原始 PNG 文件`);
+
         return { originalSize, newSize, reduction };
     } catch (error) {
         console.error(`❌ 转换失败: ${pngPath}`, error.message);
@@ -111,7 +177,7 @@ async function findPngFiles(dir) {
 }
 
 async function main() {
-    console.log('🚀 开始转换 PNG 图片为 WebP 格式...\n');
+    console.log('🚀 开始转换图片...\n');
     
     // 确保备份目录存在
     await fs.mkdir(BACKUP_DIR, { recursive: true });
@@ -123,6 +189,25 @@ async function main() {
     let skippedCount = 0;
     let errorCount = 0;
 
+    // 1. 处理应用图标（压缩为小尺寸 PNG）
+    console.log(`\n📱 处理应用图标: ${ICON_DIR}`);
+    const iconDir = path.join(rootDir, ICON_DIR);
+    const iconPngFiles = await findPngFiles(iconDir);
+    console.log(`   找到 ${iconPngFiles.length} 个 PNG 文件\n`);
+
+    for (const pngFile of iconPngFiles) {
+        const result = await convertIconPngToOptimizedPng(pngFile);
+        
+        if (result.error) {
+            errorCount++;
+        } else {
+            totalOriginalSize += result.originalSize || 0;
+            totalNewSize += result.newSize || 0;
+            convertedCount++;
+        }
+    }
+
+    // 2. 处理其他目录（转换为 WebP）
     for (const dir of DIRS_TO_CONVERT) {
         const fullDir = path.join(rootDir, dir);
         console.log(`\n📁 处理目录: ${dir}`);
@@ -158,8 +243,10 @@ async function main() {
     }
     console.log('='.repeat(60));
 
-    console.log('\n⚠️  注意: 转换完成后，请手动更新代码中的图片路径 (.png → .webp)');
-    console.log(`💡 提示: 原 PNG 文件已备份到 ${path.relative(rootDir, BACKUP_DIR)}`);
+    console.log('\n📝 说明:');
+    console.log(`   - 应用图标 (${ICON_DIR}): 已压缩为 ${ICON_PNG_SIZE}x${ICON_PNG_SIZE} PNG`);
+    console.log(`   - 其他图片: 已转换为 WebP 格式`);
+    console.log(`\n💡 提示: 原文件已备份到 ${path.relative(rootDir, BACKUP_DIR)}`);
     console.log('💡 提示: 确认无误后可以删除 public 目录下的原 PNG 文件以节省空间');
 }
 
