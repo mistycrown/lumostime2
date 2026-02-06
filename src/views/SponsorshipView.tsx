@@ -100,19 +100,20 @@ const TimePalSettingsCard: React.FC<{ categories: Category[] }> = ({ categories 
                 <h3 className="text-lg font-bold text-stone-800">时光小友</h3>
             </div>
 
-            {/* 选择小动物 - 使用与背景选择器相同的格子大小 */}
-            <div className="flex flex-wrap gap-2">
+            {/* 选择小动物 - 自适应网格布局 */}
+            <div className="grid gap-2" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(64px, 1fr))' }}>
                 {TIMEPAL_OPTIONS.map(option => {
                     const isSelected = selectedType === option.type;
                     return (
                         <button
                             key={option.type}
                             onClick={() => handleSelectType(option.type)}
-                            className={`relative w-16 h-20 rounded-lg border-2 transition-all overflow-hidden ${
+                            className={`relative rounded-lg border-2 transition-all overflow-hidden ${
                                 isSelected
                                     ? 'border-stone-400 ring-2 ring-stone-200'
                                     : 'border-stone-200 hover:border-stone-300'
                             }`}
+                            style={{ aspectRatio: '4/5' }}
                         >
                             {/* 预览图 */}
                             <div className="w-full h-full flex items-center justify-center p-1">
