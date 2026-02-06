@@ -27,23 +27,27 @@ interface NavigationDecorationSettings {
 class NavigationDecorationService {
     private decorations: NavigationDecorationOption[] = [
         { id: 'default', name: '默认', url: '', offsetY: 'bottom', offsetX: '0px', scale: 1, opacity: 0.6 },
-        { id: 'distant_mountain', name: '远山', url: '/dchh/distant_mountain.webp', offsetY: '71px', offsetX: '0px', scale: 1, opacity: 0.6 },
-        { id: 'little_prince', name: '小王子', url: '/dchh/little_prince.webp', offsetY: '71px', offsetX: '0px', scale: 1, opacity: 0.6 },
-        { id: 'book', name: '书本', url: '/dchh/book.webp', offsetY: '71px', offsetX: '0px', scale: 1, opacity: 0.6 },
-        { id: 'cloud', name: '云朵', url: '/dchh/cloud.webp', offsetY: '71px', offsetX: '0px', scale: 1, opacity: 0.6 },
-        { id: 'coffee', name: '咖啡', url: '/dchh/coffee.webp', offsetY: '71px', offsetX: '0px', scale: 1, opacity: 0.6 },
-        { id: 'fish', name: '鱼', url: '/dchh/fish.webp', offsetY: '71px', offsetX: '0px', scale: 1, opacity: 0.6 },
-        { id: 'flower', name: '花朵', url: '/dchh/flower.webp', offsetY: '71px', offsetX: '0px', scale: 1, opacity: 0.6 },
-        { id: 'grass', name: '草地', url: '/dchh/grass.webp', offsetY: '71px', offsetX: '0px', scale: 1, opacity: 0.6 },
-        { id: 'ink', name: '水墨', url: '/dchh/ink.webp', offsetY: '71px', offsetX: '0px', scale: 1, opacity: 0.6 },
-        { id: 'light', name: '灯光', url: '/dchh/light.webp', offsetY: '71px', offsetX: '0px', scale: 1, opacity: 0.6 },
-        { id: 'mushroom', name: '蘑菇', url: '/dchh/mushroom.webp', offsetY: '71px', offsetX: '0px', scale: 1, opacity: 0.6 },
-        { id: 'plant', name: '植物1', url: '/dchh/plant.webp', offsetY: '71px', offsetX: '0px', scale: 1, opacity: 0.6 },
-        { id: 'plant2', name: '植物2', url: '/dchh/plant2.webp', offsetY: '71px', offsetX: '0px', scale: 1, opacity: 0.6 },
-        { id: 'sea', name: '海洋', url: '/dchh/sea.webp', offsetY: '71px', offsetX: '0px', scale: 1, opacity: 0.6 },
-        { id: 'cat', name: '猫咪', url: '/dchh/cat.webp', offsetY: '71px', offsetX: '0px', scale: 1, opacity: 0.6 },
-        { id: 'cat2', name: '猫咪2', url: '/dchh/cat2.webp', offsetY: '71px', offsetX: '0px', scale: 1, opacity: 0.6 },
-        { id: 'sakura', name: '樱花', url: '/dchh/Sakura.webp', offsetY: '71px', offsetX: '0px', scale: 1, opacity: 0.6 },
+        { id: 'distant_mountain', name: '远山', url: '/dchh/distant_mountain.png', offsetY: '71px', offsetX: '0px', scale: 1, opacity: 0.6 },
+        { id: 'little_prince', name: '小王子', url: '/dchh/little_prince.png', offsetY: '71px', offsetX: '0px', scale: 1, opacity: 0.6 },
+        { id: 'book', name: '书本', url: '/dchh/book.png', offsetY: '71px', offsetX: '0px', scale: 1, opacity: 0.6 },
+        { id: 'cloud', name: '云朵', url: '/dchh/cloud.png', offsetY: '71px', offsetX: '0px', scale: 1, opacity: 0.6 },
+        { id: 'coffee', name: '咖啡', url: '/dchh/coffee.png', offsetY: '71px', offsetX: '0px', scale: 1, opacity: 0.6 },
+        { id: 'fish', name: '鱼', url: '/dchh/fish.png', offsetY: '71px', offsetX: '0px', scale: 1, opacity: 0.6 },
+        { id: 'flower', name: '花朵', url: '/dchh/flower.png', offsetY: '71px', offsetX: '0px', scale: 1, opacity: 0.6 },
+        { id: 'grass', name: '草地', url: '/dchh/grass.png', offsetY: '71px', offsetX: '0px', scale: 1, opacity: 0.6 },
+        { id: 'ink', name: '水墨', url: '/dchh/ink.png', offsetY: '71px', offsetX: '0px', scale: 1, opacity: 0.6 },
+        { id: 'light', name: '灯光', url: '/dchh/light.png', offsetY: '71px', offsetX: '0px', scale: 1, opacity: 0.6 },
+        { id: 'mushroom', name: '蘑菇', url: '/dchh/mushroom.png', offsetY: '71px', offsetX: '0px', scale: 1, opacity: 0.6 },
+        { id: 'plant', name: '植物1', url: '/dchh/plant.png', offsetY: '71px', offsetX: '0px', scale: 1, opacity: 0.6 },
+        { id: 'plant2', name: '植物2', url: '/dchh/plant2.png', offsetY: '71px', offsetX: '0px', scale: 1, opacity: 0.6 },
+        { id: 'sea', name: '海洋', url: '/dchh/sea.png', offsetY: '71px', offsetX: '0px', scale: 1, opacity: 0.6 },
+        { id: 'cat', name: '猫咪', url: '/dchh/cat.png', offsetY: '71px', offsetX: '0px', scale: 1, opacity: 0.6 },
+        { id: 'cat2', name: '猫咪2', url: '/dchh/cat2.png', offsetY: '71px', offsetX: '0px', scale: 1, opacity: 0.6 },
+        { id: 'sakura', name: '樱花', url: '/dchh/Sakura.png', offsetY: '71px', offsetX: '0px', scale: 1, opacity: 0.6 },
+        // 新增的导航栏装饰
+        { id: 'bird', name: '飞鸟', url: '/dchh/bird.png', offsetY: '71px', offsetX: '0px', scale: 1, opacity: 0.6 },
+        { id: 'lemon', name: '柠檬', url: '/dchh/lemon.png', offsetY: '71px', offsetX: '0px', scale: 1, opacity: 0.6 },
+        { id: 'star', name: '星星', url: '/dchh/star.png', offsetY: '71px', offsetX: '0px', scale: 1, opacity: 0.6 },
     ];
 
     getAllDecorations(): NavigationDecorationOption[] {
@@ -114,3 +118,10 @@ class NavigationDecorationService {
 }
 
 export const navigationDecorationService = new NavigationDecorationService();
+
+/**
+ * 获取导航装饰图片的降级路径（PNG → WebP）
+ */
+export const getNavigationDecorationFallbackUrl = (url: string): string => {
+    return url.replace('.png', '.webp');
+};

@@ -5,7 +5,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { Plus, Check, X } from 'lucide-react';
-import { backgroundService, BackgroundOption } from '../services/backgroundService';
+import { backgroundService, BackgroundOption, getBackgroundFallbackUrl } from '../services/backgroundService';
 import { ToastType } from './Toast';
 
 interface BackgroundSelectorProps {
@@ -17,6 +17,8 @@ export const BackgroundSelector: React.FC<BackgroundSelectorProps> = ({ onToast 
     const [currentBackground, setCurrentBackground] = useState<string>('default');
     const [backgroundOpacity, setBackgroundOpacity] = useState<number>(0.1);
     const [isUploading, setIsUploading] = useState(false);
+    const [imageErrors, setImageErrors] = useState<Record<string, boolean>>({});
+    const [imageSources, setImageSources] = useState<Record<string, string>>({});
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     useEffect(() => {
@@ -26,7 +28,19 @@ export const BackgroundSelector: React.FC<BackgroundSelectorProps> = ({ onToast 
     }, []);
 
     const loadBackgrounds = () => {
-        setBackgrounds(backgroundService.getAllBackgrounds());
+        const allBackgrounds = backgroundService.getAllBackgrounds();
+        setBackgrounds(allBackgrounds);
+        
+        // 初始化图片源为 PNG 格式（预设背景）
+        const sources: Record<string, string> = {};
+        allBackgrounds.forEach(bg => {
+            if (bg.url && bg.type === 'preset') {
+                sources[bg.id] = bg.url; // 已经是 PNG 格式
+            } else if (bg.url && bg.type === 'custom') {
+                sources[bg.id] = bg.url; // 自定义背景保持原样
+            }
+        });
+        setImageSources(sources);
     };
 
     const handleBackgroundSelect = (backgroundId: string) => {
@@ -116,12 +130,38 @@ export const BackgroundSelector: React.FC<BackgroundSelectorProps> = ({ onToast 
                 />
             );
         } else {
+            const imgSrc = imageSources[background.id] || background.thumbnail || background.url;
+            const hasError = imageErrors[background.id];
+            
             return (
-                <img
-                    src={background.thumbnail || background.url}
-                    alt={background.name}
-                    className="w-full h-full object-cover rounded-lg"
-                />
+                <>
+                    {!hasError ? (
+                        <img
+                            src={imgSrc}
+                            alt={background.name}
+                            className="w-full h-full object-cover rounded-lg"
+                            onError={() => {
+                                // 只对预设背景尝试降级
+                                if (background.type === 'preset' && imgSrc.endsWith('.png')) {
+                                    setImageSources(prev => ({
+                                        ...prev,
+                                        [background.id]: getBackgroundFallbackUrl(imgSrc)
+                                    }));
+                                } else {
+                                    // 自定义背景或 webp 失败，标记为错误
+                                    setImageErrors(prev => ({
+                                        ...prev,
+                                        [background.id]: true
+                                    }));
+                                }
+                            }}
+                        />
+                    ) : (
+                        <div className="w-full h-full bg-stone-100 flex items-center justify-center text-stone-400 text-xs">
+                            加载失败
+                        </div>
+                    )}
+                </>
             );
         }
     };

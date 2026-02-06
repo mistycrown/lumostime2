@@ -5,7 +5,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Check, Settings } from 'lucide-react';
-import { navigationDecorationService, NavigationDecorationOption } from '../services/navigationDecorationService';
+import { navigationDecorationService, NavigationDecorationOption, getNavigationDecorationFallbackUrl } from '../services/navigationDecorationService';
 import { ToastType } from './Toast';
 
 interface NavigationDecorationSelectorProps {
@@ -15,10 +15,22 @@ interface NavigationDecorationSelectorProps {
 export const NavigationDecorationSelector: React.FC<NavigationDecorationSelectorProps> = ({ onToast }) => {
     const [decorations, setDecorations] = useState<NavigationDecorationOption[]>([]);
     const [currentDecoration, setCurrentDecoration] = useState<string>('default');
+    const [imageErrors, setImageErrors] = useState<Record<string, boolean>>({});
+    const [imageSources, setImageSources] = useState<Record<string, string>>({});
 
     useEffect(() => {
-        setDecorations(navigationDecorationService.getAllDecorations());
+        const allDecorations = navigationDecorationService.getAllDecorations();
+        setDecorations(allDecorations);
         setCurrentDecoration(navigationDecorationService.getCurrentDecoration());
+        
+        // 初始化图片源为 PNG 格式
+        const sources: Record<string, string> = {};
+        allDecorations.forEach(deco => {
+            if (deco.url) {
+                sources[deco.id] = deco.url; // 已经是 PNG 格式
+            }
+        });
+        setImageSources(sources);
     }, []);
 
     const handleDecorationSelect = (decorationId: string) => {
@@ -44,20 +56,42 @@ export const NavigationDecorationSelector: React.FC<NavigationDecorationSelector
                 </div>
             );
         } else {
+            const imgSrc = imageSources[decoration.id] || decoration.url;
+            const hasError = imageErrors[decoration.id];
+            
             return (
                 <div className="w-full h-full relative overflow-hidden rounded-lg bg-stone-50">
                     {/* 预览容器 - 显示图片中间部分 */}
                     <div className="absolute inset-0 flex items-center justify-center">
-                        <img
-                            src={decoration.thumbnail || decoration.url}
-                            alt={decoration.name}
-                            className="w-full h-auto"
-                            style={{
-                                objectFit: 'cover',
-                                objectPosition: 'center',
-                                minHeight: '100%'
-                            }}
-                        />
+                        {!hasError ? (
+                            <img
+                                src={imgSrc}
+                                alt={decoration.name}
+                                className="w-full h-auto"
+                                style={{
+                                    objectFit: 'cover',
+                                    objectPosition: 'center',
+                                    minHeight: '100%'
+                                }}
+                                onError={() => {
+                                    // 如果 PNG 加载失败，尝试 webp 格式
+                                    if (imgSrc.endsWith('.png')) {
+                                        setImageSources(prev => ({
+                                            ...prev,
+                                            [decoration.id]: getNavigationDecorationFallbackUrl(imgSrc)
+                                        }));
+                                    } else {
+                                        // webp 也失败了，标记为错误
+                                        setImageErrors(prev => ({
+                                            ...prev,
+                                            [decoration.id]: true
+                                        }));
+                                    }
+                                }}
+                            />
+                        ) : (
+                            <div className="text-stone-400 text-xs">加载失败</div>
+                        )}
                     </div>
                 </div>
             );

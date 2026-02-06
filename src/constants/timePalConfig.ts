@@ -4,7 +4,11 @@
  */
 
 // 时光小友类型
-export type TimePalType = 'cat' | 'dog' | 'rabbit' | 'monkey' | 'prince' | 'chibi';
+export type TimePalType = 
+    | 'cat' | 'dog' | 'rabbit' | 'monkey' | 'prince' | 'chibi'
+    // 新增类型
+    | 'buddist' | 'cat2' | 'dog2' | 'Ghost' | 'girl2' | 'girl3' | 'girl4'
+    | 'mouse' | 'panda' | 'pigen' | 'prince2' | 'rabbit2' | 'renzhe' | 'taoist';
 
 // 时光小友选项配置
 export interface TimePalOption {
@@ -16,6 +20,7 @@ export interface TimePalOption {
 
 // 所有可用的时光小友选项
 export const TIMEPAL_OPTIONS: TimePalOption[] = [
+    // 原有类型
     { 
         type: 'cat', 
         name: '猫咪', 
@@ -52,11 +57,102 @@ export const TIMEPAL_OPTIONS: TimePalOption[] = [
         preview: '/time_pal_origin/chibi/1.webp',
         emoji: '👧'
     },
+    // 新增类型
+    { 
+        type: 'buddist', 
+        name: '佛教', 
+        preview: '/time_pal_origin/buddist/1.webp',
+        emoji: '🧘'
+    },
+    { 
+        type: 'cat2', 
+        name: '猫咪2', 
+        preview: '/time_pal_origin/cat2/1.webp',
+        emoji: '🐱'
+    },
+    { 
+        type: 'dog2', 
+        name: '小狗2', 
+        preview: '/time_pal_origin/dog2/1.webp',
+        emoji: '🐕'
+    },
+    { 
+        type: 'Ghost', 
+        name: '幽灵', 
+        preview: '/time_pal_origin/Ghost/1.webp',
+        emoji: '👻'
+    },
+    { 
+        type: 'girl2', 
+        name: '女孩2', 
+        preview: '/time_pal_origin/girl2/1.webp',
+        emoji: '👧'
+    },
+    { 
+        type: 'girl3', 
+        name: '女孩3', 
+        preview: '/time_pal_origin/girl3/1.webp',
+        emoji: '👧'
+    },
+    { 
+        type: 'girl4', 
+        name: '女孩4', 
+        preview: '/time_pal_origin/girl4/1.webp',
+        emoji: '👧'
+    },
+    { 
+        type: 'mouse', 
+        name: '老鼠', 
+        preview: '/time_pal_origin/mouse/1.webp',
+        emoji: '🐭'
+    },
+    { 
+        type: 'panda', 
+        name: '熊猫', 
+        preview: '/time_pal_origin/panda/1.webp',
+        emoji: '🐼'
+    },
+    { 
+        type: 'pigen', 
+        name: '鸽子', 
+        preview: '/time_pal_origin/pigen/1.webp',
+        emoji: '🕊️'
+    },
+    { 
+        type: 'prince2', 
+        name: '小王子2', 
+        preview: '/time_pal_origin/prince2/1.webp',
+        emoji: '🤴'
+    },
+    { 
+        type: 'rabbit2', 
+        name: '兔子2', 
+        preview: '/time_pal_origin/rabbit2/1.webp',
+        emoji: '🐇'
+    },
+    { 
+        type: 'renzhe', 
+        name: '忍者', 
+        preview: '/time_pal_origin/renzhe/1.webp',
+        emoji: '🥷'
+    },
+    { 
+        type: 'taoist', 
+        name: '道士', 
+        preview: '/time_pal_origin/taoist/1.webp',
+        emoji: '🧙'
+    },
 ];
 
 // 获取时光小友图片路径
+// 优先尝试 PNG 格式（调试用），如果不存在则使用 webp 格式
 export const getTimePalImagePath = (type: TimePalType, level: number): string => {
-    // 所有类型现在都使用统一的数字命名
+    // 优先返回 PNG 路径，组件会自动处理降级
+    return `/time_pal_origin/${type}/${level}.png`;
+};
+
+// 获取备用图片路径（webp 格式）
+export const getTimePalImagePathFallback = (type: TimePalType, level: number): string => {
     return `/time_pal_origin/${type}/${level}.webp`;
 };
 

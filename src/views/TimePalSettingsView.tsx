@@ -11,7 +11,7 @@
 import React, { useState, useEffect } from 'react';
 import { ArrowLeft } from 'lucide-react';
 import { Category } from '../types';
-import { TIMEPAL_OPTIONS, TimePalType, getTimePalEmoji } from '../constants/timePalConfig';
+import { TIMEPAL_OPTIONS, TimePalType, getTimePalEmoji, getTimePalImagePathFallback } from '../constants/timePalConfig';
 
 interface TimePalSettingsViewProps {
     onBack: () => void;
@@ -23,6 +23,17 @@ export const TimePalSettingsView: React.FC<TimePalSettingsViewProps> = ({ onBack
     const [selectedType, setSelectedType] = useState<TimePalType>(() => {
         const saved = localStorage.getItem('lumostime_timepal_type');
         return (saved as TimePalType) || 'cat';
+    });
+
+    // 图片加载错误状态（用于降级到 webp）
+    const [imageErrors, setImageErrors] = useState<Record<string, boolean>>({});
+    const [imageSources, setImageSources] = useState<Record<string, string>>(() => {
+        // 初始化所有预览图为 PNG 格式
+        const sources: Record<string, string> = {};
+        TIMEPAL_OPTIONS.forEach(option => {
+            sources[option.type] = option.preview.replace('.webp', '.png');
+        });
+        return sources;
     });
 
     // 是否启用标签筛选
@@ -105,15 +116,30 @@ export const TimePalSettingsView: React.FC<TimePalSettingsViewProps> = ({ onBack
 
                                     {/* 预览图 */}
                                     <div className="w-20 h-20 rounded-xl overflow-hidden flex items-center justify-center">
-                                        <img
-                                            src={option.preview}
-                                            alt={option.name}
-                                            className="w-full h-full object-cover"
-                                            onError={(e) => {
-                                                e.currentTarget.style.display = 'none';
-                                                e.currentTarget.parentElement!.innerHTML = `<span class="text-5xl">${getTimePalEmoji(option.type)}</span>`;
-                                            }}
-                                        />
+                                        {!imageErrors[option.type] ? (
+                                            <img
+                                                src={imageSources[option.type]}
+                                                alt={option.name}
+                                                className="w-full h-full object-cover"
+                                                onError={(e) => {
+                                                    // 如果 PNG 加载失败，尝试 webp 格式
+                                                    if (imageSources[option.type].endsWith('.png')) {
+                                                        setImageSources(prev => ({
+                                                            ...prev,
+                                                            [option.type]: option.preview
+                                                        }));
+                                                    } else {
+                                                        // webp 也失败了，显示 emoji 占位符
+                                                        setImageErrors(prev => ({
+                                                            ...prev,
+                                                            [option.type]: true
+                                                        }));
+                                                    }
+                                                }}
+                                            />
+                                        ) : (
+                                            <span className="text-5xl">{getTimePalEmoji(option.type)}</span>
+                                        )}
                                     </div>
 
                                     {/* 名称 */}

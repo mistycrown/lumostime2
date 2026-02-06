@@ -22,38 +22,45 @@ const PRESET_BACKGROUNDS: BackgroundOption[] = [
         id: 'little_prince',
         name: '小王子',
         type: 'preset',
-        url: '/background/little_prince.webp',
-        thumbnail: '/background/little_prince.webp',
+        url: '/background/little_prince.png',
+        thumbnail: '/background/little_prince.png',
     },
     {
         id: 'bank',
         name: '河岸',
         type: 'preset',
-        url: '/background/bank.webp',
-        thumbnail: '/background/bank.webp',
+        url: '/background/bank.png',
+        thumbnail: '/background/bank.png',
     },
     {
         id: 'bird',
         name: '飞鸟',
         type: 'preset',
-        url: '/background/bird.webp',
-        thumbnail: '/background/bird.webp',
+        url: '/background/bird.png',
+        thumbnail: '/background/bird.png',
     },
     {
         id: 'green',
         name: '绿意',
         type: 'preset',
-        url: '/background/green.webp',
-        thumbnail: '/background/green.webp',
+        url: '/background/green.png',
+        thumbnail: '/background/green.png',
     },
     {
         id: 'green2',
         name: '绿意2',
         type: 'preset',
-        url: '/background/green2.webp',
-        thumbnail: '/background/green2.webp',
+        url: '/background/green2.png',
+        thumbnail: '/background/green2.png',
     },
 ];
+
+/**
+ * 获取背景图片的降级路径（PNG → WebP）
+ */
+export const getBackgroundFallbackUrl = (url: string): string => {
+    return url.replace('.png', '.webp');
+};
 
 const STORAGE_KEY = 'lumos_custom_backgrounds';
 const CURRENT_BACKGROUND_KEY = 'lumos_current_background';
