@@ -29,6 +29,9 @@ const WEBP_QUALITY = 85;
 const ICON_PNG_SIZE = 256; // 图标尺寸
 const ICON_PNG_QUALITY = 90; // PNG 质量
 
+// 强制覆盖已存在的 WebP 文件
+const FORCE_OVERWRITE = true;
+
 // 备份目录
 const BACKUP_DIR = path.join(rootDir, 'static', 'png_backup');
 
@@ -112,12 +115,23 @@ async function convertPngToWebp(pngPath) {
         const webpPath = pngPath.replace(/\.png$/i, '.webp');
         
         // 检查 WebP 文件是否已存在
-        try {
-            await fs.access(webpPath);
-            console.log(`⏭️  跳过 (已存在): ${path.relative(rootDir, webpPath)}`);
-            return { skipped: true };
-        } catch {
-            // 文件不存在，继续转换
+        if (!FORCE_OVERWRITE) {
+            try {
+                await fs.access(webpPath);
+                console.log(`⏭️  跳过 (已存在): ${path.relative(rootDir, webpPath)}`);
+                return { skipped: true };
+            } catch {
+                // 文件不存在，继续转换
+            }
+        } else {
+            // 强制覆盖模式：删除已存在的 WebP
+            try {
+                await fs.access(webpPath);
+                await fs.unlink(webpPath);
+                console.log(`🔄 覆盖已存在的 WebP: ${path.relative(rootDir, webpPath)}`);
+            } catch {
+                // 文件不存在，继续
+            }
         }
 
         const stats = await fs.stat(pngPath);
