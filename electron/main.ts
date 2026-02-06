@@ -177,20 +177,42 @@ ipcMain.handle('write-obsidian-file', async (_, { filePath, content }) => {
 ipcMain.on('update-app-icon', (_, iconPath) => {
     try {
         if (win) {
-            const fullIconPath = path.join(process.env.VITE_PUBLIC, iconPath);
-            console.log('更新应用图标:', fullIconPath);
+            console.log('[Electron] 收到图标更新请求:', iconPath);
+            
+            // 移除开头的 / 以避免路径拼接问题
+            const cleanPath = iconPath.startsWith('/') ? iconPath.slice(1) : iconPath;
+            console.log('[Electron] 清理后的路径:', cleanPath);
+            
+            // 拼接完整路径
+            const fullIconPath = path.join(process.env.VITE_PUBLIC || '', cleanPath);
+            console.log('[Electron] 完整路径:', fullIconPath);
+            console.log('[Electron] 文件是否存在:', require('fs').existsSync(fullIconPath));
+            
+            if (!require('fs').existsSync(fullIconPath)) {
+                console.log('[Electron] ❌ 文件不存在，使用默认图标');
+                const defaultIcon = path.join(process.env.VITE_PUBLIC || '', 'icon.ico');
+                win.setIcon(defaultIcon);
+                return;
+            }
+            
+            console.log('[Electron] 最终使用的图标路径:', fullIconPath);
             
             // 更新窗口图标
             win.setIcon(fullIconPath);
+            console.log('[Electron] ✓ 窗口图标已更新');
             
             // 更新任务栏图标 (Windows)
             if (process.platform === 'win32') {
                 win.setOverlayIcon(fullIconPath, 'LumosTime');
+                console.log('[Electron] ✓ 任务栏覆盖图标已更新');
             }
             
-            console.log('✅ 应用图标更新成功');
+            console.log('[Electron] ✅ 应用图标更新成功');
+        } else {
+            console.log('[Electron] ❌ 窗口对象不存在');
         }
     } catch (error: any) {
-        console.error('❌ 更新应用图标失败:', error);
+        console.error('[Electron] ❌ 更新应用图标失败:', error);
+        console.error('[Electron] 错误堆栈:', error.stack);
     }
 });

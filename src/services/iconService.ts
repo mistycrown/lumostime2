@@ -28,7 +28,7 @@ export const ICON_OPTIONS: IconOption[] = [
         name: '霓虹',
         preview: '🌟',
         description: '霓虹风格图标',
-        desktopIcon: '/icon_style/icon_neon.webp',
+        desktopIcon: '/icon_style/icon_neon.png',
         mobileIcon: 'neon'
     },
     {
@@ -36,7 +36,7 @@ export const ICON_OPTIONS: IconOption[] = [
         name: '纸质',
         preview: '📄',
         description: '纸质风格图标',
-        desktopIcon: '/icon_style/icon_paper.webp',
+        desktopIcon: '/icon_style/icon_paper.png',
         mobileIcon: 'paper'
     },
     {
@@ -44,7 +44,7 @@ export const ICON_OPTIONS: IconOption[] = [
         name: '像素',
         preview: '🎮',
         description: '像素风格图标',
-        desktopIcon: '/icon_style/icon_pixel.webp',
+        desktopIcon: '/icon_style/icon_pixel.png',
         mobileIcon: 'pixel'
     },
     {
@@ -52,7 +52,7 @@ export const ICON_OPTIONS: IconOption[] = [
         name: '手绘',
         preview: '✏️',
         description: '手绘风格图标',
-        desktopIcon: '/icon_style/icon_sketch.webp',
+        desktopIcon: '/icon_style/icon_sketch.png',
         mobileIcon: 'sketch'
     },
     {
@@ -60,7 +60,7 @@ export const ICON_OPTIONS: IconOption[] = [
         name: '装饰艺术',
         preview: '🎨',
         description: '装饰艺术风格',
-        desktopIcon: '/icon_style/icon_Art%20Deco.webp',
+        desktopIcon: '/icon_style/icon_Art%20Deco.png',
         mobileIcon: 'art-deco'
     },
     {
@@ -68,7 +68,7 @@ export const ICON_OPTIONS: IconOption[] = [
         name: '蓝图',
         preview: '📐',
         description: '蓝图风格',
-        desktopIcon: '/icon_style/icon_Blueprint.webp',
+        desktopIcon: '/icon_style/icon_Blueprint.png',
         mobileIcon: 'blueprint'
     },
     {
@@ -76,7 +76,7 @@ export const ICON_OPTIONS: IconOption[] = [
         name: '黑板',
         preview: '📝',
         description: '黑板风格',
-        desktopIcon: '/icon_style/icon_Chalkboard.webp',
+        desktopIcon: '/icon_style/icon_Chalkboard.png',
         mobileIcon: 'chalkboard'
     },
     {
@@ -84,7 +84,7 @@ export const ICON_OPTIONS: IconOption[] = [
         name: '圣诞',
         preview: '🎄',
         description: '圣诞风格',
-        desktopIcon: '/icon_style/icon_Christmas.webp',
+        desktopIcon: '/icon_style/icon_Christmas.png',
         mobileIcon: 'christmas'
     },
     {
@@ -92,7 +92,7 @@ export const ICON_OPTIONS: IconOption[] = [
         name: '刺绣',
         preview: '🧵',
         description: '刺绣风格',
-        desktopIcon: '/icon_style/icon_Embroidery.webp',
+        desktopIcon: '/icon_style/icon_Embroidery.png',
         mobileIcon: 'embroidery'
     },
     {
@@ -100,7 +100,7 @@ export const ICON_OPTIONS: IconOption[] = [
         name: '涂鸦',
         preview: '🎨',
         description: '涂鸦风格',
-        desktopIcon: '/icon_style/icon_Graffiti.webp',
+        desktopIcon: '/icon_style/icon_Graffiti.png',
         mobileIcon: 'graffiti'
     },
     {
@@ -108,7 +108,7 @@ export const ICON_OPTIONS: IconOption[] = [
         name: '乐高',
         preview: '🧱',
         description: '乐高风格',
-        desktopIcon: '/icon_style/icon_lego.webp',
+        desktopIcon: '/icon_style/icon_lego.png',
         mobileIcon: 'lego'
     },
     {
@@ -116,7 +116,7 @@ export const ICON_OPTIONS: IconOption[] = [
         name: '折纸',
         preview: '📜',
         description: '折纸风格',
-        desktopIcon: '/icon_style/icon_origami.webp',
+        desktopIcon: '/icon_style/icon_origami.png',
         mobileIcon: 'origami'
     },
     {
@@ -124,7 +124,7 @@ export const ICON_OPTIONS: IconOption[] = [
         name: '点彩',
         preview: '🎨',
         description: '点彩风格',
-        desktopIcon: '/icon_style/icon_Pointillism.webp',
+        desktopIcon: '/icon_style/icon_Pointillism.png',
         mobileIcon: 'pointillism'
     },
     {
@@ -132,7 +132,7 @@ export const ICON_OPTIONS: IconOption[] = [
         name: '波普艺术',
         preview: '🎨',
         description: '波普艺术风格',
-        desktopIcon: '/icon_style/icon_Pop%20Art.webp',
+        desktopIcon: '/icon_style/icon_Pop%20Art.png',
         mobileIcon: 'pop-art'
     },
     {
@@ -140,7 +140,7 @@ export const ICON_OPTIONS: IconOption[] = [
         name: '彩色玻璃',
         preview: '🌈',
         description: '彩色玻璃风格',
-        desktopIcon: '/icon_style/icon_Stained%20Glass.webp',
+        desktopIcon: '/icon_style/icon_Stained%20Glass.png',
         mobileIcon: 'stained-glass'
     },
     {
@@ -148,7 +148,7 @@ export const ICON_OPTIONS: IconOption[] = [
         name: '浮世绘',
         preview: '🌊',
         description: '浮世绘风格',
-        desktopIcon: '/icon_style/icon_Ukiyo-e.webp',
+        desktopIcon: '/icon_style/icon_Ukiyo-e.png',
         mobileIcon: 'ukiyo-e'
     },
     {
@@ -156,7 +156,7 @@ export const ICON_OPTIONS: IconOption[] = [
         name: '简约',
         preview: '⚪',
         description: '简约风格',
-        desktopIcon: '/icon_style/icon_simple.webp',
+        desktopIcon: '/icon_style/icon_simple.png',
         mobileIcon: 'simple'
     },
     {
@@ -164,7 +164,7 @@ export const ICON_OPTIONS: IconOption[] = [
         name: '猫咪',
         preview: '🐱',
         description: '猫咪主题',
-        desktopIcon: '/icon_style/icon_cat.webp',
+        desktopIcon: '/icon_style/icon_cat.png',
         mobileIcon: 'cat'
     },
     {
@@ -172,7 +172,7 @@ export const ICON_OPTIONS: IconOption[] = [
         name: '狐狸',
         preview: '🦊',
         description: '狐狸主题',
-        desktopIcon: '/icon_style/icon_fox.webp',
+        desktopIcon: '/icon_style/icon_fox.png',
         mobileIcon: 'fox'
     },
     {
@@ -180,7 +180,7 @@ export const ICON_OPTIONS: IconOption[] = [
         name: '青蛙',
         preview: '🐸',
         description: '青蛙主题',
-        desktopIcon: '/icon_style/icon_frog.webp',
+        desktopIcon: '/icon_style/icon_frog.png',
         mobileIcon: 'frog'
     },
     {
@@ -188,7 +188,7 @@ export const ICON_OPTIONS: IconOption[] = [
         name: '熊猫',
         preview: '🐼',
         description: '熊猫主题',
-        desktopIcon: '/icon_style/icon_panda.webp',
+        desktopIcon: '/icon_style/icon_panda.png',
         mobileIcon: 'panda'
     },
     {
@@ -196,7 +196,7 @@ export const ICON_OPTIONS: IconOption[] = [
         name: '爱心',
         preview: '❤️',
         description: '爱心主题',
-        desktopIcon: '/icon_style/icon_heart.webp',
+        desktopIcon: '/icon_style/icon_heart.png',
         mobileIcon: 'heart'
     },
     {
@@ -204,7 +204,7 @@ export const ICON_OPTIONS: IconOption[] = [
         name: '月亮',
         preview: '🌙',
         description: '月亮主题',
-        desktopIcon: '/icon_style/icon_moon.webp',
+        desktopIcon: '/icon_style/icon_moon.png',
         mobileIcon: 'moon'
     },
     {
@@ -212,7 +212,7 @@ export const ICON_OPTIONS: IconOption[] = [
         name: '蘑菇',
         preview: '🍄',
         description: '蘑菇主题',
-        desktopIcon: '/icon_style/icon_mushroom.webp',
+        desktopIcon: '/icon_style/icon_mushroom.png',
         mobileIcon: 'mushroom'
     },
     {
@@ -220,7 +220,7 @@ export const ICON_OPTIONS: IconOption[] = [
         name: '植物',
         preview: '🌱',
         description: '植物主题',
-        desktopIcon: '/icon_style/icon_plant.webp',
+        desktopIcon: '/icon_style/icon_plant.png',
         mobileIcon: 'plant'
     },
     {
@@ -228,7 +228,7 @@ export const ICON_OPTIONS: IconOption[] = [
         name: '海洋',
         preview: '🌊',
         description: '海洋主题',
-        desktopIcon: '/icon_style/icon_sea.webp',
+        desktopIcon: '/icon_style/icon_sea.png',
         mobileIcon: 'sea'
     },
     {
@@ -236,7 +236,7 @@ export const ICON_OPTIONS: IconOption[] = [
         name: '结绳',
         preview: '🪢',
         description: '结绳主题',
-        desktopIcon: '/icon_style/icon_knot.webp',
+        desktopIcon: '/icon_style/icon_knot.png',
         mobileIcon: 'knot'
     },
     {
@@ -244,7 +244,7 @@ export const ICON_OPTIONS: IconOption[] = [
         name: '笔记本',
         preview: '📔',
         description: '笔记本主题',
-        desktopIcon: '/icon_style/icon_bijiaso.webp',
+        desktopIcon: '/icon_style/icon_bijiaso.png',
         mobileIcon: 'bijiaso'
     },
     {
@@ -252,7 +252,7 @@ export const ICON_OPTIONS: IconOption[] = [
         name: '彩蛋',
         preview: '🥚',
         description: '彩蛋主题',
-        desktopIcon: '/icon_style/icon_cdqm.webp',
+        desktopIcon: '/icon_style/icon_cdqm.png',
         mobileIcon: 'cdqm'
     },
     {
@@ -260,7 +260,7 @@ export const ICON_OPTIONS: IconOption[] = [
         name: '创意',
         preview: '💡',
         description: '创意主题',
-        desktopIcon: '/icon_style/icon_ciww.webp',
+        desktopIcon: '/icon_style/icon_ciww.png',
         mobileIcon: 'ciww'
     },
     {
@@ -268,7 +268,7 @@ export const ICON_OPTIONS: IconOption[] = [
         name: '紫外线',
         preview: '🔮',
         description: '紫外线主题',
-        desktopIcon: '/icon_style/icon_uvcd.webp',
+        desktopIcon: '/icon_style/icon_uvcd.png',
         mobileIcon: 'uvcd'
     },
     {
@@ -276,7 +276,7 @@ export const ICON_OPTIONS: IconOption[] = [
         name: '抽象',
         preview: '🎭',
         description: '抽象主题',
-        desktopIcon: '/icon_style/icon_wjugjp.webp',
+        desktopIcon: '/icon_style/icon_wjugjp.png',
         mobileIcon: 'wjugjp'
     }
 ];
@@ -295,27 +295,43 @@ class IconService {
      * 设置图标
      */
     async setIcon(iconId: string): Promise<{ success: boolean; message: string }> {
+        console.log('[iconService] ========== setIcon 开始 ==========');
+        console.log('[iconService] 请求的iconId:', iconId);
+        
         const iconOption = ICON_OPTIONS.find(option => option.id === iconId);
+        console.log('[iconService] 找到的iconOption:', iconOption);
+        
         if (!iconOption) {
+            console.log('[iconService] ❌ 图标选项不存在');
             return { success: false, message: '图标选项不存在' };
         }
 
         try {
             // 保存选择到本地存储
             localStorage.setItem(this.STORAGE_KEY, iconId);
+            console.log('[iconService] ✓ 已保存到localStorage:', iconId);
 
             // 根据平台设置图标
-            if (Capacitor.isNativePlatform()) {
+            const platform = Capacitor.getPlatform();
+            const isNative = Capacitor.isNativePlatform();
+            console.log('[iconService] 平台信息:', { platform, isNative });
+            
+            if (isNative) {
+                console.log('[iconService] 使用移动端图标设置');
                 // 手机端 - 通过Android原生代码设置
                 await this.setMobileIcon(iconOption);
             } else {
+                console.log('[iconService] 使用桌面端图标设置');
                 // 电脑端 - 更新favicon和标题栏图标
                 await this.setDesktopIcon(iconOption);
             }
 
+            console.log('[iconService] ✓ 图标设置成功');
+            console.log('[iconService] ========== setIcon 结束 ==========');
             return { success: true, message: '图标已更新' };
         } catch (error: any) {
-            console.error('设置图标失败:', error);
+            console.error('[iconService] ❌ 设置图标失败:', error);
+            console.log('[iconService] ========== setIcon 结束（失败）==========');
             return { success: false, message: error.message || '设置图标失败' };
         }
     }
@@ -334,7 +350,7 @@ class IconService {
 
         console.log('[iconService] 准备更新favicon:', iconOption.desktopIcon);
 
-        // 更新favicon
+        // 更新favicon（浏览器支持 PNG）
         const favicon = document.querySelector('link[rel="icon"]') as HTMLLinkElement;
         console.log('[iconService] 当前favicon元素:', favicon);
         
@@ -366,7 +382,7 @@ class IconService {
             console.log('[iconService] 检测到Electron环境，通知主进程');
             try {
                 (window as any).ipcRenderer.send('update-app-icon', iconOption.desktopIcon);
-                console.log('[iconService] ✓ Electron IPC消息已发送');
+                console.log('[iconService] ✓ Electron IPC消息已发送:', iconOption.desktopIcon);
             } catch (error) {
                 console.warn('[iconService] ❌ Electron图标更新失败:', error);
             }
