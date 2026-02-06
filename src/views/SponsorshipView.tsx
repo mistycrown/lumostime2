@@ -1,9 +1,9 @@
 /**
  * @file SponsorshipView.tsx
- * @description 赞赏功能页面 - 包含兑换码验证、专属徽章、应用图标、背景图片、导航栏样式等功能
+ * @description 投喂功能页面 - 包含兑换码验证、专属徽章、应用图标、背景图片、导航栏样式等功能
  */
 import React, { useState, useEffect } from 'react';
-import { ChevronLeft, Coffee, Check, X } from 'lucide-react';
+import { ChevronLeft, Fish, Check, X } from 'lucide-react';
 import { Capacitor } from '@capacitor/core';
 import { ToastType } from '../components/Toast';
 import { RedemptionService } from '../services/redemptionService';
@@ -404,8 +404,8 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
         console.log('[SponsorshipView] 当前选中图标:', selectedIcon);
         
         if (!isRedeemed) {
-            console.log('[SponsorshipView] ❌ 未验证赞赏码，操作被阻止');
-            onToast('error', '请先验证赞赏码');
+            console.log('[SponsorshipView] ❌ 未验证投喂码，操作被阻止');
+            onToast('error', '请先验证投喂码');
             return;
         }
 
@@ -447,48 +447,116 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
                 >
                     <ChevronLeft size={24} />
                 </button>
-                <span className="text-stone-800 font-bold text-lg">赞赏功能</span>
+                <span className="text-stone-800 font-bold text-lg">投喂功能</span>
             </div>
 
             {/* Content */}
             <div className="flex-1 overflow-y-auto px-5 py-6 pb-40">
                 {!isRedeemed ? (
                     /* 兑换码输入界面 */
-                    <div className="bg-white rounded-2xl p-6 shadow-sm space-y-6 max-w-sm mx-auto mt-10">
-                        <div className="text-center space-y-2">
-                            <div className="w-12 h-12 bg-amber-50 rounded-full flex items-center justify-center mx-auto text-amber-500">
-                                <Coffee size={24} />
+                    <div className="space-y-6 max-w-lg mx-auto mt-6">
+                        {/* 说明文案 */}
+                        <div className="bg-white rounded-2xl p-6 shadow-sm space-y-4">
+                            <div className="text-center space-y-2 mb-4">
+                                <div className="w-12 h-12 bg-amber-50 rounded-full flex items-center justify-center mx-auto text-amber-500">
+                                    <Fish size={24} />
+                                </div>
+                                <h3 className="font-bold text-lg text-stone-800">🎁 关于投喂解锁</h3>
                             </div>
-                            <h3 className="font-bold text-lg text-stone-800">请输入兑换码</h3>
-                            <p className="text-sm text-stone-500">解锁专属赞赏功能</p>
+
+                            <div className="space-y-4 text-sm text-stone-600 leading-relaxed">
+                                <p className="text-stone-500 text-xs">Hi，感谢你使用 Lumostime。</p>
+                                <p className="text-stone-500 text-xs">想和你分享几个坚持：</p>
+
+                                <div className="space-y-3">
+                                    <div className="flex gap-3">
+                                        <span className="text-base flex-shrink-0">🌟</span>
+                                        <div>
+                                            <p className="font-medium text-stone-700 mb-1">所有记录功能完全免费</p>
+                                            <p className="text-xs text-stone-500">应用内的功能已经非常全面，甚至超过了市面上 99% 的同类软件。我花了很多心思打磨功能，希望它能真正帮到你。</p>
+                                        </div>
+                                    </div>
+
+                                    <div className="flex gap-3">
+                                        <span className="text-base flex-shrink-0">🔓</span>
+                                        <div>
+                                            <p className="font-medium text-stone-700 mb-1">你的数据永远属于你</p>
+                                            <p className="text-xs text-stone-500">数据本地优先，随时可以导出。我采用数据本地优先的原则，绝不会为了留住用户而限制数据导出，更不会以此要挟你充值会员。</p>
+                                        </div>
+                                    </div>
+
+                                    <div className="flex gap-3">
+                                        <span className="text-base flex-shrink-0">✨</span>
+                                        <div>
+                                            <p className="font-medium text-stone-700 mb-1">没有开屏广告</p>
+                                            <p className="text-xs text-stone-500">应用不会添加任何开屏广告，确保你的使用体验始终保持流畅。</p>
+                                        </div>
+                                    </div>
+
+                                    <div className="flex gap-3">
+                                        <span className="text-base flex-shrink-0">🎯</span>
+                                        <div>
+                                            <p className="font-medium text-stone-700 mb-1">注重每个细节</p>
+                                            <p className="text-xs text-stone-500">我希望记录这件事能变得轻松一点，再轻松一点，让你更容易坚持下去。</p>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="pt-3 border-t border-stone-100 space-y-2">
+                                    <p className="text-xs text-stone-500">我是一名个人开发者，从设计到开发，从测试到维护，从宣发到运营，所有的工作都由我一个人独立完成。全都是为爱发电！</p>
+                                    <p className="text-xs text-stone-500">如果在使用过程中遇到任何问题，还请多多反馈、多多包涵。</p>
+                                </div>
+
+                                <div className="pt-3 border-t border-stone-100 space-y-2">
+                                    <p className="text-xs text-stone-600 font-medium">如果你喜欢这个应用，欢迎投喂本mo一个小鱼干 🐟</p>
+                                    <p className="text-xs text-stone-500">投喂后，你将收到来自本mo的小礼物 🎁</p>
+                                    <p className="text-xs text-stone-500">可以用它解锁<span className="font-medium text-stone-700">自定义主题设置</span>，包括：</p>
+                                    <ul className="text-xs text-stone-500 space-y-1 pl-4">
+                                        <li>• 更换背景图片</li>
+                                        <li>• 更换导航栏样式</li>
+                                        <li>• 更换时间小友</li>
+                                        <li>• 更换应用图标</li>
+                                        <li>• 后续更多持续更新的美化功能</li>
+                                    </ul>
+                                    <p className="text-xs text-stone-500 pt-2">让你的 Lumostime 变得独一无二 🌈</p>
+                                </div>
+                            </div>
                         </div>
 
-                        <div className="space-y-3">
-                            <input
-                                type="text"
-                                value={redemptionCode}
-                                onChange={(e) => setRedemptionCode(e.target.value)}
-                                placeholder="输入兑换码..."
-                                className="w-full bg-stone-50 border border-stone-200 rounded-xl px-4 py-3 text-sm outline-none focus:border-amber-400 focus:ring-1 focus:ring-amber-400 transition-all text-center tracking-widest font-mono"
-                                disabled={isVerifying}
-                            />
-                            <button
-                                onClick={handleRedeem}
-                                disabled={isVerifying}
-                                className={`w-full font-bold py-3 rounded-xl transition-all shadow-lg shadow-stone-200 ${isVerifying
-                                    ? 'bg-stone-400 text-white cursor-not-allowed'
-                                    : 'bg-stone-800 text-white hover:bg-stone-900 active:scale-[0.98]'
-                                    }`}
-                            >
-                                {isVerifying ? (
-                                    <span className="flex items-center justify-center gap-2">
-                                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                                        验证中...
-                                    </span>
-                                ) : (
-                                    '解锁功能'
-                                )}
-                            </button>
+                        {/* 兑换码输入 */}
+                        <div className="bg-white rounded-2xl p-6 shadow-sm space-y-4">
+                            <div className="text-center space-y-2">
+                                <h3 className="font-bold text-base text-stone-800">请输入兑换码</h3>
+                                <p className="text-xs text-stone-500">解锁专属投喂功能</p>
+                            </div>
+
+                            <div className="space-y-3">
+                                <input
+                                    type="text"
+                                    value={redemptionCode}
+                                    onChange={(e) => setRedemptionCode(e.target.value)}
+                                    placeholder="输入兑换码..."
+                                    className="w-full bg-stone-50 border border-stone-200 rounded-xl px-4 py-3 text-sm outline-none focus:border-amber-400 focus:ring-1 focus:ring-amber-400 transition-all text-center tracking-widest font-mono"
+                                    disabled={isVerifying}
+                                />
+                                <button
+                                    onClick={handleRedeem}
+                                    disabled={isVerifying}
+                                    className={`w-full font-bold py-3 rounded-xl transition-all shadow-lg shadow-stone-200 ${isVerifying
+                                        ? 'bg-stone-400 text-white cursor-not-allowed'
+                                        : 'bg-stone-800 text-white hover:bg-stone-900 active:scale-[0.98]'
+                                        }`}
+                                >
+                                    {isVerifying ? (
+                                        <span className="flex items-center justify-center gap-2">
+                                            <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                                            验证中...
+                                        </span>
+                                    ) : (
+                                        '解锁功能'
+                                    )}
+                                </button>
+                            </div>
                         </div>
                     </div>
                 ) : (
@@ -503,7 +571,7 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
                                     #{supporterId || '001'}
                                 </div>
                                 <div className="flex-1">
-                                    <h3 className="text-lg font-bold text-stone-800 mb-1">专属赞助徽章</h3>
+                                    <h3 className="text-lg font-bold text-stone-800 mb-1">专属投喂徽章</h3>
                                     <div className="flex items-center gap-2 mt-2">
                                         <span className="w-2 h-2 bg-amber-400 rounded-full animate-pulse"></span>
                                         <span className="text-xs text-amber-600 font-medium">感谢您的支持</span>
@@ -583,7 +651,7 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
                             {!isRedeemed && (
                                 <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-xl">
                                     <p className="text-xs text-amber-700 text-center">
-                                        🔒 请先验证赞赏码以解锁图标切换功能
+                                        🔒 请先验证投喂码以解锁图标切换功能
                                     </p>
                                 </div>
                             )}
@@ -616,7 +684,7 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
                             >
                                 <div className="flex items-center gap-3">
                                     <div className="w-10 h-10 bg-amber-50 rounded-full flex items-center justify-center text-amber-500">
-                                        <Coffee size={20} />
+                                        <Fish size={20} />
                                     </div>
                                     <div className="flex-1">
                                         <h3 className="font-bold text-stone-800">投喂我</h3>
@@ -646,7 +714,7 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
                             <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-3">
                                     <div className="w-12 h-12 rounded-full bg-amber-100 flex items-center justify-center">
-                                        <Coffee size={24} className="text-amber-600" />
+                                        <Fish size={24} className="text-amber-600" />
                                     </div>
                                     <div>
                                         <h3 className="font-bold text-lg text-stone-800">感谢支持</h3>
@@ -666,7 +734,7 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
                                 <div className="bg-stone-50 p-4 rounded-2xl">
                                     <img
                                         src="/sponsorship_qr.jpg"
-                                        alt="赞赏码"
+                                        alt="投喂码"
                                         className="w-64 h-64 object-contain rounded-xl"
                                     />
                                 </div>
