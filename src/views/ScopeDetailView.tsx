@@ -10,7 +10,6 @@
 import React, { useState, useMemo } from 'react';
 import { Scope, Log, Category, TodoItem, Goal } from '../types';
 import { CalendarWidget } from '../components/CalendarWidget';
-import { FocusCharts } from '../components/FocusCharts';
 import { MatrixAnalysisChart } from '../components/MatrixAnalysisChart';
 import { DateRangeFilter, RangeType } from '../components/DateRangeFilter';
 import { Check, Save, Zap, Clock, BarChart2, Archive, Plus, X, ChevronDown } from 'lucide-react';
@@ -54,7 +53,6 @@ export const ScopeDetailView: React.FC<ScopeDetailViewProps> = ({
     const [activeTab, setActiveTab] = useState('时间线');
     const [scope, setScope] = useState(initialScope);
     const [displayDate, setDisplayDate] = useState(new Date());
-    const [isSaveSuccess, setIsSaveSuccess] = useState(false);
     const [showArchived, setShowArchived] = useState(false); // 是否显示归档目标
     const [newKeyword, setNewKeyword] = useState(''); // 添加关键字输入
     const [expandedKeywords, setExpandedKeywords] = useState<Set<string>>(new Set()); // 关键字展开状态
@@ -62,6 +60,24 @@ export const ScopeDetailView: React.FC<ScopeDetailViewProps> = ({
     // Analysis State
     const [analysisRange, setAnalysisRange] = useState<RangeType>('Month');
     const [analysisDate, setAnalysisDate] = useState(new Date());
+
+    // 实时保存：当 scope 状态变化时自动保存
+    React.useEffect(() => {
+        if (scope && initialScope) {
+            // 检查是否有实际变化
+            const hasChanges = 
+                scope.name !== initialScope.name ||
+                scope.icon !== initialScope.icon ||
+                scope.description !== initialScope.description ||
+                scope.themeColor !== initialScope.themeColor ||
+                scope.enableFocusScore !== initialScope.enableFocusScore ||
+                JSON.stringify(scope.keywords) !== JSON.stringify(initialScope.keywords);
+            
+            if (hasChanges) {
+                onUpdate(scope);
+            }
+        }
+    }, [scope]); // 只监听 scope 变化
 
     // Filter logs for this scope
     const scopeLogs = useMemo(() => logs.filter(l => l.scopeIds?.includes(scope.id)), [logs, scope.id]);
@@ -103,12 +119,6 @@ export const ScopeDetailView: React.FC<ScopeDetailViewProps> = ({
     const monthHours = Math.floor(monthSeconds / 3600);
     const monthMins = Math.floor((monthSeconds % 3600) / 60);
     const monthDays = new Set(monthLogs.map(l => new Date(l.startTime).getDate())).size;
-
-    const handleSave = () => {
-        onUpdate(scope);
-        setIsSaveSuccess(true);
-        setTimeout(() => setIsSaveSuccess(false), 2000);
-    };
 
     const handleNameChange = (val: string) => {
         const firstChar = Array.from(val)[0] || '';
@@ -161,7 +171,6 @@ export const ScopeDetailView: React.FC<ScopeDetailViewProps> = ({
     };
 
     const tabs = ['细节', '时间线', '关联', '目标'];
-    if (scope.enableFocusScore) tabs.splice(3, 0, '专注');
     if (scope.keywords && scope.keywords.length > 0) tabs.push('关键字');
 
     // Matrix Stats
@@ -340,6 +349,26 @@ export const ScopeDetailView: React.FC<ScopeDetailViewProps> = ({
                                         placeholder="简要描述这个领域..."
                                     />
                                 </div>
+
+                                {/* Focus Score Setting */}
+                                <div>
+                                    <label className="text-xs text-stone-400 font-medium mb-1.5 block">Focus Score</label>
+                                    <div className="flex items-center justify-between">
+                                        <div>
+                                            <p className="text-xs text-stone-400 mt-1">If enabled, activities in this scope will track focus levels (1-5) by default.</p>
+                                        </div>
+                                        <button
+                                            onClick={() => setScope(prev => ({ ...prev, enableFocusScore: !prev.enableFocusScore }))}
+                                            className={`w-12 h-6 rounded-full p-1 transition-colors shrink-0 ml-4 ${scope.enableFocusScore ? 'bg-stone-900' : 'bg-stone-200'
+                                                }`}
+                                        >
+                                            <div
+                                                className={`w-4 h-4 rounded-full bg-white transition-transform shadow-sm ${scope.enableFocusScore ? 'translate-x-6' : ''
+                                                    }`}
+                                            />
+                                        </button>
+                                    </div>
+                                </div>
                             </div>
                         </div>
 
@@ -416,7 +445,7 @@ export const ScopeDetailView: React.FC<ScopeDetailViewProps> = ({
                             </div>
                         </div>
 
-                        {/* Focus Score Setting */}
+                        {/* Appearance */}
                         <div className="bg-white rounded-2xl p-6 border border-stone-100 shadow-sm">
                             <h3 className="text-sm font-bold text-stone-400 uppercase tracking-widest mb-4">Appearance</h3>
                             <div className="space-y-4">
@@ -435,46 +464,6 @@ export const ScopeDetailView: React.FC<ScopeDetailViewProps> = ({
                                 </div>
                             </div>
                         </div>
-
-                        {/* Focus Score Setting */}
-                        <div className="bg-white rounded-2xl p-6 border border-stone-100 shadow-sm">
-                            <h3 className="text-sm font-bold text-stone-400 uppercase tracking-widest mb-4">Focus Score</h3>
-                            <div className="flex items-center justify-between">
-                                <div>
-                                    <label className="text-sm font-bold text-stone-700">Enable Focus Score</label>
-                                    <p className="text-xs text-stone-400 mt-1">If enabled, activities in this scope will track focus levels (1-5) by default.</p>
-                                </div>
-                                <button
-                                    onClick={() => setScope(prev => ({ ...prev, enableFocusScore: !prev.enableFocusScore }))}
-                                    className={`w-12 h-6 rounded-full p-1 transition-colors shrink-0 ${scope.enableFocusScore ? 'bg-stone-900' : 'bg-stone-200'
-                                        }`}
-                                >
-                                    <div
-                                        className={`w-4 h-4 rounded-full bg-white transition-transform shadow-sm ${scope.enableFocusScore ? 'translate-x-6' : ''
-                                            }`}
-                                    />
-                                </button>
-                            </div>
-                        </div>
-
-                        {/* Save Button */}
-                        <button
-                            onClick={handleSave}
-                            className={`w-full py-4 rounded-xl font-bold text-lg shadow-xl active:scale-[0.99] transition-all flex items-center justify-center gap-2 ${isSaveSuccess ? 'bg-[#2F4F4F] text-white' : 'bg-stone-900 text-white hover:bg-black'
-                                }`}
-                        >
-                            {isSaveSuccess ? (
-                                <>
-                                    <Check size={20} />
-                                    <span>Saved Successfully</span>
-                                </>
-                            ) : (
-                                <>
-                                    <Save size={20} />
-                                    <span>Save Changes</span>
-                                </>
-                            )}
-                        </button>
                     </div>
                 );
 
@@ -573,15 +562,6 @@ export const ScopeDetailView: React.FC<ScopeDetailViewProps> = ({
                         }}
                     />
                 );
-
-            case '专注':
-                return scope.enableFocusScore ? (
-                    <FocusCharts
-                        logs={scopeLogs}
-                        currentDate={displayDate}
-                        onDateChange={setDisplayDate}
-                    />
-                ) : null;
 
             case '关键字':
                 return (
@@ -895,7 +875,7 @@ export const ScopeDetailView: React.FC<ScopeDetailViewProps> = ({
                         onClick={() => setActiveTab(tab)}
                         className={`pb-3 text-sm font-serif tracking-wide whitespace-nowrap transition-colors ${activeTab === tab ? 'text-stone-900 border-b-2 border-stone-900 font-bold' : 'text-stone-400 hover:text-stone-600'}`}
                     >
-                        {tab === '时间线' ? '時間線' : tab === '细节' ? '细节' : tab === '专注' ? '专 注' : tab}
+                        {tab === '时间线' ? '時間線' : tab}
                     </button>
                 ))}
             </div>

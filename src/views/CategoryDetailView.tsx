@@ -10,8 +10,6 @@
 import React, { useMemo, useState } from 'react';
 import { Log, Category, Activity, TodoItem } from '../types';
 import { COLOR_OPTIONS } from '../constants';
-import { CalendarWidget } from '../components/CalendarWidget';
-import { FocusCharts } from '../components/FocusCharts';
 import { Clock, Save, ChevronRight, Check, Zap, CheckCircle2, Circle } from 'lucide-react';
 import { DateRangeFilter } from '../components/DateRangeFilter';
 import { MatrixAnalysisChart } from '../components/MatrixAnalysisChart';
@@ -33,12 +31,29 @@ interface CategoryDetailViewProps {
 export const CategoryDetailView: React.FC<CategoryDetailViewProps> = ({ categoryId, logs, categories, onUpdateCategory, onEditLog, onEditTodo, onToggleTodo, todos, scopes }) => {
     const initialCategory = categories.find(c => c.id === categoryId);
     const [category, setCategory] = useState<Category | undefined>(initialCategory);
-    const [isSaveSuccess, setIsSaveSuccess] = useState(false);
 
     const [activeTab, setActiveTab] = useState('Timeline');
     const [displayDate, setDisplayDate] = useState(new Date());
     const [analysisRange, setAnalysisRange] = useState<'Week' | 'Month' | 'Year' | 'All'>('Month');
     const [analysisDate, setAnalysisDate] = useState(new Date());
+
+    // 实时保存：当 category 状态变化时自动保存
+    React.useEffect(() => {
+        if (category && initialCategory) {
+            // 检查是否有实际变化（避免初始化时触发保存）
+            const hasChanges = 
+                category.name !== initialCategory.name ||
+                category.icon !== initialCategory.icon ||
+                category.themeColor !== initialCategory.themeColor ||
+                category.heatmapMin !== initialCategory.heatmapMin ||
+                category.heatmapMax !== initialCategory.heatmapMax ||
+                category.enableFocusScore !== initialCategory.enableFocusScore;
+            
+            if (hasChanges) {
+                onUpdateCategory(category);
+            }
+        }
+    }, [category]); // 只监听 category 变化
 
     if (!category) return <div>Category not found</div>;
 
@@ -261,12 +276,8 @@ export const CategoryDetailView: React.FC<CategoryDetailViewProps> = ({ category
                                         className="w-full bg-stone-50 border border-stone-200 rounded-xl px-4 py-3 text-stone-800 font-bold outline-none focus:border-stone-400 transition-colors"
                                     />
                                 </div>
-                            </div>
-                        </div>
-
-                        <div className="bg-white rounded-2xl p-6 border border-stone-100 shadow-sm">
-                            <h3 className="text-sm font-bold text-stone-400 uppercase tracking-widest mb-4">Appearance</h3>
-                            <div className="space-y-4">
+                                
+                                {/* Theme Color */}
                                 <div>
                                     <label className="text-xs text-stone-400 font-medium mb-1.5 block">Theme Color</label>
                                     <div className="flex gap-2 flex-wrap">
@@ -280,53 +291,50 @@ export const CategoryDetailView: React.FC<CategoryDetailViewProps> = ({ category
                                         ))}
                                     </div>
                                 </div>
-                            </div>
-                        </div>
 
-                        {/* Heatmap Settings */}
-                        <div className="bg-white rounded-2xl p-6 border border-stone-100 shadow-sm">
-                            <h3 className="text-sm font-bold text-stone-400 uppercase tracking-widest mb-4">Heatmap Scale (Minutes)</h3>
-                            <div className="flex gap-4">
-                                <div className="flex-1">
-                                    <label className="text-xs text-stone-400 font-medium mb-1.5 block">Min (Lightest)</label>
-                                    <input
-                                        type="number"
-                                        min={0}
-                                        value={category.heatmapMin ?? ''}
-                                        onChange={(e) => setCategory({ ...category, heatmapMin: parseInt(e.target.value) || undefined })}
-                                        placeholder="Default: 0"
-                                        className="w-full bg-stone-50 border border-stone-200 rounded-xl px-4 py-3 text-stone-800 font-bold outline-none focus:border-stone-400 transition-colors"
-                                    />
+                                {/* Heatmap Scale */}
+                                <div>
+                                    <label className="text-xs text-stone-400 font-medium mb-1.5 block">Heatmap Scale (Minutes)</label>
+                                    <div className="flex gap-4">
+                                        <div className="flex-1">
+                                            <input
+                                                type="number"
+                                                min={0}
+                                                value={category.heatmapMin ?? ''}
+                                                onChange={(e) => setCategory({ ...category, heatmapMin: parseInt(e.target.value) || undefined })}
+                                                placeholder="Min: 0"
+                                                className="w-full bg-stone-50 border border-stone-200 rounded-xl px-4 py-3 text-stone-800 font-bold outline-none focus:border-stone-400 transition-colors"
+                                            />
+                                        </div>
+                                        <div className="flex-1">
+                                            <input
+                                                type="number"
+                                                min={0}
+                                                value={category.heatmapMax ?? ''}
+                                                onChange={(e) => setCategory({ ...category, heatmapMax: parseInt(e.target.value) || undefined })}
+                                                placeholder="Max: 240"
+                                                className="w-full bg-stone-50 border border-stone-200 rounded-xl px-4 py-3 text-stone-800 font-bold outline-none focus:border-stone-400 transition-colors"
+                                            />
+                                        </div>
+                                    </div>
                                 </div>
-                                <div className="flex-1">
-                                    <label className="text-xs text-stone-400 font-medium mb-1.5 block">Max (Darkest)</label>
-                                    <input
-                                        type="number"
-                                        min={0}
-                                        value={category.heatmapMax ?? ''}
-                                        onChange={(e) => setCategory({ ...category, heatmapMax: parseInt(e.target.value) || undefined })}
-                                        placeholder="Default: 240"
-                                        className="w-full bg-stone-50 border border-stone-200 rounded-xl px-4 py-3 text-stone-800 font-bold outline-none focus:border-stone-400 transition-colors"
-                                    />
-                                </div>
-                            </div>
-                        </div>
 
-                        {/* Focus Score Settings */}
-                        <div className="bg-white rounded-2xl p-6 border border-stone-100 shadow-sm">
-                            <h3 className="text-sm font-bold text-stone-400 uppercase tracking-widest mb-4">Focus Score</h3>
-                            <div className="flex items-center justify-between">
-                                <label className="text-sm font-bold text-stone-700">Enable Focus Score</label>
-                                <button
-                                    onClick={() => setCategory({ ...category, enableFocusScore: !category.enableFocusScore })}
-                                    className={`w-12 h-6 rounded-full p-1 transition-colors ${category.enableFocusScore ? 'bg-stone-900' : 'bg-stone-200'}`}
-                                >
-                                    <div className={`w-4 h-4 rounded-full bg-white transition-transform ${category.enableFocusScore ? 'translate-x-6' : ''}`} />
-                                </button>
+                                {/* Focus Score */}
+                                <div>
+                                    <div className="flex items-center justify-between">
+                                        <label className="text-xs text-stone-400 font-medium">Enable Focus Score</label>
+                                        <button
+                                            onClick={() => setCategory({ ...category, enableFocusScore: !category.enableFocusScore })}
+                                            className={`w-12 h-6 rounded-full p-1 transition-colors ${category.enableFocusScore ? 'bg-stone-900' : 'bg-stone-200'}`}
+                                        >
+                                            <div className={`w-4 h-4 rounded-full bg-white transition-transform ${category.enableFocusScore ? 'translate-x-6' : ''}`} />
+                                        </button>
+                                    </div>
+                                    <p className="text-xs text-stone-400 mt-1.5">
+                                        If enabled, activities in this category will track focus levels (1-5) by default.
+                                    </p>
+                                </div>
                             </div>
-                            <p className="text-xs text-stone-400 mt-2">
-                                If enabled, activities in this category will track focus levels (1-5) by default.
-                            </p>
                         </div>
 
                         <div className="bg-white rounded-2xl p-6 border border-stone-100 shadow-sm">
@@ -340,29 +348,6 @@ export const CategoryDetailView: React.FC<CategoryDetailViewProps> = ({ category
                                 ))}
                             </div>
                         </div>
-
-                        <button
-                            onClick={() => {
-                                if (category) {
-                                    onUpdateCategory(category);
-                                    setIsSaveSuccess(true);
-                                    setTimeout(() => setIsSaveSuccess(false), 2000);
-                                }
-                            }}
-                            className={`w-full py-4 rounded-xl font-bold text-lg shadow-xl active:scale-[0.99] transition-all flex items-center justify-center gap-2 ${isSaveSuccess ? 'bg-[#2F4F4F] text-white' : 'bg-stone-900 text-white hover:bg-black'}`}
-                        >
-                            {isSaveSuccess ? (
-                                <>
-                                    <Check size={20} />
-                                    <span>Saved Successfully</span>
-                                </>
-                            ) : (
-                                <>
-                                    <Save size={20} />
-                                    <span>Save Changes</span>
-                                </>
-                            )}
-                        </button>
                     </div>
                 );
             case 'Timeline':
@@ -430,14 +415,6 @@ export const CategoryDetailView: React.FC<CategoryDetailViewProps> = ({ category
                         }}
                     />
                 );
-            case 'Focus':
-                return (
-                    <FocusCharts
-                        logs={catLogs}
-                        currentDate={displayDate}
-                        onDateChange={setDisplayDate}
-                    />
-                );
             default:
                 return null;
         }
@@ -457,13 +434,13 @@ export const CategoryDetailView: React.FC<CategoryDetailViewProps> = ({ category
 
             {/* Tabs */}
             <div className="flex gap-6 border-b border-stone-200 mb-8 overflow-x-auto no-scrollbar">
-                {['Details', 'Timeline', '关联'].concat(category.enableFocusScore ? ['Focus'] : []).map((tab) => (
+                {['Details', 'Timeline', '关联'].map((tab) => (
                     <button
                         key={tab}
                         onClick={() => setActiveTab(tab)}
                         className={`pb-3 text-sm font-serif tracking-wide whitespace-nowrap transition-colors ${activeTab === tab ? 'text-stone-900 border-b-2 border-stone-900 font-bold' : 'text-stone-400 hover:text-stone-600'}`}
                     >
-                        {tab === 'Timeline' ? '時間線' : tab === 'Details' ? '细节' : tab === 'Focus' ? '专 注' : tab}
+                        {tab === 'Timeline' ? '時間線' : tab === 'Details' ? '细节' : tab}
                     </button>
                 ))}
             </div>

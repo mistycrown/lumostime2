@@ -9,7 +9,7 @@
  */
 import React, { useMemo, useState } from 'react';
 import { Log } from '../types';
-import { CalendarWidget } from './CalendarWidget';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 
 interface FocusChartsProps {
     logs: Log[];
@@ -26,8 +26,6 @@ const SCORE_COLORS = {
 };
 
 export const FocusCharts: React.FC<FocusChartsProps> = ({ logs, currentDate, onDateChange }) => {
-    const [isExpanded, setIsExpanded] = useState(true);
-
     // Calculate Month Range for the Chart
     const range = useMemo(() => {
         const start = new Date(currentDate);
@@ -87,27 +85,157 @@ export const FocusCharts: React.FC<FocusChartsProps> = ({ logs, currentDate, onD
     const maxBarHours = Math.max(...chartData.map(d => d.totalHours), 1);
     const yMax = Math.ceil(Math.max(4, maxBarHours));
 
+    // Calendar Grid Data
+    const calendarData = useMemo(() => {
+        const year = currentDate.getFullYear();
+        const month = currentDate.getMonth();
+        const firstDay = new Date(year, month, 1);
+        const lastDay = new Date(year, month + 1, 0);
+        const daysInMonth = lastDay.getDate();
+        const startDayOfWeek = firstDay.getDay();
+
+        const weeks: (Date | null)[][] = [];
+        let currentWeek: (Date | null)[] = [];
+
+        // Fill initial empty days
+        for (let i = 0; i < startDayOfWeek; i++) {
+            currentWeek.push(null);
+        }
+
+        // Fill days
+        for (let day = 1; day <= daysInMonth; day++) {
+            currentWeek.push(new Date(year, month, day));
+            if (currentWeek.length === 7) {
+                weeks.push(currentWeek);
+                currentWeek = [];
+            }
+        }
+
+        // Fill remaining empty days
+        if (currentWeek.length > 0) {
+            while (currentWeek.length < 7) {
+                currentWeek.push(null);
+            }
+            weeks.push(currentWeek);
+        }
+
+        return weeks;
+    }, [currentDate]);
+
+    // Calculate focus score for each day
+    const getFocusColor = (date: Date | null) => {
+        if (!date) return 'transparent';
+        
+        const dayLogs = logs.filter(l => {
+            const d = new Date(l.startTime);
+            return d.getDate() === date.getDate() &&
+                d.getMonth() === date.getMonth() &&
+                d.getFullYear() === date.getFullYear() &&
+                l.focusScore;
+        });
+
+        if (dayLogs.length === 0) return '#fafaf9'; // stone-50
+
+        let totalWeightedScore = 0;
+        let totalDuration = 0;
+
+        dayLogs.forEach(l => {
+            if (l.focusScore) {
+                totalWeightedScore += l.duration * l.focusScore;
+                totalDuration += l.duration;
+            }
+        });
+
+        const avgScore = totalDuration > 0 ? totalWeightedScore / totalDuration : 0;
+        
+        // Map average score to color
+        if (avgScore >= 4.5) return SCORE_COLORS[5];
+        if (avgScore >= 3.5) return SCORE_COLORS[4];
+        if (avgScore >= 2.5) return SCORE_COLORS[3];
+        if (avgScore >= 1.5) return SCORE_COLORS[2];
+        return SCORE_COLORS[1];
+    };
+
+    const handleMonthChange = (offset: number) => {
+        const newDate = new Date(currentDate);
+        newDate.setMonth(newDate.getMonth() + offset);
+        onDateChange(newDate);
+    };
+
     return (
         <div className="space-y-8">
-            {/* Reuse Calendar Widget with Focus Heatmap Mode */}
-            <div className="bg-white rounded-[2rem] p-0 border border-stone-100 shadow-[0_4px_20px_rgba(0,0,0,0.02)] overflow-hidden">
-                <CalendarWidget
-                    currentDate={currentDate}
-                    onDateChange={onDateChange}
-                    logs={logs}
-                    isExpanded={isExpanded}
-                    onExpandToggle={() => setIsExpanded(!isExpanded)}
-                    heatmapMode="focus"
-                    disableSelection={true}
-                    hideTopBar={true}
-                    preventCollapse={true}
-                    onResetView={() => onDateChange(new Date())}
-                />
+            {/* Calendar Heatmap with New Style */}
+            <div className="space-y-4">
+                {/* Month Navigation */}
+                <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                        <button
+                            onClick={() => handleMonthChange(-1)}
+                            className="p-2 hover:bg-stone-100 rounded-lg transition-colors"
+                        >
+                            <ChevronLeft size={20} className="text-stone-600" />
+                        </button>
+                        <span className="text-lg font-bold text-stone-900 min-w-[140px] text-center">
+                            {currentDate.getFullYear()}.{currentDate.getMonth() + 1}
+                        </span>
+                        <button
+                            onClick={() => handleMonthChange(1)}
+                            className="p-2 hover:bg-stone-100 rounded-lg transition-colors"
+                        >
+                            <ChevronRight size={20} className="text-stone-600" />
+                        </button>
+                    </div>
+                </div>
 
-                {/* Statistics Section */}
-                <div className="px-6 pb-6 pt-2 flex items-end justify-between">
+                {/* Calendar Grid */}
+                <div className="space-y-1">
+                    {/* Weekday Headers */}
+                    <div className="grid grid-cols-7 gap-1 mb-2">
+                        {['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'].map(day => (
+                            <div key={day} className="text-center text-[10px] font-bold text-stone-400 tracking-wider">
+                                {day}
+                            </div>
+                        ))}
+                    </div>
+
+                    {/* Calendar Days */}
+                    {calendarData.map((week, weekIdx) => (
+                        <div key={weekIdx} className="grid grid-cols-7 gap-1">
+                            {week.map((date, dayIdx) => {
+                                const bgColor = getFocusColor(date);
+                                const isToday = date && 
+                                    date.getDate() === new Date().getDate() &&
+                                    date.getMonth() === new Date().getMonth() &&
+                                    date.getFullYear() === new Date().getFullYear();
+
+                                return (
+                                    <div
+                                        key={dayIdx}
+                                        className={`aspect-square rounded-lg flex items-center justify-center text-sm font-medium transition-all ${
+                                            date ? 'cursor-pointer hover:ring-2 hover:ring-stone-300' : ''
+                                        } ${isToday ? 'ring-2 ring-stone-900' : ''}`}
+                                        style={{ backgroundColor: bgColor }}
+                                    >
+                                        {date && (
+                                            <span className={`${
+                                                bgColor === SCORE_COLORS[5] || bgColor === SCORE_COLORS[4] 
+                                                    ? 'text-white' 
+                                                    : 'text-stone-700'
+                                            }`}>
+                                                {date.getDate()}
+                                            </span>
+                                        )}
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    ))}
+                </div>
+
+                {/* Statistics */}
+                <div className="flex items-center justify-between pt-4 border-t border-stone-100">
                     <div>
-                        <div className="text-[10px] uppercase tracking-widest text-stone-400 mb-1 font-bold">TOTAL TIME</div>
+                        <div className="text-[10px] uppercase tracking-widest text-stone-400 mb-1 font-bold">Total Time</div>
                         <div className="text-2xl font-bold text-stone-900 font-mono">
                             {(() => {
                                 // All time
@@ -138,7 +266,7 @@ export const FocusCharts: React.FC<FocusChartsProps> = ({ logs, currentDate, onD
                                 );
                             })()}
                         </div>
-                        <div className="text-xs text-stone-500 bg-stone-100 inline-block px-2 py-1 rounded mt-2 font-medium">
+                        <div className="text-[10px] text-stone-500 bg-stone-100 inline-block px-2 py-1 rounded mt-2 font-bold">
                             {(() => {
                                 const allCount = logs.filter(l => l.focusScore).length;
                                 const monthCount = logs.filter(l => {
@@ -147,13 +275,13 @@ export const FocusCharts: React.FC<FocusChartsProps> = ({ logs, currentDate, onD
                                         d.getFullYear() === currentDate.getFullYear() &&
                                         l.focusScore;
                                 }).length;
-                                return `${allCount} / ${monthCount} focus logs`;
+                                return `${allCount} / ${monthCount} records`;
                             })()}
                         </div>
                     </div>
                     <div className="text-right">
-                        <div className="text-[10px] uppercase tracking-widest text-stone-400 mb-1 font-bold">FOCUS AVG.</div>
-                        <div className="text-lg font-bold text-stone-700 font-mono">
+                        <div className="text-[10px] uppercase tracking-widest text-stone-400 mb-1 font-bold">Average</div>
+                        <div className="text-xl font-bold text-stone-700 font-mono">
                             {(() => {
                                 // All time average
                                 const allFocusLogs = logs.filter(l => l.focusScore);
