@@ -13,6 +13,7 @@ import { NavigationDecorationSelector } from '../components/NavigationDecoration
 import { ICON_OPTIONS } from '../services/iconService';
 import { Category } from '../types';
 import { TIMEPAL_OPTIONS, TimePalType, getTimePalEmoji } from '../constants/timePalConfig';
+import { useSettings } from '../contexts/SettingsContext';
 
 interface SponsorshipViewProps {
     onBack: () => void;
@@ -25,7 +26,7 @@ const TimePalSettingsCard: React.FC<{ categories: Category[] }> = ({ categories 
     // 当前选择的小动物类型
     const [selectedType, setSelectedType] = useState<TimePalType>(() => {
         const saved = localStorage.getItem('lumostime_timepal_type');
-        return (saved as TimePalType) || 'cat';
+        return (saved as TimePalType) || 'default';
     });
 
     // 是否启用标签筛选
@@ -91,19 +92,11 @@ const TimePalSettingsCard: React.FC<{ categories: Category[] }> = ({ categories 
     };
 
     return (
-        <div className="bg-white rounded-2xl p-6 shadow-sm space-y-6">
-            {/* 标题 */}
-            <div className="flex items-center gap-3 text-stone-600">
-                <div className="w-8 h-8 bg-purple-50 rounded-lg flex items-center justify-center">
-                    <span className="text-purple-600 text-lg">🐾</span>
-                </div>
-                <h3 className="text-lg font-bold text-stone-800">时光小友</h3>
-            </div>
-
-            {/* 选择小动物 - 自适应网格布局 */}
+        <div className="space-y-6">{/* 选择小动物 - 自适应网格布局 */}
             <div className="grid gap-2" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(64px, 1fr))' }}>
                 {TIMEPAL_OPTIONS.map(option => {
                     const isSelected = selectedType === option.type;
+                    const isDefault = option.type === 'default';
                     return (
                         <button
                             key={option.type}
@@ -117,18 +110,22 @@ const TimePalSettingsCard: React.FC<{ categories: Category[] }> = ({ categories 
                         >
                             {/* 预览图 */}
                             <div className="w-full h-full flex items-center justify-center p-1">
-                                <img
-                                    src={option.preview}
-                                    alt={option.name}
-                                    className="w-full h-full object-contain"
-                                    onError={(e) => {
-                                        e.currentTarget.style.display = 'none';
-                                        const parent = e.currentTarget.parentElement;
-                                        if (parent) {
-                                            parent.innerHTML = `<span class="text-3xl">${getTimePalEmoji(option.type)}</span>`;
-                                        }
-                                    }}
-                                />
+                                {isDefault ? (
+                                    <span className="text-xs text-stone-400">默认</span>
+                                ) : (
+                                    <img
+                                        src={option.preview}
+                                        alt={option.name}
+                                        className="w-full h-full object-contain"
+                                        onError={(e) => {
+                                            e.currentTarget.style.display = 'none';
+                                            const parent = e.currentTarget.parentElement;
+                                            if (parent) {
+                                                parent.innerHTML = `<span class="text-3xl">${getTimePalEmoji(option.type)}</span>`;
+                                            }
+                                        }}
+                                    />
+                                )}
                             </div>
 
                             {/* 选中标记 - 黑色对勾 */}
@@ -143,7 +140,7 @@ const TimePalSettingsCard: React.FC<{ categories: Category[] }> = ({ categories 
             </div>
 
             {/* 统计时长设置 */}
-            <div className="pt-4 border-t border-stone-100">
+            <div className="pt-4 border-t border-stone-200 bg-white rounded-lg p-4 shadow-sm">
                 <div className="flex items-center justify-between mb-2">
                     <label className="text-xs font-medium text-stone-400 uppercase tracking-wider">
                         限定标签（Activity）
@@ -267,7 +264,7 @@ const TimePalSettingsCard: React.FC<{ categories: Category[] }> = ({ categories 
             </div>
 
             {/* 自定义名言设置 */}
-            <div className="pt-4 border-t border-stone-100">
+            <div className="pt-4 border-t border-stone-200 bg-white rounded-lg p-4 shadow-sm">
                 <div className="flex items-center justify-between mb-2">
                     <label className="text-xs font-medium text-stone-400 uppercase tracking-wider">
                         自定义名言
@@ -323,6 +320,11 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
     const [isChangingIcon, setIsChangingIcon] = useState(false);
     const redemptionService = new RedemptionService();
     const [showDonationModal, setShowDonationModal] = useState(false);
+    const { uiIconTheme, setUiIconTheme } = useSettings();
+    
+    // Tab 页状态
+    type TabType = 'icon' | 'background' | 'navigation' | 'timepal';
+    const [activeTab, setActiveTab] = useState<TabType>('icon');
 
     useEffect(() => {
         const checkVerification = async () => {
@@ -563,109 +565,180 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
                 ) : (
                     /* 已解锁功能界面 */
                     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-                        {/* 1. 专属徽章卡片 */}
-                        <div className="bg-white rounded-2xl p-6 shadow-sm border border-amber-50 relative overflow-hidden">
-                            <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-amber-300 via-orange-400 to-amber-300" />
-
-                            <div className="flex items-center gap-4">
-                                <div className="w-16 h-16 bg-gradient-to-br from-amber-400 to-orange-500 rounded-full flex items-center justify-center text-white text-2xl font-bold shadow-lg">
-                                    #{supporterId || '001'}
-                                </div>
-                                <div className="flex-1">
-                                    <h3 className="text-lg font-bold text-stone-800 mb-1">专属投喂徽章</h3>
-                                    <div className="flex items-center gap-2 mt-2">
-                                        <span className="w-2 h-2 bg-amber-400 rounded-full animate-pulse"></span>
-                                        <span className="text-xs text-amber-600 font-medium">感谢您的支持</span>
-                                    </div>
-                                </div>
+                        {/* 专属徽章 - 简洁风格 */}
+                        <div className="text-center py-8 space-y-3">
+                            <div className="inline-flex items-baseline gap-2">
+                                <span className="text-sm text-stone-500 font-serif">你是第</span>
+                                <span className="text-4xl font-bold text-amber-600 font-serif">#{supporterId || '001'}</span>
+                                <span className="text-sm text-stone-500 font-serif">位支持者</span>
                             </div>
+                            <p className="text-xs text-stone-400 font-serif">感谢你的支持 ✨</p>
                         </div>
 
-                        {/* 2. 应用图标切换卡片 */}
-                        <div className="bg-white rounded-2xl p-6 shadow-sm">
-                            <div className="flex items-center justify-between mb-6">
-                                <div className="flex items-center gap-3">
-                                    <div className="w-8 h-8 bg-blue-50 rounded-lg flex items-center justify-center">
-                                        <span className="text-blue-600 text-lg">📱</span>
+                        {/* Tab 导航 - 简洁风格 */}
+                        <div className="flex gap-6 border-b border-stone-200 overflow-x-auto scrollbar-hide">
+                            {(['icon', 'background', 'navigation', 'timepal'] as TabType[]).map(tab => (
+                                <button
+                                    key={tab}
+                                    onClick={() => setActiveTab(tab)}
+                                    className={`pb-3 text-sm font-serif tracking-wide whitespace-nowrap transition-colors ${
+                                        activeTab === tab
+                                            ? 'text-stone-900 border-b-2 border-stone-900 font-bold'
+                                            : 'text-stone-400 hover:text-stone-600'
+                                    }`}
+                                >
+                                    {{ 
+                                        'icon': 'Icon', 
+                                        'background': '背景', 
+                                        'navigation': '导航', 
+                                        'timepal': '时光小友' 
+                                    }[tab]}
+                                </button>
+                            ))}
+                        </div>
+
+                        {/* Tab 内容 - 直接渲染在背景上 */}
+                        <div className="animate-in fade-in duration-300 pb-20">
+                            {activeTab === 'icon' && (
+                                /* Icon - 包含应用图标和UI主题 */
+                                <div className="space-y-8">
+                                    {/* 应用图标部分 */}
+                                    <div className="space-y-4">
+                                        <div className="flex items-center justify-between">
+                                            <h4 className="text-sm font-medium text-stone-600">应用图标</h4>
+                                            {/* 手动刷新按钮 - 仅Android显示 */}
+                                            {Capacitor.isNativePlatform() && (
+                                                <button
+                                                    onClick={async () => {
+                                                        try {
+                                                            const { iconService } = await import('../services/iconService');
+                                                            const result = await iconService.refreshLauncher();
+                                                            onToast(result.success ? 'success' : 'info', result.message);
+                                                        } catch (error: any) {
+                                                            onToast('error', '刷新失败: ' + error.message);
+                                                        }
+                                                    }}
+                                                    className="px-3 py-1.5 text-xs font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors"
+                                                >
+                                                    刷新启动器
+                                                </button>
+                                            )}
+                                        </div>
+
+                                        {/* 图标网格 */}
+                                        <div className="grid gap-2" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(48px, 1fr))' }}>
+                                            {iconOptions.map((option) => (
+                                                <button
+                                                    key={option.id}
+                                                    onClick={(e) => {
+                                                        console.log('[Button] 按钮被点击:', option.id);
+                                                        console.log('[Button] 事件对象:', e);
+                                                        console.log('[Button] disabled状态:', isChangingIcon || !isRedeemed);
+                                                        handleIconChange(option.id);
+                                                    }}
+                                                    disabled={isChangingIcon || !isRedeemed}
+                                                    className={`relative aspect-square rounded-xl transition-all hover:bg-white/50 ${!isRedeemed ? 'opacity-50 cursor-not-allowed' : ''
+                                                        } ${isChangingIcon ? 'opacity-70' : ''
+                                                        }`}
+                                                >
+                                                    {isChangingIcon && selectedIcon === option.id && (
+                                                        <div className="absolute inset-0 flex items-center justify-center bg-white/80 rounded-xl">
+                                                            <div className="w-3 h-3 border-2 border-stone-400 border-t-transparent rounded-full animate-spin" />
+                                                        </div>
+                                                    )}
+
+                                                    <IconPreview
+                                                        iconId={option.id}
+                                                        iconName={option.name}
+                                                        size="medium"
+                                                    />
+
+                                                    {selectedIcon === option.id && (
+                                                        <div className="absolute top-1 right-1 w-5 h-5 bg-stone-800 rounded-full flex items-center justify-center shadow-lg">
+                                                            <Check size={12} className="text-white" />
+                                                        </div>
+                                                    )}
+                                                </button>
+                                            ))}
+                                        </div>
                                     </div>
-                                    <div>
-                                        <h3 className="text-lg font-bold text-stone-800">应用图标</h3>
+
+                                    {/* UI主题部分 */}
+                                    <div className="space-y-4">
+                                        <h4 className="text-sm font-medium text-stone-600">UI 主题</h4>
+                                        
+                                        {/* 主题预览网格 */}
+                                        <div className="grid gap-2" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(64px, 1fr))' }}>
+                                            {/* 默认选项 */}
+                                            <button
+                                                onClick={() => setUiIconTheme('default')}
+                                                className={`relative rounded-lg border-2 transition-all overflow-hidden ${
+                                                    uiIconTheme === 'default'
+                                                        ? 'border-stone-400 ring-2 ring-stone-200'
+                                                        : 'border-stone-200 hover:border-stone-300'
+                                                }`}
+                                                style={{ aspectRatio: '4/5' }}
+                                            >
+                                                <div className="w-full h-full flex items-center justify-center bg-white">
+                                                    <span className="text-xs text-stone-400">默认</span>
+                                                </div>
+                                                {uiIconTheme === 'default' && (
+                                                    <div className="absolute top-1 right-1 w-5 h-5 bg-stone-800 rounded-full flex items-center justify-center shadow-lg">
+                                                        <Check size={12} className="text-white" />
+                                                    </div>
+                                                )}
+                                            </button>
+
+                                            {/* Purple 主题 */}
+                                            <button
+                                                onClick={() => setUiIconTheme('purple')}
+                                                className={`relative rounded-lg border-2 transition-all overflow-hidden ${
+                                                    uiIconTheme === 'purple'
+                                                        ? 'border-stone-400 ring-2 ring-stone-200'
+                                                        : 'border-stone-200 hover:border-stone-300'
+                                                }`}
+                                                style={{ aspectRatio: '4/5' }}
+                                            >
+                                                {/* 显示前4个图标的缩略图网格 */}
+                                                <div className="w-full h-full grid grid-cols-2 gap-0.5 p-1 bg-white">
+                                                    {[1, 2, 3, 4].map((num) => (
+                                                        <div key={num} className="bg-stone-50 rounded flex items-center justify-center">
+                                                            <img
+                                                                src={`/uiicon/purple/${String(num).padStart(2, '0')}.png`}
+                                                                alt={`icon-${num}`}
+                                                                className="w-full h-full object-contain p-0.5"
+                                                            />
+                                                        </div>
+                                                    ))}
+                                                </div>
+
+                                                {/* 选中标记 */}
+                                                {uiIconTheme === 'purple' && (
+                                                    <div className="absolute top-1 right-1 w-5 h-5 bg-stone-800 rounded-full flex items-center justify-center shadow-lg">
+                                                        <Check size={12} className="text-white" />
+                                                    </div>
+                                                )}
+                                            </button>
+                                        </div>
                                     </div>
-                                </div>
-
-                                {/* 手动刷新按钮 - 仅Android显示 */}
-                                {isRedeemed && Capacitor.isNativePlatform() && (
-                                    <button
-                                        onClick={async () => {
-                                            try {
-                                                const { iconService } = await import('../services/iconService');
-                                                const result = await iconService.refreshLauncher();
-                                                onToast(result.success ? 'success' : 'info', result.message);
-                                            } catch (error: any) {
-                                                onToast('error', '刷新失败: ' + error.message);
-                                            }
-                                        }}
-                                        className="px-3 py-1.5 text-xs font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors"
-                                    >
-                                        刷新启动器
-                                    </button>
-                                )}
-                            </div>
-
-                            {/* 图标网格 */}
-                            <div className="grid gap-2" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(48px, 1fr))' }}>
-                                {iconOptions.map((option) => (
-                                    <button
-                                        key={option.id}
-                                        onClick={(e) => {
-                                            console.log('[Button] 按钮被点击:', option.id);
-                                            console.log('[Button] 事件对象:', e);
-                                            console.log('[Button] disabled状态:', isChangingIcon || !isRedeemed);
-                                            handleIconChange(option.id);
-                                        }}
-                                        disabled={isChangingIcon || !isRedeemed}
-                                        className={`relative aspect-square rounded-xl transition-all hover:bg-stone-50 ${!isRedeemed ? 'opacity-50 cursor-not-allowed' : ''
-                                            } ${isChangingIcon ? 'opacity-70' : ''
-                                            }`}
-                                    >
-                                        {isChangingIcon && selectedIcon === option.id && (
-                                            <div className="absolute inset-0 flex items-center justify-center bg-white/80 rounded-xl">
-                                                <div className="w-3 h-3 border-2 border-stone-400 border-t-transparent rounded-full animate-spin" />
-                                            </div>
-                                        )}
-
-                                        <IconPreview
-                                            iconId={option.id}
-                                            iconName={option.name}
-                                            size="medium"
-                                        />
-
-                                        {selectedIcon === option.id && (
-                                            <div className="absolute top-1 right-1 w-5 h-5 bg-stone-800 rounded-full flex items-center justify-center shadow-lg">
-                                                <Check size={12} className="text-white" />
-                                            </div>
-                                        )}
-                                    </button>
-                                ))}
-                            </div>
-
-                            {!isRedeemed && (
-                                <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-xl">
-                                    <p className="text-xs text-amber-700 text-center">
-                                        🔒 请先验证投喂码以解锁图标切换功能
-                                    </p>
                                 </div>
                             )}
+
+                            {activeTab === 'background' && (
+                                /* 背景图片切换 */
+                                <BackgroundSelector onToast={onToast} />
+                            )}
+
+                            {activeTab === 'navigation' && (
+                                /* 导航栏样式 */
+                                <NavigationDecorationSelector onToast={onToast} />
+                            )}
+
+                            {activeTab === 'timepal' && (
+                                /* 时光小友设置 */
+                                <TimePalSettingsCard categories={categories} />
+                            )}
                         </div>
-
-                        {/* 3. 背景图片切换卡片 */}
-                        <BackgroundSelector onToast={onToast} />
-
-                        {/* 4. 导航栏样式卡片 */}
-                        <NavigationDecorationSelector onToast={onToast} />
-
-                        {/* 5. 时光小友设置卡片 */}
-                        <TimePalSettingsCard categories={categories} />
 
                         {/* 测试用重置按钮 */}
                         <div className="flex justify-center pt-4">

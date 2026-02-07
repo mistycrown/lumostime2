@@ -99,21 +99,15 @@ export const NavigationDecorationSelector: React.FC<NavigationDecorationSelector
     };
 
     return (
-        <div className="bg-white rounded-2xl p-6 shadow-sm">
-            <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 bg-green-50 rounded-lg flex items-center justify-center">
-                        <span className="text-green-600 text-lg">🎋</span>
-                    </div>
-                    <div>
-                        <h3 className="text-lg font-bold text-stone-800">导航栏样式</h3>
-                    </div>
-                </div>
-                
-                {/* 调试按钮 */}
+        <div className="space-y-4">
+            {/* 说明文字和调试按钮 */}
+            <div className="flex items-center justify-between gap-4">
+                <p className="text-xs text-stone-500 flex-1">
+                    选择后打开调试工具并返回主菜单，调整导航栏位置
+                </p>
                 <button
                     onClick={handleOpenDebugger}
-                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-stone-600 bg-stone-100 hover:bg-stone-200 rounded-lg transition-colors"
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-stone-600 bg-white hover:bg-stone-100 rounded-lg transition-colors shadow-sm flex-shrink-0"
                 >
                     <Settings size={14} />
                     <span>调试</span>

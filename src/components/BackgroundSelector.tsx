@@ -167,18 +167,9 @@ export const BackgroundSelector: React.FC<BackgroundSelectorProps> = ({ onToast 
     };
 
     return (
-        <div className="bg-white rounded-2xl p-6 shadow-sm">
-            <div className="flex items-center gap-3 mb-4">
-                <div className="w-8 h-8 bg-purple-50 rounded-lg flex items-center justify-center">
-                    <span className="text-purple-600 text-lg">🖼️</span>
-                </div>
-                <div>
-                    <h3 className="text-lg font-bold text-stone-800">更换背景图片</h3>
-                </div>
-            </div>
-
+        <div className="space-y-4">
             {/* 背景选项网格 */}
-            <div className="grid gap-2 mb-4" style={{ 
+            <div className="grid gap-2" style={{ 
                 gridTemplateColumns: 'repeat(auto-fit, minmax(64px, 1fr))'
             }}>
                 {backgrounds.map((background) => (
@@ -240,7 +231,7 @@ export const BackgroundSelector: React.FC<BackgroundSelectorProps> = ({ onToast 
 
             {/* 透明度调节 - 仅在非默认背景时显示 */}
             {currentBackground !== 'default' && (
-                <div className="mb-4 bg-stone-50 rounded-lg p-4">
+                <div className="bg-white rounded-lg p-4 shadow-sm">
                     <div className="flex items-center justify-between mb-2">
                         <label className="text-sm font-medium text-stone-700">
                             背景透明度
@@ -269,7 +260,7 @@ export const BackgroundSelector: React.FC<BackgroundSelectorProps> = ({ onToast 
             )}
 
             {/* 提示信息 */}
-            <div className="text-xs text-stone-500 bg-stone-50 rounded-lg p-3">
+            <div className="text-xs text-stone-500 bg-white rounded-lg p-3 shadow-sm">
                 <p>• 图片大小不超过 5MB</p>
                 <p>• 自定义图片仅保存在本地，不会同步到云端</p>
             </div>
