@@ -55,7 +55,6 @@ export const ScopeDetailView: React.FC<ScopeDetailViewProps> = ({
     const [displayDate, setDisplayDate] = useState(new Date());
     const [showArchived, setShowArchived] = useState(false); // 是否显示归档目标
     const [newKeyword, setNewKeyword] = useState(''); // 添加关键字输入
-    const [expandedKeywords, setExpandedKeywords] = useState<Set<string>>(new Set()); // 关键字展开状态
 
     // Analysis State
     const [analysisRange, setAnalysisRange] = useState<RangeType>('Month');
@@ -133,7 +132,7 @@ export const ScopeDetailView: React.FC<ScopeDetailViewProps> = ({
         onArchiveGoal?.(goalId);
     };
 
-    // 关键字颜色系统（与 TagDetailView 保持一致）
+    // 关键字颜色系统（用于Details tab中的关键字显示）
     const KEYWORD_COLORS = [
         'bg-red-100 text-red-600 border-red-200 hover:bg-red-200',
         'bg-cyan-100 text-cyan-600 border-cyan-200 hover:bg-cyan-200',
@@ -157,7 +156,6 @@ export const ScopeDetailView: React.FC<ScopeDetailViewProps> = ({
     const getKeywordColor = (keyword: string) => {
         const keywords = scope.keywords || [];
         let index = keywords.indexOf(keyword);
-
         if (index === -1) {
             let hash = 0;
             for (let i = 0; i < keyword.length; i++) {
@@ -165,13 +163,11 @@ export const ScopeDetailView: React.FC<ScopeDetailViewProps> = ({
             }
             index = Math.abs(hash);
         }
-
         const colorIndex = index % KEYWORD_COLORS.length;
         return KEYWORD_COLORS[colorIndex];
     };
 
     const tabs = ['细节', '时间线', '关联', '目标'];
-    if (scope.keywords && scope.keywords.length > 0) tabs.push('关键字');
 
     // Matrix Stats
     const matrixStats = useMemo(() => {
@@ -481,6 +477,7 @@ export const ScopeDetailView: React.FC<ScopeDetailViewProps> = ({
                         onEditLog={onEditLog}
                         categories={categories}
                         todos={todos}
+                        keywords={scope.keywords || []}
                         renderLogMetadata={(log) => {
                             const category = categories.find(c => c.id === log.categoryId);
                             const activity = category?.activities.find(a => a.id === log.activityId);
@@ -562,199 +559,6 @@ export const ScopeDetailView: React.FC<ScopeDetailViewProps> = ({
                         }}
                     />
                 );
-
-            case '关键字':
-                return (
-                    <>
-                        <div className="bg-white rounded-[2rem] p-0 mb-8 border border-stone-100 shadow-[0_4px_20px_rgba(0,0,0,0.02)] overflow-hidden">
-                            <CalendarWidget
-                                currentDate={displayDate}
-                                onDateChange={(newDate) => {
-                                    if (newDate.getMonth() !== displayDate.getMonth() || newDate.getFullYear() !== displayDate.getFullYear()) {
-                                        setDisplayDate(newDate);
-                                    }
-                                }}
-                                logs={scopeLogs}
-                                isExpanded={true}
-                                onExpandToggle={() => { }}
-                                staticMode={true}
-                                disableSelection={true}
-                                hideTopBar={true}
-                                renderCustomDay={(date, isSelected, isToday) => {
-                                    // Find logs for this day
-                                    const dayLogs = scopeLogs.filter(l => {
-                                        const d = new Date(l.startTime);
-                                        return d.getDate() === date.getDate() &&
-                                            d.getMonth() === date.getMonth() &&
-                                            d.getFullYear() === date.getFullYear();
-                                    });
-
-                                    if (dayLogs.length === 0) return null;
-
-                                    // Find matched keywords in these logs
-                                    const matchedKeywords = new Set<string>();
-                                    const currentScopeKeywords = scope.keywords || [];
-
-                                    dayLogs.forEach(log => {
-                                        // Check note for keywords
-                                        currentScopeKeywords.forEach(kw => {
-                                            if (log.note && log.note.includes(kw)) {
-                                                matchedKeywords.add(kw);
-                                            }
-                                        });
-                                    });
-
-                                    // 1. Logs but no keywords matched -> Gray
-                                    if (matchedKeywords.size === 0) {
-                                        return <div className="w-full h-full bg-stone-200/50" />;
-                                    }
-
-                                    // 2. Matched keywords -> Split colors
-                                    const keywordsArray = Array.from(matchedKeywords);
-                                    return (
-                                        <div className="w-full h-full flex">
-                                            {keywordsArray.map(kw => (
-                                                <div
-                                                    key={kw}
-                                                    className={`h-full flex-1 ${getKeywordColor(kw)}`}
-                                                    style={{ border: 'none' }}
-                                                />
-                                            ))}
-                                        </div>
-                                    );
-                                }}
-                            />
-                            <div className="p-6 pt-2 border-t border-stone-100">
-                                <div className="flex flex-wrap gap-2 justify-center">
-                                    <div className="flex items-center gap-1.5">
-                                        <div className="w-3 h-3 rounded bg-stone-200/50"></div>
-                                        <span className="text-xs text-stone-500">Unmatched</span>
-                                    </div>
-                                    {(scope.keywords || []).map(kw => (
-                                        <div key={kw} className="flex items-center gap-1.5 ml-2">
-                                            <div className={`w-3 h-3 rounded ${getKeywordColor(kw).split(' ')[0]}`}></div>
-                                            <span className="text-xs text-stone-500">{kw}</span>
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Keyword Grouped Lists */}
-                        <div className="space-y-6">
-                            {(() => {
-                                // Filter logs for current month
-                                const currentMonthLogs = scopeLogs.filter(l => {
-                                    const d = new Date(l.startTime);
-                                    return d.getMonth() === displayDate.getMonth() && d.getFullYear() === displayDate.getFullYear();
-                                });
-
-                                // Group logic
-                                const groups = (scope.keywords || []).map(kw => {
-                                    const logs = currentMonthLogs.filter(l =>
-                                        (l.note && l.note.includes(kw))
-                                    );
-                                    return { keyword: kw, logs };
-                                });
-
-                                return groups.map(group => {
-                                    const totalDuration = group.logs.reduce((acc, curr) => acc + curr.duration, 0);
-                                    const h = Math.floor(totalDuration / 3600);
-                                    const m = Math.floor((totalDuration % 3600) / 60);
-                                    const timeStr = h > 0 ? `${h}h ${m}m` : `${m}m`;
-                                    const isExpanded = expandedKeywords.has(group.keyword);
-
-                                    return (
-                                        <div key={group.keyword} className="bg-white rounded-2xl p-6 border border-stone-100 shadow-sm transition-all">
-                                            {/* Header */}
-                                            <div
-                                                onClick={() => {
-                                                    const newSet = new Set(expandedKeywords);
-                                                    if (newSet.has(group.keyword)) {
-                                                        newSet.delete(group.keyword);
-                                                    } else {
-                                                        newSet.add(group.keyword);
-                                                    }
-                                                    setExpandedKeywords(newSet);
-                                                }}
-                                                className="flex items-center justify-between cursor-pointer group select-none"
-                                            >
-                                                <div className="flex items-center gap-3">
-                                                    <div className={`w-3 h-3 rounded-full ${getKeywordColor(group.keyword).split(' ')[0]}`}></div>
-                                                    <h3 className="text-sm font-bold text-stone-700 uppercase tracking-widest">{group.keyword}</h3>
-                                                    <span className="bg-stone-100 text-stone-500 text-[10px] font-bold px-2 py-0.5 rounded-full">
-                                                        {group.logs.length}
-                                                    </span>
-                                                </div>
-                                                <div className="flex items-center gap-3">
-                                                    <span className="font-mono text-sm font-bold text-stone-400 group-hover:text-stone-600 transition-colors">
-                                                        {timeStr}
-                                                    </span>
-                                                    <ChevronDown size={16} className={`text-stone-300 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
-                                                </div>
-                                            </div>
-
-                                            {/* List */}
-                                            {isExpanded && (
-                                                <div className="mt-6 space-y-0 text-sm animate-in slide-in-from-top-2 fade-in duration-200">
-                                                    {group.logs.length === 0 ? (
-                                                        <div className="text-center py-8 text-stone-300 italic text-xs">
-                                                            No records found for this keyword in this month.
-                                                        </div>
-                                                    ) : (
-                                                        group.logs
-                                                            .sort((a, b) => b.startTime - a.startTime)
-                                                            .map(log => {
-                                                                const logH = Math.floor(log.duration / 3600);
-                                                                const logM = Math.floor((log.duration % 3600) / 60);
-                                                                const logTimeStr = logH > 0 ? `${logH}h ${logM}m` : `${logM}m`;
-                                                                const dateObj = new Date(log.startTime);
-                                                                const category = categories.find(c => c.id === log.categoryId);
-                                                                const activity = category?.activities.find(a => a.id === log.activityId);
-
-                                                                return (
-                                                                    <div
-                                                                        key={log.id}
-                                                                        onClick={() => onEditLog?.(log)}
-                                                                        className="group flex items-center gap-3 py-3 border-b border-stone-100 last:border-0 hover:bg-stone-50 md:-mx-2 md:px-2 transition-colors cursor-pointer"
-                                                                    >
-                                                                        <div className="w-8 flex flex-col items-center justify-center shrink-0">
-                                                                            <span className="text-[10px] font-bold text-stone-400 leading-none">
-                                                                                {dateObj.getDate()}
-                                                                            </span>
-                                                                            <span className="text-[8px] text-stone-300 uppercase leading-none mt-0.5">
-                                                                                {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][dateObj.getDay()]}
-                                                                            </span>
-                                                                        </div>
-
-                                                                        <div className="w-1 h-8 rounded-full bg-stone-100 group-hover:bg-stone-200 transition-colors shrink-0"></div>
-
-                                                                        <div className="flex-1 min-w-0 flex flex-col justify-center">
-                                                                            <span className="font-medium truncate text-stone-700 leading-tight">
-                                                                                {activity?.name || category?.name || "Activity"}
-                                                                            </span>
-                                                                            <span className="text-[10px] text-stone-400 mt-0.5 font-mono truncate">
-                                                                                {log.note || dateObj.getHours().toString().padStart(2, '0') + ':' + dateObj.getMinutes().toString().padStart(2, '0')}
-                                                                            </span>
-                                                                        </div>
-
-                                                                        <span className="text-xs text-stone-400 font-mono whitespace-nowrap shrink-0 group-hover:text-stone-600">
-                                                                            {logTimeStr}
-                                                                        </span>
-                                                                    </div>
-                                                                );
-                                                            })
-                                                    )}
-                                                </div>
-                                            )}
-                                        </div>
-                                    );
-                                });
-                            })()}
-                        </div>
-                    </>
-                );
-
             case '目标':
                 // 分离未归档和归档目标
                 const activeGoals = goals.filter(g =>

@@ -55,7 +55,6 @@ export const TagDetailView: React.FC<TagDetailViewProps> = ({ tagId, logs, todos
    const [analysisRange, setAnalysisRange] = useState<'Week' | 'Month' | 'Year' | 'All'>('Month');
    const [analysisDate, setAnalysisDate] = useState(new Date());
    const [newKeyword, setNewKeyword] = useState(''); // New State for adding keyword
-   const [expandedKeywords, setExpandedKeywords] = useState<Set<string>>(new Set()); // Track expanded keyword sections
    const [isCategoryDropdownOpen, setIsCategoryDropdownOpen] = useState(false); // State for category dropdown
 
    // 实时保存：当 activity 状态变化时自动保存
@@ -239,42 +238,37 @@ export const TagDetailView: React.FC<TagDetailViewProps> = ({ tagId, logs, todos
       setActivity({ ...activity, color });
    };
 
-   // Keyword Logic - 颜色按跳跃式排列，相邻颜色对比度高
+   // 关键字颜色系统（用于Details tab中的关键字显示）
    const KEYWORD_COLORS = [
-      'bg-red-100 text-red-600 border-red-200 hover:bg-red-200',        // 红
-      'bg-cyan-100 text-cyan-600 border-cyan-200 hover:bg-cyan-200',    // 青
-      'bg-yellow-100 text-yellow-600 border-yellow-200 hover:bg-yellow-200',  // 黄
-      'bg-blue-100 text-blue-600 border-blue-200 hover:bg-blue-200',    // 蓝
-      'bg-orange-100 text-orange-600 border-orange-200 hover:bg-orange-200',  // 橙
-      'bg-teal-100 text-teal-600 border-teal-200 hover:bg-teal-200',    // 蓝绿
-      'bg-amber-100 text-amber-600 border-amber-200 hover:bg-amber-200',  // 琥珀
-      'bg-indigo-100 text-indigo-600 border-indigo-200 hover:bg-indigo-200',  // 靛蓝
-      'bg-lime-100 text-lime-600 border-lime-200 hover:bg-lime-200',    // 青柠
-      'bg-purple-100 text-purple-600 border-purple-200 hover:bg-purple-200',  // 紫
-      'bg-green-100 text-green-600 border-green-200 hover:bg-green-200',  // 绿
-      'bg-fuchsia-100 text-fuchsia-600 border-fuchsia-200 hover:bg-fuchsia-200',  // 紫红
-      'bg-emerald-100 text-emerald-600 border-emerald-200 hover:bg-emerald-200',  // 翠绿
-      'bg-pink-100 text-pink-600 border-pink-200 hover:bg-pink-200',    // 粉
-      'bg-sky-100 text-sky-600 border-sky-200 hover:bg-sky-200',        // 天蓝
-      'bg-rose-100 text-rose-600 border-rose-200 hover:bg-rose-200',    // 玫瑰
-      'bg-violet-100 text-violet-600 border-violet-200 hover:bg-violet-200',  // 紫罗兰
+      'bg-red-100 text-red-600 border-red-200 hover:bg-red-200',
+      'bg-cyan-100 text-cyan-600 border-cyan-200 hover:bg-cyan-200',
+      'bg-yellow-100 text-yellow-600 border-yellow-200 hover:bg-yellow-200',
+      'bg-blue-100 text-blue-600 border-blue-200 hover:bg-blue-200',
+      'bg-orange-100 text-orange-600 border-orange-200 hover:bg-orange-200',
+      'bg-teal-100 text-teal-600 border-teal-200 hover:bg-teal-200',
+      'bg-amber-100 text-amber-600 border-amber-200 hover:bg-amber-200',
+      'bg-indigo-100 text-indigo-600 border-indigo-200 hover:bg-indigo-200',
+      'bg-lime-100 text-lime-600 border-lime-200 hover:bg-lime-200',
+      'bg-purple-100 text-purple-600 border-purple-200 hover:bg-purple-200',
+      'bg-green-100 text-green-600 border-green-200 hover:bg-green-200',
+      'bg-fuchsia-100 text-fuchsia-600 border-fuchsia-200 hover:bg-fuchsia-200',
+      'bg-emerald-100 text-emerald-600 border-emerald-200 hover:bg-emerald-200',
+      'bg-pink-100 text-pink-600 border-pink-200 hover:bg-pink-200',
+      'bg-sky-100 text-sky-600 border-sky-200 hover:bg-sky-200',
+      'bg-rose-100 text-rose-600 border-rose-200 hover:bg-rose-200',
+      'bg-violet-100 text-violet-600 border-violet-200 hover:bg-violet-200',
    ];
 
    const getKeywordColor = (keyword: string) => {
-      // Logic: Use Index in the list
       const keywords = activity?.keywords || [];
       let index = keywords.indexOf(keyword);
-
-      // If not in list (e.g. new keyword being typed or removed), try to predictable hash or simple mod
       if (index === -1) {
-         // Fallback to avoid error, maybe hash
          let hash = 0;
          for (let i = 0; i < keyword.length; i++) {
             hash = keyword.charCodeAt(i) + ((hash << 5) - hash);
          }
          index = Math.abs(hash);
       }
-
       const colorIndex = index % KEYWORD_COLORS.length;
       return KEYWORD_COLORS[colorIndex];
    };
@@ -522,6 +516,7 @@ export const TagDetailView: React.FC<TagDetailViewProps> = ({ tagId, logs, todos
                   onEditLog={onEditLog}
                   categories={categories}
                   todos={todos}
+                  keywords={activity.keywords || []}
                   renderLogMetadata={(log) => {
                      return (
                         <div className="flex flex-wrap items-center gap-2 mt-1">
@@ -647,205 +642,6 @@ export const TagDetailView: React.FC<TagDetailViewProps> = ({ tagId, logs, todos
                   </div>
                </div>
             );
-         case 'Keywords':
-            return (
-               <>
-                  <div className="bg-white rounded-[2rem] p-0 mb-8 border border-stone-100 shadow-[0_4px_20px_rgba(0,0,0,0.02)] overflow-hidden">
-                     <CalendarWidget
-                        currentDate={displayDate}
-                        onDateChange={(newDate) => {
-                           if (newDate.getMonth() !== displayDate.getMonth() || newDate.getFullYear() !== displayDate.getFullYear()) {
-                              setDisplayDate(newDate);
-                           }
-                        }}
-                        logs={tagLogs} // Pass logs for basic tracking, but visual is overridden
-                        isExpanded={true}
-                        onExpandToggle={() => { }}
-                        staticMode={true} // Disable default heat map coloring
-                        disableSelection={true}
-                        hideTopBar={true}
-                        renderCustomDay={(date, isSelected, isToday) => {
-                           // Find logs for this day
-                           const dayLogs = tagLogs.filter(l => {
-                              const d = new Date(l.startTime);
-                              return d.getDate() === date.getDate() &&
-                                 d.getMonth() === date.getMonth() &&
-                                 d.getFullYear() === date.getFullYear();
-                           });
-
-                           if (dayLogs.length === 0) return null;
-
-                           // Find matched keywords in these logs
-                           const matchedKeywords = new Set<string>();
-                           const currentActivityKeywords = activity.keywords || [];
-
-                           dayLogs.forEach(log => {
-                              // Check title and note for keywords
-                              currentActivityKeywords.forEach(kw => {
-                                 if ((log.title && log.title.includes(kw)) || (log.note && log.note.includes(kw))) {
-                                    matchedKeywords.add(kw);
-                                 }
-                              });
-                           });
-
-                           // 1. Logs but no keywords matched -> Gray
-                           if (matchedKeywords.size === 0) {
-                              return <div className="w-full h-full bg-stone-200/50" />;
-                           }
-
-                           // 2. Matched keywords -> Split colors
-                           const keywordsArray = Array.from(matchedKeywords);
-                           return (
-                              <div className="w-full h-full flex">
-                                 {keywordsArray.map(kw => {
-                                    // Extract background color class from getKeywordColor return string
-                                    // The string is like "bg-red-50 text-red-500 ..."
-                                    // We just apply the whole class string, but maybe force opacity or brightness?
-                                    // Actually the bg-xxx-50 might be too light for a calendar cell background which needs to be visible.
-                                    // Let's try using the class directly first.
-                                    return (
-                                       <div
-                                          key={kw}
-                                          className={`h-full flex-1 ${getKeywordColor(kw)}`}
-                                          style={{ border: 'none' }} // Remove borders from the keyword pill style
-                                       />
-                                    );
-                                 })}
-                              </div>
-                           );
-                        }}
-                     />
-                     <div className="p-6 pt-2 border-t border-stone-100">
-                        <div className="flex flex-wrap gap-2 justify-center">
-                           <div className="flex items-center gap-1.5">
-                              <div className="w-3 h-3 rounded bg-stone-200/50"></div>
-                              <span className="text-xs text-stone-500">Unmatched</span>
-                           </div>
-                           {(activity.keywords || []).map(kw => (
-                              <div key={kw} className="flex items-center gap-1.5 ml-2">
-                                 <div className={`w-3 h-3 rounded ${getKeywordColor(kw).split(' ')[0]}`}></div> {/* Take just the bg class */}
-                                 <span className="text-xs text-stone-500">{kw}</span>
-                              </div>
-                           ))}
-                        </div>
-                     </div>
-                  </div>
-
-                  {/* Keyword Grouped Lists */}
-                  <div className="space-y-6">
-                     {(() => {
-                        // Filter logs for current month
-                        const currentMonthLogs = tagLogs.filter(l => {
-                           const d = new Date(l.startTime);
-                           return d.getMonth() === displayDate.getMonth() && d.getFullYear() === displayDate.getFullYear();
-                        });
-
-                        // Group logic
-                        const groups = (activity.keywords || []).map(kw => {
-                           const logs = currentMonthLogs.filter(l =>
-                              (l.title && l.title.includes(kw)) || (l.note && l.note.includes(kw))
-                           );
-                           return { keyword: kw, logs };
-                        });
-
-                        // Also maybe "Unmatched"? (Optional, but good for UX)
-                        // Let's stick to defined keywords first as requested.
-
-                        return groups.map(group => {
-                           const totalDuration = group.logs.reduce((acc, curr) => acc + curr.duration, 0);
-                           const h = Math.floor(totalDuration / 3600);
-                           const m = Math.floor((totalDuration % 3600) / 60);
-                           const timeStr = h > 0 ? `${h}h ${m}m` : `${m}m`;
-                           const isExpanded = expandedKeywords.has(group.keyword);
-
-                           return (
-                              <div key={group.keyword} className="bg-white rounded-2xl p-6 border border-stone-100 shadow-sm transition-all">
-                                 {/* Header */}
-                                 <div
-                                    onClick={() => {
-                                       const newSet = new Set(expandedKeywords);
-                                       if (newSet.has(group.keyword)) {
-                                          newSet.delete(group.keyword);
-                                       } else {
-                                          newSet.add(group.keyword);
-                                       }
-                                       setExpandedKeywords(newSet);
-                                    }}
-                                    className="flex items-center justify-between cursor-pointer group select-none"
-                                 >
-                                    <div className="flex items-center gap-3">
-                                       <div className={`w-3 h-3 rounded-full ${getKeywordColor(group.keyword).split(' ')[0]}`}></div>
-                                       <h3 className="text-sm font-bold text-stone-700 uppercase tracking-widest">{group.keyword}</h3>
-                                       <span className="bg-stone-100 text-stone-500 text-[10px] font-bold px-2 py-0.5 rounded-full">
-                                          {group.logs.length}
-                                       </span>
-                                    </div>
-                                    <div className="flex items-center gap-3">
-                                       <span className="font-mono text-sm font-bold text-stone-400 group-hover:text-stone-600 transition-colors">
-                                          {timeStr}
-                                       </span>
-                                       <ChevronDown size={16} className={`text-stone-300 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
-                                    </div>
-                                 </div>
-
-                                 {/* List */}
-                                 {isExpanded && (
-                                    <div className="mt-6 space-y-0 text-sm animate-in slide-in-from-top-2 fade-in duration-200">
-                                       {group.logs.length === 0 ? (
-                                          <div className="text-center py-8 text-stone-300 italic text-xs">
-                                             No records found for this keyword in this month.
-                                          </div>
-                                       ) : (
-                                          group.logs
-                                             .sort((a, b) => b.startTime - a.startTime)
-                                             .map(log => {
-                                                const logH = Math.floor(log.duration / 3600);
-                                                const logM = Math.floor((log.duration % 3600) / 60);
-                                                const logTimeStr = logH > 0 ? `${logH}h ${logM}m` : `${logM}m`;
-                                                const dateObj = new Date(log.startTime);
-
-                                                return (
-                                                   <div
-                                                      key={log.id}
-                                                      onClick={() => onEditLog?.(log)}
-                                                      className="group flex items-center gap-3 py-3 border-b border-stone-100 last:border-0 hover:bg-stone-50 md:-mx-2 md:px-2 transition-colors cursor-pointer"
-                                                   >
-                                                      <div className="w-8 flex flex-col items-center justify-center shrink-0">
-                                                         <span className="text-[10px] font-bold text-stone-400 leading-none">
-                                                            {dateObj.getDate()}
-                                                         </span>
-                                                         <span className="text-[8px] text-stone-300 uppercase leading-none mt-0.5">
-                                                            {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][dateObj.getDay()]}
-                                                         </span>
-                                                      </div>
-
-                                                      <div className="w-1 h-8 rounded-full bg-stone-100 group-hover:bg-stone-200 transition-colors shrink-0"></div>
-
-                                                      <div className="flex-1 min-w-0 flex flex-col justify-center">
-                                                         <span className="font-medium truncate text-stone-700 leading-tight">
-                                                            {log.note || log.title || "No description"}
-                                                         </span>
-                                                         <span className="text-[10px] text-stone-400 mt-0.5 font-mono">
-                                                            {dateObj.getHours().toString().padStart(2, '0')}:{dateObj.getMinutes().toString().padStart(2, '0')}
-                                                         </span>
-                                                      </div>
-
-                                                      <span className="text-xs text-stone-400 font-mono whitespace-nowrap shrink-0 group-hover:text-stone-600">
-                                                         {logTimeStr}
-                                                      </span>
-                                                   </div>
-                                                );
-                                             })
-                                       )}
-                                    </div>
-                                 )}
-                              </div>
-                           );
-                        });
-                     })()}
-                  </div>
-               </>
-            );
          default:
             return null;
       }
@@ -868,17 +664,15 @@ export const TagDetailView: React.FC<TagDetailViewProps> = ({ tagId, logs, todos
 
          {/* Tabs */}
          <div className="flex gap-6 border-b border-stone-200 mb-8 overflow-x-auto no-scrollbar">
-            {['Details', 'Timeline', '关联']
-               .concat((activity.keywords && activity.keywords.length > 0) ? ['Keywords'] : [])
-               .map((tab) => (
-                  <button
-                     key={tab}
-                     onClick={() => setActiveTab(tab)}
-                     className={`pb-3 text-sm font-serif tracking-wide whitespace-nowrap transition-colors ${activeTab === tab ? 'text-stone-900 border-b-2 border-stone-900 font-bold' : 'text-stone-400 hover:text-stone-600'}`}
-                  >
-                     {tab === 'Timeline' ? '時間線' : tab === 'Details' ? '细节' : tab === 'Keywords' ? '关键字' : tab}
-                  </button>
-               ))}
+            {['Details', 'Timeline', '关联'].map((tab) => (
+               <button
+                  key={tab}
+                  onClick={() => setActiveTab(tab)}
+                  className={`pb-3 text-sm font-serif tracking-wide whitespace-nowrap transition-colors ${activeTab === tab ? 'text-stone-900 border-b-2 border-stone-900 font-bold' : 'text-stone-400 hover:text-stone-600'}`}
+               >
+                  {tab === 'Timeline' ? '時間線' : tab === 'Details' ? '细节' : tab}
+               </button>
+            ))}
          </div>
 
          {renderContent()}
