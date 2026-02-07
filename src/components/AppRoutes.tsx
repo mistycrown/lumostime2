@@ -90,7 +90,7 @@ export const AppRoutes: React.FC<AppRoutesProps> = ({
     const { logs, todos, todoCategories, setLogs, setTodos, setTodoCategories } = useData(); // Added setters
     const { categories, scopes, goals, setScopes, setGoals, handleUpdateActivity, handleCategoryChange, handleUpdateCategory, handleUpdateCategories } = useCategoryScope();
     const { dailyReviews, weeklyReviews, monthlyReviews, setDailyReviews, setWeeklyReviews, setMonthlyReviews, reviewTemplates, checkTemplates, dailyReviewTime, weeklyReviewTime, monthlyReviewTime } = useReview();
-    const { userPersonalInfo, autoLinkRules, customNarrativeTemplates, startWeekOnSunday, minIdleTimeThreshold } = useSettings();
+    const { userPersonalInfo, autoLinkRules, customNarrativeTemplates, startWeekOnSunday, minIdleTimeThreshold, timelineGalleryMode } = useSettings();
     const { addToast } = useToast();
     const { activeSessions } = useSession();
 
@@ -248,6 +248,7 @@ export const AppRoutes: React.FC<AppRoutesProps> = ({
                     monthlyReviews={monthlyReviews}
                     onOpenMonthlyReview={handleOpenMonthlyReview}
                     monthlyReviewTime={monthlyReviewTime}
+                    timelineGalleryMode={timelineGalleryMode}
                 />
             );
         case AppView.STATS:

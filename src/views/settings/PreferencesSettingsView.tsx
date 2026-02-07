@@ -28,6 +28,8 @@ interface PreferencesSettingsViewProps {
     onSetDefaultArchiveView?: (view: DefaultArchiveView) => void;
     defaultIndexView?: DefaultIndexView;
     onSetDefaultIndexView?: (view: DefaultIndexView) => void;
+    timelineGalleryMode?: boolean;
+    onToggleTimelineGalleryMode?: () => void;
 }
 
 export const PreferencesSettingsView: React.FC<PreferencesSettingsViewProps> = ({
@@ -50,7 +52,9 @@ export const PreferencesSettingsView: React.FC<PreferencesSettingsViewProps> = (
     defaultArchiveView = 'CHRONICLE',
     onSetDefaultArchiveView,
     defaultIndexView = 'TAGS',
-    onSetDefaultIndexView
+    onSetDefaultIndexView,
+    timelineGalleryMode = false,
+    onToggleTimelineGalleryMode
 }) => {
     const [isDefaultViewDropdownOpen, setIsDefaultViewDropdownOpen] = useState(false);
 
@@ -162,6 +166,23 @@ export const PreferencesSettingsView: React.FC<PreferencesSettingsViewProps> = (
                                 type="checkbox"
                                 checked={autoFocusNote}
                                 onChange={onToggleAutoFocusNote}
+                                className="sr-only peer"
+                            />
+                            <div className="w-11 h-6 bg-stone-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-stone-800"></div>
+                        </label>
+                    </div>
+
+                    {/* Timeline Gallery Mode Toggle */}
+                    <div className="flex items-center justify-between p-4 border-b border-stone-100 hover:bg-stone-50 transition-colors">
+                        <div>
+                            <h4 className="font-bold text-stone-700">时间脉络画廊模式</h4>
+                            <p className="text-xs text-stone-400 mt-1">日历显示当天第一张图片而非热力图</p>
+                        </div>
+                        <label className="relative inline-flex items-center cursor-pointer">
+                            <input
+                                type="checkbox"
+                                checked={timelineGalleryMode}
+                                onChange={onToggleTimelineGalleryMode}
                                 className="sr-only peer"
                             />
                             <div className="w-11 h-6 bg-stone-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-stone-800"></div>

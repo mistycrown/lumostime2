@@ -133,6 +133,8 @@ interface TimelineViewProps {
     monthlyReviews?: MonthlyReview[];
     onOpenMonthlyReview?: (monthStart: Date, monthEnd: Date) => void;
     monthlyReviewTime?: string;
+    // Timeline Gallery Mode
+    timelineGalleryMode?: boolean;
 }
 
 interface TimelineItem {
@@ -152,7 +154,7 @@ interface TimelineItem {
     };
 }
 
-export const TimelineView: React.FC<TimelineViewProps> = ({ logs, todos, scopes, onAddLog, onEditLog, onUpdateLog, categories, currentDate, onDateChange, onShowStats, onBatchAddLogs, onSync, isSyncing, todoCategories, onToast, startWeekOnSunday = false, autoLinkRules = [], minIdleTimeThreshold = 1, onQuickPunch, refreshKey = 0, activeSessions = [], dailyReview, onOpenDailyReview, templates = [], dailyReviewTime = '22:00', weeklyReviews = [], onOpenWeeklyReview, weeklyReviewTime = '0-2200', monthlyReviews = [], onOpenMonthlyReview, monthlyReviewTime = '0-2200' }) => {
+export const TimelineView: React.FC<TimelineViewProps> = ({ logs, todos, scopes, onAddLog, onEditLog, onUpdateLog, categories, currentDate, onDateChange, onShowStats, onBatchAddLogs, onSync, isSyncing, todoCategories, onToast, startWeekOnSunday = false, autoLinkRules = [], minIdleTimeThreshold = 1, onQuickPunch, refreshKey = 0, activeSessions = [], dailyReview, onOpenDailyReview, templates = [], dailyReviewTime = '22:00', weeklyReviews = [], onOpenWeeklyReview, weeklyReviewTime = '0-2200', monthlyReviews = [], onOpenMonthlyReview, monthlyReviewTime = '0-2200', timelineGalleryMode = false }) => {
     const [isCalendarExpanded, setIsCalendarExpanded] = useState(false);
     const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>(() => {
         const saved = localStorage.getItem('lumos_timeline_sort');
@@ -712,6 +714,8 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ logs, todos, scopes,
                     isExpanded={isCalendarExpanded}
                     onExpandToggle={() => setIsCalendarExpanded(!isCalendarExpanded)}
                     startWeekOnSunday={startWeekOnSunday}
+                    galleryMode={timelineGalleryMode}
+                    todos={todos}
                     extraHeaderControls={
                         <>
                             {onSync && (
