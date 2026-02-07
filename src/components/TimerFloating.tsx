@@ -166,8 +166,21 @@ const SingleTimer: React.FC<{
           className={`flex items-center justify-center hover:scale-110 transition-all cursor-pointer ${
             isBorderAnimating 
               ? 'w-8 h-8 text-2xl duration-300'  // 最终状态：无背景，大图标
-              : 'w-10 h-10 text-xl rounded-full bg-orange-50 shadow-inner hover:bg-orange-100 duration-500'  // 第一阶段：保持背景
+              : 'w-10 h-10 text-xl rounded-full shadow-inner duration-500'  // 第一阶段：保持背景
           }`}
+          style={!isBorderAnimating ? {
+            backgroundColor: 'color-mix(in srgb, var(--accent-color) 10%, white)'
+          } : undefined}
+          onMouseEnter={(e) => {
+            if (!isBorderAnimating) {
+              e.currentTarget.style.backgroundColor = 'color-mix(in srgb, var(--accent-color) 20%, white)';
+            }
+          }}
+          onMouseLeave={(e) => {
+            if (!isBorderAnimating) {
+              e.currentTarget.style.backgroundColor = 'color-mix(in srgb, var(--accent-color) 10%, white)';
+            }
+          }}
         >
           {session.activityIcon}
         </div>
@@ -184,13 +197,22 @@ const SingleTimer: React.FC<{
           }`}>
             <div 
               onClick={toggleCollapse}
-              className={`w-10 h-10 rounded-full bg-orange-50 flex items-center justify-center text-xl shadow-inner shrink-0 hover:bg-orange-100 transition-colors cursor-pointer ${
+              className={`w-10 h-10 rounded-full flex items-center justify-center text-xl shadow-inner shrink-0 transition-colors cursor-pointer ${
                 currentView !== AppView.RECORD && currentView !== AppView.TODO 
                   ? currentView === AppView.REVIEW || currentView === AppView.SCOPE
                     ? 'absolute left-0'  // 档案页和索引页：需要绝对定位
                     : 'absolute left-0'  // 其他页面：也需要绝对定位
                   : ''  // 记录页和待办页：不需要绝对定位
               }`}
+              style={{
+                backgroundColor: 'color-mix(in srgb, var(--accent-color) 10%, white)'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = 'color-mix(in srgb, var(--accent-color) 20%, white)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = 'color-mix(in srgb, var(--accent-color) 10%, white)';
+              }}
             >
               {session.activityIcon}
             </div>
@@ -211,7 +233,7 @@ const SingleTimer: React.FC<{
                   </span>
                 )}
               </div>
-              <span className="text-xl font-mono font-medium text-orange-500 tabular-nums tracking-tight leading-none mt-0.5">
+              <span className="text-xl font-mono font-medium tabular-nums tracking-tight leading-none mt-0.5" style={{ color: 'var(--accent-color)' }}>
                 {formatTime(elapsed)}
               </span>
             </div>
@@ -235,7 +257,17 @@ const SingleTimer: React.FC<{
             )}
             <button
               onClick={onStop}
-              className="p-2 text-orange-400 hover:text-orange-600 hover:bg-orange-50 rounded-full transition-colors"
+              className="p-2 rounded-full transition-colors"
+              style={{ 
+                color: 'var(--accent-color)',
+                backgroundColor: 'transparent'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = 'color-mix(in srgb, var(--accent-color) 10%, transparent)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = 'transparent';
+              }}
             >
               <CheckCircle2 size={24} />
             </button>

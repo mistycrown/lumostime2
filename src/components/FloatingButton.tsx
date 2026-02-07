@@ -53,7 +53,7 @@ export const FloatingButton: React.FC<FloatingButtonProps> = ({
     const variantClasses = {
         primary: 'bg-stone-900 text-white border-stone-800',
         secondary: 'bg-white text-stone-600 border-stone-200',
-        white: 'bg-white text-amber-400 border-amber-100'
+        white: 'bg-white text-stone-600 border-stone-200'
     };
 
     // 确保 fixed 定位始终存在（除非是 custom 位置）

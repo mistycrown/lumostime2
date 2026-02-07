@@ -34,9 +34,18 @@ export const GoalCard: React.FC<GoalCardProps> = ({ goal, logs, todos, onEdit, o
     // 进度条颜色
     const progressColor = isLimitGoal
         ? (percentage > 80 ? 'bg-red-900' : 'bg-red-700')
-        : 'bg-[#2F4F4F]';
+        : '';
 
-    const progressBgColor = isLimitGoal ? 'bg-red-50' : 'bg-stone-100';
+    const progressBgColor = isLimitGoal ? 'bg-red-50' : '';
+    
+    // 进度条样式（使用CSS变量）
+    const progressStyle = !isLimitGoal ? {
+        backgroundColor: 'var(--progress-bar-fill)'
+    } : undefined;
+    
+    const progressBgStyle = !isLimitGoal ? {
+        backgroundColor: 'var(--progress-bar-bg)'
+    } : undefined;
 
     // 格式化日期显示
     const formatDate = (dateStr: string) => {
@@ -50,17 +59,17 @@ export const GoalCard: React.FC<GoalCardProps> = ({ goal, logs, todos, onEdit, o
             <div className={`p-2 ${isArchived ? 'opacity-50' : ''}`}>
                 <div className="flex items-center justify-between mb-1.5">
                     <div className="flex items-center gap-1.5 flex-1 min-w-0">
-                        <Target size={12} className="text-stone-400 flex-shrink-0" />
+                        <Target size={12} className="flex-shrink-0" style={{ color: 'var(--accent-color)' }} />
                         <span className="text-xs font-bold text-stone-700 truncate">{goal.title}</span>
                     </div>
                     <span className="text-[10px] font-mono text-stone-500 ml-2 flex-shrink-0">
                         {formatGoalValue(current, goal.metric)} / {formatGoalValue(target, goal.metric)}
                     </span>
                 </div>
-                <div className={`h-1 w-full ${progressBgColor} rounded-full overflow-hidden`}>
+                <div className={`h-1 w-full rounded-full overflow-hidden ${progressBgColor}`} style={progressBgStyle}>
                     <div
-                        className={`h-full ${progressColor} rounded-full transition-all duration-500`}
-                        style={{ width: `${percentage}%` }}
+                        className={`h-full rounded-full transition-all duration-500 ${progressColor}`}
+                        style={progressStyle ? { ...progressStyle, width: `${percentage}%` } : { width: `${percentage}%` }}
                     />
                 </div>
             </div>
@@ -80,7 +89,11 @@ export const GoalCard: React.FC<GoalCardProps> = ({ goal, logs, todos, onEdit, o
             <div className="flex items-start justify-between mb-3">
                 <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
-                        <Target size={16} className={isLimitGoal ? 'text-red-600' : (isArchived ? 'text-stone-400' : 'text-[#2F4F4F]')} />
+                        <Target 
+                            size={16} 
+                            className={isLimitGoal ? 'text-red-600' : (isArchived ? 'text-stone-400' : '')}
+                            style={!isLimitGoal && !isArchived ? { color: 'var(--accent-color)' } : undefined}
+                        />
                         <h4 className={`text-base font-bold truncate ${isArchived ? 'text-stone-400' : 'text-stone-900'
                             }`}>{goal.title}</h4>
                         {isArchived && (
@@ -142,10 +155,10 @@ export const GoalCard: React.FC<GoalCardProps> = ({ goal, logs, todos, onEdit, o
 
             {/* Progress Bar */}
             <div className="mb-2">
-                <div className={`h-2 w-full ${progressBgColor} rounded-full overflow-hidden`}>
+                <div className={`h-2 w-full rounded-full overflow-hidden ${progressBgColor}`} style={progressBgStyle}>
                     <div
-                        className={`h-full ${progressColor} rounded-full transition-all duration-500`}
-                        style={{ width: `${percentage}%` }}
+                        className={`h-full rounded-full transition-all duration-500 ${progressColor}`}
+                        style={progressStyle ? { ...progressStyle, width: `${percentage}%` } : { width: `${percentage}%` }}
                     />
                 </div>
             </div>

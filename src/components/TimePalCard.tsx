@@ -270,7 +270,7 @@ export const TimePalCard: React.FC<TimePalCardProps> = ({ logs, currentDate, cat
                         {timeDisplay}
                     </div>
                     <div className="mt-1.5 text-xs text-stone-500 leading-relaxed">
-                        <span className="text-amber-600 font-medium">{formDesc}</span>
+                        <span className="font-medium" style={{ color: 'var(--accent-color)' }}>{formDesc}</span>
                         <span> · {quote}</span>
                     </div>
                 </div>
@@ -282,9 +282,10 @@ export const TimePalCard: React.FC<TimePalCardProps> = ({ logs, currentDate, cat
                             key={i}
                             className={`w-1.5 h-1.5 rounded-full transition-all ${
                                 i < formLevel 
-                                    ? 'bg-amber-400 shadow-sm' 
+                                    ? 'shadow-sm' 
                                     : 'bg-stone-200'
                             }`}
+                            style={i < formLevel ? { backgroundColor: 'var(--accent-color)' } : undefined}
                         />
                     ))}
                 </div>
