@@ -22,6 +22,8 @@ import { ConfirmModal } from '../components/ConfirmModal';
 import { ReactionPicker, ReactionList } from '../components/ReactionComponents';
 import { TimePalCard } from '../components/TimePalCard';
 import { TimePalDebugger } from '../components/TimePalDebugger';
+import { FloatingButton } from '../components/FloatingButton';
+import { UIIcon } from '../components/UIIcon';
 
 
 // Image Thumbnail Component
@@ -1239,30 +1241,38 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ logs, todos, scopes,
             </div>
 
             {/* Floating AI Button (Above Add) */}
-            <button
+            <FloatingButton
                 onClick={() => setIsAIModalOpen(true)}
-                className="fixed bottom-[calc(8.5rem+env(safe-area-inset-bottom))] right-6 w-12 h-12 bg-white text-amber-400 rounded-full shadow-xl flex items-center justify-center active:scale-90 transition-transform z-40 border border-amber-100"
+                position="custom"
+                className="fixed bottom-[calc(8.5rem+env(safe-area-inset-bottom))] right-6"
+                size="sm"
+                variant="white"
                 title="AI Magic Backfill"
+                disableThemeStyle={true}
             >
-                <Sparkles size={20} />
-            </button>
+                <UIIcon type="ai-assist" fallbackIcon={Sparkles} size={20} className="text-amber-400" />
+            </FloatingButton>
 
             {/* Floating Punch Button */}
-            <button
+            <FloatingButton
                 onClick={onQuickPunch}
-                className="fixed bottom-[calc(4.5rem+env(safe-area-inset-bottom))] right-[5.5rem] w-12 h-12 bg-white text-stone-600 rounded-full shadow-xl flex items-center justify-center active:scale-90 transition-transform z-40 border border-stone-200"
+                position="custom"
+                className="fixed bottom-[calc(4.5rem+env(safe-area-inset-bottom))] right-[5.5rem]"
+                size="sm"
+                variant="secondary"
                 title="Quick Punch (Mark Time)"
+                disableThemeStyle={true}
             >
-                <Timer size={20} />
-            </button>
+                <UIIcon type="timer" fallbackIcon={Timer} size={20} className="text-stone-600" />
+            </FloatingButton>
 
             {/* Floating Add Button */}
-            <button
+            <FloatingButton
                 onClick={() => onAddLog()}
-                className="fixed bottom-[calc(4.5rem+env(safe-area-inset-bottom))] right-6 w-14 h-14 bg-stone-900 rounded-full text-white shadow-2xl flex items-center justify-center active:scale-90 transition-transform z-40 border border-stone-800"
                 title="Add Activity"
-            >    <Plus size={24} strokeWidth={1.5} />
-            </button>
+            >
+                <UIIcon type="add-record" fallbackIcon={Plus} size={24} className="text-white" />
+            </FloatingButton>
             {
                 isAIModalOpen && (
                     <AIBatchModal

@@ -41,6 +41,10 @@ interface SettingsContextType {
     uiIconTheme: string;
     setUiIconTheme: React.Dispatch<React.SetStateAction<string>>;
 
+    // 配色方案
+    colorScheme: string;
+    setColorScheme: React.Dispatch<React.SetStateAction<string>>;
+
     // 应用规则
     appRules: { [packageName: string]: string };
     setAppRules: React.Dispatch<React.SetStateAction<{ [packageName: string]: string }>>;
@@ -231,6 +235,19 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
         });
     }, [uiIconTheme]);
 
+    const [colorScheme, setColorScheme] = useState<string>(() => {
+        const stored = localStorage.getItem('lumostime_color_scheme');
+        return stored || 'default';
+    });
+
+    useEffect(() => {
+        localStorage.setItem('lumostime_color_scheme', colorScheme);
+        // 同步到 colorSchemeService
+        import('../services/colorSchemeService').then(({ colorSchemeService }) => {
+            colorSchemeService.setScheme(colorScheme as any);
+        });
+    }, [colorScheme]);
+
     useEffect(() => {
         localStorage.setItem('lumostime_custom_narrative_templates', JSON.stringify(customNarrativeTemplates));
     }, [customNarrativeTemplates]);
@@ -271,6 +288,8 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
             setTimelineGalleryMode,
             uiIconTheme,
             setUiIconTheme,
+            colorScheme,
+            setColorScheme,
             appRules,
             setAppRules,
             customNarrativeTemplates,

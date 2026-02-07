@@ -523,7 +523,7 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, categories, activityC
             </button>
             <button
               onClick={() => onAddTodo(selectedCategoryId)}
-              className="w-10 h-10 rounded-full bg-stone-900 text-white flex items-center justify-center shadow-lg active:scale-90 transition-transform"
+              className="floating-button w-10 h-10 rounded-full flex items-center justify-center shadow-lg active:scale-90 transition-transform"
             >
               <Plus size={20} />
             </button>

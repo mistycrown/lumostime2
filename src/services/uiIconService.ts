@@ -3,6 +3,8 @@
  * @description UI 图标主题服务 - 管理应用内所有 UI 图标的主题切换
  */
 
+import React from 'react';
+
 // UI 图标类型定义
 export type UIIconType =
     | 'sync'           // 1. 同步按钮
@@ -43,8 +45,85 @@ const ICON_NUMBER_MAP: Record<UIIconType, string> = {
 };
 
 // 可用的主题列表
-export const UI_ICON_THEMES = ['default', 'purple'] as const;
+export const UI_ICON_THEMES = ['default', 'purple', 'color', 'color2', 'prince'] as const;
 export type UIIconTheme = typeof UI_ICON_THEMES[number];
+
+// 主题样式配置
+export interface ThemeStyleConfig {
+    // 悬浮按钮样式
+    floatingButton?: {
+        backgroundColor?: string;
+        borderColor?: string;
+        borderWidth?: string;
+        shadow?: string;
+    };
+    // 顶部栏按钮样式
+    headerButton?: {
+        backgroundColor?: string;
+        borderColor?: string;
+        borderWidth?: string;
+    };
+    // 其他按钮样式可以继续扩展
+}
+
+// 主题样式配置映射
+const THEME_STYLES: Record<UIIconTheme, ThemeStyleConfig> = {
+    'default': {
+        // 默认主题使用 Lucide 图标，不需要特殊样式
+    },
+    'purple': {
+        floatingButton: {
+            backgroundColor: '#ffffff',
+            borderColor: 'rgba(147, 51, 234, 0.15)', // purple-600 with 15% opacity
+            borderWidth: '0.5px',
+            shadow: '0 4px 6px -1px rgba(147, 51, 234, 0.1), 0 2px 4px -1px rgba(147, 51, 234, 0.06)'
+        },
+        headerButton: {
+            backgroundColor: 'transparent',
+            borderColor: 'transparent',
+            borderWidth: '0'
+        }
+    },
+    'color': {
+        floatingButton: {
+            backgroundColor: '#ffffff',
+            borderColor: 'rgba(59, 130, 246, 0.15)', // blue-500 with 15% opacity
+            borderWidth: '0.5px',
+            shadow: '0 4px 6px -1px rgba(59, 130, 246, 0.1), 0 2px 4px -1px rgba(59, 130, 246, 0.06)'
+        },
+        headerButton: {
+            backgroundColor: 'transparent',
+            borderColor: 'transparent',
+            borderWidth: '0'
+        }
+    },
+    'color2': {
+        floatingButton: {
+            backgroundColor: '#ffffff',
+            borderColor: 'rgba(16, 185, 129, 0.15)', // green-500 with 15% opacity
+            borderWidth: '0.5px',
+            shadow: '0 4px 6px -1px rgba(16, 185, 129, 0.1), 0 2px 4px -1px rgba(16, 185, 129, 0.06)'
+        },
+        headerButton: {
+            backgroundColor: 'transparent',
+            borderColor: 'transparent',
+            borderWidth: '0'
+        }
+    },
+    'prince': {
+        floatingButton: {
+            backgroundColor: '#fef3c7', // amber-100
+            borderColor: 'rgba(245, 158, 11, 0.25)', // amber-500 with 25% opacity
+            borderWidth: '0.5px',
+            shadow: '0 4px 6px -1px rgba(245, 158, 11, 0.1), 0 2px 4px -1px rgba(245, 158, 11, 0.06)'
+        },
+        headerButton: {
+            backgroundColor: 'transparent',
+            borderColor: 'transparent',
+            borderWidth: '0'
+        }
+    }
+};
 
 /**
  * UI 图标服务类
@@ -124,6 +203,44 @@ class UIIconService {
     isCustomTheme(): boolean {
         return this.currentTheme !== 'default';
     }
+
+    /**
+     * 获取当前主题的样式配置
+     */
+    getThemeStyles(): ThemeStyleConfig {
+        return THEME_STYLES[this.currentTheme] || {};
+    }
+
+    /**
+     * 获取悬浮按钮样式
+     */
+    getFloatingButtonStyle(): React.CSSProperties {
+        const styles = this.getThemeStyles();
+        if (!styles.floatingButton) return {};
+
+        return {
+            backgroundColor: styles.floatingButton.backgroundColor,
+            borderColor: styles.floatingButton.borderColor,
+            borderWidth: styles.floatingButton.borderWidth,
+            borderStyle: styles.floatingButton.borderWidth ? 'solid' : undefined,
+            boxShadow: styles.floatingButton.shadow
+        };
+    }
+
+    /**
+     * 获取顶部栏按钮样式
+     */
+    getHeaderButtonStyle(): React.CSSProperties {
+        const styles = this.getThemeStyles();
+        if (!styles.headerButton) return {};
+
+        return {
+            backgroundColor: styles.headerButton.backgroundColor,
+            borderColor: styles.headerButton.borderColor,
+            borderWidth: styles.headerButton.borderWidth,
+            borderStyle: styles.headerButton.borderWidth && styles.headerButton.borderWidth !== '0' ? 'solid' : undefined
+        };
+    }
 }
 
 // 导出单例
@@ -143,4 +260,64 @@ export const useUIIcon = (iconType: UIIconType) => {
         fallbackPath: paths.fallback,
         theme
     };
+};
+
+/**
+ * React Hook - 检测当前是否使用自定义主题
+ */
+export const useIsCustomTheme = () => {
+    const [isCustom, setIsCustom] = React.useState(uiIconService.isCustomTheme());
+
+    React.useEffect(() => {
+        const handleThemeChange = () => {
+            setIsCustom(uiIconService.isCustomTheme());
+        };
+
+        window.addEventListener('ui-icon-theme-changed', handleThemeChange);
+        return () => {
+            window.removeEventListener('ui-icon-theme-changed', handleThemeChange);
+        };
+    }, []);
+
+    return isCustom;
+};
+
+/**
+ * React Hook - 获取主题样式
+ */
+export const useThemeStyles = () => {
+    const [styles, setStyles] = React.useState(uiIconService.getThemeStyles());
+
+    React.useEffect(() => {
+        const handleThemeChange = () => {
+            setStyles(uiIconService.getThemeStyles());
+        };
+
+        window.addEventListener('ui-icon-theme-changed', handleThemeChange);
+        return () => {
+            window.removeEventListener('ui-icon-theme-changed', handleThemeChange);
+        };
+    }, []);
+
+    return styles;
+};
+
+/**
+ * React Hook - 获取悬浮按钮样式
+ */
+export const useFloatingButtonStyle = () => {
+    const [style, setStyle] = React.useState(uiIconService.getFloatingButtonStyle());
+
+    React.useEffect(() => {
+        const handleThemeChange = () => {
+            setStyle(uiIconService.getFloatingButtonStyle());
+        };
+
+        window.addEventListener('ui-icon-theme-changed', handleThemeChange);
+        return () => {
+            window.removeEventListener('ui-icon-theme-changed', handleThemeChange);
+        };
+    }, []);
+
+    return style;
 };
