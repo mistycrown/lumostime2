@@ -5,6 +5,7 @@
 
 // 时光小友类型
 export type TimePalType = 
+    | 'default' // 默认（不开启时光小友）
     | 'cat' | 'dog' | 'rabbit' | 'monkey' | 'prince' | 'chibi' | 'girl'
     // 新增类型
     | 'buddist' | 'cat2' | 'dog2' | 'dog3' | 'Ghost' | 'girl2' | 'girl3' | 'girl4'
@@ -20,6 +21,13 @@ export interface TimePalOption {
 
 // 所有可用的时光小友选项
 export const TIMEPAL_OPTIONS: TimePalOption[] = [
+    // 默认选项
+    { 
+        type: 'default', 
+        name: '默认', 
+        preview: '', // 空预览，将显示文字
+        emoji: '默认'
+    },
     // 原有类型
     { 
         type: 'cat', 

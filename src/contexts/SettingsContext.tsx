@@ -37,6 +37,10 @@ interface SettingsContextType {
     timelineGalleryMode: boolean;
     setTimelineGalleryMode: React.Dispatch<React.SetStateAction<boolean>>;
 
+    // UI 主题
+    uiIconTheme: string;
+    setUiIconTheme: React.Dispatch<React.SetStateAction<string>>;
+
     // 应用规则
     appRules: { [packageName: string]: string };
     setAppRules: React.Dispatch<React.SetStateAction<{ [packageName: string]: string }>>;
@@ -214,6 +218,19 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
         localStorage.setItem('lumostime_timeline_gallery_mode', timelineGalleryMode.toString());
     }, [timelineGalleryMode]);
 
+    const [uiIconTheme, setUiIconTheme] = useState<string>(() => {
+        const stored = localStorage.getItem('lumostime_ui_icon_theme');
+        return stored || 'default'; // Default to default (built-in icons)
+    });
+
+    useEffect(() => {
+        localStorage.setItem('lumostime_ui_icon_theme', uiIconTheme);
+        // 同步到 uiIconService
+        import('../services/uiIconService').then(({ uiIconService }) => {
+            uiIconService.setTheme(uiIconTheme as any);
+        });
+    }, [uiIconTheme]);
+
     useEffect(() => {
         localStorage.setItem('lumostime_custom_narrative_templates', JSON.stringify(customNarrativeTemplates));
     }, [customNarrativeTemplates]);
@@ -252,6 +269,8 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
             setAutoFocusNote,
             timelineGalleryMode,
             setTimelineGalleryMode,
+            uiIconTheme,
+            setUiIconTheme,
             appRules,
             setAppRules,
             customNarrativeTemplates,
