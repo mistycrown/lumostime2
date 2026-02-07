@@ -34,6 +34,9 @@ interface SettingsContextType {
     autoFocusNote: boolean;
     setAutoFocusNote: React.Dispatch<React.SetStateAction<boolean>>;
 
+    timelineGalleryMode: boolean;
+    setTimelineGalleryMode: React.Dispatch<React.SetStateAction<boolean>>;
+
     // 应用规则
     appRules: { [packageName: string]: string };
     setAppRules: React.Dispatch<React.SetStateAction<{ [packageName: string]: string }>>;
