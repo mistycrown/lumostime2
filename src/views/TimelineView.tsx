@@ -1232,7 +1232,8 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ logs, todos, scopes,
                         <p className="text-stone-400 font-serif italic">Silence is golden.</p>
                         <button
                             onClick={() => onAddLog()}
-                            className="mt-6 px-8 py-3 bg-stone-900 text-white rounded-full text-sm font-bold active:scale-95 transition-transform"
+                            className="mt-6 px-8 py-3 text-white rounded-full text-sm font-bold active:scale-95 transition-transform"
+                            style={{ backgroundColor: 'var(--accent-color)' }}
                         >
                             Record Activity
                         </button>
@@ -1250,7 +1251,7 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ logs, todos, scopes,
                 title="AI Magic Backfill"
                 disableThemeStyle={true}
             >
-                <UIIcon type="ai-assist" fallbackIcon={Sparkles} size={20} className="text-amber-400" />
+                <UIIcon type="ai-assist" fallbackIcon={Sparkles} size={20} className="text-stone-600" />
             </FloatingButton>
 
             {/* Floating Punch Button */}
