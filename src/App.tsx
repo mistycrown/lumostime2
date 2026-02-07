@@ -51,6 +51,16 @@ if (typeof window !== 'undefined') {
 }
 
 import { SettingsView } from './views/SettingsView';
+import { 
+  CATEGORIES, 
+  SCOPES, 
+  MOCK_TODO_CATEGORIES, 
+  INITIAL_GOALS, 
+  INITIAL_TODOS, 
+  INITIAL_LOGS,
+  DEFAULT_REVIEW_TEMPLATES,
+  DEFAULT_CHECK_TEMPLATES
+} from './constants';
 
 const AppContent: React.FC = () => {
   // Use Contexts
@@ -390,13 +400,14 @@ const AppContent: React.FC = () => {
         <SettingsView
           onClose={() => setIsSettingsOpen(false)}
           onReset={() => {
-            setLogs([]);
-            setTodos([]);
-            setCategories(categories);
-            setScopes([]);
-            setTodoCategories(todoCategories);
-            setReviewTemplates([]);
-            setCheckTemplates([]);
+            setLogs(INITIAL_LOGS);
+            setTodos(INITIAL_TODOS);
+            setCategories(CATEGORIES);
+            setScopes(SCOPES);
+            setTodoCategories(MOCK_TODO_CATEGORIES);
+            setGoals(INITIAL_GOALS);
+            setReviewTemplates(DEFAULT_REVIEW_TEMPLATES);
+            setCheckTemplates(DEFAULT_CHECK_TEMPLATES);
             setDailyReviews([]);
             setWeeklyReviews([]);
             setMonthlyReviews([]);

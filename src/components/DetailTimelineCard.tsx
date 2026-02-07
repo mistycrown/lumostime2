@@ -469,17 +469,13 @@ export const DetailTimelineCard: React.FC<DetailTimelineCardProps> = ({
                     </div>
 
                     {/* 统计信息 - 简洁版本 */}
-                    <div className="px-2 space-y-2">
+                    <div className="px-2 space-y-3">
                         {/* Total Time */}
                         <div className="flex items-baseline gap-2">
                             <span className="text-xs font-medium text-stone-400 uppercase tracking-wider">Total</span>
                             <div className="flex-1 border-b border-dotted border-stone-200" />
                             <span className="text-xs font-medium text-stone-400">
-                                {totalHours}h {totalMins}m
-                            </span>
-                            <span className="text-stone-300">/</span>
-                            <span className="text-xs font-medium text-stone-400">
-                                {monthHours}h {monthMins}m
+                                {totalHours}h {totalMins}m / {monthHours}h {monthMins}m
                             </span>
                         </div>
 
@@ -487,19 +483,15 @@ export const DetailTimelineCard: React.FC<DetailTimelineCardProps> = ({
                         <div className="flex items-baseline gap-2">
                             <span className="text-xs font-medium text-stone-400 uppercase tracking-wider">Avg</span>
                             <div className="flex-1 border-b border-dotted border-stone-200" />
-                            {(() => {
-                                const totalDays = new Set(filteredLogs.map(l => new Date(l.startTime).toDateString())).size;
-                                const monthDays = new Set(monthLogs.map(l => new Date(l.startTime).toDateString())).size;
-                                const avgTotal = totalDays > 0 ? Math.round(totalSeconds / 60 / totalDays) : 0;
-                                const avgMonth = monthDays > 0 ? Math.round(monthSeconds / 60 / monthDays) : 0;
-                                return (
-                                    <>
-                                        <span className="text-xs font-medium text-stone-400">{avgTotal}m</span>
-                                        <span className="text-stone-300">/</span>
-                                        <span className="text-xs font-medium text-stone-400">{avgMonth}m</span>
-                                    </>
-                                );
-                            })()}
+                            <span className="text-xs font-medium text-stone-400">
+                                {(() => {
+                                    const totalDays = new Set(filteredLogs.map(l => new Date(l.startTime).toDateString())).size;
+                                    const avgTotal = totalDays > 0 ? Math.round(totalSeconds / 60 / totalDays) : 0;
+                                    const monthDays = new Set(monthLogs.map(l => new Date(l.startTime).toDateString())).size;
+                                    const avgMonth = monthDays > 0 ? Math.round(monthSeconds / 60 / monthDays) : 0;
+                                    return `${avgTotal}m / ${avgMonth}m`;
+                                })()}
+                            </span>
                         </div>
 
                         {/* Focus Score Distribution */}
@@ -526,7 +518,8 @@ export const DetailTimelineCard: React.FC<DetailTimelineCardProps> = ({
                                 };
                                 
                                 return (
-                                    <div className="flex flex-col gap-1">
+                                    <>
+                                        {/* Focus 文字行 - 与 Total 和 Average 并列 */}
                                         <div className="flex items-baseline gap-2">
                                             <span className="text-xs font-medium text-stone-400 uppercase tracking-wider">Focus</span>
                                             <div className="flex-1 border-b border-dotted border-stone-200" />
@@ -535,7 +528,7 @@ export const DetailTimelineCard: React.FC<DetailTimelineCardProps> = ({
                                             </span>
                                         </div>
                                         
-                                        {/* 水平堆叠条形图 - 更淡的颜色 */}
+                                        {/* 条形统计图 - 独立的模块 */}
                                         <div className="flex h-6 rounded-lg overflow-hidden">
                                             {percentages[1] > 0 && (
                                                 <div 
@@ -593,7 +586,7 @@ export const DetailTimelineCard: React.FC<DetailTimelineCardProps> = ({
                                                 </div>
                                             )}
                                         </div>
-                                    </div>
+                                    </>
                                 );
                             }
                             return null;

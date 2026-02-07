@@ -517,6 +517,7 @@ export const TagDetailView: React.FC<TagDetailViewProps> = ({ tagId, logs, todos
                   categories={categories}
                   todos={todos}
                   keywords={activity.keywords || []}
+                  enableFocusScore={activity.enableFocusScore ?? category?.enableFocusScore ?? false}
                   renderLogMetadata={(log) => {
                      return (
                         <div className="flex flex-wrap items-center gap-2 mt-1">

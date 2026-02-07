@@ -478,6 +478,7 @@ export const ScopeDetailView: React.FC<ScopeDetailViewProps> = ({
                         categories={categories}
                         todos={todos}
                         keywords={scope.keywords || []}
+                        enableFocusScore={scope.enableFocusScore ?? false}
                         renderLogMetadata={(log) => {
                             const category = categories.find(c => c.id === log.categoryId);
                             const activity = category?.activities.find(a => a.id === log.activityId);
