@@ -10,7 +10,7 @@
 import React, { useMemo } from 'react';
 import { Log, Category } from '../types';
 import { CalendarWidget } from './CalendarWidget';
-import { Clock, Zap, MessageCircle } from 'lucide-react';
+import { Clock, Zap, MessageCircle, ChevronLeft, ChevronRight, Grid, Image as ImageIcon } from 'lucide-react';
 import { TimelineImage } from './TimelineImage';
 
 interface DetailTimelineCardProps {
@@ -51,6 +51,7 @@ export const DetailTimelineCard: React.FC<DetailTimelineCardProps> = ({
     defaultViewMode = 'month'
 }) => {
     const [viewMode, setViewMode] = React.useState<'month' | 'all'>(defaultViewMode);
+    const [calendarViewMode, setCalendarViewMode] = React.useState<'heatmap' | 'gallery'>('heatmap');
 
     const displayMonth = displayDate.getMonth();
     const displayYear = displayDate.getFullYear();
@@ -104,63 +105,265 @@ export const DetailTimelineCard: React.FC<DetailTimelineCardProps> = ({
         return { durationMap: map, logsMap };
     }, [logsToDisplay]);
 
+    // 计算日历数据（包含热力图和画廊数据）
+    const calendarData = useMemo(() => {
+        const map = new Map<number, { duration: number; images: string[]; focusScore?: number }>();
+        const daysInMonth = new Date(displayDate.getFullYear(), displayDate.getMonth() + 1, 0).getDate();
+        
+        // 初始化所有日期
+        for (let day = 1; day <= daysInMonth; day++) {
+            map.set(day, { duration: 0, images: [] });
+        }
+        
+        // 填充数据
+        monthLogs.forEach(log => {
+            const d = new Date(log.startTime);
+            const day = d.getDate();
+            const current = map.get(day)!;
+            current.duration += log.duration;
+            
+            // 收集所有图片（从日记记录中）
+            if (log.images && log.images.length > 0) {
+                // 将这条记录的所有图片添加到当天的图片列表中
+                log.images.forEach(img => {
+                    if (!current.images.includes(img)) {
+                        current.images.push(img);
+                    }
+                });
+            }
+            
+            // 累计专注分数
+            if (log.focusScore) {
+                if (!current.focusScore) {
+                    current.focusScore = log.focusScore;
+                } else {
+                    current.focusScore += log.focusScore;
+                }
+            }
+        });
+        
+        return map;
+    }, [monthLogs, displayDate]);
+
+    const handleMonthChange = (offset: number) => {
+        const newDate = new Date(displayDate);
+        newDate.setMonth(newDate.getMonth() + offset);
+        onDateChange(newDate);
+    };
+
+    // 热力图颜色计算函数
+    const getHeatmapColor = (duration: number) => {
+        if (duration === 0) return { bg: 'bg-stone-50', text: 'text-stone-300', border: 'border-stone-100' };
+        
+        // 阈值逻辑
+        let t1 = 1800; // 30m
+        let t2 = 7200; // 2h
+        let t3 = 14400; // 4h
+
+        if (customScale && customScale.max > customScale.min) {
+            const min = Math.max(0, customScale.min);
+            const max = Math.max(min + 60, customScale.max);
+            const range = max - min;
+            t1 = min + (range * 0.33);
+            t2 = min + (range * 0.66);
+            t3 = max;
+        }
+
+        if (customScale) {
+            if (duration >= customScale.max) {
+                return { bg: 'bg-stone-700', text: 'text-white', border: 'border-stone-700' };
+            } else if (duration <= t1) {
+                return { bg: 'bg-stone-100', text: 'text-stone-600', border: 'border-stone-200' };
+            } else if (duration <= t2) {
+                return { bg: 'bg-stone-300', text: 'text-stone-800', border: 'border-stone-300' };
+            } else {
+                return { bg: 'bg-stone-500', text: 'text-white', border: 'border-stone-500' };
+            }
+        } else {
+            if (duration <= 1800) {
+                return { bg: 'bg-stone-100', text: 'text-stone-600', border: 'border-stone-200' };
+            } else if (duration <= 7200) {
+                return { bg: 'bg-stone-300', text: 'text-stone-800', border: 'border-stone-300' };
+            } else if (duration <= 14400) {
+                return { bg: 'bg-stone-500', text: 'text-white', border: 'border-stone-500' };
+            } else {
+                return { bg: 'bg-stone-700', text: 'text-white', border: 'border-stone-700' };
+            }
+        }
+    };
+
     return (
         <>
             {viewMode === 'month' ? (
-                <div className="bg-white rounded-[2rem] p-0 mb-8 border border-stone-100 shadow-[0_4px_20px_rgba(0,0,0,0.02)] overflow-hidden">
-                    <CalendarWidget
-                        currentDate={displayDate}
-                        onDateChange={(newDate) => {
-                            // Only update if month/year changes to allow navigation
-                            if (newDate.getMonth() !== displayDate.getMonth() || newDate.getFullYear() !== displayDate.getFullYear()) {
-                                onDateChange(newDate);
-                            }
-                        }}
-                        logs={filteredLogs}
-                        isExpanded={true}
-                        onExpandToggle={() => { }}
-                        disableSelection={true}
-                        hideTopBar={true}
-                        customScale={customScale}
-                    />
+                <div className="mb-8">
+                    {/* 简洁的日历头部 - 左边月份切换，右边视图切换 */}
+                    <div className="flex items-center justify-between mb-4 px-2">
+                        {/* 左侧：月份切换 */}
+                        <div className="flex items-center gap-2">
+                            <button
+                                onClick={() => handleMonthChange(-1)}
+                                className="p-1.5 hover:bg-stone-100/50 rounded-lg transition-colors"
+                            >
+                                <ChevronLeft size={18} className="text-stone-600" />
+                            </button>
+                            <span className="text-lg font-bold text-stone-800 font-mono min-w-[100px] text-center">
+                                {displayDate.getFullYear()}.{String(displayDate.getMonth() + 1).padStart(2, '0')}
+                            </span>
+                            <button
+                                onClick={() => handleMonthChange(1)}
+                                className="p-1.5 hover:bg-stone-100/50 rounded-lg transition-colors"
+                            >
+                                <ChevronRight size={18} className="text-stone-600" />
+                            </button>
+                        </div>
 
-                    <div className="px-6 pb-6 pt-2 flex flex-wrap gap-y-4 items-end justify-between">
-                        <div>
-                            <div className="text-[10px] uppercase tracking-widest text-stone-400 mb-1 font-bold">Total Time</div>
-                            <div className="text-2xl font-bold text-stone-900 font-mono">
-                                {totalHours}<span className="text-base text-stone-400 mx-1 font-sans">h</span>{totalMins}<span className="text-base text-stone-400 ml-1 font-sans">m</span>
-                                <span className="text-lg text-stone-300 mx-2 font-sans">/</span>
-                                <span className="text-lg font-bold text-stone-600">
-                                    {monthHours}<span className="text-sm text-stone-400 mx-1 font-sans">h</span>{monthMins}<span className="text-sm text-stone-400 ml-1 font-sans">m</span>
-                                </span>
-                            </div>
+                        {/* 右侧：视图切换 */}
+                        <div className="flex bg-stone-100/50 p-0.5 rounded-lg">
+                            <button
+                                onClick={() => setCalendarViewMode('heatmap')}
+                                className={`p-2 rounded-md transition-all ${
+                                    calendarViewMode === 'heatmap'
+                                        ? 'bg-white text-stone-900 shadow-sm'
+                                        : 'text-stone-400 hover:text-stone-600'
+                                }`}
+                                title="热力图"
+                            >
+                                <Grid size={16} />
+                            </button>
+                            <button
+                                onClick={() => setCalendarViewMode('gallery')}
+                                className={`p-2 rounded-md transition-all ${
+                                    calendarViewMode === 'gallery'
+                                        ? 'bg-white text-stone-900 shadow-sm'
+                                        : 'text-stone-400 hover:text-stone-600'
+                                }`}
+                                title="画廊"
+                            >
+                                <ImageIcon size={16} />
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* 日历主体 - 统一的网格布局 */}
+                    <div className="mb-6">
+                        {/* 星期标题 */}
+                        <div className="grid grid-cols-7 gap-2 mb-2 px-2">
+                            {['周日', '周一', '周二', '周三', '周四', '周五', '周六'].map(day => (
+                                <div key={day} className="text-center text-[10px] font-medium text-stone-400">
+                                    {day}
+                                </div>
+                            ))}
+                        </div>
+                        
+                        {/* 日历格子 */}
+                        <div className="grid grid-cols-7 gap-2 px-2">
+                            {(() => {
+                                const year = displayDate.getFullYear();
+                                const month = displayDate.getMonth();
+                                const firstDay = new Date(year, month, 1);
+                                const daysInMonth = new Date(year, month + 1, 0).getDate();
+                                const startDay = firstDay.getDay(); // 0 = Sunday
+                                
+                                const cells = [];
+                                
+                                // 填充前面的空白
+                                for (let i = 0; i < startDay; i++) {
+                                    cells.push(<div key={`empty-${i}`} />);
+                                }
+                                
+                                // 填充日期
+                                for (let day = 1; day <= daysInMonth; day++) {
+                                    const data = calendarData.get(day);
+                                    const hasData = data && data.duration > 0;
+                                    
+                                    if (calendarViewMode === 'gallery') {
+                                        // 画廊视图
+                                        const images = data?.images || [];
+                                        const firstImage = images.length > 0 ? images[0] : null;
+                                        
+                                        cells.push(
+                                            <div
+                                                key={day}
+                                                className="aspect-square rounded-lg overflow-hidden relative group cursor-pointer"
+                                            >
+                                                {firstImage ? (
+                                                    // 有图片：显示第一张图片，日期居中
+                                                    <div className="w-full h-full relative">
+                                                        <TimelineImage 
+                                                            filename={firstImage} 
+                                                            className="w-full h-full object-cover"
+                                                            useThumbnail={true}
+                                                        />
+                                                        <span className="absolute inset-0 flex items-center justify-center text-white text-sm font-medium drop-shadow-lg">
+                                                            {day}
+                                                        </span>
+                                                    </div>
+                                                ) : hasData ? (
+                                                    // 有数据但没图片：显示浅色背景
+                                                    <div className="w-full h-full bg-stone-100 flex items-center justify-center">
+                                                        <span className="text-sm font-medium text-stone-600">{day}</span>
+                                                    </div>
+                                                ) : (
+                                                    // 无数据：显示空白
+                                                    <div className="w-full h-full bg-stone-50 flex items-center justify-center">
+                                                        <span className="text-sm font-medium text-stone-300">{day}</span>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        );
+                                    } else {
+                                        // 热力图视图
+                                        const colors = getHeatmapColor(data?.duration || 0);
+                                        cells.push(
+                                            <div
+                                                key={day}
+                                                className={`aspect-square rounded-lg flex items-center justify-center border transition-colors ${colors.bg} ${colors.text} ${colors.border}`}
+                                            >
+                                                <span className="text-sm font-medium">{day}</span>
+                                            </div>
+                                        );
+                                    }
+                                }
+                                
+                                return cells;
+                            })()}
+                        </div>
+                    </div>
+
+                    {/* 统计信息 - 简洁版本 */}
+                    <div className="px-2 space-y-3">
+                        {/* Total Time */}
+                        <div className="flex items-baseline gap-2">
+                            <span className="text-xs font-medium text-stone-400 uppercase tracking-wider">Total</span>
+                            <div className="flex-1 border-b border-dotted border-stone-200" />
+                            <span className="text-lg font-bold text-stone-900 font-mono">
+                                {totalHours}<span className="text-sm text-stone-400 mx-0.5">h</span>
+                                {totalMins}<span className="text-sm text-stone-400 ml-0.5">m</span>
+                            </span>
+                            <span className="text-stone-300">/</span>
+                            <span className="text-base font-bold text-stone-600 font-mono">
+                                {monthHours}<span className="text-xs text-stone-400 mx-0.5">h</span>
+                                {monthMins}<span className="text-xs text-stone-400 ml-0.5">m</span>
+                            </span>
+                        </div>
+
+                        {/* Average Daily */}
+                        <div className="flex items-baseline gap-2">
+                            <span className="text-xs font-medium text-stone-400 uppercase tracking-wider">Avg</span>
+                            <div className="flex-1 border-b border-dotted border-stone-200" />
                             {(() => {
                                 const totalDays = new Set(filteredLogs.map(l => new Date(l.startTime).toDateString())).size;
                                 const monthDays = new Set(monthLogs.map(l => new Date(l.startTime).toDateString())).size;
+                                const avgTotal = totalDays > 0 ? Math.round(totalSeconds / 60 / totalDays) : 0;
+                                const avgMonth = monthDays > 0 ? Math.round(monthSeconds / 60 / monthDays) : 0;
                                 return (
-                                    <div className="text-[10px] font-bold text-stone-500 bg-stone-100 px-2 py-1 rounded inline-block mt-1">
-                                        Recorded {totalDays} days / {monthDays} days
-                                    </div>
+                                    <>
+                                        <span className="text-lg font-bold text-stone-900 font-mono">{avgTotal}m</span>
+                                        <span className="text-stone-300">/</span>
+                                        <span className="text-base font-bold text-stone-600 font-mono">{avgMonth}m</span>
+                                    </>
                                 );
                             })()}
-                        </div>
-                        <div className="text-right ml-auto">
-                            <div className="text-[10px] uppercase tracking-widest text-stone-400 mb-1 font-bold">Avg. Daily</div>
-                            <div className="text-xl font-bold text-stone-700 font-mono">
-                                {(() => {
-                                    const totalDays = new Set(filteredLogs.map(l => new Date(l.startTime).toDateString())).size;
-                                    const monthDays = new Set(monthLogs.map(l => new Date(l.startTime).toDateString())).size;
-                                    const avgTotal = totalDays > 0 ? Math.round(totalSeconds / 60 / totalDays) : 0;
-                                    const avgMonth = monthDays > 0 ? Math.round(monthSeconds / 60 / monthDays) : 0;
-                                    return (
-                                        <>
-                                            {avgTotal}m
-                                            <span className="text-base text-stone-400 mx-2 font-sans">/</span>
-                                            <span className="text-base font-bold text-stone-600">{avgMonth}m</span>
-                                        </>
-                                    );
-                                })()}
-                            </div>
                         </div>
                     </div>
                 </div>
