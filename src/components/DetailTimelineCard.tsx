@@ -37,6 +37,9 @@ interface DetailTimelineCardProps {
     renderLogMetadata?: (log: Log) => React.ReactNode;
     // 默认视图模式 (默认 'month')
     defaultViewMode?: 'month' | 'all';
+    
+    // 待办列表（用于获取 Cover Image）
+    todos?: import('../types').TodoItem[];
 }
 
 export const DetailTimelineCard: React.FC<DetailTimelineCardProps> = ({
@@ -48,7 +51,8 @@ export const DetailTimelineCard: React.FC<DetailTimelineCardProps> = ({
     onEditLog,
     categories,
     renderLogMetadata,
-    defaultViewMode = 'month'
+    defaultViewMode = 'month',
+    todos = []
 }) => {
     const [viewMode, setViewMode] = React.useState<'month' | 'all'>(defaultViewMode);
     const [calendarViewMode, setCalendarViewMode] = React.useState<'heatmap' | 'gallery'>('heatmap');
@@ -61,6 +65,31 @@ export const DetailTimelineCard: React.FC<DetailTimelineCardProps> = ({
         const d = new Date(log.startTime);
         return d.getMonth() === displayMonth && d.getFullYear() === displayYear;
     }), [filteredLogs, displayMonth, displayYear]);
+
+    // 智能判断初始视图：检测当月是否有足够的图片
+    React.useEffect(() => {
+        let imageCount = 0;
+        
+        monthLogs.forEach(log => {
+            // 统计记录本身的图片
+            if (log.images && log.images.length > 0) {
+                imageCount += log.images.length;
+            } else if (log.linkedTodoId && todos && todos.length > 0) {
+                // 统计关联待办的 Cover Image
+                const linkedTodo = todos.find(t => t.id === log.linkedTodoId);
+                if (linkedTodo?.coverImage) {
+                    imageCount += 1;
+                }
+            }
+        });
+
+        // 如果图片总数大于 3，优先显示画廊视图
+        if (imageCount > 3) {
+            setCalendarViewMode('gallery');
+        } else {
+            setCalendarViewMode('heatmap');
+        }
+    }, [monthLogs, todos, displayMonth, displayYear]); // 当月份变化时重新判断
 
     // 显示日志：根据模式选择
     const logsToDisplay = viewMode === 'month' ? monthLogs : filteredLogs;
@@ -130,6 +159,12 @@ export const DetailTimelineCard: React.FC<DetailTimelineCardProps> = ({
                         current.images.push(img);
                     }
                 });
+            } else if (log.linkedTodoId && todos && todos.length > 0) {
+                // 如果记录没有图片，但关联了待办，尝试获取待办的 Cover Image
+                const linkedTodo = todos.find(t => t.id === log.linkedTodoId);
+                if (linkedTodo?.coverImage && !current.images.includes(linkedTodo.coverImage)) {
+                    current.images.push(linkedTodo.coverImage);
+                }
             }
             
             // 累计专注分数
@@ -143,7 +178,7 @@ export const DetailTimelineCard: React.FC<DetailTimelineCardProps> = ({
         });
         
         return map;
-    }, [monthLogs, displayDate]);
+    }, [monthLogs, displayDate, todos]);
 
     const handleMonthChange = (offset: number) => {
         const newDate = new Date(displayDate);
