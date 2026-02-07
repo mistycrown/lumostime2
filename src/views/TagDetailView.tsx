@@ -12,7 +12,6 @@ import { Log, Category, Activity, TodoItem } from '../types';
 import { COLOR_OPTIONS } from '../constants';
 import { CalendarWidget } from '../components/CalendarWidget';
 import { ArrowLeft, Clock, Calendar as CalendarIcon, MoreHorizontal, ChevronDown, Check, X, Zap, Save, CheckCircle2, Circle, Plus } from 'lucide-react';
-import { FocusCharts } from '../components/FocusCharts';
 import { DateRangeFilter } from '../components/DateRangeFilter';
 import { MatrixAnalysisChart } from '../components/MatrixAnalysisChart';
 import { Scope } from '../types';
@@ -49,7 +48,6 @@ export const TagDetailView: React.FC<TagDetailViewProps> = ({ tagId, logs, todos
    // Local state for editing (simulated)
    const [activity, setActivity] = useState<Activity | undefined>(initialActivity);
    const [category, setCategory] = useState<Category | undefined>(initialCategory);
-   const [isSaveSuccess, setIsSaveSuccess] = useState(false);
 
    // State
    const [activeTab, setActiveTab] = useState('Timeline');
@@ -59,6 +57,25 @@ export const TagDetailView: React.FC<TagDetailViewProps> = ({ tagId, logs, todos
    const [newKeyword, setNewKeyword] = useState(''); // New State for adding keyword
    const [expandedKeywords, setExpandedKeywords] = useState<Set<string>>(new Set()); // Track expanded keyword sections
    const [isCategoryDropdownOpen, setIsCategoryDropdownOpen] = useState(false); // State for category dropdown
+
+   // 实时保存：当 activity 状态变化时自动保存
+   useEffect(() => {
+      if (activity && initialActivity) {
+         // 检查是否有实际变化
+         const hasChanges = 
+            activity.name !== initialActivity.name ||
+            activity.icon !== initialActivity.icon ||
+            activity.color !== initialActivity.color ||
+            activity.heatmapMin !== initialActivity.heatmapMin ||
+            activity.heatmapMax !== initialActivity.heatmapMax ||
+            activity.enableFocusScore !== initialActivity.enableFocusScore ||
+            JSON.stringify(activity.keywords) !== JSON.stringify(initialActivity.keywords);
+         
+         if (hasChanges) {
+            onUpdateActivity(activity);
+         }
+      }
+   }, [activity]); // 只监听 activity 变化
 
    // Sync state when categories prop changes (e.g., after save)
    useEffect(() => {
@@ -338,6 +355,84 @@ export const TagDetailView: React.FC<TagDetailViewProps> = ({ tagId, logs, todos
                               )}
                            </div>
                         </div>
+
+                        {/* Focus Score Setting */}
+                        <div>
+                           <label className="text-xs text-stone-400 font-medium mb-1.5 block">Focus Score</label>
+                           <div className="flex bg-stone-100 p-1 rounded-xl">
+                              {[
+                                 { value: 'inherit', label: 'Inherit' },
+                                 { value: 'true', label: 'On' },
+                                 { value: 'false', label: 'Off' }
+                              ].map((option) => {
+                                 const currentValue = activity.enableFocusScore === undefined ? 'inherit' : activity.enableFocusScore.toString();
+                                 const isSelected = currentValue === option.value;
+
+                                 let labelNode = <span className="text-xs font-bold">{option.label}</span>;
+                                 if (option.value === 'inherit') {
+                                    labelNode = (
+                                       <div className="flex flex-col items-center leading-none">
+                                          <span className="text-xs font-bold">Inherit</span>
+                                          <span className="text-[9px] opacity-60 mt-0.5">
+                                             (Cat: {category?.enableFocusScore ? 'On' : 'Off'})
+                                          </span>
+                                       </div>
+                                    );
+                                 }
+
+                                 return (
+                                    <button
+                                       key={option.value}
+                                       onClick={() => {
+                                          let newVal: boolean | undefined = undefined;
+                                          if (option.value === 'true') newVal = true;
+                                          if (option.value === 'false') newVal = false;
+                                          setActivity({ ...activity, enableFocusScore: newVal });
+                                       }}
+                                       className={`
+                                            flex-1 flex items-center justify-center py-2 rounded-lg transition-all
+                                          ${isSelected
+                                             ? 'bg-white text-stone-900 shadow-sm ring-1 ring-black/5'
+                                             : 'text-stone-400 hover:text-stone-600 hover:bg-stone-200/50'
+                                          }
+`}
+                                       title={option.value === 'inherit' ? `Inherit from Category(${category?.enableFocusScore ? 'Enabled' : 'Disabled'})` : ''}
+                                    >
+                                       {labelNode}
+                                    </button>
+                                 );
+                              })}
+                           </div>
+                        </div>
+
+                        {/* Heatmap Scale */}
+                        <div>
+                           <label className="text-xs text-stone-400 font-medium mb-1.5 block">Heatmap Scale (Minutes)</label>
+                           <div className="flex gap-4">
+                              <div className="flex-1">
+                                 <label className="text-xs text-stone-400 font-medium mb-1.5 block">Min (Lightest)</label>
+                                 <input
+                                    type="number"
+                                    min={0}
+                                    value={activity.heatmapMin ?? ''}
+                                    onChange={(e) => setActivity({ ...activity, heatmapMin: parseInt(e.target.value) || undefined })}
+                                    placeholder="Default: 0"
+                                    className="w-full bg-stone-50 border border-stone-200 rounded-xl px-4 py-3 text-stone-800 font-bold outline-none focus:border-stone-400 transition-colors"
+                                 />
+                              </div>
+                              <div className="flex-1">
+                                 <label className="text-xs text-stone-400 font-medium mb-1.5 block">Max (Darkest)</label>
+                                 <input
+                                    type="number"
+                                    min={0}
+                                    value={activity.heatmapMax ?? ''}
+                                    onChange={(e) => setActivity({ ...activity, heatmapMax: parseInt(e.target.value) || undefined })}
+                                    placeholder="Default: 240"
+                                    className="w-full bg-stone-50 border border-stone-200 rounded-xl px-4 py-3 text-stone-800 font-bold outline-none focus:border-stone-400 transition-colors"
+                                 />
+                              </div>
+                           </div>
+                        </div>
                      </div>
                   </div>
 
@@ -406,111 +501,6 @@ export const TagDetailView: React.FC<TagDetailViewProps> = ({ tagId, logs, todos
                         </div>
                      </div>
                   </div>
-
-                  <div className="bg-white rounded-2xl p-6 border border-stone-100 shadow-sm">
-                     <h3 className="text-sm font-bold text-stone-400 uppercase tracking-widest mb-4">Heatmap Scale (Minutes)</h3>
-                     <div className="flex gap-4">
-                        <div className="flex-1">
-                           <label className="text-xs text-stone-400 font-medium mb-1.5 block">Min (Lightest)</label>
-                           <input
-                              type="number"
-                              min={0}
-                              value={activity.heatmapMin ?? ''}
-                              onChange={(e) => setActivity({ ...activity, heatmapMin: parseInt(e.target.value) || undefined })}
-                              placeholder="Default: 0"
-                              className="w-full bg-stone-50 border border-stone-200 rounded-xl px-4 py-3 text-stone-800 font-bold outline-none focus:border-stone-400 transition-colors"
-                           />
-                        </div>
-                        <div className="flex-1">
-                           <label className="text-xs text-stone-400 font-medium mb-1.5 block">Max (Darkest)</label>
-                           <input
-                              type="number"
-                              min={0}
-                              value={activity.heatmapMax ?? ''}
-                              onChange={(e) => setActivity({ ...activity, heatmapMax: parseInt(e.target.value) || undefined })}
-                              placeholder="Default: 240"
-                              className="w-full bg-stone-50 border border-stone-200 rounded-xl px-4 py-3 text-stone-800 font-bold outline-none focus:border-stone-400 transition-colors"
-                           />
-                        </div>
-                     </div>
-                  </div>
-
-                  {/* Focus Score Settings */}
-                  <div className="bg-white rounded-2xl p-6 border border-stone-100 shadow-sm">
-                     <h3 className="text-sm font-bold text-stone-400 uppercase tracking-widest mb-4">Focus Score</h3>
-                     <div className="space-y-4">
-                        <div>
-                           <div className="flex bg-stone-100 p-1 rounded-xl">
-                              {[
-                                 { value: 'inherit', label: 'Inherit' },
-                                 { value: 'true', label: 'On' },
-                                 { value: 'false', label: 'Off' }
-                              ].map((option) => {
-                                 const currentValue = activity.enableFocusScore === undefined ? 'inherit' : activity.enableFocusScore.toString();
-                                 const isSelected = currentValue === option.value;
-
-                                 // Add status text for Inherit option
-                                 let labelNode = <span className="text-xs font-bold">{option.label}</span>;
-                                 if (option.value === 'inherit') {
-                                    labelNode = (
-                                       <div className="flex flex-col items-center leading-none">
-                                          <span className="text-xs font-bold">Inherit</span>
-                                          <span className="text-[9px] opacity-60 mt-0.5">
-                                             (Cat: {category?.enableFocusScore ? 'On' : 'Off'})
-                                          </span>
-                                       </div>
-                                    );
-                                 }
-
-                                 return (
-                                    <button
-                                       key={option.value}
-                                       onClick={() => {
-                                          let newVal: boolean | undefined = undefined;
-                                          if (option.value === 'true') newVal = true;
-                                          if (option.value === 'false') newVal = false;
-                                          setActivity({ ...activity, enableFocusScore: newVal });
-                                       }}
-                                       className={`
-                                            flex-1 flex items-center justify-center py-2 rounded-lg transition-all
-                                          ${isSelected
-                                             ? 'bg-white text-stone-900 shadow-sm ring-1 ring-black/5'
-                                             : 'text-stone-400 hover:text-stone-600 hover:bg-stone-200/50'
-                                          }
-`}
-                                       title={option.value === 'inherit' ? `Inherit from Category(${category?.enableFocusScore ? 'Enabled' : 'Disabled'})` : ''}
-                                    >
-                                       {labelNode}
-                                    </button>
-                                 );
-                              })}
-                           </div>
-                        </div>
-                     </div>
-                  </div>
-
-                  <button
-                     onClick={() => {
-                        if (activity) {
-                           onUpdateActivity(activity);
-                           setIsSaveSuccess(true);
-                           setTimeout(() => setIsSaveSuccess(false), 2000);
-                        }
-                     }}
-                     className={`w-full py-4 rounded-xl font-bold text-lg shadow-xl active:scale-[0.99] transition-all flex items-center justify-center gap-2 ${isSaveSuccess ? 'bg-[#2F4F4F] text-white' : 'bg-stone-900 text-white hover:bg-black'}`}
-                  >
-                     {isSaveSuccess ? (
-                        <>
-                           <Check size={20} />
-                           <span>Saved Successfully</span>
-                        </>
-                     ) : (
-                        <>
-                           <Save size={20} />
-                           <span>Save Changes</span>
-                        </>
-                     )}
-                  </button>
                </div>
             );
          case 'Timeline':
@@ -656,14 +646,6 @@ export const TagDetailView: React.FC<TagDetailViewProps> = ({ tagId, logs, todos
                      />
                   </div>
                </div>
-            );
-         case 'Focus':
-            return (
-               <FocusCharts
-                  logs={tagLogs}
-                  currentDate={displayDate}
-                  onDateChange={setDisplayDate}
-               />
             );
          case 'Keywords':
             return (
@@ -887,7 +869,6 @@ export const TagDetailView: React.FC<TagDetailViewProps> = ({ tagId, logs, todos
          {/* Tabs */}
          <div className="flex gap-6 border-b border-stone-200 mb-8 overflow-x-auto no-scrollbar">
             {['Details', 'Timeline', '关联']
-               .concat((activity.enableFocusScore ?? category.enableFocusScore) ? ['Focus'] : [])
                .concat((activity.keywords && activity.keywords.length > 0) ? ['Keywords'] : [])
                .map((tab) => (
                   <button
@@ -895,7 +876,7 @@ export const TagDetailView: React.FC<TagDetailViewProps> = ({ tagId, logs, todos
                      onClick={() => setActiveTab(tab)}
                      className={`pb-3 text-sm font-serif tracking-wide whitespace-nowrap transition-colors ${activeTab === tab ? 'text-stone-900 border-b-2 border-stone-900 font-bold' : 'text-stone-400 hover:text-stone-600'}`}
                   >
-                     {tab === 'Timeline' ? '時間線' : tab === 'Details' ? '细节' : tab === 'Focus' ? '专 注' : tab === 'Keywords' ? '关键字' : tab}
+                     {tab === 'Timeline' ? '時間線' : tab === 'Details' ? '细节' : tab === 'Keywords' ? '关键字' : tab}
                   </button>
                ))}
          </div>

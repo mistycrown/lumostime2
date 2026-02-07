@@ -349,10 +349,11 @@ export const DetailTimelineCard: React.FC<DetailTimelineCardProps> = ({
                                     } else {
                                         // 热力图视图
                                         const colors = getHeatmapColor(data?.duration || 0);
+                                        
                                         cells.push(
                                             <div
                                                 key={day}
-                                                className={`aspect-square rounded-lg flex items-center justify-center border transition-colors ${colors.bg} ${colors.text} ${colors.border}`}
+                                                className={`aspect-square rounded-lg flex items-center justify-center transition-colors ${colors.bg} ${colors.text} border ${colors.border}`}
                                             >
                                                 <span className="text-sm font-medium">{day}</span>
                                             </div>
@@ -371,12 +372,12 @@ export const DetailTimelineCard: React.FC<DetailTimelineCardProps> = ({
                         <div className="flex items-baseline gap-2">
                             <span className="text-xs font-medium text-stone-400 uppercase tracking-wider">Total</span>
                             <div className="flex-1 border-b border-dotted border-stone-200" />
-                            <span className="text-lg font-bold text-stone-900 font-mono">
+                            <span className="text-lg font-bold text-stone-900">
                                 {totalHours}<span className="text-sm text-stone-400 mx-0.5">h</span>
                                 {totalMins}<span className="text-sm text-stone-400 ml-0.5">m</span>
                             </span>
                             <span className="text-stone-300">/</span>
-                            <span className="text-base font-bold text-stone-600 font-mono">
+                            <span className="text-base font-bold text-stone-600">
                                 {monthHours}<span className="text-xs text-stone-400 mx-0.5">h</span>
                                 {monthMins}<span className="text-xs text-stone-400 ml-0.5">m</span>
                             </span>
@@ -393,13 +394,110 @@ export const DetailTimelineCard: React.FC<DetailTimelineCardProps> = ({
                                 const avgMonth = monthDays > 0 ? Math.round(monthSeconds / 60 / monthDays) : 0;
                                 return (
                                     <>
-                                        <span className="text-lg font-bold text-stone-900 font-mono">{avgTotal}m</span>
+                                        <span className="text-lg font-bold text-stone-900">{avgTotal}m</span>
                                         <span className="text-stone-300">/</span>
-                                        <span className="text-base font-bold text-stone-600 font-mono">{avgMonth}m</span>
+                                        <span className="text-base font-bold text-stone-600">{avgMonth}m</span>
                                     </>
                                 );
                             })()}
                         </div>
+
+                        {/* Focus Score Distribution */}
+                        {(() => {
+                            // 计算当月专注度分布
+                            const focusDistribution = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
+                            let totalFocusTime = 0;
+                            
+                            monthLogs.forEach(log => {
+                                if (log.focusScore && log.focusScore >= 1 && log.focusScore <= 5) {
+                                    focusDistribution[log.focusScore as 1 | 2 | 3 | 4 | 5] += log.duration;
+                                    totalFocusTime += log.duration;
+                                }
+                            });
+                            
+                            // 如果有专注度数据，显示分布图
+                            if (totalFocusTime > 0) {
+                                const percentages = {
+                                    1: (focusDistribution[1] / totalFocusTime) * 100,
+                                    2: (focusDistribution[2] / totalFocusTime) * 100,
+                                    3: (focusDistribution[3] / totalFocusTime) * 100,
+                                    4: (focusDistribution[4] / totalFocusTime) * 100,
+                                    5: (focusDistribution[5] / totalFocusTime) * 100,
+                                };
+                                
+                                return (
+                                    <div className="flex flex-col gap-1.5">
+                                        <div className="flex items-baseline gap-2">
+                                            <span className="text-xs font-medium text-stone-400 uppercase tracking-wider">Focus</span>
+                                            <div className="flex-1 border-b border-dotted border-stone-200" />
+                                            <span className="text-xs font-medium text-stone-400">
+                                                {Math.floor(totalFocusTime / 3600)}h {Math.floor((totalFocusTime % 3600) / 60)}m
+                                            </span>
+                                        </div>
+                                        
+                                        {/* 水平堆叠条形图 - 更淡的颜色 */}
+                                        <div className="flex h-6 rounded-lg overflow-hidden">
+                                            {percentages[1] > 0 && (
+                                                <div 
+                                                    className="bg-red-100 flex items-center justify-center transition-all hover:opacity-80"
+                                                    style={{ width: `${percentages[1]}%` }}
+                                                    title={`专注度1: ${Math.round(percentages[1])}%`}
+                                                >
+                                                    {percentages[1] > 8 && (
+                                                        <span className="text-[10px] font-bold text-red-600">1</span>
+                                                    )}
+                                                </div>
+                                            )}
+                                            {percentages[2] > 0 && (
+                                                <div 
+                                                    className="bg-orange-100 flex items-center justify-center transition-all hover:opacity-80"
+                                                    style={{ width: `${percentages[2]}%` }}
+                                                    title={`专注度2: ${Math.round(percentages[2])}%`}
+                                                >
+                                                    {percentages[2] > 8 && (
+                                                        <span className="text-[10px] font-bold text-orange-600">2</span>
+                                                    )}
+                                                </div>
+                                            )}
+                                            {percentages[3] > 0 && (
+                                                <div 
+                                                    className="bg-amber-100 flex items-center justify-center transition-all hover:opacity-80"
+                                                    style={{ width: `${percentages[3]}%` }}
+                                                    title={`专注度3: ${Math.round(percentages[3])}%`}
+                                                >
+                                                    {percentages[3] > 8 && (
+                                                        <span className="text-[10px] font-bold text-amber-600">3</span>
+                                                    )}
+                                                </div>
+                                            )}
+                                            {percentages[4] > 0 && (
+                                                <div 
+                                                    className="bg-lime-100 flex items-center justify-center transition-all hover:opacity-80"
+                                                    style={{ width: `${percentages[4]}%` }}
+                                                    title={`专注度4: ${Math.round(percentages[4])}%`}
+                                                >
+                                                    {percentages[4] > 8 && (
+                                                        <span className="text-[10px] font-bold text-lime-600">4</span>
+                                                    )}
+                                                </div>
+                                            )}
+                                            {percentages[5] > 0 && (
+                                                <div 
+                                                    className="bg-green-200 flex items-center justify-center transition-all hover:opacity-80"
+                                                    style={{ width: `${percentages[5]}%` }}
+                                                    title={`专注度5: ${Math.round(percentages[5])}%`}
+                                                >
+                                                    {percentages[5] > 8 && (
+                                                        <span className="text-[10px] font-bold text-green-600">5</span>
+                                                    )}
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                );
+                            }
+                            return null;
+                        })()}
                     </div>
                 </div>
             ) : (
