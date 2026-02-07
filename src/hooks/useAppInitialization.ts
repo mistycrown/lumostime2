@@ -30,20 +30,16 @@ export const useAppInitialization = () => {
         loadAppRules();
     }, []);
 
-    // Check for Updates on Mount
+    // Check for Updates on Mount (with 24h interval)
     useEffect(() => {
         const checkUpdates = async () => {
-            console.log('App: checking for updates...');
             try {
                 const updateInfo = await UpdateService.checkNeedsUpdate();
                 if (updateInfo) {
                     addToast('info', `发现新版本: ${updateInfo.version}`);
-                    console.log('App: Update found', updateInfo);
-                } else {
-                    console.log('App check: No updates found (System is up to date)');
                 }
             } catch (e) {
-                console.error('App: Update check failed', e);
+                // 静默处理更新检查失败
             }
         };
         checkUpdates();

@@ -102,17 +102,6 @@ export const ReviewHubView: React.FC<ReviewHubViewProps> = ({
         return { title, body: body || 'Tap to view details...' };
     };
 
-    // Deterministic Style Generator based on Date/ID
-    const getDailyStyle = (dateStr: string) => {
-        const styles = ['stoic', 'director', 'game', 'simple'];
-        let hash = 0;
-        for (let i = 0; i < dateStr.length; i++) {
-            hash = dateStr.charCodeAt(i) + ((hash << 5) - hash);
-        }
-        const index = Math.abs(hash) % styles.length;
-        return styles[index];
-    };
-
     // Get Week Number (ISO 8601: Week 1 is the week with the year's first Thursday)
     const getWeekNumber = (d: Date) => {
         // Copy date so we don't mutate the original
@@ -265,12 +254,23 @@ export const ReviewHubView: React.FC<ReviewHubViewProps> = ({
                                     <article
                                         key={m.id}
                                         onClick={() => onOpenMonthlyReview(new Date(m.monthStartDate), new Date(m.monthEndDate))}
-                                        className="flex-none w-[90%] snap-center bg-white/80 backdrop-blur-md border border-stone-900 border-t-[4px] border-t-stone-900 rounded-lg p-6 relative shadow-[2px_2px_10px_rgba(0,0,0,0.05)] active:scale-[0.98] transition-transform"
+                                        className="flex-none w-[90%] snap-center bg-white/80 backdrop-blur-md border rounded-lg p-6 relative shadow-[2px_2px_10px_rgba(0,0,0,0.05)] active:scale-[0.98] transition-transform"
+                                        style={{
+                                            borderColor: 'var(--progress-bar-fill)',
+                                            borderTopWidth: '4px'
+                                        }}
                                     >
                                         <div className="mb-4">
                                             <div className="flex justify-between items-center mb-1">
                                                 <h3 className="font-serif text-2xl font-extrabold text-stone-900 m-0">{monthName}</h3>
-                                                <div className={`border border-stone-900 px-2 py-1 text-[10px] font-bold uppercase rounded flex whitespace-nowrap ${!isCurrentMonth ? 'bg-stone-900 text-white' : 'bg-transparent text-stone-900'}`}>
+                                                <div 
+                                                    className={`border px-2 py-1 text-[10px] font-bold uppercase rounded flex whitespace-nowrap`}
+                                                    style={{
+                                                        borderColor: 'var(--progress-bar-fill)',
+                                                        backgroundColor: !isCurrentMonth ? 'var(--progress-bar-fill)' : 'transparent',
+                                                        color: !isCurrentMonth ? 'white' : 'var(--progress-bar-fill)'
+                                                    }}
+                                                >
                                                     {isCurrentMonth ? 'CURRENT' : 'PAST'}
                                                 </div>
                                             </div>
@@ -313,31 +313,29 @@ export const ReviewHubView: React.FC<ReviewHubViewProps> = ({
                                 const weekNum = getWeekNumber(midWeekDate);
 
                                 const { title } = parseNarrative(w.narrative);
-                                // Alternating dark/light style roughly based on index
-                                const isDark = idx % 2 === 0;
 
                                 // Format: 2025/12/08-12/14
                                 const dateRangeStr = `${startDate.getFullYear()}/${(startDate.getMonth() + 1).toString().padStart(2, '0')}/${startDate.getDate().toString().padStart(2, '0')}-${(endDate.getMonth() + 1).toString().padStart(2, '0')}/${endDate.getDate().toString().padStart(2, '0')}`;
 
                                 // Check if current week
                                 const now = new Date();
-                                // Normalize to start of days for comparison?
-                                // Simple check: is now between start and end?
                                 const isCurrentWeek = now.getTime() >= startDate.getTime() && now.getTime() <= endDate.getTime();
 
                                 return (
                                     <div
                                         key={w.id}
                                         onClick={() => onOpenWeeklyReview(new Date(w.weekStartDate), new Date(w.weekEndDate))}
-                                        className={`snap-start flex-none w-[calc(50%-6px)] rounded-2xl p-4 h-[140px] flex flex-col justify-between relative overflow-hidden border transition-all active:scale-95
-                 ${isDark
-                                                ? 'bg-stone-900/80 backdrop-blur-md text-white border-stone-900'
-                                                : 'bg-white/80 backdrop-blur-md text-stone-900 border-stone-200'}
-               `}
+                                        className="snap-start flex-none w-[calc(50%-6px)] rounded-2xl p-4 h-[140px] flex flex-col justify-between relative overflow-hidden border bg-white/80 backdrop-blur-md text-stone-900 border-stone-200 transition-all active:scale-95"
                                     >
                                         <div className="flex justify-between items-center">
                                             <span className="font-serif text-lg font-bold">W{weekNum}</span>
-                                            <span className={`text-[9px] uppercase opacity-60 border px-1 py-0.5 rounded ${isDark ? 'border-white' : 'border-stone-900'}`}>
+                                            <span 
+                                                className="text-[9px] uppercase opacity-60 border px-1 py-0.5 rounded"
+                                                style={{
+                                                    borderColor: 'var(--progress-bar-fill)',
+                                                    color: 'var(--progress-bar-fill)'
+                                                }}
+                                            >
                                                 {isCurrentWeek ? 'CURRENT' : 'PAST'}
                                             </span>
                                         </div>
@@ -371,22 +369,6 @@ export const ReviewHubView: React.FC<ReviewHubViewProps> = ({
                                 const monthStr = dateObj.toLocaleDateString('en-US', { month: 'short' });
                                 const weekdayStr = dateObj.toLocaleDateString('en-US', { weekday: 'short' }).toUpperCase(); // Short weekday (THU)
 
-                                const style = getDailyStyle(d.date);
-                                let contentClass = "bg-white/80 backdrop-blur-md border border-stone-100 shadow-sm";
-                                let tagClass = "border border-stone-900 bg-white/80 backdrop-blur-sm text-stone-900";
-
-                                // Tag label now shows Weekday instead of Style Name
-                                let tagLabel = weekdayStr;
-
-                                if (style === 'stoic') {
-                                    contentClass = "bg-white/80 backdrop-blur-md border-4 border-double border-stone-900";
-                                } else if (style === 'director') {
-                                    contentClass = "bg-white/80 backdrop-blur-md border-2 border-stone-900 shadow-[4px_4px_0_rgba(0,0,0,1)]";
-                                    tagClass = "bg-stone-900/80 backdrop-blur-sm text-white border-stone-900";
-                                } else if (style === 'game') {
-                                    contentClass = "bg-white/80 backdrop-blur-md border-2 border-dashed border-stone-300 shadow-sm";
-                                }
-
                                 return (
                                     <div key={d.id} className="flex gap-4 pb-4 border-b border-stone-100 last:border-0" onClick={() => onOpenDailyReview(new Date(d.date))}>
                                         {/* Date Column */}
@@ -396,13 +378,19 @@ export const ReviewHubView: React.FC<ReviewHubViewProps> = ({
                                         </div>
 
                                         {/* Content Card */}
-                                        <div className={`flex-1 min-w-0 rounded-lg p-4 ${contentClass}`}>
+                                        <div className="flex-1 min-w-0 rounded-lg p-4 bg-white/80 backdrop-blur-md border border-stone-100 shadow-sm">
                                             <div className="flex justify-between items-start mb-1.5 gap-2">
                                                 <div className="font-serif text-[17px] font-bold leading-snug text-stone-900 flex-1 min-w-0 truncate">
                                                     {title}
                                                 </div>
-                                                <span className={`text-[10px] font-bold uppercase inline-block px-1.5 py-0.5 rounded-sm shrink-0 whitespace-nowrap ${tagClass}`}>
-                                                    {tagLabel}
+                                                <span 
+                                                    className="text-[10px] font-bold uppercase inline-block px-1.5 py-0.5 rounded-sm shrink-0 whitespace-nowrap border text-white"
+                                                    style={{
+                                                        borderColor: 'var(--progress-bar-fill)',
+                                                        backgroundColor: 'var(--progress-bar-fill)'
+                                                    }}
+                                                >
+                                                    {weekdayStr}
                                                 </span>
                                             </div>
                                             <div className="text-[13px] text-stone-500 line-clamp-2 leading-relaxed">

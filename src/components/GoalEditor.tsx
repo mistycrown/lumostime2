@@ -223,9 +223,10 @@ export const GoalEditor: React.FC<GoalEditorProps> = ({ goal, scopeId, categorie
                                     key={option.value}
                                     onClick={() => setMetric(option.value)}
                                     className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all ${metric === option.value
-                                        ? 'bg-stone-900 text-white'
+                                        ? 'text-white'
                                         : 'bg-stone-100 text-stone-600 hover:bg-stone-200'
                                         }`}
+                                    style={metric === option.value ? { backgroundColor: 'var(--accent-color)' } : {}}
                                 >
                                     {option.label}
                                 </button>
@@ -325,9 +326,10 @@ export const GoalEditor: React.FC<GoalEditorProps> = ({ goal, scopeId, categorie
                                         }
                                     }}
                                     className={`px-3 py-1 rounded-full text-[10px] font-bold transition-all ${isTodoFilterEnabled
-                                        ? 'bg-stone-900 text-white'
+                                        ? 'text-white'
                                         : 'bg-stone-100 text-stone-500 hover:bg-stone-200'
                                         }`}
+                                    style={isTodoFilterEnabled ? { backgroundColor: 'var(--accent-color)' } : {}}
                                 >
                                     {isTodoFilterEnabled ? '已开启' : '关闭'}
                                 </button>
@@ -355,9 +357,10 @@ export const GoalEditor: React.FC<GoalEditorProps> = ({ goal, scopeId, categorie
                                                     className={`
                                                 px-2 py-2 rounded-lg text-[10px] font-medium text-center border transition-colors flex items-center justify-center gap-1.5 truncate
                                                 ${isSelected
-                                                            ? 'bg-stone-900 text-white border-stone-900'
+                                                            ? 'bg-stone-50 text-stone-500'
                                                             : 'bg-stone-50 text-stone-500 border-stone-100 hover:bg-stone-100'}
                                             `}
+                                                    style={isSelected ? { borderColor: 'var(--accent-color)' } : {}}
                                                 >
                                                     <span>{cat.icon}</span>
                                                     <span className="truncate">{cat.name}</span>
@@ -417,9 +420,10 @@ export const GoalEditor: React.FC<GoalEditorProps> = ({ goal, scopeId, categorie
                                             }
                                         }}
                                         className={`px-3 py-1 rounded-full text-[10px] font-bold transition-all ${isFilterEnabled
-                                            ? 'bg-stone-900 text-white'
+                                            ? 'text-white'
                                             : 'bg-stone-100 text-stone-500 hover:bg-stone-200'
                                             }`}
+                                        style={isFilterEnabled ? { backgroundColor: 'var(--accent-color)' } : {}}
                                     >
                                         {isFilterEnabled ? '已开启' : '关闭'}
                                     </button>
@@ -442,9 +446,10 @@ export const GoalEditor: React.FC<GoalEditorProps> = ({ goal, scopeId, categorie
                                                         className={`
                                                             px-2 py-2 rounded-lg text-[10px] font-medium text-center border transition-colors flex items-center justify-center gap-1.5 truncate
                                                             ${isSelected
-                                                                ? 'bg-stone-900 text-white border-stone-900'
+                                                                ? 'bg-stone-50 text-stone-500'
                                                                 : 'bg-stone-50 text-stone-500 border-stone-100 hover:bg-stone-100'}
                                                         `}
+                                                        style={isSelected ? { borderColor: 'var(--accent-color)' } : {}}
                                                     >
                                                         <span>{cat.icon}</span>
                                                         <span className="truncate">{cat.name}</span>
@@ -473,11 +478,16 @@ export const GoalEditor: React.FC<GoalEditorProps> = ({ goal, scopeId, categorie
                                                                 }}
                                                                 className="flex flex-col items-center gap-2 p-3 rounded-xl transition-all duration-200 active:scale-95 hover:bg-stone-50"
                                                             >
-                                                                <div className={`
+                                                                <div 
+                                                                    className={`
                                                             w-10 h-10 rounded-full flex items-center justify-center text-xl transition-all
-                                                            ${isActive ? 'ring-1 ring-stone-300 ring-offset-1 scale-110' : ''}
                                                             ${act.color}
-                                                        `}>
+                                                        `}
+                                                                    style={isActive ? { 
+                                                                        boxShadow: `0 0 0 1px var(--accent-color), 0 0 0 3px white, 0 0 0 4px var(--accent-color)`,
+                                                                        transform: 'scale(1.1)'
+                                                                    } : {}}
+                                                                >
                                                                     {act.icon}
                                                                 </div>
                                                                 <span className={`text-xs text-center font-medium leading-tight ${isActive ? 'text-stone-900 font-bold' : 'text-stone-400'}`}>
@@ -545,7 +555,10 @@ export const GoalEditor: React.FC<GoalEditorProps> = ({ goal, scopeId, categorie
                 <div className="sticky bottom-0 bg-white border-t border-stone-100 p-6">
                     <button
                         onClick={handleSave}
-                        className="w-full px-6 py-4 bg-stone-900 text-white rounded-2xl font-bold text-lg hover:bg-black transition-colors shadow-lg"
+                        className="w-full px-6 py-4 text-white rounded-2xl font-bold text-lg transition-colors shadow-lg"
+                        style={{ backgroundColor: 'var(--accent-color)' }}
+                        onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--accent-hover)'}
+                        onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'var(--accent-color)'}
                     >
                         {goal ? '更新目标' : '创建目标'}
                     </button>

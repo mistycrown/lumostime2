@@ -99,16 +99,18 @@ export const TodoAssociation: React.FC<TodoAssociationProps> = ({ todos, todoCat
                                             backgroundColor: linkedTodoId === todo.id ? 'transparent' : 'transparent',
                                         }}
                                     >
-                                        {linkedTodoId === todo.id ? (
-                                            <CheckCircle2 size={18} className="text-stone-900 fill-stone-100" />
-                                        ) : (
-                                            <Circle size={18} className="text-stone-300" />
-                                        )}
-                                        <div className="flex-1 truncate">
+                                        <div className="flex items-center justify-center flex-shrink-0">
+                                            {linkedTodoId === todo.id ? (
+                                                <CheckCircle2 size={18} style={{ color: 'var(--accent-color)' }} className="fill-stone-100" />
+                                            ) : (
+                                                <Circle size={18} className="text-stone-300" />
+                                            )}
+                                        </div>
+                                        <div className="flex-1 truncate flex items-center">
                                             <span className={`text-sm ${linkedTodoId === todo.id ? 'font-bold text-stone-900' : 'font-medium text-stone-500'}`}>{todo.title}</span>
                                         </div>
                                         {todo.isProgress && (
-                                            <TrendingUp size={14} className="text-stone-300" />
+                                            <TrendingUp size={14} className="text-stone-300 flex-shrink-0" />
                                         )}
                                     </button>
                                     {linkedTodoId === todo.id && renderExtraContent && (

@@ -206,7 +206,8 @@ export const FocusDetailView: React.FC<FocusDetailViewProps> = ({ session, todos
                 </button>
                 <button
                     onClick={handleComplete}
-                    className="w-12 h-12 rounded-full bg-stone-900 flex items-center justify-center text-white shadow-lg active:scale-95 transition-transform"
+                    className="w-12 h-12 rounded-full flex items-center justify-center text-white shadow-lg active:scale-95 transition-transform"
+                    style={{ backgroundColor: 'var(--accent-color)' }}
                 >
                     <Check size={24} strokeWidth={3} />
                 </button>
@@ -349,17 +350,20 @@ export const FocusDetailView: React.FC<FocusDetailViewProps> = ({ session, todos
                 {/* Smart Association Suggestion (Unified) */}
                 {hasSuggestions && (
                     <div className="w-full px-8 mb-4 animate-in slide-in-from-top-2">
-                        <div className="p-3 bg-purple-50 border border-purple-100 rounded-xl">
+                        <div className="p-3 rounded-xl" style={{ backgroundColor: 'var(--secondary-button-bg)', borderColor: 'var(--secondary-button-border)', borderWidth: '1px' }}>
                             <div className="flex items-start gap-2">
-                                <Lightbulb size={16} className="text-purple-600 mt-0.5 flex-shrink-0" />
+                                <Lightbulb size={16} className="mt-0.5 flex-shrink-0" style={{ color: 'var(--accent-color)' }} />
                                 <div className="flex-1">
-                                    <p className="text-xs font-bold text-purple-900 mb-2">建议关联</p>
+                                    <p className="text-xs font-bold mb-2" style={{ color: 'var(--accent-color)' }}>建议关联</p>
                                     <div className="flex flex-wrap gap-2">
                                         {/* Activity Suggestions */}
                                         {suggestions.activity && (
                                             <button
                                                 onClick={handleAcceptActivity}
-                                                className="flex items-center gap-1 px-2 py-1 bg-white border border-purple-200 rounded-lg text-xs font-medium text-purple-700 hover:bg-purple-100 transition-colors active:scale-95"
+                                                className="flex items-center gap-1 px-2 py-1 bg-white rounded-lg text-xs font-medium transition-colors active:scale-95"
+                                                style={{ borderColor: 'var(--accent-color)', borderWidth: '1px', color: 'var(--accent-color)' }}
+                                                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--secondary-button-hover-bg)'}
+                                                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'white'}
                                             >
                                                 <span className="opacity-70 text-[10px] mr-0.5">[{suggestions.activity.reason}]</span>
                                                 <span>{suggestions.activity.icon}</span>
@@ -372,7 +376,10 @@ export const FocusDetailView: React.FC<FocusDetailViewProps> = ({ session, todos
                                             <button
                                                 key={scope.id}
                                                 onClick={() => handleAcceptScope(scope.id)}
-                                                className="flex items-center gap-1 px-2 py-1 bg-white border border-purple-200 rounded-lg text-xs font-medium text-purple-700 hover:bg-purple-100 transition-colors active:scale-95"
+                                                className="flex items-center gap-1 px-2 py-1 bg-white rounded-lg text-xs font-medium transition-colors active:scale-95"
+                                                style={{ borderColor: 'var(--accent-color)', borderWidth: '1px', color: 'var(--accent-color)' }}
+                                                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--secondary-button-hover-bg)'}
+                                                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'white'}
                                             >
                                                 <span className="opacity-70 text-[10px] mr-0.5">[{scope.reason}]</span>
                                                 <span>{scope.icon}</span>

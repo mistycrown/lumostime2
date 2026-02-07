@@ -820,9 +820,10 @@ export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialSta
                   className={`
                         px-2 py-2 rounded-lg text-[10px] font-medium text-center border transition-colors flex items-center justify-center gap-1.5 truncate
                         ${selectedCategoryId === cat.id
-                      ? 'bg-stone-900 text-white border-stone-900'
+                      ? 'bg-stone-50 text-stone-500'
                       : 'bg-stone-50 text-stone-500 border-stone-100 hover:bg-stone-100'}
                      `}
+                  style={selectedCategoryId === cat.id ? { borderColor: 'var(--accent-color)' } : {}}
                 >
                   <span>{cat.icon}</span>
                   <span className="truncate">{cat.name}</span>
@@ -840,11 +841,16 @@ export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialSta
                     onClick={() => setSelectedActivityId(act.id)}
                     className="flex flex-col items-center gap-2 p-3 rounded-xl transition-all duration-200 active:scale-95 hover:bg-stone-50"
                   >
-                    <div className={`
+                    <div 
+                      className={`
                           w-10 h-10 rounded-full flex items-center justify-center text-xl transition-all
-                          ${isActive ? 'ring-1 ring-stone-300 ring-offset-1 scale-110' : ''}
                           ${act.color}
-                       `}>
+                       `}
+                      style={isActive ? { 
+                        boxShadow: `0 0 0 1px var(--accent-color), 0 0 0 3px white, 0 0 0 4px var(--accent-color)`,
+                        transform: 'scale(1.1)'
+                      } : {}}
+                    >
                       {act.icon}
                     </div>
                     <span className={`text-xs text-center font-medium leading-tight ${isActive ? 'text-stone-900 font-bold' : 'text-stone-400'}`}>
@@ -950,18 +956,21 @@ export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialSta
 
           {/* Smart Association Suggestion (Unified) */}
           {hasSuggestions && (
-            <div className="p-3 bg-purple-50 border border-purple-100 rounded-xl animate-in slide-in-from-top-2">
+            <div className="p-3 rounded-xl animate-in slide-in-from-top-2" style={{ backgroundColor: 'var(--secondary-button-bg)', borderColor: 'var(--secondary-button-border)', borderWidth: '1px' }}>
               <div className="flex items-start gap-2">
-                <Lightbulb size={16} className="text-purple-600 mt-0.5 flex-shrink-0" />
+                <Lightbulb size={16} className="mt-0.5 flex-shrink-0" style={{ color: 'var(--accent-color)' }} />
                 <div className="flex-1">
-                  <p className="text-xs font-bold text-purple-900 mb-2">建议关联</p>
+                  <p className="text-xs font-bold mb-2" style={{ color: 'var(--accent-color)' }}>建议关联</p>
                   <div className="flex flex-wrap gap-2">
 
                     {/* Activity Suggestions */}
                     {suggestions.activity && (
                       <button
                         onClick={handleAcceptActivity}
-                        className="flex items-center gap-1 px-2 py-1 bg-white border border-purple-200 rounded-lg text-xs font-medium text-purple-700 hover:bg-purple-100 transition-colors active:scale-95"
+                        className="flex items-center gap-1 px-2 py-1 bg-white rounded-lg text-xs font-medium transition-colors active:scale-95"
+                        style={{ borderColor: 'var(--accent-color)', borderWidth: '1px', color: 'var(--accent-color)' }}
+                        onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--secondary-button-hover-bg)'}
+                        onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'white'}
                       >
                         <span className="opacity-70 text-[10px] mr-0.5">[{suggestions.activity.reason}]</span>
                         <span>{suggestions.activity.icon}</span>
@@ -975,7 +984,10 @@ export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialSta
                       <button
                         key={scope.id}
                         onClick={() => handleAcceptScope(scope.id)}
-                        className="flex items-center gap-1 px-2 py-1 bg-white border border-purple-200 rounded-lg text-xs font-medium text-purple-700 hover:bg-purple-100 transition-colors active:scale-95"
+                        className="flex items-center gap-1 px-2 py-1 bg-white rounded-lg text-xs font-medium transition-colors active:scale-95"
+                        style={{ borderColor: 'var(--accent-color)', borderWidth: '1px', color: 'var(--accent-color)' }}
+                        onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--secondary-button-hover-bg)'}
+                        onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'white'}
                       >
                         <span className="opacity-70 text-[10px] mr-0.5">[{scope.reason}]</span>
                         <span>{scope.icon}</span>
@@ -1100,7 +1112,10 @@ export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialSta
         < div className="p-6 bg-white border-t border-stone-100" >
           <button
             onClick={handleSave}
-            className="w-full bg-stone-900 text-white py-3 rounded-xl font-bold text-base shadow-xl active:scale-[0.99] transition-all hover:bg-black"
+            className="w-full text-white py-3 rounded-xl font-bold text-base shadow-xl active:scale-[0.99] transition-all"
+            style={{ backgroundColor: 'var(--accent-color)' }}
+            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--accent-hover)'}
+            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'var(--accent-color)'}
           >
             {initialLog ? 'Update Log' : 'Save Log'}
           </button>

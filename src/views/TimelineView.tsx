@@ -1272,7 +1272,7 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ logs, todos, scopes,
                 onClick={() => onAddLog()}
                 title="Add Activity"
             >
-                <UIIcon type="add-record" fallbackIcon={Plus} size={24} className="text-white" />
+                <UIIcon type="add-record" fallbackIcon={Plus} size={24} />
             </FloatingButton>
             {
                 isAIModalOpen && (
