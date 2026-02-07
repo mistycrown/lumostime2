@@ -75,15 +75,33 @@ export const CalendarWidget: React.FC<CalendarWidgetProps> = ({ currentDate, onD
     };
 
 
-    // Helper to get simple week row
+    // Helper to get fixed week row (Mon-Sun or Sun-Sat based on current week)
     const getWeekDays = () => {
         const days = [];
-        // Always center around current selected date (7 days: -3 to +3)
-        for (let i = -3; i <= 3; i++) {
-            const d = new Date(currentDate);
-            d.setDate(d.getDate() + i);
-            days.push(d);
+        const today = new Date(currentDate);
+        const dayOfWeek = today.getDay(); // 0 = Sunday, 6 = Saturday
+        
+        // Calculate the start of the current week
+        let weekStart: Date;
+        if (startWeekOnSunday) {
+            // Week starts on Sunday (0-6: Sun-Sat)
+            const daysFromSunday = dayOfWeek;
+            weekStart = new Date(today);
+            weekStart.setDate(today.getDate() - daysFromSunday);
+        } else {
+            // Week starts on Monday (1-0: Mon-Sun)
+            const daysFromMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+            weekStart = new Date(today);
+            weekStart.setDate(today.getDate() - daysFromMonday);
         }
+        
+        // Generate 7 days starting from weekStart
+        for (let i = 0; i < 7; i++) {
+            const day = new Date(weekStart);
+            day.setDate(weekStart.getDate() + i);
+            days.push(day);
+        }
+        
         return days;
     };
 
@@ -111,7 +129,7 @@ export const CalendarWidget: React.FC<CalendarWidgetProps> = ({ currentDate, onD
 
             {/* Top Bar - 详情页面模式下隐藏 */}
             {!hideTopBar && (
-                <div className="px-6 py-4 flex items-center justify-between border-b border-stone-100">
+                <div className="px-4 py-2.5 flex items-center justify-between border-b border-stone-100">
                     {/* 左侧：extraHeaderControls（包含同步按钮等） */}
                     <div className="flex items-center gap-1">
                         {extraHeaderControls}
@@ -138,7 +156,7 @@ export const CalendarWidget: React.FC<CalendarWidgetProps> = ({ currentDate, onD
                                         }
                                     }}
                                     className={`
-                               px-3 py-1.5 rounded-full border transition-all active:scale-95
+                               p-2 rounded-full border transition-all active:scale-95
                                ${isExpanded ? 'bg-stone-900 text-white border-stone-900' : 'bg-white text-stone-600 border-stone-300 hover:border-stone-500'}
                             `}
                                 >
@@ -151,45 +169,99 @@ export const CalendarWidget: React.FC<CalendarWidgetProps> = ({ currentDate, onD
             )}
 
             {/* Calendar Area */}
-            <div className={`transition-all duration-500 ease-in-out overflow-hidden ${isExpanded ? 'max-h-[400px] opacity-100' : 'max-h-[60px] opacity-100'}`}>
+            <div className={`transition-all duration-500 ease-in-out overflow-hidden ${isExpanded ? 'max-h-[400px] opacity-100' : 'max-h-[56px] opacity-100'}`}>
 
                 {!isExpanded ? (
-                    // Week View (Collapsed)
-                    <div className="flex justify-between items-center px-4 pb-1 md:justify-center md:gap-8 h-[60px]">
+                    // Week View (Collapsed) - Fixed Mon-Sun display
+                    <div className="flex justify-between items-center px-4 py-2 md:justify-center md:gap-2 h-[56px]">
                         {getWeekDays().map((day, idx) => {
                             const selected = !disableSelection && isSameDay(day, currentDate);
                             const today = isToday(day);
-                            const hasData = hasLogs(day);
+                            
+                            // Get logs for this day
+                            const dayLogs = logs.filter(l => {
+                                const logDate = new Date(l.startTime);
+                                return logDate.getDate() === day.getDate() &&
+                                    logDate.getMonth() === day.getMonth() &&
+                                    logDate.getFullYear() === day.getFullYear();
+                            });
+                            
+                            const hasData = dayLogs.length > 0;
+                            
+                            // Gallery Mode: Find first image
+                            let firstImage: string | null = null;
+                            if (galleryMode) {
+                                for (const log of dayLogs) {
+                                    // Check log images
+                                    if (log.images && log.images.length > 0) {
+                                        firstImage = log.images[0];
+                                        break;
+                                    }
+                                    // Check linked todo cover image
+                                    if (log.linkedTodoId && todos) {
+                                        const linkedTodo = todos.find((t: any) => t.id === log.linkedTodoId);
+                                        if (linkedTodo?.coverImage) {
+                                            firstImage = linkedTodo.coverImage;
+                                            break;
+                                        }
+                                    }
+                                }
+                            }
+                            
+                            // Gallery mode with image
+                            if (galleryMode && firstImage) {
+                                return (
+                                    <button
+                                        key={idx}
+                                        onClick={() => onDateChange(day)}
+                                        className={`w-10 h-10 rounded-lg overflow-hidden relative transition-all duration-300 active:scale-95 ${
+                                            selected ? 'ring-1 ring-stone-300' : ''
+                                        }`}
+                                    >
+                                        <TimelineImage 
+                                            filename={firstImage} 
+                                            className="w-full h-full object-cover"
+                                            useThumbnail={true}
+                                        />
+                                        <span className="absolute inset-0 flex items-center justify-center text-white text-sm font-serif font-bold drop-shadow-lg z-10">
+                                            {day.getDate()}
+                                        </span>
+                                        {today && !selected && (
+                                            <div className="absolute bottom-1 left-1/2 -translate-x-1/2 w-3 h-[2px] bg-white/80 rounded-full z-20" />
+                                        )}
+                                    </button>
+                                );
+                            }
+                            
+                            // Default rendering (with or without data)
                             return (
                                 <button
                                     key={idx}
                                     onClick={() => onDateChange(day)}
                                     className={`
-                               w-12 h-12 rounded-xl transition-all duration-300 active:scale-95 relative group
-                               ${selected
-                                            ? 'bg-stone-900 text-white shadow-md'
-                                            : 'bg-transparent text-stone-400'
+                                        w-10 h-10 rounded-lg transition-all duration-300 active:scale-95 relative
+                                        ${selected
+                                            ? 'ring-1 ring-stone-300'
+                                            : ''
                                         }
-                            `}
+                                        ${hasData ? '' : 'text-stone-400'}
+                                        ${!hasData && !selected ? 'bg-transparent' : ''}
+                                    `}
                                 >
                                     {/* Date Number - Centered */}
                                     <div className="absolute inset-0 flex items-center justify-center">
-                                        <span className="text-lg font-serif font-bold leading-none relative">
+                                        <span className={`text-sm font-serif font-bold leading-none relative ${hasData || selected ? 'text-stone-700' : ''}`}>
                                             {day.getDate()}
-                                            {/* Custom Underline for Today */}
-                                            {today && !selected && (
-                                                <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-4 h-[2px] bg-stone-400/80 rounded-full" />
-                                            )}
                                         </span>
                                     </div>
-
-                                    {/* Data Indicator Dots */}
-                                    {hasData && !selected && (
-                                        <div className="absolute bottom-1.5 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-stone-400" />
-                                    )}
-                                    {hasData && selected && (
-                                        <div className="absolute bottom-1.5 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-white" />
-                                    )}
+                                    
+                                    {/* Data Indicator - positioned below the number */}
+                                    {/* If today, show underline; if has data, show dot; if both, show underline only */}
+                                    {today && !selected ? (
+                                        <div className="absolute bottom-2 left-1/2 -translate-x-1/2 w-3 h-[2px] bg-stone-400/80 rounded-full" />
+                                    ) : hasData ? (
+                                        <div className="absolute bottom-2 left-1/2 -translate-x-1/2 w-0.5 h-0.5 rounded-full bg-stone-400" />
+                                    ) : null}
                                 </button>
                             );
                         })}
