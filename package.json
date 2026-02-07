@@ -59,6 +59,7 @@
     "fast-check": "^4.5.3",
     "rimraf": "^6.1.2",
     "sharp": "^0.34.5",
+    "terser": "^5.46.0",
     "typescript": "~5.8.2",
     "vite": "^6.2.0",
     "vite-plugin-electron": "^0.29.0",

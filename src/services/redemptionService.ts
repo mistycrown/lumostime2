@@ -1,7 +1,7 @@
 import { TRANSFORM_PARAMS } from '../constants/redemptionHashes';
 
 /**
- * 兑换码验证结果接口
+ * Redemption verification result interface
  */
 export interface RedemptionResult {
   success: boolean;
@@ -9,64 +9,50 @@ export interface RedemptionResult {
   error?: string;
 }
 
+// Utility transformation functions
+const _x1 = (n: number) => n ^ 0x5A5A;
+const _x2 = (n: number) => (n << 3) | (n >> 29);
+const _x3 = (n: number) => n * 0x9E3779B9;
+
 /**
- * 真正可逆的编码算法
+ * Encode user identifier with transformation
  */
 function encodeUserId(userId: number, masterKeyIndex: number): string {
   const params = TRANSFORM_PARAMS[masterKeyIndex];
   
-  // 简单的可逆变换
-  // 1. 乘法变换
   let num = userId * params.multiplier;
-  
-  // 2. 加法变换  
   num = num + params.offset;
-  
-  // 3. 异或变换
   num = num ^ params.xor;
+  num = (num << 4) | masterKeyIndex;
   
-  // 4. 添加密钥索引信息（用于快速识别）
-  num = (num << 4) | masterKeyIndex;  // 最后4位存储密钥索引
-  
-  // 转换为8位十六进制
   const encoded = (num & 0xFFFFFFFF).toString(16).toUpperCase().padStart(8, '0');
   return encoded;
 }
 
 /**
- * 真正的逆向解码（瞬间完成！）
+ * Decode and verify user identifier
  */
 function decodeUserId(encoded: string): { userId: number; keyIndex: number } | null {
   try {
     let num = parseInt(encoded, 16);
     
-    // 1. 提取密钥索引（最后4位）
     const keyIndex = num & 0xF;
     if (keyIndex >= TRANSFORM_PARAMS.length) {
       return null;
     }
     
-    // 2. 去除密钥索引位
     num = num >> 4;
-    
-    // 3. 获取对应参数
     const params = TRANSFORM_PARAMS[keyIndex];
     
-    // 4. 逆向变换
-    // 逆向异或
     num = num ^ params.xor;
-    
-    // 逆向加法
     num = num - params.offset;
     
-    // 逆向乘法（除法）
     if (num % params.multiplier !== 0) {
-      return null;  // 无效兑换码
+      return null;
     }
     
     const userId = num / params.multiplier;
     
-    // 5. 验证用户ID合理性
     if (userId < 1 || userId > 1000000 || !Number.isInteger(userId)) {
       return null;
     }
