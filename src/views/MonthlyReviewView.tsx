@@ -18,6 +18,8 @@ import remarkBreaks from 'remark-breaks';
 import { ConfirmModal } from '../components/ConfirmModal';
 import { NarrativeStyleSelectionModal } from '../components/NarrativeStyleSelectionModal';
 import { StatsView } from './StatsView';
+import { FloatingButton } from '../components/FloatingButton';
+import { UIIcon } from '../components/UIIcon';
 
 interface MonthlyReviewViewProps {
     review: MonthlyReview;
@@ -850,19 +852,25 @@ export const MonthlyReviewView: React.FC<MonthlyReviewViewProps> = ({
             {/* Floating Action Button for Guide Tab */}
             {
                 activeTab === 'guide' && enabledQuestions.length > 0 && (
-                    <button
+                    <FloatingButton
                         onClick={toggleReadingMode}
-                        className="fixed bottom-16 right-6 w-14 h-14 bg-stone-900 rounded-full text-white shadow-2xl flex items-center justify-center active:scale-90 transition-transform z-40 border border-stone-800"
+                        position="custom"
+                        className="fixed bottom-16 right-6"
                     >
-                        {isReadingMode ? <Edit3 size={24} /> : <LucideIcons.BookOpen size={24} />}
-                    </button>
+                        <UIIcon 
+                            type={isReadingMode ? "editing" : "reading"}
+                            fallbackIcon={isReadingMode ? Edit3 : LucideIcons.BookOpen}
+                            size={24}
+                            className="text-white"
+                        />
+                    </FloatingButton>
                 )
             }
 
             {/* Floating Action Button for Narrative Tab */}
             {
                 activeTab === 'narrative' && (narrative || isEditing) && (
-                    <button
+                    <FloatingButton
                         onClick={() => {
                             if (isEditing) handleSaveNarrative();
                             else {
@@ -870,10 +878,16 @@ export const MonthlyReviewView: React.FC<MonthlyReviewViewProps> = ({
                                 setIsEditing(true);
                             }
                         }}
-                        className="fixed bottom-16 right-6 w-14 h-14 bg-stone-900 rounded-full text-white shadow-2xl flex items-center justify-center active:scale-90 transition-transform z-40 border border-stone-800"
+                        position="custom"
+                        className="fixed bottom-16 right-6"
                     >
-                        {isEditing ? <LucideIcons.Check size={24} /> : <Edit3 size={24} />}
-                    </button>
+                        <UIIcon 
+                            type={isEditing ? "editing" : "reading"}
+                            fallbackIcon={isEditing ? LucideIcons.Check : Edit3}
+                            size={24}
+                            className="text-white"
+                        />
+                    </FloatingButton>
                 )
             }
 

@@ -16,6 +16,8 @@ interface UIIconProps {
     size?: number;
     /** 自定义类名 */
     className?: string;
+    /** 自定义图标放大系数（默认 1.3 倍） */
+    customIconScale?: number;
     /** 其他 props */
     [key: string]: any;
 }
@@ -31,6 +33,7 @@ export const UIIcon: React.FC<UIIconProps> = ({
     fallbackIcon: FallbackIcon,
     size = 20,
     className = '',
+    customIconScale = 1.3,
     ...props
 }) => {
     const [currentTheme, setCurrentTheme] = useState(uiIconService.getCurrentTheme());
@@ -77,13 +80,14 @@ export const UIIcon: React.FC<UIIconProps> = ({
         return <FallbackIcon size={size} className={className} {...props} />;
     }
 
-    // 使用自定义主题图标
+    // 使用自定义主题图标（放大显示）
+    const scaledSize = Math.round(size * customIconScale);
     return (
         <img
             src={imageSrc}
             alt=""
-            width={size}
-            height={size}
+            width={scaledSize}
+            height={scaledSize}
             className={className}
             onError={handleImageError}
             style={{ display: 'block' }}
@@ -98,10 +102,20 @@ export const UIIcon: React.FC<UIIconProps> = ({
  * import { UIIcon } from '@/components/UIIcon';
  * import { Settings } from 'lucide-react';
  * 
+ * // 基础使用（自定义图标会自动放大 1.3 倍）
  * <UIIcon 
  *   type="settings" 
  *   fallbackIcon={Settings} 
  *   size={20} 
+ *   className="text-stone-600"
+ * />
+ * 
+ * // 自定义放大系数
+ * <UIIcon 
+ *   type="settings" 
+ *   fallbackIcon={Settings} 
+ *   size={20} 
+ *   customIconScale={1.5}
  *   className="text-stone-600"
  * />
  */

@@ -10,6 +10,7 @@ import { RedemptionService } from '../services/redemptionService';
 import { IconPreview } from '../components/IconPreview';
 import { BackgroundSelector } from '../components/BackgroundSelector';
 import { NavigationDecorationSelector } from '../components/NavigationDecorationSelector';
+import { ColorSchemeSelector } from '../components/ColorSchemeSelector';
 import { ICON_OPTIONS } from '../services/iconService';
 import { Category } from '../types';
 import { TIMEPAL_OPTIONS, TimePalType, getTimePalEmoji } from '../constants/timePalConfig';
@@ -320,10 +321,10 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
     const [isChangingIcon, setIsChangingIcon] = useState(false);
     const redemptionService = new RedemptionService();
     const [showDonationModal, setShowDonationModal] = useState(false);
-    const { uiIconTheme, setUiIconTheme } = useSettings();
+    const { uiIconTheme, setUiIconTheme, colorScheme, setColorScheme } = useSettings();
     
     // Tab 页状态
-    type TabType = 'icon' | 'background' | 'navigation' | 'timepal';
+    type TabType = 'icon' | 'colorScheme' | 'background' | 'navigation' | 'timepal';
     const [activeTab, setActiveTab] = useState<TabType>('icon');
 
     useEffect(() => {
@@ -577,7 +578,7 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
 
                         {/* Tab 导航 - 简洁风格 */}
                         <div className="flex gap-6 border-b border-stone-200 overflow-x-auto scrollbar-hide">
-                            {(['icon', 'background', 'navigation', 'timepal'] as TabType[]).map(tab => (
+                            {(['icon', 'colorScheme', 'background', 'navigation', 'timepal'] as TabType[]).map(tab => (
                                 <button
                                     key={tab}
                                     onClick={() => setActiveTab(tab)}
@@ -589,6 +590,7 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
                                 >
                                     {{ 
                                         'icon': 'Icon', 
+                                        'colorScheme': '配色',
                                         'background': '背景', 
                                         'navigation': '导航', 
                                         'timepal': '时光小友' 
@@ -704,9 +706,13 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
                                                     {[1, 2, 3, 4].map((num) => (
                                                         <div key={num} className="bg-stone-50 rounded flex items-center justify-center">
                                                             <img
-                                                                src={`/uiicon/purple/${String(num).padStart(2, '0')}.png`}
+                                                                src={`/uiicon/purple/${String(num).padStart(2, '0')}.webp`}
                                                                 alt={`icon-${num}`}
                                                                 className="w-full h-full object-contain p-0.5"
+                                                                onError={(e) => {
+                                                                    // 如果 webp 加载失败，尝试 png
+                                                                    e.currentTarget.src = `/uiicon/purple/${String(num).padStart(2, '0')}.png`;
+                                                                }}
                                                             />
                                                         </div>
                                                     ))}
@@ -719,9 +725,110 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
                                                     </div>
                                                 )}
                                             </button>
+
+                                            {/* Color 主题（蓝色） */}
+                                            <button
+                                                onClick={() => setUiIconTheme('color')}
+                                                className={`relative rounded-lg border-2 transition-all overflow-hidden ${
+                                                    uiIconTheme === 'color'
+                                                        ? 'border-stone-400 ring-2 ring-stone-200'
+                                                        : 'border-stone-200 hover:border-stone-300'
+                                                }`}
+                                                style={{ aspectRatio: '4/5' }}
+                                            >
+                                                <div className="w-full h-full grid grid-cols-2 gap-0.5 p-1 bg-white">
+                                                    {[1, 2, 3, 4].map((num) => (
+                                                        <div key={num} className="bg-stone-50 rounded flex items-center justify-center">
+                                                            <img
+                                                                src={`/uiicon/color/${String(num).padStart(2, '0')}.webp`}
+                                                                alt={`icon-${num}`}
+                                                                className="w-full h-full object-contain p-0.5"
+                                                                onError={(e) => {
+                                                                    e.currentTarget.src = `/uiicon/color/${String(num).padStart(2, '0')}.png`;
+                                                                }}
+                                                            />
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                                {uiIconTheme === 'color' && (
+                                                    <div className="absolute top-1 right-1 w-5 h-5 bg-stone-800 rounded-full flex items-center justify-center shadow-lg">
+                                                        <Check size={12} className="text-white" />
+                                                    </div>
+                                                )}
+                                            </button>
+
+                                            {/* Color2 主题（绿色） */}
+                                            <button
+                                                onClick={() => setUiIconTheme('color2')}
+                                                className={`relative rounded-lg border-2 transition-all overflow-hidden ${
+                                                    uiIconTheme === 'color2'
+                                                        ? 'border-stone-400 ring-2 ring-stone-200'
+                                                        : 'border-stone-200 hover:border-stone-300'
+                                                }`}
+                                                style={{ aspectRatio: '4/5' }}
+                                            >
+                                                <div className="w-full h-full grid grid-cols-2 gap-0.5 p-1 bg-white">
+                                                    {[1, 2, 3, 4].map((num) => (
+                                                        <div key={num} className="bg-stone-50 rounded flex items-center justify-center">
+                                                            <img
+                                                                src={`/uiicon/color2/${String(num).padStart(2, '0')}.webp`}
+                                                                alt={`icon-${num}`}
+                                                                className="w-full h-full object-contain p-0.5"
+                                                                onError={(e) => {
+                                                                    e.currentTarget.src = `/uiicon/color2/${String(num).padStart(2, '0')}.png`;
+                                                                }}
+                                                            />
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                                {uiIconTheme === 'color2' && (
+                                                    <div className="absolute top-1 right-1 w-5 h-5 bg-stone-800 rounded-full flex items-center justify-center shadow-lg">
+                                                        <Check size={12} className="text-white" />
+                                                    </div>
+                                                )}
+                                            </button>
+
+                                            {/* Prince 主题（琥珀色） */}
+                                            <button
+                                                onClick={() => setUiIconTheme('prince')}
+                                                className={`relative rounded-lg border-2 transition-all overflow-hidden ${
+                                                    uiIconTheme === 'prince'
+                                                        ? 'border-stone-400 ring-2 ring-stone-200'
+                                                        : 'border-stone-200 hover:border-stone-300'
+                                                }`}
+                                                style={{ aspectRatio: '4/5' }}
+                                            >
+                                                <div className="w-full h-full grid grid-cols-2 gap-0.5 p-1 bg-white">
+                                                    {[1, 2, 3, 4].map((num) => (
+                                                        <div key={num} className="bg-stone-50 rounded flex items-center justify-center">
+                                                            <img
+                                                                src={`/uiicon/prince/${String(num).padStart(2, '0')}.webp`}
+                                                                alt={`icon-${num}`}
+                                                                className="w-full h-full object-contain p-0.5"
+                                                                onError={(e) => {
+                                                                    e.currentTarget.src = `/uiicon/prince/${String(num).padStart(2, '0')}.png`;
+                                                                }}
+                                                            />
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                                {uiIconTheme === 'prince' && (
+                                                    <div className="absolute top-1 right-1 w-5 h-5 bg-stone-800 rounded-full flex items-center justify-center shadow-lg">
+                                                        <Check size={12} className="text-white" />
+                                                    </div>
+                                                )}
+                                            </button>
                                         </div>
                                     </div>
                                 </div>
+                            )}
+
+                            {activeTab === 'colorScheme' && (
+                                /* 配色方案 */
+                                <ColorSchemeSelector 
+                                    currentScheme={colorScheme as any}
+                                    onSchemeChange={(scheme) => setColorScheme(scheme)}
+                                />
                             )}
 
                             {activeTab === 'background' && (

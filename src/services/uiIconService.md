@@ -5,6 +5,7 @@
 UI Icon 主题系统允许用户切换应用内所有 UI 图标的视觉风格。系统支持：
 - 多套主题（默认、purple 等）
 - 自动格式降级（WebP → PNG）
+- **自动尺寸调整**：自定义图标会自动放大 1.3 倍，以匹配 Lucide 图标的视觉大小
 - 类型安全
 - 易于扩展
 
@@ -62,7 +63,7 @@ public/uiicon/
 import { UIIcon } from '@/components/UIIcon';
 import { Settings, RefreshCw, Calendar } from 'lucide-react';
 
-// 设置按钮
+// 设置按钮（自定义图标会自动放大 1.3 倍）
 <UIIcon 
   type="settings" 
   fallbackIcon={Settings} 
@@ -85,7 +86,22 @@ import { Settings, RefreshCw, Calendar } from 'lucide-react';
   size={20} 
   className="text-stone-600"
 />
+
+// 自定义放大系数（如果默认 1.3 倍不合适）
+<UIIcon 
+  type="settings" 
+  fallbackIcon={Settings} 
+  size={20} 
+  customIconScale={1.5}
+  className="text-stone-600"
+/>
 ```
+
+**重要说明**：
+- 默认主题使用 Lucide 图标，大小为 `size` 参数指定的值
+- 自定义主题使用图片图标，会自动放大 1.3 倍（`size * 1.3`）
+- 这样可以确保自定义图标和 Lucide 图标的视觉大小一致
+- 如果需要调整放大系数，可以使用 `customIconScale` 参数
 
 ### 2. 在按钮中使用
 

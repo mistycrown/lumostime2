@@ -1,0 +1,273 @@
+/**
+ * @file themes.css
+ * @description 配色方案的 CSS 变量定义
+ */
+
+/* ==================== 默认配色 ==================== */
+:root,
+[data-color-scheme="default"] {
+  /* 悬浮按钮 */
+  --floating-button-bg: #1c1917;
+  --floating-button-text: #ffffff;
+  --floating-button-border: #292524;
+  --floating-button-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+
+  /* 次要按钮 */
+  --secondary-button-bg: #ffffff;
+  --secondary-button-text: #57534e;
+  --secondary-button-border: #e7e5e4;
+  --secondary-button-hover-bg: #fafaf9;
+
+  /* 图标按钮 */
+  --icon-button-bg: rgba(28, 25, 23, 0.05);
+  --icon-button-icon: #1c1917;
+  --icon-button-hover-bg: rgba(28, 25, 23, 0.1);
+
+  /* 进度条 */
+  --progress-bar-bg: #e7e5e4;
+  --progress-bar-fill: #1c1917;
+
+  /* 卡片 */
+  --card-bg: #ffffff;
+  --card-border: #e7e5e4;
+  --card-hover-border: #d6d3d1;
+  --card-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
+
+  /* 输入框 */
+  --input-bg: #ffffff;
+  --input-border: #e7e5e4;
+  --input-focus-border: #78716c;
+  --input-text: #1c1917;
+
+  /* 标签 */
+  --tag-bg: #f5f5f4;
+  --tag-text: #57534e;
+  --tag-border: #e7e5e4;
+
+  /* 分割线 */
+  --divider-color: #e7e5e4;
+
+  /* 强调色 */
+  --accent-color: #1c1917;
+  --accent-hover: #292524;
+}
+
+/* ==================== 紫色配色 ==================== */
+[data-color-scheme="purple"] {
+  /* 悬浮按钮 */
+  --floating-button-bg: #ffffff;
+  --floating-button-text: #1c1917;
+  --floating-button-border: rgba(147, 51, 234, 0.15);
+  --floating-button-shadow: 0 4px 6px -1px rgba(147, 51, 234, 0.1), 0 2px 4px -1px rgba(147, 51, 234, 0.06);
+
+  /* 次要按钮 */
+  --secondary-button-bg: #faf5ff;
+  --secondary-button-text: #7c3aed;
+  --secondary-button-border: #e9d5ff;
+  --secondary-button-hover-bg: #f3e8ff;
+
+  /* 图标按钮 */
+  --icon-button-bg: rgba(147, 51, 234, 0.08);
+  --icon-button-icon: #9333ea;
+  --icon-button-hover-bg: rgba(147, 51, 234, 0.15);
+
+  /* 进度条 */
+  --progress-bar-bg: #f3e8ff;
+  --progress-bar-fill: rgba(147, 51, 234, 0.7);
+
+  /* 卡片 */
+  --card-bg: #ffffff;
+  --card-border: #e9d5ff;
+  --card-hover-border: #d8b4fe;
+  --card-shadow: 0 1px 3px 0 rgba(147, 51, 234, 0.1);
+
+  /* 输入框 */
+  --input-bg: #ffffff;
+  --input-border: #e9d5ff;
+  --input-focus-border: #a855f7;
+  --input-text: #1c1917;
+
+  /* 标签 */
+  --tag-bg: #faf5ff;
+  --tag-text: #7c3aed;
+  --tag-border: #e9d5ff;
+
+  /* 分割线 */
+  --divider-color: #e9d5ff;
+
+  /* 强调色 */
+  --accent-color: #9333ea;
+  --accent-hover: #7c3aed;
+}
+
+/* ==================== 通用样式类 ==================== */
+
+/* 悬浮按钮 */
+.floating-button {
+  background-color: var(--floating-button-bg);
+  color: var(--floating-button-text);
+  border: 0.5px solid var(--floating-button-border);
+  box-shadow: var(--floating-button-shadow);
+}
+
+/* 按钮 */
+.btn-primary {
+  @apply px-4 py-2 rounded-lg font-medium transition-colors;
+  background-color: var(--accent-color);
+  color: white;
+}
+
+.btn-primary:hover {
+  background-color: var(--accent-hover);
+}
+
+.btn-secondary {
+  @apply px-4 py-2 rounded-lg font-medium transition-colors;
+  background-color: var(--secondary-button-bg);
+  color: var(--secondary-button-text);
+  border: 1px solid var(--secondary-button-border);
+}
+
+.btn-secondary:hover {
+  background-color: var(--secondary-button-hover-bg);
+}
+
+.btn-ghost {
+  @apply px-4 py-2 rounded-lg font-medium transition-colors;
+  background-color: transparent;
+  color: var(--accent-color);
+}
+
+.btn-ghost:hover {
+  background-color: var(--secondary-button-bg);
+}
+
+/* 次要按钮（旧名称，保持兼容） */
+.secondary-button {
+  background-color: var(--secondary-button-bg);
+  color: var(--secondary-button-text);
+  border: 1px solid var(--secondary-button-border);
+}
+
+.secondary-button:hover {
+  background-color: var(--secondary-button-hover-bg);
+}
+
+/* 卡片 */
+.card {
+  @apply p-4 rounded-lg;
+  background-color: var(--card-bg);
+  border: 1px solid var(--card-border);
+  box-shadow: var(--card-shadow);
+}
+
+.theme-card {
+  background-color: var(--card-bg);
+  border: 1px solid var(--card-border);
+  box-shadow: var(--card-shadow);
+}
+
+.theme-card:hover {
+  border-color: var(--card-hover-border);
+}
+
+/* 卡片变体 */
+.card-flat {
+  @apply p-4 rounded-lg;
+  background-color: var(--card-bg);
+  border: 1px solid var(--card-border);
+}
+
+.card-elevated {
+  @apply p-4 rounded-lg;
+  background-color: var(--card-bg);
+  box-shadow: var(--card-shadow);
+}
+
+/* 输入框 */
+.input {
+  @apply px-3 py-2 rounded-lg transition-colors;
+  background-color: var(--input-bg);
+  border: 1px solid var(--input-border);
+  color: var(--input-text);
+}
+
+.input:focus {
+  border-color: var(--input-focus-border);
+  outline: none;
+}
+
+.theme-input {
+  background-color: var(--input-bg);
+  border: 1px solid var(--input-border);
+  color: var(--input-text);
+}
+
+.theme-input:focus {
+  border-color: var(--input-focus-border);
+  outline: none;
+}
+
+/* 标签 */
+.tag {
+  @apply px-2 py-1 rounded text-xs font-medium;
+  background-color: var(--tag-bg);
+  color: var(--tag-text);
+  border: 1px solid var(--tag-border);
+}
+
+.theme-tag {
+  background-color: var(--tag-bg);
+  color: var(--tag-text);
+  border: 1px solid var(--tag-border);
+}
+
+/* 分割线 */
+.divider {
+  border-color: var(--divider-color);
+}
+
+.theme-divider {
+  border-color: var(--divider-color);
+}
+
+/* 强调色按钮 */
+.accent-button {
+  background-color: var(--accent-color);
+  color: #ffffff;
+}
+
+.accent-button:hover {
+  background-color: var(--accent-hover);
+}
+
+/* 图标按钮 */
+.icon-button {
+  @apply w-10 h-10 rounded-lg flex items-center justify-center transition-colors;
+  color: var(--secondary-button-text);
+}
+
+.icon-button:hover {
+  background-color: var(--secondary-button-bg);
+}
+
+/* 列表项 */
+.list-item {
+  @apply p-3 rounded-lg transition-colors;
+  background-color: var(--card-bg);
+}
+
+.list-item:hover {
+  background-color: var(--secondary-button-bg);
+}
+
+/* 模态框 */
+.modal-overlay {
+  @apply fixed inset-0 bg-black/50 backdrop-blur-sm;
+}
+
+.modal-content {
+  @apply rounded-xl shadow-2xl;
+  background-color: var(--card-bg);
+  border: 1px solid var(--card-border);
+}

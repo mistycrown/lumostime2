@@ -9,6 +9,8 @@ import { useReview } from '../contexts/ReviewContext';
 import { useSettings } from '../contexts/SettingsContext';
 import { useToast } from '../contexts/ToastContext';
 import { SettingsView } from '../views/SettingsView';
+import { UIIcon } from './UIIcon';
+import { FloatingButton } from './FloatingButton';
 
 interface MainLayoutProps {
     children: React.ReactNode;
@@ -178,35 +180,35 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
                                 onClick={() => setIsSettingsOpen(true)}
                                 className="w-8 flex justify-end text-stone-400 hover:text-stone-600 transition-colors"
                             >
-                                <SettingsIcon size={24} />
+                                <SettingsIcon size={20} />
                             </button>
                         ) : currentView === AppView.TODO && !isTodoManaging ? (
                             <button
                                 onClick={() => setIsTodoManaging(true)}
                                 className="w-8 flex justify-end text-stone-400 hover:text-stone-600 transition-colors"
                             >
-                                <Settings2 size={24} />
+                                <Settings2 size={20} />
                             </button>
                         ) : currentView === AppView.TAGS && !selectedTagId && !selectedCategoryId && !isTagsManaging ? (
                             <button
                                 onClick={() => setIsTagsManaging(true)}
                                 className="w-8 flex justify-end text-stone-400 hover:text-stone-600 transition-colors"
                             >
-                                <Settings2 size={24} />
+                                <Settings2 size={20} />
                             </button>
                         ) : currentView === AppView.SCOPE && !selectedScopeId && !isScopeManaging ? (
                             <button
                                 onClick={() => setIsScopeManaging(true)}
                                 className="w-8 flex justify-end text-stone-400 hover:text-stone-600 transition-colors"
                             >
-                                <Settings2 size={24} />
+                                <Settings2 size={20} />
                             </button>
                         ) : currentView === AppView.STATS ? (
                             <button
                                 onClick={() => setIsStatsFullScreen(true)}
                                 className="w-8 flex justify-end text-stone-400 hover:text-stone-600 transition-colors"
                             >
-                                <Maximize2 size={24} />
+                                <Maximize2 size={20} />
                             </button>
                         ) : (
                             <div className="w-8" />
@@ -221,24 +223,31 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
                 {/* Global Floating Action Button for Tags/Scope Toggle */}
                 {(currentView === AppView.TAGS || currentView === AppView.SCOPE) &&
                     !selectedTagId && !selectedCategoryId && !selectedScopeId && (
-                        <button
+                        <FloatingButton
                             onClick={() => setCurrentView(currentView === AppView.TAGS ? AppView.SCOPE : AppView.TAGS)}
-                            className="fixed bottom-[calc(4.5rem+env(safe-area-inset-bottom))] right-6 w-14 h-14 bg-stone-900 rounded-full text-white shadow-2xl flex items-center justify-center active:scale-90 transition-transform z-40 border border-stone-800"
-                            aria-label={currentView === AppView.TAGS ? "Switch to Scope" : "Switch to Tags"}
+                            ariaLabel={currentView === AppView.TAGS ? "Switch to Scope" : "Switch to Tags"}
                         >
-                            {currentView === AppView.TAGS ? <Target size={24} /> : <Tag size={24} />}
-                        </button>
+                            <UIIcon 
+                                type={currentView === AppView.TAGS ? "scope" : "tags"}
+                                fallbackIcon={currentView === AppView.TAGS ? Target : Tag}
+                                size={24}
+                                className="text-white"
+                            />
+                        </FloatingButton>
                     )}
 
                 {/* Global Floating Action Button for Review/Journal Toggle */}
                 {currentView === AppView.REVIEW && !isDailyReviewOpen && !isWeeklyReviewOpen && !isMonthlyReviewOpen && (
-                    <button
+                    <FloatingButton
                         onClick={() => setIsJournalMode(!isJournalMode)}
-                        className="fixed bottom-[calc(4.5rem+env(safe-area-inset-bottom))] right-6 w-14 h-14 bg-stone-900 rounded-full text-white shadow-2xl flex items-center justify-center active:scale-90 transition-transform z-40 border border-stone-800"
-                        aria-label={isJournalMode ? "Switch to Archive" : "Switch to Journal"}
+                        ariaLabel={isJournalMode ? "Switch to Chronicle" : "Switch to Memoir"}
                     >
-                        {isJournalMode ? <BookHeart size={24} /> : <AudioWaveform size={24} />}
-                    </button>
+                        {isJournalMode ? (
+                            <UIIcon type="chronicle" fallbackIcon={BookHeart} size={24} className="text-white" />
+                        ) : (
+                            <UIIcon type="memoir" fallbackIcon={AudioWaveform} size={24} className="text-white" />
+                        )}
+                    </FloatingButton>
                 )}
 
                 {/* Full Screen Settings Overlay - Moved to App.tsx */}
