@@ -19,7 +19,7 @@ interface RecordViewProps {
 }
 
 export const RecordView: React.FC<RecordViewProps> = ({ onStartActivity, categories }) => {
-  const [selectedCategoryId, setSelectedCategoryId] = useState<string>('recent');
+  const [selectedCategoryId, setSelectedCategoryId] = useState<string>('');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [backgroundUrl, setBackgroundUrl] = useState<string>('');
   const [backgroundOpacity, setBackgroundOpacity] = useState<number>(0.1);
@@ -101,7 +101,7 @@ export const RecordView: React.FC<RecordViewProps> = ({ onStartActivity, categor
                 title={!isSidebarOpen ? category.name : undefined}
               >
                 {isSelected && (
-                  <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-5 bg-stone-900 rounded-r-full"></div>
+                  <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-5 rounded-r-full" style={{ backgroundColor: 'var(--accent-color)' }}></div>
                 )}
                 <span className={`text-xl flex-shrink-0 ${isSelected ? 'opacity-100' : 'opacity-100'}`}>
                   {category.icon}

@@ -9,6 +9,7 @@
   /* 悬浮按钮 */
   --floating-button-bg: #1c1917;
   --floating-button-text: #ffffff;
+  --floating-button-icon: #ffffff;
   --floating-button-border: #292524;
   --floating-button-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
 
@@ -52,52 +53,201 @@
   --accent-hover: #292524;
 }
 
-/* ==================== 紫色配色 ==================== */
-[data-color-scheme="purple"] {
+/* ==================== 莫兰迪紫配色 ==================== */
+[data-color-scheme="morandi-purple"] {
   /* 悬浮按钮 */
   --floating-button-bg: #ffffff;
   --floating-button-text: #1c1917;
-  --floating-button-border: rgba(147, 51, 234, 0.15);
-  --floating-button-shadow: 0 4px 6px -1px rgba(147, 51, 234, 0.1), 0 2px 4px -1px rgba(147, 51, 234, 0.06);
+  --floating-button-icon: #9c88b1;
+  --floating-button-border: rgba(156, 136, 177, 0.2);
+  --floating-button-shadow: 0 4px 6px -1px rgba(156, 136, 177, 0.1), 0 2px 4px -1px rgba(156, 136, 177, 0.06);
+  --floating-button-shadow: 0 4px 6px -1px rgba(156, 136, 177, 0.1), 0 2px 4px -1px rgba(156, 136, 177, 0.06);
 
   /* 次要按钮 */
-  --secondary-button-bg: #faf5ff;
-  --secondary-button-text: #7c3aed;
-  --secondary-button-border: #e9d5ff;
-  --secondary-button-hover-bg: #f3e8ff;
+  --secondary-button-bg: #f7f5f9;
+  --secondary-button-text: #8b7a9e;
+  --secondary-button-border: #e8e3ed;
+  --secondary-button-hover-bg: #f0ebf5;
 
   /* 图标按钮 */
-  --icon-button-bg: rgba(147, 51, 234, 0.08);
-  --icon-button-icon: #9333ea;
-  --icon-button-hover-bg: rgba(147, 51, 234, 0.15);
+  --icon-button-bg: rgba(156, 136, 177, 0.1);
+  --icon-button-icon: #9c88b1;
+  --icon-button-hover-bg: rgba(156, 136, 177, 0.18);
 
   /* 进度条 */
-  --progress-bar-bg: #f3e8ff;
-  --progress-bar-fill: rgba(147, 51, 234, 0.7);
+  --progress-bar-bg: #f0ebf5;
+  --progress-bar-fill: #b5a3c7;
 
   /* 卡片 */
   --card-bg: #ffffff;
-  --card-border: #e9d5ff;
-  --card-hover-border: #d8b4fe;
-  --card-shadow: 0 1px 3px 0 rgba(147, 51, 234, 0.1);
+  --card-border: #e8e3ed;
+  --card-hover-border: #d9d0e3;
+  --card-shadow: 0 1px 3px 0 rgba(156, 136, 177, 0.1);
 
   /* 输入框 */
   --input-bg: #ffffff;
-  --input-border: #e9d5ff;
-  --input-focus-border: #a855f7;
+  --input-border: #e8e3ed;
+  --input-focus-border: #9c88b1;
   --input-text: #1c1917;
 
   /* 标签 */
-  --tag-bg: #faf5ff;
-  --tag-text: #7c3aed;
-  --tag-border: #e9d5ff;
+  --tag-bg: #f7f5f9;
+  --tag-text: #8b7a9e;
+  --tag-border: #e8e3ed;
 
   /* 分割线 */
-  --divider-color: #e9d5ff;
+  --divider-color: #e8e3ed;
 
   /* 强调色 */
-  --accent-color: #9333ea;
-  --accent-hover: #7c3aed;
+  --accent-color: #9c88b1;
+  --accent-hover: #8b7a9e;
+}
+
+/* ==================== 莫兰迪蓝配色 ==================== */
+[data-color-scheme="morandi-blue"] {
+  /* 悬浮按钮 */
+  --floating-button-bg: #ffffff;
+  --floating-button-text: #1c1917;
+  --floating-button-icon: #8ba6b8;
+  --floating-button-border: rgba(139, 166, 184, 0.2);
+  --floating-button-shadow: 0 4px 6px -1px rgba(139, 166, 184, 0.1), 0 2px 4px -1px rgba(139, 166, 184, 0.06);
+
+  /* 次要按钮 */
+  --secondary-button-bg: #f5f7f9;
+  --secondary-button-text: #7a92a8;
+  --secondary-button-border: #e3e9ee;
+  --secondary-button-hover-bg: #ebf0f5;
+
+  /* 图标按钮 */
+  --icon-button-bg: rgba(139, 166, 184, 0.1);
+  --icon-button-icon: #8ba6b8;
+  --icon-button-hover-bg: rgba(139, 166, 184, 0.18);
+
+  /* 进度条 */
+  --progress-bar-bg: #ebf0f5;
+  --progress-bar-fill: #a3b9ca;
+
+  /* 卡片 */
+  --card-bg: #ffffff;
+  --card-border: #e3e9ee;
+  --card-hover-border: #d0dae3;
+  --card-shadow: 0 1px 3px 0 rgba(139, 166, 184, 0.1);
+
+  /* 输入框 */
+  --input-bg: #ffffff;
+  --input-border: #e3e9ee;
+  --input-focus-border: #8ba6b8;
+  --input-text: #1c1917;
+
+  /* 标签 */
+  --tag-bg: #f5f7f9;
+  --tag-text: #7a92a8;
+  --tag-border: #e3e9ee;
+
+  /* 分割线 */
+  --divider-color: #e3e9ee;
+
+  /* 强调色 */
+  --accent-color: #8ba6b8;
+  --accent-hover: #7a92a8;
+}
+
+/* ==================== 莫兰迪绿配色 ==================== */
+[data-color-scheme="morandi-green"] {
+  /* 悬浮按钮 */
+  --floating-button-bg: #ffffff;
+  --floating-button-text: #1c1917;
+  --floating-button-icon: #95a591;
+  --floating-button-border: rgba(149, 165, 145, 0.2);
+  --floating-button-shadow: 0 4px 6px -1px rgba(149, 165, 145, 0.1), 0 2px 4px -1px rgba(149, 165, 145, 0.06);
+
+  /* 次要按钮 */
+  --secondary-button-bg: #f6f8f5;
+  --secondary-button-text: #7d8f79;
+  --secondary-button-border: #e5ebe3;
+  --secondary-button-hover-bg: #edf2eb;
+
+  /* 图标按钮 */
+  --icon-button-bg: rgba(149, 165, 145, 0.1);
+  --icon-button-icon: #95a591;
+  --icon-button-hover-bg: rgba(149, 165, 145, 0.18);
+
+  /* 进度条 */
+  --progress-bar-bg: #edf2eb;
+  --progress-bar-fill: #aab9a6;
+
+  /* 卡片 */
+  --card-bg: #ffffff;
+  --card-border: #e5ebe3;
+  --card-hover-border: #d4ddd1;
+  --card-shadow: 0 1px 3px 0 rgba(149, 165, 145, 0.1);
+
+  /* 输入框 */
+  --input-bg: #ffffff;
+  --input-border: #e5ebe3;
+  --input-focus-border: #95a591;
+  --input-text: #1c1917;
+
+  /* 标签 */
+  --tag-bg: #f6f8f5;
+  --tag-text: #7d8f79;
+  --tag-border: #e5ebe3;
+
+  /* 分割线 */
+  --divider-color: #e5ebe3;
+
+  /* 强调色 */
+  --accent-color: #95a591;
+  --accent-hover: #7d8f79;
+}
+
+/* ==================== 莫兰迪粉配色 ==================== */
+[data-color-scheme="morandi-pink"] {
+  /* 悬浮按钮 */
+  --floating-button-bg: #ffffff;
+  --floating-button-text: #1c1917;
+  --floating-button-icon: #c79faa;
+  --floating-button-border: rgba(199, 159, 170, 0.2);
+  --floating-button-shadow: 0 4px 6px -1px rgba(199, 159, 170, 0.1), 0 2px 4px -1px rgba(199, 159, 170, 0.06);
+
+  /* 次要按钮 */
+  --secondary-button-bg: #faf7f8;
+  --secondary-button-text: #b08a98;
+  --secondary-button-border: #f0e8eb;
+  --secondary-button-hover-bg: #f5eef1;
+
+  /* 图标按钮 */
+  --icon-button-bg: rgba(199, 159, 170, 0.1);
+  --icon-button-icon: #c79faa;
+  --icon-button-hover-bg: rgba(199, 159, 170, 0.18);
+
+  /* 进度条 */
+  --progress-bar-bg: #f5eef1;
+  --progress-bar-fill: #d4b3bd;
+
+  /* 卡片 */
+  --card-bg: #ffffff;
+  --card-border: #f0e8eb;
+  --card-hover-border: #e5d6db;
+  --card-shadow: 0 1px 3px 0 rgba(199, 159, 170, 0.1);
+
+  /* 输入框 */
+  --input-bg: #ffffff;
+  --input-border: #f0e8eb;
+  --input-focus-border: #c79faa;
+  --input-text: #1c1917;
+
+  /* 标签 */
+  --tag-bg: #faf7f8;
+  --tag-text: #b08a98;
+  --tag-border: #f0e8eb;
+
+  /* 分割线 */
+  --divider-color: #f0e8eb;
+
+  /* 强调色 */
+  --accent-color: #c79faa;
+  --accent-hover: #b08a98;
 }
 
 /* ==================== 通用样式类 ==================== */
@@ -105,7 +255,7 @@
 /* 悬浮按钮 */
 .floating-button {
   background-color: var(--floating-button-bg);
-  color: var(--floating-button-text);
+  color: var(--floating-button-icon);
   border: 0.5px solid var(--floating-button-border);
   box-shadow: var(--floating-button-shadow);
 }
@@ -249,6 +399,43 @@
 
 .icon-button:hover {
   background-color: var(--secondary-button-bg);
+}
+
+/* 主题图标按钮 - 带主题色背景 */
+.theme-icon-button {
+  width: 2rem !important;
+  height: 2rem !important;
+  border-radius: 9999px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  transition: all 0.2s !important;
+  background-color: var(--icon-button-bg);
+  color: var(--icon-button-icon);
+}
+
+.theme-icon-button:hover {
+  background-color: var(--icon-button-hover-bg);
+}
+
+.theme-icon-button:active {
+  transform: scale(0.95);
+}
+
+/* 进度条 */
+.progress-bar {
+  height: 0.375rem;
+  width: 100%;
+  border-radius: 9999px;
+  overflow: hidden;
+  background-color: var(--progress-bar-bg);
+}
+
+.progress-bar-fill {
+  height: 100%;
+  border-radius: 9999px;
+  transition: all 0.5s;
+  background-color: var(--progress-bar-fill);
 }
 
 /* 列表项 */
