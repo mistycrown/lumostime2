@@ -33,6 +33,7 @@ interface CalendarWidgetProps {
 }
 
 export const CalendarWidget: React.FC<CalendarWidgetProps> = ({ currentDate, onDateChange, logs = [], isExpanded, onExpandToggle, extraHeaderControls, disableSelection, customScale, heatmapMode, staticMode, preventCollapse, onResetView, startWeekOnSunday = false, renderCustomDay, hideTopBar = false, galleryMode = false, todos = [] }) => {
+    const [viewMode, setViewMode] = useState<'calendar' | 'month_year'>('calendar');
 
     // ... (keep existing helper functions)
     // --- Date Helpers ---
@@ -96,6 +97,19 @@ export const CalendarWidget: React.FC<CalendarWidgetProps> = ({ currentDate, onD
         onDateChange(newDate);
     };
 
+    const switchYear = (offset: number) => {
+        const newDate = new Date(currentDate);
+        newDate.setFullYear(newDate.getFullYear() + offset);
+        onDateChange(newDate);
+    };
+
+    const selectMonth = (monthIndex: number) => {
+        const newDate = new Date(currentDate);
+        newDate.setMonth(monthIndex);
+        onDateChange(newDate);
+        setViewMode('calendar');
+    };
+
     // Helper to check if a day has logs
     const hasLogs = (date: Date) => {
         const start = new Date(date);
@@ -115,13 +129,24 @@ export const CalendarWidget: React.FC<CalendarWidgetProps> = ({ currentDate, onD
             {/* Top Bar - 详情页面模式下隐藏 */}
             {!hideTopBar && (
                 <div className="px-4 py-2.5 flex items-center justify-between border-b border-stone-100">
-                    {/* 左侧：extraHeaderControls（包含同步按钮等） */}
+                    {/* 左侧：日期显示（可点击切换到月份选择器） */}
+                    <button
+                        onClick={() => {
+                            if (isExpanded) {
+                                setViewMode(viewMode === 'calendar' ? 'month_year' : 'calendar');
+                            } else {
+                                onExpandToggle();
+                                setViewMode('month_year');
+                            }
+                        }}
+                        className="text-xs font-medium text-stone-400 uppercase tracking-widest hover:text-stone-600 transition-colors text-left whitespace-nowrap"
+                    >
+                        {String(currentDate.getFullYear()).slice(-2)}/{String(currentDate.getMonth() + 1).padStart(2, '0')}
+                    </button>
+
+                    {/* 右侧：extraHeaderControls + Today和展开/收缩按钮 */}
                     <div className="flex items-center gap-1">
                         {extraHeaderControls}
-                    </div>
-
-                    {/* 右侧：Today和展开/收缩按钮 */}
-                    <div className="flex items-center gap-3">
                         {!staticMode && (
                             <>
                                 {!disableSelection && (
@@ -136,8 +161,10 @@ export const CalendarWidget: React.FC<CalendarWidgetProps> = ({ currentDate, onD
                                     onClick={() => {
                                         if (preventCollapse) {
                                             if (onResetView) onResetView();
+                                            setViewMode('calendar');
                                         } else {
                                             onExpandToggle();
+                                            setViewMode('calendar');
                                         }
                                     }}
                                     className={`
@@ -209,18 +236,19 @@ export const CalendarWidget: React.FC<CalendarWidgetProps> = ({ currentDate, onD
                 ) : (
                     // Expanded View
                     <div className={hideTopBar ? "px-6 pb-6 pt-6 animate-in fade-in duration-300" : "px-6 pb-6 animate-in fade-in duration-300"}>
-                        <>
-                            <div className="flex items-center justify-between mt-3 mb-4 px-2">
-                                <button onClick={() => switchMonth(-1)} className="p-1 hover:bg-stone-100 rounded-full"><ChevronLeft size={20} /></button>
-                                <span className="font-bold text-stone-800">
-                                    {currentDate.getFullYear()} . {currentDate.getMonth() + 1}
-                                </span>
-                                <button onClick={() => switchMonth(1)} className="p-1 hover:bg-stone-100 rounded-full"><ChevronRight size={20} /></button>
-                            </div>
-                            <div className="grid grid-cols-7 gap-y-2 place-items-center">
-                                {weekDaysShort.map(d => (
-                                    <span key={d} className="text-[10px] font-bold text-stone-300 uppercase">{d}</span>
-                                ))}
+                        {viewMode === 'calendar' ? (
+                            <>
+                                <div className="flex items-center justify-between mt-3 mb-4 px-2">
+                                    <button onClick={() => switchMonth(-1)} className="p-1 hover:bg-stone-100 rounded-full"><ChevronLeft size={20} /></button>
+                                    <button onClick={() => setViewMode('month_year')} className="font-bold text-stone-800 hover:bg-stone-100 px-2 py-1 rounded-lg transition-colors">
+                                        {currentDate.getFullYear()} . {currentDate.getMonth() + 1}
+                                    </button>
+                                    <button onClick={() => switchMonth(1)} className="p-1 hover:bg-stone-100 rounded-full"><ChevronRight size={20} /></button>
+                                </div>
+                                <div className="grid grid-cols-7 gap-y-2 place-items-center">
+                                    {weekDaysShort.map(d => (
+                                        <span key={d} className="text-[10px] font-bold text-stone-300 uppercase">{d}</span>
+                                    ))}
                                     {getMonthDays().map((day, idx) => {
                                         if (!day) return <div key={idx} />;
                                         const selected = !disableSelection && isSameDay(day, currentDate);
@@ -454,6 +482,33 @@ export const CalendarWidget: React.FC<CalendarWidgetProps> = ({ currentDate, onD
                                     })}
                                 </div>
                             </>
+                        ) : (
+                            // Month/Year Picker Mode
+                            <div className="flex flex-col h-[280px]">
+                                <div className="flex items-center justify-between mt-3 mb-0 px-4">
+                                    <button onClick={() => switchYear(-1)} className="p-2 hover:bg-stone-100 rounded-full"><ChevronLeft size={24} /></button>
+                                    <span className="text-2xl font-bold text-stone-800">{currentDate.getFullYear()}</span>
+                                    <button onClick={() => switchYear(1)} className="p-2 hover:bg-stone-100 rounded-full"><ChevronRight size={24} /></button>
+                                </div>
+                                <div className="grid grid-cols-4 gap-4 flex-1 content-center px-4">
+                                    {Array.from({ length: 12 }, (_, i) => i).map(m => (
+                                        <button
+                                            key={m}
+                                            onClick={() => selectMonth(m)}
+                                            className={`
+                                         py-3 rounded-xl text-sm font-bold transition-all active:scale-95
+                                         ${currentDate.getMonth() === m
+                                                    ? 'text-white shadow-md'
+                                                    : 'bg-stone-50 text-stone-600 hover:bg-stone-100'}
+                                      `}
+                                            style={currentDate.getMonth() === m ? { backgroundColor: 'var(--accent-color)' } : undefined}
+                                        >
+                                            {new Date(2000, m, 1).toLocaleString('default', { month: 'short' })}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
                     </div>
                 )}
             </div>

@@ -210,9 +210,10 @@ export const TimePalSettingsView: React.FC<TimePalSettingsViewProps> = ({ onBack
                                         }
                                     }}
                                     className={`px-3 py-1 rounded-full text-[10px] font-bold transition-all ${isFilterEnabled
-                                        ? 'bg-stone-900 text-white'
+                                        ? 'text-white'
                                         : 'bg-stone-100 text-stone-500 hover:bg-stone-200'
                                         }`}
+                                    style={isFilterEnabled ? { backgroundColor: 'var(--accent-color)' } : {}}
                                 >
                                     {isFilterEnabled ? '已开启' : '关闭'}
                                 </button>
@@ -235,9 +236,10 @@ export const TimePalSettingsView: React.FC<TimePalSettingsViewProps> = ({ onBack
                                                     className={`
                                                         px-2 py-2 rounded-lg text-[10px] font-medium text-center border transition-colors flex items-center justify-center gap-1.5 truncate
                                                         ${isSelected
-                                                            ? 'bg-stone-900 text-white border-stone-900'
+                                                            ? 'bg-stone-50 text-stone-500'
                                                             : 'bg-stone-50 text-stone-500 border-stone-100 hover:bg-stone-100'}
                                                     `}
+                                                    style={isSelected ? { borderColor: 'var(--accent-color)' } : {}}
                                                 >
                                                     <span>{cat.icon}</span>
                                                     <span className="truncate">{cat.name}</span>
@@ -266,11 +268,16 @@ export const TimePalSettingsView: React.FC<TimePalSettingsViewProps> = ({ onBack
                                                             }}
                                                             className="flex flex-col items-center gap-2 p-3 rounded-xl transition-all duration-200 active:scale-95 hover:bg-stone-50"
                                                         >
-                                                            <div className={`
+                                                            <div 
+                                                                className={`
                                                                 w-10 h-10 rounded-full flex items-center justify-center text-xl transition-all
-                                                                ${isActive ? 'ring-1 ring-stone-300 ring-offset-1 scale-110' : ''}
                                                                 ${act.color}
-                                                            `}>
+                                                            `}
+                                                                style={isActive ? { 
+                                                                    boxShadow: `0 0 0 1px var(--accent-color), 0 0 0 3px white, 0 0 0 4px var(--accent-color)`,
+                                                                    transform: 'scale(1.1)'
+                                                                } : {}}
+                                                            >
                                                                 {act.icon}
                                                             </div>
                                                             <span className={`text-xs text-center font-medium leading-tight ${isActive ? 'text-stone-900 font-bold' : 'text-stone-400'}`}>
