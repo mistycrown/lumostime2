@@ -10,6 +10,7 @@
 import React, { useState } from 'react';
 import { Log } from '../types';
 import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, X } from 'lucide-react';
+import { TimelineImage } from './TimelineImage';
 
 interface CalendarWidgetProps {
     currentDate: Date;
@@ -27,9 +28,11 @@ interface CalendarWidgetProps {
     staticMode?: boolean;
     renderCustomDay?: (date: Date, isSelected: boolean, isToday: boolean) => React.ReactNode;
     hideTopBar?: boolean; // 隐藏顶部栏（用于详情页面）
+    galleryMode?: boolean; // 画廊模式：显示每天的第一张图片
+    todos?: any[]; // 待办列表（用于获取 Cover Image）
 }
 
-export const CalendarWidget: React.FC<CalendarWidgetProps> = ({ currentDate, onDateChange, logs = [], isExpanded, onExpandToggle, extraHeaderControls, disableSelection, customScale, heatmapMode, staticMode, preventCollapse, onResetView, startWeekOnSunday = false, renderCustomDay, hideTopBar = false }) => {
+export const CalendarWidget: React.FC<CalendarWidgetProps> = ({ currentDate, onDateChange, logs = [], isExpanded, onExpandToggle, extraHeaderControls, disableSelection, customScale, heatmapMode, staticMode, preventCollapse, onResetView, startWeekOnSunday = false, renderCustomDay, hideTopBar = false, galleryMode = false, todos = [] }) => {
 
     // ... (keep existing helper functions)
     // --- Date Helpers ---
@@ -219,6 +222,26 @@ export const CalendarWidget: React.FC<CalendarWidgetProps> = ({ currentDate, onD
                                                 logDate.getFullYear() === day.getFullYear();
                                         });
 
+                                        // Gallery Mode: Collect first image from the day
+                                        let firstImage: string | null = null;
+                                        if (galleryMode) {
+                                            for (const log of dayLogs) {
+                                                // Check log images
+                                                if (log.images && log.images.length > 0) {
+                                                    firstImage = log.images[0];
+                                                    break;
+                                                }
+                                                // Check linked todo cover image
+                                                if (log.linkedTodoId && todos) {
+                                                    const linkedTodo = todos.find((t: any) => t.id === log.linkedTodoId);
+                                                    if (linkedTodo?.coverImage) {
+                                                        firstImage = linkedTodo.coverImage;
+                                                        break;
+                                                    }
+                                                }
+                                            }
+                                        }
+
                                         let intensityValue = 0;
                                         if (heatmapMode === 'focus') {
                                             // Calculate Average Focus Score (1-5)
@@ -239,6 +262,64 @@ export const CalendarWidget: React.FC<CalendarWidgetProps> = ({ currentDate, onD
                                         // Determine intensity class
                                         let bgClass = 'bg-transparent';
                                         let textClass = 'text-stone-600';
+
+                                        // Gallery Mode Rendering
+                                        if (galleryMode && firstImage) {
+                                            return (
+                                                <button
+                                                    key={idx}
+                                                    onClick={() => {
+                                                        if (!disableSelection) {
+                                                            onDateChange(day);
+                                                        }
+                                                        if (!preventCollapse) {
+                                                            onExpandToggle();
+                                                        }
+                                                    }}
+                                                    className="w-9 h-9 rounded-lg overflow-hidden relative transition-all active:scale-90"
+                                                >
+                                                    <TimelineImage 
+                                                        filename={firstImage} 
+                                                        className="w-full h-full object-cover"
+                                                        useThumbnail={true}
+                                                    />
+                                                    <span className="absolute inset-0 flex items-center justify-center text-white text-sm font-medium drop-shadow-lg z-10">
+                                                        {day.getDate()}
+                                                    </span>
+                                                    {selected && (
+                                                        <div className="absolute inset-0 border-2 border-stone-900 rounded-lg" />
+                                                    )}
+                                                    {today && !selected && (
+                                                        <div className="absolute inset-0 border border-stone-300 rounded-lg" />
+                                                    )}
+                                                </button>
+                                            );
+                                        } else if (galleryMode) {
+                                            // Gallery mode but no image: show light background
+                                            const hasData = intensityValue > 0;
+                                            return (
+                                                <button
+                                                    key={idx}
+                                                    onClick={() => {
+                                                        if (!disableSelection) {
+                                                            onDateChange(day);
+                                                        }
+                                                        if (!preventCollapse) {
+                                                            onExpandToggle();
+                                                        }
+                                                    }}
+                                                    className={`w-9 h-9 rounded-lg flex items-center justify-center text-sm font-medium transition-all active:scale-90 ${
+                                                        selected 
+                                                            ? 'bg-stone-900 text-white shadow-md' 
+                                                            : hasData 
+                                                                ? 'bg-stone-100 text-stone-600' 
+                                                                : 'bg-stone-50 text-stone-300'
+                                                    } ${today && !selected ? 'border border-stone-300' : ''}`}
+                                                >
+                                                    {day.getDate()}
+                                                </button>
+                                            );
+                                        }
 
                                         // Skip heatmap coloring if staticMode is enabled and renderCustomDay is provided
                                         if (!staticMode || !renderCustomDay) {

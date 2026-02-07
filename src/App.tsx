@@ -74,7 +74,8 @@ const AppContent: React.FC = () => {
     customNarrativeTemplates, setCustomNarrativeTemplates,
     userPersonalInfo, setUserPersonalInfo,
     filters, setFilters,
-    autoFocusNote, setAutoFocusNote
+    autoFocusNote, setAutoFocusNote,
+    timelineGalleryMode, setTimelineGalleryMode
   } = useSettings();
 
   const { addToast } = useToast();
@@ -491,6 +492,9 @@ const AppContent: React.FC = () => {
 
           autoFocusNote={autoFocusNote}
           onToggleAutoFocusNote={() => setAutoFocusNote(!autoFocusNote)}
+
+          timelineGalleryMode={timelineGalleryMode}
+          onToggleTimelineGalleryMode={() => setTimelineGalleryMode(!timelineGalleryMode)}
 
           // Review Props
           reviewTemplates={reviewTemplates}

@@ -163,12 +163,14 @@ interface SettingsViewProps {
     onEditLog?: (log: Log) => void;
     autoFocusNote?: boolean;
     onToggleAutoFocusNote?: () => void;
+    timelineGalleryMode?: boolean;
+    onToggleTimelineGalleryMode?: () => void;
 }
 
 
 
 
-export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, onImport, onReset, onClearData, onToast, syncData, onSyncUpdate, startWeekOnSunday, onToggleStartWeekOnSunday, onOpenAutoLink, onOpenSearch, minIdleTimeThreshold = 1, onSetMinIdleTimeThreshold, defaultView = 'RECORD', onSetDefaultView, defaultArchiveView = 'CHRONICLE', onSetDefaultArchiveView, defaultIndexView = 'TAGS', onSetDefaultIndexView, reviewTemplates = [], onUpdateReviewTemplates, onUpdateDailyReviews, checkTemplates = [], onUpdateCheckTemplates, dailyReviewTime, onSetDailyReviewTime, weeklyReviewTime, onSetWeeklyReviewTime, monthlyReviewTime, onSetMonthlyReviewTime, customNarrativeTemplates, onUpdateCustomNarrativeTemplates, userPersonalInfo, onSetUserPersonalInfo, logs = [], todos = [], scopes = [], currentDate = new Date(), dailyReviews = [], weeklyReviews = [], monthlyReviews = [], todoCategories = [], filters = [], onUpdateFilters, categoriesData = [], onEditLog, autoFocusNote, onToggleAutoFocusNote }) => {
+export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, onImport, onReset, onClearData, onToast, syncData, onSyncUpdate, startWeekOnSunday, onToggleStartWeekOnSunday, onOpenAutoLink, onOpenSearch, minIdleTimeThreshold = 1, onSetMinIdleTimeThreshold, defaultView = 'RECORD', onSetDefaultView, defaultArchiveView = 'CHRONICLE', onSetDefaultArchiveView, defaultIndexView = 'TAGS', onSetDefaultIndexView, reviewTemplates = [], onUpdateReviewTemplates, onUpdateDailyReviews, checkTemplates = [], onUpdateCheckTemplates, dailyReviewTime, onSetDailyReviewTime, weeklyReviewTime, onSetWeeklyReviewTime, monthlyReviewTime, onSetMonthlyReviewTime, customNarrativeTemplates, onUpdateCustomNarrativeTemplates, userPersonalInfo, onSetUserPersonalInfo, logs = [], todos = [], scopes = [], currentDate = new Date(), dailyReviews = [], weeklyReviews = [], monthlyReviews = [], todoCategories = [], filters = [], onUpdateFilters, categoriesData = [], onEditLog, autoFocusNote, onToggleAutoFocusNote, timelineGalleryMode, onToggleTimelineGalleryMode }) => {
     const { isPrivacyMode } = usePrivacy();
     // Hooks for full data access during backup
     const { logs: ctxLogs, todos: ctxTodos, todoCategories: ctxTodoCategories } = useData();
@@ -861,6 +863,8 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
                 onSetMonthlyReviewTime={onSetMonthlyReviewTime}
                 autoFocusNote={autoFocusNote}
                 onToggleAutoFocusNote={onToggleAutoFocusNote}
+                timelineGalleryMode={timelineGalleryMode}
+                onToggleTimelineGalleryMode={onToggleTimelineGalleryMode}
                 minIdleTimeThreshold={minIdleTimeThreshold}
                 onSetMinIdleTimeThreshold={onSetMinIdleTimeThreshold}
                 defaultView={defaultView}

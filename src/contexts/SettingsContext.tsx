@@ -205,6 +205,15 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
         localStorage.setItem('lumostime_auto_focus_note', autoFocusNote.toString());
     }, [autoFocusNote]);
 
+    const [timelineGalleryMode, setTimelineGalleryMode] = useState<boolean>(() => {
+        const stored = localStorage.getItem('lumostime_timeline_gallery_mode');
+        return stored === 'true'; // Default to false
+    });
+
+    useEffect(() => {
+        localStorage.setItem('lumostime_timeline_gallery_mode', timelineGalleryMode.toString());
+    }, [timelineGalleryMode]);
+
     useEffect(() => {
         localStorage.setItem('lumostime_custom_narrative_templates', JSON.stringify(customNarrativeTemplates));
     }, [customNarrativeTemplates]);
@@ -241,6 +250,8 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
             setAutoLinkRules,
             autoFocusNote,
             setAutoFocusNote,
+            timelineGalleryMode,
+            setTimelineGalleryMode,
             appRules,
             setAppRules,
             customNarrativeTemplates,
