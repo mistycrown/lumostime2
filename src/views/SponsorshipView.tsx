@@ -505,6 +505,7 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
                                 <div className="pt-3 border-t border-stone-100 space-y-2">
                                     <p className="text-xs text-stone-500">我是一名个人开发者，从设计到开发，从测试到维护，从美工到宣发，所有的工作都由我一个人独立完成。全都是为爱发电！</p>
                                     <p className="text-xs text-stone-500">如果在使用过程中遇到任何问题，还请多多反馈、多多包涵。</p>
+                                    <p className="text-xs text-stone-500">请放心使用，第一我不会跑路，第二就算我跑路了也不会影响你使用任何功能。</p>
                                 </div>
 
                                 <div className="pt-3 border-t border-stone-100 space-y-2">
