@@ -46,10 +46,16 @@ const getFormDescription = (level: number): string => {
 
 export const TimePalCard: React.FC<TimePalCardProps> = ({ logs, currentDate, categories, activeSessions = [] }) => {
     // 从 localStorage 读取用户选择的小动物类型
-    const [timePalType, setTimePalType] = useState<TimePalType>(() => {
+    const [timePalType, setTimePalType] = useState<TimePalType | null>(() => {
         const saved = localStorage.getItem('lumostime_timepal_type');
+        if (saved === 'none') return null;
         return (saved as TimePalType) || 'cat';
     });
+
+    // 如果用户选择不使用时光小友，直接返回 null
+    if (timePalType === null) {
+        return null;
+    }
 
     // 实时计时器状态 - 用于更新正在进行的会话时长
     const [currentTime, setCurrentTime] = useState(Date.now());
@@ -73,7 +79,9 @@ export const TimePalCard: React.FC<TimePalCardProps> = ({ logs, currentDate, cat
     useEffect(() => {
         const handleStorageChange = () => {
             const saved = localStorage.getItem('lumostime_timepal_type');
-            if (saved) {
+            if (saved === 'none') {
+                setTimePalType(null);
+            } else if (saved) {
                 setTimePalType(saved as TimePalType);
             }
         };
@@ -83,7 +91,9 @@ export const TimePalCard: React.FC<TimePalCardProps> = ({ logs, currentDate, cat
         // 也监听自定义事件（用于同一页面内的更新）
         const handleCustomChange = () => {
             const saved = localStorage.getItem('lumostime_timepal_type');
-            if (saved) {
+            if (saved === 'none') {
+                setTimePalType(null);
+            } else if (saved) {
                 setTimePalType(saved as TimePalType);
             }
         };
