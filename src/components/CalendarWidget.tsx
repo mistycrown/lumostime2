@@ -30,7 +30,6 @@ interface CalendarWidgetProps {
 }
 
 export const CalendarWidget: React.FC<CalendarWidgetProps> = ({ currentDate, onDateChange, logs = [], isExpanded, onExpandToggle, extraHeaderControls, disableSelection, customScale, heatmapMode, staticMode, preventCollapse, onResetView, startWeekOnSunday = false, renderCustomDay, hideTopBar = false }) => {
-    const [viewMode, setViewMode] = useState<'calendar' | 'month_year'>('calendar');
 
     // ... (keep existing helper functions)
     // --- Date Helpers ---
@@ -91,19 +90,6 @@ export const CalendarWidget: React.FC<CalendarWidgetProps> = ({ currentDate, onD
         onDateChange(newDate);
     };
 
-    const switchYear = (offset: number) => {
-        const newDate = new Date(currentDate);
-        newDate.setFullYear(newDate.getFullYear() + offset);
-        onDateChange(newDate);
-    };
-
-    const selectMonth = (monthIndex: number) => {
-        const newDate = new Date(currentDate);
-        newDate.setMonth(monthIndex);
-        onDateChange(newDate);
-        setViewMode('calendar');
-    };
-
     // Helper to check if a day has logs
     const hasLogs = (date: Date) => {
         const start = new Date(date);
@@ -123,24 +109,13 @@ export const CalendarWidget: React.FC<CalendarWidgetProps> = ({ currentDate, onD
             {/* Top Bar - 详情页面模式下隐藏 */}
             {!hideTopBar && (
                 <div className="px-6 py-4 flex items-center justify-between border-b border-stone-100">
-                    <div className="flex flex-col">
-                        <button
-                            onClick={() => {
-                                if (isExpanded) {
-                                    setViewMode(viewMode === 'calendar' ? 'month_year' : 'calendar');
-                                } else {
-                                    onExpandToggle();
-                                    setViewMode('month_year');
-                                }
-                            }}
-                            className="text-xs font-medium text-stone-400 uppercase tracking-widest hover:text-stone-600 transition-colors text-left whitespace-nowrap"
-                        >
-                            {String(currentDate.getFullYear()).slice(-2)}/{String(currentDate.getMonth() + 1).padStart(2, '0')}
-                        </button>
+                    {/* 左侧：extraHeaderControls（包含同步按钮等） */}
+                    <div className="flex items-center gap-1">
+                        {extraHeaderControls}
                     </div>
 
+                    {/* 右侧：Today和展开/收缩按钮 */}
                     <div className="flex items-center gap-3">
-                        {extraHeaderControls}
                         {!staticMode && (
                             <>
                                 {!disableSelection && (
@@ -155,18 +130,16 @@ export const CalendarWidget: React.FC<CalendarWidgetProps> = ({ currentDate, onD
                                     onClick={() => {
                                         if (preventCollapse) {
                                             if (onResetView) onResetView();
-                                            setViewMode('calendar');
                                         } else {
                                             onExpandToggle();
-                                            setViewMode('calendar');
                                         }
                                     }}
                                     className={`
-                               p-2 rounded-full border transition-all active:scale-95
+                               px-3 py-1.5 rounded-full border transition-all active:scale-95
                                ${isExpanded ? 'bg-stone-900 text-white border-stone-900' : 'bg-white text-stone-600 border-stone-300 hover:border-stone-500'}
                             `}
                                 >
-                                    {isExpanded ? <X size={20} /> : <CalendarIcon size={20} />}
+                                    {isExpanded ? <X size={16} /> : <CalendarIcon size={16} />}
                                 </button>
                             </>
                         )}
@@ -175,11 +148,11 @@ export const CalendarWidget: React.FC<CalendarWidgetProps> = ({ currentDate, onD
             )}
 
             {/* Calendar Area */}
-            <div className={`transition-all duration-500 ease-in-out overflow-hidden ${isExpanded ? 'max-h-[400px] opacity-100' : 'max-h-[75px] opacity-100'}`}>
+            <div className={`transition-all duration-500 ease-in-out overflow-hidden ${isExpanded ? 'max-h-[400px] opacity-100' : 'max-h-[60px] opacity-100'}`}>
 
                 {!isExpanded ? (
                     // Week View (Collapsed)
-                    <div className="flex justify-between items-center px-4 pb-1 md:justify-center md:gap-8 h-[75px]">
+                    <div className="flex justify-between items-center px-4 pb-1 md:justify-center md:gap-8 h-[60px]">
                         {getWeekDays().map((day, idx) => {
                             const selected = !disableSelection && isSameDay(day, currentDate);
                             const today = isToday(day);
@@ -189,22 +162,15 @@ export const CalendarWidget: React.FC<CalendarWidgetProps> = ({ currentDate, onD
                                     key={idx}
                                     onClick={() => onDateChange(day)}
                                     className={`
-                               help w-12 h-14 rounded-xl transition-all duration-300 active:scale-95 relative group
+                               w-12 h-12 rounded-xl transition-all duration-300 active:scale-95 relative group
                                ${selected
                                             ? 'bg-stone-900 text-white shadow-md'
                                             : 'bg-transparent text-stone-400'
                                         }
                             `}
                                 >
-                                    {/* Week Day - Fixed Top Position */}
-                                    <div className="absolute top-2.5 left-0 right-0 flex justify-center">
-                                        <span className="text-[10px] font-serif font-medium uppercase tracking-wider opacity-80 leading-none">
-                                            {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][day.getDay()]}
-                                        </span>
-                                    </div>
-
-                                    {/* Date Number - Fixed Top Position */}
-                                    <div className="absolute top-6 left-0 right-0 flex justify-center h-6 items-center">
+                                    {/* Date Number - Centered */}
+                                    <div className="absolute inset-0 flex items-center justify-center">
                                         <span className="text-lg font-serif font-bold leading-none relative">
                                             {day.getDate()}
                                             {/* Custom Underline for Today */}
@@ -228,19 +194,18 @@ export const CalendarWidget: React.FC<CalendarWidgetProps> = ({ currentDate, onD
                 ) : (
                     // Expanded View
                     <div className={hideTopBar ? "px-6 pb-6 pt-6 animate-in fade-in duration-300" : "px-6 pb-6 animate-in fade-in duration-300"}>
-                        {viewMode === 'calendar' ? (
-                            <>
-                                <div className="flex items-center justify-between mt-3 mb-4 px-2">
-                                    <button onClick={() => switchMonth(-1)} className="p-1 hover:bg-stone-100 rounded-full"><ChevronLeft size={20} /></button>
-                                    <button onClick={() => setViewMode('month_year')} className="font-bold text-stone-800 hover:bg-stone-100 px-2 py-1 rounded-lg transition-colors">
-                                        {currentDate.getFullYear()} . {currentDate.getMonth() + 1}
-                                    </button>
-                                    <button onClick={() => switchMonth(1)} className="p-1 hover:bg-stone-100 rounded-full"><ChevronRight size={20} /></button>
-                                </div>
-                                <div className="grid grid-cols-7 gap-y-2 place-items-center">
-                                    {weekDaysShort.map(d => (
-                                        <span key={d} className="text-[10px] font-bold text-stone-300 uppercase">{d}</span>
-                                    ))}
+                        <>
+                            <div className="flex items-center justify-between mt-3 mb-4 px-2">
+                                <button onClick={() => switchMonth(-1)} className="p-1 hover:bg-stone-100 rounded-full"><ChevronLeft size={20} /></button>
+                                <span className="font-bold text-stone-800">
+                                    {currentDate.getFullYear()} . {currentDate.getMonth() + 1}
+                                </span>
+                                <button onClick={() => switchMonth(1)} className="p-1 hover:bg-stone-100 rounded-full"><ChevronRight size={20} /></button>
+                            </div>
+                            <div className="grid grid-cols-7 gap-y-2 place-items-center">
+                                {weekDaysShort.map(d => (
+                                    <span key={d} className="text-[10px] font-bold text-stone-300 uppercase">{d}</span>
+                                ))}
                                     {getMonthDays().map((day, idx) => {
                                         if (!day) return <div key={idx} />;
                                         const selected = !disableSelection && isSameDay(day, currentDate);
@@ -394,32 +359,6 @@ export const CalendarWidget: React.FC<CalendarWidgetProps> = ({ currentDate, onD
                                     })}
                                 </div>
                             </>
-                        ) : (
-                            // Month/Year Picker Mode
-                            <div className="flex flex-col h-[280px]">
-                                <div className="flex items-center justify-between mt-3 mb-0 px-4">
-                                    <button onClick={() => switchYear(-1)} className="p-2 hover:bg-stone-100 rounded-full"><ChevronLeft size={24} /></button>
-                                    <span className="text-2xl font-bold text-stone-800">{currentDate.getFullYear()}</span>
-                                    <button onClick={() => switchYear(1)} className="p-2 hover:bg-stone-100 rounded-full"><ChevronRight size={24} /></button>
-                                </div>
-                                <div className="grid grid-cols-4 gap-4 flex-1 content-center">
-                                    {Array.from({ length: 12 }, (_, i) => i).map(m => (
-                                        <button
-                                            key={m}
-                                            onClick={() => selectMonth(m)}
-                                            className={`
-                                         py-3 rounded-xl text-sm font-bold transition-all active:scale-95
-                                         ${currentDate.getMonth() === m
-                                                    ? 'bg-stone-900 text-white shadow-md'
-                                                    : 'bg-stone-50 text-stone-600 hover:bg-stone-100'}
-                                      `}
-                                        >
-                                            {new Date(2000, m, 1).toLocaleString('default', { month: 'short' })}
-                                        </button>
-                                    ))}
-                                </div>
-                            </div>
-                        )}
                     </div>
                 )}
             </div>

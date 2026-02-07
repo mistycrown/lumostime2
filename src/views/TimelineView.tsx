@@ -713,7 +713,7 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ logs, todos, scopes,
                     onExpandToggle={() => setIsCalendarExpanded(!isCalendarExpanded)}
                     startWeekOnSunday={startWeekOnSunday}
                     extraHeaderControls={
-                        <div className="flex items-center gap-1">
+                        <>
                             {onSync && (
                                 <button
                                     onClick={onSync}
@@ -724,7 +724,6 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ logs, todos, scopes,
                                     <RefreshCw size={20} />
                                 </button>
                             )}
-                            <div className="w-[1px] h-4 bg-stone-200 mx-1" />
                             <button
                                 onClick={() => setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc')}
                                 className="p-2 text-stone-400 hover:text-stone-600 hover:bg-stone-100 rounded-full transition-colors"
@@ -739,7 +738,7 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ logs, todos, scopes,
                             >
                                 <BarChart2 size={20} />
                             </button>
-                        </div>
+                        </>
                     }
                 />
 
