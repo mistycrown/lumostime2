@@ -6,7 +6,7 @@
 import React from 'react';
 
 // 配色方案类型
-export type ColorScheme = 'default' | 'purple';
+export type ColorScheme = 'default' | 'morandi-purple' | 'morandi-blue' | 'morandi-green' | 'morandi-pink';
 
 // 配色方案样式配置
 export interface ColorSchemeStyleConfig {
@@ -30,19 +30,10 @@ const COLOR_SCHEME_STYLES: Record<ColorScheme, ColorSchemeStyleConfig> = {
     'default': {
         // 默认配色不需要特殊样式
     },
-    'purple': {
-        floatingButton: {
-            backgroundColor: '#ffffff',
-            borderColor: 'rgba(147, 51, 234, 0.15)', // purple-600 with 15% opacity
-            borderWidth: '0.5px',
-            shadow: '0 4px 6px -1px rgba(147, 51, 234, 0.1), 0 2px 4px -1px rgba(147, 51, 234, 0.06)'
-        },
-        headerButton: {
-            backgroundColor: 'transparent',
-            borderColor: 'transparent',
-            borderWidth: '0'
-        }
-    }
+    'morandi-purple': {},
+    'morandi-blue': {},
+    'morandi-green': {},
+    'morandi-pink': {}
 };
 
 /**
@@ -63,7 +54,8 @@ class ColorSchemeService {
      */
     private loadScheme() {
         const saved = localStorage.getItem(this.STORAGE_KEY);
-        if (saved && (saved === 'default' || saved === 'purple')) {
+        const validSchemes: ColorScheme[] = ['default', 'morandi-purple', 'morandi-blue', 'morandi-green', 'morandi-pink'];
+        if (saved && validSchemes.includes(saved as ColorScheme)) {
             this.currentScheme = saved as ColorScheme;
         }
     }

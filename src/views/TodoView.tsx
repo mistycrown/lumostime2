@@ -173,7 +173,7 @@ const SwipeableTodoItem: React.FC<{
                     cy="8"
                     r="7"
                     fill="none"
-                    stroke="#e7e5e4"
+                    stroke="var(--progress-bar-bg)"
                     strokeWidth="2"
                   />
                   {/* Progress arc */}
@@ -182,7 +182,7 @@ const SwipeableTodoItem: React.FC<{
                     cy="8"
                     r="7"
                     fill="none"
-                    stroke="#2F4F4F"
+                    stroke="var(--progress-bar-fill)"
                     strokeWidth="2"
                     strokeDasharray={`${2 * Math.PI * 7}`}
                     strokeDashoffset={`${2 * Math.PI * 7 * (1 - (todo.completedUnits || 0) / (todo.totalAmount || 1))}`}
@@ -234,9 +234,9 @@ const SwipeableTodoItem: React.FC<{
                 <span>Progress</span>
                 <span>{Math.round((todo.completedUnits || 0) / (todo.totalAmount || 1) * 100)}%</span>
               </div>
-              <div className="h-1.5 w-full bg-stone-100 rounded-full overflow-hidden">
+              <div className="progress-bar">
                 <div
-                  className="h-full bg-stone-900 rounded-full transition-all duration-500"
+                  className="progress-bar-fill"
                   style={{ width: `${Math.min(100, Math.max(0, (todo.completedUnits || 0) / (todo.totalAmount || 1) * 100))}%` }}
                 />
               </div>
@@ -268,7 +268,7 @@ const SwipeableTodoItem: React.FC<{
 };
 
 export const TodoView: React.FC<TodoViewProps> = ({ todos, categories, activityCategories, scopes, onToggleTodo, onEditTodo, onAddTodo, onStartFocus, onDuplicateTodo, onBatchAddTodos, autoLinkRules = [] }) => {
-  const [selectedCategoryId, setSelectedCategoryId] = useState<string>(categories[0]?.id || '');
+  const [selectedCategoryId, setSelectedCategoryId] = useState<string>('');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [backgroundUrl, setBackgroundUrl] = useState<string>('');
   const [backgroundOpacity, setBackgroundOpacity] = useState<number>(0.1);
@@ -449,7 +449,7 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, categories, activityC
                 title={!isSidebarOpen ? category.name : undefined}
               >
                 {isSelected && (
-                  <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-5 bg-stone-900 rounded-r-full"></div>
+                  <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-5 rounded-r-full" style={{ backgroundColor: 'var(--accent-color)' }}></div>
                 )}
                 <span className={`text-xl ${isSelected ? 'opacity-100' : 'opacity-100'}`}>
                   {category.icon}
@@ -516,7 +516,7 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, categories, activityC
           <div className="flex items-center gap-3">
             <button
               onClick={() => setIsAIInputOpen(true)}
-              className="w-8 h-8 rounded-full bg-stone-50 text-stone-400 flex items-center justify-center hover:bg-stone-100 hover:text-stone-600 active:scale-95 transition-all"
+              className="theme-icon-button"
               title="AI Add Task"
             >
               <Sparkles size={16} />
