@@ -503,7 +503,7 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
                                 </div>
 
                                 <div className="pt-3 border-t border-stone-100 space-y-2">
-                                    <p className="text-xs text-stone-500">我是一名个人开发者，从设计到开发，从测试到维护，从宣发到运营，所有的工作都由我一个人独立完成。全都是为爱发电！</p>
+                                    <p className="text-xs text-stone-500">我是一名个人开发者，从设计到开发，从测试到维护，从美工到宣发，所有的工作都由我一个人独立完成。全都是为爱发电！</p>
                                     <p className="text-xs text-stone-500">如果在使用过程中遇到任何问题，还请多多反馈、多多包涵。</p>
                                 </div>
 
@@ -526,7 +526,7 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
                         {/* 兑换码输入 */}
                         <div className="bg-white rounded-2xl p-6 shadow-sm space-y-4">
                             <div className="text-center space-y-2">
-                                <h3 className="font-bold text-base text-stone-800">请输入兑换码</h3>
+                                <h3 className="font-bold text-base text-stone-800">请输入兑换码（正在开发，尚未开放）</h3>
                                 <p className="text-xs text-stone-500">解锁专属投喂功能</p>
                             </div>
 

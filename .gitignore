@@ -29,6 +29,7 @@ dist-ssr
 # Vercel
 .vercel
 .kiro/
+
 # Android Signing Keys (重要：不要提交到 Git)
 *.jks
 *.keystore
@@ -37,8 +38,43 @@ dist-ssr
 public/icon_style_backup/
 static/png_backup/
 
-# keytool -genkey -v -keystore lumostime-release-key.jks -keyalg RSA -keysize 2048 -validity 10000 -alias lumostime -storepass lumostime2025 -keypass lumostime2025 -dname "CN=LumosTime, OU=Development, O=MistyCrown, L=Beijing, ST=Beijing, C=CN"
-SourceCode_For_Copyright.txt
+# ========================================
+# 🔒 敏感文件 - 绝对不能上传到 GitHub！
+# ========================================
+
+# 兑换码数据库（包含所有生成的兑换码）
 redemption_codes_SECRET.json
+
+# 兑换码生成脚本（包含加密算法）
 generate_codes.py
+generate_codes_new.py
+
+# Python 缓存文件
+__pycache__/
+*.pyc
+*.pyo
+
+# 个人笔记
 note.md
+
+# 测试文件（包含解密逻辑）
+test-obfuscation.html
+
+# 混淆指南（包含破解方法）
+CODE_OBFUSCATION_GUIDE.md
+
+# 环境变量（可能包含 API 密钥）
+.env
+.env.local
+.env.*.local
+
+# 版权源代码
+SourceCode_For_Copyright.txt
+
+# ========================================
+# 📝 说明：
+# - redemption_codes_SECRET.json: 包含所有兑换码，泄露后可被无限使用
+# - generate_codes.py: 包含完整的加密算法，泄露后可生成无限兑换码
+# - test-obfuscation.html: 包含解密逻辑示例
+# - CODE_OBFUSCATION_GUIDE.md: 包含破解方法说明
+# ========================================
