@@ -12,7 +12,6 @@ import { TodoItem, TodoCategory, Log, Category, Scope } from '../types';
 import { ScopeAssociation } from './ScopeAssociation';
 import { Trash2, CheckCircle2, TrendingUp, ChevronLeft, Circle, Image as ImageIcon } from 'lucide-react';
 import { DetailTimelineCard } from './DetailTimelineCard';
-import { FocusCharts } from './FocusCharts';
 import { TimelineImage } from './TimelineImage';
 import { imageService } from '../services/imageService';
 
@@ -30,7 +29,7 @@ interface TodoDetailModalProps {
   scopes: Scope[];
 }
 
-type Tab = '细节' | '時間線' | '专注';
+type Tab = '细节' | '時間線';
 
 export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({ initialTodo, currentCategory, onClose, onSave, onDelete, logs, onLogUpdate, onEditLog, todoCategories, categories, scopes }) => {
   const [activeTab, setActiveTab] = useState<Tab>(initialTodo ? '時間線' : '细节');
@@ -208,7 +207,7 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({ initialTodo, c
   const linkedActivityCategory = linkedCategoryId
     ? categories?.find(c => c.id === linkedCategoryId)
     : null;
-  const showFocusTab = linkedActivity && (linkedActivity.enableFocusScore ?? linkedActivityCategory?.enableFocusScore);
+  const enableFocusScore = linkedActivity && (linkedActivity.enableFocusScore ?? linkedActivityCategory?.enableFocusScore);
 
   // Unit Heatmap Constants
   const totalSquares = Math.ceil(totalAmount / unitAmount);
@@ -250,7 +249,7 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({ initialTodo, c
 
         {/* Tabs */}
         <div className="flex gap-8 border-b border-stone-200 mb-8">
-          {['细节', '時間線'].concat(showFocusTab ? ['专注'] : []).map(tab => (
+          {['细节', '時間線'].map(tab => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab as Tab)}
@@ -534,6 +533,7 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({ initialTodo, c
               heatmapMax,
               coverImage,
             }]}
+            enableFocusScore={enableFocusScore}
             renderLogMetadata={(log) => {
               const category = categories?.find(c => c.id === log.categoryId);
               const activity = category?.activities.find(a => a.id === log.activityId);
@@ -578,17 +578,6 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({ initialTodo, c
               );
             }}
           />
-        )}
-
-        {/* Focus Tab Content */}
-        {activeTab === '专注' && (
-          <div className="animate-in slide-in-from-right-4 fade-in">
-            <FocusCharts
-              logs={linkedLogs}
-              currentDate={displayDate}
-              onDateChange={setDisplayDate}
-            />
-          </div>
         )}
       </div>
     </div >

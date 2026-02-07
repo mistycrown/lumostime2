@@ -10,7 +10,7 @@
 import React, { useMemo } from 'react';
 import { Log, Category } from '../types';
 import { CalendarWidget } from './CalendarWidget';
-import { Clock, Zap, MessageCircle, ChevronLeft, ChevronRight, Grid, Image as ImageIcon } from 'lucide-react';
+import { Clock, Zap, MessageCircle, ChevronLeft, ChevronRight, Grid, Image as ImageIcon, Hash } from 'lucide-react';
 import { TimelineImage } from './TimelineImage';
 
 interface DetailTimelineCardProps {
@@ -40,6 +40,12 @@ interface DetailTimelineCardProps {
     
     // 待办列表（用于获取 Cover Image）
     todos?: import('../types').TodoItem[];
+    
+    // 关键字支持
+    keywords?: string[];
+    
+    // 专注分数支持
+    enableFocusScore?: boolean;
 }
 
 export const DetailTimelineCard: React.FC<DetailTimelineCardProps> = ({
@@ -52,13 +58,49 @@ export const DetailTimelineCard: React.FC<DetailTimelineCardProps> = ({
     categories,
     renderLogMetadata,
     defaultViewMode = 'month',
-    todos = []
+    todos = [],
+    keywords = [],
+    enableFocusScore = false
 }) => {
     const [viewMode, setViewMode] = React.useState<'month' | 'all'>(defaultViewMode);
-    const [calendarViewMode, setCalendarViewMode] = React.useState<'heatmap' | 'gallery'>('heatmap');
+    const [calendarViewMode, setCalendarViewMode] = React.useState<'heatmap' | 'gallery' | 'keywords'>('heatmap');
 
     const displayMonth = displayDate.getMonth();
     const displayYear = displayDate.getFullYear();
+    
+    // 关键字颜色系统
+    const KEYWORD_COLORS = [
+        'bg-red-100 text-red-600 border-red-200',
+        'bg-cyan-100 text-cyan-600 border-cyan-200',
+        'bg-yellow-100 text-yellow-600 border-yellow-200',
+        'bg-blue-100 text-blue-600 border-blue-200',
+        'bg-orange-100 text-orange-600 border-orange-200',
+        'bg-teal-100 text-teal-600 border-teal-200',
+        'bg-amber-100 text-amber-600 border-amber-200',
+        'bg-indigo-100 text-indigo-600 border-indigo-200',
+        'bg-lime-100 text-lime-600 border-lime-200',
+        'bg-purple-100 text-purple-600 border-purple-200',
+        'bg-green-100 text-green-600 border-green-200',
+        'bg-fuchsia-100 text-fuchsia-600 border-fuchsia-200',
+        'bg-emerald-100 text-emerald-600 border-emerald-200',
+        'bg-pink-100 text-pink-600 border-pink-200',
+        'bg-sky-100 text-sky-600 border-sky-200',
+        'bg-rose-100 text-rose-600 border-rose-200',
+        'bg-violet-100 text-violet-600 border-violet-200',
+    ];
+
+    const getKeywordColor = (keyword: string) => {
+        let index = keywords.indexOf(keyword);
+        if (index === -1) {
+            let hash = 0;
+            for (let i = 0; i < keyword.length; i++) {
+                hash = keyword.charCodeAt(i) + ((hash << 5) - hash);
+            }
+            index = Math.abs(hash);
+        }
+        const colorIndex = index % KEYWORD_COLORS.length;
+        return KEYWORD_COLORS[colorIndex];
+    };
 
     // 当月日志
     const monthLogs = useMemo(() => filteredLogs.filter(log => {
@@ -68,6 +110,9 @@ export const DetailTimelineCard: React.FC<DetailTimelineCardProps> = ({
 
     // 智能判断初始视图：检测当月是否有足够的图片
     React.useEffect(() => {
+        // 如果有关键字，不自动切换视图
+        if (keywords.length > 0) return;
+        
         let imageCount = 0;
         
         monthLogs.forEach(log => {
@@ -89,7 +134,7 @@ export const DetailTimelineCard: React.FC<DetailTimelineCardProps> = ({
         } else {
             setCalendarViewMode('heatmap');
         }
-    }, [monthLogs, todos, displayMonth, displayYear]); // 当月份变化时重新判断
+    }, [monthLogs, todos, displayMonth, displayYear, keywords.length]); // 当月份变化时重新判断
 
     // 显示日志：根据模式选择
     const logsToDisplay = viewMode === 'month' ? monthLogs : filteredLogs;
@@ -256,26 +301,39 @@ export const DetailTimelineCard: React.FC<DetailTimelineCardProps> = ({
                         <div className="flex bg-stone-100/50 p-0.5 rounded-lg">
                             <button
                                 onClick={() => setCalendarViewMode('heatmap')}
-                                className={`p-2 rounded-md transition-all ${
+                                className={`p-1.5 rounded-md transition-all ${
                                     calendarViewMode === 'heatmap'
                                         ? 'bg-white text-stone-900 shadow-sm'
                                         : 'text-stone-400 hover:text-stone-600'
                                 }`}
                                 title="热力图"
                             >
-                                <Grid size={16} />
+                                <Grid size={14} />
                             </button>
                             <button
                                 onClick={() => setCalendarViewMode('gallery')}
-                                className={`p-2 rounded-md transition-all ${
+                                className={`p-1.5 rounded-md transition-all ${
                                     calendarViewMode === 'gallery'
                                         ? 'bg-white text-stone-900 shadow-sm'
                                         : 'text-stone-400 hover:text-stone-600'
                                 }`}
                                 title="画廊"
                             >
-                                <ImageIcon size={16} />
+                                <ImageIcon size={14} />
                             </button>
+                            {keywords.length > 0 && (
+                                <button
+                                    onClick={() => setCalendarViewMode('keywords')}
+                                    className={`p-1.5 rounded-md transition-all ${
+                                        calendarViewMode === 'keywords'
+                                            ? 'bg-white text-stone-900 shadow-sm'
+                                            : 'text-stone-400 hover:text-stone-600'
+                                    }`}
+                                    title="关键字"
+                                >
+                                    <Hash size={14} />
+                                </button>
+                            )}
                         </div>
                     </div>
 
@@ -311,7 +369,51 @@ export const DetailTimelineCard: React.FC<DetailTimelineCardProps> = ({
                                     const data = calendarData.get(day);
                                     const hasData = data && data.duration > 0;
                                     
-                                    if (calendarViewMode === 'gallery') {
+                                    if (calendarViewMode === 'keywords') {
+                                        // 关键字视图
+                                        const dayDate = new Date(year, month, day);
+                                        const dayLogs = monthLogs.filter(l => {
+                                            const d = new Date(l.startTime);
+                                            return d.getDate() === day;
+                                        });
+                                        
+                                        // 找到匹配的关键字
+                                        const matchedKeywords = new Set<string>();
+                                        dayLogs.forEach(log => {
+                                            keywords.forEach(kw => {
+                                                if ((log.title && log.title.includes(kw)) || (log.note && log.note.includes(kw))) {
+                                                    matchedKeywords.add(kw);
+                                                }
+                                            });
+                                        });
+                                        
+                                        cells.push(
+                                            <div
+                                                key={day}
+                                                className="aspect-square rounded-lg overflow-hidden relative"
+                                            >
+                                                {matchedKeywords.size === 0 ? (
+                                                    // 无匹配关键字：灰色
+                                                    <div className="w-full h-full bg-stone-100 flex items-center justify-center">
+                                                        <span className="text-sm font-medium text-stone-400">{day}</span>
+                                                    </div>
+                                                ) : (
+                                                    // 有匹配关键字：分割颜色
+                                                    <div className="w-full h-full flex">
+                                                        {Array.from(matchedKeywords).map(kw => (
+                                                            <div
+                                                                key={kw}
+                                                                className={`h-full flex-1 ${getKeywordColor(kw).split(' ')[0]}`}
+                                                            />
+                                                        ))}
+                                                        <span className="absolute inset-0 flex items-center justify-center text-sm font-medium text-stone-700">
+                                                            {day}
+                                                        </span>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        );
+                                    } else if (calendarViewMode === 'gallery') {
                                         // 画廊视图
                                         const images = data?.images || [];
                                         const firstImage = images.length > 0 ? images[0] : null;
@@ -367,19 +469,17 @@ export const DetailTimelineCard: React.FC<DetailTimelineCardProps> = ({
                     </div>
 
                     {/* 统计信息 - 简洁版本 */}
-                    <div className="px-2 space-y-3">
+                    <div className="px-2 space-y-2">
                         {/* Total Time */}
                         <div className="flex items-baseline gap-2">
                             <span className="text-xs font-medium text-stone-400 uppercase tracking-wider">Total</span>
                             <div className="flex-1 border-b border-dotted border-stone-200" />
-                            <span className="text-lg font-bold text-stone-900">
-                                {totalHours}<span className="text-sm text-stone-400 mx-0.5">h</span>
-                                {totalMins}<span className="text-sm text-stone-400 ml-0.5">m</span>
+                            <span className="text-xs font-medium text-stone-400">
+                                {totalHours}h {totalMins}m
                             </span>
                             <span className="text-stone-300">/</span>
-                            <span className="text-base font-bold text-stone-600">
-                                {monthHours}<span className="text-xs text-stone-400 mx-0.5">h</span>
-                                {monthMins}<span className="text-xs text-stone-400 ml-0.5">m</span>
+                            <span className="text-xs font-medium text-stone-400">
+                                {monthHours}h {monthMins}m
                             </span>
                         </div>
 
@@ -394,16 +494,16 @@ export const DetailTimelineCard: React.FC<DetailTimelineCardProps> = ({
                                 const avgMonth = monthDays > 0 ? Math.round(monthSeconds / 60 / monthDays) : 0;
                                 return (
                                     <>
-                                        <span className="text-lg font-bold text-stone-900">{avgTotal}m</span>
+                                        <span className="text-xs font-medium text-stone-400">{avgTotal}m</span>
                                         <span className="text-stone-300">/</span>
-                                        <span className="text-base font-bold text-stone-600">{avgMonth}m</span>
+                                        <span className="text-xs font-medium text-stone-400">{avgMonth}m</span>
                                     </>
                                 );
                             })()}
                         </div>
 
                         {/* Focus Score Distribution */}
-                        {(() => {
+                        {enableFocusScore && (() => {
                             // 计算当月专注度分布
                             const focusDistribution = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
                             let totalFocusTime = 0;
@@ -426,7 +526,7 @@ export const DetailTimelineCard: React.FC<DetailTimelineCardProps> = ({
                                 };
                                 
                                 return (
-                                    <div className="flex flex-col gap-1.5">
+                                    <div className="flex flex-col gap-1">
                                         <div className="flex items-baseline gap-2">
                                             <span className="text-xs font-medium text-stone-400 uppercase tracking-wider">Focus</span>
                                             <div className="flex-1 border-b border-dotted border-stone-200" />
@@ -499,6 +599,24 @@ export const DetailTimelineCard: React.FC<DetailTimelineCardProps> = ({
                             return null;
                         })()}
                     </div>
+                    
+                    {/* 关键字图例 - 仅在关键字视图时显示 */}
+                    {calendarViewMode === 'keywords' && keywords.length > 0 && (
+                        <div className="px-2 mt-4 pt-3 border-t border-stone-100">
+                            <div className="flex flex-wrap gap-2 justify-center">
+                                <div className="flex items-center gap-1.5">
+                                    <div className="w-2.5 h-2.5 rounded bg-stone-100"></div>
+                                    <span className="text-[10px] text-stone-400">Unmatched</span>
+                                </div>
+                                {keywords.map(kw => (
+                                    <div key={kw} className="flex items-center gap-1.5">
+                                        <div className={`w-2.5 h-2.5 rounded ${getKeywordColor(kw).split(' ')[0]}`}></div>
+                                        <span className="text-[10px] text-stone-500">{kw}</span>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
                 </div>
             ) : (
                 // All View Stats (Three Columns)
