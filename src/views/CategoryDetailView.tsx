@@ -383,6 +383,7 @@ export const CategoryDetailView: React.FC<CategoryDetailViewProps> = ({ category
                         }}
                         onEditLog={onEditLog}
                         categories={categories}
+                        todos={todos}
                         renderLogMetadata={(log) => {
                             const category = categories.find(c => c.id === log.categoryId);
                             const activity = category?.activities.find(a => a.id === log.activityId);

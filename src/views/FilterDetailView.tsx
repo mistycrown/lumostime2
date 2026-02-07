@@ -327,6 +327,7 @@ export const FilterDetailView: React.FC<FilterDetailViewProps> = ({
                         }}
                         onEditLog={onEditLog}
                         categories={categories}
+                        todos={todos}
                         renderLogMetadata={(log) => {
                             // Find related entities
                             const category = categories.find(c => c.id === log.categoryId);

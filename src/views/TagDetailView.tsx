@@ -531,6 +531,7 @@ export const TagDetailView: React.FC<TagDetailViewProps> = ({ tagId, logs, todos
                   }}
                   onEditLog={onEditLog}
                   categories={categories}
+                  todos={todos}
                   renderLogMetadata={(log) => {
                      return (
                         <div className="flex flex-wrap items-center gap-2 mt-1">

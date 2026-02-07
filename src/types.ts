@@ -135,6 +135,7 @@ export interface TodoItem {
   linkedCategoryId?: string; // Link back to Category
   defaultScopeIds?: string[]; // NEW: Default Scopes when starting this todo - changed from defaultScopeId
   note?: string;
+  coverImage?: string; // NEW: Cover image filename (only one image allowed)
 
   // Progress/Habit Features
   isProgress?: boolean;

@@ -10,10 +10,11 @@
 import React, { useState, useMemo } from 'react';
 import { TodoItem, TodoCategory, Log, Category, Scope } from '../types';
 import { ScopeAssociation } from './ScopeAssociation';
-import { X, Trash2, Link as LinkIcon, CheckCircle2, TrendingUp, BarChart3, List, Plus, Minus, Clock, Save, MoreHorizontal, ChevronLeft, Check, ChevronDown, Zap, Circle } from 'lucide-react';
+import { X, Trash2, Link as LinkIcon, CheckCircle2, TrendingUp, BarChart3, List, Plus, Minus, Clock, Save, MoreHorizontal, ChevronLeft, Check, ChevronDown, Zap, Circle, Image as ImageIcon } from 'lucide-react';
 import { CalendarWidget } from './CalendarWidget';
 import { FocusCharts } from './FocusCharts';
 import { TimelineImage } from './TimelineImage';
+import { imageService } from '../services/imageService';
 
 interface TodoDetailModalProps {
   initialTodo?: TodoItem | null;
@@ -60,6 +61,10 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({ initialTodo, c
   const [heatmapMin, setHeatmapMin] = useState<number | undefined>(initialTodo?.heatmapMin);
   const [heatmapMax, setHeatmapMax] = useState<number | undefined>(initialTodo?.heatmapMax);
 
+  // Cover Image State
+  const [coverImage, setCoverImage] = useState<string | undefined>(initialTodo?.coverImage);
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
+
   // Timeline / Calendar State
   const [displayDate, setDisplayDate] = useState(new Date());
   const [viewMode, setViewMode] = useState<'month' | 'all'>('month');
@@ -87,6 +92,7 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({ initialTodo, c
       completedUnits: isProgress ? completedUnits : undefined,
       heatmapMin,
       heatmapMax,
+      coverImage, // 添加封面图片
     };
     onSave(newTodo);
 
@@ -97,8 +103,64 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({ initialTodo, c
 
   const handleDelete = () => {
     if (initialTodo && onDelete) {
+      // 如果有封面图片，删除它
+      if (initialTodo.coverImage) {
+        imageService.deleteImage(initialTodo.coverImage).catch(err => {
+          console.error('Failed to delete cover image:', err);
+        });
+      }
       onDelete(initialTodo.id);
       onClose();
+    }
+  };
+
+  // 处理图片上传
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // 检查文件类型
+    if (!file.type.startsWith('image/')) {
+      alert('请选择图片文件');
+      return;
+    }
+
+    // 检查文件大小（限制为 10MB）
+    if (file.size > 10 * 1024 * 1024) {
+      alert('图片大小不能超过 10MB');
+      return;
+    }
+
+    setIsUploadingImage(true);
+    try {
+      // 如果已有封面图片，先删除旧的
+      if (coverImage) {
+        await imageService.deleteImage(coverImage);
+      }
+
+      // 保存新图片
+      const filename = await imageService.saveImage(file);
+      setCoverImage(filename);
+      console.log('Cover image uploaded:', filename);
+    } catch (error) {
+      console.error('Failed to upload cover image:', error);
+      alert('图片上传失败，请重试');
+    } finally {
+      setIsUploadingImage(false);
+    }
+  };
+
+  // 删除封面图片
+  const handleRemoveCoverImage = async () => {
+    if (!coverImage) return;
+
+    try {
+      await imageService.deleteImage(coverImage);
+      setCoverImage(undefined);
+      console.log('Cover image removed:', coverImage);
+    } catch (error) {
+      console.error('Failed to remove cover image:', error);
+      alert('删除图片失败，请重试');
     }
   };
 
@@ -260,6 +322,57 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({ initialTodo, c
                   className="w-full bg-stone-50 border border-stone-200 rounded-xl px-4 py-3 text-stone-700 text-sm outline-none focus:border-stone-400 transition-colors min-h-[100px] resize-none"
                   placeholder="Add notes..."
                 />
+              </div>
+              
+              {/* Cover Image */}
+              <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="text-xs text-stone-400 font-medium">Cover Image</label>
+                  {coverImage && (
+                    <button
+                      type="button"
+                      onClick={handleRemoveCoverImage}
+                      className="p-1 text-red-500 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
+                      title="删除封面图片"
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  )}
+                </div>
+                {coverImage ? (
+                  // 显示已上传的图片
+                  <div className="aspect-[16/9] rounded-xl overflow-hidden bg-stone-100">
+                    <TimelineImage 
+                      filename={coverImage} 
+                      className="w-full h-full object-cover"
+                      useThumbnail={false}
+                    />
+                  </div>
+                ) : (
+                  // 上传按钮
+                  <label className="block">
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handleImageUpload}
+                      className="hidden"
+                      disabled={isUploadingImage}
+                    />
+                    <div className="h-32 rounded-xl border-2 border-dashed border-stone-200 hover:border-stone-400 transition-colors cursor-pointer flex flex-col items-center justify-center gap-2 bg-stone-50 hover:bg-stone-100">
+                      {isUploadingImage ? (
+                        <>
+                          <div className="w-6 h-6 border-2 border-stone-300 border-t-stone-600 rounded-full animate-spin" />
+                          <span className="text-xs text-stone-500 font-medium">上传中...</span>
+                        </>
+                      ) : (
+                        <>
+                          <ImageIcon size={24} className="text-stone-400" />
+                          <span className="text-xs text-stone-500 font-medium">点击上传封面图片</span>
+                        </>
+                      )}
+                    </div>
+                  </label>
+                )}
               </div>
             </div>
 
