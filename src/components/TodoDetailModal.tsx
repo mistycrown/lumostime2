@@ -254,7 +254,7 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({ initialTodo, c
           </div>
           <div className="flex items-center gap-2">
             <span className="text-stone-500 text-sm font-medium bg-stone-100 px-3 py-1 rounded-full flex items-center gap-2">
-              <span>{selectedCategory.icon}</span>
+              <IconRenderer icon={selectedCategory.icon} className="text-sm" />
               <span>{selectedCategory.name}</span>
             </span>
             {isProgress && (
@@ -531,11 +531,11 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({ initialTodo, c
                   {/* Category Tag */}
                   <span className="text-[10px] font-medium text-stone-500 border border-stone-200 px-2 py-0.5 rounded flex items-center gap-1 bg-stone-50/30">
                     <span className="font-bold text-stone-400">#</span>
-                    <IconRenderer icon={category?.icon || ''} className="text-xs" />
+                    <IconRenderer icon={category?.icon || ''} className="text-xs" size={12} />
                     <span className="flex items-center">
                       <span>{category?.name}</span>
                       <span className="mx-1 text-stone-300">/</span>
-                      <IconRenderer icon={activity?.icon || ''} className="text-xs mr-1" />
+                      <IconRenderer icon={activity?.icon || ''} className="text-xs" size={12} />
                       <span className="text-stone-500">{activity?.name}</span>
                     </span>
                   </span>

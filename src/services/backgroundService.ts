@@ -33,6 +33,13 @@ const PRESET_BACKGROUNDS: BackgroundOption[] = [
         thumbnail: '/background/bank.webp',
     },
     {
+        id: 'black',
+        name: '黑色',
+        type: 'preset',
+        url: '/background/black.webp',
+        thumbnail: '/background/black.webp',
+    },
+    {
         id: 'green',
         name: '绿意',
         type: 'preset',
@@ -54,11 +61,32 @@ const PRESET_BACKGROUNDS: BackgroundOption[] = [
         thumbnail: '/background/grenn3.webp',
     },
     {
+        id: 'greenpink',
+        name: '绿粉',
+        type: 'preset',
+        url: '/background/greenpink.webp',
+        thumbnail: '/background/greenpink.webp',
+    },
+    {
         id: 'hehua',
         name: '荷花',
         type: 'preset',
         url: '/background/hehua.webp',
         thumbnail: '/background/hehua.webp',
+    },
+    {
+        id: 'pink',
+        name: '粉色',
+        type: 'preset',
+        url: '/background/pink.webp',
+        thumbnail: '/background/pink.webp',
+    },
+    {
+        id: 'pinkblue',
+        name: '粉蓝',
+        type: 'preset',
+        url: '/background/pinkblue.webp',
+        thumbnail: '/background/pinkblue.webp',
     },
     {
         id: 'purple',

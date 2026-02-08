@@ -8,7 +8,7 @@ export type TimePalType =
     | 'default' // 默认（不开启时光小友）
     | 'cat' | 'dog' | 'rabbit' | 'monkey' | 'prince' | 'chibi' | 'girl'
     // 新增类型
-    | 'buddist' | 'cat2' | 'dog2' | 'dog3' | 'Ghost' | 'girl2' | 'girl3' | 'girl4'
+    | 'buddist' | 'cat2' | 'dog2' | 'dog3' | 'flower' | 'Ghost' | 'girl2' | 'girl3' | 'girl4'
     | 'gui' | 'mouse' | 'panda' | 'pigen' | 'prince2' | 'rabbit2' | 'renzhe' | 'taoist' | 'zombis';
 
 // 时光小友选项配置
@@ -95,6 +95,12 @@ export const TIMEPAL_OPTIONS: TimePalOption[] = [
         name: '小狗3', 
         preview: '/time_pal_origin/dog3/1.webp',
         emoji: '🐕'
+    },
+    { 
+        type: 'flower', 
+        name: '花朵', 
+        preview: '/time_pal_origin/flower/1.png',
+        emoji: '🌸'
     },
     { 
         type: 'Ghost', 

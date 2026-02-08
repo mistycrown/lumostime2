@@ -104,7 +104,7 @@ const THEME_PRESETS: ThemePreset[] = [
         description: '温暖的橙色主题',
         icon: '🌅',
         appIcon: 'icon_bijiaso',
-        uiTheme: 'color2',
+        uiTheme: 'plant',
         colorScheme: 'morandi-orange',
         background: 'red',
         navigation: 'orange',
@@ -1009,37 +1009,6 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
                                                 )}
                                             </button>
 
-                                            {/* Color2 主题（绿色） */}
-                                            <button
-                                                onClick={() => handleUiIconThemeChange('color2')}
-                                                className={`relative rounded-lg border-2 transition-all overflow-hidden ${
-                                                    uiIconTheme === 'color2'
-                                                        ? 'border-stone-400 ring-2 ring-stone-200'
-                                                        : 'border-stone-200 hover:border-stone-300'
-                                                }`}
-                                                style={{ aspectRatio: '4/5' }}
-                                            >
-                                                <div className="w-full h-full grid grid-cols-2 gap-0.5 p-1 bg-white">
-                                                    {[1, 2, 3, 4].map((num) => (
-                                                        <div key={num} className="bg-stone-50 rounded flex items-center justify-center">
-                                                            <img
-                                                                src={`/uiicon/color2/${String(num).padStart(2, '0')}.webp`}
-                                                                alt={`icon-${num}`}
-                                                                className="w-full h-full object-contain p-0.5"
-                                                                onError={(e) => {
-                                                                    e.currentTarget.src = `/uiicon/color2/${String(num).padStart(2, '0')}.png`;
-                                                                }}
-                                                            />
-                                                        </div>
-                                                    ))}
-                                                </div>
-                                                {uiIconTheme === 'color2' && (
-                                                    <div className="absolute top-1 right-1 w-5 h-5 bg-stone-800 rounded-full flex items-center justify-center shadow-lg">
-                                                        <Check size={12} className="text-white" />
-                                                    </div>
-                                                )}
-                                            </button>
-
                                             {/* Prince 主题（琥珀色） */}
                                             <button
                                                 onClick={() => handleUiIconThemeChange('prince')}
@@ -1158,6 +1127,37 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
                                                     ))}
                                                 </div>
                                                 {uiIconTheme === 'plant' && (
+                                                    <div className="absolute top-1 right-1 w-5 h-5 bg-stone-800 rounded-full flex items-center justify-center shadow-lg">
+                                                        <Check size={12} className="text-white" />
+                                                    </div>
+                                                )}
+                                            </button>
+
+                                            {/* Water 主题 */}
+                                            <button
+                                                onClick={() => handleUiIconThemeChange('water')}
+                                                className={`relative rounded-lg border-2 transition-all overflow-hidden ${
+                                                    uiIconTheme === 'water'
+                                                        ? 'border-stone-400 ring-2 ring-stone-200'
+                                                        : 'border-stone-200 hover:border-stone-300'
+                                                }`}
+                                                style={{ aspectRatio: '4/5' }}
+                                            >
+                                                <div className="w-full h-full grid grid-cols-2 gap-0.5 p-1 bg-white">
+                                                    {[1, 2, 3, 4].map((num) => (
+                                                        <div key={num} className="bg-stone-50 rounded flex items-center justify-center">
+                                                            <img
+                                                                src={`/uiicon/water/${String(num).padStart(2, '0')}.webp`}
+                                                                alt={`icon-${num}`}
+                                                                className="w-full h-full object-contain p-0.5"
+                                                                onError={(e) => {
+                                                                    e.currentTarget.src = `/uiicon/water/${String(num).padStart(2, '0')}.png`;
+                                                                }}
+                                                            />
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                                {uiIconTheme === 'water' && (
                                                     <div className="absolute top-1 right-1 w-5 h-5 bg-stone-800 rounded-full flex items-center justify-center shadow-lg">
                                                         <Check size={12} className="text-white" />
                                                     </div>

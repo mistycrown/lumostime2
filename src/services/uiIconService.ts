@@ -213,7 +213,7 @@ const ICON_NUMBER_MAP: Record<UIIconType, string> = {
 };
 
 // 可用的主题列表
-export const UI_ICON_THEMES = ['default', 'purple', 'color', 'color2', 'prince', 'cat', 'forest', 'plant'] as const;
+export const UI_ICON_THEMES = ['default', 'purple', 'color', 'prince', 'cat', 'forest', 'plant', 'water'] as const;
 export type UIIconTheme = typeof UI_ICON_THEMES[number];
 
 // 图标分组定义
@@ -408,7 +408,7 @@ class UIIconService {
 
     /**
      * 获取图标路径（带降级支持）
-     * 优先使用 PNG，如果加载失败则降级到 WebP
+     * 优先使用 WebP，如果加载失败则降级到 PNG
      * @param iconType 图标类型
      * @returns { primary: string, fallback: string }
      */
@@ -419,8 +419,8 @@ class UIIconService {
 
         const iconNumber = ICON_NUMBER_MAP[iconType];
         return {
-            primary: `/uiicon/${this.currentTheme}/${iconNumber}.png`,
-            fallback: `/uiicon/${this.currentTheme}/${iconNumber}.webp`
+            primary: `/uiicon/${this.currentTheme}/${iconNumber}.webp`,
+            fallback: `/uiicon/${this.currentTheme}/${iconNumber}.png`
         };
     }
 
