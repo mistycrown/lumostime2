@@ -1,13 +1,20 @@
 /**
  * @file IconRenderer.tsx
- * @description 通用图标渲染组件 - 根据图标字符串自动选择渲染 Emoji 或 UI 图标图片
+ * @description 通用图标渲染组件 - 支持双图标系统（emoji + uiIcon）
+ * 
+ * 新的双图标系统：
+ * - icon: 始终保存 emoji（用于默认主题）
+ * - uiIcon: 保存 UI 图标 ID（用于自定义主题）
+ * - 根据当前主题自动选择渲染哪个图标
  */
 
 import React, { useState } from 'react';
 import { uiIconService, UIIconType } from '../services/uiIconService';
+import { getDisplayIcon } from '../utils/iconUtils';
 
 interface IconRendererProps {
-    icon: string;                    // 图标字符串，可能是 "ui:iconType" 或 Emoji
+    icon: string;                    // Emoji 图标（用于默认主题）
+    uiIcon?: string;                 // UI 图标 ID（用于自定义主题，格式：ui:iconType）
     className?: string;              // 额外的 CSS 类名
     size?: number | string;          // 图标大小（像素或 CSS 值）
     alt?: string;                    // 图片的 alt 文本
@@ -19,18 +26,20 @@ interface IconRendererProps {
  * 
  * 使用示例：
  * ```tsx
- * // 渲染 Emoji
+ * // 旧数据（只有 icon）
  * <IconRenderer icon="📚" />
+ * <IconRenderer icon="ui:book" />
  * 
- * // 渲染 UI 图标
- * <IconRenderer icon="ui:book" size={24} />
+ * // 新数据（同时有 icon 和 uiIcon）
+ * <IconRenderer icon="📚" uiIcon="ui:book" />
  * 
- * // 自动判断
- * <IconRenderer icon={category.icon} className="text-2xl" />
+ * // 从对象中传递
+ * <IconRenderer icon={category.icon} uiIcon={category.uiIcon} />
  * ```
  */
 export const IconRenderer: React.FC<IconRendererProps> = ({
     icon,
+    uiIcon,
     className = '',
     size,
     alt,
@@ -39,17 +48,22 @@ export const IconRenderer: React.FC<IconRendererProps> = ({
     const [imageError, setImageError] = useState(false);
     const [hasFallbackAttempted, setHasFallbackAttempted] = useState(false);
     
-    // 解析图标字符串
-    const { isUIIcon, value } = uiIconService.parseIconString(icon);
+    const currentTheme = uiIconService.getCurrentTheme();
+    
+    // 使用工具函数获取应该显示的图标
+    const displayIcon = getDisplayIcon(icon, uiIcon, currentTheme);
     
     // 当图标变化时，重置错误状态
     React.useEffect(() => {
         setImageError(false);
         setHasFallbackAttempted(false);
-    }, [icon]);
+    }, [displayIcon]);
+    
+    // 解析显示的图标字符串
+    const { isUIIcon, value } = uiIconService.parseIconString(displayIcon);
     
     // 如果不是 UI 图标格式，或者当前主题是 default，直接渲染 Emoji
-    if (!isUIIcon || uiIconService.getCurrentTheme() === 'default') {
+    if (!isUIIcon || currentTheme === 'default') {
         return (
             <span className={className} style={size ? { fontSize: size } : undefined}>
                 {value}
@@ -59,7 +73,7 @@ export const IconRenderer: React.FC<IconRendererProps> = ({
 
     // 如果图片加载失败，显示降级 Emoji
     if (imageError) {
-        const displayEmoji = fallbackEmoji || value.charAt(0);
+        const displayEmoji = fallbackEmoji || icon || value.charAt(0);
         return (
             <span className={className} style={size ? { fontSize: size } : undefined}>
                 {displayEmoji}
@@ -132,7 +146,7 @@ export const IconRenderer: React.FC<IconRendererProps> = ({
  * 
  * 使用示例：
  * ```tsx
- * const { isImage, src, emoji } = useIconRenderer(category.icon);
+ * const { isImage, src, emoji } = useIconRenderer(category.icon, category.uiIcon);
  * 
  * if (isImage) {
  *   return <img src={src} alt="icon" />;
@@ -141,9 +155,13 @@ export const IconRenderer: React.FC<IconRendererProps> = ({
  * }
  * ```
  */
-export const useIconRenderer = (icon: string) => {
-    const { isUIIcon, value } = uiIconService.parseIconString(icon);
+export const useIconRenderer = (icon: string, uiIcon?: string) => {
     const currentTheme = uiIconService.getCurrentTheme();
+    
+    // 使用工具函数获取应该显示的图标
+    const displayIcon = getDisplayIcon(icon, uiIcon, currentTheme);
+    
+    const { isUIIcon, value } = uiIconService.parseIconString(displayIcon);
     
     // 判断是否应该渲染为图片
     const shouldRenderAsImage = isUIIcon && currentTheme !== 'default';

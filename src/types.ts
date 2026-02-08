@@ -10,7 +10,8 @@
 export interface Activity {
   id: string;
   name: string;
-  icon: string; // Emoji or Lucide icon name
+  icon: string; // Emoji or Lucide icon name (for default theme)
+  uiIcon?: string; // UI icon ID (for custom theme, e.g., "ui:purple:01")
   color: string; // Tailwind color class for background
   heatmapMin?: number; // Custom heatmap scale (Minutes)
   heatmapMax?: number;
@@ -21,7 +22,8 @@ export interface Activity {
 export interface Category {
   id: string;
   name: string;
-  icon: string; // Prefix icon/emoji
+  icon: string; // Prefix icon/emoji (for default theme)
+  uiIcon?: string; // UI icon ID (for custom theme, e.g., "ui:purple:01")
   activities: Activity[];
   themeColor: string; // Hex color for stats chart
   enableFocusScore?: boolean; // Default for all activities in category
@@ -33,7 +35,8 @@ export interface Category {
 export interface Scope {
   id: string;
   name: string;
-  icon: string; // Emoji icon
+  icon: string; // Emoji icon (for default theme)
+  uiIcon?: string; // UI icon ID (for custom theme, e.g., "ui:purple:01")
   description?: string;
   isArchived: boolean;
   order: number;
@@ -122,7 +125,8 @@ export interface Log {
 export interface TodoCategory {
   id: string;
   name: string;
-  icon: string;
+  icon: string; // Emoji icon (for default theme)
+  uiIcon?: string; // UI icon ID (for custom theme, e.g., "ui:purple:01")
 }
 
 export interface TodoItem {

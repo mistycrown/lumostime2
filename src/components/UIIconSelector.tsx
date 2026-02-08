@@ -1,6 +1,11 @@
 /**
  * @file UIIconSelector.tsx
- * @description UI 图标选择器组件 - 允许用户从当前主题的图标集中选择图标
+ * @description UI 图标选择器组件 - 支持双图标系统
+ * 
+ * 新的双图标系统：
+ * - 选择图标时，根据当前主题决定更新哪个字段
+ * - 默认主题：更新 icon（emoji）
+ * - 自定义主题：更新 uiIcon（UI 图标 ID）
  */
 
 import React, { useState, useMemo } from 'react';
@@ -8,8 +13,10 @@ import { Check } from 'lucide-react';
 import { uiIconService, UIIconType, ICON_GROUPS } from '../services/uiIconService';
 
 interface UIIconSelectorProps {
-    currentIcon: string;              // 当前图标（可能是 Emoji 或 "ui:iconType"）
-    onSelect: (iconString: string) => void;  // 选择回调
+    currentIcon: string;              // 当前 emoji 图标
+    currentUiIcon?: string;           // 当前 UI 图标（可选）
+    onSelect: (iconString: string) => void;  // 选择回调（兼容旧接口）
+    onSelectDual?: (emoji: string, uiIcon: string) => void;  // 双图标选择回调（新接口）
     className?: string;
 }
 
@@ -18,25 +25,40 @@ interface UIIconSelectorProps {
  * 
  * 使用示例：
  * ```tsx
+ * // 旧接口（兼容）
  * <UIIconSelector 
  *   currentIcon={activity.icon}
  *   onSelect={(icon) => setActivity({ ...activity, icon })}
+ * />
+ * 
+ * // 新接口（推荐）
+ * <UIIconSelector 
+ *   currentIcon={activity.icon}
+ *   currentUiIcon={activity.uiIcon}
+ *   onSelectDual={(emoji, uiIcon) => setActivity({ ...activity, icon: emoji, uiIcon })}
  * />
  * ```
  */
 export const UIIconSelector: React.FC<UIIconSelectorProps> = ({
     currentIcon,
+    currentUiIcon,
     onSelect,
+    onSelectDual,
     className = ''
 }) => {
     const [selectedGroup, setSelectedGroup] = useState<keyof typeof ICON_GROUPS>('daily');
     const currentTheme = uiIconService.getCurrentTheme();
     
     // 解析当前图标
-    const { isUIIcon, value: currentIconType } = uiIconService.parseIconString(currentIcon);
+    const { isUIIcon: currentIsUIIcon, value: currentIconType } = uiIconService.parseIconString(currentIcon);
+    const { isUIIcon: currentUiIsUIIcon, value: currentUiIconType } = currentUiIcon 
+        ? uiIconService.parseIconString(currentUiIcon)
+        : { isUIIcon: false, value: '' };
     
-    // 获取当前选中的图标类型
-    const currentSelectedIconType = isUIIcon ? currentIconType : null;
+    // 获取当前选中的图标类型（根据当前主题）
+    const currentSelectedIconType = currentTheme === 'default'
+        ? (currentIsUIIcon ? currentIconType : null)
+        : (currentUiIsUIIcon ? currentUiIconType : null);
     
     // 按分组组织图标
     const groupedIcons = useMemo(() => {
@@ -49,8 +71,17 @@ export const UIIconSelector: React.FC<UIIconSelectorProps> = ({
     
     // 处理图标选择
     const handleIconSelect = (iconType: UIIconType) => {
-        const iconString = `ui:${iconType}`;
-        onSelect(iconString);
+        const uiIconString = `ui:${iconType}`;
+        
+        // 如果提供了新接口，使用新接口
+        if (onSelectDual) {
+            // 获取对应的 emoji（如果有映射的话）
+            const emoji = uiIconService.convertUIIconToEmoji(uiIconString);
+            onSelectDual(emoji, uiIconString);
+        } else {
+            // 兼容旧接口
+            onSelect(uiIconString);
+        }
     };
     
     return (
@@ -138,12 +169,23 @@ export const UIIconSelector: React.FC<UIIconSelectorProps> = ({
  */
 export const UIIconSelectorCompact: React.FC<UIIconSelectorProps> = ({
     currentIcon,
+    currentUiIcon,
     onSelect,
+    onSelectDual,
     className = ''
 }) => {
     const currentTheme = uiIconService.getCurrentTheme();
-    const { isUIIcon, value: currentIconType } = uiIconService.parseIconString(currentIcon);
-    const currentSelectedIconType = isUIIcon ? currentIconType : null;
+    
+    // 解析当前图标
+    const { isUIIcon: currentIsUIIcon, value: currentIconType } = uiIconService.parseIconString(currentIcon);
+    const { isUIIcon: currentUiIsUIIcon, value: currentUiIconType } = currentUiIcon 
+        ? uiIconService.parseIconString(currentUiIcon)
+        : { isUIIcon: false, value: '' };
+    
+    // 获取当前选中的图标类型（根据当前主题）
+    const currentSelectedIconType = currentTheme === 'default'
+        ? (currentIsUIIcon ? currentIconType : null)
+        : (currentUiIsUIIcon ? currentUiIconType : null);
     
     // 获取所有图标
     const allIcons = useMemo(() => {
@@ -151,8 +193,17 @@ export const UIIconSelectorCompact: React.FC<UIIconSelectorProps> = ({
     }, []);
     
     const handleIconSelect = (iconType: UIIconType) => {
-        const iconString = `ui:${iconType}`;
-        onSelect(iconString);
+        const uiIconString = `ui:${iconType}`;
+        
+        // 如果提供了新接口，使用新接口
+        if (onSelectDual) {
+            // 获取对应的 emoji（如果有映射的话）
+            const emoji = uiIconService.convertUIIconToEmoji(uiIconString);
+            onSelectDual(emoji, uiIconString);
+        } else {
+            // 兼容旧接口
+            onSelect(uiIconString);
+        }
     };
     
     return (
