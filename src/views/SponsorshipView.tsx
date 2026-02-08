@@ -492,6 +492,8 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
     // 执行主题方案切换的实际逻辑
     const executeThemePresetChange = async (preset: ThemePreset, oldTheme: string) => {
         try {
+            console.log('[SponsorshipView] 主题切换:', { from: oldTheme, to: preset.uiTheme });
+            
             // 1. 设置 UI 主题
             setUiIconTheme(preset.uiTheme);
             
@@ -515,89 +517,47 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
             setCurrentPresetId(preset.id);
             
             // 7. 处理图标主题切换
-            // 如果从自定义主题切换回 default，需要反向迁移并刷新
-            if (oldTheme !== 'default' && preset.uiTheme === 'default') {
-                try {
-                    const { iconMigrationService } = await import('../services/iconMigrationService');
-                    
-                    // 读取数据
-                    const categoriesStr = localStorage.getItem('lumostime_categories');
-                    const scopesStr = localStorage.getItem('lumostime_scopes');
-                    const todoCategoriesStr = localStorage.getItem('lumostime_todoCategories');
-                    
-                    if (categoriesStr && scopesStr && todoCategoriesStr) {
-                        const categories = JSON.parse(categoriesStr);
-                        const scopes = JSON.parse(scopesStr);
-                        const todoCategories = JSON.parse(todoCategoriesStr);
-                        
-                        // 执行反向迁移（UI 图标 -> Emoji）
-                        const reversedCategories = iconMigrationService.reverseMigrateCategories(categories);
-                        const reversedScopes = iconMigrationService.reverseMigrateScopes(scopes);
-                        const reversedTodoCategories = iconMigrationService.reverseMigrateTodoCategories(todoCategories);
-                        
-                        // 写回 localStorage
-                        localStorage.setItem('lumostime_categories', JSON.stringify(reversedCategories));
-                        localStorage.setItem('lumostime_scopes', JSON.stringify(reversedScopes));
-                        localStorage.setItem('lumostime_todoCategories', JSON.stringify(reversedTodoCategories));
-                    }
-                    
-                    // 重置迁移状态
-                    iconMigrationService.resetMigration();
-                    
-                    onToast('success', `已应用"${preset.name}"主题方案，正在刷新...`);
-                    
-                    // 延迟刷新，让用户看到提示
-                    setTimeout(() => {
-                        window.location.reload();
-                    }, 1000);
-                    return;
-                } catch (error) {
-                    console.error('[SponsorshipView] 反向迁移失败:', error);
-                }
-            }
-            
-            // 8. 如果从 default 切换到自定义主题，触发图标迁移
+            // 只在首次从 default 切换到自定义主题时生成 uiIcon
             if (oldTheme === 'default' && preset.uiTheme !== 'default') {
                 try {
                     const { iconMigrationService } = await import('../services/iconMigrationService');
                     
-                    // 读取数据
-                    const categoriesStr = localStorage.getItem('lumostime_categories');
-                    const scopesStr = localStorage.getItem('lumostime_scopes');
-                    const todoCategoriesStr = localStorage.getItem('lumostime_todoCategories');
-                    
-                    if (categoriesStr && scopesStr && todoCategoriesStr) {
-                        const categories = JSON.parse(categoriesStr);
-                        const scopes = JSON.parse(scopesStr);
-                        const todoCategories = JSON.parse(todoCategoriesStr);
+                    // 检查是否已经生成过 uiIcon
+                    if (!iconMigrationService.isUiIconGenerated()) {
+                        console.log('[SponsorshipView] 首次切换到自定义主题，生成 uiIcon...');
                         
-                        // 执行迁移
-                        const migratedCategories = iconMigrationService.migrateCategories(categories);
-                        const migratedScopes = iconMigrationService.migrateScopes(scopes);
-                        const migratedTodoCategories = iconMigrationService.migrateTodoCategories(todoCategories);
+                        // 执行一次性生成
+                        const result = await iconMigrationService.generateAllUiIcons();
                         
-                        // 写回 localStorage
-                        localStorage.setItem('lumostime_categories', JSON.stringify(migratedCategories));
-                        localStorage.setItem('lumostime_scopes', JSON.stringify(migratedScopes));
-                        localStorage.setItem('lumostime_todoCategories', JSON.stringify(migratedTodoCategories));
-                        
-                        // 标记迁移完成
-                        iconMigrationService.markMigrationDone();
-                        
-                        onToast('success', `已应用"${preset.name}"主题方案，正在刷新...`);
-                        
-                        // 自动刷新页面
-                        setTimeout(() => {
-                            window.location.reload();
-                        }, 1000);
-                        return;
+                        if (result.success) {
+                            console.log('[SponsorshipView] uiIcon 生成成功:', result);
+                            onToast('success', `${result.message}，正在刷新...`);
+                            
+                            // 刷新页面以应用新数据
+                            setTimeout(() => {
+                                window.location.reload();
+                            }, 1000);
+                            return;
+                        } else {
+                            console.error('[SponsorshipView] uiIcon 生成失败:', result);
+                            onToast('error', result.message);
+                        }
+                    } else {
+                        console.log('[SponsorshipView] uiIcon 已存在，直接切换主题');
                     }
                 } catch (error) {
                     console.error('[SponsorshipView] 图标迁移失败:', error);
+                    onToast('error', '图标迁移失败，请重试');
                 }
             }
             
-            // 9. 如果需要切换应用图标（仅 Android）
+            // 从自定义主题切换回 default，或在自定义主题之间切换
+            // 不做任何数据迁移，只是切换渲染方式
+            if (oldTheme !== 'default' && preset.uiTheme === 'default') {
+                console.log('[SponsorshipView] 从自定义主题切换回默认主题，不做数据迁移');
+            }
+            
+            // 8. 如果需要切换应用图标（仅 Android）
             if (Capacitor.isNativePlatform() && preset.appIcon !== 'icon_simple') {
                 // 应用图标切换需要用户确认，这里只提示
                 onToast('info', `主题已应用！如需更换应用图标，请在 Icon 标签页选择"${preset.appIcon}"`);
@@ -605,7 +565,7 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
                 onToast('success', `已应用"${preset.name}"主题方案`);
             }
             
-            // 10. 触发背景重新应用
+            // 9. 触发背景重新应用
             setTimeout(() => {
                 backgroundService.applyBackgroundToElements();
             }, 100);
@@ -619,61 +579,50 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
     // 处理 UI 图标主题切换，并触发图标迁移
     const handleUiIconThemeChange = async (newTheme: string) => {
         const oldTheme = uiIconTheme;
+        console.log('[SponsorshipView] UI主题切换:', { from: oldTheme, to: newTheme });
+        
         setUiIconTheme(newTheme);
         
-        // 如果从 default 切换到自定义主题，触发图标迁移
+        // 只在首次从 default 切换到自定义主题时生成 uiIcon
         if (oldTheme === 'default' && newTheme !== 'default') {
             try {
                 const { iconMigrationService } = await import('../services/iconMigrationService');
-                const { useCategoryScope } = await import('../contexts/CategoryScopeContext');
-                const { useData } = await import('../contexts/DataContext');
                 
-                // 注意：这里无法直接使用 hooks，需要通过其他方式获取数据
-                // 我们需要从 localStorage 读取数据，迁移后再写回
-                const categoriesStr = localStorage.getItem('lumostime_categories');
-                const scopesStr = localStorage.getItem('lumostime_scopes');
-                const todoCategoriesStr = localStorage.getItem('lumostime_todoCategories');
-                
-                if (categoriesStr && scopesStr && todoCategoriesStr) {
-                    const categories = JSON.parse(categoriesStr);
-                    const scopes = JSON.parse(scopesStr);
-                    const todoCategories = JSON.parse(todoCategoriesStr);
+                // 检查是否已经生成过 uiIcon
+                if (!iconMigrationService.isUiIconGenerated()) {
+                    console.log('[SponsorshipView] 首次切换到自定义主题，生成 uiIcon...');
                     
-                    // 执行迁移
-                    const migratedCategories = iconMigrationService.migrateCategories(categories);
-                    const migratedScopes = iconMigrationService.migrateScopes(scopes);
-                    const migratedTodoCategories = iconMigrationService.migrateTodoCategories(todoCategories);
+                    // 执行一次性生成
+                    const result = await iconMigrationService.generateAllUiIcons();
                     
-                    // 写回 localStorage
-                    localStorage.setItem('lumostime_categories', JSON.stringify(migratedCategories));
-                    localStorage.setItem('lumostime_scopes', JSON.stringify(migratedScopes));
-                    localStorage.setItem('lumostime_todoCategories', JSON.stringify(migratedTodoCategories));
-                    
-                    // 标记迁移完成
-                    iconMigrationService.markMigrationDone();
-                    
-                    // 提示用户刷新页面
-                    onToast('success', '图标已自动转换，请刷新页面查看效果');
-                    
-                    // 自动刷新页面
-                    setTimeout(() => {
-                        window.location.reload();
-                    }, 1500);
+                    if (result.success) {
+                        console.log('[SponsorshipView] uiIcon 生成成功:', result);
+                        onToast('success', `${result.message}，正在刷新...`);
+                        
+                        // 刷新页面以应用新数据
+                        setTimeout(() => {
+                            window.location.reload();
+                        }, 1000);
+                    } else {
+                        console.error('[SponsorshipView] uiIcon 生成失败:', result);
+                        onToast('error', result.message);
+                    }
+                } else {
+                    console.log('[SponsorshipView] uiIcon 已存在，直接切换主题');
+                    onToast('success', 'UI 主题已切换');
                 }
             } catch (error) {
                 console.error('[SponsorshipView] 图标迁移失败:', error);
-                onToast('error', '图标迁移失败，请手动刷新页面');
+                onToast('error', '图标迁移失败，请重试');
             }
-        }
-        
-        // 如果从自定义主题切换回 default，重置迁移状态
-        if (oldTheme !== 'default' && newTheme === 'default') {
-            try {
-                const { iconMigrationService } = await import('../services/iconMigrationService');
-                iconMigrationService.resetMigration();
-            } catch (error) {
-                console.error('[SponsorshipView] 重置迁移状态失败:', error);
-            }
+        } else if (oldTheme !== 'default' && newTheme === 'default') {
+            // 从自定义主题切换回 default，不做数据迁移
+            console.log('[SponsorshipView] 从自定义主题切换回默认主题，不做数据迁移');
+            onToast('success', 'UI 主题已切换');
+        } else {
+            // 在自定义主题之间切换，不做数据迁移
+            console.log('[SponsorshipView] 在主题之间切换，不做数据迁移');
+            onToast('success', 'UI 主题已切换');
         }
     };
 

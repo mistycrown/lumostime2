@@ -59,7 +59,7 @@ export const ScopeAssociation: React.FC<ScopeAssociationProps> = ({ scopes, sele
                                 : 'bg-stone-50 text-stone-500 border border-stone-100 hover:bg-stone-100'
                                 }`}
                         >
-                            <IconRenderer icon={scope.icon || '📍'} className="text-xs" />
+                            <IconRenderer icon={scope.icon || '📍'} uiIcon={scope.uiIcon} className="text-xs" />
                             <span className="truncate">{scope.name}</span>
                         </button>
                     );

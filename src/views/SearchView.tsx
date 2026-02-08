@@ -526,7 +526,11 @@ export const SearchView: React.FC<SearchViewProps> = ({
                                             }`}
                                     >
                                         <div className="flex items-center gap-2 mb-1">
-                                            <IconRenderer icon={scope.icon} className="text-sm" />
+                                            <IconRenderer 
+                                                icon={scope.icon} 
+                                                uiIcon={scope.uiIcon}
+                                                className="text-sm" 
+                                            />
                                             <span className="text-sm font-bold text-stone-800">
                                                 {scope.name}
                                             </span>

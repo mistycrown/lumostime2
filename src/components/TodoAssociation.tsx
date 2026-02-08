@@ -72,7 +72,7 @@ export const TodoAssociation: React.FC<TodoAssociationProps> = ({ todos, todoCat
                             }
                         `}
                     >
-                        <IconRenderer icon={cat.icon} className="text-xs" />
+                        <IconRenderer icon={cat.icon} uiIcon={cat.uiIcon} className="text-xs" />
                         <span className="truncate">{cat.name}</span>
                     </button>
                 ))}

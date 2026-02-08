@@ -17,6 +17,7 @@ import { useSettings } from '../contexts/SettingsContext';
 import { useCategoryScope } from '../contexts/CategoryScopeContext';
 import { useData } from '../contexts/DataContext';
 import { Comment as GlobalComment, Scope } from '../types';
+import { getDisplayIcon } from '../utils/iconUtils';
 
 
 interface JournalViewProps {
@@ -140,7 +141,7 @@ export const JournalView: React.FC<JournalViewProps> = ({
 }) => {
     const { categories } = useCategoryScope();
     const { setLogs } = useData();
-    const { memoirFilterConfig } = useSettings();
+    const { memoirFilterConfig, uiTheme } = useSettings();
 
     // Default to Today
     const [selectedDate, setSelectedDate] = useState(new Date());
@@ -210,6 +211,11 @@ export const JournalView: React.FC<JournalViewProps> = ({
             // Get linked scopes
             const linkedScopes = log.scopeIds?.map(id => scopes.find(s => s.id === id)).filter(Boolean) as Scope[] || [];
 
+            // Create tag with both icon and uiIcon information
+            const catIcon = cat ? getDisplayIcon(cat.icon, cat.uiIcon, uiTheme) : '';
+            const actIcon = act ? getDisplayIcon(act.icon, act.uiIcon, uiTheme) : '';
+            const tagString = cat && act ? `${catIcon} ${cat.name} / ${actIcon} ${act.name}` : (title || 'Log');
+
             diaryEntries.push({
                 id: log.id,
                 type: 'normal',
@@ -224,7 +230,7 @@ export const JournalView: React.FC<JournalViewProps> = ({
                     createdAt: new Date(c.createdAt).toISOString(),
                     author: 'Me'
                 })) || [],
-                tags: cat && act ? [`${cat.icon} ${cat.name} / ${act.icon} ${act.name}`] : [title || 'Log'],
+                tags: [tagString],
                 activityId: log.activityId, // Added for filtering
                 scopeIds: log.scopeIds,     // Added for filtering
                 relatedTodos: linkedTodo ? [{
@@ -234,7 +240,10 @@ export const JournalView: React.FC<JournalViewProps> = ({
                     completedUnits: linkedTodo.completedUnits,
                     totalAmount: linkedTodo.totalAmount
                 }] : undefined,
-                domains: linkedScopes.length > 0 ? linkedScopes.map(s => `${s.icon} ${s.name}`) : undefined,
+                domains: linkedScopes.length > 0 ? linkedScopes.map(s => {
+                    const scopeIcon = getDisplayIcon(s.icon, s.uiIcon, uiTheme);
+                    return `${scopeIcon} ${s.name}`;
+                }) : undefined,
                 reactions: log.reactions
             });
         });
@@ -381,7 +390,7 @@ export const JournalView: React.FC<JournalViewProps> = ({
 
         return groupedByDay;
 
-    }, [logs, dailyReviews, weeklyReviews, monthlyReviews, categories, selectedDate, memoirFilterConfig, todos, scopes]);
+    }, [logs, dailyReviews, weeklyReviews, monthlyReviews, categories, selectedDate, memoirFilterConfig, todos, scopes, uiTheme]);
 
     useEffect(() => {
         const container = scrollContainerRef.current;

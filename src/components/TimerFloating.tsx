@@ -183,7 +183,11 @@ const SingleTimer: React.FC<{
             }
           }}
         >
-          <IconRenderer icon={session.activityIcon} className={isBorderAnimating ? 'text-2xl' : 'text-xl'} />
+          <IconRenderer 
+            icon={session.activityIcon} 
+            uiIcon={session.activityUiIcon}
+            className={isBorderAnimating ? 'text-2xl' : 'text-xl'} 
+          />
         </div>
       ) : (
         <>
@@ -215,7 +219,11 @@ const SingleTimer: React.FC<{
                 e.currentTarget.style.backgroundColor = 'color-mix(in srgb, var(--accent-color) 10%, white)';
               }}
             >
-              <IconRenderer icon={session.activityIcon} className="text-xl" />
+              <IconRenderer 
+                icon={session.activityIcon} 
+                uiIcon={session.activityUiIcon}
+                className="text-xl" 
+              />
             </div>
             <div className={`flex flex-col min-w-0 transition-all duration-500 ease-out ${
               currentView !== AppView.RECORD && currentView !== AppView.TODO 

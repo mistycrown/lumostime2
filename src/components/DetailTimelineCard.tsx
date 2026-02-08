@@ -805,12 +805,16 @@ export const DetailTimelineCard: React.FC<DetailTimelineCardProps> = ({
                                                                 <span className="font-bold text-stone-400">
                                                                     {entityInfo.type === 'category' ? '#' : entityInfo.type === 'activity' ? '#' : '%'}
                                                                 </span>
-                                                                <IconRenderer icon={entityInfo.icon || ''} className="text-xs" />
+                                                                <IconRenderer icon={entityInfo.icon || ''} uiIcon={category?.uiIcon} className="text-xs" />
                                                                 <span>{entityInfo.name}</span>
                                                                 {activity && entityInfo.type === 'category' && (
                                                                     <>
                                                                         <span className="mx-1 text-stone-300">/</span>
-                                                                        <IconRenderer icon={activity.icon} className="text-xs mr-1" />
+                                                                        <IconRenderer 
+                                                                            icon={activity.icon} 
+                                                                            uiIcon={activity.uiIcon}
+                                                                            className="text-xs mr-1" 
+                                                                        />
                                                                         <span className="text-stone-500">{activity.name}</span>
                                                                     </>
                                                                 )}

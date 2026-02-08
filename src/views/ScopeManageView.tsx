@@ -237,7 +237,11 @@ export const ScopeManageView: React.FC<ScopeManageViewProps> = ({
                             >
                                 <div className="flex items-center justify-between">
                                     <div className="flex items-center gap-3">
-                                        <IconRenderer icon={scope.icon} className="text-xl" />
+                                        <IconRenderer 
+                                            icon={scope.icon} 
+                                            uiIcon={scope.uiIcon}
+                                            className="text-xl" 
+                                        />
                                         <span className="font-bold text-stone-600">{scope.name}</span>
                                     </div>
                                     <div className="flex gap-2">

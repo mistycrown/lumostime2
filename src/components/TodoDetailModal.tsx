@@ -254,7 +254,7 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({ initialTodo, c
           </div>
           <div className="flex items-center gap-2">
             <span className="text-stone-500 text-sm font-medium bg-stone-100 px-3 py-1 rounded-full flex items-center gap-2">
-              <IconRenderer icon={selectedCategory.icon} className="text-sm" />
+              <IconRenderer icon={selectedCategory.icon} uiIcon={selectedCategory.uiIcon} className="text-sm" />
               <span>{selectedCategory.name}</span>
             </span>
             {isProgress && (
@@ -308,7 +308,7 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({ initialTodo, c
                           : 'bg-stone-50 text-stone-500 border-stone-100 hover:bg-stone-100'}
                         `}
                     >
-                      <span>{cat.icon}</span>
+                      <IconRenderer icon={cat.icon} uiIcon={cat.uiIcon} className="text-xs" />
                       <span className="truncate">{cat.name}</span>
                     </button>
                   ))}
@@ -531,11 +531,11 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({ initialTodo, c
                   {/* Category Tag */}
                   <span className="text-[10px] font-medium text-stone-500 border border-stone-200 px-2 py-0.5 rounded flex items-center gap-1 bg-stone-50/30">
                     <span className="font-bold text-stone-400">#</span>
-                    <IconRenderer icon={category?.icon || ''} className="text-xs" size={12} />
+                    <IconRenderer icon={category?.icon || ''} uiIcon={category?.uiIcon} className="text-xs" size={12} />
                     <span className="flex items-center">
                       <span>{category?.name}</span>
                       <span className="mx-1 text-stone-300">/</span>
-                      <IconRenderer icon={activity?.icon || ''} className="text-xs" size={12} />
+                      <IconRenderer icon={activity?.icon || ''} uiIcon={activity?.uiIcon} className="text-xs" size={12} />
                       <span className="text-stone-500">{activity?.name}</span>
                     </span>
                   </span>
@@ -547,7 +547,7 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({ initialTodo, c
                       return (
                         <span key={scopeId} className="text-[10px] font-medium text-stone-500 border border-stone-200 px-2 py-0.5 rounded flex items-center gap-1 bg-stone-50/30">
                           <span className="text-stone-400 font-bold">%</span>
-                          <IconRenderer icon={linkedScope.icon || '📍'} className="text-xs" />
+                          <IconRenderer icon={linkedScope.icon || '📍'} uiIcon={linkedScope.uiIcon} className="text-xs" />
                           <span>{linkedScope.name}</span>
                         </span>
                       );

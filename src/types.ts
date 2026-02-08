@@ -88,6 +88,7 @@ export interface ActiveSession {
   categoryId: string; // Added to link back to category
   activityName: string;
   activityIcon: string;
+  activityUiIcon?: string; // UI 图标（用于自定义主题）
   startTime: number; // Timestamp
   linkedTodoId?: string; // New: Link to a specific todo task
   scopeIds?: string[]; // NEW: Link to multiple Scopes (领域) - changed from scopeId

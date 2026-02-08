@@ -30,10 +30,6 @@ export const TagAssociation: React.FC<TagAssociationProps> = ({
 
     return (
         <div className="w-full space-y-4">
-            <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-stone-400 uppercase tracking-widest">Associated Tag</span>
-            </div>
-
             {/* Category Grid */}
             <div className="grid grid-cols-4 gap-2">
                 {categories.map(cat => (
@@ -50,7 +46,7 @@ export const TagAssociation: React.FC<TagAssociationProps> = ({
                                 : 'bg-stone-50 text-stone-500 border border-stone-100 hover:bg-stone-100'}
                         `}
                     >
-                        <IconRenderer icon={cat.icon} className="text-xs" />
+                        <IconRenderer icon={cat.icon} uiIcon={cat.uiIcon} className="text-xs" />
                         <span className="truncate">{cat.name}</span>
                     </button>
                 ))}
@@ -76,7 +72,7 @@ export const TagAssociation: React.FC<TagAssociationProps> = ({
                                     transform: 'scale(1.1)'
                                 } : {}}
                             >
-                                <IconRenderer icon={act.icon} className="text-xl" />
+                                <IconRenderer icon={act.icon} uiIcon={act.uiIcon} className="text-xl" />
                             </div>
                             <span className={`text-xs text-center font-medium leading-tight ${isActive ? 'text-stone-900 font-bold' : 'text-stone-400'}`}>
                                 {act.name}

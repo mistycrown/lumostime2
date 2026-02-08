@@ -104,7 +104,11 @@ export const RecordView: React.FC<RecordViewProps> = ({ onStartActivity, categor
                 {isSelected && (
                   <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-5 rounded-r-full" style={{ backgroundColor: 'var(--accent-color)' }}></div>
                 )}
-                <IconRenderer icon={category.icon} className={`text-xl flex-shrink-0 ${isSelected ? 'opacity-100' : 'opacity-100'}`} />
+                <IconRenderer 
+                  icon={category.icon} 
+                  uiIcon={category.uiIcon}
+                  className={`text-xl flex-shrink-0 ${isSelected ? 'opacity-100' : 'opacity-100'}`} 
+                />
                 {/* whitespace-nowrap ensures text never wraps */}
                 {isSidebarOpen && (
                   <span className={`text-sm md:text-base whitespace-nowrap transition-all ${isSelected ? 'font-bold' : 'font-medium'}`}>
@@ -171,7 +175,11 @@ export const RecordView: React.FC<RecordViewProps> = ({ onStartActivity, categor
             >
               {/* Use activity.color for background */}
               <div className={`w-16 h-16 md:w-20 md:h-20 rounded-full flex items-center justify-center text-3xl md:text-4xl shadow-sm ${activity.color}`}>
-                <IconRenderer icon={activity.icon} className="text-3xl md:text-4xl" />
+                <IconRenderer 
+                  icon={activity.icon} 
+                  uiIcon={activity.uiIcon}
+                  className="text-3xl md:text-4xl" 
+                />
               </div>
               <span className="text-xs md:text-sm text-stone-600 font-medium text-center max-w-[80px] leading-tight">
                 {activity.name}

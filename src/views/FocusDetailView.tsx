@@ -56,8 +56,8 @@ export const FocusDetailView: React.FC<FocusDetailViewProps> = ({ session, todos
 
     // Unified Suggestion State
     const [suggestions, setSuggestions] = useState<{
-        activity?: { id: string; categoryId: string; name: string; icon: string; reason: string; matchedKeyword?: string };
-        scopes: { id: string; name: string; icon: string; reason: string }[];
+        activity?: { id: string; categoryId: string; name: string; icon: string; uiIcon?: string; reason: string; matchedKeyword?: string };
+        scopes: { id: string; name: string; icon: string; uiIcon?: string; reason: string }[];
     }>({ scopes: [] });
 
     // Unified Suggestion Logic
@@ -73,7 +73,7 @@ export const FocusDetailView: React.FC<FocusDetailViewProps> = ({ session, todos
                 const act = cat?.activities.find(a => a.id === linkedTodo.linkedActivityId);
                 if (cat && act) {
                     newSuggestions.activity = {
-                        id: act.id, categoryId: cat.id, name: act.name, icon: act.icon, reason: '关联待办'
+                        id: act.id, categoryId: cat.id, name: act.name, icon: act.icon, uiIcon: act.uiIcon, reason: '关联待办'
                     };
                 }
             }
@@ -87,7 +87,7 @@ export const FocusDetailView: React.FC<FocusDetailViewProps> = ({ session, todos
                     for (const kw of (act.keywords || [])) {
                         if (note.includes(kw)) {
                             newSuggestions.activity = {
-                                id: act.id, categoryId: cat.id, name: act.name, icon: act.icon, reason: '关键词匹配', matchedKeyword: kw
+                                id: act.id, categoryId: cat.id, name: act.name, icon: act.icon, uiIcon: act.uiIcon, reason: '关键词匹配', matchedKeyword: kw
                             };
                             break;
                         }
@@ -99,7 +99,7 @@ export const FocusDetailView: React.FC<FocusDetailViewProps> = ({ session, todos
         }
 
         // 2. Scope Suggestions
-        const candidateScopes = new Map<string, { id: string; name: string; icon: string; reason: string }>();
+        const candidateScopes = new Map<string, { id: string; name: string; icon: string; uiIcon?: string; reason: string }>();
         const currentScopeIds = session.scopeIds || [];
 
         // From Linked Todo
@@ -108,7 +108,7 @@ export const FocusDetailView: React.FC<FocusDetailViewProps> = ({ session, todos
                 if (currentScopeIds.includes(sId)) continue;
                 const s = scopes.find(scope => scope.id === sId);
                 if (s) {
-                    candidateScopes.set(sId, { id: s.id, name: s.name, icon: s.icon, reason: '关联待办' });
+                    candidateScopes.set(sId, { id: s.id, name: s.name, icon: s.icon, uiIcon: s.uiIcon, reason: '关联待办' });
                 }
             }
         }
@@ -120,7 +120,7 @@ export const FocusDetailView: React.FC<FocusDetailViewProps> = ({ session, todos
             const s = scopes.find(scope => scope.id === rule.scopeId);
             if (s) {
                 if (!candidateScopes.has(rule.scopeId)) {
-                    candidateScopes.set(rule.scopeId, { id: s.id, name: s.name, icon: s.icon, reason: '自动规则' });
+                    candidateScopes.set(rule.scopeId, { id: s.id, name: s.name, icon: s.icon, uiIcon: s.uiIcon, reason: '自动规则' });
                 }
             }
         }
@@ -177,7 +177,8 @@ export const FocusDetailView: React.FC<FocusDetailViewProps> = ({ session, todos
             activityId: activity.id,
             categoryId: categoryId,
             activityName: activity.name,
-            activityIcon: activity.icon
+            activityIcon: activity.icon,
+            activityUiIcon: activity.uiIcon
         });
         setIsActivitySelectorOpen(false);
     };
@@ -219,7 +220,11 @@ export const FocusDetailView: React.FC<FocusDetailViewProps> = ({ session, todos
                 {/* Timer Display */}
                 <div className="flex flex-col items-center mb-10">
                     <div className="text-[90px] mb-4 animate-bounce-slow cursor-pointer hover:scale-105 transition-transform" onClick={() => setIsActivitySelectorOpen(true)}>
-                        <IconRenderer icon={session.activityIcon} size={80} />
+                        <IconRenderer 
+                            icon={session.activityIcon} 
+                            uiIcon={session.activityUiIcon}
+                            size={80} 
+                        />
                     </div>
                     <div 
                         className="text-6xl font-medium tracking-wider" 
@@ -241,7 +246,11 @@ export const FocusDetailView: React.FC<FocusDetailViewProps> = ({ session, todos
                         className="w-full flex items-center justify-between bg-stone-50 border border-stone-200 rounded-2xl p-4 active:scale-[0.99] transition-all"
                     >
                         <div className="flex items-center gap-3">
-                            <IconRenderer icon={session.activityIcon} className="text-2xl" />
+                            <IconRenderer 
+                                icon={session.activityIcon} 
+                                uiIcon={session.activityUiIcon}
+                                className="text-2xl" 
+                            />
                             <span className="text-lg font-bold text-stone-700">{session.activityName}</span>
                         </div>
                         <ChevronDown size={20} className="text-stone-400" />
@@ -256,7 +265,11 @@ export const FocusDetailView: React.FC<FocusDetailViewProps> = ({ session, todos
                                         onClick={() => handleActivitySelect(act, cat.id)}
                                         className={`flex flex-col items-center gap-2 p-2 rounded-xl hover:bg-stone-50 ${session.activityId === act.id ? 'bg-stone-100 ring-1 ring-stone-200' : ''}`}
                                     >
-                                        <IconRenderer icon={act.icon} className="text-2xl" />
+                                        <IconRenderer 
+                                            icon={act.icon} 
+                                            uiIcon={act.uiIcon}
+                                            className="text-2xl" 
+                                        />
                                         <span className="text-[10px] text-stone-500 font-medium truncate w-full text-center">{act.name}</span>
                                     </button>
                                 )))}
@@ -374,7 +387,7 @@ export const FocusDetailView: React.FC<FocusDetailViewProps> = ({ session, todos
                                                 onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'white'}
                                             >
                                                 <span className="opacity-70 text-[10px] mr-0.5">[{suggestions.activity.reason}]</span>
-                                                <IconRenderer icon={suggestions.activity.icon} className="text-xs" />
+                                                <IconRenderer icon={suggestions.activity.icon} uiIcon={suggestions.activity.uiIcon} className="text-xs" />
                                                 <span>{suggestions.activity.name}</span>
                                                 <CheckCircle2 size={12} />
                                             </button>
@@ -390,7 +403,11 @@ export const FocusDetailView: React.FC<FocusDetailViewProps> = ({ session, todos
                                                 onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'white'}
                                             >
                                                 <span className="opacity-70 text-[10px] mr-0.5">[{scope.reason}]</span>
-                                                <IconRenderer icon={scope.icon} className="text-xs" />
+                                                <IconRenderer 
+                                                    icon={scope.icon} 
+                                                    uiIcon={scope.uiIcon}
+                                                    className="text-xs" 
+                                                />
                                                 <span>{scope.name}</span>
                                                 <CheckCircle2 size={12} />
                                             </button>
