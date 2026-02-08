@@ -9,8 +9,9 @@
  */
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { Category, Log, TodoItem, TodoCategory, Scope, AutoLinkRule, Comment } from '../types';
-import { X, Trash2, TrendingUp, Plus, Minus, Lightbulb, CheckCircle2, Clock, Camera, Image as ImageIcon, Maximize2, Minimize2 } from 'lucide-react';
+import { X, Trash2, TrendingUp, Plus, Minus, Lightbulb, Check, Clock, Camera, Image as ImageIcon, Maximize2, Minimize2 } from 'lucide-react';
 import { TodoAssociation } from '../components/TodoAssociation';
+import { TagAssociation } from '../components/TagAssociation';
 import { ScopeAssociation } from '../components/ScopeAssociation';
 import { FocusScoreSelector } from '../components/FocusScoreSelector';
 import { CommentSection } from '../components/CommentSection';
@@ -635,14 +636,19 @@ export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialSta
             <span className="text-2xl font-bold text-stone-900 tabular-nums font-mono">{durationDisplay}</span>
           </div>
           <div className="w-10 flex justify-end">
-            {initialLog && onDelete && (
-              <button
-                onClick={handleDelete}
-                className="p-2 -mr-2 text-stone-300 hover:text-red-500 hover:bg-stone-100 rounded-full transition-colors"
-              >
-                <Trash2 size={20} />
-              </button>
-            )}
+            <button
+              onClick={handleSave}
+              className="p-2 -mr-2 rounded-full transition-colors"
+              style={{ color: 'var(--accent-color)' }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = 'rgba(0, 0, 0, 0.05)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = 'transparent';
+              }}
+            >
+              <Check size={20} strokeWidth={2.5} />
+            </button>
           </div>
         </div>
 
@@ -773,26 +779,37 @@ export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialSta
               >
                 {/* Track Fill */}
                 <div
-                  className="absolute top-0 h-full bg-stone-800 opacity-20 rounded-full"
-                  style={{ left: `${startPercent}%`, width: `${endPercent - startPercent}%` }}
+                  className="absolute top-0 h-full opacity-20 rounded-full"
+                  style={{ 
+                    left: `${startPercent}%`, 
+                    width: `${endPercent - startPercent}%`,
+                    backgroundColor: 'var(--accent-color)'
+                  }}
                 />
 
                 {/* Left Handle */}
                 <div
                   onMouseDown={() => setIsDraggingStart(true)}
                   onTouchStart={(e) => { e.stopPropagation(); setIsDraggingStart(true); }}
-                  className="absolute top-1/2 -translate-y-1/2 w-6 h-6 bg-white border-2 border-stone-800 rounded-full shadow-md z-10 flex items-center justify-center hover:scale-110 transition-transform cursor-grab active:cursor-grabbing"
-                  style={{ left: `calc(${startPercent}% - 12px)` }}
+                  className="absolute top-1/2 -translate-y-1/2 w-6 h-6 bg-white border-2 rounded-full shadow-md z-10 flex items-center justify-center hover:scale-110 transition-transform cursor-grab active:cursor-grabbing"
+                  style={{ 
+                    left: `calc(${startPercent}% - 12px)`,
+                    borderColor: 'var(--accent-color)'
+                  }}
                 >
-                  <div className="w-1.5 h-1.5 bg-stone-800 rounded-full" />
+                  <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: 'var(--accent-color)' }} />
                 </div>
 
                 {/* Right Handle */}
                 <div
                   onMouseDown={() => setIsDraggingEnd(true)}
                   onTouchStart={(e) => { e.stopPropagation(); setIsDraggingEnd(true); }}
-                  className="absolute top-1/2 -translate-y-1/2 w-6 h-6 bg-stone-800 border-2 border-stone-800 rounded-full shadow-md z-10 flex items-center justify-center hover:scale-110 transition-transform cursor-grab active:cursor-grabbing"
-                  style={{ left: `calc(${endPercent}% - 12px)` }}
+                  className="absolute top-1/2 -translate-y-1/2 w-6 h-6 border-2 rounded-full shadow-md z-10 flex items-center justify-center hover:scale-110 transition-transform cursor-grab active:cursor-grabbing"
+                  style={{ 
+                    left: `calc(${endPercent}% - 12px)`,
+                    backgroundColor: 'var(--accent-color)',
+                    borderColor: 'var(--accent-color)'
+                  }}
                 >
                   <div className="w-1.5 h-1.5 bg-white rounded-full" />
                 </div>
@@ -806,61 +823,13 @@ export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialSta
           </div>
 
           {/* Activity Selection (Grid) */}
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-bold text-stone-400 uppercase tracking-widest">Associated Tag</span>
-            </div>
-
-            {/* Category Grid */}
-            <div className="grid grid-cols-4 gap-2">
-              {categories.map(cat => (
-                <button
-                  key={cat.id}
-                  onClick={() => { setSelectedCategoryId(cat.id); setSelectedActivityId(cat.activities[0].id); }}
-                  className={`
-                        px-2 py-2 rounded-lg text-[10px] font-medium text-center border transition-colors flex items-center justify-center gap-1.5 truncate
-                        ${selectedCategoryId === cat.id
-                      ? 'bg-stone-50 text-stone-500'
-                      : 'bg-stone-50 text-stone-500 border-stone-100 hover:bg-stone-100'}
-                     `}
-                  style={selectedCategoryId === cat.id ? { borderColor: 'var(--accent-color)' } : {}}
-                >
-                  <span>{cat.icon}</span>
-                  <span className="truncate">{cat.name}</span>
-                </button>
-              ))}
-            </div>
-
-            {/* Activity Grid */}
-            <div className="grid grid-cols-4 gap-3 pt-2">
-              {selectedCategory.activities.map(act => {
-                const isActive = selectedActivityId === act.id;
-                return (
-                  <button
-                    key={act.id}
-                    onClick={() => setSelectedActivityId(act.id)}
-                    className="flex flex-col items-center gap-2 p-3 rounded-xl transition-all duration-200 active:scale-95 hover:bg-stone-50"
-                  >
-                    <div 
-                      className={`
-                          w-10 h-10 rounded-full flex items-center justify-center text-xl transition-all
-                          ${act.color}
-                       `}
-                      style={isActive ? { 
-                        boxShadow: `0 0 0 1px var(--accent-color), 0 0 0 3px white, 0 0 0 4px var(--accent-color)`,
-                        transform: 'scale(1.1)'
-                      } : {}}
-                    >
-                      {act.icon}
-                    </div>
-                    <span className={`text-xs text-center font-medium leading-tight ${isActive ? 'text-stone-900 font-bold' : 'text-stone-400'}`}>
-                      {act.name}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
+          <TagAssociation
+            categories={categories}
+            selectedCategoryId={selectedCategoryId}
+            selectedActivityId={selectedActivityId}
+            onCategorySelect={setSelectedCategoryId}
+            onActivitySelect={setSelectedActivityId}
+          />
 
           {/* Todo Association with Embedded Progress */}
           <div className="space-y-0">
@@ -1018,8 +987,11 @@ export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialSta
               ref={noteRef}
               value={note}
               onChange={e => setNote(e.target.value)}
-              className={`w-full bg-white border border-stone-200 rounded-2xl p-4 text-stone-800 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-stone-900 focus:border-stone-900 resize-none placeholder:text-stone-300 font-serif transition-[height] duration-150 ease-out ${isNoteExpanded ? 'h-[400px]' : 'h-[100px]'
+              className={`w-full bg-white border border-stone-200 rounded-2xl p-4 text-stone-800 text-sm shadow-sm focus:outline-none focus:ring-1 focus:border-stone-200 resize-none placeholder:text-stone-300 font-serif transition-[height] duration-150 ease-out ${isNoteExpanded ? 'h-[400px]' : 'h-[100px]'
                 }`}
+              style={{
+                '--tw-ring-color': 'var(--accent-color)'
+              } as React.CSSProperties}
               placeholder="Add a note..."
             />
           </div>
@@ -1106,20 +1078,19 @@ export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialSta
             />
           </div>
 
-        </div>
+          {/* Delete Button */}
+          {initialLog && onDelete && (
+            <div className="pt-8">
+              <button
+                onClick={handleDelete}
+                className="w-full py-3 text-red-500 hover:text-red-600 hover:bg-red-50 rounded-full font-medium text-sm transition-colors active:scale-95"
+              >
+                Delete Task
+              </button>
+            </div>
+          )}
 
-        {/* Footer */}
-        < div className="p-6 bg-white border-t border-stone-100" >
-          <button
-            onClick={handleSave}
-            className="w-full text-white py-3 rounded-xl font-bold text-base shadow-xl active:scale-[0.99] transition-all"
-            style={{ backgroundColor: 'var(--accent-color)' }}
-            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--accent-hover)'}
-            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'var(--accent-color)'}
-          >
-            {initialLog ? 'Update Log' : 'Save Log'}
-          </button>
-        </div >
+        </div>
 
       </div >
 

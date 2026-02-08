@@ -32,15 +32,17 @@ export const HeatmapCalendar: React.FC<HeatmapCalendarProps> = ({ year, month, d
     days.push(i);
   }
 
-  // Helper to determine color intensity (Monochrome)
+  // Helper to determine color intensity using theme colors
   const getColor = (seconds: number) => {
-    if (seconds === 0) return 'bg-stone-100';
+    if (seconds === 0) return { bg: 'bg-stone-100', textColor: 'text-stone-300', useTheme: false };
     const hours = seconds / 3600;
-    if (hours < 0.5) return 'bg-[#e7e5e4]'; // stone-200
-    if (hours < 1) return 'bg-[#a8a29e]';   // stone-400
-    if (hours < 2) return 'bg-[#78716c]';   // stone-500
-    if (hours < 4) return 'bg-[#57534e]';   // stone-600
-    return 'bg-[#1c1917] text-white';       // stone-900
+    
+    // 使用主题色的不同透明度
+    if (hours < 0.5) return { bg: '', textColor: 'text-stone-700', useTheme: true, opacity: 0.15 }; // 15%
+    if (hours < 1) return { bg: '', textColor: 'text-stone-700', useTheme: true, opacity: 0.3 };   // 30%
+    if (hours < 2) return { bg: '', textColor: 'text-stone-700', useTheme: true, opacity: 0.5 };   // 50%
+    if (hours < 4) return { bg: '', textColor: 'text-white', useTheme: true, opacity: 0.7 };       // 70%
+    return { bg: '', textColor: 'text-white', useTheme: true, opacity: 1 };                        // 100%
   };
 
   const weekDays = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
@@ -79,18 +81,20 @@ export const HeatmapCalendar: React.FC<HeatmapCalendarProps> = ({ year, month, d
         {days.map((day, idx) => {
           if (day === null) return <div key={`pad-${idx}`} />;
           const duration = data.get(day) || 0;
-          const colorClass = getColor(duration);
-          const isDark = colorClass.includes('text-white');
+          const colorInfo = getColor(duration);
 
           return (
             <div
               key={day}
               className={`
                     aspect-square rounded-lg flex flex-col items-center justify-center relative group cursor-pointer transition-colors duration-300
-                    ${colorClass}
+                    ${colorInfo.useTheme ? '' : colorInfo.bg}
                  `}
+              style={colorInfo.useTheme ? {
+                backgroundColor: `color-mix(in srgb, var(--progress-bar-fill) ${colorInfo.opacity * 100}%, transparent)`
+              } : undefined}
             >
-              <span className={`text-[10px] font-medium ${isDark ? 'text-white/90' : (duration > 0 ? 'text-stone-700' : 'text-stone-300')}`}>
+              <span className={`text-[10px] font-medium ${colorInfo.textColor}`}>
                 {day}
               </span>
             </div>

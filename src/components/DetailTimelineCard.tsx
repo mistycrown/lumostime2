@@ -233,9 +233,9 @@ export const DetailTimelineCard: React.FC<DetailTimelineCardProps> = ({
 
     // 热力图颜色计算函数
     const getHeatmapColor = (duration: number) => {
-        if (duration === 0) return { bg: 'bg-stone-50', text: 'text-stone-300', border: 'border-stone-100' };
+        if (duration === 0) return { bg: 'bg-stone-50', text: 'text-stone-300', border: '', useTheme: false };
         
-        // 阈值逻辑
+        // 计算阈值
         let t1 = 1800; // 30m
         let t2 = 7200; // 2h
         let t3 = 14400; // 4h
@@ -249,26 +249,15 @@ export const DetailTimelineCard: React.FC<DetailTimelineCardProps> = ({
             t3 = max;
         }
 
-        if (customScale) {
-            if (duration >= customScale.max) {
-                return { bg: 'bg-stone-700', text: 'text-white', border: 'border-stone-700' };
-            } else if (duration <= t1) {
-                return { bg: 'bg-stone-100', text: 'text-stone-600', border: 'border-stone-200' };
-            } else if (duration <= t2) {
-                return { bg: 'bg-stone-300', text: 'text-stone-800', border: 'border-stone-300' };
-            } else {
-                return { bg: 'bg-stone-500', text: 'text-white', border: 'border-stone-500' };
-            }
+        // 根据时长返回对应透明度，所有有背景色的都使用白色文字
+        if (duration >= t3) {
+            return { bg: '', text: 'text-white', border: '', useTheme: true, opacity: 0.9 };
+        } else if (duration <= t1) {
+            return { bg: '', text: 'text-white', border: '', useTheme: true, opacity: 0.2 };
+        } else if (duration <= t2) {
+            return { bg: '', text: 'text-white', border: '', useTheme: true, opacity: 0.4 };
         } else {
-            if (duration <= 1800) {
-                return { bg: 'bg-stone-100', text: 'text-stone-600', border: 'border-stone-200' };
-            } else if (duration <= 7200) {
-                return { bg: 'bg-stone-300', text: 'text-stone-800', border: 'border-stone-300' };
-            } else if (duration <= 14400) {
-                return { bg: 'bg-stone-500', text: 'text-white', border: 'border-stone-500' };
-            } else {
-                return { bg: 'bg-stone-700', text: 'text-white', border: 'border-stone-700' };
-            }
+            return { bg: '', text: 'text-white', border: '', useTheme: true, opacity: 0.7 };
         }
     };
 
@@ -455,7 +444,10 @@ export const DetailTimelineCard: React.FC<DetailTimelineCardProps> = ({
                                         cells.push(
                                             <div
                                                 key={day}
-                                                className={`aspect-square rounded-lg flex items-center justify-center transition-colors ${colors.bg} ${colors.text} border ${colors.border}`}
+                                                className={`aspect-square rounded-lg flex items-center justify-center transition-colors ${colors.useTheme ? '' : colors.bg} ${colors.text}`}
+                                                style={colors.useTheme ? {
+                                                    backgroundColor: `color-mix(in srgb, var(--progress-bar-fill) ${colors.opacity * 100}%, transparent)`
+                                                } : undefined}
                                             >
                                                 <span className="text-sm font-medium">{day}</span>
                                             </div>
@@ -517,6 +509,45 @@ export const DetailTimelineCard: React.FC<DetailTimelineCardProps> = ({
                                     5: (focusDistribution[5] / totalFocusTime) * 100,
                                 };
                                 
+                                // 检查是否使用主题色（通过检查 CSS 变量是否为默认黑色）
+                                const useThemeColor = getComputedStyle(document.documentElement)
+                                    .getPropertyValue('--accent-color').trim() !== '#1c1917';
+                                
+                                // 获取专注度对应的颜色
+                                const getFocusColor = (score: number) => {
+                                    if (useThemeColor) {
+                                        // 使用主题色的不同透明度
+                                        const opacities = {
+                                            1: 0.1,
+                                            2: 0.3,
+                                            3: 0.5,
+                                            4: 0.75,
+                                            5: 1.0
+                                        };
+                                        return {
+                                            bgStyle: {
+                                                backgroundColor: 'var(--progress-bar-fill)',
+                                                opacity: opacities[score as keyof typeof opacities]
+                                            },
+                                            text: 'text-white',
+                                            useInlineStyle: true
+                                        };
+                                    } else {
+                                        // 使用原有的颜色逻辑
+                                        const colors = {
+                                            1: { bg: 'bg-red-100', text: 'text-red-600' },
+                                            2: { bg: 'bg-orange-100', text: 'text-orange-600' },
+                                            3: { bg: 'bg-amber-100', text: 'text-amber-600' },
+                                            4: { bg: 'bg-lime-100', text: 'text-lime-600' },
+                                            5: { bg: 'bg-green-200', text: 'text-green-600' }
+                                        };
+                                        return {
+                                            ...colors[score as keyof typeof colors],
+                                            useInlineStyle: false
+                                        };
+                                    }
+                                };
+                                
                                 return (
                                     <>
                                         {/* Focus 文字行 - 与 Total 和 Average 并列 */}
@@ -530,61 +561,29 @@ export const DetailTimelineCard: React.FC<DetailTimelineCardProps> = ({
                                         
                                         {/* 条形统计图 - 独立的模块 */}
                                         <div className="flex h-6 rounded-lg overflow-hidden">
-                                            {percentages[1] > 0 && (
-                                                <div 
-                                                    className="bg-red-100 flex items-center justify-center transition-all hover:opacity-80"
-                                                    style={{ width: `${percentages[1]}%` }}
-                                                    title={`专注度1: ${Math.round(percentages[1])}%`}
-                                                >
-                                                    {percentages[1] > 8 && (
-                                                        <span className="text-[10px] font-bold text-red-600">1</span>
-                                                    )}
-                                                </div>
-                                            )}
-                                            {percentages[2] > 0 && (
-                                                <div 
-                                                    className="bg-orange-100 flex items-center justify-center transition-all hover:opacity-80"
-                                                    style={{ width: `${percentages[2]}%` }}
-                                                    title={`专注度2: ${Math.round(percentages[2])}%`}
-                                                >
-                                                    {percentages[2] > 8 && (
-                                                        <span className="text-[10px] font-bold text-orange-600">2</span>
-                                                    )}
-                                                </div>
-                                            )}
-                                            {percentages[3] > 0 && (
-                                                <div 
-                                                    className="bg-amber-100 flex items-center justify-center transition-all hover:opacity-80"
-                                                    style={{ width: `${percentages[3]}%` }}
-                                                    title={`专注度3: ${Math.round(percentages[3])}%`}
-                                                >
-                                                    {percentages[3] > 8 && (
-                                                        <span className="text-[10px] font-bold text-amber-600">3</span>
-                                                    )}
-                                                </div>
-                                            )}
-                                            {percentages[4] > 0 && (
-                                                <div 
-                                                    className="bg-lime-100 flex items-center justify-center transition-all hover:opacity-80"
-                                                    style={{ width: `${percentages[4]}%` }}
-                                                    title={`专注度4: ${Math.round(percentages[4])}%`}
-                                                >
-                                                    {percentages[4] > 8 && (
-                                                        <span className="text-[10px] font-bold text-lime-600">4</span>
-                                                    )}
-                                                </div>
-                                            )}
-                                            {percentages[5] > 0 && (
-                                                <div 
-                                                    className="bg-green-200 flex items-center justify-center transition-all hover:opacity-80"
-                                                    style={{ width: `${percentages[5]}%` }}
-                                                    title={`专注度5: ${Math.round(percentages[5])}%`}
-                                                >
-                                                    {percentages[5] > 8 && (
-                                                        <span className="text-[10px] font-bold text-green-600">5</span>
-                                                    )}
-                                                </div>
-                                            )}
+                                            {[1, 2, 3, 4, 5].map(score => {
+                                                if (percentages[score as keyof typeof percentages] <= 0) return null;
+                                                const color = getFocusColor(score);
+                                                const percentage = percentages[score as keyof typeof percentages];
+                                                
+                                                return (
+                                                    <div 
+                                                        key={score}
+                                                        className={`flex items-center justify-center transition-all hover:opacity-80 ${color.useInlineStyle ? '' : color.bg}`}
+                                                        style={color.useInlineStyle ? { 
+                                                            width: `${percentage}%`,
+                                                            ...color.bgStyle
+                                                        } : { 
+                                                            width: `${percentage}%` 
+                                                        }}
+                                                        title={`专注度${score}: ${Math.round(percentage)}%`}
+                                                    >
+                                                        {percentage > 8 && (
+                                                            <span className={`text-[10px] font-bold ${color.text}`}>{score}</span>
+                                                        )}
+                                                    </div>
+                                                );
+                                            })}
                                         </div>
                                     </>
                                 );

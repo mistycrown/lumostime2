@@ -76,15 +76,14 @@ export const CalendarWidget: React.FC<CalendarWidgetProps> = ({ currentDate, onD
     };
 
 
-    // Helper to get 7 days centered on today (3 days before, today, 3 days after)
+    // Helper to get 7 days centered on currentDate (3 days before, currentDate, 3 days after)
     const getWeekDays = () => {
         const days = [];
-        const today = new Date();
         
-        // Generate 7 days: today - 3, today - 2, today - 1, today, today + 1, today + 2, today + 3
+        // Generate 7 days: currentDate - 3, currentDate - 2, currentDate - 1, currentDate, currentDate + 1, currentDate + 2, currentDate + 3
         for (let i = -3; i <= 3; i++) {
-            const day = new Date(today);
-            day.setDate(today.getDate() + i);
+            const day = new Date(currentDate);
+            day.setDate(currentDate.getDate() + i);
             days.push(day);
         }
         
@@ -169,9 +168,8 @@ export const CalendarWidget: React.FC<CalendarWidgetProps> = ({ currentDate, onD
                                     }}
                                     className={`
                                p-2 rounded-full border transition-all active:scale-95
-                               ${isExpanded ? 'text-white border-transparent' : 'bg-white text-stone-600 border-stone-300 hover:border-stone-500'}
+                               ${isExpanded ? 'btn-template-filled border-transparent' : 'bg-white text-stone-600 border-stone-300 hover:border-stone-500'}
                             `}
-                                    style={isExpanded ? { backgroundColor: 'var(--accent-color)' } : undefined}
                                 >
                                     {isExpanded ? <X size={16} /> : <CalendarIcon size={16} />}
                                 </button>
@@ -198,11 +196,10 @@ export const CalendarWidget: React.FC<CalendarWidgetProps> = ({ currentDate, onD
                                     className={`
                                         w-12 h-14 rounded-xl transition-all duration-300 active:scale-95 relative group
                                         ${selected
-                                            ? 'text-white shadow-md'
+                                            ? 'btn-template-filled'
                                             : 'bg-transparent text-stone-400'
                                         }
                                     `}
-                                    style={selected ? { backgroundColor: 'var(--accent-color)' } : undefined}
                                 >
                                     {/* Week Day - Fixed Top Position */}
                                     <div className="absolute top-2.5 left-0 right-0 flex justify-center">
@@ -227,7 +224,7 @@ export const CalendarWidget: React.FC<CalendarWidgetProps> = ({ currentDate, onD
                                         <div className="absolute bottom-1.5 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-stone-400" />
                                     )}
                                     {hasData && selected && (
-                                        <div className="absolute bottom-1.5 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-white" />
+                                        <div className="absolute bottom-1.5 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full" style={{ backgroundColor: 'var(--icon-button-icon)' }} />
                                     )}
                                 </button>
                             );
@@ -356,7 +353,7 @@ export const CalendarWidget: React.FC<CalendarWidgetProps> = ({ currentDate, onD
                                                                 ? 'bg-stone-100 text-stone-600' 
                                                                 : 'bg-stone-50 text-stone-300'
                                                     } ${today && !selected ? 'border border-stone-300' : ''}`}
-                                                    style={selected ? { backgroundColor: 'var(--accent-color)' } : undefined}
+                                                    style={selected ? { backgroundColor: 'var(--progress-bar-fill)' } : undefined}
                                                 >
                                                     {day.getDate()}
                                                 </button>
@@ -368,28 +365,26 @@ export const CalendarWidget: React.FC<CalendarWidgetProps> = ({ currentDate, onD
                                             if (heatmapMode === 'focus') {
                                                 if (selected) {
                                                     bgClass = 'shadow-md';
-                                                    bgStyle = { backgroundColor: 'var(--accent-color)' };
+                                                    bgStyle = { backgroundColor: 'var(--progress-bar-fill)' };
                                                     textClass = 'text-white';
                                                 } else if (intensityValue > 0) {
-                                                    // Focus Score Coloring (1-5) - 使用主题色的不同透明度
+                                                    // Focus Score Coloring (1-5) - 使用主题淡色的不同透明度
                                                     const score = Math.round(intensityValue);
                                                     textClass = 'text-white';
                                                     if (score >= 4.5) { // 5
-                                                        bgStyle = { backgroundColor: 'var(--accent-color)', opacity: 1 };
+                                                        bgStyle = { backgroundColor: 'var(--progress-bar-fill)', opacity: 1 };
                                                     } else if (score >= 3.5) { // 4
-                                                        bgStyle = { backgroundColor: 'var(--accent-color)', opacity: 0.8 };
+                                                        bgStyle = { backgroundColor: 'var(--progress-bar-fill)', opacity: 0.8 };
                                                     } else if (score >= 2.5) { // 3
-                                                        bgStyle = { backgroundColor: 'var(--accent-color)', opacity: 0.6 };
+                                                        bgStyle = { backgroundColor: 'var(--progress-bar-fill)', opacity: 0.6 };
                                                     } else if (score >= 1.5) { // 2
-                                                        bgStyle = { backgroundColor: 'var(--accent-color)', opacity: 0.4 };
-                                                        textClass = 'text-stone-800';
+                                                        bgStyle = { backgroundColor: 'var(--progress-bar-fill)', opacity: 0.4 };
                                                     } else { // 1
-                                                        bgStyle = { backgroundColor: 'var(--accent-color)', opacity: 0.2 };
-                                                        textClass = 'text-stone-600';
+                                                        bgStyle = { backgroundColor: 'var(--progress-bar-fill)', opacity: 0.2 };
                                                     }
                                                 }
                                             } else {
-                                                // Duration Coloring - 使用主题色的不同透明度
+                                                // Duration Coloring - 使用主题淡色的不同透明度
                                                 const duration = intensityValue;
 
                                                 // Thresholds logic
@@ -408,36 +403,29 @@ export const CalendarWidget: React.FC<CalendarWidgetProps> = ({ currentDate, onD
 
                                                 if (selected) {
                                                     bgClass = 'shadow-md';
-                                                    bgStyle = { backgroundColor: 'var(--accent-color)' };
+                                                    bgStyle = { backgroundColor: 'var(--progress-bar-fill)' };
                                                     textClass = 'text-white';
                                                 } else if (duration > 0) {
+                                                    textClass = 'text-white';
                                                     if (customScale) {
                                                         if (duration >= customScale.max) {
-                                                            bgStyle = { backgroundColor: 'var(--accent-color)', opacity: 0.9 };
-                                                            textClass = 'text-white';
+                                                            bgStyle = { backgroundColor: 'var(--progress-bar-fill)', opacity: 0.9 };
                                                         } else if (duration <= t1) {
-                                                            bgStyle = { backgroundColor: 'var(--accent-color)', opacity: 0.2 };
-                                                            textClass = 'text-stone-600';
+                                                            bgStyle = { backgroundColor: 'var(--progress-bar-fill)', opacity: 0.2 };
                                                         } else if (duration <= t2) {
-                                                            bgStyle = { backgroundColor: 'var(--accent-color)', opacity: 0.4 };
-                                                            textClass = 'text-stone-800';
+                                                            bgStyle = { backgroundColor: 'var(--progress-bar-fill)', opacity: 0.4 };
                                                         } else {
-                                                            bgStyle = { backgroundColor: 'var(--accent-color)', opacity: 0.7 };
-                                                            textClass = 'text-white';
+                                                            bgStyle = { backgroundColor: 'var(--progress-bar-fill)', opacity: 0.7 };
                                                         }
                                                     } else {
                                                         if (duration <= 1800) {
-                                                            bgStyle = { backgroundColor: 'var(--accent-color)', opacity: 0.2 };
-                                                            textClass = 'text-stone-600';
+                                                            bgStyle = { backgroundColor: 'var(--progress-bar-fill)', opacity: 0.2 };
                                                         } else if (duration <= 7200) {
-                                                            bgStyle = { backgroundColor: 'var(--accent-color)', opacity: 0.4 };
-                                                            textClass = 'text-stone-800';
+                                                            bgStyle = { backgroundColor: 'var(--progress-bar-fill)', opacity: 0.4 };
                                                         } else if (duration <= 14400) {
-                                                            bgStyle = { backgroundColor: 'var(--accent-color)', opacity: 0.7 };
-                                                            textClass = 'text-white';
+                                                            bgStyle = { backgroundColor: 'var(--progress-bar-fill)', opacity: 0.7 };
                                                         } else {
-                                                            bgStyle = { backgroundColor: 'var(--accent-color)', opacity: 0.9 };
-                                                            textClass = 'text-white';
+                                                            bgStyle = { backgroundColor: 'var(--progress-bar-fill)', opacity: 0.9 };
                                                         }
                                                     }
                                                 }

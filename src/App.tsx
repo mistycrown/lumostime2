@@ -83,7 +83,10 @@ const AppContent: React.FC = () => {
   const {
     isAddModalOpen, setIsAddModalOpen,
     isTodoModalOpen,
+    isTodoManaging,
     isGoalEditorOpen,
+    isTagsManaging,
+    isScopeManaging,
     isAutoLinkOpen, setIsAutoLinkOpen,
     isSettingsOpen, setIsSettingsOpen,
     isSearchOpen, setIsSearchOpen,
@@ -260,7 +263,10 @@ const AppContent: React.FC = () => {
           !selectedTagId &&
           !selectedCategoryId &&
           !selectedScopeId &&
-          currentView !== 'STATS'
+          currentView !== 'STATS' &&
+          !isTodoManaging &&
+          !isTagsManaging &&
+          !isScopeManaging
         }
       />
 

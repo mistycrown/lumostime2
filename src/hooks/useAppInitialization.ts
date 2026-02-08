@@ -14,6 +14,14 @@ export const useAppInitialization = () => {
     const { logs, setLogs } = useData();
     const hasCleanedImagesRef = useRef(false);
 
+    // Expose UpdateService to window for debugging
+    useEffect(() => {
+        if (typeof window !== 'undefined') {
+            (window as any).UpdateService = UpdateService;
+            console.log('💡 调试提示: 可以在控制台使用 UpdateService.checkNeedsUpdate(true) 强制检查更新');
+        }
+    }, []);
+
     // Load app rules on mount
     useEffect(() => {
         const loadAppRules = async () => {
@@ -39,7 +47,7 @@ export const useAppInitialization = () => {
                     addToast('info', `发现新版本: ${updateInfo.version}`);
                 }
             } catch (e) {
-                // 静默处理更新检查失败
+                console.error('[App] 更新检查异常:', e);
             }
         };
         checkUpdates();

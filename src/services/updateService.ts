@@ -51,22 +51,38 @@ export class UpdateService {
             const response: HttpResponse = await CapacitorHttp.get(options);
 
             if (response.status !== 200) {
-                throw new Error(`HTTP ${response.status}`);
+                console.warn(`[UpdateService] Gitee API 返回状态码 ${response.status}`);
+                return null;
             }
 
             // Gitee API返回base64编码的content
             const apiResponse = response.data;
+            
+            // 验证响应格式
+            if (!apiResponse || typeof apiResponse !== 'object') {
+                console.warn('[UpdateService] Gitee API 响应格式无效（非对象）');
+                return null;
+            }
+
             if (!apiResponse.content || apiResponse.encoding !== 'base64') {
-                throw new Error('无效的Gitee API响应格式');
+                console.warn('[UpdateService] Gitee API 响应缺少 content 或 encoding 字段');
+                return null;
             }
 
             // 解码base64 (处理中文字符)
             const decodedContent = decodeURIComponent(escape(atob(apiResponse.content)));
             const data: VersionInfo = JSON.parse(decodedContent);
 
+            // 验证解析后的数据结构
+            if (!data.version || !data.versionCode) {
+                console.warn('[UpdateService] Gitee API 解析后的数据缺少必要字段:', data);
+                return null;
+            }
+
+            console.log('[UpdateService] ✓ 从 Gitee API 成功获取版本信息:', data.version);
             return data;
         } catch (error: any) {
-            // 静默处理错误，避免控制台噪音
+            console.warn('[UpdateService] Gitee API 获取失败:', error.message);
             return null;
         }
     }
@@ -91,13 +107,27 @@ export class UpdateService {
             const response: HttpResponse = await CapacitorHttp.get(options);
 
             if (response.status !== 200) {
-                throw new Error(`HTTP ${response.status}`);
+                console.warn(`[UpdateService] GitHub 返回状态码 ${response.status}`);
+                return null;
             }
 
             const data: VersionInfo = response.data;
+            
+            // 验证数据结构
+            if (!data || typeof data !== 'object') {
+                console.warn('[UpdateService] GitHub 响应格式无效（非对象）');
+                return null;
+            }
+
+            if (!data.version || !data.versionCode) {
+                console.warn('[UpdateService] GitHub 响应缺少必要字段:', data);
+                return null;
+            }
+
+            console.log('[UpdateService] ✓ 从 GitHub 成功获取版本信息:', data.version);
             return data;
         } catch (error: any) {
-            // 静默处理错误
+            console.warn('[UpdateService] GitHub 获取失败:', error.message);
             return null;
         }
     }
@@ -134,6 +164,8 @@ export class UpdateService {
      * @returns 版本信息对象,如果检查失败返回 null
      */
     static async checkForUpdates(): Promise<VersionInfo | null> {
+        console.log('[UpdateService] 开始检查更新...');
+        
         // 优先尝试Gitee API(国内用户)
         let versionInfo = await this.fetchVersionFromGiteeAPI();
 
@@ -141,8 +173,14 @@ export class UpdateService {
             return versionInfo;
         }
 
+        console.log('[UpdateService] Gitee 不可用，尝试 GitHub...');
+
         // Fallback到GitHub
         versionInfo = await this.fetchVersionFromUrl(this.GITHUB_UPDATE_URL);
+
+        if (!versionInfo) {
+            console.error('[UpdateService] ✗ 所有更新源均不可用');
+        }
 
         return versionInfo;
     }
@@ -187,6 +225,7 @@ export class UpdateService {
     static async checkNeedsUpdate(force: boolean = false): Promise<VersionInfo | null> {
         // 检查是否应该执行更新检查
         if (!force && !this.shouldCheckForUpdates()) {
+            console.log('[UpdateService] 跳过更新检查（距上次检查不足24小时）');
             return null;
         }
 
@@ -196,15 +235,19 @@ export class UpdateService {
         this.updateLastCheckTime();
 
         if (!latestVersion) {
+            console.log('[UpdateService] 无法获取版本信息');
             return null;
         }
 
-        // 验证version字段
-        if (!latestVersion.version) {
-            return null;
-        }
+        console.log(`[UpdateService] 当前版本: ${this.CURRENT_VERSION}, 最新版本: ${latestVersion.version}`);
 
         const hasUpdate = this.compareVersions(this.CURRENT_VERSION, latestVersion.version);
+
+        if (hasUpdate) {
+            console.log('[UpdateService] ✓ 发现新版本');
+        } else {
+            console.log('[UpdateService] ✓ 已是最新版本');
+        }
 
         return hasUpdate ? latestVersion : null;
     }
@@ -225,5 +268,31 @@ export class UpdateService {
      */
     static getCurrentVersion(): string {
         return this.CURRENT_VERSION;
+    }
+
+    /**
+     * 清除最后检查时间（用于调试）
+     */
+    static clearLastCheckTime(): void {
+        try {
+            localStorage.removeItem(this.LAST_CHECK_KEY);
+            console.log('[UpdateService] 已清除最后检查时间');
+        } catch (e) {
+            console.error('[UpdateService] 清除失败:', e);
+        }
+    }
+
+    /**
+     * 获取最后检查时间（用于调试）
+     */
+    static getLastCheckTime(): string | null {
+        try {
+            const lastCheck = localStorage.getItem(this.LAST_CHECK_KEY);
+            if (!lastCheck) return null;
+            const date = new Date(parseInt(lastCheck, 10));
+            return date.toLocaleString('zh-CN');
+        } catch {
+            return null;
+        }
     }
 }
