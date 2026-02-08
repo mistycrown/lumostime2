@@ -15,6 +15,7 @@ import { Trash2, CheckCircle2, TrendingUp, ChevronLeft, Circle, Image as ImageIc
 import { DetailTimelineCard } from './DetailTimelineCard';
 import { TimelineImage } from './TimelineImage';
 import { imageService } from '../services/imageService';
+import { IconRenderer } from './IconRenderer';
 
 interface TodoDetailModalProps {
   initialTodo?: TodoItem | null;
@@ -530,11 +531,11 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({ initialTodo, c
                   {/* Category Tag */}
                   <span className="text-[10px] font-medium text-stone-500 border border-stone-200 px-2 py-0.5 rounded flex items-center gap-1 bg-stone-50/30">
                     <span className="font-bold text-stone-400">#</span>
-                    <span>{category?.icon}</span>
+                    <IconRenderer icon={category?.icon || ''} className="text-xs" />
                     <span className="flex items-center">
                       <span>{category?.name}</span>
                       <span className="mx-1 text-stone-300">/</span>
-                      <span className="mr-1">{activity?.icon}</span>
+                      <IconRenderer icon={activity?.icon || ''} className="text-xs mr-1" />
                       <span className="text-stone-500">{activity?.name}</span>
                     </span>
                   </span>
@@ -546,7 +547,7 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({ initialTodo, c
                       return (
                         <span key={scopeId} className="text-[10px] font-medium text-stone-500 border border-stone-200 px-2 py-0.5 rounded flex items-center gap-1 bg-stone-50/30">
                           <span className="text-stone-400 font-bold">%</span>
-                          <span>{linkedScope.icon || '📍'}</span>
+                          <IconRenderer icon={linkedScope.icon || '📍'} className="text-xs" />
                           <span>{linkedScope.name}</span>
                         </span>
                       );

@@ -9,7 +9,10 @@
  */
 import React, { useState, useEffect } from 'react';
 import { TodoCategory, TodoItem } from '../types';
-import { ChevronDown, ChevronRight, GripVertical, Plus, Trash2, ArrowUp, ArrowDown, X, Check } from 'lucide-react';
+import { ChevronDown, ChevronRight, GripVertical, Plus, Trash2, ArrowUp, ArrowDown, X, Check, Palette } from 'lucide-react';
+import { UIIconSelectorCompact } from '../components/UIIconSelector';
+import { uiIconService } from '../services/uiIconService';
+import { useSettings } from '../contexts/SettingsContext';
 
 interface TodoBatchManageViewProps {
     onBack: () => void;
@@ -32,6 +35,11 @@ export const TodoBatchManageView: React.FC<TodoBatchManageViewProps> = ({ onBack
     });
 
     const [expandedCats, setExpandedCats] = useState<Set<string>>(new Set(initialCategories.map(c => c.id)));
+    
+    // Icon selector state
+    const [iconSelectorOpen, setIconSelectorOpen] = useState<string | null>(null);
+    const { uiIconTheme } = useSettings();
+    const isCustomIconEnabled = uiIconService.isCustomTheme();
 
     // Drag state
     const [draggedItem, setDraggedItem] = useState<{ item: TodoItem, sourceCategoryId: string } | null>(null);
@@ -135,6 +143,17 @@ export const TodoBatchManageView: React.FC<TodoBatchManageViewProps> = ({ onBack
         }));
     };
 
+    // Handle icon selection from UI Icon Selector
+    const handleIconSelect = (catId: string, iconString: string) => {
+        setData(prev => prev.map(c => {
+            if (c.id === catId) {
+                return { ...c, icon: iconString };
+            }
+            return c;
+        }));
+        setIconSelectorOpen(null);
+    };
+
     // --- Drag Logic ---
     const handleDragStart = (e: React.DragEvent, item: TodoItem, categoryId: string) => {
         setDraggedItem({ item, sourceCategoryId: categoryId });
@@ -220,6 +239,16 @@ export const TodoBatchManageView: React.FC<TodoBatchManageViewProps> = ({ onBack
 
                             {/* Category Actions */}
                             <div className="flex items-center gap-1 shrink-0">
+                                {/* Icon Selector Button - Only show if custom icons are enabled */}
+                                {isCustomIconEnabled && (
+                                    <button 
+                                        onClick={() => setIconSelectorOpen(iconSelectorOpen === category.id ? null : category.id)} 
+                                        className={`p-1 transition-colors ${iconSelectorOpen === category.id ? 'text-orange-500' : 'text-stone-400 hover:text-stone-700'}`}
+                                        title="选择图标"
+                                    >
+                                        <Palette size={16} />
+                                    </button>
+                                )}
                                 <button onClick={() => moveCategory(catIndex, 'up')} disabled={catIndex === 0} className="p-1 text-stone-300 hover:text-stone-600 disabled:opacity-30">
                                     <ArrowUp size={16} />
                                 </button>
@@ -234,6 +263,16 @@ export const TodoBatchManageView: React.FC<TodoBatchManageViewProps> = ({ onBack
                                 </button>
                             </div>
                         </div>
+
+                        {/* Icon Selector Dropdown */}
+                        {isCustomIconEnabled && iconSelectorOpen === category.id && (
+                            <div className="p-4 border-b border-stone-100 bg-stone-50/30">
+                                <UIIconSelectorCompact
+                                    currentIcon={category.icon}
+                                    onSelect={(iconString) => handleIconSelect(category.id, iconString)}
+                                />
+                            </div>
+                        )}
 
                         {/* Items List */}
                         {expandedCats.has(category.id) && (

@@ -18,6 +18,7 @@ import { CommentSection } from '../components/CommentSection';
 import { imageService } from '../services/imageService';
 import { ImagePreviewModal } from './ImagePreviewModal';
 import { ReactionPicker, ReactionList } from './ReactionComponents';
+import { IconRenderer } from './IconRenderer';
 
 interface AddLogModalProps {
   initialLog?: Log | null;
@@ -942,7 +943,7 @@ export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialSta
                         onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'white'}
                       >
                         <span className="opacity-70 text-[10px] mr-0.5">[{suggestions.activity.reason}]</span>
-                        <span>{suggestions.activity.icon}</span>
+                        <IconRenderer icon={suggestions.activity.icon} className="text-xs" />
                         <span>{suggestions.activity.name}</span>
                         <CheckCircle2 size={12} />
                       </button>
@@ -959,7 +960,7 @@ export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialSta
                         onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'white'}
                       >
                         <span className="opacity-70 text-[10px] mr-0.5">[{scope.reason}]</span>
-                        <span>{scope.icon}</span>
+                        <IconRenderer icon={scope.icon} className="text-xs" />
                         <span>{scope.name}</span>
                         <CheckCircle2 size={12} />
                       </button>

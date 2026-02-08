@@ -1203,7 +1203,7 @@ export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentD
                     <div key={cat.id} className="group">
                       <div className="flex items-center justify-between mb-1.5">
                         <div className="flex items-center gap-2">
-                          <IconRenderer icon={cat.icon} className="text-base" />
+                          <IconRenderer icon={cat.icon} size={14} />
                           <span className="font-bold text-stone-700 text-[13px]">{cat.name}</span>
                           {/* Growth Indicator for Category */}
                           {renderGrowth(cat.duration, previousStats.catDurations.get(cat.id) || 0)}
@@ -1245,7 +1245,7 @@ export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentD
                       : 'bg-white border border-stone-200 text-stone-600'
                       }`}
                   >
-                    <IconRenderer icon={cat.icon} />
+                    <IconRenderer icon={cat.icon} size={14} />
                     <span>{cat.name}</span>
                   </button>
                 ))}
@@ -1278,7 +1278,7 @@ export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentD
                       <div key={cat.id} className="group">
                         <div className="flex items-center justify-between mb-1.5">
                           <div className="flex items-center gap-2">
-                            <IconRenderer icon={cat.icon} className="text-base" />
+                            <IconRenderer icon={cat.icon} size={14} />
                             <span className="font-bold text-stone-700 text-[13px]">{cat.name}</span>
                             {/* Growth Indicator for Todo Category */}
                             {renderGrowth(cat.duration, previousTodoStats.categoryDurations?.get(cat.id) || 0)}
@@ -1338,7 +1338,7 @@ export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentD
                       <div key={scope.id} className="group">
                         <div className="flex items-center justify-between mb-1.5">
                           <div className="flex items-center gap-2">
-                            <IconRenderer icon={scope.icon} className="text-base" />
+                            <IconRenderer icon={scope.icon} size={14} />
                             <span className="font-bold text-stone-700 text-[13px]">{scope.name}</span>
                             {/* Growth Indicator for Scope */}
                             {renderGrowth(scope.duration, previousScopeStats.scopeDurations.get(scope.id) || 0)}
@@ -1654,7 +1654,7 @@ export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentD
                               }`}
                             style={!isExcluded ? {} : {}}
                           >
-                            <IconRenderer icon={cat.icon} />
+                            <IconRenderer icon={cat.icon} size={14} />
                             <span>{cat.name}</span>
                           </button>
                         );
@@ -1705,7 +1705,7 @@ export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentD
                         <div key={row.activity.id} className="flex items-center">
                           <div className="w-28 shrink-0 flex items-center gap-2 pr-2 overflow-hidden">
                             <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs shrink-0 bg-stone-50`} style={{ color: getHexColor(row.activity.color) }}>
-                              {row.activity.icon}
+                              <IconRenderer icon={row.activity.icon} className="text-xs" />
                             </div>
                             <span className="text-xs font-bold text-stone-600 truncate">{row.activity.name}</span>
                           </div>
@@ -1738,7 +1738,7 @@ export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentD
                       : 'bg-white border border-stone-200 text-stone-600'
                       }`}
                   >
-                    <IconRenderer icon={cat.icon} />
+                    <IconRenderer icon={cat.icon} size={14} />
                     <span>{cat.name}</span>
                   </button>
                 ))}

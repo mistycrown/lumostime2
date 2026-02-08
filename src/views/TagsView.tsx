@@ -108,7 +108,7 @@ export const TagsView: React.FC<TagsViewProps> = ({ logs, onSelectTag, onSelectC
                         <div className="flex items-center gap-3">
                            <span className="text-stone-300 font-bold">#</span>
                            {/* Removed grayscale, added opacity-100 */}
-                           <IconRenderer icon={category.icon} className="text-lg opacity-100" />
+                           <IconRenderer icon={category.icon} size={16} />
                            <span className="font-bold text-stone-800">{category.name}</span>
                            <span className="text-xs text-stone-400 font-mono ml-1">({totalCount})</span>
                         </div>

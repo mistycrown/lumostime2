@@ -9,8 +9,11 @@
  */
 import React, { useState } from 'react';
 import { Scope } from '../types';
-import { ChevronLeft, Plus, Trash2, Archive, ArchiveRestore, GripVertical, ArrowUp, ArrowDown, X, Check } from 'lucide-react';
+import { ChevronLeft, Plus, Trash2, Archive, ArchiveRestore, GripVertical, ArrowUp, ArrowDown, X, Check, Palette } from 'lucide-react';
 import { IconRenderer } from '../components/IconRenderer';
+import { UIIconSelectorCompact } from '../components/UIIconSelector';
+import { uiIconService } from '../services/uiIconService';
+import { useSettings } from '../contexts/SettingsContext';
 
 interface ScopeManageViewProps {
     scopes: Scope[];
@@ -25,6 +28,11 @@ export const ScopeManageView: React.FC<ScopeManageViewProps> = ({
 }) => {
     const [editingScopes, setEditingScopes] = useState<Scope[]>(JSON.parse(JSON.stringify(scopes)));
     const [showArchived, setShowArchived] = useState(false);
+    
+    // Icon selector state
+    const [iconSelectorOpen, setIconSelectorOpen] = useState<string | null>(null);
+    const { uiIconTheme } = useSettings();
+    const isCustomIconEnabled = uiIconService.isCustomTheme();
 
     const activeScopes = editingScopes.filter(s => !s.isArchived).sort((a, b) => a.order - b.order);
     const archivedScopes = editingScopes.filter(s => s.isArchived).sort((a, b) => a.order - b.order);
@@ -66,6 +74,12 @@ export const ScopeManageView: React.FC<ScopeManageViewProps> = ({
 
     const handleRestoreScope = (id: string) => {
         handleUpdateScope(id, { isArchived: false });
+    };
+
+    // Handle icon selection from UI Icon Selector
+    const handleIconSelect = (id: string, iconString: string) => {
+        handleUpdateScope(id, { icon: iconString });
+        setIconSelectorOpen(null);
     };
 
     const handleSave = () => {
@@ -141,6 +155,16 @@ export const ScopeManageView: React.FC<ScopeManageViewProps> = ({
 
                                 {/* Actions */}
                                 <div className="flex items-center gap-1 shrink-0">
+                                    {/* Icon Selector Button - Only show if custom icons are enabled */}
+                                    {isCustomIconEnabled && (
+                                        <button 
+                                            onClick={() => setIconSelectorOpen(iconSelectorOpen === scope.id ? null : scope.id)} 
+                                            className={`p-1 transition-colors ${iconSelectorOpen === scope.id ? 'text-orange-500' : 'text-stone-400 hover:text-stone-700'}`}
+                                            title="选择图标"
+                                        >
+                                            <Palette size={16} />
+                                        </button>
+                                    )}
                                     <button onClick={() => moveScope(index, 'up')} disabled={index === 0} className="p-1 text-stone-300 hover:text-stone-600 disabled:opacity-30">
                                         <ArrowUp size={16} />
                                     </button>
@@ -155,6 +179,16 @@ export const ScopeManageView: React.FC<ScopeManageViewProps> = ({
                                     </button>
                                 </div>
                             </div>
+
+                            {/* Icon Selector Dropdown */}
+                            {isCustomIconEnabled && iconSelectorOpen === scope.id && (
+                                <div className="p-4 border-b border-stone-100 bg-stone-50/30">
+                                    <UIIconSelectorCompact
+                                        currentIcon={scope.icon}
+                                        onSelect={(iconString) => handleIconSelect(scope.id, iconString)}
+                                    />
+                                </div>
+                            )}
 
                             {/* Body */}
                             <div className="p-4 space-y-4">

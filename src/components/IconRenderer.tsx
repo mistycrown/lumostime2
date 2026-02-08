@@ -74,7 +74,7 @@ export const IconRenderer: React.FC<IconRendererProps> = ({
         const textSizeMatch = className.match(/text-(xs|sm|base|lg|xl|2xl|3xl|4xl|5xl|6xl|7xl|8xl|9xl)/);
         if (textSizeMatch) {
             const sizeMap: Record<string, string> = {
-                'xs': '1rem',       // 16px (原 12px * 1.33)
+                'xs': '0.75rem',    // 12px (更小，适合小标签)
                 'sm': '1.125rem',   // 18px (原 14px * 1.29)
                 'base': '1.25rem',  // 20px (原 16px * 1.25)
                 'lg': '1.5rem',     // 24px (原 18px * 1.33)

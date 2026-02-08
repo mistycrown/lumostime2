@@ -9,6 +9,7 @@
  */
 import React, { useMemo } from 'react';
 import { Log, Category } from '../types';
+import { IconRenderer } from './IconRenderer';
 
 interface MonthHeatmapProps {
     logs: Log[];
@@ -245,8 +246,9 @@ export const MonthHeatmap: React.FC<MonthHeatmapProps> = ({ logs, categories, mo
                                     className="w-3 h-3 rounded-sm shrink-0"
                                     style={{ backgroundColor: getScheduleColor(activity.color) }}
                                 />
-                                <span className="text-[10px] text-stone-600 whitespace-nowrap">
-                                    {activity.icon} {activity.name}
+                                <span className="text-[10px] text-stone-600 whitespace-nowrap flex items-center gap-0.5">
+                                    <IconRenderer icon={activity.icon} size={10} />
+                                    <span>{activity.name}</span>
                                 </span>
                             </div>
                         ))}

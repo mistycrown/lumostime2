@@ -24,6 +24,7 @@ import { TimePalCard } from '../components/TimePalCard';
 import { TimePalDebugger } from '../components/TimePalDebugger';
 import { FloatingButton } from '../components/FloatingButton';
 import { UIIcon } from '../components/UIIcon';
+import { IconRenderer } from '../components/IconRenderer';
 
 
 // Image Thumbnail Component
@@ -836,11 +837,11 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ logs, todos, scopes,
                                             {/* Category Tag */}
                                             <span className="text-[10px] font-medium text-stone-500 border border-stone-200 px-2 py-0.5 rounded flex items-center gap-1 bg-stone-50/30">
                                                 <span style={{ color: item.logData.categoryColor }} className="font-bold">#</span>
-                                                <span>{item.logData.categoryIcon}</span>
+                                                <IconRenderer icon={item.logData.categoryIcon || ''} className="text-xs" />
                                                 <span className="flex items-center">
                                                     <span>{item.logData.categoryName}</span>
                                                     <span className="mx-1 text-stone-300">/</span>
-                                                    <span className="mr-1">{item.logData.activity?.icon}</span>
+                                                    <IconRenderer icon={item.logData.activity?.icon || ''} className="text-xs mr-1" />
                                                     <span className="text-stone-500">{item.logData.activity?.name}</span>
                                                 </span>
                                             </span>
@@ -851,7 +852,7 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ logs, todos, scopes,
                                                     {item.logData.linkedScopeData.map((scopeData, idx) => (
                                                         <span key={idx} className="text-[10px] font-medium text-stone-500 border border-stone-200 px-2 py-0.5 rounded flex items-center gap-1 bg-stone-50/30">
                                                             <span className="text-stone-400 font-bold">%</span>
-                                                            <span>{scopeData.icon}</span>
+                                                            <IconRenderer icon={scopeData.icon} className="text-xs" />
                                                             <span>{scopeData.name}</span>
                                                         </span>
                                                     ))}
