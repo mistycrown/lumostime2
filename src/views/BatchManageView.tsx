@@ -28,8 +28,8 @@ export const BatchManageView: React.FC<BatchManageViewProps> = ({ onBack, catego
     // Icon selector state - for both categories and activities
     const [iconSelectorOpen, setIconSelectorOpen] = useState<{ type: 'category' | 'activity', id: string } | null>(null);
     
-    // Color picker state - for activities
-    const [colorPickerOpen, setColorPickerOpen] = useState<string | null>(null);
+    // Color picker state - for both categories and activities
+    const [colorPickerOpen, setColorPickerOpen] = useState<{ type: 'category' | 'activity', id: string } | null>(null);
     
     const { uiIconTheme } = useSettings();
     const isCustomIconEnabled = uiIconService.isCustomTheme();
@@ -176,6 +176,17 @@ export const BatchManageView: React.FC<BatchManageViewProps> = ({ onBack, catego
         setIconSelectorOpen(null);
     };
 
+    // Handle color selection for categories
+    const handleCategoryColorChange = (catId: string, color: string) => {
+        setCategories(prev => prev.map(c => {
+            if (c.id === catId) {
+                return { ...c, themeColor: color };
+            }
+            return c;
+        }));
+        setColorPickerOpen(null); // Close color picker after selection
+    };
+
     // Handle color selection for activities
     const handleActivityColorChange = (catId: string, actId: string, color: string) => {
         setCategories(prev => prev.map(c => {
@@ -192,6 +203,39 @@ export const BatchManageView: React.FC<BatchManageViewProps> = ({ onBack, catego
             }
             return c;
         }));
+        setColorPickerOpen(null); // Close color picker after selection
+    };
+
+    // Get color hex from activity color string (use lightHex for display)
+    const getColorFromActivityColor = (colorStr: string): string => {
+        if (!colorStr) return '#e7e5e4';
+        
+        // Match bg-{color}-{shade} pattern
+        const match = colorStr.match(/bg-([a-z]+)-/);
+        if (match) {
+            const colorName = match[1];
+            const option = COLOR_OPTIONS.find(opt => opt.id === colorName);
+            if (option) {
+                return option.lightHex; // Use lightHex for lighter color
+            }
+        }
+        return '#e7e5e4';
+    };
+
+    // Get color hex from category themeColor (use lightHex for display)
+    const getColorFromCategoryThemeColor = (themeColor: string): string => {
+        if (!themeColor) return '#e7e5e4';
+        
+        // Match text-{color}-{shade} pattern
+        const match = themeColor.match(/text-([a-z]+)-/);
+        if (match) {
+            const colorName = match[1];
+            const option = COLOR_OPTIONS.find(opt => opt.id === colorName);
+            if (option) {
+                return option.lightHex; // Use lightHex for lighter color
+            }
+        }
+        return '#e7e5e4';
     };
 
     // --- Drag Logic (Kept but optional now) ---
@@ -261,6 +305,22 @@ export const BatchManageView: React.FC<BatchManageViewProps> = ({ onBack, catego
 
                             {/* Category Actions */}
                             <div className="flex items-center gap-1 shrink-0">
+                                {/* Color Picker Button for Category */}
+                                <button
+                                    onClick={() => setColorPickerOpen(
+                                        colorPickerOpen?.type === 'category' && colorPickerOpen?.id === category.id 
+                                            ? null 
+                                            : { type: 'category', id: category.id }
+                                    )}
+                                    className="p-1.5 rounded-lg transition-all shrink-0 hover:bg-stone-100"
+                                    title="选择颜色"
+                                >
+                                    <div 
+                                        className="w-4 h-4 rounded-full border border-stone-300"
+                                        style={{ backgroundColor: getColorFromCategoryThemeColor(category.themeColor) }}
+                                    />
+                                </button>
+                                
                                 {/* Icon Selector Button - Only show if custom icons are enabled */}
                                 {isCustomIconEnabled && (
                                     <button 
@@ -294,6 +354,26 @@ export const BatchManageView: React.FC<BatchManageViewProps> = ({ onBack, catego
                             </div>
                         </div>
 
+                        {/* Color Picker Dropdown for Category */}
+                        {colorPickerOpen?.type === 'category' && colorPickerOpen?.id === category.id && (
+                            <div className="p-3 border-b border-stone-100 bg-stone-50/30">
+                                <div className="flex gap-2 flex-wrap">
+                                    {COLOR_OPTIONS.map(opt => (
+                                        <button
+                                            key={opt.id}
+                                            onClick={() => handleCategoryColorChange(category.id, opt.title)}
+                                            title={opt.label}
+                                            className={`w-8 h-8 rounded-full ${opt.bg} transition-all hover:scale-110 ${
+                                                category.themeColor.includes(opt.id) 
+                                                    ? `ring-2 ${opt.ring} ring-offset-2` 
+                                                    : ''
+                                            }`}
+                                        />
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
                         {/* Icon Selector Dropdown for Category */}
                         {isCustomIconEnabled && iconSelectorOpen?.type === 'category' && iconSelectorOpen?.id === category.id && (
                             <div className="p-4 border-b border-stone-100 bg-stone-50/30">
@@ -324,6 +404,22 @@ export const BatchManageView: React.FC<BatchManageViewProps> = ({ onBack, catego
                                                     onChange={(e) => handleNameChange(category.id, activity.id, e.target.value)}
                                                 />
                                             </div>
+
+                                            {/* Color Picker Button */}
+                                            <button
+                                                onClick={() => setColorPickerOpen(
+                                                    colorPickerOpen?.type === 'activity' && colorPickerOpen?.id === activity.id 
+                                                        ? null 
+                                                        : { type: 'activity', id: activity.id }
+                                                )}
+                                                className="p-1.5 rounded-lg transition-all shrink-0 hover:bg-stone-100"
+                                                title="选择颜色"
+                                            >
+                                                <div 
+                                                    className="w-4 h-4 rounded-full border border-stone-300"
+                                                    style={{ backgroundColor: getColorFromActivityColor(activity.color) }}
+                                                />
+                                            </button>
 
                                             {/* Activity Actions */}
                                             <div className="flex items-center gap-1 shrink-0">
@@ -356,6 +452,26 @@ export const BatchManageView: React.FC<BatchManageViewProps> = ({ onBack, catego
                                                 </button>
                                             </div>
                                         </div>
+
+                                        {/* Color Picker Dropdown */}
+                                        {colorPickerOpen?.type === 'activity' && colorPickerOpen?.id === activity.id && (
+                                            <div className="p-3 mt-1 bg-stone-50/50 rounded-xl border border-stone-100">
+                                                <div className="flex gap-2 flex-wrap">
+                                                    {COLOR_OPTIONS.map(opt => (
+                                                        <button
+                                                            key={opt.id}
+                                                            onClick={() => handleActivityColorChange(category.id, activity.id, `${opt.bg} ${opt.text}`)}
+                                                            title={opt.label}
+                                                            className={`w-8 h-8 rounded-full ${opt.bg} transition-all hover:scale-110 ${
+                                                                activity.color.includes(opt.bg) 
+                                                                    ? `ring-2 ${opt.ring} ring-offset-2` 
+                                                                    : ''
+                                                            }`}
+                                                        />
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        )}
 
                                         {/* Icon Selector Dropdown for Activity */}
                                         {isCustomIconEnabled && iconSelectorOpen?.type === 'activity' && iconSelectorOpen?.id === activity.id && (
