@@ -11,6 +11,7 @@ import React, { useState } from 'react';
 import { Category, Activity } from '../types';
 import { ChevronDown, ChevronRight, GripVertical, Plus, Trash2, ArrowUp, ArrowDown, X, Check, Palette } from 'lucide-react';
 import { UIIconSelectorCompact } from '../components/UIIconSelector';
+import { IconRenderer } from '../components/IconRenderer';
 import { uiIconService } from '../services/uiIconService';
 import { useSettings } from '../contexts/SettingsContext';
 import { COLOR_OPTIONS } from '../constants';
@@ -147,10 +148,10 @@ export const BatchManageView: React.FC<BatchManageViewProps> = ({ onBack, catego
     };
 
     // Handle icon selection for categories
-    const handleCategoryIconSelect = (catId: string, iconString: string) => {
+    const handleCategoryIconSelect = (catId: string, uiIconString: string) => {
         setCategories(prev => prev.map(c => {
             if (c.id === catId) {
-                return { ...c, icon: iconString };
+                return { ...c, uiIcon: uiIconString };
             }
             return c;
         }));
@@ -158,14 +159,14 @@ export const BatchManageView: React.FC<BatchManageViewProps> = ({ onBack, catego
     };
 
     // Handle icon selection for activities
-    const handleActivityIconSelect = (catId: string, actId: string, iconString: string) => {
+    const handleActivityIconSelect = (catId: string, actId: string, uiIconString: string) => {
         setCategories(prev => prev.map(c => {
             if (c.id === catId) {
                 return {
                     ...c,
                     activities: c.activities.map(a => {
                         if (a.id === actId) {
-                            return { ...a, icon: iconString };
+                            return { ...a, uiIcon: uiIconString };
                         }
                         return a;
                     })
@@ -321,7 +322,7 @@ export const BatchManageView: React.FC<BatchManageViewProps> = ({ onBack, catego
                                     />
                                 </button>
                                 
-                                {/* Icon Selector Button - Only show if custom icons are enabled */}
+                                {/* Icon Selector Button - Show current UI icon preview */}
                                 {isCustomIconEnabled && (
                                     <button 
                                         onClick={() => setIconSelectorOpen(
@@ -329,14 +330,18 @@ export const BatchManageView: React.FC<BatchManageViewProps> = ({ onBack, catego
                                                 ? null 
                                                 : { type: 'category', id: category.id }
                                         )} 
-                                        className={`p-1 transition-colors ${
+                                        className={`w-8 h-8 rounded-md transition-all border flex items-center justify-center ${
                                             iconSelectorOpen?.type === 'category' && iconSelectorOpen?.id === category.id 
-                                                ? 'text-orange-500' 
-                                                : 'text-stone-400 hover:text-stone-700'
+                                                ? 'border-orange-500 bg-orange-50' 
+                                                : 'border-stone-200 hover:border-stone-300 bg-white'
                                         }`}
-                                        title="选择图标"
+                                        title="选择 UI 图标"
                                     >
-                                        <Palette size={16} />
+                                        <IconRenderer 
+                                            icon={category.icon} 
+                                            uiIcon={category.uiIcon}
+                                            size={16}
+                                        />
                                     </button>
                                 )}
                                 <button onClick={() => moveCategory(catIndex, 'up')} disabled={catIndex === 0} className="p-1 text-stone-300 hover:text-stone-600 disabled:opacity-30">
@@ -379,7 +384,8 @@ export const BatchManageView: React.FC<BatchManageViewProps> = ({ onBack, catego
                             <div className="p-4 border-b border-stone-100 bg-stone-50/30">
                                 <UIIconSelectorCompact
                                     currentIcon={category.icon}
-                                    onSelect={(iconString) => handleCategoryIconSelect(category.id, iconString)}
+                                    currentUiIcon={category.uiIcon}
+                                    onSelectDual={(emoji, uiIcon) => handleCategoryIconSelect(category.id, uiIcon)}
                                 />
                             </div>
                         )}
@@ -423,7 +429,7 @@ export const BatchManageView: React.FC<BatchManageViewProps> = ({ onBack, catego
 
                                             {/* Activity Actions */}
                                             <div className="flex items-center gap-1 shrink-0">
-                                                {/* Icon Selector Button for Activity - Only show if custom icons are enabled */}
+                                                {/* Icon Selector Button for Activity - Show current UI icon preview */}
                                                 {isCustomIconEnabled && (
                                                     <button 
                                                         onClick={() => setIconSelectorOpen(
@@ -431,14 +437,18 @@ export const BatchManageView: React.FC<BatchManageViewProps> = ({ onBack, catego
                                                                 ? null 
                                                                 : { type: 'activity', id: activity.id }
                                                         )} 
-                                                        className={`p-1 transition-colors ${
+                                                        className={`w-7 h-7 rounded-md transition-all border flex items-center justify-center ${
                                                             iconSelectorOpen?.type === 'activity' && iconSelectorOpen?.id === activity.id 
-                                                                ? 'text-orange-500' 
-                                                                : 'text-stone-300 hover:text-stone-600'
+                                                                ? 'border-orange-500 bg-orange-50' 
+                                                                : 'border-stone-200 hover:border-stone-300 bg-white'
                                                         }`}
-                                                        title="选择图标"
+                                                        title="选择 UI 图标"
                                                     >
-                                                        <Palette size={14} />
+                                                        <IconRenderer 
+                                                            icon={activity.icon} 
+                                                            uiIcon={activity.uiIcon}
+                                                            size={14}
+                                                        />
                                                     </button>
                                                 )}
                                                 <button onClick={() => moveActivity(catIndex, actIndex, 'up')} disabled={actIndex === 0} className="p-1 text-stone-300 hover:text-stone-600 disabled:opacity-30">
@@ -478,7 +488,8 @@ export const BatchManageView: React.FC<BatchManageViewProps> = ({ onBack, catego
                                             <div className="p-3 mt-1 bg-stone-50/50 rounded-xl border border-stone-100">
                                                 <UIIconSelectorCompact
                                                     currentIcon={activity.icon}
-                                                    onSelect={(iconString) => handleActivityIconSelect(category.id, activity.id, iconString)}
+                                                    currentUiIcon={activity.uiIcon}
+                                                    onSelectDual={(emoji, uiIcon) => handleActivityIconSelect(category.id, activity.id, uiIcon)}
                                                 />
                                             </div>
                                         )}

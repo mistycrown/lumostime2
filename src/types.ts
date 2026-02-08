@@ -260,7 +260,8 @@ export interface CheckItem {
   id: string;
   category?: string; // 所属的模板标题或分组
   content: string;
-  icon?: string; // Icon from template
+  icon?: string; // Icon from template (emoji)
+  uiIcon?: string; // UI 图标 ID (格式: ui:iconType)
   isCompleted: boolean;
 }
 
@@ -269,12 +270,15 @@ export interface CheckTemplateItem {
   id: string; // Add ID for better tracking
   content: string;
   icon?: string; // Preset icon (emoji or Lucide name)
+  uiIcon?: string; // UI 图标 ID (格式: ui:iconType)
 }
 
 // 日课模板
 export interface CheckTemplate {
   id: string;
   title: string;
+  icon?: string; // 模板图标 (emoji)
+  uiIcon?: string; // 模板 UI 图标 ID (格式: ui:iconType)
   items: CheckTemplateItem[]; // Updated to object array
   enabled: boolean;
   order: number;

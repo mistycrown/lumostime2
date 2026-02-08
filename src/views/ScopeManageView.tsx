@@ -77,8 +77,8 @@ export const ScopeManageView: React.FC<ScopeManageViewProps> = ({
     };
 
     // Handle icon selection from UI Icon Selector
-    const handleIconSelect = (id: string, iconString: string) => {
-        handleUpdateScope(id, { icon: iconString });
+    const handleIconSelect = (id: string, uiIconString: string) => {
+        handleUpdateScope(id, { uiIcon: uiIconString });
         setIconSelectorOpen(null);
     };
 
@@ -155,14 +155,18 @@ export const ScopeManageView: React.FC<ScopeManageViewProps> = ({
 
                                 {/* Actions */}
                                 <div className="flex items-center gap-1 shrink-0">
-                                    {/* Icon Selector Button - Only show if custom icons are enabled */}
+                                    {/* Icon Selector Button - Show current UI icon preview */}
                                     {isCustomIconEnabled && (
                                         <button 
                                             onClick={() => setIconSelectorOpen(iconSelectorOpen === scope.id ? null : scope.id)} 
-                                            className={`p-1 transition-colors ${iconSelectorOpen === scope.id ? 'text-orange-500' : 'text-stone-400 hover:text-stone-700'}`}
-                                            title="选择图标"
+                                            className={`w-8 h-8 rounded-md transition-all border flex items-center justify-center ${iconSelectorOpen === scope.id ? 'border-orange-500 bg-orange-50' : 'border-stone-200 hover:border-stone-300 bg-white'}`}
+                                            title="选择 UI 图标"
                                         >
-                                            <Palette size={16} />
+                                            <IconRenderer 
+                                                icon={scope.icon} 
+                                                uiIcon={scope.uiIcon}
+                                                size={16}
+                                            />
                                         </button>
                                     )}
                                     <button onClick={() => moveScope(index, 'up')} disabled={index === 0} className="p-1 text-stone-300 hover:text-stone-600 disabled:opacity-30">
@@ -185,7 +189,8 @@ export const ScopeManageView: React.FC<ScopeManageViewProps> = ({
                                 <div className="p-4 border-b border-stone-100 bg-stone-50/30">
                                     <UIIconSelectorCompact
                                         currentIcon={scope.icon}
-                                        onSelect={(iconString) => handleIconSelect(scope.id, iconString)}
+                                        currentUiIcon={scope.uiIcon}
+                                        onSelectDual={(emoji, uiIcon) => handleIconSelect(scope.id, uiIcon)}
                                     />
                                 </div>
                             )}

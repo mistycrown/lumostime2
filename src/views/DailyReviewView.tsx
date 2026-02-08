@@ -13,6 +13,8 @@ import { DailyReview, ReviewTemplate, ReviewAnswer, Category, Log, TodoCategory,
 import { COLOR_OPTIONS, DEFAULT_CHECK_TEMPLATES } from '../constants';
 import * as LucideIcons from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
+import { IconRenderer } from '../components/IconRenderer';
+import { useSettings } from '../contexts/SettingsContext';
 import remarkGfm from 'remark-gfm';
 import remarkBreaks from 'remark-breaks';
 import { ConfirmModal } from '../components/ConfirmModal';
@@ -20,7 +22,6 @@ import { NarrativeStyleSelectionModal } from '../components/NarrativeStyleSelect
 import { StatsView } from './StatsView';
 import { FloatingButton } from '../components/FloatingButton';
 import { UIIcon } from '../components/UIIcon';
-import { IconRenderer } from '../components/IconRenderer';
 
 interface DailyReviewViewProps {
     review: DailyReview;
@@ -657,9 +658,18 @@ export const DailyReviewView: React.FC<DailyReviewViewProps> = ({
                                                             <LucideIcons.Check size={10} strokeWidth={3} />
                                                         </button>
 
-                                                        <div className="flex-1 min-w-0">
+                                                        <div className="flex-1 min-w-0 flex items-start gap-2">
+                                                            {/* Icon */}
+                                                            {item.icon && (
+                                                                <IconRenderer 
+                                                                    icon={item.icon} 
+                                                                    uiIcon={item.uiIcon}
+                                                                    className="text-base mt-0.5"
+                                                                />
+                                                            )}
+                                                            
                                                             {editingCheckItemId === item.id ? (
-                                                                <div className="flex items-center gap-2" onClick={e => e.stopPropagation()}>
+                                                                <div className="flex-1 flex items-center gap-2" onClick={e => e.stopPropagation()}>
                                                                     <input
                                                                         type="text"
                                                                         value={editingCheckItemText}
@@ -674,7 +684,7 @@ export const DailyReviewView: React.FC<DailyReviewViewProps> = ({
                                                                     <button onClick={saveEditingCheckItem} className="text-stone-800 p-1"><LucideIcons.Check size={16} /></button>
                                                                 </div>
                                                             ) : (
-                                                                <p className={`text-[15px] font-serif leading-relaxed transition-all ${item.isCompleted ? 'text-stone-400 line-through decoration-stone-300' : 'text-stone-900'}`}>
+                                                                <p className={`flex-1 text-[15px] font-serif leading-relaxed transition-all ${item.isCompleted ? 'text-stone-400 line-through decoration-stone-300' : 'text-stone-900'}`}>
                                                                     {item.content}
                                                                 </p>
                                                             )}

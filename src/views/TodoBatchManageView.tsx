@@ -11,6 +11,7 @@ import React, { useState, useEffect } from 'react';
 import { TodoCategory, TodoItem } from '../types';
 import { ChevronDown, ChevronRight, GripVertical, Plus, Trash2, ArrowUp, ArrowDown, X, Check, Palette } from 'lucide-react';
 import { UIIconSelectorCompact } from '../components/UIIconSelector';
+import { IconRenderer } from '../components/IconRenderer';
 import { uiIconService } from '../services/uiIconService';
 import { useSettings } from '../contexts/SettingsContext';
 
@@ -144,10 +145,10 @@ export const TodoBatchManageView: React.FC<TodoBatchManageViewProps> = ({ onBack
     };
 
     // Handle icon selection from UI Icon Selector
-    const handleIconSelect = (catId: string, iconString: string) => {
+    const handleIconSelect = (catId: string, uiIconString: string) => {
         setData(prev => prev.map(c => {
             if (c.id === catId) {
-                return { ...c, icon: iconString };
+                return { ...c, uiIcon: uiIconString };
             }
             return c;
         }));
@@ -189,7 +190,7 @@ export const TodoBatchManageView: React.FC<TodoBatchManageViewProps> = ({ onBack
 
     const handleSave = () => {
         // Separate categories and todos
-        const finalCategories: TodoCategory[] = data.map(({ id, name, icon }) => ({ id, name, icon }));
+        const finalCategories: TodoCategory[] = data.map(({ id, name, icon, uiIcon }) => ({ id, name, icon, uiIcon }));
 
         // Get all edited uncompleted todos
         const editedTodos: TodoItem[] = data.flatMap(c => c.items.map(t => ({ ...t, categoryId: c.id })));
@@ -239,14 +240,18 @@ export const TodoBatchManageView: React.FC<TodoBatchManageViewProps> = ({ onBack
 
                             {/* Category Actions */}
                             <div className="flex items-center gap-1 shrink-0">
-                                {/* Icon Selector Button - Only show if custom icons are enabled */}
+                                {/* Icon Selector Button - Show current UI icon preview */}
                                 {isCustomIconEnabled && (
                                     <button 
                                         onClick={() => setIconSelectorOpen(iconSelectorOpen === category.id ? null : category.id)} 
-                                        className={`p-1 transition-colors ${iconSelectorOpen === category.id ? 'text-orange-500' : 'text-stone-400 hover:text-stone-700'}`}
-                                        title="选择图标"
+                                        className={`w-8 h-8 rounded-md transition-all border flex items-center justify-center ${iconSelectorOpen === category.id ? 'border-orange-500 bg-orange-50' : 'border-stone-200 hover:border-stone-300 bg-white'}`}
+                                        title="选择 UI 图标"
                                     >
-                                        <Palette size={16} />
+                                        <IconRenderer 
+                                            icon={category.icon} 
+                                            uiIcon={category.uiIcon}
+                                            size={16}
+                                        />
                                     </button>
                                 )}
                                 <button onClick={() => moveCategory(catIndex, 'up')} disabled={catIndex === 0} className="p-1 text-stone-300 hover:text-stone-600 disabled:opacity-30">
@@ -269,7 +274,8 @@ export const TodoBatchManageView: React.FC<TodoBatchManageViewProps> = ({ onBack
                             <div className="p-4 border-b border-stone-100 bg-stone-50/30">
                                 <UIIconSelectorCompact
                                     currentIcon={category.icon}
-                                    onSelect={(iconString) => handleIconSelect(category.id, iconString)}
+                                    currentUiIcon={category.uiIcon}
+                                    onSelectDual={(emoji, uiIcon) => handleIconSelect(category.id, uiIcon)}
                                 />
                             </div>
                         )}

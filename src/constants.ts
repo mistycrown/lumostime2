@@ -738,12 +738,13 @@ export const INITIAL_DAILY_REVIEWS: DailyReview[] = [];
 export const DEFAULT_CHECK_TEMPLATES: CheckTemplate[] = [
   {
     id: 'ct_daily_habits',
-    title: '🌞 每日习惯',
+    title: '每日习惯',
+    icon: '🌞',
     items: [
-      { id: 'i1', content: '💧 早起喝水', icon: '💧' },
-      { id: 'i2', content: '🛏️ 整理床铺', icon: '🛏️' },
-      { id: 'i3', content: '💊 吃维生素', icon: '💊' },
-      { id: 'i4', content: '🧘 冥想 10 分钟', icon: '🧘' }
+      { id: 'i1', content: '早起喝水', icon: '💧' },
+      { id: 'i2', content: '整理床铺', icon: '🛏️' },
+      { id: 'i3', content: '吃维生素', icon: '💊' },
+      { id: 'i4', content: '冥想 10 分钟', icon: '🧘' }
     ],
     enabled: true,
     order: 1,
@@ -751,11 +752,12 @@ export const DEFAULT_CHECK_TEMPLATES: CheckTemplate[] = [
   },
   {
     id: 'ct_evening_routine',
-    title: '🌜 晚间流程',
+    title: '晚间流程',
+    icon: '🌜',
     items: [
-      { id: 'i5', content: '🧹 收拾书桌', icon: '🧹' },
-      { id: 'i6', content: '👕 准备明天衣物', icon: '👕' },
-      { id: 'i7', content: '📚 阅读 15 分钟', icon: '📚' }
+      { id: 'i5', content: '收拾书桌', icon: '🧹' },
+      { id: 'i6', content: '准备明天衣物', icon: '👕' },
+      { id: 'i7', content: '阅读 15 分钟', icon: '📚' }
     ],
     enabled: true,
     order: 2,

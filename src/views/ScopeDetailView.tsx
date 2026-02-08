@@ -384,7 +384,11 @@ export const ScopeDetailView: React.FC<ScopeDetailViewProps> = ({
                                         </label>
                                         <UIIconSelector
                                             currentIcon={scope.icon}
-                                            onSelect={(icon) => setScope({ ...scope, icon })}
+                                            currentUiIcon={scope.uiIcon}
+                                            onSelectDual={(emoji, uiIcon) => {
+                                                // 只更新 uiIcon 字段，不修改 icon（emoji）
+                                                setScope({ ...scope, uiIcon });
+                                            }}
                                         />
                                     </div>
                                 )}

@@ -351,7 +351,11 @@ export const CategoryDetailView: React.FC<CategoryDetailViewProps> = ({ category
                                         </label>
                                         <UIIconSelector
                                             currentIcon={category.icon}
-                                            onSelect={(icon) => setCategory({ ...category, icon })}
+                                            currentUiIcon={category.uiIcon}
+                                            onSelectDual={(emoji, uiIcon) => {
+                                                // 只更新 uiIcon 字段，不修改 icon（emoji）
+                                                setCategory({ ...category, uiIcon });
+                                            }}
                                         />
                                     </div>
                                 )}
