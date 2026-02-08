@@ -17,6 +17,8 @@ const DIRS_TO_CONVERT = [
     'public/background',
     'public/dchh',
     'public/time_pal_origin',
+    'public/demo_pic',
+    'public/uiicon',
 ];
 
 // 应用图标目录（特殊处理：压缩为小尺寸 PNG）

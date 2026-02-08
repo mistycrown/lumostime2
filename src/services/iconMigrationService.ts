@@ -1,6 +1,11 @@
 /**
  * @file iconMigrationService.ts
- * @description 图标迁移服务 - 在启用自定义图标主题时，自动将默认 Emoji 替换为 UI 图标类型
+ * @description 图标迁移服务 - 在启用自定义图标主题时，自动将 Emoji 转换为 UI 图标并存储在 uiIcon 字段
+ * 
+ * 新的设计：
+ * - icon 字段：始终保存 emoji（用于默认主题）
+ * - uiIcon 字段：保存 UI 图标 ID（用于自定义主题）
+ * - 切换主题时不会丢失任何数据
  */
 
 import { Category, Scope, TodoCategory } from '../types';
@@ -10,126 +15,102 @@ import { uiIconService } from './uiIconService';
  * 图标迁移服务类
  */
 class IconMigrationService {
-    private readonly MIGRATION_KEY = 'lumostime_icon_migration_done';
-
     /**
-     * 检查是否已经完成迁移
-     */
-    isMigrationDone(): boolean {
-        return localStorage.getItem(this.MIGRATION_KEY) === 'true';
-    }
-
-    /**
-     * 标记迁移已完成
-     */
-    markMigrationDone(): void {
-        localStorage.setItem(this.MIGRATION_KEY, 'true');
-    }
-
-    /**
-     * 重置迁移状态（用于测试）
-     */
-    resetMigration(): void {
-        localStorage.removeItem(this.MIGRATION_KEY);
-    }
-
-    /**
-     * 迁移分类数据
+     * 迁移分类数据 - 将 emoji 转换为 uiIcon
      * @param categories 分类数组
      * @returns 迁移后的分类数组
      */
     migrateCategories(categories: Category[]): Category[] {
         return categories.map(category => ({
             ...category,
-            icon: this.migrateIcon(category.icon),
+            uiIcon: this.convertEmojiToUiIcon(category.icon),
             activities: category.activities.map(activity => ({
                 ...activity,
-                icon: this.migrateIcon(activity.icon)
+                uiIcon: this.convertEmojiToUiIcon(activity.icon)
             }))
         }));
     }
 
     /**
-     * 迁移领域数据
+     * 迁移领域数据 - 将 emoji 转换为 uiIcon
      * @param scopes 领域数组
      * @returns 迁移后的领域数组
      */
     migrateScopes(scopes: Scope[]): Scope[] {
         return scopes.map(scope => ({
             ...scope,
-            icon: this.migrateIcon(scope.icon)
+            uiIcon: this.convertEmojiToUiIcon(scope.icon)
         }));
     }
 
     /**
-     * 迁移待办分类数据
+     * 迁移待办分类数据 - 将 emoji 转换为 uiIcon
      * @param todoCategories 待办分类数组
      * @returns 迁移后的待办分类数组
      */
     migrateTodoCategories(todoCategories: TodoCategory[]): TodoCategory[] {
         return todoCategories.map(category => ({
             ...category,
-            icon: this.migrateIcon(category.icon)
+            uiIcon: this.convertEmojiToUiIcon(category.icon)
         }));
     }
 
     /**
-     * 迁移单个图标
-     * @param iconStr 图标字符串
-     * @returns 迁移后的图标字符串
+     * 清除 uiIcon 数据（切换回默认主题时）
+     * @param categories 分类数组
+     * @returns 清除后的分类数组
      */
-    private migrateIcon(iconStr: string): string {
-        // 如果已经是 UI 图标格式，不需要迁移
-        if (iconStr.startsWith('ui:')) {
-            return iconStr;
-        }
-
-        // 如果是默认 Emoji，转换为 UI 图标格式
-        if (uiIconService.isDefaultEmoji(iconStr)) {
-            const converted = uiIconService.convertEmojiToUIIcon(iconStr);
-            console.log(`[IconMigration] 迁移图标: ${iconStr} -> ${converted}`);
-            return converted;
-        }
-
-        // 用户自定义的 Emoji，保持不变
-        return iconStr;
+    clearUiIconsFromCategories(categories: Category[]): Category[] {
+        return categories.map(category => ({
+            ...category,
+            uiIcon: undefined,
+            activities: category.activities.map(activity => ({
+                ...activity,
+                uiIcon: undefined
+            }))
+        }));
     }
 
     /**
-     * 执行完整迁移
-     * @param data 包含所有需要迁移的数据
-     * @returns 迁移后的数据
+     * 清除 uiIcon 数据（切换回默认主题时）
+     * @param scopes 领域数组
+     * @returns 清除后的领域数组
      */
-    migrateAll(data: {
-        categories: Category[];
-        scopes: Scope[];
-        todoCategories: TodoCategory[];
-    }): {
-        categories: Category[];
-        scopes: Scope[];
-        todoCategories: TodoCategory[];
-        migrated: boolean;
-    } {
-        // 如果已经迁移过，直接返回原数据
-        if (this.isMigrationDone()) {
-            console.log('[IconMigration] 迁移已完成，跳过');
-            return { ...data, migrated: false };
+    clearUiIconsFromScopes(scopes: Scope[]): Scope[] {
+        return scopes.map(scope => ({
+            ...scope,
+            uiIcon: undefined
+        }));
+    }
+
+    /**
+     * 清除 uiIcon 数据（切换回默认主题时）
+     * @param todoCategories 待办分类数组
+     * @returns 清除后的待办分类数组
+     */
+    clearUiIconsFromTodoCategories(todoCategories: TodoCategory[]): TodoCategory[] {
+        return todoCategories.map(category => ({
+            ...category,
+            uiIcon: undefined
+        }));
+    }
+
+    /**
+     * 将 emoji 转换为 uiIcon
+     * @param emoji emoji 字符串
+     * @returns UI 图标 ID 或 undefined
+     */
+    private convertEmojiToUiIcon(emoji: string): string | undefined {
+        // 如果是默认 Emoji，转换为 UI 图标格式
+        if (uiIconService.isDefaultEmoji(emoji)) {
+            const converted = uiIconService.convertEmojiToUIIcon(emoji);
+            console.log(`[IconMigration] 转换图标: ${emoji} -> ${converted}`);
+            return converted;
         }
 
-        console.log('[IconMigration] 开始迁移图标数据...');
-
-        const migratedData = {
-            categories: this.migrateCategories(data.categories),
-            scopes: this.migrateScopes(data.scopes),
-            todoCategories: this.migrateTodoCategories(data.todoCategories),
-            migrated: true
-        };
-
-        // 标记迁移完成
-        this.markMigrationDone();
-        console.log('[IconMigration] 迁移完成');
-
-        return migratedData;
+        // 用户自定义的 Emoji，返回 undefined（保持使用 emoji）
+        console.log(`[IconMigration] 保持自定义 emoji: ${emoji}`);
+        return undefined;
     }
 }
 

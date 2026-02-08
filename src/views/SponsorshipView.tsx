@@ -15,6 +15,7 @@ import { ICON_OPTIONS } from '../services/iconService';
 import { Category } from '../types';
 import { TIMEPAL_OPTIONS, TimePalType, getTimePalEmoji } from '../constants/timePalConfig';
 import { useSettings } from '../contexts/SettingsContext';
+import { ConfirmModal } from '../components/ConfirmModal';
 
 interface SponsorshipViewProps {
     onBack: () => void;
@@ -36,7 +37,7 @@ interface ThemePreset {
     timePal: string;
 }
 
-// 测试方案数据
+// 主题方案数据
 const THEME_PRESETS: ThemePreset[] = [
     {
         id: 'default',
@@ -46,13 +47,13 @@ const THEME_PRESETS: ThemePreset[] = [
         appIcon: 'icon_simple',
         uiTheme: 'default',
         colorScheme: 'default',
-        background: 'none',
-        navigation: 'none',
-        timePal: 'default'
+        background: 'default',
+        navigation: 'default',
+        timePal: 'none'
     },
     {
-        id: 'purple-dream',
-        name: '紫色梦境',
+        id: 'purple',
+        name: 'Purple',
         description: '优雅的紫色主题',
         icon: '💜',
         appIcon: 'icon_uvcd',
@@ -60,79 +61,79 @@ const THEME_PRESETS: ThemePreset[] = [
         colorScheme: 'morandi-purple',
         background: 'purple',
         navigation: 'purple',
+        timePal: 'girl3'
+    },
+    {
+        id: 'catty',
+        name: 'Catty',
+        description: '可爱的粉色主题',
+        icon: '🐱',
+        appIcon: 'icon_cat',
+        uiTheme: 'cat',
+        colorScheme: 'morandi-pink',
+        background: 'pinkblue',
+        navigation: 'cat2',
+        timePal: 'cat'
+    },
+    {
+        id: 'little-prince',
+        name: 'Little Prince',
+        description: '梦幻的小王子主题',
+        icon: '🤴',
+        appIcon: 'icon_bijiaso',
+        uiTheme: 'prince',
+        colorScheme: 'dunhuang-feitian',
+        background: 'little_prince',
+        navigation: 'little_prince',
         timePal: 'prince'
     },
     {
-        id: 'forest-zen',
-        name: '森林禅意',
+        id: 'forest',
+        name: 'Forest',
         description: '清新自然的绿色主题',
         icon: '🌿',
         appIcon: 'icon_plant',
         uiTheme: 'forest',
-        colorScheme: 'morandi-green',
+        colorScheme: 'bamboo-green',
         background: 'green',
-        navigation: 'forest',
+        navigation: 'plant',
         timePal: 'rabbit'
     },
     {
-        id: 'ocean-blue',
-        name: '海洋蓝调',
-        description: '宁静的蓝色主题',
+        id: 'water-color',
+        name: 'Water Color',
+        description: '宁静的青色主题',
         icon: '🌊',
         appIcon: 'icon_sea',
-        uiTheme: 'color',
-        colorScheme: 'morandi-blue',
-        background: 'sea',
-        navigation: 'sea',
-        timePal: 'cat'
+        uiTheme: 'water',
+        colorScheme: 'morandi-cyan',
+        background: 'grenn3',
+        navigation: 'ya',
+        timePal: 'flower'
     },
     {
-        id: 'sakura-pink',
-        name: '樱花粉',
-        description: '温柔的粉色主题',
-        icon: '🌸',
-        appIcon: 'icon_heart',
-        uiTheme: 'cat',
-        colorScheme: 'morandi-pink',
-        background: 'pink',
-        navigation: 'pink',
-        timePal: 'girl'
-    },
-    {
-        id: 'sunset-orange',
-        name: '日落橙',
-        description: '温暖的橙色主题',
-        icon: '🌅',
-        appIcon: 'icon_bijiaso',
-        uiTheme: 'plant',
-        colorScheme: 'morandi-orange',
-        background: 'red',
-        navigation: 'orange',
-        timePal: 'dog'
-    },
-    {
-        id: 'minimal-gray',
-        name: '极简灰',
-        description: '简约的灰色主题',
-        icon: '⚪',
-        appIcon: 'icon_sketch',
-        uiTheme: 'default',
-        colorScheme: 'morandi-gray',
-        background: 'none',
-        navigation: 'minimal',
-        timePal: 'default'
-    },
-    {
-        id: 'golden-hour',
-        name: '黄金时刻',
-        description: '温馨的金色主题',
-        icon: '✨',
+        id: 'good-night',
+        name: 'Good Night',
+        description: '温暖的焦糖主题',
+        icon: '☕',
         appIcon: 'icon_cdqm',
+        uiTheme: 'color',
+        colorScheme: 'latte-caramel',
+        background: 'greenpink',
+        navigation: 'grass',
+        timePal: 'rabbit2'
+    },
+    {
+        id: 'flower',
+        name: 'Flower',
+        description: '清新的莫兰迪绿',
+        icon: '🌱',
+        appIcon: 'icon_plant',
         uiTheme: 'plant',
-        colorScheme: 'morandi-yellow',
-        background: 'bank',
-        navigation: 'gold',
-        timePal: 'panda'
+        colorScheme: 'morandi-green',
+        background: 'grenn3',
+        navigation: 'plant2',
+        timePal: 'flower'
     }
 ];
 
@@ -440,6 +441,180 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
     // Tab 页状态
     type TabType = 'preset' | 'icon' | 'colorScheme' | 'background' | 'navigation' | 'timepal';
     const [activeTab, setActiveTab] = useState<TabType>('preset');
+
+    // 当前应用的主题方案
+    const [currentPresetId, setCurrentPresetId] = useState<string>(() => {
+        return localStorage.getItem('lumostime_current_preset') || 'default';
+    });
+
+    // 确认模态框状态
+    const [isDefaultThemeConfirmOpen, setIsDefaultThemeConfirmOpen] = useState(false);
+    const [pendingPreset, setPendingPreset] = useState<ThemePreset | null>(null);
+
+    // 应用主题方案
+    const applyThemePreset = async (preset: ThemePreset) => {
+        try {
+            const oldTheme = uiIconTheme;
+            
+            // 检测是否从自定义主题切换到默认主题
+            if (oldTheme !== 'default' && preset.uiTheme === 'default') {
+                // 显示确认模态框
+                setPendingPreset(preset);
+                setIsDefaultThemeConfirmOpen(true);
+                return;
+            }
+            
+            // 执行实际的主题切换
+            await executeThemePresetChange(preset, oldTheme);
+            
+        } catch (error) {
+            console.error('[SponsorshipView] 应用主题方案失败:', error);
+            onToast('error', '应用主题方案失败，请重试');
+        }
+    };
+
+    // 确认切换到默认主题
+    const handleConfirmDefaultTheme = async () => {
+        setIsDefaultThemeConfirmOpen(false);
+        if (pendingPreset) {
+            const oldTheme = uiIconTheme;
+            await executeThemePresetChange(pendingPreset, oldTheme);
+            setPendingPreset(null);
+        }
+    };
+
+    // 取消切换到默认主题
+    const handleCancelDefaultTheme = () => {
+        setIsDefaultThemeConfirmOpen(false);
+        setPendingPreset(null);
+    };
+
+    // 执行主题方案切换的实际逻辑
+    const executeThemePresetChange = async (preset: ThemePreset, oldTheme: string) => {
+        try {
+            // 1. 设置 UI 主题
+            setUiIconTheme(preset.uiTheme);
+            
+            // 2. 设置配色方案
+            setColorScheme(preset.colorScheme);
+            
+            // 3. 设置背景
+            const { backgroundService } = await import('../services/backgroundService');
+            backgroundService.setCurrentBackground(preset.background);
+            
+            // 4. 设置导航装饰
+            const { navigationDecorationService } = await import('../services/navigationDecorationService');
+            navigationDecorationService.setCurrentDecoration(preset.navigation);
+            
+            // 5. 设置时间小友
+            localStorage.setItem('lumostime_timepal_type', preset.timePal);
+            window.dispatchEvent(new Event('timepal-type-changed'));
+            
+            // 6. 保存当前方案
+            localStorage.setItem('lumostime_current_preset', preset.id);
+            setCurrentPresetId(preset.id);
+            
+            // 7. 处理图标主题切换
+            // 如果从自定义主题切换回 default，需要反向迁移并刷新
+            if (oldTheme !== 'default' && preset.uiTheme === 'default') {
+                try {
+                    const { iconMigrationService } = await import('../services/iconMigrationService');
+                    
+                    // 读取数据
+                    const categoriesStr = localStorage.getItem('lumostime_categories');
+                    const scopesStr = localStorage.getItem('lumostime_scopes');
+                    const todoCategoriesStr = localStorage.getItem('lumostime_todoCategories');
+                    
+                    if (categoriesStr && scopesStr && todoCategoriesStr) {
+                        const categories = JSON.parse(categoriesStr);
+                        const scopes = JSON.parse(scopesStr);
+                        const todoCategories = JSON.parse(todoCategoriesStr);
+                        
+                        // 执行反向迁移（UI 图标 -> Emoji）
+                        const reversedCategories = iconMigrationService.reverseMigrateCategories(categories);
+                        const reversedScopes = iconMigrationService.reverseMigrateScopes(scopes);
+                        const reversedTodoCategories = iconMigrationService.reverseMigrateTodoCategories(todoCategories);
+                        
+                        // 写回 localStorage
+                        localStorage.setItem('lumostime_categories', JSON.stringify(reversedCategories));
+                        localStorage.setItem('lumostime_scopes', JSON.stringify(reversedScopes));
+                        localStorage.setItem('lumostime_todoCategories', JSON.stringify(reversedTodoCategories));
+                    }
+                    
+                    // 重置迁移状态
+                    iconMigrationService.resetMigration();
+                    
+                    onToast('success', `已应用"${preset.name}"主题方案，正在刷新...`);
+                    
+                    // 延迟刷新，让用户看到提示
+                    setTimeout(() => {
+                        window.location.reload();
+                    }, 1000);
+                    return;
+                } catch (error) {
+                    console.error('[SponsorshipView] 反向迁移失败:', error);
+                }
+            }
+            
+            // 8. 如果从 default 切换到自定义主题，触发图标迁移
+            if (oldTheme === 'default' && preset.uiTheme !== 'default') {
+                try {
+                    const { iconMigrationService } = await import('../services/iconMigrationService');
+                    
+                    // 读取数据
+                    const categoriesStr = localStorage.getItem('lumostime_categories');
+                    const scopesStr = localStorage.getItem('lumostime_scopes');
+                    const todoCategoriesStr = localStorage.getItem('lumostime_todoCategories');
+                    
+                    if (categoriesStr && scopesStr && todoCategoriesStr) {
+                        const categories = JSON.parse(categoriesStr);
+                        const scopes = JSON.parse(scopesStr);
+                        const todoCategories = JSON.parse(todoCategoriesStr);
+                        
+                        // 执行迁移
+                        const migratedCategories = iconMigrationService.migrateCategories(categories);
+                        const migratedScopes = iconMigrationService.migrateScopes(scopes);
+                        const migratedTodoCategories = iconMigrationService.migrateTodoCategories(todoCategories);
+                        
+                        // 写回 localStorage
+                        localStorage.setItem('lumostime_categories', JSON.stringify(migratedCategories));
+                        localStorage.setItem('lumostime_scopes', JSON.stringify(migratedScopes));
+                        localStorage.setItem('lumostime_todoCategories', JSON.stringify(migratedTodoCategories));
+                        
+                        // 标记迁移完成
+                        iconMigrationService.markMigrationDone();
+                        
+                        onToast('success', `已应用"${preset.name}"主题方案，正在刷新...`);
+                        
+                        // 自动刷新页面
+                        setTimeout(() => {
+                            window.location.reload();
+                        }, 1000);
+                        return;
+                    }
+                } catch (error) {
+                    console.error('[SponsorshipView] 图标迁移失败:', error);
+                }
+            }
+            
+            // 9. 如果需要切换应用图标（仅 Android）
+            if (Capacitor.isNativePlatform() && preset.appIcon !== 'icon_simple') {
+                // 应用图标切换需要用户确认，这里只提示
+                onToast('info', `主题已应用！如需更换应用图标，请在 Icon 标签页选择"${preset.appIcon}"`);
+            } else {
+                onToast('success', `已应用"${preset.name}"主题方案`);
+            }
+            
+            // 10. 触发背景重新应用
+            setTimeout(() => {
+                backgroundService.applyBackgroundToElements();
+            }, 100);
+            
+        } catch (error) {
+            console.error('[SponsorshipView] 执行主题方案切换失败:', error);
+            onToast('error', '应用主题方案失败，请重试');
+        }
+    };
 
     // 处理 UI 图标主题切换，并触发图标迁移
     const handleUiIconThemeChange = async (newTheme: string) => {
@@ -779,75 +954,141 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
                         <div className="animate-in fade-in duration-300 pb-20">
                             {activeTab === 'preset' && (
                                 /* 方案预设 */
-                                <div className="space-y-4">
-                                    <div className="text-center mb-6">
-                                        <h4 className="text-sm font-medium text-stone-600 mb-1">主题方案</h4>
-                                        <p className="text-xs text-stone-400">一键应用完整的主题配置</p>
-                                    </div>
-
-                                    {/* 方案网格 - 使用卡片式布局 */}
-                                    <div className="space-y-3">
-                                        {THEME_PRESETS.map((preset) => {
-                                            const isSelected = false; // TODO: 实现选中状态
-                                            
-                                            return (
-                                                <button
-                                                    key={preset.id}
-                                                    onClick={() => {
-                                                        // TODO: 实现方案应用逻辑
-                                                        onToast('info', `方案"${preset.name}"功能开发中...`);
-                                                    }}
-                                                    className={`w-full rounded-2xl border-2 transition-all overflow-hidden text-left ${
-                                                        isSelected
-                                                            ? 'border-stone-400 ring-2 ring-stone-200 bg-white'
-                                                            : 'border-stone-200 hover:border-stone-300 bg-white hover:bg-stone-50'
-                                                    }`}
-                                                >
-                                                    <div className="p-4 flex items-center gap-4">
-                                                        {/* 图标区域 */}
-                                                        <div className="w-16 h-16 rounded-xl bg-gradient-to-br from-stone-50 to-stone-100 flex items-center justify-center shrink-0">
-                                                            <span className="text-3xl">{preset.icon}</span>
-                                                        </div>
-                                                        
-                                                        {/* 方案信息 */}
-                                                        <div className="flex-1 min-w-0">
-                                                            <div className="flex items-center gap-2 mb-1">
-                                                                <h5 className="text-base font-bold text-stone-800">
-                                                                    {preset.name}
-                                                                </h5>
-                                                                {isSelected && (
-                                                                    <div className="w-5 h-5 bg-stone-800 rounded-full flex items-center justify-center">
-                                                                        <Check size={12} className="text-white" />
-                                                                    </div>
-                                                                )}
-                                                            </div>
-                                                            <p className="text-xs text-stone-500 mb-2">
-                                                                {preset.description}
-                                                            </p>
-                                                            
-                                                            {/* 配置标签 */}
-                                                            <div className="flex flex-wrap gap-1">
-                                                                <span className="px-2 py-0.5 bg-stone-100 text-[10px] text-stone-600 rounded">
-                                                                    {preset.colorScheme}
-                                                                </span>
-                                                                <span className="px-2 py-0.5 bg-stone-100 text-[10px] text-stone-600 rounded">
-                                                                    {preset.uiTheme}
-                                                                </span>
-                                                                <span className="px-2 py-0.5 bg-stone-100 text-[10px] text-stone-600 rounded">
-                                                                    {preset.timePal}
-                                                                </span>
-                                                            </div>
-                                                        </div>
+                                <div className="space-y-3">
+                                    {THEME_PRESETS.map((preset) => {
+                                        const isSelected = currentPresetId === preset.id;
+                                        
+                                        return (
+                                            <button
+                                                key={preset.id}
+                                                onClick={() => applyThemePreset(preset)}
+                                                className={`w-full rounded-2xl border-2 transition-all overflow-hidden text-left ${
+                                                    isSelected
+                                                        ? 'border-stone-400 ring-2 ring-stone-200 bg-white shadow-md'
+                                                        : 'border-stone-200 hover:border-stone-300 bg-white hover:bg-stone-50'
+                                                }`}
+                                            >
+                                                <div className="p-3 flex items-center gap-3">
+                                                    {/* 左侧：方案名称（缩窄宽度，自动换行） */}
+                                                    <div className="w-16 shrink-0 flex items-center justify-center">
+                                                        <h5 className="text-sm font-bold text-stone-800 text-center leading-tight break-words">
+                                                            {preset.name}
+                                                        </h5>
                                                     </div>
-                                                </button>
-                                            );
-                                        })}
-                                    </div>
+                                                    
+                                                    {/* 右侧：配置预览框 - 一行显示所有预览 */}
+                                                    <div className="flex-1 bg-stone-50 rounded-lg p-2 flex items-center gap-2 overflow-x-auto scrollbar-hide">
+                                                        {/* UI主题图标预览 - 只显示一个图标 */}
+                                                        {preset.uiTheme === 'default' ? (
+                                                            /* 默认主题显示 emoji */
+                                                            <div className="shrink-0 w-10 h-10 rounded-md overflow-hidden bg-white border border-stone-200 flex items-center justify-center">
+                                                                <span className="text-lg">➕</span>
+                                                            </div>
+                                                        ) : (
+                                                            /* 自定义主题显示图片 - 使用 01.webp */
+                                                            <div className="shrink-0 w-10 h-10 rounded-md overflow-hidden bg-white border border-stone-200 flex items-center justify-center">
+                                                                <img 
+                                                                    src={`/uiicon/${preset.uiTheme}/01.webp`}
+                                                                    alt="UI"
+                                                                    className="w-6 h-6 object-contain"
+                                                                    onError={(e) => {
+                                                                        e.currentTarget.style.display = 'none';
+                                                                    }}
+                                                                />
+                                                            </div>
+                                                        )}
+                                                        
+                                                        {/* 背景预览 */}
+                                                        {preset.background === 'default' ? (
+                                                            <div className="shrink-0 w-10 h-10 rounded-md overflow-hidden bg-gradient-to-br from-stone-100 to-stone-200 border border-stone-200 flex items-center justify-center">
+                                                                <span className="text-[8px] text-stone-400">默认</span>
+                                                            </div>
+                                                        ) : (
+                                                            <div className="shrink-0 w-10 h-10 rounded-md overflow-hidden bg-white border border-stone-200">
+                                                                <img 
+                                                                    src={`/background/${preset.background}.webp`}
+                                                                    alt="背景"
+                                                                    className="w-full h-full object-cover"
+                                                                    onError={(e) => {
+                                                                        e.currentTarget.style.display = 'none';
+                                                                    }}
+                                                                />
+                                                            </div>
+                                                        )}
+                                                        
+                                                        {/* 导航装饰预览 */}
+                                                        {preset.navigation === 'default' ? (
+                                                            <div className="shrink-0 w-10 h-10 rounded-md overflow-hidden bg-gradient-to-br from-stone-100 to-stone-200 border border-stone-200 flex items-center justify-center">
+                                                                <span className="text-[8px] text-stone-400">默认</span>
+                                                            </div>
+                                                        ) : (
+                                                            <div className="shrink-0 w-10 h-10 rounded-md overflow-hidden bg-white border border-stone-200">
+                                                                <img 
+                                                                    src={`/dchh/${preset.navigation}.webp`}
+                                                                    alt="导航"
+                                                                    className="w-full h-full object-cover"
+                                                                    onError={(e) => {
+                                                                        e.currentTarget.style.display = 'none';
+                                                                    }}
+                                                                />
+                                                            </div>
+                                                        )}
+                                                        
+                                                        {/* 时间小友预览 */}
+                                                        {preset.timePal === 'none' || preset.timePal === 'default' ? (
+                                                            <div className="shrink-0 w-10 h-10 rounded-md overflow-hidden bg-gradient-to-br from-stone-100 to-stone-200 border border-stone-200 flex items-center justify-center">
+                                                                <span className="text-[8px] text-stone-400">关闭</span>
+                                                            </div>
+                                                        ) : (
+                                                            <div className="shrink-0 w-10 h-10 rounded-md overflow-hidden bg-white border border-stone-200">
+                                                                <img 
+                                                                    src={`/time_pal_origin/${preset.timePal}/1.webp`}
+                                                                    alt="时间小友"
+                                                                    className="w-full h-full object-cover"
+                                                                    onError={(e) => {
+                                                                        // 尝试 PNG 格式
+                                                                        const pngSrc = `/time_pal_origin/${preset.timePal}/1.png`;
+                                                                        if (e.currentTarget.src.indexOf('.png') === -1) {
+                                                                            e.currentTarget.src = pngSrc;
+                                                                        } else {
+                                                                            e.currentTarget.style.display = 'none';
+                                                                        }
+                                                                    }}
+                                                                />
+                                                            </div>
+                                                        )}
+                                                        
+                                                        {/* 配色方案色块 */}
+                                                        <div className="shrink-0 w-10 h-10 rounded-md overflow-hidden border border-stone-200" 
+                                                             style={{
+                                                                 background: preset.colorScheme === 'default' ? '#f5f5f4' :
+                                                                            preset.colorScheme === 'morandi-purple' ? 'linear-gradient(135deg, #b8a5c8 0%, #9b8aad 100%)' :
+                                                                            preset.colorScheme === 'morandi-pink' ? 'linear-gradient(135deg, #e8b4b8 0%, #d4a5a5 100%)' :
+                                                                            preset.colorScheme === 'dunhuang-feitian' ? 'linear-gradient(135deg, #f4d5a6 0%, #e8c4a0 100%)' :
+                                                                            preset.colorScheme === 'bamboo-green' ? 'linear-gradient(135deg, #a8c5a8 0%, #8fb58f 100%)' :
+                                                                            preset.colorScheme === 'morandi-cyan' ? 'linear-gradient(135deg, #a8c8d8 0%, #8fb5c5 100%)' :
+                                                                            preset.colorScheme === 'latte-caramel' ? 'linear-gradient(135deg, #d4b5a0 0%, #c4a590 100%)' :
+                                                                            preset.colorScheme === 'morandi-green' ? 'linear-gradient(135deg, #b5c8b5 0%, #a0b5a0 100%)' :
+                                                                            '#f5f5f4'
+                                                             }}
+                                                        />
+                                                    </div>
+                                                    
+                                                    {/* 选中标记 */}
+                                                    {isSelected && (
+                                                        <div className="shrink-0 w-5 h-5 bg-stone-800 rounded-full flex items-center justify-center">
+                                                            <Check size={12} className="text-white" />
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </button>
+                                        );
+                                    })}
 
                                     {/* 提示信息 */}
-                                    <div className="mt-6 p-4 bg-amber-50 border border-amber-200 rounded-xl">
-                                        <p className="text-xs text-amber-800 text-center">
-                                            💡 方案功能开发中，点击方案可预览效果
+                                    <div className="mt-4 p-2.5 bg-blue-50 border border-blue-200 rounded-xl">
+                                        <p className="text-xs text-blue-800 text-center">
+                                            💡 首次应用需要打开导航栏调试，调整导航栏的位置
                                         </p>
                                     </div>
                                 </div>
@@ -1282,6 +1523,18 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
                     </div>
                 </div>
             )}
+            
+            {/* 默认主题确认模态框 */}
+            <ConfirmModal
+                isOpen={isDefaultThemeConfirmOpen}
+                onClose={handleCancelDefaultTheme}
+                onConfirm={handleConfirmDefaultTheme}
+                title="切换为默认主题"
+                description="切换为默认主题后，icon 格式可能会丢失，可能需要重新设置。确定要继续吗？"
+                confirmText="确认切换"
+                cancelText="取消"
+                type="warning"
+            />
         </div>
     );
 };

@@ -504,6 +504,31 @@ class UIIconService {
     }
 
     /**
+     * 将 UI 图标格式字符串转换回 Emoji
+     * @param uiIconStr UI 图标字符串（格式：ui:iconType）
+     * @returns Emoji 字符或 '❓'（如果无法转换）
+     */
+    convertUIIconToEmoji(uiIconStr: string): string {
+        // 如果不是 UI 图标格式，直接返回
+        if (!uiIconStr.startsWith('ui:')) {
+            return uiIconStr;
+        }
+
+        // 提取 iconType
+        const iconType = uiIconStr.substring(3) as UIIconType;
+
+        // 在映射表中查找对应的 Emoji
+        for (const [emoji, type] of Object.entries(DEFAULT_EMOJI_TO_ICON_MAP)) {
+            if (type === iconType) {
+                return emoji;
+            }
+        }
+
+        // 如果找不到对应的 Emoji，返回一个"待选择"的图标
+        return '❓';
+    }
+
+    /**
      * 检查图标字符串是否为默认 Emoji（可以被替换）
      * @param iconStr 图标字符串
      * @returns boolean
