@@ -11,6 +11,7 @@ import React, { useState, useMemo } from 'react';
 import { Search, X, ChevronLeft, FileText } from 'lucide-react';
 import { Log, Category, TodoItem, TodoCategory, Scope, Goal, DailyReview, WeeklyReview, MonthlyReview, SearchType } from '../types';
 import { useNavigation } from '../contexts/NavigationContext';
+import { IconRenderer } from '../components/IconRenderer';
 
 interface SearchViewProps {
     logs: Log[];
@@ -433,7 +434,7 @@ export const SearchView: React.FC<SearchViewProps> = ({
                                             }`}
                                     >
                                         <div className="flex items-center gap-2">
-                                            <span className="text-xl">{cat.icon}</span>
+                                            <IconRenderer icon={cat.icon} className="text-xl" />
                                             <span className="text-sm font-bold text-stone-800">
                                                 {cat.name}
                                             </span>
@@ -525,7 +526,7 @@ export const SearchView: React.FC<SearchViewProps> = ({
                                             }`}
                                     >
                                         <div className="flex items-center gap-2 mb-1">
-                                            <span className="text-sm">{scope.icon}</span>
+                                            <IconRenderer icon={scope.icon} className="text-sm" />
                                             <span className="text-sm font-bold text-stone-800">
                                                 {scope.name}
                                             </span>

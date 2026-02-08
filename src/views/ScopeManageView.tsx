@@ -10,6 +10,7 @@
 import React, { useState } from 'react';
 import { Scope } from '../types';
 import { ChevronLeft, Plus, Trash2, Archive, ArchiveRestore, GripVertical, ArrowUp, ArrowDown, X, Check } from 'lucide-react';
+import { IconRenderer } from '../components/IconRenderer';
 
 interface ScopeManageViewProps {
     scopes: Scope[];
@@ -202,7 +203,7 @@ export const ScopeManageView: React.FC<ScopeManageViewProps> = ({
                             >
                                 <div className="flex items-center justify-between">
                                     <div className="flex items-center gap-3">
-                                        <span className="text-xl">{scope.icon}</span>
+                                        <IconRenderer icon={scope.icon} className="text-xl" />
                                         <span className="font-bold text-stone-600">{scope.name}</span>
                                     </div>
                                     <div className="flex gap-2">

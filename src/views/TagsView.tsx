@@ -11,6 +11,7 @@ import React, { useState, useMemo } from 'react';
 import { Log, Category } from '../types';
 import { ChevronDown, ChevronRight, Settings2 } from 'lucide-react';
 import { BatchManageView } from './BatchManageView';
+import { IconRenderer } from '../components/IconRenderer';
 
 
 interface TagsViewProps {
@@ -107,7 +108,7 @@ export const TagsView: React.FC<TagsViewProps> = ({ logs, onSelectTag, onSelectC
                         <div className="flex items-center gap-3">
                            <span className="text-stone-300 font-bold">#</span>
                            {/* Removed grayscale, added opacity-100 */}
-                           <span className="text-lg opacity-100">{category.icon}</span>
+                           <IconRenderer icon={category.icon} className="text-lg opacity-100" />
                            <span className="font-bold text-stone-800">{category.name}</span>
                            <span className="text-xs text-stone-400 font-mono ml-1">({totalCount})</span>
                         </div>
@@ -136,7 +137,7 @@ export const TagsView: React.FC<TagsViewProps> = ({ logs, onSelectTag, onSelectC
                                     <div className="flex items-center gap-3">
                                        <span className="text-stone-300 font-light text-sm">#</span>
                                        {/* Swapped icon and name */}
-                                       {act.icon && <span className="opacity-100 text-sm">{act.icon}</span>}
+                                       {act.icon && <IconRenderer icon={act.icon} className="opacity-100 text-sm" />}
                                        <span className="text-stone-600 font-medium text-sm">{act.name}</span>
                                     </div>
                                     <span className="text-xs text-stone-400 font-mono">{count}</span>

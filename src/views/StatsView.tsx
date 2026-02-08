@@ -17,6 +17,7 @@ import { Minimize2, Share, PieChart, Grid, Calendar, ChevronLeft, ChevronRight, 
 import { ToastType } from '../components/Toast';
 import { MonthHeatmap } from '../components/MonthHeatmap';
 import { usePrivacy } from '../contexts/PrivacyContext';
+import { IconRenderer } from '../components/IconRenderer';
 
 import { ConfirmModal } from '../components/ConfirmModal';
 
@@ -1202,7 +1203,7 @@ export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentD
                     <div key={cat.id} className="group">
                       <div className="flex items-center justify-between mb-1.5">
                         <div className="flex items-center gap-2">
-                          <span className="text-base">{cat.icon}</span>
+                          <IconRenderer icon={cat.icon} className="text-base" />
                           <span className="font-bold text-stone-700 text-[13px]">{cat.name}</span>
                           {/* Growth Indicator for Category */}
                           {renderGrowth(cat.duration, previousStats.catDurations.get(cat.id) || 0)}
@@ -1219,7 +1220,7 @@ export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentD
                         {cat.items.map(act => (
                           <div key={act.id} className="flex items-center justify-between text-[11px] text-stone-500 hover:bg-stone-50 rounded px-2 py-0.5 -ml-2 transition-colors">
                             <div className="flex items-center gap-1.5">
-                              <span className="text-xs">{act.icon}</span>
+                              <IconRenderer icon={act.icon} className="text-xs" />
                               <span>{act.name}</span>
                               {/* Growth Indicator for Activity */}
                               {renderGrowth(act.duration, previousStats.actDurations.get(act.id) || 0)}
@@ -1244,7 +1245,7 @@ export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentD
                       : 'bg-white border border-stone-200 text-stone-600'
                       }`}
                   >
-                    <span>{cat.icon}</span>
+                    <IconRenderer icon={cat.icon} />
                     <span>{cat.name}</span>
                   </button>
                 ))}
@@ -1277,7 +1278,7 @@ export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentD
                       <div key={cat.id} className="group">
                         <div className="flex items-center justify-between mb-1.5">
                           <div className="flex items-center gap-2">
-                            <span className="text-base">{cat.icon}</span>
+                            <IconRenderer icon={cat.icon} className="text-base" />
                             <span className="font-bold text-stone-700 text-[13px]">{cat.name}</span>
                             {/* Growth Indicator for Todo Category */}
                             {renderGrowth(cat.duration, previousTodoStats.categoryDurations?.get(cat.id) || 0)}
@@ -1337,7 +1338,7 @@ export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentD
                       <div key={scope.id} className="group">
                         <div className="flex items-center justify-between mb-1.5">
                           <div className="flex items-center gap-2">
-                            <span className="text-base">{scope.icon}</span>
+                            <IconRenderer icon={scope.icon} className="text-base" />
                             <span className="font-bold text-stone-700 text-[13px]">{scope.name}</span>
                             {/* Growth Indicator for Scope */}
                             {renderGrowth(scope.duration, previousScopeStats.scopeDurations.get(scope.id) || 0)}
@@ -1653,7 +1654,7 @@ export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentD
                               }`}
                             style={!isExcluded ? {} : {}}
                           >
-                            <span>{cat.icon}</span>
+                            <IconRenderer icon={cat.icon} />
                             <span>{cat.name}</span>
                           </button>
                         );
@@ -1737,7 +1738,7 @@ export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentD
                       : 'bg-white border border-stone-200 text-stone-600'
                       }`}
                   >
-                    <span>{cat.icon}</span>
+                    <IconRenderer icon={cat.icon} />
                     <span>{cat.name}</span>
                   </button>
                 ))}
