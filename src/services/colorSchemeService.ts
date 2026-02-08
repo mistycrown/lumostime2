@@ -6,7 +6,41 @@
 import React from 'react';
 
 // 配色方案类型
-export type ColorScheme = 'default' | 'morandi-purple' | 'morandi-blue' | 'morandi-green' | 'morandi-pink';
+export type ColorScheme = 
+    | 'default' 
+    // 莫兰迪色系
+    | 'morandi-purple' 
+    | 'morandi-blue' 
+    | 'morandi-green' 
+    | 'morandi-pink'
+    | 'morandi-orange'
+    | 'morandi-gray'
+    | 'morandi-yellow'
+    | 'morandi-red'
+    | 'morandi-cyan'
+    | 'morandi-brown'
+    | 'morandi-lavender'
+    | 'morandi-peach'
+    | 'morandi-olive'
+    // 焦糖拿铁色系
+    | 'latte-caramel'
+    // 暗黑学院风
+    | 'dark-academia'
+    // 克莱因蓝/深海色系
+    | 'klein-blue'
+    | 'midnight-ocean'
+    // 胶片/复古电影色系
+    | 'film-japanese'
+    | 'film-hongkong'
+    // 中国传统色系
+    | 'dunhuang-moon'
+    | 'dunhuang-feitian'
+    | 'dunhuang-cinnabar'
+    | 'chinese-red'
+    | 'blue-white-porcelain'
+    | 'bamboo-green'
+    | 'sky-blue'
+    | 'rouge';
 
 // 配色方案样式配置
 export interface ColorSchemeStyleConfig {
@@ -27,13 +61,34 @@ export interface ColorSchemeStyleConfig {
 
 // 配色方案样式映射
 const COLOR_SCHEME_STYLES: Record<ColorScheme, ColorSchemeStyleConfig> = {
-    'default': {
-        // 默认配色不需要特殊样式
-    },
+    'default': {},
     'morandi-purple': {},
     'morandi-blue': {},
     'morandi-green': {},
-    'morandi-pink': {}
+    'morandi-pink': {},
+    'morandi-orange': {},
+    'morandi-gray': {},
+    'morandi-yellow': {},
+    'morandi-red': {},
+    'morandi-cyan': {},
+    'morandi-brown': {},
+    'morandi-lavender': {},
+    'morandi-peach': {},
+    'morandi-olive': {},
+    'latte-caramel': {},
+    'dark-academia': {},
+    'klein-blue': {},
+    'midnight-ocean': {},
+    'film-japanese': {},
+    'film-hongkong': {},
+    'dunhuang-moon': {},
+    'dunhuang-feitian': {},
+    'dunhuang-cinnabar': {},
+    'chinese-red': {},
+    'blue-white-porcelain': {},
+    'bamboo-green': {},
+    'sky-blue': {},
+    'rouge': {}
 };
 
 /**

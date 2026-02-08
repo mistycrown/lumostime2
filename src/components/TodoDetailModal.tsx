@@ -556,7 +556,7 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({ initialTodo, c
 
                   {/* Progress Increment */}
                   {log.progressIncrement && log.progressIncrement > 0 && (
-                    <span className="text-[10px] font-medium text-[#2F4F4F] border border-[#2F4F4F]/20 px-2 py-0.5 rounded flex items-center gap-1 bg-[#2F4F4F]/5">
+                    <span className="text-[10px] font-medium border px-2 py-0.5 rounded flex items-center gap-1 btn-template-filled">
                       <TrendingUp size={10} />
                       <span className="font-mono">+{log.progressIncrement}</span>
                     </span>
