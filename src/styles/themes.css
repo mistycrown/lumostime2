@@ -265,6 +265,1410 @@
   --text-deep: #8a6370;
 }
 
+/* ==================== 莫兰迪橙配色 ==================== */
+[data-color-scheme="morandi-orange"] {
+  /* 悬浮按钮 */
+  --floating-button-bg: #ffffff;
+  --floating-button-text: #1c1917;
+  --floating-button-icon: #c89b7a;
+  --floating-button-border: rgba(200, 155, 122, 0.2);
+  --floating-button-shadow: 0 4px 6px -1px rgba(200, 155, 122, 0.1), 0 2px 4px -1px rgba(200, 155, 122, 0.06);
+
+  /* 次要按钮 */
+  --secondary-button-bg: #faf8f6;
+  --secondary-button-text: #b08968;
+  --secondary-button-border: #f0ebe5;
+  --secondary-button-hover-bg: #f5f0eb;
+
+  /* 图标按钮 */
+  --icon-button-bg: rgba(200, 155, 122, 0.1);
+  --icon-button-icon: #c89b7a;
+  --icon-button-hover-bg: rgba(200, 155, 122, 0.18);
+
+  /* 进度条 */
+  --progress-bar-bg: #f5f0eb;
+  --progress-bar-fill: #d4ab8c;
+
+  /* 卡片 */
+  --card-bg: #ffffff;
+  --card-border: #f0ebe5;
+  --card-hover-border: #e5ddd1;
+  --card-shadow: 0 1px 3px 0 rgba(200, 155, 122, 0.1);
+
+  /* 输入框 */
+  --input-bg: #ffffff;
+  --input-border: #f0ebe5;
+  --input-focus-border: #c89b7a;
+  --input-text: #1c1917;
+
+  /* 标签 */
+  --tag-bg: #faf8f6;
+  --tag-text: #b08968;
+  --tag-border: #f0ebe5;
+
+  /* 分割线 */
+  --divider-color: #f0ebe5;
+
+  /* 强调色 */
+  --accent-color: #c89b7a;
+  --accent-hover: #b08968;
+  
+  /* 深色文字 */
+  --text-deep: #8a6f56;
+}
+
+/* ==================== 莫兰迪灰配色 ==================== */
+[data-color-scheme="morandi-gray"] {
+  /* 悬浮按钮 */
+  --floating-button-bg: #ffffff;
+  --floating-button-text: #1c1917;
+  --floating-button-icon: #8a8a8a;
+  --floating-button-border: rgba(138, 138, 138, 0.2);
+  --floating-button-shadow: 0 4px 6px -1px rgba(138, 138, 138, 0.1), 0 2px 4px -1px rgba(138, 138, 138, 0.06);
+
+  /* 次要按钮 */
+  --secondary-button-bg: #f7f7f7;
+  --secondary-button-text: #6e6e6e;
+  --secondary-button-border: #e8e8e8;
+  --secondary-button-hover-bg: #f0f0f0;
+
+  /* 图标按钮 */
+  --icon-button-bg: rgba(138, 138, 138, 0.1);
+  --icon-button-icon: #8a8a8a;
+  --icon-button-hover-bg: rgba(138, 138, 138, 0.18);
+
+  /* 进度条 */
+  --progress-bar-bg: #f0f0f0;
+  --progress-bar-fill: #9e9e9e;
+
+  /* 卡片 */
+  --card-bg: #ffffff;
+  --card-border: #e8e8e8;
+  --card-hover-border: #d9d9d9;
+  --card-shadow: 0 1px 3px 0 rgba(138, 138, 138, 0.1);
+
+  /* 输入框 */
+  --input-bg: #ffffff;
+  --input-border: #e8e8e8;
+  --input-focus-border: #8a8a8a;
+  --input-text: #1c1917;
+
+  /* 标签 */
+  --tag-bg: #f7f7f7;
+  --tag-text: #6e6e6e;
+  --tag-border: #e8e8e8;
+
+  /* 分割线 */
+  --divider-color: #e8e8e8;
+
+  /* 强调色 */
+  --accent-color: #8a8a8a;
+  --accent-hover: #6e6e6e;
+  
+  /* 深色文字 */
+  --text-deep: #525252;
+}
+
+/* ==================== 莫兰迪黄配色 ==================== */
+[data-color-scheme="morandi-yellow"] {
+  /* 悬浮按钮 */
+  --floating-button-bg: #ffffff;
+  --floating-button-text: #1c1917;
+  --floating-button-icon: #c9b577;
+  --floating-button-border: rgba(201, 181, 119, 0.2);
+  --floating-button-shadow: 0 4px 6px -1px rgba(201, 181, 119, 0.1), 0 2px 4px -1px rgba(201, 181, 119, 0.06);
+
+  /* 次要按钮 */
+  --secondary-button-bg: #faf9f5;
+  --secondary-button-text: #b0a165;
+  --secondary-button-border: #f0ede3;
+  --secondary-button-hover-bg: #f5f2eb;
+
+  /* 图标按钮 */
+  --icon-button-bg: rgba(201, 181, 119, 0.1);
+  --icon-button-icon: #c9b577;
+  --icon-button-hover-bg: rgba(201, 181, 119, 0.18);
+
+  /* 进度条 */
+  --progress-bar-bg: #f5f2eb;
+  --progress-bar-fill: #d5c48c;
+
+  /* 卡片 */
+  --card-bg: #ffffff;
+  --card-border: #f0ede3;
+  --card-hover-border: #e5dfd1;
+  --card-shadow: 0 1px 3px 0 rgba(201, 181, 119, 0.1);
+
+  /* 输入框 */
+  --input-bg: #ffffff;
+  --input-border: #f0ede3;
+  --input-focus-border: #c9b577;
+  --input-text: #1c1917;
+
+  /* 标签 */
+  --tag-bg: #faf9f5;
+  --tag-text: #b0a165;
+  --tag-border: #f0ede3;
+
+  /* 分割线 */
+  --divider-color: #f0ede3;
+
+  /* 强调色 */
+  --accent-color: #c9b577;
+  --accent-hover: #b0a165;
+  
+  /* 深色文字 */
+  --text-deep: #8a7d53;
+}
+
+/* ==================== 莫兰迪红配色 ==================== */
+[data-color-scheme="morandi-red"] {
+  /* 悬浮按钮 */
+  --floating-button-bg: #ffffff;
+  --floating-button-text: #1c1917;
+  --floating-button-icon: #b87d7d;
+  --floating-button-border: rgba(184, 125, 125, 0.2);
+  --floating-button-shadow: 0 4px 6px -1px rgba(184, 125, 125, 0.1), 0 2px 4px -1px rgba(184, 125, 125, 0.06);
+
+  /* 次要按钮 */
+  --secondary-button-bg: #faf7f7;
+  --secondary-button-text: #a16b6b;
+  --secondary-button-border: #f0e8e8;
+  --secondary-button-hover-bg: #f5eeee;
+
+  /* 图标按钮 */
+  --icon-button-bg: rgba(184, 125, 125, 0.1);
+  --icon-button-icon: #b87d7d;
+  --icon-button-hover-bg: rgba(184, 125, 125, 0.18);
+
+  /* 进度条 */
+  --progress-bar-bg: #f5eeee;
+  --progress-bar-fill: #c99090;
+
+  /* 卡片 */
+  --card-bg: #ffffff;
+  --card-border: #f0e8e8;
+  --card-hover-border: #e5d6d6;
+  --card-shadow: 0 1px 3px 0 rgba(184, 125, 125, 0.1);
+
+  /* 输入框 */
+  --input-bg: #ffffff;
+  --input-border: #f0e8e8;
+  --input-focus-border: #b87d7d;
+  --input-text: #1c1917;
+
+  /* 标签 */
+  --tag-bg: #faf7f7;
+  --tag-text: #a16b6b;
+  --tag-border: #f0e8e8;
+
+  /* 分割线 */
+  --divider-color: #f0e8e8;
+
+  /* 强调色 */
+  --accent-color: #b87d7d;
+  --accent-hover: #a16b6b;
+  
+  /* 深色文字 */
+  --text-deep: #8a5959;
+}
+
+/* ==================== 莫兰迪青配色 ==================== */
+[data-color-scheme="morandi-cyan"] {
+  /* 悬浮按钮 */
+  --floating-button-bg: #ffffff;
+  --floating-button-text: #1c1917;
+  --floating-button-icon: #7aa8a0;
+  --floating-button-border: rgba(122, 168, 160, 0.2);
+  --floating-button-shadow: 0 4px 6px -1px rgba(122, 168, 160, 0.1), 0 2px 4px -1px rgba(122, 168, 160, 0.06);
+
+  /* 次要按钮 */
+  --secondary-button-bg: #f6f9f8;
+  --secondary-button-text: #68938c;
+  --secondary-button-border: #e5eeec;
+  --secondary-button-hover-bg: #edf3f2;
+
+  /* 图标按钮 */
+  --icon-button-bg: rgba(122, 168, 160, 0.1);
+  --icon-button-icon: #7aa8a0;
+  --icon-button-hover-bg: rgba(122, 168, 160, 0.18);
+
+  /* 进度条 */
+  --progress-bar-bg: #edf3f2;
+  --progress-bar-fill: #91bcb4;
+
+  /* 卡片 */
+  --card-bg: #ffffff;
+  --card-border: #e5eeec;
+  --card-hover-border: #d4e3e0;
+  --card-shadow: 0 1px 3px 0 rgba(122, 168, 160, 0.1);
+
+  /* 输入框 */
+  --input-bg: #ffffff;
+  --input-border: #e5eeec;
+  --input-focus-border: #7aa8a0;
+  --input-text: #1c1917;
+
+  /* 标签 */
+  --tag-bg: #f6f9f8;
+  --tag-text: #68938c;
+  --tag-border: #e5eeec;
+
+  /* 分割线 */
+  --divider-color: #e5eeec;
+
+  /* 强调色 */
+  --accent-color: #7aa8a0;
+  --accent-hover: #68938c;
+  
+  /* 深色文字 */
+  --text-deep: #527870;
+}
+
+/* ==================== 莫兰迪棕配色 ==================== */
+[data-color-scheme="morandi-brown"] {
+  /* 悬浮按钮 */
+  --floating-button-bg: #ffffff;
+  --floating-button-text: #1c1917;
+  --floating-button-icon: #a08570;
+  --floating-button-border: rgba(160, 133, 112, 0.2);
+  --floating-button-shadow: 0 4px 6px -1px rgba(160, 133, 112, 0.1), 0 2px 4px -1px rgba(160, 133, 112, 0.06);
+
+  /* 次要按钮 */
+  --secondary-button-bg: #f9f7f6;
+  --secondary-button-text: #8c7360;
+  --secondary-button-border: #ede9e5;
+  --secondary-button-hover-bg: #f3efeb;
+
+  /* 图标按钮 */
+  --icon-button-bg: rgba(160, 133, 112, 0.1);
+  --icon-button-icon: #a08570;
+  --icon-button-hover-bg: rgba(160, 133, 112, 0.18);
+
+  /* 进度条 */
+  --progress-bar-bg: #f3efeb;
+  --progress-bar-fill: #b49885;
+
+  /* 卡片 */
+  --card-bg: #ffffff;
+  --card-border: #ede9e5;
+  --card-hover-border: #dfd9d1;
+  --card-shadow: 0 1px 3px 0 rgba(160, 133, 112, 0.1);
+
+  /* 输入框 */
+  --input-bg: #ffffff;
+  --input-border: #ede9e5;
+  --input-focus-border: #a08570;
+  --input-text: #1c1917;
+
+  /* 标签 */
+  --tag-bg: #f9f7f6;
+  --tag-text: #8c7360;
+  --tag-border: #ede9e5;
+
+  /* 分割线 */
+  --divider-color: #ede9e5;
+
+  /* 强调色 */
+  --accent-color: #a08570;
+  --accent-hover: #8c7360;
+  
+  /* 深色文字 */
+  --text-deep: #6e5d4e;
+}
+
+/* ==================== 莫兰迪薰衣草配色 ==================== */
+[data-color-scheme="morandi-lavender"] {
+  /* 悬浮按钮 */
+  --floating-button-bg: #ffffff;
+  --floating-button-text: #1c1917;
+  --floating-button-icon: #9d8fb8;
+  --floating-button-border: rgba(157, 143, 184, 0.2);
+  --floating-button-shadow: 0 4px 6px -1px rgba(157, 143, 184, 0.1), 0 2px 4px -1px rgba(157, 143, 184, 0.06);
+
+  /* 次要按钮 */
+  --secondary-button-bg: #f8f7fa;
+  --secondary-button-text: #877ba1;
+  --secondary-button-border: #ebe8f0;
+  --secondary-button-hover-bg: #f2eff5;
+
+  /* 图标按钮 */
+  --icon-button-bg: rgba(157, 143, 184, 0.1);
+  --icon-button-icon: #9d8fb8;
+  --icon-button-hover-bg: rgba(157, 143, 184, 0.18);
+
+  /* 进度条 */
+  --progress-bar-bg: #f2eff5;
+  --progress-bar-fill: #afa2c9;
+
+  /* 卡片 */
+  --card-bg: #ffffff;
+  --card-border: #ebe8f0;
+  --card-hover-border: #dcd5e3;
+  --card-shadow: 0 1px 3px 0 rgba(157, 143, 184, 0.1);
+
+  /* 输入框 */
+  --input-bg: #ffffff;
+  --input-border: #ebe8f0;
+  --input-focus-border: #9d8fb8;
+  --input-text: #1c1917;
+
+  /* 标签 */
+  --tag-bg: #f8f7fa;
+  --tag-text: #877ba1;
+  --tag-border: #ebe8f0;
+
+  /* 分割线 */
+  --divider-color: #ebe8f0;
+
+  /* 强调色 */
+  --accent-color: #9d8fb8;
+  --accent-hover: #877ba1;
+  
+  /* 深色文字 */
+  --text-deep: #6d6380;
+}
+
+/* ==================== 莫兰迪桃配色 ==================== */
+[data-color-scheme="morandi-peach"] {
+  /* 悬浮按钮 */
+  --floating-button-bg: #ffffff;
+  --floating-button-text: #1c1917;
+  --floating-button-icon: #d4a59a;
+  --floating-button-border: rgba(212, 165, 154, 0.2);
+  --floating-button-shadow: 0 4px 6px -1px rgba(212, 165, 154, 0.1), 0 2px 4px -1px rgba(212, 165, 154, 0.06);
+
+  /* 次要按钮 */
+  --secondary-button-bg: #fdf9f8;
+  --secondary-button-text: #bc9186;
+  --secondary-button-border: #f5ebe8;
+  --secondary-button-hover-bg: #f9f1ee;
+
+  /* 图标按钮 */
+  --icon-button-bg: rgba(212, 165, 154, 0.1);
+  --icon-button-icon: #d4a59a;
+  --icon-button-hover-bg: rgba(212, 165, 154, 0.18);
+
+  /* 进度条 */
+  --progress-bar-bg: #f9f1ee;
+  --progress-bar-fill: #e0b5ab;
+
+  /* 卡片 */
+  --card-bg: #ffffff;
+  --card-border: #f5ebe8;
+  --card-hover-border: #ead9d4;
+  --card-shadow: 0 1px 3px 0 rgba(212, 165, 154, 0.1);
+
+  /* 输入框 */
+  --input-bg: #ffffff;
+  --input-border: #f5ebe8;
+  --input-focus-border: #d4a59a;
+  --input-text: #1c1917;
+
+  /* 标签 */
+  --tag-bg: #fdf9f8;
+  --tag-text: #bc9186;
+  --tag-border: #f5ebe8;
+
+  /* 分割线 */
+  --divider-color: #f5ebe8;
+
+  /* 强调色 */
+  --accent-color: #d4a59a;
+  --accent-hover: #bc9186;
+  
+  /* 深色文字 */
+  --text-deep: #9d7368;
+}
+
+/* ==================== 莫兰迪橄榄配色 ==================== */
+[data-color-scheme="morandi-olive"] {
+  /* 悬浮按钮 */
+  --floating-button-bg: #ffffff;
+  --floating-button-text: #1c1917;
+  --floating-button-icon: #8d9177;
+  --floating-button-border: rgba(141, 145, 119, 0.2);
+  --floating-button-shadow: 0 4px 6px -1px rgba(141, 145, 119, 0.1), 0 2px 4px -1px rgba(141, 145, 119, 0.06);
+
+  /* 次要按钮 */
+  --secondary-button-bg: #f7f8f6;
+  --secondary-button-text: #7a7d65;
+  --secondary-button-border: #e9ebe5;
+  --secondary-button-hover-bg: #f0f2ed;
+
+  /* 图标按钮 */
+  --icon-button-bg: rgba(141, 145, 119, 0.1);
+  --icon-button-icon: #8d9177;
+  --icon-button-hover-bg: rgba(141, 145, 119, 0.18);
+
+  /* 进度条 */
+  --progress-bar-bg: #f0f2ed;
+  --progress-bar-fill: #a1a58c;
+
+  /* 卡片 */
+  --card-bg: #ffffff;
+  --card-border: #e9ebe5;
+  --card-hover-border: #d9ddd1;
+  --card-shadow: 0 1px 3px 0 rgba(141, 145, 119, 0.1);
+
+  /* 输入框 */
+  --input-bg: #ffffff;
+  --input-border: #e9ebe5;
+  --input-focus-border: #8d9177;
+  --input-text: #1c1917;
+
+  /* 标签 */
+  --tag-bg: #f7f8f6;
+  --tag-text: #7a7d65;
+  --tag-border: #e9ebe5;
+
+  /* 分割线 */
+  --divider-color: #e9ebe5;
+
+  /* 强调色 */
+  --accent-color: #8d9177;
+  --accent-hover: #7a7d65;
+  
+  /* 深色文字 */
+  --text-deep: #636653;
+}
+
+/* ==================== 马卡龙薄荷配色 ==================== */
+[data-color-scheme="macaron-mint"] {
+  /* 悬浮按钮 */
+  --floating-button-bg: #ffffff;
+  --floating-button-text: #1c1917;
+  --floating-button-icon: #7dd3c0;
+  --floating-button-border: rgba(125, 211, 192, 0.25);
+  --floating-button-shadow: 0 4px 6px -1px rgba(125, 211, 192, 0.15), 0 2px 4px -1px rgba(125, 211, 192, 0.08);
+
+  /* 次要按钮 */
+  --secondary-button-bg: #f0fdfb;
+  --secondary-button-text: #4db8a3;
+  --secondary-button-border: #d4f5ef;
+  --secondary-button-hover-bg: #e0faf6;
+
+  /* 图标按钮 */
+  --icon-button-bg: rgba(125, 211, 192, 0.15);
+  --icon-button-icon: #5dc9b4;
+  --icon-button-hover-bg: rgba(125, 211, 192, 0.25);
+
+  /* 进度条 */
+  --progress-bar-bg: #e0faf6;
+  --progress-bar-fill: #7dd3c0;
+
+  /* 卡片 */
+  --card-bg: #ffffff;
+  --card-border: #d4f5ef;
+  --card-hover-border: #b8ede3;
+  --card-shadow: 0 1px 3px 0 rgba(125, 211, 192, 0.12);
+
+  /* 输入框 */
+  --input-bg: #ffffff;
+  --input-border: #d4f5ef;
+  --input-focus-border: #7dd3c0;
+  --input-text: #1c1917;
+
+  /* 标签 */
+  --tag-bg: #f0fdfb;
+  --tag-text: #4db8a3;
+  --tag-border: #d4f5ef;
+
+  /* 分割线 */
+  --divider-color: #d4f5ef;
+
+  /* 强调色 */
+  --accent-color: #7dd3c0;
+  --accent-hover: #5dc9b4;
+  
+  /* 深色文字 */
+  --text-deep: #3a9d8a;
+}
+
+/* ==================== 马卡龙草莓配色 ==================== */
+[data-color-scheme="macaron-strawberry"] {
+  /* 悬浮按钮 */
+  --floating-button-bg: #ffffff;
+  --floating-button-text: #1c1917;
+  --floating-button-icon: #ff9eb5;
+  --floating-button-border: rgba(255, 158, 181, 0.25);
+  --floating-button-shadow: 0 4px 6px -1px rgba(255, 158, 181, 0.15), 0 2px 4px -1px rgba(255, 158, 181, 0.08);
+
+  /* 次要按钮 */
+  --secondary-button-bg: #fff5f8;
+  --secondary-button-text: #ff6b8f;
+  --secondary-button-border: #ffe0e9;
+  --secondary-button-hover-bg: #ffeaf0;
+
+  /* 图标按钮 */
+  --icon-button-bg: rgba(255, 158, 181, 0.15);
+  --icon-button-icon: #ff85a3;
+  --icon-button-hover-bg: rgba(255, 158, 181, 0.25);
+
+  /* 进度条 */
+  --progress-bar-bg: #ffeaf0;
+  --progress-bar-fill: #ff9eb5;
+
+  /* 卡片 */
+  --card-bg: #ffffff;
+  --card-border: #ffe0e9;
+  --card-hover-border: #ffc9d9;
+  --card-shadow: 0 1px 3px 0 rgba(255, 158, 181, 0.12);
+
+  /* 输入框 */
+  --input-bg: #ffffff;
+  --input-border: #ffe0e9;
+  --input-focus-border: #ff9eb5;
+  --input-text: #1c1917;
+
+  /* 标签 */
+  --tag-bg: #fff5f8;
+  --tag-text: #ff6b8f;
+  --tag-border: #ffe0e9;
+
+  /* 分割线 */
+  --divider-color: #ffe0e9;
+
+  /* 强调色 */
+  --accent-color: #ff9eb5;
+  --accent-hover: #ff85a3;
+  
+  /* 深色文字 */
+  --text-deep: #e65580;
+}
+
+/* ==================== 马卡龙柠檬配色 ==================== */
+[data-color-scheme="macaron-lemon"] {
+  /* 悬浮按钮 */
+  --floating-button-bg: #ffffff;
+  --floating-button-text: #1c1917;
+  --floating-button-icon: #ffd966;
+  --floating-button-border: rgba(255, 217, 102, 0.25);
+  --floating-button-shadow: 0 4px 6px -1px rgba(255, 217, 102, 0.15), 0 2px 4px -1px rgba(255, 217, 102, 0.08);
+
+  /* 次要按钮 */
+  --secondary-button-bg: #fffbf0;
+  --secondary-button-text: #e6b800;
+  --secondary-button-border: #fff3d4;
+  --secondary-button-hover-bg: #fff8e6;
+
+  /* 图标按钮 */
+  --icon-button-bg: rgba(255, 217, 102, 0.15);
+  --icon-button-icon: #ffc933;
+  --icon-button-hover-bg: rgba(255, 217, 102, 0.25);
+
+  /* 进度条 */
+  --progress-bar-bg: #fff8e6;
+  --progress-bar-fill: #ffd966;
+
+  /* 卡片 */
+  --card-bg: #ffffff;
+  --card-border: #fff3d4;
+  --card-hover-border: #ffe9b3;
+  --card-shadow: 0 1px 3px 0 rgba(255, 217, 102, 0.12);
+
+  /* 输入框 */
+  --input-bg: #ffffff;
+  --input-border: #fff3d4;
+  --input-focus-border: #ffd966;
+  --input-text: #1c1917;
+
+  /* 标签 */
+  --tag-bg: #fffbf0;
+  --tag-text: #e6b800;
+  --tag-border: #fff3d4;
+
+  /* 分割线 */
+  --divider-color: #fff3d4;
+
+  /* 强调色 */
+  --accent-color: #ffd966;
+  --accent-hover: #ffc933;
+  
+  /* 深色文字 */
+  --text-deep: #cc9900;
+}
+
+/* ==================== 马卡龙蓝莓配色 ==================== */
+[data-color-scheme="macaron-blueberry"] {
+  /* 悬浮按钮 */
+  --floating-button-bg: #ffffff;
+  --floating-button-text: #1c1917;
+  --floating-button-icon: #8ba3ff;
+  --floating-button-border: rgba(139, 163, 255, 0.25);
+  --floating-button-shadow: 0 4px 6px -1px rgba(139, 163, 255, 0.15), 0 2px 4px -1px rgba(139, 163, 255, 0.08);
+
+  /* 次要按钮 */
+  --secondary-button-bg: #f5f7ff;
+  --secondary-button-text: #5c7cfa;
+  --secondary-button-border: #dce4ff;
+  --secondary-button-hover-bg: #e8edff;
+
+  /* 图标按钮 */
+  --icon-button-bg: rgba(139, 163, 255, 0.15);
+  --icon-button-icon: #748ffc;
+  --icon-button-hover-bg: rgba(139, 163, 255, 0.25);
+
+  /* 进度条 */
+  --progress-bar-bg: #e8edff;
+  --progress-bar-fill: #8ba3ff;
+
+  /* 卡片 */
+  --card-bg: #ffffff;
+  --card-border: #dce4ff;
+  --card-hover-border: #c5d2ff;
+  --card-shadow: 0 1px 3px 0 rgba(139, 163, 255, 0.12);
+
+  /* 输入框 */
+  --input-bg: #ffffff;
+  --input-border: #dce4ff;
+  --input-focus-border: #8ba3ff;
+  --input-text: #1c1917;
+
+  /* 标签 */
+  --tag-bg: #f5f7ff;
+  --tag-text: #5c7cfa;
+  --tag-border: #dce4ff;
+
+  /* 分割线 */
+  --divider-color: #dce4ff;
+
+  /* 强调色 */
+  --accent-color: #8ba3ff;
+  --accent-hover: #748ffc;
+  
+  /* 深色文字 */
+  --text-deep: #4c6ef5;
+}
+
+/* ==================== 敦煌月牙泉配色 ==================== */
+[data-color-scheme="dunhuang-moon"] {
+  /* 悬浮按钮 */
+  --floating-button-bg: #ffffff;
+  --floating-button-text: #1c1917;
+  --floating-button-icon: #5b9bd5;
+  --floating-button-border: rgba(91, 155, 213, 0.2);
+  --floating-button-shadow: 0 4px 6px -1px rgba(91, 155, 213, 0.12), 0 2px 4px -1px rgba(91, 155, 213, 0.06);
+
+  /* 次要按钮 */
+  --secondary-button-bg: #f4f8fc;
+  --secondary-button-text: #4682b4;
+  --secondary-button-border: #deeaf6;
+  --secondary-button-hover-bg: #e8f1f9;
+
+  /* 图标按钮 */
+  --icon-button-bg: rgba(91, 155, 213, 0.12);
+  --icon-button-icon: #5b9bd5;
+  --icon-button-hover-bg: rgba(91, 155, 213, 0.2);
+
+  /* 进度条 */
+  --progress-bar-bg: #e8f1f9;
+  --progress-bar-fill: #5b9bd5;
+
+  /* 卡片 */
+  --card-bg: #ffffff;
+  --card-border: #deeaf6;
+  --card-hover-border: #c9ddef;
+  --card-shadow: 0 1px 3px 0 rgba(91, 155, 213, 0.1);
+
+  /* 输入框 */
+  --input-bg: #ffffff;
+  --input-border: #deeaf6;
+  --input-focus-border: #5b9bd5;
+  --input-text: #1c1917;
+
+  /* 标签 */
+  --tag-bg: #f4f8fc;
+  --tag-text: #4682b4;
+  --tag-border: #deeaf6;
+
+  /* 分割线 */
+  --divider-color: #deeaf6;
+
+  /* 强调色 */
+  --accent-color: #5b9bd5;
+  --accent-hover: #4682b4;
+  
+  /* 深色文字 */
+  --text-deep: #36648b;
+}
+
+/* ==================== 敦煌飞天配色 ==================== */
+[data-color-scheme="dunhuang-feitian"] {
+  /* 悬浮按钮 */
+  --floating-button-bg: #ffffff;
+  --floating-button-text: #1c1917;
+  --floating-button-icon: #d4a574;
+  --floating-button-border: rgba(212, 165, 116, 0.2);
+  --floating-button-shadow: 0 4px 6px -1px rgba(212, 165, 116, 0.12), 0 2px 4px -1px rgba(212, 165, 116, 0.06);
+
+  /* 次要按钮 */
+  --secondary-button-bg: #fdf9f4;
+  --secondary-button-text: #c08552;
+  --secondary-button-border: #f5ebe0;
+  --secondary-button-hover-bg: #faf3ea;
+
+  /* 图标按钮 */
+  --icon-button-bg: rgba(212, 165, 116, 0.12);
+  --icon-button-icon: #d4a574;
+  --icon-button-hover-bg: rgba(212, 165, 116, 0.2);
+
+  /* 进度条 */
+  --progress-bar-bg: #faf3ea;
+  --progress-bar-fill: #d4a574;
+
+  /* 卡片 */
+  --card-bg: #ffffff;
+  --card-border: #f5ebe0;
+  --card-hover-border: #ecdcc8;
+  --card-shadow: 0 1px 3px 0 rgba(212, 165, 116, 0.1);
+
+  /* 输入框 */
+  --input-bg: #ffffff;
+  --input-border: #f5ebe0;
+  --input-focus-border: #d4a574;
+  --input-text: #1c1917;
+
+  /* 标签 */
+  --tag-bg: #fdf9f4;
+  --tag-text: #c08552;
+  --tag-border: #f5ebe0;
+
+  /* 分割线 */
+  --divider-color: #f5ebe0;
+
+  /* 强调色 */
+  --accent-color: #d4a574;
+  --accent-hover: #c08552;
+  
+  /* 深色文字 */
+  --text-deep: #a06d3e;
+}
+
+/* ==================== 敦煌朱砂配色 ==================== */
+[data-color-scheme="dunhuang-cinnabar"] {
+  /* 悬浮按钮 */
+  --floating-button-bg: #ffffff;
+  --floating-button-text: #1c1917;
+  --floating-button-icon: #c93756;
+  --floating-button-border: rgba(201, 55, 86, 0.2);
+  --floating-button-shadow: 0 4px 6px -1px rgba(201, 55, 86, 0.12), 0 2px 4px -1px rgba(201, 55, 86, 0.06);
+
+  /* 次要按钮 */
+  --secondary-button-bg: #fef5f7;
+  --secondary-button-text: #b32d4a;
+  --secondary-button-border: #fde0e6;
+  --secondary-button-hover-bg: #fceaef;
+
+  /* 图标按钮 */
+  --icon-button-bg: rgba(201, 55, 86, 0.12);
+  --icon-button-icon: #c93756;
+  --icon-button-hover-bg: rgba(201, 55, 86, 0.2);
+
+  /* 进度条 */
+  --progress-bar-bg: #fceaef;
+  --progress-bar-fill: #c93756;
+
+  /* 卡片 */
+  --card-bg: #ffffff;
+  --card-border: #fde0e6;
+  --card-hover-border: #fbc9d4;
+  --card-shadow: 0 1px 3px 0 rgba(201, 55, 86, 0.1);
+
+  /* 输入框 */
+  --input-bg: #ffffff;
+  --input-border: #fde0e6;
+  --input-focus-border: #c93756;
+  --input-text: #1c1917;
+
+  /* 标签 */
+  --tag-bg: #fef5f7;
+  --tag-text: #b32d4a;
+  --tag-border: #fde0e6;
+
+  /* 分割线 */
+  --divider-color: #fde0e6;
+
+  /* 强调色 */
+  --accent-color: #c93756;
+  --accent-hover: #b32d4a;
+  
+  /* 深色文字 */
+  --text-deep: #8f2139;
+}
+
+/* ==================== 中国红配色 ==================== */
+[data-color-scheme="chinese-red"] {
+  /* 悬浮按钮 */
+  --floating-button-bg: #ffffff;
+  --floating-button-text: #1c1917;
+  --floating-button-icon: #dc143c;
+  --floating-button-border: rgba(220, 20, 60, 0.2);
+  --floating-button-shadow: 0 4px 6px -1px rgba(220, 20, 60, 0.12), 0 2px 4px -1px rgba(220, 20, 60, 0.06);
+
+  /* 次要按钮 */
+  --secondary-button-bg: #fef5f6;
+  --secondary-button-text: #c41230;
+  --secondary-button-border: #fddfe4;
+  --secondary-button-hover-bg: #fceaed;
+
+  /* 图标按钮 */
+  --icon-button-bg: rgba(220, 20, 60, 0.12);
+  --icon-button-icon: #dc143c;
+  --icon-button-hover-bg: rgba(220, 20, 60, 0.2);
+
+  /* 进度条 */
+  --progress-bar-bg: #fceaed;
+  --progress-bar-fill: #dc143c;
+
+  /* 卡片 */
+  --card-bg: #ffffff;
+  --card-border: #fddfe4;
+  --card-hover-border: #fbc7d0;
+  --card-shadow: 0 1px 3px 0 rgba(220, 20, 60, 0.1);
+
+  /* 输入框 */
+  --input-bg: #ffffff;
+  --input-border: #fddfe4;
+  --input-focus-border: #dc143c;
+  --input-text: #1c1917;
+
+  /* 标签 */
+  --tag-bg: #fef5f6;
+  --tag-text: #c41230;
+  --tag-border: #fddfe4;
+
+  /* 分割线 */
+  --divider-color: #fddfe4;
+
+  /* 强调色 */
+  --accent-color: #dc143c;
+  --accent-hover: #c41230;
+  
+  /* 深色文字 */
+  --text-deep: #a00f28;
+}
+
+/* ==================== 青花瓷配色 ==================== */
+[data-color-scheme="blue-white-porcelain"] {
+  /* 悬浮按钮 */
+  --floating-button-bg: #ffffff;
+  --floating-button-text: #1c1917;
+  --floating-button-icon: #4169a8;
+  --floating-button-border: rgba(65, 105, 168, 0.2);
+  --floating-button-shadow: 0 4px 6px -1px rgba(65, 105, 168, 0.12), 0 2px 4px -1px rgba(65, 105, 168, 0.06);
+
+  /* 次要按钮 */
+  --secondary-button-bg: #f4f7fb;
+  --secondary-button-text: #365a94;
+  --secondary-button-border: #dfe7f2;
+  --secondary-button-hover-bg: #e8eff7;
+
+  /* 图标按钮 */
+  --icon-button-bg: rgba(65, 105, 168, 0.12);
+  --icon-button-icon: #4169a8;
+  --icon-button-hover-bg: rgba(65, 105, 168, 0.2);
+
+  /* 进度条 */
+  --progress-bar-bg: #e8eff7;
+  --progress-bar-fill: #4169a8;
+
+  /* 卡片 */
+  --card-bg: #ffffff;
+  --card-border: #dfe7f2;
+  --card-hover-border: #cbd9eb;
+  --card-shadow: 0 1px 3px 0 rgba(65, 105, 168, 0.1);
+
+  /* 输入框 */
+  --input-bg: #ffffff;
+  --input-border: #dfe7f2;
+  --input-focus-border: #4169a8;
+  --input-text: #1c1917;
+
+  /* 标签 */
+  --tag-bg: #f4f7fb;
+  --tag-text: #365a94;
+  --tag-border: #dfe7f2;
+
+  /* 分割线 */
+  --divider-color: #dfe7f2;
+
+  /* 强调色 */
+  --accent-color: #4169a8;
+  --accent-hover: #365a94;
+  
+  /* 深色文字 */
+  --text-deep: #2a4770;
+}
+
+/* ==================== 竹青配色 ==================== */
+[data-color-scheme="bamboo-green"] {
+  /* 悬浮按钮 */
+  --floating-button-bg: #ffffff;
+  --floating-button-text: #1c1917;
+  --floating-button-icon: #5a9367;
+  --floating-button-border: rgba(90, 147, 103, 0.2);
+  --floating-button-shadow: 0 4px 6px -1px rgba(90, 147, 103, 0.12), 0 2px 4px -1px rgba(90, 147, 103, 0.06);
+
+  /* 次要按钮 */
+  --secondary-button-bg: #f5f9f6;
+  --secondary-button-text: #4a7d55;
+  --secondary-button-border: #e0ede3;
+  --secondary-button-hover-bg: #eaf3ed;
+
+  /* 图标按钮 */
+  --icon-button-bg: rgba(90, 147, 103, 0.12);
+  --icon-button-icon: #5a9367;
+  --icon-button-hover-bg: rgba(90, 147, 103, 0.2);
+
+  /* 进度条 */
+  --progress-bar-bg: #eaf3ed;
+  --progress-bar-fill: #5a9367;
+
+  /* 卡片 */
+  --card-bg: #ffffff;
+  --card-border: #e0ede3;
+  --card-hover-border: #cce0d1;
+  --card-shadow: 0 1px 3px 0 rgba(90, 147, 103, 0.1);
+
+  /* 输入框 */
+  --input-bg: #ffffff;
+  --input-border: #e0ede3;
+  --input-focus-border: #5a9367;
+  --input-text: #1c1917;
+
+  /* 标签 */
+  --tag-bg: #f5f9f6;
+  --tag-text: #4a7d55;
+  --tag-border: #e0ede3;
+
+  /* 分割线 */
+  --divider-color: #e0ede3;
+
+  /* 强调色 */
+  --accent-color: #5a9367;
+  --accent-hover: #4a7d55;
+  
+  /* 深色文字 */
+  --text-deep: #3a6343;
+}
+
+/* ==================== 霁青配色 ==================== */
+[data-color-scheme="sky-blue"] {
+  /* 悬浮按钮 */
+  --floating-button-bg: #ffffff;
+  --floating-button-text: #1c1917;
+  --floating-button-icon: #5698c3;
+  --floating-button-border: rgba(86, 152, 195, 0.2);
+  --floating-button-shadow: 0 4px 6px -1px rgba(86, 152, 195, 0.12), 0 2px 4px -1px rgba(86, 152, 195, 0.06);
+
+  /* 次要按钮 */
+  --secondary-button-bg: #f5f9fc;
+  --secondary-button-text: #4682b0;
+  --secondary-button-border: #e0eef6;
+  --secondary-button-hover-bg: #eaf3f9;
+
+  /* 图标按钮 */
+  --icon-button-bg: rgba(86, 152, 195, 0.12);
+  --icon-button-icon: #5698c3;
+  --icon-button-hover-bg: rgba(86, 152, 195, 0.2);
+
+  /* 进度条 */
+  --progress-bar-bg: #eaf3f9;
+  --progress-bar-fill: #5698c3;
+
+  /* 卡片 */
+  --card-bg: #ffffff;
+  --card-border: #e0eef6;
+  --card-hover-border: #cce3f0;
+  --card-shadow: 0 1px 3px 0 rgba(86, 152, 195, 0.1);
+
+  /* 输入框 */
+  --input-bg: #ffffff;
+  --input-border: #e0eef6;
+  --input-focus-border: #5698c3;
+  --input-text: #1c1917;
+
+  /* 标签 */
+  --tag-bg: #f5f9fc;
+  --tag-text: #4682b0;
+  --tag-border: #e0eef6;
+
+  /* 分割线 */
+  --divider-color: #e0eef6;
+
+  /* 强调色 */
+  --accent-color: #5698c3;
+  --accent-hover: #4682b0;
+  
+  /* 深色文字 */
+  --text-deep: #36688d;
+}
+
+/* ==================== 胭脂配色 ==================== */
+[data-color-scheme="rouge"] {
+  /* 悬浮按钮 */
+  --floating-button-bg: #ffffff;
+  --floating-button-text: #1c1917;
+  --floating-button-icon: #e05d8c;
+  --floating-button-border: rgba(224, 93, 140, 0.2);
+  --floating-button-shadow: 0 4px 6px -1px rgba(224, 93, 140, 0.12), 0 2px 4px -1px rgba(224, 93, 140, 0.06);
+
+  /* 次要按钮 */
+  --secondary-button-bg: #fef6f9;
+  --secondary-button-text: #c94d78;
+  --secondary-button-border: #fde3ec;
+  --secondary-button-hover-bg: #fcedf3;
+
+  /* 图标按钮 */
+  --icon-button-bg: rgba(224, 93, 140, 0.12);
+  --icon-button-icon: #e05d8c;
+  --icon-button-hover-bg: rgba(224, 93, 140, 0.2);
+
+  /* 进度条 */
+  --progress-bar-bg: #fcedf3;
+  --progress-bar-fill: #e05d8c;
+
+  /* 卡片 */
+  --card-bg: #ffffff;
+  --card-border: #fde3ec;
+  --card-hover-border: #fbcfdd;
+  --card-shadow: 0 1px 3px 0 rgba(224, 93, 140, 0.1);
+
+  /* 输入框 */
+  --input-bg: #ffffff;
+  --input-border: #fde3ec;
+  --input-focus-border: #e05d8c;
+  --input-text: #1c1917;
+
+  /* 标签 */
+  --tag-bg: #fef6f9;
+  --tag-text: #c94d78;
+  --tag-border: #fde3ec;
+
+  /* 分割线 */
+  --divider-color: #fde3ec;
+
+  /* 强调色 */
+  --accent-color: #e05d8c;
+  --accent-hover: #c94d78;
+  
+  /* 深色文字 */
+  --text-deep: #a83d64;
+}
+
+/* ==================== 焦糖拿铁配色 ==================== */
+[data-color-scheme="latte-caramel"] {
+  /* 悬浮按钮 */
+  --floating-button-bg: #ffffff;
+  --floating-button-text: #1c1917;
+  --floating-button-icon: #8b4513;
+  --floating-button-border: rgba(139, 69, 19, 0.2);
+  --floating-button-shadow: 0 4px 6px -1px rgba(139, 69, 19, 0.12), 0 2px 4px -1px rgba(139, 69, 19, 0.06);
+
+  /* 次要按钮 */
+  --secondary-button-bg: #faf0e6;
+  --secondary-button-text: #8b4513;
+  --secondary-button-border: #f0e6d8;
+  --secondary-button-hover-bg: #f5ebe0;
+
+  /* 图标按钮 */
+  --icon-button-bg: rgba(139, 69, 19, 0.12);
+  --icon-button-icon: #8b4513;
+  --icon-button-hover-bg: rgba(139, 69, 19, 0.2);
+
+  /* 进度条 */
+  --progress-bar-bg: #f5ebe0;
+  --progress-bar-fill: #d2b48c;
+
+  /* 卡片 */
+  --card-bg: #ffffff;
+  --card-border: #f0e6d8;
+  --card-hover-border: #e6d8c8;
+  --card-shadow: 0 1px 3px 0 rgba(139, 69, 19, 0.1);
+
+  /* 输入框 */
+  --input-bg: #ffffff;
+  --input-border: #f0e6d8;
+  --input-focus-border: #d2b48c;
+  --input-text: #4b3621;
+
+  /* 标签 */
+  --tag-bg: #faf0e6;
+  --tag-text: #8b4513;
+  --tag-border: #f0e6d8;
+
+  /* 分割线 */
+  --divider-color: #f0e6d8;
+
+  /* 强调色 */
+  --accent-color: #d2b48c;
+  --accent-hover: #8b4513;
+  
+  /* 深色文字 */
+  --text-deep: #4b3621;
+}
+
+/* ==================== 暗黑学院风配色 ==================== */
+[data-color-scheme="dark-academia"] {
+  /* 悬浮按钮 */
+  --floating-button-bg: #ffffff;
+  --floating-button-text: #1c1917;
+  --floating-button-icon: #556b2f;
+  --floating-button-border: rgba(85, 107, 47, 0.2);
+  --floating-button-shadow: 0 4px 6px -1px rgba(85, 107, 47, 0.12), 0 2px 4px -1px rgba(85, 107, 47, 0.06);
+
+  /* 次要按钮 */
+  --secondary-button-bg: #f5f5dc;
+  --secondary-button-text: #556b2f;
+  --secondary-button-border: #e8e8d0;
+  --secondary-button-hover-bg: #eeeec8;
+
+  /* 图标按钮 */
+  --icon-button-bg: rgba(85, 107, 47, 0.12);
+  --icon-button-icon: #556b2f;
+  --icon-button-hover-bg: rgba(85, 107, 47, 0.2);
+
+  /* 进度条 */
+  --progress-bar-bg: #eeeec8;
+  --progress-bar-fill: #6b8e23;
+
+  /* 卡片 */
+  --card-bg: #ffffff;
+  --card-border: #e8e8d0;
+  --card-hover-border: #d8d8c0;
+  --card-shadow: 0 1px 3px 0 rgba(85, 107, 47, 0.1);
+
+  /* 输入框 */
+  --input-bg: #ffffff;
+  --input-border: #e8e8d0;
+  --input-focus-border: #556b2f;
+  --input-text: #1c1917;
+
+  /* 标签 */
+  --tag-bg: #f5f5dc;
+  --tag-text: #556b2f;
+  --tag-border: #e8e8d0;
+
+  /* 分割线 */
+  --divider-color: #e8e8d0;
+
+  /* 强调色 */
+  --accent-color: #556b2f;
+  --accent-hover: #6b8e23;
+  
+  /* 深色文字 */
+  --text-deep: #3a4a1f;
+}
+
+/* ==================== 克莱因蓝配色 ==================== */
+[data-color-scheme="klein-blue"] {
+  /* 悬浮按钮 */
+  --floating-button-bg: #ffffff;
+  --floating-button-text: #1c1917;
+  --floating-button-icon: #002fa7;
+  --floating-button-border: rgba(0, 47, 167, 0.2);
+  --floating-button-shadow: 0 4px 6px -1px rgba(0, 47, 167, 0.12), 0 2px 4px -1px rgba(0, 47, 167, 0.06);
+
+  /* 次要按钮 */
+  --secondary-button-bg: #f0f8ff;
+  --secondary-button-text: #002fa7;
+  --secondary-button-border: #d6e9ff;
+  --secondary-button-hover-bg: #e6f2ff;
+
+  /* 图标按钮 */
+  --icon-button-bg: rgba(0, 47, 167, 0.12);
+  --icon-button-icon: #002fa7;
+  --icon-button-hover-bg: rgba(0, 47, 167, 0.2);
+
+  /* 进度条 */
+  --progress-bar-bg: #e6f2ff;
+  --progress-bar-fill: #0047d4;
+
+  /* 卡片 */
+  --card-bg: #ffffff;
+  --card-border: #d6e9ff;
+  --card-hover-border: #c0dcff;
+  --card-shadow: 0 1px 3px 0 rgba(0, 47, 167, 0.1);
+
+  /* 输入框 */
+  --input-bg: #ffffff;
+  --input-border: #d6e9ff;
+  --input-focus-border: #002fa7;
+  --input-text: #1c1917;
+
+  /* 标签 */
+  --tag-bg: #f0f8ff;
+  --tag-text: #002fa7;
+  --tag-border: #d6e9ff;
+
+  /* 分割线 */
+  --divider-color: #d6e9ff;
+
+  /* 强调色 */
+  --accent-color: #002fa7;
+  --accent-hover: #0047d4;
+  
+  /* 深色文字 */
+  --text-deep: #001f70;
+}
+
+/* ==================== 午夜深海配色 ==================== */
+[data-color-scheme="midnight-ocean"] {
+  /* 悬浮按钮 */
+  --floating-button-bg: #ffffff;
+  --floating-button-text: #1c1917;
+  --floating-button-icon: #191970;
+  --floating-button-border: rgba(25, 25, 112, 0.2);
+  --floating-button-shadow: 0 4px 6px -1px rgba(25, 25, 112, 0.12), 0 2px 4px -1px rgba(25, 25, 112, 0.06);
+
+  /* 次要按钮 */
+  --secondary-button-bg: #f0f4ff;
+  --secondary-button-text: #191970;
+  --secondary-button-border: #dce6ff;
+  --secondary-button-hover-bg: #e6edff;
+
+  /* 图标按钮 */
+  --icon-button-bg: rgba(25, 25, 112, 0.12);
+  --icon-button-icon: #191970;
+  --icon-button-hover-bg: rgba(25, 25, 112, 0.2);
+
+  /* 进度条 */
+  --progress-bar-bg: #e6edff;
+  --progress-bar-fill: #4169e1;
+
+  /* 卡片 */
+  --card-bg: #ffffff;
+  --card-border: #dce6ff;
+  --card-hover-border: #c8d8ff;
+  --card-shadow: 0 1px 3px 0 rgba(25, 25, 112, 0.1);
+
+  /* 输入框 */
+  --input-bg: #ffffff;
+  --input-border: #dce6ff;
+  --input-focus-border: #191970;
+  --input-text: #1c1917;
+
+  /* 标签 */
+  --tag-bg: #f0f4ff;
+  --tag-text: #191970;
+  --tag-border: #dce6ff;
+
+  /* 分割线 */
+  --divider-color: #dce6ff;
+
+  /* 强调色 */
+  --accent-color: #191970;
+  --accent-hover: #4169e1;
+  
+  /* 深色文字 */
+  --text-deep: #0f0f48;
+}
+
+/* ==================== 日系胶片配色 ==================== */
+[data-color-scheme="film-japanese"] {
+  /* 悬浮按钮 */
+  --floating-button-bg: #ffffff;
+  --floating-button-text: #1c1917;
+  --floating-button-icon: #5f9ea0;
+  --floating-button-border: rgba(95, 158, 160, 0.2);
+  --floating-button-shadow: 0 4px 6px -1px rgba(95, 158, 160, 0.12), 0 2px 4px -1px rgba(95, 158, 160, 0.06);
+
+  /* 次要按钮 */
+  --secondary-button-bg: #f5f9f9;
+  --secondary-button-text: #5f9ea0;
+  --secondary-button-border: #e0eded;
+  --secondary-button-hover-bg: #ebf3f3;
+
+  /* 图标按钮 */
+  --icon-button-bg: rgba(95, 158, 160, 0.12);
+  --icon-button-icon: #5f9ea0;
+  --icon-button-hover-bg: rgba(95, 158, 160, 0.2);
+
+  /* 进度条 */
+  --progress-bar-bg: #ebf3f3;
+  --progress-bar-fill: #5f9ea0;
+
+  /* 卡片 */
+  --card-bg: #ffffff;
+  --card-border: #e0eded;
+  --card-hover-border: #cce0e0;
+  --card-shadow: 0 1px 3px 0 rgba(95, 158, 160, 0.1);
+
+  /* 输入框 */
+  --input-bg: #ffffff;
+  --input-border: #e0eded;
+  --input-focus-border: #5f9ea0;
+  --input-text: #1c1917;
+
+  /* 标签 */
+  --tag-bg: #f5f9f9;
+  --tag-text: #5f9ea0;
+  --tag-border: #e0eded;
+
+  /* 分割线 */
+  --divider-color: #e0eded;
+
+  /* 强调色 */
+  --accent-color: #5f9ea0;
+  --accent-hover: #4a8082;
+  
+  /* 深色文字 */
+  --text-deep: #3a6567;
+}
+
+/* ==================== 港风复古配色 ==================== */
+[data-color-scheme="film-hongkong"] {
+  /* 悬浮按钮 */
+  --floating-button-bg: #ffffff;
+  --floating-button-text: #1c1917;
+  --floating-button-icon: #006400;
+  --floating-button-border: rgba(0, 100, 0, 0.2);
+  --floating-button-shadow: 0 4px 6px -1px rgba(0, 100, 0, 0.12), 0 2px 4px -1px rgba(0, 100, 0, 0.06);
+
+  /* 次要按钮 */
+  --secondary-button-bg: #f5f9f5;
+  --secondary-button-text: #006400;
+  --secondary-button-border: #e0ede0;
+  --secondary-button-hover-bg: #ebf3eb;
+
+  /* 图标按钮 */
+  --icon-button-bg: rgba(0, 100, 0, 0.12);
+  --icon-button-icon: #006400;
+  --icon-button-hover-bg: rgba(0, 100, 0, 0.2);
+
+  /* 进度条 */
+  --progress-bar-bg: #ebf3eb;
+  --progress-bar-fill: #228b22;
+
+  /* 卡片 */
+  --card-bg: #ffffff;
+  --card-border: #e0ede0;
+  --card-hover-border: #cce0cc;
+  --card-shadow: 0 1px 3px 0 rgba(0, 100, 0, 0.1);
+
+  /* 输入框 */
+  --input-bg: #ffffff;
+  --input-border: #e0ede0;
+  --input-focus-border: #006400;
+  --input-text: #1c1917;
+
+  /* 标签 */
+  --tag-bg: #f5f9f5;
+  --tag-text: #006400;
+  --tag-border: #e0ede0;
+
+  /* 分割线 */
+  --divider-color: #e0ede0;
+
+  /* 强调色 */
+  --accent-color: #006400;
+  --accent-hover: #228b22;
+  
+  /* 深色文字 */
+  --text-deep: #004d00;
+}
+
 /* ==================== 通用样式类 ==================== */
 
 /* 悬浮按钮 */
