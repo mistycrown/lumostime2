@@ -16,6 +16,9 @@ import { DateRangeFilter } from '../components/DateRangeFilter';
 import { MatrixAnalysisChart } from '../components/MatrixAnalysisChart';
 import { Scope } from '../types';
 import { DetailTimelineCard } from '../components/DetailTimelineCard';
+import { UIIconSelector } from '../components/UIIconSelector';
+import { uiIconService } from '../services/uiIconService';
+import { useSettings } from '../contexts/SettingsContext';
 
 
 interface TagDetailViewProps {
@@ -48,6 +51,10 @@ export const TagDetailView: React.FC<TagDetailViewProps> = ({ tagId, logs, todos
    // Local state for editing (simulated)
    const [activity, setActivity] = useState<Activity | undefined>(initialActivity);
    const [category, setCategory] = useState<Category | undefined>(initialCategory);
+   
+   // 获取当前 UI 图标主题
+   const { uiIconTheme } = useSettings();
+   const isCustomThemeEnabled = uiIconTheme !== 'default';
 
    // State
    const [activeTab, setActiveTab] = useState('Timeline');
@@ -427,6 +434,20 @@ export const TagDetailView: React.FC<TagDetailViewProps> = ({ tagId, logs, todos
                               </div>
                            </div>
                         </div>
+                        
+                        {/* UI Icon Selector - 仅在启用自定义主题时显示 */}
+                        {isCustomThemeEnabled && (
+                           <div>
+                              <label className="text-xs text-stone-400 font-medium mb-2 block">
+                                 UI 图标
+                                 <span className="text-stone-300 ml-1">(可选)</span>
+                              </label>
+                              <UIIconSelector
+                                 currentIcon={activity.icon}
+                                 onSelect={(icon) => setActivity({ ...activity, icon })}
+                              />
+                           </div>
+                        )}
                      </div>
                   </div>
 

@@ -15,6 +15,8 @@ import { DateRangeFilter } from '../components/DateRangeFilter';
 import { MatrixAnalysisChart } from '../components/MatrixAnalysisChart';
 import { Scope } from '../types';
 import { DetailTimelineCard } from '../components/DetailTimelineCard';
+import { UIIconSelector } from '../components/UIIconSelector';
+import { useSettings } from '../contexts/SettingsContext';
 
 interface CategoryDetailViewProps {
     categoryId: string;
@@ -31,6 +33,10 @@ interface CategoryDetailViewProps {
 export const CategoryDetailView: React.FC<CategoryDetailViewProps> = ({ categoryId, logs, categories, onUpdateCategory, onEditLog, onEditTodo, onToggleTodo, todos, scopes }) => {
     const initialCategory = categories.find(c => c.id === categoryId);
     const [category, setCategory] = useState<Category | undefined>(initialCategory);
+    
+    // 获取当前 UI 图标主题
+    const { uiIconTheme } = useSettings();
+    const isCustomThemeEnabled = uiIconTheme !== 'default';
 
     const [activeTab, setActiveTab] = useState('Timeline');
     const [displayDate, setDisplayDate] = useState(new Date());
@@ -334,6 +340,20 @@ export const CategoryDetailView: React.FC<CategoryDetailViewProps> = ({ category
                                         If enabled, activities in this category will track focus levels (1-5) by default.
                                     </p>
                                 </div>
+                                
+                                {/* UI Icon Selector - 仅在启用自定义主题时显示 */}
+                                {isCustomThemeEnabled && (
+                                    <div>
+                                        <label className="text-xs text-stone-400 font-medium mb-2 block">
+                                            UI 图标
+                                            <span className="text-stone-300 ml-1">(可选)</span>
+                                        </label>
+                                        <UIIconSelector
+                                            currentIcon={category.icon}
+                                            onSelect={(icon) => setCategory({ ...category, icon })}
+                                        />
+                                    </div>
+                                )}
                             </div>
                         </div>
 

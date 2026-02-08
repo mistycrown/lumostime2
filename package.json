@@ -15,7 +15,8 @@
     "install-image-deps": "node scripts/install-image-deps.js",
     "process-icons": "node scripts/process-icon-corners.js",
     "restore-icons": "node scripts/process-icon-corners.js --restore",
-    "optimize-images": "node scripts/optimize-images.js"
+    "optimize-images": "node scripts/optimize-images.js",
+    "convert-uiicon": "node scripts/convert-uiicon-to-webp.js"
   },
   "dependencies": {
     "@awesome-cordova-plugins/core": "^8.1.0",

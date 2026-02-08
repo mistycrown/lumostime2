@@ -16,6 +16,8 @@ import { Check, Save, Zap, Clock, BarChart2, Archive, Plus, X, ChevronDown } fro
 import { COLOR_OPTIONS } from '../constants';
 import { GoalCard } from '../components/GoalCard';
 import { DetailTimelineCard } from '../components/DetailTimelineCard';
+import { UIIconSelector } from '../components/UIIconSelector';
+import { useSettings } from '../contexts/SettingsContext';
 
 interface ScopeDetailViewProps {
     scope: Scope;
