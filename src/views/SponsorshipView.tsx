@@ -818,6 +818,99 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
                                                     </div>
                                                 )}
                                             </button>
+
+                                            {/* Cat 主题 */}
+                                            <button
+                                                onClick={() => setUiIconTheme('cat')}
+                                                className={`relative rounded-lg border-2 transition-all overflow-hidden ${
+                                                    uiIconTheme === 'cat'
+                                                        ? 'border-stone-400 ring-2 ring-stone-200'
+                                                        : 'border-stone-200 hover:border-stone-300'
+                                                }`}
+                                                style={{ aspectRatio: '4/5' }}
+                                            >
+                                                <div className="w-full h-full grid grid-cols-2 gap-0.5 p-1 bg-white">
+                                                    {[1, 2, 3, 4].map((num) => (
+                                                        <div key={num} className="bg-stone-50 rounded flex items-center justify-center">
+                                                            <img
+                                                                src={`/uiicon/cat/${String(num).padStart(2, '0')}.webp`}
+                                                                alt={`icon-${num}`}
+                                                                className="w-full h-full object-contain p-0.5"
+                                                                onError={(e) => {
+                                                                    e.currentTarget.src = `/uiicon/cat/${String(num).padStart(2, '0')}.png`;
+                                                                }}
+                                                            />
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                                {uiIconTheme === 'cat' && (
+                                                    <div className="absolute top-1 right-1 w-5 h-5 bg-stone-800 rounded-full flex items-center justify-center shadow-lg">
+                                                        <Check size={12} className="text-white" />
+                                                    </div>
+                                                )}
+                                            </button>
+
+                                            {/* Forest 主题 */}
+                                            <button
+                                                onClick={() => setUiIconTheme('forest')}
+                                                className={`relative rounded-lg border-2 transition-all overflow-hidden ${
+                                                    uiIconTheme === 'forest'
+                                                        ? 'border-stone-400 ring-2 ring-stone-200'
+                                                        : 'border-stone-200 hover:border-stone-300'
+                                                }`}
+                                                style={{ aspectRatio: '4/5' }}
+                                            >
+                                                <div className="w-full h-full grid grid-cols-2 gap-0.5 p-1 bg-white">
+                                                    {[1, 2, 3, 4].map((num) => (
+                                                        <div key={num} className="bg-stone-50 rounded flex items-center justify-center">
+                                                            <img
+                                                                src={`/uiicon/forest/${String(num).padStart(2, '0')}.webp`}
+                                                                alt={`icon-${num}`}
+                                                                className="w-full h-full object-contain p-0.5"
+                                                                onError={(e) => {
+                                                                    e.currentTarget.src = `/uiicon/forest/${String(num).padStart(2, '0')}.png`;
+                                                                }}
+                                                            />
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                                {uiIconTheme === 'forest' && (
+                                                    <div className="absolute top-1 right-1 w-5 h-5 bg-stone-800 rounded-full flex items-center justify-center shadow-lg">
+                                                        <Check size={12} className="text-white" />
+                                                    </div>
+                                                )}
+                                            </button>
+
+                                            {/* Plant 主题 */}
+                                            <button
+                                                onClick={() => setUiIconTheme('plant')}
+                                                className={`relative rounded-lg border-2 transition-all overflow-hidden ${
+                                                    uiIconTheme === 'plant'
+                                                        ? 'border-stone-400 ring-2 ring-stone-200'
+                                                        : 'border-stone-200 hover:border-stone-300'
+                                                }`}
+                                                style={{ aspectRatio: '4/5' }}
+                                            >
+                                                <div className="w-full h-full grid grid-cols-2 gap-0.5 p-1 bg-white">
+                                                    {[1, 2, 3, 4].map((num) => (
+                                                        <div key={num} className="bg-stone-50 rounded flex items-center justify-center">
+                                                            <img
+                                                                src={`/uiicon/plant/${String(num).padStart(2, '0')}.webp`}
+                                                                alt={`icon-${num}`}
+                                                                className="w-full h-full object-contain p-0.5"
+                                                                onError={(e) => {
+                                                                    e.currentTarget.src = `/uiicon/plant/${String(num).padStart(2, '0')}.png`;
+                                                                }}
+                                                            />
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                                {uiIconTheme === 'plant' && (
+                                                    <div className="absolute top-1 right-1 w-5 h-5 bg-stone-800 rounded-full flex items-center justify-center shadow-lg">
+                                                        <Check size={12} className="text-white" />
+                                                    </div>
+                                                )}
+                                            </button>
                                         </div>
                                     </div>
                                 </div>

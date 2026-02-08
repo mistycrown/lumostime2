@@ -62,3 +62,47 @@ cp static/png_backup/public/background/xxx.png public/background/
 - `backup-and-clean-png.js` - 仅备份和删除（已废弃）
 
 推荐使用 `optimize-images.js` 一键完成所有操作。
+
+
+## convert-uiicon-to-webp.js
+
+专门用于转换 `public/uiicon` 文件夹下的 UI 图标为 WebP 格式。
+
+### 功能
+
+- 将所有 PNG 图标转换为 WebP 格式
+- 使用高质量设置（90%）确保图标清晰
+- 自动删除原始 PNG 文件
+- **不进行备份**（假设用户已有备份）
+
+### 使用方法
+
+```bash
+npm run convert-uiicon
+```
+
+### 处理的目录
+
+- `public/uiicon/cat` - 猫咪主题图标
+- `public/uiicon/color` - 彩色主题图标
+- `public/uiicon/color2` - 彩色主题图标 2
+- `public/uiicon/forest` - 森林主题图标
+- `public/uiicon/plant` - 植物主题图标
+- `public/uiicon/prince` - 小王子主题图标
+- `public/uiicon/purple` - 紫色主题图标
+
+### 注意事项
+
+- ⚠️ **此脚本不会备份原文件**，请确保已有备份！
+- ⚠️ 转换后原始 PNG 文件会被永久删除
+- ✅ 使用 90% 质量确保 UI 图标清晰度
+- ✅ 自动递归处理所有子文件夹
+
+### 使用场景
+
+当你在 `public/uiicon` 文件夹下添加新的 UI 图标主题时：
+
+1. 确保已备份原始 PNG 文件
+2. 运行 `npm run convert-uiicon`
+3. 脚本会自动转换所有 PNG 为 WebP 并删除原文件
+4. 更新 `src/services/uiIconService.ts` 添加新主题配置
