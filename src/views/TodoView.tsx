@@ -207,14 +207,14 @@ const SwipeableTodoItem: React.FC<{
                 <span className="text-stone-300 font-sans">#</span>
                 {viewMode === 'loose' ? (
                   <>
-                    <span className="text-xs">{linkedDetails.categoryIcon}</span>
+                    <IconRenderer icon={linkedDetails.categoryIcon} className="text-xs" />
                     <span className="opacity-90">{linkedDetails.categoryName}</span>
                     <span className="text-stone-300 px-0.5">/</span>
-                    <span className="text-xs">{linkedDetails.activityIcon}</span>
+                    <IconRenderer icon={linkedDetails.activityIcon} className="text-xs" />
                     <span className="opacity-90">{linkedDetails.activityName}</span>
                   </>
                 ) : (
-                  <span className="text-xs">{linkedDetails.activityIcon}</span>
+                  <IconRenderer icon={linkedDetails.activityIcon} className="text-xs" />
                 )}
               </span>
             )}

@@ -11,6 +11,7 @@ import React, { useEffect, useState } from 'react';
 import { ActiveSession, TodoItem, AppView } from '../types';
 import { StopCircle, X, CheckCircle2 } from 'lucide-react';
 import { useNavigation } from '../contexts/NavigationContext';
+import { IconRenderer } from './IconRenderer';
 
 interface TimerFloatingProps {
   sessions: ActiveSession[];
@@ -182,7 +183,7 @@ const SingleTimer: React.FC<{
             }
           }}
         >
-          {session.activityIcon}
+          <IconRenderer icon={session.activityIcon} className={isBorderAnimating ? 'text-2xl' : 'text-xl'} />
         </div>
       ) : (
         <>
@@ -214,7 +215,7 @@ const SingleTimer: React.FC<{
                 e.currentTarget.style.backgroundColor = 'color-mix(in srgb, var(--accent-color) 10%, white)';
               }}
             >
-              {session.activityIcon}
+              <IconRenderer icon={session.activityIcon} className="text-xl" />
             </div>
             <div className={`flex flex-col min-w-0 transition-all duration-500 ease-out ${
               currentView !== AppView.RECORD && currentView !== AppView.TODO 

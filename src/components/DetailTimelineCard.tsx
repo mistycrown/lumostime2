@@ -12,6 +12,7 @@ import { Log, Category } from '../types';
 import { CalendarWidget } from './CalendarWidget';
 import { Clock, Zap, MessageCircle, ChevronLeft, ChevronRight, Grid, Image as ImageIcon, Hash } from 'lucide-react';
 import { TimelineImage } from './TimelineImage';
+import { IconRenderer } from './IconRenderer';
 
 interface DetailTimelineCardProps {
     // 数据
@@ -804,12 +805,12 @@ export const DetailTimelineCard: React.FC<DetailTimelineCardProps> = ({
                                                                 <span className="font-bold text-stone-400">
                                                                     {entityInfo.type === 'category' ? '#' : entityInfo.type === 'activity' ? '#' : '%'}
                                                                 </span>
-                                                                <span>{entityInfo.icon}</span>
+                                                                <IconRenderer icon={entityInfo.icon || ''} className="text-xs" />
                                                                 <span>{entityInfo.name}</span>
                                                                 {activity && entityInfo.type === 'category' && (
                                                                     <>
                                                                         <span className="mx-1 text-stone-300">/</span>
-                                                                        <span className="mr-1">{activity.icon}</span>
+                                                                        <IconRenderer icon={activity.icon} className="text-xs mr-1" />
                                                                         <span className="text-stone-500">{activity.name}</span>
                                                                     </>
                                                                 )}

@@ -10,6 +10,7 @@
 import React, { useState, useEffect } from 'react';
 import { TodoItem, TodoCategory } from '../types';
 import { CheckCircle2, Circle, ListTodo, TrendingUp, Ban } from 'lucide-react';
+import { IconRenderer } from './IconRenderer';
 
 interface TodoAssociationProps {
     todos: TodoItem[];
@@ -71,7 +72,7 @@ export const TodoAssociation: React.FC<TodoAssociationProps> = ({ todos, todoCat
                             }
                         `}
                     >
-                        <span>{cat.icon}</span>
+                        <IconRenderer icon={cat.icon} className="text-xs" />
                         <span className="truncate">{cat.name}</span>
                     </button>
                 ))}

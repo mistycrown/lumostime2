@@ -278,12 +278,9 @@ export const ReviewHubView: React.FC<ReviewHubViewProps> = ({
                                             <div className="flex justify-between items-center mb-1">
                                                 <h3 className="font-serif text-2xl font-extrabold text-stone-900 m-0">{monthName}</h3>
                                                 <div 
-                                                    className={`border px-2 py-1 text-[10px] font-bold uppercase rounded flex whitespace-nowrap`}
-                                                    style={{
-                                                        borderColor: 'var(--progress-bar-fill)',
-                                                        backgroundColor: !isCurrentMonth ? 'var(--progress-bar-fill)' : 'transparent',
-                                                        color: !isCurrentMonth ? 'white' : 'var(--progress-bar-fill)'
-                                                    }}
+                                                    className={`px-2 py-1 text-[10px] font-bold uppercase rounded flex whitespace-nowrap ${
+                                                        isCurrentMonth ? 'btn-template-filled' : 'btn-template-outlined'
+                                                    }`}
                                                 >
                                                     {isCurrentMonth ? 'CURRENT' : 'PAST'}
                                                 </div>
@@ -350,11 +347,9 @@ export const ReviewHubView: React.FC<ReviewHubViewProps> = ({
                                         <div className="flex justify-between items-center">
                                             <span className="font-serif text-lg font-bold">W{weekNum}</span>
                                             <span 
-                                                className="text-[9px] uppercase opacity-60 border px-1 py-0.5 rounded"
-                                                style={{
-                                                    borderColor: 'var(--progress-bar-fill)',
-                                                    color: 'var(--progress-bar-fill)'
-                                                }}
+                                                className={`text-[9px] uppercase px-1 py-0.5 rounded ${
+                                                    isCurrentWeek ? 'btn-template-filled' : 'btn-template-outlined'
+                                                }`}
                                             >
                                                 {isCurrentWeek ? 'CURRENT' : 'PAST'}
                                             </span>

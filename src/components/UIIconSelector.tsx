@@ -64,7 +64,7 @@ export const UIIconSelector: React.FC<UIIconSelectorProps> = ({
                         className={`
                             px-3 py-1.5 rounded-lg text-xs font-medium transition-all
                             ${selectedGroup === group.key
-                                ? 'bg-stone-900 text-white'
+                                ? 'btn-template-filled'
                                 : 'bg-stone-100 text-stone-600 hover:bg-stone-200'
                             }
                         `}
@@ -94,7 +94,7 @@ export const UIIconSelector: React.FC<UIIconSelectorProps> = ({
                                 relative aspect-square rounded-lg transition-all
                                 flex items-center justify-center p-2
                                 ${isSelected
-                                    ? 'bg-white ring-2 ring-stone-400 shadow-md'
+                                    ? 'btn-template-filled shadow-md'
                                     : 'bg-white hover:bg-stone-100 hover:shadow-sm'
                                 }
                             `}
@@ -113,7 +113,10 @@ export const UIIconSelector: React.FC<UIIconSelectorProps> = ({
                             
                             {/* 选中标记 */}
                             {isSelected && (
-                                <div className="absolute -top-1 -right-1 w-5 h-5 bg-stone-800 rounded-full flex items-center justify-center shadow-lg">
+                                <div 
+                                    className="absolute -top-1 -right-1 w-5 h-5 rounded-full flex items-center justify-center shadow-lg"
+                                    style={{ backgroundColor: 'var(--accent-color)' }}
+                                >
                                     <Check size={12} className="text-white" />
                                 </div>
                             )}
@@ -173,7 +176,7 @@ export const UIIconSelectorCompact: React.FC<UIIconSelectorProps> = ({
                                 relative aspect-square rounded-lg transition-all
                                 flex items-center justify-center p-1.5
                                 ${isSelected
-                                    ? 'bg-white ring-2 ring-stone-400 shadow-md'
+                                    ? 'btn-template-filled shadow-md'
                                     : 'bg-white hover:bg-stone-100'
                                 }
                             `}
@@ -191,7 +194,10 @@ export const UIIconSelectorCompact: React.FC<UIIconSelectorProps> = ({
                             />
                             
                             {isSelected && (
-                                <div className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-stone-800 rounded-full flex items-center justify-center">
+                                <div 
+                                    className="absolute -top-0.5 -right-0.5 w-4 h-4 rounded-full flex items-center justify-center"
+                                    style={{ backgroundColor: 'var(--accent-color)' }}
+                                >
                                     <Check size={10} className="text-white" />
                                 </div>
                             )}

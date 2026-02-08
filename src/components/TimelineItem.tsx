@@ -4,6 +4,7 @@ import { MessageSquarePlus, AudioLines, MessageCircle, Heart, Share2, Bookmark, 
 import { imageService } from '../services/imageService';
 import { ImagePreviewModal } from './ImagePreviewModal';
 import { usePrivacy } from '../contexts/PrivacyContext';
+import { IconRenderer } from './IconRenderer';
 
 import { ReactionPicker, ReactionList } from './ReactionComponents';
 
@@ -39,6 +40,36 @@ const TimelineImage: React.FC<{ src: string; alt: string; className: string }> =
     if (!imgUrl) return <div className={`bg-gray-100 ${className} animate-pulse`} />;
 
     return <img src={imgUrl} alt={alt} className={className} />;
+};
+
+// Helper function to parse and render tag text with icons
+const renderTagContent = (tagText: string) => {
+    // Split by " / " to handle category/activity format
+    const parts = tagText.split(' / ');
+    
+    return parts.map((part, index) => {
+        // Match pattern: "icon text" where icon could be emoji or "ui:iconType"
+        const match = part.match(/^(ui:\w+|[^\s]+)\s+(.+)$/);
+        
+        if (match) {
+            const [, icon, text] = match;
+            return (
+                <React.Fragment key={index}>
+                    {index > 0 && <span className="mx-1 text-stone-300">/</span>}
+                    <IconRenderer icon={icon} className="text-xs" />
+                    <span className="ml-1">{text}</span>
+                </React.Fragment>
+            );
+        }
+        
+        // If no match, just return the text
+        return (
+            <React.Fragment key={index}>
+                {index > 0 && <span className="mx-1 text-stone-300">/</span>}
+                <span>{part}</span>
+            </React.Fragment>
+        );
+    });
 };
 
 interface TimelineItemProps {
@@ -229,7 +260,7 @@ const TimelineItem: React.FC<TimelineItemProps> = ({ entry, isLast, isFirstOfDay
                         {entry.tags?.map((tag, i) => (
                             <span key={`tag-${i}`} className="text-[10px] font-medium text-stone-500 border border-stone-200 px-2 py-0.5 rounded flex items-center gap-1 bg-stone-50/30">
                                 <span className="font-bold">#</span>
-                                <span>{tag}</span>
+                                {renderTagContent(tag)}
                             </span>
                         ))}
 
@@ -237,7 +268,7 @@ const TimelineItem: React.FC<TimelineItemProps> = ({ entry, isLast, isFirstOfDay
                         {entry.domains?.map((domain, i) => (
                             <span key={`domain-${i}`} className="text-[10px] font-medium text-stone-500 border border-stone-200 px-2 py-0.5 rounded flex items-center gap-1 bg-stone-50/30">
                                 <span className="text-stone-400 font-bold">%</span>
-                                <span>{domain}</span>
+                                {renderTagContent(domain)}
                             </span>
                         ))}
                     </div>

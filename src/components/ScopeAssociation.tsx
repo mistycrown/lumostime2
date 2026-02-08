@@ -10,6 +10,7 @@
 import React from 'react';
 import { Scope } from '../types';
 import { Target } from 'lucide-react';
+import { IconRenderer } from './IconRenderer';
 
 interface ScopeAssociationProps {
     scopes: Scope[];
@@ -58,7 +59,7 @@ export const ScopeAssociation: React.FC<ScopeAssociationProps> = ({ scopes, sele
                                 : 'bg-stone-50 text-stone-500 border border-stone-100 hover:bg-stone-100'
                                 }`}
                         >
-                            <span>{scope.icon || '📍'}</span>
+                            <IconRenderer icon={scope.icon || '📍'} className="text-xs" />
                             <span className="truncate">{scope.name}</span>
                         </button>
                     );

@@ -15,6 +15,7 @@ import { ScopeAssociation } from '../components/ScopeAssociation';
 import { FocusScoreSelector } from '../components/FocusScoreSelector';
 import FocusNotification from '../plugins/FocusNotificationPlugin';
 import { Capacitor } from '@capacitor/core';
+import { IconRenderer } from '../components/IconRenderer';
 
 interface FocusDetailViewProps {
     session: ActiveSession;
@@ -217,8 +218,8 @@ export const FocusDetailView: React.FC<FocusDetailViewProps> = ({ session, todos
 
                 {/* Timer Display */}
                 <div className="flex flex-col items-center mb-10">
-                    <div className="text-[80px] mb-4 animate-bounce-slow cursor-pointer hover:scale-105 transition-transform" onClick={() => setIsActivitySelectorOpen(true)}>
-                        {session.activityIcon}
+                    <div className="text-[90px] mb-4 animate-bounce-slow cursor-pointer hover:scale-105 transition-transform" onClick={() => setIsActivitySelectorOpen(true)}>
+                        <IconRenderer icon={session.activityIcon} size={80} />
                     </div>
                     <div 
                         className="text-6xl font-medium tracking-wider" 
@@ -240,7 +241,7 @@ export const FocusDetailView: React.FC<FocusDetailViewProps> = ({ session, todos
                         className="w-full flex items-center justify-between bg-stone-50 border border-stone-200 rounded-2xl p-4 active:scale-[0.99] transition-all"
                     >
                         <div className="flex items-center gap-3">
-                            <span className="text-2xl">{session.activityIcon}</span>
+                            <IconRenderer icon={session.activityIcon} className="text-2xl" />
                             <span className="text-lg font-bold text-stone-700">{session.activityName}</span>
                         </div>
                         <ChevronDown size={20} className="text-stone-400" />
@@ -255,7 +256,7 @@ export const FocusDetailView: React.FC<FocusDetailViewProps> = ({ session, todos
                                         onClick={() => handleActivitySelect(act, cat.id)}
                                         className={`flex flex-col items-center gap-2 p-2 rounded-xl hover:bg-stone-50 ${session.activityId === act.id ? 'bg-stone-100 ring-1 ring-stone-200' : ''}`}
                                     >
-                                        <span className="text-2xl">{act.icon}</span>
+                                        <IconRenderer icon={act.icon} className="text-2xl" />
                                         <span className="text-[10px] text-stone-500 font-medium truncate w-full text-center">{act.name}</span>
                                     </button>
                                 )))}
@@ -373,7 +374,7 @@ export const FocusDetailView: React.FC<FocusDetailViewProps> = ({ session, todos
                                                 onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'white'}
                                             >
                                                 <span className="opacity-70 text-[10px] mr-0.5">[{suggestions.activity.reason}]</span>
-                                                <span>{suggestions.activity.icon}</span>
+                                                <IconRenderer icon={suggestions.activity.icon} className="text-xs" />
                                                 <span>{suggestions.activity.name}</span>
                                                 <CheckCircle2 size={12} />
                                             </button>
@@ -389,7 +390,7 @@ export const FocusDetailView: React.FC<FocusDetailViewProps> = ({ session, todos
                                                 onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'white'}
                                             >
                                                 <span className="opacity-70 text-[10px] mr-0.5">[{scope.reason}]</span>
-                                                <span>{scope.icon}</span>
+                                                <IconRenderer icon={scope.icon} className="text-xs" />
                                                 <span>{scope.name}</span>
                                                 <CheckCircle2 size={12} />
                                             </button>

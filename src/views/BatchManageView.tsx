@@ -9,7 +9,11 @@
  */
 import React, { useState } from 'react';
 import { Category, Activity } from '../types';
-import { ChevronDown, ChevronRight, GripVertical, Plus, Trash2, ArrowUp, ArrowDown, X, Check } from 'lucide-react';
+import { ChevronDown, ChevronRight, GripVertical, Plus, Trash2, ArrowUp, ArrowDown, X, Check, Palette } from 'lucide-react';
+import { UIIconSelectorCompact } from '../components/UIIconSelector';
+import { uiIconService } from '../services/uiIconService';
+import { useSettings } from '../contexts/SettingsContext';
+import { COLOR_OPTIONS } from '../constants';
 
 interface BatchManageViewProps {
     onBack: () => void;
@@ -20,6 +24,15 @@ interface BatchManageViewProps {
 export const BatchManageView: React.FC<BatchManageViewProps> = ({ onBack, categories: initialCategories, onSave }) => {
     const [categories, setCategories] = useState<Category[]>(JSON.parse(JSON.stringify(initialCategories)));
     const [expandedCats, setExpandedCats] = useState<Set<string>>(new Set(initialCategories.map(c => c.id)));
+
+    // Icon selector state - for both categories and activities
+    const [iconSelectorOpen, setIconSelectorOpen] = useState<{ type: 'category' | 'activity', id: string } | null>(null);
+    
+    // Color picker state - for activities
+    const [colorPickerOpen, setColorPickerOpen] = useState<string | null>(null);
+    
+    const { uiIconTheme } = useSettings();
+    const isCustomIconEnabled = uiIconService.isCustomTheme();
 
     // Drag state (kept for reference, but user said it's unusable, so we rely on buttons now)
     const [draggedActivity, setDraggedActivity] = useState<{ activity: Activity, sourceCategoryId: string } | null>(null);
@@ -133,6 +146,54 @@ export const BatchManageView: React.FC<BatchManageViewProps> = ({ onBack, catego
         }));
     };
 
+    // Handle icon selection for categories
+    const handleCategoryIconSelect = (catId: string, iconString: string) => {
+        setCategories(prev => prev.map(c => {
+            if (c.id === catId) {
+                return { ...c, icon: iconString };
+            }
+            return c;
+        }));
+        setIconSelectorOpen(null);
+    };
+
+    // Handle icon selection for activities
+    const handleActivityIconSelect = (catId: string, actId: string, iconString: string) => {
+        setCategories(prev => prev.map(c => {
+            if (c.id === catId) {
+                return {
+                    ...c,
+                    activities: c.activities.map(a => {
+                        if (a.id === actId) {
+                            return { ...a, icon: iconString };
+                        }
+                        return a;
+                    })
+                };
+            }
+            return c;
+        }));
+        setIconSelectorOpen(null);
+    };
+
+    // Handle color selection for activities
+    const handleActivityColorChange = (catId: string, actId: string, color: string) => {
+        setCategories(prev => prev.map(c => {
+            if (c.id === catId) {
+                return {
+                    ...c,
+                    activities: c.activities.map(a => {
+                        if (a.id === actId) {
+                            return { ...a, color };
+                        }
+                        return a;
+                    })
+                };
+            }
+            return c;
+        }));
+    };
+
     // --- Drag Logic (Kept but optional now) ---
     const handleDragStart = (e: React.DragEvent, activity: Activity, categoryId: string) => {
         setDraggedActivity({ activity, sourceCategoryId: categoryId });
@@ -200,6 +261,24 @@ export const BatchManageView: React.FC<BatchManageViewProps> = ({ onBack, catego
 
                             {/* Category Actions */}
                             <div className="flex items-center gap-1 shrink-0">
+                                {/* Icon Selector Button - Only show if custom icons are enabled */}
+                                {isCustomIconEnabled && (
+                                    <button 
+                                        onClick={() => setIconSelectorOpen(
+                                            iconSelectorOpen?.type === 'category' && iconSelectorOpen?.id === category.id 
+                                                ? null 
+                                                : { type: 'category', id: category.id }
+                                        )} 
+                                        className={`p-1 transition-colors ${
+                                            iconSelectorOpen?.type === 'category' && iconSelectorOpen?.id === category.id 
+                                                ? 'text-orange-500' 
+                                                : 'text-stone-400 hover:text-stone-700'
+                                        }`}
+                                        title="选择图标"
+                                    >
+                                        <Palette size={16} />
+                                    </button>
+                                )}
                                 <button onClick={() => moveCategory(catIndex, 'up')} disabled={catIndex === 0} className="p-1 text-stone-300 hover:text-stone-600 disabled:opacity-30">
                                     <ArrowUp size={16} />
                                 </button>
@@ -215,39 +294,78 @@ export const BatchManageView: React.FC<BatchManageViewProps> = ({ onBack, catego
                             </div>
                         </div>
 
+                        {/* Icon Selector Dropdown for Category */}
+                        {isCustomIconEnabled && iconSelectorOpen?.type === 'category' && iconSelectorOpen?.id === category.id && (
+                            <div className="p-4 border-b border-stone-100 bg-stone-50/30">
+                                <UIIconSelectorCompact
+                                    currentIcon={category.icon}
+                                    onSelect={(iconString) => handleCategoryIconSelect(category.id, iconString)}
+                                />
+                            </div>
+                        )}
+
                         {/* Activities List */}
                         {expandedCats.has(category.id) && (
                             <div className="p-2 space-y-1">
                                 {category.activities.map((activity, actIndex) => (
-                                    <div
-                                        key={activity.id}
-                                        draggable
-                                        onDragStart={(e) => handleDragStart(e, activity, category.id)}
-                                        className="flex items-center gap-3 p-2 bg-white border border-stone-100 rounded-xl hover:border-stone-300 group cursor-move active:shadow-lg active:scale-[1.02] transition-all"
-                                    >
-                                        <GripVertical size={14} className="text-stone-300 shrink-0" />
+                                    <div key={activity.id}>
+                                        <div
+                                            draggable
+                                            onDragStart={(e) => handleDragStart(e, activity, category.id)}
+                                            className="flex items-center gap-3 p-2 bg-white border border-stone-100 rounded-xl hover:border-stone-300 group cursor-move active:shadow-lg active:scale-[1.02] transition-all"
+                                        >
+                                            <GripVertical size={14} className="text-stone-300 shrink-0" />
 
-                                        {/* Combined Input for Icon + Name */}
-                                        <div className="flex-1 flex items-center gap-2 min-w-0">
-                                            <input
-                                                className="w-full bg-transparent outline-none text-sm font-medium text-stone-700 min-w-0"
-                                                value={`${activity.icon}${activity.name}`}
-                                                onChange={(e) => handleNameChange(category.id, activity.id, e.target.value)}
-                                            />
+                                            {/* Combined Input for Icon + Name */}
+                                            <div className="flex-1 flex items-center gap-2 min-w-0">
+                                                <input
+                                                    className="w-full bg-transparent outline-none text-sm font-medium text-stone-700 min-w-0"
+                                                    value={`${activity.icon}${activity.name}`}
+                                                    onChange={(e) => handleNameChange(category.id, activity.id, e.target.value)}
+                                                />
+                                            </div>
+
+                                            {/* Activity Actions */}
+                                            <div className="flex items-center gap-1 shrink-0">
+                                                {/* Icon Selector Button for Activity - Only show if custom icons are enabled */}
+                                                {isCustomIconEnabled && (
+                                                    <button 
+                                                        onClick={() => setIconSelectorOpen(
+                                                            iconSelectorOpen?.type === 'activity' && iconSelectorOpen?.id === activity.id 
+                                                                ? null 
+                                                                : { type: 'activity', id: activity.id }
+                                                        )} 
+                                                        className={`p-1 transition-colors ${
+                                                            iconSelectorOpen?.type === 'activity' && iconSelectorOpen?.id === activity.id 
+                                                                ? 'text-orange-500' 
+                                                                : 'text-stone-300 hover:text-stone-600'
+                                                        }`}
+                                                        title="选择图标"
+                                                    >
+                                                        <Palette size={14} />
+                                                    </button>
+                                                )}
+                                                <button onClick={() => moveActivity(catIndex, actIndex, 'up')} disabled={actIndex === 0} className="p-1 text-stone-300 hover:text-stone-600 disabled:opacity-30">
+                                                    <ArrowUp size={14} />
+                                                </button>
+                                                <button onClick={() => moveActivity(catIndex, actIndex, 'down')} disabled={actIndex === category.activities.length - 1} className="p-1 text-stone-300 hover:text-stone-600 disabled:opacity-30">
+                                                    <ArrowDown size={14} />
+                                                </button>
+                                                <button onClick={() => handleDeleteActivity(category.id, activity.id)} className="p-1 text-stone-200 hover:text-red-400">
+                                                    <Trash2 size={14} />
+                                                </button>
+                                            </div>
                                         </div>
 
-                                        {/* Activity Actions */}
-                                        <div className="flex items-center gap-1 shrink-0">
-                                            <button onClick={() => moveActivity(catIndex, actIndex, 'up')} disabled={actIndex === 0} className="p-1 text-stone-300 hover:text-stone-600 disabled:opacity-30">
-                                                <ArrowUp size={14} />
-                                            </button>
-                                            <button onClick={() => moveActivity(catIndex, actIndex, 'down')} disabled={actIndex === category.activities.length - 1} className="p-1 text-stone-300 hover:text-stone-600 disabled:opacity-30">
-                                                <ArrowDown size={14} />
-                                            </button>
-                                            <button onClick={() => handleDeleteActivity(category.id, activity.id)} className="p-1 text-stone-200 hover:text-red-400">
-                                                <Trash2 size={14} />
-                                            </button>
-                                        </div>
+                                        {/* Icon Selector Dropdown for Activity */}
+                                        {isCustomIconEnabled && iconSelectorOpen?.type === 'activity' && iconSelectorOpen?.id === activity.id && (
+                                            <div className="p-3 mt-1 bg-stone-50/50 rounded-xl border border-stone-100">
+                                                <UIIconSelectorCompact
+                                                    currentIcon={activity.icon}
+                                                    onSelect={(iconString) => handleActivityIconSelect(category.id, activity.id, iconString)}
+                                                />
+                                            </div>
+                                        )}
                                     </div>
                                 ))}
                                 {category.activities.length === 0 && (

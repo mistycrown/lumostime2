@@ -9,6 +9,7 @@
  */
 import React from 'react';
 import { Category } from '../types';
+import { IconRenderer } from './IconRenderer';
 
 interface TagAssociationProps {
     categories: Category[];
@@ -49,7 +50,7 @@ export const TagAssociation: React.FC<TagAssociationProps> = ({
                                 : 'bg-stone-50 text-stone-500 border border-stone-100 hover:bg-stone-100'}
                         `}
                     >
-                        <span>{cat.icon}</span>
+                        <IconRenderer icon={cat.icon} className="text-xs" />
                         <span className="truncate">{cat.name}</span>
                     </button>
                 ))}
@@ -75,7 +76,7 @@ export const TagAssociation: React.FC<TagAssociationProps> = ({
                                     transform: 'scale(1.1)'
                                 } : {}}
                             >
-                                {act.icon}
+                                <IconRenderer icon={act.icon} className="text-xl" />
                             </div>
                             <span className={`text-xs text-center font-medium leading-tight ${isActive ? 'text-stone-900 font-bold' : 'text-stone-400'}`}>
                                 {act.name}

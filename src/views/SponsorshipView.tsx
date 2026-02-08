@@ -22,6 +22,120 @@ interface SponsorshipViewProps {
     categories: Category[];
 }
 
+// 方案预设数据结构
+interface ThemePreset {
+    id: string;
+    name: string;
+    description: string;
+    icon: string;
+    appIcon: string;
+    uiTheme: string;
+    colorScheme: string;
+    background: string;
+    navigation: string;
+    timePal: string;
+}
+
+// 测试方案数据
+const THEME_PRESETS: ThemePreset[] = [
+    {
+        id: 'default',
+        name: '默认',
+        description: '系统默认配置',
+        icon: '⚙️',
+        appIcon: 'icon_simple',
+        uiTheme: 'default',
+        colorScheme: 'default',
+        background: 'none',
+        navigation: 'none',
+        timePal: 'default'
+    },
+    {
+        id: 'purple-dream',
+        name: '紫色梦境',
+        description: '优雅的紫色主题',
+        icon: '💜',
+        appIcon: 'icon_uvcd',
+        uiTheme: 'purple',
+        colorScheme: 'morandi-purple',
+        background: 'purple',
+        navigation: 'purple',
+        timePal: 'prince'
+    },
+    {
+        id: 'forest-zen',
+        name: '森林禅意',
+        description: '清新自然的绿色主题',
+        icon: '🌿',
+        appIcon: 'icon_plant',
+        uiTheme: 'forest',
+        colorScheme: 'morandi-green',
+        background: 'green',
+        navigation: 'forest',
+        timePal: 'rabbit'
+    },
+    {
+        id: 'ocean-blue',
+        name: '海洋蓝调',
+        description: '宁静的蓝色主题',
+        icon: '🌊',
+        appIcon: 'icon_sea',
+        uiTheme: 'color',
+        colorScheme: 'morandi-blue',
+        background: 'sea',
+        navigation: 'sea',
+        timePal: 'cat'
+    },
+    {
+        id: 'sakura-pink',
+        name: '樱花粉',
+        description: '温柔的粉色主题',
+        icon: '🌸',
+        appIcon: 'icon_heart',
+        uiTheme: 'cat',
+        colorScheme: 'morandi-pink',
+        background: 'pink',
+        navigation: 'pink',
+        timePal: 'girl'
+    },
+    {
+        id: 'sunset-orange',
+        name: '日落橙',
+        description: '温暖的橙色主题',
+        icon: '🌅',
+        appIcon: 'icon_bijiaso',
+        uiTheme: 'color2',
+        colorScheme: 'morandi-orange',
+        background: 'red',
+        navigation: 'orange',
+        timePal: 'dog'
+    },
+    {
+        id: 'minimal-gray',
+        name: '极简灰',
+        description: '简约的灰色主题',
+        icon: '⚪',
+        appIcon: 'icon_sketch',
+        uiTheme: 'default',
+        colorScheme: 'morandi-gray',
+        background: 'none',
+        navigation: 'minimal',
+        timePal: 'default'
+    },
+    {
+        id: 'golden-hour',
+        name: '黄金时刻',
+        description: '温馨的金色主题',
+        icon: '✨',
+        appIcon: 'icon_cdqm',
+        uiTheme: 'plant',
+        colorScheme: 'morandi-yellow',
+        background: 'bank',
+        navigation: 'gold',
+        timePal: 'panda'
+    }
+];
+
 // 时光小友设置卡片组件
 const TimePalSettingsCard: React.FC<{ categories: Category[] }> = ({ categories }) => {
     // 当前选择的小动物类型
@@ -324,8 +438,8 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
     const { uiIconTheme, setUiIconTheme, colorScheme, setColorScheme } = useSettings();
     
     // Tab 页状态
-    type TabType = 'icon' | 'colorScheme' | 'background' | 'navigation' | 'timepal';
-    const [activeTab, setActiveTab] = useState<TabType>('icon');
+    type TabType = 'preset' | 'icon' | 'colorScheme' | 'background' | 'navigation' | 'timepal';
+    const [activeTab, setActiveTab] = useState<TabType>('preset');
 
     // 处理 UI 图标主题切换，并触发图标迁移
     const handleUiIconThemeChange = async (newTheme: string) => {
@@ -639,7 +753,7 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
 
                         {/* Tab 导航 - 简洁风格 */}
                         <div className="flex gap-6 border-b border-stone-200 overflow-x-auto scrollbar-hide">
-                            {(['icon', 'colorScheme', 'background', 'navigation', 'timepal'] as TabType[]).map(tab => (
+                            {(['preset', 'icon', 'colorScheme', 'background', 'navigation', 'timepal'] as TabType[]).map(tab => (
                                 <button
                                     key={tab}
                                     onClick={() => setActiveTab(tab)}
@@ -650,6 +764,7 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
                                     }`}
                                 >
                                     {{ 
+                                        'preset': '方案',
                                         'icon': 'Icon', 
                                         'colorScheme': '配色',
                                         'background': '背景', 
@@ -662,6 +777,82 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
 
                         {/* Tab 内容 - 直接渲染在背景上 */}
                         <div className="animate-in fade-in duration-300 pb-20">
+                            {activeTab === 'preset' && (
+                                /* 方案预设 */
+                                <div className="space-y-4">
+                                    <div className="text-center mb-6">
+                                        <h4 className="text-sm font-medium text-stone-600 mb-1">主题方案</h4>
+                                        <p className="text-xs text-stone-400">一键应用完整的主题配置</p>
+                                    </div>
+
+                                    {/* 方案网格 - 使用卡片式布局 */}
+                                    <div className="space-y-3">
+                                        {THEME_PRESETS.map((preset) => {
+                                            const isSelected = false; // TODO: 实现选中状态
+                                            
+                                            return (
+                                                <button
+                                                    key={preset.id}
+                                                    onClick={() => {
+                                                        // TODO: 实现方案应用逻辑
+                                                        onToast('info', `方案"${preset.name}"功能开发中...`);
+                                                    }}
+                                                    className={`w-full rounded-2xl border-2 transition-all overflow-hidden text-left ${
+                                                        isSelected
+                                                            ? 'border-stone-400 ring-2 ring-stone-200 bg-white'
+                                                            : 'border-stone-200 hover:border-stone-300 bg-white hover:bg-stone-50'
+                                                    }`}
+                                                >
+                                                    <div className="p-4 flex items-center gap-4">
+                                                        {/* 图标区域 */}
+                                                        <div className="w-16 h-16 rounded-xl bg-gradient-to-br from-stone-50 to-stone-100 flex items-center justify-center shrink-0">
+                                                            <span className="text-3xl">{preset.icon}</span>
+                                                        </div>
+                                                        
+                                                        {/* 方案信息 */}
+                                                        <div className="flex-1 min-w-0">
+                                                            <div className="flex items-center gap-2 mb-1">
+                                                                <h5 className="text-base font-bold text-stone-800">
+                                                                    {preset.name}
+                                                                </h5>
+                                                                {isSelected && (
+                                                                    <div className="w-5 h-5 bg-stone-800 rounded-full flex items-center justify-center">
+                                                                        <Check size={12} className="text-white" />
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                            <p className="text-xs text-stone-500 mb-2">
+                                                                {preset.description}
+                                                            </p>
+                                                            
+                                                            {/* 配置标签 */}
+                                                            <div className="flex flex-wrap gap-1">
+                                                                <span className="px-2 py-0.5 bg-stone-100 text-[10px] text-stone-600 rounded">
+                                                                    {preset.colorScheme}
+                                                                </span>
+                                                                <span className="px-2 py-0.5 bg-stone-100 text-[10px] text-stone-600 rounded">
+                                                                    {preset.uiTheme}
+                                                                </span>
+                                                                <span className="px-2 py-0.5 bg-stone-100 text-[10px] text-stone-600 rounded">
+                                                                    {preset.timePal}
+                                                                </span>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
+
+                                    {/* 提示信息 */}
+                                    <div className="mt-6 p-4 bg-amber-50 border border-amber-200 rounded-xl">
+                                        <p className="text-xs text-amber-800 text-center">
+                                            💡 方案功能开发中，点击方案可预览效果
+                                        </p>
+                                    </div>
+                                </div>
+                            )}
+
                             {activeTab === 'icon' && (
                                 /* Icon - 包含应用图标和UI主题 */
                                 <div className="space-y-8">
