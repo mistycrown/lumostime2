@@ -520,11 +520,11 @@ export const ScopeDetailView: React.FC<ScopeDetailViewProps> = ({
                                     {/* Category Tag */}
                                     <span className="text-[10px] font-medium text-stone-500 border border-stone-200 px-2 py-0.5 rounded flex items-center gap-1 bg-stone-50/30">
                                         <span className="font-bold text-stone-400">#</span>
-                                        <IconRenderer icon={category?.icon || ''} className="text-xs" />
+                                        <IconRenderer icon={category?.icon || ''} uiIcon={category?.uiIcon} className="text-xs" />
                                         <span className="flex items-center">
                                             <span>{category?.name}</span>
                                             <span className="mx-1 text-stone-300">/</span>
-                                            <IconRenderer icon={activity?.icon || ''} className="text-xs mr-1" />
+                                            <IconRenderer icon={activity?.icon || ''} uiIcon={activity?.uiIcon} className="text-xs mr-1" />
                                             <span className="text-stone-500">{activity?.name}</span>
                                         </span>
                                     </span>
@@ -559,7 +559,7 @@ export const ScopeDetailView: React.FC<ScopeDetailViewProps> = ({
                                             return (
                                                 <span key={scopeId} className="text-[10px] font-medium text-stone-500 border border-stone-200 px-2 py-0.5 rounded flex items-center gap-1 bg-stone-50/30">
                                                     <span className="text-stone-400 font-bold">%</span>
-                                                    <IconRenderer icon={scope.icon || '📍'} className="text-xs" />
+                                                    <IconRenderer icon={scope.icon || '📍'} uiIcon={scope.uiIcon} className="text-xs" />
                                                     <span>{scope.name}</span>
                                                 </span>
                                             );
@@ -685,7 +685,11 @@ export const ScopeDetailView: React.FC<ScopeDetailViewProps> = ({
             <div className="mb-6">
                 <h1 className="text-2xl font-bold text-stone-900 flex items-center gap-3">
                     <span className="text-stone-300 font-normal">%</span>
-                    {scope.icon && <IconRenderer icon={scope.icon} className="text-2xl" />}
+                    {scope.icon && <IconRenderer 
+                        icon={scope.icon} 
+                        uiIcon={scope.uiIcon}
+                        className="text-2xl" 
+                    />}
                     {scope.name}
                 </h1>
                 {scope.description && (

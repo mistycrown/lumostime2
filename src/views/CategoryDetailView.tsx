@@ -448,7 +448,11 @@ export const CategoryDetailView: React.FC<CategoryDetailViewProps> = ({ category
             <div className="mb-6">
                 <h1 className="text-3xl font-bold text-stone-900 flex items-center gap-3">
                     <span className="text-stone-300 font-normal">#</span>
-                    {category.icon && <IconRenderer icon={category.icon} className="text-2xl" />}
+                    {category.icon && <IconRenderer 
+                        icon={category.icon} 
+                        uiIcon={category.uiIcon}
+                        className="text-2xl" 
+                    />}
                     {category.name}
                 </h1>
                 <span className="text-stone-400 text-sm font-medium ml-1 mt-1 block">Category</span>

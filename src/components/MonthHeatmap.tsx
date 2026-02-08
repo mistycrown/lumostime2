@@ -247,7 +247,11 @@ export const MonthHeatmap: React.FC<MonthHeatmapProps> = ({ logs, categories, mo
                                     style={{ backgroundColor: getScheduleColor(activity.color) }}
                                 />
                                 <span className="text-[10px] text-stone-600 whitespace-nowrap flex items-center gap-0.5">
-                                    <IconRenderer icon={activity.icon} size={10} />
+                                    <IconRenderer 
+                                        icon={activity.icon} 
+                                        uiIcon={activity.uiIcon}
+                                        size={10} 
+                                    />
                                     <span>{activity.name}</span>
                                 </span>
                             </div>

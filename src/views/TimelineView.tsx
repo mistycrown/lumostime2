@@ -469,11 +469,16 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ logs, todos, scopes,
                     activity,
                     categoryName: category?.name || (currentLog.categoryId === 'uncategorized' ? '未分类' : 'Unknown'),
                     categoryIcon: category?.icon || (currentLog.categoryId === 'uncategorized' ? '⏱️' : '?'),
+                    categoryUiIcon: category?.uiIcon,
                     categoryColor: category?.themeColor || '#a8a29e', // Stone-400 fallback
                     linkedTodoTitle: linkedTodo?.title,
                     linkedTodo: linkedTodo, // 传递完整的待办对象
                     linkedScopeData: linkedScopes.length > 0
-                        ? linkedScopes.map(s => ({ icon: s.icon || '📍', name: s.name }))
+                        ? linkedScopes.map(s => ({ 
+                            icon: s.icon || '📍', 
+                            uiIcon: s.uiIcon,
+                            name: s.name 
+                        }))
                         : undefined
                 }
             });
@@ -837,11 +842,19 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ logs, todos, scopes,
                                             {/* Category Tag */}
                                             <span className="text-[10px] font-medium text-stone-500 border border-stone-200 px-2 py-0.5 rounded flex items-center gap-1 bg-stone-50/30">
                                                 <span style={{ color: item.logData.categoryColor }} className="font-bold">#</span>
-                                                <IconRenderer icon={item.logData.categoryIcon || ''} className="text-xs" />
+                                                <IconRenderer 
+                                                    icon={item.logData.categoryIcon || ''} 
+                                                    uiIcon={item.logData.categoryUiIcon}
+                                                    className="text-xs" 
+                                                />
                                                 <span className="flex items-center">
                                                     <span>{item.logData.categoryName}</span>
                                                     <span className="mx-1 text-stone-300">/</span>
-                                                    <IconRenderer icon={item.logData.activity?.icon || ''} className="text-xs mr-1" />
+                                                    <IconRenderer 
+                                                        icon={item.logData.activity?.icon || ''} 
+                                                        uiIcon={item.logData.activity?.uiIcon}
+                                                        className="text-xs mr-1" 
+                                                    />
                                                     <span className="text-stone-500">{item.logData.activity?.name}</span>
                                                 </span>
                                             </span>
@@ -852,7 +865,11 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ logs, todos, scopes,
                                                     {item.logData.linkedScopeData.map((scopeData, idx) => (
                                                         <span key={idx} className="text-[10px] font-medium text-stone-500 border border-stone-200 px-2 py-0.5 rounded flex items-center gap-1 bg-stone-50/30">
                                                             <span className="text-stone-400 font-bold">%</span>
-                                                            <IconRenderer icon={scopeData.icon} className="text-xs" />
+                                                            <IconRenderer 
+                                                                icon={scopeData.icon} 
+                                                                uiIcon={scopeData.uiIcon}
+                                                                className="text-xs" 
+                                                            />
                                                             <span>{scopeData.name}</span>
                                                         </span>
                                                     ))}

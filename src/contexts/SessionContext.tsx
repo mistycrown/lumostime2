@@ -84,6 +84,7 @@ export const SessionProvider: React.FC<SessionProviderProps> = ({ children, spli
             categoryId: categoryId,
             activityName: activity.name,
             activityIcon: activity.icon,
+            activityUiIcon: activity.uiIcon,
             startTime: Date.now(),
             linkedTodoId: todoId,
             scopeIds: appliedScopeIds,

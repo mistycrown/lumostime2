@@ -960,7 +960,11 @@ export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialSta
                         onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'white'}
                       >
                         <span className="opacity-70 text-[10px] mr-0.5">[{scope.reason}]</span>
-                        <IconRenderer icon={scope.icon} className="text-xs" />
+                        <IconRenderer 
+                            icon={scope.icon} 
+                            uiIcon={scope.uiIcon}
+                            className="text-xs" 
+                        />
                         <span>{scope.name}</span>
                         <CheckCircle2 size={12} />
                       </button>

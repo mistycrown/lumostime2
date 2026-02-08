@@ -3,25 +3,44 @@
  * @description 图标工具函数 - 处理 emoji 和 uiIcon 的获取和设置
  */
 
+import { uiIconService } from '../services/uiIconService';
+
 /**
  * 获取当前应该显示的图标
- * @param emoji - emoji 字符（默认主题使用）
+ * @param icon - icon 字段（可能是 emoji 或 ui:iconType 格式）
  * @param uiIcon - UI 图标 ID（自定义主题使用）
  * @param currentTheme - 当前 UI 主题
  * @returns 应该显示的图标
  */
 export function getDisplayIcon(
-  emoji: string,
+  icon: string,
   uiIcon: string | undefined,
   currentTheme: string
 ): string {
-  // 如果是默认主题，返回 emoji
+  // 如果是默认主题
   if (currentTheme === 'default') {
-    return emoji;
+    // 如果 icon 是 ui: 格式，尝试转换回 emoji
+    if (icon.startsWith('ui:')) {
+      // 尝试从 uiIconService 转换回 emoji
+      const emoji = uiIconService.convertUIIconToEmoji(icon);
+      return emoji;
+    }
+    // 否则直接返回 icon（应该是 emoji）
+    return icon;
   }
   
-  // 如果是自定义主题，优先返回 uiIcon，如果没有则返回 emoji
-  return uiIcon || emoji;
+  // 如果是自定义主题，优先返回 uiIcon
+  if (uiIcon) {
+    return uiIcon;
+  }
+  
+  // 如果没有 uiIcon，检查 icon 是否已经是 ui: 格式
+  if (icon.startsWith('ui:')) {
+    return icon;
+  }
+  
+  // 否则返回 icon（emoji）
+  return icon;
 }
 
 /**

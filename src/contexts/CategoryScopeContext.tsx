@@ -100,7 +100,8 @@ export const CategoryScopeProvider: React.FC<CategoryScopeProviderProps> = ({
                 return {
                     ...session,
                     activityName: activity.name,
-                    activityIcon: activity.icon
+                    activityIcon: activity.icon,
+                    activityUiIcon: activity.uiIcon
                 };
             }
             return session;
@@ -121,7 +122,8 @@ export const CategoryScopeProvider: React.FC<CategoryScopeProviderProps> = ({
                 return {
                     ...session,
                     activityName: activity.name,
-                    activityIcon: activity.icon
+                    activityIcon: activity.icon,
+                    activityUiIcon: activity.uiIcon
                 };
             }
             return session;

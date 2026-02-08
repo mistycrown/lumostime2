@@ -104,7 +104,11 @@ export const ScopeView: React.FC<ScopeViewProps> = ({
                                 >
                                     {/* Left: Icon + Title + Description */}
                                     <div className="flex items-center gap-3 flex-1 min-w-0">
-                                        <IconRenderer icon={scope.icon} className="text-2xl flex-shrink-0" />
+                                        <IconRenderer 
+                                            icon={scope.icon} 
+                                            uiIcon={scope.uiIcon}
+                                            className="text-2xl flex-shrink-0" 
+                                        />
                                         <div className="flex-1 min-w-0">
                                             <h3 className="text-base font-bold text-stone-900 truncate">
                                                 {scope.name}

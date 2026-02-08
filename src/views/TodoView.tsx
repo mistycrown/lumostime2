@@ -99,7 +99,14 @@ const SwipeableTodoItem: React.FC<{
     if (!todo.linkedCategoryId || !todo.linkedActivityId) return null;
     const cat = activityCategories.find(c => c.id === todo.linkedCategoryId);
     const act = cat?.activities.find(a => a.id === todo.linkedActivityId);
-    return act && cat ? { categoryName: cat.name, categoryIcon: cat.icon, activityName: act.name, activityIcon: act.icon } : null;
+    return act && cat ? { 
+      categoryName: cat.name, 
+      categoryIcon: cat.icon, 
+      categoryUiIcon: cat.uiIcon,
+      activityName: act.name, 
+      activityIcon: act.icon,
+      activityUiIcon: act.uiIcon
+    } : null;
   })();
 
   const linkedScopes = (!todo.defaultScopeIds || todo.defaultScopeIds.length === 0)
@@ -207,21 +214,25 @@ const SwipeableTodoItem: React.FC<{
                 <span className="text-stone-300 font-sans">#</span>
                 {viewMode === 'loose' ? (
                   <>
-                    <IconRenderer icon={linkedDetails.categoryIcon} className="text-xs" />
+                    <IconRenderer icon={linkedDetails.categoryIcon} uiIcon={linkedDetails.categoryUiIcon} className="text-xs" />
                     <span className="opacity-90">{linkedDetails.categoryName}</span>
                     <span className="text-stone-300 px-0.5">/</span>
-                    <IconRenderer icon={linkedDetails.activityIcon} className="text-xs" />
+                    <IconRenderer icon={linkedDetails.activityIcon} uiIcon={linkedDetails.activityUiIcon} className="text-xs" />
                     <span className="opacity-90">{linkedDetails.activityName}</span>
                   </>
                 ) : (
-                  <IconRenderer icon={linkedDetails.activityIcon} className="text-xs" />
+                  <IconRenderer icon={linkedDetails.activityIcon} uiIcon={linkedDetails.activityUiIcon} className="text-xs" />
                 )}
               </span>
             )}
             {linkedScopes.map((scope, idx) => (
               <span key={idx} className={`text-[11px] text-stone-500 font-medium flex items-center gap-1 ${viewMode === 'compact' ? 'px-0 border-0 bg-transparent' : 'px-1.5 py-0.5 rounded-md border border-stone-200 bg-white/50'}`}>
                 <span className="text-stone-300 font-sans">%</span>
-                <IconRenderer icon={scope.icon} className="text-xs" />
+                <IconRenderer 
+                    icon={scope.icon} 
+                    uiIcon={scope.uiIcon}
+                    className="text-xs" 
+                />
                 {/* Show Scope Name only in Loose Mode */}
                 {viewMode === 'loose' && <span className="opacity-90 ml-0.5">{scope.name}</span>}
               </span>
@@ -452,7 +463,11 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, categories, activityC
                 {isSelected && (
                   <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-5 rounded-r-full" style={{ backgroundColor: 'var(--accent-color)' }}></div>
                 )}
-                <IconRenderer icon={category.icon} className={`text-xl ${isSelected ? 'opacity-100' : 'opacity-100'}`} />
+                <IconRenderer 
+                  icon={category.icon} 
+                  uiIcon={category.uiIcon}
+                  className={`text-xl ${isSelected ? 'opacity-100' : 'opacity-100'}`} 
+                />
                 {isSidebarOpen && (
                   <span className={`text-sm md:text-base whitespace-nowrap transition-all ${isSelected ? 'font-bold' : 'font-medium'}`}>
                     {category.name}

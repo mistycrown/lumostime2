@@ -301,41 +301,47 @@ export const DEFAULT_EMOJI_TO_ICON_MAP: Record<string, UIIconType> = {
     '🪞': 'self',           // 与自己
     '🤝': 'handshake',      // 与他人
     '🧭': 'explore',        // 探索世界
-    '�': 'art',            // 爱欲再生产
+    '🎡': 'art',            // 爱欲再生产
     
     // Activities (标签)
     '🚇': 'commute',        // 通勤
-    '�': 'meal',           // 饮食
+    '🍱': 'meal',           // 饮食
     '🧹': 'housework',      // 家务
-    '�': 'hygiene',        // 洗护
-    '�': 'shopping',       // 购物
+    '🚿': 'hygiene',        // 洗护
+    '🛒': 'shopping',       // 购物
     '🧾': 'chores',         // 杂务
-    '�': 'sleep',          // 睡觉
+    '🛌': 'sleep',          // 睡觉
     '🔋': 'nap',            // 小憩
-    '�': 'meeting',        // 上课开会
+    '🏫': 'meeting',        // 上课开会
     '💻': 'laptop',         // 网课自学
     '📖': 'book',           // 书籍文献
     '👾': 'code',           // 代码编程
     '✒️': 'thesis',         // 论文写作
+    '✒': 'thesis',          // 论文写作 (无变体选择器)
     '🧠': 'think',          // 日记复盘
-    '�️': 'folder',        // 整理收集
+    '🗂️': 'folder',        // 整理收集
+    '🗂': 'folder',         // 整理收集 (无变体选择器)
     '⚙️': 'settings',       // 工具开发
+    '⚙': 'settings',        // 工具开发 (无变体选择器)
     '🏃': 'workout',        // 运动健身
-    '�': 'money',          // 兼职工作
-    '�️': 'social',        // 社会织网
-    '�': 'design',         // 设计
+    '💰': 'money',          // 兼职工作
+    '🕸️': 'social',        // 社会织网
+    '🕸': 'social',         // 社会织网 (无变体选择器)
+    '🎨': 'design',         // 设计
     '🎵': 'music',          // 音乐
     '🧶': 'craft',          // 手工
-    '�️': 'brush',         // 书法
-    '�': 'chat',           // 闲聊瞎扯
-    '�': 'surf',           // 网上冲浪
+    '🖌️': 'brush',         // 书法
+    '🖌': 'brush',          // 书法 (无变体选择器)
+    '🍵': 'chat',           // 闲聊瞎扯
+    '🏄': 'surf',           // 网上冲浪
     '🍿': 'watch',          // 看文看剧
     '🎮': 'game',           // 玩玩游戏
-    '�': 'mystery',        // 不可名状
+    '🔮': 'mystery',        // 不可名状
     
     // Scopes (领域)
-    '�': 'phd',            // 专业输入
+    '🚩': 'phd',            // 专业输入
     '🏛️': 'phd',           // 博士课题
+    '🏛': 'phd',            // 博士课题 (无变体选择器)
     '🦉': 'wisdom',         // 博雅通识
     '⚡️': 'ai',            // AI玩具
     '⚡': 'ai',             // AI玩具 (无变体选择器)
@@ -345,11 +351,11 @@ export const DEFAULT_EMOJI_TO_ICON_MAP: Record<string, UIIconType> = {
     
     // CheckTemplates (日课模板)
     '💧': 'water',          // 早起喝水
-    '�️': 'sleep',         // 整理床铺
-    '�': 'sleep',          // 整理床铺 (无变体选择器)
+    '🛏️': 'sleep',         // 整理床铺
+    '🛏': 'sleep',          // 整理床铺 (无变体选择器)
     '💊': 'medical',        // 吃维生素
     '🧘': 'meditation',     // 冥想
-    '�': 'shopping',       // 准备明天衣物
+    '👔': 'shopping',       // 准备明天衣物
 };
 
 /**
