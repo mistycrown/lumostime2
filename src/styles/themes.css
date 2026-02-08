@@ -51,6 +51,9 @@
   /* 强调色 */
   --accent-color: #1c1917;
   --accent-hover: #292524;
+  
+  /* 深色文字 */
+  --text-deep: #1c1917;
 }
 
 /* ==================== 莫兰迪紫配色 ==================== */
@@ -101,6 +104,9 @@
   /* 强调色 */
   --accent-color: #8b6fa8;
   --accent-hover: #7d6693;
+  
+  /* 深色文字 */
+  --text-deep: #5a4a6b;
 }
 
 /* ==================== 莫兰迪蓝配色 ==================== */
@@ -150,6 +156,9 @@
   /* 强调色 */
   --accent-color: #6b8ca8;
   --accent-hover: #5d7a93;
+  
+  /* 深色文字 */
+  --text-deep: #4a6578;
 }
 
 /* ==================== 莫兰迪绿配色 ==================== */
@@ -199,6 +208,9 @@
   /* 强调色 */
   --accent-color: #7a9176;
   --accent-hover: #6a7d66;
+  
+  /* 深色文字 */
+  --text-deep: #556b52;
 }
 
 /* ==================== 莫兰迪粉配色 ==================== */
@@ -248,6 +260,9 @@
   /* 强调色 */
   --accent-color: #b88595;
   --accent-hover: #a17383;
+  
+  /* 深色文字 */
+  --text-deep: #8a6370;
 }
 
 /* ==================== 通用样式类 ==================== */
@@ -422,13 +437,47 @@
   transform: scale(0.95);
 }
 
+/* ==================== 按钮样式模板 ==================== */
+
+/* 模板一：浅色填充背景，无边框，主题色内容 
+ * 对应原 theme-icon-button 样式
+ */
+.btn-template-filled {
+  background-color: var(--icon-button-bg);
+  color: var(--icon-button-icon);
+  transition: all 0.2s;
+}
+
+.btn-template-filled:hover {
+  background-color: var(--icon-button-hover-bg);
+}
+
+.btn-template-filled:active {
+  transform: scale(0.95);
+}
+
+/* 模板二：白色背景，浅色主题色细描边，主题色内容
+ * 对应原 floating-button 样式
+ */
+.btn-template-outlined {
+  background-color: var(--floating-button-bg);
+  color: var(--floating-button-icon);
+  border: 0.5px solid var(--floating-button-border);
+  box-shadow: var(--floating-button-shadow);
+  transition: all 0.2s;
+}
+
+.btn-template-outlined:active {
+  transform: scale(0.95);
+}
+
 /* 进度条 */
 .progress-bar {
-  height: 0.375rem;
+  height: 4px;
   width: 100%;
   border-radius: 9999px;
   overflow: hidden;
-  background-color: var(--progress-bar-bg);
+  background-color: #f5f5f4;
 }
 
 .progress-bar-fill {

@@ -53,11 +53,10 @@ export const ScopeAssociation: React.FC<ScopeAssociationProps> = ({ scopes, sele
                         <button
                             key={scope.id}
                             onClick={() => handleToggle(scope.id)}
-                            className={`px-2 py-2 rounded-lg text-[10px] font-medium text-center border transition-colors flex items-center justify-center gap-1.5 truncate ${isSelected
-                                ? 'bg-stone-50 text-stone-500'
-                                : 'bg-stone-50 text-stone-500 border-stone-100 hover:bg-stone-100'
+                            className={`px-2 py-2 rounded-lg text-[10px] font-medium text-center transition-colors flex items-center justify-center gap-1.5 truncate ${isSelected
+                                ? 'btn-template-filled'
+                                : 'bg-stone-50 text-stone-500 border border-stone-100 hover:bg-stone-100'
                                 }`}
-                            style={isSelected ? { borderColor: 'var(--accent-color)' } : {}}
                         >
                             <span>{scope.icon || '📍'}</span>
                             <span className="truncate">{scope.name}</span>

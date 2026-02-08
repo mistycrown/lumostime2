@@ -24,11 +24,10 @@ export const FocusScoreSelector: React.FC<FocusScoreSelectorProps> = ({ value, o
                     <button
                         key={score}
                         onClick={() => onChange(score === value ? undefined : score)} // Allow toggle off if clicking same
-                        className={`w-10 h-10 rounded-full flex items-center justify-center transition-all border ${(value || 0) >= score
-                            ? 'bg-transparent border-stone-300 scale-110' // Selected: Outline
-                            : 'bg-transparent border-stone-100 text-stone-200 hover:border-stone-200' // Unselected: Faint
+                        className={`w-10 h-10 rounded-full flex items-center justify-center transition-all ${(value || 0) >= score
+                            ? 'btn-template-filled scale-110' // Selected: Use template 1
+                            : 'bg-transparent border border-stone-100 text-stone-200 hover:border-stone-200' // Unselected: Faint
                             }`}
-                        style={(value || 0) >= score ? { color: 'var(--accent-color)' } : {}}
                         title={`Focus Level ${score}`}
                     >
                         <Zap size={18} fill={(value || 0) >= score ? "currentColor" : "none"} />

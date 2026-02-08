@@ -35,6 +35,21 @@ export const ReviewHubView: React.FC<ReviewHubViewProps> = ({
     const [isScrolled, setIsScrolled] = React.useState(false);
     const scrollContainerRef = React.useRef<HTMLDivElement>(null);
 
+    // 检测是否使用默认主题
+    const getCardShadow = () => {
+        const accentColor = getComputedStyle(document.documentElement)
+            .getPropertyValue('--accent-color').trim();
+        const isDefaultTheme = accentColor === '#1c1917' || accentColor === 'rgb(28, 25, 23)';
+        
+        if (isDefaultTheme) {
+            // 默认黑色主题：使用更小、更淡的阴影
+            return '0 2px 8px -1px rgba(0, 0, 0, 0.08), 0 4px 16px -2px rgba(0, 0, 0, 0.05)';
+        } else {
+            // 主题色：使用彩色光晕效果
+            return '0 4px 16px -2px color-mix(in srgb, var(--progress-bar-fill) 12%, transparent), 0 12px 32px -4px color-mix(in srgb, var(--progress-bar-fill) 8%, transparent)';
+        }
+    };
+
     // 滚动监听:标题栏缩小效果
     React.useEffect(() => {
         const container = scrollContainerRef.current;
@@ -243,7 +258,7 @@ export const ReviewHubView: React.FC<ReviewHubViewProps> = ({
                         </div>
                     ) : (
                         /* Scroll Container */
-                        <div className="flex overflow-x-auto gap-4 pb-5 -mr-5 pr-5 snap-x snap-mandatory scrollbar-hide">
+                        <div className="flex overflow-x-auto gap-4 pb-5 pt-2 -mr-5 pr-5 snap-x snap-mandatory scrollbar-hide">
                             {sortedMonthlyReviews.map((m) => {
                                 const mDate = new Date(m.monthStartDate);
                                 const monthName = mDate.toLocaleDateString('en-US', { month: 'long' }).toUpperCase();
@@ -254,10 +269,9 @@ export const ReviewHubView: React.FC<ReviewHubViewProps> = ({
                                     <article
                                         key={m.id}
                                         onClick={() => onOpenMonthlyReview(new Date(m.monthStartDate), new Date(m.monthEndDate))}
-                                        className="flex-none w-[90%] snap-center bg-white/80 backdrop-blur-md border rounded-lg p-6 relative shadow-[2px_2px_10px_rgba(0,0,0,0.05)] active:scale-[0.98] transition-transform"
+                                        className="flex-none w-[90%] snap-center bg-white/80 backdrop-blur-md border border-stone-100 rounded-lg p-6 relative active:scale-[0.98] transition-transform"
                                         style={{
-                                            borderColor: 'var(--progress-bar-fill)',
-                                            borderTopWidth: '4px'
+                                            boxShadow: getCardShadow()
                                         }}
                                     >
                                         <div className="mb-4">
@@ -300,7 +314,7 @@ export const ReviewHubView: React.FC<ReviewHubViewProps> = ({
                         </div>
                     ) : (
                         /* Weekly Grid Scroll Container */
-                        <div className="flex overflow-x-auto gap-3 -mr-5 pr-5 pb-5 snap-x snap-mandatory scrollbar-hide">
+                        <div className="flex overflow-x-auto gap-3 -mr-5 pr-5 pb-5 pt-2 snap-x snap-mandatory scrollbar-hide">
                             {sortedWeeklyReviews.map((w, idx) => {
                                 const startDate = new Date(w.weekStartDate);
                                 const endDate = new Date(w.weekEndDate);
@@ -317,15 +331,21 @@ export const ReviewHubView: React.FC<ReviewHubViewProps> = ({
                                 // Format: 2025/12/08-12/14
                                 const dateRangeStr = `${startDate.getFullYear()}/${(startDate.getMonth() + 1).toString().padStart(2, '0')}/${startDate.getDate().toString().padStart(2, '0')}-${(endDate.getMonth() + 1).toString().padStart(2, '0')}/${endDate.getDate().toString().padStart(2, '0')}`;
 
-                                // Check if current week
+                                // Check if current week - 使用日期字符串比较避免时区问题
                                 const now = new Date();
-                                const isCurrentWeek = now.getTime() >= startDate.getTime() && now.getTime() <= endDate.getTime();
+                                const nowDateOnly = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+                                const startDateOnly = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate());
+                                const endDateOnly = new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate());
+                                const isCurrentWeek = nowDateOnly >= startDateOnly && nowDateOnly <= endDateOnly;
 
                                 return (
                                     <div
                                         key={w.id}
                                         onClick={() => onOpenWeeklyReview(new Date(w.weekStartDate), new Date(w.weekEndDate))}
-                                        className="snap-start flex-none w-[calc(50%-6px)] rounded-2xl p-4 h-[140px] flex flex-col justify-between relative overflow-hidden border bg-white/80 backdrop-blur-md text-stone-900 border-stone-200 transition-all active:scale-95"
+                                        className="snap-start flex-none w-[calc(50%-6px)] rounded-2xl p-4 h-[140px] flex flex-col justify-between relative overflow-hidden border border-stone-100 bg-white/80 backdrop-blur-md text-stone-900 transition-all active:scale-95"
+                                        style={{
+                                            boxShadow: getCardShadow()
+                                        }}
                                     >
                                         <div className="flex justify-between items-center">
                                             <span className="font-serif text-lg font-bold">W{weekNum}</span>
@@ -378,17 +398,18 @@ export const ReviewHubView: React.FC<ReviewHubViewProps> = ({
                                         </div>
 
                                         {/* Content Card */}
-                                        <div className="flex-1 min-w-0 rounded-lg p-4 bg-white/80 backdrop-blur-md border border-stone-100 shadow-sm">
+                                        <div 
+                                            className="flex-1 min-w-0 rounded-lg p-4 bg-white/80 backdrop-blur-md border border-stone-100"
+                                            style={{
+                                                boxShadow: getCardShadow()
+                                            }}
+                                        >
                                             <div className="flex justify-between items-start mb-1.5 gap-2">
                                                 <div className="font-serif text-[17px] font-bold leading-snug text-stone-900 flex-1 min-w-0 truncate">
                                                     {title}
                                                 </div>
                                                 <span 
-                                                    className="text-[10px] font-bold uppercase inline-block px-1.5 py-0.5 rounded-sm shrink-0 whitespace-nowrap border text-white"
-                                                    style={{
-                                                        borderColor: 'var(--progress-bar-fill)',
-                                                        backgroundColor: 'var(--progress-bar-fill)'
-                                                    }}
+                                                    className="btn-template-filled text-[10px] font-bold uppercase inline-block px-1.5 py-0.5 rounded-sm shrink-0 whitespace-nowrap"
                                                 >
                                                     {weekdayStr}
                                                 </span>

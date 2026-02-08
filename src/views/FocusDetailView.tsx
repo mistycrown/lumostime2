@@ -206,8 +206,7 @@ export const FocusDetailView: React.FC<FocusDetailViewProps> = ({ session, todos
                 </button>
                 <button
                     onClick={handleComplete}
-                    className="w-12 h-12 rounded-full flex items-center justify-center text-white shadow-lg active:scale-95 transition-transform"
-                    style={{ backgroundColor: 'var(--accent-color)' }}
+                    className="btn-template-filled w-12 h-12 rounded-full flex items-center justify-center shadow-lg active:scale-95 transition-transform"
                 >
                     <Check size={24} strokeWidth={3} />
                 </button>
@@ -221,7 +220,15 @@ export const FocusDetailView: React.FC<FocusDetailViewProps> = ({ session, todos
                     <div className="text-[80px] mb-4 animate-bounce-slow cursor-pointer hover:scale-105 transition-transform" onClick={() => setIsActivitySelectorOpen(true)}>
                         {session.activityIcon}
                     </div>
-                    <div className="text-6xl font-mono font-medium text-stone-800 tracking-wider">
+                    <div 
+                        className="text-6xl font-medium tracking-wider" 
+                        style={{ 
+                            color: 'var(--text-deep)',
+                            fontFamily: 'Georgia, "Times New Roman", serif',
+                            fontVariantNumeric: 'lining-nums tabular-nums',
+                            fontFeatureSettings: '"tnum" 1'
+                        }}
+                    >
                         {formatTime(elapsed)}
                     </div>
                 </div>

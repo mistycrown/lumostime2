@@ -92,19 +92,22 @@ export const CommentSection: React.FC<CommentSectionProps> = ({
                   <textarea
                     value={editContent}
                     onChange={(e) => setEditContent(e.target.value)}
-                    className="w-full bg-white border border-stone-200 rounded-xl p-3 text-sm text-stone-800 leading-relaxed font-serif focus:outline-none focus:ring-1 focus:ring-stone-900 focus:border-stone-900 transition-all resize-none"
+                    className="w-full bg-white border border-stone-200 rounded-xl p-3 text-sm text-stone-800 leading-relaxed font-serif focus:outline-none focus:ring-1 focus:border-stone-200 transition-all resize-none"
+                    style={{
+                      '--tw-ring-color': 'var(--accent-color)'
+                    } as React.CSSProperties}
                     rows={2}
                   />
                   <div className="flex gap-2">
                     <button
                       onClick={handleSaveEdit}
-                      className="px-3 py-1 bg-stone-900 text-white rounded-lg text-xs font-medium hover:bg-stone-800 transition-colors"
+                      className="btn-template-filled px-3 py-1 rounded-lg text-xs font-medium transition-colors"
                     >
                       Save
                     </button>
                     <button
                       onClick={handleCancelEdit}
-                      className="px-3 py-1 bg-stone-200 text-stone-700 rounded-lg text-xs font-medium hover:bg-stone-300 transition-colors"
+                      className="btn-template-outline px-3 py-1 rounded-lg text-xs font-medium transition-colors"
                     >
                       Cancel
                     </button>
@@ -156,7 +159,10 @@ export const CommentSection: React.FC<CommentSectionProps> = ({
             value={newComment}
             onChange={(e) => setNewComment(e.target.value)}
             placeholder="Add a comment..."
-            className="w-full bg-white border border-stone-200 rounded-2xl p-4 text-stone-800 text-sm min-h-[80px] shadow-sm focus:outline-none focus:ring-1 focus:ring-stone-900 focus:border-stone-900 transition-all resize-none placeholder:text-stone-300 font-serif"
+            className="w-full bg-white border border-stone-200 rounded-2xl p-4 text-stone-800 text-sm min-h-[80px] shadow-sm focus:outline-none focus:ring-1 focus:border-stone-200 transition-all resize-none placeholder:text-stone-300 font-serif"
+            style={{
+              '--tw-ring-color': 'var(--accent-color)'
+            } as React.CSSProperties}
             autoFocus
           />
           <div className="flex gap-2 justify-end">
@@ -166,14 +172,14 @@ export const CommentSection: React.FC<CommentSectionProps> = ({
                 setIsAdding(false);
                 setNewComment('');
               }}
-              className="px-4 py-2 bg-stone-200 text-stone-700 rounded-xl text-sm font-medium hover:bg-stone-300 transition-colors"
+              className="btn-template-outline px-4 py-2 rounded-xl text-sm font-medium transition-colors"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={!newComment.trim()}
-              className="px-4 py-2 bg-stone-900 text-white rounded-xl text-sm font-medium hover:bg-stone-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              className="btn-template-filled px-4 py-2 rounded-xl text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
               Add Comment
             </button>

@@ -1232,8 +1232,7 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ logs, todos, scopes,
                         <p className="text-stone-400 font-serif italic">Silence is golden.</p>
                         <button
                             onClick={() => onAddLog()}
-                            className="mt-6 px-8 py-3 text-white rounded-full text-sm font-bold active:scale-95 transition-transform"
-                            style={{ backgroundColor: 'var(--accent-color)' }}
+                            className="mt-6 px-8 py-3 rounded-full text-sm font-bold active:scale-95 transition-transform btn-template-filled"
                         >
                             Record Activity
                         </button>

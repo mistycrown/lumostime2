@@ -64,13 +64,12 @@ export const TodoAssociation: React.FC<TodoAssociationProps> = ({ todos, todoCat
                         key={cat.id}
                         onClick={() => setSelectedCatId(selectedCatId === cat.id ? null : cat.id)}
                         className={`
-                            px-2 py-2 rounded-lg text-[10px] font-medium text-center border transition-colors flex items-center justify-center gap-1.5 truncate
+                            px-2 py-2 rounded-lg text-[10px] font-medium text-center transition-colors flex items-center justify-center gap-1.5 truncate
                             ${selectedCatId === cat.id
-                                ? 'bg-stone-50 text-stone-500'
-                                : 'bg-stone-50 text-stone-500 border-stone-100 hover:bg-stone-100'
+                                ? 'btn-template-filled'
+                                : 'bg-stone-50 text-stone-500 border border-stone-100 hover:bg-stone-100'
                             }
                         `}
-                        style={selectedCatId === cat.id ? { borderColor: 'var(--accent-color)' } : {}}
                     >
                         <span>{cat.icon}</span>
                         <span className="truncate">{cat.name}</span>
@@ -92,7 +91,7 @@ export const TodoAssociation: React.FC<TodoAssociationProps> = ({ todos, todoCat
                                     <button
                                         onClick={() => onChange(linkedTodoId === todo.id ? undefined : todo.id)}
                                         className={`w-full text-left px-4 py-2 rounded-2xl flex items-center gap-3 transition-all ${linkedTodoId === todo.id
-                                            ? 'bg-transparent text-stone-900' // Selected: No border, no background
+                                            ? 'bg-transparent' // Selected: No border, no background
                                             : 'bg-transparent text-stone-400 hover:bg-stone-50'
                                             }`}
                                         style={{
@@ -107,7 +106,7 @@ export const TodoAssociation: React.FC<TodoAssociationProps> = ({ todos, todoCat
                                             )}
                                         </div>
                                         <div className="flex-1 truncate flex items-center">
-                                            <span className={`text-sm ${linkedTodoId === todo.id ? 'font-bold text-stone-900' : 'font-medium text-stone-500'}`}>{todo.title}</span>
+                                            <span className={`text-sm ${linkedTodoId === todo.id ? 'font-bold' : 'font-medium text-stone-500'}`} style={linkedTodoId === todo.id ? { color: 'var(--text-deep)' } : {}}>{todo.title}</span>
                                         </div>
                                         {todo.isProgress && (
                                             <TrendingUp size={14} className="text-stone-300 flex-shrink-0" />

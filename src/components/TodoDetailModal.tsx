@@ -10,6 +10,7 @@
 import React, { useState, useMemo } from 'react';
 import { TodoItem, TodoCategory, Log, Category, Scope } from '../types';
 import { ScopeAssociation } from './ScopeAssociation';
+import { TagAssociation } from './TagAssociation';
 import { Trash2, CheckCircle2, TrendingUp, ChevronLeft, Circle, Image as ImageIcon } from 'lucide-react';
 import { DetailTimelineCard } from './DetailTimelineCard';
 import { TimelineImage } from './TimelineImage';
@@ -207,7 +208,24 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({ initialTodo, c
   const linkedActivityCategory = linkedCategoryId
     ? categories?.find(c => c.id === linkedCategoryId)
     : null;
-  const enableFocusScore = linkedActivity && (linkedActivity.enableFocusScore ?? linkedActivityCategory?.enableFocusScore);
+  
+  // 检查是否应该显示专注打分：
+  // 1. 首先检查日志中是否有专注打分数据（最直接的判断）
+  // 2. 如果有关联活动，也检查活动的设置
+  // 3. 如果日志中有任何一个活动启用了专注打分，就显示
+  const hasLogFocusData = linkedLogs.some(log => log.focusScore !== undefined && log.focusScore > 0);
+  const linkedActivityFocusEnabled = linkedActivity 
+    ? (linkedActivity.enableFocusScore ?? linkedActivityCategory?.enableFocusScore ?? false)
+    : false;
+  
+  // 检查日志所属的活动是否有启用专注打分的
+  const logActivitiesFocusEnabled = linkedLogs.some(log => {
+    const logCategory = categories?.find(c => c.id === log.categoryId);
+    const logActivity = logCategory?.activities.find(a => a.id === log.activityId);
+    return logActivity && (logActivity.enableFocusScore ?? logCategory?.enableFocusScore ?? false);
+  });
+  
+  const enableFocusScore = hasLogFocusData || linkedActivityFocusEnabled || logActivitiesFocusEnabled;
 
   // Unit Heatmap Constants
   const totalSquares = Math.ceil(totalAmount / unitAmount);
@@ -239,7 +257,7 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({ initialTodo, c
               <span>{selectedCategory.name}</span>
             </span>
             {isProgress && (
-              <span className="text-[#2F4F4F] bg-[#2F4F4F]/10 text-xs font-bold px-2 py-1 rounded-md flex items-center gap-1">
+              <span className="btn-template-filled text-xs font-bold px-2 py-1 rounded-md flex items-center gap-1">
                 <TrendingUp size={12} />
                 Tracking
               </span>
@@ -285,7 +303,7 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({ initialTodo, c
                       className={`
                             px-2 py-2 rounded-lg text-[10px] font-medium text-center border transition-colors truncate flex items-center justify-center gap-1.5
                             ${selectedCategoryId === cat.id
-                          ? 'bg-stone-900 text-white border-stone-900'
+                          ? 'btn-template-filled border-transparent'
                           : 'bg-stone-50 text-stone-500 border-stone-100 hover:bg-stone-100'}
                         `}
                     >
@@ -370,7 +388,8 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({ initialTodo, c
                 <div className="flex items-center justify-between mb-1.5">
                   <label className="text-xs text-stone-400 font-medium">Progress Tracking</label>
                   <div
-                    className={`w-12 h-6 rounded-full relative transition-colors cursor-pointer ${isProgress ? 'bg-[#2F4F4F]' : 'bg-stone-200'}`}
+                    className={`w-12 h-6 rounded-full relative transition-colors cursor-pointer ${isProgress ? '' : 'bg-stone-200'}`}
+                    style={isProgress ? { backgroundColor: 'var(--progress-bar-fill)' } : undefined}
                     onClick={() => setIsProgress(!isProgress)}
                   >
                     <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all shadow-sm ${isProgress ? 'left-7' : 'left-1'}`}></div>
@@ -422,61 +441,29 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({ initialTodo, c
             </div>
 
             {/* Link Activity */}
-            <div className="bg-white rounded-2xl p-6 border border-stone-100 shadow-sm space-y-4">
+            <div className="bg-white rounded-2xl p-6 border border-stone-100 shadow-sm">
               <div className="flex items-center justify-between mb-4">
-                <h3 className="text-xs font-bold text-stone-400 uppercase tracking-widest">Associated Tag</h3>
+                <span className="text-xs font-bold text-stone-400 uppercase tracking-widest">Associated Tag</span>
                 {(linkedCategoryId || linkedActivityId) && (
                   <button
-                    onClick={() => { setLinkedCategoryId(undefined); setLinkedActivityId(undefined); }}
+                    onClick={() => { 
+                      setLinkedCategoryId(''); 
+                      setLinkedActivityId(''); 
+                    }}
                     className="text-[10px] text-stone-400 hover:text-red-400 transition-colors"
                   >
                     Clear
                   </button>
                 )}
               </div>
-
-              {/* Category Grid */}
-              <div className="grid grid-cols-4 gap-2">
-                {categories.map(cat => (
-                  <button
-                    key={cat.id}
-                    onClick={() => { setLinkedCategoryId(cat.id); setLinkedActivityId(cat.activities[0].id); }}
-                    className={`
-                          px-2 py-2 rounded-lg text-[10px] font-medium text-center border transition-colors truncate flex items-center justify-center gap-1.5
-                          ${linkedCategoryId === cat.id
-                        ? 'bg-stone-900 text-white border-stone-900'
-                        : 'bg-stone-50 text-stone-500 border-stone-100 hover:bg-stone-100'}
-                       `}
-                  >
-                    <span>{cat.icon}</span>
-                    <span className="truncate">{cat.name}</span>
-                  </button>
-                ))}
-              </div>
-
-              {/* Activity Grid */}
-              {selectedLinkCategory && (
-                <div className="grid grid-cols-4 gap-3 pt-2">
-                  {selectedLinkCategory.activities.map(act => (
-                    <button
-                      key={act.id}
-                      onClick={() => setLinkedActivityId(act.id)}
-                      className="flex flex-col items-center gap-2 p-3 rounded-xl transition-all duration-200 active:scale-95"
-                    >
-                      <div className={`
-                            w-10 h-10 rounded-full flex items-center justify-center text-xl transition-all
-                            ${linkedActivityId === act.id ? 'ring-1 ring-stone-300 ring-offset-1 scale-110' : ''}
-                            ${act.color}
-                         `}>
-                        {act.icon}
-                      </div>
-                      <span className={`text-xs text-center font-medium leading-tight ${linkedActivityId === act.id ? 'text-stone-900 font-bold' : 'text-stone-400'}`}>
-                        {act.name}
-                      </span>
-                    </button>
-                  ))}
-                </div>
-              )}
+              
+              <TagAssociation
+                categories={categories}
+                selectedCategoryId={linkedCategoryId || categories[0]?.id || ''}
+                selectedActivityId={linkedActivityId || categories[0]?.activities[0]?.id || ''}
+                onCategorySelect={setLinkedCategoryId}
+                onActivitySelect={setLinkedActivityId}
+              />
             </div>
 
             {/* Scope Association */}
