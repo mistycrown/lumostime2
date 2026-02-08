@@ -8,7 +8,7 @@
  * 3. 之后两套系统共存，切换主题只是切换渲染，不再迁移数据
  */
 
-import { Category, Scope, TodoCategory } from '../types';
+import { Category, Scope, TodoCategory, CheckTemplate } from '../types';
 import { uiIconService } from './uiIconService';
 
 class IconMigrationService {
@@ -90,6 +90,22 @@ class IconMigrationService {
     }
 
     /**
+     * 为 CheckTemplates 生成 uiIcon
+     */
+    generateUiIconsForCheckTemplates(checkTemplates: CheckTemplate[]): CheckTemplate[] {
+        return checkTemplates.map(template => ({
+            ...template,
+            // 为模板本身生成 uiIcon
+            uiIcon: template.uiIcon || (template.icon ? this.generateUiIcon(template.icon) : undefined),
+            // 为模板中的每个 item 生成 uiIcon
+            items: template.items.map(item => ({
+                ...item,
+                uiIcon: item.uiIcon || (item.icon ? this.generateUiIcon(item.icon) : undefined)
+            }))
+        }));
+    }
+
+    /**
      * 执行首次迁移：为所有 emoji 生成对应的 uiIcon
      */
     async generateAllUiIcons(): Promise<{
@@ -116,6 +132,7 @@ class IconMigrationService {
             const categoriesStr = localStorage.getItem('lumostime_categories');
             const scopesStr = localStorage.getItem('lumostime_scopes');
             const todoCategoriesStr = localStorage.getItem('lumostime_todoCategories');
+            const checkTemplatesStr = localStorage.getItem('lumostime_checkTemplates');
 
             // 生成 categories 的 uiIcon
             if (categoriesStr) {
@@ -151,6 +168,20 @@ class IconMigrationService {
                 
                 updated.forEach(cat => {
                     if (cat.uiIcon) generatedCount++; else unmatchedCount++;
+                });
+            }
+
+            // 生成 checkTemplates 的 uiIcon
+            if (checkTemplatesStr) {
+                const checkTemplates = JSON.parse(checkTemplatesStr) as CheckTemplate[];
+                const updated = this.generateUiIconsForCheckTemplates(checkTemplates);
+                localStorage.setItem('lumostime_checkTemplates', JSON.stringify(updated));
+                
+                updated.forEach(template => {
+                    if (template.uiIcon) generatedCount++; else unmatchedCount++;
+                    template.items.forEach(item => {
+                        if (item.uiIcon) generatedCount++; else unmatchedCount++;
+                    });
                 });
             }
 

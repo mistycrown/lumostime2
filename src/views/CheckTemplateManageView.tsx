@@ -18,10 +18,14 @@ import {
     ArrowDown,
     Save,
     Database,
-    AlertCircle
+    AlertCircle,
+    Palette
 } from 'lucide-react';
 import { CheckTemplate } from '../types';
 import { ConfirmModal } from '../components/ConfirmModal';
+import { UIIconSelector } from '../components/UIIconSelector';
+import { IconRenderer } from '../components/IconRenderer';
+import { useSettings } from '../contexts/SettingsContext';
 
 interface CheckTemplateManageViewProps {
     templates: CheckTemplate[];
@@ -36,6 +40,11 @@ export const CheckTemplateManageView: React.FC<CheckTemplateManageViewProps> = (
     const [editingTemplateId, setEditingTemplateId] = useState<string | null>(null);
     const [templateForm, setTemplateForm] = useState<CheckTemplate | null>(null);
     const [deletingTemplateId, setDeletingTemplateId] = useState<string | null>(null);
+    const [showIconSelector, setShowIconSelector] = useState(false);
+    
+    // 获取当前 UI 图标主题
+    const { uiIconTheme } = useSettings();
+    const isCustomThemeEnabled = uiIconTheme !== 'default';
 
     // Batch Modify State
     const [showBatchModal, setShowBatchModal] = useState(false);
@@ -61,6 +70,7 @@ export const CheckTemplateManageView: React.FC<CheckTemplateManageViewProps> = (
         const newTemplate: CheckTemplate = {
             id: crypto.randomUUID(),
             title: '新日课',
+            icon: '📝', // 默认 emoji
             items: [{ id: crypto.randomUUID(), content: '日课 1', icon: '📝' }], // Default item
             enabled: true,
             order: (templates.length > 0 ? Math.max(...templates.map(t => t.order)) : 0) + 1,
@@ -282,6 +292,13 @@ export const CheckTemplateManageView: React.FC<CheckTemplateManageViewProps> = (
                                         <div className="flex items-start justify-between gap-3">
                                             <div className="flex-1 min-w-0">
                                                 <div className="flex items-center gap-2 mb-2">
+                                                    {template.icon && (
+                                                        <IconRenderer 
+                                                            icon={template.icon} 
+                                                            uiIcon={template.uiIcon}
+                                                            className="text-lg"
+                                                        />
+                                                    )}
                                                     <h3 className="font-bold text-stone-800 text-base">{template.title}</h3>
                                                     {!template.enabled && (
                                                         <span className="px-1.5 py-0.5 bg-stone-100 text-stone-400 text-[10px] rounded">已停用</span>
@@ -293,6 +310,11 @@ export const CheckTemplateManageView: React.FC<CheckTemplateManageViewProps> = (
                                                             key={idx}
                                                             className="px-2 py-1.5 rounded-lg text-[10px] font-medium text-center border transition-colors flex items-center justify-center gap-1.5 bg-stone-50 text-stone-500 border-stone-100"
                                                         >
+                                                            <IconRenderer 
+                                                                icon={item.icon || '📝'} 
+                                                                uiIcon={item.uiIcon}
+                                                                className="text-xs"
+                                                            />
                                                             <span className="truncate">{item.content}</span>
                                                         </div>
                                                     ))}
@@ -341,18 +363,62 @@ export const CheckTemplateManageView: React.FC<CheckTemplateManageViewProps> = (
                         </div>
 
                         <div className="p-4 space-y-6">
-                            {/* Title */}
+                            {/* Title with Icon */}
                             <div>
-                                <label className="block text-xs font-bold text-stone-500 mb-1.5 uppercase tracking-wider">模板标题</label>
-                                <input
-                                    type="text"
-                                    value={templateForm.title}
-                                    onChange={(e) => setTemplateForm({ ...templateForm, title: e.target.value })}
-                                    className={`w-full bg-stone-50 border ${errors.title ? 'border-red-300 focus:border-red-500' : 'border-stone-200 focus:border-stone-400'} rounded-xl px-4 py-2.5 text-sm outline-none transition-colors`}
-                                    placeholder="例如：早间流程"
-                                />
+                                <label className="block text-xs font-bold text-stone-500 mb-1.5 uppercase tracking-wider">模板名称</label>
+                                <div className="flex items-center gap-2">
+                                    <input
+                                        type="text"
+                                        value={`${templateForm.icon || ''}${templateForm.title}`}
+                                        onChange={(e) => {
+                                            const val = e.target.value;
+                                            const firstChar = Array.from(val)[0] || '';
+                                            const icon = firstChar;
+                                            const title = val.slice(firstChar.length).trim();
+                                            setTemplateForm({ ...templateForm, icon, title });
+                                        }}
+                                        className={`flex-1 bg-stone-50 border ${errors.title ? 'border-red-300 focus:border-red-500' : 'border-stone-200 focus:border-stone-400'} rounded-xl px-4 py-2.5 text-sm outline-none transition-colors`}
+                                        placeholder="📝 输入模板名称 (首字符作为图标)..."
+                                    />
+                                    {isCustomThemeEnabled && (
+                                        <button
+                                            onClick={() => setShowIconSelector(!showIconSelector)}
+                                            className="w-8 h-8 flex items-center justify-center border border-stone-200 rounded-lg hover:bg-stone-50 transition-colors"
+                                            title="选择 UI 图标"
+                                        >
+                                            {templateForm.uiIcon ? (
+                                                <IconRenderer 
+                                                    icon={templateForm.icon || '📝'} 
+                                                    uiIcon={templateForm.uiIcon}
+                                                    className="text-base"
+                                                />
+                                            ) : (
+                                                <Palette size={16} className="text-stone-400" />
+                                            )}
+                                        </button>
+                                    )}
+                                </div>
                                 {errors.title && <p className="text-xs text-red-500 mt-1">{errors.title}</p>}
                             </div>
+
+                            {/* UI Icon Selector - 仅在启用自定义主题时显示 */}
+                            {isCustomThemeEnabled && showIconSelector && (
+                                <div>
+                                    <label className="text-xs text-stone-400 font-medium mb-2 block">
+                                        UI 图标
+                                        <span className="text-stone-300 ml-1">(可选)</span>
+                                    </label>
+                                    <UIIconSelector
+                                        currentIcon={templateForm.icon || '📝'}
+                                        currentUiIcon={templateForm.uiIcon}
+                                        onSelectDual={(emoji, uiIcon) => {
+                                            // 只更新 uiIcon 字段，不修改 icon（emoji）
+                                            setTemplateForm({ ...templateForm, uiIcon });
+                                            setShowIconSelector(false);
+                                        }}
+                                    />
+                                </div>
+                            )}
 
                             {/* Items */}
                             <div>

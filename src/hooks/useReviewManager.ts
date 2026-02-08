@@ -55,11 +55,13 @@ export const useReviewManager = () => {
                     t.items.forEach((item: any) => {
                         const content = typeof item === 'string' ? item : item.content;
                         const icon = typeof item === 'string' ? undefined : item.icon;
+                        const uiIcon = typeof item === 'string' ? undefined : item.uiIcon;
                         initialCheckItems.push({
                             id: crypto.randomUUID(),
                             category: t.title,
                             content: content,
                             icon: icon,
+                            uiIcon: uiIcon,
                             isCompleted: false
                         });
                     });

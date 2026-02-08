@@ -3,7 +3,7 @@
  * @description 双图标系统迁移服务 - 为现有数据添加 uiIcon 字段
  */
 
-import { Category, Scope, TodoCategory } from '../types';
+import { Category, Scope, TodoCategory, CheckTemplate } from '../types';
 import { ensureUiIconField } from '../utils/iconUtils';
 
 class DualIconMigrationService {
@@ -64,6 +64,24 @@ class DualIconMigrationService {
   }
 
   /**
+   * 迁移 CheckTemplates 数据
+   */
+  migrateCheckTemplates(checkTemplates: CheckTemplate[]): CheckTemplate[] {
+    return checkTemplates.map(template => {
+      // 迁移模板本身的图标
+      const migratedTemplate = ensureUiIconField(template);
+      
+      // 迁移模板中的每个 item 的图标
+      const migratedItems = template.items.map(item => ensureUiIconField(item));
+      
+      return {
+        ...migratedTemplate,
+        items: migratedItems
+      };
+    });
+  }
+
+  /**
    * 执行完整的数据迁移
    */
   async migrateAll(): Promise<{
@@ -83,6 +101,7 @@ class DualIconMigrationService {
       const categoriesStr = localStorage.getItem('lumostime_categories');
       const scopesStr = localStorage.getItem('lumostime_scopes');
       const todoCategoriesStr = localStorage.getItem('lumostime_todoCategories');
+      const checkTemplatesStr = localStorage.getItem('lumostime_checkTemplates');
 
       let migrated = false;
 
@@ -107,6 +126,14 @@ class DualIconMigrationService {
         const todoCategories = JSON.parse(todoCategoriesStr) as TodoCategory[];
         const migratedTodoCategories = this.migrateTodoCategories(todoCategories);
         localStorage.setItem('lumostime_todoCategories', JSON.stringify(migratedTodoCategories));
+        migrated = true;
+      }
+
+      // 迁移 checkTemplates
+      if (checkTemplatesStr) {
+        const checkTemplates = JSON.parse(checkTemplatesStr) as CheckTemplate[];
+        const migratedCheckTemplates = this.migrateCheckTemplates(checkTemplates);
+        localStorage.setItem('lumostime_checkTemplates', JSON.stringify(migratedCheckTemplates));
         migrated = true;
       }
 
