@@ -266,7 +266,7 @@ export const TimePalCard: React.FC<TimePalCardProps> = ({ logs, currentDate, cat
 
                 {/* 右侧：专注时长和状态 */}
                 <div className="flex-1 flex flex-col justify-center min-w-0">
-                    <div className="text-2xl font-bold text-stone-800 tracking-tight leading-none" style={{ fontFamily: 'Georgia, serif' }}>
+                    <div className="text-2xl font-bold tabular-nums leading-none text-stone-800" style={{ fontFamily: '"Playfair Display", "Noto Serif SC", Georgia, serif', letterSpacing: '0.08em' }}>
                         {timeDisplay}
                     </div>
                     <div className="mt-1.5 text-xs text-stone-500 leading-relaxed">

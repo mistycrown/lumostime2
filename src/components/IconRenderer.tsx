@@ -37,9 +37,16 @@ export const IconRenderer: React.FC<IconRendererProps> = ({
     fallbackEmoji
 }) => {
     const [imageError, setImageError] = useState(false);
+    const [hasFallbackAttempted, setHasFallbackAttempted] = useState(false);
     
     // 解析图标字符串
     const { isUIIcon, value } = uiIconService.parseIconString(icon);
+    
+    // 当图标变化时，重置错误状态
+    React.useEffect(() => {
+        setImageError(false);
+        setHasFallbackAttempted(false);
+    }, [icon]);
     
     // 如果不是 UI 图标格式，或者当前主题是 default，直接渲染 Emoji
     if (!isUIIcon || uiIconService.getCurrentTheme() === 'default') {
@@ -105,11 +112,14 @@ export const IconRenderer: React.FC<IconRendererProps> = ({
             className={`inline-block ${className}`}
             style={sizeStyle}
             onError={(e) => {
-                // 尝试降级到 WebP
-                if (e.currentTarget.src === primary) {
+                // 第一次失败：尝试降级到 fallback 格式
+                if (!hasFallbackAttempted) {
+                    console.log(`[IconRenderer] Primary failed: ${primary}, trying fallback: ${fallback}`);
+                    setHasFallbackAttempted(true);
                     e.currentTarget.src = fallback;
                 } else {
-                    // WebP 也失败了，显示 Emoji
+                    // 第二次也失败了：显示 Emoji
+                    console.log(`[IconRenderer] Fallback also failed: ${fallback}, showing emoji`);
                     setImageError(true);
                 }
             }}
