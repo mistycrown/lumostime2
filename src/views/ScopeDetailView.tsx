@@ -18,6 +18,7 @@ import { GoalCard } from '../components/GoalCard';
 import { DetailTimelineCard } from '../components/DetailTimelineCard';
 import { UIIconSelector } from '../components/UIIconSelector';
 import { useSettings } from '../contexts/SettingsContext';
+import { IconRenderer } from '../components/IconRenderer';
 
 interface ScopeDetailViewProps {
     scope: Scope;
@@ -57,6 +58,10 @@ export const ScopeDetailView: React.FC<ScopeDetailViewProps> = ({
     const [displayDate, setDisplayDate] = useState(new Date());
     const [showArchived, setShowArchived] = useState(false); // 是否显示归档目标
     const [newKeyword, setNewKeyword] = useState(''); // 添加关键字输入
+    
+    // 获取当前 UI 图标主题
+    const { uiIconTheme } = useSettings();
+    const isCustomThemeEnabled = uiIconTheme !== 'default';
 
     // Analysis State
     const [analysisRange, setAnalysisRange] = useState<RangeType>('Month');
@@ -367,6 +372,20 @@ export const ScopeDetailView: React.FC<ScopeDetailViewProps> = ({
                                         </button>
                                     </div>
                                 </div>
+                                
+                                {/* UI Icon Selector - 仅在启用自定义主题时显示 */}
+                                {isCustomThemeEnabled && (
+                                    <div>
+                                        <label className="text-xs text-stone-400 font-medium mb-2 block">
+                                            UI 图标
+                                            <span className="text-stone-300 ml-1">(可选)</span>
+                                        </label>
+                                        <UIIconSelector
+                                            currentIcon={scope.icon}
+                                            onSelect={(icon) => setScope({ ...scope, icon })}
+                                        />
+                                    </div>
+                                )}
                             </div>
                         </div>
 
@@ -664,7 +683,7 @@ export const ScopeDetailView: React.FC<ScopeDetailViewProps> = ({
             <div className="mb-6">
                 <h1 className="text-2xl font-bold text-stone-900 flex items-center gap-3">
                     <span className="text-stone-300 font-normal">%</span>
-                    {scope.icon && <span className="text-2xl">{scope.icon}</span>}
+                    {scope.icon && <IconRenderer icon={scope.icon} className="text-2xl" />}
                     {scope.name}
                 </h1>
                 {scope.description && (

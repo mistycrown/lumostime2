@@ -327,6 +327,67 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
     type TabType = 'icon' | 'colorScheme' | 'background' | 'navigation' | 'timepal';
     const [activeTab, setActiveTab] = useState<TabType>('icon');
 
+    // 处理 UI 图标主题切换，并触发图标迁移
+    const handleUiIconThemeChange = async (newTheme: string) => {
+        const oldTheme = uiIconTheme;
+        setUiIconTheme(newTheme);
+        
+        // 如果从 default 切换到自定义主题，触发图标迁移
+        if (oldTheme === 'default' && newTheme !== 'default') {
+            try {
+                const { iconMigrationService } = await import('../services/iconMigrationService');
+                const { useCategoryScope } = await import('../contexts/CategoryScopeContext');
+                const { useData } = await import('../contexts/DataContext');
+                
+                // 注意：这里无法直接使用 hooks，需要通过其他方式获取数据
+                // 我们需要从 localStorage 读取数据，迁移后再写回
+                const categoriesStr = localStorage.getItem('lumostime_categories');
+                const scopesStr = localStorage.getItem('lumostime_scopes');
+                const todoCategoriesStr = localStorage.getItem('lumostime_todoCategories');
+                
+                if (categoriesStr && scopesStr && todoCategoriesStr) {
+                    const categories = JSON.parse(categoriesStr);
+                    const scopes = JSON.parse(scopesStr);
+                    const todoCategories = JSON.parse(todoCategoriesStr);
+                    
+                    // 执行迁移
+                    const migratedCategories = iconMigrationService.migrateCategories(categories);
+                    const migratedScopes = iconMigrationService.migrateScopes(scopes);
+                    const migratedTodoCategories = iconMigrationService.migrateTodoCategories(todoCategories);
+                    
+                    // 写回 localStorage
+                    localStorage.setItem('lumostime_categories', JSON.stringify(migratedCategories));
+                    localStorage.setItem('lumostime_scopes', JSON.stringify(migratedScopes));
+                    localStorage.setItem('lumostime_todoCategories', JSON.stringify(migratedTodoCategories));
+                    
+                    // 标记迁移完成
+                    iconMigrationService.markMigrationDone();
+                    
+                    // 提示用户刷新页面
+                    onToast('success', '图标已自动转换，请刷新页面查看效果');
+                    
+                    // 自动刷新页面
+                    setTimeout(() => {
+                        window.location.reload();
+                    }, 1500);
+                }
+            } catch (error) {
+                console.error('[SponsorshipView] 图标迁移失败:', error);
+                onToast('error', '图标迁移失败，请手动刷新页面');
+            }
+        }
+        
+        // 如果从自定义主题切换回 default，重置迁移状态
+        if (oldTheme !== 'default' && newTheme === 'default') {
+            try {
+                const { iconMigrationService } = await import('../services/iconMigrationService');
+                iconMigrationService.resetMigration();
+            } catch (error) {
+                console.error('[SponsorshipView] 重置迁移状态失败:', error);
+            }
+        }
+    };
+
     useEffect(() => {
         const checkVerification = async () => {
             const result = await redemptionService.isVerified();
@@ -673,7 +734,7 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
                                         <div className="grid gap-2" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(64px, 1fr))' }}>
                                             {/* 默认选项 */}
                                             <button
-                                                onClick={() => setUiIconTheme('default')}
+                                                onClick={() => handleUiIconThemeChange('default')}
                                                 className={`relative rounded-lg border-2 transition-all overflow-hidden ${
                                                     uiIconTheme === 'default'
                                                         ? 'border-stone-400 ring-2 ring-stone-200'
@@ -693,7 +754,7 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
 
                                             {/* Purple 主题 */}
                                             <button
-                                                onClick={() => setUiIconTheme('purple')}
+                                                onClick={() => handleUiIconThemeChange('purple')}
                                                 className={`relative rounded-lg border-2 transition-all overflow-hidden ${
                                                     uiIconTheme === 'purple'
                                                         ? 'border-stone-400 ring-2 ring-stone-200'
@@ -728,7 +789,7 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
 
                                             {/* Color 主题（蓝色） */}
                                             <button
-                                                onClick={() => setUiIconTheme('color')}
+                                                onClick={() => handleUiIconThemeChange('color')}
                                                 className={`relative rounded-lg border-2 transition-all overflow-hidden ${
                                                     uiIconTheme === 'color'
                                                         ? 'border-stone-400 ring-2 ring-stone-200'
@@ -759,7 +820,7 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
 
                                             {/* Color2 主题（绿色） */}
                                             <button
-                                                onClick={() => setUiIconTheme('color2')}
+                                                onClick={() => handleUiIconThemeChange('color2')}
                                                 className={`relative rounded-lg border-2 transition-all overflow-hidden ${
                                                     uiIconTheme === 'color2'
                                                         ? 'border-stone-400 ring-2 ring-stone-200'
@@ -790,7 +851,7 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
 
                                             {/* Prince 主题（琥珀色） */}
                                             <button
-                                                onClick={() => setUiIconTheme('prince')}
+                                                onClick={() => handleUiIconThemeChange('prince')}
                                                 className={`relative rounded-lg border-2 transition-all overflow-hidden ${
                                                     uiIconTheme === 'prince'
                                                         ? 'border-stone-400 ring-2 ring-stone-200'
@@ -821,7 +882,7 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
 
                                             {/* Cat 主题 */}
                                             <button
-                                                onClick={() => setUiIconTheme('cat')}
+                                                onClick={() => handleUiIconThemeChange('cat')}
                                                 className={`relative rounded-lg border-2 transition-all overflow-hidden ${
                                                     uiIconTheme === 'cat'
                                                         ? 'border-stone-400 ring-2 ring-stone-200'
@@ -852,7 +913,7 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
 
                                             {/* Forest 主题 */}
                                             <button
-                                                onClick={() => setUiIconTheme('forest')}
+                                                onClick={() => handleUiIconThemeChange('forest')}
                                                 className={`relative rounded-lg border-2 transition-all overflow-hidden ${
                                                     uiIconTheme === 'forest'
                                                         ? 'border-stone-400 ring-2 ring-stone-200'
@@ -883,7 +944,7 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
 
                                             {/* Plant 主题 */}
                                             <button
-                                                onClick={() => setUiIconTheme('plant')}
+                                                onClick={() => handleUiIconThemeChange('plant')}
                                                 className={`relative rounded-lg border-2 transition-all overflow-hidden ${
                                                     uiIconTheme === 'plant'
                                                         ? 'border-stone-400 ring-2 ring-stone-200'

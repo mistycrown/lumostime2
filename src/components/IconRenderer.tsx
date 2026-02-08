@@ -64,15 +64,45 @@ export const IconRenderer: React.FC<IconRendererProps> = ({
     const iconType = value as UIIconType;
     const { primary, fallback } = uiIconService.getIconPathWithFallback(iconType);
     
-    const sizeStyle = size ? (
-        typeof size === 'number' ? { width: size, height: size } : { width: size, height: size }
-    ) : undefined;
+    // 根据 className 中的 text-* 类自动计算尺寸
+    const getImageSize = (): string => {
+        if (size) {
+            return typeof size === 'number' ? `${size}px` : size;
+        }
+        
+        // 从 className 中提取 text-* 尺寸类
+        const textSizeMatch = className.match(/text-(xs|sm|base|lg|xl|2xl|3xl|4xl|5xl|6xl|7xl|8xl|9xl)/);
+        if (textSizeMatch) {
+            const sizeMap: Record<string, string> = {
+                'xs': '1rem',       // 16px (原 12px * 1.33)
+                'sm': '1.125rem',   // 18px (原 14px * 1.29)
+                'base': '1.25rem',  // 20px (原 16px * 1.25)
+                'lg': '1.5rem',     // 24px (原 18px * 1.33)
+                'xl': '1.625rem',   // 26px (原 20px * 1.3)
+                '2xl': '2rem',      // 32px (原 24px * 1.33)
+                '3xl': '2.5rem',    // 40px (原 30px * 1.33)
+                '4xl': '3rem',      // 48px (原 36px * 1.33)
+                '5xl': '4rem',      // 64px (原 48px * 1.33)
+                '6xl': '5rem',      // 80px (原 60px * 1.33)
+                '7xl': '6rem',      // 96px (原 72px * 1.33)
+                '8xl': '8rem',      // 128px (原 96px * 1.33)
+                '9xl': '10rem'      // 160px (原 128px * 1.25)
+            };
+            return sizeMap[textSizeMatch[1]] || '1.25rem';
+        }
+        
+        // 默认尺寸（稍大于 text-base）
+        return '1.25rem';
+    };
+    
+    const imageSize = getImageSize();
+    const sizeStyle = { width: imageSize, height: imageSize };
 
     return (
         <img
             src={primary}
             alt={alt || uiIconService.getIconLabel(iconType)}
-            className={className}
+            className={`inline-block ${className}`}
             style={sizeStyle}
             onError={(e) => {
                 // 尝试降级到 WebP

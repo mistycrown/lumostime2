@@ -11,6 +11,7 @@ import React, { useMemo } from 'react';
 import { Scope, Goal, Log, TodoItem } from '../types';
 import { GoalCard } from '../components/GoalCard';
 import { Settings2 } from 'lucide-react';
+import { IconRenderer } from '../components/IconRenderer';
 
 
 interface ScopeViewProps {
@@ -103,7 +104,7 @@ export const ScopeView: React.FC<ScopeViewProps> = ({
                                 >
                                     {/* Left: Icon + Title + Description */}
                                     <div className="flex items-center gap-3 flex-1 min-w-0">
-                                        <span className="text-2xl flex-shrink-0">{scope.icon}</span>
+                                        <IconRenderer icon={scope.icon} className="text-2xl flex-shrink-0" />
                                         <div className="flex-1 min-w-0">
                                             <h3 className="text-base font-bold text-stone-900 truncate">
                                                 {scope.name}

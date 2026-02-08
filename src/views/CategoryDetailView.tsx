@@ -17,6 +17,7 @@ import { Scope } from '../types';
 import { DetailTimelineCard } from '../components/DetailTimelineCard';
 import { UIIconSelector } from '../components/UIIconSelector';
 import { useSettings } from '../contexts/SettingsContext';
+import { IconRenderer } from '../components/IconRenderer';
 
 interface CategoryDetailViewProps {
     categoryId: string;
@@ -362,7 +363,7 @@ export const CategoryDetailView: React.FC<CategoryDetailViewProps> = ({ category
                             <div className="space-y-2">
                                 {category.activities.map(act => (
                                     <div key={act.id} className="flex items-center gap-3 p-3 bg-stone-50 rounded-xl">
-                                        <span className="text-xl">{act.icon}</span>
+                                        <IconRenderer icon={act.icon} className="text-xl" />
                                         <span className="font-medium text-stone-700">{act.name}</span>
                                     </div>
                                 ))}
@@ -447,7 +448,7 @@ export const CategoryDetailView: React.FC<CategoryDetailViewProps> = ({ category
             <div className="mb-6">
                 <h1 className="text-3xl font-bold text-stone-900 flex items-center gap-3">
                     <span className="text-stone-300 font-normal">#</span>
-                    {category.icon && <span className="text-2xl">{category.icon}</span>}
+                    {category.icon && <IconRenderer icon={category.icon} className="text-2xl" />}
                     {category.name}
                 </h1>
                 <span className="text-stone-400 text-sm font-medium ml-1 mt-1 block">Category</span>

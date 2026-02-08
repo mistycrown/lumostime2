@@ -19,6 +19,7 @@ import { DetailTimelineCard } from '../components/DetailTimelineCard';
 import { UIIconSelector } from '../components/UIIconSelector';
 import { uiIconService } from '../services/uiIconService';
 import { useSettings } from '../contexts/SettingsContext';
+import { IconRenderer } from '../components/IconRenderer';
 
 
 interface TagDetailViewProps {
@@ -675,11 +676,11 @@ export const TagDetailView: React.FC<TagDetailViewProps> = ({ tagId, logs, todos
          <div className="mb-6">
             <h1 className="text-2xl font-bold text-stone-900 flex items-center gap-3">
                <span className="text-stone-300 font-normal">#</span>
-               {activity.icon && <span className="text-2xl">{activity.icon}</span>}
+               {activity.icon && <IconRenderer icon={activity.icon} className="text-2xl" />}
                {activity.name}
             </h1>
             <span className="text-stone-400 text-sm font-medium ml-1 mt-1 flex items-center gap-2">
-               <span>{category.icon}</span>
+               <IconRenderer icon={category.icon} className="text-base" />
                <span>{category.name}</span>
             </span>
          </div>

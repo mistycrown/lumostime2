@@ -17,6 +17,7 @@ import { AITodoConfirmModal, ParsedTask } from '../components/AITodoConfirmModal
 import { aiService, AIParsedTodo } from '../services/aiService';
 import { usePrivacy } from '../contexts/PrivacyContext';
 import { backgroundService } from '../services/backgroundService';
+import { IconRenderer } from '../components/IconRenderer';
 
 
 interface TodoViewProps {
@@ -220,7 +221,7 @@ const SwipeableTodoItem: React.FC<{
             {linkedScopes.map((scope, idx) => (
               <span key={idx} className={`text-[11px] text-stone-500 font-medium flex items-center gap-1 ${viewMode === 'compact' ? 'px-0 border-0 bg-transparent' : 'px-1.5 py-0.5 rounded-md border border-stone-200 bg-white/50'}`}>
                 <span className="text-stone-300 font-sans">%</span>
-                <span className="text-xs">{scope.icon}</span>
+                <IconRenderer icon={scope.icon} className="text-xs" />
                 {/* Show Scope Name only in Loose Mode */}
                 {viewMode === 'loose' && <span className="opacity-90 ml-0.5">{scope.name}</span>}
               </span>
@@ -451,9 +452,7 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, categories, activityC
                 {isSelected && (
                   <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-5 rounded-r-full" style={{ backgroundColor: 'var(--accent-color)' }}></div>
                 )}
-                <span className={`text-xl ${isSelected ? 'opacity-100' : 'opacity-100'}`}>
-                  {category.icon}
-                </span>
+                <IconRenderer icon={category.icon} className={`text-xl ${isSelected ? 'opacity-100' : 'opacity-100'}`} />
                 {isSidebarOpen && (
                   <span className={`text-sm md:text-base whitespace-nowrap transition-all ${isSelected ? 'font-bold' : 'font-medium'}`}>
                     {category.name}
