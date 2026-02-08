@@ -128,24 +128,13 @@ export const CalendarWidget: React.FC<CalendarWidgetProps> = ({ currentDate, onD
             {/* Top Bar - 详情页面模式下隐藏 */}
             {!hideTopBar && (
                 <div className="px-4 py-2.5 flex items-center justify-between border-b border-stone-100">
-                    {/* 左侧：日期显示（可点击切换到月份选择器） */}
-                    <button
-                        onClick={() => {
-                            if (isExpanded) {
-                                setViewMode(viewMode === 'calendar' ? 'month_year' : 'calendar');
-                            } else {
-                                onExpandToggle();
-                                setViewMode('month_year');
-                            }
-                        }}
-                        className="text-xs font-medium text-stone-400 uppercase tracking-widest hover:text-stone-600 transition-colors text-left whitespace-nowrap"
-                    >
-                        {String(currentDate.getFullYear()).slice(-2)}/{String(currentDate.getMonth() + 1).padStart(2, '0')}
-                    </button>
-
-                    {/* 右侧：extraHeaderControls + Today和展开/收缩按钮 */}
+                    {/* 左侧：控制按钮（同步、排序、统计） */}
                     <div className="flex items-center gap-1">
                         {extraHeaderControls}
+                    </div>
+
+                    {/* 右侧：Today和展开/收缩按钮 */}
+                    <div className="flex items-center gap-1">
                         {!staticMode && (
                             <>
                                 {!disableSelection && (
@@ -178,6 +167,20 @@ export const CalendarWidget: React.FC<CalendarWidgetProps> = ({ currentDate, onD
                     </div>
                 </div>
             )}
+
+            {/* 隐藏的日期按钮 - 保留功能但不显示 */}
+            <button
+                onClick={() => {
+                    if (isExpanded) {
+                        setViewMode(viewMode === 'calendar' ? 'month_year' : 'calendar');
+                    } else {
+                        onExpandToggle();
+                        setViewMode('month_year');
+                    }
+                }}
+                className="hidden"
+                aria-label="Switch to month/year selector"
+            />
 
             {/* Calendar Area */}
             <div className={`transition-all duration-500 ease-in-out overflow-hidden ${isExpanded ? 'max-h-[400px] opacity-100' : 'max-h-[75px] opacity-100'}`}>

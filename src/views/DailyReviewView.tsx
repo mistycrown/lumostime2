@@ -20,6 +20,7 @@ import { NarrativeStyleSelectionModal } from '../components/NarrativeStyleSelect
 import { StatsView } from './StatsView';
 import { FloatingButton } from '../components/FloatingButton';
 import { UIIcon } from '../components/UIIcon';
+import { IconRenderer } from '../components/IconRenderer';
 
 interface DailyReviewViewProps {
     review: DailyReview;
@@ -40,13 +41,14 @@ interface DailyReviewViewProps {
 
 type TabType = 'check' | 'data' | 'guide' | 'narrative';
 
-// Helper to extract emoji
+// Helper to extract emoji or UI icon
 const getTemplateDisplayInfo = (title: string) => {
-    const emojiRegex = /^(\p{Emoji_Presentation}|\p{Extended_Pictographic})/u;
-    const match = title.match(emojiRegex);
+    // 匹配 emoji 或 ui:iconType 格式
+    const iconRegex = /^(ui:[a-z_]+|\p{Emoji_Presentation}|\p{Extended_Pictographic})\s*/u;
+    const match = title.match(iconRegex);
     if (match) {
         return {
-            emoji: match[0],
+            emoji: match[1],  // 可能是 emoji 或 "ui:iconType"
             text: title.substring(match[0].length).trim()
         };
     }
@@ -813,7 +815,7 @@ export const DailyReviewView: React.FC<DailyReviewViewProps> = ({
                                             <div key={template.id}>
                                                 <div className="space-y-6 mb-8">
                                                     <h3 className="text-base font-bold text-stone-900 flex items-center gap-2">
-                                                        {emoji && <span className="text-xl">{emoji}</span>}
+                                                        {emoji && <IconRenderer icon={emoji} size={20} />}
                                                         <span>{text}</span>
                                                     </h3>
                                                     <div className="space-y-8 pl-1">
@@ -836,7 +838,7 @@ export const DailyReviewView: React.FC<DailyReviewViewProps> = ({
                                         <div key={template.id} className="bg-white rounded-2xl p-5 shadow-sm">
                                             <div className="flex items-center justify-between mb-4">
                                                 <h3 className="text-base font-bold text-stone-900 flex items-center gap-2">
-                                                    {emoji && <span className="text-xl">{emoji}</span>}
+                                                    {emoji && <IconRenderer icon={emoji} size={20} />}
                                                     <span>{text}</span>
                                                 </h3>
                                                 {/* syncToTimeline 开关 */}

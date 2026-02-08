@@ -12,6 +12,10 @@ import { ReviewTemplate, ReviewQuestion, QuestionType } from '../types';
 import { DEFAULT_REVIEW_TEMPLATES, COLOR_OPTIONS } from '../constants';
 import { ChevronLeft, Plus, Trash2, GripVertical, Check, X, Edit3, MessageSquare, List, Star, MoreVertical, ToggleLeft, ToggleRight, ArrowUp, ArrowDown, RotateCcw } from 'lucide-react';
 import { ConfirmModal } from '../components/ConfirmModal';
+import { useSettings } from '../contexts/SettingsContext';
+import { UIIconSelector } from '../components/UIIconSelector';
+import { IconRenderer } from '../components/IconRenderer';
+import { uiIconService } from '../services/uiIconService';
 
 interface ReviewTemplateManageViewProps {
     templates: ReviewTemplate[];
@@ -114,13 +118,14 @@ const TemplateList: React.FC<{
         onEdit(newTemplate.id);
     };
 
-    // Helper to extract emoji
+    // Helper to extract emoji or UI icon
     const getDisplayInfo = (title: string, id: string) => {
-        const emojiRegex = /^(\p{Emoji_Presentation}|\p{Extended_Pictographic})/u;
-        const match = title.match(emojiRegex);
+        // 匹配 emoji 或 ui:iconType 格式
+        const iconRegex = /^(ui:[a-z_]+|\p{Emoji_Presentation}|\p{Extended_Pictographic})\s*/u;
+        const match = title.match(iconRegex);
         if (match) {
             return {
-                emoji: match[0],
+                emoji: match[1],  // 可能是 emoji 或 "ui:iconType"
                 text: title.substring(match[0].length).trim()
             };
         }
@@ -128,9 +133,9 @@ const TemplateList: React.FC<{
         // Fallback: check defaults
         const defaultTmpl = DEFAULT_REVIEW_TEMPLATES.find(t => t.id === id);
         if (defaultTmpl) {
-            const defaultMatch = defaultTmpl.title.match(emojiRegex);
+            const defaultMatch = defaultTmpl.title.match(iconRegex);
             if (defaultMatch) {
-                return { emoji: defaultMatch[0], text: title };
+                return { emoji: defaultMatch[1], text: title };
             }
         }
 
@@ -155,8 +160,12 @@ const TemplateList: React.FC<{
                     return (
                         <div key={template.id} className="flex items-center justify-between p-4 bg-white border border-stone-100 shadow-[0_2px_8px_rgba(0,0,0,0.02)] rounded-2xl hover:bg-stone-50 transition-colors group">
                             <div className="flex items-center gap-4 flex-1" onClick={() => onEdit(template.id)}>
-                                <div className="w-10 h-10 flex items-center justify-center bg-stone-50 rounded-xl text-xl border border-stone-100">
-                                    {emoji || <List size={20} className="text-stone-400" />}
+                                <div className="w-10 h-10 flex items-center justify-center bg-stone-50 rounded-xl border border-stone-100">
+                                    {emoji ? (
+                                        <IconRenderer icon={emoji} size={24} />
+                                    ) : (
+                                        <List size={20} className="text-stone-400" />
+                                    )}
                                 </div>
                                 <div>
                                     <h4 className="font-bold text-stone-800 text-[15px]">{text}</h4>
@@ -202,6 +211,10 @@ const TemplateEditor: React.FC<{
     onClose: () => void
 }> = ({ template, onUpdate, onClose }) => {
     const [editingQuestionId, setEditingQuestionId] = useState<string | null>(null);
+    const { uiIconTheme } = useSettings();
+    
+    // 检查是否开启了自定义图标功能
+    const isCustomIconEnabled = uiIconTheme !== 'default';
 
     const handleAddQuestion = () => {
         const newQuestion: ReviewQuestion = {
@@ -238,6 +251,29 @@ const TemplateEditor: React.FC<{
         [newQuestions[idx], newQuestions[swapIdx]] = [newQuestions[swapIdx], newQuestions[idx]];
         onUpdate({ ...template, questions: newQuestions });
     };
+    
+    // 处理图标选择
+    const handleIconSelect = (iconString: string) => {
+        // 解析图标字符串，提取 emoji 或 UI 图标
+        const { isUIIcon, value } = uiIconService.parseIconString(iconString);
+        
+        // 更新模板标题
+        // 如果当前标题有图标，替换它；否则在前面添加
+        const emojiRegex = /^(\p{Emoji_Presentation}|\p{Extended_Pictographic}|ui:[a-z_]+)\s*/u;
+        const currentTitle = template.title;
+        const match = currentTitle.match(emojiRegex);
+        
+        let newTitle: string;
+        if (match) {
+            // 替换现有图标
+            newTitle = iconString + ' ' + currentTitle.substring(match[0].length).trim();
+        } else {
+            // 在前面添加图标
+            newTitle = iconString + ' ' + currentTitle.trim();
+        }
+        
+        onUpdate({ ...template, title: newTitle });
+    };
 
     return (
         <div className="p-4 space-y-6">
@@ -251,6 +287,20 @@ const TemplateEditor: React.FC<{
                         placeholder="请输入模板名称"
                     />
                 </div>
+                
+                {/* UI Icon Selector - 仅在启用自定义主题时显示 */}
+                {isCustomIconEnabled && (
+                    <div>
+                        <label className="text-xs text-stone-400 font-medium mb-2 block">
+                            UI 图标
+                            <span className="text-stone-300 ml-1">(可选)</span>
+                        </label>
+                        <UIIconSelector
+                            currentIcon={template.title}
+                            onSelect={handleIconSelect}
+                        />
+                    </div>
+                )}
                 <div className="flex items-center justify-between pt-2">
                     <div className="flex flex-col">
                         <span className="text-sm font-bold text-stone-700">同步到时间轴</span>
