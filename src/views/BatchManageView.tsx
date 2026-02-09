@@ -330,11 +330,12 @@ export const BatchManageView: React.FC<BatchManageViewProps> = ({ onBack, catego
                                                 ? null 
                                                 : { type: 'category', id: category.id }
                                         )} 
-                                        className={`w-8 h-8 rounded-md transition-all border flex items-center justify-center ${
+                                        className={`w-8 h-8 rounded-md transition-all flex items-center justify-center ${
                                             iconSelectorOpen?.type === 'category' && iconSelectorOpen?.id === category.id 
-                                                ? 'ring-2 ring-[var(--accent-color)] bg-[var(--accent-color)]/10' 
-                                                : 'border-stone-200 hover:border-stone-300 bg-white'
+                                                ? 'bg-[var(--accent-color)]/10' 
+                                                : 'border border-stone-200 hover:border-stone-300 bg-white'
                                         }`}
+                                        style={iconSelectorOpen?.type === 'category' && iconSelectorOpen?.id === category.id ? { border: '0.5px solid var(--accent-color)' } : undefined}
                                         title="选择 UI 图标"
                                     >
                                         {category.uiIcon ? (
@@ -441,11 +442,12 @@ export const BatchManageView: React.FC<BatchManageViewProps> = ({ onBack, catego
                                                                 ? null 
                                                                 : { type: 'activity', id: activity.id }
                                                         )} 
-                                                        className={`w-7 h-7 rounded-md transition-all border flex items-center justify-center ${
+                                                        className={`w-7 h-7 rounded-md transition-all flex items-center justify-center ${
                                                             iconSelectorOpen?.type === 'activity' && iconSelectorOpen?.id === activity.id 
-                                                                ? 'ring-2 ring-[var(--accent-color)] bg-[var(--accent-color)]/10' 
-                                                                : 'border-stone-200 hover:border-stone-300 bg-white'
+                                                                ? 'bg-[var(--accent-color)]/10' 
+                                                                : 'border border-stone-200 hover:border-stone-300 bg-white'
                                                         }`}
+                                                        style={iconSelectorOpen?.type === 'activity' && iconSelectorOpen?.id === activity.id ? { border: '0.5px solid var(--accent-color)' } : undefined}
                                                         title="选择 UI 图标"
                                                     >
                                                         {activity.uiIcon ? (
