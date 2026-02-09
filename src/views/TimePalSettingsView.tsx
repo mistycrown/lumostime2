@@ -19,11 +19,11 @@ interface TimePalSettingsViewProps {
 }
 
 export const TimePalSettingsView: React.FC<TimePalSettingsViewProps> = ({ onBack, categories }) => {
-    // 当前选择的小动物类型（null 表示不使用）
-    const [selectedType, setSelectedType] = useState<TimePalType | null>(() => {
+    // 当前选择的小动物类型（'none' 表示不使用）
+    const [selectedType, setSelectedType] = useState<TimePalType | 'none'>(() => {
         const saved = localStorage.getItem('lumostime_timepal_type');
-        if (saved === 'none') return null;
-        return (saved as TimePalType) || 'cat';
+        if (!saved || saved === 'none') return 'none';
+        return saved as TimePalType;
     });
 
     // 图片加载错误状态（用于降级到 webp）
@@ -54,9 +54,9 @@ export const TimePalSettingsView: React.FC<TimePalSettingsViewProps> = ({ onBack
     const [selectedCategoryId, setSelectedCategoryId] = useState<string>('');
 
     // 保存小动物类型
-    const handleSelectType = (type: TimePalType | null) => {
+    const handleSelectType = (type: TimePalType | 'none') => {
         setSelectedType(type);
-        localStorage.setItem('lumostime_timepal_type', type || 'none');
+        localStorage.setItem('lumostime_timepal_type', type);
     };
 
     // 保存筛选设置
@@ -100,16 +100,16 @@ export const TimePalSettingsView: React.FC<TimePalSettingsViewProps> = ({ onBack
                     }}>
                         {/* 不使用时光小友选项 */}
                         <button
-                            onClick={() => handleSelectType(null)}
+                            onClick={() => handleSelectType('none')}
                             className={`
                                 relative flex flex-col items-center gap-2 p-3 rounded-xl border-2 transition-all
-                                ${selectedType === null
+                                ${selectedType === 'none'
                                     ? 'border-stone-400 bg-stone-50/50'
                                     : 'border-stone-200 bg-white hover:border-stone-300'}
                             `}
                         >
                             {/* 选中标记 */}
-                            {selectedType === null && (
+                            {selectedType === 'none' && (
                                 <div className="absolute top-2 right-2 w-5 h-5 bg-stone-400 rounded-full flex items-center justify-center">
                                     <span className="text-white text-xs">✓</span>
                                 </div>
@@ -121,7 +121,7 @@ export const TimePalSettingsView: React.FC<TimePalSettingsViewProps> = ({ onBack
                             </div>
 
                             {/* 名称 */}
-                            <span className={`text-xs font-medium text-center leading-tight ${selectedType === null ? 'text-stone-600' : 'text-stone-500'}`}>
+                            <span className={`text-xs font-medium text-center leading-tight ${selectedType === 'none' ? 'text-stone-600' : 'text-stone-500'}`}>
                                 不使用
                             </span>
                         </button>
