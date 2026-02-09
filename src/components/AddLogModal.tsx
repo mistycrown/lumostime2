@@ -9,7 +9,7 @@
  */
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { Category, Log, TodoItem, TodoCategory, Scope, AutoLinkRule, Comment } from '../types';
-import { X, Trash2, TrendingUp, Plus, Minus, Lightbulb, Check, Clock, Camera, Image as ImageIcon, Maximize2, Minimize2 } from 'lucide-react';
+import { X, Trash2, TrendingUp, Plus, Minus, Lightbulb, Check, CheckCircle2, Clock, Camera, Image as ImageIcon, Maximize2, Minimize2 } from 'lucide-react';
 import { TodoAssociation } from '../components/TodoAssociation';
 import { TagAssociation } from '../components/TagAssociation';
 import { ScopeAssociation } from '../components/ScopeAssociation';

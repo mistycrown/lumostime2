@@ -216,6 +216,7 @@ export interface ReviewQuestion {
 export interface ReviewTemplate {
   id: string;
   title: string;
+  uiIcon?: string; // UI icon ID (for custom theme, e.g., "ui:purple:01")
   questions: ReviewQuestion[];
   isSystem: boolean; // 是否系统预设
   order: number;
