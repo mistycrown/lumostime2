@@ -1,3 +1,16 @@
+/**
+ * IconPlugin.java - 动态图标切换插件
+ * 
+ * 功能：允许用户在应用内切换桌面图标样式
+ * 
+ * 实现方案：
+ * - 所有图标（包括默认图标）都对应一个 activity-alias
+ * - MainActivity 只负责承载应用逻辑，不作为启动器入口
+ * - 图标切换只在 alias 之间进行（启用目标 alias，禁用其他 alias）
+ * - MainActivity 状态永远不变，避免覆盖安装时报错
+ * 
+ * 更新日期：2026-02-09
+ */
 package com.mistycrown.lumostime;
 
 import android.content.ComponentName;
@@ -18,42 +31,43 @@ public class IconPlugin extends Plugin {
 
     // 定义可用的图标别名
     private static final List<String> AVAILABLE_ICONS = Arrays.asList(
-        "default",
-        "neon", 
-        "paper",
-        "pixel",
-        "sketch",
-        "art-deco",
-        "blueprint", 
-        "chalkboard",
-        "christmas",
-        "embroidery",
-        "graffiti",
-        "lego",
-        "origami",
-        "pointillism",
-        "pop-art",
-        "stained-glass",
-        "ukiyo-e",
-        "simple",
-        "cat",
-        "fox",
-        "frog",
-        "panda",
-        "heart",
-        "moon",
-        "mushroom",
-        "plant",
-        "sea",
-        "knot",
-        "bijiaso",
-        "cdqm",
-        "ciww",
-        "uvcd",
-        "wjugjp"
-    );
+            "default",
+            "neon",
+            "paper",
+            "pixel",
+            "sketch",
+            "art-deco",
+            "blueprint",
+            "chalkboard",
+            "christmas",
+            "embroidery",
+            "graffiti",
+            "lego",
+            "origami",
+            "pointillism",
+            "pop-art",
+            "stained-glass",
+            "ukiyo-e",
+            "simple",
+            "cat",
+            "fox",
+            "frog",
+            "panda",
+            "heart",
+            "moon",
+            "mushroom",
+            "plant",
+            "sea",
+            "knot",
+            "bijiaso",
+            "cdqm",
+            "ciww",
+            "uvcd",
+            "wjugjp");
 
     // 图标别名到Activity别名的映射
+    // 所有图标（包括默认图标）都对应一个 activity-alias
+    // MainActivity 不再作为启动器入口
     private String getActivityAlias(String iconId) {
         switch (iconId) {
             case "default":
@@ -130,7 +144,7 @@ public class IconPlugin extends Plugin {
     @PluginMethod
     public void setIcon(PluginCall call) {
         String iconId = call.getString("iconId", "default");
-        
+
         if (!AVAILABLE_ICONS.contains(iconId)) {
             call.reject("无效的图标ID: " + iconId);
             return;
@@ -139,81 +153,37 @@ public class IconPlugin extends Plugin {
         try {
             PackageManager packageManager = getContext().getPackageManager();
             String packageName = getContext().getPackageName();
-            
-            // 1. 处理主 MainActivity（默认图标）
-            ComponentName mainActivity = new ComponentName(packageName, 
-                "com.mistycrown.lumostime.MainActivity");
-            
-            // 重要修复：主 Activity 始终保持启用状态，只控制 alias 的显示
-            // 这样可以避免重新安装时找不到 MainActivity 的问题
-            
-            if (iconId.equals("default")) {
-                // 选择默认图标：确保主 Activity 启用，禁用所有 alias
+
+            // 核心方案：所有图标切换只在 alias 之间进行
+            // MainActivity 永远不操作，始终保持 enabled 状态
+            // 这样既不会出现两个图标，也不会导致覆盖安装失败
+
+            // 遍历所有图标，启用目标 alias，禁用其他 alias
+            for (String availableIcon : AVAILABLE_ICONS) {
+                String activityAlias = getActivityAlias(availableIcon);
+                ComponentName componentName = new ComponentName(packageName, activityAlias);
+
+                // 选中的 alias 设置为 ENABLED，其他设置为 DISABLED
+                int newState = availableIcon.equals(iconId) ? PackageManager.COMPONENT_ENABLED_STATE_ENABLED
+                        : PackageManager.COMPONENT_ENABLED_STATE_DISABLED;
+
                 packageManager.setComponentEnabledSetting(
-                    mainActivity,
-                    PackageManager.COMPONENT_ENABLED_STATE_ENABLED,
-                    PackageManager.DONT_KILL_APP
-                );
-                
-                // 禁用所有 alias
-                for (String availableIcon : AVAILABLE_ICONS) {
-                    if (availableIcon.equals("default")) continue;
-                    
-                    String activityAlias = getActivityAlias(availableIcon);
-                    ComponentName componentName = new ComponentName(packageName, activityAlias);
-                    packageManager.setComponentEnabledSetting(
-                        componentName,
-                        PackageManager.COMPONENT_ENABLED_STATE_DISABLED,
-                        PackageManager.DONT_KILL_APP
-                    );
-                }
-            } else {
-                // 选择其他图标：保持主 Activity 启用但隐藏，启用对应的 alias
-                // 注意：这里不禁用主 Activity，而是让 alias 优先显示
-                packageManager.setComponentEnabledSetting(
-                    mainActivity,
-                    PackageManager.COMPONENT_ENABLED_STATE_ENABLED,
-                    PackageManager.DONT_KILL_APP
-                );
-                
-                // 处理所有 alias
-                for (String availableIcon : AVAILABLE_ICONS) {
-                    if (availableIcon.equals("default")) continue;
-                    
-                    String activityAlias = getActivityAlias(availableIcon);
-                    ComponentName componentName = new ComponentName(packageName, activityAlias);
-                    
-                    int newState = availableIcon.equals(iconId) ? 
-                        PackageManager.COMPONENT_ENABLED_STATE_ENABLED : 
-                        PackageManager.COMPONENT_ENABLED_STATE_DISABLED;
-                        
-                    packageManager.setComponentEnabledSetting(
                         componentName,
                         newState,
-                        PackageManager.DONT_KILL_APP
-                    );
-                }
+                        PackageManager.DONT_KILL_APP);
             }
-            
+
             // 保存当前图标设置
             getContext().getSharedPreferences("lumos_settings", 0)
-                .edit()
-                .putString("current_icon", iconId)
-                .apply();
-            
-            // 延迟刷新启动器，确保系统有时间处理组件状态变更
-            new Handler(Looper.getMainLooper()).postDelayed(new Runnable() {
-                @Override
-                public void run() {
-                    refreshLauncher();
-                }
-            }, 1000); // 延迟1秒
-            
+                    .edit()
+                    .putString("current_icon", iconId)
+                    .apply();
+
             JSObject result = new JSObject();
             result.put("success", true);
-            result.put("message", "图标已更新为: " + iconId + "，启动器将在几秒内刷新");
+            result.put("message", "图标已更新为: " + iconId);
             call.resolve(result);
-            
+
         } catch (Exception e) {
             call.reject("设置图标失败: " + e.getMessage());
         }
@@ -222,8 +192,8 @@ public class IconPlugin extends Plugin {
     @PluginMethod
     public void getCurrentIcon(PluginCall call) {
         String currentIcon = getContext().getSharedPreferences("lumos_settings", 0)
-            .getString("current_icon", "default");
-            
+                .getString("current_icon", "default");
+
         JSObject result = new JSObject();
         result.put("iconId", currentIcon);
         call.resolve(result);
@@ -239,39 +209,30 @@ public class IconPlugin extends Plugin {
     @PluginMethod
     public void initializeIconState(PluginCall call) {
         try {
-            // 在应用启动时确保至少有一个入口点是启用的
+            // 在应用启动时确保图标状态正确
             String currentIcon = getContext().getSharedPreferences("lumos_settings", 0)
-                .getString("current_icon", "default");
-            
+                    .getString("current_icon", "default");
+
             PackageManager packageManager = getContext().getPackageManager();
             String packageName = getContext().getPackageName();
-            
-            // 检查当前设置的图标是否正确启用
-            if (currentIcon.equals("default")) {
-                // 确保主 Activity 启用
-                ComponentName mainActivity = new ComponentName(packageName, 
-                    "com.mistycrown.lumostime.MainActivity");
-                packageManager.setComponentEnabledSetting(
-                    mainActivity,
-                    PackageManager.COMPONENT_ENABLED_STATE_ENABLED,
-                    PackageManager.DONT_KILL_APP
-                );
-            } else {
-                // 确保对应的 alias 启用
-                String activityAlias = getActivityAlias(currentIcon);
+
+            // 所有图标切换只在 alias 之间进行，不操作 MainActivity
+            for (String availableIcon : AVAILABLE_ICONS) {
+                String activityAlias = getActivityAlias(availableIcon);
                 ComponentName componentName = new ComponentName(packageName, activityAlias);
+                int state = availableIcon.equals(currentIcon) ? PackageManager.COMPONENT_ENABLED_STATE_ENABLED
+                        : PackageManager.COMPONENT_ENABLED_STATE_DISABLED;
                 packageManager.setComponentEnabledSetting(
-                    componentName,
-                    PackageManager.COMPONENT_ENABLED_STATE_ENABLED,
-                    PackageManager.DONT_KILL_APP
-                );
+                        componentName,
+                        state,
+                        PackageManager.DONT_KILL_APP);
             }
-            
+
             JSObject result = new JSObject();
             result.put("success", true);
             result.put("currentIcon", currentIcon);
             call.resolve(result);
-            
+
         } catch (Exception e) {
             call.reject("初始化图标状态失败: " + e.getMessage());
         }
@@ -279,64 +240,9 @@ public class IconPlugin extends Plugin {
 
     @PluginMethod
     public void refreshLauncher(PluginCall call) {
-        refreshLauncher();
-        
         JSObject result = new JSObject();
         result.put("success", true);
-        result.put("message", "启动器刷新请求已发送");
+        result.put("message", "图标更新完成，启动器会自动刷新");
         call.resolve(result);
-    }
-    private void refreshLauncher() {
-        try {
-            // 方法1: 发送启动器刷新广播
-            Intent refreshIntent = new Intent("android.intent.action.MAIN");
-            refreshIntent.addCategory("android.intent.category.HOME");
-            refreshIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-            
-            // 方法2: 发送包替换广播 (需要权限，可能不会成功)
-            try {
-                String packageName = getContext().getPackageName();
-                Intent packageReplacedIntent = new Intent(Intent.ACTION_PACKAGE_REPLACED);
-                packageReplacedIntent.setData(android.net.Uri.parse("package:" + packageName));
-                getContext().sendBroadcast(packageReplacedIntent);
-            } catch (Exception e) {
-                // 忽略权限错误
-            }
-            
-            // 方法3: 创建桌面快捷方式刷新 (Android 8.0+)
-            try {
-                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
-                    android.content.pm.ShortcutManager shortcutManager = 
-                        getContext().getSystemService(android.content.pm.ShortcutManager.class);
-                    if (shortcutManager != null) {
-                        // 更新动态快捷方式可能触发启动器刷新
-                        shortcutManager.updateShortcuts(java.util.Collections.emptyList());
-                    }
-                }
-            } catch (Exception e) {
-                // 忽略错误
-            }
-            
-            // 方法4: 延迟重启应用 (最后手段)
-            new Handler(Looper.getMainLooper()).postDelayed(new Runnable() {
-                @Override
-                public void run() {
-                    try {
-                        // 提示用户手动刷新
-                        android.widget.Toast.makeText(
-                            getContext(), 
-                            "图标已更新，如未显示请重启启动器或重启设备", 
-                            android.widget.Toast.LENGTH_LONG
-                        ).show();
-                    } catch (Exception e) {
-                        // 忽略错误
-                    }
-                }
-            }, 2000);
-            
-        } catch (Exception e) {
-            // 记录错误但不抛出异常
-            android.util.Log.w("IconPlugin", "刷新启动器失败: " + e.getMessage());
-        }
     }
 }

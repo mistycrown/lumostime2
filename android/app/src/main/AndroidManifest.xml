@@ -23,12 +23,8 @@
             android:launchMode="singleTask"
             android:exported="true"
             android:enabled="true">
-            <!-- 主 Activity 的启动器入口，当使用默认图标时显示 -->
-            <intent-filter android:priority="0">
-                <action android:name="android.intent.action.MAIN" />
-                <category android:name="android.intent.category.LAUNCHER" />
-            </intent-filter>
-
+            <!-- MainActivity 不再作为启动器入口，由 activity-alias 接管 -->
+            <!-- 保留 NFC 和 deep link 相关的 intent-filter -->
             <intent-filter>
                 <action android:name="android.nfc.action.NDEF_DISCOVERED" />
                 <category android:name="android.intent.category.DEFAULT" />
@@ -42,6 +38,21 @@
                 <data android:scheme="lumostime" />
             </intent-filter>
         </activity>
+
+        <!-- 图标别名 - 默认图标（始终启用其中之一作为启动器入口） -->
+        <activity-alias
+            android:name=".MainActivityDefault"
+            android:targetActivity=".MainActivity"
+            android:icon="@mipmap/ic_launcher"
+            android:roundIcon="@mipmap/ic_launcher_round"
+            android:label="@string/app_name"
+            android:enabled="true"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
 
         <!-- 图标别名 - 霓虹风格 -->
         <activity-alias
