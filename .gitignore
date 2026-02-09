@@ -56,7 +56,7 @@ __pycache__/
 
 # 个人笔记
 note.md
-
+mymemo.md
 # 测试文件（包含解密逻辑）
 test-obfuscation.html
 
