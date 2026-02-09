@@ -10,12 +10,11 @@
 import React, { useState } from 'react';
 import { ReviewTemplate, ReviewQuestion, QuestionType } from '../types';
 import { DEFAULT_REVIEW_TEMPLATES, COLOR_OPTIONS } from '../constants';
-import { ChevronLeft, Plus, Trash2, GripVertical, Check, X, Edit3, MessageSquare, List, Star, MoreVertical, ToggleLeft, ToggleRight, ArrowUp, ArrowDown, RotateCcw } from 'lucide-react';
+import { ChevronLeft, Plus, Trash2, Edit3, List, ArrowUp, ArrowDown, RotateCcw, ToggleLeft, ToggleRight } from 'lucide-react';
 import { ConfirmModal } from '../components/ConfirmModal';
 import { useSettings } from '../contexts/SettingsContext';
 import { UIIconSelector } from '../components/UIIconSelector';
 import { IconRenderer } from '../components/IconRenderer';
-import { uiIconService } from '../services/uiIconService';
 
 interface ReviewTemplateManageViewProps {
     templates: ReviewTemplate[];
@@ -119,27 +118,36 @@ const TemplateList: React.FC<{
     };
 
     // Helper to extract emoji or UI icon
-    const getDisplayInfo = (title: string, id: string) => {
-        // 匹配 emoji 或 ui:iconType 格式
-        const iconRegex = /^(ui:[a-z_]+|\p{Emoji_Presentation}|\p{Extended_Pictographic})\s*/u;
-        const match = title.match(iconRegex);
+    const getDisplayInfo = (template: ReviewTemplate) => {
+        // 从 title 中提取 emoji 和纯文本
+        const emojiRegex = /^(\p{Emoji_Presentation}|\p{Extended_Pictographic})\s*/u;
+        const match = template.title.match(emojiRegex);
+        
+        let emoji: string | null = null;
+        let text: string = template.title;
+        
         if (match) {
-            return {
-                emoji: match[1],  // 可能是 emoji 或 "ui:iconType"
-                text: title.substring(match[0].length).trim()
-            };
+            emoji = match[1];
+            text = template.title.substring(match[0].length).trim();
         }
-
+        
+        // 优先使用 uiIcon 字段作为显示图标
+        if (template.uiIcon) {
+            emoji = template.uiIcon;
+        }
+        
         // Fallback: check defaults
-        const defaultTmpl = DEFAULT_REVIEW_TEMPLATES.find(t => t.id === id);
-        if (defaultTmpl) {
-            const defaultMatch = defaultTmpl.title.match(iconRegex);
-            if (defaultMatch) {
-                return { emoji: defaultMatch[1], text: title };
+        if (!emoji) {
+            const defaultTmpl = DEFAULT_REVIEW_TEMPLATES.find(t => t.id === template.id);
+            if (defaultTmpl) {
+                const defaultMatch = defaultTmpl.title.match(emojiRegex);
+                if (defaultMatch) {
+                    emoji = defaultMatch[1];
+                }
             }
         }
 
-        return { emoji: null, text: title };
+        return { emoji, text };
     };
 
     return (
@@ -156,7 +164,7 @@ const TemplateList: React.FC<{
 
             <div className="space-y-3">
                 {templates.map(template => {
-                    const { emoji, text } = getDisplayInfo(template.title, template.id);
+                    const { emoji, text } = getDisplayInfo(template);
                     return (
                         <div key={template.id} className="flex items-center justify-between p-4 bg-white border border-stone-100 shadow-[0_2px_8px_rgba(0,0,0,0.02)] rounded-2xl hover:bg-stone-50 transition-colors group">
                             <div className="flex items-center gap-4 flex-1" onClick={() => onEdit(template.id)}>
@@ -209,12 +217,21 @@ const TemplateEditor: React.FC<{
     template: ReviewTemplate,
     onUpdate: (t: ReviewTemplate) => void,
     onClose: () => void
-}> = ({ template, onUpdate, onClose }) => {
+}> = ({ template, onUpdate }) => {
     const [editingQuestionId, setEditingQuestionId] = useState<string | null>(null);
     const { uiIconTheme } = useSettings();
     
     // 检查是否开启了自定义图标功能
     const isCustomIconEnabled = uiIconTheme !== 'default';
+
+    // 处理模板名称变化（自动提取第一个字符作为 emoji）
+    const handleTitleChange = (val: string) => {
+        const firstChar = Array.from(val)[0] || '';
+        const icon = firstChar;
+        const name = val.slice(firstChar.length).trim();
+        // 更新 title 为完整的 "emoji + 名称"
+        onUpdate({ ...template, title: icon + ' ' + name });
+    };
 
     const handleAddQuestion = () => {
         const newQuestion: ReviewQuestion = {
@@ -252,39 +269,29 @@ const TemplateEditor: React.FC<{
         onUpdate({ ...template, questions: newQuestions });
     };
     
-    // 处理图标选择
-    const handleIconSelect = (iconString: string) => {
-        // 解析图标字符串，提取 emoji 或 UI 图标
-        const { isUIIcon, value } = uiIconService.parseIconString(iconString);
-        
-        // 更新模板标题
-        // 如果当前标题有图标，替换它；否则在前面添加
-        const emojiRegex = /^(\p{Emoji_Presentation}|\p{Extended_Pictographic}|ui:[a-z_]+)\s*/u;
-        const currentTitle = template.title;
-        const match = currentTitle.match(emojiRegex);
-        
-        let newTitle: string;
-        if (match) {
-            // 替换现有图标
-            newTitle = iconString + ' ' + currentTitle.substring(match[0].length).trim();
-        } else {
-            // 在前面添加图标
-            newTitle = iconString + ' ' + currentTitle.trim();
-        }
-        
-        onUpdate({ ...template, title: newTitle });
+    // 处理 UI 图标选择 - 只更新 uiIcon 字段，不修改 title
+    const handleIconSelect = (emoji: string, uiIcon: string) => {
+        // 只更新 uiIcon 字段，不修改 title
+        onUpdate({ ...template, uiIcon });
+    };
+
+    // 从 title 中提取 emoji
+    const getEmojiFromTitle = () => {
+        const emojiRegex = /^(\p{Emoji_Presentation}|\p{Extended_Pictographic})\s*/u;
+        const match = template.title.match(emojiRegex);
+        return match ? match[1] : '';
     };
 
     return (
         <div className="p-4 space-y-6">
             <div className="bg-white rounded-2xl p-6 shadow-sm space-y-4">
                 <div>
-                    <label className="text-xs font-bold text-stone-400 uppercase ml-1">模板名称</label>
+                    <label className="text-xs font-bold text-stone-400 uppercase ml-1">模板名称 (第一个字符是 emoji)</label>
                     <input
                         className="w-full text-lg font-bold text-stone-800 bg-transparent border-b border-stone-200 py-2 outline-none focus:border-stone-400 transition-colors"
                         value={template.title}
-                        onChange={e => onUpdate({ ...template, title: e.target.value })}
-                        placeholder="请输入模板名称"
+                        onChange={e => handleTitleChange(e.target.value)}
+                        placeholder="📝 请输入模板名称"
                     />
                 </div>
                 
@@ -296,8 +303,9 @@ const TemplateEditor: React.FC<{
                             <span className="text-stone-300 ml-1">(可选)</span>
                         </label>
                         <UIIconSelector
-                            currentIcon={template.title}
-                            onSelect={handleIconSelect}
+                            currentIcon={getEmojiFromTitle()}
+                            currentUiIcon={template.uiIcon}
+                            onSelectDual={handleIconSelect}
                         />
                     </div>
                 )}
