@@ -10,18 +10,30 @@ import { ToastType } from './Toast';
 
 interface NavigationDecorationSelectorProps {
     onToast: (type: ToastType, message: string) => void;
+    currentDecoration?: string;
+    onDecorationChange?: (decorationId: string) => void;
 }
 
-export const NavigationDecorationSelector: React.FC<NavigationDecorationSelectorProps> = ({ onToast }) => {
+export const NavigationDecorationSelector: React.FC<NavigationDecorationSelectorProps> = ({ 
+    onToast,
+    currentDecoration: controlledDecoration,
+    onDecorationChange
+}) => {
     const [decorations, setDecorations] = useState<NavigationDecorationOption[]>([]);
-    const [currentDecoration, setCurrentDecoration] = useState<string>('default');
+    const [internalDecoration, setInternalDecoration] = useState<string>('default');
     const [imageErrors, setImageErrors] = useState<Record<string, boolean>>({});
     const [imageSources, setImageSources] = useState<Record<string, string>>({});
+    
+    // Use controlled or internal state
+    const currentDecoration = controlledDecoration !== undefined ? controlledDecoration : internalDecoration;
+    const isControlled = controlledDecoration !== undefined;
 
     useEffect(() => {
         const allDecorations = navigationDecorationService.getAllDecorations();
         setDecorations(allDecorations);
-        setCurrentDecoration(navigationDecorationService.getCurrentDecoration());
+        if (!isControlled) {
+            setInternalDecoration(navigationDecorationService.getCurrentDecoration());
+        }
         
         // 初始化图片源为 PNG 格式
         const sources: Record<string, string> = {};
@@ -31,12 +43,18 @@ export const NavigationDecorationSelector: React.FC<NavigationDecorationSelector
             }
         });
         setImageSources(sources);
-    }, []);
+    }, [isControlled]);
 
     const handleDecorationSelect = (decorationId: string) => {
-        navigationDecorationService.setCurrentDecoration(decorationId);
-        setCurrentDecoration(decorationId);
-        onToast('success', '标题栏样式已更换');
+        if (isControlled && onDecorationChange) {
+            // Controlled mode - just notify parent
+            onDecorationChange(decorationId);
+        } else {
+            // Uncontrolled mode - update service and internal state
+            navigationDecorationService.setCurrentDecoration(decorationId);
+            setInternalDecoration(decorationId);
+            onToast('success', '标题栏样式已更换');
+        }
     };
 
     const handleOpenDebugger = () => {

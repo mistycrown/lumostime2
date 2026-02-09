@@ -10,22 +10,34 @@ import { ToastType } from './Toast';
 
 interface BackgroundSelectorProps {
     onToast: (type: ToastType, message: string) => void;
+    currentBackground?: string;
+    onBackgroundChange?: (backgroundId: string) => void;
 }
 
-export const BackgroundSelector: React.FC<BackgroundSelectorProps> = ({ onToast }) => {
+export const BackgroundSelector: React.FC<BackgroundSelectorProps> = ({ 
+    onToast,
+    currentBackground: controlledBackground,
+    onBackgroundChange
+}) => {
     const [backgrounds, setBackgrounds] = useState<BackgroundOption[]>([]);
-    const [currentBackground, setCurrentBackground] = useState<string>('default');
+    const [internalBackground, setInternalBackground] = useState<string>('default');
     const [backgroundOpacity, setBackgroundOpacity] = useState<number>(0.1);
     const [isUploading, setIsUploading] = useState(false);
     const [imageErrors, setImageErrors] = useState<Record<string, boolean>>({});
     const [imageSources, setImageSources] = useState<Record<string, string>>({});
     const fileInputRef = useRef<HTMLInputElement>(null);
+    
+    // Use controlled or internal state
+    const currentBackground = controlledBackground !== undefined ? controlledBackground : internalBackground;
+    const isControlled = controlledBackground !== undefined;
 
     useEffect(() => {
         loadBackgrounds();
-        setCurrentBackground(backgroundService.getCurrentBackground());
+        if (!isControlled) {
+            setInternalBackground(backgroundService.getCurrentBackground());
+        }
         setBackgroundOpacity(backgroundService.getBackgroundOpacity());
-    }, []);
+    }, [isControlled]);
 
     const loadBackgrounds = () => {
         const allBackgrounds = backgroundService.getAllBackgrounds();
@@ -44,9 +56,15 @@ export const BackgroundSelector: React.FC<BackgroundSelectorProps> = ({ onToast 
     };
 
     const handleBackgroundSelect = (backgroundId: string) => {
-        backgroundService.setCurrentBackground(backgroundId);
-        setCurrentBackground(backgroundId);
-        onToast('success', '背景已更换');
+        if (isControlled && onBackgroundChange) {
+            // Controlled mode - just notify parent
+            onBackgroundChange(backgroundId);
+        } else {
+            // Uncontrolled mode - update service and internal state
+            backgroundService.setCurrentBackground(backgroundId);
+            setInternalBackground(backgroundId);
+            onToast('success', '背景已更换');
+        }
     };
 
     const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
