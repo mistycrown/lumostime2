@@ -445,10 +445,10 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
         
         // 特殊处理：morning3 文件名前面有空格
         if (timeOfDay === 'morning' && randomNum === 3) {
-            return `/banner/ morning3.png`;
+            return `/banner/ morning3.webp`;
         }
         
-        return `/banner/${timeOfDay}${randomNum}.png`;
+        return `/banner/${timeOfDay}${randomNum}.webp`;
     });
     
     // 根据时间段生成问候语
@@ -983,7 +983,7 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
                                         {/* 文字内容 - 居中对齐 */}
                                         <div className="relative flex flex-col items-center gap-2 py-3 px-8">
                                             <span className="text-sm text-stone-800 font-serif font-medium drop-shadow-md">{greeting.prefix}</span>
-                                            <span className="text-5xl font-bold text-amber-600 font-serif drop-shadow-lg leading-none">#{supporterId || '001'}</span>
+                                            <span className="text-5xl font-bold font-serif drop-shadow-lg leading-none" style={{ color: 'var(--text-deep)' }}>#{supporterId || '001'}</span>
                                             <span className="text-sm text-stone-800 font-serif font-medium drop-shadow-md">{greeting.suffix}</span>
                                         </div>
                                     </div>
@@ -1028,10 +1028,10 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
                                             <div key={preset.id} className="relative">
                                                 <button
                                                     onClick={() => applyThemePreset(preset)}
-                                                    className={`w-full rounded-2xl border-2 transition-all overflow-hidden text-left ${
+                                                    className={`w-full rounded-2xl transition-all overflow-hidden text-left ${
                                                         isSelected
-                                                            ? 'border-stone-400 ring-2 ring-stone-200 bg-white shadow-md'
-                                                            : 'border-stone-200 hover:border-stone-300 bg-white hover:bg-stone-50'
+                                                            ? 'border-2 border-stone-300 ring-1 ring-stone-200 bg-white shadow-sm'
+                                                            : 'border border-stone-100 hover:border-stone-200 bg-white hover:bg-stone-50'
                                                     }`}
                                                 >
                                                     <div className="p-3 flex items-center gap-3">
@@ -1169,7 +1169,7 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
                                     {/* 保存当前设置按钮 */}
                                     <button
                                         onClick={() => setIsNameModalOpen(true)}
-                                        className="w-full rounded-2xl border-2 border-dashed border-stone-300 bg-white hover:bg-stone-50 hover:border-stone-400 transition-all p-4 flex items-center justify-center gap-2 text-stone-600 font-medium"
+                                        className="w-full rounded-2xl border border-dashed border-stone-200 bg-white hover:bg-stone-50 hover:border-stone-300 transition-all p-4 flex items-center justify-center gap-2 text-stone-600 font-medium"
                                     >
                                         <span className="text-lg">+</span>
                                         <span>保存当前设置为方案</span>
