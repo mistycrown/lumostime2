@@ -3,6 +3,8 @@
  * @description 时光小友励志语录
  */
 
+import { TIMEPAL_KEYS, storage } from './storageKeys';
+
 export const TIMEPAL_MOTIVATIONAL_QUOTES = [
     '种一棵树最好的时间是十年前，其次是现在',
     '万物皆有裂痕，那是光照进来的地方',
@@ -74,19 +76,12 @@ export const TIMEPAL_MOTIVATIONAL_QUOTES = [
 // 获取随机语录
 export const getRandomQuote = (): string => {
     // 检查是否启用自定义语录
-    const customEnabled = localStorage.getItem('lumostime_timepal_custom_quotes_enabled') === 'true';
+    const customEnabled = storage.getBoolean(TIMEPAL_KEYS.CUSTOM_QUOTES_ENABLED, false);
     
     if (customEnabled) {
-        const customQuotesStr = localStorage.getItem('lumostime_timepal_custom_quotes');
-        if (customQuotesStr) {
-            try {
-                const customQuotes = JSON.parse(customQuotesStr) as string[];
-                if (customQuotes.length > 0) {
-                    return customQuotes[Math.floor(Math.random() * customQuotes.length)];
-                }
-            } catch (e) {
-                console.error('Failed to parse custom quotes:', e);
-            }
+        const customQuotes = storage.getJSON<string[]>(TIMEPAL_KEYS.CUSTOM_QUOTES, []);
+        if (customQuotes.length > 0) {
+            return customQuotes[Math.floor(Math.random() * customQuotes.length)];
         }
     }
     

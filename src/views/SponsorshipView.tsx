@@ -19,6 +19,7 @@ import { InputModal } from '../components/InputModal';
 import { PresetEditModal } from '../components/PresetEditModal';
 import { useCustomPresets, ThemePreset, getValidationErrorMessage } from '../hooks/useCustomPresets';
 import { TimePalSettings } from '../components/TimePalSettings';
+import { ThemePresetService } from '../services/themePresetService';
 
 interface SponsorshipViewProps {
     onBack: () => void;
@@ -298,89 +299,30 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
 
     // 执行主题方案切换的实际逻辑
     const executeThemePresetChange = async (preset: ThemePreset, oldTheme: string) => {
-        try {
-            console.log('[SponsorshipView] 主题切换:', { from: oldTheme, to: preset.uiTheme });
-            
-            // 1. 设置 UI 主题
-            setUiIconTheme(preset.uiTheme);
-            
-            // 2. 设置配色方案
-            setColorScheme(preset.colorScheme);
-            
-            // 3. 设置背景
-            const { backgroundService } = await import('../services/backgroundService');
-            backgroundService.setCurrentBackground(preset.background);
-            
-            // 4. 设置导航装饰
-            const { navigationDecorationService } = await import('../services/navigationDecorationService');
-            navigationDecorationService.setCurrentDecoration(preset.navigation);
-            
-            // 5. 设置时间小友
-            localStorage.setItem('lumostime_timepal_type', preset.timePal);
-            window.dispatchEvent(new Event('timepal-type-changed'));
-            
-            // 6. 保存当前方案
-            localStorage.setItem('lumostime_current_preset', preset.id);
-            setCurrentPresetId(preset.id);
-            
-            // 7. 处理图标主题切换
-            // 只在首次从 default 切换到自定义主题时生成 uiIcon
-            if (oldTheme === 'default' && preset.uiTheme !== 'default') {
-                try {
-                    const { iconMigrationService } = await import('../services/iconMigrationService');
-                    
-                    // 检查是否已经生成过 uiIcon
-                    if (!iconMigrationService.isUiIconGenerated()) {
-                        console.log('[SponsorshipView] 首次切换到自定义主题，生成 uiIcon...');
-                        
-                        // 执行一次性生成
-                        const result = await iconMigrationService.generateAllUiIcons();
-                        
-                        if (result.success) {
-                            console.log('[SponsorshipView] uiIcon 生成成功:', result);
-                            onToast('success', `${result.message}，正在刷新...`);
-                            
-                            // 刷新页面以应用新数据
-                            setTimeout(() => {
-                                window.location.reload();
-                            }, 1000);
-                            return;
-                        } else {
-                            console.error('[SponsorshipView] uiIcon 生成失败:', result);
-                            onToast('error', result.message);
-                        }
-                    } else {
-                        console.log('[SponsorshipView] uiIcon 已存在，直接切换主题');
-                    }
-                } catch (error) {
-                    console.error('[SponsorshipView] 图标迁移失败:', error);
-                    onToast('error', '图标迁移失败，请重试');
-                }
-            }
-            
-            // 从自定义主题切换回 default，或在自定义主题之间切换
-            // 不做任何数据迁移，只是切换渲染方式
-            if (oldTheme !== 'default' && preset.uiTheme === 'default') {
-                console.log('[SponsorshipView] 从自定义主题切换回默认主题，不做数据迁移');
-            }
-            
-            // 8. 如果需要切换应用图标（仅 Android）
-            if (Capacitor.isNativePlatform() && preset.appIcon !== 'icon_simple') {
-                // 应用图标切换需要用户确认，这里只提示
-                onToast('info', `主题已应用！如需更换应用图标，请在 Icon 标签页选择"${preset.appIcon}"`);
-            } else {
-                onToast('success', `已应用"${preset.name}"主题方案`);
-            }
-            
-            // 9. 触发背景重新应用
-            setTimeout(() => {
-                backgroundService.applyBackgroundToElements();
-            }, 100);
-            
-        } catch (error) {
-            console.error('[SponsorshipView] 执行主题方案切换失败:', error);
-            onToast('error', '应用主题方案失败，请重试');
+        const result = await ThemePresetService.applyThemePreset(
+            preset,
+            oldTheme,
+            setUiIconTheme,
+            setColorScheme,
+            setCurrentPresetId
+        );
+        
+        if (!result.success) {
+            onToast('error', result.message);
+            return;
         }
+        
+        if (result.needsReload) {
+            onToast('success', result.message);
+            setTimeout(() => {
+                window.location.reload();
+            }, 1000);
+            return;
+        }
+        
+        // 根据消息类型显示不同的 toast
+        const toastType = result.message.includes('Icon') ? 'info' : 'success';
+        onToast(toastType, result.message);
     };
 
     // 处理 UI 图标主题切换，并触发图标迁移
