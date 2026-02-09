@@ -99,7 +99,7 @@ export const TIMEPAL_OPTIONS: TimePalOption[] = [
     { 
         type: 'flower', 
         name: '花朵', 
-        preview: '/time_pal_origin/flower/1.png',
+        preview: '/time_pal_origin/flower/1.webp',
         emoji: '🌸'
     },
     { 
