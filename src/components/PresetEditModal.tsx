@@ -234,9 +234,29 @@ export const PresetEditModal: React.FC<PresetEditModalProps> = ({
                             时间小友
                         </label>
                         <div className="grid gap-2" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(64px, 1fr))' }}>
+                            {/* 不使用选项 */}
+                            <button
+                                onClick={() => handleFieldChange('timePal', 'none')}
+                                className={`relative rounded-lg border-2 transition-all overflow-hidden ${
+                                    editedPreset.timePal === 'none'
+                                        ? 'border-stone-400 ring-2 ring-stone-200'
+                                        : 'border-stone-200 hover:border-stone-300'
+                                }`}
+                                style={{ aspectRatio: '4/5' }}
+                            >
+                                <div className="w-full h-full flex items-center justify-center p-1">
+                                    <span className="text-xs text-stone-400">不使用</span>
+                                </div>
+                                {editedPreset.timePal === 'none' && (
+                                    <div className="absolute top-1 right-1 w-5 h-5 bg-stone-800 rounded-full flex items-center justify-center shadow-lg">
+                                        <Check size={12} className="text-white" />
+                                    </div>
+                                )}
+                            </button>
+                            
+                            {/* TimePal 选项 */}
                             {TIMEPAL_OPTIONS.map((option) => {
                                 const isSelected = editedPreset.timePal === option.type;
-                                const isDefault = option.type === 'default';
                                 return (
                                     <button
                                         key={option.type}
@@ -249,22 +269,18 @@ export const PresetEditModal: React.FC<PresetEditModalProps> = ({
                                         style={{ aspectRatio: '4/5' }}
                                     >
                                         <div className="w-full h-full flex items-center justify-center p-1">
-                                            {isDefault ? (
-                                                <span className="text-xs text-stone-400">默认</span>
-                                            ) : (
-                                                <img
-                                                    src={option.preview}
-                                                    alt={option.name}
-                                                    className="w-full h-full object-contain"
-                                                    onError={(e) => {
-                                                        e.currentTarget.style.display = 'none';
-                                                        const parent = e.currentTarget.parentElement;
-                                                        if (parent) {
-                                                            parent.innerHTML = `<span class="text-3xl">${getTimePalEmoji(option.type)}</span>`;
-                                                        }
-                                                    }}
-                                                />
-                                            )}
+                                            <img
+                                                src={option.preview}
+                                                alt={option.name}
+                                                className="w-full h-full object-contain"
+                                                onError={(e) => {
+                                                    e.currentTarget.style.display = 'none';
+                                                    const parent = e.currentTarget.parentElement;
+                                                    if (parent) {
+                                                        parent.innerHTML = `<span class="text-3xl">${getTimePalEmoji(option.type)}</span>`;
+                                                    }
+                                                }}
+                                            />
                                         </div>
                                         {isSelected && (
                                             <div className="absolute top-1 right-1 w-5 h-5 bg-stone-800 rounded-full flex items-center justify-center shadow-lg">

@@ -1,4 +1,5 @@
 import { TRANSFORM_PARAMS } from '../constants/redemptionHashes';
+import { SPONSORSHIP_KEYS, storage } from '../constants/storageKeys';
 
 /**
  * Redemption verification result interface
@@ -95,9 +96,6 @@ class FastDecoder {
  * 负责处理兑换码验证的核心业务逻辑
  */
 export class RedemptionService {
-  private readonly STORAGE_KEY = 'lumos_sponsorship_code';
-  private readonly VERIFIED_KEY = 'lumos_verified_user_id';
-  
   // 内存缓存，避免重复计算
   private verificationCache = new Map<string, number>();
 
@@ -164,9 +162,9 @@ export class RedemptionService {
    */
   saveCode(code: string, userId?: number): void {
     try {
-      localStorage.setItem(this.STORAGE_KEY, code);
+      storage.set(SPONSORSHIP_KEYS.REDEMPTION_CODE, code);
       if (userId) {
-        localStorage.setItem(this.VERIFIED_KEY, userId.toString());
+        storage.set(SPONSORSHIP_KEYS.SUPPORTER_ID, userId.toString());
       }
     } catch (error) {
       console.warn('LocalStorage not available, using session-only mode:', error);
@@ -179,7 +177,7 @@ export class RedemptionService {
    */
   getSavedCode(): string | null {
     try {
-      return localStorage.getItem(this.STORAGE_KEY);
+      return storage.get(SPONSORSHIP_KEYS.REDEMPTION_CODE);
     } catch (error) {
       console.warn('LocalStorage not available:', error);
       return null;
@@ -192,7 +190,7 @@ export class RedemptionService {
    */
   getVerifiedUserId(): number | null {
     try {
-      const userId = localStorage.getItem(this.VERIFIED_KEY);
+      const userId = storage.get(SPONSORSHIP_KEYS.SUPPORTER_ID);
       return userId ? parseInt(userId, 10) : null;
     } catch (error) {
       console.warn('LocalStorage not available:', error);
@@ -205,8 +203,8 @@ export class RedemptionService {
    */
   clearSavedCode(): void {
     try {
-      localStorage.removeItem(this.STORAGE_KEY);
-      localStorage.removeItem(this.VERIFIED_KEY);
+      storage.remove(SPONSORSHIP_KEYS.REDEMPTION_CODE);
+      storage.remove(SPONSORSHIP_KEYS.SUPPORTER_ID);
       this.verificationCache.clear();
       FastDecoder.clearCache();
     } catch (error) {

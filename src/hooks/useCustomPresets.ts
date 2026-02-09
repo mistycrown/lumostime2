@@ -4,10 +4,7 @@
  */
 import { useState, useEffect, useCallback } from 'react';
 import { useSettings } from '../contexts/SettingsContext';
-
-// LocalStorage key for custom presets
-const CUSTOM_PRESETS_KEY = 'lumostime_custom_presets';
-const CURRENT_PRESET_KEY = 'lumostime_current_preset';
+import { THEME_KEYS, TIMEPAL_KEYS, storage } from '../constants/storageKeys';
 
 // Theme preset interface
 export interface ThemePreset {
@@ -39,10 +36,7 @@ export type ValidationError =
  */
 const loadCustomPresets = (): ThemePreset[] => {
     try {
-        const data = localStorage.getItem(CUSTOM_PRESETS_KEY);
-        if (!data) return [];
-        
-        const presets = JSON.parse(data) as ThemePreset[];
+        const presets = storage.getJSON<ThemePreset[]>(THEME_KEYS.CUSTOM_PRESETS, []);
         // Filter out invalid presets
         return presets.filter(preset => validatePresetData(preset));
     } catch (error) {
@@ -56,7 +50,7 @@ const loadCustomPresets = (): ThemePreset[] => {
  */
 const saveCustomPresets = (presets: ThemePreset[]): void => {
     try {
-        localStorage.setItem(CUSTOM_PRESETS_KEY, JSON.stringify(presets));
+        storage.setJSON(THEME_KEYS.CUSTOM_PRESETS, presets);
     } catch (error) {
         console.error('[useCustomPresets] Failed to save custom presets:', error);
         throw new Error('保存失败，请重试');
@@ -156,12 +150,12 @@ export const useCustomPresets = () => {
             name: name.trim(),
             description: '自定义方案',
             icon: '',
-            appIcon: localStorage.getItem('lumostime_app_icon') || 'icon_simple',
+            appIcon: storage.get(THEME_KEYS.UI_ICON_THEME) || 'icon_simple',
             uiTheme: uiIconTheme,
             colorScheme: colorScheme,
-            background: localStorage.getItem('lumos_current_background') || 'default',
-            navigation: localStorage.getItem('navigation_decoration') || 'default',
-            timePal: localStorage.getItem('lumostime_timepal_type') || 'none',
+            background: storage.get(THEME_KEYS.CURRENT_BACKGROUND) || 'default',
+            navigation: storage.get(THEME_KEYS.NAVIGATION_DECORATION) || 'default',
+            timePal: storage.get(TIMEPAL_KEYS.TYPE) || 'none',
             isCustom: true,
             createdAt: timestamp,
             updatedAt: timestamp
@@ -235,9 +229,9 @@ export const useCustomPresets = () => {
             setCustomPresets(updatedPresets);
             
             // If deleted preset was current, clear current preset ID
-            const currentPresetId = localStorage.getItem(CURRENT_PRESET_KEY);
+            const currentPresetId = storage.get(THEME_KEYS.CURRENT_PRESET);
             if (currentPresetId === presetId) {
-                localStorage.removeItem(CURRENT_PRESET_KEY);
+                storage.remove(THEME_KEYS.CURRENT_PRESET);
             }
             
             return true;
