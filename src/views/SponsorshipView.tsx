@@ -427,6 +427,58 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
     const [showDonationModal, setShowDonationModal] = useState(false);
     const { uiIconTheme, setUiIconTheme, colorScheme, setColorScheme } = useSettings();
     
+    // 根据时间段随机选择背景图片
+    const [bannerImage] = useState(() => {
+        const hour = new Date().getHours();
+        let timeOfDay: 'morning' | 'noon' | 'evening';
+        
+        if (hour >= 6 && hour < 12) {
+            timeOfDay = 'morning';
+        } else if (hour >= 12 && hour < 18) {
+            timeOfDay = 'noon';
+        } else {
+            timeOfDay = 'evening';
+        }
+        
+        // 随机选择 1-3 中的一个数字
+        const randomNum = Math.floor(Math.random() * 3) + 1;
+        
+        // 特殊处理：morning3 文件名前面有空格
+        if (timeOfDay === 'morning' && randomNum === 3) {
+            return `/banner/ morning3.png`;
+        }
+        
+        return `/banner/${timeOfDay}${randomNum}.png`;
+    });
+    
+    // 根据时间段生成问候语
+    const [greeting] = useState(() => {
+        const hour = new Date().getHours();
+        
+        if (hour >= 6 && hour < 12) {
+            const morningGreetings = [
+                { prefix: '早安，第', suffix: '位晨光伙伴' },
+                { prefix: '晨光正好，第', suffix: '位早起者' },
+                { prefix: '新的一天，第', suffix: '位追光人' }
+            ];
+            return morningGreetings[Math.floor(Math.random() * morningGreetings.length)];
+        } else if (hour >= 12 && hour < 18) {
+            const noonGreetings = [
+                { prefix: '午安，第', suffix: '位阳光伙伴' },
+                { prefix: '午后时光，第', suffix: '位同行者' },
+                { prefix: '下午好，第', suffix: '位温暖支持者' }
+            ];
+            return noonGreetings[Math.floor(Math.random() * noonGreetings.length)];
+        } else {
+            const eveningGreetings = [
+                { prefix: '晚安，第', suffix: '位星光伙伴' },
+                { prefix: '夜幕降临，第', suffix: '位守夜人' },
+                { prefix: '晚上好，第', suffix: '位温柔支持者' }
+            ];
+            return eveningGreetings[Math.floor(Math.random() * eveningGreetings.length)];
+        }
+    });
+    
     // Custom presets hook
     const { 
         customPresets, 
@@ -909,19 +961,36 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
                     </div>
                 ) : (
                     /* 已解锁功能界面 */
-                    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-                        {/* 专属徽章 - 简洁风格 */}
-                        <div className="text-center py-8 space-y-3">
-                            <div className="inline-flex items-baseline gap-2">
-                                <span className="text-sm text-stone-500 font-serif">你是第</span>
-                                <span className="text-4xl font-bold text-amber-600 font-serif">#{supporterId || '001'}</span>
-                                <span className="text-sm text-stone-500 font-serif">位支持者</span>
-                            </div>
-                            <p className="text-xs text-stone-400 font-serif">感谢你的支持 ✨</p>
-                        </div>
+                    <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+                        {/* 专属徽章 + Tab 导航 - 统一背景 */}
+                        <div className="relative rounded-2xl overflow-hidden mb-6">
+                            {/* 背景图片 - 覆盖整个区域 */}
+                            <div 
+                                className="absolute inset-0 bg-cover bg-center opacity-20"
+                                style={{ backgroundImage: `url(${bannerImage})` }}
+                            />
+                            
+                            {/* 内容层 */}
+                            <div className="relative z-10">
+                                {/* 专属徽章 */}
+                                <div className="text-center py-5">
+                                    {/* 柔和的渐变光晕背景 - 无明显边缘 */}
+                                    <div className="inline-block relative">
+                                        {/* 多层弥散光晕 - 创造自然过渡 */}
+                                        <div className="absolute inset-0 bg-gradient-radial from-white/70 via-white/40 to-transparent blur-3xl scale-150" />
+                                        <div className="absolute inset-0 bg-gradient-radial from-white/50 via-white/20 to-transparent blur-2xl scale-125" />
+                                        
+                                        {/* 文字内容 - 居中对齐 */}
+                                        <div className="relative flex flex-col items-center gap-2 py-3 px-8">
+                                            <span className="text-sm text-stone-800 font-serif font-medium drop-shadow-md">{greeting.prefix}</span>
+                                            <span className="text-5xl font-bold text-amber-600 font-serif drop-shadow-lg leading-none">#{supporterId || '001'}</span>
+                                            <span className="text-sm text-stone-800 font-serif font-medium drop-shadow-md">{greeting.suffix}</span>
+                                        </div>
+                                    </div>
+                                </div>
 
-                        {/* Tab 导航 - 简洁风格 */}
-                        <div className="flex gap-6 border-b border-stone-200 overflow-x-auto scrollbar-hide">
+                                {/* Tab 导航 - 简洁风格 */}
+                                <div className="flex gap-6 border-b border-stone-200 overflow-x-auto scrollbar-hide px-5">
                             {(['preset', 'icon', 'colorScheme', 'background', 'navigation', 'timepal'] as TabType[]).map(tab => (
                                 <button
                                     key={tab}
@@ -942,6 +1011,8 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
                                     }[tab]}
                                 </button>
                             ))}
+                        </div>
+                            </div>
                         </div>
 
                         {/* Tab 内容 - 直接渲染在背景上 */}
@@ -1418,6 +1489,99 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
                                                     ))}
                                                 </div>
                                                 {uiIconTheme === 'water' && (
+                                                    <div className="absolute top-1 right-1 w-5 h-5 bg-stone-800 rounded-full flex items-center justify-center shadow-lg">
+                                                        <Check size={12} className="text-white" />
+                                                    </div>
+                                                )}
+                                            </button>
+
+                                            {/* Knit 主题 */}
+                                            <button
+                                                onClick={() => handleUiIconThemeChange('knit')}
+                                                className={`relative rounded-lg border-2 transition-all overflow-hidden ${
+                                                    uiIconTheme === 'knit'
+                                                        ? 'border-stone-400 ring-2 ring-stone-200'
+                                                        : 'border-stone-200 hover:border-stone-300'
+                                                }`}
+                                                style={{ aspectRatio: '4/5' }}
+                                            >
+                                                <div className="w-full h-full grid grid-cols-2 gap-0.5 p-1 bg-white">
+                                                    {[1, 2, 3, 4].map((num) => (
+                                                        <div key={num} className="bg-stone-50 rounded flex items-center justify-center">
+                                                            <img
+                                                                src={`/uiicon/knit/${String(num).padStart(2, '0')}.webp`}
+                                                                alt={`icon-${num}`}
+                                                                className="w-full h-full object-contain p-0.5"
+                                                                onError={(e) => {
+                                                                    e.currentTarget.src = `/uiicon/knit/${String(num).padStart(2, '0')}.png`;
+                                                                }}
+                                                            />
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                                {uiIconTheme === 'knit' && (
+                                                    <div className="absolute top-1 right-1 w-5 h-5 bg-stone-800 rounded-full flex items-center justify-center shadow-lg">
+                                                        <Check size={12} className="text-white" />
+                                                    </div>
+                                                )}
+                                            </button>
+
+                                            {/* Paper 主题 */}
+                                            <button
+                                                onClick={() => handleUiIconThemeChange('paper')}
+                                                className={`relative rounded-lg border-2 transition-all overflow-hidden ${
+                                                    uiIconTheme === 'paper'
+                                                        ? 'border-stone-400 ring-2 ring-stone-200'
+                                                        : 'border-stone-200 hover:border-stone-300'
+                                                }`}
+                                                style={{ aspectRatio: '4/5' }}
+                                            >
+                                                <div className="w-full h-full grid grid-cols-2 gap-0.5 p-1 bg-white">
+                                                    {[1, 2, 3, 4].map((num) => (
+                                                        <div key={num} className="bg-stone-50 rounded flex items-center justify-center">
+                                                            <img
+                                                                src={`/uiicon/paper/${String(num).padStart(2, '0')}.webp`}
+                                                                alt={`icon-${num}`}
+                                                                className="w-full h-full object-contain p-0.5"
+                                                                onError={(e) => {
+                                                                    e.currentTarget.src = `/uiicon/paper/${String(num).padStart(2, '0')}.png`;
+                                                                }}
+                                                            />
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                                {uiIconTheme === 'paper' && (
+                                                    <div className="absolute top-1 right-1 w-5 h-5 bg-stone-800 rounded-full flex items-center justify-center shadow-lg">
+                                                        <Check size={12} className="text-white" />
+                                                    </div>
+                                                )}
+                                            </button>
+
+                                            {/* Pencil 主题 */}
+                                            <button
+                                                onClick={() => handleUiIconThemeChange('pencil')}
+                                                className={`relative rounded-lg border-2 transition-all overflow-hidden ${
+                                                    uiIconTheme === 'pencil'
+                                                        ? 'border-stone-400 ring-2 ring-stone-200'
+                                                        : 'border-stone-200 hover:border-stone-300'
+                                                }`}
+                                                style={{ aspectRatio: '4/5' }}
+                                            >
+                                                <div className="w-full h-full grid grid-cols-2 gap-0.5 p-1 bg-white">
+                                                    {[1, 2, 3, 4].map((num) => (
+                                                        <div key={num} className="bg-stone-50 rounded flex items-center justify-center">
+                                                            <img
+                                                                src={`/uiicon/pencil/${String(num).padStart(2, '0')}.webp`}
+                                                                alt={`icon-${num}`}
+                                                                className="w-full h-full object-contain p-0.5"
+                                                                onError={(e) => {
+                                                                    e.currentTarget.src = `/uiicon/pencil/${String(num).padStart(2, '0')}.png`;
+                                                                }}
+                                                            />
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                                {uiIconTheme === 'pencil' && (
                                                     <div className="absolute top-1 right-1 w-5 h-5 bg-stone-800 rounded-full flex items-center justify-center shadow-lg">
                                                         <Check size={12} className="text-white" />
                                                     </div>

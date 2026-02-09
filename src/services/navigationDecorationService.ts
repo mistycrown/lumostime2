@@ -33,6 +33,7 @@ class NavigationDecorationService {
         { id: 'book', name: '书本', url: '/dchh/book.webp', offsetY: '76px', offsetX: '0px', scale: 1, opacity: 0.6 },
         { id: 'cat', name: '猫咪', url: '/dchh/cat.webp', offsetY: '71px', offsetX: '0px', scale: 1, opacity: 0.6 },
         { id: 'cat2', name: '猫咪2', url: '/dchh/cat2.webp', offsetY: '61px', offsetX: '0px', scale: 1, opacity: 0.6 },
+        { id: 'chrismas', name: '圣诞', url: '/dchh/chrismas.png', offsetY: '61px', offsetX: '0px', scale: 1, opacity: 0.6 },
         { id: 'cloud', name: '云朵', url: '/dchh/cloud.webp', offsetY: '86px', offsetX: '0px', scale: 1, opacity: 0.6 },
         { id: 'distant_mountain', name: '远山', url: '/dchh/distant_mountain.webp', offsetY: '62px', offsetX: '50px', scale: 1, opacity: 0.6 },
         { id: 'fish', name: '鱼', url: '/dchh/fish.webp', offsetY: '61px', offsetX: '0px', scale: 1, opacity: 0.6 },
