@@ -1,6 +1,9 @@
 /**
  * @file TimePalSettings.tsx
  * @description 时光小友设置组件 - 可在多个页面复用
+ * @input categories: Category[] - 活动分类列表
+ * @output 时光小友设置界面（包含选择、筛选、自定义名言）
+ * @pos Component
  * 
  * 功能：
  * 1. 选择小动物类型
@@ -15,11 +18,9 @@ import { TIMEPAL_KEYS, storage } from '../constants/storageKeys';
 
 interface TimePalSettingsProps {
     categories: Category[];
-    /** 是否显示为卡片样式（带边框和阴影） */
-    asCard?: boolean;
 }
 
-export const TimePalSettings: React.FC<TimePalSettingsProps> = ({ categories, asCard = false }) => {
+export const TimePalSettings: React.FC<TimePalSettingsProps> = ({ categories }) => {
     // 当前选择的小动物类型（'none' 表示不使用）
     const [selectedType, setSelectedType] = useState<TimePalType | 'none'>(() => {
         const saved = storage.get(TIMEPAL_KEYS.TYPE);
@@ -78,10 +79,8 @@ export const TimePalSettings: React.FC<TimePalSettingsProps> = ({ categories, as
         storage.setJSON(TIMEPAL_KEYS.CUSTOM_QUOTES, quotesArray);
     };
 
-    const containerClass = asCard ? 'space-y-6' : 'space-y-6';
-
     return (
-        <div className={containerClass}>
+        <div className="space-y-6">
             {/* 选择小动物 - 自适应网格布局 */}
             <div className="grid gap-2" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(64px, 1fr))' }}>
                 {/* 不使用选项 */}

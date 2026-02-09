@@ -42,3 +42,21 @@ Small, atomic display components.
 
 - `ActivityItem.tsx`: Circular activity icon.
 - `GoalCard.tsx`: Goal progress summary card.
+
+## Theme & Customization
+Components for theme and appearance customization.
+
+- `UiThemeButton.tsx`: UI 主题选择按钮组件（用于投喂功能）
+- `TimePalSettings.tsx`: 时光小友设置组件 - 可在多个页面复用
+- `TimePalCard.tsx`: 时光小友卡片显示组件
+- `BackgroundSelector.tsx`: 背景图片选择器
+- `ColorSchemeSelector.tsx`: 配色方案选择器
+- `NavigationDecorationSelector.tsx`: 导航装饰选择器
+- `UIIconSelector.tsx`: UI 图标主题选择器
+- `PresetEditModal.tsx`: 主题预设编辑弹窗
+
+## Recently Added (2026-02)
+- `UiThemeButton.tsx`: 新增 - 从 SponsorshipView 中提取的可复用主题按钮组件
+- `TimePalSettings.tsx`: 新增 - 从 SponsorshipView 中提取的时光小友设置组件
+
+> ⚠️ 本文档最后更新：2026-02-09
