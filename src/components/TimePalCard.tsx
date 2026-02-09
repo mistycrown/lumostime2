@@ -6,7 +6,9 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import { Log, Category, ActiveSession } from '../types';
 import { getRandomQuote } from '../constants/timePalQuotes';
-import { TimePalType, getAllTimePalTypes, getTimePalImagePath, getTimePalImagePathFallback, getTimePalEmoji } from '../constants/timePalConfig';
+import { TimePalType, getAllTimePalTypes } from '../constants/timePalConfig';
+import { useTimePalImage } from '../hooks/useTimePalImage';
+import { TIMEPAL_KEYS, storage } from '../constants/storageKeys';
 
 interface TimePalCardProps {
     logs: Log[];
@@ -47,7 +49,7 @@ const getFormDescription = (level: number): string => {
 export const TimePalCard: React.FC<TimePalCardProps> = ({ logs, currentDate, categories, activeSessions = [] }) => {
     // 从 localStorage 读取用户选择的小动物类型
     const [timePalType, setTimePalType] = useState<TimePalType | null>(() => {
-        const saved = localStorage.getItem('lumostime_timepal_type');
+        const saved = storage.get(TIMEPAL_KEYS.TYPE);
         if (saved === 'none' || !saved) return null;
         return (saved as TimePalType);
     });
@@ -78,7 +80,7 @@ export const TimePalCard: React.FC<TimePalCardProps> = ({ logs, currentDate, cat
     // 监听 localStorage 变化，实现跨组件同步
     useEffect(() => {
         const handleStorageChange = () => {
-            const saved = localStorage.getItem('lumostime_timepal_type');
+            const saved = storage.get(TIMEPAL_KEYS.TYPE);
             if (saved === 'none' || !saved) {
                 setTimePalType(null);
             } else {
@@ -90,7 +92,7 @@ export const TimePalCard: React.FC<TimePalCardProps> = ({ logs, currentDate, cat
         
         // 也监听自定义事件（用于同一页面内的更新）
         const handleCustomChange = () => {
-            const saved = localStorage.getItem('lumostime_timepal_type');
+            const saved = storage.get(TIMEPAL_KEYS.TYPE);
             if (saved === 'none' || !saved) {
                 setTimePalType(null);
             } else {
@@ -124,7 +126,7 @@ export const TimePalCard: React.FC<TimePalCardProps> = ({ logs, currentDate, cat
         const currentIndex = types.indexOf(timePalType);
         const nextType = types[(currentIndex + 1) % types.length];
         setTimePalType(nextType);
-        localStorage.setItem('lumostime_timepal_type', nextType);
+        storage.set(TIMEPAL_KEYS.TYPE, nextType);
         // 触发自定义事件通知其他组件
         window.dispatchEvent(new Event('timepal-type-changed'));
     };
@@ -150,9 +152,8 @@ export const TimePalCard: React.FC<TimePalCardProps> = ({ logs, currentDate, cat
         });
 
         // 读取筛选配置
-        const isFilterEnabled = localStorage.getItem('lumostime_timepal_filter_enabled') === 'true';
-        const filterActivityIdsStr = localStorage.getItem('lumostime_timepal_filter_activities');
-        const filterActivityIds: string[] = filterActivityIdsStr ? JSON.parse(filterActivityIdsStr) : [];
+        const isFilterEnabled = storage.getBoolean(TIMEPAL_KEYS.FILTER_ENABLED, false);
+        const filterActivityIds = storage.getJSON<string[]>(TIMEPAL_KEYS.FILTER_ACTIVITIES, []);
 
         // 计算总专注时长（已完成的记录）
         let totalSeconds = 0;
@@ -200,15 +201,8 @@ export const TimePalCard: React.FC<TimePalCardProps> = ({ logs, currentDate, cat
         };
     }, [logs, currentDate, categories, activeSessions, currentTime, debugMode, debugFocusSeconds, debugLevel]);
 
-    // 获取小动物图片路径（优先 PNG，降级到 webp）
-    const [imageUrl, setImageUrl] = useState(() => getTimePalImagePath(timePalType, formLevel));
-    const [imageError, setImageError] = useState(false);
-    
-    // 当类型或等级变化时，重置图片 URL 和错误状态
-    useEffect(() => {
-        setImageUrl(getTimePalImagePath(timePalType, formLevel));
-        setImageError(false);
-    }, [timePalType, formLevel]);
+    // 使用图片加载 Hook
+    const { imageUrl, hasError: imageError, emoji, handleImageError } = useTimePalImage(timePalType, formLevel);
     
     const timeDisplay = formatDuration(totalFocusSeconds);
     const formDesc = getFormDescription(formLevel);
@@ -248,18 +242,10 @@ export const TimePalCard: React.FC<TimePalCardProps> = ({ logs, currentDate, cat
                                 src={imageUrl} 
                                 alt="时光小友" 
                                 className="w-full h-full object-cover"
-                                onError={(e) => {
-                                    // 如果 PNG 加载失败，尝试 webp 格式
-                                    if (imageUrl.endsWith('.png')) {
-                                        setImageUrl(getTimePalImagePathFallback(timePalType, formLevel));
-                                    } else {
-                                        // webp 也失败了，显示 emoji 占位符
-                                        setImageError(true);
-                                    }
-                                }}
+                                onError={handleImageError}
                             />
                         ) : (
-                            <span className="text-4xl">{getTimePalEmoji(timePalType)}</span>
+                            <span className="text-4xl">{emoji}</span>
                         )}
                     </div>
                 </button>

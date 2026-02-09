@@ -11,6 +11,7 @@ import React, { useState, useEffect } from 'react';
 import { Check } from 'lucide-react';
 import { Category } from '../types';
 import { TIMEPAL_OPTIONS, TimePalType, getTimePalEmoji } from '../constants/timePalConfig';
+import { TIMEPAL_KEYS, storage } from '../constants/storageKeys';
 
 interface TimePalSettingsProps {
     categories: Category[];
@@ -21,21 +22,19 @@ interface TimePalSettingsProps {
 export const TimePalSettings: React.FC<TimePalSettingsProps> = ({ categories, asCard = false }) => {
     // 当前选择的小动物类型（'none' 表示不使用）
     const [selectedType, setSelectedType] = useState<TimePalType | 'none'>(() => {
-        const saved = localStorage.getItem('lumostime_timepal_type');
+        const saved = storage.get(TIMEPAL_KEYS.TYPE);
         if (!saved || saved === 'none') return 'none';
         return saved as TimePalType;
     });
 
     // 是否启用标签筛选
     const [isFilterEnabled, setIsFilterEnabled] = useState<boolean>(() => {
-        const saved = localStorage.getItem('lumostime_timepal_filter_enabled');
-        return saved === 'true';
+        return storage.getBoolean(TIMEPAL_KEYS.FILTER_ENABLED, false);
     });
 
     // 选中的标签 ID 列表
     const [filterActivityIds, setFilterActivityIds] = useState<string[]>(() => {
-        const saved = localStorage.getItem('lumostime_timepal_filter_activities');
-        return saved ? JSON.parse(saved) : [];
+        return storage.getJSON<string[]>(TIMEPAL_KEYS.FILTER_ACTIVITIES, []);
     });
 
     // 当前选择的分类 ID（用于展开活动列表）
@@ -43,49 +42,40 @@ export const TimePalSettings: React.FC<TimePalSettingsProps> = ({ categories, as
 
     // 自定义名言功能
     const [customQuotesEnabled, setCustomQuotesEnabled] = useState<boolean>(() => {
-        const saved = localStorage.getItem('lumostime_timepal_custom_quotes_enabled');
-        return saved === 'true';
+        return storage.getBoolean(TIMEPAL_KEYS.CUSTOM_QUOTES_ENABLED, false);
     });
 
     const [customQuotes, setCustomQuotes] = useState<string>(() => {
-        const saved = localStorage.getItem('lumostime_timepal_custom_quotes');
-        if (saved) {
-            try {
-                const quotes = JSON.parse(saved) as string[];
-                return quotes.join('\n');
-            } catch (e) {
-                return '';
-            }
-        }
-        return '';
+        const quotes = storage.getJSON<string[]>(TIMEPAL_KEYS.CUSTOM_QUOTES, []);
+        return quotes.join('\n');
     });
 
     // 保存小动物类型
     const handleSelectType = (type: TimePalType | 'none') => {
         setSelectedType(type);
-        localStorage.setItem('lumostime_timepal_type', type);
+        storage.set(TIMEPAL_KEYS.TYPE, type);
         window.dispatchEvent(new Event('timepal-type-changed'));
     };
 
     // 保存筛选设置
     useEffect(() => {
-        localStorage.setItem('lumostime_timepal_filter_enabled', isFilterEnabled.toString());
+        storage.setBoolean(TIMEPAL_KEYS.FILTER_ENABLED, isFilterEnabled);
     }, [isFilterEnabled]);
 
     useEffect(() => {
-        localStorage.setItem('lumostime_timepal_filter_activities', JSON.stringify(filterActivityIds));
+        storage.setJSON(TIMEPAL_KEYS.FILTER_ACTIVITIES, filterActivityIds);
     }, [filterActivityIds]);
 
     // 保存自定义名言设置
     useEffect(() => {
-        localStorage.setItem('lumostime_timepal_custom_quotes_enabled', customQuotesEnabled.toString());
+        storage.setBoolean(TIMEPAL_KEYS.CUSTOM_QUOTES_ENABLED, customQuotesEnabled);
     }, [customQuotesEnabled]);
 
     const handleCustomQuotesChange = (value: string) => {
         setCustomQuotes(value);
         // 将文本按行分割，过滤空行
         const quotesArray = value.split('\n').map(q => q.trim()).filter(q => q.length > 0);
-        localStorage.setItem('lumostime_timepal_custom_quotes', JSON.stringify(quotesArray));
+        storage.setJSON(TIMEPAL_KEYS.CUSTOM_QUOTES, quotesArray);
     };
 
     const containerClass = asCard ? 'space-y-6' : 'space-y-6';
@@ -293,7 +283,7 @@ export const TimePalSettings: React.FC<TimePalSettingsProps> = ({ categories, as
                             if (customQuotesEnabled) {
                                 // 关闭时清空自定义名言
                                 setCustomQuotes('');
-                                localStorage.removeItem('lumostime_timepal_custom_quotes');
+                                storage.remove(TIMEPAL_KEYS.CUSTOM_QUOTES);
                             }
                         }}
                         className={`px-3 py-1 rounded-full text-[10px] font-bold transition-all ${customQuotesEnabled

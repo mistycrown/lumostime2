@@ -12,6 +12,7 @@ import React, { useState, useEffect } from 'react';
 import { ArrowLeft } from 'lucide-react';
 import { Category } from '../types';
 import { TIMEPAL_OPTIONS, TimePalType, getTimePalEmoji, getTimePalImagePath, getTimePalImagePathFallback } from '../constants/timePalConfig';
+import { TIMEPAL_KEYS, storage } from '../constants/storageKeys';
 
 interface TimePalSettingsViewProps {
     onBack: () => void;
@@ -21,7 +22,7 @@ interface TimePalSettingsViewProps {
 export const TimePalSettingsView: React.FC<TimePalSettingsViewProps> = ({ onBack, categories }) => {
     // 当前选择的小动物类型（'none' 表示不使用）
     const [selectedType, setSelectedType] = useState<TimePalType | 'none'>(() => {
-        const saved = localStorage.getItem('lumostime_timepal_type');
+        const saved = storage.get(TIMEPAL_KEYS.TYPE);
         if (!saved || saved === 'none') return 'none';
         return saved as TimePalType;
     });
@@ -40,14 +41,12 @@ export const TimePalSettingsView: React.FC<TimePalSettingsViewProps> = ({ onBack
 
     // 是否启用标签筛选
     const [isFilterEnabled, setIsFilterEnabled] = useState<boolean>(() => {
-        const saved = localStorage.getItem('lumostime_timepal_filter_enabled');
-        return saved === 'true';
+        return storage.getBoolean(TIMEPAL_KEYS.FILTER_ENABLED, false);
     });
 
     // 选中的标签 ID 列表
     const [filterActivityIds, setFilterActivityIds] = useState<string[]>(() => {
-        const saved = localStorage.getItem('lumostime_timepal_filter_activities');
-        return saved ? JSON.parse(saved) : [];
+        return storage.getJSON<string[]>(TIMEPAL_KEYS.FILTER_ACTIVITIES, []);
     });
 
     // 当前选择的分类 ID（用于展开活动列表）
@@ -56,16 +55,16 @@ export const TimePalSettingsView: React.FC<TimePalSettingsViewProps> = ({ onBack
     // 保存小动物类型
     const handleSelectType = (type: TimePalType | 'none') => {
         setSelectedType(type);
-        localStorage.setItem('lumostime_timepal_type', type);
+        storage.set(TIMEPAL_KEYS.TYPE, type);
     };
 
     // 保存筛选设置
     useEffect(() => {
-        localStorage.setItem('lumostime_timepal_filter_enabled', isFilterEnabled.toString());
+        storage.setBoolean(TIMEPAL_KEYS.FILTER_ENABLED, isFilterEnabled);
     }, [isFilterEnabled]);
 
     useEffect(() => {
-        localStorage.setItem('lumostime_timepal_filter_activities', JSON.stringify(filterActivityIds));
+        storage.setJSON(TIMEPAL_KEYS.FILTER_ACTIVITIES, filterActivityIds);
     }, [filterActivityIds]);
 
     return (
