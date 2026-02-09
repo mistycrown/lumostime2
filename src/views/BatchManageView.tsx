@@ -332,7 +332,7 @@ export const BatchManageView: React.FC<BatchManageViewProps> = ({ onBack, catego
                                         )} 
                                         className={`w-8 h-8 rounded-md transition-all border flex items-center justify-center ${
                                             iconSelectorOpen?.type === 'category' && iconSelectorOpen?.id === category.id 
-                                                ? 'border-orange-500 bg-orange-50' 
+                                                ? 'ring-2 ring-[var(--accent-color)] bg-[var(--accent-color)]/10' 
                                                 : 'border-stone-200 hover:border-stone-300 bg-white'
                                         }`}
                                         title="选择 UI 图标"
@@ -443,7 +443,7 @@ export const BatchManageView: React.FC<BatchManageViewProps> = ({ onBack, catego
                                                         )} 
                                                         className={`w-7 h-7 rounded-md transition-all border flex items-center justify-center ${
                                                             iconSelectorOpen?.type === 'activity' && iconSelectorOpen?.id === activity.id 
-                                                                ? 'border-orange-500 bg-orange-50' 
+                                                                ? 'ring-2 ring-[var(--accent-color)] bg-[var(--accent-color)]/10' 
                                                                 : 'border-stone-200 hover:border-stone-300 bg-white'
                                                         }`}
                                                         title="选择 UI 图标"
