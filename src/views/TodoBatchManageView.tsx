@@ -205,7 +205,7 @@ export const TodoBatchManageView: React.FC<TodoBatchManageViewProps> = ({ onBack
     };
 
     return (
-        <div className="h-full bg-[#faf9f6] flex flex-col">
+        <div className="h-full bg-[#faf9f6] flex flex-col pt-[env(safe-area-inset-top)]">
             {/* Header */}
             <div className="h-14 flex items-center justify-between px-5 bg-[#fdfbf7] border-b border-stone-100 sticky top-0 z-20">
                 <button onClick={onBack} className="p-2 -ml-2 text-stone-400 hover:text-stone-600 transition-colors">
@@ -247,11 +247,15 @@ export const TodoBatchManageView: React.FC<TodoBatchManageViewProps> = ({ onBack
                                         className={`w-8 h-8 rounded-md transition-all border flex items-center justify-center ${iconSelectorOpen === category.id ? 'border-orange-500 bg-orange-50' : 'border-stone-200 hover:border-stone-300 bg-white'}`}
                                         title="选择 UI 图标"
                                     >
-                                        <IconRenderer 
-                                            icon={category.icon} 
-                                            uiIcon={category.uiIcon}
-                                            size={16}
-                                        />
+                                        {category.uiIcon ? (
+                                            <IconRenderer 
+                                                icon={category.icon} 
+                                                uiIcon={category.uiIcon}
+                                                size={16}
+                                            />
+                                        ) : (
+                                            <span className="text-stone-300 text-xs">+</span>
+                                        )}
                                     </button>
                                 )}
                                 <button onClick={() => moveCategory(catIndex, 'up')} disabled={catIndex === 0} className="p-1 text-stone-300 hover:text-stone-600 disabled:opacity-30">
@@ -273,7 +277,7 @@ export const TodoBatchManageView: React.FC<TodoBatchManageViewProps> = ({ onBack
                         {isCustomIconEnabled && iconSelectorOpen === category.id && (
                             <div className="p-4 border-b border-stone-100 bg-stone-50/30">
                                 <UIIconSelectorCompact
-                                    currentIcon={category.icon}
+                                    currentIcon=""
                                     currentUiIcon={category.uiIcon}
                                     onSelectDual={(emoji, uiIcon) => handleIconSelect(category.id, uiIcon)}
                                 />

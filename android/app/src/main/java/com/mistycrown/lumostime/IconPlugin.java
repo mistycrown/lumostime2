@@ -56,6 +56,8 @@ public class IconPlugin extends Plugin {
     // 图标别名到Activity别名的映射
     private String getActivityAlias(String iconId) {
         switch (iconId) {
+            case "default":
+                return "com.mistycrown.lumostime.MainActivityDefault";
             case "neon":
                 return "com.mistycrown.lumostime.MainActivityNeon";
             case "paper":
@@ -120,9 +122,8 @@ public class IconPlugin extends Plugin {
                 return "com.mistycrown.lumostime.MainActivityUvcd";
             case "wjugjp":
                 return "com.mistycrown.lumostime.MainActivityWjugjp";
-            case "default":
             default:
-                return "com.mistycrown.lumostime.MainActivity";
+                return "com.mistycrown.lumostime.MainActivityDefault";
         }
     }
 

@@ -106,7 +106,7 @@ export const ScopeManageView: React.FC<ScopeManageViewProps> = ({
     };
 
     return (
-        <div className="h-full bg-[#faf9f6] flex flex-col">
+        <div className="h-full bg-[#faf9f6] flex flex-col pt-[env(safe-area-inset-top)]">
             {/* Header */}
             <div className="h-14 flex items-center justify-between px-5 bg-[#fdfbf7] border-b border-stone-100 sticky top-0 z-20">
                 <button
@@ -162,11 +162,15 @@ export const ScopeManageView: React.FC<ScopeManageViewProps> = ({
                                             className={`w-8 h-8 rounded-md transition-all border flex items-center justify-center ${iconSelectorOpen === scope.id ? 'border-orange-500 bg-orange-50' : 'border-stone-200 hover:border-stone-300 bg-white'}`}
                                             title="选择 UI 图标"
                                         >
-                                            <IconRenderer 
-                                                icon={scope.icon} 
-                                                uiIcon={scope.uiIcon}
-                                                size={16}
-                                            />
+                                            {scope.uiIcon ? (
+                                                <IconRenderer 
+                                                    icon={scope.icon} 
+                                                    uiIcon={scope.uiIcon}
+                                                    size={16}
+                                                />
+                                            ) : (
+                                                <span className="text-stone-300 text-xs">+</span>
+                                            )}
                                         </button>
                                     )}
                                     <button onClick={() => moveScope(index, 'up')} disabled={index === 0} className="p-1 text-stone-300 hover:text-stone-600 disabled:opacity-30">
@@ -188,7 +192,7 @@ export const ScopeManageView: React.FC<ScopeManageViewProps> = ({
                             {isCustomIconEnabled && iconSelectorOpen === scope.id && (
                                 <div className="p-4 border-b border-stone-100 bg-stone-50/30">
                                     <UIIconSelectorCompact
-                                        currentIcon={scope.icon}
+                                        currentIcon=""
                                         currentUiIcon={scope.uiIcon}
                                         onSelectDual={(emoji, uiIcon) => handleIconSelect(scope.id, uiIcon)}
                                     />
