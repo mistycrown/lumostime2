@@ -159,7 +159,7 @@ export const ScopeManageView: React.FC<ScopeManageViewProps> = ({
                                     {isCustomIconEnabled && (
                                         <button 
                                             onClick={() => setIconSelectorOpen(iconSelectorOpen === scope.id ? null : scope.id)} 
-                                            className={`w-8 h-8 rounded-md transition-all border flex items-center justify-center ${iconSelectorOpen === scope.id ? 'border-orange-500 bg-orange-50' : 'border-stone-200 hover:border-stone-300 bg-white'}`}
+                                            className={`w-8 h-8 rounded-md transition-all border flex items-center justify-center ${iconSelectorOpen === scope.id ? 'ring-2 ring-[var(--accent-color)] bg-[var(--accent-color)]/10' : 'border-stone-200 hover:border-stone-300 bg-white'}`}
                                             title="选择 UI 图标"
                                         >
                                             {scope.uiIcon ? (
