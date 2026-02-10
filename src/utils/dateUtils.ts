@@ -75,3 +75,49 @@ export const formatRelativeTime = (date: Date | number): string => {
     // 超过7天显示具体日期
     return getLocalDateStr(new Date(timestamp));
 };
+
+/**
+ * 获取一周的开始和结束日期
+ * @param date - 参考日期
+ * @param startWeekOnSunday - 是否以周日为一周的开始（默认为周一）
+ * @returns 包含 start 和 end 的对象
+ * 
+ * @example
+ * getWeekRange(new Date('2024-01-15'), false) // { start: Mon, end: Sun }
+ * getWeekRange(new Date('2024-01-15'), true)  // { start: Sun, end: Sat }
+ */
+export const getWeekRange = (date: Date, startWeekOnSunday: boolean = false): { start: Date; end: Date } => {
+    const day = date.getDay();
+    
+    let diff: number;
+    if (startWeekOnSunday) {
+        // 周日为一周的开始
+        diff = day;
+    } else {
+        // 周一为一周的开始
+        diff = day === 0 ? 6 : day - 1;
+    }
+    
+    const start = new Date(date);
+    start.setDate(date.getDate() - diff);
+    start.setHours(0, 0, 0, 0);
+    
+    const end = new Date(start);
+    end.setDate(start.getDate() + 6);
+    end.setHours(23, 59, 59, 999);
+    
+    return { start, end };
+};
+
+/**
+ * 格式化短日期（M/D 格式）
+ * @param dateStr - YYYY-MM-DD 格式的日期字符串
+ * @returns M/D 格式的日期字符串
+ * 
+ * @example
+ * formatShortDate('2024-01-15') // '1/15'
+ */
+export const formatShortDate = (dateStr: string): string => {
+    const d = new Date(dateStr);
+    return `${d.getMonth() + 1}/${d.getDate()}`;
+};

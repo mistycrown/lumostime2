@@ -11,6 +11,7 @@ import React from 'react';
 import { Goal, Log, TodoItem } from '../types';
 import { Target, Edit2, Trash2, Archive } from 'lucide-react';
 import { calculateGoalProgress, formatGoalValue, getGoalMetricLabel } from '../utils/goalUtils';
+import { formatShortDate } from '../utils/dateUtils';
 
 interface GoalCardProps {
     goal: Goal;
@@ -46,12 +47,6 @@ export const GoalCard: React.FC<GoalCardProps> = ({ goal, logs, todos, onEdit, o
     const progressBgStyle = !isLimitGoal ? {
         backgroundColor: 'var(--progress-bar-bg)'
     } : undefined;
-
-    // 格式化日期显示
-    const formatDate = (dateStr: string) => {
-        const d = new Date(dateStr);
-        return `${d.getMonth() + 1}/${d.getDate()}`;
-    };
 
     if (compact) {
         // 紧凑模式：用于ScopeView
@@ -105,7 +100,7 @@ export const GoalCard: React.FC<GoalCardProps> = ({ goal, logs, todos, onEdit, o
                     <div className="flex items-center gap-2 text-[10px] text-stone-400">
                         <span className="font-medium uppercase tracking-wider">{getGoalMetricLabel(goal.metric)}</span>
                         <span className="text-stone-300">•</span>
-                        <span>{formatDate(goal.startDate)} - {formatDate(goal.endDate)}</span>
+                        <span>{formatShortDate(goal.startDate)} - {formatShortDate(goal.endDate)}</span>
                     </div>
                 </div>
 

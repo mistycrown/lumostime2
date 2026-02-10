@@ -1,6 +1,6 @@
 /**
  * @file DateRangeFilter.tsx
- * @input rangeType (Week/Month/Year/All), date
+ * @input rangeType (Week/Month/Year/All), date, startWeekOnSunday
  * @output Date Range Navigation UI
  * @pos Component (Input)
  * @description Controls for filtering views by date range, including tab switching and previous/next navigation.
@@ -9,6 +9,7 @@
  */
 import React from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { getWeekRange } from '../utils/dateUtils';
 
 export type RangeType = 'Week' | 'Month' | 'Year' | 'All';
 
@@ -17,34 +18,37 @@ interface DateRangeFilterProps {
     date: Date;
     onRangeChange: (range: RangeType) => void;
     onDateChange: (date: Date) => void;
+    startWeekOnSunday?: boolean;
 }
 
 export const DateRangeFilter: React.FC<DateRangeFilterProps> = ({
     rangeType,
     date,
     onRangeChange,
-    onDateChange
+    onDateChange,
+    startWeekOnSunday = false
 }) => {
+    // Range type labels
+    const rangeLabels: Record<RangeType, string> = {
+        Week: '周',
+        Month: '月',
+        Year: '年',
+        All: '总'
+    };
+
     // Helper to format date range string
     const getRangeString = () => {
         if (rangeType === 'All') return 'All Time';
 
         const y = date.getFullYear();
         const m = date.getMonth() + 1;
-        const d = date.getDate();
 
         if (rangeType === 'Year') return `${y}`;
         if (rangeType === 'Month') return `${y}/${String(m).padStart(2, '0')}`;
 
         if (rangeType === 'Week') {
-            // Calculate start/end of week (assuming Mon start)
-            const day = date.getDay();
-            const diff = date.getDate() - day + (day === 0 ? -6 : 1); // adjust when day is sunday
-            const start = new Date(date);
-            start.setDate(diff);
-            const end = new Date(start);
-            end.setDate(start.getDate() + 6);
-
+            // Use unified week calculation from dateUtils
+            const { start, end } = getWeekRange(date, startWeekOnSunday);
             return `${start.getMonth() + 1}/${start.getDate()} - ${end.getMonth() + 1}/${end.getDate()}`;
         }
         return '';
@@ -79,7 +83,7 @@ export const DateRangeFilter: React.FC<DateRangeFilterProps> = ({
                             : 'text-stone-400 hover:text-stone-600'
                             }`}
                     >
-                        {r === 'Week' ? '周' : r === 'Month' ? '月' : r === 'Year' ? '年' : '总'}
+                        {rangeLabels[r]}
                     </button>
                 ))}
             </div>
