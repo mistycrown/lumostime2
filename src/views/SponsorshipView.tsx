@@ -1,6 +1,11 @@
 /**
  * @file SponsorshipView.tsx
+ * @input onBack (callback), onToast (callback), categories (Category[])
+ * @output Navigation (onBack), Toast Messages (onToast), Theme Changes (localStorage, service calls)
+ * @pos View
  * @description 投喂功能页面 - 包含兑换码验证、专属徽章、应用图标、背景图片、导航栏样式等功能
+ * 
+ * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
 import React, { useState, useEffect } from 'react';
 import { ChevronLeft, Fish, Check, X } from 'lucide-react';
