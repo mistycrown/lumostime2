@@ -179,6 +179,7 @@ export const DailyReviewView: React.FC<DailyReviewViewProps> = ({
                     category: template.title,
                     content: item.content,
                     icon: item.icon,
+                    uiIcon: item.uiIcon,  // 添加 uiIcon 字段
                     isCompleted: false
                 });
             });
@@ -492,15 +493,6 @@ export const DailyReviewView: React.FC<DailyReviewViewProps> = ({
                                                         </button>
 
                                                         <div className="flex-1 min-w-0 flex items-start gap-2">
-                                                            {/* Icon */}
-                                                            {item.icon && (
-                                                                <IconRenderer 
-                                                                    icon={item.icon} 
-                                                                    uiIcon={item.uiIcon}
-                                                                    className="text-base mt-0.5"
-                                                                />
-                                                            )}
-                                                            
                                                             {editingCheckItemId === item.id ? (
                                                                 <div className="flex-1 flex items-center gap-2" onClick={e => e.stopPropagation()}>
                                                                     <input
