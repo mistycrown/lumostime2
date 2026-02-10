@@ -1,3 +1,18 @@
+/**
+ * @file syncService.ts
+ * @input WebDAV/S3 Storage Services, Local Image Service, Image Reference Lists
+ * @output Image Sync Operations (syncImages), Storage Service Selection (getActiveStorageService), File Operations (forceDeleteLocalFile)
+ * @pos Service
+ * @description 同步服务 - 处理本地和云端图片的双向同步，支持 WebDAV 和 S3/COS 存储
+ * 
+ * 核心功能：
+ * - 图片上传/下载同步
+ * - 删除操作同步
+ * - 引用列表管理
+ * - 存储服务抽象层
+ * 
+ * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
+ */
 import { webdavService } from './webdavService';
 import { s3Service } from './s3Service';
 import { imageService } from './imageService';

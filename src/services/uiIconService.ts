@@ -1,5 +1,8 @@
 /**
  * @file uiIconService.ts
+ * @input Icon ID, Theme selection, Emoji for matching
+ * @output Icon URLs, Icon metadata, Theme switching
+ * @pos Service (UI Icon System)
  * @description UI 图标主题服务 - 管理应用内所有 UI 图标的主题切换
  * 
  * ## 图标系统说明
@@ -13,6 +16,8 @@
  * 
  * ### 主题系统
  * - 支持多套视觉风格主题 (default, purple, color, prince, cat, forest, plant, water)
+ * 
+ * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  * - 每个主题包含完整的96个图标
  * - 图标文件格式: `/uiicon/{theme}/{编号}.webp` (带PNG降级)
  * - 编号格式: 01-96 (两位数字，前导零)

@@ -1,11 +1,23 @@
 /**
  * @file iconMigrationService.ts
+ * @input Categories, Scopes, TodoCategories, CheckTemplates with emoji icons
+ * @output Data with generated uiIcon field based on emoji matching
+ * @pos Service (Data Migration)
  * @description 图标迁移服务 - 首次从默认主题切换到自定义主题时，生成 uiIcon 数据
  * 
  * 核心逻辑：
  * 1. 用户初始只有 emoji 系统（icon 字段）
  * 2. 首次切换到自定义主题时，通过 emoji 匹配生成 uiIcon 字段
  * 3. 之后两套系统共存，切换主题只是切换渲染，不再迁移数据
+ * 
+ * 迁移流程：
+ * - 检查是否已生成 uiIcon
+ * - 遍历所有数据实体
+ * - 通过 emoji 查找对应的 UI 图标 ID
+ * - 设置 uiIcon 字段
+ * - 标记迁移完成
+ * 
+ * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
 
 import { Category, Scope, TodoCategory, CheckTemplate } from '../types';

@@ -1,4 +1,14 @@
 /**
+ * @file crypto.ts
+ * @input String data
+ * @output SHA-256 hash (hex string)
+ * @pos Utility (Cryptography)
+ * @description Provides SHA-256 hashing functionality using Web Crypto API
+ * 
+ * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
+ */
+
+/**
  * 计算字符串的 SHA-256 哈希值
  * @param input - 输入字符串
  * @returns Promise<string> - 64 位十六进制哈希字符串

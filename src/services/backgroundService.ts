@@ -1,6 +1,17 @@
 /**
  * @file backgroundService.ts
- * @description 背景图片管理服务，支持预设背景和自定义背景图片，直接操作DOM元素
+ * @input Background image files, DOM elements
+ * @output Background display operations, Custom background management
+ * @pos Service (UI Customization)
+ * @description 背景图片管理服务 - 支持预设背景和自定义背景图片，直接操作 DOM 元素
+ * 
+ * 核心功能：
+ * - 预设背景图片管理
+ * - 自定义背景上传和存储
+ * - DOM 元素背景样式应用
+ * - 背景图片删除和清理
+ * 
+ * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
 
 export interface BackgroundOption {

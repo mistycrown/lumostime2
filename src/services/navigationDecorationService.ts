@@ -1,6 +1,17 @@
 /**
  * @file navigationDecorationService.ts
- * @description 导航栏装饰管理服务
+ * @input Decoration images, Custom settings (offset, scale, opacity)
+ * @output Navigation bar decoration display, Custom decoration management
+ * @pos Service (UI Customization)
+ * @description 导航栏装饰管理服务 - 管理导航栏顶部的装饰图片
+ * 
+ * 核心功能：
+ * - 预设装饰图片管理
+ * - 自定义装饰上传和存储
+ * - 装饰位置和样式调整（偏移、缩放、透明度）
+ * - 装饰图片删除和清理
+ * 
+ * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
 
 export interface NavigationDecorationOption {

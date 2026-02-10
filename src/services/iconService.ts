@@ -1,6 +1,17 @@
 /**
  * @file iconService.ts
- * @description 应用图标管理服务，支持电脑端和手机端图标切换
+ * @input Icon selection, Platform detection
+ * @output App icon updates (desktop/mobile)
+ * @pos Service (App Customization)
+ * @description 应用图标管理服务 - 支持电脑端和手机端图标切换
+ * 
+ * 核心功能：
+ * - 预设图标选项管理
+ * - 平台检测（桌面端/移动端）
+ * - 图标切换和应用
+ * - 图标预览
+ * 
+ * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
 
 import { Capacitor } from '@capacitor/core';

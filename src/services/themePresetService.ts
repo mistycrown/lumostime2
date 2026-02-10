@@ -1,6 +1,24 @@
 /**
  * @file themePresetService.ts
+ * @input ThemePreset data, LocalStorage settings
+ * @output Theme application result, Settings updates
+ * @pos Service (Theme Management)
  * @description 主题预设应用服务 - 拆分复杂的主题切换逻辑
+ * 
+ * 核心功能：
+ * - 主题预设应用
+ * - 设置项批量更新
+ * - 主题切换验证
+ * - 错误处理和回滚
+ * 
+ * 支持的设置项：
+ * - UI 图标主题
+ * - 配色方案
+ * - 背景图片
+ * - 导航栏装饰
+ * - TimePal 角色
+ * 
+ * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
 
 import { Capacitor } from '@capacitor/core';
