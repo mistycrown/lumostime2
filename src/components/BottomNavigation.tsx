@@ -1,6 +1,20 @@
 /**
  * @file BottomNavigation.tsx
- * @description 底部导航栏组件
+ * @input currentView, isVisible
+ * @output Navigation View Changes, Decoration Display
+ * @pos Component (Navigation)
+ * @description 底部导航栏组件 - 提供主要视图切换和装饰图片显示
+ * 
+ * 核心功能：
+ * - 4个主要视图切换（Timeline, Tags, Todo, Scope）
+ * - 导航栏装饰图片显示
+ * - 装饰调试器（开发用）
+ * 
+ * Debug 命令：
+ * - window.LumosTime.debug.enableNavDeco() - 启用调试器
+ * - window.LumosTime.debug.disableNavDeco() - 禁用调试器
+ * 
+ * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
 import React, { useState, useEffect } from 'react';
 import { AppView } from '../types';
@@ -80,14 +94,23 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
         window.addEventListener('navigationDecorationChange', handleDecorationChange as EventListener);
         window.addEventListener('navigationDecorationPreview', handlePreview as EventListener);
 
-        (window as any).enableNavDecoDebug = () => setShowDebugger(true);
-        (window as any).disableNavDecoDebug = () => setShowDebugger(false);
+        // Debug functions with namespace to avoid global pollution
+        if (!(window as any).LumosTime) {
+            (window as any).LumosTime = {};
+        }
+        if (!(window as any).LumosTime.debug) {
+            (window as any).LumosTime.debug = {};
+        }
+        (window as any).LumosTime.debug.enableNavDeco = () => setShowDebugger(true);
+        (window as any).LumosTime.debug.disableNavDeco = () => setShowDebugger(false);
 
         return () => {
             window.removeEventListener('navigationDecorationChange', handleDecorationChange as EventListener);
             window.removeEventListener('navigationDecorationPreview', handlePreview as EventListener);
-            delete (window as any).enableNavDecoDebug;
-            delete (window as any).disableNavDecoDebug;
+            if ((window as any).LumosTime?.debug) {
+                delete (window as any).LumosTime.debug.enableNavDeco;
+                delete (window as any).LumosTime.debug.disableNavDeco;
+            }
         };
     }, []);
 

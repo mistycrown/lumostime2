@@ -17,13 +17,10 @@ import { useToast } from '../contexts/ToastContext';
 import { narrativeService } from '../services/narrativeService';
 import { NARRATIVE_TEMPLATES } from '../constants';
 
-// Helper to get local YYYY-MM-DD string
-const getLocalDateStr = (d: Date) => {
-    const year = d.getFullYear();
-    const month = String(d.getMonth() + 1).padStart(2, '0');
-    const day = String(d.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
-};
+import { getLocalDateStr } from '../utils/dateUtils';
+
+// Helper to get local YYYY-MM-DD string (now imported from utils)
+// const getLocalDateStr = (d: Date) => { ... } // Removed - using utils version
 
 export const useReviewManager = () => {
     const { dailyReviews, setDailyReviews, weeklyReviews, setWeeklyReviews, monthlyReviews, setMonthlyReviews, reviewTemplates, checkTemplates } = useReview();

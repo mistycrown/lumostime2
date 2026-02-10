@@ -7,7 +7,7 @@
  * 
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import { Trash2, AlertTriangle, Info, X } from 'lucide-react';
 
 interface ConfirmModalProps {
@@ -31,6 +31,33 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
     cancelText = '取消',
     type = 'danger'
 }) => {
+    const confirmButtonRef = useRef<HTMLButtonElement>(null);
+
+    // Keyboard support: ESC to close, Enter to confirm
+    useEffect(() => {
+        if (!isOpen) return;
+
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (e.key === 'Escape') {
+                e.preventDefault();
+                onClose();
+            } else if (e.key === 'Enter') {
+                e.preventDefault();
+                onConfirm();
+            }
+        };
+
+        document.addEventListener('keydown', handleKeyDown);
+        return () => document.removeEventListener('keydown', handleKeyDown);
+    }, [isOpen, onClose, onConfirm]);
+
+    // Focus management: auto-focus confirm button when modal opens
+    useEffect(() => {
+        if (isOpen && confirmButtonRef.current) {
+            confirmButtonRef.current.focus();
+        }
+    }, [isOpen]);
+
     if (!isOpen) return null;
 
     const getIcon = () => {
@@ -86,6 +113,7 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
                         {cancelText}
                     </button>
                     <button
+                        ref={confirmButtonRef}
                         onClick={onConfirm}
                         className={`flex-1 py-3.5 rounded-2xl font-bold hover:scale-[1.01] active:scale-[0.99] transition-transform shadow-xl ${getConfirmBtnClass()}`}
                     >
