@@ -494,7 +494,7 @@ export const CalendarWidget: React.FC<CalendarWidgetProps> = ({ currentDate, onD
                                       `}
                                             style={currentDate.getMonth() === m ? { backgroundColor: 'var(--accent-color)' } : undefined}
                                         >
-                                            {new Date(2000, m, 1).toLocaleString('default', { month: 'short' })}
+                                            {new Date(2000, m, 1).toLocaleString('zh-CN', { month: 'short' })}
                                         </button>
                                     ))}
                                 </div>

@@ -114,13 +114,10 @@ export const AppRoutes: React.FC<AppRoutesProps> = ({
         setLogs(prev => prev.map(l => l.id === updatedLog.id ? updatedLog : l));
     };
 
-    // Helper to get local YYYY-MM-DD string
-    const getLocalDateStr = (d: Date) => {
-        const year = d.getFullYear();
-        const month = String(d.getMonth() + 1).padStart(2, '0');
-        const day = String(d.getDate()).padStart(2, '0');
-        return `${year}-${month}-${day}`;
-    };
+import { getLocalDateStr } from '../utils/dateUtils';
+
+    // Helper to get local YYYY-MM-DD string (now imported from utils)
+    // const getLocalDateStr = (d: Date) => { ... } // Removed - using utils version
 
     if (isSettingsOpen) return null;
 

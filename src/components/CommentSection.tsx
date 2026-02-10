@@ -1,8 +1,19 @@
 /**
  * @file CommentSection.tsx
- * @description 专注记录评论区组件，支持添加和显示评论
+ * @input comments, onAddComment, onEditComment, onDeleteComment
+ * @output Comment CRUD Operations
+ * @pos Component (Content Display)
+ * @description 专注记录评论区组件 - 支持添加、编辑和显示评论
+ * 
+ * 核心功能：
+ * - 添加新评论
+ * - 编辑现有评论
+ * - 删除评论
+ * - 显示评论列表和时间戳
+ * 
+ * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
-import React, { useState } from 'react';
+import React, { useReducer } from 'react';
 import { Comment } from '../types';
 import { Plus, Edit3, Trash2 } from 'lucide-react';
 
@@ -13,47 +24,57 @@ interface CommentSectionProps {
   onDeleteComment?: (commentId: string) => void;
 }
 
+// State management with useReducer
+type CommentState = {
+  mode: 'idle' | 'adding' | 'editing';
+  content: string;
+  editingId: string | null;
+};
+
+type CommentAction =
+  | { type: 'START_ADDING' }
+  | { type: 'START_EDITING'; id: string; content: string }
+  | { type: 'UPDATE_CONTENT'; content: string }
+  | { type: 'CANCEL' }
+  | { type: 'SUBMIT' };
+
+const commentReducer = (state: CommentState, action: CommentAction): CommentState => {
+  switch (action.type) {
+    case 'START_ADDING':
+      return { mode: 'adding', content: '', editingId: null };
+    case 'START_EDITING':
+      return { mode: 'editing', content: action.content, editingId: action.id };
+    case 'UPDATE_CONTENT':
+      return { ...state, content: action.content };
+    case 'CANCEL':
+    case 'SUBMIT':
+      return { mode: 'idle', content: '', editingId: null };
+    default:
+      return state;
+  }
+};
+
 export const CommentSection: React.FC<CommentSectionProps> = ({ 
   comments = [], 
   onAddComment,
   onEditComment,
   onDeleteComment
 }) => {
-  const [isAdding, setIsAdding] = useState(false);
-  const [newComment, setNewComment] = useState('');
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [editContent, setEditContent] = useState('');
+  const [state, dispatch] = useReducer(commentReducer, {
+    mode: 'idle',
+    content: '',
+    editingId: null
+  });
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (newComment.trim()) {
-      onAddComment(newComment.trim());
-      setNewComment('');
-      setIsAdding(false);
-    }
-  };
-
-  const handleEdit = (comment: Comment) => {
-    setEditingId(comment.id);
-    setEditContent(comment.content);
-  };
-
-  const handleSaveEdit = () => {
-    if (editingId && editContent.trim() && onEditComment) {
-      onEditComment(editingId, editContent.trim());
-      setEditingId(null);
-      setEditContent('');
-    }
-  };
-
-  const handleCancelEdit = () => {
-    setEditingId(null);
-    setEditContent('');
-  };
-
-  const handleDelete = (commentId: string) => {
-    if (onDeleteComment) {
-      onDeleteComment(commentId);
+    if (state.content.trim()) {
+      if (state.mode === 'adding') {
+        onAddComment(state.content.trim());
+      } else if (state.mode === 'editing' && state.editingId && onEditComment) {
+        onEditComment(state.editingId, state.content.trim());
+      }
+      dispatch({ type: 'SUBMIT' });
     }
   };
 
@@ -72,9 +93,9 @@ export const CommentSection: React.FC<CommentSectionProps> = ({
     <div>
       <div className="flex items-center justify-between mb-2">
         <span className="text-xs font-bold text-stone-400 uppercase tracking-widest">Comments</span>
-        {!isAdding && (
+        {state.mode === 'idle' && (
           <button
-            onClick={() => setIsAdding(true)}
+            onClick={() => dispatch({ type: 'START_ADDING' })}
             className="text-stone-500 hover:text-stone-800 transition-colors"
           >
             <Plus size={18} />
@@ -87,11 +108,11 @@ export const CommentSection: React.FC<CommentSectionProps> = ({
         <div className="space-y-2 mb-4">
           {comments.map((comment) => (
             <div key={comment.id} className="border-l-2 border-stone-200 pl-3">
-              {editingId === comment.id ? (
+              {state.mode === 'editing' && state.editingId === comment.id ? (
                 <div className="space-y-2">
                   <textarea
-                    value={editContent}
-                    onChange={(e) => setEditContent(e.target.value)}
+                    value={state.content}
+                    onChange={(e) => dispatch({ type: 'UPDATE_CONTENT', content: e.target.value })}
                     className="w-full bg-white border border-stone-200 rounded-xl p-3 text-sm text-stone-800 leading-relaxed font-serif focus:outline-none focus:ring-1 focus:border-stone-200 transition-all resize-none"
                     style={{
                       '--tw-ring-color': 'var(--accent-color)'
@@ -100,13 +121,13 @@ export const CommentSection: React.FC<CommentSectionProps> = ({
                   />
                   <div className="flex gap-2">
                     <button
-                      onClick={handleSaveEdit}
+                      onClick={handleSubmit}
                       className="btn-template-filled px-3 py-1 rounded-lg text-xs font-medium transition-colors"
                     >
                       Save
                     </button>
                     <button
-                      onClick={handleCancelEdit}
+                      onClick={() => dispatch({ type: 'CANCEL' })}
                       className="btn-template-outline px-3 py-1 rounded-lg text-xs font-medium transition-colors"
                     >
                       Cancel
@@ -118,7 +139,7 @@ export const CommentSection: React.FC<CommentSectionProps> = ({
                   {/* 编辑按钮 - 右上角 */}
                   {onEditComment && (
                     <button
-                      onClick={() => handleEdit(comment)}
+                      onClick={() => dispatch({ type: 'START_EDITING', id: comment.id, content: comment.content })}
                       className="absolute top-0 right-0 p-1 text-stone-400 hover:text-stone-600 transition-colors"
                     >
                       <Edit3 size={12} />
@@ -138,7 +159,7 @@ export const CommentSection: React.FC<CommentSectionProps> = ({
                     {/* 删除按钮 - 右下角 */}
                     {onDeleteComment && (
                       <button
-                        onClick={() => handleDelete(comment.id)}
+                        onClick={() => onDeleteComment(comment.id)}
                         className="p-1 text-stone-400 hover:text-red-500 transition-colors"
                       >
                         <Trash2 size={12} />
@@ -152,12 +173,12 @@ export const CommentSection: React.FC<CommentSectionProps> = ({
         </div>
       )}
 
-      {/* Add Comment Form */}
-      {isAdding && (
+      {/* Add/Edit Comment Form */}
+      {(state.mode === 'adding' || state.mode === 'editing') && (
         <form onSubmit={handleSubmit} className="space-y-2">
           <textarea
-            value={newComment}
-            onChange={(e) => setNewComment(e.target.value)}
+            value={state.content}
+            onChange={(e) => dispatch({ type: 'UPDATE_CONTENT', content: e.target.value })}
             placeholder="Add a comment..."
             className="w-full bg-white border border-stone-200 rounded-2xl p-4 text-stone-800 text-sm min-h-[80px] shadow-sm focus:outline-none focus:ring-1 focus:border-stone-200 transition-all resize-none placeholder:text-stone-300 font-serif"
             style={{
@@ -168,20 +189,17 @@ export const CommentSection: React.FC<CommentSectionProps> = ({
           <div className="flex gap-2 justify-end">
             <button
               type="button"
-              onClick={() => {
-                setIsAdding(false);
-                setNewComment('');
-              }}
+              onClick={() => dispatch({ type: 'CANCEL' })}
               className="btn-template-outline px-4 py-2 rounded-xl text-sm font-medium transition-colors"
             >
               Cancel
             </button>
             <button
               type="submit"
-              disabled={!newComment.trim()}
+              disabled={!state.content.trim()}
               className="btn-template-filled px-4 py-2 rounded-xl text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
-              Add Comment
+              {state.mode === 'adding' ? 'Add Comment' : 'Save'}
             </button>
           </div>
         </form>
