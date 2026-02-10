@@ -26,6 +26,11 @@ import {
     formatDuration,
     getTemplateDisplayInfo
 } from '../components/ReviewView';
+import { 
+    calculateMonthlyStats,
+    generateCheckItemStatsText,
+    formatDuration as utilFormatDuration
+} from '../utils/reviewStatsUtils';
 
 interface WeeklyReviewViewProps {
     review: WeeklyReview;
@@ -106,37 +111,10 @@ export const WeeklyReviewView: React.FC<WeeklyReviewViewProps> = ({
     }, [logs, weekStartDate, weekEndDate]);
 
     // 统计本周数据（用于AI叙事生成）
-    const stats = useMemo(() => {
-        const totalDuration = weekLogs.reduce((acc, log) => acc + (log.duration || 0), 0);
-
-        const categoryStats = categories.map(cat => {
-            const catLogs = weekLogs.filter(l => l.categoryId === cat.id);
-            const duration = catLogs.reduce((acc, l) => acc + (l.duration || 0), 0);
-            const percentage = totalDuration > 0 ? (duration / totalDuration) * 100 : 0;
-            return { ...cat, duration, percentage };
-        }).filter(c => c.duration > 0);
-
-        const todoStats = todoCategories.map(cat => {
-            const catTodos = todos.filter(t => t.categoryId === cat.id);
-            const linkedLogs = weekLogs.filter(l =>
-                l.linkedTodoId && catTodos.some(t => t.id === l.linkedTodoId)
-            );
-            const duration = linkedLogs.reduce((acc, l) => acc + (l.duration || 0), 0);
-            const percentage = totalDuration > 0 ? (duration / totalDuration) * 100 : 0;
-            return { ...cat, duration, percentage };
-        }).filter(c => c.duration > 0);
-
-        const scopeStats = scopes.map(scope => {
-            const scopeLogs = weekLogs.filter(l =>
-                l.scopeIds && l.scopeIds.includes(scope.id)
-            );
-            const duration = scopeLogs.reduce((acc, l) => acc + (l.duration || 0), 0);
-            const percentage = totalDuration > 0 ? (duration / totalDuration) * 100 : 0;
-            return { ...scope, duration, percentage };
-        }).filter(s => s.duration > 0);
-
-        return { totalDuration, categoryStats, todoStats, scopeStats };
-    }, [weekLogs, categories, todos, todoCategories, scopes]);
+    const stats = useMemo(() => 
+        calculateMonthlyStats(weekLogs, categories, todos, todoCategories, scopes),
+        [weekLogs, categories, todos, todoCategories, scopes]
+    );
 
     // 获取用于显示的模板列表 (用于渲染模板卡片)
     const templatesForDisplay = useMemo(() => {
@@ -254,56 +232,7 @@ export const WeeklyReviewView: React.FC<WeeklyReviewViewProps> = ({
                 dailyStatsText;
 
             // 生成本周 check 项汇总统计
-            const checkText = (() => {
-                // 筛选本周的 dailyReviews
-                const weekStart = new Date(weekStartDate);
-                weekStart.setHours(0, 0, 0, 0);
-                const weekEnd = new Date(weekEndDate);
-                weekEnd.setHours(23, 59, 59, 999);
-
-                const weekDailyReviews = dailyReviews.filter(r => {
-                    const reviewDate = new Date(r.date);
-                    return reviewDate >= weekStart && reviewDate <= weekEnd;
-                });
-
-                // 统计每个 check 项的完成情况
-                const checkStats: Record<string, { category: string, total: number, completed: number }> = {};
-
-                weekDailyReviews.forEach(review => {
-                    if (review.checkItems) {
-                        review.checkItems.forEach(item => {
-                            if (!item.category) return; // 跳过无分类项
-                            const key = `${item.category}|${item.content}`;
-                            if (!checkStats[key]) {
-                                checkStats[key] = { category: item.category, total: 0, completed: 0 };
-                            }
-                            checkStats[key].total++;
-                            if (item.isCompleted) checkStats[key].completed++;
-                        });
-                    }
-                });
-
-                if (Object.keys(checkStats).length === 0) return '';
-
-                // 按分类分组
-                const byCategory: Record<string, Array<{ content: string, total: number, completed: number, rate: number }>> = {};
-                Object.entries(checkStats).forEach(([key, stats]) => {
-                    const content = key.split('|')[1];
-                    const rate = stats.total > 0 ? (stats.completed / stats.total) * 100 : 0;
-                    if (!byCategory[stats.category]) byCategory[stats.category] = [];
-                    byCategory[stats.category].push({ content, total: stats.total, completed: stats.completed, rate });
-                });
-
-                let text = '\n日课完成情况（本周汇总）：\n';
-                Object.entries(byCategory).forEach(([category, items]) => {
-                    text += `\n${category}：\n`;
-                    items.forEach(item => {
-                        text += `  ${item.content}: ${item.completed}/${item.total} (${item.rate.toFixed(0)}%)\n`;
-                    });
-                });
-
-                return text;
-            })();
+            const checkText = generateCheckItemStatsText(dailyReviews, weekStartDate, weekEndDate);
 
             const generated = await onGenerateNarrative(review, statsText + checkText, template.prompt);
             setNarrative(generated);
