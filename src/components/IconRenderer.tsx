@@ -128,12 +128,10 @@ export const IconRenderer: React.FC<IconRendererProps> = ({
             onError={(e) => {
                 // 第一次失败：尝试降级到 fallback 格式
                 if (!hasFallbackAttempted) {
-                    console.log(`[IconRenderer] Primary failed: ${primary}, trying fallback: ${fallback}`);
                     setHasFallbackAttempted(true);
                     e.currentTarget.src = fallback;
                 } else {
                     // 第二次也失败了：显示 Emoji
-                    console.log(`[IconRenderer] Fallback also failed: ${fallback}, showing emoji`);
                     setImageError(true);
                 }
             }}

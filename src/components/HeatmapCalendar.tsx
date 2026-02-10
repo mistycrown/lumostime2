@@ -45,7 +45,7 @@ export const HeatmapCalendar: React.FC<HeatmapCalendarProps> = ({ year, month, d
     return { bg: '', textColor: 'text-white', useTheme: true, opacity: 1 };                        // 100%
   };
 
-  const weekDays = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
+  const weekDays = ['日', '一', '二', '三', '四', '五', '六'];
 
   return (
     <div className="w-full">
