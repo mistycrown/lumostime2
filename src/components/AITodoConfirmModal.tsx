@@ -96,6 +96,23 @@ export const AITodoConfirmModal: React.FC<AITodoConfirmModalProps> = ({
         }
     };
 
+    const handleSave = () => {
+        // Validation: Check for empty titles
+        const emptyTasks = tasks.filter(t => !t.title.trim());
+        if (emptyTasks.length > 0) {
+            // Show error or filter out empty tasks
+            const validTasks = tasks.filter(t => t.title.trim());
+            if (validTasks.length === 0) {
+                // All tasks are empty, don't save
+                return;
+            }
+            // Save only valid tasks
+            onSave(validTasks);
+        } else {
+            onSave(tasks);
+        }
+    };
+
     const handleTabClick = (taskId: string, categoryId: string) => {
         setActiveTabMap(prev => ({ ...prev, [taskId]: categoryId }));
     };
@@ -285,11 +302,12 @@ export const AITodoConfirmModal: React.FC<AITodoConfirmModalProps> = ({
                             Back
                         </button>
                         <button
-                            onClick={() => onSave(tasks)}
-                            className="flex-1 py-4 bg-stone-900 text-white rounded-2xl font-bold flex items-center justify-center gap-2 hover:bg-black transition-colors shadow-xl shadow-stone-200 active:scale-[0.98]"
+                            onClick={handleSave}
+                            disabled={tasks.length === 0 || tasks.every(t => !t.title.trim())}
+                            className="flex-1 py-4 bg-stone-900 disabled:bg-stone-300 disabled:cursor-not-allowed text-white rounded-2xl font-bold flex items-center justify-center gap-2 hover:bg-black transition-colors shadow-xl shadow-stone-200 active:scale-[0.98]"
                         >
                             <Check size={20} />
-                            <span>Save All ({tasks.length})</span>
+                            <span>Save All ({tasks.filter(t => t.title.trim()).length})</span>
                         </button>
                     </div>
                 </div>
