@@ -1,3 +1,12 @@
+/**
+ * @file useSyncManager.ts
+ * @input DataContext (logs, todos, categories, etc.), SettingsContext (sync config, timestamps), CategoryScopeContext (categories, scopes, goals), ReviewContext (reviews), NavigationContext (currentView, modal states), ToastContext (addToast)
+ * @output Sync Operations (performSync, handleQuickSync, handleImageSync, handleSyncDataUpdate), Sync State (isSyncing, refreshKey)
+ * @pos Hook (System Integration)
+ * @description 同步管理 Hook - 处理数据和图片的云端同步，支持启动同步、恢复同步、手动同步、自动同步等多种模式
+ * 
+ * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
+ */
 import { useState, useRef, useEffect } from 'react';
 import { App } from '@capacitor/app';
 import { Capacitor } from '@capacitor/core';

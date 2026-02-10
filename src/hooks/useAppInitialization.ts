@@ -1,3 +1,12 @@
+/**
+ * @file useAppInitialization.ts
+ * @input SettingsContext (setAppRules), ToastContext (addToast), DataContext (logs, setLogs)
+ * @output App Initialization (data repair, dual icon migration, app rules loading, update check, background service init)
+ * @pos Hook (System Integration)
+ * @description 应用初始化 Hook - 处理应用启动时的数据修复、迁移、规则加载、更新检查等初始化任务
+ * 
+ * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
+ */
 import { useEffect, useRef } from 'react';
 import { Capacitor } from '@capacitor/core';
 import { useSettings } from '../contexts/SettingsContext';
@@ -99,7 +108,20 @@ export const useAppInitialization = () => {
         console.log('🖼️ Background service initialized');
     }, []);
 
-    // Auto-cleanup deleted images from logs on load
+    /**
+     * 图片清理逻辑（已禁用）
+     * 
+     * 说明：此功能用于自动清理日志中引用的无效图片
+     * 当前已禁用，因为：
+     * 1. 可能在同步过程中误删除正在上传的图片
+     * 2. 需要更完善的同步状态检测机制
+     * 3. 建议在设置中提供手动清理选项
+     * 
+     * 如需启用，请确保：
+     * - 同步完成后再执行清理
+     * - 添加用户确认提示
+     * - 记录清理日志供用户查看
+     */
     /* 
     useEffect(() => {
         const cleanLogs = async () => {

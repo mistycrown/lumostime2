@@ -1,3 +1,18 @@
+/**
+ * @file useHardwareBackButton.ts
+ * @input NavigationContext (all modal and view states)
+ * @output Hardware Back Button Handler (backButton event listener)
+ * @pos Hook (System Integration)
+ * @description 硬件返回键 Hook - 处理 Android 硬件返回键的层级导航逻辑
+ * 
+ * 优先级顺序：
+ * 1. 模态框（Settings, AutoLink, Search, FocusDetail, AddLog, Todo, Reviews）
+ * 2. 全屏/管理模式（Stats FullScreen, Todo Managing, Tags Managing）
+ * 3. 视图导航（Stats → Timeline, Tag Detail → Tag List, Scope Detail → Scope List）
+ * 4. 退出应用
+ * 
+ * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
+ */
 import { useEffect } from 'react';
 import { App as CapacitorApp } from '@capacitor/app';
 import { AppView } from '../types';
