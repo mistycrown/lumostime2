@@ -1,8 +1,18 @@
+/**
+ * @file ImagePreviewModal.tsx
+ * @input imageUrl, onClose, onDelete
+ * @output Full-Screen Image Preview Modal
+ * @pos Component (Modal)
+ * @description 全屏图片预览模态框 - 支持缩放、平移、旋转和删除功能
+ * 
+ * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
+ */
 import React, { useState } from 'react';
 import { createPortal } from 'react-dom';
-import { X, ZoomIn, ZoomOut, RotateCcw, Trash2, ImageOff } from 'lucide-react';
+import { ImageOff } from 'lucide-react';
 import { TransformWrapper, TransformComponent } from 'react-zoom-pan-pinch';
 import { ConfirmModal } from './ConfirmModal';
+import { ImagePreviewControls } from './ImagePreviewControls';
 
 interface ImagePreviewModalProps {
     imageUrl: string | null | undefined;
@@ -40,52 +50,12 @@ export const ImagePreviewModal: React.FC<ImagePreviewModalProps> = ({ imageUrl, 
                 onClick={(e) => e.stopPropagation()}
             >
                 {/* Controls */}
-                <div className="absolute top-[calc(1rem+env(safe-area-inset-top))] right-4 z-50 flex items-center gap-2">
-                    {onDelete && (
-                        <button
-                            onClick={(e) => {
-                                e.stopPropagation();
-                                handleDeleteClick();
-                            }}
-                            className="p-2 bg-white/10 hover:bg-red-500/80 text-white rounded-full backdrop-blur-sm transition-colors mr-2 [&>svg]:stroke-[2.5]"
-                            style={{ WebkitTextStroke: '0.5px black', paintOrder: 'stroke fill' }}
-                            title="Delete"
-                        >
-                            <Trash2 size={20} style={{ filter: 'drop-shadow(0 0 0.5px black)' }} />
-                        </button>
-                    )}
-                    {imageUrl && (
-                        <>
-                            <button 
-                                onClick={(e) => e.stopPropagation()} 
-                                className="zoom-in-btn p-2 bg-white/10 hover:bg-white/20 text-white rounded-full backdrop-blur-sm transition-colors [&>svg]:stroke-[2.5]"
-                                style={{ WebkitTextStroke: '0.5px black', paintOrder: 'stroke fill' }}
-                            >
-                                <ZoomIn size={20} style={{ filter: 'drop-shadow(0 0 0.5px black)' }} />
-                            </button>
-                            <button 
-                                onClick={(e) => e.stopPropagation()} 
-                                className="zoom-out-btn p-2 bg-white/10 hover:bg-white/20 text-white rounded-full backdrop-blur-sm transition-colors [&>svg]:stroke-[2.5]"
-                                style={{ WebkitTextStroke: '0.5px black', paintOrder: 'stroke fill' }}
-                            >
-                                <ZoomOut size={20} style={{ filter: 'drop-shadow(0 0 0.5px black)' }} />
-                            </button>
-                            <button 
-                                onClick={(e) => e.stopPropagation()} 
-                                className="reset-btn p-2 bg-white/10 hover:bg-white/20 text-white rounded-full backdrop-blur-sm transition-colors [&>svg]:stroke-[2.5]"
-                                style={{ WebkitTextStroke: '0.5px black', paintOrder: 'stroke fill' }}
-                            >
-                                <RotateCcw size={20} style={{ filter: 'drop-shadow(0 0 0.5px black)' }} />
-                            </button>
-                        </>
-                    )}
-                    <button 
-                        onClick={(e) => { e.stopPropagation(); onClose(); }} 
-                        className="p-2 bg-white/10 hover:bg-white/20 text-white hover:text-red-400 rounded-full backdrop-blur-sm transition-colors ml-2 [&>svg]:stroke-[2.5]"
-                        style={{ WebkitTextStroke: '0.5px black', paintOrder: 'stroke fill' }}
-                    >
-                        <X size={20} style={{ filter: 'drop-shadow(0 0 0.5px black)' }} />
-                    </button>
+                <div className="absolute top-[calc(1rem+env(safe-area-inset-top))] right-4 z-50">
+                    <ImagePreviewControls
+                        onDelete={onDelete ? handleDeleteClick : undefined}
+                        onClose={onClose}
+                        showImageControls={false}
+                    />
                 </div>
 
                 {imageUrl ? (
@@ -99,51 +69,18 @@ export const ImagePreviewModal: React.FC<ImagePreviewModalProps> = ({ imageUrl, 
                         {({ zoomIn, zoomOut, resetTransform }) => (
                             <>
                                 <div className="absolute inset-0 pointer-events-none z-[60]">
-                                    <div className="absolute top-[calc(1rem+env(safe-area-inset-top))] right-4 z-50 flex items-center gap-2 pointer-events-auto">
-                                        {onDelete && (
-                                            <button
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    handleDeleteClick();
-                                                }}
-                                                className="p-2 bg-white/10 hover:bg-red-500/80 text-white rounded-full backdrop-blur-sm transition-colors mr-2 [&>svg]:stroke-[2.5]"
-                                                style={{ WebkitTextStroke: '0.5px black', paintOrder: 'stroke fill' }}
-                                            >
-                                                <Trash2 size={20} style={{ filter: 'drop-shadow(0 0 0.5px black)' }} />
-                                            </button>
-                                        )}
-                                        <button 
-                                            onClick={() => zoomIn()} 
-                                            className="p-2 bg-white/10 hover:bg-white/20 text-white rounded-full backdrop-blur-sm transition-colors [&>svg]:stroke-[2.5]"
-                                            style={{ WebkitTextStroke: '0.5px black', paintOrder: 'stroke fill' }}
-                                        >
-                                            <ZoomIn size={20} style={{ filter: 'drop-shadow(0 0 0.5px black)' }} />
-                                        </button>
-                                        <button 
-                                            onClick={() => zoomOut()} 
-                                            className="p-2 bg-white/10 hover:bg-white/20 text-white rounded-full backdrop-blur-sm transition-colors [&>svg]:stroke-[2.5]"
-                                            style={{ WebkitTextStroke: '0.5px black', paintOrder: 'stroke fill' }}
-                                        >
-                                            <ZoomOut size={20} style={{ filter: 'drop-shadow(0 0 0.5px black)' }} />
-                                        </button>
-                                        <button
-                                            onClick={() => setRotation(r => r - 90)}
-                                            className="p-2 bg-white/10 hover:bg-white/20 text-white rounded-full backdrop-blur-sm transition-colors [&>svg]:stroke-[2.5]"
-                                            style={{ WebkitTextStroke: '0.5px black', paintOrder: 'stroke fill' }}
-                                        >
-                                            <RotateCcw size={20} style={{ filter: 'drop-shadow(0 0 0.5px black)' }} />
-                                        </button>
-                                        <button
-                                            onClick={(e) => {
-                                                e.stopPropagation();
+                                    <div className="absolute top-[calc(1rem+env(safe-area-inset-top))] right-4 z-50 pointer-events-auto">
+                                        <ImagePreviewControls
+                                            onZoomIn={zoomIn}
+                                            onZoomOut={zoomOut}
+                                            onRotate={() => setRotation(r => r - 90)}
+                                            onDelete={onDelete ? handleDeleteClick : undefined}
+                                            onClose={() => {
                                                 setRotation(0);
                                                 onClose();
                                             }}
-                                            className="p-2 bg-white/10 hover:bg-white/20 text-white hover:text-red-400 rounded-full backdrop-blur-sm transition-colors ml-2 [&>svg]:stroke-[2.5]"
-                                            style={{ WebkitTextStroke: '0.5px black', paintOrder: 'stroke fill' }}
-                                        >
-                                            <X size={20} style={{ filter: 'drop-shadow(0 0 0.5px black)' }} />
-                                        </button>
+                                            showImageControls={true}
+                                        />
                                     </div>
                                 </div>
 
@@ -176,7 +113,6 @@ export const ImagePreviewModal: React.FC<ImagePreviewModalProps> = ({ imageUrl, 
                                     }}
                                     className="px-4 py-2 bg-red-500/20 hover:bg-red-500/40 text-red-200 border border-red-500/30 rounded-lg transition-colors flex items-center gap-2"
                                 >
-                                    <Trash2 size={16} />
                                     <span>Delete Reference</span>
                                 </button>
                             )}
