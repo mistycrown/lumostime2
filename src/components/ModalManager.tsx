@@ -1,6 +1,11 @@
 /**
  * @file ModalManager.tsx
- * @description 统一管理所有应用模态框
+ * @input modal states, handlers, data
+ * @output Unified Modal Management
+ * @pos Component (Manager)
+ * @description 统一管理所有应用模态框 - 避免 Props drilling，集中管理 Modal 状态
+ * 
+ * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
 import React from 'react';
 import { AddLogModal } from './AddLogModal';

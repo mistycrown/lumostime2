@@ -1,3 +1,12 @@
+/**
+ * @file MainLayout.tsx
+ * @input children, navigation state, handlers
+ * @output Main Application Layout
+ * @pos Component (Layout)
+ * @description 主应用布局组件 - 包含顶部导航栏、主内容区域和浮动按钮
+ * 
+ * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
+ */
 import React, { useState, useEffect } from 'react';
 import { RefreshCw, ChevronLeft, Settings as SettingsIcon, Settings2, Maximize2, Target, Tag, AudioWaveform, BookHeart } from 'lucide-react';
 import { AppView } from '../types';
