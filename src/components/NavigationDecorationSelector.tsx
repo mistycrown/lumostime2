@@ -1,6 +1,11 @@
 /**
  * @file NavigationDecorationSelector.tsx
- * @description 导航栏装饰选择组件
+ * @input onToast (callback), currentDecoration (optional string), onDecorationChange (optional callback)
+ * @output Toast Messages (onToast), Decoration Selection (onDecorationChange or navigationDecorationService)
+ * @pos Component (Selector)
+ * @description 导航栏装饰选择组件 - 支持预设装饰样式、调试工具
+ * 
+ * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
 
 import React, { useState, useEffect } from 'react';

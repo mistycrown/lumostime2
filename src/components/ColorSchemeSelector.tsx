@@ -1,6 +1,11 @@
 /**
  * @file ColorSchemeSelector.tsx
- * @description 配色方案选择器组件
+ * @input currentScheme (ColorScheme), onSchemeChange (callback)
+ * @output Color Scheme Selection (onSchemeChange)
+ * @pos Component (Selector)
+ * @description 配色方案选择器组件 - 支持莫兰迪、风格、传统等多种配色方案
+ * 
+ * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
 
 import React from 'react';
