@@ -69,6 +69,8 @@ import { aiService, AIConfig } from '../services/aiService';
 import { UpdateService, VersionInfo } from '../services/updateService';
 import { CustomSelect } from '../components/CustomSelect';
 import { ToastType } from '../components/Toast';
+import { uploadDataToCloud, downloadWithBackup, CloudService } from '../utils/syncUtils';
+import { validateLocalData, canSafelyUpload } from '../utils/dataValidation';
 
 import { ReviewTemplateManageView } from './ReviewTemplateManageView';
 import { CheckTemplateManageView } from './CheckTemplateManageView';
@@ -321,23 +323,31 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
     const handleSyncUpload = async () => {
         if (!webdavConfig) return;
         setIsSyncing(true);
+        
         try {
             const localData = getFullLocalData();
-            if (!localData.logs || !localData.todos) {
-                console.error('[Settings] Critical: Logs or Todos are undefined in upload payload!', localData);
-                alert('Error: Local data is seemingly empty (undefined). Upload aborted.');
+            
+            // 验证数据
+            const uploadCheck = canSafelyUpload(localData);
+            if (!uploadCheck.canUpload) {
+                alert(`错误: ${uploadCheck.reason}`);
                 setIsSyncing(false);
                 return;
             }
-            const uploadTimestamp = Date.now();
-            const dataToSync = {
-                ...localData,
-                timestamp: uploadTimestamp,
-                version: '1.0.0'
-            };
-            await webdavService.uploadData(dataToSync);
-            updateDataLastModified();
-            onToast('success', '数据已成功上传至云端');
+
+            // 使用统一的上传函数
+            const result = await uploadDataToCloud(
+                webdavService,
+                localData,
+                undefined,
+                updateDataLastModified
+            );
+
+            if (result.success) {
+                onToast('success', result.message);
+            } else {
+                onToast('error', result.message);
+            }
         } catch (error) {
             console.error(error);
             onToast('error', '数据上传失败');
@@ -351,37 +361,28 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
         if (!window.confirm("这将使用云端版本覆盖当前本地数据。首先会将当前本地数据的备份上传到云端的 'backups/' 目录。确定吗？")) return;
 
         setIsSyncing(true);
+        
         try {
-            // 0. Backup Local Data to Cloud
-            try {
-                const localData = getFullLocalData();
-                if (!localData.logs || !localData.todos) {
-                    console.error('[Settings] Critical: Logs or Todos are undefined in backup payload!', localData);
-                    alert('Error: Local data is seemingly empty (undefined). Backup aborted to prevent overwriting cloud with empty data.');
-                    setIsSyncing(false);
-                    return;
-                }
-                const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-                const backupFilename = `backups/local_backup_${timestamp}.json`;
-                onToast('info', `正在备份本地数据到 ${backupFilename}...`);
-                await webdavService.uploadData(localData, backupFilename);
-                onToast('success', '本地数据备份成功');
-            } catch (backupError: any) {
-                console.error('[Settings] Cloud backup failed:', backupError);
-                if (!window.confirm(`云端备份失败: ${backupError.message || '未知错误'}. 是否继续还原? (警告: 当前本地数据将丢失)`)) {
-                    setIsSyncing(false);
-                    return;
-                }
-            }
+            const localData = getFullLocalData();
+            
+            // 使用统一的下载函数（包含备份）
+            const result = await downloadWithBackup(
+                webdavService,
+                localData,
+                (message) => onToast('info', message),
+                async (message) => window.confirm(message)
+            );
 
-            const data = await webdavService.downloadData();
-            if (data) {
-                onSyncUpdate(data);
-                onToast('success', '从云端恢复数据成功');
+            if (result.success && result.data) {
+                onSyncUpdate(result.data);
+                onToast('success', result.message);
+                
                 // 同步完成后关闭设置页面，自动刷新到脉络页面
                 setTimeout(() => {
                     onClose();
-                }, 1000); // 延迟1秒让用户看到成功提示
+                }, 1000);
+            } else {
+                onToast('error', result.message);
             }
         } catch (error) {
             console.error(error);
@@ -395,44 +396,30 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
     const handleS3SyncUpload = async () => {
         if (!s3Config) return;
         setIsSyncing(true);
+        
         try {
-            // 1. Upload main data
             const localData = getFullLocalData();
-            if (!localData.logs || !localData.todos) {
-                console.error('[Settings] Critical: Logs or Todos are undefined in upload payload!', localData);
-                alert('Error: Local data is seemingly empty (undefined). Upload aborted.');
+            
+            // 验证数据
+            const uploadCheck = canSafelyUpload(localData);
+            if (!uploadCheck.canUpload) {
+                alert(`错误: ${uploadCheck.reason}`);
                 setIsSyncing(false);
                 return;
             }
-            const uploadTimestamp = Date.now();
-            const dataToSync = {
-                ...localData,
-                timestamp: uploadTimestamp,
-                version: '1.0.0'
-            };
-            await s3Service.uploadData(dataToSync);
-            updateDataLastModified();
 
-            // 2. Sync images
-            const localImageList = imageService.getReferencedImagesList();
-            if (localImageList.length > 0) {
-                console.log(`[Settings] 开始同步 ${localImageList.length} 张图片到 COS...`);
-                const imageResult = await syncService.syncImages(
-                    undefined, // no progress callback in settings
-                    localImageList,
-                    localImageList
-                );
+            // 使用统一的上传函数
+            const result = await uploadDataToCloud(
+                s3Service,
+                localData,
+                (message) => console.log('[S3 Upload]', message),
+                updateDataLastModified
+            );
 
-                if (imageResult.uploaded > 0 || imageResult.errors.length > 0) {
-                    const message = imageResult.errors.length > 0
-                        ? `数据已上传。图片: ${imageResult.uploaded} 张上传成功, ${imageResult.errors.length} 张失败`
-                        : `数据及 ${imageResult.uploaded} 张图片已成功上传至 COS！`;
-                    onToast(imageResult.errors.length > 0 ? 'warning' : 'success', message);
-                } else {
-                    onToast('success', '数据已成功上传至 COS！');
-                }
+            if (result.success) {
+                onToast(result.imageStats?.errors.length ? 'warning' : 'success', result.message);
             } else {
-                onToast('success', '数据已成功上传至 COS！');
+                onToast('error', result.message);
             }
         } catch (error: any) {
             console.error('S3 Upload Error:', error);
@@ -475,68 +462,28 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
         if (!window.confirm("这将使用 COS 版本覆盖当前本地数据。首先会将当前本地数据的备份上传到云端的 'backups/' 目录。确定吗？")) return;
 
         setIsSyncing(true);
+        
         try {
-            // 0. Backup Local Data to Cloud
-            try {
-                const localData = getFullLocalData();
-                if (!localData.logs || !localData.todos) {
-                    console.error('[Settings] Critical: Logs or Todos are undefined in backup payload!', localData);
-                    alert('错误：本地数据似乎为空 (undefined)。已中止备份以防止用空数据覆盖云端。');
-                    setIsSyncing(false);
-                    return;
-                }
-                const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-                const backupFilename = `backups/local_backup_${timestamp}.json`;
-                onToast('info', `正在备份本地数据到 ${backupFilename}...`);
-                await s3Service.uploadData(localData, backupFilename);
-                onToast('success', '本地数据备份成功');
-            } catch (backupError: any) {
-                console.error('[Settings] Cloud backup failed:', backupError);
-                if (!window.confirm(`云端备份失败：${backupError.message || '未知错误'}. 是否继续还原？(警告：当前本地数据将丢失)`)) {
-                    setIsSyncing(false);
-                    return;
-                }
-            }
+            const localData = getFullLocalData();
+            
+            // 使用统一的下载函数（包含备份）
+            const result = await downloadWithBackup(
+                s3Service,
+                localData,
+                (message) => onToast('info', message),
+                async (message) => window.confirm(message)
+            );
 
-            // 1. Download main data
-            const data = await s3Service.downloadData();
-            if (data) {
-                onSyncUpdate(data);
-
-                // 2. Sync images after data is updated
-                try {
-                    // Get image list from downloaded data
-                    const cloudImageData = await s3Service.downloadImageList();
-                    const cloudImageList = cloudImageData?.images || [];
-                    const localImageList = imageService.getReferencedImagesList();
-
-                    // Merge and update local image list
-                    const mergedImageList = Array.from(new Set([...localImageList, ...cloudImageList]));
-                    if (mergedImageList.length > 0) {
-                        imageService.updateReferencedImagesList(mergedImageList);
-
-                        console.log(`[Settings] 开始从 COS 同步 ${mergedImageList.length} 张图片...`);
-                        const imageResult = await syncService.syncImages(
-                            undefined, // no progress callback in settings
-                            localImageList,
-                            [] // [Fix] Don't assume cloud has these images. Pass empty to force check/upload.
-                        );
-
-                        if (imageResult.downloaded > 0 || imageResult.errors.length > 0) {
-                            const message = imageResult.errors.length > 0
-                                ? `数据已还原。图片: ${imageResult.downloaded} 张下载成功，${imageResult.errors.length} 张失败`
-                                : `数据及 ${imageResult.downloaded} 张图片已成功从 COS 还原！`;
-                            onToast(imageResult.errors.length > 0 ? 'warning' : 'success', message);
-                        } else {
-                            onToast('success', '从 COS 恢复数据成功！');
-                        }
-                    } else {
-                        onToast('success', '从 COS 恢复数据成功！');
-                    }
-                } catch (imageError) {
-                    console.warn('[Settings] 图片同步失败:', imageError);
-                    onToast('warning', '数据已恢复，但图片同步失败');
-                }
+            if (result.success && result.data) {
+                onSyncUpdate(result.data);
+                onToast(result.imageStats?.errors.length ? 'warning' : 'success', result.message);
+                
+                // 同步完成后关闭设置页面
+                setTimeout(() => {
+                    onClose();
+                }, 1000);
+            } else {
+                onToast('error', result.message);
             }
         } catch (error) {
             console.error(error);
