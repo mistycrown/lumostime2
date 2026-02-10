@@ -1,3 +1,12 @@
+/**
+ * @file useReviewManager.ts
+ * @input DataContext (dailyReviews, weeklyReviews, monthlyReviews, reviewTemplates, checkTemplates), ReviewContext (review data setters), NavigationContext (review modal states, currentDate), CategoryScopeContext (scopes), SettingsContext (userPersonalInfo, updateDataLastModified), ToastContext (addToast)
+ * @output Review CRUD Operations (handleOpenDailyReview, handleUpdateReview, handleDeleteReview, handleOpenWeeklyReview, handleUpdateWeeklyReview, handleDeleteWeeklyReview, handleOpenMonthlyReview, handleUpdateMonthlyReview, handleDeleteMonthlyReview), Narrative Generation (handleGenerateNarrative, handleGenerateWeeklyNarrative, handleGenerateMonthlyNarrative), Modal Control (handleCloseWeeklyReview, handleCloseMonthlyReview)
+ * @pos Hook (Data Manager)
+ * @description 复盘数据管理 Hook - 处理日报、周报、月报的增删改查、AI 叙事生成等操作
+ * 
+ * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
+ */
 import { DailyReview, WeeklyReview, MonthlyReview } from '../types';
 import { useData } from '../contexts/DataContext';
 import { useReview } from '../contexts/ReviewContext';

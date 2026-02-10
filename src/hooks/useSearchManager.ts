@@ -1,3 +1,17 @@
+/**
+ * @file useSearchManager.ts
+ * @input NavigationContext (search modal state, view navigation states)
+ * @output Search Control (handleOpenSearch, handleCloseSearch), Navigation (handleSelectSearchScope, handleSelectSearchCategory, handleSelectSearchActivity), Wrapper Functions (handleSelectSearchLogWrapper, handleSelectSearchTodoWrapper)
+ * @pos Hook (Data Manager)
+ * @description 搜索管理 Hook - 处理搜索界面的打开关闭、搜索结果选择后的导航跳转
+ * 
+ * 设计说明：
+ * - 搜索结果选择后会自动导航到对应的视图（Scope、Tags、Todo）
+ * - 对于 Log 和 Todo 的选择，需要配合外部的 modal 打开函数使用
+ * - 使用 returnToSearch 标记来支持从详情页返回搜索界面
+ * 
+ * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
+ */
 import { Log, TodoItem, Category, AppView } from '../types';
 import { useNavigation } from '../contexts/NavigationContext';
 
@@ -48,14 +62,18 @@ export const useSearchManager = () => {
         setSelectedCategoryId(null); // Ensure we are in tag mode
     };
 
-    // For Logs and Todos, App.tsx handled them by opening modals.
-    // We will return helper functions that behave similarly to App.tsx logic
-
+    /**
+     * 处理搜索结果中的日志选择
+     * 需要配合外部的 openEditModal 函数使用
+     */
     const handleSelectSearchLogWrapper = (log: Log, openEditModal: (log: Log) => void) => {
-        // setIsSearchOpen(false); // Keep search open for modal context (as per App.tsx)
         openEditModal(log);
     };
 
+    /**
+     * 处理搜索结果中的待办选择
+     * 需要配合外部的 openEditTodoModal 函数使用
+     */
     const handleSelectSearchTodoWrapper = (todo: TodoItem, openEditTodoModal: (todo: TodoItem) => void) => {
         setReturnToSearch(true);
         setIsSearchOpen(false);
