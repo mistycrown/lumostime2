@@ -1,6 +1,16 @@
 /**
  * @file colorSchemeService.ts
- * @description 配色方案服务 - 管理应用的配色方案
+ * @input ColorScheme selection, LocalStorage (saved scheme)
+ * @output Color Scheme Management (getCurrentScheme, setScheme), Style Configs (getSchemeStyles, getFloatingButtonStyle, getHeaderButtonStyle), React Hooks (useFloatingButtonStyle, useColorSchemeStyles)
+ * @pos Service
+ * @description 配色方案服务 - 管理应用的配色方案，提供样式配置和 React Hooks
+ * 
+ * 注意：
+ * - COLOR_SCHEME_STYLES 当前为空对象，配色主要通过 CSS 变量实现
+ * - validSchemes 数组不完整，仅包含部分方案用于向后兼容
+ * - 实际配色通过 HTML data-color-scheme 属性和 CSS 实现
+ * 
+ * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
 
 import React from 'react';
@@ -60,6 +70,11 @@ export interface ColorSchemeStyleConfig {
 }
 
 // 配色方案样式映射
+// 注意：当前所有配色方案都使用空对象，实际样式通过 CSS 变量实现
+// 这个映射表保留是为了：
+// 1. 类型安全 - 确保所有 ColorScheme 都有对应的配置
+// 2. 扩展性 - 未来可以在这里添加 JS 层面的样式覆盖
+// 3. 向后兼容 - 保持 API 接口不变
 const COLOR_SCHEME_STYLES: Record<ColorScheme, ColorSchemeStyleConfig> = {
     'default': {},
     'morandi-purple': {},
@@ -109,7 +124,39 @@ class ColorSchemeService {
      */
     private loadScheme() {
         const saved = localStorage.getItem(this.STORAGE_KEY);
-        const validSchemes: ColorScheme[] = ['default', 'morandi-purple', 'morandi-blue', 'morandi-green', 'morandi-pink'];
+        // 注意：validSchemes 仅包含部分方案用于向后兼容
+        // 实际上所有 ColorScheme 类型的值都是有效的
+        // 这里的验证主要是为了防止旧版本的无效值
+        const validSchemes: ColorScheme[] = [
+            'default', 
+            'morandi-purple', 
+            'morandi-blue', 
+            'morandi-green', 
+            'morandi-pink',
+            'morandi-orange',
+            'morandi-gray',
+            'morandi-yellow',
+            'morandi-red',
+            'morandi-cyan',
+            'morandi-brown',
+            'morandi-lavender',
+            'morandi-peach',
+            'morandi-olive',
+            'latte-caramel',
+            'dark-academia',
+            'klein-blue',
+            'midnight-ocean',
+            'film-japanese',
+            'film-hongkong',
+            'dunhuang-moon',
+            'dunhuang-feitian',
+            'dunhuang-cinnabar',
+            'chinese-red',
+            'blue-white-porcelain',
+            'bamboo-green',
+            'sky-blue',
+            'rouge'
+        ];
         if (saved && validSchemes.includes(saved as ColorScheme)) {
             this.currentScheme = saved as ColorScheme;
         }
