@@ -1,3 +1,12 @@
+/**
+ * @file useTodoManager.ts
+ * @input DataContext (todos, setTodos, todoCategories, setTodoCategories, logs, setLogs), NavigationContext (modal states), CategoryScopeContext (categories), ToastContext (addToast), SessionContext (startActivity), SettingsContext (autoLinkRules, updateDataLastModified)
+ * @output Todo CRUD Operations (handleSaveTodo, handleDeleteTodo, handleToggleTodo, handleDuplicateTodo, handleBatchAddTodos), Modal Control (openAddTodoModal, openEditTodoModal, closeTodoModal), Focus Management (handleStartTodoFocus), Progress Update (updateTodoProgress)
+ * @pos Hook (Data Manager)
+ * @description 待办事项数据管理 Hook - 处理待办的增删改查、完成状态切换、专注模式启动、批量操作等
+ * 
+ * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
+ */
 import { useState } from 'react';
 import { TodoItem, TodoCategory } from '../types';
 import { useData } from '../contexts/DataContext';
@@ -19,13 +28,6 @@ export const useTodoManager = () => {
     const { addToast } = useToast();
     const { startActivity } = useSession();
     const { autoLinkRules, updateDataLastModified } = useSettings();
-
-    /* 
-     * NOTE: useSession's startActivity usage in App.tsx had a wrapper:
-     * handleStartActivity(activity, categoryId, todoId, scopeIdOrIds, note)
-     * which called startActivity(activity, categoryId, autoLinkRules, todoId, scopeIdOrIds, note)
-     * We need to replicate this logic or call startActivity directly with autoLinkRules.
-     */
 
     const [isDeleteTodoConfirmOpen, setIsDeleteTodoConfirmOpen] = useState(false);
     const [todoToDeleteId, setTodoToDeleteId] = useState<string | null>(null);

@@ -1,3 +1,12 @@
+/**
+ * @file useGoalManager.ts
+ * @input CategoryScopeContext (setGoals), NavigationContext (goal editor modal states)
+ * @output Goal CRUD Operations (handleAddGoal, handleEditGoal, handleSaveGoal, handleDeleteGoal, handleArchiveGoal), Modal Control (closeGoalEditor)
+ * @pos Hook (Data Manager)
+ * @description 目标数据管理 Hook - 处理目标的增删改查、归档等操作
+ * 
+ * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
+ */
 import { Goal } from '../types';
 import { useCategoryScope } from '../contexts/CategoryScopeContext';
 import { useNavigation } from '../contexts/NavigationContext';

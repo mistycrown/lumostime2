@@ -1,3 +1,12 @@
+/**
+ * @file useLogManager.ts
+ * @input DataContext (logs, setLogs, setTodos), NavigationContext (modal states, currentDate), CategoryScopeContext (categories), ToastContext (addToast), SettingsContext (updateDataLastModified)
+ * @output Log CRUD Operations (handleSaveLog, handleDeleteLog, handleQuickPunch, handleBatchAddLogs), Modal Control (openAddModal, openEditModal, closeModal), Image Management (handleLogImageRemove)
+ * @pos Hook (Data Manager)
+ * @description 日志数据管理 Hook - 处理日志的增删改查、快速打点、批量添加、图片管理等操作
+ * 
+ * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
+ */
 import { useState } from 'react';
 import { Log, TodoItem, ParsedTimeEntry, ActiveSession } from '../types';
 import { useData } from '../contexts/DataContext';
@@ -95,6 +104,16 @@ export const useLogManager = () => {
         if (shouldCloseModal) closeModal();
     };
 
+    /**
+     * 快速打点功能
+     * 
+     * 逻辑说明：
+     * 1. 获取当前时间作为结束时间
+     * 2. 查找最后一条日志的结束时间作为开始时间
+     * 3. 如果最后一条日志在未来，则报错
+     * 4. 如果最后一条日志在今天之前，则从今天 00:00 开始
+     * 5. 创建一个新的"快速打点"日志填充时间间隙
+     */
     const handleQuickPunch = () => {
         const now = new Date();
         const endTimestamp = now.getTime();
