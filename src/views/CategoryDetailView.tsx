@@ -18,6 +18,7 @@ import { DetailTimelineCard } from '../components/DetailTimelineCard';
 import { UIIconSelector } from '../components/UIIconSelector';
 import { useSettings } from '../contexts/SettingsContext';
 import { IconRenderer } from '../components/IconRenderer';
+import { getDateRange } from '../utils/dateRangeUtils';
 
 interface CategoryDetailViewProps {
     categoryId: string;
@@ -88,19 +89,9 @@ export const CategoryDetailView: React.FC<CategoryDetailViewProps> = ({ category
                 return d.getFullYear() === target.getFullYear() && d.getMonth() === target.getMonth();
             }
             if (analysisRange === 'Week') {
-                // Check if in same week
-                const getWeekStart = (date: Date) => {
-                    const d = new Date(date);
-                    const day = d.getDay();
-                    const diff = d.getDate() - day + (day === 0 ? -6 : 1);
-                    d.setDate(diff);
-                    d.setHours(0, 0, 0, 0);
-                    return d;
-                };
-                const wStart = getWeekStart(target);
-                const wEnd = new Date(wStart);
-                wEnd.setDate(wStart.getDate() + 7);
-                return d >= wStart && d < wEnd;
+                // Use dateRangeUtils for consistent week calculation
+                const weekRange = getDateRange(target, 'week');
+                return d >= weekRange.start && d < weekRange.end;
             }
             return true;
         });

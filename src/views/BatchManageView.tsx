@@ -15,6 +15,7 @@ import { IconRenderer } from '../components/IconRenderer';
 import { uiIconService } from '../services/uiIconService';
 import { useSettings } from '../contexts/SettingsContext';
 import { COLOR_OPTIONS } from '../constants';
+import { extractActivityColor, extractCategoryColor } from '../utils/colorUtils';
 
 interface BatchManageViewProps {
     onBack: () => void;
@@ -209,34 +210,12 @@ export const BatchManageView: React.FC<BatchManageViewProps> = ({ onBack, catego
 
     // Get color hex from activity color string (use lightHex for display)
     const getColorFromActivityColor = (colorStr: string): string => {
-        if (!colorStr) return '#e7e5e4';
-        
-        // Match bg-{color}-{shade} pattern
-        const match = colorStr.match(/bg-([a-z]+)-/);
-        if (match) {
-            const colorName = match[1];
-            const option = COLOR_OPTIONS.find(opt => opt.id === colorName);
-            if (option) {
-                return option.lightHex; // Use lightHex for lighter color
-            }
-        }
-        return '#e7e5e4';
+        return extractActivityColor(colorStr, true);
     };
 
     // Get color hex from category themeColor (use lightHex for display)
     const getColorFromCategoryThemeColor = (themeColor: string): string => {
-        if (!themeColor) return '#e7e5e4';
-        
-        // Match text-{color}-{shade} pattern
-        const match = themeColor.match(/text-([a-z]+)-/);
-        if (match) {
-            const colorName = match[1];
-            const option = COLOR_OPTIONS.find(opt => opt.id === colorName);
-            if (option) {
-                return option.lightHex; // Use lightHex for lighter color
-            }
-        }
-        return '#e7e5e4';
+        return extractCategoryColor(themeColor, true);
     };
 
     // --- Drag Logic (Kept but optional now) ---
