@@ -305,12 +305,15 @@ export const AIBatchModal: React.FC<AIBatchModalProps> = ({ onClose, onSave, cat
             const entriesWithIds = entries.map(e => {
                 const autoLinkResult = detectAutoLinkSuggestions(e);
 
-                // Logic: AutoLink Rule > AI Inference > Empty
+                // Logic: Merge AutoLink Rule + AI Inference (instead of overwriting)
                 // detectAutoLinkSuggestions returns array if rule found, or empty.
                 // AI inference is in e.scopeIds.
 
                 let finalScopeIds: string[] = [];
-                if (autoLinkResult.length > 0) {
+                if (autoLinkResult.length > 0 && e.scopeIds && e.scopeIds.length > 0) {
+                    // Merge both sources and remove duplicates
+                    finalScopeIds = [...new Set([...autoLinkResult, ...e.scopeIds])];
+                } else if (autoLinkResult.length > 0) {
                     finalScopeIds = autoLinkResult;
                 } else if (e.scopeIds && e.scopeIds.length > 0) {
                     finalScopeIds = e.scopeIds;
@@ -319,13 +322,15 @@ export const AIBatchModal: React.FC<AIBatchModalProps> = ({ onClose, onSave, cat
                 return {
                     ...e,
                     _uiId: crypto.randomUUID(),
-                    scopeIds: finalScopeIds // Overwrite with final logic
+                    scopeIds: finalScopeIds // Merged result
                 };
             });
             setParsedEntries(entriesWithIds);
             setStep('review');
         } catch (e) {
-            setError("Failed to generate schedule. Check API settings.");
+            const errorMessage = e instanceof Error ? e.message : String(e);
+            setError(`AI 解析失败: ${errorMessage}. 请检查 API 配置或输入格式。`);
+            console.error('AI Batch Modal Error:', e);
         } finally {
             setIsLoading(false);
         }
@@ -398,9 +403,20 @@ export const AIBatchModal: React.FC<AIBatchModalProps> = ({ onClose, onSave, cat
 
 
                             {error && (
-                                <div className="p-4 bg-red-50 text-red-600 text-sm rounded-xl flex items-center gap-2">
-                                    <AlertTriangle size={16} />
-                                    {error}
+                                <div className="p-4 bg-red-50 text-red-600 text-sm rounded-xl">
+                                    <div className="flex items-start gap-2 mb-3">
+                                        <AlertTriangle size={16} className="flex-shrink-0 mt-0.5" />
+                                        <div className="flex-1">
+                                            <p className="font-medium mb-1">解析失败</p>
+                                            <p className="text-xs text-red-500">{error}</p>
+                                        </div>
+                                    </div>
+                                    <button
+                                        onClick={handleParse}
+                                        className="w-full bg-red-100 hover:bg-red-200 text-red-700 font-medium py-2 px-4 rounded-lg transition-colors text-sm"
+                                    >
+                                        重试
+                                    </button>
                                 </div>
                             )}
                         </div>
