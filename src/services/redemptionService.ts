@@ -1,3 +1,18 @@
+/**
+ * @file redemptionService.ts
+ * @input Redemption code (string), LocalStorage (saved codes)
+ * @output Verification Result (RedemptionResult), Storage Operations (saveCode, clearSavedCode), Verification Status (isVerified)
+ * @pos Service
+ * @description 兑换码验证服务 - 处理投喂兑换码的验证、存储和状态管理
+ * 
+ * 核心功能：
+ * - 兑换码格式验证和解码
+ * - 用户ID验证和缓存
+ * - 验证状态持久化
+ * - 快速解码优化（使用缓存）
+ * 
+ * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
+ */
 import { TRANSFORM_PARAMS } from '../constants/redemptionHashes';
 import { SPONSORSHIP_KEYS, storage } from '../constants/storageKeys';
 
@@ -9,11 +24,6 @@ export interface RedemptionResult {
   supporterId?: number;
   error?: string;
 }
-
-// Utility transformation functions
-const _x1 = (n: number) => n ^ 0x5A5A;
-const _x2 = (n: number) => (n << 3) | (n >> 29);
-const _x3 = (n: number) => n * 0x9E3779B9;
 
 /**
  * Encode user identifier with transformation
