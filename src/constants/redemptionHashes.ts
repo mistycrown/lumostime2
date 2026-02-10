@@ -1,3 +1,23 @@
+/**
+ * @file redemptionHashes.ts
+ * @input Encoded transformation parameters
+ * @output Decoded transformation parameters, Master key identifiers
+ * @pos Constants (Redemption System)
+ * @description 兑换码哈希参数 - 存储兑换码验证所需的转换参数和主密钥标识
+ * 
+ * 核心内容：
+ * - 转换参数（multiplier, offset, xor）
+ * - 主密钥标识符
+ * - Base64 编码的配置数据
+ * 
+ * 安全说明：
+ * - 参数经过 Base64 编码
+ * - 用于兑换码的加密和验证
+ * - 配合 redemptionService 使用
+ * 
+ * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
+ */
+
 // Core transformation utilities
 const _e = (s: string) => atob(s);
 const _d = (o: any) => JSON.parse(_e(o));

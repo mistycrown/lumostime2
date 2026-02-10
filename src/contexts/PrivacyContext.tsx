@@ -1,3 +1,19 @@
+/**
+ * @file PrivacyContext.tsx
+ * @input User privacy mode preference
+ * @output Privacy mode state, Toggle function
+ * @pos Context (Privacy Management)
+ * @description 隐私模式上下文 - 管理应用的隐私模式状态，用于隐藏敏感信息
+ * 
+ * 核心功能：
+ * - 隐私模式状态管理
+ * - 全局切换函数
+ * - LocalStorage 持久化
+ * - 控制台调试接口
+ * 
+ * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
+ */
+
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 
 interface PrivacyContextType {

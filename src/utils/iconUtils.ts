@@ -1,6 +1,17 @@
 /**
  * @file iconUtils.ts
+ * @input icon (emoji or ui:iconType), uiIcon (UI icon ID), currentTheme
+ * @output Display icon (emoji or UI icon URL), uiIcon field management
+ * @pos Utility (Icon System)
  * @description 图标工具函数 - 处理 emoji 和 uiIcon 的获取和设置
+ * 
+ * 核心功能：
+ * - 根据主题返回正确的图标
+ * - emoji 和 UI 图标的转换
+ * - 确保 uiIcon 字段存在
+ * - 支持双图标系统
+ * 
+ * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
 
 import { uiIconService } from '../services/uiIconService';

@@ -1,5 +1,8 @@
 /**
  * @file resetDataTool.ts
+ * @input Browser console commands
+ * @output Data reset operations, Migration flag clearing
+ * @pos Utility (Development Tool)
  * @description 控制台数据重置工具 - 用于在浏览器控制台中重置数据为默认值
  * 
  * 使用方法：
@@ -19,6 +22,8 @@
  * 
  * 5. 清除迁移标记（用于测试首次迁移）：
  *    window.clearMigrationFlags()
+ * 
+ * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
 
 import { CATEGORIES, SCOPES, MOCK_TODO_CATEGORIES } from '../constants';
