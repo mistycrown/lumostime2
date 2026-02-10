@@ -1,6 +1,11 @@
 /**
  * @file useCustomPresets.ts
- * @description Hook for managing custom theme presets
+ * @input SettingsContext (uiIconTheme, colorScheme), LocalStorage (custom presets data)
+ * @output Custom Presets Management (customPresets, addCustomPreset, updateCustomPreset, deleteCustomPreset, getCustomPresetById, isPresetNameValid, validatePresetName), Loading State (isLoading)
+ * @pos Hook (Data Manager)
+ * @description 自定义主题方案 Hook - 管理用户自定义的主题方案，支持增删改查和名称验证
+ * 
+ * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
 import { useState, useEffect, useCallback } from 'react';
 import { useSettings } from '../contexts/SettingsContext';
