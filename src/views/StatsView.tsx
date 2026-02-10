@@ -18,8 +18,14 @@ import { ToastType } from '../components/Toast';
 import { MonthHeatmap } from '../components/MonthHeatmap';
 import { usePrivacy } from '../contexts/PrivacyContext';
 import { IconRenderer } from '../components/IconRenderer';
-
 import { ConfirmModal } from '../components/ConfirmModal';
+
+// 新的 Hooks 和组件
+import { useStatsCalculation } from '../hooks/useStatsCalculation';
+import { useTodoStats } from '../hooks/useTodoStats';
+import { useScopeStats } from '../hooks/useScopeStats';
+import { PieChartView } from '../components/stats/PieChartView';
+import { formatDuration, getHexColor, getScheduleStyle } from '../utils/chartUtils';
 
 interface StatsViewProps {
   logs: Log[];
@@ -149,31 +155,6 @@ export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentD
     }
   };
 
-  // 增长/下降指示器渲染函数
-  const renderGrowth = (current: number, previous: number) => {
-    // Case 1: Both zero or very small -> No trend
-    if (current < 0.1 && (!previous || previous < 0.1)) return null;
-
-    // Case 2: No previous data (New entry) -> Hide
-    if (!previous || previous < 0.1) {
-      return null;
-    }
-
-    // Case 3: Standard calculation
-    const delta = current - previous;
-    const percentage = Math.round((delta / previous) * 100);
-    if (percentage === 0) return null;
-    const isPositive = percentage > 0;
-
-    // 上升=绿色(emerald-500)，下降=红色(red-400)
-    return (
-      <div className={`flex items-center gap-0.5 text-[10px] font-medium ml-1.5 ${isPositive ? 'text-emerald-500' : 'text-red-400'}`}>
-        {isPositive ? <TrendingUp size={10} /> : <TrendingDown size={10} />}
-        <span>{Math.abs(percentage)}%</span>
-      </div>
-    );
-  };
-
   // 生成动态标题
   const getDynamicTitle = (date: Date, rangeType: PieRange | 'week_fixed' | 'day_fixed' | 'month'): string => {
     const formatDateShort = (d: Date) => `${d.getMonth() + 1}/${d.getDate()}`;
@@ -288,84 +269,30 @@ export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentD
 
   const { start: rangeStart, end: rangeEnd } = effectiveRange;
 
-  const filteredLogs = useMemo(() => {
-    return logs.filter(log =>
-      log.startTime >= rangeStart.getTime() &&
-      log.endTime <= rangeEnd.getTime() &&
-      !excludedCategoryIds.includes(log.categoryId)
-    );
-  }, [logs, rangeStart, rangeEnd, excludedCategoryIds]);
+  // 使用新的统计计算 Hooks
+  const { stats, previousStats, filteredLogs } = useStatsCalculation({
+    logs,
+    categories,
+    dateRange: effectiveRange,
+    excludedCategoryIds,
+    includePrevious: true
+  });
 
-  const stats = useMemo(() => {
-    const totalDuration = filteredLogs.reduce((acc, log) => acc + Math.max(0, (log.endTime - log.startTime) / 1000), 0);
-    const categoryStats: CategoryStat[] = categories.map(cat => {
-      const catLogs = filteredLogs.filter(l => l.categoryId === cat.id);
-      const catDuration = catLogs.reduce((acc, l) => acc + Math.max(0, (l.endTime - l.startTime) / 1000), 0);
-      const activityStats: ActivityStat[] = cat.activities.map(act => {
-        const actLogs = catLogs.filter(l => l.activityId === act.id);
-        const actDuration = actLogs.reduce((acc, l) => acc + Math.max(0, (l.endTime - l.startTime) / 1000), 0);
-        return { ...act, duration: actDuration };
-      }).filter(a => a.duration > 0).sort((a, b) => b.duration - a.duration);
+  const { todoStats, previousTodoStats } = useTodoStats({
+    logs,
+    todos,
+    todoCategories,
+    dateRange: effectiveRange,
+    includePrevious: true
+  });
 
-      return {
-        ...cat,
-        duration: catDuration,
-        percentage: totalDuration > 0 ? (catDuration / totalDuration) * 100 : 0,
-        items: activityStats
-      };
-    }).filter(s => s.duration > 0).sort((a, b) => b.duration - a.duration);
-    return { totalDuration, categoryStats };
-  }, [filteredLogs, categories]);
-
-  const getHexColor = (className: string = '') => {
-    if (typeof className !== 'string') return '#e7e5e4';
-    const match = className.match(/(?:text|bg)-([a-z]+)-/);
-    const colorId = match ? match[1] : 'stone';
-    const option = COLOR_OPTIONS.find(opt => opt.id === colorId);
-    return option ? (option.lightHex || option.hex) : '#e7e5e4';
-  };
-
-  const getScheduleStyle = (className: string = '') => {
-    if (typeof className !== 'string') return 'bg-stone-100 text-stone-700 border-stone-200';
-    const match = className.match(/(?:text|bg)-([a-z]+)-/);
-    const color = match ? match[1] : 'stone';
-    const styles: Record<string, string> = {
-      stone: 'bg-stone-100/90 text-stone-700 border-stone-200',
-      slate: 'bg-slate-100/90 text-slate-700 border-slate-200',
-      gray: 'bg-gray-100/90 text-gray-700 border-gray-200',
-      zinc: 'bg-zinc-100/90 text-zinc-700 border-zinc-200',
-      neutral: 'bg-neutral-100/90 text-neutral-700 border-neutral-200',
-      red: 'bg-red-100/90 text-red-700 border-red-200',
-      orange: 'bg-orange-100/90 text-orange-700 border-orange-200',
-      amber: 'bg-amber-100/90 text-amber-700 border-amber-200',
-      yellow: 'bg-yellow-100/90 text-yellow-700 border-yellow-200',
-      lime: 'bg-lime-100/90 text-lime-700 border-lime-200',
-      green: 'bg-green-100/90 text-green-700 border-green-200',
-      emerald: 'bg-emerald-100/90 text-emerald-700 border-emerald-200',
-      teal: 'bg-teal-100/90 text-teal-700 border-teal-200',
-      cyan: 'bg-cyan-100/90 text-cyan-700 border-cyan-200',
-      sky: 'bg-sky-100/90 text-sky-700 border-sky-200',
-      blue: 'bg-blue-100/90 text-blue-700 border-blue-200',
-      indigo: 'bg-indigo-100/90 text-indigo-700 border-indigo-200',
-      violet: 'bg-violet-100/90 text-violet-700 border-violet-200',
-      purple: 'bg-purple-100/90 text-purple-700 border-purple-200',
-      fuchsia: 'bg-fuchsia-100/90 text-fuchsia-700 border-fuchsia-200',
-      pink: 'bg-pink-100/90 text-pink-700 border-pink-200',
-      rose: 'bg-rose-100/90 text-rose-700 border-rose-200',
-    };
-    return styles[color] || styles['stone'];
-  };
-
-  const formatDuration = (seconds: number) => {
-    const h = Math.floor(seconds / 3600);
-    const m = Math.floor((seconds % 3600) / 60);
-    if (h > 0) return `${h}小时 ${m}分钟`;
-    return `${m}分钟`;
-  };
-  const { h: totalH, m: totalM } = (() => {
-    const s = stats.totalDuration;
-    return { h: Math.floor(s / 3600), m: Math.floor((s % 3600) / 60) };
-  })();
+  const { scopeStats, previousScopeStats } = useScopeStats({
+    logs,
+    scopes,
+    categories,
+    dateRange: effectiveRange,
+    includePrevious: true
+  });
 
   const handleExportStats = () => {
     const { start } = effectiveRange;
@@ -482,298 +409,6 @@ export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentD
     });
     return { days, rows };
   }, [rangeStart, rangeEnd, filteredLogs, categories]);
-
-  const pieChartData = useMemo(() => {
-    let currentAngle = 0; const gapAngle = 2; const radius = 80; const center = 100;
-    return stats.categoryStats.map(cat => {
-      const sweepAngle = (cat.percentage / 100) * 360;
-      if (sweepAngle < 1) return null;
-      const startAngle = currentAngle;
-      const endAngle = currentAngle + sweepAngle - gapAngle;
-      currentAngle += sweepAngle;
-      const startRad = (startAngle - 90) * Math.PI / 180.0;
-      const endRad = (endAngle - 90) * Math.PI / 180.0;
-      const x1 = center + radius * Math.cos(startRad);
-      const y1 = center + radius * Math.sin(startRad);
-      const x2 = center + radius * Math.cos(endRad);
-      const y2 = center + radius * Math.sin(endRad);
-      const largeArcFlag = endAngle - startAngle <= 180 ? "0" : "1";
-      const d = ["M", x1, y1, "A", radius, radius, 0, largeArcFlag, 1, x2, y2].join(" ");
-      return { ...cat, d, hexColor: getHexColor(cat.themeColor) };
-    }).filter(Boolean);
-  }, [stats]);
-
-  // Todo Stats
-  const todoStats = useMemo(() => {
-    const logsWithTodos = filteredLogs.filter(l => l.linkedTodoId);
-    const totalDuration = logsWithTodos.reduce((acc, log) => acc + Math.max(0, (log.endTime - log.startTime) / 1000), 0);
-
-    const todoDurations: Record<string, number> = {};
-    logsWithTodos.forEach(l => {
-      const d = Math.max(0, (l.endTime - l.startTime) / 1000);
-      todoDurations[l.linkedTodoId!] = (todoDurations[l.linkedTodoId!] || 0) + d;
-    });
-
-    const COLORS = ['#fee2e2', '#ffedd5', '#fef9c3', '#dcfce7', '#ccfbf1', '#dbeafe', '#e0e7ff', '#f3e8ff', '#fce7f3', '#ffe4e6'];
-
-    const categoryStats = todoCategories.map((cat, index) => {
-      const catTodos = todos.filter(t => t.categoryId === cat.id);
-      let catDuration = 0;
-      const items = catTodos.map(t => {
-        const d = todoDurations[t.id] || 0;
-        catDuration += d;
-        return {
-          id: t.id,
-          name: t.title,
-          duration: d,
-        };
-      }).filter(i => i.duration > 0).sort((a, b) => b.duration - a.duration);
-
-      return {
-        ...cat,
-        duration: catDuration,
-        percentage: totalDuration > 0 ? (catDuration / totalDuration) * 100 : 0,
-        items,
-        assignedColor: COLORS[index % COLORS.length]
-      };
-    }).filter(c => c.duration > 0).sort((a, b) => b.duration - a.duration);
-
-    return { totalDuration, categoryStats };
-  }, [filteredLogs, todos, todoCategories]);
-
-  const todoPieChartData = useMemo(() => {
-    let currentAngle = 0; const gapAngle = 2; const radius = 80; const center = 100;
-    return todoStats.categoryStats.map(cat => {
-      const sweepAngle = (cat.percentage / 100) * 360;
-      if (sweepAngle < 1) return null;
-      const startAngle = currentAngle;
-      const endAngle = currentAngle + sweepAngle - gapAngle;
-      currentAngle += sweepAngle;
-      const startRad = (startAngle - 90) * Math.PI / 180.0;
-      const endRad = (endAngle - 90) * Math.PI / 180.0;
-      const x1 = center + radius * Math.cos(startRad);
-      const y1 = center + radius * Math.sin(startRad);
-      const x2 = center + radius * Math.cos(endRad);
-      const y2 = center + radius * Math.sin(endRad);
-      const largeArcFlag = endAngle - startAngle <= 180 ? "0" : "1";
-      const d = ["M", x1, y1, "A", radius, radius, 0, largeArcFlag, 1, x2, y2].join(" ");
-      return { ...cat, d, hexColor: cat.assignedColor };
-    }).filter(Boolean);
-  }, [todoStats]);
-
-  const { h: totalTodoH, m: totalTodoM } = (() => {
-    const s = todoStats.totalDuration;
-    return { h: Math.floor(s / 3600), m: Math.floor((s % 3600) / 60) };
-  })();
-
-  // Scope Stats
-  const scopeStats = useMemo(() => {
-    // 1. Filter logs that have ANY scope assigned
-    const logsWithScopes = filteredLogs.filter(l => l.scopeIds && l.scopeIds.length > 0);
-
-    // We calculate "Scoped Duration" separate from Total Duration.
-    // If a log has multiple scopes, we SPLIT the duration to avoid > 100% in pie chart.
-    // e.g. 1 hour log with 2 scopes => 30 mins each.
-
-    let totalScopedDuration = 0;
-    const scopeDurations: Record<string, number> = {};
-    const scopeActivityBreakdown: Record<string, Record<string, number>> = {}; // scopeId -> activityName -> duration
-
-    logsWithScopes.forEach(l => {
-      const d = Math.max(0, (l.endTime - l.startTime) / 1000);
-      const count = l.scopeIds!.length;
-      const splitDuration = d / count;
-
-      // Find activity name for breakdown
-      const cat = categories.find(c => c.id === l.categoryId);
-      const act = cat?.activities.find(a => a.id === l.activityId);
-      const actName = act?.name || 'Unknown';
-
-      totalScopedDuration += d; // Wait, total time is simple sum of log durations (regardless of split)
-      // Actually, if we want the pie chart to sum to "Total Scoped Time", 
-      // simple sum of splits IS the whole.
-
-      l.scopeIds!.forEach(sId => {
-        scopeDurations[sId] = (scopeDurations[sId] || 0) + splitDuration;
-
-        if (!scopeActivityBreakdown[sId]) scopeActivityBreakdown[sId] = {};
-        scopeActivityBreakdown[sId][actName] = (scopeActivityBreakdown[sId][actName] || 0) + splitDuration;
-      });
-    });
-
-    // We can't use simple sum of splits for totalScopedDuration if we want "Real Time".
-    // But for the pie chart "Whole", sum of splits IS the whole.
-    // So distinct logs duration sum is the denominator.
-
-    const distinctTotalDuration = logsWithScopes.reduce((acc, l) => acc + Math.max(0, (l.endTime - l.startTime) / 1000), 0);
-
-    const categoryStats = scopes.map(scope => {
-      const duration = scopeDurations[scope.id] || 0;
-
-      // Breakdown items
-      const breakdown = scopeActivityBreakdown[scope.id] || {};
-      const items = Object.entries(breakdown).map(([name, d]) => ({
-        id: name, // pseudo id
-        name: name,
-        duration: d,
-        icon: '', // activity icon hard to get here efficiently without lookup map, skip for now
-        color: ''
-      })).sort((a, b) => b.duration - a.duration);
-
-      return {
-        ...scope,
-        duration,
-        percentage: distinctTotalDuration > 0 ? (duration / distinctTotalDuration) * 100 : 0,
-        items,
-        // Fallback for color if not set (scopes usually have themeColor)
-        themeColor: scope.themeColor || 'stone'
-      };
-    }).filter(s => s.duration > 0).sort((a, b) => b.duration - a.duration);
-
-    return { totalDuration: distinctTotalDuration, categoryStats };
-  }, [filteredLogs, scopes, categories]);
-
-  // --- Previous Period Helpers ---
-  const getPreviousDateRange = (currentStart: Date, currentEnd: Date, rangeType: PieRange | 'week_fixed' | 'day_fixed' | 'month') => {
-    const start = new Date(currentStart);
-    const end = new Date(currentEnd);
-
-    if (rangeType === 'day' || rangeType === 'day_fixed') {
-      start.setDate(start.getDate() - 1);
-      end.setDate(end.getDate() - 1);
-    } else if (rangeType === 'week' || rangeType === 'week_fixed') {
-      start.setDate(start.getDate() - 7);
-      end.setDate(end.getDate() - 7);
-    } else if (rangeType === 'month') {
-      // Fix: Simply subtract 1 month from the current start date
-      const prevMonth = new Date(start);
-      prevMonth.setMonth(prevMonth.getMonth() - 1);
-      return getDateRange(prevMonth, 'month');
-    } else if (rangeType === 'year') {
-      start.setFullYear(start.getFullYear() - 1);
-      return getDateRange(start, 'year');
-    }
-    return { start, end };
-  };
-
-  const previousRange = useMemo(() => {
-    let rangeType: PieRange | 'week_fixed' | 'day_fixed' | 'month';
-    if (viewType === 'pie') {
-      rangeType = pieRange;
-    } else if (viewType === 'matrix') {
-      rangeType = 'week_fixed';
-    } else if (viewType === 'schedule') {
-      rangeType = scheduleRange === 'day' ? 'day_fixed' : 'week_fixed';
-    } else if (viewType === 'line') {
-      rangeType = lineRange === 'week' ? 'week_fixed' : 'month';
-    } else if (viewType === 'check') {
-      // Check view使用pieRange，但不支持day，默认为week
-      rangeType = pieRange === 'day' ? 'week' : pieRange;
-    } else {
-      rangeType = 'day';
-    }
-    return getPreviousDateRange(rangeStart, rangeEnd, rangeType);
-  }, [rangeStart, rangeEnd, viewType, pieRange, scheduleRange, lineRange]);
-
-  const previousFilteredLogs = useMemo(() => {
-    return logs.filter(log =>
-      log.startTime >= previousRange.start.getTime() &&
-      log.endTime <= previousRange.end.getTime() &&
-      !excludedCategoryIds.includes(log.categoryId) // Keep same filters
-    );
-  }, [logs, previousRange, excludedCategoryIds]);
-
-  const previousStats = useMemo(() => {
-    const totalDuration = previousFilteredLogs.reduce((acc, log) => acc + Math.max(0, (log.endTime - log.startTime) / 1000), 0);
-
-    // Map of Category ID -> Duration
-    const catDurations = new Map<string, number>();
-    // Map of Activity ID -> Duration
-    const actDurations = new Map<string, number>();
-
-    previousFilteredLogs.forEach(log => {
-      const d = Math.max(0, (log.endTime - log.startTime) / 1000);
-      catDurations.set(log.categoryId, (catDurations.get(log.categoryId) || 0) + d);
-      actDurations.set(log.activityId, (actDurations.get(log.activityId) || 0) + d);
-    });
-
-    return { totalDuration, catDurations, actDurations };
-  }, [previousFilteredLogs]);
-
-  // Previous Todo Stats
-  const previousTodoStats = useMemo(() => {
-    const logsWithTodos = previousFilteredLogs.filter(l => l.linkedTodoId);
-    const totalDuration = logsWithTodos.reduce((acc, log) => acc + Math.max(0, (log.endTime - log.startTime) / 1000), 0);
-    const todoDurations = new Map<string, number>();
-    logsWithTodos.forEach(l => {
-      const d = Math.max(0, (l.endTime - l.startTime) / 1000);
-      todoDurations.set(l.linkedTodoId!, (todoDurations.get(l.linkedTodoId!) || 0) + d);
-    });
-
-    // Aggregate by Category
-    const categoryDurations = new Map<string, number>();
-    todoCategories.forEach(cat => {
-      const catTodos = todos.filter(t => t.categoryId === cat.id);
-      let d = 0;
-      catTodos.forEach(t => d += (todoDurations.get(t.id) || 0));
-      categoryDurations.set(cat.id, d);
-    });
-
-    return { totalDuration, todoDurations, categoryDurations };
-  }, [previousFilteredLogs, todos, todoCategories]);
-
-  // Previous Scope Stats
-  const previousScopeStats = useMemo(() => {
-    const logsWithScopes = previousFilteredLogs.filter(l => l.scopeIds && l.scopeIds.length > 0);
-    const distinctTotalDuration = logsWithScopes.reduce((acc, l) => acc + Math.max(0, (l.endTime - l.startTime) / 1000), 0);
-
-    const scopeDurations = new Map<string, number>();
-    const scopeActivityBreakdown: Record<string, Record<string, number>> = {};
-
-    logsWithScopes.forEach(l => {
-      const d = Math.max(0, (l.endTime - l.startTime) / 1000);
-      const count = l.scopeIds!.length;
-      const splitDuration = d / count;
-
-      // Find activity name for breakdown
-      const cat = categories.find(c => c.id === l.categoryId);
-      const act = cat?.activities.find(a => a.id === l.activityId);
-      const actName = act?.name || 'Unknown';
-
-      l.scopeIds!.forEach(sId => {
-        scopeDurations.set(sId, (scopeDurations.get(sId) || 0) + splitDuration);
-
-        if (!scopeActivityBreakdown[sId]) scopeActivityBreakdown[sId] = {};
-        scopeActivityBreakdown[sId][actName] = (scopeActivityBreakdown[sId][actName] || 0) + splitDuration;
-      });
-    });
-    return { totalDuration: distinctTotalDuration, scopeDurations, scopeActivityBreakdown };
-  }, [previousFilteredLogs, categories]);
-
-  const scopePieChartData = useMemo(() => {
-    let currentAngle = 0; const gapAngle = 2; const radius = 80; const center = 100;
-    return scopeStats.categoryStats.map(cat => {
-      const sweepAngle = (cat.percentage / 100) * 360;
-      if (sweepAngle < 1) return null;
-      const startAngle = currentAngle;
-      const endAngle = currentAngle + sweepAngle - gapAngle;
-      currentAngle += sweepAngle;
-      const startRad = (startAngle - 90) * Math.PI / 180.0;
-      const endRad = (endAngle - 90) * Math.PI / 180.0;
-      const x1 = center + radius * Math.cos(startRad);
-      const y1 = center + radius * Math.sin(startRad);
-      const x2 = center + radius * Math.cos(endRad);
-      const y2 = center + radius * Math.sin(endRad);
-      const largeArcFlag = endAngle - startAngle <= 180 ? "0" : "1";
-      const d = ["M", x1, y1, "A", radius, radius, 0, largeArcFlag, 1, x2, y2].join(" ");
-      return { ...cat, d, hexColor: getHexColor(cat.themeColor) };
-    }).filter(Boolean);
-  }, [scopeStats]);
-
-  const { h: totalScopeH, m: totalScopeM } = (() => {
-    const s = scopeStats.totalDuration;
-    return { h: Math.floor(s / 3600), m: Math.floor((s % 3600) / 60) };
-  })();
 
   // --- Check Stats Logic ---
   const checkStats = useMemo(() => {
@@ -1177,208 +812,20 @@ export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentD
 
           {/* --- Pie View Content --- */}
           {viewType === 'pie' && (
-            <div className="space-y-6 animate-in fade-in zoom-in-95 duration-300">
-              {/* Chart Card - No border */}
-              <div className="flex flex-col items-center">
-                <div className="relative w-56 h-56 mb-8 mt-2">
-                  <svg viewBox="0 0 200 200" className="w-full h-full transform -rotate-90">
-                    <circle cx="100" cy="100" r="80" fill="none" stroke="#f5f5f4" strokeWidth="25" />
-                    {pieChartData.map((segment, idx) => (
-                      <path key={segment && segment.id} d={segment && segment.d} fill="none" stroke={segment && segment.hexColor} strokeWidth="25" strokeLinecap="round" className="animate-in fade-in duration-700" style={{ animationDelay: `${idx * 100}ms` }} />
-                    ))}
-                  </svg>
-                  <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                    <span className="text-xs font-bold text-stone-300 uppercase">Tags</span>
-                    <div className="flex items-baseline gap-0.5 text-stone-800">
-                      <span className="text-3xl font-bold font-mono">{totalH}</span>
-                      <span className="text-xs text-stone-400">h</span>
-                      <span className="text-xl font-bold font-mono">{totalM}</span>
-                      <span className="text-xs text-stone-400">m</span>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="w-full space-y-4">
-                  {stats.categoryStats.map(cat => (
-                    <div key={cat.id} className="group">
-                      <div className="flex items-center justify-between mb-1.5">
-                        <div className="flex items-center gap-2">
-                          <IconRenderer icon={cat.icon} uiIcon={cat.uiIcon} size={14} />
-                          <span className="font-bold text-stone-700 text-[13px]">{cat.name}</span>
-                          {/* Growth Indicator for Category */}
-                          {renderGrowth(cat.duration, previousStats.catDurations.get(cat.id) || 0)}
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs font-mono text-stone-400">{formatDuration(cat.duration)}</span>
-                          <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 bg-stone-100 rounded text-stone-500">{cat.percentage.toFixed(0)}%</span>
-                        </div>
-                      </div>
-                      <div className="w-full h-1.5 bg-stone-50 rounded-full overflow-hidden mb-2">
-                        <div className="h-full rounded-full" style={{ width: `${cat.percentage}%`, backgroundColor: getHexColor(cat.themeColor) }} />
-                      </div>
-                      <div className="pl-6 space-y-1">
-                        {cat.items.map(act => (
-                          <div key={act.id} className="flex items-center justify-between text-[11px] text-stone-500 hover:bg-stone-50 rounded px-2 py-0.5 -ml-2 transition-colors">
-                            <div className="flex items-center gap-1.5">
-                              <IconRenderer 
-                                  icon={act.icon} 
-                                  uiIcon={act.uiIcon}
-                                  className="text-xs" 
-                              />
-                              <span>{act.name}</span>
-                              {/* Growth Indicator for Activity */}
-                              {renderGrowth(act.duration, previousStats.actDurations.get(act.id) || 0)}
-                            </div>
-                            <span className="font-mono opacity-60">{formatDuration(act.duration)}</span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Filter Chips - Pie View Position */}
-              <div className="flex flex-wrap gap-2 justify-center pt-2 pb-4">
-                {categories.map(cat => (
-                  <button
-                    key={cat.id}
-                    onClick={() => toggleExclusion(cat.id)}
-                    className={`px-3 py-1.5 rounded-full text-[10px] font-bold flex items-center gap-1 transition-all ${excludedCategoryIds.includes(cat.id)
-                      ? 'bg-stone-50 text-stone-300 grayscale'
-                      : 'bg-white border border-stone-200 text-stone-600'
-                      }`}
-                  >
-                    <IconRenderer icon={cat.icon} uiIcon={cat.uiIcon} size={14} />
-                    <span>{cat.name}</span>
-                  </button>
-                ))}
-              </div>
-
-              {/* Todo Stats Chart (New) */}
-              {todoStats.totalDuration > 0 && (
-                <div className="flex flex-col items-center pt-8 border-t border-stone-100 mt-8">
-
-                  <div className="relative w-56 h-56 mb-8 mt-2">
-                    <svg viewBox="0 0 200 200" className="w-full h-full transform -rotate-90">
-                      <circle cx="100" cy="100" r="80" fill="none" stroke="#f5f5f4" strokeWidth="25" />
-                      {todoPieChartData.map((segment, idx) => (
-                        <path key={segment && segment.id} d={segment && segment.d} fill="none" stroke={segment && segment.hexColor} strokeWidth="25" strokeLinecap="round" className="animate-in fade-in duration-700" style={{ animationDelay: `${idx * 100}ms` }} />
-                      ))}
-                    </svg>
-                    <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                      <span className="text-xs font-bold text-stone-300 uppercase">Todos</span>
-                      <div className="flex items-baseline gap-0.5 text-stone-800">
-                        <span className="text-3xl font-bold font-mono">{totalTodoH}</span>
-                        <span className="text-xs text-stone-400">h</span>
-                        <span className="text-xl font-bold font-mono">{totalTodoM}</span>
-                        <span className="text-xs text-stone-400">m</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="w-full space-y-4">
-                    {todoStats.categoryStats.map(cat => (
-                      <div key={cat.id} className="group">
-                        <div className="flex items-center justify-between mb-1.5">
-                          <div className="flex items-center gap-2">
-                            <IconRenderer icon={cat.icon} uiIcon={cat.uiIcon} size={14} />
-                            <span className="font-bold text-stone-700 text-[13px]">{cat.name}</span>
-                            {/* Growth Indicator for Todo Category */}
-                            {renderGrowth(cat.duration, previousTodoStats.categoryDurations?.get(cat.id) || 0)}
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <span className="text-xs font-mono text-stone-400">{formatDuration(cat.duration)}</span>
-                            <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 bg-stone-100 rounded text-stone-500">{cat.percentage.toFixed(0)}%</span>
-                          </div>
-                        </div>
-                        <div className="w-full h-1.5 bg-stone-50 rounded-full overflow-hidden mb-2">
-                          <div className="h-full rounded-full" style={{ width: `${cat.percentage}%`, backgroundColor: cat.assignedColor }} />
-                        </div>
-                        {pieRange !== 'year' && (
-                          <div className="pl-6 space-y-1">
-                            {cat.items.map(act => (
-                              <div key={act.id} className="flex items-center justify-between text-[11px] text-stone-500 hover:bg-stone-50 rounded px-2 py-0.5 -ml-2 transition-colors">
-                                <div className="flex items-center gap-1.5">
-                                  <div className={`w-1 h-1 rounded-full`} style={{ backgroundColor: cat.assignedColor }}></div>
-                                  <span>{act.name}</span>
-                                  {/* Growth Indicator for Todo Item */}
-                                  {renderGrowth(act.duration, previousTodoStats.todoDurations.get(act.id) || 0)}
-                                </div>
-                                <span className="font-mono opacity-60">{formatDuration(act.duration)}</span>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Scope Stats Chart (New) */}
-              {scopeStats.totalDuration > 0 && (
-                <div className="flex flex-col items-center pt-8 border-t border-stone-100 mt-8">
-                  <div className="relative w-56 h-56 mb-8 mt-2">
-                    <svg viewBox="0 0 200 200" className="w-full h-full transform -rotate-90">
-                      <circle cx="100" cy="100" r="80" fill="none" stroke="#f5f5f4" strokeWidth="25" />
-                      {scopePieChartData.map((segment, idx) => (
-                        <path key={segment && segment.id} d={segment && segment.d} fill="none" stroke={segment && segment.hexColor} strokeWidth="25" strokeLinecap="round" className="animate-in fade-in duration-700" style={{ animationDelay: `${idx * 100}ms` }} />
-                      ))}
-                    </svg>
-                    <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                      <span className="text-xs font-bold text-stone-300 uppercase">Scopes</span>
-                      <div className="flex items-baseline gap-0.5 text-stone-800">
-                        <span className="text-3xl font-bold font-mono">{totalScopeH}</span>
-                        <span className="text-xs text-stone-400">h</span>
-                        <span className="text-xl font-bold font-mono">{totalScopeM}</span>
-                        <span className="text-xs text-stone-400">m</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="w-full space-y-4">
-                    {scopeStats.categoryStats.map(scope => (
-                      <div key={scope.id} className="group">
-                        <div className="flex items-center justify-between mb-1.5">
-                          <div className="flex items-center gap-2">
-                            <IconRenderer 
-                                icon={scope.icon} 
-                                uiIcon={scope.uiIcon}
-                                size={14} 
-                            />
-                            <span className="font-bold text-stone-700 text-[13px]">{scope.name}</span>
-                            {/* Growth Indicator for Scope */}
-                            {renderGrowth(scope.duration, previousScopeStats.scopeDurations.get(scope.id) || 0)}
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <span className="text-xs font-mono text-stone-400">{formatDuration(scope.duration)}</span>
-                            <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 bg-stone-100 rounded text-stone-500">{scope.percentage.toFixed(0)}%</span>
-                          </div>
-                        </div>
-                        <div className="w-full h-1.5 bg-stone-50 rounded-full overflow-hidden mb-2">
-                          <div className="h-full rounded-full" style={{ width: `${scope.percentage}%`, backgroundColor: getHexColor(scope.themeColor) }} />
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-
-              {/* Bottom Export (Moved inside Pie View) */}
-              {!isFullScreen && (
-                <div className="flex justify-center pt-8 mt-4 mb-4">
-                  <button
-                    onClick={handleExportStats}
-                    className="flex items-center gap-1 text-stone-400 hover:text-stone-600 transition-colors text-xs font-medium"
-                  >
-                    <Share size={12} />
-                    <span>导出统计文本</span>
-                  </button>
-                </div>
-              )}
-            </div>
+            <PieChartView
+              stats={stats}
+              previousStats={previousStats}
+              todoStats={todoStats}
+              previousTodoStats={previousTodoStats}
+              scopeStats={scopeStats}
+              previousScopeStats={previousScopeStats}
+              pieRange={pieRange}
+              categories={categories}
+              excludedCategoryIds={excludedCategoryIds}
+              onToggleExclusion={toggleExclusion}
+              onExport={handleExportStats}
+              isFullScreen={isFullScreen}
+            />
           )}
 
           {/* --- Line Chart View Content --- */}

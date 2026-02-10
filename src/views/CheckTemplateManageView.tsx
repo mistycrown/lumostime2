@@ -26,6 +26,7 @@ import { ConfirmModal } from '../components/ConfirmModal';
 import { UIIconSelector } from '../components/UIIconSelector';
 import { IconRenderer } from '../components/IconRenderer';
 import { useSettings } from '../contexts/SettingsContext';
+import { scanCheckItems, batchRenameCheckItems, batchDeleteCheckItems } from '../utils/checkItemBatchOperations';
 
 interface CheckTemplateManageViewProps {
     templates: CheckTemplate[];
@@ -164,22 +165,13 @@ export const CheckTemplateManageView: React.FC<CheckTemplateManageViewProps> = (
 
         // Step 1: Scan
         if (batchStep === 'input') {
-            let count = 0;
-            const target = batchTargetContent.trim();
-            props.dailyReviews.forEach(review => {
-                if (!review.checkItems) return;
-                review.checkItems.forEach((item: any) => {
-                    // Loose matching: includes
-                    if (item.content.includes(target)) {
-                        count++;
-                    }
-                });
-            });
+            const scanResult = scanCheckItems(props.dailyReviews, batchTargetContent.trim());
+            const count = scanResult.totalMatches;
 
             setScanCount(count);
             if (count > 0) {
                 setBatchStep('confirm');
-                setBatchResult(`🔍 扫描到 ${count} 条包含 "${target}" 的记录，请点击执行以确认修改。`);
+                setBatchResult(`🔍 扫描到 ${count} 条包含 "${batchTargetContent.trim()}" 的记录，请点击执行以确认修改。`);
             } else {
                 setBatchResult('❌ 未找到匹配的日课记录');
                 setTimeout(() => setBatchResult(null), 2000);
@@ -188,44 +180,22 @@ export const CheckTemplateManageView: React.FC<CheckTemplateManageViewProps> = (
         }
 
         // Step 2: Execute
-        let updatedCount = 0;
-        // Iterate over props.dailyReviews
-        const updatedReviews = props.dailyReviews.map(review => {
-            if (!review.checkItems) return review;
+        const target = batchTargetContent.trim();
+        let result;
 
-            let hasChange = false;
-            let newCheckItems = [...review.checkItems];
-            const target = batchTargetContent.trim();
+        if (batchTab === 'rename') {
+            if (!batchNewContent.trim()) return;
+            result = batchRenameCheckItems(props.dailyReviews, target, batchNewContent.trim());
+        } else if (batchTab === 'delete') {
+            result = batchDeleteCheckItems(props.dailyReviews, target);
+        } else {
+            return;
+        }
 
-            if (batchTab === 'rename') {
-                if (!batchNewContent.trim()) return review;
-                newCheckItems = newCheckItems.map(item => {
-                    if (item.content.includes(target)) {
-                        hasChange = true;
-                        updatedCount++;
-                        // Replace the entire content with new content, or just replace the substring? 
-                        // Usually user wants to replace the whole item content to standardize it.
-                        return { ...item, content: batchNewContent.trim() };
-                    }
-                    return item;
-                });
-            } else if (batchTab === 'delete') {
-                const initialLen = newCheckItems.length;
-                newCheckItems = newCheckItems.filter(item => !item.content.includes(target));
-                if (newCheckItems.length !== initialLen) {
-                    hasChange = true;
-                    updatedCount += (initialLen - newCheckItems.length);
-                }
-            }
-
-            if (hasChange) {
-                return { ...review, checkItems: newCheckItems };
-            }
-            return review;
-        });
+        const updatedCount = result.affectedCount;
 
         if (updatedCount > 0) {
-            props.onBatchUpdateDailyReviewItems(updatedReviews);
+            props.onBatchUpdateDailyReviewItems(result.updatedReviews);
             setBatchResult(`✅ 成功${batchTab === 'rename' ? '重命名' : '删除'}了 ${updatedCount} 条日课记录`);
             setTimeout(() => {
                 setShowBatchModal(false);
