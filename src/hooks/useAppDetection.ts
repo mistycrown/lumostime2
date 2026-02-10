@@ -1,3 +1,12 @@
+/**
+ * @file useAppDetection.ts
+ * @input SessionContext (activeSessions), SettingsContext (appRules), CategoryScopeContext (categories), ToastContext (addToast), handleStartActivity callback
+ * @output App Detection Listener (startFocusFromPrompt event handler)
+ * @pos Hook (System Integration)
+ * @description 应用检测 Hook - 监听悬浮球触发的应用启动事件，自动关联并启动对应的活动计时
+ * 
+ * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
+ */
 import { useEffect, useRef } from 'react';
 import { Capacitor } from '@capacitor/core';
 import { useSession } from '../contexts/SessionContext';

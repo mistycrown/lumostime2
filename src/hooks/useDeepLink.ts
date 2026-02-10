@@ -1,3 +1,18 @@
+/**
+ * @file useDeepLink.ts
+ * @input CategoryScopeContext (categories), SessionContext (activeSessions), SettingsContext (autoLinkRules), DataContext (logs), ToastContext (addToast), handleQuickPunch callback, handleStartActivity callback, handleStopActivity callback
+ * @output Deep Link Listener (appUrlOpen event handler), NFC Listener (nfcTagScanned event handler)
+ * @pos Hook (System Integration)
+ * @description 深度链接和 NFC Hook - 处理应用的深度链接和 NFC 标签扫描，支持快速打点和活动启动
+ * 
+ * 设计说明：
+ * - 支持通过 URL Scheme 启动应用并执行操作
+ * - 支持 NFC 标签扫描触发快速打点或活动切换
+ * - 使用 ref 确保回调函数始终是最新版本
+ * - 处理冷启动和热启动两种场景
+ * 
+ * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
+ */
 import { useEffect, useRef } from 'react';
 import { App as CapacitorApp } from '@capacitor/app';
 import { Capacitor } from '@capacitor/core';
@@ -24,7 +39,7 @@ export const useDeepLink = (
     const { autoLinkRules } = useSettings();
     const { addToast } = useToast();
 
-    // Quick Punch Ref
+    // Quick Punch Ref - 确保使用最新的回调函数
     const quickPunchRef = useRef(handleQuickPunch);
     useEffect(() => {
         quickPunchRef.current = handleQuickPunch;
