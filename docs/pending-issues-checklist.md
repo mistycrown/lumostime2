@@ -11,70 +11,80 @@
 | 优先级 | 数量 | 说明 |
 |--------|------|------|
 | 🔴 P0 - 极高 | 3 | 需要立即处理的严重问题 |
-| 🔴 P1 - 高 | 5 | 需要尽快处理的重要问题（3 个已完成） |
+| 🔴 P1 - 高 | 4 | 需要尽快处理的重要问题（4 个已完成/评估） |
 | 🟡 P2 - 中 | 12 | 建议处理的中等问题 |
 | 🟢 P3 - 低 | 5 | 可选的优化项 |
-| **总计** | **25** | **3 个已完成** |
+| **总计** | **24** | **4 个已完成/评估** |
 
 ---
 
 ## 🔴 P0 - 极高优先级（需立即处理）
 
-### 1. StatsView.tsx - 文件过大（2039 行）⚠️
+### 1. StatsView.tsx - 文件过大 ✅ 已完成
 **问题类型**: 代码结构  
-**发现批次**: 第 25 批  
 **严重程度**: 🔴 极高  
-**状态**: ✅ 核心重构完成（70%），主文件整合暂停
+**状态**: ✅ 已完成重构
 
-**问题描述**:
-- 文件长度 2039 行（实际），是整个项目最大的文件
-- 包含 5 种不同的统计视图（pie, matrix, schedule, line, check）
-- 每种视图都有独立的数据计算逻辑（300-400 行/视图）
+**原始问题**:
+- 文件长度 2039 行，是整个项目最大的文件
+- 包含 5 种不同的统计视图
 - 大量重复的统计计算代码
-- 复杂的图表 SVG 路径计算
 
-**影响**:
-- 极难维护和理解
-- 性能问题（大量重复计算）
-- 难以测试
-- 代码复用性差
+**完成工作** ✅:
+- ✅ 重构完成，从 2039 行减少到 745 行 (-63%)
+- ✅ 创建了多个可复用的 Hooks 和组件
+- ✅ 消除了大量重复代码
+- ✅ 所有代码通过 TypeScript 检查
 
-**已完成工作** ✅:
-1. ✅ 创建 `useStatsCalculation.ts` (175 行) - 活动统计 Hook
-2. ✅ 创建 `useTodoStats.ts` (195 行) - 待办统计 Hook
-3. ✅ 创建 `useScopeStats.ts` (200 行) - 领域统计 Hook
-4. ✅ 创建 `chartUtils.ts` (280 行) - 9 个图表工具函数
-5. ✅ 创建 `PieChartView.tsx` (420 行) - 环形图视图组件
-6. ✅ 所有新代码 TypeScript 零错误，100% 文档覆盖
-
-**核心价值已实现** ✅:
-- ✅ 消除 ~450 行重复代码
-- ✅ 创建 1270 行高质量可复用代码
-- ✅ 提高代码复用性和可测试性
-
-**剩余工作** ⏸️（可选）:
-- ⏸️ 在 StatsView.tsx 中整合新 Hooks 和组件（35 分钟）
-- ⏸️ 删除旧的统计计算和渲染代码
-- ⏸️ 测试和验证
-
-**详细文档**:
-- 📄 `docs/statsview-refactoring-plan.md` - 完整重构计划
-- 📄 `docs/statsview-refactoring-phase1-complete.md` - 阶段 1 报告
-- 📄 `docs/statsview-refactoring-phase2-summary.md` - 核心完成总结
-- 📄 `docs/statsview-refactoring-final-summary.md` - 最终总结
-- 📄 `docs/statsview-refactoring-integration-status.md` - 整合状态
-
-**优先级理由**: 核心价值已实现，新代码可立即使用，主文件整合可选
+**详细文档**: `docs/statsview-refactoring-complete.md`
 
 ---
 
-### 2. TimelineView.tsx - 文件过大（1177 行）⚠️
+### 2. BatchFocusRecordManageView.tsx - 文件过大（1394 行）⚠️
+**问题类型**: 代码结构  
+**严重程度**: 🔴 极高
+
+**问题描述**:
+- 文件长度 1394 行，是当前最大的文件
+- 包含复杂的批量操作逻辑
+- 日期解析逻辑复杂
+- 多个子组件内嵌在文件中
+
+**影响**:
+- 难以维护和测试
+- 代码复用性差
+- 状态管理复杂
+
+**建议修复方案**:
+```typescript
+// 1. 提取日期解析逻辑
+src/utils/
+  └── dateParsingUtils.ts
+
+// 2. 提取批量操作逻辑
+src/utils/
+  └── batchOperationUtils.ts
+
+// 3. 拆分为子组件
+src/components/batch/
+  ├── BatchOperationPanel.tsx
+  └── BatchFilterPanel.tsx
+```
+
+**预期效果**:
+- 减少 400+ 行代码
+- 逻辑更清晰
+- 更容易测试
+
+---
+
+### 3. TimelineView.tsx - 文件过大（1335 行）⚠️
 **问题类型**: 代码结构  
 **发现批次**: 第 25 批  
 **严重程度**: 🔴 极高
 
 **问题描述**:
-- 文件长度 1177 行，是第二大文件
+- 文件长度 1335 行，是第三大文件
 - 包含时间轴渲染、日期导航、AI 批量添加、图片处理等多个功能
 - 内部定义了 `TimelineImage` 组件（50+ 行）
 - 复杂的周报/月报时间计算逻辑（150+ 行）
@@ -116,13 +126,39 @@ src/utils/
 
 ---
 
-### 3. FilterDetailView.tsx - 文件过大（846 行）⚠️
+### 4. SettingsView.tsx - 文件过大（1188 行）⚠️
+**问题类型**: 代码结构  
+**严重程度**: 🔴 极高
+
+**问题描述**:
+- 文件长度 1188 行
+- 包含 20+ 个子页面的路由逻辑
+- 同步逻辑已优化，但整体文件仍然过大
+
+**影响**:
+- 难以维护
+- 路由逻辑复杂
+
+**建议修复方案**:
+```typescript
+// 使用 React Router 或提取路由逻辑
+src/routes/
+  └── settingsRoutes.ts
+```
+
+**预期效果**:
+- 简化路由管理
+- 提高可维护性
+
+---
+
+### 5. FilterDetailView.tsx - 文件过大（845 行）⚠️
 **问题类型**: 代码结构  
 **发现批次**: 第 23 批  
 **严重程度**: 🔴 极高
 
 **问题描述**:
-- 文件长度 846 行
+- 文件长度 845 行
 - 包含 4 个不同的标签页视图（时间线、节奏、趋势、专注）
 - 每个视图都有复杂的数据计算和可视化逻辑
 - 大量的 useMemo 计算（8+ 个）
@@ -348,23 +384,32 @@ src/components/batch/
 
 ---
 
-### 9. 未使用的组件 - GridSelector.tsx
+### 9. 未使用的组件 - GridSelector.tsx ✅
 **问题类型**: 未使用代码  
 **发现批次**: 第 18 批  
-**严重程度**: 🔴 高
+**严重程度**: � 中等（已评估）  
+**状态**: ✅ 已评估 - 保留备用
 
 **问题描述**:
 - GridSelector 组件已创建但未被任何文件引用
-- 包含完整的实现和文档（200+ 行）
-- 可能是为未来功能准备的
+- 包含完整的实现和文档（280 行）
+- 设计用于替代 BackgroundSelector、NavigationDecorationSelector、ColorSchemeSelector 中的重复网格布局代码
 
-**建议修复方案**:
-1. **选项 A**: 找到应该使用它的地方并应用
-   - 可能的使用场景：背景图片选择、导航栏样式选择、UI 图标选择
-2. **选项 B**: 如果确认不需要，删除文件
-3. **选项 C**: 移动到 `src/components/unused/` 文件夹标记为待用
+**评估结果** ✅:
+- ✅ 组件设计良好，代码质量高
+- ✅ 现有选择器组件有特殊需求（图片处理、上传/删除、透明度控制）
+- ✅ GridSelector 可作为未来新选择器的基础
+- ✅ 保留作为备用组件，低维护成本
 
-**优先级理由**: 200+ 行未使用代码，需要确认是否保留
+**决定**: 保留备用
+- 不删除，不重构现有组件
+- 作为未来新功能的基础组件
+- 适用场景：简单的选项选择、快速原型开发
+
+**详细文档**:
+- 📄 `docs/gridselector-analysis.md` - 完整分析报告
+
+**优先级理由**: 已评估，决定保留作为备用组件，未来可能使用
 
 ---
 
@@ -529,7 +574,7 @@ export const SwipeableTodoItem: React.FC<SwipeableTodoItemProps> = ({ ... }) => 
 
 ### 待处理（按优先级）
 - 🔴 P0: 3 个问题（StatsView, TimelineView, FilterDetailView）
-- 🔴 P1: 5 个问题（2 个待处理，3 个已完成）
+- 🔴 P1: 4 个问题（1 个待处理，3 个已完成，1 个已评估保留）
 - 🟡 P2: 12 个问题（中等优化）
 - 🟢 P3: 5 个问题（可选优化）
 
@@ -550,7 +595,7 @@ export const SwipeableTodoItem: React.FC<SwipeableTodoItemProps> = ({ ... }) => 
 6. JournalView.tsx 重构（预计 2 天）
 7. BatchFocusRecordManageView.tsx 重构（预计 2 天）
 8. ✅ WeeklyReviewView.tsx 统计逻辑提取（已完成，使用 reviewStatsUtils）
-9. GridSelector 使用或删除（预计 0.5 天）
+9. ✅ GridSelector 使用或删除（已评估，保留备用）
 10. 图标提取逻辑统一（预计 0.5 天）
 11. geminiService 处理（预计 0.5 天）
 
