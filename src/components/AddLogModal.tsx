@@ -7,7 +7,7 @@
  * 
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
-import React, { useState, useMemo, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Category, Log, TodoItem, TodoCategory, Scope, AutoLinkRule, Comment } from '../types';
 import { X, Trash2, TrendingUp, Plus, Minus, Lightbulb, Check, CheckCircle2, Clock, Camera, Image as ImageIcon, Maximize2, Minimize2 } from 'lucide-react';
 import { TodoAssociation } from '../components/TodoAssociation';
@@ -15,10 +15,10 @@ import { TagAssociation } from '../components/TagAssociation';
 import { ScopeAssociation } from '../components/ScopeAssociation';
 import { FocusScoreSelector } from '../components/FocusScoreSelector';
 import { CommentSection } from '../components/CommentSection';
-import { imageService } from '../services/imageService';
 import { ImagePreviewModal } from './ImagePreviewModal';
 import { ReactionPicker, ReactionList } from './ReactionComponents';
 import { IconRenderer } from './IconRenderer';
+import { useLogForm, useTimeCalculation, useImageManager, useSuggestions } from '../hooks';
 
 interface AddLogModalProps {
   initialLog?: Log | null;
@@ -40,478 +40,172 @@ interface AddLogModalProps {
 }
 
 export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialStartTime, initialEndTime, onClose, onSave, onDelete, onImageRemove, categories, todos, todoCategories, scopes, autoLinkRules = [], lastLogEndTime, autoFocusNote = true, allLogs = [] }) => {
-  const [selectedCategoryId, setSelectedCategoryId] = useState<string>(categories[0].id);
-  const [selectedActivityId, setSelectedActivityId] = useState<string>(categories[0].activities[0].id);
-  const [note, setNote] = useState('');
+  // 使用自定义 Hooks 管理状态
+  const { formState, updateField, updateFields, previousLogEndTime } = useLogForm({
+    initialLog,
+    initialStartTime,
+    initialEndTime,
+    categories,
+    todos,
+    todoCategories,
+    lastLogEndTime,
+    allLogs
+  });
 
-  const [linkedTodoId, setLinkedTodoId] = useState<string | undefined>(undefined);
+  // 时间计算
+  const timeCalc = useTimeCalculation(
+    formState.currentStartTime,
+    formState.currentEndTime,
+    formState.trackStartTime,
+    formState.trackEndTime
+  );
 
-  const [progressIncrement, setProgressIncrement] = useState(0);
-  const [focusScore, setFocusScore] = useState<number | undefined>(undefined);
-  const [scopeIds, setScopeIds] = useState<string[] | undefined>(undefined);
-  const [images, setImages] = useState<string[]>([]);
-  const [imageUrls, setImageUrls] = useState<Record<string, string>>({});
-  const [previewFilename, setPreviewFilename] = useState<string | null>(null);
-  const [comments, setComments] = useState<Comment[]>([]);
-  const [reactions, setReactions] = useState<string[]>([]);
+  // 图片管理
+  const imageManager = useImageManager(formState.images);
+
+  // 建议系统
+  const suggestions = useSuggestions(
+    formState.linkedTodoId,
+    formState.note,
+    formState.selectedActivityId,
+    formState.scopeIds,
+    categories,
+    todos,
+    scopes,
+    autoLinkRules
+  );
+
+  // UI 状态
   const [isNoteExpanded, setIsNoteExpanded] = useState(false);
+  const [isDraggingStart, setIsDraggingStart] = useState(false);
+  const [isDraggingEnd, setIsDraggingEnd] = useState(false);
 
-  // --- TIME STATE (New Logic) ---
-  const [trackStartTime, setTrackStartTime] = useState<number>(0);
-  const [trackEndTime, setTrackEndTime] = useState<number>(0);
-  const [currentStartTime, setCurrentStartTime] = useState<number>(0);
-  const [currentEndTime, setCurrentEndTime] = useState<number>(0);
+  // Refs
+  const sliderRef = useRef<HTMLDivElement>(null);
+  const noteRef = useRef<HTMLTextAreaElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Auto-focus note on new log
   useEffect(() => {
-    let tStart = 0;
-    let tEnd = 0;
-    let cStart = 0;
-    let cEnd = 0;
-
-    if (initialLog) {
-      // Scenario 1: Edit Log -> Track is FIXED to original bounds
-      tStart = initialLog.startTime;
-      tEnd = initialLog.endTime;
-      cStart = initialLog.startTime;
-      cEnd = initialLog.endTime;
-
-      setSelectedCategoryId(initialLog.categoryId);
-      setSelectedActivityId(initialLog.activityId);
-      setNote(initialLog.note || '');
-      setLinkedTodoId(initialLog.linkedTodoId);
-      setProgressIncrement(initialLog.progressIncrement || 0);
-      setFocusScore(initialLog.focusScore);
-      setScopeIds(initialLog.scopeIds);
-      setFocusScore(initialLog.focusScore);
-      setScopeIds(initialLog.scopeIds);
-      setImages(initialLog.images || []);
-      setComments(initialLog.comments || []);
-      setReactions(initialLog.reactions || []);
-
-      // Sync Todo Category
-      // (Logic moved to TodoAssociation)
-
-    } else if (initialStartTime && initialEndTime) {
-      // Scenario 2: Gap -> Track is Gap, Default Full Selection
-      tStart = initialStartTime;
-      tEnd = initialEndTime;
-      cStart = initialStartTime;
-      cEnd = initialEndTime;
-
-      setSelectedCategoryId(categories[0].id);
-      setSelectedActivityId(categories[0].activities[0].id);
-      setNote('');
-      setLinkedTodoId(undefined);
-      setProgressIncrement(0);
-      setFocusScore(undefined);
-      setScopeIds(undefined);
-      setImages([]);
-      setComments([]);
-      setReactions([]);
-
-    } else {
-      // Scenario 3: New Button -> Use lastLogEndTime as start if available, otherwise default 1 hour
-      const now = Date.now();
-      let startTime: number;
-
-      if (lastLogEndTime) {
-        // Use last log's end time as start time
-        startTime = lastLogEndTime;
-      } else {
-        // Default to 1 hour ago if no previous logs
-        startTime = now - 60 * 60 * 1000;
-      }
-
-      tStart = startTime;
-      tEnd = now;
-      cStart = startTime;
-      cEnd = now;
-
-      setSelectedCategoryId(categories[0].id);
-      setSelectedActivityId(categories[0].activities[0].id);
-      setNote('');
-      setLinkedTodoId(undefined);
-      setProgressIncrement(0);
-      setFocusScore(undefined);
-      setScopeIds(undefined);
-      setImages([]);
-      setComments([]);
-      setReactions([]);
-
+    if (!initialLog && noteRef.current && autoFocusNote) {
+      setTimeout(() => {
+        noteRef.current?.focus();
+        noteRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }, 400);
     }
+  }, [initialLog, autoFocusNote]);
 
-    setTrackStartTime(tStart);
-    setTrackEndTime(tEnd);
-    setCurrentStartTime(cStart);
-    setCurrentEndTime(cEnd);
-  }, [initialLog, initialStartTime, initialEndTime, categories, todos, todoCategories]);
-
-  // 计算真正的"上一条记录"的结束时间
-  const previousLogEndTime = useMemo(() => {
-    if (!allLogs || allLogs.length === 0) return lastLogEndTime;
-    
-    // 获取当前记录的开始时间作为参考点
-    const referenceTime = currentStartTime || trackStartTime || Date.now();
-    
-    // 获取参考时间的日期（当天0点）
-    const referenceDate = new Date(referenceTime);
-    referenceDate.setHours(0, 0, 0, 0);
-    const dayStartTime = referenceDate.getTime();
-    
-    // 过滤出在参考时间之前结束的所有记录
-    const previousLogs = allLogs.filter(log => {
-      // 如果是编辑模式，排除当前正在编辑的记录
-      if (initialLog && log.id === initialLog.id) return false;
-      // 只要结束时间在参考时间之前的记录
-      return log.endTime <= referenceTime;
-    });
-    
-    // 如果没有之前的记录，返回 lastLogEndTime
-    if (previousLogs.length === 0) return lastLogEndTime;
-    
-    // 找到结束时间最接近参考时间的记录
-    const sortedPreviousLogs = previousLogs.sort((a, b) => b.endTime - a.endTime);
-    const closestLog = sortedPreviousLogs[0];
-    
-    // 检查最近的记录是否在同一天
-    // 如果不在同一天（即当天没有更早的记录），返回当天0点
-    if (closestLog.endTime < dayStartTime) {
-      return dayStartTime;
-    }
-    
-    return closestLog.endTime;
-  }, [allLogs, currentStartTime, trackStartTime, initialLog, lastLogEndTime]);
-
-  // Unified Suggestion State
-  const [suggestions, setSuggestions] = useState<{
-    activity?: { id: string; categoryId: string; name: string; icon: string; reason: string; matchedKeyword?: string };
-    scopes: { id: string; name: string; icon: string; reason: string }[];
-  }>({ scopes: [] });
-
-  // Unified Suggestion Logic
+  // 同步图片状态到 formState
   useEffect(() => {
-    const newSuggestions: typeof suggestions = { scopes: [] };
-
-    // 1. Activity Suggestions (Priority: Linked Todo > Note Keywords)
-    const linkedTodo = todos.find(t => t.id === linkedTodoId);
-
-    // Check Linked Todo Activity
-    if (linkedTodo?.linkedActivityId && linkedTodo.linkedCategoryId) {
-      // Only suggest if not already selected
-      if (linkedTodo.linkedActivityId !== selectedActivityId) {
-        const cat = categories.find(c => c.id === linkedTodo.linkedCategoryId);
-        const act = cat?.activities.find(a => a.id === linkedTodo.linkedActivityId);
-        if (cat && act) {
-          newSuggestions.activity = {
-            id: act.id,
-            categoryId: cat.id,
-            name: act.name,
-            icon: act.icon,
-            reason: '关联待办'
-          };
-        }
-      }
+    if (imageManager.images !== formState.images) {
+      updateField('images', imageManager.images);
     }
+  }, [imageManager.images, formState.images, updateField]);
 
-    // If no todo suggestion, check Note Keywords
-    if (!newSuggestions.activity && note) {
-      for (const cat of categories) {
-        for (const act of cat.activities) {
-          // Skip currently selected
-          if (act.id === selectedActivityId) continue;
-
-          for (const kw of (act.keywords || [])) {
-            if (note.includes(kw)) {
-              newSuggestions.activity = {
-                id: act.id,
-                categoryId: cat.id,
-                name: act.name,
-                icon: act.icon,
-                reason: '关键词匹配',
-                matchedKeyword: kw
-              };
-              break;
-            }
-          }
-          if (newSuggestions.activity) break;
-        }
-        if (newSuggestions.activity) break;
-      }
-    }
-
-    // 2. Scope Suggestions (Combine Todo Scopes + AutoLink Rules + Keyword Matching)
-    const candidateScopes = new Map<string, { id: string; name: string; icon: string; reason: string }>();
-
-    // From Linked Todo
-    if (linkedTodo?.defaultScopeIds) {
-      for (const sId of linkedTodo.defaultScopeIds) {
-        // Skip if already selected
-        if (scopeIds?.includes(sId)) continue;
-
-        const s = scopes.find(scope => scope.id === sId);
-        if (s) {
-          candidateScopes.set(sId, { id: s.id, name: s.name, icon: s.icon, reason: '关联待办' });
-        }
-      }
-    }
-
-    // From AutoLink Rules (based on currently selected Activity)
-    const activeRules = autoLinkRules.filter(r => r.activityId === selectedActivityId);
-    for (const rule of activeRules) {
-      if (scopeIds?.includes(rule.scopeId)) continue;
-
-      const s = scopes.find(scope => scope.id === rule.scopeId);
-      if (s) {
-        // If already added by Todo, keep Todo reason (or overwrite? Todo seems more specific)
-        if (!candidateScopes.has(rule.scopeId)) {
-          candidateScopes.set(rule.scopeId, { id: s.id, name: s.name, icon: s.icon, reason: '自动规则' });
-        }
-      }
-    }
-
-    // From Keyword Matching (based on note content)
-    if (note) {
-      for (const scope of scopes) {
-        // Skip if already selected
-        if (scopeIds?.includes(scope.id)) continue;
-        // Skip if already suggested by other means
-        if (candidateScopes.has(scope.id)) continue;
-
-        // Check if note contains any of the scope's keywords
-        for (const kw of (scope.keywords || [])) {
-          if (note.includes(kw)) {
-            candidateScopes.set(scope.id, {
-              id: scope.id,
-              name: scope.name,
-              icon: scope.icon,
-              reason: '关键词匹配'
-            });
-            break;
-          }
-        }
-      }
-    }
-
-    newSuggestions.scopes = Array.from(candidateScopes.values());
-
-    setSuggestions(newSuggestions);
-
-  }, [linkedTodoId, note, selectedActivityId, scopeIds, categories, todos, scopes, autoLinkRules]);
-
-  // Derived Values for Display and Inputs
-  // Helper to get H/M from timestamp
-  const getHM = (ts: number) => {
-    const d = new Date(ts);
-    return { h: d.getHours(), m: d.getMinutes() };
-  };
-
-  const startHM = useMemo(() => getHM(currentStartTime), [currentStartTime]);
-  const endHM = useMemo(() => getHM(currentEndTime), [currentEndTime]);
-
-  // Handle Input Changes (H/M)
+  // 事件处理函数
   const handleTimeInput = (type: 'start' | 'end', field: 'h' | 'm', value: number) => {
-    // 获取日期基准：使用 trackStartTime 的日期部分，确保所有时间都在同一天
-    const baseDate = new Date(trackStartTime);
-    baseDate.setHours(0, 0, 0, 0);
-
-    // 获取当前时间的小时和分钟
-    let targetTime = type === 'start' ? currentStartTime : currentEndTime;
-    const currentHM = getHM(targetTime);
-
-    // 根据用户输入创建新的时间
-    let newHours = currentHM.h;
-    let newMinutes = currentHM.m;
-
-    if (field === 'h') {
-      newHours = Math.max(0, Math.min(23, value)); // 限制在 0-23
-    } else {
-      newMinutes = Math.max(0, Math.min(59, value)); // 限制在 0-59
-    }
-
-    // 基于同一天的基准日期构建新时间戳
-    const newDate = new Date(baseDate);
-    newDate.setHours(newHours, newMinutes, 0, 0);
-    const newTime = newDate.getTime();
-
-    // 直接设置新时间，不做约束检查，允许用户自由输入
-    // 如果出现 start > end 的情况，在保存时会被验证（handleSave 中 duration <= 0 会阻止保存）
-    if (type === 'start') {
-      setCurrentStartTime(newTime);
-    } else {
-      setCurrentEndTime(newTime);
-    }
+    const newTime = timeCalc.createTimeFromInput(
+      type === 'start' ? formState.currentStartTime : formState.currentEndTime,
+      field,
+      value
+    );
+    updateField(type === 'start' ? 'currentStartTime' : 'currentEndTime', newTime);
   };
 
-  // --- Image Logic ---
-  useEffect(() => {
-    const loadUrls = async () => {
-      const newUrls: Record<string, string> = {};
-      const missingImgs: string[] = [];
-      let changed = false;
+  const handleSetStartToNow = () => {
+    const now = timeCalc.setToNow('start', formState.currentStartTime);
+    updateField('currentStartTime', now);
+  };
 
-      for (const img of images) {
-        if (!imageUrls[img]) {
-          const url = await imageService.getImageUrl(img);
-          if (!url) {
-            missingImgs.push(img);
-          } else {
-            newUrls[img] = url;
-            changed = true;
-          }
-        } else if (imageUrls[img] === '') {
-          // Double check if existing empty url needs removal
-          missingImgs.push(img);
-        }
-      }
+  const handleSetEndToNow = () => {
+    const now = timeCalc.setToNow('end', formState.currentStartTime);
+    updateField('currentEndTime', now);
+  };
 
-      // Auto-remove missing images
-      if (missingImgs.length > 0) {
-        console.log('Auto-removing missing images:', missingImgs);
-        setImages(prev => prev.filter(i => !missingImgs.includes(i)));
-      }
-
-      if (changed) {
-        setImageUrls(prev => ({ ...prev, ...newUrls }));
-      }
-    };
-    if (images.length > 0) loadUrls();
-  }, [images, imageUrls]);
+  const handleSetStartToPreviousEnd = () => {
+    if (previousLogEndTime) {
+      updateField('currentStartTime', previousLogEndTime);
+    } else {
+      handleSetStartToNow();
+    }
+  };
 
   const handleAddImage = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files.length > 0) {
-      const file = e.target.files[0];
-      try {
-        const filename = await imageService.saveImage(file);
-        setImages(prev => [...prev, filename]);
-      } catch (err) {
-        console.error('Failed to save image', err);
-      }
+    if (e.target.files?.[0]) {
+      await imageManager.handleAddImage(e.target.files[0]);
     }
   };
 
   const handleDeleteImage = async (filename: string) => {
-    try {
-      await imageService.deleteImage(filename);
-      setImages(prev => prev.filter(img => img !== filename));
-
-      // Immediately remove reference from global log state if editing an existing log
-      if (initialLog && onImageRemove) {
-        onImageRemove(initialLog.id, filename);
-      }
-    } catch (err) {
-      console.error('Failed to delete image', err);
+    await imageManager.handleDeleteImage(filename);
+    if (initialLog && onImageRemove) {
+      onImageRemove(initialLog.id, filename);
     }
   };
 
-  const fileInputRef = useRef<HTMLInputElement>(null);
-
-  // 处理添加评论
   const handleAddComment = (content: string) => {
     const newComment: Comment = {
       id: crypto.randomUUID(),
       content,
       createdAt: Date.now()
     };
-    setComments(prev => [...prev, newComment]);
+    updateField('comments', [...formState.comments, newComment]);
   };
 
-  // 处理编辑评论
   const handleEditComment = (commentId: string, content: string) => {
-    setComments(prev => prev.map(comment =>
-      comment.id === commentId
-        ? { ...comment, content }
-        : comment
+    updateField('comments', formState.comments.map(comment =>
+      comment.id === commentId ? { ...comment, content } : comment
     ));
   };
 
-  // 处理删除评论
   const handleDeleteComment = (commentId: string) => {
-    setComments(prev => prev.filter(comment => comment.id !== commentId));
+    updateField('comments', formState.comments.filter(c => c.id !== commentId));
   };
 
   const handleToggleReaction = (emoji: string) => {
-    setReactions(prev => {
-      if (prev.includes(emoji)) {
-        return prev.filter(r => r !== emoji);
-      }
-      return [...prev, emoji];
-    });
+    const reactions = formState.reactions;
+    if (reactions.includes(emoji)) {
+      updateField('reactions', reactions.filter(r => r !== emoji));
+    } else {
+      updateField('reactions', [...reactions, emoji]);
+    }
   };
 
-  const selectedCategory = categories.find(c => c.id === selectedCategoryId) || categories[0];
-  const linkedTodo = todos.find(t => t.id === linkedTodoId);
-
-  // Apply Handlers
   const handleAcceptActivity = () => {
     if (suggestions.activity) {
-      setSelectedCategoryId(suggestions.activity.categoryId);
-      setSelectedActivityId(suggestions.activity.id);
-      // Suggestions will update automatically via useEffect
+      updateFields({
+        selectedCategoryId: suggestions.activity.categoryId,
+        selectedActivityId: suggestions.activity.id
+      });
     }
   };
 
   const handleAcceptScope = (scopeId: string) => {
-    const currentScopeIds = scopeIds || [];
+    const currentScopeIds = formState.scopeIds || [];
     if (!currentScopeIds.includes(scopeId)) {
-      setScopeIds([...currentScopeIds, scopeId]);
-    }
-    // Suggestions will update automatically via useEffect
-  };
-
-  // 设置开始时间为当前时间
-  const handleSetStartToNow = () => {
-    const now = Date.now();
-    setCurrentStartTime(now);
-  };
-
-  // 设置结束时间为当前时间
-  const handleSetEndToNow = () => {
-    const now = Date.now();
-    const startDate = new Date(currentStartTime);
-    const nowDate = new Date(now);
-
-    // 如果跨天（比如昨天开始，现在是今天凌晨），则限制到昨天23:59:59
-    if (startDate.toDateString() !== nowDate.toDateString()) {
-      const endOfDay = new Date(currentStartTime);
-      endOfDay.setHours(23, 59, 59, 999);
-      setCurrentEndTime(endOfDay.getTime());
-    } else {
-      setCurrentEndTime(now);
+      updateField('scopeIds', [...currentScopeIds, scopeId]);
     }
   };
-
-  const durationDisplay = useMemo(() => {
-    const diff = (currentEndTime - currentStartTime) / 1000 / 60; // mins
-
-    // 如果持续时间为负数或零，显示占位符
-    if (diff <= 0) return '---';
-
-    const h = Math.floor(diff / 60);
-    const m = Math.round(diff % 60);
-    if (h > 0 && m > 0) return `${h}h ${m}m`;
-    if (h > 0) return `${h}h`;
-    return `${m}m`;
-  }, [currentStartTime, currentEndTime]);
 
   const handleSave = () => {
-    const duration = (currentEndTime - currentStartTime) / 1000;
-    if (duration <= 0) return; // Prevent zero duration logs
+    const duration = (formState.currentEndTime - formState.currentStartTime) / 1000;
+    if (duration <= 0) return;
 
     const newLog: Log = {
       id: initialLog ? initialLog.id : crypto.randomUUID(),
-      categoryId: selectedCategoryId,
-      activityId: selectedActivityId,
-      startTime: currentStartTime,
-      endTime: currentEndTime,
+      categoryId: formState.selectedCategoryId,
+      activityId: formState.selectedActivityId,
+      startTime: formState.currentStartTime,
+      endTime: formState.currentEndTime,
       duration: duration,
-      note: note.trim(),
-      linkedTodoId: linkedTodoId,
-      progressIncrement: linkedTodoId && progressIncrement ? progressIncrement : undefined,
-      focusScore: focusScore,
-      scopeIds: scopeIds,
-      images: images,
-      comments: comments.length > 0 ? comments : undefined,
-      reactions: reactions.length > 0 ? reactions : undefined,
+      note: formState.note.trim(),
+      linkedTodoId: formState.linkedTodoId,
+      progressIncrement: formState.linkedTodoId && formState.progressIncrement ? formState.progressIncrement : undefined,
+      focusScore: formState.focusScore,
+      scopeIds: formState.scopeIds,
+      images: imageManager.images,
+      comments: formState.comments.length > 0 ? formState.comments : undefined,
+      reactions: formState.reactions.length > 0 ? formState.reactions : undefined,
     };
     onSave(newLog);
   };
@@ -522,64 +216,29 @@ export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialSta
     }
   };
 
-  // --- Slider Logic ---
-  const sliderRef = useRef<HTMLDivElement>(null);
-  const noteRef = useRef<HTMLTextAreaElement>(null);
-
-  // Auto-focus note on new log
-  useEffect(() => {
-    if (!initialLog && noteRef.current && autoFocusNote) {
-      setTimeout(() => {
-        noteRef.current?.focus();
-        noteRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      }, 400); // 延时稍长一点以等待动画完成
-    }
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
-
-  const [isDraggingStart, setIsDraggingStart] = useState(false);
-  const [isDraggingEnd, setIsDraggingEnd] = useState(false);
-
-  // Convert Time to Percentage relative to Track
-  const trackDuration = trackEndTime - trackStartTime;
-  // If trackDuration is 0 (shouldn't happen), prevent division by zero
-  const safeTrackDuration = trackDuration > 0 ? trackDuration : 1;
-
-  const startPercent = Math.max(0, Math.min(100, ((currentStartTime - trackStartTime) / safeTrackDuration) * 100));
-  const endPercent = Math.max(0, Math.min(100, ((currentEndTime - trackStartTime) / safeTrackDuration) * 100));
-
-  const calculateTimeFromClientX = (clientX: number) => {
-    if (!sliderRef.current || trackDuration <= 0) return null;
-    const rect = sliderRef.current.getBoundingClientRect();
-    const percent = Math.min(100, Math.max(0, ((clientX - rect.left) / rect.width) * 100));
-
-    // Calculate time from percent
-    let newTime = trackStartTime + (percent / 100) * trackDuration;
-    const MS_PER_MIN = 60000;
-    // Round to nearest minute
-    return Math.round(newTime / MS_PER_MIN) * MS_PER_MIN;
-  };
-
+  // 滑块拖动逻辑
   const handleDragUpdate = (clientX: number) => {
-    const newTime = calculateTimeFromClientX(clientX);
+    if (!sliderRef.current) return;
+    
+    const rect = sliderRef.current.getBoundingClientRect();
+    const newTime = timeCalc.calculateTimeFromClientX(clientX, rect);
     if (newTime === null) return;
 
     if (isDraggingStart) {
-      // Constraint: start <= end
-      if (newTime > currentEndTime) {
-        setCurrentStartTime(currentEndTime); // Stick to end
-      } else if (newTime < trackStartTime) {
-        setCurrentStartTime(trackStartTime); // Stick to start
+      if (newTime > formState.currentEndTime) {
+        updateField('currentStartTime', formState.currentEndTime);
+      } else if (newTime < formState.trackStartTime) {
+        updateField('currentStartTime', formState.trackStartTime);
       } else {
-        setCurrentStartTime(newTime);
+        updateField('currentStartTime', newTime);
       }
     } else if (isDraggingEnd) {
-      // Constraint: end >= start
-      if (newTime < currentStartTime) {
-        setCurrentEndTime(currentStartTime); // Stick to start
-      } else if (newTime > trackEndTime) {
-        setCurrentEndTime(trackEndTime); // Stick to end
+      if (newTime < formState.currentStartTime) {
+        updateField('currentEndTime', formState.currentStartTime);
+      } else if (newTime > formState.trackEndTime) {
+        updateField('currentEndTime', formState.trackEndTime);
       } else {
-        setCurrentEndTime(newTime);
+        updateField('currentEndTime', newTime);
       }
     }
   };
@@ -612,8 +271,11 @@ export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialSta
       window.removeEventListener('touchmove', handleTouchMove);
       window.removeEventListener('touchend', handleMouseUp);
     };
-  }, [isDraggingStart, isDraggingEnd]);
+  }, [isDraggingStart, isDraggingEnd, formState.currentStartTime, formState.currentEndTime, formState.trackStartTime, formState.trackEndTime]);
 
+  // Derived values
+  const selectedCategory = categories.find(c => c.id === formState.selectedCategoryId) || categories[0];
+  const linkedTodo = todos.find(t => t.id === formState.linkedTodoId);
   const hasSuggestions = suggestions.activity || suggestions.scopes.length > 0;
 
   return (
@@ -634,7 +296,7 @@ export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialSta
           </button>
           <div className="flex flex-col items-center">
             <span className="text-[10px] uppercase tracking-widest text-stone-400 font-bold mb-1">Total Time</span>
-            <span className="text-2xl font-bold text-stone-900 tabular-nums font-mono">{durationDisplay}</span>
+            <span className="text-2xl font-bold text-stone-900 tabular-nums font-mono">{timeCalc.durationDisplay}</span>
           </div>
           <div className="w-10 flex justify-end">
             <button
@@ -666,10 +328,10 @@ export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialSta
                     type="number"
                     inputMode="numeric"
                     min={0} max={23}
-                    value={String(startHM.h).padStart(2, '0')}
+                    value={String(timeCalc.startHM.h).padStart(2, '0')}
                     onChange={e => {
                       const val = e.target.value;
-                      if (val === '') return; // 允许清空
+                      if (val === '') return;
                       const num = parseInt(val);
                       if (!isNaN(num)) handleTimeInput('start', 'h', num);
                     }}
@@ -685,7 +347,7 @@ export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialSta
                     type="number"
                     inputMode="numeric"
                     min={0} max={59}
-                    value={String(startHM.m).padStart(2, '0')}
+                    value={String(timeCalc.startHM.m).padStart(2, '0')}
                     onChange={e => {
                       const val = e.target.value;
                       if (val === '') return; // 允许清空
@@ -702,14 +364,7 @@ export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialSta
                 </div>
 
                 <button
-                  onClick={() => {
-                    if (previousLogEndTime) {
-                      setCurrentStartTime(previousLogEndTime);
-                    } else {
-                      // Fallback to now if no last log
-                      handleSetStartToNow();
-                    }
-                  }}
+                  onClick={handleSetStartToPreviousEnd}
                   className="mt-2 flex items-center gap-1 px-2 py-1 text-xs font-medium text-stone-600 hover:text-stone-900 hover:bg-stone-100 rounded-lg transition-colors active:scale-95"
                   title="设置开始时间为上一条记录的结束时间"
                 >
@@ -727,10 +382,10 @@ export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialSta
                     type="number"
                     inputMode="numeric"
                     min={0} max={23}
-                    value={String(endHM.h).padStart(2, '0')}
+                    value={String(timeCalc.endHM.h).padStart(2, '0')}
                     onChange={e => {
                       const val = e.target.value;
-                      if (val === '') return; // 允许清空
+                      if (val === '') return;
                       const num = parseInt(val);
                       if (!isNaN(num)) handleTimeInput('end', 'h', num);
                     }}
@@ -746,7 +401,7 @@ export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialSta
                     type="number"
                     inputMode="numeric"
                     min={0} max={59}
-                    value={String(endHM.m).padStart(2, '0')}
+                    value={String(timeCalc.endHM.m).padStart(2, '0')}
                     onChange={e => {
                       const val = e.target.value;
                       if (val === '') return; // 允许清空
@@ -782,8 +437,8 @@ export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialSta
                 <div
                   className="absolute top-0 h-full opacity-20 rounded-full"
                   style={{ 
-                    left: `${startPercent}%`, 
-                    width: `${endPercent - startPercent}%`,
+                    left: `${timeCalc.startPercent}%`, 
+                    width: `${timeCalc.endPercent - timeCalc.startPercent}%`,
                     backgroundColor: 'var(--accent-color)'
                   }}
                 />
@@ -794,7 +449,7 @@ export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialSta
                   onTouchStart={(e) => { e.stopPropagation(); setIsDraggingStart(true); }}
                   className="absolute top-1/2 -translate-y-1/2 w-6 h-6 bg-white border-2 rounded-full shadow-md z-10 flex items-center justify-center hover:scale-110 transition-transform cursor-grab active:cursor-grabbing"
                   style={{ 
-                    left: `calc(${startPercent}% - 12px)`,
+                    left: `calc(${timeCalc.startPercent}% - 12px)`,
                     borderColor: 'var(--accent-color)'
                   }}
                 >
@@ -807,7 +462,7 @@ export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialSta
                   onTouchStart={(e) => { e.stopPropagation(); setIsDraggingEnd(true); }}
                   className="absolute top-1/2 -translate-y-1/2 w-6 h-6 border-2 rounded-full shadow-md z-10 flex items-center justify-center hover:scale-110 transition-transform cursor-grab active:cursor-grabbing"
                   style={{ 
-                    left: `calc(${endPercent}% - 12px)`,
+                    left: `calc(${timeCalc.endPercent}% - 12px)`,
                     backgroundColor: 'var(--accent-color)',
                     borderColor: 'var(--accent-color)'
                   }}
@@ -816,9 +471,9 @@ export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialSta
                 </div>
               </div>
               <div className="flex justify-between mt-2 text-[10px] text-stone-400 font-mono">
-                <span>{getHM(trackStartTime).h}:{String(getHM(trackStartTime).m).padStart(2, '0')}</span>
-                <span>Max: {Math.floor(trackDuration / 1000 / 60)}m</span>
-                <span>{getHM(trackEndTime).h}:{String(getHM(trackEndTime).m).padStart(2, '0')}</span>
+                <span>{new Date(formState.trackStartTime).getHours()}:{String(new Date(formState.trackStartTime).getMinutes()).padStart(2, '0')}</span>
+                <span>Max: {Math.floor(timeCalc.trackDuration / 1000 / 60)}m</span>
+                <span>{new Date(formState.trackEndTime).getHours()}:{String(new Date(formState.trackEndTime).getMinutes()).padStart(2, '0')}</span>
               </div>
             </div>
           </div>
@@ -826,10 +481,10 @@ export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialSta
           {/* Activity Selection (Grid) */}
           <TagAssociation
             categories={categories}
-            selectedCategoryId={selectedCategoryId}
-            selectedActivityId={selectedActivityId}
-            onCategorySelect={setSelectedCategoryId}
-            onActivitySelect={setSelectedActivityId}
+            selectedCategoryId={formState.selectedCategoryId}
+            selectedActivityId={formState.selectedActivityId}
+            onCategorySelect={(id) => updateField('selectedCategoryId', id)}
+            onActivitySelect={(id) => updateField('selectedActivityId', id)}
           />
 
           {/* Todo Association with Embedded Progress */}
@@ -837,10 +492,12 @@ export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialSta
             <TodoAssociation
               todos={todos}
               todoCategories={todoCategories}
-              linkedTodoId={linkedTodoId}
+              linkedTodoId={formState.linkedTodoId}
               onChange={(id) => {
-                setLinkedTodoId(id);
-                setProgressIncrement(0);
+                updateFields({
+                  linkedTodoId: id,
+                  progressIncrement: 0
+                });
               }}
               renderExtraContent={(tId) => {
                 const t = todos.find(x => x.id === tId);
@@ -859,23 +516,23 @@ export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialSta
                     {/* Right: Controls */}
                     <div className="flex items-center rounded-lg p-0.5 scale-90 origin-right">
                       <button
-                        onClick={() => setProgressIncrement(Math.max(0, progressIncrement - 1))}
+                        onClick={() => updateField('progressIncrement', Math.max(0, formState.progressIncrement - 1))}
                         className="w-8 h-8 flex items-center justify-center text-stone-400 hover:text-stone-600 hover:bg-stone-100/50 rounded-md transition-colors active:scale-95"
                       >
                         <Minus size={16} />
                       </button>
                       <div className="flex items-center justify-center min-w-[40px]">
-                        {progressIncrement > 0 && <span className="text-xs font-bold text-stone-800 mr-0.5">+</span>}
+                        {formState.progressIncrement > 0 && <span className="text-xs font-bold text-stone-800 mr-0.5">+</span>}
                         <input
                           type="number"
                           min={0}
-                          value={progressIncrement}
-                          onChange={(e) => setProgressIncrement(Math.max(0, parseInt(e.target.value) || 0))}
-                          className={`w-8 text-left text-sm font-bold tabular-nums bg-transparent outline-none p-0 border-none focus:ring-0 ${progressIncrement > 0 ? 'text-stone-800' : 'text-stone-300'}`}
+                          value={formState.progressIncrement}
+                          onChange={(e) => updateField('progressIncrement', Math.max(0, parseInt(e.target.value) || 0))}
+                          className={`w-8 text-left text-sm font-bold tabular-nums bg-transparent outline-none p-0 border-none focus:ring-0 ${formState.progressIncrement > 0 ? 'text-stone-800' : 'text-stone-300'}`}
                         />
                       </div>
                       <button
-                        onClick={() => setProgressIncrement(progressIncrement + 1)}
+                        onClick={() => updateField('progressIncrement', formState.progressIncrement + 1)}
                         className="w-8 h-8 flex items-center justify-center text-stone-600 hover:bg-stone-100/50 rounded-md transition-colors active:scale-95"
                       >
                         <Plus size={16} />
@@ -891,23 +548,23 @@ export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialSta
           <div className="space-y-0">
             <ScopeAssociation
               scopes={scopes}
-              selectedScopeIds={scopeIds}
-              onSelect={setScopeIds}
+              selectedScopeIds={formState.scopeIds}
+              onSelect={(ids) => updateField('scopeIds', ids)}
             />
           </div>
 
           {/* Focus Score Selector */}
           {
             (() => {
-              const cat = categories.find(c => c.id === selectedCategoryId);
-              const act = cat?.activities.find(a => a.id === selectedActivityId);
+              const cat = categories.find(c => c.id === formState.selectedCategoryId);
+              const act = cat?.activities.find(a => a.id === formState.selectedActivityId);
 
               // Check if should show focus score: activity > category > any associated scope
               let shouldShowFocus = act?.enableFocusScore ?? cat?.enableFocusScore;
 
               // Also check if any of the selected scopes has enableFocusScore
-              if (!shouldShowFocus && scopeIds && scopeIds.length > 0) {
-                shouldShowFocus = scopeIds.some(sid => {
+              if (!shouldShowFocus && formState.scopeIds && formState.scopeIds.length > 0) {
+                shouldShowFocus = formState.scopeIds.some(sid => {
                   const scope = scopes.find(s => s.id === sid);
                   return scope?.enableFocusScore === true;
                 });
@@ -916,7 +573,7 @@ export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialSta
               if (shouldShowFocus) {
                 return (
                   <div className="space-y-4 animate-in slide-in-from-top-2">
-                    <FocusScoreSelector value={focusScore} onChange={setFocusScore} />
+                    <FocusScoreSelector value={formState.focusScore} onChange={(score) => updateField('focusScore', score)} />
                   </div>
                 );
               }
@@ -962,7 +619,6 @@ export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialSta
                         <span className="opacity-70 text-[10px] mr-0.5">[{scope.reason}]</span>
                         <IconRenderer 
                             icon={scope.icon} 
-                            uiIcon={scope.uiIcon}
                             className="text-xs" 
                         />
                         <span>{scope.name}</span>
@@ -990,8 +646,8 @@ export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialSta
             </div>
             <textarea
               ref={noteRef}
-              value={note}
-              onChange={e => setNote(e.target.value)}
+              value={formState.note}
+              onChange={e => updateField('note', e.target.value)}
               className={`w-full bg-white border border-stone-200 rounded-2xl p-4 text-stone-800 text-sm shadow-sm focus:outline-none focus:ring-1 focus:border-stone-200 resize-none placeholder:text-stone-300 font-serif transition-[height] duration-150 ease-out ${isNoteExpanded ? 'h-[400px]' : 'h-[100px]'
                 }`}
               style={{
@@ -1020,23 +676,22 @@ export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialSta
               />
             </div>
 
-            {images.length > 0 ? (
+            {imageManager.images.length > 0 ? (
               <div className="flex flex-wrap gap-3 pb-2">
-                {images.map(img => (
+                {imageManager.images.map(img => (
                   <div key={img} className="relative group flex-shrink-0">
                     <div
                       className="w-20 h-20 rounded-xl overflow-hidden border border-stone-200 cursor-zoom-in"
-                      onClick={() => setPreviewFilename(img)}
+                      onClick={() => imageManager.setPreviewFilename(img)}
                     >
-                      {imageUrls[img] ? (
-                        <img src={imageUrls[img]} alt="attachment" className="w-full h-full object-cover" />
+                      {imageManager.imageUrls[img] ? (
+                        <img src={imageManager.imageUrls[img]} alt="attachment" className="w-full h-full object-cover" />
                       ) : (
                         <div className="w-full h-full bg-stone-100 flex items-center justify-center">
                           <ImageIcon size={20} className="text-stone-300" />
                         </div>
                       )}
                     </div>
-                    {/* Hover Delete Button Removed */}
                   </div>
                 ))}
               </div>
@@ -1057,13 +712,13 @@ export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialSta
               <span className="text-xs font-bold text-stone-400 uppercase tracking-widest">Reactions</span>
               <ReactionPicker
                 onSelect={(emoji) => handleToggleReaction(emoji)}
-                currentReactions={reactions}
+                currentReactions={formState.reactions}
                 align="inline-slide-left"
               />
             </div>
-            {reactions.length > 0 ? (
+            {formState.reactions.length > 0 ? (
               <ReactionList
-                reactions={reactions}
+                reactions={formState.reactions}
                 onToggle={handleToggleReaction}
                 className="mt-2"
               />
@@ -1076,7 +731,7 @@ export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialSta
           {/* Comments Section */}
           <div>
             <CommentSection
-              comments={comments}
+              comments={formState.comments}
               onAddComment={handleAddComment}
               onEditComment={handleEditComment}
               onDeleteComment={handleDeleteComment}
@@ -1118,12 +773,12 @@ export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialSta
 
       {/* Full Screen Image Preview */}
       <ImagePreviewModal
-        imageUrl={previewFilename ? (imageUrls[previewFilename] || '') : null}
-        onClose={() => setPreviewFilename(null)}
+        imageUrl={imageManager.previewFilename ? (imageManager.imageUrls[imageManager.previewFilename] || '') : null}
+        onClose={() => imageManager.setPreviewFilename(null)}
         onDelete={() => {
-          if (previewFilename) {
-            handleDeleteImage(previewFilename);
-            setPreviewFilename(null);
+          if (imageManager.previewFilename) {
+            handleDeleteImage(imageManager.previewFilename);
+            imageManager.setPreviewFilename(null);
           }
         }}
       />
