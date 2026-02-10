@@ -10,6 +10,7 @@
 import React, { useMemo } from 'react';
 import * as LucideIcons from 'lucide-react';
 import { DailyReview, WeeklyReview, MonthlyReview, Log } from '../types';
+import { parseNarrative } from '../utils/narrativeUtils';
 
 
 interface ReviewHubViewProps {
@@ -66,56 +67,6 @@ export const ReviewHubView: React.FC<ReviewHubViewProps> = ({
     }, []);
 
     // --- Helpers ---
-
-    // Parse Narrative: Extract Title (First Line) and Body
-    const parseNarrative = (narrative: string | undefined): { title: string; body: string } => {
-        if (!narrative) return { title: '暂无叙事标题', body: '...' };
-
-        // Remove Markdown headers if any (for title extraction mainly)
-        const cleanNarrative = narrative.replace(/^#+\s*/, '').trim();
-        const lines = cleanNarrative.split('\n');
-
-        // 1. Get Title (First Line)
-        let title = lines[0].trim();
-
-        // 2. Try to find blockquote content for Body
-        // Look for lines starting with >
-        // We match all blockquotes and take the last one, or combine them?
-        // User said "read the quote at the end".
-        const blockquoteMatch = narrative.match(/>\s*([^>]+)$/m) || narrative.match(/>\s*(.+)/g);
-
-        let body = '';
-
-        if (blockquoteMatch) {
-            // If regex matched last one specifically or global matches
-            // Let's filter for the last block of quotes
-            const quotes = narrative.split('\n').filter(line => line.trim().startsWith('>'));
-            if (quotes.length > 0) {
-                // Join them and remove >
-                body = quotes[quotes.length - 1].replace(/^>\s*/, '').trim();
-                // If there are multiple lines in the last quote block? 
-                // Simple approach: grab the last line starting with > or try to grab the whole block.
-                // Better regex for multi-line blockquote at end:
-            }
-        }
-
-        // Improved Blockquote Extraction:
-        // Find the last occurrence of a blockquote section
-        const quoteRegex = /(?:^|\n)>\s*(.*?)(?=(?:\n\n|$))/gs;
-        const matches = [...narrative.matchAll(quoteRegex)];
-
-        if (matches.length > 0) {
-            // Use the content of the last blockquote found
-            body = matches[matches.length - 1][1].replace(/\n>\s*/g, '\n').trim();
-        }
-
-        // 3. Fallback to normal body (rest of text) if no quote found
-        if (!body) {
-            body = lines.slice(1).join('\n').trim();
-        }
-
-        return { title, body: body || 'Tap to view details...' };
-    };
 
     // Get Week Number (ISO 8601: Week 1 is the week with the year's first Thursday)
     const getWeekNumber = (d: Date) => {
@@ -262,7 +213,7 @@ export const ReviewHubView: React.FC<ReviewHubViewProps> = ({
                             {sortedMonthlyReviews.map((m) => {
                                 const mDate = new Date(m.monthStartDate);
                                 const monthName = mDate.toLocaleDateString('en-US', { month: 'long' }).toUpperCase();
-                                const { title, body } = parseNarrative(m.narrative);
+                                const { title, content: body } = parseNarrative(m.narrative, '暂无叙事标题');
                                 const isCurrentMonth = new Date().getMonth() === mDate.getMonth() && new Date().getFullYear() === mDate.getFullYear();
 
                                 return (
@@ -323,7 +274,7 @@ export const ReviewHubView: React.FC<ReviewHubViewProps> = ({
                                 const midWeekDate = new Date(startDate.getTime() + 3 * 24 * 60 * 60 * 1000);
                                 const weekNum = getWeekNumber(midWeekDate);
 
-                                const { title } = parseNarrative(w.narrative);
+                                const { title } = parseNarrative(w.narrative, '暂无标题');
 
                                 // Format: 2025/12/08-12/14
                                 const dateRangeStr = `${startDate.getFullYear()}/${(startDate.getMonth() + 1).toString().padStart(2, '0')}/${startDate.getDate().toString().padStart(2, '0')}-${(endDate.getMonth() + 1).toString().padStart(2, '0')}/${endDate.getDate().toString().padStart(2, '0')}`;
@@ -378,7 +329,7 @@ export const ReviewHubView: React.FC<ReviewHubViewProps> = ({
                     ) : (
                         <div className="flex flex-col gap-4">
                             {visibleDailyReviews.map((d, idx) => {
-                                const { title, body } = parseNarrative(d.narrative);
+                                const { title, content: body } = parseNarrative(d.narrative, '暂无标题');
                                 const dateObj = new Date(d.date);
                                 const dayStr = dateObj.getDate().toString();
                                 const monthStr = dateObj.toLocaleDateString('en-US', { month: 'short' });

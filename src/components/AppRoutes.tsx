@@ -10,6 +10,7 @@ import { useSession } from '../contexts/SessionContext';
 import { useGoalManager } from '../hooks/useGoalManager';
 import { useReviewManager } from '../hooks/useReviewManager';
 import { aiService } from '../services/aiService';
+import { getLocalDateStr } from '../utils/dateUtils';
 
 // Views
 import { DailyReviewView } from '../views/DailyReviewView';
@@ -113,8 +114,6 @@ export const AppRoutes: React.FC<AppRoutesProps> = ({
     const handleUpdateLog = (updatedLog: Log) => {
         setLogs(prev => prev.map(l => l.id === updatedLog.id ? updatedLog : l));
     };
-
-import { getLocalDateStr } from '../utils/dateUtils';
 
     // Helper to get local YYYY-MM-DD string (now imported from utils)
     // const getLocalDateStr = (d: Date) => { ... } // Removed - using utils version

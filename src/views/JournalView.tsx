@@ -18,6 +18,7 @@ import { useCategoryScope } from '../contexts/CategoryScopeContext';
 import { useData } from '../contexts/DataContext';
 import { Comment as GlobalComment, Scope } from '../types';
 import { getDisplayIcon } from '../utils/iconUtils';
+import { parseNarrative } from '../utils/narrativeUtils';
 
 
 interface JournalViewProps {
@@ -33,35 +34,7 @@ interface JournalViewProps {
     onOpenMonthlyReview: (start: Date, end: Date) => void;
 }
 
-/**
- * 解析 Review 的 narrative 字段，提取标题和内容
- * @param narrative - Review 的 narrative markdown 文本
- * @param defaultTitle - 默认标题（如果无法从 narrative 提取）
- * @returns 包含 title 和 content 的对象
- */
-const parseNarrative = (narrative: string, defaultTitle: string) => {
-    let title = defaultTitle;
-    let content = '...';
-
-    if (narrative) {
-        // Get Title (First Line)
-        const cleanNarrative = narrative.replace(/^#+\s*/, '').trim();
-        const lines = cleanNarrative.split('\n');
-        title = lines[0].trim() || defaultTitle;
-
-        // Get Content (Last Blockquote or truncated body)
-        const quoteRegex = /(?:^|\n)>\s*(.*?)(?=(?:\n\n|$))/gs;
-        const matches = [...narrative.matchAll(quoteRegex)];
-
-        if (matches.length > 0) {
-            content = matches[matches.length - 1][1].replace(/\n>\s*/g, '\n').trim();
-        } else {
-            const bodyText = lines.slice(1).join('\n').trim();
-            content = bodyText.length > 100 ? bodyText.slice(0, 100) + '...' : bodyText;
-        }
-    }
-    return { title, content };
-};
+// parseNarrative 已移至 src/utils/narrativeUtils.ts
 
 const DateNavigationSidebar: React.FC<{
     entries: { date: string; entries: any[] }[];
