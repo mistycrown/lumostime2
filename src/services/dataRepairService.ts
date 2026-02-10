@@ -1,9 +1,20 @@
 /**
  * @file dataRepairService.ts
+ * @input Categories, Scopes, TodoCategories with corrupted icon data
+ * @output Repaired data with correct icon/uiIcon separation
+ * @pos Service (Data Migration)
  * @description 数据修复服务 - 修复旧迁移逻辑造成的数据问题
  * 
  * 问题：旧的迁移逻辑将 icon 字段从 emoji 转换为 ui:iconType，导致切换回默认主题时无法显示 emoji
  * 解决：将 ui:iconType 格式的 icon 移动到 uiIcon 字段，并尝试恢复原始 emoji
+ * 
+ * 修复逻辑：
+ * 1. 检测 icon 字段是否为 ui:iconType 格式
+ * 2. 将其移动到 uiIcon 字段
+ * 3. 通过 uiIconService 反向查找原始 emoji
+ * 4. 恢复 icon 字段为 emoji（如果找到）
+ * 
+ * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
 
 import { Category, Scope, TodoCategory } from '../types';

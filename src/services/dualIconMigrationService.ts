@@ -1,6 +1,17 @@
 /**
  * @file dualIconMigrationService.ts
+ * @input Categories, Scopes, TodoCategories, CheckTemplates without uiIcon field
+ * @output Data with uiIcon field added
+ * @pos Service (Data Migration)
  * @description 双图标系统迁移服务 - 为现有数据添加 uiIcon 字段
+ * 
+ * 核心功能：
+ * - 检测是否已完成迁移
+ * - 为所有数据实体添加 uiIcon 字段
+ * - 使用 ensureUiIconField 工具函数处理
+ * - 标记迁移完成状态
+ * 
+ * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
 
 import { Category, Scope, TodoCategory, CheckTemplate } from '../types';

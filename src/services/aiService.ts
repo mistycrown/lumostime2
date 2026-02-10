@@ -1,9 +1,18 @@
 /**
  * @file aiService.ts
- * @input Unstructured Time Text, API Keys
- * @output Parsed Structured Time Entries
- * @pos Service (Business Logic)
- * @description Core service for communicating with AI Providers (OpenAI/Gemini). Handles prompt construction and response parsing for converting natural language into time logs and todo tasks.
+ * @input AI Configuration (OpenAI/Gemini keys), User Natural Language Input, Context Data (categories, scopes, todos)
+ * @output Parsed Time Entries (ParsedTimeEntry[]), Parsed Todos (AIParsedTodo[]), Generated Narratives (string), Connection Status (boolean)
+ * @pos Service (AI Integration Layer)
+ * @description AI 服务 - 处理与 AI 提供商（OpenAI/Gemini）的所有交互，包括配置管理、连接测试和提示执行
+ * 
+ * 核心功能：
+ * - 自然语言解析为时间记录
+ * - 待办任务智能提取
+ * - AI 叙事生成
+ * - 多 AI 提供商支持
+ * - 配置文件管理
+ * 
+ * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
 import { TodoCategory, Category, Scope } from '../types';
 export interface AIConfig {
@@ -43,15 +52,6 @@ export interface AIParsedTodo {
 const AI_CONFIG_KEY = 'lumostime_ai_config';
 const AI_PROFILES_KEY = 'lumostime_ai_profiles';
 
-/**
- * @file aiService.ts
- * @input AI Configuration (OpenAI/Gemini keys), User Natural Language Input
- * @output Parsed Time Entries (JSON), Generated Narratives
- * @pos Service (AI Integration Layer)
- * @description Handles all interactions with AI providers, including configuration management, connection testing, and prompt execution.
- * 
- * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
- */
 import { HTTP } from '@awesome-cordova-plugins/http';
 import { Capacitor } from '@capacitor/core';
 
