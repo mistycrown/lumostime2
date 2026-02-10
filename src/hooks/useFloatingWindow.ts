@@ -1,3 +1,12 @@
+/**
+ * @file useFloatingWindow.ts
+ * @input SessionContext (activeSessions), ToastContext (addToast), handleStopActivity callback
+ * @output Floating Window Listener (stopFocusFromFloating event handler)
+ * @pos Hook (System Integration)
+ * @description 悬浮窗 Hook - 监听 Android 悬浮窗的结束计时事件，自动停止所有活动会话
+ * 
+ * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
+ */
 import { useEffect } from 'react';
 import { Capacitor } from '@capacitor/core';
 import { useSession } from '../contexts/SessionContext';
