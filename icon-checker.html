@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>UI Icon 图标核对工具</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Microsoft YaHei', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        }
+
+        h1 {
+            text-align: center;
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 32px;
+        }
+
+        .subtitle {
+            text-align: center;
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 16px;
+        }
+
+        .controls {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            margin-bottom: 30px;
+            flex-wrap: wrap;
+        }
+
+        .theme-btn {
+            padding: 12px 24px;
+            border: 2px solid #667eea;
+            background: white;
+            color: #667eea;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            text-transform: capitalize;
+        }
+
+        .theme-btn:hover {
+            background: #667eea;
+            color: white;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.3);
+        }
+
+        .theme-btn.active {
+            background: #667eea;
+            color: white;
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        .icon-grid {
+            display: grid;
+            grid-template-columns: repeat(8, 1fr);
+            gap: 20px;
+            margin-bottom: 40px;
+        }
+
+        .icon-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 12px;
+            transition: all 0.3s ease;
+            border: 2px solid transparent;
+        }
+
+        .icon-item:hover {
+            background: #e9ecef;
+            border-color: #667eea;
+            transform: translateY(-3px);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+        }
+
+        .icon-image {
+            width: 64px;
+            height: 64px;
+            object-fit: contain;
+            margin-bottom: 10px;
+        }
+
+        .icon-number {
+            font-size: 14px;
+            color: #999;
+            margin-bottom: 5px;
+            font-weight: 600;
+        }
+
+        .icon-label {
+            font-size: 14px;
+            color: #333;
+            text-align: center;
+            font-weight: 500;
+            margin-bottom: 3px;
+        }
+
+        .icon-type {
+            font-size: 12px;
+            color: #666;
+            text-align: center;
+            font-family: 'Courier New', monospace;
+        }
+
+        .group-header {
+            grid-column: 1 / -1;
+            padding: 15px 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 10px;
+            font-size: 18px;
+            font-weight: 600;
+            margin-top: 20px;
+        }
+
+        .group-header:first-child {
+            margin-top: 0;
+        }
+
+        .current-theme {
+            text-align: center;
+            font-size: 20px;
+            color: #667eea;
+            margin-bottom: 20px;
+            font-weight: 600;
+        }
+
+        @media (max-width: 1200px) {
+            .icon-grid {
+                grid-template-columns: repeat(6, 1fr);
+            }
+        }
+
+        @media (max-width: 900px) {
+            .icon-grid {
+                grid-template-columns: repeat(4, 1fr);
+            }
+        }
+
+        @media (max-width: 600px) {
+            .icon-grid {
+                grid-template-columns: repeat(3, 1fr);
+                gap: 10px;
+            }
+            
+            .icon-item {
+                padding: 10px;
+            }
+            
+            .icon-image {
+                width: 48px;
+                height: 48px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎨 UI Icon 图标核对工具</h1>
+        <p class="subtitle">检查图片与文字说明是否对应 - 修正后的编号映射</p>
+        
+        <div class="current-theme" id="currentTheme">当前主题: cat</div>
+        
+        <div class="controls" id="themeButtons"></div>
+        
+        <div class="icon-grid" id="iconGrid"></div>
+    </div>
+
+    <script>
+        // 主题列表
+        const themes = ['cat', 'color', 'forest', 'knit', 'old', 'paper', 'pencil', 'plant', 'prince', 'purple', 'water'];
+        
+        // 图标数据（修正后的编号映射）
+        const iconData = [
+            // Group 1: 核心功能图标 (1-16)
+            { num: '01', type: 'sync', label: '同步', group: '核心功能 (1-16)' },
+            { num: '02', type: 'settings', label: '设置', group: '核心功能 (1-16)' },
+            { num: '03', type: 'manage', label: '管理', group: '核心功能 (1-16)' },
+            { num: '04', type: 'calendar', label: '日历', group: '核心功能 (1-16)' },
+            { num: '05', type: 'add-record', label: '记录', group: '核心功能 (1-16)' },
+            { num: '06', type: 'timer', label: '计时', group: '核心功能 (1-16)' },
+            { num: '07', type: 'ai-assist', label: 'AI助手', group: '核心功能 (1-16)' },
+            { num: '08', type: 'tags', label: '标签', group: '核心功能 (1-16)' },
+            { num: '09', type: 'scope', label: '领域', group: '核心功能 (1-16)' },
+            { num: '10', type: 'chronicle', label: '编年史', group: '核心功能 (1-16)' },
+            { num: '11', type: 'memoir', label: '回忆录', group: '核心功能 (1-16)' },
+            { num: '12', type: 'reading', label: '阅读', group: '核心功能 (1-16)' },
+            { num: '13', type: 'editing', label: '编辑', group: '核心功能 (1-16)' },
+            { num: '14', type: 'sort-asc', label: '升序', group: '核心功能 (1-16)' },
+            { num: '15', type: 'sort-desc', label: '降序', group: '核心功能 (1-16)' },
+            { num: '16', type: 'data-view', label: '数据', group: '核心功能 (1-16)' },
+            
+            // Group 2: 日常生活图标 (17-32, 81-88)
+            { num: '17', type: 'home', label: '首页', group: '日常生活 (17-32, 81-88)' },
+            { num: '18', type: 'sleep', label: '睡眠', group: '日常生活 (17-32, 81-88)' },
+            { num: '19', type: 'commute', label: '通勤', group: '日常生活 (17-32, 81-88)' },
+            { num: '20', type: 'meal', label: '用餐', group: '日常生活 (17-32, 81-88)' },
+            { num: '21', type: 'housework', label: '家务', group: '日常生活 (17-32, 81-88)' },
+            { num: '22', type: 'hygiene', label: '卫生', group: '日常生活 (17-32, 81-88)' },
+            { num: '23', type: 'shopping', label: '购物', group: '日常生活 (17-32, 81-88)' },
+            { num: '24', type: 'chores', label: '杂务', group: '日常生活 (17-32, 81-88)' },
+            { num: '25', type: 'medical', label: '医疗', group: '日常生活 (17-32, 81-88)' },
+            { num: '26', type: 'haircut', label: '理发', group: '日常生活 (17-32, 81-88)' },
+            { num: '27', type: 'cooking', label: '烹饪', group: '日常生活 (17-32, 81-88)' },
+            { num: '28', type: 'pet', label: '宠物', group: '日常生活 (17-32, 81-88)' },
+            { num: '29', type: 'walk', label: '散步', group: '日常生活 (17-32, 81-88)' },
+            { num: '30', type: 'nap', label: '小憩', group: '日常生活 (17-32, 81-88)' },
+            { num: '31', type: 'water', label: '喝水', group: '日常生活 (17-32, 81-88)' },
+            { num: '32', type: 'weather', label: '天气', group: '日常生活 (17-32, 81-88)' },
+            { num: '81', type: 'coffee', label: '咖啡', group: '日常生活 (17-32, 81-88)' },
+            { num: '82', type: 'drink', label: '饮品', group: '日常生活 (17-32, 81-88)' },
+            { num: '83', type: 'laundry', label: '洗衣', group: '日常生活 (17-32, 81-88)' },
+            { num: '84', type: 'gardening', label: '园艺', group: '日常生活 (17-32, 81-88)' },
+            { num: '85', type: 'family', label: '家庭', group: '日常生活 (17-32, 81-88)' },
+            { num: '86', type: 'date', label: '约会', group: '日常生活 (17-32, 81-88)' },
+            { num: '87', type: 'gift', label: '礼物', group: '日常生活 (17-32, 81-88)' },
+            { num: '88', type: 'makeup', label: '化妆', group: '日常生活 (17-32, 81-88)' },
+            
+            // Group 3: 学习工作图标 (33-48, 93-95)
+            { num: '33', type: 'study', label: '学习', group: '学习工作 (33-48, 93-95)' },
+            { num: '34', type: 'meeting', label: '会议', group: '学习工作 (33-48, 93-95)' },
+            { num: '35', type: 'laptop', label: '电脑', group: '学习工作 (33-48, 93-95)' },
+            { num: '36', type: 'book', label: '书籍', group: '学习工作 (33-48, 93-95)' },
+            { num: '37', type: 'code', label: '编程', group: '学习工作 (33-48, 93-95)' },
+            { num: '38', type: 'thesis', label: '论文', group: '学习工作 (33-48, 93-95)' },
+            { num: '39', type: 'language', label: '语言', group: '学习工作 (33-48, 93-95)' },
+            { num: '40', type: 'money', label: '金钱', group: '学习工作 (33-48, 93-95)' },
+            { num: '41', type: 'wallet', label: '钱包', group: '学习工作 (33-48, 93-95)' },
+            { num: '42', type: 'folder', label: '文件夹', group: '学习工作 (33-48, 93-95)' },
+            { num: '43', type: 'tools', label: '工具', group: '学习工作 (33-48, 93-95)' },
+            { num: '44', type: 'input', label: '输入', group: '学习工作 (33-48, 93-95)' },
+            { num: '45', type: 'phd', label: '博士', group: '学习工作 (33-48, 93-95)' },
+            { num: '46', type: 'wisdom', label: '智慧', group: '学习工作 (33-48, 93-95)' },
+            { num: '47', type: 'ai', label: 'AI', group: '学习工作 (33-48, 93-95)' },
+            { num: '48', type: 'briefcase', label: '公文包', group: '学习工作 (33-48, 93-95)' },
+            { num: '93', type: 'car', label: '汽车', group: '学习工作 (33-48, 93-95)' },
+            { num: '94', type: 'call', label: '电话', group: '学习工作 (33-48, 93-95)' },
+            { num: '95', type: 'email', label: '邮件', group: '学习工作 (33-48, 93-95)' },
+            
+            // Group 4: 娱乐社交图标 (49-64, 72, 92, 96)
+            { num: '49', type: 'explore', label: '探索', group: '娱乐社交 (49-64, 72, 92, 96)' },
+            { num: '50', type: 'love', label: '喜欢', group: '娱乐社交 (49-64, 72, 92, 96)' },
+            { num: '51', type: 'handshake', label: '握手', group: '娱乐社交 (49-64, 72, 92, 96)' },
+            { num: '52', type: 'social', label: '社交', group: '娱乐社交 (49-64, 72, 92, 96)' },
+            { num: '53', type: 'chat', label: '聊天', group: '娱乐社交 (49-64, 72, 92, 96)' },
+            { num: '54', type: 'surf', label: '上网', group: '娱乐社交 (49-64, 72, 92, 96)' },
+            { num: '55', type: 'watch', label: '观看', group: '娱乐社交 (49-64, 72, 92, 96)' },
+            { num: '56', type: 'game', label: '游戏', group: '娱乐社交 (49-64, 72, 92, 96)' },
+            { num: '57', type: 'mystery', label: '神秘', group: '娱乐社交 (49-64, 72, 92, 96)' },
+            { num: '58', type: 'design', label: '设计', group: '娱乐社交 (49-64, 72, 92, 96)' },
+            { num: '59', type: 'music', label: '音乐', group: '娱乐社交 (49-64, 72, 92, 96)' },
+            { num: '60', type: 'craft', label: '手工', group: '娱乐社交 (49-64, 72, 92, 96)' },
+            { num: '61', type: 'brush', label: '书法', group: '娱乐社交 (49-64, 72, 92, 96)' },
+            { num: '62', type: 'travel', label: '旅行', group: '娱乐社交 (49-64, 72, 92, 96)' },
+            { num: '63', type: 'photo', label: '摄影', group: '娱乐社交 (49-64, 72, 92, 96)' },
+            { num: '64', type: 'movie', label: '电影', group: '娱乐社交 (49-64, 72, 92, 96)' },
+            { num: '72', type: 'novel', label: '小说', group: '娱乐社交 (49-64, 72, 92, 96)' },
+            { num: '92', type: 'bill', label: '账单', group: '娱乐社交 (49-64, 72, 92, 96)' },
+            { num: '96', type: 'delivery', label: '快递', group: '娱乐社交 (49-64, 72, 92, 96)' },
+            
+            // Group 5: 个人成长图标 (65-71, 73-80, 89-91)
+            { num: '65', type: 'self', label: '自我', group: '个人成长 (65-71, 73-80, 89-91)' },
+            { num: '66', type: 'think', label: '思考', group: '个人成长 (65-71, 73-80, 89-91)' },
+            { num: '67', type: 'workout', label: '锻炼', group: '个人成长 (65-71, 73-80, 89-91)' },
+            { num: '68', type: 'meditation', label: '冥想', group: '个人成长 (65-71, 73-80, 89-91)' },
+            { num: '69', type: 'piano', label: '钢琴', group: '个人成长 (65-71, 73-80, 89-91)' },
+            { num: '70', type: 'art', label: '艺术', group: '个人成长 (65-71, 73-80, 89-91)' },
+            { num: '71', type: 'volunteer', label: '志愿', group: '个人成长 (65-71, 73-80, 89-91)' },
+            { num: '73', type: 'search', label: '搜索', group: '个人成长 (65-71, 73-80, 89-91)' },
+            { num: '74', type: 'user', label: '用户', group: '个人成长 (65-71, 73-80, 89-91)' },
+            { num: '75', type: 'location', label: '位置', group: '个人成长 (65-71, 73-80, 89-91)' },
+            { num: '76', type: 'bell', label: '通知', group: '个人成长 (65-71, 73-80, 89-91)' },
+            { num: '77', type: 'trash', label: '删除', group: '个人成长 (65-71, 73-80, 89-91)' },
+            { num: '78', type: 'lock', label: '锁定', group: '个人成长 (65-71, 73-80, 89-91)' },
+            { num: '79', type: 'star', label: '星标', group: '个人成长 (65-71, 73-80, 89-91)' },
+            { num: '80', type: 'share', label: '分享', group: '个人成长 (65-71, 73-80, 89-91)' },
+            { num: '89', type: 'yoga', label: '瑜伽', group: '个人成长 (65-71, 73-80, 89-91)' },
+            { num: '90', type: 'swim', label: '游泳', group: '个人成长 (65-71, 73-80, 89-91)' },
+            { num: '91', type: 'cycling', label: '骑行', group: '个人成长 (65-71, 73-80, 89-91)' }
+        ];
+
+        let currentTheme = 'cat';
+
+        // 初始化主题按钮
+        function initThemeButtons() {
+            const container = document.getElementById('themeButtons');
+            themes.forEach(theme => {
+                const btn = document.createElement('button');
+                btn.className = 'theme-btn';
+                btn.textContent = theme;
+                btn.onclick = () => switchTheme(theme);
+                if (theme === currentTheme) {
+                    btn.classList.add('active');
+                }
+                container.appendChild(btn);
+            });
+        }
+
+        // 切换主题
+        function switchTheme(theme) {
+            currentTheme = theme;
+            document.getElementById('currentTheme').textContent = `当前主题: ${theme}`;
+            
+            // 更新按钮状态
+            document.querySelectorAll('.theme-btn').forEach(btn => {
+                btn.classList.toggle('active', btn.textContent === theme);
+            });
+            
+            // 重新渲染图标
+            renderIcons();
+        }
+
+        // 渲染图标
+        function renderIcons() {
+            const grid = document.getElementById('iconGrid');
+            grid.innerHTML = '';
+            
+            let currentGroup = '';
+            
+            iconData.forEach(icon => {
+                // 如果是新的分组，添加分组标题
+                if (icon.group !== currentGroup) {
+                    currentGroup = icon.group;
+                    const groupHeader = document.createElement('div');
+                    groupHeader.className = 'group-header';
+                    groupHeader.textContent = currentGroup;
+                    grid.appendChild(groupHeader);
+                }
+                
+                // 创建图标项
+                const item = document.createElement('div');
+                item.className = 'icon-item';
+                
+                const img = document.createElement('img');
+                img.className = 'icon-image';
+                img.src = `public/uiicon/${currentTheme}/${icon.num}.webp`;
+                img.alt = icon.label;
+                img.onerror = function() {
+                    this.style.display = 'none';
+                    const errorText = document.createElement('div');
+                    errorText.textContent = '❌ 图片缺失';
+                    errorText.style.color = 'red';
+                    errorText.style.fontSize = '12px';
+                    this.parentElement.appendChild(errorText);
+                };
+                
+                const number = document.createElement('div');
+                number.className = 'icon-number';
+                number.textContent = `#${icon.num}`;
+                
+                const label = document.createElement('div');
+                label.className = 'icon-label';
+                label.textContent = icon.label;
+                
+                const type = document.createElement('div');
+                type.className = 'icon-type';
+                type.textContent = icon.type;
+                
+                item.appendChild(img);
+                item.appendChild(number);
+                item.appendChild(label);
+                item.appendChild(type);
+                
+                grid.appendChild(item);
+            });
+        }
+
+        // 初始化
+        initThemeButtons();
+        renderIcons();
+    </script>
+</body>
+</html>

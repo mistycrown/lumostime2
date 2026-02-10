@@ -133,7 +133,7 @@ const THEME_PRESETS: ThemePreset[] = [
 ];
 
 // UI 主题列表
-const UI_THEMES = ['purple', 'color', 'prince', 'cat', 'forest', 'plant', 'water', 'knit', 'paper', 'pencil'];
+const UI_THEMES = ['purple', 'color', 'prince', 'cat', 'forest', 'plant', 'water', 'knit', 'paper', 'pencil', 'old'];
 
 export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToast, categories }) => {
     const [redemptionCode, setRedemptionCode] = useState('');

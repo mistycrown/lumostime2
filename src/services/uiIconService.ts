@@ -10,12 +10,13 @@
  * ### 图标分组 (共96个图标)
  * - **Group 1 (1-16)**: 核心功能图标 - 同步、设置、管理、日历等应用核心功能
  * - **Group 2 (17-40)**: 日常生活图标 - 首页、睡眠、通勤、用餐、咖啡、饮品、洗衣、园艺、家庭、约会、礼物、化妆等日常活动
- * - **Group 3 (41-59)**: 学习工作图标 - 学习、会议、编程、论文、汽车、电话、邮件等工作学习相关
- * - **Group 4 (60-78)**: 娱乐社交图标 - 探索、社交、游戏、旅行、账单、快递等娱乐活动
- * - **Group 5 (79-96)**: 个人成长图标 - 自我、思考、锻炼、冥想、瑜伽、游泳、骑行等个人发展
+ * - **Group 3 (41-51)**: 学习工作图标 - 学习、会议、编程、论文、汽车、电话、邮件等工作学习相关
+ * - **Group 4 (52-69)**: 娱乐社交图标 - 探索、社交、游戏、旅行、账单、快递等娱乐活动
+ * - **Group 5 (70-80)**: 个人成长图标 - 自我、思考、锻炼、冥想、瑜伽、游泳、骑行等个人发展
+ * - **Group 6 (81-96)**: 扩展图标 - 新增的日常生活和个人成长图标
  * 
  * ### 主题系统
- * - 支持多套视觉风格主题 (default, purple, color, prince, cat, forest, plant, water)
+ * - 支持多套视觉风格主题 (default, purple, color, prince, cat, forest, plant, water, knit, old, paper, pencil)
  * 
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  * - 每个主题包含完整的96个图标
@@ -76,73 +77,73 @@ export type UIIconType =
     | 'nap'            // 30. 小憩
     | 'water'          // 31. 喝水
     | 'weather'        // 32. 天气
-    | 'coffee'         // 33. 咖啡
-    | 'drink'          // 34. 饮品
-    | 'laundry'        // 35. 洗衣
-    | 'gardening'      // 36. 园艺
-    | 'family'         // 37. 家庭
-    | 'date'           // 38. 约会
-    | 'gift'           // 39. 礼物
-    | 'makeup'         // 40. 化妆
-    // Group 3: 学习工作图标 (41-59)
-    | 'study'          // 41. 学习
-    | 'meeting'        // 42. 会议
-    | 'laptop'         // 43. 笔记本电脑
-    | 'book'           // 44. 书籍
-    | 'code'           // 45. 编程
-    | 'thesis'         // 46. 论文
-    | 'language'       // 47. 语言
-    | 'money'          // 48. 金钱
-    | 'wallet'         // 49. 钱包
-    | 'folder'         // 50. 文件夹
-    | 'tools'          // 51. 工具
-    | 'input'          // 52. 输入/信号
-    | 'phd'            // 53. 博士/学术
-    | 'wisdom'         // 54. 智慧
-    | 'ai'             // 55. 人工智能
-    | 'briefcase'      // 56. 公文包
-    | 'car'            // 57. 汽车
-    | 'call'           // 58. 电话
-    | 'email'          // 59. 邮件
-    // Group 4: 娱乐社交图标 (60-78)
-    | 'explore'        // 60. 探索
-    | 'love'           // 61. 爱/喜欢
-    | 'handshake'      // 62. 握手
-    | 'social'         // 63. 社交
-    | 'chat'           // 64. 聊天
-    | 'surf'           // 65. 上网
-    | 'watch'          // 66. 观看
-    | 'game'           // 67. 游戏
-    | 'mystery'        // 68. 神秘
-    | 'design'         // 69. 设计
-    | 'music'          // 70. 音乐
-    | 'craft'          // 71. 手工
-    | 'brush'          // 72. 书法
-    | 'travel'         // 73. 旅行
-    | 'photo'          // 74. 摄影
-    | 'movie'          // 75. 电影
-    | 'bill'           // 76. 账单
-    | 'delivery'       // 77. 快递
-    | 'novel'          // 78. 小说
-    // Group 5: 个人成长与系统图标 (79-96)
-    | 'self'           // 79. 自我
-    | 'think'          // 80. 思考
-    | 'workout'        // 81. 锻炼
-    | 'meditation'     // 82. 冥想
-    | 'piano'          // 83. 钢琴
-    | 'art'            // 84. 艺术
-    | 'volunteer'      // 85. 志愿
-    | 'yoga'           // 86. 瑜伽
-    | 'swim'           // 87. 游泳
-    | 'cycling'        // 88. 骑行
-    | 'search'         // 89. 搜索
-    | 'user'           // 90. 用户
-    | 'location'       // 91. 位置
-    | 'bell'           // 92. 通知
-    | 'trash'          // 93. 删除
-    | 'lock'           // 94. 锁定
-    | 'star'           // 95. 星标
-    | 'share';         // 96. 分享
+    | 'coffee'         // 81. 咖啡 (新增)
+    | 'drink'          // 82. 饮品 (新增)
+    | 'laundry'        // 83. 洗衣 (新增)
+    | 'gardening'      // 84. 园艺 (新增)
+    | 'family'         // 85. 家庭 (新增)
+    | 'date'           // 86. 约会 (新增)
+    | 'gift'           // 87. 礼物 (新增)
+    | 'makeup'         // 88. 化妆 (新增)
+    // Group 3: 学习工作图标 (33-51)
+    | 'study'          // 33. 学习
+    | 'meeting'        // 34. 会议
+    | 'laptop'         // 35. 笔记本电脑
+    | 'book'           // 36. 书籍
+    | 'code'           // 37. 编程
+    | 'thesis'         // 38. 论文
+    | 'language'       // 39. 语言
+    | 'money'          // 40. 金钱
+    | 'wallet'         // 41. 钱包
+    | 'folder'         // 42. 文件夹
+    | 'tools'          // 43. 工具
+    | 'input'          // 44. 输入/信号
+    | 'phd'            // 45. 博士/学术
+    | 'wisdom'         // 46. 智慧
+    | 'ai'             // 47. 人工智能
+    | 'briefcase'      // 48. 公文包
+    | 'car'            // 93. 汽车 (新增)
+    | 'call'           // 94. 电话 (新增)
+    | 'email'          // 95. 邮件 (新增)
+    // Group 4: 娱乐社交图标 (49-69)
+    | 'explore'        // 49. 探索
+    | 'love'           // 50. 爱/喜欢
+    | 'handshake'      // 51. 握手
+    | 'social'         // 52. 社交
+    | 'chat'           // 53. 聊天
+    | 'surf'           // 54. 上网
+    | 'watch'          // 55. 观看
+    | 'game'           // 56. 游戏
+    | 'mystery'        // 57. 神秘
+    | 'design'         // 58. 设计
+    | 'music'          // 59. 音乐
+    | 'craft'          // 60. 手工
+    | 'brush'          // 61. 书法
+    | 'travel'         // 62. 旅行
+    | 'photo'          // 63. 摄影
+    | 'movie'          // 64. 电影
+    | 'bill'           // 92. 账单 (新增)
+    | 'delivery'       // 96. 快递 (新增)
+    | 'novel'          // 72. 小说
+    // Group 5: 个人成长与系统图标 (65-80, 89-91)
+    | 'self'           // 65. 自我
+    | 'think'          // 66. 思考
+    | 'workout'        // 67. 锻炼
+    | 'meditation'     // 68. 冥想
+    | 'piano'          // 69. 钢琴
+    | 'art'            // 70. 艺术
+    | 'volunteer'      // 71. 志愿
+    | 'yoga'           // 89. 瑜伽 (新增)
+    | 'swim'           // 90. 游泳 (新增)
+    | 'cycling'        // 91. 骑行 (新增)
+    | 'search'         // 73. 搜索
+    | 'user'           // 74. 用户
+    | 'location'       // 75. 位置
+    | 'bell'           // 76. 通知
+    | 'trash'          // 77. 删除
+    | 'lock'           // 78. 锁定
+    | 'star'           // 79. 星标
+    | 'share';         // 80. 分享
 
 // 图标编号映射（对应文件名）
 const ICON_NUMBER_MAP: Record<UIIconType, string> = {
@@ -163,7 +164,7 @@ const ICON_NUMBER_MAP: Record<UIIconType, string> = {
     'sort-asc': '14',
     'sort-desc': '15',
     'data-view': '16',
-    // Group 2: 日常生活图标 (17-40)
+    // Group 2: 日常生活图标 (17-32, 81-88)
     'home': '17',
     'sleep': '18',
     'commute': '19',
@@ -180,77 +181,77 @@ const ICON_NUMBER_MAP: Record<UIIconType, string> = {
     'nap': '30',
     'water': '31',
     'weather': '32',
-    'coffee': '33',
-    'drink': '34',
-    'laundry': '35',
-    'gardening': '36',
-    'family': '37',
-    'date': '38',
-    'gift': '39',
-    'makeup': '40',
-    // Group 3: 学习工作图标 (41-59)
-    'study': '41',
-    'meeting': '42',
-    'laptop': '43',
-    'book': '44',
-    'code': '45',
-    'thesis': '46',
-    'language': '47',
-    'money': '48',
-    'wallet': '49',
-    'folder': '50',
-    'tools': '51',
-    'input': '52',
-    'phd': '53',
-    'wisdom': '54',
-    'ai': '55',
-    'briefcase': '56',
-    'car': '57',
-    'call': '58',
-    'email': '59',
-    // Group 4: 娱乐社交图标 (60-78)
-    'explore': '60',
-    'love': '61',
-    'handshake': '62',
-    'social': '63',
-    'chat': '64',
-    'surf': '65',
-    'watch': '66',
-    'game': '67',
-    'mystery': '68',
-    'design': '69',
-    'music': '70',
-    'craft': '71',
-    'brush': '72',
-    'travel': '73',
-    'photo': '74',
-    'movie': '75',
-    'bill': '76',
-    'delivery': '77',
-    'novel': '78',
-    // Group 5: 个人成长与系统图标 (79-96)
-    'self': '79',
-    'think': '80',
-    'workout': '81',
-    'meditation': '82',
-    'piano': '83',
-    'art': '84',
-    'volunteer': '85',
-    'yoga': '86',
-    'swim': '87',
-    'cycling': '88',
-    'search': '89',
-    'user': '90',
-    'location': '91',
-    'bell': '92',
-    'trash': '93',
-    'lock': '94',
-    'star': '95',
-    'share': '96'
+    'coffee': '81',
+    'drink': '82',
+    'laundry': '83',
+    'gardening': '84',
+    'family': '85',
+    'date': '86',
+    'gift': '87',
+    'makeup': '88',
+    // Group 3: 学习工作图标 (33-48, 93-95)
+    'study': '33',
+    'meeting': '34',
+    'laptop': '35',
+    'book': '36',
+    'code': '37',
+    'thesis': '38',
+    'language': '39',
+    'money': '40',
+    'wallet': '41',
+    'folder': '42',
+    'tools': '43',
+    'input': '44',
+    'phd': '45',
+    'wisdom': '46',
+    'ai': '47',
+    'briefcase': '48',
+    'car': '93',
+    'call': '94',
+    'email': '95',
+    // Group 4: 娱乐社交图标 (49-64, 72, 92, 96)
+    'explore': '49',
+    'love': '50',
+    'handshake': '51',
+    'social': '52',
+    'chat': '53',
+    'surf': '54',
+    'watch': '55',
+    'game': '56',
+    'mystery': '57',
+    'design': '58',
+    'music': '59',
+    'craft': '60',
+    'brush': '61',
+    'travel': '62',
+    'photo': '63',
+    'movie': '64',
+    'bill': '92',
+    'delivery': '96',
+    'novel': '72',
+    // Group 5: 个人成长与系统图标 (65-71, 73-80, 89-91)
+    'self': '65',
+    'think': '66',
+    'workout': '67',
+    'meditation': '68',
+    'piano': '69',
+    'art': '70',
+    'volunteer': '71',
+    'yoga': '89',
+    'swim': '90',
+    'cycling': '91',
+    'search': '73',
+    'user': '74',
+    'location': '75',
+    'bell': '76',
+    'trash': '77',
+    'lock': '78',
+    'star': '79',
+    'share': '80'
 };
 
 // 可用的主题列表
-export const UI_ICON_THEMES = ['default', 'purple', 'color', 'prince', 'cat', 'forest', 'plant', 'water'] as const;
+export const UI_ICON_THEMES = ['default', 'purple', 'color', 'prince', 'cat', 'forest', 'plant', 'water', 'knit', 'old', 'paper', 'pencil'] as const;
 export type UIIconTheme = typeof UI_ICON_THEMES[number];
 
 // 图标分组定义
@@ -265,7 +266,7 @@ export const ICON_GROUPS = {
     },
     daily: {
         name: '生活',
-        range: [17, 40],
+        range: [17, 32],
         icons: [
             'home', 'sleep', 'commute', 'meal', 'housework', 'hygiene', 'shopping', 'chores',
             'medical', 'haircut', 'cooking', 'pet', 'walk', 'nap', 'water', 'weather',
@@ -274,7 +275,7 @@ export const ICON_GROUPS = {
     },
     work: {
         name: '工作',
-        range: [41, 59],
+        range: [33, 48],
         icons: [
             'study', 'meeting', 'laptop', 'book', 'code', 'thesis', 'language', 'money',
             'wallet', 'folder', 'tools', 'input', 'phd', 'wisdom', 'ai', 'briefcase',
@@ -283,20 +284,20 @@ export const ICON_GROUPS = {
     },
     entertainment: {
         name: '社交',
-        range: [60, 78],
+        range: [49, 64],
         icons: [
             'explore', 'love', 'handshake', 'social', 'chat', 'surf', 'watch', 'game',
             'mystery', 'design', 'music', 'craft', 'brush', 'travel', 'photo', 'movie',
-            'bill', 'delivery', 'novel'
+            'novel', 'bill', 'delivery'
         ] as UIIconType[]
     },
     personal: {
         name: '成长',
-        range: [79, 96],
+        range: [65, 80],
         icons: [
             'self', 'think', 'workout', 'meditation', 'piano', 'art', 'volunteer',
-            'yoga', 'swim', 'cycling',
-            'search', 'user', 'location', 'bell', 'trash', 'lock', 'star', 'share'
+            'search', 'user', 'location', 'bell', 'trash', 'lock', 'star', 'share',
+            'yoga', 'swim', 'cycling'
         ] as UIIconType[]
     }
 } as const;
