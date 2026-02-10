@@ -27,6 +27,7 @@ import {
     formatDuration,
     getTemplateDisplayInfo
 } from '../components/ReviewView';
+import { calculateMonthlyStats } from '../utils/reviewStatsUtils';
 
 interface DailyReviewViewProps {
     review: DailyReview;
@@ -206,37 +207,10 @@ export const DailyReviewView: React.FC<DailyReviewViewProps> = ({
     }, [logs, date]);
 
     // 注意：以下stats计算仅用于AI叙事生成，数据展示由StatsView处理
-    const stats = useMemo(() => {
-        const totalDuration = dayLogs.reduce((acc, log) => acc + (log.duration || 0), 0);
-
-        const categoryStats = categories.map(cat => {
-            const catLogs = dayLogs.filter(l => l.categoryId === cat.id);
-            const duration = catLogs.reduce((acc, l) => acc + (l.duration || 0), 0);
-            const percentage = totalDuration > 0 ? (duration / totalDuration) * 100 : 0;
-            return { ...cat, duration, percentage };
-        }).filter(c => c.duration > 0);
-
-        const todoStats = todoCategories.map(cat => {
-            const catTodos = todos.filter(t => t.categoryId === cat.id);
-            const linkedLogs = dayLogs.filter(l =>
-                l.linkedTodoId && catTodos.some(t => t.id === l.linkedTodoId)
-            );
-            const duration = linkedLogs.reduce((acc, l) => acc + (l.duration || 0), 0);
-            const percentage = totalDuration > 0 ? (duration / totalDuration) * 100 : 0;
-            return { ...cat, duration, percentage };
-        }).filter(c => c.duration > 0);
-
-        const scopeStats = scopes.map(scope => {
-            const scopeLogs = dayLogs.filter(l =>
-                l.scopeIds && l.scopeIds.includes(scope.id)
-            );
-            const duration = scopeLogs.reduce((acc, l) => acc + (l.duration || 0), 0);
-            const percentage = totalDuration > 0 ? (duration / totalDuration) * 100 : 0;
-            return { ...scope, duration, percentage };
-        }).filter(s => s.duration > 0);
-
-        return { totalDuration, categoryStats, todoStats, scopeStats };
-    }, [dayLogs, categories, todos, todoCategories, scopes]);
+    const stats = useMemo(() => 
+        calculateMonthlyStats(dayLogs, categories, todos, todoCategories, scopes),
+        [dayLogs, categories, todos, todoCategories, scopes]
+    );
 
     // 获取用于显示的模板列表 (用于渲染模板卡片)
     const templatesForDisplay = useMemo(() => {

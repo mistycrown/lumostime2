@@ -26,6 +26,10 @@ import {
     formatDuration,
     getTemplateDisplayInfo
 } from '../components/ReviewView';
+import { 
+    calculateMonthlyStats,
+    generateCompleteMonthlyStatsText
+} from '../utils/reviewStatsUtils';
 
 interface MonthlyReviewViewProps {
     review: MonthlyReview;
@@ -107,37 +111,10 @@ export const MonthlyReviewView: React.FC<MonthlyReviewViewProps> = ({
     }, [logs, monthStartDate, monthEndDate]);
 
     // Stats calculation for AI Narrative
-    const stats = useMemo(() => {
-        const totalDuration = monthLogs.reduce((acc, log) => acc + (log.duration || 0), 0);
-
-        const categoryStats = categories.map(cat => {
-            const catLogs = monthLogs.filter(l => l.categoryId === cat.id);
-            const duration = catLogs.reduce((acc, l) => acc + (l.duration || 0), 0);
-            const percentage = totalDuration > 0 ? (duration / totalDuration) * 100 : 0;
-            return { ...cat, duration, percentage };
-        }).filter(c => c.duration > 0);
-
-        const todoStats = todoCategories.map(cat => {
-            const catTodos = todos.filter(t => t.categoryId === cat.id);
-            const linkedLogs = monthLogs.filter(l =>
-                l.linkedTodoId && catTodos.some(t => t.id === l.linkedTodoId)
-            );
-            const duration = linkedLogs.reduce((acc, l) => acc + (l.duration || 0), 0);
-            const percentage = totalDuration > 0 ? (duration / totalDuration) * 100 : 0;
-            return { ...cat, duration, percentage };
-        }).filter(c => c.duration > 0);
-
-        const scopeStats = scopes.map(scope => {
-            const scopeLogs = monthLogs.filter(l =>
-                l.scopeIds && l.scopeIds.includes(scope.id)
-            );
-            const duration = scopeLogs.reduce((acc, l) => acc + (l.duration || 0), 0);
-            const percentage = totalDuration > 0 ? (duration / totalDuration) * 100 : 0;
-            return { ...scope, duration, percentage };
-        }).filter(s => s.duration > 0);
-
-        return { totalDuration, categoryStats, todoStats, scopeStats };
-    }, [monthLogs, categories, todos, todoCategories, scopes]);
+    const stats = useMemo(() => 
+        calculateMonthlyStats(monthLogs, categories, todos, todoCategories, scopes),
+        [monthLogs, categories, todos, todoCategories, scopes]
+    );
 
     // 获取月报模板questions
     const enabledQuestions = useMemo(() => {
@@ -220,162 +197,19 @@ export const MonthlyReviewView: React.FC<MonthlyReviewViewProps> = ({
         setIsStyleModalOpen(false);
         setIsGenerating(true);
         try {
-            // Generate Weekly Stats Layout
-            const weeklyStatsText = (() => {
-                let text = '每周详细统计：\n';
-                const start = new Date(monthStartDate);
-                const end = new Date(monthEndDate);
+            // 使用统一的统计文本生成函数
+            const statsText = generateCompleteMonthlyStatsText(
+                monthLogs,
+                categories,
+                todos,
+                todoCategories,
+                scopes,
+                dailyReviews,
+                monthStartDate,
+                monthEndDate
+            );
 
-                // Helper to get week ranges within the month
-                const getWeeks = () => {
-                    const weeks: { start: Date, end: Date }[] = [];
-                    let current = new Date(start);
-                    current.setHours(0, 0, 0, 0);
-
-                    while (current <= end) {
-                        const weekStart = new Date(current);
-                        const weekEnd = new Date(current);
-                        // Advance to end of week (Sat) or end of month
-                        const dayOfWeek = current.getDay();
-                        const daysToSat = 6 - dayOfWeek;
-                        weekEnd.setDate(current.getDate() + daysToSat);
-
-                        if (weekEnd > end) {
-                            weekEnd.setTime(end.getTime());
-                        }
-                        weekEnd.setHours(23, 59, 59, 999);
-
-                        weeks.push({ start: weekStart, end: weekEnd });
-
-                        // Advance to next week's Sunday
-                        current.setDate(current.getDate() + daysToSat + 1);
-                    }
-                    return weeks;
-                };
-
-                const weeks = getWeeks();
-
-                weeks.forEach((week, index) => {
-                    const weekLogs = monthLogs.filter(l =>
-                        l.startTime >= week.start.getTime() &&
-                        l.endTime <= week.end.getTime()
-                    );
-
-                    if (weekLogs.length === 0) return;
-
-                    const dateRange = `${week.start.getMonth() + 1}/${week.start.getDate()} - ${week.end.getMonth() + 1}/${week.end.getDate()}`;
-                    text += `\n【第${index + 1}周 (${dateRange})】\n`;
-
-                    // 1. Tags (Categories)
-                    const catDurations = new Map<string, number>();
-                    weekLogs.forEach(l => {
-                        const catName = categories.find(c => c.id === l.categoryId)?.name || '未知';
-                        catDurations.set(catName, (catDurations.get(catName) || 0) + (l.endTime - l.startTime) / 1000);
-                    });
-                    text += `  标签分布：\n`;
-                    Array.from(catDurations.entries())
-                        .sort((a, b) => b[1] - a[1]) // Sort by duration desc
-                        .forEach(([name, duration]) => {
-                            text += `    - ${name}: ${formatDuration(duration)}\n`;
-                        });
-
-                    // 2. Scopes
-                    const scopeDurations = new Map<string, number>();
-                    weekLogs.forEach(l => {
-                        if (l.scopeIds && l.scopeIds.length > 0) {
-                            // Split duration among scopes? Or count full duration for each?
-                            // Usually full duration adds up to > total time.
-                            // Let's use simple check: log belongs to scope.
-                            const duration = (l.endTime - l.startTime) / 1000;
-                            l.scopeIds.forEach(sid => {
-                                const sName = scopes.find(s => s.id === sid)?.name || '未知';
-                                scopeDurations.set(sName, (scopeDurations.get(sName) || 0) + duration);
-                            });
-                        }
-                    });
-                    if (scopeDurations.size > 0) {
-                        text += `  领域分布：\n`;
-                        Array.from(scopeDurations.entries())
-                            .sort((a, b) => b[1] - a[1])
-                            .forEach(([name, duration]) => {
-                                text += `    - ${name}: ${formatDuration(duration)}\n`;
-                            });
-                    }
-
-                    // 3. Todo Total Duration
-                    const todoLogs = weekLogs.filter(l => l.linkedTodoId);
-                    const todoTotal = todoLogs.reduce((acc, l) => acc + (l.endTime - l.startTime) / 1000, 0);
-                    if (todoTotal > 0) {
-                        text += `  待办投入总时长：${formatDuration(todoTotal)}\n`;
-                    }
-                });
-
-                return text;
-            })();
-
-            const statsText = `月度总览：\n` +
-                `总时长：${formatDuration(stats.totalDuration)}\n` +
-                `标签统计：\n${stats.categoryStats.map(c =>
-                    `- ${c.name}: ${formatDuration(c.duration)} (${c.percentage.toFixed(1)}%)`
-                ).join('\n')}\n` +
-                `领域统计：\n${stats.scopeStats.map(s =>
-                    `- ${s.name}: ${formatDuration(s.duration)} (${s.percentage.toFixed(1)}%)`
-                ).join('\n')}\n\n` +
-                weeklyStatsText;
-
-            // 生成本月 check 项汇总统计
-            const checkText = (() => {
-                // 筛选本月的 dailyReviews
-                const monthStart = new Date(monthStartDate);
-                monthStart.setHours(0, 0, 0, 0);
-                const monthEnd = new Date(monthEndDate);
-                monthEnd.setHours(23, 59, 59, 999);
-
-                const monthDailyReviews = dailyReviews.filter(r => {
-                    const reviewDate = new Date(r.date);
-                    return reviewDate >= monthStart && reviewDate <= monthEnd;
-                });
-
-                // 统计每个 check 项的完成情况
-                const checkStats: Record<string, { category: string, total: number, completed: number }> = {};
-
-                monthDailyReviews.forEach(review => {
-                    if (review.checkItems) {
-                        review.checkItems.forEach(item => {
-                            if (!item.category) return; // 跳过无分类项
-                            const key = `${item.category}|${item.content}`;
-                            if (!checkStats[key]) {
-                                checkStats[key] = { category: item.category, total: 0, completed: 0 };
-                            }
-                            checkStats[key].total++;
-                            if (item.isCompleted) checkStats[key].completed++;
-                        });
-                    }
-                });
-
-                if (Object.keys(checkStats).length === 0) return '';
-
-                // 按分类分组
-                const byCategory: Record<string, Array<{ content: string, total: number, completed: number, rate: number }>> = {};
-                Object.entries(checkStats).forEach(([key, stats]) => {
-                    const content = key.split('|')[1];
-                    const rate = stats.total > 0 ? (stats.completed / stats.total) * 100 : 0;
-                    if (!byCategory[stats.category]) byCategory[stats.category] = [];
-                    byCategory[stats.category].push({ content, total: stats.total, completed: stats.completed, rate });
-                });
-
-                let text = '\n\n日课完成情况（本月汇总）：\n';
-                Object.entries(byCategory).forEach(([category, items]) => {
-                    text += `\n${category}：\n`;
-                    items.forEach(item => {
-                        text += `  ${item.content}: ${item.completed}/${item.total} (${item.rate.toFixed(0)}%)\n`;
-                    });
-                });
-
-                return text;
-            })();
-
-            const generated = await onGenerateNarrative(review, statsText + checkText, template.prompt);
+            const generated = await onGenerateNarrative(review, statsText, template.prompt);
             setNarrative(generated);
             setEditedNarrative(generated);
 
