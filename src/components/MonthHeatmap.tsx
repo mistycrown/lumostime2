@@ -17,6 +17,10 @@ interface MonthHeatmapProps {
     month: Date;
 }
 
+// 常量配置
+const ROW_HEIGHT = 16; // 每行的高度（像素）
+const HOUR_LABEL_INTERVAL = 3; // 小时标签显示间隔
+
 // 从Tailwind类名获取浅色背景色
 const getScheduleColor = (className: string = ''): string => {
     if (typeof className !== 'string') return 'rgba(245, 245, 244, 0.9)'; // stone-100/90
@@ -56,8 +60,6 @@ export const MonthHeatmap: React.FC<MonthHeatmapProps> = ({ logs, categories, mo
     const monthIndex = month.getMonth();
     const daysInMonth = new Date(year, monthIndex + 1, 0).getDate();
 
-    // 每行的高度（像素）
-    const ROW_HEIGHT = 16;
     const TOTAL_HEIGHT = daysInMonth * ROW_HEIGHT;
 
     // 过滤当月的logs并按日期分组
@@ -175,7 +177,7 @@ export const MonthHeatmap: React.FC<MonthHeatmapProps> = ({ logs, categories, mo
                                 className="flex-1 text-[8px] text-stone-400 font-medium text-center"
                                 style={{ transform: 'translateY(-12px)' }}
                             >
-                                {h % 3 === 0 ? h : ''}
+                                {h % HOUR_LABEL_INTERVAL === 0 ? h : ''}
                             </div>
                         ))}
                     </div>
