@@ -92,12 +92,12 @@ export const RecordView: React.FC<RecordViewProps> = ({ onStartActivity, categor
                 key={category.id}
                 onClick={() => setSelectedCategoryId(category.id)}
                 className={`
-                  flex items-center gap-2 px-4 py-4 md:py-3 mb-1 transition-all duration-200 text-left relative rounded-r-2xl group w-full
+                  flex items-center gap-2 mb-1 transition-all duration-200 text-left relative rounded-r-2xl group
                   ${isSelected
                     ? 'text-stone-900 font-bold bg-white shadow-[2px_2px_10px_rgba(0,0,0,0.02)] z-10'
                     : 'text-stone-600 hover:text-stone-800'
                   }
-                  ${!isSidebarOpen && 'justify-center px-0'}
+                  ${!isSidebarOpen ? 'justify-center w-12 h-12 md:w-14 md:h-14' : 'w-full h-12 md:h-14 px-4'}
                 `}
                 title={!isSidebarOpen ? category.name : undefined}
               >

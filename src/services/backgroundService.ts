@@ -37,6 +37,20 @@ const PRESET_BACKGROUNDS: BackgroundOption[] = [
         thumbnail: '/background/little_prince.webp',
     },
     {
+        id: 'abstract',
+        name: '抽象',
+        type: 'preset',
+        url: '/background/abstract.webp',
+        thumbnail: '/background/abstract.webp',
+    },
+    {
+        id: 'ancient',
+        name: '古风',
+        type: 'preset',
+        url: '/background/ancient.webp',
+        thumbnail: '/background/ancient.webp',
+    },
+    {
         id: 'bank',
         name: '河岸',
         type: 'preset',
@@ -49,6 +63,13 @@ const PRESET_BACKGROUNDS: BackgroundOption[] = [
         type: 'preset',
         url: '/background/black.webp',
         thumbnail: '/background/black.webp',
+    },
+    {
+        id: 'brown',
+        name: '棕色',
+        type: 'preset',
+        url: '/background/brown.webp',
+        thumbnail: '/background/brown.webp',
     },
     {
         id: 'green',
@@ -114,18 +135,18 @@ const PRESET_BACKGROUNDS: BackgroundOption[] = [
         thumbnail: '/background/night.webp',
     },
     {
+        id: 'pencil',
+        name: '铅笔',
+        type: 'preset',
+        url: '/background/pencil.webp',
+        thumbnail: '/background/pencil.webp',
+    },
+    {
         id: 'plant',
         name: '植物',
         type: 'preset',
         url: '/background/plant.webp',
         thumbnail: '/background/plant.webp',
-    },
-    {
-        id: 'pink',
-        name: '粉色',
-        type: 'preset',
-        url: '/background/pink.webp',
-        thumbnail: '/background/pink.webp',
     },
     {
         id: 'pinkblue',

@@ -90,7 +90,7 @@ const THEME_PRESETS: ThemePreset[] = [
         appIcon: 'icon_plant',
         uiTheme: 'forest',
         colorScheme: 'bamboo-green',
-        background: 'green',
+        background: 'forest',
         navigation: 'plant',
         timePal: 'rabbit'
     },
@@ -103,32 +103,80 @@ const THEME_PRESETS: ThemePreset[] = [
         uiTheme: 'water',
         colorScheme: 'morandi-cyan',
         background: 'grenn3',
-        navigation: 'ya',
-        timePal: 'flower'
+        navigation: 'distant_mountain',
+        timePal: 'girl'
     },
     {
         id: 'good-night',
         name: 'Good Night',
-        description: '温暖的焦糖主题',
-        icon: '☕',
-        appIcon: 'icon_cdqm',
+        description: '温暖的夜晚主题',
+        icon: '🌙',
+        appIcon: 'icon_moon',
         uiTheme: 'color',
-        colorScheme: 'latte-caramel',
+        colorScheme: 'klein-blue',
         background: 'greenpink',
-        navigation: 'grass',
-        timePal: 'rabbit2'
+        navigation: 'night',
+        timePal: 'pigen'
     },
     {
         id: 'flower',
         name: 'Flower',
         description: '清新的莫兰迪绿',
-        icon: '🌱',
+        icon: '🌸',
         appIcon: 'icon_plant',
         uiTheme: 'plant',
         colorScheme: 'morandi-green',
-        background: 'grenn3',
-        navigation: 'plant2',
+        background: 'plant',
+        navigation: 'kamon',
         timePal: 'flower'
+    },
+    {
+        id: 'knit',
+        name: 'Knit',
+        description: '温暖的编织主题',
+        icon: '🧶',
+        appIcon: 'icon_knot',
+        uiTheme: 'knit',
+        colorScheme: 'latte-caramel',
+        background: 'knit',
+        navigation: 'knit',
+        timePal: 'knit'
+    },
+    {
+        id: 'paper',
+        name: 'Paper',
+        description: '清新的纸艺主题',
+        icon: '📄',
+        appIcon: 'icon_paper',
+        uiTheme: 'paper',
+        colorScheme: 'morandi-yellow',
+        background: 'abstract',
+        navigation: 'paper',
+        timePal: 'butterfly'
+    },
+    {
+        id: 'ancient',
+        name: 'Ancient',
+        description: '古典雅致主题',
+        icon: '🏛️',
+        appIcon: 'icon_Ukiyo-e',
+        uiTheme: 'old',
+        colorScheme: 'sky-blue',
+        background: 'ancient',
+        navigation: 'book',
+        timePal: 'girl2'
+    },
+    {
+        id: 'pencil',
+        name: 'Pencil',
+        description: '日系胶片主题',
+        icon: '✏️',
+        appIcon: 'icon_sketch',
+        uiTheme: 'pencil',
+        colorScheme: 'film-japanese',
+        background: 'pencil',
+        navigation: 'pencil',
+        timePal: 'dog2'
     }
 ];
 
@@ -794,6 +842,10 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
                                                                                 preset.colorScheme === 'morandi-cyan' ? 'linear-gradient(135deg, #a8c8d8 0%, #8fb5c5 100%)' :
                                                                                 preset.colorScheme === 'latte-caramel' ? 'linear-gradient(135deg, #d4b5a0 0%, #c4a590 100%)' :
                                                                                 preset.colorScheme === 'morandi-green' ? 'linear-gradient(135deg, #b5c8b5 0%, #a0b5a0 100%)' :
+                                                                                preset.colorScheme === 'klein-blue' ? 'linear-gradient(135deg, #5a8fc8 0%, #4a7fb8 100%)' :
+                                                                                preset.colorScheme === 'morandi-yellow' ? 'linear-gradient(135deg, #e8d4a8 0%, #d8c498 100%)' :
+                                                                                preset.colorScheme === 'sky-blue' ? 'linear-gradient(135deg, #7ab8d8 0%, #6aa8c8 100%)' :
+                                                                                preset.colorScheme === 'film-japanese' ? 'linear-gradient(135deg, #8fbec8 0%, #7faeb8 100%)' :
                                                                                 '#f5f5f4'
                                                                  }}
                                                             />
