@@ -14,6 +14,7 @@ import { ToastType } from '../components/Toast';
 import { ConfirmModal } from '../components/ConfirmModal';
 import { CustomSelect } from '../components/CustomSelect';
 import { parseFilterExpression, matchesFilter, FilterContext } from '../utils/filterUtils';
+import { usePrivacy } from '../contexts/PrivacyContext';
 
 interface BatchFocusRecordManageViewProps {
     onBack: () => void;
@@ -420,7 +421,7 @@ const RecordItem: React.FC<RecordItemProps> = ({
 
             {/* Note - Direct on background without border */}
             {log.note && (
-                <div className="text-xs text-stone-500 line-clamp-2">
+                <div className={`text-xs text-stone-500 line-clamp-2 ${isPrivacyMode ? 'blur-sm select-none' : ''}`}>
                     {log.note}
                 </div>
             )}
@@ -1016,6 +1017,7 @@ export const BatchFocusRecordManageView: React.FC<BatchFocusRecordManageViewProp
     todoCategories,
     onToast
 }) => {
+    const { isPrivacyMode } = usePrivacy();
     // State for time range filtering
     const [startDate, setStartDate] = useState<string>('');
     const [endDate, setEndDate] = useState<string>('');

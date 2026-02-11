@@ -25,6 +25,7 @@ import { TimePalDebugger } from '../components/TimePalDebugger';
 import { FloatingButton } from '../components/FloatingButton';
 import { UIIcon } from '../components/UIIcon';
 import { IconRenderer } from '../components/IconRenderer';
+import { usePrivacy } from '../contexts/PrivacyContext';
 
 
 // Image Thumbnail Component
@@ -158,6 +159,7 @@ interface TimelineItem {
 }
 
 export const TimelineView: React.FC<TimelineViewProps> = ({ logs, todos, scopes, onAddLog, onEditLog, onUpdateLog, categories, currentDate, onDateChange, onShowStats, onBatchAddLogs, onSync, isSyncing, todoCategories, onToast, startWeekOnSunday = false, autoLinkRules = [], minIdleTimeThreshold = 1, onQuickPunch, refreshKey = 0, activeSessions = [], dailyReview, onOpenDailyReview, templates = [], dailyReviewTime = '22:00', weeklyReviews = [], onOpenWeeklyReview, weeklyReviewTime = '0-2200', monthlyReviews = [], onOpenMonthlyReview, monthlyReviewTime = '0-2200', timelineGalleryMode = false }) => {
+    const { isPrivacyMode } = usePrivacy();
     const [isCalendarExpanded, setIsCalendarExpanded] = useState(false);
     const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>(() => {
         const saved = localStorage.getItem('lumos_timeline_sort');
@@ -820,7 +822,7 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ logs, todos, scopes,
                                         </div>
 
                                         {item.logData.note && (
-                                            <p className="text-sm text-stone-500 leading-relaxed mb-2 font-light whitespace-pre-wrap">
+                                            <p className={`text-sm text-stone-500 leading-relaxed mb-2 font-light whitespace-pre-wrap ${isPrivacyMode ? 'blur-sm select-none transition-all duration-500' : 'transition-all duration-500'}`}>
                                                 {item.logData.note}
                                             </p>
                                         )}

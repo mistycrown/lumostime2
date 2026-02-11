@@ -20,7 +20,9 @@ import search from '../../../docs/user-guide/07-search.md?raw';
 // @ts-ignore
 import dataSync from '../../../docs/user-guide/08-data-sync.md?raw';
 // @ts-ignore
-import developerOptions from '../../../docs/user-guide/09-developer-options.md?raw';
+import personalization from '../../../docs/user-guide/09-personalization.md?raw';
+// @ts-ignore
+import timeTrackingMethods from '../../../docs/user-guide/00-time-tracking-methods.md?raw';
 
 interface UserGuideViewProps {
     onBack: () => void;
@@ -34,15 +36,16 @@ interface GuideSection {
 }
 
 const guideSections: GuideSection[] = [
+    { id: '00', title: '时间记录的理论与方法', content: timeTrackingMethods, icon: '📖' },
     { id: '01', title: '开始记录你的时间', content: gettingStarted, icon: '⏱️' },
     { id: '02', title: '待办管理', content: todoManagement, icon: '✅' },
     { id: '03', title: '标签管理', content: tagsManagement, icon: '🏷️' },
     { id: '04', title: '领域与目标', content: scopeAndGoals, icon: '🎯' },
     { id: '05', title: '数据统计', content: dataStatistics, icon: '📊' },
-    { id: '06', title: '每日回顾与 AI 叙事', content: dailyReview, icon: '📝' },
-    { id: '07', title: '全局搜索', content: search, icon: '🔍' },
-    { id: '08', title: '数据同步', content: dataSync, icon: '☁️' },
-    { id: '09', title: '开发者选项', content: developerOptions, icon: '🔧' },
+    { id: '06', title: '回顾与复盘', content: dailyReview, icon: '📝' },
+    { id: '07', title: '搜索与数据管理', content: search, icon: '🔍' },
+    { id: '08', title: '数据同步与管理', content: dataSync, icon: '☁️' },
+    { id: '09', title: '个性化设置', content: personalization, icon: '🎨' },
 ];
 
 export const UserGuideView: React.FC<UserGuideViewProps> = ({ onBack }) => {
@@ -159,7 +162,7 @@ export const UserGuideView: React.FC<UserGuideViewProps> = ({ onBack }) => {
                     <div className="bg-gradient-to-br from-amber-50 to-orange-50 rounded-2xl p-6 mb-2 border border-amber-100/50">
                         <h2 className="text-xl font-bold text-stone-800 mb-2">欢迎使用 LumosTime ✨</h2>
                         <p className="text-sm text-stone-600 leading-relaxed">
-                            这不仅仅是一个时间记录工具，更是一个帮助你将被动的时间流逝转化为主动生命积累的私人助手。
+                            LumosTime是一个结合柳比歇夫时间记录法和间歇日志方法的记录工具，让我们一起将被动的时间流逝转化为主动生命积累吧！
                         </p>
                     </div>
 

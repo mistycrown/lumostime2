@@ -12,6 +12,8 @@ interface PreferencesSettingsViewProps {
     onToast: (type: ToastType, message: string) => void;
     startWeekOnSunday?: boolean;
     onToggleStartWeekOnSunday?: () => void;
+    privacyMode?: boolean;
+    onTogglePrivacyMode?: () => void;
     dailyReviewTime?: string;
     onSetDailyReviewTime?: (time: string) => void;
     weeklyReviewTime?: string;
@@ -37,6 +39,8 @@ export const PreferencesSettingsView: React.FC<PreferencesSettingsViewProps> = (
     onToast,
     startWeekOnSunday,
     onToggleStartWeekOnSunday,
+    privacyMode,
+    onTogglePrivacyMode,
     dailyReviewTime,
     onSetDailyReviewTime,
     weeklyReviewTime,
@@ -69,6 +73,26 @@ export const PreferencesSettingsView: React.FC<PreferencesSettingsViewProps> = (
 
             <div className="flex-1 overflow-y-auto p-4 space-y-4 pb-40">
                 <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
+                    {/* Privacy Mode Toggle */}
+                    <div className="flex items-center justify-between p-4 border-b border-stone-100 hover:bg-stone-50 transition-colors">
+                        <div>
+                            <h4 className="font-bold text-stone-700">隐私模式</h4>
+                            <p className="text-xs text-stone-400 mt-1">开启后将模糊显示备注等敏感信息</p>
+                        </div>
+                        <button
+                            onClick={onTogglePrivacyMode}
+                            className={`w-12 h-7 rounded-full transition-colors flex items-center px-1 ${
+                                privacyMode ? 'bg-stone-800' : 'bg-stone-200'
+                            }`}
+                        >
+                            <div
+                                className={`w-5 h-5 bg-white rounded-full shadow-sm transition-transform ${
+                                    privacyMode ? 'translate-x-5' : 'translate-x-0'
+                                }`}
+                            />
+                        </button>
+                    </div>
+
                     {/* Start Week Toggle */}
                     <div className="flex items-center justify-between p-4 border-b border-stone-100 last:border-0 hover:bg-stone-50 transition-colors">
                         <div>

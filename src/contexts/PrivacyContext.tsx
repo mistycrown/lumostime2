@@ -15,6 +15,7 @@
  */
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { SETTINGS_KEYS } from '../constants/storageKeys';
 
 interface PrivacyContextType {
     isPrivacyMode: boolean;
@@ -39,11 +40,15 @@ declare global {
 }
 
 export const PrivacyProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-    const [isPrivacyMode, setIsPrivacyMode] = useState(false);
+    const [isPrivacyMode, setIsPrivacyMode] = useState(() => {
+        const stored = localStorage.getItem(SETTINGS_KEYS.PRIVACY_MODE);
+        return stored === 'true';
+    });
 
     const togglePrivacyMode = () => {
         setIsPrivacyMode(prev => {
             const newState = !prev;
+            localStorage.setItem(SETTINGS_KEYS.PRIVACY_MODE, newState.toString());
             console.log(`Privacy Mode: ${newState ? 'ON' : 'OFF'}`);
             return newState;
         });
@@ -53,6 +58,7 @@ export const PrivacyProvider: React.FC<{ children: ReactNode }> = ({ children })
         window.togglePrivacyMode = togglePrivacyMode;
         window.setPrivacyMode = (enabled: boolean) => {
             setIsPrivacyMode(enabled);
+            localStorage.setItem(SETTINGS_KEYS.PRIVACY_MODE, enabled.toString());
             console.log(`Privacy Mode: ${enabled ? 'ON' : 'OFF'}`);
         };
 

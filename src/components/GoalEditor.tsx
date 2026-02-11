@@ -9,7 +9,8 @@
  */
 import React, { useState, useEffect } from 'react';
 import { Goal, Category, TodoCategory } from '../types';
-import { X } from 'lucide-react';
+import { X, Check } from 'lucide-react';
+import { TagMultipleAssociation } from './TagMultipleAssociation';
 
 interface GoalEditorProps {
     goal?: Goal;
@@ -59,12 +60,6 @@ export const GoalEditor: React.FC<GoalEditorProps> = ({ goal, scopeId, categorie
     // 🔍 筛选器状态 (Filter States)
     const [filterTodoCategories, setFilterTodoCategories] = useState<string[]>(goal?.filterTodoCategories || []);
     const [filterActivityIds, setFilterActivityIds] = useState<string[]>(goal?.filterActivityIds || []);
-    const [selectedCategoryId, setSelectedCategoryId] = useState<string>(''); // 用于二级选择
-    const [isFilterEnabled, setIsFilterEnabled] = useState<boolean>(
-        (goal?.filterTodoCategories && goal.filterTodoCategories.length > 0) ||
-        (goal?.filterActivityIds && goal.filterActivityIds.length > 0) ||
-        false
-    );
     const [isTodoFilterEnabled, setIsTodoFilterEnabled] = useState<boolean>(
         (goal?.filterTodoCategories && goal.filterTodoCategories.length > 0) || false
     );
@@ -174,30 +169,41 @@ export const GoalEditor: React.FC<GoalEditorProps> = ({ goal, scopeId, categorie
 
     return (
         <div
-            className="fixed inset-0 bg-black/50 flex items-end justify-center z-50 animate-fadeIn"
+            className="fixed inset-0 z-[100] flex items-end md:items-center justify-center bg-stone-900/40 backdrop-blur-sm animate-fadeIn pb-[env(safe-area-inset-bottom)]"
             onClick={onClose}
         >
+            {/* Modal Content - Bottom Sheet on Mobile, Center on Desktop */}
             <div
-                className="bg-white rounded-t-3xl w-full max-w-2xl max-h-[85vh] overflow-y-auto animate-slideUp"
+                className="w-full h-[85vh] md:h-auto md:max-h-[85vh] md:max-w-2xl bg-[#faf9f6] rounded-t-[2rem] md:rounded-3xl shadow-2xl flex flex-col overflow-hidden relative animate-slideUp"
                 onClick={(e) => e.stopPropagation()}
             >
                 {/* Header */}
-                <div className="sticky top-0 bg-white border-b border-stone-100 px-6 py-4">
-                    <div className="flex items-center justify-between mb-1">
-                        <h2 className="text-sm font-bold text-stone-400 uppercase tracking-widest">
-                            {goal ? '编辑目标' : '新建目标'}
-                        </h2>
+                <div className="flex items-center justify-between p-6 border-b border-stone-100 bg-white/50">
+                    <button onClick={onClose} className="p-2 -ml-2 hover:bg-stone-100 rounded-full text-stone-500 transition-colors">
+                        <X size={24} />
+                    </button>
+                    <h2 className="text-sm font-bold text-stone-400 uppercase tracking-widest">
+                        {goal ? '编辑目标' : '新建目标'}
+                    </h2>
+                    <div className="w-10 flex justify-end">
                         <button
-                            onClick={onClose}
-                            className="p-1.5 hover:bg-stone-100 rounded-full transition-colors"
+                            onClick={handleSave}
+                            className="p-2 -mr-2 rounded-full transition-colors"
+                            style={{ color: 'var(--accent-color)' }}
+                            onMouseEnter={(e) => {
+                                e.currentTarget.style.backgroundColor = 'rgba(0, 0, 0, 0.05)';
+                            }}
+                            onMouseLeave={(e) => {
+                                e.currentTarget.style.backgroundColor = 'transparent';
+                            }}
                         >
-                            <X size={20} className="text-stone-400" />
+                            <Check size={20} strokeWidth={2.5} />
                         </button>
                     </div>
                 </div>
 
                 {/* Form */}
-                <div className="p-6 space-y-5">
+                <div className="flex-1 overflow-y-auto px-6 py-6 space-y-8 no-scrollbar pb-60">
                     {/* 目标标题 */}
                     <div>
                         <label className="block text-xs font-medium text-stone-400 mb-2 uppercase tracking-wider">
@@ -355,12 +361,11 @@ export const GoalEditor: React.FC<GoalEditorProps> = ({ goal, scopeId, categorie
                                                         }
                                                     }}
                                                     className={`
-                                                px-2 py-2 rounded-lg text-[10px] font-medium text-center border transition-colors flex items-center justify-center gap-1.5 truncate
-                                                ${isSelected
-                                                            ? 'bg-stone-50 text-stone-500'
-                                                            : 'bg-stone-50 text-stone-500 border-stone-100 hover:bg-stone-100'}
-                                            `}
-                                                    style={isSelected ? { borderColor: 'var(--accent-color)' } : {}}
+                                                        px-2 py-2 rounded-lg text-[10px] font-medium text-center transition-colors flex items-center justify-center gap-1.5 truncate
+                                                        ${isSelected
+                                                            ? 'btn-template-filled'
+                                                            : 'bg-stone-50 text-stone-500 border border-stone-100 hover:bg-stone-100'}
+                                                    `}
                                                 >
                                                     <span>{cat.icon}</span>
                                                     <span className="truncate">{cat.name}</span>
@@ -400,138 +405,16 @@ export const GoalEditor: React.FC<GoalEditorProps> = ({ goal, scopeId, categorie
                             )}
                         </div>
                     ) : (
-                        /* 记录模式筛选 */
-                        <div className="space-y-4">
-                            <div>
-                                <div className="flex items-center justify-between mb-2">
-                                    <label className="text-xs font-medium text-stone-400 uppercase tracking-wider">
-                                        限定标签（Activity）
-                                        <span className="text-stone-300 ml-1">（可选）</span>
-                                    </label>
-                                    {/* Toggle 开关 */}
-                                    <button
-                                        type="button"
-                                        onClick={() => {
-                                            setIsFilterEnabled(!isFilterEnabled);
-                                            if (isFilterEnabled) {
-                                                // 关闭时清空选择
-                                                setFilterActivityIds([]);
-                                                setSelectedCategoryId('');
-                                            }
-                                        }}
-                                        className={`px-3 py-1 rounded-full text-[10px] font-bold transition-all ${isFilterEnabled
-                                            ? 'text-white'
-                                            : 'bg-stone-100 text-stone-500 hover:bg-stone-200'
-                                            }`}
-                                        style={isFilterEnabled ? { backgroundColor: 'var(--accent-color)' } : {}}
-                                    >
-                                        {isFilterEnabled ? '已开启' : '关闭'}
-                                    </button>
-                                </div>
-                                <p className="text-xs text-stone-500 mb-3">
-                                    仅统计选中标签的时间记录
-                                </p>
-
-                                {isFilterEnabled && (
-                                    <>
-                                        {/* Category Grid */}
-                                        <div className="grid grid-cols-4 gap-2 mb-3">
-                                            {categories.map(cat => {
-                                                const isSelected = selectedCategoryId === cat.id;
-                                                return (
-                                                    <button
-                                                        key={cat.id}
-                                                        type="button"
-                                                        onClick={() => setSelectedCategoryId(isSelected ? '' : cat.id)}
-                                                        className={`
-                                                            px-2 py-2 rounded-lg text-[10px] font-medium text-center border transition-colors flex items-center justify-center gap-1.5 truncate
-                                                            ${isSelected
-                                                                ? 'bg-stone-50 text-stone-500'
-                                                                : 'bg-stone-50 text-stone-500 border-stone-100 hover:bg-stone-100'}
-                                                        `}
-                                                        style={isSelected ? { borderColor: 'var(--accent-color)' } : {}}
-                                                    >
-                                                        <span>{cat.icon}</span>
-                                                        <span className="truncate">{cat.name}</span>
-                                                    </button>
-                                                );
-                                            })}
-                                        </div>
-
-                                        {/* Activity Grid */}
-                                        {selectedCategoryId && (
-                                            <div className="grid grid-cols-4 gap-3 pt-2 animate-in slide-in-from-top-2">
-                                                {categories
-                                                    .find(c => c.id === selectedCategoryId)
-                                                    ?.activities.map(act => {
-                                                        const isActive = filterActivityIds.includes(act.id);
-                                                        return (
-                                                            <button
-                                                                key={act.id}
-                                                                type="button"
-                                                                onClick={() => {
-                                                                    if (isActive) {
-                                                                        setFilterActivityIds(filterActivityIds.filter(id => id !== act.id));
-                                                                    } else {
-                                                                        setFilterActivityIds([...filterActivityIds, act.id]);
-                                                                    }
-                                                                }}
-                                                                className="flex flex-col items-center gap-2 p-3 rounded-xl transition-all duration-200 active:scale-95 hover:bg-stone-50"
-                                                            >
-                                                                <div 
-                                                                    className={`
-                                                            w-10 h-10 rounded-full flex items-center justify-center text-xl transition-all
-                                                            ${act.color}
-                                                        `}
-                                                                    style={isActive ? { 
-                                                                        boxShadow: `0 0 0 1px var(--accent-color), 0 0 0 3px white, 0 0 0 4px var(--accent-color)`,
-                                                                        transform: 'scale(1.1)'
-                                                                    } : {}}
-                                                                >
-                                                                    {act.icon}
-                                                                </div>
-                                                                <span className={`text-xs text-center font-medium leading-tight ${isActive ? 'text-stone-900 font-bold' : 'text-stone-400'}`}>
-                                                                    {act.name}
-                                                                </span>
-                                                            </button>
-                                                        );
-                                                    })}
-                                            </div>
-                                        )}
-
-                                        {/* Clear 按钮 */}
-                                        {filterActivityIds.length > 0 && (
-                                            <div className="flex justify-end mt-2">
-                                                <button
-                                                    type="button"
-                                                    onClick={() => setFilterActivityIds([])}
-                                                    className="text-xs font-medium text-stone-400 hover:text-red-400 transition-colors"
-                                                >
-                                                    Clear
-                                                </button>
-                                            </div>
-                                        )}
-
-                                        {/* 已选择标签提示 */}
-                                        {filterActivityIds.length > 0 && (
-                                            <div className="mt-3 text-xs text-stone-500 animate-in fade-in">
-                                                <span className="font-medium">已选择：</span>
-                                                {filterActivityIds.map((actId, index) => {
-                                                    const activity = categories
-                                                        .flatMap(c => c.activities)
-                                                        .find(a => a.id === actId);
-                                                    return activity ? (
-                                                        <span key={actId}>
-                                                            {activity.icon} {activity.name}{index < filterActivityIds.length - 1 ? '、' : ''}
-                                                        </span>
-                                                    ) : null;
-                                                })}
-                                            </div>
-                                        )}
-                                    </>
-                                )}
-
-                            </div>
+                        /* 记录模式筛选 - 使用 TagMultipleAssociation 组件 */
+                        <div>
+                            <TagMultipleAssociation
+                                categories={categories}
+                                selectedActivityIds={filterActivityIds}
+                                onChange={setFilterActivityIds}
+                                showToggle={true}
+                                toggleLabel="限定标签（Activity）"
+                                description="仅统计选中标签的时间记录"
+                            />
                         </div>
                     )}
 
@@ -549,19 +432,6 @@ export const GoalEditor: React.FC<GoalEditorProps> = ({ goal, scopeId, categorie
                             className="w-full px-3 py-2 bg-stone-50 border border-stone-200 rounded-lg text-sm text-stone-900 outline-none focus:border-stone-400 transition-colors resize-none"
                         />
                     </div>
-                </div>
-
-                {/* Footer */}
-                <div className="sticky bottom-0 bg-white border-t border-stone-100 p-6">
-                    <button
-                        onClick={handleSave}
-                        className="w-full px-6 py-4 text-white rounded-2xl font-bold text-lg transition-colors shadow-lg"
-                        style={{ backgroundColor: 'var(--accent-color)' }}
-                        onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--accent-hover)'}
-                        onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'var(--accent-color)'}
-                    >
-                        {goal ? '更新目标' : '创建目标'}
-                    </button>
                 </div>
             </div>
 

@@ -15,6 +15,7 @@ import { Check } from 'lucide-react';
 import { Category } from '../types';
 import { TIMEPAL_OPTIONS, TimePalType, getTimePalEmoji } from '../constants/timePalConfig';
 import { TIMEPAL_KEYS, storage } from '../constants/storageKeys';
+import { TagMultipleAssociation } from './TagMultipleAssociation';
 
 interface TimePalSettingsProps {
     categories: Category[];
@@ -28,18 +29,11 @@ export const TimePalSettings: React.FC<TimePalSettingsProps> = ({ categories }) 
         return saved as TimePalType;
     });
 
-    // 是否启用标签筛选
-    const [isFilterEnabled, setIsFilterEnabled] = useState<boolean>(() => {
-        return storage.getBoolean(TIMEPAL_KEYS.FILTER_ENABLED, false);
-    });
-
+    // 是否启用标签筛选（由 TagMultipleAssociation 内部管理）
     // 选中的标签 ID 列表
     const [filterActivityIds, setFilterActivityIds] = useState<string[]>(() => {
         return storage.getJSON<string[]>(TIMEPAL_KEYS.FILTER_ACTIVITIES, []);
     });
-
-    // 当前选择的分类 ID（用于展开活动列表）
-    const [selectedCategoryId, setSelectedCategoryId] = useState<string>('');
 
     // 自定义名言功能
     const [customQuotesEnabled, setCustomQuotesEnabled] = useState<boolean>(() => {
@@ -60,11 +54,9 @@ export const TimePalSettings: React.FC<TimePalSettingsProps> = ({ categories }) 
 
     // 保存筛选设置
     useEffect(() => {
-        storage.setBoolean(TIMEPAL_KEYS.FILTER_ENABLED, isFilterEnabled);
-    }, [isFilterEnabled]);
-
-    useEffect(() => {
         storage.setJSON(TIMEPAL_KEYS.FILTER_ACTIVITIES, filterActivityIds);
+        // 同时保存 enabled 状态
+        storage.setBoolean(TIMEPAL_KEYS.FILTER_ENABLED, filterActivityIds.length > 0);
     }, [filterActivityIds]);
 
     // 保存自定义名言设置
@@ -143,128 +135,15 @@ export const TimePalSettings: React.FC<TimePalSettingsProps> = ({ categories }) 
                 })}
             </div>
 
-            {/* 统计时长设置 */}
             <div className="pt-4 border-t border-stone-200 bg-white rounded-lg p-4 shadow-sm">
-                <div className="flex items-center justify-between mb-2">
-                    <label className="text-xs font-medium text-stone-400 uppercase tracking-wider">
-                        限定标签（Activity）
-                        <span className="text-stone-300 ml-1">（可选）</span>
-                    </label>
-                    {/* Toggle 开关 */}
-                    <button
-                        type="button"
-                        onClick={() => {
-                            setIsFilterEnabled(!isFilterEnabled);
-                            if (isFilterEnabled) {
-                                // 关闭时清空选择
-                                setFilterActivityIds([]);
-                                setSelectedCategoryId('');
-                            }
-                        }}
-                        className={`px-3 py-1 rounded-full text-[10px] font-bold transition-all ${isFilterEnabled
-                            ? 'bg-stone-900 text-white'
-                            : 'bg-stone-100 text-stone-500 hover:bg-stone-200'
-                            }`}
-                    >
-                        {isFilterEnabled ? '已开启' : '关闭'}
-                    </button>
-                </div>
-                <p className="text-xs text-stone-500 mb-3">
-                    仅统计选中标签的时间记录
-                </p>
-
-                {isFilterEnabled && (
-                    <>
-                        {/* Category Grid */}
-                        <div className="grid grid-cols-4 gap-2 mb-3">
-                            {categories.map(cat => {
-                                const isSelected = selectedCategoryId === cat.id;
-                                return (
-                                    <button
-                                        key={cat.id}
-                                        type="button"
-                                        onClick={() => setSelectedCategoryId(isSelected ? '' : cat.id)}
-                                        className={`
-                                            px-2 py-2 rounded-lg text-[10px] font-medium text-center border transition-colors flex items-center justify-center gap-1.5 truncate
-                                            ${isSelected
-                                                ? 'bg-stone-900 text-white border-stone-900'
-                                                : 'bg-stone-50 text-stone-500 border-stone-100 hover:bg-stone-100'}
-                                        `}
-                                    >
-                                        <span>{cat.icon}</span>
-                                        <span className="truncate">{cat.name}</span>
-                                    </button>
-                                );
-                            })}
-                        </div>
-
-                        {/* Activity Grid */}
-                        {selectedCategoryId && (
-                            <div className="grid grid-cols-4 gap-3 pt-2 animate-in slide-in-from-top-2">
-                                {categories
-                                    .find(c => c.id === selectedCategoryId)
-                                    ?.activities.map(act => {
-                                        const isActive = filterActivityIds.includes(act.id);
-                                        return (
-                                            <button
-                                                key={act.id}
-                                                type="button"
-                                                onClick={() => {
-                                                    if (isActive) {
-                                                        setFilterActivityIds(filterActivityIds.filter(id => id !== act.id));
-                                                    } else {
-                                                        setFilterActivityIds([...filterActivityIds, act.id]);
-                                                    }
-                                                }}
-                                                className="flex flex-col items-center gap-2 p-3 rounded-xl transition-all duration-200 active:scale-95 hover:bg-stone-50"
-                                            >
-                                                <div className={`
-                                                    w-10 h-10 rounded-full flex items-center justify-center text-xl transition-all
-                                                    ${isActive ? 'ring-1 ring-stone-300 ring-offset-1 scale-110' : ''}
-                                                    ${act.color}
-                                                `}>
-                                                    {act.icon}
-                                                </div>
-                                                <span className={`text-xs text-center font-medium leading-tight ${isActive ? 'text-stone-900 font-bold' : 'text-stone-400'}`}>
-                                                    {act.name}
-                                                </span>
-                                            </button>
-                                        );
-                                    })}
-                            </div>
-                        )}
-
-                        {/* Clear 按钮 */}
-                        {filterActivityIds.length > 0 && (
-                            <div className="flex justify-end mt-2">
-                                <button
-                                    type="button"
-                                    onClick={() => setFilterActivityIds([])}
-                                    className="text-xs font-medium text-stone-400 hover:text-red-400 transition-colors"
-                                >
-                                    Clear
-                                </button>
-                            </div>
-                        )}
-
-                        {/* 已选择标签提示 */}
-                        {filterActivityIds.length > 0 && (
-                            <div className="mt-3 text-xs text-stone-500 animate-in fade-in">
-                                <span className="font-medium">已选择：</span>
-                                {filterActivityIds.map((actId, index) => {
-                                    const activity = categories
-                                        .flatMap(c => c.activities)
-                                        .find(a => a.id === actId);
-                                    return activity ? (
-                                        <span key={actId}>
-                                            {activity.icon} {activity.name}{index < filterActivityIds.length - 1 ? '、' : ''}
-                                        </span>
-                                    ) : null;
-                                })}
-                            </div>
-                        )}
-                    </>
-                )}
+                <TagMultipleAssociation
+                    categories={categories}
+                    selectedActivityIds={filterActivityIds}
+                    onChange={setFilterActivityIds}
+                    showToggle={true}
+                    toggleLabel="限定标签（Activity）"
+                    description="仅统计选中标签的时间记录"
+                />
             </div>
 
             {/* 自定义名言设置 */}
