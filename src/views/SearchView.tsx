@@ -12,6 +12,7 @@ import { Search, X, ChevronLeft, FileText } from 'lucide-react';
 import { Log, Category, TodoItem, TodoCategory, Scope, Goal, DailyReview, WeeklyReview, MonthlyReview, SearchType } from '../types';
 import { useNavigation } from '../contexts/NavigationContext';
 import { IconRenderer } from '../components/IconRenderer';
+import { usePrivacy } from '../contexts/PrivacyContext';
 
 interface SearchViewProps {
     logs: Log[];
@@ -56,6 +57,7 @@ export const SearchView: React.FC<SearchViewProps> = ({
     onSelectWeeklyReview,
     onSelectMonthlyReview
 }) => {
+    const { isPrivacyMode } = usePrivacy();
     const {
         searchQuery: query, setSearchQuery: setQuery,
         searchMode, setSearchMode,
@@ -399,7 +401,7 @@ export const SearchView: React.FC<SearchViewProps> = ({
                                                     </span>
                                                 </div>
                                                 {log.note && (
-                                                    <p className="text-xs text-stone-500 line-clamp-1 ml-6">{log.note}</p>
+                                                    <p className={`text-xs text-stone-500 line-clamp-1 ml-6 ${isPrivacyMode ? 'blur-sm select-none' : ''}`}>{log.note}</p>
                                                 )}
                                             </div>
 
@@ -500,7 +502,7 @@ export const SearchView: React.FC<SearchViewProps> = ({
                                             </span>
                                         </div>
                                         {todo.note && (
-                                            <p className="text-xs text-stone-500 line-clamp-1">{todo.note}</p>
+                                            <p className={`text-xs text-stone-500 line-clamp-1 ${isPrivacyMode ? 'blur-sm select-none' : ''}`}>{todo.note}</p>
                                         )}
                                         <span className="text-[10px] text-stone-400">
                                             {category?.name}

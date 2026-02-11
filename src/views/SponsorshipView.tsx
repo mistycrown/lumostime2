@@ -579,7 +579,7 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
                                         <span className="text-base flex-shrink-0">🌟</span>
                                         <div>
                                             <p className="font-medium text-stone-700 mb-1">所有记录功能完全免费</p>
-                                            <p className="text-xs text-stone-500">应用内的功能已经非常全面，甚至超过了市面上 99% 的同类软件。我花了很多心思打磨功能，希望它能真正帮到你。</p>
+                                            <p className="text-xs text-stone-500">应用内的免费功能非常全面，基本超过了市面上 90% 的同类软件。我花了很多心思打磨功能，希望它能真正帮到你。</p>
                                         </div>
                                     </div>
 
@@ -587,7 +587,7 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
                                         <span className="text-base flex-shrink-0">🔓</span>
                                         <div>
                                             <p className="font-medium text-stone-700 mb-1">你的数据永远属于你</p>
-                                            <p className="text-xs text-stone-500">数据本地优先，随时可以导出。我采用数据本地优先的原则，绝不会为了留住用户而限制数据导出，更不会以此要挟你充值会员。</p>
+                                            <p className="text-xs text-stone-500">数据本地优先，随时可以导出。采用数据本地优先的原则，绝不会为了留住用户而限制数据导出，更不会以此要挟你充值会员。</p>
                                         </div>
                                     </div>
 

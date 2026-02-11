@@ -13,6 +13,7 @@ import { CalendarWidget } from './CalendarWidget';
 import { Clock, Zap, MessageCircle, ChevronLeft, ChevronRight, Grid, Image as ImageIcon, Hash } from 'lucide-react';
 import { TimelineImage } from './TimelineImage';
 import { IconRenderer } from './IconRenderer';
+import { usePrivacy } from '../contexts/PrivacyContext';
 
 interface DetailTimelineCardProps {
     // 数据
@@ -63,6 +64,7 @@ export const DetailTimelineCard: React.FC<DetailTimelineCardProps> = ({
     keywords = [],
     enableFocusScore = false
 }) => {
+    const { isPrivacyMode } = usePrivacy();
     const [viewMode, setViewMode] = React.useState<'month' | 'all'>(defaultViewMode);
     const [calendarViewMode, setCalendarViewMode] = React.useState<'heatmap' | 'gallery' | 'keywords'>('heatmap');
 
@@ -791,7 +793,7 @@ export const DetailTimelineCard: React.FC<DetailTimelineCardProps> = ({
                                                         </div>
                                                     </div>
                                                     {log.note && (
-                                                        <p className="text-sm text-stone-500 font-light leading-relaxed mb-2 whitespace-pre-wrap">
+                                                        <p className={`text-sm text-stone-500 font-light leading-relaxed mb-2 whitespace-pre-wrap ${isPrivacyMode ? 'blur-sm select-none' : ''}`}>
                                                             {log.note}
                                                         </p>
                                                     )}

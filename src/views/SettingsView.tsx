@@ -173,7 +173,7 @@ interface SettingsViewProps {
 
 
 export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, onImport, onReset, onClearData, onToast, syncData, onSyncUpdate, startWeekOnSunday, onToggleStartWeekOnSunday, onOpenAutoLink, onOpenSearch, minIdleTimeThreshold = 1, onSetMinIdleTimeThreshold, defaultView = 'RECORD', onSetDefaultView, defaultArchiveView = 'CHRONICLE', onSetDefaultArchiveView, defaultIndexView = 'TAGS', onSetDefaultIndexView, reviewTemplates = [], onUpdateReviewTemplates, onUpdateDailyReviews, checkTemplates = [], onUpdateCheckTemplates, dailyReviewTime, onSetDailyReviewTime, weeklyReviewTime, onSetWeeklyReviewTime, monthlyReviewTime, onSetMonthlyReviewTime, customNarrativeTemplates, onUpdateCustomNarrativeTemplates, userPersonalInfo, onSetUserPersonalInfo, logs = [], todos = [], scopes = [], currentDate = new Date(), dailyReviews = [], weeklyReviews = [], monthlyReviews = [], todoCategories = [], filters = [], onUpdateFilters, categoriesData = [], onEditLog, autoFocusNote, onToggleAutoFocusNote, timelineGalleryMode, onToggleTimelineGalleryMode }) => {
-    const { isPrivacyMode } = usePrivacy();
+    const { isPrivacyMode, togglePrivacyMode } = usePrivacy();
     // Hooks for full data access during backup
     const { logs: ctxLogs, todos: ctxTodos, todoCategories: ctxTodoCategories } = useData();
     const { categories: ctxCategories, scopes: ctxScopes, goals: ctxGoals } = useCategoryScope();
@@ -802,6 +802,8 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
                 onToast={onToast}
                 startWeekOnSunday={startWeekOnSunday}
                 onToggleStartWeekOnSunday={onToggleStartWeekOnSunday}
+                privacyMode={isPrivacyMode}
+                onTogglePrivacyMode={togglePrivacyMode}
                 dailyReviewTime={dailyReviewTime}
                 onSetDailyReviewTime={onSetDailyReviewTime}
                 weeklyReviewTime={weeklyReviewTime}
