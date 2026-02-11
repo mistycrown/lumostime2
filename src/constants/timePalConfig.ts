@@ -6,10 +6,11 @@
 // 时光小友类型
 // 注意：'none' 不在类型定义中，使用 null 或 'none' 字符串表示不使用时光小友
 export type TimePalType = 
-    | 'cat' | 'dog' | 'rabbit' | 'monkey' | 'prince' | 'chibi' | 'girl'
+    | 'cat' | 'rabbit' | 'prince' | 'girl'
     // 新增类型
-    | 'buddist' | 'cat2' | 'dog2' | 'dog3' | 'flower' | 'Ghost' | 'girl2' | 'girl3' | 'girl4'
-    | 'gui' | 'mouse' | 'panda' | 'pigen' | 'prince2' | 'rabbit2' | 'renzhe' | 'taoist' | 'zombis';
+    | 'buddist' | 'cat2' | 'dog2' | 'flower' | 'Ghost' | 'girl2' | 'girl3'
+    | 'pigen' | 'prince2' | 'taoist'
+    | 'boy' | 'boy2' | 'butterfly' | 'girl5' | 'knit' | 'paper';
 
 // 时光小友选项配置
 export interface TimePalOption {
@@ -29,34 +30,16 @@ export const TIMEPAL_OPTIONS: TimePalOption[] = [
         emoji: '🐱'
     },
     { 
-        type: 'dog', 
-        name: '小狗', 
-        preview: '/time_pal_origin/dog/1.webp',
-        emoji: '🐶'
-    },
-    { 
         type: 'rabbit', 
         name: '兔子', 
         preview: '/time_pal_origin/rabbit/1.webp',
         emoji: '🐰'
     },
     { 
-        type: 'monkey', 
-        name: '猴子', 
-        preview: '/time_pal_origin/monkey/1.webp',
-        emoji: '🐵'
-    },
-    { 
         type: 'prince', 
         name: '小王子', 
         preview: '/time_pal_origin/prince/1.webp',
         emoji: '🤴'
-    },
-    { 
-        type: 'chibi', 
-        name: 'Q版', 
-        preview: '/time_pal_origin/chibi/1.webp',
-        emoji: '👧'
     },
     { 
         type: 'girl', 
@@ -84,12 +67,6 @@ export const TIMEPAL_OPTIONS: TimePalOption[] = [
         emoji: '🐕'
     },
     { 
-        type: 'dog3', 
-        name: '小狗3', 
-        preview: '/time_pal_origin/dog3/1.webp',
-        emoji: '🐕'
-    },
-    { 
         type: 'flower', 
         name: '花朵', 
         preview: '/time_pal_origin/flower/1.webp',
@@ -114,30 +91,6 @@ export const TIMEPAL_OPTIONS: TimePalOption[] = [
         emoji: '👧'
     },
     { 
-        type: 'girl4', 
-        name: '女孩4', 
-        preview: '/time_pal_origin/girl4/1.webp',
-        emoji: '👧'
-    },
-    { 
-        type: 'gui', 
-        name: '鬼怪', 
-        preview: '/time_pal_origin/gui/1.webp',
-        emoji: '👹'
-    },
-    { 
-        type: 'mouse', 
-        name: '老鼠', 
-        preview: '/time_pal_origin/mouse/1.webp',
-        emoji: '🐭'
-    },
-    { 
-        type: 'panda', 
-        name: '熊猫', 
-        preview: '/time_pal_origin/panda/1.webp',
-        emoji: '🐼'
-    },
-    { 
         type: 'pigen', 
         name: '鸽子', 
         preview: '/time_pal_origin/pigen/1.webp',
@@ -150,28 +103,46 @@ export const TIMEPAL_OPTIONS: TimePalOption[] = [
         emoji: '🤴'
     },
     { 
-        type: 'rabbit2', 
-        name: '兔子2', 
-        preview: '/time_pal_origin/rabbit2/1.webp',
-        emoji: '🐇'
-    },
-    { 
-        type: 'renzhe', 
-        name: '忍者', 
-        preview: '/time_pal_origin/renzhe/1.webp',
-        emoji: '🥷'
-    },
-    { 
         type: 'taoist', 
         name: '道士', 
         preview: '/time_pal_origin/taoist/1.webp',
         emoji: '🧙'
     },
     { 
-        type: 'zombis', 
-        name: '僵尸', 
-        preview: '/time_pal_origin/zombis/1.webp',
-        emoji: '🧟'
+        type: 'boy', 
+        name: '男孩', 
+        preview: '/time_pal_origin/boy/1.webp',
+        emoji: '👦'
+    },
+    { 
+        type: 'boy2', 
+        name: '男孩2', 
+        preview: '/time_pal_origin/boy2/1.webp',
+        emoji: '👦'
+    },
+    { 
+        type: 'butterfly', 
+        name: '蝴蝶', 
+        preview: '/time_pal_origin/butterfly/1.webp',
+        emoji: '🦋'
+    },
+    { 
+        type: 'girl5', 
+        name: '女孩5', 
+        preview: '/time_pal_origin/girl5/1.webp',
+        emoji: '👧'
+    },
+    { 
+        type: 'knit', 
+        name: '编织', 
+        preview: '/time_pal_origin/knit/1.webp',
+        emoji: '🧶'
+    },
+    { 
+        type: 'paper', 
+        name: '纸艺', 
+        preview: '/time_pal_origin/paper/1.webp',
+        emoji: '📄'
     },
 ];
 
