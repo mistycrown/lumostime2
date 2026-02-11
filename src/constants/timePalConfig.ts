@@ -8,7 +8,7 @@
 export type TimePalType = 
     | 'cat' | 'rabbit' | 'prince' | 'girl'
     // 新增类型
-    | 'buddist' | 'cat2' | 'dog2' | 'flower' | 'Ghost' | 'girl2' | 'girl3'
+    | 'buddist' | 'cat2' | 'dog2' | 'flower' | 'Ghost' | 'girl3'
     | 'pigen' | 'prince2' | 'taoist'
     | 'boy' | 'boy2' | 'butterfly' | 'girl5' | 'knit' | 'paper';
 
@@ -77,12 +77,6 @@ export const TIMEPAL_OPTIONS: TimePalOption[] = [
         name: '幽灵', 
         preview: '/time_pal_origin/Ghost/1.webp',
         emoji: '👻'
-    },
-    { 
-        type: 'girl2', 
-        name: '女孩2', 
-        preview: '/time_pal_origin/girl2/1.webp',
-        emoji: '👧'
     },
     { 
         type: 'girl3', 
