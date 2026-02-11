@@ -114,7 +114,7 @@ const THEME_PRESETS: ThemePreset[] = [
         appIcon: 'icon_moon',
         uiTheme: 'color',
         colorScheme: 'klein-blue',
-        background: 'greenpink',
+        background: 'night',
         navigation: 'night',
         timePal: 'pigen'
     },
@@ -164,7 +164,7 @@ const THEME_PRESETS: ThemePreset[] = [
         colorScheme: 'sky-blue',
         background: 'ancient',
         navigation: 'book',
-        timePal: 'girl2'
+        timePal: 'boy2'
     },
     {
         id: 'pencil',

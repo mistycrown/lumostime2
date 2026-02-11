@@ -67,7 +67,7 @@ export const NavigationDecorationSelector: React.FC<NavigationDecorationSelector
             onToast('info', '请先选择一个装饰样式');
             return;
         }
-        (window as any).enableNavDecoDebug?.();
+        (window as any).LumosTime?.debug?.enableNavDeco?.();
         onToast('success', '调试工具已开启');
     };
 
