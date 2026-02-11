@@ -190,6 +190,7 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
     const [supporterId, setSupporterId] = useState<number | undefined>(undefined);
     const [selectedIcon, setSelectedIcon] = useState('default');
     const [isChangingIcon, setIsChangingIcon] = useState(false);
+    const [previewImage, setPreviewImage] = useState<string | null>(null); // 图片预览状态
     const redemptionService = new RedemptionService();
     const [showDonationModal, setShowDonationModal] = useState(false);
     const { uiIconTheme, setUiIconTheme, colorScheme, setColorScheme } = useSettings();
@@ -649,13 +650,14 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
                                             <li>通过付款码支付 9.9 元</li>
                                             <li>备注个人邮箱</li>
                                             <li>我人工核实后会发送兑换码</li>
-                                            <li>如果两个工作日没有回复，请通过微信联系我</li>
+                                            <li>一般每天查看，如果两个工作日没有回复，请通过微信联系我</li>
                                         </ol>
                                         <div className="mt-3 flex justify-center">
                                             <img
                                                 src="https://lumostime-1315858561.cos.ap-chongqing.myqcloud.com/%E4%BB%98%E6%AC%BE%E7%A0%81.jpg"
                                                 alt="付款码"
-                                                className="w-32 h-32 object-contain rounded-lg border border-blue-200"
+                                                className="w-32 h-32 object-contain rounded-lg border border-blue-200 cursor-pointer hover:opacity-80 transition-opacity"
+                                                onClick={() => setPreviewImage("https://lumostime-1315858561.cos.ap-chongqing.myqcloud.com/%E4%BB%98%E6%AC%BE%E7%A0%81.jpg")}
                                             />
                                         </div>
                                     </div>
@@ -670,12 +672,14 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
                                             <li>直接加我微信</li>
                                             <li>备注「lumostime」</li>
                                             <li>转账 9.9 元后我会发送兑换码</li>
+                                            <li>也欢迎反馈bug，许愿新功能，没事唠嗑也可以</li>
                                         </ol>
                                         <div className="mt-3 flex justify-center">
                                             <img
                                                 src="https://lumostime-1315858561.cos.ap-chongqing.myqcloud.com/%E5%BE%AE%E4%BF%A1%E7%A0%81.jpg"
                                                 alt="微信码"
-                                                className="w-32 h-32 object-contain rounded-lg border border-orange-200"
+                                                className="w-32 h-32 object-contain rounded-lg border border-orange-200 cursor-pointer hover:opacity-80 transition-opacity"
+                                                onClick={() => setPreviewImage("https://lumostime-1315858561.cos.ap-chongqing.myqcloud.com/%E5%BE%AE%E4%BF%A1%E7%A0%81.jpg")}
                                             />
                                         </div>
                                     </div>
@@ -685,8 +689,8 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
                                 <div className="bg-stone-50 rounded-xl p-4 border border-stone-200">
                                     <p className="text-xs text-stone-600 leading-relaxed space-y-2">
                                         <span className="block">我希望更多人使用Lumostime，远远大于我想利用软件赚钱的想法，如果喜欢，请推荐给身边的人~</span>
-                                        <span className="block">9.9 元买不了吃亏也买不了上当，这并不是在卖功能，因为同类软件的会员价格肯定不止 9.9 元。</span>
-                                        <span className="block font-medium text-stone-700">这只是一个赠送礼物，用来感谢大家的支持，软件本质还是一个普惠性质的工具。</span>
+                                        <span className="block">9.9 元不仅是解锁几套精心设计的主题，更是对一位独立开发者最大的鼓励。</span>
+                                        <span className="block font-medium text-stone-700">因为是人工操作，所以可能会有延迟，请大家耐心等待~</span>
                                     </p>
                                 </div>
                             </div>
@@ -1196,6 +1200,21 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
                 onDelete={handleDeletePreset}
                 onToast={onToast}
             />
+
+            {/* 图片预览模态框 */}
+            {previewImage && (
+                <div 
+                    className="fixed inset-0 z-[100] bg-black/80 flex items-center justify-center p-4 animate-in fade-in duration-200"
+                    onClick={() => setPreviewImage(null)}
+                >
+                    <img
+                        src={previewImage}
+                        alt="预览"
+                        className="max-w-2xl w-full h-auto rounded-lg"
+                        onClick={(e) => e.stopPropagation()}
+                    />
+                </div>
+            )}
         </div>
     );
 };
