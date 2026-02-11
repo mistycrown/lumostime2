@@ -37,11 +37,11 @@ const formatDuration = (seconds: number): string => {
 // 获取形态描述
 const getFormDescription = (level: number): string => {
     const descriptions = [
-        '刚刚苏醒',
+        '破晓时分',
         '精神饱满',
         '活力四射',
         '元气满满',
-        '超级无敌'
+        '熠熠生辉'
     ];
     return descriptions[level - 1] || descriptions[0];
 };
