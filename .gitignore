@@ -44,7 +44,7 @@ static/png_backup/
 
 # 兑换码数据库（包含所有生成的兑换码）
 redemption_codes_SECRET.json
-
+redemption_codes_SECRET.csv
 # 兑换码生成脚本（包含加密算法）
 generate_codes.py
 generate_codes_new.py
