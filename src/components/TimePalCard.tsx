@@ -223,13 +223,7 @@ export const TimePalCard: React.FC<TimePalCardProps> = ({ logs, currentDate, cat
 
     return (
         <div className="mb-4">
-            <div className={`relative bg-gradient-to-br from-white/70 to-stone-50/70 rounded-2xl border ${debugMode ? 'border-amber-400 shadow-amber-100' : 'border-stone-200'} p-4 flex items-center gap-4 transition-shadow`} style={{ boxShadow: debugMode ? '0 4px 12px 0 rgba(251, 191, 36, 0.15)' : '0 1px 3px 0 rgba(0, 0, 0, 0.05)' }}>
-                {/* 调试模式标识 */}
-                {debugMode && (
-                    <div className="absolute top-2 right-2 bg-amber-400 text-white text-[9px] font-bold px-2 py-0.5 rounded-full">
-                        调试
-                    </div>
-                )}
+            <div className="relative bg-gradient-to-br from-white/70 to-stone-50/70 rounded-2xl border border-stone-200 p-4 flex items-center gap-4 transition-shadow" style={{ boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.05)' }}>
                 {/* 左侧：小动物图片（可点击切换） */}
                 <button 
                     onClick={switchTimePal}
