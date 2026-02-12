@@ -190,7 +190,6 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
     const [supporterId, setSupporterId] = useState<number | undefined>(undefined);
     const [selectedIcon, setSelectedIcon] = useState('default');
     const [isChangingIcon, setIsChangingIcon] = useState(false);
-    const [previewImage, setPreviewImage] = useState<string | null>(null); // 图片预览状态
     const redemptionService = new RedemptionService();
     const [showDonationModal, setShowDonationModal] = useState(false);
     const { uiIconTheme, setUiIconTheme, colorScheme, setColorScheme } = useSettings();
@@ -562,145 +561,13 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
                 {!isRedeemed ? (
                     /* 兑换码输入界面 */
                     <div className="space-y-6 max-w-lg mx-auto mt-6">
-                        {/* 说明文案 */}
-                        <div className="bg-white rounded-2xl p-6 shadow-sm space-y-4">
-                            <div className="text-center space-y-2 mb-4">
-                                <div className="w-12 h-12 bg-amber-50 rounded-full flex items-center justify-center mx-auto text-amber-500">
-                                    <Fish size={24} />
-                                </div>
-                                <h3 className="font-bold text-lg text-stone-800">🎁 关于投喂解锁</h3>
-                            </div>
-
-                            <div className="space-y-4 text-sm text-stone-600 leading-relaxed">
-                                <p className="text-stone-500 text-xs">Hi，感谢你使用 Lumostime。</p>
-                                <p className="text-stone-500 text-xs">想和你分享几个坚持：</p>
-
-                                <div className="space-y-3">
-                                    <div className="flex gap-3">
-                                        <span className="text-base flex-shrink-0">🌟</span>
-                                        <div>
-                                            <p className="font-medium text-stone-700 mb-1">所有记录功能完全免费</p>
-                                            <p className="text-xs text-stone-500">应用内的免费功能非常全面，基本超过了市面上 90% 的同类软件。我花了很多心思打磨功能，希望它能真正帮到你。</p>
-                                        </div>
-                                    </div>
-
-                                    <div className="flex gap-3">
-                                        <span className="text-base flex-shrink-0">🔓</span>
-                                        <div>
-                                            <p className="font-medium text-stone-700 mb-1">你的数据永远属于你</p>
-                                            <p className="text-xs text-stone-500">数据本地优先，随时可以导出。采用数据本地优先的原则，绝不会为了留住用户而限制数据导出，更不会以此要挟你充值会员。</p>
-                                        </div>
-                                    </div>
-
-                                    <div className="flex gap-3">
-                                        <span className="text-base flex-shrink-0">✨</span>
-                                        <div>
-                                            <p className="font-medium text-stone-700 mb-1">没有开屏广告</p>
-                                            <p className="text-xs text-stone-500">应用不会添加任何开屏广告，确保你的使用体验始终保持流畅。</p>
-                                        </div>
-                                    </div>
-
-                                    <div className="flex gap-3">
-                                        <span className="text-base flex-shrink-0">🎯</span>
-                                        <div>
-                                            <p className="font-medium text-stone-700 mb-1">注重每个细节</p>
-                                            <p className="text-xs text-stone-500">我希望记录这件事能变得轻松一点，再轻松一点，让你更容易坚持下去。</p>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <div className="pt-3 border-t border-stone-100 space-y-2">
-                                    <p className="text-xs text-stone-500">我是一名个人开发者，从设计到开发，从测试到维护，从美工到宣发，所有的工作都由我一个人独立完成。全都是为爱发电！</p>
-                                    <p className="text-xs text-stone-500">如果在使用过程中遇到任何问题，还请多多反馈、多多包涵。</p>
-                                    <p className="text-xs text-stone-500">请放心使用，第一我不会跑路，第二就算我跑路了也不会影响你使用任何功能。</p>
-                                </div>
-
-                                <div className="pt-3 border-t border-stone-100 space-y-2">
-                                    <p className="text-xs text-stone-600 font-medium">如果你喜欢这个应用，欢迎投喂本mo一个小鱼干 🐟</p>
-                                    <p className="text-xs text-stone-500">投喂后，你将收到来自本mo的小礼物 🎁</p>
-                                    <p className="text-xs text-stone-500">可以用它解锁<span className="font-medium text-stone-700">自定义主题设置</span>，包括：</p>
-                                    <ul className="text-xs text-stone-500 space-y-1 pl-4">
-                                        <li>• 更换背景图片</li>
-                                        <li>• 更换导航栏样式</li>
-                                        <li>• 更换时间小友</li>
-                                        <li>• 更换应用图标</li>
-                                        <li>• 后续更多持续更新的美化功能</li>
-                                    </ul>
-                                    <p className="text-xs text-stone-500 pt-2">让你的 Lumostime 变得独一无二 🌈</p>
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* 投喂方式说明 */}
-                        <div className="bg-white rounded-2xl p-6 shadow-sm space-y-4">
-                            <div className="text-center mb-4">
-                                <h3 className="font-bold text-base text-stone-800">💝 投喂方式</h3>
-                            </div>
-
-                            <div className="space-y-4">
-                                {/* 两个通道并排显示 */}
-                                <div className="grid grid-cols-2 gap-3">
-                                    {/* 社恐通道 */}
-                                    <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl p-4 border border-blue-100">
-                                        <div className="flex items-center gap-2 mb-3">
-                                            <span className="text-lg">🤫</span>
-                                            <h4 className="font-bold text-stone-800 text-sm">社恐通道</h4>
-                                        </div>
-                                        <ol className="text-xs text-stone-600 space-y-1.5 pl-4 list-decimal">
-                                            <li>通过付款码支付 9.9 元</li>
-                                            <li>备注个人邮箱</li>
-                                            <li>我人工核实后会发送兑换码</li>
-                                            <li>一般每天查看，如果两个工作日没有回复，请通过微信联系我</li>
-                                        </ol>
-                                        <div className="mt-3 flex justify-center">
-                                            <img
-                                                src="https://lumostime-1315858561.cos.ap-chongqing.myqcloud.com/%E4%BB%98%E6%AC%BE%E7%A0%81.jpg"
-                                                alt="付款码"
-                                                className="w-32 h-32 object-contain rounded-lg border border-blue-200 cursor-pointer hover:opacity-80 transition-opacity"
-                                                onClick={() => setPreviewImage("https://lumostime-1315858561.cos.ap-chongqing.myqcloud.com/%E4%BB%98%E6%AC%BE%E7%A0%81.jpg")}
-                                            />
-                                        </div>
-                                    </div>
-
-                                    {/* 社牛通道 */}
-                                    <div className="bg-gradient-to-br from-orange-50 to-amber-50 rounded-xl p-4 border border-orange-100">
-                                        <div className="flex items-center gap-2 mb-3">
-                                            <span className="text-lg">🎉</span>
-                                            <h4 className="font-bold text-stone-800 text-sm">社牛通道</h4>
-                                        </div>
-                                        <ol className="text-xs text-stone-600 space-y-1.5 pl-4 list-decimal">
-                                            <li>直接加我微信</li>
-                                            <li>备注「lumostime」</li>
-                                            <li>转账 9.9 元后我会发送兑换码</li>
-                                            <li>也欢迎反馈bug，许愿新功能，没事唠嗑也可以</li>
-                                        </ol>
-                                        <div className="mt-3 flex justify-center">
-                                            <img
-                                                src="https://lumostime-1315858561.cos.ap-chongqing.myqcloud.com/%E5%BE%AE%E4%BF%A1%E7%A0%81.jpg"
-                                                alt="微信码"
-                                                className="w-32 h-32 object-contain rounded-lg border border-orange-200 cursor-pointer hover:opacity-80 transition-opacity"
-                                                onClick={() => setPreviewImage("https://lumostime-1315858561.cos.ap-chongqing.myqcloud.com/%E5%BE%AE%E4%BF%A1%E7%A0%81.jpg")}
-                                            />
-                                        </div>
-                                    </div>
-                                </div>
-
-                                {/* 温馨提示 */}
-                                <div className="bg-stone-50 rounded-xl p-4 border border-stone-200">
-                                    <p className="text-xs text-stone-600 leading-relaxed space-y-2">
-                                        <span className="block">我希望更多人使用Lumostime，远远大于我想利用软件赚钱的想法，如果喜欢，请推荐给身边的人~</span>
-                                        <span className="block">9.9 元不仅是解锁几套精心设计的主题，更是对一位独立开发者最大的鼓励。</span>
-                                        <span className="block font-medium text-stone-700">因为是人工操作，所以可能会有延迟，请大家耐心等待~</span>
-                                    </p>
-                                </div>
-                            </div>
-                        </div>
-
                         {/* 兑换码输入 */}
                         <div className="bg-white rounded-2xl p-6 shadow-sm space-y-4">
                             <div className="text-center space-y-2">
-                                <h3 className="font-bold text-base text-stone-800">请输入兑换码</h3>
-                                <p className="text-xs text-stone-500">解锁专属投喂功能</p>
+                                <div className="w-12 h-12 bg-amber-50 rounded-full flex items-center justify-center mx-auto text-amber-500">
+                                    <Fish size={24} />
+                                </div>
+                                <h3 className="font-bold text-lg text-stone-800">请输入兑换码</h3>
                             </div>
 
                             <div className="space-y-3">
@@ -726,9 +593,35 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
                                             验证中...
                                         </span>
                                     ) : (
-                                        '解锁功能'
+                                        '确定'
                                     )}
                                 </button>
+                            </div>
+
+                            {/* 获取兑换码说明 */}
+                            <div className="pt-4 border-t border-stone-100 space-y-2">
+                                <p className="text-xs text-stone-600 text-center">
+                                    如何获取兑换码？
+                                    <a 
+                                        href="https://my.feishu.cn/wiki/QdlZw1vVai8DJakKvOzclKQ0nPk" 
+                                        target="_blank" 
+                                        rel="noopener noreferrer"
+                                        className="text-blue-600 hover:text-blue-700 underline ml-1"
+                                    >
+                                        请见链接
+                                    </a>
+                                </p>
+                                <p className="text-xs text-stone-600 text-center">
+                                    想看看主题效果？
+                                    <a 
+                                        href="https://my.feishu.cn/wiki/NlLSwoz7cidKm4kPqeqcjsQHnKe" 
+                                        target="_blank" 
+                                        rel="noopener noreferrer"
+                                        className="text-blue-600 hover:text-blue-700 underline ml-1"
+                                    >
+                                        主题预览
+                                    </a>
+                                </p>
                             </div>
                         </div>
                     </div>
@@ -1200,21 +1093,6 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
                 onDelete={handleDeletePreset}
                 onToast={onToast}
             />
-
-            {/* 图片预览模态框 */}
-            {previewImage && (
-                <div 
-                    className="fixed inset-0 z-[100] bg-black/80 flex items-center justify-center p-4 animate-in fade-in duration-200"
-                    onClick={() => setPreviewImage(null)}
-                >
-                    <img
-                        src={previewImage}
-                        alt="预览"
-                        className="max-w-2xl w-full h-auto rounded-lg"
-                        onClick={(e) => e.stopPropagation()}
-                    />
-                </div>
-            )}
         </div>
     );
 };

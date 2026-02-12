@@ -28,6 +28,24 @@ interface UserGuideViewProps {
     onBack: () => void;
 }
 
+// 处理高亮语法的辅助函数
+const processHighlight = (text: string) => {
+    const parts = text.split(/(==.+?==)/g);
+    return parts.map((part, index) => {
+        if (part.startsWith('==') && part.endsWith('==')) {
+            return (
+                <span
+                    key={index}
+                    className="text-amber-700 bg-amber-50 px-2 py-0.5 rounded text-sm font-mono border border-amber-100"
+                >
+                    {part.slice(2, -2)}
+                </span>
+            );
+        }
+        return part;
+    });
+};
+
 interface GuideSection {
     id: string;
     title: string;
@@ -44,7 +62,7 @@ const guideSections: GuideSection[] = [
     { id: '05', title: '数据统计', content: dataStatistics, icon: '📊' },
     { id: '06', title: '回顾与复盘', content: dailyReview, icon: '📝' },
     { id: '07', title: '搜索与数据管理', content: search, icon: '🔍' },
-    { id: '08', title: '数据同步与管理', content: dataSync, icon: '☁️' },
+    { id: '08', title: '数据同步与导出', content: dataSync, icon: '☁️' },
     { id: '09', title: '个性化设置', content: personalization, icon: '🎨' },
 ];
 
@@ -83,18 +101,24 @@ export const UserGuideView: React.FC<UserGuideViewProps> = ({ onBack }) => {
                                     h3: ({ node, ...props }) => (
                                         <h3 className="text-lg font-bold text-stone-700 mt-8 mb-3" {...props} />
                                     ),
-                                    p: ({ node, ...props }) => (
-                                        <p className="text-stone-600 leading-[1.8] my-4 text-[15px]" {...props} />
+                                    p: ({ node, children, ...props }) => (
+                                        <p className="text-stone-600 leading-[1.8] my-4 text-[15px] break-words" {...props}>
+                                            {React.Children.map(children, child => 
+                                                typeof child === 'string' ? processHighlight(child) : child
+                                            )}
+                                        </p>
                                     ),
                                     ul: ({ node, ...props }) => (
-                                        <ul className="my-4 space-y-2.5 pl-0" {...props} />
+                                        <ul className="my-4 space-y-2.5 pl-0 break-words" {...props} />
                                     ),
                                     ol: ({ node, ...props }) => (
-                                        <ol className="my-4 space-y-2.5 pl-6 list-decimal" {...props} />
+                                        <ol className="my-4 space-y-2.5 pl-6 list-decimal break-words" {...props} />
                                     ),
                                     li: ({ node, children, ...props }) => (
-                                        <li className="text-stone-600 text-[15px] leading-relaxed pl-6 relative before:content-['•'] before:absolute before:left-0 before:text-amber-500 before:font-bold before:text-lg" {...props}>
-                                            {children}
+                                        <li className="text-stone-600 text-[15px] leading-relaxed pl-6 relative before:content-['•'] before:absolute before:left-0 before:text-amber-500 before:font-bold before:text-lg break-words" {...props}>
+                                            {React.Children.map(children, child => 
+                                                typeof child === 'string' ? processHighlight(child) : child
+                                            )}
                                         </li>
                                     ),
                                     strong: ({ node, ...props }) => (
@@ -102,11 +126,14 @@ export const UserGuideView: React.FC<UserGuideViewProps> = ({ onBack }) => {
                                     ),
                                     code: ({ node, inline, className, children, ...props }: any) =>
                                         inline ? (
-                                            <code className="text-amber-700 bg-amber-50 px-2 py-0.5 rounded text-sm font-mono border border-amber-100" {...props}>
+                                            <span 
+                                                className="text-amber-700 bg-amber-50 px-2 py-0.5 rounded text-sm font-mono border border-amber-100 whitespace-nowrap"
+                                                {...props}
+                                            >
                                                 {children}
-                                            </code>
+                                            </span>
                                         ) : (
-                                            <code className="block bg-stone-50 border border-stone-200 rounded-xl p-5 text-sm font-mono leading-relaxed shadow-sm" {...props}>
+                                            <code className="block bg-stone-50 border border-stone-200 rounded-xl p-5 text-sm font-mono leading-relaxed shadow-sm overflow-x-auto" style={{ wordBreak: 'break-all', whiteSpace: 'pre-wrap' }} {...props}>
                                                 {children}
                                             </code>
                                         ),
