@@ -37,6 +37,7 @@ export const useSyncManager = () => {
     const { categories, setCategories, scopes, setScopes, goals, setGoals } = useCategoryScope();
     const {
         reviewTemplates, setReviewTemplates,
+        checkTemplates, setCheckTemplates,
         dailyReviews, setDailyReviews,
         weeklyReviews, setWeeklyReviews,
         monthlyReviews, setMonthlyReviews
@@ -63,6 +64,7 @@ export const useSyncManager = () => {
             if (data.goals) setGoals(data.goals);
             if (data.autoLinkRules) setAutoLinkRules(data.autoLinkRules);
             if (data.reviewTemplates) setReviewTemplates(data.reviewTemplates);
+            if (data.checkTemplates) setCheckTemplates(data.checkTemplates);
             if (data.dailyReviews) setDailyReviews(data.dailyReviews);
             if (data.weeklyReviews) setWeeklyReviews(data.weeklyReviews);
             if (data.monthlyReviews) setMonthlyReviews(data.monthlyReviews);
@@ -129,7 +131,7 @@ export const useSyncManager = () => {
     const getFullLocalData = () => {
         const localData = {
             logs, todos, categories, todoCategories, scopes, goals,
-            autoLinkRules, reviewTemplates, dailyReviews, weeklyReviews,
+            autoLinkRules, reviewTemplates, checkTemplates, dailyReviews, weeklyReviews,
             monthlyReviews, customNarrativeTemplates, userPersonalInfo, filters,
             version: '1.0.0',
             timestamp: localDataTimestamp // Use the tracking timestamp
@@ -440,7 +442,7 @@ export const useSyncManager = () => {
             clearTimeout(timer);
             // Don't clear the pending flag here, only clear it when sync completes or is skipped
         };
-    }, [logs, todos, categories, todoCategories, scopes, goals, autoLinkRules, reviewTemplates, dailyReviews, weeklyReviews, monthlyReviews, customNarrativeTemplates, userPersonalInfo, filters]); // Removed lastSyncTime to prevent potential loops
+    }, [logs, todos, categories, todoCategories, scopes, goals, autoLinkRules, reviewTemplates, checkTemplates, dailyReviews, weeklyReviews, monthlyReviews, customNarrativeTemplates, userPersonalInfo, filters]); // Removed lastSyncTime to prevent potential loops
 
     // 3. Image Auto Sync Listeners
     useEffect(() => {
@@ -568,7 +570,7 @@ export const useSyncManager = () => {
             if (appListener) appListener.remove();
             document.removeEventListener('visibilitychange', handleVisibilityChange);
         };
-    }, [logs, todos, categories, todoCategories, scopes, goals, autoLinkRules, reviewTemplates, dailyReviews, weeklyReviews, monthlyReviews, customNarrativeTemplates, userPersonalInfo, dataLastModified]); // Add dataLastModified dependancy
+    }, [logs, todos, categories, todoCategories, scopes, goals, autoLinkRules, reviewTemplates, checkTemplates, dailyReviews, weeklyReviews, monthlyReviews, customNarrativeTemplates, userPersonalInfo, dataLastModified]); // Add dataLastModified dependancy
 
     return {
         isSyncing,

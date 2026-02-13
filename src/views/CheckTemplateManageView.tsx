@@ -18,12 +18,10 @@ import {
     ArrowDown,
     Save,
     Database,
-    AlertCircle,
-    Palette
+    AlertCircle
 } from 'lucide-react';
 import { CheckTemplate } from '../types';
 import { ConfirmModal } from '../components/ConfirmModal';
-import { UIIconSelector } from '../components/UIIconSelector';
 import { IconRenderer } from '../components/IconRenderer';
 import { useSettings } from '../contexts/SettingsContext';
 import { scanCheckItems, batchRenameCheckItems, batchDeleteCheckItems } from '../utils/checkItemBatchOperations';
@@ -41,11 +39,6 @@ export const CheckTemplateManageView: React.FC<CheckTemplateManageViewProps> = (
     const [editingTemplateId, setEditingTemplateId] = useState<string | null>(null);
     const [templateForm, setTemplateForm] = useState<CheckTemplate | null>(null);
     const [deletingTemplateId, setDeletingTemplateId] = useState<string | null>(null);
-    const [showIconSelector, setShowIconSelector] = useState(false);
-    
-    // 获取当前 UI 图标主题
-    const { uiIconTheme } = useSettings();
-    const isCustomThemeEnabled = uiIconTheme !== 'default';
 
     // Batch Modify State
     const [showBatchModal, setShowBatchModal] = useState(false);
@@ -55,6 +48,15 @@ export const CheckTemplateManageView: React.FC<CheckTemplateManageViewProps> = (
     const [batchResult, setBatchResult] = useState<string | null>(null);
     const [batchStep, setBatchStep] = useState<'input' | 'confirm'>('input');
     const [scanCount, setScanCount] = useState(0);
+
+    // 模板修改检测状态
+    const [showRenameConfirmModal, setShowRenameConfirmModal] = useState(false);
+    const [pendingRenames, setPendingRenames] = useState<Array<{
+        oldContent: string;
+        newContent: string;
+        matchCount: number;
+    }>>([]);
+    const [pendingTemplate, setPendingTemplate] = useState<CheckTemplate | null>(null);
 
     // Reset when tab/modal changes
     React.useEffect(() => {
@@ -101,6 +103,51 @@ export const CheckTemplateManageView: React.FC<CheckTemplateManageViewProps> = (
         const cleanItems = templateForm.items.filter(i => !!i.content.trim());
         const finalTemplate = { ...templateForm, items: cleanItems };
 
+        // 如果是编辑已存在的模板，检测日课条目是否被修改
+        if (editingTemplateId !== 'NEW') {
+            const originalTemplate = templates.find(t => t.id === finalTemplate.id);
+            if (originalTemplate) {
+                // 检测哪些条目被修改了
+                const modifiedItems: Array<{ oldContent: string; newContent: string; matchCount: number }> = [];
+                
+                // 创建原始条目的映射（通过 id）
+                const originalItemsMap = new Map(
+                    originalTemplate.items.map(item => [item.id, item.content])
+                );
+
+                // 检查每个当前条目
+                finalTemplate.items.forEach(item => {
+                    const originalContent = originalItemsMap.get(item.id);
+                    // 如果找到了原始内容，且内容发生了变化
+                    if (originalContent && originalContent !== item.content) {
+                        // 扫描历史数据中是否存在旧内容
+                        const scanResult = scanCheckItems(props.dailyReviews, originalContent);
+                        if (scanResult.totalMatches > 0) {
+                            modifiedItems.push({
+                                oldContent: originalContent,
+                                newContent: item.content,
+                                matchCount: scanResult.totalMatches
+                            });
+                        }
+                    }
+                });
+
+                // 如果有修改且历史数据中存在旧条目，显示确认对话框
+                if (modifiedItems.length > 0) {
+                    setPendingRenames(modifiedItems);
+                    setPendingTemplate(finalTemplate);
+                    setShowRenameConfirmModal(true);
+                    return; // 等待用户确认
+                }
+            }
+        }
+
+        // 没有需要处理的修改，直接保存
+        saveTemplateDirectly(finalTemplate);
+    };
+
+    // 直接保存模板（不检测修改）
+    const saveTemplateDirectly = (finalTemplate: CheckTemplate) => {
         if (editingTemplateId === 'NEW') {
             onUpdateTemplates([...templates, finalTemplate]);
         } else {
@@ -110,6 +157,47 @@ export const CheckTemplateManageView: React.FC<CheckTemplateManageViewProps> = (
         setEditingTemplateId(null);
         setTemplateForm(null);
         setErrors({});
+    };
+
+    // 确认批量重命名历史数据
+    const handleConfirmBatchRename = () => {
+        if (!pendingTemplate || pendingRenames.length === 0) return;
+
+        // 执行所有批量重命名操作
+        let updatedReviews = [...props.dailyReviews];
+        let totalAffected = 0;
+
+        pendingRenames.forEach(({ oldContent, newContent }) => {
+            const result = batchRenameCheckItems(updatedReviews, oldContent, newContent);
+            updatedReviews = result.updatedReviews;
+            totalAffected += result.affectedCount;
+        });
+
+        // 更新日报数据
+        if (totalAffected > 0) {
+            props.onBatchUpdateDailyReviewItems(updatedReviews);
+        }
+
+        // 保存模板
+        saveTemplateDirectly(pendingTemplate);
+
+        // 清理状态
+        setShowRenameConfirmModal(false);
+        setPendingRenames([]);
+        setPendingTemplate(null);
+    };
+
+    // 跳过批量重命名，仅保存模板
+    const handleSkipBatchRename = () => {
+        if (!pendingTemplate) return;
+
+        // 直接保存模板
+        saveTemplateDirectly(pendingTemplate);
+
+        // 清理状态
+        setShowRenameConfirmModal(false);
+        setPendingRenames([]);
+        setPendingTemplate(null);
     };
 
     // Cancel edit
@@ -343,59 +431,21 @@ export const CheckTemplateManageView: React.FC<CheckTemplateManageViewProps> = (
                             {/* Title with Icon */}
                             <div>
                                 <label className="block text-xs font-bold text-stone-500 mb-1.5 uppercase tracking-wider">模板名称</label>
-                                <div className="flex items-center gap-2">
-                                    <input
-                                        type="text"
-                                        value={`${templateForm.icon || ''}${templateForm.title}`}
-                                        onChange={(e) => {
-                                            const val = e.target.value;
-                                            const firstChar = Array.from(val)[0] || '';
-                                            const icon = firstChar;
-                                            const title = val.slice(firstChar.length).trim();
-                                            setTemplateForm({ ...templateForm, icon, title });
-                                        }}
-                                        className={`flex-1 bg-stone-50 border ${errors.title ? 'border-red-300 focus:border-red-500' : 'border-stone-200 focus:border-stone-400'} rounded-xl px-4 py-2.5 text-sm outline-none transition-colors`}
-                                        placeholder="📝 输入模板名称 (首字符作为图标)..."
-                                    />
-                                    {isCustomThemeEnabled && (
-                                        <button
-                                            onClick={() => setShowIconSelector(!showIconSelector)}
-                                            className="w-8 h-8 flex items-center justify-center border border-stone-200 rounded-lg hover:bg-stone-50 transition-colors"
-                                            title="选择 UI 图标"
-                                        >
-                                            {templateForm.uiIcon ? (
-                                                <IconRenderer 
-                                                    icon={templateForm.icon || '📝'} 
-                                                    uiIcon={templateForm.uiIcon}
-                                                    className="text-base"
-                                                />
-                                            ) : (
-                                                <Palette size={16} className="text-stone-400" />
-                                            )}
-                                        </button>
-                                    )}
-                                </div>
+                                <input
+                                    type="text"
+                                    value={`${templateForm.icon || ''}${templateForm.title}`}
+                                    onChange={(e) => {
+                                        const val = e.target.value;
+                                        const firstChar = Array.from(val)[0] || '';
+                                        const icon = firstChar;
+                                        const title = val.slice(firstChar.length).trim();
+                                        setTemplateForm({ ...templateForm, icon, title });
+                                    }}
+                                    className={`w-full bg-stone-50 border ${errors.title ? 'border-red-300 focus:border-red-500' : 'border-stone-200 focus:border-stone-400'} rounded-xl px-4 py-2.5 text-sm outline-none transition-colors`}
+                                    placeholder="📝 输入模板名称 (首字符作为图标)..."
+                                />
                                 {errors.title && <p className="text-xs text-red-500 mt-1">{errors.title}</p>}
                             </div>
-
-                            {/* UI Icon Selector - 仅在启用自定义主题时显示 */}
-                            {isCustomThemeEnabled && showIconSelector && (
-                                <div>
-                                    <label className="text-xs text-stone-400 font-medium mb-2 block">
-                                        UI 图标
-                                        <span className="text-stone-300 ml-1">(可选)</span>
-                                    </label>
-                                    <UIIconSelector
-                                        currentIcon={templateForm.icon || '📝'}
-                                        currentUiIcon={templateForm.uiIcon}
-                                        onSelectDual={(emoji, uiIcon) => {
-                                            // 只更新 uiIcon 字段，不修改 icon（emoji）
-                                            setTemplateForm({ ...templateForm, uiIcon });
-                                            setShowIconSelector(false);
-                                        }}
-                                    />
-                                </div>
-                            )}
 
                             {/* Items */}
                             <div>
@@ -543,6 +593,64 @@ export const CheckTemplateManageView: React.FC<CheckTemplateManageViewProps> = (
                                     </>
                                 )}
                             </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* 批量重命名确认模态框 */}
+            {showRenameConfirmModal && (
+                <div className="fixed inset-0 z-[70] bg-black/50 flex items-center justify-center p-4">
+                    <div className="bg-white rounded-2xl w-full max-w-md shadow-xl animate-in fade-in zoom-in-95 duration-200 overflow-hidden">
+                        <div className="p-4 border-b border-stone-100 flex justify-between items-center bg-amber-50/50">
+                            <div className="flex items-center gap-2">
+                                <AlertCircle size={20} className="text-amber-600" />
+                                <h3 className="font-bold text-stone-800">检测到日课条目修改</h3>
+                            </div>
+                            <button 
+                                onClick={() => setShowRenameConfirmModal(false)} 
+                                className="text-stone-400 hover:text-stone-600"
+                            >
+                                <X size={20} />
+                            </button>
+                        </div>
+
+                        <div className="p-5 space-y-4">
+                            <div className="bg-amber-50 text-amber-700 text-xs p-3 rounded-xl flex gap-2 items-start">
+                                <AlertCircle size={14} className="shrink-0 mt-0.5" />
+                                <p>
+                                    您修改了日课模板中的条目名称。为了保持数据一致性，建议将历史日报中的旧条目批量更新为新名称，
+                                    否则可能导致统计数据分散。
+                                </p>
+                            </div>
+
+                            <div className="bg-stone-50 rounded-xl p-4 text-center">
+                                <div className="text-2xl font-bold text-stone-800 mb-1">
+                                    {pendingRenames.reduce((sum, item) => sum + item.matchCount, 0)}
+                                </div>
+                                <div className="text-xs text-stone-500">
+                                    历史数据中找到 {pendingRenames.reduce((sum, item) => sum + item.matchCount, 0)} 条记录
+                                </div>
+                                <div className="text-xs text-stone-400 mt-2">
+                                    涉及 {pendingRenames.length} 个条目的修改
+                                </div>
+                            </div>
+
+                            <div className="pt-2 space-y-2">
+                                <button
+                                    onClick={handleConfirmBatchRename}
+                                    className="w-full py-2.5 rounded-xl text-sm font-bold text-white bg-stone-800 hover:bg-stone-700 shadow-lg shadow-stone-200 transition-all active:scale-[0.98] flex items-center justify-center gap-2"
+                                >
+                                    <Edit2 size={14} />
+                                    批量更新历史数据并保存
+                                </button>
+                                <button
+                                    onClick={handleSkipBatchRename}
+                                    className="w-full py-2.5 rounded-xl text-sm font-bold text-stone-600 bg-stone-100 hover:bg-stone-200 transition-all active:scale-[0.98]"
+                                >
+                                    跳过，仅保存模板
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>

@@ -123,7 +123,7 @@ const AppContent: React.FC = () => {
   const handleExportData = () => {
     const data = {
       logs, todos, categories, todoCategories, scopes, goals,
-      autoLinkRules, reviewTemplates, dailyReviews, weeklyReviews,
+      autoLinkRules, reviewTemplates, checkTemplates, dailyReviews, weeklyReviews,
       monthlyReviews, customNarrativeTemplates, userPersonalInfo, filters,
       version: '1.0.0',
       timestamp: Date.now()
@@ -466,6 +466,7 @@ const AppContent: React.FC = () => {
             goals,
             autoLinkRules,
             reviewTemplates,
+            checkTemplates,
             dailyReviews,
             weeklyReviews,
             monthlyReviews,
@@ -508,6 +509,8 @@ const AppContent: React.FC = () => {
 
           checkTemplates={checkTemplates}
           onUpdateCheckTemplates={setCheckTemplates}
+
+          onUpdateDailyReviews={setDailyReviews}
 
           dailyReviewTime={dailyReviewTime}
           onSetDailyReviewTime={setDailyReviewTime}
