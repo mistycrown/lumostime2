@@ -67,9 +67,27 @@ export const DetailTimelineCard: React.FC<DetailTimelineCardProps> = ({
     const { isPrivacyMode } = usePrivacy();
     const [viewMode, setViewMode] = React.useState<'month' | 'all'>(defaultViewMode);
     const [calendarViewMode, setCalendarViewMode] = React.useState<'heatmap' | 'gallery' | 'keywords'>('heatmap');
+    
+    // 用于存储日期对应的 DOM 元素引用
+    const dateRefs = React.useRef<Map<number, HTMLDivElement>>(new Map());
 
     const displayMonth = displayDate.getMonth();
     const displayYear = displayDate.getFullYear();
+    
+    // 处理日期点击，滚动到对应的时间轴记录
+    const handleDayClick = React.useCallback((date: Date) => {
+        const timestamp = new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
+        const element = dateRefs.current.get(timestamp);
+        
+        if (element) {
+            // 滚动到对应的日期记录，带平滑动画
+            element.scrollIntoView({ 
+                behavior: 'smooth', 
+                block: 'start',
+                inline: 'nearest'
+            });
+        }
+    }, []);
     
     // 关键字颜色系统
     const KEYWORD_COLORS = [
@@ -382,7 +400,8 @@ export const DetailTimelineCard: React.FC<DetailTimelineCardProps> = ({
                                         cells.push(
                                             <div
                                                 key={day}
-                                                className="aspect-square rounded-lg overflow-hidden relative"
+                                                className="aspect-square rounded-lg overflow-hidden relative cursor-pointer"
+                                                onClick={() => handleDayClick(new Date(year, month, day))}
                                             >
                                                 {matchedKeywords.size === 0 ? (
                                                     // 无匹配关键字：灰色
@@ -414,6 +433,7 @@ export const DetailTimelineCard: React.FC<DetailTimelineCardProps> = ({
                                             <div
                                                 key={day}
                                                 className="aspect-square rounded-lg overflow-hidden relative group cursor-pointer"
+                                                onClick={() => handleDayClick(new Date(year, month, day))}
                                             >
                                                 {firstImage ? (
                                                     // 有图片：显示第一张图片，日期居中
@@ -447,10 +467,11 @@ export const DetailTimelineCard: React.FC<DetailTimelineCardProps> = ({
                                         cells.push(
                                             <div
                                                 key={day}
-                                                className={`aspect-square rounded-lg flex items-center justify-center transition-colors ${colors.useTheme ? '' : colors.bg} ${colors.text}`}
+                                                className={`aspect-square rounded-lg flex items-center justify-center transition-colors cursor-pointer ${colors.useTheme ? '' : colors.bg} ${colors.text}`}
                                                 style={colors.useTheme ? {
                                                     backgroundColor: `color-mix(in srgb, var(--progress-bar-fill) ${colors.opacity * 100}%, transparent)`
                                                 } : undefined}
+                                                onClick={() => handleDayClick(new Date(year, month, day))}
                                             >
                                                 <span className="text-sm font-medium">{day}</span>
                                             </div>
@@ -718,7 +739,17 @@ export const DetailTimelineCard: React.FC<DetailTimelineCardProps> = ({
                         const weekDay = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'][date.getDay()];
 
                         return (
-                            <div key={timestamp} className="flex flex-col gap-3 group">
+                            <div 
+                                key={timestamp} 
+                                className="flex flex-col gap-3 group"
+                                ref={(el) => {
+                                    if (el) {
+                                        dateRefs.current.set(timestamp, el);
+                                    } else {
+                                        dateRefs.current.delete(timestamp);
+                                    }
+                                }}
+                            >
                                 <div className="flex justify-between items-end border-b border-stone-100 pb-2">
                                     <div className="flex items-baseline gap-2">
                                         <span className="text-lg font-bold text-stone-800 font-mono">

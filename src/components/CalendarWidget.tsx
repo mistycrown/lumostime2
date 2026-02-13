@@ -30,9 +30,10 @@ interface CalendarWidgetProps {
     hideTopBar?: boolean; // 隐藏顶部栏（用于详情页面）
     galleryMode?: boolean; // 画廊模式：显示每天的第一张图片
     todos?: any[]; // 待办列表（用于获取 Cover Image）
+    onDayClick?: (date: Date) => void; // 点击日期时的回调（用于跳转到时间轴）
 }
 
-export const CalendarWidget: React.FC<CalendarWidgetProps> = ({ currentDate, onDateChange, logs = [], isExpanded, onExpandToggle, extraHeaderControls, disableSelection, customScale, heatmapMode, staticMode, preventCollapse, onResetView, startWeekOnSunday = false, renderCustomDay, hideTopBar = false, galleryMode = false, todos = [] }) => {
+export const CalendarWidget: React.FC<CalendarWidgetProps> = ({ currentDate, onDateChange, logs = [], isExpanded, onExpandToggle, extraHeaderControls, disableSelection, customScale, heatmapMode, staticMode, preventCollapse, onResetView, startWeekOnSunday = false, renderCustomDay, hideTopBar = false, galleryMode = false, todos = [], onDayClick }) => {
     const [viewMode, setViewMode] = useState<'calendar' | 'month_year'>('calendar');
 
     // ... (keep existing helper functions)
@@ -195,7 +196,12 @@ export const CalendarWidget: React.FC<CalendarWidgetProps> = ({ currentDate, onD
                             return (
                                 <button
                                     key={idx}
-                                    onClick={() => onDateChange(day)}
+                                    onClick={() => {
+                                        onDateChange(day);
+                                        if (onDayClick) {
+                                            onDayClick(day);
+                                        }
+                                    }}
                                     className={`
                                         w-12 h-14 rounded-xl transition-all duration-300 active:scale-95 relative group
                                         ${selected
@@ -316,6 +322,9 @@ export const CalendarWidget: React.FC<CalendarWidgetProps> = ({ currentDate, onD
                                                         if (!preventCollapse) {
                                                             onExpandToggle();
                                                         }
+                                                        if (onDayClick) {
+                                                            onDayClick(day);
+                                                        }
                                                     }}
                                                     className="w-9 h-9 rounded-lg overflow-hidden relative transition-all active:scale-90"
                                                 >
@@ -347,6 +356,9 @@ export const CalendarWidget: React.FC<CalendarWidgetProps> = ({ currentDate, onD
                                                         }
                                                         if (!preventCollapse) {
                                                             onExpandToggle();
+                                                        }
+                                                        if (onDayClick) {
+                                                            onDayClick(day);
                                                         }
                                                     }}
                                                     className={`w-9 h-9 rounded-lg flex items-center justify-center text-sm font-medium transition-all active:scale-90 ${
@@ -447,6 +459,9 @@ export const CalendarWidget: React.FC<CalendarWidgetProps> = ({ currentDate, onD
                                                     // If preventCollapse, we should NOT collapse.
                                                     if (!preventCollapse) {
                                                         onExpandToggle();
+                                                    }
+                                                    if (onDayClick) {
+                                                        onDayClick(day);
                                                     }
                                                 }}
                                                 className={`
