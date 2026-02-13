@@ -4,7 +4,7 @@
  */
 import React, { useState, useRef, useEffect } from 'react';
 import { ChevronLeft, Download, Palette, Layout } from 'lucide-react';
-import html2canvas from 'html2canvas';
+import { toPng } from 'html-to-image';
 import { Log } from '../types';
 import { SHARE_THEMES, SHARE_TEMPLATES } from '../components/ShareCard/constants';
 import { ShareCardContent } from '../components/ShareCard/types';
@@ -96,31 +96,25 @@ export const ShareView: React.FC<ShareViewProps> = ({ log, onBack }) => {
     
     setIsExporting(true);
     try {
-      // Wait for images to be fully rendered
-      await new Promise(r => setTimeout(r, 500));
+      // Increased delay to 300ms to allow fonts and layout to settle completely before capture
+      await new Promise(r => setTimeout(r, 300));
 
-      // Use html2canvas which handles Base64 images better
-      const canvas = await html2canvas(previewRef.current, {
-        backgroundColor: activeTheme.backgroundColor,
-        scale: 2, // High quality
-        useCORS: false, // Don't use CORS for Base64 images
-        allowTaint: true, // Allow tainted canvas (needed for Base64)
-        logging: false,
-        imageTimeout: 0,
-        removeContainer: true
-      });
+      const options = { 
+        cacheBust: true, 
+        pixelRatio: 3, // Higher quality for mobile
+        useCORS: true, // Crucial for external images
+        backgroundColor: activeTheme.backgroundColor // Prevent transparent backgrounds
+      };
 
-      // Convert canvas to blob and download
-      canvas.toBlob((blob) => {
-        if (blob) {
-          const url = URL.createObjectURL(blob);
-          const link = document.createElement('a');
-          link.download = `lumostime-share-${Date.now()}.png`;
-          link.href = url;
-          link.click();
-          URL.revokeObjectURL(url);
-        }
-      }, 'image/png', 1.0);
+      try {
+        const dataUrl = await toPng(previewRef.current, options);
+        triggerDownload(dataUrl);
+      } catch (firstErr) {
+        console.warn("First export attempt failed, retrying with skipFonts...", firstErr);
+        // Fallback: Skip fonts if CORS/CSS rules access fails
+        const dataUrl = await toPng(previewRef.current, { ...options, skipFonts: true });
+        triggerDownload(dataUrl);
+      }
       
     } catch (err) {
       console.error("Could not download image", err);
@@ -128,6 +122,13 @@ export const ShareView: React.FC<ShareViewProps> = ({ log, onBack }) => {
     } finally {
         setIsExporting(false);
     }
+  };
+
+  const triggerDownload = (dataUrl: string) => {
+    const link = document.createElement('a');
+    link.download = `lumostime-share-${Date.now()}.png`;
+    link.href = dataUrl;
+    link.click();
   };
 
   return (
@@ -183,22 +184,21 @@ export const ShareView: React.FC<ShareViewProps> = ({ log, onBack }) => {
             <div className="flex items-center gap-2 text-xs font-bold text-stone-700 mb-3 uppercase tracking-wider">
               <Palette size={14} /> 主题色彩
             </div>
-            <div className="flex justify-between items-start px-2">
+            <div className="flex justify-between gap-2">
               {SHARE_THEMES.map(theme => (
                 <button
                   key={theme.id}
                   onClick={() => setActiveThemeId(theme.id)}
-                  className={`flex flex-col items-center gap-2 transition-all ${
+                  className={`flex-1 flex items-center justify-center transition-all ${
                     activeThemeId === theme.id ? 'scale-110' : 'opacity-60 hover:opacity-100'
                   }`}
                 >
                   <div
-                    className={`w-10 h-10 rounded-full border-2 transition-all ${
+                    className={`w-8 h-8 rounded-full border-2 transition-all ${
                       activeThemeId === theme.id ? 'ring-2 ring-offset-2 ring-stone-400' : 'border-transparent'
                     }`}
                     style={{ backgroundColor: theme.primaryColor }}
                   />
-                  <span className="text-[10px] text-stone-600 text-center leading-tight">{theme.name}</span>
                 </button>
               ))}
             </div>
@@ -209,19 +209,24 @@ export const ShareView: React.FC<ShareViewProps> = ({ log, onBack }) => {
             <div className="flex items-center gap-2 text-xs font-bold text-stone-700 mb-3 uppercase tracking-wider">
               <Layout size={14} /> 布局模版
             </div>
-            <div className="grid grid-cols-1 gap-2">
-              {SHARE_TEMPLATES.map(template => (
+            <div className="flex justify-between gap-2">
+              {[
+                { id: 'magazine-classic', label: '经典' },
+                { id: 'vertical-poetry', label: '古韵' },
+                { id: 'minimal-note', label: '现代' },
+                { id: 'modern-split', label: '分割' },
+                { id: 'film-story', label: '变迁' }
+              ].map(template => (
                 <button
                   key={template.id}
                   onClick={() => setActiveTemplateId(template.id)}
-                  className={`px-4 py-3 rounded-xl text-left text-sm border transition-all ${
+                  className={`flex-1 px-2 py-1.5 rounded-full text-[10px] font-medium border transition-all ${
                     activeTemplateId === template.id 
-                      ? 'bg-stone-50 border-stone-400 font-medium' 
-                      : 'border-stone-200 hover:border-stone-300'
+                      ? 'bg-stone-100 border-stone-400 text-stone-900' 
+                      : 'border-stone-300 text-stone-600 hover:border-stone-400'
                   }`}
                 >
-                  <span className="block text-stone-800">{template.name}</span>
-                  <span className="text-xs text-stone-400 font-light">{template.description}</span>
+                  {template.label}
                 </button>
               ))}
             </div>
