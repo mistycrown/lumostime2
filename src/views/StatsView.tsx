@@ -514,13 +514,13 @@ export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentD
       )}
 
       {/* Main Content */}
-      <div className={`flex-1 overflow-y-auto custom-scrollbar ${isFullScreen ? 'pt-0' : 'pt-2'}`}>
-        <div className={`${isFullScreen ? 'h-full flex flex-col' : 'px-5 pb-24 space-y-6 max-w-2xl mx-auto'}`}>
+      <div className={`flex-1 overflow-y-auto custom-scrollbar ${isFullScreen ? 'pt-0' : viewType === 'schedule' ? 'pt-0' : 'pt-2'}`}>
+        <div className={`${isFullScreen ? 'h-full flex flex-col' : viewType === 'schedule' ? 'h-full flex flex-col' : 'px-5 pb-24 space-y-6 max-w-2xl mx-auto'}`}>
 
           {/* Control Bar: Time Range (Left) + Date Navigation + View Switcher (Right) - Hidden in FullScreen */}
           {/* Control Bar: Time Range (Left) + Date Navigation + View Switcher (Right) - Hidden in FullScreen */}
           {!hideControls && !isFullScreen && (
-            <div className="flex items-center justify-between mb-4">
+            <div className={`flex items-center justify-between mb-4 ${viewType === 'schedule' ? 'mt-2 px-5' : ''}`}>
               {/* Left: Time Range Selector (only for pie and schedule views) */}
               <div className="flex-1">
                 {!hideRangeControls && viewType === 'pie' && (
