@@ -28,6 +28,7 @@ import {
     getTemplateDisplayInfo
 } from '../components/ReviewView';
 import { calculateMonthlyStats } from '../utils/reviewStatsUtils';
+import { updateAutoCheckItems } from '../utils/autoCheckUtils';
 
 interface DailyReviewViewProps {
     review: DailyReview;
@@ -106,6 +107,29 @@ export const DailyReviewView: React.FC<DailyReviewViewProps> = ({
         setNarrative(review.narrative || '');
     }, [review]);
 
+    // 更新自动日课状态（当切换到日课标签或数据变化时）
+    useEffect(() => {
+        if (activeTab === 'check' && checkItems.length > 0) {
+            const context = {
+                categories,
+                scopes,
+                todos,
+                todoCategories
+            };
+            const updatedItems = updateAutoCheckItems(checkItems, logs, context, date);
+            
+            // 只有当状态真的改变时才更新
+            const hasChanges = updatedItems.some((item, index) => 
+                item.isCompleted !== checkItems[index].isCompleted
+            );
+            
+            if (hasChanges) {
+                setCheckItems(updatedItems);
+                onUpdateReview({ ...review, checkItems: updatedItems, updatedAt: Date.now() });
+            }
+        }
+    }, [activeTab, logs, categories, scopes, todos, todoCategories, date]);
+
     // Check for "Today"
     const isToday = useMemo(() => {
         const now = new Date();
@@ -115,6 +139,12 @@ export const DailyReviewView: React.FC<DailyReviewViewProps> = ({
     }, [date]);
 
     const handleToggleCheckItem = (id: string) => {
+        const item = checkItems.find(i => i.id === id);
+        // 自动类型的日课不允许手动切换
+        if (item?.type === 'auto') {
+            return;
+        }
+        
         const newItems = checkItems.map(item =>
             item.id === id ? { ...item, isCompleted: !item.isCompleted } : item
         );
@@ -180,15 +210,26 @@ export const DailyReviewView: React.FC<DailyReviewViewProps> = ({
                     category: template.title,
                     content: item.content,
                     icon: item.icon,
-                    uiIcon: item.uiIcon,  // 添加 uiIcon 字段
-                    isCompleted: false
+                    uiIcon: item.uiIcon,
+                    isCompleted: false,
+                    type: item.type || 'manual',
+                    autoConfig: item.autoConfig
                 });
             });
         });
 
-        // 3. Update state
-        setCheckItems(newItems);
-        onUpdateReview({ ...review, checkItems: newItems, updatedAt: Date.now() });
+        // 3. 更新自动日课状态
+        const context = {
+            categories,
+            scopes,
+            todos,
+            todoCategories
+        };
+        const updatedItems = updateAutoCheckItems(newItems, logs, context, date);
+
+        // 4. Update state
+        setCheckItems(updatedItems);
+        onUpdateReview({ ...review, checkItems: updatedItems, updatedAt: Date.now() });
         setIsReloadConfirmOpen(false);
         addToast('success', '已重新导入模板');
     };
@@ -453,15 +494,21 @@ export const DailyReviewView: React.FC<DailyReviewViewProps> = ({
                                                 {items.map((item) => (
                                                     <div
                                                         key={item.id}
-                                                        className={`flex items-start gap-4 py-2 px-1 group transition-opacity ${item.isCompleted ? 'opacity-50' : ''}`}
-                                                        onClick={() => handleToggleCheckItem(item.id)}
+                                                        className={`flex items-start gap-4 py-2 px-1 group transition-opacity ${item.isCompleted ? 'opacity-50' : ''} ${item.type === 'auto' ? 'cursor-default' : ''}`}
+                                                        onClick={() => item.type !== 'auto' && handleToggleCheckItem(item.id)}
                                                     >
                                                         {/* Checkbox: Black/White, small, aligned */}
                                                         <button
-                                                            className={`mt-1.5 w-4 h-4 rounded-full border flex items-center justify-center transition-all shrink-0 ${item.isCompleted
-                                                                ? 'bg-stone-900 border-stone-900 text-white'
-                                                                : 'border-stone-400 text-transparent hover:border-stone-600'
-                                                                }`}
+                                                            className={`mt-1.5 w-4 h-4 rounded-full border flex items-center justify-center transition-all shrink-0 ${
+                                                                item.type === 'auto' 
+                                                                    ? item.isCompleted
+                                                                        ? 'bg-blue-600 border-blue-600 text-white'
+                                                                        : 'border-blue-400 text-transparent'
+                                                                    : item.isCompleted
+                                                                        ? 'bg-stone-900 border-stone-900 text-white'
+                                                                        : 'border-stone-400 text-transparent hover:border-stone-600'
+                                                            }`}
+                                                            disabled={item.type === 'auto'}
                                                         >
                                                             <LucideIcons.Check size={10} strokeWidth={3} />
                                                         </button>
@@ -483,13 +530,20 @@ export const DailyReviewView: React.FC<DailyReviewViewProps> = ({
                                                                     <button onClick={saveEditingCheckItem} className="text-stone-800 p-1"><LucideIcons.Check size={16} /></button>
                                                                 </div>
                                                             ) : (
-                                                                <p className={`flex-1 text-[15px] font-serif leading-relaxed transition-all ${item.isCompleted ? 'text-stone-400 line-through decoration-stone-300' : 'text-stone-900'}`}>
-                                                                    {item.content}
-                                                                </p>
+                                                                <div className="flex-1 flex items-center gap-2">
+                                                                    <p className={`flex-1 text-[15px] font-serif leading-relaxed transition-all ${item.isCompleted ? 'text-stone-400 line-through decoration-stone-300' : 'text-stone-900'}`}>
+                                                                        {item.content}
+                                                                    </p>
+                                                                    {item.type === 'auto' && (
+                                                                        <span className="text-xs text-blue-500 bg-blue-50 px-2 py-0.5 rounded-full shrink-0">
+                                                                            自动
+                                                                        </span>
+                                                                    )}
+                                                                </div>
                                                             )}
                                                         </div>
 
-                                                        {!editingCheckItemId && !item.category && (
+                                                        {!editingCheckItemId && !item.category && item.type !== 'auto' && (
                                                             <div className="flex items-center gap-3 opacity-0 group-hover:opacity-100 transition-opacity" onClick={e => e.stopPropagation()}>
                                                                 <button
                                                                     onClick={() => startEditingCheckItem(item)}

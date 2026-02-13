@@ -264,6 +264,8 @@ export interface CheckItem {
   icon?: string; // Icon from template (emoji)
   uiIcon?: string; // UI 图标 ID (格式: ui:iconType)
   isCompleted: boolean;
+  type?: 'manual' | 'auto'; // 类型：手动或自动（默认为 manual）
+  autoConfig?: AutoCheckConfig; // 自动日课配置（仅当 type='auto' 时有效）
 }
 
 // 日课定义 (用于模板)
@@ -272,6 +274,16 @@ export interface CheckTemplateItem {
   content: string;
   icon?: string; // Preset icon (emoji or Lucide name)
   uiIcon?: string; // UI 图标 ID (格式: ui:iconType)
+  type?: 'manual' | 'auto'; // 类型：手动或自动（默认为 manual）
+  autoConfig?: AutoCheckConfig; // 自动日课配置（仅当 type='auto' 时有效）
+}
+
+// 自动日课配置
+export interface AutoCheckConfig {
+  filterExpression: string; // 筛选表达式（如 "#学习 %专业输入"）
+  comparisonType: 'duration' | 'earliestStart' | 'latestStart' | 'earliestEnd' | 'latestEnd' | 'count'; // 判断类型
+  operator: '>=' | '<=' | '>' | '<' | '='; // 比较运算符
+  targetValue: number; // 目标值（分钟数，时刻用分钟表示如 480=8:00，次数就是数字）
 }
 
 // 日课模板
