@@ -72,7 +72,7 @@ export const CheckTemplateManageView: React.FC<CheckTemplateManageViewProps> = (
             id: crypto.randomUUID(),
             title: '新日课',
             icon: '📝', // 默认 emoji
-            items: [{ id: crypto.randomUUID(), content: '日课 1', icon: '📝' }], // Default item - content without icon
+            items: [{ id: crypto.randomUUID(), content: '日课 1', icon: '📝' }], // Default item
             enabled: true,
             order: (templates.length > 0 ? Math.max(...templates.map(t => t.order)) : 0) + 1,
             isDaily: true
@@ -125,7 +125,7 @@ export const CheckTemplateManageView: React.FC<CheckTemplateManageViewProps> = (
         setTemplateForm({
             ...templateForm,
             ...templateForm,
-            items: [...templateForm.items, { id: crypto.randomUUID(), content: '', icon: '⚡' }] // Empty content, icon will be set on input
+            items: [...templateForm.items, { id: crypto.randomUUID(), content: '', icon: '⚡' }]
         });
     };
 
@@ -135,9 +135,7 @@ export const CheckTemplateManageView: React.FC<CheckTemplateManageViewProps> = (
         // Auto-update icon based on first char of content
         const firstChar = Array.from(content.trim())[0] || '';
         const icon = firstChar || '📝';
-        // Remove the first character from content to avoid duplication
-        const textContent = firstChar ? content.trim().slice(firstChar.length).trim() : content.trim();
-        newItems[index] = { ...newItems[index], content: textContent, icon };
+        newItems[index] = { ...newItems[index], content, icon };
         setTemplateForm({ ...templateForm, items: newItems });
     };
 
@@ -278,19 +276,25 @@ export const CheckTemplateManageView: React.FC<CheckTemplateManageViewProps> = (
                                                     )}
                                                 </div>
                                                 <div className="flex flex-wrap gap-2">
-                                                    {template.items.map((item, idx) => (
-                                                        <div
-                                                            key={idx}
-                                                            className="px-2 py-1.5 rounded-lg text-[10px] font-medium text-center border transition-colors flex items-center justify-center gap-1.5 bg-stone-50 text-stone-500 border-stone-100"
-                                                        >
-                                                            <IconRenderer 
-                                                                icon={item.icon || '📝'} 
-                                                                uiIcon={item.uiIcon}
-                                                                className="text-xs"
-                                                            />
-                                                            <span className="truncate">{item.content}</span>
-                                                        </div>
-                                                    ))}
+                                                    {template.items.map((item, idx) => {
+                                                        // Remove the first character (icon) from content for display
+                                                        // Use Array.from to properly handle multi-byte characters like emojis
+                                                        const contentArray = Array.from(item.content.trim());
+                                                        const displayContent = contentArray.length > 1 ? contentArray.slice(1).join('').trim() : item.content;
+                                                        return (
+                                                            <div
+                                                                key={idx}
+                                                                className="px-2 py-1.5 rounded-lg text-[10px] font-medium text-center border transition-colors flex items-center justify-center gap-1.5 bg-stone-50 text-stone-500 border-stone-100"
+                                                            >
+                                                                <IconRenderer 
+                                                                    icon={item.icon || '📝'} 
+                                                                    uiIcon={item.uiIcon}
+                                                                    className="text-xs"
+                                                                />
+                                                                <span className="truncate">{displayContent}</span>
+                                                            </div>
+                                                        );
+                                                    })}
                                                 </div>
                                             </div>
 
@@ -412,7 +416,7 @@ export const CheckTemplateManageView: React.FC<CheckTemplateManageViewProps> = (
                                             {/* Content Input (Combined) */}
                                             <input
                                                 type="text"
-                                                value={`${item.icon || ''}${item.content}`}
+                                                value={item.content}
                                                 onChange={(e) => handleUpdateItem(idx, e.target.value)}
                                                 className="flex-1 bg-white border border-stone-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-stone-400 focus:ring-2 focus:ring-stone-100 transition-all font-serif"
                                                 placeholder="💧 输入检查内容 (首字符作为图标)..."

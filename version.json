@@ -2,6 +2,6 @@
     "version": "1.0.9",
     "versionCode": 9,
     "updateUrl": "https://github.com/mistycrown/lumostime2/releases/latest",
-    "releaseNotes": "v1.0.9\n• 更新内容待补充",
+    "releaseNotes": "v1.0.9\n• 修复部分 UI icon 编号错误的问题。\n• 修复手机端待办/计时页面左侧边栏图标压缩的问题。\n• 修订用户指南。",
     "forceUpdate": false
 }
