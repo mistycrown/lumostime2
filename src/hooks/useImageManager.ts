@@ -68,7 +68,8 @@ export const useImageManager = (initialImages: string[] = []) => {
     if (images.length > 0) {
       loadUrls();
     }
-  }, [images, imageUrls]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [images]); // 只依赖 images，不依赖 imageUrls
 
   // 添加图片
   const handleAddImage = useCallback(async (file: File) => {

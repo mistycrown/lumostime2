@@ -3,7 +3,7 @@
  * @description Custom hook for managing log form state
  */
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { Log, Category, TodoItem, TodoCategory, Scope, AutoLinkRule, Comment } from '../types';
 
 interface UseLogFormProps {
@@ -157,15 +157,15 @@ export const useLogForm = ({
     return closestLog.endTime;
   }, [allLogs, formState.currentStartTime, formState.trackStartTime, initialLog, lastLogEndTime]);
 
-  // 更新单个字段
-  const updateField = <K extends keyof LogFormState>(field: K, value: LogFormState[K]) => {
+  // 更新单个字段 - 使用 useCallback 保持引用稳定
+  const updateField = useCallback(<K extends keyof LogFormState>(field: K, value: LogFormState[K]) => {
     setFormState(prev => ({ ...prev, [field]: value }));
-  };
+  }, []);
 
-  // 批量更新字段
-  const updateFields = (updates: Partial<LogFormState>) => {
+  // 批量更新字段 - 使用 useCallback 保持引用稳定
+  const updateFields = useCallback((updates: Partial<LogFormState>) => {
     setFormState(prev => ({ ...prev, ...updates }));
-  };
+  }, []);
 
   return {
     formState,
