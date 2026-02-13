@@ -1113,7 +1113,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
                                 {updateInfo.releaseNotes && (
                                     <div>
                                         <h4 className="text-xs font-bold text-stone-600 mb-2">更新内容</h4>
-                                        <div className="bg-stone-50 rounded-xl p-4">
+                                        <div className="bg-stone-50 rounded-xl p-4 max-h-[40vh] overflow-y-auto">
                                             <p className="text-sm text-stone-700 leading-relaxed whitespace-pre-line">
                                                 {updateInfo.releaseNotes}
                                             </p>
