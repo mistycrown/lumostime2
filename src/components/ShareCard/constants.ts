@@ -37,9 +37,9 @@ export const SHARE_THEMES: ShareTheme[] = [
   {
     id: 'pure-white',
     name: '极简白',
-    primaryColor: '#111111',
+    primaryColor: '#6B6B6B',
     backgroundColor: '#FFFFFF',
-    fontFamily: 'font-sans',
+    fontFamily: 'font-serif',
   },
 ];
 

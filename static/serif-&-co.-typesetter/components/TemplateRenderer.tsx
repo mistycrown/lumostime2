@@ -8,18 +8,27 @@ interface TemplateRendererProps {
   templateId: string;
 }
 
+// Improved TagPill component to prevent layout shifts during export
 const TagPill: React.FC<{ text: string; icon: React.ReactNode; color: string; bg?: string; borderColor?: string }> = ({ text, icon, color, bg, borderColor }) => (
-  <span 
-    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] uppercase tracking-wider font-medium border"
+  <div 
+    className="flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-solid"
     style={{ 
       borderColor: borderColor || color, 
       color: color,
-      backgroundColor: bg || 'transparent'
+      backgroundColor: bg || 'transparent',
+      // Explicit line-height is crucial for html-to-image vertical alignment
+      lineHeight: 1 
     }}
   >
-    {icon}
-    {text}
-  </span>
+    {/* Icon wrapper ensures SVGs don't collapse or shift */}
+    <div className="flex items-center justify-center shrink-0 w-3 h-3">
+        {icon}
+    </div>
+    {/* Text with leading-none to match the container center */}
+    <span className="text-[10px] uppercase tracking-wider font-medium leading-none pt-[1px] whitespace-nowrap">
+        {text}
+    </span>
+  </div>
 );
 
 export const TemplateRenderer: React.FC<TemplateRendererProps> = ({ content, theme, templateId }) => {

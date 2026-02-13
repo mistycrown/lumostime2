@@ -39,8 +39,8 @@ const App: React.FC = () => {
     
     setIsExporting(true);
     try {
-      // Small delay to ensure rendering is complete (hack for some frameworks)
-      await new Promise(r => setTimeout(r, 100));
+      // Increased delay to 300ms to allow fonts and layout to settle completely before capture
+      await new Promise(r => setTimeout(r, 300));
 
       const options = { 
         cacheBust: true, 
