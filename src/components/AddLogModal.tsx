@@ -744,14 +744,14 @@ export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialSta
 
           {/* Share Button */}
           {initialLog && (
-            <div className="pt-2">
+            <div className="pt-6">
               <button
                 onClick={() => {
                   setSharingLog(initialLog);
                   setIsShareViewOpen(true);
                   onClose(); // Close the log detail modal
                 }}
-                className="w-full py-3 text-stone-700 hover:text-stone-900 hover:bg-stone-100 rounded-full font-medium text-sm transition-colors active:scale-95"
+                className="w-full py-2.5 text-stone-700 hover:text-stone-900 hover:bg-stone-100 rounded-full font-medium text-sm transition-colors active:scale-95"
               >
                 Share
               </button>
@@ -763,7 +763,7 @@ export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialSta
             <div className="pt-2">
               <button
                 onClick={handleDelete}
-                className="w-full py-3 text-red-500 hover:text-red-600 hover:bg-red-50 rounded-full font-medium text-sm transition-colors active:scale-95"
+                className="w-full py-2.5 text-red-500 hover:text-red-600 hover:bg-red-50 rounded-full font-medium text-sm transition-colors active:scale-95"
               >
                 Delete Task
               </button>
