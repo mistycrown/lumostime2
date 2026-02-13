@@ -62,13 +62,17 @@ export const useReviewManager = () => {
                         const content = typeof item === 'string' ? item : item.content;
                         const icon = typeof item === 'string' ? undefined : item.icon;
                         const uiIcon = typeof item === 'string' ? undefined : item.uiIcon;
+                        const type = typeof item === 'string' ? 'manual' : (item.type || 'manual');
+                        const autoConfig = typeof item === 'string' ? undefined : item.autoConfig;
                         initialCheckItems.push({
                             id: crypto.randomUUID(),
                             category: t.title,
                             content: content,
                             icon: icon,
                             uiIcon: uiIcon,
-                            isCompleted: false
+                            isCompleted: false,
+                            type: type,
+                            autoConfig: autoConfig
                         });
                     });
                 });

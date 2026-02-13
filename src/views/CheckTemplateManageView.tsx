@@ -20,11 +20,12 @@ import {
     Database,
     AlertCircle
 } from 'lucide-react';
-import { CheckTemplate } from '../types';
+import { CheckTemplate, CheckTemplateItem } from '../types';
 import { ConfirmModal } from '../components/ConfirmModal';
 import { IconRenderer } from '../components/IconRenderer';
 import { useSettings } from '../contexts/SettingsContext';
 import { scanCheckItems, batchRenameCheckItems, batchDeleteCheckItems } from '../utils/checkItemBatchOperations';
+import { CheckTemplateItemRow } from '../components/CheckTemplateItemRow';
 
 interface CheckTemplateManageViewProps {
     templates: CheckTemplate[];
@@ -101,6 +102,19 @@ export const CheckTemplateManageView: React.FC<CheckTemplateManageViewProps> = (
 
         // Filter out empty items
         const cleanItems = templateForm.items.filter(i => !!i.content.trim());
+        
+        // 验证自动日课必须配置规则
+        const invalidAutoItems = cleanItems.filter(
+            item => item.type === 'auto' && !item.autoConfig
+        );
+
+        if (invalidAutoItems.length > 0) {
+            setErrors({ 
+                title: `有 ${invalidAutoItems.length} 个自动日课未配置规则，请点击配置按钮完成设置` 
+            });
+            return;
+        }
+
         const finalTemplate = { ...templateForm, items: cleanItems };
 
         // 如果是编辑已存在的模板，检测日课条目是否被修改
@@ -212,18 +226,14 @@ export const CheckTemplateManageView: React.FC<CheckTemplateManageViewProps> = (
         if (!templateForm) return;
         setTemplateForm({
             ...templateForm,
-            ...templateForm,
-            items: [...templateForm.items, { id: crypto.randomUUID(), content: '', icon: '⚡' }]
+            items: [...templateForm.items, { id: crypto.randomUUID(), content: '', icon: '⚡', type: 'manual' }]
         });
     };
 
-    const handleUpdateItem = (index: number, content: string) => {
+    const handleUpdateItem = (index: number, updatedItem: CheckTemplateItem) => {
         if (!templateForm) return;
         const newItems = [...templateForm.items];
-        // Auto-update icon based on first char of content
-        const firstChar = Array.from(content.trim())[0] || '';
-        const icon = firstChar || '📝';
-        newItems[index] = { ...newItems[index], content, icon };
+        newItems[index] = updatedItem;
         setTemplateForm({ ...templateForm, items: newItems });
     };
 
@@ -459,27 +469,15 @@ export const CheckTemplateManageView: React.FC<CheckTemplateManageViewProps> = (
                                         添加项
                                     </button>
                                 </div>
-                                <div className="space-y-2">
+                                <div className="space-y-3">
                                     {templateForm.items.map((item, idx) => (
-                                        <div key={item.id || idx} className="flex items-center gap-2 group">
-                                            <span className="text-stone-300 text-xs w-4 text-center">{idx + 1}</span>
-                                            {/* Content Input (Combined) */}
-                                            <input
-                                                type="text"
-                                                value={item.content}
-                                                onChange={(e) => handleUpdateItem(idx, e.target.value)}
-                                                className="flex-1 bg-white border border-stone-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-stone-400 focus:ring-2 focus:ring-stone-100 transition-all font-serif"
-                                                placeholder="💧 输入检查内容 (首字符作为图标)..."
-                                                autoFocus={templateForm.items.length > 1 && idx === templateForm.items.length - 1}
-                                            />
-                                            <button
-                                                onClick={() => handleDeleteItem(idx)}
-                                                className="p-2 text-stone-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all"
-                                                tabIndex={-1}
-                                            >
-                                                <X size={16} />
-                                            </button>
-                                        </div>
+                                        <CheckTemplateItemRow
+                                            key={item.id || idx}
+                                            item={item}
+                                            index={idx}
+                                            onUpdate={handleUpdateItem}
+                                            onDelete={handleDeleteItem}
+                                        />
                                     ))}
                                     {templateForm.items.length === 0 && (
                                         <div className="text-center py-4 text-xs text-stone-300 border-2 border-dashed border-stone-100 rounded-lg">
