@@ -158,10 +158,10 @@ export const ShareView: React.FC<ShareViewProps> = ({ log, onBack }) => {
           {isLoadingImages ? (
             <div className="text-stone-400 text-sm">加载图片中...</div>
           ) : (
-            <div className="aspect-[3/4] w-full max-w-[400px] shadow-2xl">
+            <div className="w-full max-w-[400px] shadow-2xl">
               <div 
                 ref={previewRef}
-                className="w-full h-full overflow-hidden"
+                className="w-full"
                 style={{ 
                   backgroundColor: activeTheme.backgroundColor,
                   fontFamily: activeTheme.fontFamily === 'font-serif' ? '"Noto Serif SC", "Playfair Display", serif' : '"Inter", "Noto Sans SC", sans-serif'
