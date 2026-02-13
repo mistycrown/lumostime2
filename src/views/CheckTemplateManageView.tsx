@@ -72,7 +72,7 @@ export const CheckTemplateManageView: React.FC<CheckTemplateManageViewProps> = (
             id: crypto.randomUUID(),
             title: '新日课',
             icon: '📝', // 默认 emoji
-            items: [{ id: crypto.randomUUID(), content: '日课 1', icon: '📝' }], // Default item
+            items: [{ id: crypto.randomUUID(), content: '日课 1', icon: '📝' }], // Default item - content without icon
             enabled: true,
             order: (templates.length > 0 ? Math.max(...templates.map(t => t.order)) : 0) + 1,
             isDaily: true
@@ -125,7 +125,7 @@ export const CheckTemplateManageView: React.FC<CheckTemplateManageViewProps> = (
         setTemplateForm({
             ...templateForm,
             ...templateForm,
-            items: [...templateForm.items, { id: crypto.randomUUID(), content: '', icon: '⚡' }]
+            items: [...templateForm.items, { id: crypto.randomUUID(), content: '', icon: '⚡' }] // Empty content, icon will be set on input
         });
     };
 
@@ -133,8 +133,11 @@ export const CheckTemplateManageView: React.FC<CheckTemplateManageViewProps> = (
         if (!templateForm) return;
         const newItems = [...templateForm.items];
         // Auto-update icon based on first char of content
-        const icon = content.trim().slice(0, 1) || '📝';
-        newItems[index] = { ...newItems[index], content, icon };
+        const firstChar = Array.from(content.trim())[0] || '';
+        const icon = firstChar || '📝';
+        // Remove the first character from content to avoid duplication
+        const textContent = firstChar ? content.trim().slice(firstChar.length).trim() : content.trim();
+        newItems[index] = { ...newItems[index], content: textContent, icon };
         setTemplateForm({ ...templateForm, items: newItems });
     };
 
@@ -409,7 +412,7 @@ export const CheckTemplateManageView: React.FC<CheckTemplateManageViewProps> = (
                                             {/* Content Input (Combined) */}
                                             <input
                                                 type="text"
-                                                value={item.content}
+                                                value={`${item.icon || ''}${item.content}`}
                                                 onChange={(e) => handleUpdateItem(idx, e.target.value)}
                                                 className="flex-1 bg-white border border-stone-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-stone-400 focus:ring-2 focus:ring-stone-100 transition-all font-serif"
                                                 placeholder="💧 输入检查内容 (首字符作为图标)..."
