@@ -149,9 +149,28 @@ export const TemplateRenderer: React.FC<TemplateRendererProps> = ({ content, the
                      <div className="aspect-square bg-gray-100 rotate-1 transition-transform hover:rotate-0 duration-500">
                        <img src={content.images[0]} alt="Main" className="w-full h-full object-cover" />
                      </div>
-                   ) : (
+                   ) : content.images.length === 2 ? (
                      <div className="grid grid-cols-2 gap-3">
                        {content.images.slice(0, 2).map((img, i) => (
+                         <div key={i} className="aspect-square bg-gray-100 overflow-hidden">
+                           <img src={img} alt={`Img ${i}`} className="w-full h-full object-cover" />
+                         </div>
+                       ))}
+                     </div>
+                   ) : content.images.length === 3 ? (
+                     <div className="grid grid-cols-2 gap-3">
+                       <div className="col-span-2 aspect-video bg-gray-100 overflow-hidden">
+                         <img src={content.images[0]} alt="Main" className="w-full h-full object-cover" />
+                       </div>
+                       {content.images.slice(1, 3).map((img, i) => (
+                         <div key={i} className="aspect-square bg-gray-100 overflow-hidden">
+                           <img src={img} alt={`Img ${i + 1}`} className="w-full h-full object-cover" />
+                         </div>
+                       ))}
+                     </div>
+                   ) : (
+                     <div className="grid grid-cols-2 gap-3">
+                       {content.images.slice(0, 4).map((img, i) => (
                          <div key={i} className="aspect-square bg-gray-100 overflow-hidden">
                            <img src={img} alt={`Img ${i}`} className="w-full h-full object-cover" />
                          </div>
@@ -293,11 +312,31 @@ export const TemplateRenderer: React.FC<TemplateRendererProps> = ({ content, the
                 {hasImages && (
                     <div className="w-full md:w-1/2 flex-shrink-0 flex flex-col gap-2 max-h-[500px]">
                         {/* Custom Vertical Stack Rendering for Modern Split */}
-                        {content.images.slice(0, 3).map((img, i) => (
-                          <div key={i} className="flex-1 relative rounded-lg overflow-hidden shadow-sm min-h-[150px]">
-                              <img src={img} alt={`Split ${i}`} className="absolute inset-0 w-full h-full object-cover" />
+                        {content.images.length === 1 ? (
+                          <div className="flex-1 relative rounded-lg overflow-hidden shadow-sm">
+                            <img src={content.images[0]} alt="Main" className="absolute inset-0 w-full h-full object-cover" />
                           </div>
-                        ))}
+                        ) : content.images.length === 2 ? (
+                          content.images.slice(0, 2).map((img, i) => (
+                            <div key={i} className="flex-1 relative rounded-lg overflow-hidden shadow-sm min-h-[150px]">
+                              <img src={img} alt={`Split ${i}`} className="absolute inset-0 w-full h-full object-cover" />
+                            </div>
+                          ))
+                        ) : content.images.length === 3 ? (
+                          content.images.slice(0, 3).map((img, i) => (
+                            <div key={i} className="flex-1 relative rounded-lg overflow-hidden shadow-sm min-h-[120px]">
+                              <img src={img} alt={`Split ${i}`} className="absolute inset-0 w-full h-full object-cover" />
+                            </div>
+                          ))
+                        ) : (
+                          <div className="grid grid-cols-2 gap-2 h-full">
+                            {content.images.slice(0, 4).map((img, i) => (
+                              <div key={i} className="aspect-square relative rounded-lg overflow-hidden shadow-sm">
+                                <img src={img} alt={`Split ${i}`} className="absolute inset-0 w-full h-full object-cover" />
+                              </div>
+                            ))}
+                          </div>
+                        )}
                     </div>
                 )}
                 <div className="flex-1 flex flex-col">

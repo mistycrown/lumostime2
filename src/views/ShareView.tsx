@@ -148,7 +148,7 @@ export const ShareView: React.FC<ShareViewProps> = ({ log, onBack }) => {
           className="text-stone-400 hover:text-stone-600 p-1 disabled:opacity-50"
           title={isExporting ? '处理中...' : '保存'}
         >
-          <Download size={24} />
+          <Download size={20} />
         </button>
       </div>
 
