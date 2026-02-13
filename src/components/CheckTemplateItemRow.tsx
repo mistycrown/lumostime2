@@ -37,11 +37,18 @@ export const CheckTemplateItemRow: React.FC<CheckTemplateItemRowProps> = ({
     }
   };
 
-  const handleContentChange = (content: string) => {
-    const firstChar = Array.from(content.trim())[0] || '';
+  const handleContentChange = (fullText: string) => {
+    // 提取第一个字符作为图标
+    const firstChar = Array.from(fullText.trim())[0] || '';
     const icon = firstChar || '📝';
+    // 剩余部分作为内容
+    const contentArray = Array.from(fullText.trim());
+    const content = contentArray.length > 1 ? contentArray.slice(1).join('').trim() : '';
     onUpdate(index, { ...item, content, icon });
   };
+
+  // 显示值：图标 + 内容
+  const displayValue = `${item.icon || ''}${item.content || ''}`;
 
   return (
     <>
@@ -52,9 +59,9 @@ export const CheckTemplateItemRow: React.FC<CheckTemplateItemRowProps> = ({
           {/* 内容输入 */}
           <input
             type="text"
-            value={item.content}
+            value={displayValue}
             onChange={(e) => handleContentChange(e.target.value)}
-            className="flex-1 bg-white border border-stone-200 rounded-lg px-3 py-2.5 text-sm outline-none focus:border-stone-400 focus:ring-2 focus:ring-stone-100 transition-all font-serif"
+            className="flex-1 bg-white border border-stone-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-stone-400 focus:ring-2 focus:ring-stone-100 transition-all font-serif"
             placeholder={item.type === 'auto' ? '⚡ 输入自动日课名称...' : '💧 输入检查内容 (首字符作为图标)...'}
           />
           
@@ -62,7 +69,7 @@ export const CheckTemplateItemRow: React.FC<CheckTemplateItemRowProps> = ({
           <button
             type="button"
             onClick={handleToggleType}
-            className={`px-2.5 py-2.5 rounded-lg transition-colors shrink-0 ${
+            className={`px-2.5 py-2 rounded-lg transition-colors shrink-0 ${
               item.type === 'auto' 
                 ? 'text-blue-600' 
                 : 'text-stone-400'
@@ -76,7 +83,7 @@ export const CheckTemplateItemRow: React.FC<CheckTemplateItemRowProps> = ({
           <button
             type="button"
             onClick={() => onDelete(index)}
-            className="px-2.5 py-2.5 text-stone-300 active:text-red-500 transition-colors shrink-0"
+            className="px-2.5 py-2 text-stone-300 active:text-red-500 transition-colors shrink-0"
             tabIndex={-1}
           >
             <X size={16} />

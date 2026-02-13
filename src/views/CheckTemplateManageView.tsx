@@ -18,7 +18,8 @@ import {
     ArrowDown,
     Save,
     Database,
-    AlertCircle
+    AlertCircle,
+    RotateCcw
 } from 'lucide-react';
 import { CheckTemplate, CheckTemplateItem } from '../types';
 import { ConfirmModal } from '../components/ConfirmModal';
@@ -26,6 +27,7 @@ import { IconRenderer } from '../components/IconRenderer';
 import { useSettings } from '../contexts/SettingsContext';
 import { scanCheckItems, batchRenameCheckItems, batchDeleteCheckItems } from '../utils/checkItemBatchOperations';
 import { CheckTemplateItemRow } from '../components/CheckTemplateItemRow';
+import { DEFAULT_CHECK_TEMPLATES } from '../constants';
 
 interface CheckTemplateManageViewProps {
     templates: CheckTemplate[];
@@ -40,6 +42,7 @@ export const CheckTemplateManageView: React.FC<CheckTemplateManageViewProps> = (
     const [editingTemplateId, setEditingTemplateId] = useState<string | null>(null);
     const [templateForm, setTemplateForm] = useState<CheckTemplate | null>(null);
     const [deletingTemplateId, setDeletingTemplateId] = useState<string | null>(null);
+    const [isResetConfirmOpen, setIsResetConfirmOpen] = useState(false);
 
     // Batch Modify State
     const [showBatchModal, setShowBatchModal] = useState(false);
@@ -315,14 +318,25 @@ export const CheckTemplateManageView: React.FC<CheckTemplateManageViewProps> = (
     return (
         <div className="fixed inset-0 z-50 bg-[#fdfbf7] flex flex-col font-serif animate-in slide-in-from-right duration-300 pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">
             {/* Header */}
-            <div className="flex items-center gap-3 px-4 h-14 border-b border-stone-100 bg-[#fdfbf7]/80 backdrop-blur-md sticky top-0 shrink-0 z-10">
-                <button
-                    onClick={onBack}
-                    className="text-stone-400 hover:text-stone-600 p-1"
-                >
-                    <ChevronLeft size={24} />
-                </button>
-                <span className="text-stone-800 font-bold text-lg">日课模板</span>
+            <div className="flex items-center justify-between px-4 h-14 border-b border-stone-100 bg-[#fdfbf7]/80 backdrop-blur-md sticky top-0 shrink-0 z-10">
+                <div className="flex items-center gap-3">
+                    <button
+                        onClick={onBack}
+                        className="text-stone-400 hover:text-stone-600 p-1"
+                    >
+                        <ChevronLeft size={24} />
+                    </button>
+                    <span className="text-stone-800 font-bold text-lg">日课模板</span>
+                </div>
+                {!editingTemplateId && (
+                    <button
+                        onClick={() => setIsResetConfirmOpen(true)}
+                        className="p-2 text-stone-400 hover:text-red-500 transition-colors"
+                        title="重置为默认"
+                    >
+                        <RotateCcw size={20} />
+                    </button>
+                )}
             </div>
 
             <div className="flex-1 overflow-y-auto p-4 pb-20">
@@ -375,10 +389,6 @@ export const CheckTemplateManageView: React.FC<CheckTemplateManageViewProps> = (
                                                 </div>
                                                 <div className="flex flex-wrap gap-2">
                                                     {template.items.map((item, idx) => {
-                                                        // Remove the first character (icon) from content for display
-                                                        // Use Array.from to properly handle multi-byte characters like emojis
-                                                        const contentArray = Array.from(item.content.trim());
-                                                        const displayContent = contentArray.length > 1 ? contentArray.slice(1).join('').trim() : item.content;
                                                         return (
                                                             <div
                                                                 key={idx}
@@ -389,7 +399,7 @@ export const CheckTemplateManageView: React.FC<CheckTemplateManageViewProps> = (
                                                                     uiIcon={item.uiIcon}
                                                                     className="text-xs"
                                                                 />
-                                                                <span className="truncate">{displayContent}</span>
+                                                                <span className="truncate">{item.content}</span>
                                                             </div>
                                                         );
                                                     })}
@@ -661,6 +671,20 @@ export const CheckTemplateManageView: React.FC<CheckTemplateManageViewProps> = (
                 title="删除模板"
                 description="确定要删除这个日课模板吗？此操作不会影响已生成的历史记录。"
                 confirmText="删除"
+                cancelText="取消"
+                type="danger"
+            />
+
+            <ConfirmModal
+                isOpen={isResetConfirmOpen}
+                onClose={() => setIsResetConfirmOpen(false)}
+                onConfirm={() => {
+                    onUpdateTemplates(DEFAULT_CHECK_TEMPLATES);
+                    setIsResetConfirmOpen(false);
+                }}
+                title="重置日课模板"
+                description="确定要重置所有日课模板为默认状态吗？这将覆盖您当前的修改，且无法撤销。默认模板包含时间管理、效率目标、数字健康等实用的自动日课示例。"
+                confirmText="重置"
                 cancelText="取消"
                 type="danger"
             />

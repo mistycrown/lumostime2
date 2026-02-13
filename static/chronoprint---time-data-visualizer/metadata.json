@@ -1,0 +1,5 @@
+{
+  "name": "ChronoPrint - Time Data Visualizer",
+  "description": "Transforms structured time-tracking text into elegant, print-ready editorial infographics.",
+  "requestFramePermissions": []
+}

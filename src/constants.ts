@@ -737,30 +737,73 @@ export const INITIAL_DAILY_REVIEWS: DailyReview[] = [];
 
 export const DEFAULT_CHECK_TEMPLATES: CheckTemplate[] = [
   {
-    id: 'ct_daily_habits',
-    title: '每日习惯',
-    icon: '🌞',
+    id: 'ct_auto_examples',
+    title: '自动日课示例',
+    icon: '⚡',
     items: [
-      { id: 'i1', content: '早起喝水', icon: '💧' },
-      { id: 'i2', content: '整理床铺', icon: '🛏️' },
-      { id: 'i3', content: '吃维生素', icon: '💊' },
-      { id: 'i4', content: '冥想 10 分钟', icon: '🧘' }
+      { 
+        id: 'i1', 
+        content: '早起（8点前起床）', 
+        icon: '🌅',
+        type: 'auto',
+        autoConfig: {
+          filterExpression: '#睡觉',
+          comparisonType: 'earliestEnd',
+          operator: '<',
+          targetValue: 480 // 8:00，早于判断（时刻类型）
+        }
+      },
+      { 
+        id: 'i2', 
+        content: '早睡（23点前入睡）', 
+        icon: '🌙',
+        type: 'auto',
+        autoConfig: {
+          filterExpression: '#睡觉',
+          comparisonType: 'latestStart',
+          operator: '<',
+          targetValue: 1380 // 23:00，晚于判断（时刻类型）
+        }
+      },
+      { 
+        id: 'i3', 
+        content: '控制手机（≤2小时）', 
+        icon: '📵',
+        type: 'auto',
+        autoConfig: {
+          filterExpression: '#网上冲浪',
+          comparisonType: 'duration',
+          operator: '<=',
+          targetValue: 120 // 2小时，小于等于判断（时长类型）
+        }
+      },
+      { 
+        id: 'i4', 
+        content: '按时吃饭（3次）', 
+        icon: '🍽️',
+        type: 'auto',
+        autoConfig: {
+          filterExpression: '#饮食',
+          comparisonType: 'count',
+          operator: '>=',
+          targetValue: 3 // 3次，次数判断（次数类型）
+        }
+      },
+      { 
+        id: 'i5', 
+        content: '学习时长（≥4小时）', 
+        icon: '📚',
+        type: 'auto',
+        autoConfig: {
+          filterExpression: '#学习',
+          comparisonType: 'duration',
+          operator: '>=',
+          targetValue: 240 // 4小时，大于等于判断（时长类型，匹配"学习"分类下所有活动）
+        }
+      }
     ],
     enabled: true,
     order: 1,
-    isDaily: true
-  },
-  {
-    id: 'ct_evening_routine',
-    title: '晚间流程',
-    icon: '🌜',
-    items: [
-      { id: 'i5', content: '收拾书桌', icon: '🧹' },
-      { id: 'i6', content: '准备明天衣物', icon: '👕' },
-      { id: 'i7', content: '阅读 15 分钟', icon: '📚' }
-    ],
-    enabled: true,
-    order: 2,
     isDaily: true
   }
 ];
