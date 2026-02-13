@@ -50,12 +50,10 @@ function calculateLogStats(
   };
 
   if (!filterExpression.trim()) {
-    console.log('[AutoCheck] 筛选表达式为空');
     return stats;
   }
 
   const condition = parseFilterExpression(filterExpression);
-  console.log('[AutoCheck] 解析后的筛选条件:', condition);
   
   // 筛选当天的记录
   const dayStart = new Date(targetDate);
@@ -63,30 +61,13 @@ function calculateLogStats(
   const dayEnd = new Date(targetDate);
   dayEnd.setHours(23, 59, 59, 999);
 
-  console.log('[AutoCheck] 目标日期范围:', {
-    dayStart: dayStart.toISOString(),
-    dayEnd: dayEnd.toISOString(),
-    totalLogs: logs.length
-  });
-
   const filteredLogs = logs.filter(log => {
     const logStartTime = log.startTime;
     const isInDateRange = logStartTime >= dayStart.getTime() && logStartTime <= dayEnd.getTime();
     const matchesCondition = matchesFilter(log, condition, context);
     
-    if (isInDateRange && !matchesCondition) {
-      console.log('[AutoCheck] 记录在日期范围内但不匹配筛选条件:', {
-        logId: log.id,
-        startTime: new Date(log.startTime).toISOString(),
-        activityId: log.activityId,
-        categoryId: log.categoryId
-      });
-    }
-    
     return isInDateRange && matchesCondition;
   });
-
-  console.log('[AutoCheck] 筛选后的记录数:', filteredLogs.length);
 
   // 计算统计信息
   filteredLogs.forEach(log => {
@@ -99,14 +80,6 @@ function calculateLogStats(
     // 时间点（从时间戳转换为当天的分钟数）
     const startMinutes = timestampToMinutes(log.startTime);
     const endMinutes = timestampToMinutes(log.endTime);
-
-    console.log('[AutoCheck] 记录时间:', {
-      logId: log.id,
-      startTime: new Date(log.startTime).toLocaleTimeString(),
-      endTime: new Date(log.endTime).toLocaleTimeString(),
-      startMinutes,
-      endMinutes
-    });
 
     if (stats.earliestStart === null || startMinutes < stats.earliestStart) {
       stats.earliestStart = startMinutes;
@@ -122,7 +95,6 @@ function calculateLogStats(
     }
   });
 
-  console.log('[AutoCheck] 最终统计:', stats);
   return stats;
 }
 
@@ -168,41 +140,24 @@ export function evaluateAutoCheck(
 
   // 如果没有匹配的记录，返回 false
   if (actualValue === null) {
-    console.log('[AutoCheck] 没有匹配的记录，actualValue 为 null');
     return false;
   }
 
   // 根据运算符判断
-  let result = false;
   switch (config.operator) {
     case '>=':
-      result = actualValue >= config.targetValue;
-      break;
+      return actualValue >= config.targetValue;
     case '<=':
-      result = actualValue <= config.targetValue;
-      break;
+      return actualValue <= config.targetValue;
     case '>':
-      result = actualValue > config.targetValue;
-      break;
+      return actualValue > config.targetValue;
     case '<':
-      result = actualValue < config.targetValue;
-      break;
+      return actualValue < config.targetValue;
     case '=':
-      result = actualValue === config.targetValue;
-      break;
+      return actualValue === config.targetValue;
     default:
-      result = false;
+      return false;
   }
-
-  console.log('[AutoCheck] 判断结果:', {
-    comparisonType: config.comparisonType,
-    actualValue,
-    operator: config.operator,
-    targetValue: config.targetValue,
-    result
-  });
-
-  return result;
 }
 
 /**
