@@ -9,7 +9,7 @@
  */
 import React, { useState, useEffect, useRef } from 'react';
 import { Category, Log, TodoItem, TodoCategory, Scope, AutoLinkRule, Comment } from '../types';
-import { X, Trash2, TrendingUp, Plus, Minus, Lightbulb, Check, CheckCircle2, Clock, Camera, Image as ImageIcon, Maximize2, Minimize2 } from 'lucide-react';
+import { X, Trash2, TrendingUp, Plus, Minus, Lightbulb, Check, CheckCircle2, Clock, Camera, Image as ImageIcon, Maximize2, Minimize2, Share2 } from 'lucide-react';
 import { TodoAssociation } from '../components/TodoAssociation';
 import { TagAssociation } from '../components/TagAssociation';
 import { ScopeAssociation } from '../components/ScopeAssociation';
@@ -19,6 +19,7 @@ import { ImagePreviewModal } from './ImagePreviewModal';
 import { ReactionPicker, ReactionList } from './ReactionComponents';
 import { IconRenderer } from './IconRenderer';
 import { useLogForm, useTimeCalculation, useImageManager, useSuggestions } from '../hooks';
+import { useNavigation } from '../contexts/NavigationContext';
 
 interface AddLogModalProps {
   initialLog?: Log | null;
@@ -41,6 +42,8 @@ interface AddLogModalProps {
 
 export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialStartTime, initialEndTime, onClose, onSave, onDelete, onImageRemove, categories, todos, todoCategories, scopes, autoLinkRules = [], lastLogEndTime, autoFocusNote = true, allLogs = [] }) => {
   // 使用自定义 Hooks 管理状态
+  const { setIsShareViewOpen, setSharingLog } = useNavigation();
+  
   const { formState, updateField, updateFields, previousLogEndTime } = useLogForm({
     initialLog,
     initialStartTime,
@@ -100,7 +103,8 @@ export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialSta
     if (imageManager.images !== formState.images) {
       updateField('images', imageManager.images);
     }
-  }, [imageManager.images, formState.images, updateField]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [imageManager.images]); // 只依赖 imageManager.images，避免循环
 
   // 事件处理函数
   const handleTimeInput = (type: 'start' | 'end', field: 'h' | 'm', value: number) => {
@@ -738,9 +742,25 @@ export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialSta
             />
           </div>
 
+          {/* Share Button */}
+          {initialLog && (
+            <div className="pt-2">
+              <button
+                onClick={() => {
+                  setSharingLog(initialLog);
+                  setIsShareViewOpen(true);
+                  onClose(); // Close the log detail modal
+                }}
+                className="w-full py-3 text-stone-700 hover:text-stone-900 hover:bg-stone-100 rounded-full font-medium text-sm transition-colors active:scale-95"
+              >
+                Share
+              </button>
+            </div>
+          )}
+
           {/* Delete Button */}
           {initialLog && onDelete && (
-            <div className="pt-8">
+            <div className="pt-2">
               <button
                 onClick={handleDelete}
                 className="w-full py-3 text-red-500 hover:text-red-600 hover:bg-red-50 rounded-full font-medium text-sm transition-colors active:scale-95"

@@ -102,6 +102,12 @@ interface NavigationContextType {
     focusDetailSessionId: string | null;
     setFocusDetailSessionId: (id: string | null) => void;
 
+    // Share View
+    isShareViewOpen: boolean;
+    setIsShareViewOpen: (open: boolean) => void;
+    sharingLog: Log | null;
+    setSharingLog: (log: Log | null) => void;
+
     // Global Date State
     currentDate: Date;
     setCurrentDate: (date: Date) => void;
@@ -205,6 +211,8 @@ export const NavigationProvider: React.FC<NavigationProviderProps> = ({
     const [initialLogTimes, setInitialLogTimes] = useState<{ start?: number; end?: number } | null>(null);
 
     const [focusDetailSessionId, setFocusDetailSessionId] = useState<string | null>(null);
+    const [isShareViewOpen, setIsShareViewOpen] = useState(false);
+    const [sharingLog, setSharingLog] = useState<Log | null>(null);
     const [currentDate, setCurrentDate] = useState<Date>(new Date());
 
     return (
@@ -283,6 +291,10 @@ export const NavigationProvider: React.FC<NavigationProviderProps> = ({
             setInitialLogTimes,
             focusDetailSessionId,
             setFocusDetailSessionId,
+            isShareViewOpen,
+            setIsShareViewOpen,
+            sharingLog,
+            setSharingLog,
             currentDate,
             setCurrentDate
         }}>

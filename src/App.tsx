@@ -28,6 +28,7 @@ import { GoalEditor } from './components/GoalEditor';
 import { ConfirmModal } from './components/ConfirmModal';
 import { SearchView } from './views/SearchView';
 import { FocusDetailView } from './views/FocusDetailView';
+import { ShareView } from './views/ShareView';
 import { BottomNavigation } from './components/BottomNavigation';
 import { AutoLinkView } from './views/AutoLinkView';
 
@@ -102,6 +103,8 @@ const AppContent: React.FC = () => {
     editingGoal,
     goalScopeId,
     focusDetailSessionId, setFocusDetailSessionId,
+    isShareViewOpen, setIsShareViewOpen,
+    sharingLog,
     statsTitle, setStatsTitle,
     currentView, setCurrentView,
     initialLogTimes,
@@ -399,6 +402,15 @@ const AppContent: React.FC = () => {
           onSelectDailyReview={handleSelectDailyReviewWrapper}
           onSelectWeeklyReview={handleSelectWeeklyReviewWrapper}
           onSelectMonthlyReview={handleSelectMonthlyReviewWrapper}
+        />
+      )}
+
+      {/* Share View Overlay */}
+      {isShareViewOpen && sharingLog && (
+        <ShareView
+          log={sharingLog}
+          scopes={scopes}
+          onBack={() => setIsShareViewOpen(false)}
         />
       )}
 
