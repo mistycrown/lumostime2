@@ -38,7 +38,6 @@ import { useGoalManager } from './hooks/useGoalManager';
 import { useReviewManager } from './hooks/useReviewManager';
 import { useSyncManager } from './hooks/useSyncManager';
 import { useAppInitialization } from './hooks/useAppInitialization';
-import { useAutoGenerateReview } from './hooks/useAutoGenerateReview';
 import { useSearchManager } from './hooks/useSearchManager';
 import { useDeepLink } from './hooks/useDeepLink';
 import { useFloatingWindow } from './hooks/useFloatingWindow';
@@ -171,12 +170,7 @@ const AppContent: React.FC = () => {
   const { isHeaderScrolled } = useAppLifecycle();
   useHardwareBackButton();
 
-  // 自动生成回顾
-  useAutoGenerateReview(
-    reviewManager.handleOpenDailyReview,
-    reviewManager.handleOpenWeeklyReview,
-    reviewManager.handleOpenMonthlyReview
-  );
+  // 注意：自动生成回顾的逻辑已经集成到 TimelineView 中，不需要单独的 hook
 
   const [sessionToStop, setSessionToStop] = React.useState<string | null>(null);
   // Wrappers for Session Actions to match original signature (injecting autoLinkRules)

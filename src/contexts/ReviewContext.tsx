@@ -103,17 +103,17 @@ export const ReviewProvider: React.FC<{ children: ReactNode }> = ({ children }) 
                         // We prioritize the default icon for known default items to fix the "no icon" issue
                         let icon = defaultIconMap[content] || currentIcon || content.trim().slice(0, 1) || '📝';
 
-                        // MERGE: Ensure content starts with icon if it doesn't already
-                        try {
-                            // If content doesn't start with icon, prepend it
-                            if (!content.startsWith(icon)) {
-                                content = `${icon} ${content}`;
-                            }
-                        } catch (e) {
-                            // ignore string errors
-                        }
+                        // 不要修改 content，icon 和 content 应该分开存储
+                        // 移除旧的 MERGE 逻辑，避免重复添加 icon
 
-                        return { id, content, icon };
+                        return { 
+                            id, 
+                            content, 
+                            icon,
+                            uiIcon: item.uiIcon,
+                            type: item.type || 'manual',
+                            autoConfig: item.autoConfig
+                        };
                     })
                 }));
                 return migrated;
@@ -238,9 +238,7 @@ export const ReviewProvider: React.FC<{ children: ReactNode }> = ({ children }) 
             weeklyReviews,
             setWeeklyReviews,
             monthlyReviews,
-            setMonthlyReviews,
-            checkTemplates,
-            setCheckTemplates
+            setMonthlyReviews
         }}>
             {children}
         </ReviewContext.Provider>

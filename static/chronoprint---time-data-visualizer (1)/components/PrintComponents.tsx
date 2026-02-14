@@ -33,14 +33,18 @@ const Barcode: React.FC<{ color: string }> = ({ color }) => {
   );
 };
 
-// Serrated Edge for Ticket Bottom
+// Serrated Edge for Ticket Bottom (SVG Pattern)
 const SerratedEdge: React.FC<{ bg: string }> = ({ bg }) => (
   <div 
-    className="absolute -bottom-2 left-0 w-full h-2 z-20"
+    className="w-full h-2 relative z-20"
     style={{
-      background: `linear-gradient(-45deg, transparent 6px, ${bg} 0) 0 0, linear-gradient(45deg, transparent 6px, ${bg} 0) 0 0`,
-      backgroundSize: '12px 100%',
-      backgroundRepeat: 'repeat-x'
+        backgroundColor: 'transparent',
+        // Triangle pattern using SVG data URI for reliability in export
+        backgroundImage: `url("data:image/svg+xml,%3Csvg width='12' height='6' viewBox='0 0 12 6' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M0 0h12L6 6z' fill='${encodeURIComponent(bg)}'/%3E%3C/svg%3E")`,
+        backgroundRepeat: 'repeat-x',
+        backgroundPosition: 'top left',
+        backgroundSize: '12px 6px',
+        marginTop: '-1px' // Slight overlap to prevent sub-pixel gaps
     }}
   />
 );
@@ -478,7 +482,7 @@ export const PrintCard = React.forwardRef<HTMLDivElement, PrintCardProps>(({
     classic: "bg-white shadow-lg print:shadow-none print:border print:border-gray-200",
     modern: "bg-white border-y-8 relative", // Added relative to constrain absolute children (dot grid)
     retro: "shadow-none relative overflow-hidden", 
-    ticket: "shadow-md relative mb-8", // mb-8 for jagged edge space
+    ticket: "shadow-md relative mb-8", // mb-8 for visual spacing in app, but export needs careful handling
   };
 
   const headerBorder = {
@@ -491,143 +495,196 @@ export const PrintCard = React.forwardRef<HTMLDivElement, PrintCardProps>(({
   return (
     <div 
       ref={ref} 
-      className={`flex flex-col ${isWide ? 'col-span-2' : 'col-span-1'} ${isMobile ? 'p-6' : 'p-8 md:p-12'} ${containerClasses[variantStyle]}`}
+      className={`flex flex-col ${isWide ? 'col-span-2' : 'col-span-1'} ${containerClasses[variantStyle]}`}
       style={{
-        backgroundColor: variantStyle === 'retro' ? theme.bg : (variantStyle === 'ticket' ? theme.bg : '#ffffff'),
+        // For ticket, the main container is transparent to allow the serrated edge bottom to work with the page background.
+        // We add an inner container for the background color.
+        backgroundColor: variantStyle === 'ticket' ? 'transparent' : (variantStyle === 'retro' ? theme.bg : '#ffffff'),
         borderColor: variantStyle === 'modern' ? theme.primary : undefined,
-        borderRadius: variantStyle === 'retro' ? '1.5rem' : '0'
+        borderRadius: variantStyle === 'retro' ? '1.5rem' : '0',
+        padding: variantStyle === 'ticket' ? '0' : (isMobile ? '1.5rem' : '2rem 3rem')
       }}
     >
-      {/* Modern Grid Background */}
-      {variantStyle === 'modern' && (
-         <div 
-         className="absolute inset-0 pointer-events-none opacity-[0.08]" 
-         style={{ 
-           backgroundImage: `radial-gradient(${theme.primary} 1px, transparent 1px)`,
-           backgroundSize: '20px 20px'
-         }}
-       ></div>
-      )}
-
-      {/* Retro Grain Overlay */}
-      {variantStyle === 'retro' && (
-        <div 
-          className="absolute inset-0 pointer-events-none opacity-[0.03] mix-blend-multiply"
-          style={{ 
-            backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E")` 
-          }}
-        ></div>
-      )}
-
-      {/* Ticket Visuals */}
-      {variantStyle === 'ticket' && (
+      {/* 
+        Ticket Structure:
+        1. Inner Container with BG (Content)
+        2. Static Edge below
+      */}
+      {variantStyle === 'ticket' ? (
         <>
-          {/* Top Perforation (Visual only) */}
-          <div className="absolute top-0 left-0 w-full h-3 border-b border-gray-300 opacity-20"></div>
-          {/* Bottom Serrated Edge */}
-          <SerratedEdge bg={theme.bg} />
+           <div className="p-6 md:p-8" style={{ backgroundColor: theme.bg }}>
+              <CardContent 
+                title={title} 
+                subtitle={subtitle} 
+                total={total} 
+                categoryLabel={categoryLabel} 
+                headerBorder={headerBorder[variantStyle]} 
+                theme={theme} 
+                isMobile={isMobile} 
+                variantStyle={variantStyle}
+              >
+                 {/* Top Perforation for Ticket */}
+                 <div className="absolute top-0 left-0 w-full h-3 border-b border-gray-300 opacity-20 pointer-events-none"></div>
+                 {children}
+              </CardContent>
+           </div>
+           {/* Static Serrated Edge */}
+           <SerratedEdge bg={theme.bg} />
+        </>
+      ) : (
+        /* Other Styles Structure */
+        <>
+            {/* Modern Grid Background */}
+            {variantStyle === 'modern' && (
+                <div 
+                className="absolute inset-0 pointer-events-none opacity-[0.08]" 
+                style={{ 
+                backgroundImage: `radial-gradient(${theme.primary} 1px, transparent 1px)`,
+                backgroundSize: '20px 20px'
+                }}
+            ></div>
+            )}
+
+            {/* Retro Grain Overlay */}
+            {variantStyle === 'retro' && (
+                <div 
+                className="absolute inset-0 pointer-events-none opacity-[0.03] mix-blend-multiply"
+                style={{ 
+                    backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E")` 
+                }}
+                ></div>
+            )}
+            
+            <CardContent 
+                title={title} 
+                subtitle={subtitle} 
+                total={total} 
+                categoryLabel={categoryLabel} 
+                headerBorder={headerBorder[variantStyle]} 
+                theme={theme} 
+                isMobile={isMobile} 
+                variantStyle={variantStyle}
+            >
+                {children}
+            </CardContent>
         </>
       )}
-
-      {/* Header Container */}
-      <header 
-        className={`flex justify-between mb-6 gap-4 relative z-10 ${headerBorder[variantStyle]}`}
-        style={{ borderColor: variantStyle === 'classic' || variantStyle === 'modern' ? theme.primary : (variantStyle === 'ticket' ? `${theme.primary}60` : undefined) }}
-      >
-        
-        {/* Left Block */}
-        <div className="flex flex-col justify-between items-start gap-1">
-          <h1 
-            className={`
-              leading-[0.9]
-              ${isMobile ? 'text-2xl' : 'text-3xl md:text-4xl'}
-              ${variantStyle === 'classic' ? 'font-display font-bold' : ''}
-              ${variantStyle === 'modern' ? 'font-sans font-black tracking-tighter uppercase' : ''}
-              ${variantStyle === 'retro' ? 'font-display font-black tracking-tight' : ''}
-              ${variantStyle === 'ticket' ? 'font-serif font-bold tracking-tight uppercase' : ''}
-            `}
-            style={{ color: theme.primary }}
-          >
-            {title}
-          </h1>
-          <p 
-            className={`
-              text-sm leading-none mt-1
-              ${variantStyle === 'classic' ? 'font-sans font-medium tracking-widest' : ''}
-              ${variantStyle === 'modern' ? 'font-sans font-bold tracking-normal uppercase inline-block px-1' : ''}
-              ${variantStyle === 'retro' ? 'font-mono font-medium opacity-70 tracking-tight' : ''}
-              ${variantStyle === 'ticket' ? 'font-serif font-medium opacity-80 uppercase tracking-widest' : ''}
-            `}
-            style={{ 
-              color: variantStyle === 'modern' ? theme.bg : (variantStyle === 'ticket' ? theme.accent : theme.secondary),
-              backgroundColor: variantStyle === 'modern' ? theme.accent : undefined
-            }}
-          >
-            {subtitle}
-          </p>
-        </div>
-
-        {/* Right Block */}
-        <div className="flex flex-col justify-between items-end text-right flex-shrink-0">
-          <div 
-            className={`
-              text-[10px] leading-none pt-1
-              ${variantStyle === 'classic' ? 'font-sans uppercase tracking-widest' : ''}
-              ${variantStyle === 'modern' ? 'font-sans font-bold uppercase' : ''}
-              ${variantStyle === 'retro' ? 'font-mono uppercase opacity-60' : ''}
-              ${variantStyle === 'ticket' ? 'font-serif uppercase opacity-80 font-bold' : ''}
-            `}
-            style={{ color: variantStyle === 'modern' ? theme.primary : theme.secondary }}
-          >Total Time</div>
-          <div 
-            className={`
-              leading-[0.85]
-              ${isMobile ? 'text-xl' : 'text-2xl'}
-              ${variantStyle === 'classic' ? 'font-serif font-bold' : ''}
-              ${variantStyle === 'modern' ? 'font-sans font-black' : ''}
-              ${variantStyle === 'retro' ? 'font-display font-black' : ''}
-              ${variantStyle === 'ticket' ? 'font-serif font-bold' : ''}
-            `}
-            style={{ color: theme.primary }}
-          >{total}</div>
-        </div>
-
-      </header>
-
-      <div className="flex-1 relative z-10">
-        {children}
-      </div>
-
-      <footer className={`
-        mt-10 pt-4 flex justify-between items-center text-[10px] uppercase tracking-widest relative z-10
-        ${variantStyle === 'classic' ? 'border-t border-gray-100 font-sans' : ''}
-        ${variantStyle === 'modern' ? 'border-t-4 font-sans font-bold' : ''}
-        ${variantStyle === 'retro' ? 'border-t-2 border-black/5 font-mono opacity-60' : ''}
-        ${variantStyle === 'ticket' ? 'flex-col border-t border-dotted' : ''}
-      `}
-      style={{ 
-        color: variantStyle === 'classic' ? theme.secondary : (variantStyle === 'modern' ? theme.primary : theme.primary),
-        borderColor: variantStyle === 'modern' ? theme.primary : (variantStyle === 'ticket' ? `${theme.primary}60` : undefined)
-      }}
-      >
-        {variantStyle === 'ticket' ? (
-          <div className="w-full flex flex-col items-center py-2 gap-2">
-            <div className="flex justify-between w-full">
-               <span className="font-serif font-bold">LUMOSTIME</span>
-               <span className="font-serif opacity-70">{categoryLabel}</span>
-            </div>
-            <Barcode color={theme.primary} />
-            <div className="text-[8px] font-mono opacity-50 tracking-widest">THANK YOU</div>
-          </div>
-        ) : (
-          <>
-            <span className={`${variantStyle === 'classic' ? 'font-bold opacity-70' : ''}`}>LUMOSTIME</span>
-            <span>{categoryLabel}</span>
-          </>
-        )}
-      </footer>
     </div>
   );
 });
+
+// Extracted inner content to avoid duplication
+const CardContent: React.FC<{
+    title: string;
+    subtitle: string;
+    total: string;
+    categoryLabel: string;
+    headerBorder: string;
+    theme: ColorTheme;
+    isMobile?: boolean;
+    variantStyle: PrintStyle;
+    children: React.ReactNode;
+}> = ({ title, subtitle, total, categoryLabel, headerBorder, theme, isMobile, variantStyle, children }) => {
+    return (
+        <>
+            {/* Header Container */}
+            <header 
+                className={`flex justify-between mb-6 gap-4 relative z-10 ${headerBorder}`}
+                style={{ borderColor: variantStyle === 'classic' || variantStyle === 'modern' ? theme.primary : (variantStyle === 'ticket' ? `${theme.primary}60` : undefined) }}
+            >
+                {/* Left Block */}
+                <div className="flex flex-col justify-between items-start gap-1">
+                <h1 
+                    className={`
+                    leading-[0.9]
+                    ${isMobile ? 'text-2xl' : 'text-3xl md:text-4xl'}
+                    ${variantStyle === 'classic' ? 'font-display font-bold' : ''}
+                    ${variantStyle === 'modern' ? 'font-sans font-black tracking-tighter uppercase' : ''}
+                    ${variantStyle === 'retro' ? 'font-display font-black tracking-tight' : ''}
+                    ${variantStyle === 'ticket' ? 'font-serif font-bold tracking-tight uppercase' : ''}
+                    `}
+                    style={{ color: theme.primary }}
+                >
+                    {title}
+                </h1>
+                <p 
+                    className={`
+                    text-sm leading-none mt-1
+                    ${variantStyle === 'classic' ? 'font-sans font-medium tracking-widest' : ''}
+                    ${variantStyle === 'modern' ? 'font-sans font-bold tracking-normal uppercase inline-block px-1' : ''}
+                    ${variantStyle === 'retro' ? 'font-mono font-medium opacity-70 tracking-tight' : ''}
+                    ${variantStyle === 'ticket' ? 'font-serif font-medium opacity-80 uppercase tracking-widest' : ''}
+                    `}
+                    style={{ 
+                    color: variantStyle === 'modern' ? theme.bg : (variantStyle === 'ticket' ? theme.accent : theme.secondary),
+                    backgroundColor: variantStyle === 'modern' ? theme.accent : undefined
+                    }}
+                >
+                    {subtitle}
+                </p>
+                </div>
+
+                {/* Right Block */}
+                <div className="flex flex-col justify-between items-end text-right flex-shrink-0">
+                <div 
+                    className={`
+                    text-[10px] leading-none pt-1
+                    ${variantStyle === 'classic' ? 'font-sans uppercase tracking-widest' : ''}
+                    ${variantStyle === 'modern' ? 'font-sans font-bold uppercase' : ''}
+                    ${variantStyle === 'retro' ? 'font-mono uppercase opacity-60' : ''}
+                    ${variantStyle === 'ticket' ? 'font-serif uppercase opacity-80 font-bold' : ''}
+                    `}
+                    style={{ color: variantStyle === 'modern' ? theme.primary : theme.secondary }}
+                >Total Time</div>
+                <div 
+                    className={`
+                    leading-[0.85]
+                    ${isMobile ? 'text-xl' : 'text-2xl'}
+                    ${variantStyle === 'classic' ? 'font-serif font-bold' : ''}
+                    ${variantStyle === 'modern' ? 'font-sans font-black' : ''}
+                    ${variantStyle === 'retro' ? 'font-display font-black' : ''}
+                    ${variantStyle === 'ticket' ? 'font-serif font-bold' : ''}
+                    `}
+                    style={{ color: theme.primary }}
+                >{total}</div>
+                </div>
+
+            </header>
+
+            <div className="flex-1 relative z-10">
+                {children}
+            </div>
+
+            <footer className={`
+                mt-10 pt-4 flex justify-between items-center text-[10px] uppercase tracking-widest relative z-10
+                ${variantStyle === 'classic' ? 'border-t border-gray-100 font-sans' : ''}
+                ${variantStyle === 'modern' ? 'border-t-4 font-sans font-bold' : ''}
+                ${variantStyle === 'retro' ? 'border-t-2 border-black/5 font-mono opacity-60' : ''}
+                ${variantStyle === 'ticket' ? 'flex-col border-t border-dotted' : ''}
+            `}
+            style={{ 
+                color: variantStyle === 'classic' ? theme.secondary : (variantStyle === 'modern' ? theme.primary : theme.primary),
+                borderColor: variantStyle === 'modern' ? theme.primary : (variantStyle === 'ticket' ? `${theme.primary}60` : undefined)
+            }}
+            >
+                {variantStyle === 'ticket' ? (
+                <div className="w-full flex flex-col items-center py-2 gap-2">
+                    <div className="flex justify-between w-full">
+                    <span className="font-serif font-bold">LUMOSTIME</span>
+                    <span className="font-serif opacity-70">{categoryLabel}</span>
+                    </div>
+                    <Barcode color={theme.primary} />
+                    <div className="text-[8px] font-mono opacity-50 tracking-widest">THANK YOU</div>
+                </div>
+                ) : (
+                <>
+                    <span className={`${variantStyle === 'classic' ? 'font-bold opacity-70' : ''}`}>LUMOSTIME</span>
+                    <span>{categoryLabel}</span>
+                </>
+                )}
+            </footer>
+        </>
+    );
+};
 
 PrintCard.displayName = "PrintCard";
