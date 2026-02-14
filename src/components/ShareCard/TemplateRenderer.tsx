@@ -42,7 +42,10 @@ export const TemplateRenderer: React.FC<TemplateRendererProps> = ({ content, the
   const renderImagesDefault = (className: string) => {
     if (!hasImages) return null;
 
-    if (content.images.length === 1) {
+    const imageCount = content.images.length;
+
+    // 1 张图
+    if (imageCount === 1) {
       return (
         <div className={`w-full h-full overflow-hidden ${className}`}>
           <img src={content.images[0]} alt="Main" className="w-full h-full object-cover" />
@@ -50,7 +53,8 @@ export const TemplateRenderer: React.FC<TemplateRendererProps> = ({ content, the
       );
     }
 
-    if (content.images.length === 2) {
+    // 2 张图
+    if (imageCount === 2) {
       return (
         <div className={`grid grid-cols-2 gap-2 w-full h-full ${className}`}>
           {content.images.slice(0, 2).map((img, i) => (
@@ -62,7 +66,8 @@ export const TemplateRenderer: React.FC<TemplateRendererProps> = ({ content, the
       );
     }
 
-    if (content.images.length === 3) {
+    // 3 张图
+    if (imageCount === 3) {
       return (
         <div className={`grid grid-cols-2 gap-2 w-full h-full ${className}`}>
           <div className="col-span-2 aspect-video overflow-hidden relative">
@@ -77,10 +82,102 @@ export const TemplateRenderer: React.FC<TemplateRendererProps> = ({ content, the
       );
     }
 
-    // 4 or more images
+    // 4 张图
+    if (imageCount === 4) {
+      return (
+        <div className={`grid grid-cols-2 gap-2 w-full h-full ${className}`}>
+          {content.images.slice(0, 4).map((img, i) => (
+            <div key={i} className="aspect-square overflow-hidden relative">
+              <img src={img} alt={`Img ${i}`} className="absolute inset-0 w-full h-full object-cover" />
+            </div>
+          ))}
+        </div>
+      );
+    }
+
+    // 5 张图：上2下3
+    if (imageCount === 5) {
+      return (
+        <div className={`grid gap-2 w-full h-full ${className}`}>
+          <div className="grid grid-cols-2 gap-2">
+            {content.images.slice(0, 2).map((img, i) => (
+              <div key={i} className="aspect-square overflow-hidden relative">
+                <img src={img} alt={`Img ${i}`} className="absolute inset-0 w-full h-full object-cover" />
+              </div>
+            ))}
+          </div>
+          <div className="grid grid-cols-3 gap-2">
+            {content.images.slice(2, 5).map((img, i) => (
+              <div key={i} className="aspect-square overflow-hidden relative">
+                <img src={img} alt={`Img ${i + 2}`} className="absolute inset-0 w-full h-full object-cover" />
+              </div>
+            ))}
+          </div>
+        </div>
+      );
+    }
+
+    // 6 张图：3x2 网格
+    if (imageCount === 6) {
+      return (
+        <div className={`grid grid-cols-3 gap-2 w-full h-full ${className}`}>
+          {content.images.slice(0, 6).map((img, i) => (
+            <div key={i} className="aspect-square overflow-hidden relative">
+              <img src={img} alt={`Img ${i}`} className="absolute inset-0 w-full h-full object-cover" />
+            </div>
+          ))}
+        </div>
+      );
+    }
+
+    // 7 张图：上1大图，下6小图
+    if (imageCount === 7) {
+      return (
+        <div className={`grid gap-2 w-full h-full ${className}`}>
+          <div className="aspect-video overflow-hidden relative">
+            <img src={content.images[0]} alt="Main" className="absolute inset-0 w-full h-full object-cover" />
+          </div>
+          <div className="grid grid-cols-3 gap-2">
+            {content.images.slice(1, 7).map((img, i) => (
+              <div key={i} className="aspect-square overflow-hidden relative">
+                <img src={img} alt={`Img ${i + 1}`} className="absolute inset-0 w-full h-full object-cover" />
+              </div>
+            ))}
+          </div>
+        </div>
+      );
+    }
+
+    // 8 张图：4x2 网格
+    if (imageCount === 8) {
+      return (
+        <div className={`grid grid-cols-4 gap-2 w-full h-full ${className}`}>
+          {content.images.slice(0, 8).map((img, i) => (
+            <div key={i} className="aspect-square overflow-hidden relative">
+              <img src={img} alt={`Img ${i}`} className="absolute inset-0 w-full h-full object-cover" />
+            </div>
+          ))}
+        </div>
+      );
+    }
+
+    // 9 张图：3x3 网格
+    if (imageCount === 9) {
+      return (
+        <div className={`grid grid-cols-3 gap-2 w-full h-full ${className}`}>
+          {content.images.slice(0, 9).map((img, i) => (
+            <div key={i} className="aspect-square overflow-hidden relative">
+              <img src={img} alt={`Img ${i}`} className="absolute inset-0 w-full h-full object-cover" />
+            </div>
+          ))}
+        </div>
+      );
+    }
+
+    // 超过9张图：显示前9张，3x3 网格
     return (
-      <div className={`grid grid-cols-2 gap-2 w-full h-full ${className}`}>
-        {content.images.slice(0, 4).map((img, i) => (
+      <div className={`grid grid-cols-3 gap-2 w-full h-full ${className}`}>
+        {content.images.slice(0, 9).map((img, i) => (
           <div key={i} className="aspect-square overflow-hidden relative">
             <img src={img} alt={`Img ${i}`} className="absolute inset-0 w-full h-full object-cover" />
           </div>
@@ -91,16 +188,71 @@ export const TemplateRenderer: React.FC<TemplateRendererProps> = ({ content, the
 
   // --- Template: Vertical Poetry (New Chinese Style) - Pure Text ---
   if (templateId === 'vertical-poetry') {
-    // For vertical text, we need to calculate approximate height based on content length
-    // Each vertical column can fit roughly 30-35 characters depending on font size
-    const charsPerColumn = 32;
-    const columnWidth = 40; // approximate width per column in pixels
-    const estimatedColumns = Math.ceil(content.body.length / charsPerColumn);
-    const minHeight = 600; // minimum height for aesthetic
-    const calculatedHeight = Math.max(minHeight, estimatedColumns * columnWidth * 0.8);
+    // 按段落分割文本（保留换行符）
+    const paragraphs = content.body.split('\n').filter(p => p.trim().length > 0);
+    const totalChars = content.body.replace(/\n/g, '').length; // 不计算换行符
+    const maxColumns = 8; // 最多8列
+    
+    // 根据字数决定列数
+    let numColumns: number;
+    if (totalChars <= 30) {
+      numColumns = 1;
+    } else if (totalChars <= 60) {
+      numColumns = 2;
+    } else if (totalChars <= 100) {
+      numColumns = 3;
+    } else if (totalChars <= 150) {
+      numColumns = 4;
+    } else if (totalChars <= 200) {
+      numColumns = 5;
+    } else if (totalChars <= 250) {
+      numColumns = 6;
+    } else if (totalChars <= 300) {
+      numColumns = 7;
+    } else {
+      numColumns = maxColumns;
+    }
+    
+    // 计算每列的理想字数
+    const charsPerColumn = Math.ceil(totalChars / numColumns);
+    
+    // 智能分配段落到列（尽量保持段落完整）
+    const columns: string[] = [];
+    let currentColumn = '';
+    let currentColumnLength = 0;
+    
+    for (let i = 0; i < paragraphs.length; i++) {
+      const para = paragraphs[i];
+      const paraLength = para.length;
+      
+      // 如果当前列为空，直接添加段落
+      if (currentColumnLength === 0) {
+        currentColumn = para;
+        currentColumnLength = paraLength;
+      }
+      // 如果添加这个段落不会超过太多，就添加到当前列
+      else if (currentColumnLength + paraLength <= charsPerColumn * 1.3) {
+        currentColumn += '\n' + para;
+        currentColumnLength += paraLength;
+      }
+      // 否则，开始新列
+      else {
+        columns.push(currentColumn);
+        currentColumn = para;
+        currentColumnLength = paraLength;
+      }
+      
+      // 最后一个段落
+      if (i === paragraphs.length - 1) {
+        columns.push(currentColumn);
+      }
+    }
+    
+    // 反转数组，实现从右往左排列
+    columns.reverse();
     
     return (
-      <div className="w-full p-6 md:p-8 relative" style={{ minHeight: `${calculatedHeight}px` }}>
+      <div className="w-full p-6 md:p-8 relative min-h-[500px]">
         {/* Background Element */}
         <div className="absolute top-0 right-0 w-32 h-32 opacity-5 rounded-bl-full pointer-events-none" style={bgStyle}></div>
 
@@ -111,16 +263,22 @@ export const TemplateRenderer: React.FC<TemplateRendererProps> = ({ content, the
           </div>
         </div>
 
-        {/* Vertical Body Text - centered, pure text layout */}
-        <div className="flex justify-center items-start py-2 pr-16">
-          <div className="text-base md:text-lg font-serif leading-loose text-justify" style={{
-            ...primaryStyle, 
-            writingMode: 'vertical-rl', 
-            textOrientation: 'mixed',
-            whiteSpace: 'pre-wrap'
-          }}>
-            {content.body}
-          </div>
+        {/* Vertical Body Text - multiple columns, right to left */}
+        <div className="flex justify-center items-start py-8 pr-16 gap-3">
+          {columns.map((columnText, index) => (
+            <div 
+              key={index}
+              className="text-base md:text-lg font-serif leading-loose" 
+              style={{
+                ...primaryStyle, 
+                writingMode: 'vertical-rl', 
+                textOrientation: 'mixed',
+                whiteSpace: 'pre-wrap'
+              }}
+            >
+              {columnText}
+            </div>
+          ))}
         </div>
         
         {/* LumosTime Watermark */}
@@ -145,38 +303,7 @@ export const TemplateRenderer: React.FC<TemplateRendererProps> = ({ content, the
         <div className="flex flex-col items-center py-4">
            {hasImages && (
                <div className="mb-6 w-full max-w-md shadow-lg flex-shrink-0">
-                   {content.images.length === 1 ? (
-                     <div className="aspect-square bg-gray-100 rotate-1 transition-transform hover:rotate-0 duration-500">
-                       <img src={content.images[0]} alt="Main" className="w-full h-full object-cover" />
-                     </div>
-                   ) : content.images.length === 2 ? (
-                     <div className="grid grid-cols-2 gap-3">
-                       {content.images.slice(0, 2).map((img, i) => (
-                         <div key={i} className="aspect-square bg-gray-100 overflow-hidden">
-                           <img src={img} alt={`Img ${i}`} className="w-full h-full object-cover" />
-                         </div>
-                       ))}
-                     </div>
-                   ) : content.images.length === 3 ? (
-                     <div className="grid grid-cols-2 gap-3">
-                       <div className="col-span-2 aspect-video bg-gray-100 overflow-hidden">
-                         <img src={content.images[0]} alt="Main" className="w-full h-full object-cover" />
-                       </div>
-                       {content.images.slice(1, 3).map((img, i) => (
-                         <div key={i} className="aspect-square bg-gray-100 overflow-hidden">
-                           <img src={img} alt={`Img ${i + 1}`} className="w-full h-full object-cover" />
-                         </div>
-                       ))}
-                     </div>
-                   ) : (
-                     <div className="grid grid-cols-2 gap-3">
-                       {content.images.slice(0, 4).map((img, i) => (
-                         <div key={i} className="aspect-square bg-gray-100 overflow-hidden">
-                           <img src={img} alt={`Img ${i}`} className="w-full h-full object-cover" />
-                         </div>
-                       ))}
-                     </div>
-                   )}
+                   {renderImagesDefault('bg-gray-100')}
                </div>
            )}
            
@@ -310,27 +437,85 @@ export const TemplateRenderer: React.FC<TemplateRendererProps> = ({ content, the
 
             <div className="flex flex-col md:flex-row gap-6">
                 {hasImages && (
-                    <div className="w-full md:w-1/2 flex-shrink-0 flex flex-col gap-2 max-h-[500px]">
+                    <div className="w-full md:w-1/2 flex-shrink-0 max-h-[500px]">
                         {/* Custom Vertical Stack Rendering for Modern Split */}
                         {content.images.length === 1 ? (
-                          <div className="flex-1 relative rounded-lg overflow-hidden shadow-sm">
+                          <div className="h-full relative rounded-lg overflow-hidden shadow-sm min-h-[300px]">
                             <img src={content.images[0]} alt="Main" className="absolute inset-0 w-full h-full object-cover" />
                           </div>
                         ) : content.images.length === 2 ? (
-                          content.images.slice(0, 2).map((img, i) => (
-                            <div key={i} className="flex-1 relative rounded-lg overflow-hidden shadow-sm min-h-[150px]">
-                              <img src={img} alt={`Split ${i}`} className="absolute inset-0 w-full h-full object-cover" />
-                            </div>
-                          ))
+                          <div className="flex flex-col gap-2 h-full">
+                            {content.images.slice(0, 2).map((img, i) => (
+                              <div key={i} className="flex-1 relative rounded-lg overflow-hidden shadow-sm min-h-[150px]">
+                                <img src={img} alt={`Split ${i}`} className="absolute inset-0 w-full h-full object-cover" />
+                              </div>
+                            ))}
+                          </div>
                         ) : content.images.length === 3 ? (
-                          content.images.slice(0, 3).map((img, i) => (
-                            <div key={i} className="flex-1 relative rounded-lg overflow-hidden shadow-sm min-h-[120px]">
-                              <img src={img} alt={`Split ${i}`} className="absolute inset-0 w-full h-full object-cover" />
-                            </div>
-                          ))
-                        ) : (
+                          <div className="flex flex-col gap-2 h-full">
+                            {content.images.slice(0, 3).map((img, i) => (
+                              <div key={i} className="flex-1 relative rounded-lg overflow-hidden shadow-sm min-h-[100px]">
+                                <img src={img} alt={`Split ${i}`} className="absolute inset-0 w-full h-full object-cover" />
+                              </div>
+                            ))}
+                          </div>
+                        ) : content.images.length === 4 ? (
                           <div className="grid grid-cols-2 gap-2 h-full">
                             {content.images.slice(0, 4).map((img, i) => (
+                              <div key={i} className="aspect-square relative rounded-lg overflow-hidden shadow-sm">
+                                <img src={img} alt={`Split ${i}`} className="absolute inset-0 w-full h-full object-cover" />
+                              </div>
+                            ))}
+                          </div>
+                        ) : content.images.length === 5 ? (
+                          <div className="grid gap-2 h-full">
+                            <div className="grid grid-cols-2 gap-2">
+                              {content.images.slice(0, 2).map((img, i) => (
+                                <div key={i} className="aspect-square relative rounded-lg overflow-hidden shadow-sm">
+                                  <img src={img} alt={`Split ${i}`} className="absolute inset-0 w-full h-full object-cover" />
+                                </div>
+                              ))}
+                            </div>
+                            <div className="grid grid-cols-3 gap-2">
+                              {content.images.slice(2, 5).map((img, i) => (
+                                <div key={i} className="aspect-square relative rounded-lg overflow-hidden shadow-sm">
+                                  <img src={img} alt={`Split ${i + 2}`} className="absolute inset-0 w-full h-full object-cover" />
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        ) : content.images.length === 6 ? (
+                          <div className="grid grid-cols-3 gap-2 h-full">
+                            {content.images.slice(0, 6).map((img, i) => (
+                              <div key={i} className="aspect-square relative rounded-lg overflow-hidden shadow-sm">
+                                <img src={img} alt={`Split ${i}`} className="absolute inset-0 w-full h-full object-cover" />
+                              </div>
+                            ))}
+                          </div>
+                        ) : content.images.length === 7 ? (
+                          <div className="grid gap-2 h-full">
+                            <div className="aspect-video relative rounded-lg overflow-hidden shadow-sm">
+                              <img src={content.images[0]} alt="Main" className="absolute inset-0 w-full h-full object-cover" />
+                            </div>
+                            <div className="grid grid-cols-3 gap-2">
+                              {content.images.slice(1, 7).map((img, i) => (
+                                <div key={i} className="aspect-square relative rounded-lg overflow-hidden shadow-sm">
+                                  <img src={img} alt={`Split ${i + 1}`} className="absolute inset-0 w-full h-full object-cover" />
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        ) : content.images.length === 8 ? (
+                          <div className="grid grid-cols-4 gap-2 h-full">
+                            {content.images.slice(0, 8).map((img, i) => (
+                              <div key={i} className="aspect-square relative rounded-lg overflow-hidden shadow-sm">
+                                <img src={img} alt={`Split ${i}`} className="absolute inset-0 w-full h-full object-cover" />
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <div className="grid grid-cols-3 gap-2 h-full">
+                            {content.images.slice(0, 9).map((img, i) => (
                               <div key={i} className="aspect-square relative rounded-lg overflow-hidden shadow-sm">
                                 <img src={img} alt={`Split ${i}`} className="absolute inset-0 w-full h-full object-cover" />
                               </div>
@@ -357,6 +542,156 @@ export const TemplateRenderer: React.FC<TemplateRendererProps> = ({ content, the
                     )}
                 </div>
             </div>
+        </div>
+      </div>
+    );
+  }
+
+  // --- Template: Glass Morphism (Frosted Glass Effect) ---
+  if (templateId === 'glass-morphism') {
+    // 使用固定的互补色对，确保视觉对比明显
+    const getComplementaryColor = (hexColor: string) => {
+      // 预定义的互补色对（蓝色系 → 粉色/橙色系）
+      const colorPairs: { [key: string]: string } = {
+        // 深色系
+        '#2C2C2C': '#E8B4B8', // 水墨黑 → 粉色
+        '#8E2800': '#00A8A8', // 朱砂红 → 青色
+        '#385E3C': '#E8A0BF', // 竹青 → 粉紫
+        '#2B4C7E': '#FFB6C1', // 靛蓝 → 粉色
+        '#6B6B6B': '#FFD4A3', // 极简白 → 橙色
+        '#9D2933': '#33C3C3', // 胭脂粉 → 青绿
+        '#8B5A00': '#A855F7', // 琥珀黄 → 紫色
+        '#5D3A7A': '#FFB347', // 紫藤 → 橙色
+        '#4A5568': '#FFB6D9', // 青灰 → 粉色
+      };
+      
+      // 如果有预定义的配对，使用它
+      if (colorPairs[hexColor]) {
+        return colorPairs[hexColor];
+      }
+      
+      // 否则生成一个明显不同的颜色
+      const hex = hexColor.replace('#', '');
+      const r = parseInt(hex.substr(0, 2), 16);
+      const g = parseInt(hex.substr(2, 2), 16);
+      const b = parseInt(hex.substr(4, 2), 16);
+      
+      // 简单反转并调整，确保明显不同
+      const r2 = 255 - r + 100;
+      const g2 = 255 - g + 50;
+      const b2 = 255 - b + 80;
+      
+      return `rgb(${Math.min(255, r2)}, ${Math.min(255, g2)}, ${Math.min(255, b2)})`;
+    };
+    
+    const secondaryColor = getComplementaryColor(theme.primaryColor);
+    
+    return (
+      <div 
+        className="w-full relative overflow-hidden"
+        style={{ 
+          background: '#FAFAFA',
+        }}
+      >
+        {/* Background decorative blurred circles - 两个弥散光晕，中间留白 */}
+        {/* 主色光晕 - 左上角 */}
+        <div 
+          className="absolute -top-40 -left-40 w-[500px] h-[500px] rounded-full pointer-events-none"
+          style={{ 
+            background: `radial-gradient(circle, ${theme.primaryColor}45 0%, ${theme.primaryColor}30 25%, ${theme.primaryColor}15 45%, transparent 70%)`,
+            filter: 'blur(60px)'
+          }}
+        ></div>
+        
+        {/* 互补色光晕 - 右下角 */}
+        <div 
+          className="absolute -bottom-40 -right-40 w-[500px] h-[500px] rounded-full pointer-events-none"
+          style={{ 
+            background: `radial-gradient(circle, ${secondaryColor}45 0%, ${secondaryColor}30 25%, ${secondaryColor}15 45%, transparent 70%)`,
+            filter: 'blur(60px)'
+          }}
+        ></div>
+
+        {/* Main content - single glass card with reduced padding */}
+        <div className="relative z-10 p-4 md:p-6">
+          <div 
+            className="rounded-3xl p-5 md:p-6"
+            style={{
+              background: `linear-gradient(135deg, rgba(255, 255, 255, 0.5) 0%, rgba(255, 255, 255, 0.35) 100%)`,
+              backdropFilter: 'blur(20px)',
+              WebkitBackdropFilter: 'blur(20px)',
+              border: '1px solid rgba(255, 255, 255, 0.4)',
+              boxShadow: '0 8px 32px rgba(0, 0, 0, 0.12)',
+            }}
+          >
+            {/* Header */}
+            <div className="flex justify-between items-center mb-5">
+              {content.activity && (
+                <div 
+                  className="px-3 py-1.5 rounded-full text-xs font-medium"
+                  style={{
+                    background: `linear-gradient(135deg, ${theme.primaryColor}35 0%, ${secondaryColor}25 100%)`,
+                    color: theme.primaryColor,
+                    border: '1px solid rgba(255, 255, 255, 0.4)',
+                  }}
+                >
+                  #{content.activity}
+                </div>
+              )}
+              <div 
+                className="text-xs font-mono font-medium ml-auto"
+                style={{ 
+                  color: theme.primaryColor,
+                  opacity: 0.7
+                }}
+              >
+                {content.date}
+              </div>
+            </div>
+
+            {/* Images */}
+            {hasImages && (
+              <div className="rounded-2xl overflow-hidden mb-5">
+                {renderImagesDefault('')}
+              </div>
+            )}
+
+            {/* Body text */}
+            <p 
+              className="text-base leading-relaxed font-serif mb-5"
+              style={{
+                color: theme.primaryColor,
+                whiteSpace: 'pre-wrap'
+              }}
+            >
+              {content.body}
+            </p>
+
+            {/* Footer */}
+            <div className="flex justify-center items-center gap-4 pt-4 border-t border-white/25">
+              <div 
+                className="h-px flex-1"
+                style={{ 
+                  background: `linear-gradient(90deg, transparent 0%, ${theme.primaryColor}40 50%, transparent 100%)`
+                }}
+              ></div>
+              <div 
+                className="text-[9px] font-sans tracking-wider font-medium"
+                style={{ 
+                  color: theme.primaryColor,
+                  opacity: 0.5
+                }}
+              >
+                LumosTime
+              </div>
+              <div 
+                className="h-px flex-1"
+                style={{ 
+                  background: `linear-gradient(90deg, transparent 0%, ${theme.primaryColor}40 50%, transparent 100%)`
+                }}
+              ></div>
+            </div>
+          </div>
         </div>
       </div>
     );

@@ -99,14 +99,31 @@ export const ShareView: React.FC<ShareViewProps> = ({ log, onBack, onToast }) =>
     
     setIsExporting(true);
     try {
-      // 减少延迟时间，加快生成速度
-      await new Promise(r => setTimeout(r, 100));
+      // 等待所有图片加载完成
+      const images = previewRef.current.querySelectorAll('img');
+      const imagePromises = Array.from(images).map(img => {
+        if (img.complete) return Promise.resolve();
+        return new Promise((resolve, reject) => {
+          img.onload = resolve;
+          img.onerror = () => {
+            console.warn('Image failed to load:', img.src);
+            resolve(); // 即使失败也继续
+          };
+          // 超时保护
+          setTimeout(resolve, 3000);
+        });
+      });
+      
+      await Promise.all(imagePromises);
+      
+      // 额外延迟确保渲染完成
+      await new Promise(r => setTimeout(r, 200));
 
       const options = { 
         cacheBust: true, 
-        pixelRatio: 2, // 降低到 2 以提升速度，质量仍然很好
+        pixelRatio: 2,
         useCORS: true,
-        backgroundColor: activeTheme.backgroundColor
+        backgroundColor: activeTemplateId === 'glass-morphism' ? 'transparent' : activeTheme.backgroundColor
       };
 
       let dataUrl: string;
@@ -114,7 +131,12 @@ export const ShareView: React.FC<ShareViewProps> = ({ log, onBack, onToast }) =>
         dataUrl = await toPng(previewRef.current, options);
       } catch (firstErr) {
         console.warn("First export attempt failed, retrying with skipFonts...", firstErr);
-        dataUrl = await toPng(previewRef.current, { ...options, skipFonts: true });
+        try {
+          dataUrl = await toPng(previewRef.current, { ...options, skipFonts: true });
+        } catch (secondErr) {
+          console.error("Second export attempt also failed:", secondErr);
+          throw new Error('图片导出失败，请重试');
+        }
       }
       
       const isNative = Capacitor.isNativePlatform();
@@ -197,7 +219,12 @@ export const ShareView: React.FC<ShareViewProps> = ({ log, onBack, onToast }) =>
       </div>
 
       {/* Preview Area - 预览区域（可滚动） */}
-      <div className="flex-1 overflow-y-auto bg-stone-100 py-8 px-4">
+      <div 
+        className="flex-1 overflow-y-auto py-8 px-4"
+        style={{
+          backgroundColor: activeTemplateId === 'glass-morphism' ? 'transparent' : '#f5f5f4'
+        }}
+      >
         <div className="w-full max-w-[400px] mx-auto">
           {isLoadingImages ? (
             <div className="text-stone-400 text-sm text-center">加载图片中...</div>
@@ -207,7 +234,7 @@ export const ShareView: React.FC<ShareViewProps> = ({ log, onBack, onToast }) =>
                 ref={previewRef}
                 className="w-full"
                 style={{ 
-                  backgroundColor: activeTheme.backgroundColor,
+                  backgroundColor: activeTemplateId === 'glass-morphism' ? 'transparent' : activeTheme.backgroundColor,
                   fontFamily: activeTheme.fontFamily === 'font-serif' ? '"Noto Serif SC", "Playfair Display", serif' : '"Inter", "Noto Sans SC", sans-serif'
                 }}
               >
@@ -254,18 +281,19 @@ export const ShareView: React.FC<ShareViewProps> = ({ log, onBack, onToast }) =>
             <div className="flex items-center gap-2 text-xs font-bold text-stone-700 mb-3 uppercase tracking-wider">
               <Layout size={14} /> 布局模版
             </div>
-            <div className="flex justify-between gap-2">
+            <div className="grid grid-cols-3 gap-2">
               {[
                 { id: 'magazine-classic', label: '经典' },
                 { id: 'vertical-poetry', label: '古韵' },
                 { id: 'minimal-note', label: '现代' },
                 { id: 'modern-split', label: '分割' },
-                { id: 'film-story', label: '变迁' }
+                { id: 'film-story', label: '变迁' },
+                { id: 'glass-morphism', label: '玻璃' }
               ].map(template => (
                 <button
                   key={template.id}
                   onClick={() => setActiveTemplateId(template.id)}
-                  className={`flex-1 px-2 py-1.5 rounded-full text-[10px] font-medium border transition-all ${
+                  className={`px-2 py-1.5 rounded-full text-[10px] font-medium border transition-all ${
                     activeTemplateId === template.id 
                       ? 'bg-stone-100 border-stone-400 text-stone-900' 
                       : 'border-stone-300 text-stone-600 hover:border-stone-400'
