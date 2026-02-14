@@ -233,7 +233,7 @@ const TimelineItem: React.FC<TimelineItemProps> = ({ entry, isLast, isFirstOfDay
                     if (!displayTitle) return null;
 
                     return (
-                        <h3 className={`text-gray-900 font-bold leading-tight ${isSummary ? 'text-[16px]' : 'text-[16px]'} transition-all duration-500`} style={{ fontFamily: '"Noto Serif SC", serif' }}>
+                        <h3 className={`text-gray-900 font-bold leading-tight ${isSummary ? 'text-[16px]' : 'text-[16px]'} transition-all duration-500`}>
                             {displayTitle}
                         </h3>
                     );
@@ -340,7 +340,7 @@ const TimelineItem: React.FC<TimelineItemProps> = ({ entry, isLast, isFirstOfDay
                             <div key={comment.id} className="flex gap-3 text-sm group/comment">
                                 <div className="w-1 h-auto bg-gray-300 rounded-full my-1 opacity-50"></div>
                                 <div className="flex flex-col gap-1">
-                                    <p className="text-sm text-stone-500 leading-relaxed font-light" style={{ fontFamily: '"Noto Serif SC", serif' }}>{comment.text}</p>
+                                    <p className="text-sm text-stone-500 leading-relaxed font-light">{comment.text}</p>
                                     <span className="text-[10px] text-stone-300 font-sans tracking-wide mt-0.5">
                                         {(() => {
                                             const d = new Date(comment.createdAt);

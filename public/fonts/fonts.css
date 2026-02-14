@@ -1,0 +1,72 @@
+/**
+ * 自定义字体定义
+ * 字体文件位于 public/fonts/ 目录下
+ */
+
+/* 霞鹜文楷 Lite - LXGW WenKai Lite */
+@font-face {
+    font-family: 'LXGW WenKai';
+    src: url('./LXGWWenKaiLite-Regular.woff2') format('woff2');
+    font-weight: 400;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'LXGW WenKai';
+    src: url('./LXGWWenKaiLite-Regular.woff2') format('woff2');
+    font-weight: 700;
+    font-style: normal;
+    font-display: swap;
+}
+
+/* 霞鹜新致宋 - LXGW Neo ZhiSong */
+@font-face {
+    font-family: 'LXGW Neo ZhiSong';
+    src: url('./LXGWNeoZhiSong.woff2') format('woff2');
+    font-weight: 400;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'LXGW Neo ZhiSong';
+    src: url('./LXGWNeoZhiSong.woff2') format('woff2');
+    font-weight: 700;
+    font-style: normal;
+    font-display: swap;
+}
+
+/* 鼎烈宋体 - Ding Lie Song */
+@font-face {
+    font-family: 'Ding Lie Song';
+    src: url('./dingliesongtypeface.woff2') format('woff2');
+    font-weight: 400;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'Ding Lie Song';
+    src: url('./dingliesongtypeface.woff2') format('woff2');
+    font-weight: 700;
+    font-style: normal;
+    font-display: swap;
+}
+
+/* 朱雀仿宋 - Zhuque Fangsong */
+@font-face {
+    font-family: 'Zhuque Fangsong';
+    src: url('./ZhuqueFangsong-Regular.woff2') format('woff2');
+    font-weight: 400;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'Zhuque Fangsong';
+    src: url('./ZhuqueFangsong-Regular.woff2') format('woff2');
+    font-weight: 700;
+    font-style: normal;
+    font-display: swap;
+}

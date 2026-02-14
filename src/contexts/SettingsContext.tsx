@@ -49,6 +49,10 @@ interface SettingsContextType {
     colorScheme: string;
     setColorScheme: React.Dispatch<React.SetStateAction<string>>;
 
+    // 字体设置
+    fontFamily: string;
+    setFontFamily: React.Dispatch<React.SetStateAction<string>>;
+
     // 应用规则
     appRules: { [packageName: string]: string };
     setAppRules: React.Dispatch<React.SetStateAction<{ [packageName: string]: string }>>;
@@ -253,6 +257,11 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
         return stored || 'default';
     });
 
+    const [fontFamily, setFontFamily] = useState<string>(() => {
+        const stored = localStorage.getItem('lumostime_font_family');
+        return stored || 'default';
+    });
+
     useEffect(() => {
         localStorage.setItem('lumostime_color_scheme', colorScheme);
         // 同步到 colorSchemeService
@@ -260,6 +269,14 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
             colorSchemeService.setScheme(colorScheme as any);
         });
     }, [colorScheme]);
+
+    useEffect(() => {
+        localStorage.setItem('lumostime_font_family', fontFamily);
+        // 同步到 fontService
+        import('../services/fontService').then(({ fontService }) => {
+            fontService.setFont(fontFamily);
+        });
+    }, [fontFamily]);
 
     useEffect(() => {
         localStorage.setItem('lumostime_custom_narrative_templates', JSON.stringify(customNarrativeTemplates));
@@ -305,6 +322,8 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
             setUiIconTheme,
             colorScheme,
             setColorScheme,
+            fontFamily,
+            setFontFamily,
             appRules,
             setAppRules,
             customNarrativeTemplates,
