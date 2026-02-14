@@ -96,5 +96,10 @@ export const SHARE_TEMPLATES: ShareTemplate[] = [
     id: 'minimal-note',
     name: '留白便签',
     description: '极简风格',
+  },
+  {
+    id: 'glass-morphism',
+    name: '磨砂玻璃',
+    description: '毛玻璃质感',
   }
 ];
