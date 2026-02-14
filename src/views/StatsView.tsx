@@ -18,6 +18,7 @@ import { ToastType } from '../components/Toast';
 import { usePrivacy } from '../contexts/PrivacyContext';
 import { IconRenderer } from '../components/IconRenderer';
 import { ConfirmModal } from '../components/ConfirmModal';
+import { ChronoPrintView } from './ChronoPrintView';
 
 // 新的 Hooks 和组件
 import { useStatsCalculation } from '../hooks/useStatsCalculation';
@@ -83,6 +84,10 @@ export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentD
 
   // 复制失败/手动复制确认模态框状态
   const [copyFailureModal, setCopyFailureModal] = useState<{ isOpen: boolean, text: string }>({ isOpen: false, text: '' });
+  
+  // ChronoPrint 视图状态
+  const [showChronoPrint, setShowChronoPrint] = useState(false);
+  const [chronoPrintText, setChronoPrintText] = useState('');
 
 
   // 日期导航函数
@@ -340,6 +345,48 @@ export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentD
     setCopyFailureModal({ isOpen: true, text: text });
   };
 
+  const handleExportImage = () => {
+    const { start } = effectiveRange;
+    const dateStr = `${start.getFullYear()}/${start.getMonth() + 1}/${start.getDate()}`;
+    let rangeLabel = '';
+    if (viewType === 'pie') rangeLabel = pieRange.charAt(0).toUpperCase() + pieRange.slice(1);
+    if (viewType === 'matrix') rangeLabel = 'Week Matrix';
+    if (viewType === 'schedule') rangeLabel = scheduleRange === 'day' ? 'Day Schedule' : 'Week Schedule';
+
+    let text = `## 📊 ${dateStr} - ${rangeLabel} 统计\n**总时长**: ${formatDuration(stats.totalDuration)}\n\n`;
+    stats.categoryStats.forEach(cat => {
+      text += `- **[${cat.name}]** ${formatDuration(cat.duration)} (${cat.percentage.toFixed(1)}%)\n`;
+      cat.items.forEach(act => {
+        text += `    * ${act.name}: ${formatDuration(act.duration)}\n`;
+      });
+      text += '\n';
+    });
+    text += '\n';
+
+    if (todoStats.totalDuration > 0) {
+      text += `\n## 📋 待办专注分布\n**待办总时长**: ${formatDuration(todoStats.totalDuration)}\n\n`;
+      todoStats.categoryStats.forEach(cat => {
+        text += `- **[${cat.name}]** ${formatDuration(cat.duration)} (${cat.percentage.toFixed(1)}%)\n`;
+        cat.items.forEach(item => {
+          text += `    * ${item.name}: ${formatDuration(item.duration)}\n`;
+        });
+        text += '\n';
+      });
+    }
+
+    if (scopeStats.totalDuration > 0) {
+      text += `\n## 🎯 领域专注分布\n**领域总时长**: ${formatDuration(scopeStats.totalDuration)}\n\n`;
+      scopeStats.categoryStats.forEach(scope => {
+        text += `- **[${scope.name}]** ${formatDuration(scope.duration)} (${scope.percentage.toFixed(1)}%)\n`;
+        text += '\n';
+      });
+    }
+
+    // Open ChronoPrint view
+    setChronoPrintText(text);
+    setShowChronoPrint(true);
+  };
+
   const executeCopy = (text: string) => {
     // Try standard API first
     if (navigator.clipboard && navigator.clipboard.writeText) {
@@ -495,6 +542,16 @@ export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentD
 
     return { categories: sortedCategories, allDays: days, dateMap };
   }, [dailyReviews, rangeStart, rangeEnd, viewType]);
+
+  // If ChronoPrint view is active, render it instead
+  if (showChronoPrint) {
+    return (
+      <ChronoPrintView
+        inputText={chronoPrintText}
+        onBack={() => setShowChronoPrint(false)}
+      />
+    );
+  }
 
   return (
     <div
@@ -666,6 +723,7 @@ export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentD
               excludedCategoryIds={excludedCategoryIds}
               onToggleExclusion={toggleExclusion}
               onExport={handleExportStats}
+              onExportImage={handleExportImage}
               isFullScreen={isFullScreen}
             />
           )}
