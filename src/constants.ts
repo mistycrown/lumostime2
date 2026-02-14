@@ -187,7 +187,7 @@ export const SCOPES: Scope[] = [
 export const MOCK_TODO_CATEGORIES: TodoCategory[] = [
   { id: 'thesis', name: '毕业论文', icon: '🎓' },
   { id: 'study', name: '学习计划', icon: '📚' },
-  { id: 'life', name: '生活杂务', icon: '🏠' },
+  { id: 'hobby', name: '兴趣爱好', icon: '🎨' },
   { id: 'dev', name: '开发任务', icon: '⚙️' },
 ];
 
@@ -230,95 +230,115 @@ const NOW = Date.now();
 const DAY_MS = 86400000;
 
 export const INITIAL_TODOS: TodoItem[] = [
-  // Thesis (Linked to PhD Project Scope & Study Category)
+  // === 学术项目 ===
   {
     id: 't_thesis_1',
     categoryId: 'thesis',
-    title: '完成文献综述初稿',
+    title: '完成毕业论文第三章',
     isCompleted: false,
-    linkedCategoryId: 'study', // Study
-    linkedActivityId: 'writing', // Writing
+    linkedCategoryId: 'study',
+    linkedActivityId: 'writing',
     defaultScopeIds: ['s2'], // 博士课题
-    isProgress: true,
-    totalAmount: 20,
-    unitAmount: 1,
-    completedUnits: 12,
-    note: '需包含近5年核心期刊',
-    heatmapMin: 0,
-    heatmapMax: 240
+    note: '实验数据分析部分'
   },
   {
     id: 't_thesis_2',
     categoryId: 'thesis',
-    title: '整理实验数据',
-    isCompleted: false,
-    linkedCategoryId: 'study',
-    linkedActivityId: 'coding', // Coding
-    defaultScopeIds: ['s2'],
-    note: '导出 CSV 并预处理'
-  },
-  {
-    id: 't_thesis_3',
-    categoryId: 'thesis',
-    title: '修改论文摘要',
-    isCompleted: true,
-    completedAt: new Date(NOW - 2 * DAY_MS).toISOString(),
-    linkedCategoryId: 'study',
-    linkedActivityId: 'writing',
-    defaultScopeIds: ['s2'],
-    note: '根据导师意见修改'
-  },
-
-  // Reading (Linked to Professional Input Scope)
-  {
-    id: 't_read_1',
-    categoryId: 'study',
-    title: '阅读《资本论》第一卷',
+    title: '整理文献综述',
     isCompleted: false,
     linkedCategoryId: 'study',
     linkedActivityId: 'reading',
     defaultScopeIds: ['s1'], // 专业输入
-    isProgress: true,
-    totalAmount: 800,
-    unitAmount: 20,
-    completedUnits: 150,
-    note: '每天阅读20页',
-    heatmapMin: 0,
-    heatmapMax: 240
+    note: '近五年核心期刊'
   },
+
+  // === 学习计划 ===
   {
-    id: 't_read_2',
+    id: 't_study_1',
     categoryId: 'study',
-    title: '研读 Transformer 架构论文',
-    isCompleted: true,
-    completedAt: new Date(NOW - 5 * DAY_MS).toISOString(),
-    linkedCategoryId: 'study',
-    linkedActivityId: 'reading',
-    defaultScopeIds: ['s4'], // AI玩具
-  },
-  {
-    id: 't_read_3',
-    categoryId: 'study',
-    title: '学习 Rust 语言基础',
+    title: '完成《机器学习实战》课程',
     isCompleted: false,
     linkedCategoryId: 'study',
     linkedActivityId: 'self_study',
-    defaultScopeIds: ['s4'],
+    defaultScopeIds: ['s4'], // AI玩具
     isProgress: true,
-    totalAmount: 20,
+    totalAmount: 24, // 24节课
     unitAmount: 1,
-    completedUnits: 3,
-    note: '完成 Rustlings 练习'
+    completedUnits: 0, // 进度通过 log 中的 progressIncrement 累积
+    note: '在线课程学习'
+  },
+  {
+    id: 't_study_2',
+    categoryId: 'study',
+    title: '看完《认知觉醒》',
+    isCompleted: true,
+    completedAt: new Date(NOW - 10 * DAY_MS).toISOString(),
+    linkedCategoryId: 'study',
+    linkedActivityId: 'reading',
+    defaultScopeIds: ['s3'],
+    note: '个人成长类书籍'
   },
 
-  // Life
-  { id: 't_life_1', categoryId: 'life', title: '预约牙医', isCompleted: false, note: '周五下午有空' },
-  { id: 't_life_2', categoryId: 'life', title: '购买下周食材', isCompleted: true, completedAt: new Date(NOW - DAY_MS).toISOString() },
-  { id: 't_life_3', categoryId: 'life', title: '缴纳电费', isCompleted: false },
+  // === 兴趣爱好 ===
+  {
+    id: 't_hobby_1',
+    categoryId: 'hobby',
+    title: '看完《百年孤独》',
+    isCompleted: false,
+    linkedCategoryId: 'study',
+    linkedActivityId: 'reading',
+    defaultScopeIds: ['s3'], // 博雅通识
+    isProgress: true,
+    totalAmount: 400, // 400页
+    unitAmount: 20, // 每次20页
+    completedUnits: 0, // 进度通过 log 中的 progressIncrement 累积
+    note: '拉美文学经典',
+    heatmapMin: 0,
+    heatmapMax: 120
+  },
+  {
+    id: 't_hobby_2',
+    categoryId: 'hobby',
+    title: '看《肖申克的救赎》',
+    isCompleted: true,
+    completedAt: new Date(NOW - 3 * DAY_MS).toISOString(),
+    linkedCategoryId: 'eros',
+    linkedActivityId: 'watch',
+    defaultScopeIds: ['s3'],
+    note: '经典电影'
+  },
+  {
+    id: 't_hobby_3',
+    categoryId: 'hobby',
+    title: '看《三体》三部曲',
+    isCompleted: false,
+    linkedCategoryId: 'eros',
+    linkedActivityId: 'watch',
+    defaultScopeIds: ['s3'],
+    note: '科幻小说阅读'
+  },
 
-  // Dev
-  { id: 't_dev_1', categoryId: 'dev', title: '优化 LumosTime 性能', isCompleted: false, defaultScopeIds: ['s4'] },
-  { id: 't_dev_2', categoryId: 'dev', title: '修复 Android 端回退按钮', isCompleted: true, completedAt: new Date(NOW - 1 * DAY_MS).toISOString(), defaultScopeIds: ['s4'] },
+  // === 开发任务 ===
+  {
+    id: 't_dev_1',
+    categoryId: 'dev',
+    title: '开发个人博客系统',
+    isCompleted: false,
+    linkedCategoryId: 'self',
+    linkedActivityId: 'dev',
+    defaultScopeIds: ['s4'],
+    note: '使用 React + Node.js'
+  },
+  {
+    id: 't_dev_2',
+    categoryId: 'dev',
+    title: '完成数据结构课程设计',
+    isCompleted: false,
+    linkedCategoryId: 'study',
+    linkedActivityId: 'coding',
+    defaultScopeIds: ['s2'],
+    note: '图论算法实现'
+  }
 ];
 
 export const INITIAL_LOGS: Log[] = [
@@ -340,10 +360,10 @@ export const INITIAL_LOGS: Log[] = [
     activityId: 'reading', categoryId: 'study', // Reading -> Professional Input
     startTime: new Date().setHours(9, 0, 0, 0), endTime: new Date().setHours(11, 0, 0, 0),
     duration: 2 * 3600,
-    scopeIds: ['s1'], // 专业输入
-    linkedTodoId: 't_read_1',
-    progressIncrement: 20,
-    note: '资本论第4章',
+    scopeIds: ['s3'], // 博雅通识
+    linkedTodoId: 't_hobby_1',
+    progressIncrement: 20, // 读了20页
+    note: '《百年孤独》第3章',
     focusScore: 4
   },
   {
@@ -385,12 +405,13 @@ export const INITIAL_LOGS: Log[] = [
   },
   {
     id: 'l_y_3', // New entry
-    activityId: 'coding', categoryId: 'study',
+    activityId: 'self_study', categoryId: 'study',
     startTime: new Date(NOW - DAY_MS).setHours(14, 0, 0, 0), endTime: new Date(NOW - DAY_MS).setHours(17, 0, 0, 0),
     duration: 3 * 3600,
     scopeIds: ['s4'],
-    linkedTodoId: 't_dev_2',
-    note: '修复关键 bug',
+    linkedTodoId: 't_study_1',
+    progressIncrement: 1, // 完成1节课
+    note: '机器学习第9课',
     focusScore: 5
   },
 
@@ -414,12 +435,12 @@ export const INITIAL_LOGS: Log[] = [
   },
   {
     id: 'l_d2_3', // New entry
-    activityId: 'writing', categoryId: 'study',
+    activityId: 'coding', categoryId: 'study',
     startTime: new Date(NOW - 2 * DAY_MS).setHours(14, 0, 0, 0), endTime: new Date(NOW - 2 * DAY_MS).setHours(16, 0, 0, 0),
     duration: 2 * 3600,
     scopeIds: ['s2'],
-    linkedTodoId: 't_thesis_3',
-    note: '修改摘要',
+    linkedTodoId: 't_dev_2',
+    note: '课程设计：图的遍历算法',
     focusScore: 4
   },
 
