@@ -5,7 +5,9 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { ChevronLeft, Download, Palette, Layout } from 'lucide-react';
 import { toPng } from 'html-to-image';
-import { Log } from '../types';
+import { Capacitor } from '@capacitor/core';
+import { Filesystem, Directory } from '@capacitor/filesystem';
+import { Log, ToastType } from '../types';
 import { SHARE_THEMES, SHARE_TEMPLATES } from '../components/ShareCard/constants';
 import { ShareCardContent } from '../components/ShareCard/types';
 import { TemplateRenderer } from '../components/ShareCard/TemplateRenderer';
@@ -15,9 +17,10 @@ import { imageService } from '../services/imageService';
 interface ShareViewProps {
   log: Log;
   onBack: () => void;
+  onToast?: (type: ToastType, message: string) => void;
 }
 
-export const ShareView: React.FC<ShareViewProps> = ({ log, onBack }) => {
+export const ShareView: React.FC<ShareViewProps> = ({ log, onBack, onToast }) => {
   const { categories } = useCategoryScope();
   const [activeThemeId, setActiveThemeId] = useState<string>(SHARE_THEMES[0].id);
   const [activeTemplateId, setActiveTemplateId] = useState<string>(SHARE_TEMPLATES[0].id);
@@ -96,39 +99,76 @@ export const ShareView: React.FC<ShareViewProps> = ({ log, onBack }) => {
     
     setIsExporting(true);
     try {
-      // Increased delay to 300ms to allow fonts and layout to settle completely before capture
-      await new Promise(r => setTimeout(r, 300));
+      // 减少延迟时间，加快生成速度
+      await new Promise(r => setTimeout(r, 100));
 
       const options = { 
         cacheBust: true, 
-        pixelRatio: 3, // Higher quality for mobile
-        useCORS: true, // Crucial for external images
-        backgroundColor: activeTheme.backgroundColor // Prevent transparent backgrounds
+        pixelRatio: 2, // 降低到 2 以提升速度，质量仍然很好
+        useCORS: true,
+        backgroundColor: activeTheme.backgroundColor
       };
 
+      let dataUrl: string;
       try {
-        const dataUrl = await toPng(previewRef.current, options);
-        triggerDownload(dataUrl);
+        dataUrl = await toPng(previewRef.current, options);
       } catch (firstErr) {
         console.warn("First export attempt failed, retrying with skipFonts...", firstErr);
-        // Fallback: Skip fonts if CORS/CSS rules access fails
-        const dataUrl = await toPng(previewRef.current, { ...options, skipFonts: true });
-        triggerDownload(dataUrl);
+        dataUrl = await toPng(previewRef.current, { ...options, skipFonts: true });
+      }
+      
+      const isNative = Capacitor.isNativePlatform();
+      
+      if (isNative) {
+        // 移动端：保存到 Pictures 目录
+        try {
+          const base64Data = dataUrl.replace(/^data:image\/\w+;base64,/, '');
+          const filename = `LumosTime_${Date.now()}.png`;
+          
+          await Filesystem.writeFile({
+            path: `Pictures/LumosTime/${filename}`,
+            data: base64Data,
+            directory: Directory.ExternalStorage,
+            recursive: true
+          });
+          
+          // 使用自定义 Toast
+          if (onToast) {
+            onToast('success', '图片已保存到相册');
+          } else {
+            alert('图片已保存到相册');
+          }
+          
+        } catch (err: any) {
+          console.error('Failed to save image:', err);
+          if (onToast) {
+            onToast('error', '保存失败：' + (err.message || '请检查存储权限'));
+          } else {
+            alert('保存图片失败：' + (err.message || '请检查存储权限'));
+          }
+        }
+      } else {
+        // 桌面端/Web端：直接下载
+        const link = document.createElement('a');
+        link.download = `lumostime-share-${Date.now()}.png`;
+        link.href = dataUrl;
+        link.click();
+        
+        if (onToast) {
+          onToast('success', '图片已下载');
+        }
       }
       
     } catch (err) {
       console.error("Could not download image", err);
-      alert("保存图片失败。请稍后重试。");
+      if (onToast) {
+        onToast('error', '保存图片失败');
+      } else {
+        alert("保存图片失败。请稍后重试。");
+      }
     } finally {
-        setIsExporting(false);
+      setIsExporting(false);
     }
-  };
-
-  const triggerDownload = (dataUrl: string) => {
-    const link = document.createElement('a');
-    link.download = `lumostime-share-${Date.now()}.png`;
-    link.href = dataUrl;
-    link.click();
   };
 
   return (
@@ -144,11 +184,15 @@ export const ShareView: React.FC<ShareViewProps> = ({ log, onBack }) => {
         <span className="text-stone-800 font-bold text-lg flex-1 text-center">分享卡片</span>
         <button
           onClick={downloadImage}
-          disabled={isExporting}
-          className="text-stone-400 hover:text-stone-600 p-1 disabled:opacity-50"
-          title={isExporting ? '处理中...' : '保存'}
+          disabled={isExporting || isLoadingImages}
+          className="text-stone-400 hover:text-stone-600 p-1 disabled:opacity-50 relative"
+          title={isExporting ? '生成中...' : '保存'}
         >
-          <Download size={20} />
+          {isExporting ? (
+            <div className="w-5 h-5 border-2 border-stone-300 border-t-stone-600 rounded-full animate-spin" />
+          ) : (
+            <Download size={20} />
+          )}
         </button>
       </div>
 

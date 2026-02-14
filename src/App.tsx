@@ -416,6 +416,7 @@ const AppContent: React.FC = () => {
           log={sharingLog}
           scopes={scopes}
           onBack={() => setIsShareViewOpen(false)}
+          onToast={showToast}
         />
       )}
 
