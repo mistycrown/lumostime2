@@ -105,6 +105,7 @@ export const DailyReviewView: React.FC<DailyReviewViewProps> = ({
     const [editingCheckItemText, setEditingCheckItemText] = useState('');
     const [isClearCheckConfirmOpen, setIsClearCheckConfirmOpen] = useState(false);
     const [isReloadConfirmOpen, setIsReloadConfirmOpen] = useState(false);
+    const [isReloadGuideConfirmOpen, setIsReloadGuideConfirmOpen] = useState(false);
 
     // Sync state when review prop changes (e.g. deletion and re-creation)
     useEffect(() => {
@@ -299,6 +300,34 @@ export const DailyReviewView: React.FC<DailyReviewViewProps> = ({
             updatedAt: Date.now()
         };
         onUpdateReview(updatedReview);
+    };
+
+    // 重新从模板导入引导问题
+    const confirmReloadGuideFromTemplate = () => {
+        // 从当前模板重新生成 templateSnapshot
+        const newTemplateSnapshot = templates
+            .filter(t => t.isDailyTemplate)
+            .sort((a, b) => a.order - b.order)
+            .map(t => ({
+                id: t.id,
+                title: t.title,
+                questions: t.questions,
+                order: t.order,
+                syncToTimeline: t.syncToTimeline
+            }));
+
+        // 清空现有答案（因为问题可能已经改变）
+        const updatedReview = {
+            ...review,
+            templateSnapshot: newTemplateSnapshot,
+            answers: [],
+            updatedAt: Date.now()
+        };
+        
+        onUpdateReview(updatedReview);
+        setAnswers([]);
+        setIsReloadGuideConfirmOpen(false);
+        addToast('success', '已重新导入模板');
     };
 
     // 切换模板的syncToTimeline状态
@@ -694,6 +723,28 @@ export const DailyReviewView: React.FC<DailyReviewViewProps> = ({
                             isReadingMode={isReadingMode}
                             onUpdateAnswer={updateAnswer}
                             onToggleSyncToTimeline={toggleTemplateSyncToTimeline}
+                        />
+                        
+                        {/* 重新从模板导入按钮 */}
+                        <div className="mt-12 mb-8 flex flex-col items-center gap-4">
+                            <button
+                                onClick={() => setIsReloadGuideConfirmOpen(true)}
+                                className="flex items-center gap-2 text-stone-400 hover:text-stone-600 transition-colors text-sm"
+                            >
+                                <RefreshCw size={14} />
+                                <span>重新从模板导入</span>
+                            </button>
+                        </div>
+
+                        {/* 重新导入引导模板确认对话框 */}
+                        <ConfirmModal
+                            isOpen={isReloadGuideConfirmOpen}
+                            onClose={() => setIsReloadGuideConfirmOpen(false)}
+                            onConfirm={confirmReloadGuideFromTemplate}
+                            title="重新导入模板"
+                            description="将从最新的模板重新生成引导问题。当前的所有回答将被清空。确定要继续吗？"
+                            confirmText="确认导入"
+                            type="warning"
                         />
                     </div>
                 )}
