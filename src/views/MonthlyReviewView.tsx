@@ -97,6 +97,8 @@ export const MonthlyReviewView: React.FC<MonthlyReviewViewProps> = ({
         storageKey: 'dailyReview_guideMode'
     });
 
+    const [isReloadConfirmOpen, setIsReloadConfirmOpen] = useState(false);
+
     // Get logs for the month
     const monthLogs = useMemo(() => {
         const start = new Date(monthStartDate);
@@ -174,6 +176,34 @@ export const MonthlyReviewView: React.FC<MonthlyReviewViewProps> = ({
             updatedAt: Date.now()
         };
         onUpdateReview(updatedReview);
+    };
+
+    // 重新从模板导入
+    const confirmReloadFromTemplate = () => {
+        // 从当前模板重新生成 templateSnapshot
+        const newTemplateSnapshot = templates
+            .filter(t => t.isMonthlyTemplate)
+            .sort((a, b) => a.order - b.order)
+            .map(t => ({
+                id: t.id,
+                title: t.title,
+                questions: t.questions,
+                order: t.order,
+                syncToTimeline: t.syncToTimeline
+            }));
+
+        // 清空现有答案（因为问题可能已经改变）
+        const updatedReview = {
+            ...review,
+            templateSnapshot: newTemplateSnapshot,
+            answers: [],
+            updatedAt: Date.now()
+        };
+        
+        onUpdateReview(updatedReview);
+        setAnswers([]);
+        setIsReloadConfirmOpen(false);
+        onToast?.('success', '已重新导入模板');
     };
 
     // Update Cite
@@ -366,6 +396,17 @@ export const MonthlyReviewView: React.FC<MonthlyReviewViewProps> = ({
                                 onUpdateAnswer={updateAnswer}
                                 onToggleSyncToTimeline={toggleTemplateSyncToTimeline}
                             />
+                            
+                            {/* 重新从模板导入按钮 */}
+                            <div className="mt-12 mb-8 flex flex-col items-center gap-4">
+                                <button
+                                    onClick={() => setIsReloadConfirmOpen(true)}
+                                    className="flex items-center gap-2 text-stone-400 hover:text-stone-600 transition-colors text-sm"
+                                >
+                                    <RefreshCw size={14} />
+                                    <span>重新从模板导入</span>
+                                </button>
+                            </div>
                         </div>
                     )
                 }
@@ -444,6 +485,17 @@ export const MonthlyReviewView: React.FC<MonthlyReviewViewProps> = ({
                 confirmText="删除"
                 cancelText="取消"
                 type="danger"
+            />
+
+            {/* Reload Template Confirmation Modal */}
+            <ConfirmModal
+                isOpen={isReloadConfirmOpen}
+                onClose={() => setIsReloadConfirmOpen(false)}
+                onConfirm={confirmReloadFromTemplate}
+                title="重新导入模板"
+                description="将从最新的模板重新生成引导问题。当前的所有回答将被清空。确定要继续吗？"
+                confirmText="确认导入"
+                type="warning"
             />
 
             {/* Narrative Style Selection Modal */}
