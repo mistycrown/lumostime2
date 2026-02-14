@@ -70,6 +70,11 @@ export const DetailTimelineCard: React.FC<DetailTimelineCardProps> = ({
     
     // 用于存储日期对应的 DOM 元素引用
     const dateRefs = React.useRef<Map<number, HTMLDivElement>>(new Map());
+    
+    // 日期悬浮条相关状态
+    const [showDateSidebar, setShowDateSidebar] = React.useState(false);
+    const [activeDay, setActiveDay] = React.useState<string | null>(null);
+    const scrollContainerRef = React.useRef<HTMLDivElement | null>(null);
 
     const displayMonth = displayDate.getMonth();
     const displayYear = displayDate.getFullYear();
@@ -199,6 +204,71 @@ export const DetailTimelineCard: React.FC<DetailTimelineCardProps> = ({
 
         return { durationMap: map, logsMap };
     }, [logsToDisplay]);
+    
+    // 滚动监听：显示日期悬浮条并更新活跃日期
+    React.useEffect(() => {
+        // 查找最近的滚动容器（向上遍历 DOM）
+        const findScrollContainer = (element: HTMLElement | null): HTMLElement | null => {
+            if (!element) return null;
+            const style = window.getComputedStyle(element);
+            if (style.overflowY === 'auto' || style.overflowY === 'scroll') {
+                return element;
+            }
+            return findScrollContainer(element.parentElement);
+        };
+
+        // 使用任意一个 dateRef 来找到滚动容器
+        const firstDateElement = Array.from(dateRefs.current.values())[0];
+        if (!firstDateElement) return;
+
+        const container = findScrollContainer(firstDateElement);
+        if (!container) return;
+
+        scrollContainerRef.current = container;
+
+        const handleScroll = () => {
+            const scrollTop = container.scrollTop;
+            setShowDateSidebar(scrollTop > 10);
+
+            // 确定当前活跃的日期
+            const dayElements = Array.from(dateRefs.current.entries());
+            let currentActive = null;
+            let minDistance = Infinity;
+
+            dayElements.forEach(([timestamp, el]) => {
+                const rect = el.getBoundingClientRect();
+                const distance = Math.abs(rect.top - 100);
+                if (distance < minDistance) {
+                    minDistance = distance;
+                    const date = new Date(timestamp);
+                    currentActive = date.getDate().toString();
+                }
+            });
+
+            if (currentActive) {
+                setActiveDay(currentActive);
+            }
+        };
+
+        container.addEventListener('scroll', handleScroll);
+        handleScroll();
+        return () => container.removeEventListener('scroll', handleScroll);
+    }, [groupedData.durationMap]);
+    
+    // 日期点击处理
+    const handleDateSidebarClick = React.useCallback((dayStr: string) => {
+        const day = parseInt(dayStr);
+        const timestamp = new Date(displayYear, displayMonth, day).getTime();
+        const element = dateRefs.current.get(timestamp);
+        
+        if (element) {
+            element.scrollIntoView({ 
+                behavior: 'smooth', 
+                block: 'start',
+                inline: 'nearest'
+            });
+        }
+    }, [displayMonth, displayYear]);
 
     // 计算日历数据（包含热力图和画廊数据）
     const calendarData = useMemo(() => {
@@ -283,7 +353,7 @@ export const DetailTimelineCard: React.FC<DetailTimelineCardProps> = ({
     };
 
     return (
-        <>
+        <div className="relative">
             {viewMode === 'month' ? (
                 <div className="mb-8">
                     {/* 简洁的日历头部 - 左边月份切换，右边视图切换 */}
@@ -881,6 +951,82 @@ export const DetailTimelineCard: React.FC<DetailTimelineCardProps> = ({
                     })
                 )}
             </div>
-        </>
+            
+            {/* 日期悬浮条 - 仅在月视图且有数据时显示 */}
+            {viewMode === 'month' && logsToDisplay.length > 0 && (
+                <DateNavigationSidebar
+                    groupedData={groupedData}
+                    activeDay={activeDay}
+                    onDateClick={handleDateSidebarClick}
+                    visible={showDateSidebar}
+                />
+            )}
+        </div>
+    );
+};
+
+// 日期导航悬浮条组件
+const DateNavigationSidebar: React.FC<{
+    groupedData: { durationMap: Map<number, number>; logsMap: Map<number, Log[]> };
+    activeDay: string | null;
+    onDateClick: (dateStr: string) => void;
+    visible: boolean;
+}> = ({ groupedData, activeDay, onDateClick, visible }) => {
+    const containerRef = React.useRef<HTMLDivElement>(null);
+    
+    // 提取唯一的日期
+    const days = React.useMemo(() => {
+        return Array.from(groupedData.durationMap.keys())
+            .sort((a, b) => b - a) // 降序排列
+            .map(timestamp => {
+                const d = new Date(timestamp);
+                return {
+                    dayStr: d.getDate().toString(),
+                    timestamp
+                };
+            });
+    }, [groupedData]);
+
+    // 自动滚动活跃日期到视图中心
+    React.useEffect(() => {
+        if (activeDay && containerRef.current) {
+            const activeBtn = Array.from(containerRef.current.children).find(child =>
+                child.textContent?.includes(activeDay.padStart(2, '0'))
+            );
+            if (activeBtn) {
+                activeBtn.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+        }
+    }, [activeDay]);
+
+    return (
+        <div
+            ref={containerRef}
+            className={`fixed right-0 top-1/2 -translate-y-1/2 z-50 flex flex-col items-center gap-3 py-4 rounded-l-xl h-[216px] overflow-y-auto no-scrollbar scroll-smooth transition-opacity duration-300 ${visible ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
+        >
+            {days.map(({ dayStr }) => {
+                const isActive = activeDay === dayStr;
+                return (
+                    <button
+                        key={dayStr}
+                        onClick={() => onDateClick(dayStr)}
+                        className="group relative flex items-center justify-center w-6 h-4 select-none touch-manipulation shrink-0"
+                    >
+                        <span className={`
+               font-serif text-[10px] transition-all duration-300
+               ${isActive
+                                ? 'text-stone-900 font-bold scale-150 origin-right'
+                                : 'text-stone-300 font-medium group-hover:text-stone-500'}
+             `}>
+                            {dayStr.padStart(2, '0')}
+                        </span>
+                        <div className={`
+               absolute -left-1 w-1 h-1 rounded-full bg-stone-900 transition-all duration-300
+               ${isActive ? 'opacity-100 scale-100' : 'opacity-0 scale-0'}
+             `}></div>
+                    </button>
+                );
+            })}
+        </div>
     );
 };
