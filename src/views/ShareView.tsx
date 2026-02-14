@@ -134,7 +134,7 @@ export const ShareView: React.FC<ShareViewProps> = ({ log, onBack }) => {
   return (
     <div className="fixed inset-0 z-50 bg-[#fdfbf7] flex flex-col font-serif animate-in slide-in-from-right duration-300 pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">
       {/* Header */}
-      <div className="flex items-center justify-between gap-3 px-4 h-14 border-b border-stone-100 bg-[#fdfbf7]/80 backdrop-blur-md sticky top-0 z-10">
+      <div className="flex-shrink-0 flex items-center justify-between gap-3 px-4 h-14 border-b border-stone-100 bg-[#fdfbf7]/80 backdrop-blur-md z-10">
         <button
           onClick={onBack}
           className="text-stone-400 hover:text-stone-600 p-1"
@@ -152,13 +152,13 @@ export const ShareView: React.FC<ShareViewProps> = ({ log, onBack }) => {
         </button>
       </div>
 
-      <div className="flex-1 overflow-y-auto">
-        {/* Preview Area */}
-        <div className="bg-stone-100 py-8 px-4 flex items-center justify-center min-h-[50vh]">
+      {/* Preview Area - 预览区域（可滚动） */}
+      <div className="flex-1 overflow-y-auto bg-stone-100 py-8 px-4">
+        <div className="w-full max-w-[400px] mx-auto">
           {isLoadingImages ? (
-            <div className="text-stone-400 text-sm">加载图片中...</div>
+            <div className="text-stone-400 text-sm text-center">加载图片中...</div>
           ) : (
-            <div className="w-full max-w-[400px] shadow-2xl">
+            <div className="w-full shadow-2xl">
               <div 
                 ref={previewRef}
                 className="w-full"
@@ -176,9 +176,10 @@ export const ShareView: React.FC<ShareViewProps> = ({ log, onBack }) => {
             </div>
           )}
         </div>
+      </div>
 
-        {/* Controls Area */}
-        <div className="bg-white px-4 py-6 space-y-6">
+      {/* Controls Area - 底部选项区（固定） */}
+      <div className="flex-shrink-0 bg-white px-4 py-6 space-y-6 border-t border-stone-100">
           {/* Theme Selector */}
           <section>
             <div className="flex items-center gap-2 text-xs font-bold text-stone-700 mb-3 uppercase tracking-wider">
@@ -232,7 +233,6 @@ export const ShareView: React.FC<ShareViewProps> = ({ log, onBack }) => {
             </div>
           </section>
         </div>
-      </div>
     </div>
   );
 };
