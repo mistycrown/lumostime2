@@ -32,6 +32,7 @@ interface JournalViewProps {
     onEditLog: (log: Log) => void;
     onOpenWeeklyReview: (start: Date, end: Date) => void;
     onOpenMonthlyReview: (start: Date, end: Date) => void;
+    collapseThreshold?: number; // 折叠字数阈值
 }
 
 // parseNarrative 已移至 src/utils/narrativeUtils.ts
@@ -110,7 +111,8 @@ export const JournalView: React.FC<JournalViewProps> = ({
     scopes,
     onEditLog,
     onOpenWeeklyReview,
-    onOpenMonthlyReview
+    onOpenMonthlyReview,
+    collapseThreshold = 9999
 }) => {
     const { categories } = useCategoryScope();
     const { setLogs } = useData();
@@ -719,6 +721,7 @@ export const JournalView: React.FC<JournalViewProps> = ({
                                                         onAddComment={handleAddComment}
                                                         onToggleReaction={handleToggleReaction}
                                                         onClick={() => handleEntryClick(entry)}
+                                                        collapseThreshold={collapseThreshold}
                                                     />
                                                 ))}
                                             </div>
