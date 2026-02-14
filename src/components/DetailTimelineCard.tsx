@@ -237,7 +237,7 @@ export const DetailTimelineCard: React.FC<DetailTimelineCardProps> = ({
 
         const handleScroll = () => {
             const scrollTop = container.scrollTop;
-            setShowDateSidebar(scrollTop > 10);
+            setShowDateSidebar(scrollTop > 200); // 需要滚动超过 200px 才显示悬浮条
 
             // 确定当前活跃的日期
             const dayElements = Array.from(dateRefs.current.entries());
@@ -564,7 +564,7 @@ export const DetailTimelineCard: React.FC<DetailTimelineCardProps> = ({
                     </div>
 
                     {/* 统计信息 - 简洁版本 */}
-                    <div className="px-2 space-y-3">
+                    <div className="space-y-3">
                         {/* Total Time */}
                         <div className="flex items-baseline gap-2">
                             <span className="text-xs font-medium text-stone-400 uppercase tracking-wider">Total</span>
@@ -697,7 +697,7 @@ export const DetailTimelineCard: React.FC<DetailTimelineCardProps> = ({
                     
                     {/* 关键字图例 - 仅在关键字视图时显示 */}
                     {calendarViewMode === 'keywords' && keywords.length > 0 && (
-                        <div className="px-2 mt-4 pt-3 border-t border-stone-100">
+                        <div className="mt-4 pt-3 border-t border-stone-100">
                             <div className="flex flex-wrap gap-2 justify-center">
                                 <div className="flex items-center gap-1.5">
                                     <div className="w-2.5 h-2.5 rounded bg-stone-100"></div>
@@ -715,7 +715,7 @@ export const DetailTimelineCard: React.FC<DetailTimelineCardProps> = ({
                 </div>
             ) : (
                 // All View Stats (Three Columns)
-                <div className="flex items-start justify-around px-2 py-4 mb-8">
+                <div className="flex items-start justify-around py-4 mb-8">
                     {/* Total Duration */}
                     <div className="flex flex-col items-center gap-2">
                         <span className="text-xs font-bold text-stone-900 tracking-wider">累计投入</span>
@@ -845,22 +845,6 @@ export const DetailTimelineCard: React.FC<DetailTimelineCardProps> = ({
                       );
                     });
                   })()}
-                </div>
-                
-                {/* Legend */}
-                <div className="flex items-center justify-center gap-3 mt-3 text-[10px] text-stone-500">
-                  <div className="flex items-center gap-1">
-                    <div className="w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: 'var(--progress-bar-fill)' }} />
-                    <span>Completed</span>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <div className="w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: 'var(--progress-bar-fill)', opacity: 0.3 }} />
-                    <span>In Progress</span>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <div className="w-2.5 h-2.5 rounded-sm border border-stone-300" />
-                    <span>Not Started</span>
-                  </div>
                 </div>
                 
                 {(() => {
