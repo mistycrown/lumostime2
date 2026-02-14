@@ -16,6 +16,7 @@
 import React from 'react';
 import { CheckCircle2 } from 'lucide-react';
 import { getWeekColorStyle, getMonthYearColorStyle } from '../../utils/checkViewUtils';
+import { IconRenderer } from '../IconRenderer';
 
 export interface CheckStats {
   categories: {
@@ -23,6 +24,7 @@ export interface CheckStats {
     items: {
       name: string;
       icon: string;
+      uiIcon?: string;
       days: Record<string, boolean>;
       stats: {
         total: number;
@@ -75,7 +77,12 @@ export const CheckView: React.FC<CheckViewProps> = ({
 
                   return (
                     <div key={habit.name} className="flex items-center justify-between py-1">
-                      <div className="w-28 sm:w-40 shrink-0 flex items-center">
+                      <div className="w-28 sm:w-40 shrink-0 flex items-center gap-2">
+                        <IconRenderer 
+                          icon={habit.icon} 
+                          uiIcon={habit.uiIcon}
+                          className="text-base shrink-0"
+                        />
                         <span className="text-sm font-medium text-stone-800 truncate" title={habit.name}>
                           {habit.name}
                         </span>
@@ -119,13 +126,18 @@ export const CheckView: React.FC<CheckViewProps> = ({
             return (
               <div key={`${cat.name}-${habit.name}`} className="bg-white rounded-2xl p-4 shadow-sm border border-stone-100 flex flex-col">
                 <div className="flex items-start justify-between mb-2">
-                  <div className="flex items-center gap-3">
-                    <div>
+                  <div className="flex flex-col gap-1">
+                    <div className="flex items-center gap-2">
+                      <IconRenderer 
+                        icon={habit.icon} 
+                        uiIcon={habit.uiIcon}
+                        className="text-base shrink-0"
+                      />
                       <h4 className="font-bold text-stone-800 text-sm">
                         {habit.name}
                       </h4>
-                      <p className="text-xs text-stone-400">{cat.name === '默认' ? '日常' : cat.name}</p>
                     </div>
+                    <p className="text-xs text-stone-400">{cat.name === '默认' ? '日常' : cat.name}</p>
                   </div>
                 </div>
 
@@ -184,6 +196,11 @@ export const CheckView: React.FC<CheckViewProps> = ({
             return (
               <div key={`${cat.name}-${habit.name}`} className="bg-white rounded-xl py-4 shadow-sm border border-stone-100 overflow-hidden">
                 <div className="flex items-center gap-3 mb-4 px-4">
+                  <IconRenderer 
+                    icon={habit.icon} 
+                    uiIcon={habit.uiIcon}
+                    className="text-lg shrink-0"
+                  />
                   <span className="font-bold text-sm text-stone-800 shrink-0">
                     {habit.name}
                   </span>
