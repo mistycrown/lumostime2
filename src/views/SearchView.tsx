@@ -102,13 +102,17 @@ export const SearchView: React.FC<SearchViewProps> = ({
                 return (start > 0 ? '...' : '') + text.substring(start, end) + (end < text.length ? '...' : '');
             };
 
-            const getReviewMatch = (review: { answers: { answer: string }[], narrative?: string }, query: string) => {
+            const getReviewMatch = (review: { answers: { answer: string }[], summary?: string, narrative?: string }, query: string) => {
                 // Check answers
                 const answerMatch = review.answers?.find(ans => ans.answer && ans.answer.toLowerCase().includes(query));
                 if (answerMatch) {
                     return getSnippet(answerMatch.answer, query);
                 }
-                // Check narrative
+                // Check summary (手动叙事)
+                if (review.summary && review.summary.toLowerCase().includes(query)) {
+                    return getSnippet(review.summary, query);
+                }
+                // Check narrative (AI 叙事)
                 if (review.narrative && review.narrative.toLowerCase().includes(query)) {
                     return getSnippet(review.narrative, query);
                 }

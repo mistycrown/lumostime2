@@ -71,22 +71,23 @@ export const DailyReviewView: React.FC<DailyReviewViewProps> = ({
     const {
         answers,
         setAnswers,
+        summary,
+        setSummary,
         narrative,
         setNarrative,
-        isEditing,
-        setIsEditing,
         isGenerating,
         setIsGenerating,
-        editedNarrative,
-        setEditedNarrative,
         isStyleModalOpen,
         setIsStyleModalOpen,
-        isDeleteConfirmOpen,
-        setIsDeleteConfirmOpen,
+        isDeleteSummaryConfirmOpen,
+        setIsDeleteSummaryConfirmOpen,
+        isDeleteNarrativeConfirmOpen,
+        setIsDeleteNarrativeConfirmOpen,
         isReadingMode,
         toggleReadingMode
     } = useReviewState({
         initialAnswers: review.answers || [],
+        initialSummary: review.summary || '',
         initialNarrative: review.narrative || '',
         storageKey: 'dailyReview_guideMode'
     });
@@ -116,6 +117,7 @@ export const DailyReviewView: React.FC<DailyReviewViewProps> = ({
         }));
         setCheckItems(migratedItems);
         setAnswers(review.answers || []);
+        setSummary(review.summary || '');
         setNarrative(review.narrative || '');
     }, [review]);
 
@@ -427,7 +429,6 @@ export const DailyReviewView: React.FC<DailyReviewViewProps> = ({
 
             const generated = await onGenerateNarrative(review, statsText + checkText, timelineText, template.prompt);
             setNarrative(generated);
-            setEditedNarrative(generated); // Sync to edit box
 
             const updatedReview = {
                 ...review,
@@ -445,14 +446,50 @@ export const DailyReviewView: React.FC<DailyReviewViewProps> = ({
         }
     };
 
-    // 保存编辑的叙事
-    const handleSaveNarrative = () => {
-        setNarrative(editedNarrative);
-        setIsEditing(false);
+    // 自动保存手动叙事
+    const handleSummaryChange = (value: string) => {
+        setSummary(value);
+        
+        const updatedReview = {
+            ...review,
+            summary: value,
+            summaryUpdatedAt: Date.now(),
+            updatedAt: Date.now()
+        };
+        onUpdateReview(updatedReview);
+    };
+
+    // 删除手动叙事
+    const handleDeleteSummary = () => {
+        setIsDeleteSummaryConfirmOpen(true);
+    };
+
+    const confirmDeleteSummary = async () => {
+        try {
+            const updatedReview = {
+                ...review,
+                summary: '',
+                summaryUpdatedAt: undefined,
+                updatedAt: Date.now()
+            };
+            await onUpdateReview(updatedReview);
+            setSummary('');
+            addToast('success', '手动叙事已删除');
+        } catch (error) {
+            console.error('Failed to delete summary', error);
+            addToast('error', '删除失败');
+        } finally {
+            setIsDeleteSummaryConfirmOpen(false);
+        }
+    };
+
+    // 自动保存 AI 叙事
+    const handleNarrativeChange = (value: string) => {
+        setNarrative(value);
 
         const updatedReview = {
             ...review,
-            narrative: editedNarrative,
+            narrative: value,
             narrativeUpdatedAt: Date.now(),
             isEdited: true,
             updatedAt: Date.now()
@@ -461,7 +498,7 @@ export const DailyReviewView: React.FC<DailyReviewViewProps> = ({
     };
 
     const handleDeleteNarrative = () => {
-        setIsDeleteConfirmOpen(true);
+        setIsDeleteNarrativeConfirmOpen(true);
     };
 
     const confirmDeleteNarrative = async () => {
@@ -472,17 +509,14 @@ export const DailyReviewView: React.FC<DailyReviewViewProps> = ({
                 narrativeUpdatedAt: undefined,
                 updatedAt: Date.now()
             };
-            // update local state
             await onUpdateReview(updatedReview);
             setNarrative('');
-            setEditedNarrative('');
-            setIsEditing(false); // reset to false to show empty state options
-            addToast('success', '叙事已删除');
+            addToast('success', 'AI 叙事已删除');
         } catch (error) {
             console.error('Failed to delete narrative', error);
             addToast('error', '删除失败');
         } finally {
-            setIsDeleteConfirmOpen(false);
+            setIsDeleteNarrativeConfirmOpen(false);
         }
     };
 
@@ -783,16 +817,14 @@ export const DailyReviewView: React.FC<DailyReviewViewProps> = ({
                 {activeTab === 'narrative' && (
                     <div className="space-y-4 animate-in fade-in duration-300 relative min-h-[50vh] pb-40">
                         <ReviewNarrativeTab
+                            summary={summary}
                             narrative={narrative}
-                            isEditing={isEditing}
                             isGenerating={isGenerating}
-                            editedNarrative={editedNarrative}
-                            onEditedNarrativeChange={setEditedNarrative}
-                            onStartEditing={() => {
-                                setEditedNarrative('');
-                                setIsEditing(true);
-                            }}
+                            isReadingMode={isReadingMode}
+                            onSummaryChange={handleSummaryChange}
+                            onNarrativeChange={handleNarrativeChange}
                             onGenerateNarrative={handleGenerateNarrative}
+                            onDeleteSummary={handleDeleteSummary}
                             onDeleteNarrative={handleDeleteNarrative}
                         />
                     </div>
@@ -827,21 +859,15 @@ export const DailyReviewView: React.FC<DailyReviewViewProps> = ({
             )}
 
             {/* Floating Action Button for Narrative Tab */}
-            {activeTab === 'narrative' && (narrative || isEditing) && (
+            {activeTab === 'narrative' && (
                 <FloatingButton
-                    onClick={() => {
-                        if (isEditing) handleSaveNarrative();
-                        else {
-                            setEditedNarrative(narrative);
-                            setIsEditing(true);
-                        }
-                    }}
+                    onClick={toggleReadingMode}
                     position="custom"
                     className="fixed bottom-16 right-6"
                 >
                     <UIIcon 
-                        type={isEditing ? "editing" : "reading"}
-                        fallbackIcon={isEditing ? LucideIcons.Check : Edit3}
+                        type={isReadingMode ? "editing" : "reading"}
+                        fallbackIcon={isReadingMode ? Edit3 : LucideIcons.BookOpen}
                         size={24}
                         className="text-white"
                     />
@@ -856,13 +882,24 @@ export const DailyReviewView: React.FC<DailyReviewViewProps> = ({
                 period="daily"
             />
 
-            {/* Delete Confirmation Modal */}
+            {/* Delete Summary Confirmation Modal */}
             <ConfirmModal
-                isOpen={isDeleteConfirmOpen}
-                onClose={() => setIsDeleteConfirmOpen(false)}
+                isOpen={isDeleteSummaryConfirmOpen}
+                onClose={() => setIsDeleteSummaryConfirmOpen(false)}
+                onConfirm={confirmDeleteSummary}
+                title="删除手动叙事？"
+                description="确定要删除这条总结吗？此操作无法撤销。"
+                confirmText="确认删除"
+                type="danger"
+            />
+
+            {/* Delete Narrative Confirmation Modal */}
+            <ConfirmModal
+                isOpen={isDeleteNarrativeConfirmOpen}
+                onClose={() => setIsDeleteNarrativeConfirmOpen(false)}
                 onConfirm={confirmDeleteNarrative}
-                title="删除叙事？"
-                description="确定要删除当前生成的叙事吗？此操作无法撤销，需要重新生成。"
+                title="删除 AI 叙事？"
+                description="确定要删除当前生成的 AI 叙事吗？此操作无法撤销，需要重新生成。"
                 confirmText="确认删除"
                 type="danger"
             />

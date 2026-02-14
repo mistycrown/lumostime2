@@ -251,6 +251,8 @@ export interface DailyReview {
   answers: ReviewAnswer[]; // 引导问答的答案
   checkItems?: CheckItem[]; // New: 每日日课
   checkCategorySyncToTimeline?: { [category: string]: boolean }; // 日课分组是否同步到时间轴
+  summary?: string; // 手动叙事：一句话总结今天
+  summaryUpdatedAt?: number;
   narrative?: string; // AI生成的叙事
   narrativeUpdatedAt?: number;
   isEdited?: boolean; // 叙事是否被手动编辑过
@@ -308,6 +310,8 @@ export interface WeeklyReview {
   createdAt: number;
   updatedAt: number;
   answers: ReviewAnswer[]; // 引导问答的答案
+  summary?: string; // 手动叙事：一句话总结本周
+  summaryUpdatedAt?: number;
   narrative?: string; // AI生成的叙事
   narrativeUpdatedAt?: number;
   isEdited?: boolean; // 叙事是否被手动编辑过
@@ -322,6 +326,8 @@ export interface MonthlyReview {
   createdAt: number;
   updatedAt: number;
   answers: ReviewAnswer[]; // 引导问答的答案
+  summary?: string; // 手动叙事：一句话总结本月
+  summaryUpdatedAt?: number;
   narrative?: string; // AI生成的叙事
   narrativeUpdatedAt?: number;
   isEdited?: boolean; // 叙事是否被手动编辑过

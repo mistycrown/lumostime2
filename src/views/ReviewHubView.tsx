@@ -213,8 +213,27 @@ export const ReviewHubView: React.FC<ReviewHubViewProps> = ({
                             {sortedMonthlyReviews.map((m) => {
                                 const mDate = new Date(m.monthStartDate);
                                 const monthName = mDate.toLocaleDateString('en-US', { month: 'long' }).toUpperCase();
-                                const { title, content: body } = parseNarrative(m.narrative, '暂无叙事标题');
                                 const isCurrentMonth = new Date().getMonth() === mDate.getMonth() && new Date().getFullYear() === mDate.getFullYear();
+
+                                // 优先使用手动总结，如果没有才使用 AI 叙事
+                                let displayTitle: string;
+                                let displayContent: string;
+
+                                if (m.summary && m.summary.trim()) {
+                                    // 有手动总结：直接使用手动总结作为内容
+                                    // 标题：如果手动总结没有标题，显示"暂无叙事标题"
+                                    displayTitle = '暂无叙事标题';
+                                    displayContent = m.summary;
+                                } else if (m.narrative && m.narrative.trim()) {
+                                    // 没有手动总结但有 AI 叙事：使用 AI 叙事的标题和引用
+                                    const { title, content: body } = parseNarrative(m.narrative, '暂无叙事标题');
+                                    displayTitle = title;
+                                    displayContent = body;
+                                } else {
+                                    // 两者都没有
+                                    displayTitle = '暂无叙事标题';
+                                    displayContent = '...';
+                                }
 
                                 return (
                                     <article
@@ -236,11 +255,11 @@ export const ReviewHubView: React.FC<ReviewHubViewProps> = ({
                                                     {isCurrentMonth ? 'CURRENT' : 'PAST'}
                                                 </div>
                                             </div>
-                                            <span className="text-[11px] uppercase text-stone-500 block tracking-wider">{title.slice(0, 30)}...</span>
+                                            <span className="text-[11px] uppercase text-stone-500 block tracking-wider">{displayTitle.slice(0, 30)}...</span>
                                         </div>
 
                                         <div className="text-sm text-stone-600 leading-relaxed border-l-2 border-stone-200 pl-3 mb-4 line-clamp-3">
-                                            {body}
+                                            {displayContent}
                                         </div>
 
                                         <div className="flex justify-between text-[10px] text-stone-500 border-t border-stone-100 pt-3">
@@ -274,7 +293,20 @@ export const ReviewHubView: React.FC<ReviewHubViewProps> = ({
                                 const midWeekDate = new Date(startDate.getTime() + 3 * 24 * 60 * 60 * 1000);
                                 const weekNum = getWeekNumber(midWeekDate);
 
-                                const { title } = parseNarrative(w.narrative, '暂无标题');
+                                // 优先使用手动总结，如果没有才使用 AI 叙事
+                                let displayTitle: string;
+
+                                if (w.summary && w.summary.trim()) {
+                                    // 有手动总结：显示"一句话总结"
+                                    displayTitle = w.summary;
+                                } else if (w.narrative && w.narrative.trim()) {
+                                    // 没有手动总结但有 AI 叙事：使用 AI 叙事的标题
+                                    const { title } = parseNarrative(w.narrative, '暂无标题');
+                                    displayTitle = title;
+                                } else {
+                                    // 两者都没有
+                                    displayTitle = '暂无标题';
+                                }
 
                                 // Format: 2025/12/08-12/14
                                 const dateRangeStr = `${startDate.getFullYear()}/${(startDate.getMonth() + 1).toString().padStart(2, '0')}/${startDate.getDate().toString().padStart(2, '0')}-${(endDate.getMonth() + 1).toString().padStart(2, '0')}/${endDate.getDate().toString().padStart(2, '0')}`;
@@ -306,8 +338,9 @@ export const ReviewHubView: React.FC<ReviewHubViewProps> = ({
                                             </span>
                                         </div>
 
-                                        <div className="font-serif text-[13px] leading-snug font-semibold line-clamp-3">
-                                            {title}
+                                        {/* 溢出处理：最多显示两行，超过30字自动溢出 */}
+                                        <div className="font-serif text-[13px] leading-snug font-semibold line-clamp-2 overflow-hidden">
+                                            {displayTitle}
                                         </div>
 
                                         <div className="flex gap-2 text-[9px] opacity-80 font-mono">
@@ -329,11 +362,29 @@ export const ReviewHubView: React.FC<ReviewHubViewProps> = ({
                     ) : (
                         <div className="flex flex-col gap-4">
                             {visibleDailyReviews.map((d, idx) => {
-                                const { title, content: body } = parseNarrative(d.narrative, '暂无标题');
                                 const dateObj = new Date(d.date);
                                 const dayStr = dateObj.getDate().toString();
                                 const monthStr = dateObj.toLocaleDateString('en-US', { month: 'short' });
                                 const weekdayStr = dateObj.toLocaleDateString('en-US', { weekday: 'short' }).toUpperCase(); // Short weekday (THU)
+
+                                // 优先使用手动总结，如果没有才使用 AI 叙事
+                                let displayTitle: string;
+                                let displayContent: string;
+
+                                if (d.summary && d.summary.trim()) {
+                                    // 有手动总结：标题为日期，内容为手动总结
+                                    displayTitle = d.date; // 例如："2026-02-16"
+                                    displayContent = d.summary;
+                                } else if (d.narrative && d.narrative.trim()) {
+                                    // 没有手动总结但有 AI 叙事：使用 AI 叙事的标题和引用
+                                    const { title, content: body } = parseNarrative(d.narrative, '暂无标题');
+                                    displayTitle = title;
+                                    displayContent = body;
+                                } else {
+                                    // 两者都没有
+                                    displayTitle = '暂无标题';
+                                    displayContent = '...';
+                                }
 
                                 return (
                                     <div key={d.id} className="flex gap-4 pb-4 border-b border-stone-100 last:border-0" onClick={() => onOpenDailyReview(new Date(d.date))}>
@@ -352,7 +403,7 @@ export const ReviewHubView: React.FC<ReviewHubViewProps> = ({
                                         >
                                             <div className="flex justify-between items-start mb-1.5 gap-2">
                                                 <div className="font-serif text-[17px] font-bold leading-snug text-stone-900 flex-1 min-w-0 truncate">
-                                                    {title}
+                                                    {displayTitle}
                                                 </div>
                                                 <span 
                                                     className="btn-template-filled text-[10px] font-bold uppercase inline-block px-1.5 py-0.5 rounded-sm shrink-0 whitespace-nowrap"
@@ -361,7 +412,7 @@ export const ReviewHubView: React.FC<ReviewHubViewProps> = ({
                                                 </span>
                                             </div>
                                             <div className="text-[13px] text-stone-500 line-clamp-2 leading-relaxed">
-                                                {body}
+                                                {displayContent}
                                             </div>
                                         </div>
                                     </div>

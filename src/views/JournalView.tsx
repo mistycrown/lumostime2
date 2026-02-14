@@ -233,13 +233,25 @@ export const JournalView: React.FC<JournalViewProps> = ({
                 return;
             }
 
-            const { title, content } = parseNarrative(review.narrative || '', review.date);
+            // 优先使用手动叙事（summary），如果没有才使用 AI 叙事（narrative）
+            let finalTitle: string;
+            let finalContent: string;
 
-            // User Policy: If no content (or just '...'), show '...'
-            // Title should be the Date
-            const hasContent = content && content !== '...';
-            const finalTitle = hasContent ? (title === 'Daily Reflection' ? review.date : title) : review.date;
-            const finalContent = hasContent ? content : '...';
+            if (review.summary && review.summary.trim()) {
+                // 有手动叙事：标题为日期，内容为手动叙事
+                finalTitle = review.date;
+                finalContent = review.summary;
+            } else if (review.narrative && review.narrative.trim()) {
+                // 没有手动叙事但有 AI 叙事：使用 AI 叙事的标题和引用
+                const { title, content } = parseNarrative(review.narrative, review.date);
+                const hasContent = content && content !== '...';
+                finalTitle = hasContent ? (title === 'Daily Reflection' ? review.date : title) : review.date;
+                finalContent = hasContent ? content : '...';
+            } else {
+                // 两者都没有：显示日期和省略号
+                finalTitle = review.date;
+                finalContent = '...';
+            }
 
             const entry: DiaryEntry = {
                 id: review.id,
@@ -258,18 +270,29 @@ export const JournalView: React.FC<JournalViewProps> = ({
             const dateObj = new Date(review.weekEndDate);
             if (dateObj.getFullYear() !== targetYear || dateObj.getMonth() !== targetMonth) return;
 
-            // Calculate week number or just use date range for title default
-            const d = new Date(review.weekStartDate);
-            // Default Title: "Week of <Date>"
-            const defaultTitle = `Week of ${d.toLocaleDateString()}`;
-            const { title, content } = parseNarrative(review.narrative || '', defaultTitle);
+            // 优先使用手动叙事（summary），如果没有才使用 AI 叙事（narrative）
+            let finalTitle: string;
+            let finalContent: string;
 
-            // User Policy: If no content, use date range as title, '...' as content
             const dateRange = `${review.weekStartDate} ~ ${review.weekEndDate}`;
-            const hasContent = content && content !== '...';
 
-            const finalTitle = hasContent ? title : dateRange;
-            const finalContent = hasContent ? content : '...';
+            if (review.summary && review.summary.trim()) {
+                // 有手动叙事：标题为日期范围，内容为手动叙事
+                finalTitle = dateRange;
+                finalContent = review.summary;
+            } else if (review.narrative && review.narrative.trim()) {
+                // 没有手动叙事但有 AI 叙事：使用 AI 叙事的标题和引用
+                const d = new Date(review.weekStartDate);
+                const defaultTitle = `Week of ${d.toLocaleDateString()}`;
+                const { title, content } = parseNarrative(review.narrative, defaultTitle);
+                const hasContent = content && content !== '...';
+                finalTitle = hasContent ? title : dateRange;
+                finalContent = hasContent ? content : '...';
+            } else {
+                // 两者都没有：显示日期范围和省略号
+                finalTitle = dateRange;
+                finalContent = '...';
+            }
 
             diaryEntries.push({
                 id: review.id,
