@@ -584,7 +584,7 @@ export const DailyReviewView: React.FC<DailyReviewViewProps> = ({
                                                     >
                                                         {/* Checkbox: Black/White, small, aligned */}
                                                         <button
-                                                            className={`mt-1.5 w-4 h-4 rounded-full border flex items-center justify-center transition-all shrink-0 pointer-events-none ${
+                                                            className={`mt-[5px] w-4 h-4 rounded-full border flex items-center justify-center transition-all shrink-0 pointer-events-none ${
                                                                 item.type === 'auto' 
                                                                     ? item.isCompleted
                                                                         ? 'bg-blue-600 border-blue-600 text-white'

@@ -48,6 +48,14 @@ interface DetailTimelineCardProps {
     
     // 专注分数支持
     enableFocusScore?: boolean;
+    
+    // 进度追踪支持（Ink Grid）
+    progressTracking?: {
+        isProgress: boolean;
+        totalAmount: number;
+        unitAmount: number;
+        completedUnits: number;
+    };
 }
 
 export const DetailTimelineCard: React.FC<DetailTimelineCardProps> = ({
@@ -62,7 +70,8 @@ export const DetailTimelineCard: React.FC<DetailTimelineCardProps> = ({
     defaultViewMode = 'month',
     todos = [],
     keywords = [],
-    enableFocusScore = false
+    enableFocusScore = false,
+    progressTracking
 }) => {
     const { isPrivacyMode } = usePrivacy();
     const [viewMode, setViewMode] = React.useState<'month' | 'all'>(defaultViewMode);
@@ -756,6 +765,113 @@ export const DetailTimelineCard: React.FC<DetailTimelineCardProps> = ({
                         </div>
                     </div>
                 </div>
+            )}
+
+            {/* Ink Grid Progress Visualization */}
+            {progressTracking?.isProgress && 
+             progressTracking.totalAmount > 0 && 
+             progressTracking.unitAmount > 0 && 
+             viewMode === 'month' && (
+              <div className="mb-8">
+                <div className="flex items-center justify-between mb-3">
+                  <span className="text-xs font-bold text-stone-400 uppercase tracking-widest">Progress Grid</span>
+                  <span className="text-xs text-stone-500 font-mono">
+                    {progressTracking.completedUnits} / {progressTracking.totalAmount}
+                  </span>
+                </div>
+                
+                {/* Grid Container with max size constraint */}
+                <div className="grid gap-1.5" style={{
+                  gridTemplateColumns: 'repeat(auto-fill, minmax(20px, 1fr))',
+                  maxWidth: '100%'
+                }}>
+                  {(() => {
+                    const totalSquares = Math.ceil(progressTracking.totalAmount / progressTracking.unitAmount);
+                    const renderSquares = totalSquares > 3000 ? 3000 : totalSquares;
+                    
+                    return Array.from({ length: renderSquares }).map((_, i) => {
+                      const squareStart = i * progressTracking.unitAmount;
+                      const squareEnd = (i + 1) * progressTracking.unitAmount;
+                      
+                      // Case A: Completed square (fully filled)
+                      if (progressTracking.completedUnits >= squareEnd) {
+                        return (
+                          <div
+                            key={i}
+                            className="aspect-square rounded-sm transition-all duration-300"
+                            style={{ 
+                              backgroundColor: 'var(--progress-bar-fill)',
+                              opacity: 1,
+                              maxWidth: '32px',
+                              maxHeight: '32px'
+                            }}
+                            title={`${squareStart}-${squareEnd}: Completed`}
+                          />
+                        );
+                      }
+                      
+                      // Case B: Active square (partially filled with watercolor effect)
+                      if (progressTracking.completedUnits > squareStart && progressTracking.completedUnits < squareEnd) {
+                        const remainder = progressTracking.completedUnits % progressTracking.unitAmount;
+                        const rawOpacity = remainder / progressTracking.unitAmount;
+                        const finalOpacity = Math.max(0.15, rawOpacity);
+                        
+                        return (
+                          <div
+                            key={i}
+                            className="aspect-square rounded-sm transition-all duration-300"
+                            style={{ 
+                              backgroundColor: 'var(--progress-bar-fill)',
+                              opacity: finalOpacity,
+                              maxWidth: '32px',
+                              maxHeight: '32px'
+                            }}
+                            title={`${squareStart}-${squareEnd}: ${Math.round(rawOpacity * 100)}% (${remainder}/${progressTracking.unitAmount})`}
+                          />
+                        );
+                      }
+                      
+                      // Case C: Empty square (outline only)
+                      return (
+                        <div
+                          key={i}
+                          className="aspect-square rounded-sm border border-stone-300 bg-transparent transition-all duration-300"
+                          style={{
+                            maxWidth: '32px',
+                            maxHeight: '32px'
+                          }}
+                          title={`${squareStart}-${squareEnd}: Not started`}
+                        />
+                      );
+                    });
+                  })()}
+                </div>
+                
+                {/* Legend */}
+                <div className="flex items-center justify-center gap-3 mt-3 text-[10px] text-stone-500">
+                  <div className="flex items-center gap-1">
+                    <div className="w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: 'var(--progress-bar-fill)' }} />
+                    <span>Completed</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <div className="w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: 'var(--progress-bar-fill)', opacity: 0.3 }} />
+                    <span>In Progress</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <div className="w-2.5 h-2.5 rounded-sm border border-stone-300" />
+                    <span>Not Started</span>
+                  </div>
+                </div>
+                
+                {(() => {
+                  const totalSquares = Math.ceil(progressTracking.totalAmount / progressTracking.unitAmount);
+                  return totalSquares > 3000 && (
+                    <p className="text-[10px] text-stone-400 text-center mt-2">
+                      Showing first 3000 of {totalSquares} squares
+                    </p>
+                  );
+                })()}
+              </div>
             )}
 
             {/* History List */}

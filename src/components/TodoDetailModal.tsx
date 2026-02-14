@@ -486,19 +486,19 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({ initialTodo, c
 
         {activeTab === '時間線' && (
           <DetailTimelineCard
-            filteredLogs={linkedLogs}
-            displayDate={displayDate}
-            onDateChange={setDisplayDate}
-            customScale={
-              (heatmapMin !== undefined || heatmapMax !== undefined)
-                ? { min: (heatmapMin || 30) * 60, max: (heatmapMax || 240) * 60 }
-                : undefined
-            }
-            entityInfo={{
-              icon: '@',
-              name: title || 'Task',
-              type: 'other'
-            }}
+              filteredLogs={linkedLogs}
+              displayDate={displayDate}
+              onDateChange={setDisplayDate}
+              customScale={
+                (heatmapMin !== undefined || heatmapMax !== undefined)
+                  ? { min: (heatmapMin || 30) * 60, max: (heatmapMax || 240) * 60 }
+                  : undefined
+              }
+              entityInfo={{
+                icon: '@',
+                name: title || 'Task',
+                type: 'other'
+              }}
             onEditLog={onEditLog}
             categories={categories}
             todos={[{
@@ -522,6 +522,12 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({ initialTodo, c
               coverImage,
             }]}
             enableFocusScore={enableFocusScore}
+            progressTracking={isProgress ? {
+              isProgress,
+              totalAmount,
+              unitAmount,
+              completedUnits
+            } : undefined}
             renderLogMetadata={(log) => {
               const category = categories?.find(c => c.id === log.categoryId);
               const activity = category?.activities.find(a => a.id === log.activityId);
