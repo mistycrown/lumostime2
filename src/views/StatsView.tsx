@@ -549,6 +549,7 @@ export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentD
       <ChronoPrintView
         inputText={chronoPrintText}
         onBack={() => setShowChronoPrint(false)}
+        onToast={onToast}
       />
     );
   }

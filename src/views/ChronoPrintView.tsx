@@ -13,9 +13,10 @@ const FONT_URL = "https://fonts.googleapis.com/css2?family=Inter:wght@300;400;50
 interface ChronoPrintViewProps {
   inputText: string;
   onBack: () => void;
+  onToast?: (type: ToastType, message: string) => void;
 }
 
-export const ChronoPrintView: React.FC<ChronoPrintViewProps> = ({ inputText, onBack }) => {
+export const ChronoPrintView: React.FC<ChronoPrintViewProps> = ({ inputText, onBack, onToast }) => {
   const [data, setData] = useState<ParsedData | null>(null);
   const [globalDateLabel, setGlobalDateLabel] = useState<string>("");
   const [mainTitle, setMainTitle] = useState<string>("");
@@ -64,22 +65,55 @@ export const ChronoPrintView: React.FC<ChronoPrintViewProps> = ({ inputText, onB
 
     try {
       // Determine background color based on style
-      // Ticket style needs transparent background for the serrated edge transparency to work
       const bgColor = currentStyle === 'ticket' ? undefined : (currentStyle === 'retro' ? currentTheme.bg : '#ffffff');
 
-      // Use pixelRatio for better quality
+      // Generate image with optimized settings
       const dataUrl = await toPng(ref.current, { 
         cacheBust: true, 
-        pixelRatio: 2.5, // Higher quality
+        pixelRatio: 2, // Optimized for speed and quality
         backgroundColor: bgColor,
         skipAutoScale: true,
       });
-      const link = document.createElement('a');
-      link.download = filename;
-      link.href = dataUrl;
-      link.click();
+      
+      const isNative = Capacitor.isNativePlatform();
+      
+      if (isNative) {
+        // 移动端：保存到相册
+        try {
+          const base64Data = dataUrl.replace(/^data:image\/\w+;base64,/, '');
+          
+          await Filesystem.writeFile({
+            path: `Pictures/LumosTime/${filename}`,
+            data: base64Data,
+            directory: Directory.ExternalStorage,
+            recursive: true
+          });
+          
+          if (onToast) {
+            onToast('success', '图片已保存到相册');
+          }
+        } catch (err: any) {
+          console.error('Failed to save image:', err);
+          if (onToast) {
+            onToast('error', '保存失败：' + (err.message || '请检查存储权限'));
+          }
+        }
+      } else {
+        // 桌面端/Web端：直接下载
+        const link = document.createElement('a');
+        link.download = filename;
+        link.href = dataUrl;
+        link.click();
+        
+        if (onToast) {
+          onToast('success', '图片已下载');
+        }
+      }
     } catch (err) {
       console.error(`Failed to export ${filename}:`, err);
+      if (onToast) {
+        onToast('error', '导出失败');
+      }
     } finally {
       setExportingState(null);
     }
@@ -120,7 +154,7 @@ export const ChronoPrintView: React.FC<ChronoPrintViewProps> = ({ inputText, onB
                     title={mainTitle || data.monthStats.title} 
                     total={data.monthStats.totalDuration}
                     categoryLabel="TAGS"
-                    subtitle="Tag Statistics"
+                    subtitle={currentStyle === 'modern' || currentStyle === 'ticket' ? 'Tags' : 'Tag Statistics'}
                     isMobile={true}
                     variantStyle={currentStyle}
                     theme={currentTheme}
@@ -144,7 +178,7 @@ export const ChronoPrintView: React.FC<ChronoPrintViewProps> = ({ inputText, onB
                     title={mainTitle}
                     total={data.todoStats.totalDuration}
                     categoryLabel="TODOS"
-                    subtitle="To Do Statistics"
+                    subtitle={currentStyle === 'modern' || currentStyle === 'ticket' ? 'ToDo' : 'To Do Statistics'}
                     isMobile={true}
                     variantStyle={currentStyle}
                     theme={currentTheme}
@@ -171,7 +205,7 @@ export const ChronoPrintView: React.FC<ChronoPrintViewProps> = ({ inputText, onB
                     title={mainTitle}
                     total={data.domainStats.totalDuration}
                     categoryLabel="SCOPES"
-                    subtitle="Scopes Statistics"
+                    subtitle={currentStyle === 'modern' || currentStyle === 'ticket' ? 'Scopes' : 'Scopes Statistics'}
                     isMobile={true}
                     variantStyle={currentStyle}
                     theme={currentTheme}
