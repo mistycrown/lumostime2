@@ -95,6 +95,64 @@ export const useReviewManager = () => {
         updateDataLastModified();
     };
 
+    // 后台创建日课（不打开视图）- 用于自动生成
+    const handleCreateDailyReviewSilently = (targetDate?: Date) => {
+        const dateToUse = (targetDate instanceof Date && !isNaN(targetDate.getTime())) ? targetDate : currentDate;
+        const dateStr = getLocalDateStr(dateToUse);
+        let review = dailyReviews.find(r => r.date === dateStr);
+
+        // 如果已存在，不需要创建
+        if (review) return;
+
+        const templateSnapshot = reviewTemplates
+            .filter(t => t.isDailyTemplate)
+            .sort((a, b) => a.order - b.order)
+            .map(t => ({
+                id: t.id,
+                title: t.title,
+                questions: t.questions,
+                order: t.order,
+                syncToTimeline: t.syncToTimeline
+            }));
+
+        const initialCheckItems: any[] = [];
+        const dailyCheckTemplates = checkTemplates.filter(t => t.enabled && t.isDaily);
+        if (dailyCheckTemplates.length > 0) {
+            dailyCheckTemplates.sort((a, b) => a.order - b.order).forEach(t => {
+                t.items.forEach((item: any) => {
+                    const content = typeof item === 'string' ? item : item.content;
+                    const icon = typeof item === 'string' ? undefined : item.icon;
+                    const uiIcon = typeof item === 'string' ? undefined : item.uiIcon;
+                    const type = typeof item === 'string' ? 'manual' : (item.type || 'manual');
+                    const autoConfig = typeof item === 'string' ? undefined : item.autoConfig;
+                    initialCheckItems.push({
+                        id: crypto.randomUUID(),
+                        category: t.title,
+                        content: content,
+                        icon: icon,
+                        uiIcon: uiIcon,
+                        isCompleted: false,
+                        type: type,
+                        autoConfig: autoConfig
+                    });
+                });
+            });
+        }
+
+        review = {
+            id: crypto.randomUUID(),
+            date: dateStr,
+            createdAt: Date.now(),
+            updatedAt: Date.now(),
+            answers: [],
+            checkItems: initialCheckItems,
+            templateSnapshot
+        };
+        setDailyReviews(prev => [...prev, review!]);
+        updateDataLastModified();
+        console.log('[AutoGenerate] 已在后台创建每日回顾');
+    };
+
     const handleUpdateReview = (updatedReview: DailyReview) => {
         setDailyReviews(prev => prev.map(r => r.id === updatedReview.id ? updatedReview : r));
         updateDataLastModified();
@@ -240,6 +298,7 @@ export const useReviewManager = () => {
 
     return {
         handleOpenDailyReview,
+        handleCreateDailyReviewSilently,
         handleUpdateReview,
         handleDeleteReview,
         handleGenerateNarrative,
