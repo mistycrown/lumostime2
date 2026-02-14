@@ -37,6 +37,10 @@ interface SettingsContextType {
     timelineGalleryMode: boolean;
     setTimelineGalleryMode: React.Dispatch<React.SetStateAction<boolean>>;
 
+    // 折叠字数设置
+    collapseThreshold: number;
+    setCollapseThreshold: React.Dispatch<React.SetStateAction<number>>;
+
     // UI 主题
     uiIconTheme: string;
     setUiIconTheme: React.Dispatch<React.SetStateAction<string>>;
@@ -222,6 +226,15 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
         localStorage.setItem('lumostime_timeline_gallery_mode', timelineGalleryMode.toString());
     }, [timelineGalleryMode]);
 
+    const [collapseThreshold, setCollapseThreshold] = useState<number>(() => {
+        const stored = localStorage.getItem('lumostime_collapse_threshold');
+        return stored ? parseInt(stored) : 9999; // Default to 9999 (no collapse)
+    });
+
+    useEffect(() => {
+        localStorage.setItem('lumostime_collapse_threshold', collapseThreshold.toString());
+    }, [collapseThreshold]);
+
     const [uiIconTheme, setUiIconTheme] = useState<string>(() => {
         const stored = localStorage.getItem('lumostime_ui_icon_theme');
         return stored || 'default'; // Default to default (built-in icons)
@@ -286,6 +299,8 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
             setAutoFocusNote,
             timelineGalleryMode,
             setTimelineGalleryMode,
+            collapseThreshold,
+            setCollapseThreshold,
             uiIconTheme,
             setUiIconTheme,
             colorScheme,

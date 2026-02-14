@@ -76,7 +76,8 @@ const AppContent: React.FC = () => {
     userPersonalInfo, setUserPersonalInfo,
     filters, setFilters,
     autoFocusNote, setAutoFocusNote,
-    timelineGalleryMode, setTimelineGalleryMode
+    timelineGalleryMode, setTimelineGalleryMode,
+    collapseThreshold, setCollapseThreshold
   } = useSettings();
 
   const { addToast } = useToast();
@@ -520,6 +521,9 @@ const AppContent: React.FC = () => {
 
           timelineGalleryMode={timelineGalleryMode}
           onToggleTimelineGalleryMode={() => setTimelineGalleryMode(!timelineGalleryMode)}
+
+          collapseThreshold={collapseThreshold}
+          onSetCollapseThreshold={setCollapseThreshold}
 
           // Review Props
           reviewTemplates={reviewTemplates}

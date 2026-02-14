@@ -38,6 +38,8 @@ interface PreferencesSettingsViewProps {
     onSetDefaultIndexView?: (view: DefaultIndexView) => void;
     timelineGalleryMode?: boolean;
     onToggleTimelineGalleryMode?: () => void;
+    collapseThreshold?: number;
+    onSetCollapseThreshold?: (val: number) => void;
 }
 
 export const PreferencesSettingsView: React.FC<PreferencesSettingsViewProps> = ({
@@ -70,7 +72,9 @@ export const PreferencesSettingsView: React.FC<PreferencesSettingsViewProps> = (
     defaultIndexView = 'TAGS',
     onSetDefaultIndexView,
     timelineGalleryMode = false,
-    onToggleTimelineGalleryMode
+    onToggleTimelineGalleryMode,
+    collapseThreshold = 9999,
+    onSetCollapseThreshold
 }) => {
     const [isDefaultViewDropdownOpen, setIsDefaultViewDropdownOpen] = useState(false);
 
@@ -306,6 +310,26 @@ export const PreferencesSettingsView: React.FC<PreferencesSettingsViewProps> = (
                                 <ChevronRight size={16} />
                             </button>
                         </div>
+                    </div>
+
+                    {/* Collapse Threshold Config */}
+                    <div className="flex items-center justify-between p-4 border-b border-stone-100 hover:bg-stone-50 transition-colors">
+                        <div>
+                            <h4 className="font-bold text-stone-700">折叠字数</h4>
+                            <p className="text-xs text-stone-400 mt-1">备注超过此字数将被折叠（字）</p>
+                        </div>
+                        <input
+                            type="number"
+                            inputMode="numeric"
+                            min="0"
+                            value={collapseThreshold}
+                            onChange={(e) => {
+                                const val = parseInt(e.target.value) || 0;
+                                onSetCollapseThreshold?.(Math.max(0, val));
+                            }}
+                            onFocus={(e) => e.target.select()}
+                            className="bg-stone-100 border-none rounded-lg px-3 py-1.5 text-sm font-bold text-stone-700 focus:outline-none focus:ring-0 focus:bg-stone-200 transition-colors w-20 text-center font-mono"
+                        />
                     </div>
 
                     {/* Default View Config */}

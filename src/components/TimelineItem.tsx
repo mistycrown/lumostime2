@@ -5,6 +5,7 @@ import { imageService } from '../services/imageService';
 import { ImagePreviewModal } from './ImagePreviewModal';
 import { usePrivacy } from '../contexts/PrivacyContext';
 import { IconRenderer } from './IconRenderer';
+import { CollapsibleText } from './CollapsibleText';
 
 import { ReactionPicker, ReactionList } from './ReactionComponents';
 
@@ -79,9 +80,10 @@ interface TimelineItemProps {
     onAddComment: (entryId: string, text: string) => void;
     onToggleReaction?: (entryId: string, emoji: string) => void;
     onClick?: () => void;
+    collapseThreshold?: number; // 折叠字数阈值
 }
 
-const TimelineItem: React.FC<TimelineItemProps> = ({ entry, isLast, isFirstOfDay = true, onAddComment, onToggleReaction, onClick }) => {
+const TimelineItem: React.FC<TimelineItemProps> = ({ entry, isLast, isFirstOfDay = true, onAddComment, onToggleReaction, onClick, collapseThreshold = 9999 }) => {
     const [isCommenting, setIsCommenting] = useState(false);
     const [commentText, setCommentText] = useState('');
     const [previewImage, setPreviewImage] = useState<string | null>(null);
@@ -238,9 +240,11 @@ const TimelineItem: React.FC<TimelineItemProps> = ({ entry, isLast, isFirstOfDay
                 })()}
 
                 {/* Body Text */}
-                <p className={`text-sm text-stone-500 leading-relaxed whitespace-pre-wrap font-light ${isSummary ? 'mt-2' : 'mb-1'} ${isPrivacyMode ? 'blur-sm select-none transition-all duration-500' : 'transition-all duration-500'}`} style={{ fontFamily: '"Noto Serif SC", serif' }}>
-                    {entry.content}
-                </p>
+                <CollapsibleText
+                    text={entry.content}
+                    threshold={collapseThreshold}
+                    className={`text-sm text-stone-500 leading-relaxed font-light ${isSummary ? 'mt-2' : 'mb-1'} ${isPrivacyMode ? 'blur-sm select-none transition-all duration-500' : 'transition-all duration-500'}`}
+                />
 
                 {/* Metadata Chips: @ (Todo), # (Tags), % (Domain) - HIDDEN FOR SUMMARIES */}
                 {!isSummary && hasMetadata && (
