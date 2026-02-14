@@ -1,0 +1,49 @@
+字体文件检查清单
+================
+
+请按照此清单确认字体文件是否正确放置：
+
+□ 霞鹜文楷
+  □ public/fonts/lxgw-wenkai/LXGWWenKai-Regular.woff2
+  □ public/fonts/lxgw-wenkai/LXGWWenKai-Bold.woff2
+
+□ 思源宋体
+  □ public/fonts/source-han-serif/SourceHanSerifSC-Regular.woff2
+  □ public/fonts/source-han-serif/SourceHanSerifSC-Bold.woff2
+
+□ 阿里巴巴普惠体
+  □ public/fonts/alibaba-puhuiti/AlibabaPuHuiTi-Regular.woff2
+  □ public/fonts/alibaba-puhuiti/AlibabaPuHuiTi-Bold.woff2
+
+测试步骤：
+=========
+
+1. □ 启动应用：npm run dev
+2. □ 打开浏览器开发者工具（F12）
+3. □ 切换到 Network 标签
+4. □ 刷新页面
+5. □ 搜索 ".woff2"，确认字体文件加载成功
+6. □ 进入"投喂功能" → "字体" Tab
+7. □ 测试切换不同字体
+8. □ 确认字体立即生效
+
+如果遇到问题：
+============
+
+1. 检查文件名是否完全一致（区分大小写）
+2. 检查文件格式是否为 .woff2
+3. 查看浏览器控制台是否有错误信息
+4. 清除浏览器缓存后重试
+
+下载链接：
+=========
+
+霞鹜文楷：https://github.com/lxgw/LxgwWenKai/releases
+思源宋体：https://github.com/adobe-fonts/source-han-serif/releases
+阿里巴巴普惠体：https://www.alibabafonts.com/
+
+注意：
+=====
+- 所有字体必须是 woff2 格式
+- 文件名必须完全匹配（包括大小写）
+- 每个字体需要 Regular 和 Bold 两个字重

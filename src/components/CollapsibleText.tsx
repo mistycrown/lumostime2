@@ -22,7 +22,7 @@ export const CollapsibleText: React.FC<CollapsibleTextProps> = ({
     if (text.length <= threshold) {
         return (
             <div className={className}>
-                <div className="whitespace-pre-wrap" style={{ fontFamily: '"Noto Serif SC", serif' }}>
+                <div className="whitespace-pre-wrap">
                     {text}
                 </div>
             </div>
@@ -34,7 +34,7 @@ export const CollapsibleText: React.FC<CollapsibleTextProps> = ({
 
     return (
         <div className={className}>
-            <div className="whitespace-pre-wrap" style={{ fontFamily: '"Noto Serif SC", serif' }}>
+            <div className="whitespace-pre-wrap">
                 {displayText}
                 {!isExpanded && '...'}
             </div>
@@ -44,7 +44,6 @@ export const CollapsibleText: React.FC<CollapsibleTextProps> = ({
                     setIsExpanded(!isExpanded);
                 }}
                 className="mt-2 flex items-center gap-1 text-xs text-stone-500 hover:text-stone-700 transition-colors"
-                style={{ fontFamily: '"Noto Serif SC", serif' }}
             >
                 {isExpanded ? (
                     <>

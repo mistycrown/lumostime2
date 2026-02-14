@@ -25,6 +25,7 @@ import { useCustomPresets, ThemePreset, getValidationErrorMessage } from '../hoo
 import { TimePalSettings } from '../components/TimePalSettings';
 import { ThemePresetService } from '../services/themePresetService';
 import { UiThemeButton } from '../components/UiThemeButton';
+import { FontSelector } from '../components/FontSelector';
 
 interface SponsorshipViewProps {
     onBack: () => void;
@@ -260,7 +261,7 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
     const [editingPresetId, setEditingPresetId] = useState<string | null>(null);
     
     // Tab 页状态
-    type TabType = 'preset' | 'icon' | 'colorScheme' | 'background' | 'navigation' | 'timepal';
+    type TabType = 'preset' | 'icon' | 'colorScheme' | 'background' | 'navigation' | 'timepal' | 'font';
     const [activeTab, setActiveTab] = useState<TabType>('preset');
 
     // 当前应用的主题方案
@@ -657,7 +658,7 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
 
                                 {/* Tab 导航 - 简洁风格 */}
                                 <div className="flex gap-6 border-b border-stone-200 overflow-x-auto scrollbar-hide px-5">
-                            {(['preset', 'icon', 'colorScheme', 'background', 'navigation', 'timepal'] as TabType[]).map(tab => (
+                            {(['preset', 'icon', 'colorScheme', 'background', 'navigation', 'timepal', 'font'] as TabType[]).map(tab => (
                                 <button
                                     key={tab}
                                     onClick={() => setActiveTab(tab)}
@@ -673,7 +674,8 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
                                         'colorScheme': '配色',
                                         'background': '背景', 
                                         'navigation': '导航', 
-                                        'timepal': '小友' 
+                                        'timepal': '小友',
+                                        'font': '字体'
                                     }[tab]}
                                 </button>
                             ))}
@@ -979,6 +981,11 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
                             {activeTab === 'timepal' && (
                                 /* 时光小友设置 */
                                 <TimePalSettings categories={categories} />
+                            )}
+
+                            {activeTab === 'font' && (
+                                /* 字体切换 */
+                                <FontSelector onToast={onToast} />
                             )}
                         </div>
 

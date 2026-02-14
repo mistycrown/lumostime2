@@ -632,7 +632,7 @@ export const JournalView: React.FC<JournalViewProps> = ({
             {/* Scrollable Content Area */}
             <div
                 ref={scrollContainerRef}
-                className="flex-1 overflow-y-auto overflow-x-hidden pb-safe no-scrollbar font-sans selection:bg-gray-200 selection:text-black"
+                className="flex-1 overflow-y-auto overflow-x-hidden pb-safe no-scrollbar font-serif selection:bg-gray-200 selection:text-black"
             >
                 <main 
                     className="max-w-2xl mx-auto pl-4 pr-[25px] pt-[10px] pb-24 min-h-[80vh] w-full"

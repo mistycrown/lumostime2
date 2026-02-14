@@ -6,13 +6,36 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
   <title>LumosTime</title>
   <link rel="icon" type="image/png" href="/lumostime_icon.png">
+  <!-- 立即应用保存的字体设置，必须在 Tailwind 之前 -->
+  <script>
+    (function() {
+      try {
+        const savedFont = localStorage.getItem('lumostime_font_family');
+        const fontMap = {
+          'default': '"Noto Serif SC", serif',
+          'lxgw-wenkai': '"LXGW WenKai", "Noto Serif SC", serif',
+          'lxgw-neo-zhisong': '"LXGW Neo ZhiSong", "Noto Serif SC", serif',
+          'ding-lie-song': '"Ding Lie Song", "Noto Serif SC", serif',
+          'zhuque-fangsong': '"Zhuque Fangsong", "Noto Serif SC", serif'
+        };
+        const fontFamily = fontMap[savedFont] || fontMap['default'];
+        // 立即设置 CSS 变量
+        document.documentElement.style.setProperty('--font-family', fontFamily);
+        console.log('[Font Init] Applied font:', savedFont || 'default', '→', fontFamily);
+      } catch (e) {
+        console.error('[Font Init] Failed:', e);
+        document.documentElement.style.setProperty('--font-family', '"Noto Serif SC", serif');
+      }
+    })();
+  </script>
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
     tailwind.config = {
       theme: {
         extend: {
           fontFamily: {
-            serif: ['"Noto Serif SC"', 'serif'],
+            // 使用 CSS 变量，这样可以动态切换
+            serif: ['var(--font-family)', '"Noto Serif SC"', 'serif'],
             sans: ['Inter', 'sans-serif'],
           }
         }
@@ -22,9 +45,12 @@
   <link
     href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;500;700&family=Inter:wght@400;500;600;700&display=swap"
     rel="stylesheet">
+  <!-- 自定义字体 -->
+  <link rel="stylesheet" href="/fonts/fonts.css">
   <style>
     body {
-      font-family: 'Noto Serif SC', serif;
+      /* 使用 CSS 变量，由 fontService 动态控制 */
+      font-family: var(--font-family, 'Noto Serif SC', serif);
       /* Background will be controlled by backgroundService */
     }
 

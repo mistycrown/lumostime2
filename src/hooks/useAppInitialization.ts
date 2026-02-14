@@ -108,6 +108,20 @@ export const useAppInitialization = () => {
         console.log('🖼️ Background service initialized');
     }, []);
 
+    // Initialize font service
+    useEffect(() => {
+        const initFont = async () => {
+            try {
+                const { fontService } = await import('../services/fontService');
+                fontService.initializeFont();
+                console.log('🔤 Font service initialized');
+            } catch (error) {
+                console.error('❌ Font service initialization failed:', error);
+            }
+        };
+        initFont();
+    }, []);
+
     /**
      * 图片清理逻辑（已禁用）
      * 
