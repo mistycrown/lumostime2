@@ -19,8 +19,11 @@ import {
     Save,
     Database,
     AlertCircle,
-    RotateCcw
+    RotateCcw,
+    ToggleLeft,
+    ToggleRight
 } from 'lucide-react';
+import * as LucideIcons from 'lucide-react';
 import { CheckTemplate, CheckTemplateItem } from '../types';
 import { ConfirmModal } from '../components/ConfirmModal';
 import { IconRenderer } from '../components/IconRenderer';
@@ -494,6 +497,22 @@ export const CheckTemplateManageView: React.FC<CheckTemplateManageViewProps> = (
                                             暂无日课
                                         </div>
                                     )}
+                                </div>
+                            </div>
+
+                            {/* Sync to Timeline Toggle */}
+                            <div className="pt-4 border-t border-stone-100">
+                                <div className="flex items-center justify-between">
+                                    <div className="flex flex-col">
+                                        <span className="text-sm font-bold text-stone-700">同步到时间轴</span>
+                                        <span className="text-[10px] text-stone-400">开启后，此日课分组将显示在时间轴底部</span>
+                                    </div>
+                                    <button
+                                        onClick={() => setTemplateForm({ ...templateForm, syncToTimeline: !templateForm.syncToTimeline })}
+                                        className={`p-2 rounded-lg transition-colors ${templateForm.syncToTimeline ? 'text-[#2F4F4F]' : 'text-stone-300'}`}
+                                    >
+                                        {templateForm.syncToTimeline ? <LucideIcons.ToggleRight size={28} /> : <LucideIcons.ToggleLeft size={28} />}
+                                    </button>
                                 </div>
                             </div>
                         </div>

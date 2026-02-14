@@ -354,7 +354,7 @@ const TemplateEditor: React.FC<{
                 <div className="flex items-center justify-between pt-2">
                     <div className="flex flex-col">
                         <span className="text-sm font-bold text-stone-700">设置为月报模板</span>
-                        <span className="text-[10px] text-stone-400">开启后，此模板将在月报中使用，并参与月报生成</span>
+                        <span className="text-[10px] text-stone-400">开启后，此模板将在月报中使用</span>
                     </div>
                     <button
                         onClick={() => onUpdate({

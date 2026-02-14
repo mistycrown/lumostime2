@@ -55,9 +55,13 @@ export const useReviewManager = () => {
                 }));
 
             const initialCheckItems: any[] = [];
+            const checkCategorySyncToTimeline: { [category: string]: boolean } = {};
             const dailyCheckTemplates = checkTemplates.filter(t => t.enabled && t.isDaily);
             if (dailyCheckTemplates.length > 0) {
                 dailyCheckTemplates.sort((a, b) => a.order - b.order).forEach(t => {
+                    // 记录该分组的 syncToTimeline 状态
+                    checkCategorySyncToTimeline[t.title] = t.syncToTimeline || false;
+                    
                     t.items.forEach((item: any) => {
                         const content = typeof item === 'string' ? item : item.content;
                         const icon = typeof item === 'string' ? undefined : item.icon;
@@ -85,6 +89,7 @@ export const useReviewManager = () => {
                 updatedAt: Date.now(),
                 answers: [],
                 checkItems: initialCheckItems,
+                checkCategorySyncToTimeline: checkCategorySyncToTimeline,
                 templateSnapshot
             };
             setDailyReviews(prev => [...prev, review!]);
@@ -116,9 +121,13 @@ export const useReviewManager = () => {
             }));
 
         const initialCheckItems: any[] = [];
+        const checkCategorySyncToTimeline: { [category: string]: boolean } = {};
         const dailyCheckTemplates = checkTemplates.filter(t => t.enabled && t.isDaily);
         if (dailyCheckTemplates.length > 0) {
             dailyCheckTemplates.sort((a, b) => a.order - b.order).forEach(t => {
+                // 记录该分组的 syncToTimeline 状态
+                checkCategorySyncToTimeline[t.title] = t.syncToTimeline || false;
+                
                 t.items.forEach((item: any) => {
                     const content = typeof item === 'string' ? item : item.content;
                     const icon = typeof item === 'string' ? undefined : item.icon;
@@ -146,6 +155,7 @@ export const useReviewManager = () => {
             updatedAt: Date.now(),
             answers: [],
             checkItems: initialCheckItems,
+            checkCategorySyncToTimeline: checkCategorySyncToTimeline,
             templateSnapshot
         };
         setDailyReviews(prev => [...prev, review!]);

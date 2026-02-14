@@ -348,6 +348,22 @@ export const DailyReviewView: React.FC<DailyReviewViewProps> = ({
         onUpdateReview(updatedReview);
     };
 
+    // 切换日课分组的syncToTimeline状态
+    const toggleCheckCategorySyncToTimeline = (category: string) => {
+        const currentSyncState = review.checkCategorySyncToTimeline || {};
+        const newSyncState = {
+            ...currentSyncState,
+            [category]: !currentSyncState[category]
+        };
+
+        const updatedReview = {
+            ...review,
+            checkCategorySyncToTimeline: newSyncState,
+            updatedAt: Date.now()
+        };
+        onUpdateReview(updatedReview);
+    };
+
     // 生成叙事 - Step 1: Open Modal
     const handleGenerateNarrative = () => {
         setIsStyleModalOpen(true);
@@ -531,9 +547,23 @@ export const DailyReviewView: React.FC<DailyReviewViewProps> = ({
                                         <div key={category} className="space-y-2">
                                             {/* Category Header */}
                                             {category !== '默认' && items.length > 0 && (
-                                                <h3 className="text-sm font-bold text-stone-900 border-b border-stone-200 pb-1 mb-2 font-serif">
-                                                    {category}
-                                                </h3>
+                                                <div className="flex items-center justify-between border-b border-stone-200 pb-1 mb-2">
+                                                    <h3 className="text-sm font-bold text-stone-900 font-serif">
+                                                        {category}
+                                                    </h3>
+                                                    {/* syncToTimeline toggle */}
+                                                    <button
+                                                        onClick={() => toggleCheckCategorySyncToTimeline(category)}
+                                                        className={`w-7 h-7 rounded-full flex items-center justify-center transition-colors ${
+                                                            review.checkCategorySyncToTimeline?.[category]
+                                                                ? 'bg-stone-800 text-white'
+                                                                : 'bg-stone-100 text-stone-400'
+                                                        }`}
+                                                        title={review.checkCategorySyncToTimeline?.[category] ? '已同步到时间轴' : '未同步到时间轴'}
+                                                    >
+                                                        <Calendar size={14} />
+                                                    </button>
+                                                </div>
                                             )}
 
                                             {/* Items List - No background card, printing style */}

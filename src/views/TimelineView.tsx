@@ -992,6 +992,58 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ logs, todos, scopes,
                                 </div>
                             )}
 
+                            {/* Synced Check Items (Daily) - Grouped by Category */}
+                            {dailyReview?.checkItems && dailyReview.checkCategorySyncToTimeline && (() => {
+                                // Group check items by category
+                                const groupedItems: { [key: string]: typeof dailyReview.checkItems } = {};
+                                dailyReview.checkItems.forEach(item => {
+                                    const cat = item.category || '默认';
+                                    if (!groupedItems[cat]) groupedItems[cat] = [];
+                                    groupedItems[cat].push(item);
+                                });
+
+                                // Filter only synced categories
+                                const syncedCategories = Object.entries(groupedItems).filter(
+                                    ([category]) => dailyReview.checkCategorySyncToTimeline?.[category]
+                                );
+
+                                return syncedCategories.map(([category, items]) => (
+                                    <div key={category} className="relative pl-8 mt-6 animate-in slide-in-from-bottom-2 duration-500">
+                                        {/* Time Marker - Category Title */}
+                                        <div className="absolute -left-[60px] top-0.5 w-[45px] text-right flex flex-col items-end">
+                                            <span className="text-xs font-bold text-stone-500 leading-tight">
+                                                {category}
+                                            </span>
+                                        </div>
+
+                                        {/* Timeline Dot */}
+                                        <div className="absolute -left-[5px] top-1.5 w-2.5 h-2.5 rounded-full bg-stone-300 border-2 border-[#faf9f6] z-10" />
+
+                                        {/* Content Wrapper */}
+                                        <div className="space-y-2" style={{ paddingTop: '2px' }}>
+                                            {items.map(item => (
+                                                <div key={item.id} className="flex items-center gap-2">
+                                                    <div className={`w-3.5 h-3.5 rounded-full border flex items-center justify-center shrink-0 ${
+                                                        item.isCompleted
+                                                            ? 'bg-stone-900 border-stone-900 text-white'
+                                                            : 'border-stone-400 text-transparent'
+                                                    }`}>
+                                                        <LucideIcons.Check size={8} strokeWidth={3} />
+                                                    </div>
+                                                    <span className={`text-sm leading-tight ${
+                                                        item.isCompleted
+                                                            ? 'text-stone-400 line-through'
+                                                            : 'text-stone-600'
+                                                    }`}>
+                                                        {item.content}
+                                                    </span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                ));
+                            })()}
+
                             {/* Synced Template Content (Daily) - Using Snapshot */}
                             {dailyReview?.templateSnapshot?.filter(t => t.syncToTimeline).map((template) => {
                                 // Check if template has answers
