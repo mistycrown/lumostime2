@@ -250,6 +250,7 @@ export interface DailyReview {
   updatedAt: number;
   answers: ReviewAnswer[]; // 引导问答的答案
   checkItems?: CheckItem[]; // New: 每日日课
+  checkCategorySyncToTimeline?: { [category: string]: boolean }; // 日课分组是否同步到时间轴
   narrative?: string; // AI生成的叙事
   narrativeUpdatedAt?: number;
   isEdited?: boolean; // 叙事是否被手动编辑过
@@ -296,6 +297,7 @@ export interface CheckTemplate {
   enabled: boolean;
   order: number;
   isDaily: boolean; // 是否是每日必做
+  syncToTimeline?: boolean; // 是否同步到时间轴
 }
 
 // 每周回顾
