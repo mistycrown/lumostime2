@@ -41,6 +41,34 @@ export const SHARE_THEMES: ShareTheme[] = [
     backgroundColor: '#FFFFFF',
     fontFamily: 'font-serif',
   },
+  {
+    id: 'rouge-pink',
+    name: '胭脂粉',
+    primaryColor: '#9D2933',
+    backgroundColor: '#FFF5F7',
+    fontFamily: 'font-serif',
+  },
+  {
+    id: 'amber-yellow',
+    name: '琥珀黄',
+    primaryColor: '#8B5A00',
+    backgroundColor: '#FFFBF0',
+    fontFamily: 'font-serif',
+  },
+  {
+    id: 'wisteria-purple',
+    name: '紫藤',
+    primaryColor: '#5D3A7A',
+    backgroundColor: '#F8F5FA',
+    fontFamily: 'font-serif',
+  },
+  {
+    id: 'slate-gray',
+    name: '青灰',
+    primaryColor: '#4A5568',
+    backgroundColor: '#F7F8FA',
+    fontFamily: 'font-serif',
+  },
 ];
 
 export const SHARE_TEMPLATES: ShareTemplate[] = [
