@@ -44,6 +44,7 @@ export const CheckTemplateItemRow: React.FC<CheckTemplateItemRowProps> = ({
     // 剩余部分作为内容
     const contentArray = Array.from(fullText.trim());
     const content = contentArray.length > 1 ? contentArray.slice(1).join('').trim() : '';
+    // 保留 type 和 autoConfig 字段
     onUpdate(index, { ...item, content, icon });
   };
 

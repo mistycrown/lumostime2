@@ -115,11 +115,15 @@ const App: React.FC = () => {
     setExportingState(key);
 
     try {
+      // Determine background color based on style
+      // Ticket style needs transparent background for the serrated edge transparency to work
+      const bgColor = currentStyle === 'ticket' ? undefined : (currentStyle === 'retro' ? currentTheme.bg : '#ffffff');
+
       // Use pixelRatio for better quality
       const dataUrl = await toPng(ref.current, { 
         cacheBust: true, 
         pixelRatio: 2.5, // Higher quality
-        backgroundColor: currentStyle === 'retro' || currentStyle === 'ticket' ? currentTheme.bg : '#ffffff', // Ensure backgrounds are captured
+        backgroundColor: bgColor,
         skipAutoScale: true,
       });
       const link = document.createElement('a');
@@ -149,7 +153,7 @@ const App: React.FC = () => {
             <h1 className="text-xl font-bold tracking-tight text-neutral-900">ChronoPrint</h1>
           </div>
           <p className="text-sm text-neutral-500">
-            Paste your structured time report below to generate editorial infographics.
+            Paste your structured time-tracking text below.
           </p>
         </div>
         

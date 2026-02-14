@@ -92,7 +92,13 @@ export const DailyReviewView: React.FC<DailyReviewViewProps> = ({
     });
 
     // Check Items Logic
-    const [checkItems, setCheckItems] = useState<CheckItem[]>(review.checkItems || []);
+    const [checkItems, setCheckItems] = useState<CheckItem[]>(() => {
+        // 数据迁移：为旧数据添加 type 字段
+        return (review.checkItems || []).map(item => ({
+            ...item,
+            type: item.type || 'manual' // 如果没有 type 字段，默认为 manual
+        }));
+    });
     const [newCheckItemText, setNewCheckItemText] = useState('');
     const [isAddCheckItemOpen, setIsAddCheckItemOpen] = useState(false);
     const [editingCheckItemId, setEditingCheckItemId] = useState<string | null>(null);
@@ -102,7 +108,12 @@ export const DailyReviewView: React.FC<DailyReviewViewProps> = ({
 
     // Sync state when review prop changes (e.g. deletion and re-creation)
     useEffect(() => {
-        setCheckItems(review.checkItems || []);
+        // 数据迁移：为旧数据添加 type 字段
+        const migratedItems = (review.checkItems || []).map(item => ({
+            ...item,
+            type: item.type || 'manual'
+        }));
+        setCheckItems(migratedItems);
         setAnswers(review.answers || []);
         setNarrative(review.narrative || '');
     }, [review]);
@@ -140,8 +151,10 @@ export const DailyReviewView: React.FC<DailyReviewViewProps> = ({
 
     const handleToggleCheckItem = (id: string) => {
         const item = checkItems.find(i => i.id === id);
+        console.log('[DailyReview] 点击日课:', { id, type: item?.type, content: item?.content });
         // 自动类型的日课不允许手动切换
         if (item?.type === 'auto') {
+            console.log('[DailyReview] 阻止自动日课切换');
             return;
         }
         
@@ -201,10 +214,13 @@ export const DailyReviewView: React.FC<DailyReviewViewProps> = ({
             .filter(t => t.enabled && t.isDaily)
             .sort((a, b) => a.order - b.order);
 
+        console.log('[DailyReview] 日课模板:', dailyTemplates);
+
         // 2. Map to CheckItems
         const newItems: CheckItem[] = [];
         dailyTemplates.forEach(template => {
             template.items.forEach(item => {
+                console.log('[DailyReview] 模板项:', { content: item.content, type: item.type, autoConfig: item.autoConfig });
                 newItems.push({
                     id: crypto.randomUUID(),
                     category: template.title,
@@ -217,6 +233,8 @@ export const DailyReviewView: React.FC<DailyReviewViewProps> = ({
                 });
             });
         });
+
+        console.log('[DailyReview] 创建的日课项:', newItems);
 
         // 3. 更新自动日课状态
         const context = {
@@ -494,21 +512,28 @@ export const DailyReviewView: React.FC<DailyReviewViewProps> = ({
                                                 {items.map((item) => (
                                                     <div
                                                         key={item.id}
-                                                        className={`flex items-start gap-4 py-2 px-1 group transition-opacity ${item.isCompleted ? 'opacity-50' : ''} ${item.type === 'auto' ? 'cursor-default' : ''}`}
-                                                        onClick={() => item.type !== 'auto' && handleToggleCheckItem(item.id)}
+                                                        className={`flex items-start gap-4 py-2 px-1 group transition-opacity ${item.isCompleted ? 'opacity-50' : ''} ${item.type === 'auto' ? 'cursor-default' : 'cursor-pointer'}`}
+                                                        onClick={(e) => {
+                                                            if (item.type === 'auto') {
+                                                                e.preventDefault();
+                                                                e.stopPropagation();
+                                                                console.log('[DailyReview] 阻止自动日课点击');
+                                                                return;
+                                                            }
+                                                            handleToggleCheckItem(item.id);
+                                                        }}
                                                     >
                                                         {/* Checkbox: Black/White, small, aligned */}
                                                         <button
-                                                            className={`mt-1.5 w-4 h-4 rounded-full border flex items-center justify-center transition-all shrink-0 ${
+                                                            className={`mt-1.5 w-4 h-4 rounded-full border flex items-center justify-center transition-all shrink-0 pointer-events-none ${
                                                                 item.type === 'auto' 
                                                                     ? item.isCompleted
                                                                         ? 'bg-blue-600 border-blue-600 text-white'
                                                                         : 'border-blue-400 text-transparent'
                                                                     : item.isCompleted
                                                                         ? 'bg-stone-900 border-stone-900 text-white'
-                                                                        : 'border-stone-400 text-transparent hover:border-stone-600'
+                                                                        : 'border-stone-400 text-transparent'
                                                             }`}
-                                                            disabled={item.type === 'auto'}
                                                         >
                                                             <LucideIcons.Check size={10} strokeWidth={3} />
                                                         </button>
