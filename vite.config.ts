@@ -75,7 +75,7 @@ export default defineConfig(({ mode }) => {
         output: {
           // 手动分块，将敏感代码单独打包
           manualChunks: (id) => {
-            // 将兑换码相关的代码单独打包并混淆
+            
             if (id.includes('redemption')) {
               return 'redemption-core';
             }
