@@ -15,7 +15,7 @@
 
 import React, { useMemo } from 'react';
 import { Category } from '../../types';
-import { TrendingUp, TrendingDown, Share } from 'lucide-react';
+import { TrendingUp, TrendingDown, Share, Image } from 'lucide-react';
 import { IconRenderer } from '../IconRenderer';
 import { 
   calculatePieChartPath, 
@@ -48,6 +48,7 @@ export interface PieChartViewProps {
   excludedCategoryIds: string[];
   onToggleExclusion: (id: string) => void;
   onExport?: () => void;
+  onExportImage?: () => void;
   isFullScreen?: boolean;
 }
 
@@ -63,6 +64,7 @@ export const PieChartView: React.FC<PieChartViewProps> = ({
   excludedCategoryIds,
   onToggleExclusion,
   onExport,
+  onExportImage,
   isFullScreen = false
 }) => {
   
@@ -384,9 +386,9 @@ export const PieChartView: React.FC<PieChartViewProps> = ({
         </div>
       )}
 
-      {/* Export Button */}
+      {/* Export Buttons */}
       {!isFullScreen && onExport && (
-        <div className="flex justify-center pt-8 mt-4 mb-4">
+        <div className="flex flex-col items-center gap-3 pt-8 mt-4 mb-4">
           <button
             onClick={onExport}
             className="flex items-center gap-1 text-stone-400 hover:text-stone-600 transition-colors text-xs font-medium"
@@ -394,6 +396,15 @@ export const PieChartView: React.FC<PieChartViewProps> = ({
             <Share size={12} />
             <span>导出统计文本</span>
           </button>
+          {onExportImage && (
+            <button
+              onClick={onExportImage}
+              className="flex items-center gap-1 text-stone-400 hover:text-stone-600 transition-colors text-xs font-medium"
+            >
+              <Image size={12} />
+              <span>导出统计图片</span>
+            </button>
+          )}
         </div>
       )}
     </div>
