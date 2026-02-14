@@ -682,7 +682,7 @@ export const JournalView: React.FC<JournalViewProps> = ({
                             >
                                 <div className="absolute top-2 left-4 text-8xl font-serif text-stone-50 select-none pointer-events-none">“</div>
                                 <p className="relative z-10 text-[17px] font-serif text-stone-600 italic text-center leading-relaxed">
-                                    "{currentMonthCite || "Every moment is a memory waiting to happen."}"
+                                    {currentMonthCite || "Every moment is a memory waiting to happen."}
                                 </p>
                                 <div className="w-8 h-0.5 bg-stone-200 mx-auto mt-6 rounded-full"></div>
                             </div>

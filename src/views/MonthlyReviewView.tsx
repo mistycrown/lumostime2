@@ -8,12 +8,13 @@
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
 import React, { useState, useMemo } from 'react';
-import { ChevronLeft, Trash2, Sparkles, Edit3, RefreshCw, X, Calendar } from 'lucide-react';
+import { ChevronLeft, Trash2, Edit3, RefreshCw, X, Calendar } from 'lucide-react';
 import { MonthlyReview, ReviewTemplate, ReviewAnswer, Category, Log, TodoCategory, TodoItem, Scope, ReviewQuestion, NarrativeTemplate, DailyReview } from '../types';
 import { COLOR_OPTIONS } from '../constants';
 import * as LucideIcons from 'lucide-react';
 import { ConfirmModal } from '../components/ConfirmModal';
 import { NarrativeStyleSelectionModal } from '../components/NarrativeStyleSelectionModal';
+import { AIQuoteGenerator } from '../components/AIQuoteGenerator';
 import { StatsView } from './StatsView';
 import { FloatingButton } from '../components/FloatingButton';
 import { UIIcon } from '../components/UIIcon';
@@ -98,6 +99,7 @@ export const MonthlyReviewView: React.FC<MonthlyReviewViewProps> = ({
     });
 
     const [isReloadConfirmOpen, setIsReloadConfirmOpen] = useState(false);
+    const [isAIQuoteGeneratorOpen, setIsAIQuoteGeneratorOpen] = useState(false);
 
     // Get logs for the month
     const monthLogs = useMemo(() => {
@@ -367,21 +369,28 @@ export const MonthlyReviewView: React.FC<MonthlyReviewViewProps> = ({
                 {/* 4. Cite Tab */}
                 {activeTab === 'cite' && (
                     <div className="animate-in fade-in duration-300 pb-24">
-                        <div className="bg-white rounded-2xl p-6 shadow-sm border border-stone-100">
-                            <label className="block text-sm font-bold text-stone-700 mb-4">
-                                本月引言 / 主题
-                            </label>
-                            <textarea
-                                value={cite}
-                                onChange={(e) => handleCiteChange(e.target.value)}
-                                className="w-full bg-[#faf9f6] border border-stone-200 rounded-xl p-4 text-stone-800 outline-none focus:border-stone-400 focus:bg-white transition-all resize-none text-lg font-serif italic leading-relaxed text-center placeholder-stone-300"
-                                rows={6}
-                                placeholder="输入一句能代表这个月的话..."
-                            />
-                            <p className="text-xs text-stone-400 mt-4 text-center">
-                                这句话将显示在 Memoir 页面顶部的引用卡片中
-                            </p>
+                        <textarea
+                            value={cite}
+                            onChange={(e) => handleCiteChange(e.target.value)}
+                            className="w-full bg-white border border-stone-200 rounded-xl p-4 text-stone-800 outline-none focus:border-stone-400 transition-all resize-none text-lg leading-relaxed text-center placeholder-stone-300"
+                            rows={6}
+                            placeholder="输入一句能代表这个月的话..."
+                        />
+                        
+                        {/* AI 灵感按钮 */}
+                        <div className="mt-4 flex justify-center">
+                            <button
+                                onClick={() => setIsAIQuoteGeneratorOpen(true)}
+                                className="py-2 text-stone-400 hover:text-stone-600 transition-colors flex items-center gap-2 text-sm"
+                            >
+                                <Edit3 size={14} />
+                                <span>向 AI 找找灵感</span>
+                            </button>
                         </div>
+                        
+                        <p className="text-xs text-stone-400 mt-4 text-center">
+                            这句话将显示在 Memoir 页面顶部的引用卡片中
+                        </p>
                     </div>
                 )}
 
@@ -506,6 +515,17 @@ export const MonthlyReviewView: React.FC<MonthlyReviewViewProps> = ({
                 customTemplates={customNarrativeTemplates}
                 period="monthly"
             />
+
+            {/* AI Quote Generator Modal */}
+            {isAIQuoteGeneratorOpen && (
+                <AIQuoteGenerator
+                    monthStartDate={monthStartDate}
+                    monthEndDate={monthEndDate}
+                    onSelectQuote={handleCiteChange}
+                    onClose={() => setIsAIQuoteGeneratorOpen(false)}
+                    addToast={addToast}
+                />
+            )}
         </div >
     );
 };
