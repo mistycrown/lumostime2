@@ -490,6 +490,42 @@ export const JournalView: React.FC<JournalViewProps> = ({
         setSelectedDate(newDate);
     };
 
+    // 触摸滑动手势处理 - 切换月份
+    const [touchStart, setTouchStart] = useState<number | null>(null);
+    const [touchEnd, setTouchEnd] = useState<number | null>(null);
+
+    // 最小滑动距离（像素）- 防止误触
+    const minSwipeDistance = 100;
+
+    const onTouchStart = (e: React.TouchEvent) => {
+        setTouchEnd(null);
+        setTouchStart(e.targetTouches[0].clientX);
+    };
+
+    const onTouchMove = (e: React.TouchEvent) => {
+        setTouchEnd(e.targetTouches[0].clientX);
+    };
+
+    const onTouchEnd = () => {
+        if (!touchStart || !touchEnd) return;
+
+        const distance = touchStart - touchEnd;
+        const isLeftSwipe = distance > minSwipeDistance;
+        const isRightSwipe = distance < -minSwipeDistance;
+
+        if (isLeftSwipe) {
+            // 向左滑动 = 下个月 (Next Month)
+            const nextMonth = new Date(selectedDate);
+            nextMonth.setMonth(nextMonth.getMonth() + 1);
+            setSelectedDate(nextMonth);
+        } else if (isRightSwipe) {
+            // 向右滑动 = 上个月 (Previous Month)
+            const prevMonth = new Date(selectedDate);
+            prevMonth.setMonth(prevMonth.getMonth() - 1);
+            setSelectedDate(prevMonth);
+        }
+    };
+
     // --- Date Helpers for Switcher ---
     const addDays = (date: Date, days: number) => {
         const result = new Date(date);
@@ -533,7 +569,12 @@ export const JournalView: React.FC<JournalViewProps> = ({
     };
 
     return (
-        <div className="flex flex-col h-full bg-[#faf9f6] relative">
+        <div 
+            className="flex flex-col h-full bg-[#faf9f6] relative"
+            onTouchStart={onTouchStart}
+            onTouchMove={onTouchMove}
+            onTouchEnd={onTouchEnd}
+        >
             {/* Month Picker Dropdown - Portal to avoid stacking context issues */}
             {isMonthPickerOpen && (
                 <div 
