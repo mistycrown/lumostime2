@@ -523,16 +523,33 @@ export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentD
       }
     });
 
+    // Store icon and uiIcon for each habit
+    const habitIcons: Record<string, { icon: string, uiIcon?: string }> = {};
+
+    dailyReviews.forEach(review => {
+      if (days.includes(review.date) && review.checkItems) {
+        review.checkItems.forEach(item => {
+          if (!item.category) return;
+          const key = `${item.category}|${item.content}`;
+          // Store the first encountered icon for each habit
+          if (!habitIcons[key] && item.icon) {
+            habitIcons[key] = { icon: item.icon, uiIcon: item.uiIcon };
+          }
+        });
+      }
+    });
+
     // Convert to array using insertion order (first encountered)
     const sortedCategories = categoryOrder.map(cat => {
       const catHabits = habitOrder[cat].map(hab => {
         const key = `${cat}|${hab}`;
         const stats = habitStats[key] || { total: 0, checked: 0 };
+        const iconData = habitIcons[key] || { icon: '📝' };
 
         return {
           name: hab,
-          // Use Array.from to correctly handle emoji characters (surrogate pairs)
-          icon: Array.from(hab)[0] || '📝',
+          icon: iconData.icon,
+          uiIcon: iconData.uiIcon,
           days: habits[cat][hab], // Map of DateStr -> Boolean
           stats
         };
