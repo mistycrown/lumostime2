@@ -34,13 +34,13 @@ const EditModeQuestion: React.FC<{
 }> = ({ question: q, answer, onUpdateAnswer }) => {
     if (q.type === 'text') {
         return (
-            <div key={q.id} className="space-y-2">
-                <label className="text-sm font-medium text-stone-700">{q.question}</label>
+            <div key={q.id} className="space-y-3">
+                <label className="text-sm text-stone-700">{q.question}</label>
                 <textarea
                     value={answer?.answer || ''}
                     onChange={(e) => onUpdateAnswer(q.id, q.question, e.target.value)}
-                    className="w-full bg-stone-50 border border-stone-200 rounded-xl px-4 py-3 text-stone-800 outline-none focus:border-stone-400 transition-colors resize-none"
-                    rows={2}
+                    className="w-full bg-white border border-stone-200 rounded-xl px-4 py-3 text-stone-800 outline-none text-[15px] leading-relaxed shadow-sm focus:border-stone-400 transition-colors resize-none"
+                    rows={3}
                     placeholder="输入你的回答..."
                 />
             </div>
@@ -49,8 +49,8 @@ const EditModeQuestion: React.FC<{
 
     if (q.type === 'choice' && q.choices) {
         return (
-            <div key={q.id} className="space-y-2">
-                <label className="text-sm font-medium text-stone-700">{q.question}</label>
+            <div key={q.id} className="space-y-3">
+                <label className="text-sm text-stone-700">{q.question}</label>
                 <div className="flex gap-2 flex-wrap">
                     {q.choices.map(choice => (
                         <button
@@ -59,7 +59,7 @@ const EditModeQuestion: React.FC<{
                             className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
                                 answer?.answer === choice
                                     ? 'bg-stone-900 text-white shadow-md'
-                                    : 'bg-stone-100 text-stone-600 hover:bg-stone-200'
+                                    : 'bg-white border border-stone-200 text-stone-600 hover:bg-stone-50'
                             }`}
                         >
                             {choice}
@@ -80,8 +80,8 @@ const EditModeQuestion: React.FC<{
         const currentRating = parseInt(answer?.answer || '0');
 
         return (
-            <div key={q.id} className="space-y-2">
-                <label className="text-sm font-medium text-stone-700">{q.question}</label>
+            <div key={q.id} className="space-y-3">
+                <label className="text-sm text-stone-700">{q.question}</label>
                 <div className="grid grid-cols-5 gap-1">
                     {[1, 2, 3, 4, 5].map((rating) => {
                         const colorOption = COLOR_OPTIONS.find(c => c.id === q.colorId) || COLOR_OPTIONS.find(c => c.id === 'amber')!;
