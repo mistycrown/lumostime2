@@ -50,12 +50,18 @@ export const GoalCard: React.FC<GoalCardProps> = ({ goal, logs, todos, onEdit, o
 
     if (compact) {
         // 紧凑模式：用于ScopeView
+        const endDate = new Date(goal.endDate);
+        const formattedEndDate = `${endDate.getMonth() + 1}-${endDate.getDate()}`;
+        
         return (
             <div className={`p-2 ${isArchived ? 'opacity-50' : ''}`}>
                 <div className="flex items-center justify-between mb-1.5">
                     <div className="flex items-center gap-1.5 flex-1 min-w-0">
                         <Target size={12} className="flex-shrink-0" style={{ color: 'var(--accent-color)' }} />
                         <span className="text-xs font-bold text-stone-700 truncate">{goal.title}</span>
+                        <span className="text-[10px] text-stone-400 flex-shrink-0">
+                            {formattedEndDate}
+                        </span>
                     </div>
                     <span className="text-[10px] font-mono text-stone-500 ml-2 flex-shrink-0">
                         {formatGoalValue(current, goal.metric)} / {formatGoalValue(target, goal.metric)}
