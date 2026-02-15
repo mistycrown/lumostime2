@@ -427,7 +427,7 @@ export const GoalEditor: React.FC<GoalEditorProps> = ({ goal, scopeId, categorie
                         <textarea
                             value={motivation}
                             onChange={(e) => setMotivation(e.target.value)}
-                            placeholder="例如：完成奖励自己一套新香具"
+                            placeholder="例如：完成奖励自己……"
                             rows={2}
                             className="w-full px-3 py-2 bg-stone-50 border border-stone-200 rounded-lg text-sm text-stone-900 outline-none focus:border-stone-400 transition-colors resize-none"
                         />
