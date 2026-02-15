@@ -146,9 +146,6 @@ export class ThemePresetService {
      * 生成应用图标提示消息
      */
     static getAppIconMessage(preset: ThemePreset): string {
-        if (Capacitor.isNativePlatform() && preset.appIcon !== 'icon_simple') {
-            return `主题已应用！如需更换应用图标，请在 Icon 标签页选择"${preset.appIcon}"`;
-        }
         return `已应用"${preset.name}"主题方案`;
     }
 

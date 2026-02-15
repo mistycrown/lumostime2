@@ -26,6 +26,7 @@ import { TimePalSettings } from '../components/TimePalSettings';
 import { ThemePresetService } from '../services/themePresetService';
 import { UiThemeButton } from '../components/UiThemeButton';
 import { FontSelector } from '../components/FontSelector';
+import { userStatsService, UserStats } from '../services/userStatsService';
 
 interface SponsorshipViewProps {
     onBack: () => void;
@@ -264,6 +265,9 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
     type TabType = 'preset' | 'icon' | 'colorScheme' | 'background' | 'navigation' | 'timepal' | 'font';
     const [activeTab, setActiveTab] = useState<TabType>('preset');
 
+    // 用户统计数据
+    const [userStats, setUserStats] = useState<UserStats | null>(null);
+
     // 当前应用的主题方案
     const [currentPresetId, setCurrentPresetId] = useState<string>(() => {
         return localStorage.getItem('lumostime_current_preset') || 'default';
@@ -439,6 +443,9 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
                 setIsRedeemed(true);
                 setSupporterId(result.userId);
                 console.log('[SponsorshipView] ✓ 用户已验证，ID:', result.userId);
+                
+                // 加载用户统计数据
+                loadUserStats();
             } else {
                 console.log('[SponsorshipView] ❌ 用户未验证');
             }
@@ -470,6 +477,17 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
         };
         console.log('[SponsorshipView] 调试命令已注册: window.debugIconSwitch()');
     }, []);
+
+    // 加载用户统计数据
+    const loadUserStats = async () => {
+        try {
+            const stats = await userStatsService.getUserStats();
+            setUserStats(stats);
+            console.log('[SponsorshipView] 用户统计数据:', stats);
+        } catch (error) {
+            console.error('[SponsorshipView] 加载统计数据失败:', error);
+        }
+    };
 
     const handleRedeem = async () => {
         if (!redemptionCode.trim()) {
@@ -639,25 +657,47 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
                             
                             {/* 内容层 */}
                             <div className="relative z-10">
-                                {/* 专属徽章 */}
-                                <div className="text-center py-5">
-                                    {/* 柔和的渐变光晕背景 - 无明显边缘 */}
-                                    <div className="inline-block relative">
-                                        {/* 多层弥散光晕 - 创造自然过渡 */}
-                                        <div className="absolute inset-0 bg-gradient-radial from-white/70 via-white/40 to-transparent blur-3xl scale-150" />
-                                        <div className="absolute inset-0 bg-gradient-radial from-white/50 via-white/20 to-transparent blur-2xl scale-125" />
-                                        
-                                        {/* 文字内容 - 居中对齐 */}
-                                        <div className="relative flex flex-col items-center gap-2 py-3 px-8">
-                                            <span className="text-sm text-stone-800 font-serif font-medium drop-shadow-md">{greeting.prefix}</span>
-                                            <span className="text-5xl font-bold font-serif drop-shadow-lg leading-none" style={{ color: 'var(--text-deep)' }}>#{supporterId || '001'}</span>
-                                            <span className="text-sm text-stone-800 font-serif font-medium drop-shadow-md">{greeting.suffix}</span>
-                                        </div>
+                                {/* 数据统计展示 */}
+                                <div className="text-center py-5 pb-3">
+                                    {/* 问候语和编号 - 一行显示 */}
+                                    <div className="flex items-center justify-center gap-2 mb-4">
+                                        <span className="text-sm text-stone-800 font-serif font-medium drop-shadow-md">{greeting.prefix}</span>
+                                        <span className="text-3xl font-bold font-serif drop-shadow-lg leading-none" style={{ color: 'var(--text-deep)' }}>#{supporterId || '001'}</span>
+                                        <span className="text-sm text-stone-800 font-serif font-medium drop-shadow-md">{greeting.suffix}</span>
                                     </div>
+
+                                    {/* 数据统计卡片 */}
+                                    {userStats && (
+                                        <div className="grid grid-cols-2 gap-3 max-w-md mx-auto px-4">
+                                            {/* 记录时长 */}
+                                            <div className="bg-white/80 backdrop-blur-sm rounded-xl p-3 shadow-sm">
+                                                <div className="text-xs text-stone-500 mb-1">记录时长</div>
+                                                <div className="text-lg font-bold text-stone-800">{userStats.totalTimeFormatted}</div>
+                                            </div>
+
+                                            {/* 写的文字 */}
+                                            <div className="bg-white/80 backdrop-blur-sm rounded-xl p-3 shadow-sm">
+                                                <div className="text-xs text-stone-500 mb-1">写的文字</div>
+                                                <div className="text-lg font-bold text-stone-800">{userStats.totalWords.toLocaleString()} 字</div>
+                                            </div>
+
+                                            {/* 记录瞬间 */}
+                                            <div className="bg-white/80 backdrop-blur-sm rounded-xl p-3 shadow-sm">
+                                                <div className="text-xs text-stone-500 mb-1">记录瞬间</div>
+                                                <div className="text-lg font-bold text-stone-800">{userStats.totalImages} 张</div>
+                                            </div>
+
+                                            {/* 一起走过 */}
+                                            <div className="bg-white/80 backdrop-blur-sm rounded-xl p-3 shadow-sm">
+                                                <div className="text-xs text-stone-500 mb-1">一起走过</div>
+                                                <div className="text-lg font-bold text-stone-800">{userStats.daysUsed} 天</div>
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
 
                                 {/* Tab 导航 - 简洁风格 */}
-                                <div className="flex gap-6 border-b border-stone-200 overflow-x-auto scrollbar-hide px-5">
+                                <div className="flex gap-4 border-b border-stone-200 overflow-x-auto scrollbar-hide px-5">
                             {(['preset', 'icon', 'colorScheme', 'background', 'navigation', 'timepal', 'font'] as TabType[]).map(tab => (
                                 <button
                                     key={tab}
