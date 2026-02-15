@@ -19,6 +19,8 @@ import { DetailTimelineCard } from '../components/DetailTimelineCard';
 import { UIIconSelector } from '../components/UIIconSelector';
 import { useSettings } from '../contexts/SettingsContext';
 import { IconRenderer } from '../components/IconRenderer';
+import { useGoalStatus } from '../hooks/useGoalStatus';
+import { calculateGoalProgress } from '../utils/goalUtils';
 
 interface ScopeDetailViewProps {
     scope: Scope;
@@ -595,6 +597,25 @@ export const ScopeDetailView: React.FC<ScopeDetailViewProps> = ({
                 const archivedGoals = goals.filter(g =>
                     g.scopeId === scope.id && g.status === 'archived'
                 );
+                
+                // 计算归档目标的成功和失败数量
+                const archivedStats = archivedGoals.reduce((acc, goal) => {
+                    const { current, target, percentage } = calculateGoalProgress(goal, logs, todos);
+                    const isLimitGoal = goal.metric === 'duration_limit';
+                    
+                    // 判断成功或失败
+                    const isSuccess = isLimitGoal 
+                        ? percentage < 100  // 负向目标：进度 < 100% 为成功
+                        : percentage >= 100; // 正向目标：进度 >= 100% 为成功
+                    
+                    if (isSuccess) {
+                        acc.success++;
+                    } else {
+                        acc.failed++;
+                    }
+                    return acc;
+                }, { success: 0, failed: 0 });
+                
                 const archivedCount = archivedGoals.length;
 
                 return (
@@ -638,14 +659,14 @@ export const ScopeDetailView: React.FC<ScopeDetailViewProps> = ({
 
                                 {/* 显示归档 Toggle（在未归档目标后） */}
                                 {archivedCount > 0 && (
-                                    <div className="flex items-center justify-between px-4 py-3 bg-stone-50 rounded-xl mt-6">
+                                    <div className="flex items-center justify-between px-2 py-3 bg-stone-50 rounded-xl mt-6">
                                         <div className="flex items-center gap-2">
                                             <Archive size={16} className="text-stone-400" />
                                             <span className="text-sm font-medium text-stone-600">
                                                 显示归档目标
                                             </span>
                                             <span className="text-xs text-stone-400">
-                                                ({archivedCount})
+                                                (成功 {archivedStats.success} 个、失败 {archivedStats.failed} 个)
                                             </span>
                                         </div>
                                         <button
