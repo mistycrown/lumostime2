@@ -207,9 +207,9 @@ export const MonthView: React.FC<ViewProps> = ({ date, entries, theme, layoutSty
                     }}
                 >
                     {/* Days Header */}
-                    {['M', 'T', 'W', 'T', 'F', 'S', 'S'].map(day => (
+                    {['M', 'T', 'W', 'T', 'F', 'S', 'S'].map((day, index) => (
                         <div 
-                            key={day} 
+                            key={`day-header-${index}`}
                             className={`p-1 text-center text-[8px] font-bold ${isFilm ? 'font-mono' : getFontClass(layoutStyle)}`}
                             style={{ 
                                 color: isFilm ? theme.colors.ink : theme.colors.inkLight,

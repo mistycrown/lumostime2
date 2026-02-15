@@ -4,22 +4,61 @@
  */
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { ChevronLeft, Download, Palette, LayoutTemplate, Calendar, Loader2 } from 'lucide-react';
-import { Log, Category, DailyReview } from '../types';
+import { Log, DailyReview } from '../types';
+import { Capacitor } from '@capacitor/core';
+import { Filesystem, Directory } from '@capacitor/filesystem';
 
 // Toast type definition
 type ToastType = 'success' | 'error' | 'info';
 import { 
     format, eachDayOfInterval, getYear,
-    subWeeks, addWeeks, subMonths, addMonths, subYears, addYears
+    subWeeks, addWeeks, subMonths, addMonths, subYears, addYears,
+    startOfWeek, endOfWeek, startOfMonth, endOfMonth
 } from 'date-fns';
 import * as htmlToImage from 'html-to-image';
 import { WeekView, MonthView, YearView } from './GalleryExport/DiaryViews';
 import { DiaryEntry } from './GalleryExport/DiaryComponents';
 import { imageService } from '../services/imageService';
 
+// 常量定义
+const IMAGE_LOAD_TIMEOUT = 3000;      // 图片加载超时时间（毫秒）
+const EXPORT_PIXEL_RATIO = 2;         // 导出图片分辨率倍数（适配高清屏）
+const RENDER_COMPLETE_DELAY = 200;    // 等待DOM渲染完成的延迟（毫秒）
+
+/**
+ * 从日期范围内的logs中收集图片文件名
+ * @param logs - 所有日志记录
+ * @param dateRange - 日期范围
+ * @returns 图片文件名集合
+ */
+const collectImagesFromDateRange = (
+    logs: Log[], 
+    dateRange: { start: Date; end: Date }
+): Set<string> => {
+    const imageFilenames = new Set<string>();
+    const allDays = eachDayOfInterval({ start: dateRange.start, end: dateRange.end });
+    
+    allDays.forEach(day => {
+        const dayStr = format(day, 'yyyy-MM-dd');
+        const dayLogs = logs.filter(log => {
+            const logDate = new Date(log.startTime);
+            return format(logDate, 'yyyy-MM-dd') === dayStr;
+        });
+        
+        // 只收集第一张图片
+        for (const log of dayLogs) {
+            if (log.images && log.images.length > 0) {
+                imageFilenames.add(log.images[0]);
+                break;
+            }
+        }
+    });
+    
+    return imageFilenames;
+};
+
 interface GalleryExportViewProps {
     logs: Log[];
-    categories: Category[];
     dailyReviews?: DailyReview[];
     onBack: () => void;
     onToast?: (type: ToastType, message: string) => void;
@@ -159,18 +198,34 @@ export const GalleryExportView: React.FC<GalleryExportViewProps> = ({
     const [isExporting, setIsExporting] = useState(false);
     const [imageUrls, setImageUrls] = useState<Map<string, string>>(new Map());
     const [orientation, setOrientation] = useState<Orientation>('portrait');
+    const [isLoading, setIsLoading] = useState(false);
+    const [loadingTarget, setLoadingTarget] = useState<string>('');
     
     const exportRef = useRef<HTMLDivElement>(null);
 
-    // 数据转换：从 logs 和 dailyReviews 提取数据
+    // 按需计算日期范围（优化：只处理当前视图需要的日期）
+    const dateRange = useMemo(() => {
+        if (currentPeriod === 'week') {
+            const start = startOfWeek(currentDate, { weekStartsOn: 1 });
+            const end = endOfWeek(currentDate, { weekStartsOn: 1 });
+            return { start, end };
+        } else if (currentPeriod === 'month') {
+            const start = startOfWeek(startOfMonth(currentDate), { weekStartsOn: 1 });
+            const end = endOfWeek(endOfMonth(currentDate), { weekStartsOn: 1 });
+            return { start, end };
+        } else {
+            // 年视图：整年
+            const year = getYear(currentDate);
+            const start = new Date(year, 0, 1);
+            const end = new Date(year, 11, 31);
+            return { start, end };
+        }
+    }, [currentDate, currentPeriod]);
+
+    // 数据转换：从 logs 和 dailyReviews 提取数据（优化：只处理当前视图的日期范围）
     const diaryEntries = useMemo(() => {
         const entries: DiaryEntry[] = [];
-        const year = getYear(currentDate);
-        
-        // 获取该年所有日期
-        const startDate = new Date(year, 0, 1);
-        const endDate = new Date(year, 11, 31);
-        const allDays = eachDayOfInterval({ start: startDate, end: endDate });
+        const allDays = eachDayOfInterval({ start: dateRange.start, end: dateRange.end });
         
         allDays.forEach(day => {
             const dayStr = format(day, 'yyyy-MM-dd');
@@ -224,50 +279,93 @@ export const GalleryExportView: React.FC<GalleryExportViewProps> = ({
         });
         
         return entries;
-    }, [logs, dailyReviews, currentDate, imageUrls]);
+    }, [logs, dailyReviews, dateRange, imageUrls]);
 
-    // 加载图片URL
+    // 加载图片URL（优化：并行加载，只加载当前视图需要的图片）
     useEffect(() => {
+        let cancelled = false; // 竞态条件保护
+        
         const loadImageUrls = async () => {
+            setIsLoading(true);
             const urlMap = new Map<string, string>();
-            const imageFilenames = new Set<string>();
             
-            // 收集所有需要的图片文件名
-            logs.forEach(log => {
-                if (log.images && log.images.length > 0) {
-                    imageFilenames.add(log.images[0]);
-                }
-            });
+            // 使用提取的函数收集图片文件名
+            const imageFilenames = collectImagesFromDateRange(logs, dateRange);
             
-            // 批量加载图片URL（使用缩略图以提高性能）
-            for (const filename of imageFilenames) {
+            // 并行加载所有图片URL
+            const loadPromises = Array.from(imageFilenames).map(async (filename) => {
                 try {
                     const url = await imageService.getImageUrl(filename, 'thumbnail');
                     if (url) {
-                        urlMap.set(filename, url);
+                        return { filename, url };
                     }
                 } catch (error) {
                     console.error(`Failed to load image URL: ${filename}`, error);
                 }
-            }
+                return null;
+            });
             
-            setImageUrls(urlMap);
+            const results = await Promise.all(loadPromises);
+            
+            // 构建URL映射
+            results.forEach(result => {
+                if (result) {
+                    urlMap.set(result.filename, result.url);
+                }
+            });
+            
+            // 只有在未取消的情况下才更新状态
+            if (!cancelled) {
+                setImageUrls(urlMap);
+                setIsLoading(false);
+                setLoadingTarget('');
+            }
         };
         
         loadImageUrls();
-    }, [logs]);
+        
+        // 清理函数：组件卸载或依赖变化时取消加载
+        return () => {
+            cancelled = true;
+        };
+    }, [logs, dateRange]);
 
     // 导航逻辑
     const handlePrev = () => {
+        setLoadingTarget('nav-prev');
         if (currentPeriod === 'week') setCurrentDate(d => subWeeks(d, 1));
         else if (currentPeriod === 'month') setCurrentDate(d => subMonths(d, 1));
         else setCurrentDate(d => subYears(d, 1));
     };
 
     const handleNext = () => {
+        setLoadingTarget('nav-next');
         if (currentPeriod === 'week') setCurrentDate(d => addWeeks(d, 1));
         else if (currentPeriod === 'month') setCurrentDate(d => addMonths(d, 1));
         else setCurrentDate(d => addYears(d, 1));
+    };
+
+    const handleToday = () => {
+        setLoadingTarget('nav-today');
+        setCurrentDate(new Date());
+    };
+
+    // 切换布局样式
+    const handleLayoutChange = (style: LayoutStyle) => {
+        setLoadingTarget(`layout-${style}`);
+        setCurrentLayout(style);
+    };
+
+    // 切换时间段
+    const handlePeriodChange = (period: TimePeriod) => {
+        setLoadingTarget(`period-${period}`);
+        setCurrentPeriod(period);
+    };
+
+    // 切换方向
+    const handleOrientationChange = (newOrientation: Orientation) => {
+        setLoadingTarget(`orientation-${newOrientation}`);
+        setOrientation(newOrientation);
     };
 
     // 将blob URL转换为base64 data URL
@@ -290,14 +388,26 @@ export const GalleryExportView: React.FC<GalleryExportViewProps> = ({
     const handleExport = async () => {
         if (exportRef.current && !isExporting) {
             setIsExporting(true);
+            
+            // 保存原始图片src，用于失败时恢复
+            const originalSrcs = new Map<HTMLImageElement, string>();
+            
             try {
                 // 1. 将所有blob URL转换为base64 data URL
                 const images = exportRef.current.querySelectorAll('img');
                 const conversionPromises = Array.from(images).map(async (img) => {
                     if (img.src && img.src.startsWith('blob:')) {
+                        // 保存原始src
+                        originalSrcs.set(img, img.src);
+                        
                         const dataUrl = await convertBlobUrlToDataUrl(img.src);
                         if (dataUrl) {
+                            const oldBlobUrl = img.src;
                             img.src = dataUrl;
+                            // 释放blob URL，防止内存泄漏
+                            URL.revokeObjectURL(oldBlobUrl);
+                        } else {
+                            console.warn('Failed to convert blob URL, keeping original:', img.src);
                         }
                     }
                 });
@@ -307,25 +417,25 @@ export const GalleryExportView: React.FC<GalleryExportViewProps> = ({
                 // 2. 等待所有图片加载完成
                 const imageLoadPromises = Array.from(images).map(img => {
                     if (img.complete) return Promise.resolve();
-                    return new Promise((resolve) => {
-                        img.onload = resolve;
+                    return new Promise<void>((resolve) => {
+                        img.onload = () => resolve();
                         img.onerror = () => {
                             console.warn('Image failed to load:', img.src);
                             resolve(); // 即使失败也继续
                         };
                         // 超时保护
-                        setTimeout(resolve, 3000);
+                        setTimeout(() => resolve(), IMAGE_LOAD_TIMEOUT);
                     });
                 });
                 
                 await Promise.all(imageLoadPromises);
                 
                 // 额外延迟确保渲染完成
-                await new Promise(r => setTimeout(r, 200));
+                await new Promise(r => setTimeout(r, RENDER_COMPLETE_DELAY));
 
                 const options = {
                     cacheBust: true,
-                    pixelRatio: 2,
+                    pixelRatio: EXPORT_PIXEL_RATIO,
                     useCORS: true,
                     backgroundColor: currentTheme.colors.paper
                 };
@@ -343,16 +453,52 @@ export const GalleryExportView: React.FC<GalleryExportViewProps> = ({
                     }
                 }
                 
-                const link = document.createElement('a');
-                link.download = `gallery-${currentPeriod}-${format(currentDate, 'yyyy-MM-dd')}.png`;
-                link.href = dataUrl;
-                link.click();
+                // 3. 导出图片
+                const isNative = Capacitor.isNativePlatform();
                 
-                if (onToast) {
-                    onToast('success', '图片已保存');
+                if (isNative) {
+                    // 手机端：保存到 Pictures 目录
+                    try {
+                        const base64Data = dataUrl.replace(/^data:image\/\w+;base64,/, '');
+                        const filename = `Gallery_${currentPeriod}_${format(currentDate, 'yyyy-MM-dd')}_${Date.now()}.png`;
+                        
+                        await Filesystem.writeFile({
+                            path: `Pictures/LumosTime/${filename}`,
+                            data: base64Data,
+                            directory: Directory.ExternalStorage,
+                            recursive: true
+                        });
+                        
+                        if (onToast) {
+                            onToast('success', '图片已保存到相册');
+                        }
+                    } catch (err: any) {
+                        console.error('Failed to save image:', err);
+                        if (onToast) {
+                            onToast('error', '保存失败：' + (err.message || '请检查存储权限'));
+                        }
+                    }
+                } else {
+                    // 桌面端/Web端：直接下载
+                    const link = document.createElement('a');
+                    link.download = `gallery-${currentPeriod}-${format(currentDate, 'yyyy-MM-dd')}.png`;
+                    link.href = dataUrl;
+                    link.click();
+                    
+                    if (onToast) {
+                        onToast('success', '图片已下载');
+                    }
                 }
             } catch (error) {
                 console.error('Export failed:', error);
+                
+                // 恢复原始图片src（如果转换失败）
+                originalSrcs.forEach((originalSrc, img) => {
+                    if (img.src !== originalSrc) {
+                        img.src = originalSrc;
+                    }
+                });
+                
                 if (onToast) {
                     onToast('error', '导出失败，请重试');
                 }
@@ -471,48 +617,66 @@ export const GalleryExportView: React.FC<GalleryExportViewProps> = ({
                         <div className="flex justify-between items-center gap-2">
                             {/* 左侧：样式选择 */}
                             <div className="flex gap-2 flex-1">
-                                {LAYOUT_STYLES.map((style) => (
-                                    <button
-                                        key={style.key}
-                                        onClick={() => setCurrentLayout(style.key)}
-                                        className={`flex-1 px-2 py-1.5 rounded-full text-[10px] font-medium border transition-all font-serif ${
-                                            currentLayout === style.key
-                                                ? 'bg-stone-100 border-stone-400 text-stone-900'
-                                                : 'border-stone-300 text-stone-600 hover:border-stone-400'
-                                        }`}
-                                    >
-                                        {style.label}
-                                    </button>
-                                ))}
+                                {LAYOUT_STYLES.map((style) => {
+                                    const isLoadingThis = isLoading && loadingTarget === `layout-${style.key}`;
+                                    return (
+                                        <button
+                                            key={style.key}
+                                            onClick={() => handleLayoutChange(style.key)}
+                                            disabled={isLoading}
+                                            className={`flex-1 px-2 py-1.5 rounded-full text-[10px] font-medium border transition-all font-serif flex items-center justify-center ${
+                                                currentLayout === style.key
+                                                    ? 'bg-stone-100 border-stone-400 text-stone-900'
+                                                    : 'border-stone-300 text-stone-600 hover:border-stone-400'
+                                            } disabled:opacity-50`}
+                                        >
+                                            {isLoadingThis ? (
+                                                <div className="w-3 h-3 border-2 border-stone-300 border-t-stone-600 rounded-full animate-spin" />
+                                            ) : (
+                                                style.label
+                                            )}
+                                        </button>
+                                    );
+                                })}
                             </div>
                             
                             {/* 右侧：横竖屏切换 */}
                             <div className="flex gap-1">
                                 <button
-                                    onClick={() => setOrientation('portrait')}
-                                    className={`p-1.5 rounded-full border transition-all ${
+                                    onClick={() => handleOrientationChange('portrait')}
+                                    disabled={isLoading}
+                                    className={`p-1.5 rounded-full border transition-all flex items-center justify-center ${
                                         orientation === 'portrait'
                                             ? 'bg-stone-100 border-stone-400 text-stone-900'
                                             : 'border-stone-300 text-stone-600 hover:border-stone-400'
-                                    }`}
+                                    } disabled:opacity-50`}
                                     title="竖屏"
                                 >
-                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                        <rect x="7" y="2" width="10" height="20" rx="2" />
-                                    </svg>
+                                    {isLoading && loadingTarget === 'orientation-portrait' ? (
+                                        <div className="w-3 h-3 border-2 border-stone-300 border-t-stone-600 rounded-full animate-spin" />
+                                    ) : (
+                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                            <rect x="7" y="2" width="10" height="20" rx="2" />
+                                        </svg>
+                                    )}
                                 </button>
                                 <button
-                                    onClick={() => setOrientation('landscape')}
-                                    className={`p-1.5 rounded-full border transition-all ${
+                                    onClick={() => handleOrientationChange('landscape')}
+                                    disabled={isLoading}
+                                    className={`p-1.5 rounded-full border transition-all flex items-center justify-center ${
                                         orientation === 'landscape'
                                             ? 'bg-stone-100 border-stone-400 text-stone-900'
                                             : 'border-stone-300 text-stone-600 hover:border-stone-400'
-                                    }`}
+                                    } disabled:opacity-50`}
                                     title="横屏"
                                 >
-                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                        <rect x="2" y="7" width="20" height="10" rx="2" />
-                                    </svg>
+                                    {isLoading && loadingTarget === 'orientation-landscape' ? (
+                                        <div className="w-3 h-3 border-2 border-stone-300 border-t-stone-600 rounded-full animate-spin" />
+                                    ) : (
+                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                            <rect x="2" y="7" width="20" height="10" rx="2" />
+                                        </svg>
+                                    )}
                                 </button>
                             </div>
                         </div>
@@ -527,43 +691,66 @@ export const GalleryExportView: React.FC<GalleryExportViewProps> = ({
                         <div className="flex justify-between items-center gap-2">
                             {/* 左侧：周期选择 */}
                             <div className="flex gap-2 flex-1">
-                                {TIME_PERIODS.map((period) => (
-                                    <button
-                                        key={period.key}
-                                        onClick={() => setCurrentPeriod(period.key)}
-                                        className={`flex-1 px-2 py-1.5 rounded-full text-[10px] font-medium border transition-all font-serif ${
-                                            currentPeriod === period.key
-                                                ? 'bg-stone-100 border-stone-400 text-stone-900'
-                                                : 'border-stone-300 text-stone-600 hover:border-stone-400'
-                                        }`}
-                                    >
-                                        {period.label}
-                                    </button>
-                                ))}
+                                {TIME_PERIODS.map((period) => {
+                                    const isLoadingThis = isLoading && loadingTarget === `period-${period.key}`;
+                                    return (
+                                        <button
+                                            key={period.key}
+                                            onClick={() => handlePeriodChange(period.key)}
+                                            disabled={isLoading}
+                                            className={`flex-1 px-2 py-1.5 rounded-full text-[10px] font-medium border transition-all font-serif flex items-center justify-center ${
+                                                currentPeriod === period.key
+                                                    ? 'bg-stone-100 border-stone-400 text-stone-900'
+                                                    : 'border-stone-300 text-stone-600 hover:border-stone-400'
+                                            } disabled:opacity-50`}
+                                        >
+                                            {isLoadingThis ? (
+                                                <div className="w-3 h-3 border-2 border-stone-300 border-t-stone-600 rounded-full animate-spin" />
+                                            ) : (
+                                                period.label
+                                            )}
+                                        </button>
+                                    );
+                                })}
                             </div>
                             
                             {/* 右侧：导航按钮 */}
                             <div className="flex gap-1">
                                 <button
                                     onClick={handlePrev}
-                                    className="px-2 py-1.5 rounded-full text-[10px] font-medium border border-stone-300 text-stone-600 hover:border-stone-400 hover:bg-stone-50 transition-all"
+                                    disabled={isLoading}
+                                    className="px-2 py-1.5 rounded-full text-[10px] font-medium border border-stone-300 text-stone-600 hover:border-stone-400 hover:bg-stone-50 transition-all disabled:opacity-50 flex items-center justify-center min-w-[28px]"
                                     title="上一周期"
                                 >
-                                    ←
+                                    {isLoading && loadingTarget === 'nav-prev' ? (
+                                        <div className="w-3 h-3 border-2 border-stone-300 border-t-stone-600 rounded-full animate-spin" />
+                                    ) : (
+                                        '←'
+                                    )}
                                 </button>
                                 <button
-                                    onClick={() => setCurrentDate(new Date())}
-                                    className="px-2 py-1.5 rounded-full text-[10px] font-medium border border-stone-300 text-stone-600 hover:border-stone-400 hover:bg-stone-50 transition-all font-serif"
+                                    onClick={handleToday}
+                                    disabled={isLoading}
+                                    className="px-2 py-1.5 rounded-full text-[10px] font-medium border border-stone-300 text-stone-600 hover:border-stone-400 hover:bg-stone-50 transition-all font-serif disabled:opacity-50 flex items-center justify-center min-w-[28px]"
                                     title="回到今天"
                                 >
-                                    今
+                                    {isLoading && loadingTarget === 'nav-today' ? (
+                                        <div className="w-3 h-3 border-2 border-stone-300 border-t-stone-600 rounded-full animate-spin" />
+                                    ) : (
+                                        '今'
+                                    )}
                                 </button>
                                 <button
                                     onClick={handleNext}
-                                    className="px-2 py-1.5 rounded-full text-[10px] font-medium border border-stone-300 text-stone-600 hover:border-stone-400 hover:bg-stone-50 transition-all"
+                                    disabled={isLoading}
+                                    className="px-2 py-1.5 rounded-full text-[10px] font-medium border border-stone-300 text-stone-600 hover:border-stone-400 hover:bg-stone-50 transition-all disabled:opacity-50 flex items-center justify-center min-w-[28px]"
                                     title="下一周期"
                                 >
-                                    →
+                                    {isLoading && loadingTarget === 'nav-next' ? (
+                                        <div className="w-3 h-3 border-2 border-stone-300 border-t-stone-600 rounded-full animate-spin" />
+                                    ) : (
+                                        '→'
+                                    )}
                                 </button>
                             </div>
                         </div>

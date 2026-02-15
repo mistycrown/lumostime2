@@ -3,8 +3,9 @@
  * @description 画廊视图 - 以瀑布流方式展示所有带图片的记录
  */
 import React, { useState, useEffect, useMemo } from 'react';
-import { Log, Category, DailyReview, ToastType } from '../types';
+import { Log, Category, DailyReview } from '../types';
 import { ChevronLeft, Share2 } from 'lucide-react';
+import { ToastType } from './Toast';
 import { imageService } from '../services/imageService';
 import { IconRenderer } from './IconRenderer';
 import { ImagePreviewModal } from './ImagePreviewModal';
@@ -140,9 +141,7 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
         return galleryItems.slice(0, displayCount);
     }, [galleryItems, displayCount]);
 
-    // 将图片分配到左右两栏（瀑布流算法）
-    const [leftColumn, setLeftColumn] = useState<GalleryItem[]>([]);
-    const [rightColumn, setRightColumn] = useState<GalleryItem[]>([]);
+    // Note: 瀑布流分配在每个月份组内部完成，不需要全局状态
 
     // 按月份分组图片
     const monthGroups = useMemo(() => {
@@ -189,22 +188,7 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
         return months.sort((a, b) => b.monthKey.localeCompare(a.monthKey));
     }, [galleryItems]);
 
-    useEffect(() => {
-        // 简单的瀑布流分配：交替放置
-        const left: GalleryItem[] = [];
-        const right: GalleryItem[] = [];
-        
-        visibleItems.forEach((item, index) => {
-            if (index % 2 === 0) {
-                left.push(item);
-            } else {
-                right.push(item);
-            }
-        });
-        
-        setLeftColumn(left);
-        setRightColumn(right);
-    }, [visibleItems]);
+
 
     // 监听滚动
     useEffect(() => {
@@ -314,7 +298,6 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
                             });
 
                             const date = new Date(items[0].log.startTime);
-                            const year = date.getFullYear();
                             const month = date.getMonth() + 1;
 
                             return (
@@ -327,7 +310,7 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
                                     {/* 月份标题 */}
                                     <div className="mb-6 flex items-center gap-3">
                                         <h2 className="text-sm font-serif text-stone-400">
-                                            {year}年{month}月
+                                            {date.getFullYear()}年{month}月
                                         </h2>
                                         <div className="flex-1 h-px bg-stone-200"></div>
                                     </div>
@@ -530,7 +513,6 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
             {showExportView && (
                 <GalleryExportView
                     logs={logs}
-                    categories={categories}
                     dailyReviews={dailyReviews}
                     onBack={() => setShowExportView(false)}
                     onToast={onToast}
