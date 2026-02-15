@@ -72,51 +72,56 @@ export const ReviewGuideTab: React.FC<ReviewGuideTabProps> = ({
         );
     }
 
-    // Edit Mode (Card Style)
+    // Edit Mode (Flat Style - No Card Nesting)
     return (
-        <>
-            {templates.map(template => {
+        <div className="space-y-8">
+            {templates.map((template, idx, arr) => {
                 const { emoji, text } = getTemplateDisplayInfo(template.title);
                 return (
-                    <div key={template.id} className="bg-white rounded-2xl p-5 shadow-sm">
-                        <div className="flex items-center justify-between mb-4">
-                            <h3 className="text-base font-bold text-stone-900 flex items-center gap-2">
-                                {emoji && <IconRenderer icon={emoji} size={20} />}
-                                <span>{text}</span>
-                            </h3>
-                            {/* syncToTimeline toggle */}
-                            {onToggleSyncToTimeline && (
-                                <button
-                                    onClick={() => onToggleSyncToTimeline(template.id)}
-                                    className={`w-8 h-8 rounded-full flex items-center justify-center transition-colors ${
-                                        template.syncToTimeline
-                                            ? 'bg-stone-800 text-white'
-                                            : 'bg-stone-100 text-stone-400'
-                                    }`}
-                                    title={template.syncToTimeline ? '已同步到时间轴' : '未同步到时间轴'}
-                                >
-                                    <Calendar size={16} />
-                                </button>
-                            )}
-                        </div>
-                        <div className="space-y-6">
-                            {template.questions.map(q => {
-                                const answer = answers.find(a => a.questionId === q.id);
-                                return (
-                                    <div key={q.id}>
+                    <div key={template.id}>
+                        <div className="space-y-6 mb-8">
+                            <div className="flex items-center justify-between">
+                                <h3 className="text-sm font-bold text-stone-600 flex items-center gap-2">
+                                    {emoji && <IconRenderer icon={emoji} size={16} />}
+                                    <span>{text}</span>
+                                </h3>
+                                {/* syncToTimeline toggle */}
+                                {onToggleSyncToTimeline && (
+                                    <button
+                                        onClick={() => onToggleSyncToTimeline(template.id)}
+                                        className={`transition-colors ${
+                                            template.syncToTimeline
+                                                ? 'text-stone-800'
+                                                : 'text-stone-300 hover:text-stone-400'
+                                        }`}
+                                        title={template.syncToTimeline ? '已同步到时间轴' : '未同步到时间轴'}
+                                    >
+                                        <Calendar size={14} />
+                                    </button>
+                                )}
+                            </div>
+                            <div className="space-y-6 pl-1">
+                                {template.questions.map(q => {
+                                    const answer = answers.find(a => a.questionId === q.id);
+                                    return (
                                         <ReviewQuestionRenderer
+                                            key={q.id}
                                             question={q}
                                             answer={answer}
                                             isReadingMode={false}
                                             onUpdateAnswer={onUpdateAnswer}
                                         />
-                                    </div>
-                                );
-                            })}
+                                    );
+                                })}
+                            </div>
                         </div>
+                        {/* Divider (except last) */}
+                        {idx < arr.length - 1 && (
+                            <div className="border-t border-stone-200" />
+                        )}
                     </div>
                 );
             })}
-        </>
+        </div>
     );
 };

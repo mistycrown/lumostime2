@@ -107,6 +107,7 @@ export const DailyReviewView: React.FC<DailyReviewViewProps> = ({
     const [isClearCheckConfirmOpen, setIsClearCheckConfirmOpen] = useState(false);
     const [isReloadConfirmOpen, setIsReloadConfirmOpen] = useState(false);
     const [isReloadGuideConfirmOpen, setIsReloadGuideConfirmOpen] = useState(false);
+    const [isClearGuideConfirmOpen, setIsClearGuideConfirmOpen] = useState(false);
 
     // Sync state when review prop changes (e.g. deletion and re-creation)
     useEffect(() => {
@@ -330,6 +331,21 @@ export const DailyReviewView: React.FC<DailyReviewViewProps> = ({
         setAnswers([]);
         setIsReloadGuideConfirmOpen(false);
         addToast('success', '已重新导入模板');
+    };
+
+    // 清空当前引导
+    const confirmClearGuide = () => {
+        const updatedReview = {
+            ...review,
+            templateSnapshot: [],
+            answers: [],
+            updatedAt: Date.now()
+        };
+        
+        onUpdateReview(updatedReview);
+        setAnswers([]);
+        setIsClearGuideConfirmOpen(false);
+        addToast('success', '已清空引导内容');
     };
 
     // 切换模板的syncToTimeline状态
@@ -798,6 +814,13 @@ export const DailyReviewView: React.FC<DailyReviewViewProps> = ({
                                 <RefreshCw size={14} />
                                 <span>重新从模板导入</span>
                             </button>
+                            <button
+                                onClick={() => setIsClearGuideConfirmOpen(true)}
+                                className="flex items-center gap-2 text-stone-400 hover:text-red-500 transition-colors text-sm"
+                            >
+                                <Trash2 size={14} />
+                                <span>清空当前引导</span>
+                            </button>
                         </div>
 
                         {/* 重新导入引导模板确认对话框 */}
@@ -809,6 +832,17 @@ export const DailyReviewView: React.FC<DailyReviewViewProps> = ({
                             description="将从最新的模板重新生成引导问题。当前的所有回答将被清空。确定要继续吗？"
                             confirmText="确认导入"
                             type="warning"
+                        />
+
+                        {/* 清空引导确认对话框 */}
+                        <ConfirmModal
+                            isOpen={isClearGuideConfirmOpen}
+                            onClose={() => setIsClearGuideConfirmOpen(false)}
+                            onConfirm={confirmClearGuide}
+                            title="清空当前引导"
+                            description="确定要清空所有引导问题和回答吗？此操作无法撤销。"
+                            confirmText="确认清空"
+                            type="danger"
                         />
                     </div>
                 )}

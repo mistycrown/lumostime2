@@ -100,6 +100,7 @@ export const MonthlyReviewView: React.FC<MonthlyReviewViewProps> = ({
     });
 
     const [isReloadConfirmOpen, setIsReloadConfirmOpen] = useState(false);
+    const [isClearGuideConfirmOpen, setIsClearGuideConfirmOpen] = useState(false);
     const [isAIQuoteGeneratorOpen, setIsAIQuoteGeneratorOpen] = useState(false);
 
     // Get logs for the month
@@ -207,6 +208,21 @@ export const MonthlyReviewView: React.FC<MonthlyReviewViewProps> = ({
         setAnswers([]);
         setIsReloadConfirmOpen(false);
         addToast('success', '已重新导入模板');
+    };
+
+    // 清空当前引导
+    const confirmClearGuide = () => {
+        const updatedReview = {
+            ...review,
+            templateSnapshot: [],
+            answers: [],
+            updatedAt: Date.now()
+        };
+        
+        onUpdateReview(updatedReview);
+        setAnswers([]);
+        setIsClearGuideConfirmOpen(false);
+        addToast('success', '已清空引导内容');
     };
 
     // Update Cite
@@ -447,6 +463,13 @@ export const MonthlyReviewView: React.FC<MonthlyReviewViewProps> = ({
                                     <RefreshCw size={14} />
                                     <span>重新从模板导入</span>
                                 </button>
+                                <button
+                                    onClick={() => setIsClearGuideConfirmOpen(true)}
+                                    className="flex items-center gap-2 text-stone-400 hover:text-red-500 transition-colors text-sm"
+                                >
+                                    <Trash2 size={14} />
+                                    <span>清空当前引导</span>
+                                </button>
                             </div>
                         </div>
                     )
@@ -539,6 +562,17 @@ export const MonthlyReviewView: React.FC<MonthlyReviewViewProps> = ({
                 description="将从最新的模板重新生成引导问题。当前的所有回答将被清空。确定要继续吗？"
                 confirmText="确认导入"
                 type="warning"
+            />
+
+            {/* Clear Guide Confirmation Modal */}
+            <ConfirmModal
+                isOpen={isClearGuideConfirmOpen}
+                onClose={() => setIsClearGuideConfirmOpen(false)}
+                onConfirm={confirmClearGuide}
+                title="清空当前引导"
+                description="确定要清空所有引导问题和回答吗？此操作无法撤销。"
+                confirmText="确认清空"
+                type="danger"
             />
 
             {/* Narrative Style Selection Modal */}
