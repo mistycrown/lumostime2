@@ -26,7 +26,7 @@ interface ScopeViewProps {
     onArchiveGoal?: (goalId: string) => void;
     onExtendGoal?: (goalId: string, days: number) => void;
     onIncreaseGoalTarget?: (goalId: string, increaseAmount: number) => void;
-    onAddGoal?: (scopeId: string) => void;
+    onAddGoal?: (scopeId: string, templateGoal?: Goal) => void; // 修改：支持传递模板目标
 }
 
 export const ScopeView: React.FC<ScopeViewProps> = ({
@@ -143,7 +143,7 @@ export const ScopeView: React.FC<ScopeViewProps> = ({
                         onArchive={handleArchive}
                         onExtend={handleExtend}
                         onIncreaseTarget={handleIncreaseTarget}
-                        onCreate={() => onAddGoal?.(scopeId)}
+                        onCreate={(templateGoal) => onAddGoal?.(scopeId, templateGoal)}
                         onDismiss={() => handleDismissAlert(goal.id)}
                     />
                 ))}
@@ -157,7 +157,7 @@ export const ScopeView: React.FC<ScopeViewProps> = ({
                         onArchive={handleArchive}
                         onExtend={handleExtend}
                         onIncreaseTarget={handleIncreaseTarget}
-                        onCreate={() => onAddGoal?.(scopeId)}
+                        onCreate={(templateGoal) => onAddGoal?.(scopeId, templateGoal)}
                         onDismiss={() => handleDismissAlert(goal.id)}
                     />
                 ))}

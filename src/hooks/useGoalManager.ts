@@ -15,8 +15,19 @@ export const useGoalManager = () => {
     const { setGoals } = useCategoryScope();
     const { setIsGoalEditorOpen, setEditingGoal, setGoalScopeId } = useNavigation();
 
-    const handleAddGoal = (scopeId: string) => {
-        setEditingGoal(null);
+    const handleAddGoal = (scopeId: string, templateGoal?: Goal) => {
+        // 如果提供了模板目标，使用它作为编辑基础（但清除 ID 和状态）
+        if (templateGoal) {
+            const goalTemplate: Goal = {
+                ...templateGoal,
+                id: '', // 清除 ID，让保存时生成新 ID
+                status: 'active', // 重置为活跃状态
+                // 保留其他所有参数（title, metric, targetValue, filters 等）
+            };
+            setEditingGoal(goalTemplate);
+        } else {
+            setEditingGoal(null);
+        }
         setGoalScopeId(scopeId);
         setIsGoalEditorOpen(true);
     };

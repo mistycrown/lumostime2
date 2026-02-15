@@ -19,7 +19,7 @@ interface GoalStatusAlertProps {
   onArchive: (goalId: string) => void;
   onExtend: (goalId: string, days: number) => void;
   onIncreaseTarget: (goalId: string, increaseAmount: number) => void;
-  onCreate?: () => void;
+  onCreate?: (templateGoal?: Goal) => void; // 修改：支持传递模板目标
   onDismiss: () => void;
 }
 
@@ -88,7 +88,7 @@ export const GoalStatusAlert: React.FC<GoalStatusAlertProps> = ({
               <div className="flex items-center gap-2">
                 <button
                   onClick={() => {
-                    onCreate?.();
+                    onCreate?.(goal); // 传递当前目标作为模板
                     onDismiss();
                   }}
                   className="px-4 py-2 text-white text-xs font-medium rounded-lg transition-colors"
@@ -243,7 +243,7 @@ export const GoalStatusAlert: React.FC<GoalStatusAlertProps> = ({
                   <button
                     onClick={() => {
                       onArchive(goal.id);
-                      onCreate?.();
+                      onCreate?.(goal); // 传递当前目标作为模板
                       onDismiss();
                     }}
                     className="px-4 py-2 bg-white text-xs font-medium rounded-lg border transition-colors"
@@ -275,7 +275,7 @@ export const GoalStatusAlert: React.FC<GoalStatusAlertProps> = ({
                   <button
                     onClick={() => {
                       onArchive(goal.id);
-                      onCreate?.();
+                      onCreate?.(goal); // 传递当前目标作为模板
                       onDismiss();
                     }}
                     className="px-4 py-2 bg-white text-xs font-medium rounded-lg border transition-colors"
