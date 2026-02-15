@@ -40,6 +40,8 @@ interface PreferencesSettingsViewProps {
     onToggleTimelineGalleryMode?: () => void;
     collapseThreshold?: number;
     onSetCollapseThreshold?: (val: number) => void;
+    useTwemoji?: boolean;
+    onToggleUseTwemoji?: () => void;
 }
 
 export const PreferencesSettingsView: React.FC<PreferencesSettingsViewProps> = ({
@@ -74,7 +76,9 @@ export const PreferencesSettingsView: React.FC<PreferencesSettingsViewProps> = (
     timelineGalleryMode = false,
     onToggleTimelineGalleryMode,
     collapseThreshold = 9999,
-    onSetCollapseThreshold
+    onSetCollapseThreshold,
+    useTwemoji = false,
+    onToggleUseTwemoji
 }) => {
     const [isDefaultViewDropdownOpen, setIsDefaultViewDropdownOpen] = useState(false);
 
@@ -283,6 +287,23 @@ export const PreferencesSettingsView: React.FC<PreferencesSettingsViewProps> = (
                                 type="checkbox"
                                 checked={timelineGalleryMode}
                                 onChange={onToggleTimelineGalleryMode}
+                                className="sr-only peer"
+                            />
+                            <div className="w-11 h-6 bg-stone-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-stone-800"></div>
+                        </label>
+                    </div>
+
+                    {/* Use Twemoji Toggle */}
+                    <div className="flex items-center justify-between p-4 border-b border-stone-100 hover:bg-stone-50 transition-colors">
+                        <div>
+                            <h4 className="font-bold text-stone-700">使用 Twemoji</h4>
+                            <p className="text-xs text-stone-400 mt-1">使用 Twitter 风格的 emoji 图标替代系统原生 emoji</p>
+                        </div>
+                        <label className="relative inline-flex items-center cursor-pointer">
+                            <input
+                                type="checkbox"
+                                checked={useTwemoji}
+                                onChange={onToggleUseTwemoji}
                                 className="sr-only peer"
                             />
                             <div className="w-11 h-6 bg-stone-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-stone-800"></div>

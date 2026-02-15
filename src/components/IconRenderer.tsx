@@ -8,9 +8,11 @@
  * - 根据当前主题自动选择渲染哪个图标
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import twemoji from 'twemoji';
 import { uiIconService, UIIconType } from '../services/uiIconService';
 import { getDisplayIcon } from '../utils/iconUtils';
+import { useSettings } from '../contexts/SettingsContext';
 
 interface IconRendererProps {
     icon: string;                    // Emoji 图标（用于默认主题）
@@ -47,6 +49,8 @@ export const IconRenderer: React.FC<IconRendererProps> = ({
 }) => {
     const [imageError, setImageError] = useState(false);
     const [hasFallbackAttempted, setHasFallbackAttempted] = useState(false);
+    const emojiRef = useRef<HTMLSpanElement>(null);
+    const { useTwemoji } = useSettings();
     
     const currentTheme = uiIconService.getCurrentTheme();
     
@@ -62,80 +66,107 @@ export const IconRenderer: React.FC<IconRendererProps> = ({
     // 解析显示的图标字符串
     const { isUIIcon, value } = uiIconService.parseIconString(displayIcon);
     
-    // 如果不是 UI 图标格式，或者当前主题是 default，直接渲染 Emoji
-    if (!isUIIcon || currentTheme === 'default') {
+    // 1. 判断是否使用自定义主题的 UI Icon
+    const shouldUseUIIcon = isUIIcon && currentTheme !== 'default' && !imageError;
+    
+    // 2. 如果使用 UI Icon，渲染图片
+    if (shouldUseUIIcon) {
+        const iconType = value as UIIconType;
+        const { primary, fallback } = uiIconService.getIconPathWithFallback(iconType);
+        
+        // 根据 className 中的 text-* 类自动计算尺寸
+        const getImageSize = (): string => {
+            if (size) {
+                return typeof size === 'number' ? `${size}px` : size;
+            }
+            
+            // 从 className 中提取 text-* 尺寸类
+            const textSizeMatch = className.match(/text-(xs|sm|base|lg|xl|2xl|3xl|4xl|5xl|6xl|7xl|8xl|9xl)/);
+            if (textSizeMatch) {
+                const sizeMap: Record<string, string> = {
+                    'xs': '0.75rem',
+                    'sm': '1.125rem',
+                    'base': '1.25rem',
+                    'lg': '1.5rem',
+                    'xl': '1.625rem',
+                    '2xl': '2rem',
+                    '3xl': '2.5rem',
+                    '4xl': '3rem',
+                    '5xl': '4rem',
+                    '6xl': '5rem',
+                    '7xl': '6rem',
+                    '8xl': '8rem',
+                    '9xl': '10rem'
+                };
+                return sizeMap[textSizeMatch[1]] || '1.25rem';
+            }
+            
+            return '1.25rem';
+        };
+        
+        const imageSize = getImageSize();
+        const sizeStyle = { width: imageSize, height: imageSize };
+
         return (
-            <span className={className} style={size ? { fontSize: size } : undefined}>
-                {value}
-            </span>
+            <img
+                src={primary}
+                alt={alt || uiIconService.getIconLabel(iconType)}
+                className={`inline-block ${className}`}
+                style={sizeStyle}
+                onError={(e) => {
+                    if (!hasFallbackAttempted) {
+                        setHasFallbackAttempted(true);
+                        e.currentTarget.src = fallback;
+                    } else {
+                        setImageError(true);
+                    }
+                }}
+            />
         );
     }
-
-    // 如果图片加载失败，显示降级 Emoji
-    if (imageError) {
-        const displayEmoji = fallbackEmoji || icon || value.charAt(0);
-        return (
-            <span className={className} style={size ? { fontSize: size } : undefined}>
-                {displayEmoji}
-            </span>
-        );
-    }
-
-    // 渲染 UI 图标图片
-    const iconType = value as UIIconType;
-    const { primary, fallback } = uiIconService.getIconPathWithFallback(iconType);
     
-    // 根据 className 中的 text-* 类自动计算尺寸
-    const getImageSize = (): string => {
-        if (size) {
-            return typeof size === 'number' ? `${size}px` : size;
-        }
-        
-        // 从 className 中提取 text-* 尺寸类
-        const textSizeMatch = className.match(/text-(xs|sm|base|lg|xl|2xl|3xl|4xl|5xl|6xl|7xl|8xl|9xl)/);
-        if (textSizeMatch) {
-            const sizeMap: Record<string, string> = {
-                'xs': '0.75rem',    // 12px (更小，适合小标签)
-                'sm': '1.125rem',   // 18px (原 14px * 1.29)
-                'base': '1.25rem',  // 20px (原 16px * 1.25)
-                'lg': '1.5rem',     // 24px (原 18px * 1.33)
-                'xl': '1.625rem',   // 26px (原 20px * 1.3)
-                '2xl': '2rem',      // 32px (原 24px * 1.33)
-                '3xl': '2.5rem',    // 40px (原 30px * 1.33)
-                '4xl': '3rem',      // 48px (原 36px * 1.33)
-                '5xl': '4rem',      // 64px (原 48px * 1.33)
-                '6xl': '5rem',      // 80px (原 60px * 1.33)
-                '7xl': '6rem',      // 96px (原 72px * 1.33)
-                '8xl': '8rem',      // 128px (原 96px * 1.33)
-                '9xl': '10rem'      // 160px (原 128px * 1.25)
-            };
-            return sizeMap[textSizeMatch[1]] || '1.25rem';
-        }
-        
-        // 默认尺寸（稍大于 text-base）
-        return '1.25rem';
-    };
+    // 3. 渲染 Emoji（原生或 Twemoji）
+    // 显示 Emoji（如果开启 Twemoji，useEffect 会自动转换）
+    const displayEmoji = imageError ? (fallbackEmoji || icon || value) : value;
     
-    const imageSize = getImageSize();
-    const sizeStyle = { width: imageSize, height: imageSize };
+    // Twemoji 处理
+    useEffect(() => {
+        if (useTwemoji && emojiRef.current) {
+            // 清空之前的内容，重新设置 emoji
+            emojiRef.current.innerHTML = displayEmoji;
+            
+            // 使用 Twemoji 解析
+            twemoji.parse(emojiRef.current, {
+                folder: 'svg',
+                ext: '.svg',
+                base: 'https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/'
+            });
 
-    return (
-        <img
-            src={primary}
-            alt={alt || uiIconService.getIconLabel(iconType)}
-            className={`inline-block ${className}`}
-            style={sizeStyle}
-            onError={(e) => {
-                // 第一次失败：尝试降级到 fallback 格式
-                if (!hasFallbackAttempted) {
-                    setHasFallbackAttempted(true);
-                    e.currentTarget.src = fallback;
+            // 调整图片大小
+            const imgs = emojiRef.current.querySelectorAll('img');
+            imgs.forEach(img => {
+                if (size) {
+                    const sizeValue = typeof size === 'number' ? `${size}px` : size;
+                    img.style.width = sizeValue;
+                    img.style.height = sizeValue;
                 } else {
-                    // 第二次也失败了：显示 Emoji
-                    setImageError(true);
+                    // 默认使用 1em，这样会跟随字体大小
+                    img.style.width = '1em';
+                    img.style.height = '1em';
                 }
-            }}
-        />
+                img.style.verticalAlign = 'middle';
+            });
+        }
+    }, [displayEmoji, useTwemoji, size]);
+    
+    return (
+        <span 
+            ref={emojiRef}
+            className={`inline-flex items-center justify-center ${className}`} 
+            style={!useTwemoji && size ? { fontSize: size } : undefined}
+        >
+            {!useTwemoji && displayEmoji}
+        </span>
     );
 };
 

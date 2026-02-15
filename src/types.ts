@@ -253,6 +253,7 @@ export interface DailyReview {
   checkCategorySyncToTimeline?: { [category: string]: boolean }; // 日课分组是否同步到时间轴
   summary?: string; // 手动叙事：一句话总结今天
   summaryUpdatedAt?: number;
+  moodEmoji?: string; // 今日心情 emoji
   narrative?: string; // AI生成的叙事
   narrativeUpdatedAt?: number;
   isEdited?: boolean; // 叙事是否被手动编辑过

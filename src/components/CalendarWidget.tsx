@@ -337,7 +337,7 @@ export const CalendarWidget: React.FC<CalendarWidgetProps> = ({ currentDate, onD
                                                         {day.getDate()}
                                                     </span>
                                                     {selected && (
-                                                        <div className="absolute inset-0 border-2 border-stone-900 rounded-lg" />
+                                                        <div className="absolute inset-0 border-2 rounded-lg" style={{ borderColor: 'var(--progress-bar-fill)' }} />
                                                     )}
                                                     {today && !selected && (
                                                         <div className="absolute inset-0 border border-stone-300 rounded-lg" />

@@ -53,6 +53,10 @@ interface SettingsContextType {
     fontFamily: string;
     setFontFamily: React.Dispatch<React.SetStateAction<string>>;
 
+    // Twemoji 设置
+    useTwemoji: boolean;
+    setUseTwemoji: React.Dispatch<React.SetStateAction<boolean>>;
+
     // 应用规则
     appRules: { [packageName: string]: string };
     setAppRules: React.Dispatch<React.SetStateAction<{ [packageName: string]: string }>>;
@@ -262,6 +266,11 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
         return stored || 'default';
     });
 
+    const [useTwemoji, setUseTwemoji] = useState<boolean>(() => {
+        const stored = localStorage.getItem('lumostime_use_twemoji');
+        return stored === 'true';
+    });
+
     useEffect(() => {
         localStorage.setItem('lumostime_color_scheme', colorScheme);
         // 同步到 colorSchemeService
@@ -277,6 +286,10 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
             fontService.setFont(fontFamily);
         });
     }, [fontFamily]);
+
+    useEffect(() => {
+        localStorage.setItem('lumostime_use_twemoji', useTwemoji.toString());
+    }, [useTwemoji]);
 
     useEffect(() => {
         localStorage.setItem('lumostime_custom_narrative_templates', JSON.stringify(customNarrativeTemplates));
@@ -324,6 +337,8 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
             setColorScheme,
             fontFamily,
             setFontFamily,
+            useTwemoji,
+            setUseTwemoji,
             appRules,
             setAppRules,
             customNarrativeTemplates,

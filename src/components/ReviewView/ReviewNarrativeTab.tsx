@@ -7,14 +7,18 @@ import { RefreshCw, Sparkles, Trash2 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkBreaks from 'remark-breaks';
+import { MoodPicker } from '../MoodPicker';
 
 interface ReviewNarrativeTabProps {
     summary: string;
     narrative: string;
     isGenerating: boolean;
     isReadingMode: boolean;
+    moodEmoji?: string;
     onSummaryChange: (value: string) => void;
     onNarrativeChange: (value: string) => void;
+    onMoodChange?: (emoji: string) => void;
+    onMoodClear?: () => void;
     onGenerateNarrative: () => void;
     onDeleteSummary: () => void;
     onDeleteNarrative: () => void;
@@ -25,8 +29,11 @@ export const ReviewNarrativeTab: React.FC<ReviewNarrativeTabProps> = ({
     narrative,
     isGenerating,
     isReadingMode,
+    moodEmoji,
     onSummaryChange,
     onNarrativeChange,
+    onMoodChange,
+    onMoodClear,
     onGenerateNarrative,
     onDeleteSummary,
     onDeleteNarrative
@@ -103,14 +110,23 @@ export const ReviewNarrativeTab: React.FC<ReviewNarrativeTabProps> = ({
                         </div>
                     )
                 ) : (
-                    // 编辑模式：显示输入框
-                    <input
-                        type="text"
-                        value={summary}
-                        onChange={(e) => handleSummaryChange(e.target.value)}
-                        className="w-full bg-white border border-stone-200 rounded-xl px-4 py-3 text-stone-800 outline-none text-[15px] leading-relaxed shadow-sm focus:border-stone-400 transition-colors"
-                        placeholder="用一句话总结..."
-                    />
+                    // 编辑模式：显示输入框和心情选择器
+                    <div className="flex items-center gap-3">
+                        <input
+                            type="text"
+                            value={summary}
+                            onChange={(e) => handleSummaryChange(e.target.value)}
+                            className="flex-1 bg-white border border-stone-200 rounded-xl px-4 py-3 text-stone-800 outline-none text-[15px] leading-relaxed shadow-sm focus:border-stone-400 transition-colors"
+                            placeholder="用一句话总结..."
+                        />
+                        {onMoodChange && (
+                            <MoodPicker
+                                selectedMood={moodEmoji}
+                                onSelect={onMoodChange}
+                                onClear={onMoodClear}
+                            />
+                        )}
+                    </div>
                 )}
             </div>
 

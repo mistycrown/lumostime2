@@ -92,6 +92,9 @@ export const DailyReviewView: React.FC<DailyReviewViewProps> = ({
         storageKey: 'dailyReview_guideMode'
     });
 
+    // Mood Emoji State
+    const [moodEmoji, setMoodEmoji] = useState<string | undefined>(review.moodEmoji);
+
     // Check Items Logic
     const [checkItems, setCheckItems] = useState<CheckItem[]>(() => {
         // 数据迁移：为旧数据添加 type 字段
@@ -499,6 +502,27 @@ export const DailyReviewView: React.FC<DailyReviewViewProps> = ({
         }
     };
 
+    // 心情选择器处理
+    const handleMoodChange = (emoji: string) => {
+        setMoodEmoji(emoji);
+        const updatedReview = {
+            ...review,
+            moodEmoji: emoji,
+            updatedAt: Date.now()
+        };
+        onUpdateReview(updatedReview);
+    };
+
+    const handleMoodClear = () => {
+        setMoodEmoji(undefined);
+        const updatedReview = {
+            ...review,
+            moodEmoji: undefined,
+            updatedAt: Date.now()
+        };
+        onUpdateReview(updatedReview);
+    };
+
     // 自动保存 AI 叙事
     const handleNarrativeChange = (value: string) => {
         setNarrative(value);
@@ -855,8 +879,11 @@ export const DailyReviewView: React.FC<DailyReviewViewProps> = ({
                             narrative={narrative}
                             isGenerating={isGenerating}
                             isReadingMode={isReadingMode}
+                            moodEmoji={moodEmoji}
                             onSummaryChange={handleSummaryChange}
                             onNarrativeChange={handleNarrativeChange}
+                            onMoodChange={handleMoodChange}
+                            onMoodClear={handleMoodClear}
                             onGenerateNarrative={handleGenerateNarrative}
                             onDeleteSummary={handleDeleteSummary}
                             onDeleteNarrative={handleDeleteNarrative}
