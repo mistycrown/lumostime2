@@ -275,7 +275,8 @@ const AppContent: React.FC = () => {
           currentView !== 'STATS' &&
           !isTodoManaging &&
           !isTagsManaging &&
-          !isScopeManaging
+          !isScopeManaging &&
+          !isSettingsOpen
         }
       />
 

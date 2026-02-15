@@ -2,13 +2,13 @@
  * @file MoodPicker.tsx
  * @description 心情选择器组件 - 用于每日回顾（全屏模态框样式）
  */
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 import { IconRenderer } from './IconRenderer';
 
-// 心情 emoji 列表（参考 Daylio 样式）
-export const MOOD_EMOJIS = [
+// 默认心情 emoji 列表
+const DEFAULT_MOOD_EMOJIS = [
     { emoji: '🤩', label: 'Radical' },
     { emoji: '🥰', label: 'Loved' },
     { emoji: '😎', label: 'Proud' },
@@ -25,6 +25,54 @@ export const MOOD_EMOJIS = [
     { emoji: '😇', label: 'Blessed' },
     { emoji: '🥳', label: 'Excited' }
 ];
+
+// 从 localStorage 获取当前选中的 emoji 组
+const getMoodEmojis = () => {
+    const groupId = localStorage.getItem('lumostime_mood_emoji_group') || 'default-moods';
+    const customGroups = localStorage.getItem('lumostime_custom_emoji_groups');
+    
+    // 预设组
+    const presetGroups: Record<string, Array<{ emoji: string; label: string }>> = {
+        'default-moods': DEFAULT_MOOD_EMOJIS,
+        'activities': [
+            { emoji: '📚', label: 'Study' },
+            { emoji: '💼', label: 'Work' },
+            { emoji: '🎨', label: 'Art' },
+            { emoji: '🎵', label: 'Music' },
+            { emoji: '🏃', label: 'Exercise' },
+            { emoji: '🧘', label: 'Meditation' },
+            { emoji: '🍳', label: 'Cooking' },
+            { emoji: '🎮', label: 'Gaming' },
+            { emoji: '📺', label: 'TV' },
+            { emoji: '✈️', label: 'Travel' },
+            { emoji: '🛌', label: 'Rest' },
+            { emoji: '☕', label: 'Coffee' },
+            { emoji: '🍕', label: 'Food' },
+            { emoji: '🎉', label: 'Party' },
+            { emoji: '💪', label: 'Strong' }
+        ]
+    };
+    
+    // 检查是否是预设组
+    if (presetGroups[groupId]) {
+        return presetGroups[groupId];
+    }
+    
+    // 检查自定义组
+    if (customGroups) {
+        try {
+            const groups = JSON.parse(customGroups);
+            const group = groups.find((g: any) => g.id === groupId);
+            if (group) {
+                return group.emojis;
+            }
+        } catch (e) {
+            console.error('Failed to parse custom emoji groups:', e);
+        }
+    }
+    
+    return DEFAULT_MOOD_EMOJIS;
+};
 
 interface MoodPickerModalProps {
     isOpen: boolean;
@@ -45,6 +93,17 @@ export const MoodPickerModal: React.FC<MoodPickerModalProps> = ({
 }) => {
     const [isCustomMode, setIsCustomMode] = React.useState(false);
     const [customEmoji, setCustomEmoji] = React.useState('');
+    const [moodEmojis, setMoodEmojis] = useState(getMoodEmojis());
+
+    // 监听 emoji 组变化
+    useEffect(() => {
+        const handleGroupChange = () => {
+            setMoodEmojis(getMoodEmojis());
+        };
+        
+        window.addEventListener('moodEmojiGroupChanged', handleGroupChange);
+        return () => window.removeEventListener('moodEmojiGroupChanged', handleGroupChange);
+    }, []);
 
     if (!isOpen) return null;
 
@@ -81,9 +140,9 @@ export const MoodPickerModal: React.FC<MoodPickerModalProps> = ({
 
                 {!isCustomMode ? (
                     <>
-                        {/* Emoji 网格 - 15 个预设 + 1 个自定义 */}
+                        {/* Emoji 网格 - 动态数量 + 1 个自定义 */}
                         <div className="grid grid-cols-4 gap-2 mb-6">
-                            {MOOD_EMOJIS.map(({ emoji, label }) => (
+                            {moodEmojis.map(({ emoji, label }) => (
                                 <button
                                     key={emoji}
                                     onClick={() => {

@@ -48,6 +48,7 @@ import {
     Target,
     Edit2,
     PlusCircle,
+    Smile,
     Check,
     FileSpreadsheet,
     Sparkles,
@@ -96,6 +97,7 @@ import { SponsorshipView } from './SponsorshipView';
 import { NARRATIVE_TEMPLATES } from '../constants';
 import { AISettingsView } from './settings/AISettingsView';
 import { PreferencesSettingsView } from './settings/PreferencesSettingsView';
+import { EmojiSettingsView } from './settings/EmojiSettingsView';
 import { NarrativeSettingsView } from './settings/NarrativeSettingsView';
 import { NFCSettingsView } from './settings/NFCSettingsView';
 
@@ -727,6 +729,14 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
         return <AISettingsView onBack={() => setActiveSubmenu('main')} onToast={onToast} />;
     }
 
+    if (activeSubmenu === 'emoji') {
+        return (
+            <EmojiSettingsView
+                onBack={() => setActiveSubmenu('main')}
+            />
+        );
+    }
+
     if (activeSubmenu === 'cloud') {
         return (
             <CloudSyncSettingsView
@@ -984,8 +994,13 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
                         <MenuItem
                             icon={<Settings size={18} />}
                             label="偏好设置"
-                            isLast
                             onClick={() => setActiveSubmenu('preferences')}
+                        />
+                        <MenuItem
+                            icon={<Smile size={18} className="text-yellow-500" />}
+                            label="Emoji 相关"
+                            isLast
+                            onClick={() => setActiveSubmenu('emoji')}
                         />
                     </div>
                 </div>
