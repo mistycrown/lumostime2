@@ -216,6 +216,7 @@ export const AppRoutes: React.FC<AppRoutesProps> = ({
                     refreshKey={refreshKey}
                     logs={logs}
                     todos={todos}
+                    goals={goals}
                     categories={categories}
                     onAddLog={openAddModal}
                     onEditLog={openEditModal}
@@ -237,6 +238,10 @@ export const AppRoutes: React.FC<AppRoutesProps> = ({
                     onNavigateToTodo={(todo) => {
                         // 直接打开待办详情
                         openEditTodoModal(todo);
+                    }}
+                    onNavigateToGoal={(goal) => {
+                        // 直接打开目标编辑器
+                        handleEditGoal(goal);
                     }}
                     dailyReview={dailyReviews.find(r => r.date === getLocalDateStr(currentDate))}
                     onOpenDailyReview={handleOpenDailyReview}
