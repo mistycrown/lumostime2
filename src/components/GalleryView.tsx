@@ -348,25 +348,16 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
                                                             {formatTime(item.log.startTime)}
                                                         </div>
                                                         
-                                                        {/* 第二行：标签 */}
-                                                        {item.categoryName && item.activityName && (
+                                                        {/* 第二行：标签（仅显示二级标签） */}
+                                                        {item.activityName && (
                                                             <div className="text-[10px] font-medium text-stone-500 border border-stone-200 px-2 py-0.5 rounded inline-flex items-center gap-1 bg-stone-50/30">
                                                                 <span style={{ color: item.categoryColor }} className="font-bold">#</span>
                                                                 <IconRenderer 
-                                                                    icon={item.categoryIcon || ''} 
-                                                                    uiIcon={item.categoryUiIcon}
+                                                                    icon={item.activityIcon || ''} 
+                                                                    uiIcon={item.activityUiIcon}
                                                                     className="text-xs" 
                                                                 />
-                                                                <span className="flex items-center">
-                                                                    <span>{item.categoryName}</span>
-                                                                    <span className="mx-1 text-stone-300">/</span>
-                                                                    <IconRenderer 
-                                                                        icon={item.activityIcon || ''} 
-                                                                        uiIcon={item.activityUiIcon}
-                                                                        className="text-xs mr-1" 
-                                                                    />
-                                                                    <span className="text-stone-500">{item.activityName}</span>
-                                                                </span>
+                                                                <span>{item.activityName}</span>
                                                             </div>
                                                         )}
 
@@ -412,25 +403,16 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
                                                             {formatTime(item.log.startTime)}
                                                         </div>
                                                         
-                                                        {/* 第二行：标签 */}
-                                                        {item.categoryName && item.activityName && (
+                                                        {/* 第二行：标签（仅显示二级标签） */}
+                                                        {item.activityName && (
                                                             <div className="text-[10px] font-medium text-stone-500 border border-stone-200 px-2 py-0.5 rounded inline-flex items-center gap-1 bg-stone-50/30">
                                                                 <span style={{ color: item.categoryColor }} className="font-bold">#</span>
                                                                 <IconRenderer 
-                                                                    icon={item.categoryIcon || ''} 
-                                                                    uiIcon={item.categoryUiIcon}
+                                                                    icon={item.activityIcon || ''} 
+                                                                    uiIcon={item.activityUiIcon}
                                                                     className="text-xs" 
                                                                 />
-                                                                <span className="flex items-center">
-                                                                    <span>{item.categoryName}</span>
-                                                                    <span className="mx-1 text-stone-300">/</span>
-                                                                    <IconRenderer 
-                                                                        icon={item.activityIcon || ''} 
-                                                                        uiIcon={item.activityUiIcon}
-                                                                        className="text-xs mr-1" 
-                                                                    />
-                                                                    <span className="text-stone-500">{item.activityName}</span>
-                                                                </span>
+                                                                <span>{item.activityName}</span>
                                                             </div>
                                                         )}
 

@@ -1558,9 +1558,11 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ logs, todos, scopes,
                 <GalleryView
                     logs={logs}
                     categories={categories}
+                    dailyReviews={dailyReview ? [dailyReview] : []}
                     onClose={() => setShowGalleryView(false)}
                     onEditLog={onEditLog}
                     refreshKey={refreshKey}
+                    onToast={onToast}
                 />
             )}
         </div >

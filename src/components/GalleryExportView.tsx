@@ -469,14 +469,20 @@ export const GalleryExportView: React.FC<GalleryExportViewProps> = ({
                             recursive: true
                         });
                         
+                        // 使用自定义 Toast
                         if (onToast) {
                             onToast('success', '图片已保存到相册');
+                        } else {
+                            alert('图片已保存到相册');
                         }
                     } catch (err: any) {
                         console.error('Failed to save image:', err);
                         if (onToast) {
                             onToast('error', '保存失败：' + (err.message || '请检查存储权限'));
+                        } else {
+                            alert('保存图片失败：' + (err.message || '请检查存储权限'));
                         }
+                        throw err; // 重新抛出错误，让外部 catch 也能处理
                     }
                 } else {
                     // 桌面端/Web端：直接下载

@@ -443,16 +443,18 @@ export const YearView: React.FC<ViewProps> = ({ date, entries, theme, layoutStyl
                                                             opacity: entry ? 1 : (isFilm ? 0.5 : 0.4)
                                                         }}
                                                     >
-                                                        {/* 日期数字 - 只在无图片时显示 */}
-                                                        <span 
-                                                            className={`${isFilm ? 'font-mono' : getFontClass(layoutStyle)} font-bold text-[6px] leading-none`}
-                                                            style={{ 
-                                                                color: isFilm ? theme.colors.paper : theme.colors.inkLight,
-                                                                opacity: 0.6
-                                                            }}
-                                                        >
-                                                            {dayNum}
-                                                        </span>
+                                                        {/* 日期数字 - 只在横屏且无图片时显示 */}
+                                                        {orientation === 'landscape' && (
+                                                            <span 
+                                                                className={`${isFilm ? 'font-mono' : getFontClass(layoutStyle)} font-bold text-[6px] leading-none`}
+                                                                style={{ 
+                                                                    color: isFilm ? theme.colors.paper : theme.colors.inkLight,
+                                                                    opacity: 0.6
+                                                                }}
+                                                            >
+                                                                {dayNum}
+                                                            </span>
+                                                        )}
                                                     </div>
                                                 )}
                                             </div>
