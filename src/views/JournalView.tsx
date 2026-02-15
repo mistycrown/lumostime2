@@ -12,6 +12,7 @@ import { DailyReview, Log, WeeklyReview, MonthlyReview } from '../types';
 import { DiaryEntry, MOCK_ENTRIES, MONTHS, Comment } from './journalTypes';
 import TimelineItem from '../components/TimelineItem';
 import { Search, Menu, PenLine, ChevronDown, ChevronLeft, ChevronRight, SlidersHorizontal, Image as ImageIcon, AlignLeft, X, FilterX, AudioWaveform } from 'lucide-react';
+import { MoodCalendar } from '../components/MoodCalendar';
 
 import { useSettings } from '../contexts/SettingsContext';
 import { useCategoryScope } from '../contexts/CategoryScopeContext';
@@ -27,6 +28,8 @@ interface JournalViewProps {
     monthlyReviews: MonthlyReview[]; // Add MonthlyReview
     logs: Log[];
     onOpenDailyReview: (date: Date) => void;
+    onUpdateDailyReview?: (review: DailyReview) => void;
+    onCreateDailyReviewSilently?: (date: Date) => Promise<DailyReview>;
     todos: any[];  // TodoItem[]
     scopes: Scope[];
     onEditLog: (log: Log) => void;
@@ -35,7 +38,7 @@ interface JournalViewProps {
     collapseThreshold?: number; // 折叠字数阈值
 }
 
-// parseNarrative 已移至 src/utils/narrativeUtils.ts
+// parseNarrative 已移�?src/utils/narrativeUtils.ts
 
 const DateNavigationSidebar: React.FC<{
     entries: { date: string; entries: any[] }[];
@@ -107,6 +110,8 @@ export const JournalView: React.FC<JournalViewProps> = ({
     monthlyReviews,
     logs,
     onOpenDailyReview,
+    onUpdateDailyReview,
+    onCreateDailyReviewSilently,
     todos,
     scopes,
     onEditLog,
@@ -121,7 +126,7 @@ export const JournalView: React.FC<JournalViewProps> = ({
     // Default to Today
     const [selectedDate, setSelectedDate] = useState(new Date());
     const [isMonthPickerOpen, setIsMonthPickerOpen] = useState(false);
-    const [isScrolled, setIsScrolled] = useState(false); // 滚动状态
+    const [isScrolled, setIsScrolled] = useState(false); // 滚动状�?
 
 
 
@@ -146,7 +151,7 @@ export const JournalView: React.FC<JournalViewProps> = ({
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, []);
 
-    // 滚动监听:标题栏缩小效果 & Date Sidebar Active State
+    // 滚动监听:标题栏缩小效�?& Date Sidebar Active State
     const [activeDay, setActiveDay] = useState<string | null>(null);
     const [showSidebar, setShowSidebar] = useState(false);
 
@@ -173,7 +178,7 @@ export const JournalView: React.FC<JournalViewProps> = ({
             const titleMatch = content.match(/#([^#]+)#/);
             if (titleMatch) {
                 title = titleMatch[1];
-                // 移除备注中的#标题#字符串
+                // 移除备注中的#标题#字符�?
                 content = content.replace(/#[^#]+#/, '').trim();
             } else if (act) {
                 title = act.name;
@@ -233,22 +238,22 @@ export const JournalView: React.FC<JournalViewProps> = ({
                 return;
             }
 
-            // 优先使用手动叙事（summary），如果没有才使用 AI 叙事（narrative）
+            // 优先使用手动叙事（summary），如果没有才使�?AI 叙事（narrative�?
             let finalTitle: string;
             let finalContent: string;
 
             if (review.summary && review.summary.trim()) {
-                // 有手动叙事：标题为日期，内容为手动叙事
+                // 有手动叙事：标题为日期，内容为手动叙�?
                 finalTitle = review.date;
                 finalContent = review.summary;
             } else if (review.narrative && review.narrative.trim()) {
-                // 没有手动叙事但有 AI 叙事：使用 AI 叙事的标题和引用
+                // 没有手动叙事但有 AI 叙事：使�?AI 叙事的标题和引用
                 const { title, content } = parseNarrative(review.narrative, review.date);
                 const hasContent = content && content !== '...';
                 finalTitle = hasContent ? (title === 'Daily Reflection' ? review.date : title) : review.date;
                 finalContent = hasContent ? content : '...';
             } else {
-                // 两者都没有：显示日期和省略号
+                // 两者都没有：显示日期和省略�?
                 finalTitle = review.date;
                 finalContent = '...';
             }
@@ -259,6 +264,7 @@ export const JournalView: React.FC<JournalViewProps> = ({
                 date: `${review.date}T23:59:59`,
                 title: finalTitle,
                 content: finalContent,
+                mood: review.moodEmoji, // 添加心情 emoji
                 comments: []
             };
 
@@ -270,18 +276,18 @@ export const JournalView: React.FC<JournalViewProps> = ({
             const dateObj = new Date(review.weekEndDate);
             if (dateObj.getFullYear() !== targetYear || dateObj.getMonth() !== targetMonth) return;
 
-            // 优先使用手动叙事（summary），如果没有才使用 AI 叙事（narrative）
+            // 优先使用手动叙事（summary），如果没有才使�?AI 叙事（narrative�?
             let finalTitle: string;
             let finalContent: string;
 
             const dateRange = `${review.weekStartDate} ~ ${review.weekEndDate}`;
 
             if (review.summary && review.summary.trim()) {
-                // 有手动叙事：标题为日期范围，内容为手动叙事
+                // 有手动叙事：标题为日期范围，内容为手动叙�?
                 finalTitle = dateRange;
                 finalContent = review.summary;
             } else if (review.narrative && review.narrative.trim()) {
-                // 没有手动叙事但有 AI 叙事：使用 AI 叙事的标题和引用
+                // 没有手动叙事但有 AI 叙事：使�?AI 叙事的标题和引用
                 const d = new Date(review.weekStartDate);
                 const defaultTitle = `Week of ${d.toLocaleDateString()}`;
                 const { title, content } = parseNarrative(review.narrative, defaultTitle);
@@ -289,7 +295,7 @@ export const JournalView: React.FC<JournalViewProps> = ({
                 finalTitle = hasContent ? title : dateRange;
                 finalContent = hasContent ? content : '...';
             } else {
-                // 两者都没有：显示日期范围和省略号
+                // 两者都没有：显示日期范围和省略�?
                 finalTitle = dateRange;
                 finalContent = '...';
             }
@@ -519,7 +525,7 @@ export const JournalView: React.FC<JournalViewProps> = ({
     const [touchStart, setTouchStart] = useState<number | null>(null);
     const [touchEnd, setTouchEnd] = useState<number | null>(null);
 
-    // 最小滑动距离（像素）- 防止误触
+    // 最小滑动距离（像素�? 防止误触
     const minSwipeDistance = 100;
 
     const onTouchStart = (e: React.TouchEvent) => {
@@ -539,12 +545,12 @@ export const JournalView: React.FC<JournalViewProps> = ({
         const isRightSwipe = distance < -minSwipeDistance;
 
         if (isLeftSwipe) {
-            // 向左滑动 = 下个月 (Next Month)
+            // 向左滑动 = 下个�?(Next Month)
             const nextMonth = new Date(selectedDate);
             nextMonth.setMonth(nextMonth.getMonth() + 1);
             setSelectedDate(nextMonth);
         } else if (isRightSwipe) {
-            // 向右滑动 = 上个月 (Previous Month)
+            // 向右滑动 = 上个�?(Previous Month)
             const prevMonth = new Date(selectedDate);
             prevMonth.setMonth(prevMonth.getMonth() - 1);
             setSelectedDate(prevMonth);
@@ -693,22 +699,55 @@ export const JournalView: React.FC<JournalViewProps> = ({
                             </div>
                         </div>
 
-                        {/* Quote or Summary Card - Click to Open Monthly Review */}
+                        {/* Mood Calendar Card */}
                         {filteredEntries.length > 0 && (
-                            <div
-                                onClick={() => {
-                                    const start = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1);
-                                    const end = new Date(selectedDate.getFullYear(), selectedDate.getMonth() + 1, 0);
-                                    onOpenMonthlyReview(start, end);
-                                }}
-                                className="relative p-8 mb-10 overflow-hidden bg-white/80 backdrop-blur-md rounded-2xl shadow-[0_2px_15px_-3px_rgba(0,0,0,0.05)] border border-stone-100/50 cursor-pointer group"
-                            >
-                                <div className="absolute top-2 left-4 text-8xl font-serif text-stone-50 select-none pointer-events-none">“</div>
-                                <p className="relative z-10 text-[17px] font-serif text-stone-600 italic text-center leading-relaxed">
-                                    {currentMonthCite || "Every moment is a memory waiting to happen."}
-                                </p>
-                                <div className="w-8 h-0.5 bg-stone-200 mx-auto mt-6 rounded-full"></div>
-                            </div>
+                            <>
+                                <MoodCalendar
+                                    year={selectedDate.getFullYear()}
+                                    month={selectedDate.getMonth()}
+                                    dailyReviews={dailyReviews}
+                                    onUpdateMood={async (date, emoji) => {
+                                        // 找到或创建对应日期的 DailyReview
+                                        const existingReview = dailyReviews.find(r => r.date === date);
+                                        if (existingReview) {
+                                            // 更新现有 review 的 moodEmoji
+                                            if (onUpdateDailyReview) {
+                                                onUpdateDailyReview({ ...existingReview, moodEmoji: emoji, updatedAt: Date.now() });
+                                            }
+                                        } else {
+                                            // 创建新的 review
+                                            if (onCreateDailyReviewSilently && onUpdateDailyReview) {
+                                                const dateObj = new Date(date);
+                                                const newReview = await onCreateDailyReviewSilently(dateObj);
+                                                if (newReview) {
+                                                    // 立即更新新创建的 review，添加 moodEmoji
+                                                    onUpdateDailyReview({ ...newReview, moodEmoji: emoji, updatedAt: Date.now() });
+                                                }
+                                            }
+                                        }
+                                    }}
+                                    onClearMood={(date) => {
+                                        const existingReview = dailyReviews.find(r => r.date === date);
+                                        if (existingReview && onUpdateDailyReview) {
+                                            onUpdateDailyReview({ ...existingReview, moodEmoji: undefined, updatedAt: Date.now() });
+                                        }
+                                    }}
+                                />
+
+                                {/* Quote Text - Click to Open Monthly Review */}
+                                <div 
+                                    className="text-center mb-10 px-4 cursor-pointer group"
+                                    onClick={() => {
+                                        const start = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1);
+                                        const end = new Date(selectedDate.getFullYear(), selectedDate.getMonth() + 1, 0);
+                                        onOpenMonthlyReview(start, end);
+                                    }}
+                                >
+                                    <p className="text-sm font-serif text-stone-400 italic leading-relaxed group-hover:text-stone-600 transition-colors">
+                                        {currentMonthCite || "Every day is a line in your life's letter."}
+                                    </p>
+                                </div>
+                            </>
                         )}
                     </div>
 

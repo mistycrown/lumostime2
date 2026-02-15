@@ -4,6 +4,7 @@
  */
 import React from 'react';
 import { createPortal } from 'react-dom';
+import { X } from 'lucide-react';
 import { IconRenderer } from './IconRenderer';
 
 // 心情 emoji 列表（参考 Daylio 样式）
@@ -59,6 +60,15 @@ export const MoodPickerModal: React.FC<MoodPickerModalProps> = ({
     const modalContent = (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/20 backdrop-blur-sm animate-in fade-in duration-200">
             <div className="bg-white rounded-3xl shadow-2xl w-[90%] max-w-md p-8 animate-in zoom-in-95 duration-200 relative">
+                {/* 关闭按钮 */}
+                <button
+                    onClick={onClose}
+                    className="absolute top-4 right-4 p-2 text-stone-400 hover:text-stone-600 hover:bg-stone-100 rounded-full transition-all"
+                    aria-label="关闭"
+                >
+                    <X className="w-5 h-5" />
+                </button>
+
                 {/* 标题 */}
                 <h2 className="text-2xl font-bold text-stone-900 text-center mb-2">
                     How was {formatDate(date)}?

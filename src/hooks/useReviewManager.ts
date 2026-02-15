@@ -101,66 +101,74 @@ export const useReviewManager = () => {
     };
 
     // 后台创建日课（不打开视图）- 用于自动生成
-    const handleCreateDailyReviewSilently = (targetDate?: Date) => {
-        const dateToUse = (targetDate instanceof Date && !isNaN(targetDate.getTime())) ? targetDate : currentDate;
-        const dateStr = getLocalDateStr(dateToUse);
-        let review = dailyReviews.find(r => r.date === dateStr);
+    const handleCreateDailyReviewSilently = (targetDate?: Date): Promise<DailyReview> => {
+        return new Promise((resolve) => {
+            const dateToUse = (targetDate instanceof Date && !isNaN(targetDate.getTime())) ? targetDate : currentDate;
+            const dateStr = getLocalDateStr(dateToUse);
+            let review = dailyReviews.find(r => r.date === dateStr);
 
-        // 如果已存在，不需要创建
-        if (review) return;
+            // 如果已存在，直接返回
+            if (review) {
+                resolve(review);
+                return;
+            }
 
-        const templateSnapshot = reviewTemplates
-            .filter(t => t.isDailyTemplate)
-            .sort((a, b) => a.order - b.order)
-            .map(t => ({
-                id: t.id,
-                title: t.title,
-                questions: t.questions,
-                order: t.order,
-                syncToTimeline: t.syncToTimeline
-            }));
+            const templateSnapshot = reviewTemplates
+                .filter(t => t.isDailyTemplate)
+                .sort((a, b) => a.order - b.order)
+                .map(t => ({
+                    id: t.id,
+                    title: t.title,
+                    questions: t.questions,
+                    order: t.order,
+                    syncToTimeline: t.syncToTimeline
+                }));
 
-        const initialCheckItems: any[] = [];
-        const checkCategorySyncToTimeline: { [category: string]: boolean } = {};
-        const dailyCheckTemplates = checkTemplates.filter(t => t.enabled && t.isDaily);
-        if (dailyCheckTemplates.length > 0) {
-            dailyCheckTemplates.sort((a, b) => a.order - b.order).forEach(t => {
-                // 记录该分组的 syncToTimeline 状态
-                checkCategorySyncToTimeline[t.title] = t.syncToTimeline || false;
-                
-                t.items.forEach((item: any) => {
-                    const content = typeof item === 'string' ? item : item.content;
-                    const icon = typeof item === 'string' ? undefined : item.icon;
-                    const uiIcon = typeof item === 'string' ? undefined : item.uiIcon;
-                    const type = typeof item === 'string' ? 'manual' : (item.type || 'manual');
-                    const autoConfig = typeof item === 'string' ? undefined : item.autoConfig;
-                    initialCheckItems.push({
-                        id: crypto.randomUUID(),
-                        category: t.title,
-                        content: content,
-                        icon: icon,
-                        uiIcon: uiIcon,
-                        isCompleted: false,
-                        type: type,
-                        autoConfig: autoConfig
+            const initialCheckItems: any[] = [];
+            const checkCategorySyncToTimeline: { [category: string]: boolean } = {};
+            const dailyCheckTemplates = checkTemplates.filter(t => t.enabled && t.isDaily);
+            if (dailyCheckTemplates.length > 0) {
+                dailyCheckTemplates.sort((a, b) => a.order - b.order).forEach(t => {
+                    // 记录该分组的 syncToTimeline 状态
+                    checkCategorySyncToTimeline[t.title] = t.syncToTimeline || false;
+                    
+                    t.items.forEach((item: any) => {
+                        const content = typeof item === 'string' ? item : item.content;
+                        const icon = typeof item === 'string' ? undefined : item.icon;
+                        const uiIcon = typeof item === 'string' ? undefined : item.uiIcon;
+                        const type = typeof item === 'string' ? 'manual' : (item.type || 'manual');
+                        const autoConfig = typeof item === 'string' ? undefined : item.autoConfig;
+                        initialCheckItems.push({
+                            id: crypto.randomUUID(),
+                            category: t.title,
+                            content: content,
+                            icon: icon,
+                            uiIcon: uiIcon,
+                            isCompleted: false,
+                            type: type,
+                            autoConfig: autoConfig
+                        });
                     });
                 });
-            });
-        }
+            }
 
-        review = {
-            id: crypto.randomUUID(),
-            date: dateStr,
-            createdAt: Date.now(),
-            updatedAt: Date.now(),
-            answers: [],
-            checkItems: initialCheckItems,
-            checkCategorySyncToTimeline: checkCategorySyncToTimeline,
-            templateSnapshot
-        };
-        setDailyReviews(prev => [...prev, review!]);
-        updateDataLastModified();
-        console.log('[AutoGenerate] 已在后台创建每日回顾');
+            review = {
+                id: crypto.randomUUID(),
+                date: dateStr,
+                createdAt: Date.now(),
+                updatedAt: Date.now(),
+                answers: [],
+                checkItems: initialCheckItems,
+                checkCategorySyncToTimeline: checkCategorySyncToTimeline,
+                templateSnapshot
+            };
+            setDailyReviews(prev => [...prev, review!]);
+            updateDataLastModified();
+            console.log('[AutoGenerate] 已在后台创建每日回顾');
+            
+            // 返回新创建的 review
+            resolve(review);
+        });
     };
 
     const handleUpdateReview = (updatedReview: DailyReview) => {

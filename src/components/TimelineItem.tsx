@@ -230,11 +230,17 @@ const TimelineItem: React.FC<TimelineItemProps> = ({ entry, isLast, isFirstOfDay
                     const titleMatch = entry.content.match(/#([^#]+)#/);
                     const displayTitle = titleMatch ? titleMatch[1] : (entry.title || entry.tags?.[0]);
 
-                    if (!displayTitle) return null;
+                    // 如果有标题或有 mood，就显示这个区块
+                    if (!displayTitle && !entry.mood) return null;
 
                     return (
-                        <h3 className={`text-gray-900 font-bold leading-tight ${isSummary ? 'text-[16px]' : 'text-[16px]'} transition-all duration-500`}>
-                            {displayTitle}
+                        <h3 className={`text-gray-900 font-bold leading-tight ${isSummary ? 'text-[16px]' : 'text-[16px]'} transition-all duration-500 flex items-center gap-2`}>
+                            {displayTitle && <span>{displayTitle}</span>}
+                            {entry.mood && (
+                                <span className="text-base leading-none">
+                                    <IconRenderer icon={entry.mood} />
+                                </span>
+                            )}
                         </h3>
                     );
                 })()}
