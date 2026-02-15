@@ -974,7 +974,9 @@ export const DetailTimelineCard: React.FC<DetailTimelineCardProps> = ({
                                                         {log.reactions && log.reactions.length > 0 && (
                                                             <div className="flex items-center -space-x-1 ml-0.5">
                                                                 {Array.from(new Set(log.reactions)).map((emoji, idx) => (
-                                                                    <span key={idx} className="text-sm scale-90">{emoji}</span>
+                                                                    <span key={idx} className="text-sm scale-90">
+                                                                        <IconRenderer icon={emoji} />
+                                                                    </span>
                                                                 ))}
                                                             </div>
                                                         )}

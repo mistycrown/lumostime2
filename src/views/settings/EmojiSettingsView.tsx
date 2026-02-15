@@ -1,11 +1,82 @@
 /**
  * @file EmojiSettingsView.tsx
- * @description Emoji 相关设置页面 - 管理心情日历的 emoji 组
+ * @description Emoji 相关设置页面 - 管理心情日历的 emoji 组和 emoji 渲染风格
  */
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { ChevronLeft, Plus, Trash2, Edit2, Check, X } from 'lucide-react';
 import { IconRenderer } from '../../components/IconRenderer';
 import { ConfirmModal } from '../../components/ConfirmModal';
+import { useSettings } from '../../contexts/SettingsContext';
+import type { EmojiStyle } from '../../contexts/SettingsContext';
+
+// Emoji 预览组件 - 用于显示不同风格的 emoji
+const EmojiPreview: React.FC<{ emoji: string; style: EmojiStyle }> = ({ emoji, style }) => {
+    const emojiRef = useRef<HTMLSpanElement>(null);
+    
+    // 获取 emoji 的 Unicode codepoint（用于 CDN URL）
+    const getEmojiCodepoint = (emoji: string): string => {
+        const codePoints = [];
+        for (const char of emoji) {
+            const code = char.codePointAt(0);
+            if (code !== undefined) {
+                // 跳过变体选择器 (U+FE0F) 和零宽连接符 (U+200D)
+                if (code !== 0xFE0F && code !== 0x200D) {
+                    codePoints.push(code.toString(16));
+                }
+            }
+        }
+        return codePoints.join('-');
+    };
+    
+    useEffect(() => {
+        if (style !== 'native' && emojiRef.current) {
+            const codepoint = getEmojiCodepoint(emoji);
+            
+            let imgSrc = '';
+            if (style === 'twemoji') {
+                imgSrc = `https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/svg/${codepoint}.svg`;
+            } else if (style === 'openmoji') {
+                // OpenMoji 使用大写的 codepoint
+                imgSrc = `https://cdn.jsdelivr.net/npm/openmoji@15.0.0/color/svg/${codepoint.toUpperCase()}.svg`;
+            }
+            
+            // 创建图片元素
+            const img = document.createElement('img');
+            img.src = imgSrc;
+            img.alt = emoji;
+            img.draggable = false;
+            img.style.width = '2rem';
+            img.style.height = '2rem';
+            img.style.verticalAlign = 'middle';
+            img.style.display = 'inline-block';
+            
+            // 错误处理：如果图片加载失败，显示原生 emoji
+            img.onerror = () => {
+                if (emojiRef.current) {
+                    emojiRef.current.innerHTML = emoji;
+                    emojiRef.current.style.fontSize = '2rem';
+                }
+            };
+            
+            // 清空并插入图片
+            emojiRef.current.innerHTML = '';
+            emojiRef.current.appendChild(img);
+        } else if (style === 'native' && emojiRef.current) {
+            // 原生 emoji
+            emojiRef.current.innerHTML = emoji;
+            emojiRef.current.style.fontSize = '2rem';
+        }
+    }, [emoji, style]);
+    
+    return (
+        <span 
+            ref={emojiRef}
+            className="inline-flex items-center justify-center"
+        >
+            {style === 'native' && emoji}
+        </span>
+    );
+};
 
 interface EmojiGroup {
     id: string;
@@ -69,6 +140,8 @@ interface EmojiSettingsViewProps {
 }
 
 export const EmojiSettingsView: React.FC<EmojiSettingsViewProps> = ({ onBack }) => {
+    const { emojiStyle, setEmojiStyle } = useSettings();
+    
     // 从 localStorage 读取设置
     const [selectedGroupId, setSelectedGroupId] = useState<string>(() => {
         return localStorage.getItem('lumostime_mood_emoji_group') || 'default-moods';
@@ -225,6 +298,43 @@ export const EmojiSettingsView: React.FC<EmojiSettingsViewProps> = ({ onBack }) 
 
             {/* Content */}
             <div className="flex-1 overflow-y-auto p-4 space-y-6">
+                {/* Emoji 渲染风格 */}
+                <div className="bg-white rounded-xl p-4 shadow-sm">
+                    <h3 className="text-sm font-bold text-stone-700 mb-3">Emoji 渲染风格</h3>
+                    <p className="text-xs text-stone-500 mb-4">选择应用中 emoji 的显示风格</p>
+                    
+                    <div className="space-y-2">
+                        {[
+                            { value: 'native', label: '原生 Emoji', desc: '使用系统默认的 emoji 样式', preview: ['😊', '❤️', '🎉', '🔥'] },
+                            { value: 'twemoji', label: 'Twitter Emoji', desc: 'Twitter 的开源 emoji 设计', preview: ['😊', '❤️', '🎉', '🔥'] },
+                            { value: 'openmoji', label: 'OpenMoji', desc: '开源的彩色 emoji 设计', preview: ['😊', '❤️', '🎉', '🔥'] }
+                        ].map(style => (
+                            <button
+                                key={style.value}
+                                onClick={() => setEmojiStyle(style.value as any)}
+                                className={`w-full text-left p-3 rounded-lg border transition-all ${
+                                    emojiStyle === style.value
+                                        ? 'border-stone-400 bg-stone-50'
+                                        : 'border-stone-200 hover:border-stone-300'
+                                }`}
+                            >
+                                <div className="flex items-center justify-between mb-1">
+                                    <span className="text-sm font-bold text-stone-800">{style.label}</span>
+                                    {emojiStyle === style.value && (
+                                        <Check size={16} className="text-green-600" />
+                                    )}
+                                </div>
+                                <p className="text-xs text-stone-500 mb-2">{style.desc}</p>
+                                <div className="flex gap-2">
+                                    {style.preview.map((emoji, idx) => (
+                                        <EmojiPreview key={idx} emoji={emoji} style={style.value as any} />
+                                    ))}
+                                </div>
+                            </button>
+                        ))}
+                    </div>
+                </div>
+
                 {/* 心情日历图标组 */}
                 <div className="bg-white rounded-xl p-4 shadow-sm">
                     <h3 className="text-sm font-bold text-stone-700 mb-3">心情日历图标组</h3>

@@ -50,7 +50,7 @@ export const IconRenderer: React.FC<IconRendererProps> = ({
     const [imageError, setImageError] = useState(false);
     const [hasFallbackAttempted, setHasFallbackAttempted] = useState(false);
     const emojiRef = useRef<HTMLSpanElement>(null);
-    const { useTwemoji } = useSettings();
+    const { emojiStyle } = useSettings();
     
     const currentTheme = uiIconService.getCurrentTheme();
     
@@ -125,47 +125,80 @@ export const IconRenderer: React.FC<IconRendererProps> = ({
         );
     }
     
-    // 3. 渲染 Emoji（原生或 Twemoji）
-    // 显示 Emoji（如果开启 Twemoji，useEffect 会自动转换）
+    // 3. 渲染 Emoji（原生、Twemoji 或 Fluent）
+    // 显示 Emoji（如果开启 Twemoji 或 Fluent，useEffect 会自动转换）
     const displayEmoji = imageError ? (fallbackEmoji || icon || value) : value;
     
-    // Twemoji 处理
-    useEffect(() => {
-        if (useTwemoji && emojiRef.current) {
-            // 清空之前的内容，重新设置 emoji
-            emojiRef.current.innerHTML = displayEmoji;
-            
-            // 使用 Twemoji 解析
-            twemoji.parse(emojiRef.current, {
-                folder: 'svg',
-                ext: '.svg',
-                base: 'https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/'
-            });
-
-            // 调整图片大小
-            const imgs = emojiRef.current.querySelectorAll('img');
-            imgs.forEach(img => {
-                if (size) {
-                    const sizeValue = typeof size === 'number' ? `${size}px` : size;
-                    img.style.width = sizeValue;
-                    img.style.height = sizeValue;
-                } else {
-                    // 默认使用 1em，这样会跟随字体大小
-                    img.style.width = '1em';
-                    img.style.height = '1em';
+    // 获取 emoji 的 Unicode codepoint（用于 CDN URL）
+    const getEmojiCodepoint = (emoji: string): string => {
+        const codePoints = [];
+        for (const char of emoji) {
+            const code = char.codePointAt(0);
+            if (code !== undefined) {
+                // 跳过变体选择器 (U+FE0F) 和零宽连接符 (U+200D)
+                if (code !== 0xFE0F && code !== 0x200D) {
+                    codePoints.push(code.toString(16));
                 }
-                img.style.verticalAlign = 'middle';
-            });
+            }
         }
-    }, [displayEmoji, useTwemoji, size]);
+        return codePoints.join('-');
+    };
+    
+    // Twemoji 或 OpenMoji 处理
+    useEffect(() => {
+        if (emojiStyle !== 'native' && emojiRef.current) {
+            const codepoint = getEmojiCodepoint(displayEmoji);
+            
+            let imgSrc = '';
+            if (emojiStyle === 'twemoji') {
+                imgSrc = `https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/svg/${codepoint}.svg`;
+            } else if (emojiStyle === 'openmoji') {
+                // OpenMoji 使用大写的 codepoint
+                imgSrc = `https://cdn.jsdelivr.net/npm/openmoji@15.0.0/color/svg/${codepoint.toUpperCase()}.svg`;
+            }
+            
+            // 创建图片元素
+            const img = document.createElement('img');
+            img.src = imgSrc;
+            img.alt = displayEmoji;
+            img.draggable = false;
+            
+            // 设置图片大小
+            if (size) {
+                const sizeValue = typeof size === 'number' ? `${size}px` : size;
+                img.style.width = sizeValue;
+                img.style.height = sizeValue;
+            } else {
+                // 默认使用 1em，这样会跟随字体大小
+                img.style.width = '1em';
+                img.style.height = '1em';
+            }
+            img.style.verticalAlign = 'middle';
+            img.style.display = 'inline-block';
+            
+            // 错误处理：如果图片加载失败，显示原生 emoji
+            img.onerror = () => {
+                if (emojiRef.current) {
+                    emojiRef.current.innerHTML = displayEmoji;
+                }
+            };
+            
+            // 清空并插入图片
+            emojiRef.current.innerHTML = '';
+            emojiRef.current.appendChild(img);
+        } else if (emojiStyle === 'native' && emojiRef.current) {
+            // 原生 emoji
+            emojiRef.current.innerHTML = displayEmoji;
+        }
+    }, [displayEmoji, emojiStyle, size]);
     
     return (
         <span 
             ref={emojiRef}
             className={`inline-flex items-center justify-center ${className}`} 
-            style={!useTwemoji && size ? { fontSize: size } : undefined}
+            style={emojiStyle === 'native' && size ? { fontSize: size } : undefined}
         >
-            {!useTwemoji && displayEmoji}
+            {emojiStyle === 'native' && displayEmoji}
         </span>
     );
 };

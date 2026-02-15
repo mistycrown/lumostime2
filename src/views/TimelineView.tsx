@@ -899,7 +899,9 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ logs, todos, scopes,
                                             {item.logData.reactions && item.logData.reactions.length > 0 && (
                                                 <div className="flex items-center -space-x-1 ml-0.5">
                                                     {Array.from(new Set(item.logData.reactions)).map((emoji, idx) => (
-                                                        <span key={idx} className="text-sm scale-90">{emoji}</span>
+                                                        <span key={idx} className="text-sm scale-90">
+                                                            <IconRenderer icon={emoji} />
+                                                        </span>
                                                     ))}
                                                 </div>
                                             )}

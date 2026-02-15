@@ -168,16 +168,16 @@ export const MoodCalendar: React.FC<MoodCalendarProps> = ({
                                     : undefined
                                 }
                             >
-                                <span className={`absolute top-1 left-1 text-[10px] font-mono ${today ? 'text-stone-900 font-bold' : 'text-stone-400'}`}>
-                                    {day}
-                                </span>
                                 {mood && (
-                                    <div className="absolute bottom-0 right-1">
-                                        <span className="text-2xl leading-none">
+                                    <div className="flex items-center justify-center mb-1">
+                                        <span className="text-3xl leading-none block">
                                             <IconRenderer icon={mood} />
                                         </span>
                                     </div>
                                 )}
+                                <span className={`absolute bottom-0 left-0 right-0 text-center text-[9px] font-mono ${today ? 'text-stone-900 font-bold' : 'text-stone-400'}`}>
+                                    {day}
+                                </span>
                             </button>
                         );
                     })}

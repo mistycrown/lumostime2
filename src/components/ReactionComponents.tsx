@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Smile, Plus } from 'lucide-react';
 import confetti from 'canvas-confetti';
+import { IconRenderer } from './IconRenderer';
 
 // Updated emoji list for different effects
 export const REACTIONS = ['🎉', '❤️', '🔥', '❄️', '✨', '🌸'];
@@ -203,7 +204,7 @@ export const ReactionPicker: React.FC<ReactionPickerProps> = ({ onSelect, curren
                     }}
                     className="w-4 h-4 flex-shrink-0 flex items-center justify-center text-xs hover:scale-125 transition-transform rounded-full hover:bg-stone-50"
                 >
-                    {emoji}
+                    <IconRenderer icon={emoji} />
                 </button>
             ))}
         </>
@@ -260,7 +261,7 @@ export const ReactionPicker: React.FC<ReactionPickerProps> = ({ onSelect, curren
                             }}
                             className={`w-5 h-5 flex items-center justify-center text-xs hover:scale-125 transition-transform rounded-full hover:bg-stone-50 ${currentReactions.includes(emoji) ? 'bg-stone-100' : ''}`}
                         >
-                            {emoji}
+                            <IconRenderer icon={emoji} />
                         </button>
                     ))}
                 </div>
@@ -293,7 +294,9 @@ export const ReactionList: React.FC<ReactionListProps> = ({ reactions = [], onTo
                     className="inline-flex items-center gap-1 px-2 py-0.5 bg-stone-50 border border-stone-200 rounded-full text-xs hover:bg-stone-100 transition-colors cursor-pointer group select-none"
                     title="Remove reaction"
                 >
-                    <span className="text-[10px] group-hover:scale-110 transition-transform block">{emoji}</span>
+                    <span className="text-[10px] group-hover:scale-110 transition-transform block">
+                        <IconRenderer icon={emoji} />
+                    </span>
                     {count > 1 && <span className="font-bold text-stone-500">{count}</span>}
                 </button>
             ))}

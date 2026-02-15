@@ -8,6 +8,7 @@ import { DEFAULT_USER_PERSONAL_INFO } from '../constants';
 
 export type DefaultArchiveView = 'CHRONICLE' | 'MEMOIR';
 export type DefaultIndexView = 'TAGS' | 'SCOPE';
+export type EmojiStyle = 'native' | 'twemoji' | 'openmoji';
 
 interface SettingsContextType {
     // 基础偏好设置
@@ -53,9 +54,9 @@ interface SettingsContextType {
     fontFamily: string;
     setFontFamily: React.Dispatch<React.SetStateAction<string>>;
 
-    // Twemoji 设置
-    useTwemoji: boolean;
-    setUseTwemoji: React.Dispatch<React.SetStateAction<boolean>>;
+    // Emoji 风格设置
+    emojiStyle: EmojiStyle;
+    setEmojiStyle: React.Dispatch<React.SetStateAction<EmojiStyle>>;
 
     // 应用规则
     appRules: { [packageName: string]: string };
@@ -266,9 +267,16 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
         return stored || 'default';
     });
 
-    const [useTwemoji, setUseTwemoji] = useState<boolean>(() => {
-        const stored = localStorage.getItem('lumostime_use_twemoji');
-        return stored === 'true';
+    const [emojiStyle, setEmojiStyle] = useState<EmojiStyle>(() => {
+        const stored = localStorage.getItem('lumostime_emoji_style');
+        // 向后兼容：如果之前使用 useTwemoji，转换为新格式
+        if (!stored) {
+            const oldTwemoji = localStorage.getItem('lumostime_use_twemoji');
+            if (oldTwemoji === 'true') {
+                return 'twemoji';
+            }
+        }
+        return (stored as EmojiStyle) || 'native';
     });
 
     useEffect(() => {
@@ -288,8 +296,8 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
     }, [fontFamily]);
 
     useEffect(() => {
-        localStorage.setItem('lumostime_use_twemoji', useTwemoji.toString());
-    }, [useTwemoji]);
+        localStorage.setItem('lumostime_emoji_style', emojiStyle);
+    }, [emojiStyle]);
 
     useEffect(() => {
         localStorage.setItem('lumostime_custom_narrative_templates', JSON.stringify(customNarrativeTemplates));
@@ -337,8 +345,8 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
             setColorScheme,
             fontFamily,
             setFontFamily,
-            useTwemoji,
-            setUseTwemoji,
+            emojiStyle,
+            setEmojiStyle,
             appRules,
             setAppRules,
             customNarrativeTemplates,

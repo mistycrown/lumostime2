@@ -841,8 +841,6 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
                 onToggleTimelineGalleryMode={onToggleTimelineGalleryMode}
                 collapseThreshold={collapseThreshold}
                 onSetCollapseThreshold={onSetCollapseThreshold}
-                useTwemoji={useTwemoji}
-                onToggleUseTwemoji={() => setUseTwemoji(!useTwemoji)}
                 minIdleTimeThreshold={minIdleTimeThreshold}
                 onSetMinIdleTimeThreshold={onSetMinIdleTimeThreshold}
                 defaultView={defaultView}
