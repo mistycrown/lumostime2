@@ -27,3 +27,14 @@ root.render(
     <App />
   </React.StrictMode>
 );
+
+// React 渲染完成后移除加载屏幕
+setTimeout(() => {
+  const loadingScreen = document.getElementById('loading-screen');
+  if (loadingScreen) {
+    loadingScreen.classList.add('fade-out');
+    setTimeout(() => {
+      loadingScreen.remove();
+    }, 300);
+  }
+}, 100);

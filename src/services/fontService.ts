@@ -142,10 +142,22 @@ class FontService {
      * 应用字体到页面
      */
     private applyFont(font: FontOption) {
-        document.body.style.fontFamily = font.fontFamily;
-        
-        // 同时更新 CSS 变量（如果需要）
-        document.documentElement.style.setProperty('--font-family', font.fontFamily);
+        try {
+            // 更新 body 字体
+            document.body.style.fontFamily = font.fontFamily;
+            
+            // 更新 CSS 变量
+            document.documentElement.style.setProperty('--font-family', font.fontFamily);
+            
+            // 强制重绘
+            document.body.offsetHeight;
+            
+            console.log('[FontService] 字体已应用:', font.fontFamily);
+            console.log('[FontService] body.style.fontFamily:', document.body.style.fontFamily);
+            console.log('[FontService] CSS变量:', getComputedStyle(document.documentElement).getPropertyValue('--font-family'));
+        } catch (error) {
+            console.error('[FontService] 应用字体失败:', error);
+        }
     }
 
     /**
@@ -155,6 +167,18 @@ class FontService {
         const currentFontOption = this.getCurrentFontOption();
         this.applyFont(currentFontOption);
         console.log('[FontService] 字体初始化完成:', currentFontOption.displayName);
+        
+        // 检查字体是否加载成功
+        if (document.fonts && document.fonts.check) {
+            setTimeout(() => {
+                const fontLoaded = document.fonts.check(`16px "${currentFontOption.fontFamily.split(',')[0].replace(/"/g, '')}"`);
+                console.log('[FontService] 字体加载状态:', fontLoaded ? '成功' : '失败');
+                
+                if (!fontLoaded && currentFontOption.type === 'custom') {
+                    console.warn('[FontService] 自定义字体未加载，可能需要检查字体文件');
+                }
+            }, 1000);
+        }
     }
 }
 

@@ -48,29 +48,15 @@ export default defineConfig(({ mode }) => {
       }
     },
     build: {
-      // 生产环境启用代码混淆
-      minify: isProduction ? 'terser' : false,
-      terserOptions: isProduction ? {
-        compress: {
-          // 移除 console.log
-          drop_console: false, // 保留 console，方便调试
-          drop_debugger: true,
-          pure_funcs: ['console.debug'], // 只移除 debug
-        },
-        mangle: {
-          // 混淆变量名
-          toplevel: true,
-          safari10: true,
-          properties: {
-            // 混淆属性名（谨慎使用）
-            regex: /^_/  // 只混淆以 _ 开头的私有属性
-          }
-        },
-        format: {
-          // 移除注释
-          comments: false,
+      // 使用 esbuild 进行压缩（比 terser 更快，内存占用更少）
+      minify: isProduction ? 'esbuild' : false,
+      // esbuild 压缩选项
+      ...(isProduction && {
+        esbuild: {
+          drop: ['debugger'],
+          pure: ['console.debug'],
         }
-      } : undefined,
+      }),
       rollupOptions: {
         output: {
           // 手动分块，将敏感代码单独打包
