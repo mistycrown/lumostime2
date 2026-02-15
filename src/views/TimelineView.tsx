@@ -1112,8 +1112,13 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ logs, todos, scopes,
                                         onClick={onOpenDailyReview}
                                         className="text-left hover:text-amber-600 transition-colors group"
                                     >
-                                        <h3 className="font-bold text-stone-900 text-lg group-hover:text-amber-600 transition-colors">
-                                            {dailyReview ? '今日回顾' : '准备好开始回顾了吗？'}
+                                        <h3 className="font-bold text-stone-900 text-lg group-hover:text-amber-600 transition-colors flex items-center gap-2">
+                                            <span>{dailyReview ? '今日回顾' : '准备好开始回顾了吗？'}</span>
+                                            {dailyReview?.moodEmoji && (
+                                                <span className="text-base flex items-center justify-center leading-none">
+                                                    <IconRenderer icon={dailyReview.moodEmoji} />
+                                                </span>
+                                            )}
                                         </h3>
                                         {dailyReview?.summary && (
                                             <p className="text-xs text-stone-400 mt-1">

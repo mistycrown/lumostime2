@@ -2,12 +2,13 @@
  * @file ReviewNarrativeTab.tsx
  * @description Shared Narrative Tab component for Review Views with Reading/Editing modes
  */
-import React, { useEffect, useRef } from 'react';
-import { RefreshCw, Sparkles, Trash2 } from 'lucide-react';
+import React, { useEffect, useRef, useState } from 'react';
+import { RefreshCw, Sparkles, Trash2, Smile } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkBreaks from 'remark-breaks';
-import { MoodPicker } from '../MoodPicker';
+import { MoodPickerModal } from '../MoodPicker';
+import { IconRenderer } from '../IconRenderer';
 
 interface ReviewNarrativeTabProps {
     summary: string;
@@ -15,6 +16,7 @@ interface ReviewNarrativeTabProps {
     isGenerating: boolean;
     isReadingMode: boolean;
     moodEmoji?: string;
+    date: string; // 添加日期参数，用于模态框标题
     onSummaryChange: (value: string) => void;
     onNarrativeChange: (value: string) => void;
     onMoodChange?: (emoji: string) => void;
@@ -30,6 +32,7 @@ export const ReviewNarrativeTab: React.FC<ReviewNarrativeTabProps> = ({
     isGenerating,
     isReadingMode,
     moodEmoji,
+    date,
     onSummaryChange,
     onNarrativeChange,
     onMoodChange,
@@ -38,6 +41,7 @@ export const ReviewNarrativeTab: React.FC<ReviewNarrativeTabProps> = ({
     onDeleteSummary,
     onDeleteNarrative
 }) => {
+    const [isMoodModalOpen, setIsMoodModalOpen] = useState(false);
     // 自动保存的防抖处理
     const summaryTimeoutRef = useRef<NodeJS.Timeout>();
     const narrativeTimeoutRef = useRef<NodeJS.Timeout>();
@@ -87,7 +91,9 @@ export const ReviewNarrativeTab: React.FC<ReviewNarrativeTabProps> = ({
             {/* Section 1: 手动叙事（一句话总结） */}
             <div className="space-y-3">
                 <div className="flex items-center justify-between">
-                    <h3 className="text-sm font-bold text-stone-600">一句话总结</h3>
+                    <div className="flex items-center gap-2">
+                        <h3 className="text-sm font-bold text-stone-600">一句话总结</h3>
+                    </div>
                     {summary && isReadingMode && (
                         <button
                             onClick={onDeleteSummary}
@@ -99,10 +105,15 @@ export const ReviewNarrativeTab: React.FC<ReviewNarrativeTabProps> = ({
                 </div>
 
                 {isReadingMode ? (
-                    // 阅读模式：显示内容或空状态
+                    // 阅读模式：emoji + 文字内容作为一个整体，无边框
                     summary ? (
-                        <div className="bg-stone-50 border border-stone-200 rounded-xl px-4 py-3 text-stone-800 text-[15px] leading-relaxed">
-                            {summary}
+                        <div className="text-stone-800 text-[15px] leading-relaxed flex items-start gap-2">
+                            {moodEmoji && (
+                                <span className="text-lg flex items-center justify-center leading-none mt-0.5">
+                                    <IconRenderer icon={moodEmoji} />
+                                </span>
+                            )}
+                            <span className="flex-1">{summary}</span>
                         </div>
                     ) : (
                         <div className="text-center py-8 text-stone-400 text-sm border border-dashed border-stone-200 rounded-xl">
@@ -110,21 +121,33 @@ export const ReviewNarrativeTab: React.FC<ReviewNarrativeTabProps> = ({
                         </div>
                     )
                 ) : (
-                    // 编辑模式：显示输入框和心情选择器
+                    // 编辑模式：显示输入框和心情选择器按钮
                     <div className="flex items-center gap-3">
                         <input
                             type="text"
                             value={summary}
                             onChange={(e) => handleSummaryChange(e.target.value)}
-                            className="flex-1 bg-white border border-stone-200 rounded-xl px-4 py-3 text-stone-800 outline-none text-[15px] leading-relaxed shadow-sm focus:border-stone-400 transition-colors"
+                            className="flex-1 bg-white border border-stone-200 rounded-xl px-4 py-2 text-stone-800 outline-none text-[15px] leading-relaxed shadow-sm focus:border-stone-400 transition-colors"
                             placeholder="用一句话总结..."
                         />
                         {onMoodChange && (
-                            <MoodPicker
-                                selectedMood={moodEmoji}
-                                onSelect={onMoodChange}
-                                onClear={onMoodClear}
-                            />
+                            <button
+                                onClick={() => setIsMoodModalOpen(true)}
+                                className={`flex items-center justify-center w-10 h-10 rounded-xl transition-all flex-shrink-0 ${
+                                    moodEmoji
+                                        ? 'bg-stone-100 hover:bg-stone-200'
+                                        : 'bg-white border border-stone-200 hover:border-stone-300'
+                                }`}
+                                title="选择今日心情"
+                            >
+                                {moodEmoji ? (
+                                    <span className="text-2xl flex items-center justify-center leading-none">
+                                        <IconRenderer icon={moodEmoji} />
+                                    </span>
+                                ) : (
+                                    <Smile size={20} className="text-stone-400" />
+                                )}
+                            </button>
                         )}
                     </div>
                 )}
@@ -132,6 +155,18 @@ export const ReviewNarrativeTab: React.FC<ReviewNarrativeTabProps> = ({
 
             {/* Divider */}
             <div className="border-t border-stone-200"></div>
+
+            {/* 心情选择器模态框 */}
+            {onMoodChange && (
+                <MoodPickerModal
+                    isOpen={isMoodModalOpen}
+                    date={date}
+                    selectedMood={moodEmoji}
+                    onSelect={onMoodChange}
+                    onClear={onMoodClear}
+                    onClose={() => setIsMoodModalOpen(false)}
+                />
+            )}
 
             {/* Section 2: AI 生成的叙事 */}
             <div className="space-y-3">

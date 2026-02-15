@@ -880,6 +880,7 @@ export const DailyReviewView: React.FC<DailyReviewViewProps> = ({
                             isGenerating={isGenerating}
                             isReadingMode={isReadingMode}
                             moodEmoji={moodEmoji}
+                            date={review.date}
                             onSummaryChange={handleSummaryChange}
                             onNarrativeChange={handleNarrativeChange}
                             onMoodChange={handleMoodChange}

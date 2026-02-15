@@ -1,12 +1,12 @@
 /**
  * @file MoodPicker.tsx
- * @description 心情选择器组件 - 用于每日回顾
+ * @description 心情选择器组件 - 用于每日回顾（全屏模态框样式）
  */
-import React, { useState, useRef, useEffect } from 'react';
-import { Smile } from 'lucide-react';
+import React from 'react';
+import { createPortal } from 'react-dom';
 import { IconRenderer } from './IconRenderer';
 
-// 心情 emoji 列表（参考图片中的样式）
+// 心情 emoji 列表（参考 Daylio 样式）
 export const MOOD_EMOJIS = [
     { emoji: '🤩', label: 'Radical' },
     { emoji: '🥰', label: 'Loved' },
@@ -22,97 +22,89 @@ export const MOOD_EMOJIS = [
     { emoji: '😖', label: 'Awful' }
 ];
 
-interface MoodPickerProps {
+interface MoodPickerModalProps {
+    isOpen: boolean;
+    date: string; // YYYY-MM-DD 格式
     selectedMood?: string;
     onSelect: (emoji: string) => void;
     onClear?: () => void;
+    onClose: () => void;
 }
 
-export const MoodPicker: React.FC<MoodPickerProps> = ({ selectedMood, onSelect, onClear }) => {
-    const [isOpen, setIsOpen] = useState(false);
-    const containerRef = useRef<HTMLDivElement>(null);
+export const MoodPickerModal: React.FC<MoodPickerModalProps> = ({
+    isOpen,
+    date,
+    selectedMood,
+    onSelect,
+    onClear,
+    onClose
+}) => {
+    if (!isOpen) return null;
 
-    // 点击外部关闭
-    useEffect(() => {
-        const handleClickOutside = (event: MouseEvent) => {
-            if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
-                setIsOpen(false);
-            }
-        };
+    // 格式化日期显示为中国格式：YYYY/MM/DD
+    const formatDate = (dateStr: string) => {
+        const d = new Date(dateStr);
+        const year = d.getFullYear();
+        const month = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        return `${year}/${month}/${day}`;
+    };
 
-        if (isOpen) {
-            document.addEventListener('mousedown', handleClickOutside);
-        }
-        return () => {
-            document.removeEventListener('mousedown', handleClickOutside);
-        };
-    }, [isOpen]);
+    const modalContent = (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/20 backdrop-blur-sm animate-in fade-in duration-200">
+            <div className="bg-white rounded-3xl shadow-2xl w-[90%] max-w-md p-8 animate-in zoom-in-95 duration-200 relative">
+                {/* 标题 */}
+                <h2 className="text-2xl font-bold text-stone-900 text-center mb-2">
+                    How was {formatDate(date)}?
+                </h2>
 
-    return (
-        <div className="relative" ref={containerRef}>
-            {/* 触发按钮 */}
-            <button
-                onClick={() => setIsOpen(!isOpen)}
-                className={`flex items-center justify-center w-10 h-10 rounded-xl transition-all ${
-                    selectedMood
-                        ? 'bg-stone-100 hover:bg-stone-200'
-                        : 'bg-white border border-stone-200 hover:border-stone-300'
-                }`}
-                title="选择今日心情"
-            >
-                {selectedMood ? (
-                    <span className="text-2xl">
-                        <IconRenderer icon={selectedMood} />
-                    </span>
-                ) : (
-                    <Smile size={20} className="text-stone-400" />
-                )}
-            </button>
+                {/* 副标题 */}
+                <p className="text-center text-stone-400 text-xs font-bold tracking-widest mb-8">
+                    SELECT YOUR MOOD
+                </p>
 
-            {/* 心情选择器弹窗 */}
-            {isOpen && (
-                <div className="absolute top-full right-0 mt-2 bg-white rounded-2xl shadow-2xl border border-stone-100 p-6 z-50 animate-in fade-in zoom-in-95 duration-200 origin-top-right w-80">
-                    <h3 className="text-center text-stone-400 text-xs font-bold tracking-widest mb-6">
-                        SELECT YOUR MOOD
-                    </h3>
-
-                    {/* Emoji 网格 */}
-                    <div className="grid grid-cols-4 gap-4 mb-6">
-                        {MOOD_EMOJIS.map(({ emoji, label }) => (
-                            <button
-                                key={emoji}
-                                onClick={() => {
-                                    onSelect(emoji);
-                                    setIsOpen(false);
-                                }}
-                                className={`flex flex-col items-center gap-2 p-3 rounded-xl transition-all hover:bg-stone-50 ${
-                                    selectedMood === emoji ? 'bg-stone-100 ring-2 ring-stone-300' : ''
-                                }`}
-                            >
-                                <span className="text-4xl">
+                {/* Emoji 网格 */}
+                <div className="grid grid-cols-4 gap-4 mb-8">
+                    {MOOD_EMOJIS.map(({ emoji, label }) => (
+                        <button
+                            key={emoji}
+                            onClick={() => {
+                                onSelect(emoji);
+                                onClose();
+                            }}
+                            className="flex flex-col items-center justify-center gap-2 p-4 transition-all hover:bg-stone-50 rounded-2xl relative"
+                        >
+                            {/* Emoji 容器 - 选中时显示圆形边框 */}
+                            <div className="relative flex items-center justify-center w-16 h-16">
+                                {selectedMood === emoji && (
+                                    <div className="absolute inset-0 border-4 border-stone-300 rounded-full"></div>
+                                )}
+                                <span className="text-5xl flex items-center justify-center">
                                     <IconRenderer icon={emoji} />
                                 </span>
-                                <span className="text-[10px] text-stone-400 font-medium">
-                                    {label}
-                                </span>
-                            </button>
-                        ))}
-                    </div>
-
-                    {/* 清除按钮 */}
-                    {selectedMood && onClear && (
-                        <button
-                            onClick={() => {
-                                onClear();
-                                setIsOpen(false);
-                            }}
-                            className="w-full text-center text-red-400 hover:text-red-500 text-sm font-medium py-2 transition-colors"
-                        >
-                            CLEAR MOOD
+                            </div>
+                            <span className="text-[10px] text-stone-400 font-medium">
+                                {label}
+                            </span>
                         </button>
-                    )}
+                    ))}
                 </div>
-            )}
+
+                {/* 清除按钮 */}
+                {selectedMood && onClear && (
+                    <button
+                        onClick={() => {
+                            onClear();
+                            onClose();
+                        }}
+                        className="w-full text-center text-red-400 hover:text-red-500 text-sm font-bold tracking-wider py-3 transition-colors"
+                    >
+                        CLEAR LOG
+                    </button>
+                )}
+            </div>
         </div>
     );
+
+    return createPortal(modalContent, document.body);
 };
