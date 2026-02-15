@@ -9,6 +9,7 @@ import { X } from 'lucide-react';
 import { IconRenderer } from './IconRenderer';
 import { stickerService } from '../services/stickerService';
 import { useSettings } from '../contexts/SettingsContext';
+import { RedemptionService } from '../services/redemptionService';
 
 // 默认心情 emoji 列表（只存储 emoji，不需要 label）
 const DEFAULT_MOOD_EMOJIS = [
@@ -75,12 +76,20 @@ export const MoodPickerModal: React.FC<MoodPickerModalProps> = ({
     const [customEmoji, setCustomEmoji] = React.useState('');
     const [moodEmojis, setMoodEmojis] = useState(getMoodEmojis());
     
+    // 验证状态
+    const [isRedeemed, setIsRedeemed] = useState(false);
+    const redemptionService = new RedemptionService();
+    
     // 获取 sticker sets
     const [stickerSets, setStickerSets] = useState(stickerService.getAllStickerSets());
     
     // 根据 defaultSelectorPage 计算初始页面索引
     const getInitialPageIndex = () => {
         if (defaultSelectorPage === 'emoji') {
+            return 0;
+        }
+        // 如果未验证，强制返回 emoji 页
+        if (!isRedeemed) {
             return 0;
         }
         // 查找对应的 sticker set 索引
@@ -95,6 +104,15 @@ export const MoodPickerModal: React.FC<MoodPickerModalProps> = ({
     // 总页数 = 1 (Emoji) + N (Sticker sets)
     const totalPages = 1 + stickerSets.length;
 
+    // 检查验证状态
+    useEffect(() => {
+        const checkVerification = async () => {
+            const result = await redemptionService.isVerified();
+            setIsRedeemed(result.isVerified);
+        };
+        checkVerification();
+    }, []);
+
     // 当 modal 打开时，重置到默认页面
     useEffect(() => {
         if (isOpen) {
@@ -102,7 +120,7 @@ export const MoodPickerModal: React.FC<MoodPickerModalProps> = ({
             setIsCustomMode(false);
             setCustomEmoji('');
         }
-    }, [isOpen, defaultSelectorPage]);
+    }, [isOpen, defaultSelectorPage, isRedeemed]);
 
     // 监听 emoji 组和贴纸集变化
     useEffect(() => {
@@ -186,13 +204,18 @@ export const MoodPickerModal: React.FC<MoodPickerModalProps> = ({
 
                 {/* 页面导航 */}
                 <div className="flex items-center justify-between mb-6">
-                    <button
-                        onClick={goToPreviousPage}
-                        disabled={currentPageIndex === 0}
-                        className="p-2 text-stone-600 hover:bg-stone-100 rounded-lg disabled:opacity-20 disabled:cursor-not-allowed transition-all"
-                    >
-                        <span className="text-xl">←</span>
-                    </button>
+                    {/* 左箭头 - 未验证时隐藏 */}
+                    {isRedeemed ? (
+                        <button
+                            onClick={goToPreviousPage}
+                            disabled={currentPageIndex === 0}
+                            className="p-2 text-stone-600 hover:bg-stone-100 rounded-lg disabled:opacity-20 disabled:cursor-not-allowed transition-all"
+                        >
+                            <span className="text-xl">←</span>
+                        </button>
+                    ) : (
+                        <div className="w-10"></div>
+                    )}
                     
                     <div className="text-center flex-1">
                         <h3 className="text-sm font-bold text-stone-800">
@@ -205,13 +228,18 @@ export const MoodPickerModal: React.FC<MoodPickerModalProps> = ({
                         )}
                     </div>
                     
-                    <button
-                        onClick={goToNextPage}
-                        disabled={currentPageIndex === totalPages - 1}
-                        className="p-2 text-stone-600 hover:bg-stone-100 rounded-lg disabled:opacity-20 disabled:cursor-not-allowed transition-all"
-                    >
-                        <span className="text-xl">→</span>
-                    </button>
+                    {/* 右箭头 - 未验证时隐藏 */}
+                    {isRedeemed ? (
+                        <button
+                            onClick={goToNextPage}
+                            disabled={currentPageIndex === totalPages - 1}
+                            className="p-2 text-stone-600 hover:bg-stone-100 rounded-lg disabled:opacity-20 disabled:cursor-not-allowed transition-all"
+                        >
+                            <span className="text-xl">→</span>
+                        </button>
+                    ) : (
+                        <div className="w-10"></div>
+                    )}
                 </div>
 
                 {!isCustomMode ? (
@@ -300,20 +328,22 @@ export const MoodPickerModal: React.FC<MoodPickerModalProps> = ({
                             </>
                         )}
 
-                        {/* 页码指示器 */}
-                        <div className="flex justify-center gap-1 mb-4">
-                            {Array.from({ length: totalPages }).map((_, index) => (
-                                <button
-                                    key={index}
-                                    onClick={() => setCurrentPageIndex(index)}
-                                    className={`h-2 rounded-full transition-all ${
-                                        index === currentPageIndex
-                                            ? 'bg-stone-800 w-6'
-                                            : 'bg-stone-300 hover:bg-stone-400 w-2'
-                                    }`}
-                                />
-                            ))}
-                        </div>
+                        {/* 页码指示器 - 仅在已验证时显示 */}
+                        {isRedeemed && (
+                            <div className="flex justify-center gap-1 mb-4">
+                                {Array.from({ length: totalPages }).map((_, index) => (
+                                    <button
+                                        key={index}
+                                        onClick={() => setCurrentPageIndex(index)}
+                                        className={`h-2 rounded-full transition-all ${
+                                            index === currentPageIndex
+                                                ? 'bg-stone-800 w-6'
+                                                : 'bg-stone-300 hover:bg-stone-400 w-2'
+                                        }`}
+                                    />
+                                ))}
+                            </div>
+                        )}
                     </>
                 ) : (
                     <>
