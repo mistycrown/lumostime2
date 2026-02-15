@@ -234,6 +234,10 @@ export const AppRoutes: React.FC<AppRoutesProps> = ({
                     minIdleTimeThreshold={minIdleTimeThreshold}
                     onQuickPunch={handleQuickPunch}
                     activeSessions={activeSessions}
+                    onNavigateToTodo={(todo) => {
+                        // 直接打开待办详情
+                        openEditTodoModal(todo);
+                    }}
                     dailyReview={dailyReviews.find(r => r.date === getLocalDateStr(currentDate))}
                     onOpenDailyReview={handleOpenDailyReview}
                     onCreateDailyReviewSilently={handleCreateDailyReviewSilently}

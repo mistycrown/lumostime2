@@ -22,6 +22,7 @@ export const useTodoManager = () => {
     const {
         setIsTodoModalOpen,
         setEditingTodo,
+        todoCategoryToAdd, // 读取待添加的分类 ID
         setTodoCategoryToAdd,
         setIsTodoManaging
     } = useNavigation();
@@ -184,6 +185,7 @@ export const useTodoManager = () => {
         updateTodoProgress,
         isDeleteTodoConfirmOpen,
         setIsDeleteTodoConfirmOpen,
-        todoToDeleteId
+        todoToDeleteId,
+        todoCategoryToAdd // 导出待添加的分类 ID
     };
 };

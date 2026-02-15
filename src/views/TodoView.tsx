@@ -395,6 +395,13 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, categories, activityC
     localStorage.setItem('todoViewMode', viewMode);
   }, [viewMode]);
 
+  // 初始化选中的分类：如果没有选中任何分类，默认选中第一个
+  React.useEffect(() => {
+    if (!selectedCategoryId && categories.length > 0) {
+      setSelectedCategoryId(categories[0].id);
+    }
+  }, [categories, selectedCategoryId]);
+
   const selectedCategory = categories.find(c => c.id === selectedCategoryId) || categories[0];
 
   // 如果没有分类，显示空状态而不是崩溃

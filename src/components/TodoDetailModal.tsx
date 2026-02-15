@@ -7,7 +7,7 @@
  * 
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { TodoItem, TodoCategory, Log, Category, Scope } from '../types';
 import { ScopeAssociation } from './ScopeAssociation';
 import { TagAssociation } from './TagAssociation';
@@ -39,6 +39,9 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({ initialTodo, c
   // Stable ID for the session
   const [todoId] = useState(initialTodo?.id || crypto.randomUUID());
 
+  // Ref for Task Name input
+  const taskNameInputRef = useRef<HTMLInputElement>(null);
+
   // --- Detail State ---
   const [selectedCategoryId, setSelectedCategoryId] = useState(initialTodo?.categoryId || currentCategory.id);
   const [title, setTitle] = useState(initialTodo?.title || '');
@@ -67,6 +70,17 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({ initialTodo, c
 
   // Timeline / Calendar State
   const [displayDate, setDisplayDate] = useState(new Date());
+
+  // Auto-focus Task Name input when creating a new task
+  useEffect(() => {
+    if (!initialTodo && activeTab === '细节' && taskNameInputRef.current) {
+      // 延迟聚焦以确保动画完成
+      const timer = setTimeout(() => {
+        taskNameInputRef.current?.focus();
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [initialTodo, activeTab]);
 
   // 实时保存：当状态变化时自动保存
   React.useEffect(() => {
@@ -317,6 +331,7 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({ initialTodo, c
               <div>
                 <label className="text-xs text-stone-400 font-medium mb-1.5 block">Task Name</label>
                 <input
+                  ref={taskNameInputRef}
                   type="text"
                   value={title}
                   onChange={e => setTitle(e.target.value)}
