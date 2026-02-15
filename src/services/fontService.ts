@@ -53,6 +53,14 @@ const FONT_OPTIONS: FontOption[] = [
         description: '',
         fontFamily: '"Zhuque Fangsong", "Noto Serif SC", serif',
         type: 'custom'
+    },
+    {
+        id: 'wenquanyi-bitmap',
+        name: 'wenquanyi-bitmap',
+        displayName: '文泉驿点阵宋',
+        description: '',
+        fontFamily: '"WenQuanYi Bitmap Song", "Noto Serif SC", serif',
+        type: 'custom'
     }
 ];
 

@@ -3,15 +3,17 @@
  * @description 画廊视图 - 以瀑布流方式展示所有带图片的记录
  */
 import React, { useState, useEffect, useMemo } from 'react';
-import { Log, Category } from '../types';
-import { ChevronLeft } from 'lucide-react';
+import { Log, Category, DailyReview } from '../types';
+import { ChevronLeft, Share2 } from 'lucide-react';
 import { imageService } from '../services/imageService';
 import { IconRenderer } from './IconRenderer';
 import { ImagePreviewModal } from './ImagePreviewModal';
+import { GalleryExportView } from './GalleryExportView';
 
 interface GalleryViewProps {
     logs: Log[];
     categories: Category[];
+    dailyReviews?: DailyReview[];
     onClose: () => void;
     onEditLog: (log: Log) => void;
     refreshKey?: number;
@@ -89,6 +91,7 @@ const GalleryImage: React.FC<{
 export const GalleryView: React.FC<GalleryViewProps> = ({
     logs,
     categories,
+    dailyReviews = [],
     onClose,
     onEditLog,
     refreshKey = 0
@@ -99,6 +102,7 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
     const [previewImage, setPreviewImage] = useState<string | null>(null);
     const [activeMonth, setActiveMonth] = useState<string | null>(null);
     const [showSidebar, setShowSidebar] = useState(false);
+    const [showExportView, setShowExportView] = useState(false);
 
     // 提取所有带图片的记录
     const galleryItems = useMemo(() => {
@@ -273,7 +277,12 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
                         }`}>
                         Gallery
                     </h1>
-                    <div className="w-9" />
+                    <button
+                        onClick={() => setShowExportView(true)}
+                        className="p-2 text-stone-400 active:text-stone-600 transition-colors active:scale-95"
+                    >
+                        <Share2 size={20} />
+                    </button>
                 </div>
             </header>
 
@@ -513,6 +522,16 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
                         );
                     })}
                 </div>
+            )}
+
+            {/* 画廊导出视图 */}
+            {showExportView && (
+                <GalleryExportView
+                    logs={logs}
+                    categories={categories}
+                    dailyReviews={dailyReviews}
+                    onBack={() => setShowExportView(false)}
+                />
             )}
         </div>
     );
