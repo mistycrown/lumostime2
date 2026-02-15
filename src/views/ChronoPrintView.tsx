@@ -136,7 +136,7 @@ export const ChronoPrintView: React.FC<ChronoPrintViewProps> = ({ inputText, onB
               <path d="m15 18-6-6 6-6"></path>
             </svg>
           </button>
-          <span className="text-stone-800 font-bold text-lg flex-1 text-center font-serif">分享卡片</span>
+          <span className="text-stone-800 font-bold text-lg flex-1 text-center font-serif">分享统计</span>
           <div className="w-10"></div> {/* 占位，保持标题居中 */}
         </div>
       </div>
