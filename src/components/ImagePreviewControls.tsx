@@ -20,9 +20,9 @@ interface ImagePreviewControlsProps {
     showImageControls?: boolean;
 }
 
-const buttonBaseClass = "p-2 bg-white/10 hover:bg-white/20 text-white rounded-full backdrop-blur-sm transition-colors [&>svg]:stroke-[2.5]";
-const buttonStyle = { WebkitTextStroke: '0.5px black', paintOrder: 'stroke fill' as const };
-const iconStyle = { filter: 'drop-shadow(0 0 0.5px black)' };
+const buttonBaseClass = "p-2 bg-black/40 hover:bg-black/60 text-white rounded-full transition-all [&>svg]:stroke-[2]";
+const buttonStyle = {};
+const iconStyle = {};
 
 export const ImagePreviewControls: React.FC<ImagePreviewControlsProps> = ({
     onZoomIn,
@@ -41,7 +41,7 @@ export const ImagePreviewControls: React.FC<ImagePreviewControlsProps> = ({
                         e.stopPropagation();
                         onDelete();
                     }}
-                    className="p-2 bg-white/10 hover:bg-red-500/80 text-white rounded-full backdrop-blur-sm transition-colors mr-2 [&>svg]:stroke-[2.5]"
+                    className="p-2 bg-black/40 hover:bg-red-500/80 text-white rounded-full transition-all mr-2 [&>svg]:stroke-[2]"
                     style={buttonStyle}
                     title="Delete"
                 >
