@@ -27,6 +27,8 @@ import { ThemePresetService } from '../services/themePresetService';
 import { UiThemeButton } from '../components/UiThemeButton';
 import { FontSelector } from '../components/FontSelector';
 import { userStatsService, UserStats } from '../services/userStatsService';
+import { stickerService } from '../services/stickerService';
+import { IconRenderer } from '../components/IconRenderer';
 
 interface SponsorshipViewProps {
     onBack: () => void;
@@ -994,6 +996,40 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
                                                     currentTheme={uiIconTheme}
                                                     onThemeChange={handleUiIconThemeChange}
                                                 />
+                                            ))}
+                                        </div>
+                                    </div>
+
+                                    {/* Sticker 集部分 */}
+                                    <div className="space-y-4">
+                                        <h4 className="text-sm font-medium text-stone-600">Sticker 集</h4>
+                                        <p className="text-xs text-stone-500 mb-3">在已开启 Emoji 和 Sticker 的选择器中查看</p>
+                                        
+                                        {/* Sticker 集预览网格 - 限制最大宽度 */}
+                                        <div className="grid gap-2" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(80px, 1fr))', maxWidth: '400px' }}>
+                                            {stickerService.getAllStickerSets().map((stickerSet) => (
+                                                <div
+                                                    key={stickerSet.id}
+                                                    className="relative rounded-lg border-2 border-stone-200 overflow-hidden"
+                                                    style={{ aspectRatio: '1/1' }}
+                                                >
+                                                    <div className="w-full h-full bg-white p-1.5">
+                                                        {/* 2x2 网格显示前 4 个 sticker */}
+                                                        <div className="grid grid-cols-2 gap-1 h-full">
+                                                            {stickerSet.stickers.slice(0, 4).map((sticker, index) => (
+                                                                <div 
+                                                                    key={index}
+                                                                    className="flex items-center justify-center"
+                                                                >
+                                                                    <IconRenderer 
+                                                                        icon={`image:${sticker.path}`} 
+                                                                        size="100%"
+                                                                    />
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    </div>
+                                                </div>
                                             ))}
                                         </div>
                                     </div>

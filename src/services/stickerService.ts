@@ -64,6 +64,29 @@ const PRESET_STICKER_SETS: StickerSet[] = [
             { path: '/sticker/water2/15.png' },
             { path: '/sticker/water2/16.png' },
         ]
+    },
+    {
+        id: 'water3',
+        name: 'Water3 水彩',
+        isCustom: false,
+        stickers: [
+            { path: '/sticker/water3/01.png' },
+            { path: '/sticker/water3/02.png' },
+            { path: '/sticker/water3/03.png' },
+            { path: '/sticker/water3/04.png' },
+            { path: '/sticker/water3/05.png' },
+            { path: '/sticker/water3/06.png' },
+            { path: '/sticker/water3/07.png' },
+            { path: '/sticker/water3/08.png' },
+            { path: '/sticker/water3/09.png' },
+            { path: '/sticker/water3/10.png' },
+            { path: '/sticker/water3/11.png' },
+            { path: '/sticker/water3/12.png' },
+            { path: '/sticker/water3/13.png' },
+            { path: '/sticker/water3/14.png' },
+            { path: '/sticker/water3/15.png' },
+            { path: '/sticker/water3/16.png' },
+        ]
     }
 ];
 
