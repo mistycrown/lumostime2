@@ -163,18 +163,39 @@ export const IconRenderer: React.FC<IconRendererProps> = ({
             img.alt = displayEmoji;
             img.draggable = false;
             
+            // OpenMoji 缩放系数（比 Twemoji 和原生 emoji 放大 30%）
+            const scaleFactor = emojiStyle === 'openmoji' ? 1.3 : 1;
+            
             // 设置图片大小
             if (size) {
                 const sizeValue = typeof size === 'number' ? `${size}px` : size;
-                img.style.width = sizeValue;
-                img.style.height = sizeValue;
+                // 如果是数字，直接应用缩放
+                if (typeof size === 'number') {
+                    const scaledSize = `${size * scaleFactor}px`;
+                    img.style.width = scaledSize;
+                    img.style.height = scaledSize;
+                } else {
+                    // 如果是 CSS 值（如 100%, 2rem 等）
+                    img.style.width = sizeValue;
+                    img.style.height = sizeValue;
+                    // 对于 OpenMoji，使用 transform scale 来放大
+                    if (scaleFactor !== 1) {
+                        img.style.transform = `scale(${scaleFactor})`;
+                    }
+                }
             } else {
                 // 默认使用 1em，这样会跟随字体大小
-                img.style.width = '1em';
-                img.style.height = '1em';
+                if (scaleFactor !== 1) {
+                    img.style.width = `${scaleFactor}em`;
+                    img.style.height = `${scaleFactor}em`;
+                } else {
+                    img.style.width = '1em';
+                    img.style.height = '1em';
+                }
             }
             img.style.verticalAlign = 'middle';
             img.style.display = 'inline-block';
+            img.style.objectFit = 'contain'; // 确保图片按比例缩放
             
             // 错误处理：如果图片加载失败，显示原生 emoji
             img.onerror = () => {
@@ -196,7 +217,13 @@ export const IconRenderer: React.FC<IconRendererProps> = ({
         <span 
             ref={emojiRef}
             className={`inline-flex items-center justify-center ${className}`} 
-            style={emojiStyle === 'native' && size ? { fontSize: size } : undefined}
+            style={
+                emojiStyle === 'native' && size 
+                    ? typeof size === 'number' 
+                        ? { fontSize: `${size}px` }
+                        : { fontSize: size, width: size, height: size }
+                    : undefined
+            }
         >
             {emojiStyle === 'native' && displayEmoji}
         </span>

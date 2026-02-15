@@ -284,20 +284,20 @@ export const EmojiSettingsView: React.FC<EmojiSettingsViewProps> = ({ onBack }) 
     };
 
     return (
-        <div className="h-full flex flex-col bg-stone-50">
+        <div className="fixed inset-0 z-50 bg-stone-50 flex flex-col font-serif animate-in slide-in-from-right duration-300 pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">
             {/* Header */}
-            <div className="bg-white border-b border-stone-200 px-4 py-3 flex items-center gap-3">
+            <div className="flex items-center gap-3 px-4 h-14 border-b border-stone-100 bg-white/80 backdrop-blur-md sticky top-0">
                 <button
                     onClick={onBack}
-                    className="p-2 hover:bg-stone-100 rounded-lg transition-colors"
+                    className="text-stone-400 hover:text-stone-600 p-1"
                 >
-                    <ChevronLeft size={20} className="text-stone-600" />
+                    <ChevronLeft size={24} />
                 </button>
-                <h2 className="text-lg font-bold text-stone-800">Emoji 相关</h2>
+                <span className="text-stone-800 font-bold text-lg">Emoji 相关</span>
             </div>
 
             {/* Content */}
-            <div className="flex-1 overflow-y-auto p-4 space-y-6">
+            <div className="flex-1 overflow-y-auto p-4 space-y-6 pb-40">{/* 添加 pb-40 以避免底部内容被遮挡 */}
                 {/* Emoji 渲染风格 */}
                 <div className="bg-white rounded-xl p-4 shadow-sm">
                     <h3 className="text-sm font-bold text-stone-700 mb-3">Emoji 渲染风格</h3>

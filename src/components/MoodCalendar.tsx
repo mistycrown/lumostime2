@@ -16,7 +16,7 @@ interface MoodCalendarProps {
     onClearMood: (date: string) => void;
 }
 
-const WEEK_DAYS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
+const WEEK_DAYS = ['M', 'T', 'W', 'T', 'F', 'S', 'S']; // 周一到周日
 
 export const MoodCalendar: React.FC<MoodCalendarProps> = ({
     year,
@@ -67,12 +67,15 @@ export const MoodCalendar: React.FC<MoodCalendarProps> = ({
         const firstDay = new Date(year, month, 1);
         const lastDay = new Date(year, month + 1, 0);
         const daysInMonth = lastDay.getDate();
-        const startDayOfWeek = firstDay.getDay(); // 0 = Sunday
+        const startDayOfWeek = firstDay.getDay(); // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
 
         const days: (number | null)[] = [];
 
+        // 调整为周一开始：周日是0，需要转换为6；周一是1，转换为0
+        const adjustedStartDay = startDayOfWeek === 0 ? 6 : startDayOfWeek - 1;
+
         // 填充第一周的空白
-        for (let i = 0; i < startDayOfWeek; i++) {
+        for (let i = 0; i < adjustedStartDay; i++) {
             days.push(null);
         }
 
@@ -124,7 +127,7 @@ export const MoodCalendar: React.FC<MoodCalendarProps> = ({
         <>
             <div className="bg-white border border-stone-200 shadow-sm p-4 rounded-lg mb-6">
                 {/* Weekday Headers */}
-                <div className="grid grid-cols-7 mb-4">
+                <div className="grid grid-cols-7 mb-2">
                     {WEEK_DAYS.map((day, i) => (
                         <div key={i} className="text-center font-mono text-xs text-stone-400 uppercase tracking-wider">
                             {day}
@@ -169,10 +172,14 @@ export const MoodCalendar: React.FC<MoodCalendarProps> = ({
                                 }
                             >
                                 {mood && (
-                                    <div className="flex items-center justify-center mb-1">
-                                        <span className="text-3xl leading-none block">
-                                            <IconRenderer icon={mood} />
-                                        </span>
+                                    <div className="absolute inset-0 flex items-center justify-center pb-3">
+                                        <div className="w-[60%] h-[60%] flex items-center justify-center">
+                                            <IconRenderer 
+                                                icon={mood} 
+                                                className="w-full h-full"
+                                                size="100%"
+                                            />
+                                        </div>
                                     </div>
                                 )}
                                 <span className={`absolute bottom-0 left-0 right-0 text-center text-[9px] font-mono ${today ? 'text-stone-900 font-bold' : 'text-stone-400'}`}>
