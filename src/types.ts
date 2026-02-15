@@ -79,7 +79,7 @@ export interface Goal {
   status: 'active' | 'completed' | 'failed' | 'archived';
 
   // 📝 奖励/备注 (Gamification)
-  motivation?: string;  // e.g., "完成奖励自己一套新香具"
+  motivation?: string; 
 }
 
 export interface ActiveSession {

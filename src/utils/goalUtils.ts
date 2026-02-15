@@ -95,7 +95,7 @@ export const calculateGoalProgress = (
             currentValue = 0;
     }
 
-    const percentage = Math.min(100, Math.max(0, (currentValue / targetValue) * 100));
+    const percentage = Math.max(0, (currentValue / targetValue) * 100);
 
     return {
         current: currentValue,

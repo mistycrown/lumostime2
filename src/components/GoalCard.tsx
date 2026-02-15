@@ -9,7 +9,7 @@
  */
 import React from 'react';
 import { Goal, Log, TodoItem } from '../types';
-import { Target, Edit2, Trash2, Archive } from 'lucide-react';
+import { Target, Edit2, Trash2, Archive, CheckCircle2, XCircle } from 'lucide-react';
 import { calculateGoalProgress, formatGoalValue, getGoalMetricLabel } from '../utils/goalUtils';
 import { formatShortDate } from '../utils/dateUtils';
 
@@ -31,6 +31,29 @@ export const GoalCard: React.FC<GoalCardProps> = ({ goal, logs, todos, onEdit, o
 
     // 判断是否为反向目标（时长上限）
     const isLimitGoal = goal.metric === 'duration_limit';
+
+    // 计算目标状态
+    const now = Date.now();
+    const endTime = new Date(goal.endDate).setHours(23, 59, 59, 999);
+    const isExpired = now > endTime;
+    const daysUntilDeadline = Math.ceil((endTime - now) / (1000 * 60 * 60 * 24));
+
+    // 根据状态选择图标
+    const getGoalIcon = () => {
+        if (isLimitGoal) {
+            // 负向目标
+            if (percentage >= 100) return XCircle; // 超标（不管是否过期，都显示失败图标）
+            if (isExpired) return CheckCircle2; // 成功控制
+            return Target; // 进行中
+        } else {
+            // 正向目标
+            if (percentage >= 100) return CheckCircle2; // 达成目标（不管是否过期，都显示完成图标）
+            if (isExpired) return XCircle; // 过期未完成
+            return Target; // 进行中
+        }
+    };
+
+    const GoalIcon = getGoalIcon();
 
     // 进度条颜色
     const progressColor = isLimitGoal
@@ -57,7 +80,7 @@ export const GoalCard: React.FC<GoalCardProps> = ({ goal, logs, todos, onEdit, o
             <div className={`p-2 ${isArchived ? 'opacity-50' : ''}`}>
                 <div className="flex items-center justify-between mb-1.5">
                     <div className="flex items-center gap-1.5 flex-1 min-w-0">
-                        <Target size={12} className="flex-shrink-0" style={{ color: 'var(--accent-color)' }} />
+                        <GoalIcon size={12} className="flex-shrink-0" style={{ color: 'var(--accent-color)' }} />
                         <span className="text-xs font-bold text-stone-700 truncate">{goal.title}</span>
                         <span className="text-[10px] text-stone-400 flex-shrink-0">
                             {formattedEndDate}
@@ -90,7 +113,7 @@ export const GoalCard: React.FC<GoalCardProps> = ({ goal, logs, todos, onEdit, o
             <div className="flex items-start justify-between mb-3">
                 <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
-                        <Target 
+                        <GoalIcon 
                             size={16} 
                             className={isLimitGoal ? 'text-red-600' : (isArchived ? 'text-stone-400' : '')}
                             style={!isLimitGoal && !isArchived ? { color: 'var(--accent-color)' } : undefined}

@@ -96,7 +96,7 @@ export const AppRoutes: React.FC<AppRoutesProps> = ({
     const { activeSessions } = useSession();
 
     // Import hooks
-    const { handleAddGoal, handleEditGoal, handleSaveGoal, handleDeleteGoal, handleArchiveGoal } = useGoalManager();
+    const { handleAddGoal, handleEditGoal, handleSaveGoal, handleDeleteGoal, handleArchiveGoal, handleExtendGoal, handleIncreaseGoalTarget } = useGoalManager();
 
     // We need to instantiate ReviewManager here.
     // Note: useReviewManager requires many args.
@@ -407,6 +407,10 @@ export const AppRoutes: React.FC<AppRoutesProps> = ({
                     todos={todos}
                     onScopeClick={(id) => setSelectedScopeId(id)}
                     onManageClick={() => setIsScopeManaging(true)}
+                    onArchiveGoal={handleArchiveGoal}
+                    onExtendGoal={handleExtendGoal}
+                    onIncreaseGoalTarget={handleIncreaseGoalTarget}
+                    onAddGoal={handleAddGoal}
                 />
             );
         default:

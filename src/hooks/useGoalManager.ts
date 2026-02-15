@@ -55,6 +55,33 @@ export const useGoalManager = () => {
         }) as Goal[]);
     };
 
+    const handleExtendGoal = (goalId: string, days: number) => {
+        setGoals(prev => prev.map(g => {
+            if (g.id === goalId) {
+                const currentEndDate = new Date(g.endDate);
+                currentEndDate.setDate(currentEndDate.getDate() + days);
+                return {
+                    ...g,
+                    endDate: currentEndDate.toISOString().split('T')[0],
+                    extendedCount: (g.extendedCount || 0) + 1
+                };
+            }
+            return g;
+        }) as Goal[]);
+    };
+
+    const handleIncreaseGoalTarget = (goalId: string, increaseAmount: number) => {
+        setGoals(prev => prev.map(g => {
+            if (g.id === goalId) {
+                return {
+                    ...g,
+                    targetValue: g.targetValue + increaseAmount
+                };
+            }
+            return g;
+        }) as Goal[]);
+    };
+
     const closeGoalEditor = () => {
         setIsGoalEditorOpen(false);
         setEditingGoal(null);
@@ -66,6 +93,8 @@ export const useGoalManager = () => {
         handleSaveGoal,
         handleDeleteGoal,
         handleArchiveGoal,
+        handleExtendGoal,
+        handleIncreaseGoalTarget,
         closeGoalEditor
     };
 };

@@ -202,7 +202,7 @@ export const INITIAL_GOALS: Goal[] = [
     metric: 'duration_raw',
     targetValue: 100 * 3600, // 100小时（秒）
     status: 'active',
-    motivation: '完成奖励自己一套新香具'
+    motivation: '完成奖励自己……'
   },
   {
     id: 'goal_2',

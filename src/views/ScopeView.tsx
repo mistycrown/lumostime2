@@ -7,11 +7,13 @@
  * 
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Scope, Goal, Log, TodoItem } from '../types';
 import { GoalCard } from '../components/GoalCard';
+import { GoalStatusAlert } from '../components/GoalStatusAlert';
 import { Settings2 } from 'lucide-react';
 import { IconRenderer } from '../components/IconRenderer';
+import { useGoalStatus } from '../hooks/useGoalStatus';
 
 
 interface ScopeViewProps {
@@ -21,6 +23,10 @@ interface ScopeViewProps {
     todos: TodoItem[];
     onScopeClick: (scopeId: string) => void;
     onManageClick: () => void;
+    onArchiveGoal?: (goalId: string) => void;
+    onExtendGoal?: (goalId: string, days: number) => void;
+    onIncreaseGoalTarget?: (goalId: string, increaseAmount: number) => void;
+    onAddGoal?: (scopeId: string) => void;
 }
 
 export const ScopeView: React.FC<ScopeViewProps> = ({
@@ -29,8 +35,17 @@ export const ScopeView: React.FC<ScopeViewProps> = ({
     goals = [],
     todos = [],
     onScopeClick,
-    onManageClick
+    onManageClick,
+    onArchiveGoal,
+    onExtendGoal,
+    onIncreaseGoalTarget,
+    onAddGoal
 }) => {
+    // 用于管理已关闭的提示
+    const [dismissedAlerts, setDismissedAlerts] = useState<Set<string>>(new Set());
+    // 用于跟踪刚刚归档的目标（显示第二步）
+    const [recentlyArchivedGoals, setRecentlyArchivedGoals] = useState<Set<string>>(new Set());
+
     // Calculate stats for each scope
     const scopeStats = useMemo(() => {
         const stats = new Map<string, { allTime: number; thisMonth: number }>();
@@ -68,6 +83,86 @@ export const ScopeView: React.FC<ScopeViewProps> = ({
         const h = Math.floor(seconds / 3600);
         const m = Math.floor((seconds % 3600) / 60);
         return h > 0 ? `${h}h ${m}m` : `${m}m`;
+    };
+
+    const handleDismissAlert = (goalId: string) => {
+        setDismissedAlerts(prev => new Set(prev).add(goalId));
+        // 同时从最近归档列表中移除
+        setRecentlyArchivedGoals(prev => {
+            const newSet = new Set(prev);
+            newSet.delete(goalId);
+            return newSet;
+        });
+    };
+
+    const handleExtend = (goalId: string, days: number) => {
+        onExtendGoal?.(goalId, days);
+    };
+
+    const handleIncreaseTarget = (goalId: string, increaseAmount: number) => {
+        onIncreaseGoalTarget?.(goalId, increaseAmount);
+    };
+
+    const handleArchive = (goalId: string) => {
+        onArchiveGoal?.(goalId);
+        // 标记为最近归档，以便显示第二步
+        setRecentlyArchivedGoals(prev => new Set(prev).add(goalId));
+    };
+
+    // 为每个领域找到需要提示的目标（成功和失败分别显示）
+    const ScopeGoalAlert: React.FC<{ scopeId: string; scopeGoals: Goal[] }> = ({ scopeId, scopeGoals }) => {
+        // 包含活跃目标和最近归档的目标
+        const allRelevantGoals = goals.filter(g => 
+            g.scopeId === scopeId && 
+            (g.status === 'active' || recentlyArchivedGoals.has(g.id))
+        );
+
+        // 计算每个目标的状态
+        const goalsWithStatus = allRelevantGoals.map(goal => ({
+            goal,
+            statusInfo: useGoalStatus(goal, logs, todos)
+        }));
+
+        // 分别找出完成和失败的目标
+        const completedGoals = goalsWithStatus
+            .filter(({ statusInfo }) => statusInfo.isCompleted)
+            .filter(({ goal }) => !dismissedAlerts.has(goal.id));
+
+        const failedGoals = goalsWithStatus
+            .filter(({ statusInfo }) => statusInfo.isFailed)
+            .filter(({ goal }) => !dismissedAlerts.has(goal.id));
+
+        return (
+            <>
+                {/* 显示所有完成的目标提示 */}
+                {completedGoals.map(({ goal, statusInfo }) => (
+                    <GoalStatusAlert
+                        key={goal.id}
+                        goal={goal}
+                        statusInfo={statusInfo}
+                        onArchive={handleArchive}
+                        onExtend={handleExtend}
+                        onIncreaseTarget={handleIncreaseTarget}
+                        onCreate={() => onAddGoal?.(scopeId)}
+                        onDismiss={() => handleDismissAlert(goal.id)}
+                    />
+                ))}
+                
+                {/* 显示所有失败的目标提示 */}
+                {failedGoals.map(({ goal, statusInfo }) => (
+                    <GoalStatusAlert
+                        key={goal.id}
+                        goal={goal}
+                        statusInfo={statusInfo}
+                        onArchive={handleArchive}
+                        onExtend={handleExtend}
+                        onIncreaseTarget={handleIncreaseTarget}
+                        onCreate={() => onAddGoal?.(scopeId)}
+                        onDismiss={() => handleDismissAlert(goal.id)}
+                    />
+                ))}
+            </>
+        );
     };
 
     return (
@@ -137,6 +232,10 @@ export const ScopeView: React.FC<ScopeViewProps> = ({
                                 {scopeGoals.length > 0 && (
                                     <>
                                         <div className="border-t border-stone-100 my-3" />
+                                        
+                                        {/* Goal Status Alert */}
+                                        <ScopeGoalAlert scopeId={scope.id} scopeGoals={scopeGoals} />
+                                        
                                         <div className="space-y-2">
                                             {scopeGoals.map(goal => (
                                                 <GoalCard
