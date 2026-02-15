@@ -19,7 +19,10 @@ export const MOOD_EMOJIS = [
     { emoji: '☹️', label: 'Sad' },
     { emoji: '😠', label: 'Angry' },
     { emoji: '🤢', label: 'Sick' },
-    { emoji: '😖', label: 'Awful' }
+    { emoji: '😖', label: 'Awful' },
+    { emoji: '🤗', label: 'Grateful' },
+    { emoji: '😇', label: 'Blessed' },
+    { emoji: '🥳', label: 'Excited' }
 ];
 
 interface MoodPickerModalProps {
@@ -39,6 +42,9 @@ export const MoodPickerModal: React.FC<MoodPickerModalProps> = ({
     onClear,
     onClose
 }) => {
+    const [isCustomMode, setIsCustomMode] = React.useState(false);
+    const [customEmoji, setCustomEmoji] = React.useState('');
+
     if (!isOpen) return null;
 
     // 格式化日期显示为中国格式：YYYY/MM/DD
@@ -63,35 +69,95 @@ export const MoodPickerModal: React.FC<MoodPickerModalProps> = ({
                     SELECT YOUR MOOD
                 </p>
 
-                {/* Emoji 网格 */}
-                <div className="grid grid-cols-4 gap-4 mb-8">
-                    {MOOD_EMOJIS.map(({ emoji, label }) => (
-                        <button
-                            key={emoji}
-                            onClick={() => {
-                                onSelect(emoji);
-                                onClose();
-                            }}
-                            className="flex flex-col items-center justify-center gap-2 p-4 transition-all hover:bg-stone-50 rounded-2xl relative"
-                        >
-                            {/* Emoji 容器 - 选中时显示圆形边框 */}
-                            <div className="relative flex items-center justify-center w-16 h-16">
-                                {selectedMood === emoji && (
-                                    <div className="absolute inset-0 border-4 border-stone-300 rounded-full"></div>
-                                )}
-                                <span className="text-5xl flex items-center justify-center">
-                                    <IconRenderer icon={emoji} />
+                {!isCustomMode ? (
+                    <>
+                        {/* Emoji 网格 - 15 个预设 + 1 个自定义 */}
+                        <div className="grid grid-cols-4 gap-2 mb-6">
+                            {MOOD_EMOJIS.map(({ emoji, label }) => (
+                                <button
+                                    key={emoji}
+                                    onClick={() => {
+                                        onSelect(emoji);
+                                        onClose();
+                                    }}
+                                    className="flex flex-col items-center justify-center gap-1 p-2 transition-all hover:bg-stone-50 rounded-2xl relative"
+                                >
+                                    {/* Emoji 容器 - 选中时显示圆形边框 */}
+                                    <div className="relative flex items-center justify-center w-14 h-14">
+                                        {selectedMood === emoji && (
+                                            <div className="absolute inset-0 border-4 border-stone-300 rounded-full"></div>
+                                        )}
+                                        <span className="text-4xl flex items-center justify-center">
+                                            <IconRenderer icon={emoji} />
+                                        </span>
+                                    </div>
+                                    <span className="text-[9px] text-stone-400 font-medium">
+                                        {label}
+                                    </span>
+                                </button>
+                            ))}
+
+                            {/* 自定义按钮 */}
+                            <button
+                                onClick={() => setIsCustomMode(true)}
+                                className="flex flex-col items-center justify-center gap-1 p-2 transition-all hover:bg-stone-50 rounded-2xl relative border-2 border-dashed border-stone-300"
+                            >
+                                <div className="relative flex items-center justify-center w-14 h-14">
+                                    <span className="text-3xl text-stone-400">+</span>
+                                </div>
+                                <span className="text-[9px] text-stone-400 font-medium">
+                                    Custom
                                 </span>
+                            </button>
+                        </div>
+                    </>
+                ) : (
+                    <>
+                        {/* 自定义 Emoji 输入 */}
+                        <div className="mb-8 space-y-4">
+                            <div className="text-center">
+                                <p className="text-sm text-stone-600 mb-4">输入你的自定义 emoji</p>
+                                <input
+                                    type="text"
+                                    value={customEmoji}
+                                    onChange={(e) => setCustomEmoji(e.target.value)}
+                                    className="w-full text-center text-5xl bg-stone-50 border-2 border-stone-200 rounded-2xl py-6 outline-none focus:border-stone-400 transition-colors"
+                                    placeholder=""
+                                    maxLength={2}
+                                    autoFocus
+                                />
                             </div>
-                            <span className="text-[10px] text-stone-400 font-medium">
-                                {label}
-                            </span>
-                        </button>
-                    ))}
-                </div>
+                            <div className="flex gap-3">
+                                <button
+                                    onClick={() => {
+                                        setIsCustomMode(false);
+                                        setCustomEmoji('');
+                                    }}
+                                    className="flex-1 py-3 bg-stone-100 text-stone-600 rounded-2xl font-bold hover:bg-stone-200 transition-colors"
+                                >
+                                    返回
+                                </button>
+                                <button
+                                    onClick={() => {
+                                        if (customEmoji.trim()) {
+                                            onSelect(customEmoji.trim());
+                                            setIsCustomMode(false);
+                                            setCustomEmoji('');
+                                            onClose();
+                                        }
+                                    }}
+                                    disabled={!customEmoji.trim()}
+                                    className="flex-1 py-3 bg-stone-900 text-white rounded-2xl font-bold hover:bg-stone-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                    确认
+                                </button>
+                            </div>
+                        </div>
+                    </>
+                )}
 
                 {/* 清除按钮 */}
-                {selectedMood && onClear && (
+                {!isCustomMode && selectedMood && onClear && (
                     <button
                         onClick={() => {
                             onClear();
