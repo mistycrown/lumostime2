@@ -47,6 +47,7 @@ export const IconRenderer: React.FC<IconRendererProps> = ({
     alt,
     fallbackEmoji
 }) => {
+    // ===== 所有 Hooks 必须在最前面，不能在条件语句中 =====
     const [imageError, setImageError] = useState(false);
     const [hasFallbackAttempted, setHasFallbackAttempted] = useState(false);
     const emojiRef = useRef<HTMLSpanElement>(null);
@@ -66,67 +67,12 @@ export const IconRenderer: React.FC<IconRendererProps> = ({
     // 解析显示的图标字符串
     const { isUIIcon, value } = uiIconService.parseIconString(displayIcon);
     
-    // 1. 判断是否使用自定义主题的 UI Icon
-    const shouldUseUIIcon = isUIIcon && currentTheme !== 'default' && !imageError;
+    // 检查是否是自定义图片（格式：image:/path/to/image.png）
+    const isCustomImage = displayIcon.startsWith('image:');
+    const customImagePath = isCustomImage ? displayIcon.substring(6) : null; // 移除 "image:" 前缀
     
-    // 2. 如果使用 UI Icon，渲染图片
-    if (shouldUseUIIcon) {
-        const iconType = value as UIIconType;
-        const { primary, fallback } = uiIconService.getIconPathWithFallback(iconType);
-        
-        // 根据 className 中的 text-* 类自动计算尺寸
-        const getImageSize = (): string => {
-            if (size) {
-                return typeof size === 'number' ? `${size}px` : size;
-            }
-            
-            // 从 className 中提取 text-* 尺寸类
-            const textSizeMatch = className.match(/text-(xs|sm|base|lg|xl|2xl|3xl|4xl|5xl|6xl|7xl|8xl|9xl)/);
-            if (textSizeMatch) {
-                const sizeMap: Record<string, string> = {
-                    'xs': '0.75rem',
-                    'sm': '1.125rem',
-                    'base': '1.25rem',
-                    'lg': '1.5rem',
-                    'xl': '1.625rem',
-                    '2xl': '2rem',
-                    '3xl': '2.5rem',
-                    '4xl': '3rem',
-                    '5xl': '4rem',
-                    '6xl': '5rem',
-                    '7xl': '6rem',
-                    '8xl': '8rem',
-                    '9xl': '10rem'
-                };
-                return sizeMap[textSizeMatch[1]] || '1.25rem';
-            }
-            
-            return '1.25rem';
-        };
-        
-        const imageSize = getImageSize();
-        const sizeStyle = { width: imageSize, height: imageSize };
-
-        return (
-            <img
-                src={primary}
-                alt={alt || uiIconService.getIconLabel(iconType)}
-                className={`inline-block ${className}`}
-                style={sizeStyle}
-                onError={(e) => {
-                    if (!hasFallbackAttempted) {
-                        setHasFallbackAttempted(true);
-                        e.currentTarget.src = fallback;
-                    } else {
-                        setImageError(true);
-                    }
-                }}
-            />
-        );
-    }
-    
-    // 3. 渲染 Emoji（原生、Twemoji 或 Fluent）
-    // 显示 Emoji（如果开启 Twemoji 或 Fluent，useEffect 会自动转换）
+    // 4. 渲染 Emoji（原生、Twemoji 或 OpenMoji）
+    // 显示 Emoji（如果开启 Twemoji 或 OpenMoji，useEffect 会自动转换）
     const displayEmoji = imageError ? (fallbackEmoji || icon || value) : value;
     
     // 获取 emoji 的 Unicode codepoint（用于 CDN URL）
@@ -146,7 +92,7 @@ export const IconRenderer: React.FC<IconRendererProps> = ({
     
     // Twemoji 或 OpenMoji 处理
     useEffect(() => {
-        if (emojiStyle !== 'native' && emojiRef.current) {
+        if (emojiStyle !== 'native' && emojiRef.current && !isCustomImage && !isUIIcon) {
             const codepoint = getEmojiCodepoint(displayEmoji);
             
             let imgSrc = '';
@@ -163,8 +109,11 @@ export const IconRenderer: React.FC<IconRendererProps> = ({
             img.alt = displayEmoji;
             img.draggable = false;
             
-            // OpenMoji 缩放系数（比 Twemoji 和原生 emoji 放大 30%）
-            const scaleFactor = emojiStyle === 'openmoji' ? 1.3 : 1;
+            // 不同 emoji 风格的缩放系数
+            // - OpenMoji: 1.3 (放大 30%)
+            // - Twemoji: 0.85 (缩小到 85%)
+            // - Native: 不在这里处理（在渲染时单独处理）
+            const scaleFactor = emojiStyle === 'openmoji' ? 1.3 : 0.85;
             
             // 设置图片大小
             if (size) {
@@ -207,11 +156,104 @@ export const IconRenderer: React.FC<IconRendererProps> = ({
             // 清空并插入图片
             emojiRef.current.innerHTML = '';
             emojiRef.current.appendChild(img);
-        } else if (emojiStyle === 'native' && emojiRef.current) {
-            // 原生 emoji
+        } else if (emojiStyle === 'native' && emojiRef.current && !isCustomImage && !isUIIcon) {
+            // 原生 emoji - 放大到 1.2 倍
             emojiRef.current.innerHTML = displayEmoji;
+            emojiRef.current.style.fontSize = '1.2em';
         }
-    }, [displayEmoji, emojiStyle, size]);
+    }, [displayEmoji, emojiStyle, size, isCustomImage, isUIIcon]);
+    
+    // ===== 所有 Hooks 调用完毕，现在可以做条件渲染 =====
+    
+    // 辅助函数：计算图片尺寸
+    const getImageSize = (): string => {
+        if (size) {
+            return typeof size === 'number' ? `${size}px` : size;
+        }
+        
+        // 从 className 中提取 text-* 尺寸类
+        const textSizeMatch = className.match(/text-(xs|sm|base|lg|xl|2xl|3xl|4xl|5xl|6xl|7xl|8xl|9xl)/);
+        if (textSizeMatch) {
+            const sizeMap: Record<string, string> = {
+                'xs': '0.75rem',
+                'sm': '1.125rem',
+                'base': '1.25rem',
+                'lg': '1.5rem',
+                'xl': '1.625rem',
+                '2xl': '2rem',
+                '3xl': '2.5rem',
+                '4xl': '3rem',
+                '5xl': '4rem',
+                '6xl': '5rem',
+                '7xl': '6rem',
+                '8xl': '8rem',
+                '9xl': '10rem'
+            };
+            return sizeMap[textSizeMatch[1]] || '1.25rem';
+        }
+        
+        return '1.25rem';
+    };
+    
+    // 1. 判断是否使用自定义图片
+    if (isCustomImage && customImagePath && !imageError) {
+        const imageSize = getImageSize();
+        const sizeStyle = { 
+            width: imageSize, 
+            height: imageSize,
+            objectFit: 'contain' as const  // 保持宽高比
+        };
+
+        return (
+            <img
+                src={customImagePath}
+                alt={alt || 'Custom icon'}
+                className={`inline-block ${className}`}
+                style={sizeStyle}
+                onError={(e) => {
+                    if (!hasFallbackAttempted && fallbackEmoji) {
+                        setHasFallbackAttempted(true);
+                        setImageError(true);
+                    } else {
+                        setImageError(true);
+                    }
+                }}
+            />
+        );
+    }
+    
+    // 2. 判断是否使用自定义主题的 UI Icon
+    const shouldUseUIIcon = isUIIcon && currentTheme !== 'default' && !imageError;
+    
+    // 3. 如果使用 UI Icon，渲染图片
+    if (shouldUseUIIcon) {
+        const iconType = value as UIIconType;
+        const { primary, fallback } = uiIconService.getIconPathWithFallback(iconType);
+        
+        const imageSize = getImageSize();
+        const sizeStyle = { width: imageSize, height: imageSize };
+
+        return (
+            <img
+                src={primary}
+                alt={alt || uiIconService.getIconLabel(iconType)}
+                className={`inline-block ${className}`}
+                style={sizeStyle}
+                onError={(e) => {
+                    if (!hasFallbackAttempted) {
+                        setHasFallbackAttempted(true);
+                        e.currentTarget.src = fallback;
+                    } else {
+                        setImageError(true);
+                    }
+                }}
+            />
+        );
+    }
+    
+    // 4. 渲染 Emoji（原生、Twemoji 或 OpenMoji）
+    // 原生 emoji 放大 1.2 倍
+    const nativeEmojiScale = emojiStyle === 'native' ? 1.2 : 1;
     
     return (
         <span 
@@ -220,8 +262,10 @@ export const IconRenderer: React.FC<IconRendererProps> = ({
             style={
                 emojiStyle === 'native' && size 
                     ? typeof size === 'number' 
-                        ? { fontSize: `${size}px` }
-                        : { fontSize: size, width: size, height: size }
+                        ? { fontSize: `${size * nativeEmojiScale}px` }
+                        : { fontSize: size, width: size, height: size, transform: `scale(${nativeEmojiScale})` }
+                    : emojiStyle === 'native'
+                    ? { fontSize: '1.2em' }
                     : undefined
             }
         >

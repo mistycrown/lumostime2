@@ -1,6 +1,6 @@
 /**
  * @file MoodCalendar.tsx
- * @description 心情日历组件 - 显示当月每日的心情 emoji（基于 monomood 设计）
+ * @description 心情日历组件 - 显示当月每日的心情 emoji/贴纸（基于 monomood 设计）
  */
 import React, { useMemo, useState } from 'react';
 import { DailyReview } from '../types';
@@ -87,10 +87,11 @@ export const MoodCalendar: React.FC<MoodCalendarProps> = ({
         return days;
     }, [year, month]);
 
-    // 获取指定日期的心情 emoji
+    // 获取指定日期的心情 emoji/贴纸
     const getMoodForDate = (day: number): string | undefined => {
         const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
         const review = dailyReviews.find(r => r.date === dateStr);
+        // 直接返回存储的值（可能是 emoji 或 "image:/path"）
         return review?.moodEmoji;
     };
 
@@ -125,31 +126,24 @@ export const MoodCalendar: React.FC<MoodCalendarProps> = ({
 
     return (
         <>
-            <div className="bg-white border border-stone-200 shadow-sm p-4 rounded-lg mb-6">
+            <div className="bg-stone-50 shadow-sm p-6 rounded-2xl mb-6">
                 {/* Weekday Headers */}
-                <div className="grid grid-cols-7 mb-2">
+                <div className="grid grid-cols-7 mb-4">
                     {WEEK_DAYS.map((day, i) => (
-                        <div key={i} className="text-center font-mono text-xs text-stone-400 uppercase tracking-wider">
+                        <div key={i} className="text-center text-sm text-stone-400 font-light">
                             {day}
                         </div>
                     ))}
                 </div>
 
                 {/* Calendar Days */}
-                <div 
-                    className={`grid grid-cols-7 gap-px ${uiIconTheme === 'default' ? 'bg-stone-200 border border-stone-200' : ''}`}
-                    style={uiIconTheme !== 'default' ? {
-                        backgroundColor: 'var(--secondary-button-border)',
-                        border: '1px solid var(--secondary-button-border)'
-                    } : undefined}
-                >
+                <div className="grid grid-cols-7 gap-2">
                     {calendarData.map((day, index) => {
                         if (day === null) {
                             return (
                                 <div 
                                     key={`empty-${index}`} 
-                                    className={`aspect-square ${uiIconTheme === 'default' ? themeColors.cellBg : ''}`}
-                                    style={uiIconTheme !== 'default' ? themeColors.cellStyle : undefined}
+                                    className="aspect-square"
                                 />
                             );
                         }
@@ -161,30 +155,29 @@ export const MoodCalendar: React.FC<MoodCalendarProps> = ({
                             <button
                                 key={day}
                                 onClick={() => handleDateClick(day)}
-                                className={`aspect-square relative flex flex-col items-center justify-center border-0 transition-colors ${
-                                    uiIconTheme === 'default' 
-                                        ? `${today ? themeColors.todayBg : themeColors.cellBg} ${themeColors.hoverBg}`
-                                        : 'hover:opacity-90'
-                                }`}
-                                style={uiIconTheme !== 'default' 
-                                    ? (today ? themeColors.todayStyle : themeColors.cellStyle)
-                                    : undefined
-                                }
+                                className="aspect-square relative flex items-center justify-center border-0 rounded-full transition-all hover:bg-stone-100/50"
                             >
-                                {mood && (
-                                    <div className="absolute inset-0 flex items-center justify-center pb-3">
-                                        <div className="w-[60%] h-[60%] flex items-center justify-center">
-                                            <IconRenderer 
-                                                icon={mood} 
-                                                className="w-full h-full"
-                                                size="100%"
-                                            />
-                                        </div>
+                                {mood ? (
+                                    // 有贴纸时，只显示贴纸，不显示数字
+                                    <div className="w-full h-full flex items-center justify-center">
+                                        <IconRenderer 
+                                            icon={mood} 
+                                            className="w-full h-full"
+                                            size="100%"
+                                        />
                                     </div>
+                                ) : (
+                                    // 没有贴纸时，显示日期数字（居中）
+                                    <span 
+                                        className={`text-lg font-handwriting ${
+                                            today 
+                                                ? 'text-stone-900 font-bold' 
+                                                : 'text-stone-400'
+                                        }`}
+                                    >
+                                        {day}
+                                    </span>
                                 )}
-                                <span className={`absolute bottom-0 left-0 right-0 text-center text-[9px] font-mono ${today ? 'text-stone-900 font-bold' : 'text-stone-400'}`}>
-                                    {day}
-                                </span>
                             </button>
                         );
                     })}
@@ -195,7 +188,7 @@ export const MoodCalendar: React.FC<MoodCalendarProps> = ({
             <MoodPickerModal
                 isOpen={isMoodModalOpen}
                 date={selectedDate || ''}
-                selectedMood={selectedDate ? getMoodForDate(parseInt(selectedDate.split('-')[2])) : undefined}
+                selectedMood={selectedDate ? dailyReviews.find(r => r.date === selectedDate)?.moodEmoji : undefined}
                 onSelect={handleSelectMood}
                 onClear={handleClearMood}
                 onClose={() => {

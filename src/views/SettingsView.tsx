@@ -996,7 +996,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
                         />
                         <MenuItem
                             icon={<Smile size={18} className="text-yellow-500" />}
-                            label="Emoji 相关"
+                            label="Emoji 和 Sticker"
                             isLast
                             onClick={() => setActiveSubmenu('emoji')}
                         />

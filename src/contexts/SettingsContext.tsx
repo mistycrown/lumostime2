@@ -9,6 +9,7 @@ import { DEFAULT_USER_PERSONAL_INFO } from '../constants';
 export type DefaultArchiveView = 'CHRONICLE' | 'MEMOIR';
 export type DefaultIndexView = 'TAGS' | 'SCOPE';
 export type EmojiStyle = 'native' | 'twemoji' | 'openmoji';
+export type DefaultSelectorPage = 'emoji' | string; // 'emoji' 或 sticker set ID (如 'water', 'water-1', 'water-2')
 
 interface SettingsContextType {
     // 基础偏好设置
@@ -57,6 +58,10 @@ interface SettingsContextType {
     // Emoji 风格设置
     emojiStyle: EmojiStyle;
     setEmojiStyle: React.Dispatch<React.SetStateAction<EmojiStyle>>;
+
+    // Selector 默认页设置
+    defaultSelectorPage: DefaultSelectorPage;
+    setDefaultSelectorPage: React.Dispatch<React.SetStateAction<DefaultSelectorPage>>;
 
     // 应用规则
     appRules: { [packageName: string]: string };
@@ -279,6 +284,11 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
         return (stored as EmojiStyle) || 'native';
     });
 
+    const [defaultSelectorPage, setDefaultSelectorPage] = useState<DefaultSelectorPage>(() => {
+        const stored = localStorage.getItem('lumostime_default_selector_page');
+        return stored || 'emoji';
+    });
+
     useEffect(() => {
         localStorage.setItem('lumostime_color_scheme', colorScheme);
         // 同步到 colorSchemeService
@@ -298,6 +308,10 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
     useEffect(() => {
         localStorage.setItem('lumostime_emoji_style', emojiStyle);
     }, [emojiStyle]);
+
+    useEffect(() => {
+        localStorage.setItem('lumostime_default_selector_page', defaultSelectorPage);
+    }, [defaultSelectorPage]);
 
     useEffect(() => {
         localStorage.setItem('lumostime_custom_narrative_templates', JSON.stringify(customNarrativeTemplates));
@@ -347,6 +361,8 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
             setFontFamily,
             emojiStyle,
             setEmojiStyle,
+            defaultSelectorPage,
+            setDefaultSelectorPage,
             appRules,
             setAppRules,
             customNarrativeTemplates,

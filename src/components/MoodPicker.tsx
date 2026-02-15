@@ -1,29 +1,20 @@
 /**
  * @file MoodPicker.tsx
  * @description 心情选择器组件 - 用于每日回顾（全屏模态框样式）
+ * 支持 emoji 和自定义贴纸组
  */
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 import { IconRenderer } from './IconRenderer';
+import { stickerService } from '../services/stickerService';
+import { useSettings } from '../contexts/SettingsContext';
 
-// 默认心情 emoji 列表
+// 默认心情 emoji 列表（只存储 emoji，不需要 label）
 const DEFAULT_MOOD_EMOJIS = [
-    { emoji: '🤩', label: 'Radical' },
-    { emoji: '🥰', label: 'Loved' },
-    { emoji: '😎', label: 'Proud' },
-    { emoji: '😊', label: 'Happy' },
-    { emoji: '😌', label: 'Calm' },
-    { emoji: '😐', label: 'Meh' },
-    { emoji: '😴', label: 'Tired' },
-    { emoji: '😰', label: 'Anxious' },
-    { emoji: '☹️', label: 'Sad' },
-    { emoji: '😠', label: 'Angry' },
-    { emoji: '🤢', label: 'Sick' },
-    { emoji: '😖', label: 'Awful' },
-    { emoji: '🤗', label: 'Grateful' },
-    { emoji: '😇', label: 'Blessed' },
-    { emoji: '🥳', label: 'Excited' }
+    '🤩', '🥰', '😎', '😊', '😌', '😐', 
+    '😴', '😰', '☹️', '😠', '🤢', '😖', 
+    '🤗', '😇', '🥳'
 ];
 
 // 从 localStorage 获取当前选中的 emoji 组
@@ -32,24 +23,12 @@ const getMoodEmojis = () => {
     const customGroups = localStorage.getItem('lumostime_custom_emoji_groups');
     
     // 预设组
-    const presetGroups: Record<string, Array<{ emoji: string; label: string }>> = {
+    const presetGroups: Record<string, string[]> = {
         'default-moods': DEFAULT_MOOD_EMOJIS,
         'activities': [
-            { emoji: '📚', label: 'Study' },
-            { emoji: '💼', label: 'Work' },
-            { emoji: '🎨', label: 'Art' },
-            { emoji: '🎵', label: 'Music' },
-            { emoji: '🏃', label: 'Exercise' },
-            { emoji: '🧘', label: 'Meditation' },
-            { emoji: '🍳', label: 'Cooking' },
-            { emoji: '🎮', label: 'Gaming' },
-            { emoji: '📺', label: 'TV' },
-            { emoji: '✈️', label: 'Travel' },
-            { emoji: '🛌', label: 'Rest' },
-            { emoji: '☕', label: 'Coffee' },
-            { emoji: '🍕', label: 'Food' },
-            { emoji: '🎉', label: 'Party' },
-            { emoji: '💪', label: 'Strong' }
+            '📚', '💼', '🎨', '🎵', '🏃', '🧘', 
+            '🍳', '🎮', '📺', '✈️', '🛌', '☕', 
+            '🍕', '🎉', '💪'
         ]
     };
     
@@ -91,19 +70,86 @@ export const MoodPickerModal: React.FC<MoodPickerModalProps> = ({
     onClear,
     onClose
 }) => {
+    const { defaultSelectorPage } = useSettings();
     const [isCustomMode, setIsCustomMode] = React.useState(false);
     const [customEmoji, setCustomEmoji] = React.useState('');
     const [moodEmojis, setMoodEmojis] = useState(getMoodEmojis());
+    
+    // 获取 sticker sets
+    const [stickerSets, setStickerSets] = useState(stickerService.getAllStickerSets());
+    
+    // 根据 defaultSelectorPage 计算初始页面索引
+    const getInitialPageIndex = () => {
+        if (defaultSelectorPage === 'emoji') {
+            return 0;
+        }
+        // 查找对应的 sticker set 索引
+        const stickerIndex = stickerSets.findIndex(set => set.id === defaultSelectorPage);
+        // 如果找到，返回索引 + 1（因为 0 是 emoji 页）；否则返回 0
+        return stickerIndex >= 0 ? stickerIndex + 1 : 0;
+    };
+    
+    // 页面切换状态
+    const [currentPageIndex, setCurrentPageIndex] = useState(getInitialPageIndex());
+    
+    // 总页数 = 1 (Emoji) + N (Sticker sets)
+    const totalPages = 1 + stickerSets.length;
 
-    // 监听 emoji 组变化
+    // 当 modal 打开时，重置到默认页面
+    useEffect(() => {
+        if (isOpen) {
+            setCurrentPageIndex(getInitialPageIndex());
+            setIsCustomMode(false);
+            setCustomEmoji('');
+        }
+    }, [isOpen, defaultSelectorPage]);
+
+    // 监听 emoji 组和贴纸集变化
     useEffect(() => {
         const handleGroupChange = () => {
             setMoodEmojis(getMoodEmojis());
         };
         
+        const handleStickerSetsChange = () => {
+            setStickerSets(stickerService.getAllStickerSets());
+        };
+        
         window.addEventListener('moodEmojiGroupChanged', handleGroupChange);
-        return () => window.removeEventListener('moodEmojiGroupChanged', handleGroupChange);
+        window.addEventListener('stickerSetsChanged', handleStickerSetsChange);
+        
+        return () => {
+            window.removeEventListener('moodEmojiGroupChanged', handleGroupChange);
+            window.removeEventListener('stickerSetsChanged', handleStickerSetsChange);
+        };
     }, []);
+    
+    // 获取当前页面标题
+    const getCurrentPageTitle = () => {
+        if (currentPageIndex === 0) {
+            return 'Emoji';
+        }
+        const stickerSetIndex = currentPageIndex - 1;
+        return stickerSets[stickerSetIndex]?.name || 'Stickers';
+    };
+    
+    // 获取当前页面描述
+    const getCurrentPageDescription = () => {
+        if (currentPageIndex === 0) {
+            return null;
+        }
+        const stickerSetIndex = currentPageIndex - 1;
+        return stickerSets[stickerSetIndex]?.description;
+    };
+    
+    // 上一页
+    const goToPreviousPage = () => {
+        setCurrentPageIndex(Math.max(0, currentPageIndex - 1));
+    };
+    
+    // 下一页
+    const goToNextPage = () => {
+        setCurrentPageIndex(Math.min(totalPages - 1, currentPageIndex + 1));
+    };
 
     if (!isOpen) return null;
 
@@ -134,50 +180,139 @@ export const MoodPickerModal: React.FC<MoodPickerModalProps> = ({
                 </h2>
 
                 {/* 副标题 */}
-                <p className="text-center text-stone-400 text-xs font-bold tracking-widest mb-8">
+                <p className="text-center text-stone-400 text-xs font-bold tracking-widest mb-4">
                     SELECT YOUR MOOD
                 </p>
 
+                {/* 页面导航 */}
+                <div className="flex items-center justify-between mb-6">
+                    <button
+                        onClick={goToPreviousPage}
+                        disabled={currentPageIndex === 0}
+                        className="p-2 text-stone-600 hover:bg-stone-100 rounded-lg disabled:opacity-20 disabled:cursor-not-allowed transition-all"
+                    >
+                        <span className="text-xl">←</span>
+                    </button>
+                    
+                    <div className="text-center flex-1">
+                        <h3 className="text-sm font-bold text-stone-800">
+                            {getCurrentPageTitle()}
+                        </h3>
+                        {getCurrentPageDescription() && (
+                            <p className="text-xs text-stone-400 mt-0.5">
+                                {getCurrentPageDescription()}
+                            </p>
+                        )}
+                    </div>
+                    
+                    <button
+                        onClick={goToNextPage}
+                        disabled={currentPageIndex === totalPages - 1}
+                        className="p-2 text-stone-600 hover:bg-stone-100 rounded-lg disabled:opacity-20 disabled:cursor-not-allowed transition-all"
+                    >
+                        <span className="text-xl">→</span>
+                    </button>
+                </div>
+
                 {!isCustomMode ? (
                     <>
-                        {/* Emoji 网格 - 动态数量 + 1 个自定义 */}
-                        <div className="grid grid-cols-4 gap-2 mb-6">
-                            {moodEmojis.map(({ emoji, label }) => (
-                                <button
-                                    key={emoji}
-                                    onClick={() => {
-                                        onSelect(emoji);
-                                        onClose();
-                                    }}
-                                    className="flex flex-col items-center justify-center gap-1 p-2 transition-all hover:bg-stone-50 rounded-2xl relative"
-                                >
-                                    {/* Emoji 容器 - 选中时显示圆形边框 */}
-                                    <div className="relative flex items-center justify-center w-14 h-14">
-                                        {selectedMood === emoji && (
-                                            <div className="absolute inset-0 border-4 border-stone-300 rounded-full"></div>
-                                        )}
-                                        <span className="text-4xl flex items-center justify-center">
-                                            <IconRenderer icon={emoji} />
-                                        </span>
-                                    </div>
-                                    <span className="text-[9px] text-stone-400 font-medium">
-                                        {label}
-                                    </span>
-                                </button>
-                            ))}
+                        {/* Emoji 页面 (currentPageIndex === 0) */}
+                        {currentPageIndex === 0 && (
+                            <div className="grid grid-cols-4 gap-2 mb-6">
+                                {moodEmojis.map((emoji) => (
+                                    <button
+                                        key={emoji}
+                                        onClick={() => {
+                                            onSelect(emoji);
+                                            onClose();
+                                        }}
+                                        className="flex items-center justify-center p-2 transition-all hover:bg-stone-50 rounded-2xl relative"
+                                    >
+                                        {/* Emoji 容器 */}
+                                        <div className="relative flex items-center justify-center w-14 h-14">
+                                            <span className="text-4xl flex items-center justify-center">
+                                                <IconRenderer icon={emoji} />
+                                            </span>
+                                        </div>
+                                    </button>
+                                ))}
 
-                            {/* 自定义按钮 */}
-                            <button
-                                onClick={() => setIsCustomMode(true)}
-                                className="flex flex-col items-center justify-center gap-1 p-2 transition-all hover:bg-stone-50 rounded-2xl relative border-2 border-dashed border-stone-300"
-                            >
-                                <div className="relative flex items-center justify-center w-14 h-14">
-                                    <span className="text-3xl text-stone-400">+</span>
-                                </div>
-                                <span className="text-[9px] text-stone-400 font-medium">
-                                    Custom
-                                </span>
-                            </button>
+                                {/* 自定义按钮 */}
+                                <button
+                                    onClick={() => setIsCustomMode(true)}
+                                    className="flex items-center justify-center p-2 transition-all hover:bg-stone-50 rounded-2xl relative border-2 border-dashed border-stone-300"
+                                >
+                                    <div className="relative flex items-center justify-center w-14 h-14">
+                                        <span className="text-3xl text-stone-400">+</span>
+                                    </div>
+                                </button>
+                            </div>
+                        )}
+
+                        {/* Sticker 页面 (currentPageIndex > 0) */}
+                        {currentPageIndex > 0 && (
+                            <>
+                                {(() => {
+                                    const stickerSetIndex = currentPageIndex - 1;
+                                    const currentStickerSet = stickerSets[stickerSetIndex];
+                                    
+                                    if (!currentStickerSet) {
+                                        return (
+                                            <div className="text-center py-12 text-stone-400">
+                                                <p className="text-sm">贴纸集不存在</p>
+                                            </div>
+                                        );
+                                    }
+                                    
+                                    return (
+                                        <div className="grid grid-cols-4 gap-2 mb-6 max-h-[320px] overflow-y-auto">
+                                            {currentStickerSet.stickers.map((sticker) => {
+                                                const stickerIcon = `image:${sticker.path}`;
+                                                const isSelected = selectedMood === stickerIcon;
+                                                
+                                                return (
+                                                    <button
+                                                        key={sticker.path}
+                                                        onClick={() => {
+                                                            onSelect(stickerIcon);
+                                                            onClose();
+                                                        }}
+                                                        className="flex flex-col items-center justify-center gap-1 p-2 transition-all hover:bg-stone-50 rounded-2xl relative"
+                                                    >
+                                                        {/* 贴纸容器 */}
+                                                        <div className="relative flex items-center justify-center w-14 h-14">
+                                                            <div className="w-full h-full flex items-center justify-center">
+                                                                <IconRenderer icon={stickerIcon} size="100%" />
+                                                            </div>
+                                                        </div>
+                                                        {/* 贴纸标签（可选） */}
+                                                        {sticker.label && (
+                                                            <span className="text-[9px] text-stone-400 font-medium">
+                                                                {sticker.label}
+                                                            </span>
+                                                        )}
+                                                    </button>
+                                                );
+                                            })}
+                                        </div>
+                                    );
+                                })()}
+                            </>
+                        )}
+
+                        {/* 页码指示器 */}
+                        <div className="flex justify-center gap-1 mb-4">
+                            {Array.from({ length: totalPages }).map((_, index) => (
+                                <button
+                                    key={index}
+                                    onClick={() => setCurrentPageIndex(index)}
+                                    className={`h-2 rounded-full transition-all ${
+                                        index === currentPageIndex
+                                            ? 'bg-stone-800 w-6'
+                                            : 'bg-stone-300 hover:bg-stone-400 w-2'
+                                    }`}
+                                />
+                            ))}
                         </div>
                     </>
                 ) : (

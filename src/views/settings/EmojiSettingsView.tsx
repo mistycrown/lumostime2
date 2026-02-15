@@ -1,6 +1,6 @@
 /**
  * @file EmojiSettingsView.tsx
- * @description Emoji 相关设置页面 - 管理心情日历的 emoji 组和 emoji 渲染风格
+ * @description Emoji 和 Sticker 设置页面 - 管理心情日历的 emoji 组、emoji 渲染风格和 Selector 默认页
  */
 import React, { useState, useEffect, useRef } from 'react';
 import { ChevronLeft, Plus, Trash2, Edit2, Check, X } from 'lucide-react';
@@ -8,6 +8,7 @@ import { IconRenderer } from '../../components/IconRenderer';
 import { ConfirmModal } from '../../components/ConfirmModal';
 import { useSettings } from '../../contexts/SettingsContext';
 import type { EmojiStyle } from '../../contexts/SettingsContext';
+import { stickerService } from '../../services/stickerService';
 
 // Emoji 预览组件 - 用于显示不同风格的 emoji
 const EmojiPreview: React.FC<{ emoji: string; style: EmojiStyle }> = ({ emoji, style }) => {
@@ -81,7 +82,7 @@ const EmojiPreview: React.FC<{ emoji: string; style: EmojiStyle }> = ({ emoji, s
 interface EmojiGroup {
     id: string;
     name: string;
-    emojis: Array<{ emoji: string; label: string }>;
+    emojis: string[];  // 只存储 emoji 字符串数组
     isCustom: boolean;
 }
 
@@ -92,21 +93,9 @@ const PRESET_EMOJI_GROUPS: EmojiGroup[] = [
         name: '心情表情',
         isCustom: false,
         emojis: [
-            { emoji: '🤩', label: 'Radical' },
-            { emoji: '🥰', label: 'Loved' },
-            { emoji: '😎', label: 'Proud' },
-            { emoji: '😊', label: 'Happy' },
-            { emoji: '😌', label: 'Calm' },
-            { emoji: '😐', label: 'Meh' },
-            { emoji: '😴', label: 'Tired' },
-            { emoji: '😰', label: 'Anxious' },
-            { emoji: '☹️', label: 'Sad' },
-            { emoji: '😠', label: 'Angry' },
-            { emoji: '🤢', label: 'Sick' },
-            { emoji: '😖', label: 'Awful' },
-            { emoji: '🤗', label: 'Grateful' },
-            { emoji: '😇', label: 'Blessed' },
-            { emoji: '🥳', label: 'Excited' }
+            '🤩', '🥰', '😎', '😊', '😌', '😐',
+            '😴', '😰', '☹️', '😠', '🤢', '😖',
+            '🤗', '😇', '🥳'
         ]
     },
     {
@@ -114,21 +103,9 @@ const PRESET_EMOJI_GROUPS: EmojiGroup[] = [
         name: '活动符号',
         isCustom: false,
         emojis: [
-            { emoji: '📚', label: 'Study' },
-            { emoji: '💼', label: 'Work' },
-            { emoji: '🎨', label: 'Art' },
-            { emoji: '🎵', label: 'Music' },
-            { emoji: '🏃', label: 'Exercise' },
-            { emoji: '🧘', label: 'Meditation' },
-            { emoji: '🍳', label: 'Cooking' },
-            { emoji: '🎮', label: 'Gaming' },
-            { emoji: '📺', label: 'TV' },
-            { emoji: '✈️', label: 'Travel' },
-            { emoji: '🛌', label: 'Rest' },
-            { emoji: '☕', label: 'Coffee' },
-            { emoji: '🍕', label: 'Food' },
-            { emoji: '🎉', label: 'Party' },
-            { emoji: '💪', label: 'Strong' }
+            '📚', '💼', '🎨', '🎵', '🏃', '🧘',
+            '🍳', '🎮', '📺', '✈️', '🛌', '☕',
+            '🍕', '🎉', '💪'
         ]
     }
 ];
@@ -140,7 +117,7 @@ interface EmojiSettingsViewProps {
 }
 
 export const EmojiSettingsView: React.FC<EmojiSettingsViewProps> = ({ onBack }) => {
-    const { emojiStyle, setEmojiStyle } = useSettings();
+    const { emojiStyle, setEmojiStyle, defaultSelectorPage, setDefaultSelectorPage } = useSettings();
     
     // 从 localStorage 读取设置
     const [selectedGroupId, setSelectedGroupId] = useState<string>(() => {
@@ -156,8 +133,8 @@ export const EmojiSettingsView: React.FC<EmojiSettingsViewProps> = ({ onBack }) 
     const [editingGroupId, setEditingGroupId] = useState<string | null>(null);
     const [isEditingPreset, setIsEditingPreset] = useState(false); // 标记是否在编辑预设组
     const [newGroupName, setNewGroupName] = useState('');
-    const [newGroupEmojis, setNewGroupEmojis] = useState<Array<{ emoji: string; label: string }>>([]);
-    const [editingEmoji, setEditingEmoji] = useState<{ emoji: string; label: string } | null>(null);
+    const [newGroupEmojis, setNewGroupEmojis] = useState<string[]>([]);  // 只存储 emoji 字符串
+    const [editingEmoji, setEditingEmoji] = useState<string>('');  // 当前正在编辑的 emoji
     const [editingEmojiIndex, setEditingEmojiIndex] = useState<number | null>(null); // 正在编辑的 emoji 索引
     const [deleteConfirmGroupId, setDeleteConfirmGroupId] = useState<string | null>(null);
 
@@ -223,7 +200,7 @@ export const EmojiSettingsView: React.FC<EmojiSettingsViewProps> = ({ onBack }) 
         setIsEditingPreset(false);
         setNewGroupName('');
         setNewGroupEmojis([]);
-        setEditingEmoji(null);
+        setEditingEmoji('');
         setEditingEmojiIndex(null);
     };
 
@@ -248,7 +225,7 @@ export const EmojiSettingsView: React.FC<EmojiSettingsViewProps> = ({ onBack }) 
 
     // 添加或更新 emoji
     const handleAddOrUpdateEmoji = () => {
-        if (!editingEmoji?.emoji.trim()) return;
+        if (!editingEmoji.trim()) return;
         
         if (editingEmojiIndex !== null) {
             // 更新模式
@@ -263,14 +240,14 @@ export const EmojiSettingsView: React.FC<EmojiSettingsViewProps> = ({ onBack }) 
             setNewGroupEmojis([...newGroupEmojis, editingEmoji]);
         }
         
-        setEditingEmoji(null);
+        setEditingEmoji('');
         setEditingEmojiIndex(null);
     };
 
     // 开始编辑某个 emoji
     const handleStartEditEmoji = (index: number) => {
         setEditingEmojiIndex(index);
-        setEditingEmoji({ ...newGroupEmojis[index] });
+        setEditingEmoji(newGroupEmojis[index]);
     };
 
     // 移除 emoji
@@ -278,7 +255,7 @@ export const EmojiSettingsView: React.FC<EmojiSettingsViewProps> = ({ onBack }) 
         setNewGroupEmojis(newGroupEmojis.filter((_, i) => i !== index));
         // 如果正在编辑这个 emoji，取消编辑状态
         if (editingEmojiIndex === index) {
-            setEditingEmoji(null);
+            setEditingEmoji('');
             setEditingEmojiIndex(null);
         }
     };
@@ -293,7 +270,7 @@ export const EmojiSettingsView: React.FC<EmojiSettingsViewProps> = ({ onBack }) 
                 >
                     <ChevronLeft size={24} />
                 </button>
-                <span className="text-stone-800 font-bold text-lg">Emoji 相关</span>
+                <span className="text-stone-800 font-bold text-lg">Emoji 和 Sticker</span>
             </div>
 
             {/* Content */}
@@ -335,10 +312,58 @@ export const EmojiSettingsView: React.FC<EmojiSettingsViewProps> = ({ onBack }) 
                     </div>
                 </div>
 
-                {/* 心情日历图标组 */}
+                {/* Selector 默认页 */}
                 <div className="bg-white rounded-xl p-4 shadow-sm">
-                    <h3 className="text-sm font-bold text-stone-700 mb-3">心情日历图标组</h3>
-                    <p className="text-xs text-stone-500 mb-4">选择在心情日历中显示的 emoji 组</p>
+                    <h3 className="text-sm font-bold text-stone-700 mb-3">Selector 默认页</h3>
+                    <p className="text-xs text-stone-500 mb-4">选择打开心情选择器时默认显示的页面</p>
+                    
+                    <div className="space-y-2">
+                        {/* Emoji 页选项 */}
+                        <button
+                            onClick={() => setDefaultSelectorPage('emoji')}
+                            className={`w-full text-left p-3 rounded-lg border transition-all ${
+                                defaultSelectorPage === 'emoji'
+                                    ? 'border-stone-400 bg-stone-50'
+                                    : 'border-stone-200 hover:border-stone-300'
+                            }`}
+                        >
+                            <div className="flex items-center justify-between">
+                                <span className="text-sm font-bold text-stone-800">Emoji 页</span>
+                                {defaultSelectorPage === 'emoji' && (
+                                    <Check size={16} className="text-green-600" />
+                                )}
+                            </div>
+                        </button>
+
+                        {/* Sticker 页选项 */}
+                        {stickerService.getAllStickerSets().map((stickerSet) => (
+                            <button
+                                key={stickerSet.id}
+                                onClick={() => setDefaultSelectorPage(stickerSet.id)}
+                                className={`w-full text-left p-3 rounded-lg border transition-all ${
+                                    defaultSelectorPage === stickerSet.id
+                                        ? 'border-stone-400 bg-stone-50'
+                                        : 'border-stone-200 hover:border-stone-300'
+                                }`}
+                            >
+                                <div className="flex items-center justify-between">
+                                    <span className="text-sm font-bold text-stone-800">{stickerSet.name}</span>
+                                    {defaultSelectorPage === stickerSet.id && (
+                                        <Check size={16} className="text-green-600" />
+                                    )}
+                                </div>
+                                {stickerSet.description && (
+                                    <p className="text-xs text-stone-500 mt-1">{stickerSet.description}</p>
+                                )}
+                            </button>
+                        ))}
+                    </div>
+                </div>
+
+                {/* Selector 图标组 */}
+                <div className="bg-white rounded-xl p-4 shadow-sm">
+                    <h3 className="text-sm font-bold text-stone-700 mb-3">Selector 图标组</h3>
+                    <p className="text-xs text-stone-500 mb-4">选择在 Selector 中显示的 emoji 组</p>
 
                     {/* 预设组 */}
                     <div className="space-y-2 mb-4">
@@ -390,9 +415,9 @@ export const EmojiSettingsView: React.FC<EmojiSettingsViewProps> = ({ onBack }) 
                                     </div>
                                 </div>
                                 <div className="flex flex-wrap gap-1">
-                                    {group.emojis.slice(0, 10).map((item, idx) => (
+                                    {group.emojis.slice(0, 10).map((emoji, idx) => (
                                         <span key={idx} className="text-lg">
-                                            <IconRenderer icon={item.emoji} />
+                                            <IconRenderer icon={emoji} />
                                         </span>
                                     ))}
                                     {group.emojis.length > 10 && (
@@ -439,7 +464,7 @@ export const EmojiSettingsView: React.FC<EmojiSettingsViewProps> = ({ onBack }) 
                             {/* Emoji 列表 */}
                             <div className="space-y-3">
                                 <div className="flex flex-wrap gap-2">
-                                    {newGroupEmojis.map((item, idx) => (
+                                    {newGroupEmojis.map((emoji, idx) => (
                                 <div
                                     key={idx}
                                     onClick={() => handleStartEditEmoji(idx)}
@@ -449,8 +474,7 @@ export const EmojiSettingsView: React.FC<EmojiSettingsViewProps> = ({ onBack }) 
                                             : 'bg-stone-50 hover:bg-stone-100'
                                     }`}
                                 >
-                                    <span className="text-base leading-none flex items-center"><IconRenderer icon={item.emoji} /></span>
-                                    <span className="text-xs text-stone-600 leading-none flex items-center">{item.label}</span>
+                                    <span className="text-base leading-none flex items-center"><IconRenderer icon={emoji} /></span>
                                     <button
                                         onClick={(e) => {
                                             e.stopPropagation();
@@ -478,24 +502,16 @@ export const EmojiSettingsView: React.FC<EmojiSettingsViewProps> = ({ onBack }) 
                                     <div className="flex gap-2 items-stretch">
                                         <input
                                             type="text"
-                                            value={editingEmoji?.emoji || ''}
-                                            onChange={(e) => setEditingEmoji({ emoji: e.target.value, label: editingEmoji?.label || '' })}
+                                            value={editingEmoji}
+                                            onChange={(e) => setEditingEmoji(e.target.value)}
                                             placeholder="😊"
-                                            maxLength={2}
-                                            className="w-12 h-9 px-2 border border-stone-200 rounded-lg text-base outline-none focus:border-stone-400 focus:ring-1 focus:ring-stone-400 text-center transition-all"
-                                            disabled={editingEmojiIndex === null && newGroupEmojis.length >= MAX_EMOJIS_PER_GROUP}
-                                        />
-                                        <input
-                                            type="text"
-                                            value={editingEmoji?.label || ''}
-                                            onChange={(e) => setEditingEmoji({ emoji: editingEmoji?.emoji || '', label: e.target.value })}
-                                            placeholder="标签..."
-                                            className="flex-1 h-9 px-3 border border-stone-200 rounded-lg text-sm outline-none focus:border-stone-400 focus:ring-1 focus:ring-stone-400 transition-all"
+                                            maxLength={4}
+                                            className="flex-1 h-9 px-3 border border-stone-200 rounded-lg text-base outline-none focus:border-stone-400 focus:ring-1 focus:ring-stone-400 text-center transition-all"
                                             disabled={editingEmojiIndex === null && newGroupEmojis.length >= MAX_EMOJIS_PER_GROUP}
                                         />
                                         <button
                                             onClick={handleAddOrUpdateEmoji}
-                                            disabled={!editingEmoji?.emoji.trim() || (editingEmojiIndex === null && newGroupEmojis.length >= MAX_EMOJIS_PER_GROUP)}
+                                            disabled={!editingEmoji.trim() || (editingEmojiIndex === null && newGroupEmojis.length >= MAX_EMOJIS_PER_GROUP)}
                                             className="w-9 h-9 flex items-center justify-center bg-green-500 text-white rounded-lg hover:bg-green-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                                             title={editingEmojiIndex !== null ? '更新' : '添加'}
                                         >
@@ -504,7 +520,7 @@ export const EmojiSettingsView: React.FC<EmojiSettingsViewProps> = ({ onBack }) 
                                         {editingEmojiIndex !== null && (
                                             <button
                                                 onClick={() => {
-                                                    setEditingEmoji(null);
+                                                    setEditingEmoji('');
                                                     setEditingEmojiIndex(null);
                                                 }}
                                                 className="w-9 h-9 flex items-center justify-center bg-stone-200 text-stone-600 rounded-lg hover:bg-stone-300 transition-colors"
