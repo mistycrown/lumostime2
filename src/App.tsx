@@ -305,7 +305,7 @@ const AppContent: React.FC = () => {
       {isTodoModalOpen && (
         <TodoDetailModal
           initialTodo={editingTodo}
-          currentCategory={todoCategories[0]}
+          currentCategory={todoCategories.find(c => c.id === todoManager.todoCategoryToAdd) || todoCategories[0]}
           onClose={todoManager.closeTodoModal}
           onSave={todoManager.handleSaveTodo}
           onDelete={todoManager.handleDeleteTodo}
