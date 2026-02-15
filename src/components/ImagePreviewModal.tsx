@@ -49,15 +49,6 @@ export const ImagePreviewModal: React.FC<ImagePreviewModalProps> = ({ imageUrl, 
                 className="relative w-full h-full flex items-center justify-center p-4"
                 onClick={(e) => e.stopPropagation()}
             >
-                {/* Controls */}
-                <div className="absolute top-[calc(1rem+env(safe-area-inset-top))] right-4 z-50">
-                    <ImagePreviewControls
-                        onDelete={onDelete ? handleDeleteClick : undefined}
-                        onClose={onClose}
-                        showImageControls={false}
-                    />
-                </div>
-
                 {imageUrl ? (
                     <TransformWrapper
                         initialScale={1}

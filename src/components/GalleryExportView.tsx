@@ -3,33 +3,32 @@
  * @description 画廊导出视图 - 将画廊导出为美观的图片
  */
 import React, { useState, useRef, useEffect, useMemo } from 'react';
-import { ChevronLeft, Download, Palette, LayoutTemplate, Calendar } from 'lucide-react';
+import { ChevronLeft, Download, Palette, LayoutTemplate, Calendar, Loader2 } from 'lucide-react';
 import { Log, Category, DailyReview } from '../types';
+
+// Toast type definition
+type ToastType = 'success' | 'error' | 'info';
 import { 
-    format, startOfWeek, endOfWeek, eachDayOfInterval, isSameDay, 
-    startOfMonth, endOfMonth, isSameMonth, getYear, getDay, 
-    subWeeks, addWeeks, subMonths, addMonths, subYears, addYears 
+    format, eachDayOfInterval, getYear,
+    subWeeks, addWeeks, subMonths, addMonths, subYears, addYears
 } from 'date-fns';
-import zhCN from 'date-fns/locale/zh-CN';
 import * as htmlToImage from 'html-to-image';
+import { WeekView, MonthView, YearView } from './GalleryExport/DiaryViews';
+import { DiaryEntry } from './GalleryExport/DiaryComponents';
+import { imageService } from '../services/imageService';
 
 interface GalleryExportViewProps {
     logs: Log[];
     categories: Category[];
     dailyReviews?: DailyReview[];
     onBack: () => void;
+    onToast?: (type: ToastType, message: string) => void;
 }
 
 // 数据类型定义
-interface DiaryEntry {
-    id: string;
-    date: Date;
-    content: string;
-    imageUrl?: string;
-}
-
 type TimePeriod = 'week' | 'month' | 'year';
 type LayoutStyle = 'magazine' | 'minimal' | 'newspaper' | 'film';
+type Orientation = 'portrait' | 'landscape';
 
 interface ColorTheme {
     id: string;
@@ -149,15 +148,17 @@ const TIME_PERIODS: { key: TimePeriod; label: string }[] = [
 
 export const GalleryExportView: React.FC<GalleryExportViewProps> = ({
     logs,
-    categories,
     dailyReviews = [],
-    onBack
+    onBack,
+    onToast
 }) => {
     const [currentTheme, setCurrentTheme] = useState(THEMES[0]);
     const [currentLayout, setCurrentLayout] = useState<LayoutStyle>('magazine');
-    const [currentPeriod, setCurrentPeriod] = useState<TimePeriod>('month');
+    const [currentPeriod, setCurrentPeriod] = useState<TimePeriod>('week');
     const [currentDate, setCurrentDate] = useState(new Date());
     const [isExporting, setIsExporting] = useState(false);
+    const [imageUrls, setImageUrls] = useState<Map<string, string>>(new Map());
+    const [orientation, setOrientation] = useState<Orientation>('portrait');
     
     const exportRef = useRef<HTMLDivElement>(null);
 
@@ -180,21 +181,21 @@ export const GalleryExportView: React.FC<GalleryExportViewProps> = ({
                 return format(logDate, 'yyyy-MM-dd') === dayStr;
             });
             
-            let imageUrl: string | undefined;
+            let imageFilename: string | undefined;
             let content = '';
             let logWithImage: Log | undefined;
             
             // 找到第一张图片
             for (const log of dayLogs) {
                 if (log.images && log.images.length > 0) {
-                    imageUrl = log.images[0];
+                    imageFilename = log.images[0];
                     logWithImage = log;
                     break;
                 }
             }
             
             // 2. 确定文字内容
-            if (imageUrl && logWithImage?.note) {
+            if (imageFilename && logWithImage?.note) {
                 // 如果有图片，使用该图片对应的备注
                 content = logWithImage.note;
             } else {
@@ -212,18 +213,49 @@ export const GalleryExportView: React.FC<GalleryExportViewProps> = ({
             }
             
             // 只有当有图片或有内容时才添加条目
-            if (imageUrl || content) {
+            if (imageFilename || content) {
                 entries.push({
                     id: `entry-${dayStr}`,
                     date: day,
                     content: content || '',
-                    imageUrl
+                    imageUrl: imageFilename ? imageUrls.get(imageFilename) : undefined
                 });
             }
         });
         
         return entries;
-    }, [logs, dailyReviews, currentDate]);
+    }, [logs, dailyReviews, currentDate, imageUrls]);
+
+    // 加载图片URL
+    useEffect(() => {
+        const loadImageUrls = async () => {
+            const urlMap = new Map<string, string>();
+            const imageFilenames = new Set<string>();
+            
+            // 收集所有需要的图片文件名
+            logs.forEach(log => {
+                if (log.images && log.images.length > 0) {
+                    imageFilenames.add(log.images[0]);
+                }
+            });
+            
+            // 批量加载图片URL（使用缩略图以提高性能）
+            for (const filename of imageFilenames) {
+                try {
+                    const url = await imageService.getImageUrl(filename, 'thumbnail');
+                    if (url) {
+                        urlMap.set(filename, url);
+                    }
+                } catch (error) {
+                    console.error(`Failed to load image URL: ${filename}`, error);
+                }
+            }
+            
+            setImageUrls(urlMap);
+        };
+        
+        loadImageUrls();
+    }, [logs]);
 
     // 导航逻辑
     const handlePrev = () => {
@@ -238,27 +270,95 @@ export const GalleryExportView: React.FC<GalleryExportViewProps> = ({
         else setCurrentDate(d => addYears(d, 1));
     };
 
+    // 将blob URL转换为base64 data URL
+    const convertBlobUrlToDataUrl = async (blobUrl: string): Promise<string> => {
+        try {
+            const response = await fetch(blobUrl);
+            const blob = await response.blob();
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onloadend = () => resolve(reader.result as string);
+                reader.onerror = reject;
+                reader.readAsDataURL(blob);
+            });
+        } catch (error) {
+            console.error('Failed to convert blob URL:', blobUrl, error);
+            return '';
+        }
+    };
+
     const handleExport = async () => {
         if (exportRef.current && !isExporting) {
             setIsExporting(true);
-            setTimeout(async () => {
-                try {
-                    if (!exportRef.current) return;
-                    const dataUrl = await htmlToImage.toPng(exportRef.current, {
-                        quality: 1.0,
-                        backgroundColor: currentTheme.colors.paper,
-                        pixelRatio: 2
+            try {
+                // 1. 将所有blob URL转换为base64 data URL
+                const images = exportRef.current.querySelectorAll('img');
+                const conversionPromises = Array.from(images).map(async (img) => {
+                    if (img.src && img.src.startsWith('blob:')) {
+                        const dataUrl = await convertBlobUrlToDataUrl(img.src);
+                        if (dataUrl) {
+                            img.src = dataUrl;
+                        }
+                    }
+                });
+                
+                await Promise.all(conversionPromises);
+                
+                // 2. 等待所有图片加载完成
+                const imageLoadPromises = Array.from(images).map(img => {
+                    if (img.complete) return Promise.resolve();
+                    return new Promise((resolve) => {
+                        img.onload = resolve;
+                        img.onerror = () => {
+                            console.warn('Image failed to load:', img.src);
+                            resolve(); // 即使失败也继续
+                        };
+                        // 超时保护
+                        setTimeout(resolve, 3000);
                     });
-                    const link = document.createElement('a');
-                    link.download = `gallery-${currentPeriod}-${format(currentDate, 'yyyy-MM-dd')}.png`;
-                    link.href = dataUrl;
-                    link.click();
-                } catch (error) {
-                    console.error('Export failed:', error);
-                } finally {
-                    setIsExporting(false);
+                });
+                
+                await Promise.all(imageLoadPromises);
+                
+                // 额外延迟确保渲染完成
+                await new Promise(r => setTimeout(r, 200));
+
+                const options = {
+                    cacheBust: true,
+                    pixelRatio: 2,
+                    useCORS: true,
+                    backgroundColor: currentTheme.colors.paper
+                };
+
+                let dataUrl: string;
+                try {
+                    dataUrl = await htmlToImage.toPng(exportRef.current, options);
+                } catch (firstErr) {
+                    console.warn("First export attempt failed, retrying with skipFonts...", firstErr);
+                    try {
+                        dataUrl = await htmlToImage.toPng(exportRef.current, { ...options, skipFonts: true });
+                    } catch (secondErr) {
+                        console.error("Second export attempt also failed:", secondErr);
+                        throw new Error('图片导出失败，请重试');
+                    }
                 }
-            }, 100);
+                
+                const link = document.createElement('a');
+                link.download = `gallery-${currentPeriod}-${format(currentDate, 'yyyy-MM-dd')}.png`;
+                link.href = dataUrl;
+                link.click();
+                
+                if (onToast) {
+                    onToast('success', '图片已保存');
+                }
+            } catch (error) {
+                console.error('Export failed:', error);
+                if (onToast) {
+                    onToast('error', '导出失败，请重试');
+                }
+            } finally {
+                setIsExporting(false);
+            }
         }
     };
 
@@ -277,28 +377,53 @@ export const GalleryExportView: React.FC<GalleryExportViewProps> = ({
                     <button
                         onClick={handleExport}
                         disabled={isExporting}
-                        className="text-stone-600 hover:text-stone-800 p-1 active:scale-95 transition-transform disabled:opacity-50"
+                        className="text-stone-600 hover:text-stone-800 p-1 active:scale-95 transition-transform disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
                     >
-                        <Download size={20} />
+                        {isExporting ? (
+                            <Loader2 size={20} className="animate-spin" />
+                        ) : (
+                            <Download size={20} />
+                        )}
                     </button>
                 </div>
             </div>
 
             {/* Main Content Area - 预览区域 */}
-            <div className="flex-1 overflow-y-auto overflow-x-hidden px-4 py-6">
-                <div className="max-w-md mx-auto">
-                    <div 
-                        ref={exportRef}
-                        className="shadow-2xl"
-                        style={{ backgroundColor: currentTheme.colors.paper }}
-                    >
-                        {/* TODO: 在这里渲染周/月/年视图 */}
-                        <div className="p-8 text-center">
-                            <p className="text-sm text-stone-400">预览区域</p>
-                            <p className="text-xs text-stone-300 mt-2">主题: {currentTheme.name}</p>
-                            <p className="text-xs text-stone-300">样式: {LAYOUT_STYLES.find(s => s.key === currentLayout)?.label}</p>
-                            <p className="text-xs text-stone-300">时间段: {TIME_PERIODS.find(p => p.key === currentPeriod)?.label}</p>
-                            <p className="text-xs text-stone-300 mt-2">数据条目: {diaryEntries.length}</p>
+            <div className="flex-1 overflow-y-auto overflow-x-hidden px-4 py-6 bg-stone-100">
+                <div className={orientation === 'landscape' ? 'max-w-4xl mx-auto' : 'max-w-md mx-auto'}>
+                    <div className="shadow-2xl w-full">
+                        <div
+                            ref={exportRef}
+                            className="w-full overflow-hidden"
+                            style={{ backgroundColor: currentTheme.colors.paper }}
+                        >
+                        {currentPeriod === 'week' && (
+                            <WeekView 
+                                date={currentDate}
+                                entries={diaryEntries}
+                                theme={currentTheme}
+                                layoutStyle={currentLayout}
+                                orientation={orientation}
+                            />
+                        )}
+                        {currentPeriod === 'month' && (
+                            <MonthView 
+                                date={currentDate}
+                                entries={diaryEntries}
+                                theme={currentTheme}
+                                layoutStyle={currentLayout}
+                                orientation={orientation}
+                            />
+                        )}
+                        {currentPeriod === 'year' && (
+                            <YearView 
+                                date={currentDate}
+                                entries={diaryEntries}
+                                theme={currentTheme}
+                                layoutStyle={currentLayout}
+                                orientation={orientation}
+                            />
+                        )}
                         </div>
                     </div>
                 </div>
@@ -343,20 +468,53 @@ export const GalleryExportView: React.FC<GalleryExportViewProps> = ({
                             <LayoutTemplate size={14} />
                             排版样式
                         </div>
-                        <div className="flex justify-between gap-2">
-                            {LAYOUT_STYLES.map((style) => (
+                        <div className="flex justify-between items-center gap-2">
+                            {/* 左侧：样式选择 */}
+                            <div className="flex gap-2 flex-1">
+                                {LAYOUT_STYLES.map((style) => (
+                                    <button
+                                        key={style.key}
+                                        onClick={() => setCurrentLayout(style.key)}
+                                        className={`flex-1 px-2 py-1.5 rounded-full text-[10px] font-medium border transition-all font-serif ${
+                                            currentLayout === style.key
+                                                ? 'bg-stone-100 border-stone-400 text-stone-900'
+                                                : 'border-stone-300 text-stone-600 hover:border-stone-400'
+                                        }`}
+                                    >
+                                        {style.label}
+                                    </button>
+                                ))}
+                            </div>
+                            
+                            {/* 右侧：横竖屏切换 */}
+                            <div className="flex gap-1">
                                 <button
-                                    key={style.key}
-                                    onClick={() => setCurrentLayout(style.key)}
-                                    className={`flex-1 px-2 py-1.5 rounded-full text-[10px] font-medium border transition-all font-serif ${
-                                        currentLayout === style.key
+                                    onClick={() => setOrientation('portrait')}
+                                    className={`p-1.5 rounded-full border transition-all ${
+                                        orientation === 'portrait'
                                             ? 'bg-stone-100 border-stone-400 text-stone-900'
                                             : 'border-stone-300 text-stone-600 hover:border-stone-400'
                                     }`}
+                                    title="竖屏"
                                 >
-                                    {style.label}
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                        <rect x="7" y="2" width="10" height="20" rx="2" />
+                                    </svg>
                                 </button>
-                            ))}
+                                <button
+                                    onClick={() => setOrientation('landscape')}
+                                    className={`p-1.5 rounded-full border transition-all ${
+                                        orientation === 'landscape'
+                                            ? 'bg-stone-100 border-stone-400 text-stone-900'
+                                            : 'border-stone-300 text-stone-600 hover:border-stone-400'
+                                    }`}
+                                    title="横屏"
+                                >
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                        <rect x="2" y="7" width="20" height="10" rx="2" />
+                                    </svg>
+                                </button>
+                            </div>
                         </div>
                     </section>
 
@@ -366,20 +524,48 @@ export const GalleryExportView: React.FC<GalleryExportViewProps> = ({
                             <Calendar size={14} />
                             时间段
                         </div>
-                        <div className="flex justify-between gap-2">
-                            {TIME_PERIODS.map((period) => (
+                        <div className="flex justify-between items-center gap-2">
+                            {/* 左侧：周期选择 */}
+                            <div className="flex gap-2 flex-1">
+                                {TIME_PERIODS.map((period) => (
+                                    <button
+                                        key={period.key}
+                                        onClick={() => setCurrentPeriod(period.key)}
+                                        className={`flex-1 px-2 py-1.5 rounded-full text-[10px] font-medium border transition-all font-serif ${
+                                            currentPeriod === period.key
+                                                ? 'bg-stone-100 border-stone-400 text-stone-900'
+                                                : 'border-stone-300 text-stone-600 hover:border-stone-400'
+                                        }`}
+                                    >
+                                        {period.label}
+                                    </button>
+                                ))}
+                            </div>
+                            
+                            {/* 右侧：导航按钮 */}
+                            <div className="flex gap-1">
                                 <button
-                                    key={period.key}
-                                    onClick={() => setCurrentPeriod(period.key)}
-                                    className={`flex-1 px-2 py-1.5 rounded-full text-[10px] font-medium border transition-all font-serif ${
-                                        currentPeriod === period.key
-                                            ? 'bg-stone-100 border-stone-400 text-stone-900'
-                                            : 'border-stone-300 text-stone-600 hover:border-stone-400'
-                                    }`}
+                                    onClick={handlePrev}
+                                    className="px-2 py-1.5 rounded-full text-[10px] font-medium border border-stone-300 text-stone-600 hover:border-stone-400 hover:bg-stone-50 transition-all"
+                                    title="上一周期"
                                 >
-                                    {period.label}
+                                    ←
                                 </button>
-                            ))}
+                                <button
+                                    onClick={() => setCurrentDate(new Date())}
+                                    className="px-2 py-1.5 rounded-full text-[10px] font-medium border border-stone-300 text-stone-600 hover:border-stone-400 hover:bg-stone-50 transition-all font-serif"
+                                    title="回到今天"
+                                >
+                                    今
+                                </button>
+                                <button
+                                    onClick={handleNext}
+                                    className="px-2 py-1.5 rounded-full text-[10px] font-medium border border-stone-300 text-stone-600 hover:border-stone-400 hover:bg-stone-50 transition-all"
+                                    title="下一周期"
+                                >
+                                    →
+                                </button>
+                            </div>
                         </div>
                     </section>
                 </div>

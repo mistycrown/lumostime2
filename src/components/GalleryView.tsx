@@ -3,7 +3,7 @@
  * @description 画廊视图 - 以瀑布流方式展示所有带图片的记录
  */
 import React, { useState, useEffect, useMemo } from 'react';
-import { Log, Category, DailyReview } from '../types';
+import { Log, Category, DailyReview, ToastType } from '../types';
 import { ChevronLeft, Share2 } from 'lucide-react';
 import { imageService } from '../services/imageService';
 import { IconRenderer } from './IconRenderer';
@@ -17,6 +17,7 @@ interface GalleryViewProps {
     onClose: () => void;
     onEditLog: (log: Log) => void;
     refreshKey?: number;
+    onToast?: (type: ToastType, message: string) => void;
 }
 
 interface GalleryItem {
@@ -94,7 +95,8 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
     dailyReviews = [],
     onClose,
     onEditLog,
-    refreshKey = 0
+    refreshKey = 0,
+    onToast
 }) => {
     const [isScrolled, setIsScrolled] = useState(false);
     const [displayCount, setDisplayCount] = useState(20); // 初始显示20张图片
@@ -178,7 +180,7 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
                 const month = date.getMonth() + 1;
                 months.push({
                     monthKey,
-                    displayText: `${month}月`
+                    displayText: String(month).padStart(2, '0')
                 });
             }
         });
@@ -531,6 +533,7 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
                     categories={categories}
                     dailyReviews={dailyReviews}
                     onBack={() => setShowExportView(false)}
+                    onToast={onToast}
                 />
             )}
         </div>
