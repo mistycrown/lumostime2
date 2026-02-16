@@ -122,7 +122,8 @@ export const EmojiSettingsView: React.FC<EmojiSettingsViewProps> = ({ onBack }) 
     
     // 验证状态
     const [isRedeemed, setIsRedeemed] = useState(false);
-    const redemptionService = new RedemptionService();
+    // 使用 useMemo 避免重复实例化
+    const redemptionService = React.useMemo(() => new RedemptionService(), []);
     
     // 从 localStorage 读取设置
     const [selectedGroupId, setSelectedGroupId] = useState<string>(() => {

@@ -194,7 +194,8 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
     const [supporterId, setSupporterId] = useState<number | undefined>(undefined);
     const [selectedIcon, setSelectedIcon] = useState('default');
     const [isChangingIcon, setIsChangingIcon] = useState(false);
-    const redemptionService = new RedemptionService();
+    // 使用 useMemo 避免重复实例化
+    const redemptionService = React.useMemo(() => new RedemptionService(), []);
     const [showDonationModal, setShowDonationModal] = useState(false);
     const { uiIconTheme, setUiIconTheme, colorScheme, setColorScheme } = useSettings();
     

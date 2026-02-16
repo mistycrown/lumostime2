@@ -78,13 +78,21 @@ export const MoodPickerModal: React.FC<MoodPickerModalProps> = ({
     
     // 验证状态
     const [isRedeemed, setIsRedeemed] = useState(false);
-    const redemptionService = new RedemptionService();
+    // 使用 useMemo 避免重复实例化
+    const redemptionService = React.useMemo(() => new RedemptionService(), []);
     
     // 获取 sticker sets
     const [stickerSets, setStickerSets] = useState(stickerService.getAllStickerSets());
     
+    // 滑动相关状态
+    const [touchStart, setTouchStart] = useState<number | null>(null);
+    const [touchEnd, setTouchEnd] = useState<number | null>(null);
+    
+    // 最小滑动距离（像素）
+    const minSwipeDistance = 50;
+    
     // 根据 defaultSelectorPage 计算初始页面索引
-    const getInitialPageIndex = () => {
+    const getInitialPageIndex = React.useCallback(() => {
         if (defaultSelectorPage === 'emoji') {
             return 0;
         }
@@ -96,10 +104,10 @@ export const MoodPickerModal: React.FC<MoodPickerModalProps> = ({
         const stickerIndex = stickerSets.findIndex(set => set.id === defaultSelectorPage);
         // 如果找到，返回索引 + 1（因为 0 是 emoji 页）；否则返回 0
         return stickerIndex >= 0 ? stickerIndex + 1 : 0;
-    };
+    }, [defaultSelectorPage, isRedeemed, stickerSets]);
     
     // 页面切换状态
-    const [currentPageIndex, setCurrentPageIndex] = useState(getInitialPageIndex());
+    const [currentPageIndex, setCurrentPageIndex] = useState(0);
     
     // 总页数 = 1 (Emoji) + N (Sticker sets)
     const totalPages = 1 + stickerSets.length;
@@ -119,8 +127,18 @@ export const MoodPickerModal: React.FC<MoodPickerModalProps> = ({
             setCurrentPageIndex(getInitialPageIndex());
             setIsCustomMode(false);
             setCustomEmoji('');
+            
+            // 禁用底层页面滚动
+            document.body.style.overflow = 'hidden';
+        } else {
+            // 恢复底层页面滚动
+            document.body.style.overflow = '';
         }
-    }, [isOpen, defaultSelectorPage, isRedeemed]);
+        
+        return () => {
+            document.body.style.overflow = '';
+        };
+    }, [isOpen, getInitialPageIndex]);
 
     // 监听 emoji 组和贴纸集变化
     useEffect(() => {
@@ -168,6 +186,44 @@ export const MoodPickerModal: React.FC<MoodPickerModalProps> = ({
     const goToNextPage = () => {
         setCurrentPageIndex(Math.min(totalPages - 1, currentPageIndex + 1));
     };
+    
+    // 处理触摸开始
+    const handleTouchStart = (e: React.TouchEvent) => {
+        // 只在已验证且不在自定义模式时启用滑动
+        if (!isRedeemed || isCustomMode) return;
+        
+        setTouchEnd(null);
+        setTouchStart(e.targetTouches[0].clientX);
+    };
+    
+    // 处理触摸移动
+    const handleTouchMove = (e: React.TouchEvent) => {
+        if (!isRedeemed || isCustomMode) return;
+        
+        setTouchEnd(e.targetTouches[0].clientX);
+    };
+    
+    // 处理触摸结束
+    const handleTouchEnd = () => {
+        if (!isRedeemed || isCustomMode) return;
+        if (!touchStart || !touchEnd) return;
+        
+        const distance = touchStart - touchEnd;
+        const isLeftSwipe = distance > minSwipeDistance;
+        const isRightSwipe = distance < -minSwipeDistance;
+        
+        if (isLeftSwipe) {
+            // 向左滑动 = 下一页
+            goToNextPage();
+        } else if (isRightSwipe) {
+            // 向右滑动 = 上一页
+            goToPreviousPage();
+        }
+        
+        // 重置状态
+        setTouchStart(null);
+        setTouchEnd(null);
+    };
 
     if (!isOpen) return null;
 
@@ -182,7 +238,12 @@ export const MoodPickerModal: React.FC<MoodPickerModalProps> = ({
 
     const modalContent = (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/20 backdrop-blur-sm animate-in fade-in duration-200">
-            <div className="bg-white rounded-3xl shadow-2xl w-[90%] max-w-md p-8 animate-in zoom-in-95 duration-200 relative">
+            <div 
+                className="bg-white rounded-3xl shadow-2xl w-[90%] max-w-md p-8 animate-in zoom-in-95 duration-200 relative"
+                onTouchStart={handleTouchStart}
+                onTouchMove={handleTouchMove}
+                onTouchEnd={handleTouchEnd}
+            >
                 {/* 关闭按钮 */}
                 <button
                     onClick={onClose}
@@ -296,7 +357,6 @@ export const MoodPickerModal: React.FC<MoodPickerModalProps> = ({
                                         <div className="grid grid-cols-4 gap-2 mb-6 max-h-[320px] overflow-y-auto">
                                             {currentStickerSet.stickers.map((sticker) => {
                                                 const stickerIcon = `image:${sticker.path}`;
-                                                const isSelected = selectedMood === stickerIcon;
                                                 
                                                 return (
                                                     <button
