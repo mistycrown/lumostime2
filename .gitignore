@@ -34,9 +34,24 @@ dist-ssr
 *.jks
 *.keystore
 
-# Backup folders (不打包)
-public/icon_style_backup/
+# ========================================
+# 🎨 美术资源 - 不上传到 GitHub
+# ========================================
+# public 文件夹下的所有美术资源
+public/
+
+# static 文件夹下的备份和设计参考文件
+static/banner_backup/
 static/png_backup/
+static/sticker_backup/
+static/chronoprint---time-data-visualizer (1)/
+static/monomood/
+static/serif-diary-layout/
+
+# 但保留 static 下的文档图片（如 README 引用的图片）
+!static/*.png
+!static/*.jpg
+!static/*.webp
 
 # ========================================
 # 🔒 敏感文件 - 绝对不能上传到 GitHub！
