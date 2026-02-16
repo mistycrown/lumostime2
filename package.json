@@ -40,6 +40,7 @@
     "date-fns": "^4.1.0",
     "html-to-image": "^1.11.13",
     "html2canvas": "^1.4.1",
+    "jszip": "^3.10.1",
     "lucide-react": "^0.555.0",
     "lunar-javascript": "^1.7.7",
     "react": "^19.2.1",

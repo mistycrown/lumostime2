@@ -3,12 +3,13 @@
  * @description 数据管理页面 - 备份、导入、导出、清理等
  */
 import React, { useState, useRef } from 'react';
-import { ChevronLeft, Database, Download, Upload, Trash2, Cloud, FileSpreadsheet, ImageIcon, Search, RefreshCw } from 'lucide-react';
+import { ChevronLeft, Database, Download, Upload, Trash2, Cloud, FileSpreadsheet, ImageIcon, Search, RefreshCw, Package } from 'lucide-react';
 import { ToastType } from '../../components/Toast';
 import { Log, Category, TodoItem, TodoCategory, Scope } from '../../types';
 import excelExportService from '../../services/excelExportService';
 import { imageService } from '../../services/imageService';
 import { imageCleanupService } from '../../services/imageCleanupService';
+import { imageExportService } from '../../services/imageExportService';
 import { ConfirmModal } from '../../components/ConfirmModal';
 
 interface DataManagementViewProps {
@@ -41,6 +42,7 @@ export const DataManagementView: React.FC<DataManagementViewProps> = ({
     onCleanupCloudBackups
 }) => {
     const fileInputRef = useRef<HTMLInputElement>(null);
+    const imageZipInputRef = useRef<HTMLInputElement>(null);
     const [confirmReset, setConfirmReset] = useState(false);
     const [confirmClear, setConfirmClear] = useState(false);
     const [isCheckingImages, setIsCheckingImages] = useState(false);
@@ -48,6 +50,8 @@ export const DataManagementView: React.FC<DataManagementViewProps> = ({
     const [imageCleanupReport, setImageCleanupReport] = useState<string>('');
     const [isImageCleanupConfirmOpen, setIsImageCleanupConfirmOpen] = useState(false);
     const [isCleaningBackups, setIsCleaningBackups] = useState(false);
+    const [isExportingImages, setIsExportingImages] = useState(false);
+    const [isImportingImages, setIsImportingImages] = useState(false);
 
     // Excel Export State
     const [excelStartDate, setExcelStartDate] = useState(new Date());
@@ -258,6 +262,44 @@ export const DataManagementView: React.FC<DataManagementViewProps> = ({
         setIsCleaningBackups(false);
     };
 
+    const handleExportImages = async () => {
+        setIsExportingImages(true);
+        try {
+            await imageExportService.exportImagesToZip();
+            onToast('success', '图片导出成功');
+        } catch (error: any) {
+            console.error('图片导出失败:', error);
+            onToast('error', `图片导出失败: ${error.message}`);
+        } finally {
+            setIsExportingImages(false);
+        }
+    };
+
+    const handleImageZipFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0];
+        if (!file) return;
+
+        if (!file.name.endsWith('.zip')) {
+            onToast('error', '请选择ZIP格式的文件');
+            return;
+        }
+
+        setIsImportingImages(true);
+        try {
+            const result = await imageExportService.importImagesFromZip(file);
+            const message = `导入完成: 成功 ${result.success} 张, 跳过 ${result.skipped} 张${result.failed > 0 ? `, 失败 ${result.failed} 张` : ''}`;
+            onToast('success', message);
+        } catch (error: any) {
+            console.error('图片导入失败:', error);
+            onToast('error', `图片导入失败: ${error.message}`);
+        } finally {
+            setIsImportingImages(false);
+            if (imageZipInputRef.current) {
+                imageZipInputRef.current.value = '';
+            }
+        }
+    };
+
     return (
         <div className="fixed inset-0 z-50 bg-[#fdfbf7] flex flex-col font-serif animate-in slide-in-from-right duration-300 pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">
             <div className="flex items-center gap-3 px-4 h-14 border-b border-stone-100 bg-[#fdfbf7]/80 backdrop-blur-md sticky top-0">
@@ -456,73 +498,129 @@ export const DataManagementView: React.FC<DataManagementViewProps> = ({
                         <h3 className="font-bold text-lg">图片管理</h3>
                     </div>
                     <p className="text-sm text-stone-500 mb-4 leading-relaxed">
-                        检查并清理未被专注记录引用的图片，释放存储空间
+                        导出和导入图片，或检查并清理未被专注记录引用的图片
                     </p>
 
-                    <div className="grid grid-cols-1 gap-3">
-                        <button
-                            onClick={handleFixImageList}
-                            disabled={isCheckingImages}
-                            className="flex items-center justify-center gap-2 w-full py-3 bg-blue-500 text-white rounded-xl font-medium active:scale-[0.98] transition-transform disabled:opacity-50 disabled:cursor-not-allowed hover:bg-blue-600"
-                        >
-                            {isCheckingImages ? (
-                                <>
-                                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                                    修复中...
-                                </>
-                            ) : (
-                                <>
-                                    <RefreshCw size={18} />
-                                    修复图片列表
-                                </>
-                            )}
-                        </button>
+                    {/* 图片导出导入 */}
+                    <div className="space-y-3 pb-4 border-b border-stone-100">
+                        <p className="text-xs font-bold text-stone-400 uppercase tracking-widest px-1">图片备份</p>
+                        <div className="grid grid-cols-2 gap-3">
+                            <button
+                                onClick={handleExportImages}
+                                disabled={isExportingImages}
+                                className="flex items-center justify-center gap-2 py-3 bg-stone-800 text-white rounded-xl font-medium active:scale-[0.98] transition-transform disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                {isExportingImages ? (
+                                    <>
+                                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                                        导出中...
+                                    </>
+                                ) : (
+                                    <>
+                                        <Package size={18} />
+                                        导出图片
+                                    </>
+                                )}
+                            </button>
 
-                        <button
-                            onClick={handleCheckUnreferencedImages}
-                            disabled={isCheckingImages}
-                            className="flex items-center justify-center gap-2 w-full py-3 bg-white border border-stone-200 text-stone-800 rounded-xl font-medium active:scale-[0.98] transition-transform disabled:opacity-50 disabled:cursor-not-allowed hover:bg-stone-50"
-                        >
-                            {isCheckingImages ? (
-                                <>
-                                    <div className="w-4 h-4 border-2 border-stone-400 border-t-transparent rounded-full animate-spin" />
-                                    检查中...
-                                </>
-                            ) : (
-                                <>
-                                    <Search size={18} />
-                                    检查未引用图片
-                                </>
-                            )}
-                        </button>
-
-                        <button
-                            onClick={() => setIsImageCleanupConfirmOpen(true)}
-                            disabled={isCleaningImages}
-                            className="flex items-center justify-center gap-2 w-full py-3 bg-white border border-stone-200 text-stone-800 rounded-xl font-medium active:scale-[0.98] transition-transform disabled:opacity-50 disabled:cursor-not-allowed hover:bg-stone-50"
-                        >
-                            {isCleaningImages ? (
-                                <>
-                                    <div className="w-4 h-4 border-2 border-stone-400 border-t-transparent rounded-full animate-spin" />
-                                    清理中...
-                                </>
-                            ) : (
-                                <>
-                                    <Trash2 size={18} />
-                                    执行清理（删除图片）
-                                </>
-                            )}
-                        </button>
+                            <button
+                                onClick={() => imageZipInputRef.current?.click()}
+                                disabled={isImportingImages}
+                                className="flex items-center justify-center gap-2 py-3 bg-white border border-stone-200 text-stone-700 rounded-xl font-medium active:scale-[0.98] transition-transform disabled:opacity-50 disabled:cursor-not-allowed hover:bg-stone-50"
+                            >
+                                {isImportingImages ? (
+                                    <>
+                                        <div className="w-4 h-4 border-2 border-stone-400 border-t-transparent rounded-full animate-spin" />
+                                        导入中...
+                                    </>
+                                ) : (
+                                    <>
+                                        <Upload size={18} />
+                                        导入图片
+                                    </>
+                                )}
+                            </button>
+                            <input
+                                type="file"
+                                ref={imageZipInputRef}
+                                onChange={handleImageZipFileChange}
+                                accept=".zip"
+                                className="hidden"
+                            />
+                        </div>
+                        <p className="text-xs text-stone-400 px-1">
+                            导出所有图片为ZIP压缩包，或从ZIP文件导入图片
+                        </p>
                     </div>
 
-                    {imageCleanupReport && (
-                        <div className="mt-4 p-4 bg-stone-50 rounded-xl">
-                            <h4 className="font-medium text-stone-700 mb-2">清理报告</h4>
-                            <div className="text-sm text-stone-600 whitespace-pre-line max-h-40 overflow-y-auto">
-                                {imageCleanupReport}
-                            </div>
+                    {/* 图片清理 */}
+                    <div className="space-y-3 pt-2">
+                        <p className="text-xs font-bold text-stone-400 uppercase tracking-widest px-1">图片清理</p>
+                        <div className="grid grid-cols-1 gap-3">
+                            <button
+                                onClick={handleFixImageList}
+                                disabled={isCheckingImages}
+                                className="flex items-center justify-center gap-2 w-full py-3 bg-blue-500 text-white rounded-xl font-medium active:scale-[0.98] transition-transform disabled:opacity-50 disabled:cursor-not-allowed hover:bg-blue-600"
+                            >
+                                {isCheckingImages ? (
+                                    <>
+                                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                                        修复中...
+                                    </>
+                                ) : (
+                                    <>
+                                        <RefreshCw size={18} />
+                                        修复图片列表
+                                    </>
+                                )}
+                            </button>
+
+                            <button
+                                onClick={handleCheckUnreferencedImages}
+                                disabled={isCheckingImages}
+                                className="flex items-center justify-center gap-2 w-full py-3 bg-white border border-stone-200 text-stone-800 rounded-xl font-medium active:scale-[0.98] transition-transform disabled:opacity-50 disabled:cursor-not-allowed hover:bg-stone-50"
+                            >
+                                {isCheckingImages ? (
+                                    <>
+                                        <div className="w-4 h-4 border-2 border-stone-400 border-t-transparent rounded-full animate-spin" />
+                                        检查中...
+                                    </>
+                                ) : (
+                                    <>
+                                        <Search size={18} />
+                                        检查未引用图片
+                                    </>
+                                )}
+                            </button>
+
+                            <button
+                                onClick={() => setIsImageCleanupConfirmOpen(true)}
+                                disabled={isCleaningImages}
+                                className="flex items-center justify-center gap-2 w-full py-3 bg-white border border-stone-200 text-stone-800 rounded-xl font-medium active:scale-[0.98] transition-transform disabled:opacity-50 disabled:cursor-not-allowed hover:bg-stone-50"
+                            >
+                                {isCleaningImages ? (
+                                    <>
+                                        <div className="w-4 h-4 border-2 border-stone-400 border-t-transparent rounded-full animate-spin" />
+                                        清理中...
+                                    </>
+                                ) : (
+                                    <>
+                                        <Trash2 size={18} />
+                                        执行清理（删除图片）
+                                    </>
+                                )}
+                            </button>
                         </div>
-                    )}
+
+                        {imageCleanupReport && (
+                            <div className="mt-4 p-4 bg-stone-50 rounded-xl">
+                                <h4 className="font-medium text-stone-700 mb-2">清理报告</h4>
+                                <div className="text-sm text-stone-600 whitespace-pre-line max-h-40 overflow-y-auto">
+                                    {imageCleanupReport}
+                                </div>
+                            </div>
+                        )}
+                    </div>
                 </div>
             </div>
 

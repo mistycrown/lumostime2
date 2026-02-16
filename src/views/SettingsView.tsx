@@ -1063,7 +1063,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
                         />
                         <MenuItem
                             icon={<Database size={18} />}
-                            label="数据导出导入 (包含重置)"
+                            label="数据导出导入"
                             isLast={!isElectronEnvironment()}
                             onClick={() => setActiveSubmenu('data')}
                         />
