@@ -143,15 +143,14 @@ class FontService {
      */
     private applyFont(font: FontOption) {
         try {
-            // 更新 body 字体
-            document.body.style.fontFamily = font.fontFamily;
-            document.documentElement.style.fontFamily = font.fontFamily;
+            // 设置 CSS 变量，这样 Tailwind 的 font-serif 类会使用这个变量
+            document.documentElement.style.setProperty('--font-family', font.fontFamily);
             
             // 强制重绘
             document.body.offsetHeight;
             
             console.log('[FontService] 字体已应用:', font.fontFamily);
-            console.log('[FontService] body.style.fontFamily:', document.body.style.fontFamily);
+            console.log('[FontService] CSS变量 --font-family:', getComputedStyle(document.documentElement).getPropertyValue('--font-family'));
         } catch (error) {
             console.error('[FontService] 应用字体失败:', error);
         }

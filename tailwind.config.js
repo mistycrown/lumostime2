@@ -7,20 +7,8 @@ export default {
   theme: {
     extend: {
       fontFamily: {
-        // 使用系统字体，不依赖网络
-        serif: [
-          'Noto Serif SC',
-          'Source Han Serif SC',
-          'Source Han Serif CN',
-          'Songti SC',
-          'STSong',
-          'SimSun',
-          'NSimSun',
-          'FangSong',
-          'KaiTi',
-          'Microsoft YaHei',
-          'serif'
-        ],
+        // 使用 CSS 变量，允许动态切换字体
+        serif: ['var(--font-family)', 'serif'],
         sans: [
           'Inter',
           '-apple-system',
