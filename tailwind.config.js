@@ -7,8 +7,8 @@ export default {
   theme: {
     extend: {
       fontFamily: {
-        // 使用 CSS 变量，允许动态切换字体
-        serif: ['var(--font-family)', 'serif'],
+        // 使用 CSS 变量，这样可以动态切换
+        serif: ['var(--font-family)', 'Noto Serif SC', 'serif'],
         sans: [
           'Inter',
           '-apple-system',

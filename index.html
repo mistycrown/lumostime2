@@ -14,11 +14,11 @@
         const savedFont = localStorage.getItem('lumostime_font_family');
         const fontMap = {
           'default': '"Noto Serif SC", "Source Han Serif SC", "Source Han Serif CN", "Songti SC", "STSong", "SimSun", "Microsoft YaHei", serif',
-          'lxgw-wenkai': '"LXGW WenKai", "Noto Serif SC", "Source Han Serif SC", "SimSun", "Microsoft YaHei", serif',
-          'lxgw-neo-zhisong': '"LXGW Neo ZhiSong", "Noto Serif SC", "Source Han Serif SC", "SimSun", "Microsoft YaHei", serif',
-          'ding-lie-song': '"Ding Lie Song", "Noto Serif SC", "Source Han Serif SC", "SimSun", "Microsoft YaHei", serif',
-          'zhuque-fangsong': '"Zhuque Fangsong", "Noto Serif SC", "Source Han Serif SC", "SimSun", "Microsoft YaHei", serif',
-          'wenquanyi-bitmap': '"WenQuanYi Bitmap Song", "Noto Serif SC", "Source Han Serif SC", "SimSun", "Microsoft YaHei", serif'
+          'lxgw-wenkai': '"LXGW WenKai", "Noto Serif SC", "Source Han Serif SC", "SimSun", serif',
+          'lxgw-neo-zhisong': '"LXGW Neo ZhiSong", "Noto Serif SC", "Source Han Serif SC", "SimSun", serif',
+          'ding-lie-song': '"Ding Lie Song", "Noto Serif SC", "Source Han Serif SC", "SimSun", serif',
+          'zhuque-fangsong': '"Zhuque Fangsong", "Noto Serif SC", "Source Han Serif SC", "SimSun", serif',
+          'wenquanyi-bitmap': '"WenQuanYi Bitmap Song", "Noto Serif SC", "Source Han Serif SC", "SimSun", serif'
         };
         const fontFamily = fontMap[savedFont] || fontMap['default'];
         // 设置 CSS 变量
@@ -26,8 +26,7 @@
         console.log('[Font Init] Applied font:', savedFont || 'default', '→', fontFamily);
       } catch (e) {
         console.error('[Font Init] Failed:', e);
-        const fallback = '"Noto Serif SC", "Source Han Serif SC", "SimSun", "Microsoft YaHei", serif';
-        document.documentElement.style.setProperty('--font-family', fallback);
+        document.documentElement.style.setProperty('--font-family', '"Noto Serif SC", "Source Han Serif SC", "SimSun", "Microsoft YaHei", serif');
       }
     })();
   </script>
@@ -35,14 +34,14 @@
   <!-- 自定义字体（本地） -->
   <link rel="stylesheet" href="/fonts/fonts.css">
   <style>
-    /* CSS 变量定义 - 用于动态字体切换 */
+    /* CSS 变量定义 */
     :root {
       --font-family: 'Noto Serif SC', 'Source Han Serif SC', 'Source Han Serif CN', 'Songti SC', 'STSong', 'SimSun', 'Microsoft YaHei', serif;
     }
     
     /* 字体加载优化 - 使用系统字体作为回退 */
     body {
-      /* 使用 CSS 变量，允许动态切换 */
+      /* 使用 CSS 变量，由 fontService 动态控制 */
       font-family: var(--font-family);
       font-weight: 400;
       /* Background will be controlled by backgroundService */
