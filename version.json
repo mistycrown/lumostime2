@@ -1,7 +1,7 @@
 {
-    "version": "1.1.1",
-    "versionCode": 11,
+    "version": "1.1.2",
+    "versionCode": 12,
     "updateUrl": "https://github.com/mistycrown/lumostime2/releases/latest",
-    "releaseNotes": "v1.1.1\n• 修复日课在统计视图中不显示emoji的问题\n• 增加五个自定义字体\n• 增加手动叙事和自动叙事分开的功能，现在可以同时存在手动一句话总结和ai叙事\n• 引导界面增加"清空当前引导"功能\n• 修复查看大图页面旋转按钮有两层的问题\n• 领域页增加目标完成时间的显示\n• 增加目标的成功/失败检测\n• 脉络时间轴增加待办/目标完成节点\n• 在待办页面添加新任务，传递任务分类\n• 增加总数据统计个人档案\n• 增加画廊视图\n• 增加画廊视图导出周历、月历、年历图片的功能\n• 增加Twemoji、openmoji支持\n• 增加每日心情选择，并同步到时间轴\n• 增加三组sticker\n• 增加本地Tailwind支持",
+    "releaseNotes": "v1.1.2\n• StickerSelector 增加快捷填写一句话总结的输入框\n• 禁用手动添加日课\n• 增加自定义reaction图标，并且在自定义筛选器中支持搜索reaction图标\n• 增加月、年表情和总结统计视图的分享导出功能\n• 增加review页阅读/编辑模式的自动感应\n• 增加导出导入图片压缩包备份的功能",
     "forceUpdate": false
 }
