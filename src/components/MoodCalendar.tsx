@@ -169,7 +169,7 @@ export const MoodCalendar: React.FC<MoodCalendarProps> = ({
                                 ) : (
                                     // 没有贴纸时，显示日期数字（居中）
                                     <span 
-                                        className={`text-lg font-handwriting ${
+                                        className={`text-sm font-handwriting ${
                                             today 
                                                 ? 'text-stone-900 font-bold' 
                                                 : 'text-stone-400'
