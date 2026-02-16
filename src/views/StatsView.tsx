@@ -13,7 +13,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { Log, Category, Activity, Scope, TodoItem, TodoCategory, DailyReview } from '../types';
 import { COLOR_OPTIONS } from '../constants';
-import { Minimize2, Share, PieChart, Grid, Calendar, ChevronLeft, ChevronRight, TrendingUp, TrendingDown, CheckCircle2 } from 'lucide-react';
+import { Minimize2, Share, PieChart, Grid, Calendar, ChevronLeft, ChevronRight, TrendingUp, TrendingDown, CheckCircle2, Smile } from 'lucide-react';
 import { ToastType } from '../components/Toast';
 import { usePrivacy } from '../contexts/PrivacyContext';
 import { IconRenderer } from '../components/IconRenderer';
@@ -29,6 +29,7 @@ import { MatrixView } from '../components/stats/MatrixView';
 import { CheckView } from '../components/stats/CheckView';
 import { ScheduleView } from '../components/stats/ScheduleView';
 import { LineChartView } from '../components/stats/LineChartView';
+import { EmojiStatsView } from '../components/stats/EmojiStatsView';
 import { formatDuration, getHexColor, getScheduleStyle } from '../utils/chartUtils';
 
 interface StatsViewProps {
@@ -54,9 +55,10 @@ interface StatsViewProps {
   allowedViews?: ViewType[]; // 允许切换的视图类型，默认全部
 }
 
-type ViewType = 'pie' | 'matrix' | 'schedule' | 'line' | 'check';
+type ViewType = 'pie' | 'matrix' | 'schedule' | 'line' | 'check' | 'emoji';
 type PieRange = 'day' | 'week' | 'month' | 'year';
 type ScheduleRange = 'day' | 'week' | 'month';
+type EmojiRange = 'month' | 'year';
 
 interface ActivityStat extends Activity {
   duration: number;
@@ -68,7 +70,7 @@ interface CategoryStat extends Category {
   items: ActivityStat[];
 }
 
-export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentDate, onBack, onDateChange, isFullScreen, onToggleFullScreen, onToast, onTitleChange, todos, todoCategories, scopes, dailyReviews = [], hideControls = false, hideRangeControls = false, hideDateNavigation = false, forcedView, forcedRange, allowedViews = ['pie', 'matrix', 'line', 'schedule', 'check'] }) => {
+export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentDate, onBack, onDateChange, isFullScreen, onToggleFullScreen, onToast, onTitleChange, todos, todoCategories, scopes, dailyReviews = [], hideControls = false, hideRangeControls = false, hideDateNavigation = false, forcedView, forcedRange, allowedViews = ['pie', 'matrix', 'line', 'schedule', 'check', 'emoji'] }) => {
   const { isPrivacyMode } = usePrivacy();
   const [viewType, setViewType] = useState<ViewType>(forcedView || 'pie');
   const [pieRange, setPieRange] = useState<PieRange>(forcedRange || 'day');
@@ -76,6 +78,7 @@ export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentD
     forcedRange === 'month' ? 'month' : (forcedRange === 'week' ? 'week' : 'day')
   );
   const [lineRange, setLineRange] = useState<'week' | 'month'>((forcedRange === 'month' || forcedRange === 'year') ? 'month' : 'week');
+  const [emojiRange, setEmojiRange] = useState<EmojiRange>('month');
   const [excludedCategoryIds, setExcludedCategoryIds] = useState<string[]>([]);
 
   const toggleExclusion = (id: string) => {
@@ -111,6 +114,9 @@ export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentD
     } else if (viewType === 'check') {
       // Check view使用pieRange，但不支持day，默认为week
       rangeType = pieRange === 'day' ? 'week' : pieRange;
+    } else if (viewType === 'emoji') {
+      // Emoji view使用emojiRange (month/year)
+      rangeType = emojiRange;
     } else {
       rangeType = 'day';
     }
@@ -247,8 +253,11 @@ export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentD
       const actualRange = pieRange === 'day' ? 'week' : pieRange;
       return getDateRange(currentDate, actualRange);
     }
+    if (viewType === 'emoji') {
+      return getDateRange(currentDate, emojiRange);
+    }
     return getDateRange(currentDate, 'day');
-  }, [currentDate, viewType, pieRange, scheduleRange, lineRange]);
+  }, [currentDate, viewType, pieRange, scheduleRange, lineRange, emojiRange]);
 
   // 当视图类型、时间范围或日期变化时，自动更新标题
   useEffect(() => {
@@ -266,6 +275,8 @@ export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentD
         rangeType = lineRange === 'week' ? 'week_fixed' : 'month';
       } else if (viewType === 'check') {
         rangeType = pieRange === 'day' ? 'week' : pieRange;
+      } else if (viewType === 'emoji') {
+        rangeType = emojiRange;
       } else {
         rangeType = 'day';
       }
@@ -273,7 +284,7 @@ export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentD
       const title = getDynamicTitle(currentDate, rangeType);
       onTitleChange(title);
     }
-  }, [currentDate, viewType, pieRange, scheduleRange, lineRange, onTitleChange]);
+  }, [currentDate, viewType, pieRange, scheduleRange, lineRange, emojiRange, onTitleChange]);
 
   const { start: rangeStart, end: rangeEnd } = effectiveRange;
 
@@ -664,6 +675,22 @@ export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentD
                     </button>
                   </div>
                 )}
+                {!hideRangeControls && viewType === 'emoji' && (
+                  <div className="flex bg-stone-100/50 p-0.5 rounded-lg w-fit">
+                    <button
+                      onClick={() => setEmojiRange('month')}
+                      className={`px-2.5 py-1 rounded-md text-[10px] font-bold transition-all ${emojiRange === 'month' ? 'bg-white text-stone-900 shadow-sm' : 'text-stone-400 hover:text-stone-600'}`}
+                    >
+                      月
+                    </button>
+                    <button
+                      onClick={() => setEmojiRange('year')}
+                      className={`px-2.5 py-1 rounded-md text-[10px] font-bold transition-all ${emojiRange === 'year' ? 'bg-white text-stone-900 shadow-sm' : 'text-stone-400 hover:text-stone-600'}`}
+                    >
+                      年
+                    </button>
+                  </div>
+                )}
               </div>
 
               {/* Right: Date Navigation + View Type Switcher */}
@@ -720,6 +747,15 @@ export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentD
                       title="打卡"
                     >
                       <CheckCircle2 size={14} />
+                    </button>
+                  )}
+                  {allowedViews.includes('emoji') && (
+                    <button
+                      onClick={() => setViewType('emoji')}
+                      className={`p-1.5 rounded-md transition-all ${viewType === 'emoji' ? 'bg-white text-stone-900 shadow-sm' : 'text-stone-400 hover:text-stone-600'}`}
+                      title="情绪"
+                    >
+                      <Smile size={14} />
                     </button>
                   )}
                 </div>
@@ -791,6 +827,15 @@ export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentD
               checkStats={checkStats}
               pieRange={pieRange}
               rangeStart={rangeStart}
+            />
+          )}
+
+          {/* --- Emoji View Content --- */}
+          {viewType === 'emoji' && (
+            <EmojiStatsView
+              dailyReviews={dailyReviews}
+              currentDate={currentDate}
+              emojiRange={emojiRange}
             />
           )}
 
