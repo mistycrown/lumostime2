@@ -3,13 +3,14 @@
  * @description Emoji 和 Sticker 设置页面 - 管理心情日历的 emoji 组、emoji 渲染风格和 Selector 默认页
  */
 import React, { useState, useEffect, useRef } from 'react';
-import { ChevronLeft, Plus, Trash2, Edit2, Check, X } from 'lucide-react';
+import { ChevronLeft, Plus, Trash2, Edit2, Check, X, RotateCcw } from 'lucide-react';
 import { IconRenderer } from '../../components/IconRenderer';
 import { ConfirmModal } from '../../components/ConfirmModal';
 import { useSettings } from '../../contexts/SettingsContext';
 import type { EmojiStyle } from '../../contexts/SettingsContext';
 import { stickerService } from '../../services/stickerService';
 import { RedemptionService } from '../../services/redemptionService';
+import { DEFAULT_REACTIONS } from '../../components/ReactionComponents';
 
 // Emoji 预览组件 - 用于显示不同风格的 emoji
 const EmojiPreview: React.FC<{ emoji: string; style: EmojiStyle }> = ({ emoji, style }) => {
@@ -144,6 +145,18 @@ export const EmojiSettingsView: React.FC<EmojiSettingsViewProps> = ({ onBack }) 
     const [editingEmojiIndex, setEditingEmojiIndex] = useState<number | null>(null); // 正在编辑的 emoji 索引
     const [deleteConfirmGroupId, setDeleteConfirmGroupId] = useState<string | null>(null);
 
+    // Reaction 相关状态
+    const [customReactions, setCustomReactions] = useState<string[]>(() => {
+        const stored = localStorage.getItem('lumostime_custom_reactions');
+        return stored ? JSON.parse(stored) : [];
+    });
+    const [isEditingReactions, setIsEditingReactions] = useState(false);
+    const [editingReactionEmoji, setEditingReactionEmoji] = useState<string>('');
+    const [editingReactionIndex, setEditingReactionIndex] = useState<number | null>(null);
+    const [tempReactions, setTempReactions] = useState<string[]>([]);
+
+    const MAX_REACTIONS = 6;
+
     const allGroups = [...PRESET_EMOJI_GROUPS, ...customGroups];
 
     // 检查验证状态
@@ -272,6 +285,69 @@ export const EmojiSettingsView: React.FC<EmojiSettingsViewProps> = ({ onBack }) 
         if (editingEmojiIndex === index) {
             setEditingEmoji('');
             setEditingEmojiIndex(null);
+        }
+    };
+
+    // Reaction 相关函数
+    const handleStartEditReactions = () => {
+        setTempReactions(customReactions.length > 0 ? [...customReactions] : [...DEFAULT_REACTIONS]);
+        setIsEditingReactions(true);
+    };
+
+    const handleSaveReactions = () => {
+        setCustomReactions(tempReactions);
+        localStorage.setItem('lumostime_custom_reactions', JSON.stringify(tempReactions));
+        setIsEditingReactions(false);
+        setEditingReactionEmoji('');
+        setEditingReactionIndex(null);
+        // 触发事件通知其他组件
+        window.dispatchEvent(new Event('customReactionsChanged'));
+    };
+
+    const handleCancelEditReactions = () => {
+        setIsEditingReactions(false);
+        setTempReactions([]);
+        setEditingReactionEmoji('');
+        setEditingReactionIndex(null);
+    };
+
+    const handleResetReactions = () => {
+        setCustomReactions([]);
+        localStorage.removeItem('lumostime_custom_reactions');
+        // 触发事件通知其他组件
+        window.dispatchEvent(new Event('customReactionsChanged'));
+    };
+
+    const handleAddOrUpdateReaction = () => {
+        if (!editingReactionEmoji.trim()) return;
+        
+        if (editingReactionIndex !== null) {
+            // 更新模式
+            const updated = [...tempReactions];
+            updated[editingReactionIndex] = editingReactionEmoji;
+            setTempReactions(updated);
+        } else {
+            // 添加模式
+            if (tempReactions.length >= MAX_REACTIONS) {
+                return;
+            }
+            setTempReactions([...tempReactions, editingReactionEmoji]);
+        }
+        
+        setEditingReactionEmoji('');
+        setEditingReactionIndex(null);
+    };
+
+    const handleStartEditReaction = (index: number) => {
+        setEditingReactionIndex(index);
+        setEditingReactionEmoji(tempReactions[index]);
+    };
+
+    const handleRemoveReaction = (index: number) => {
+        setTempReactions(tempReactions.filter((_, i) => i !== index));
+        if (editingReactionIndex === index) {
+            setEditingReactionEmoji('');
+            setEditingReactionIndex(null);
         }
     };
 
@@ -567,6 +643,168 @@ export const EmojiSettingsView: React.FC<EmojiSettingsViewProps> = ({ onBack }) 
                                     className="flex-1 py-2 bg-stone-800 text-white rounded-lg text-sm hover:bg-stone-700 disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
                                     {editingGroupId && !isEditingPreset ? '保存' : '创建'}
+                                </button>
+                            </div>
+                        </div>
+                    )}
+                </div>
+
+                {/* Reaction 图标组 */}
+                <div className="bg-white rounded-xl p-4 shadow-sm">
+                    <div className="flex items-center justify-between mb-3">
+                        <div>
+                            <h3 className="text-sm font-bold text-stone-700">Reaction 图标组</h3>
+                            <p className="text-xs text-stone-500 mt-1">
+                                {customReactions.length > 0 
+                                    ? '使用自定义图标（无动画特效）' 
+                                    : '使用默认图标（带动画特效）'}
+                            </p>
+                        </div>
+                        {customReactions.length > 0 && !isEditingReactions && (
+                            <button
+                                onClick={handleResetReactions}
+                                className="p-2 text-stone-400 hover:text-stone-600 hover:bg-stone-50 rounded-lg transition-colors"
+                                title="恢复默认"
+                            >
+                                <RotateCcw size={16} />
+                            </button>
+                        )}
+                    </div>
+
+                    {/* 当前 Reaction 显示 */}
+                    {!isEditingReactions && (
+                        <div className="space-y-3">
+                            <div className="flex flex-wrap gap-2 p-3 bg-stone-50 rounded-lg">
+                                {(customReactions.length > 0 ? customReactions : DEFAULT_REACTIONS).map((emoji, idx) => (
+                                    <div
+                                        key={idx}
+                                        className="flex items-center justify-center w-10 h-10 bg-white rounded-lg shadow-sm"
+                                    >
+                                        <span className="text-xl">
+                                            <IconRenderer icon={emoji} />
+                                        </span>
+                                    </div>
+                                ))}
+                            </div>
+                            
+                            <button
+                                onClick={handleStartEditReactions}
+                                className="w-full py-2 border border-stone-300 rounded-lg text-sm text-stone-600 hover:bg-stone-50 transition-colors flex items-center justify-center gap-2"
+                            >
+                                <Edit2 size={14} />
+                                <span>自定义 Reaction</span>
+                            </button>
+
+                            {customReactions.length === 0 && (
+                                <div className="text-xs text-stone-400 bg-amber-50 border border-amber-100 rounded-lg p-3">
+                                    <p className="font-medium text-amber-700 mb-1">💡 关于特效</p>
+                                    <p>默认的 6 个图标带有动画特效。自定义后将仅支持静态显示。</p>
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    {/* 编辑 Reaction 表单 */}
+                    {isEditingReactions && (
+                        <div className="border border-stone-300 rounded-lg p-4 space-y-3">
+                            <div className="flex items-center justify-between mb-2">
+                                <h4 className="text-sm font-bold text-stone-700">编辑 Reaction 图标</h4>
+                                <span className="text-xs text-amber-600 bg-amber-50 px-2 py-1 rounded">
+                                    自定义后将无动画特效
+                                </span>
+                            </div>
+
+                            {/* Reaction 列表 */}
+                            <div className="space-y-3">
+                                <div className="flex flex-wrap gap-2">
+                                    {tempReactions.map((emoji, idx) => (
+                                        <div
+                                            key={idx}
+                                            onClick={() => handleStartEditReaction(idx)}
+                                            className={`flex items-center gap-1.5 px-3 py-2 rounded-lg cursor-pointer transition-all ${
+                                                editingReactionIndex === idx 
+                                                    ? 'bg-stone-100 ring-1 ring-stone-300' 
+                                                    : 'bg-stone-50 hover:bg-stone-100'
+                                            }`}
+                                        >
+                                            <span className="text-lg leading-none flex items-center">
+                                                <IconRenderer icon={emoji} />
+                                            </span>
+                                            <button
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    handleRemoveReaction(idx);
+                                                }}
+                                                className="ml-0.5 p-0.5 hover:bg-red-50 rounded transition-colors"
+                                                title="删除"
+                                            >
+                                                <Trash2 size={11} className="text-red-500" />
+                                            </button>
+                                        </div>
+                                    ))}
+                                </div>
+
+                                {/* 添加/编辑 reaction */}
+                                <div className="space-y-2">
+                                    <div className="flex items-center justify-between">
+                                        <p className="text-xs text-stone-500 font-medium">
+                                            {editingReactionIndex !== null ? '编辑图标' : '添加新图标'}
+                                        </p>
+                                        <p className="text-xs text-stone-400">
+                                            {tempReactions.length}/{MAX_REACTIONS}
+                                        </p>
+                                    </div>
+                                    <div className="flex gap-2 items-stretch">
+                                        <input
+                                            type="text"
+                                            value={editingReactionEmoji}
+                                            onChange={(e) => setEditingReactionEmoji(e.target.value)}
+                                            placeholder="😊"
+                                            maxLength={4}
+                                            className="flex-1 h-9 px-3 border border-stone-200 rounded-lg text-base outline-none focus:border-stone-400 focus:ring-1 focus:ring-stone-400 text-center transition-all"
+                                            disabled={editingReactionIndex === null && tempReactions.length >= MAX_REACTIONS}
+                                        />
+                                        <button
+                                            onClick={handleAddOrUpdateReaction}
+                                            disabled={!editingReactionEmoji.trim() || (editingReactionIndex === null && tempReactions.length >= MAX_REACTIONS)}
+                                            className="w-9 h-9 flex items-center justify-center bg-green-500 text-white rounded-lg hover:bg-green-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                            title={editingReactionIndex !== null ? '更新' : '添加'}
+                                        >
+                                            <Check size={16} />
+                                        </button>
+                                        {editingReactionIndex !== null && (
+                                            <button
+                                                onClick={() => {
+                                                    setEditingReactionEmoji('');
+                                                    setEditingReactionIndex(null);
+                                                }}
+                                                className="w-9 h-9 flex items-center justify-center bg-stone-200 text-stone-600 rounded-lg hover:bg-stone-300 transition-colors"
+                                                title="取消"
+                                            >
+                                                <X size={16} />
+                                            </button>
+                                        )}
+                                    </div>
+                                    {editingReactionIndex === null && tempReactions.length >= MAX_REACTIONS && (
+                                        <p className="text-xs text-amber-600">已达到最大数量限制（{MAX_REACTIONS}个）</p>
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* 操作按钮 */}
+                            <div className="flex gap-2">
+                                <button
+                                    onClick={handleCancelEditReactions}
+                                    className="flex-1 py-2 border border-stone-300 rounded-lg text-sm text-stone-600 hover:bg-stone-50"
+                                >
+                                    取消
+                                </button>
+                                <button
+                                    onClick={handleSaveReactions}
+                                    disabled={tempReactions.length === 0}
+                                    className="flex-1 py-2 bg-stone-800 text-white rounded-lg text-sm hover:bg-stone-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                    保存
                                 </button>
                             </div>
                         </div>

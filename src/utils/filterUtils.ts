@@ -16,6 +16,7 @@ import { Log, Filter, ParsedFilterCondition, Category, Scope, TodoItem, TodoCate
  * - #关键词: 匹配标签名称
  * - %关键词: 匹配领域名称
  * - @关键词: 匹配代办标题
+ * - ^emoji: 匹配 Reaction Emoji (例如: ^🌸)
  * - 关键词: 匹配备注全文
  * - OR: 逻辑或 (不区分大小写, 用于连接同类型条件)
  * - 空格: 逻辑与 (默认)
@@ -24,17 +25,19 @@ import { Log, Filter, ParsedFilterCondition, Category, Scope, TodoItem, TodoCate
  * - 前缀继承: "#工作 OR 学习" 等同于 "#工作 OR #学习"
  * - 结合性: OR 的优先级高于空格 (实现为分组逻辑)
  * - 混合: "%健康 瑜伽 OR 冥想" -> (领域包含健康) AND (备注包含瑜伽 OR 冥想)
+ * - Emoji 搜索: "^🌸" -> 匹配所有带有🌸 Reaction 的记录
  * 
  * @example
- * parseFilterExpression("#运动 OR 学习 %健康")
- * // 返回: { tags: [["运动", "学习"]], scopes: [["健康"]], ... }
+ * parseFilterExpression("#运动 OR 学习 %健康 ^🌸")
+ * // 返回: { tags: [["运动", "学习"]], scopes: [["健康"]], reactions: [["🌸"]], ... }
  */
 export function parseFilterExpression(expression: string): ParsedFilterCondition {
     const condition: ParsedFilterCondition = {
         tags: [],
         scopes: [],
         todos: [],
-        notes: []
+        notes: [],
+        reactions: []
     };
 
     if (!expression || !expression.trim()) {
@@ -46,16 +49,17 @@ export function parseFilterExpression(expression: string): ParsedFilterCondition
     const tokens = expression.trim().split(/\s+/);
 
     // 帮助函数: 识别类型并提取内容
-    // Returns: { type: 'tags'|'scopes'|'todos'|'notes', content: string }
+    // Returns: { type: 'tags'|'scopes'|'todos'|'notes'|'reactions', content: string }
     const parseToken = (token: string) => {
         if (token.startsWith('#')) return { type: 'tags' as const, content: token.substring(1) };
         if (token.startsWith('%')) return { type: 'scopes' as const, content: token.substring(1) };
         if (token.startsWith('@')) return { type: 'todos' as const, content: token.substring(1) };
+        if (token.startsWith('^')) return { type: 'reactions' as const, content: token.substring(1) };
         return { type: 'notes' as const, content: token };
     };
 
     let pendingOR = false;
-    let lastType: 'tags' | 'scopes' | 'todos' | 'notes' | null = null;
+    let lastType: 'tags' | 'scopes' | 'todos' | 'notes' | 'reactions' | null = null;
 
     for (const token of tokens) {
         if (!token) continue;
@@ -205,6 +209,22 @@ export function matchesFilter(
         });
 
         if (!allNoteGroupsMatch) return false;
+    }
+
+    // 5. 检查 Reaction 筛选 (^)
+    if (condition.reactions.length > 0) {
+        if (!log.reactions || log.reactions.length === 0) return false;
+
+        // 所有 Reaction 条件组都必须满足 (AND)
+        const allReactionGroupsMatch = condition.reactions.every(reactionGroup => {
+            // 每个条件组内,只要有一个匹配即可 (OR)
+            return reactionGroup.some(reactionEmoji => {
+                // 直接匹配 emoji (支持完整匹配或包含匹配)
+                return log.reactions?.includes(reactionEmoji);
+            });
+        });
+
+        if (!allReactionGroupsMatch) return false;
     }
 
     // 所有条件都满足

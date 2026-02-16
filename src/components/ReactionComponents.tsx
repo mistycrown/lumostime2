@@ -3,8 +3,37 @@ import { Smile, Plus } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { IconRenderer } from './IconRenderer';
 
-// Updated emoji list for different effects
-export const REACTIONS = ['🎉', '❤️', '🔥', '❄️', '✨', '🌸'];
+// Default emoji list with effects
+export const DEFAULT_REACTIONS = ['🎉', '❤️', '🔥', '❄️', '✨', '🌸'];
+
+// Get current reactions (custom or default)
+export const getReactions = (): string[] => {
+    const stored = localStorage.getItem('lumostime_custom_reactions');
+    if (stored) {
+        try {
+            const parsed = JSON.parse(stored);
+            return parsed.length > 0 ? parsed : DEFAULT_REACTIONS;
+        } catch {
+            return DEFAULT_REACTIONS;
+        }
+    }
+    return DEFAULT_REACTIONS;
+};
+
+// Check if using custom reactions (no effects)
+export const isUsingCustomReactions = (): boolean => {
+    const stored = localStorage.getItem('lumostime_custom_reactions');
+    if (!stored) return false;
+    try {
+        const parsed = JSON.parse(stored);
+        return parsed.length > 0;
+    } catch {
+        return false;
+    }
+};
+
+// For backward compatibility
+export const REACTIONS = getReactions();
 
 interface ReactionPickerProps {
     onSelect: (emoji: string) => void;
@@ -14,13 +43,34 @@ interface ReactionPickerProps {
 
 export const ReactionPicker: React.FC<ReactionPickerProps> = ({ onSelect, currentReactions = [], align = 'left' }) => {
     const [isOpen, setIsOpen] = useState(false);
+    const [reactions, setReactions] = useState<string[]>(getReactions());
+    const [hasEffects, setHasEffects] = useState(!isUsingCustomReactions());
+    const [showCustomInput, setShowCustomInput] = useState(false);
+    const [customEmoji, setCustomEmoji] = useState('');
     const containerRef = useRef<HTMLDivElement>(null);
+    const inputRef = useRef<HTMLInputElement>(null);
+
+    // Listen for custom reactions changes
+    useEffect(() => {
+        const handleReactionsChange = () => {
+            setReactions(getReactions());
+            setHasEffects(!isUsingCustomReactions());
+        };
+        
+        window.addEventListener('customReactionsChanged', handleReactionsChange);
+        return () => {
+            window.removeEventListener('customReactionsChanged', handleReactionsChange);
+        };
+    }, []);
 
     // Close when clicking outside
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
             if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
-                setIsOpen(false);
+                // 如果正在显示自定义输入框，不要立即关闭，让 onBlur 处理
+                if (!showCustomInput) {
+                    setIsOpen(false);
+                }
             }
         };
 
@@ -30,7 +80,14 @@ export const ReactionPicker: React.FC<ReactionPickerProps> = ({ onSelect, curren
         return () => {
             document.removeEventListener('mousedown', handleClickOutside);
         };
-    }, [isOpen]);
+    }, [isOpen, showCustomInput]);
+
+    // Auto-focus input when custom input is shown
+    useEffect(() => {
+        if (showCustomInput && inputRef.current) {
+            inputRef.current.focus();
+        }
+    }, [showCustomInput]);
 
     // Determine layout mode based on align prop
     const isInlineSlide = align === 'inline-slide';
@@ -191,14 +248,48 @@ export const ReactionPicker: React.FC<ReactionPickerProps> = ({ onSelect, curren
         }
     };
 
+    const handleCustomEmojiSubmit = () => {
+        if (customEmoji.trim()) {
+            onSelect(customEmoji.trim());
+            setCustomEmoji('');
+            setShowCustomInput(false);
+            setIsOpen(false);
+        }
+    };
+
+    const handleCustomEmojiBlur = () => {
+        // 使用 setTimeout 确保在点击事件之后执行
+        setTimeout(() => {
+            // 失去焦点时自动保存
+            if (customEmoji.trim()) {
+                onSelect(customEmoji.trim());
+            }
+            setCustomEmoji('');
+            setShowCustomInput(false);
+            setIsOpen(false);
+        }, 100);
+    };
+
+    const handleCustomEmojiKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+        if (e.key === 'Enter') {
+            handleCustomEmojiSubmit();
+        } else if (e.key === 'Escape') {
+            setShowCustomInput(false);
+            setCustomEmoji('');
+        }
+    };
+
     const renderButtons = () => (
         <>
-            {REACTIONS.map(emoji => (
+            {reactions.map(emoji => (
                 <button
                     key={emoji}
                     onClick={(e) => {
-                        const rect = e.currentTarget.getBoundingClientRect();
-                        triggerConfetti(emoji, rect);
+                        // Only trigger confetti for default reactions with effects
+                        if (hasEffects && DEFAULT_REACTIONS.includes(emoji)) {
+                            const rect = e.currentTarget.getBoundingClientRect();
+                            triggerConfetti(emoji, rect);
+                        }
                         onSelect(emoji);
                         setIsOpen(false);
                     }}
@@ -207,6 +298,14 @@ export const ReactionPicker: React.FC<ReactionPickerProps> = ({ onSelect, curren
                     <IconRenderer icon={emoji} />
                 </button>
             ))}
+            {/* Custom emoji button */}
+            <button
+                onClick={() => setShowCustomInput(true)}
+                className="w-4 h-4 flex-shrink-0 flex items-center justify-center text-xs hover:scale-125 transition-transform rounded-full hover:bg-stone-50 text-stone-400"
+                title="自定义 Emoji"
+            >
+                <Plus size={12} />
+            </button>
         </>
     );
 
@@ -221,9 +320,23 @@ export const ReactionPicker: React.FC<ReactionPickerProps> = ({ onSelect, curren
                         ${isOpen ? 'w-auto opacity-100 mr-1.5' : 'w-0 opacity-0'}
                     `}
                 >
-                    <div className="flex items-center gap-4">
-                        {renderButtons()}
-                    </div>
+                    {!showCustomInput ? (
+                        <div className="flex items-center gap-4">
+                            {renderButtons()}
+                        </div>
+                    ) : (
+                        <input
+                            ref={inputRef}
+                            type="text"
+                            value={customEmoji}
+                            onChange={(e) => setCustomEmoji(e.target.value)}
+                            onKeyDown={handleCustomEmojiKeyDown}
+                            onBlur={handleCustomEmojiBlur}
+                            placeholder="Emoji"
+                            maxLength={4}
+                            className="w-12 h-4 px-1 text-xs border-none bg-stone-50 rounded outline-none text-center"
+                        />
+                    )}
                 </div>
             )}
 
@@ -243,27 +356,70 @@ export const ReactionPicker: React.FC<ReactionPickerProps> = ({ onSelect, curren
                         ${isOpen ? 'w-auto opacity-100 ml-1.5' : 'w-0 opacity-0'}
                     `}
                 >
-                    {renderButtons()}
+                    {!showCustomInput ? (
+                        <>
+                            {renderButtons()}
+                        </>
+                    ) : (
+                        <input
+                            ref={inputRef}
+                            type="text"
+                            value={customEmoji}
+                            onChange={(e) => setCustomEmoji(e.target.value)}
+                            onKeyDown={handleCustomEmojiKeyDown}
+                            onBlur={handleCustomEmojiBlur}
+                            placeholder="Emoji"
+                            maxLength={4}
+                            className="w-12 h-4 px-1 text-xs border-none bg-stone-50 rounded outline-none text-center"
+                        />
+                    )}
                 </div>
             )}
 
             {/* Popup Mode (Fallback) */}
             {!isInlineSlide && !isInlineSlideLeft && isOpen && (
                 <div className={popupClasses}>
-                    {REACTIONS.map(emoji => (
-                        <button
-                            key={emoji}
-                            onClick={(e) => {
-                                const rect = e.currentTarget.getBoundingClientRect();
-                                triggerConfetti(emoji, rect);
-                                onSelect(emoji);
-                                setIsOpen(false);
-                            }}
-                            className={`w-5 h-5 flex items-center justify-center text-xs hover:scale-125 transition-transform rounded-full hover:bg-stone-50 ${currentReactions.includes(emoji) ? 'bg-stone-100' : ''}`}
-                        >
-                            <IconRenderer icon={emoji} />
-                        </button>
-                    ))}
+                    {!showCustomInput ? (
+                        <>
+                            {reactions.map(emoji => (
+                                <button
+                                    key={emoji}
+                                    onClick={(e) => {
+                                        // Only trigger confetti for default reactions with effects
+                                        if (hasEffects && DEFAULT_REACTIONS.includes(emoji)) {
+                                            const rect = e.currentTarget.getBoundingClientRect();
+                                            triggerConfetti(emoji, rect);
+                                        }
+                                        onSelect(emoji);
+                                        setIsOpen(false);
+                                    }}
+                                    className={`w-5 h-5 flex items-center justify-center text-xs hover:scale-125 transition-transform rounded-full hover:bg-stone-50 ${currentReactions.includes(emoji) ? 'bg-stone-100' : ''}`}
+                                >
+                                    <IconRenderer icon={emoji} />
+                                </button>
+                            ))}
+                            {/* Custom emoji button */}
+                            <button
+                                onClick={() => setShowCustomInput(true)}
+                                className="w-5 h-5 flex items-center justify-center text-xs hover:scale-125 transition-transform rounded-full hover:bg-stone-50 text-stone-400 border border-stone-200"
+                                title="自定义 Emoji"
+                            >
+                                <Plus size={14} />
+                            </button>
+                        </>
+                    ) : (
+                        <input
+                            ref={inputRef}
+                            type="text"
+                            value={customEmoji}
+                            onChange={(e) => setCustomEmoji(e.target.value)}
+                            onKeyDown={handleCustomEmojiKeyDown}
+                            onBlur={handleCustomEmojiBlur}
+                            placeholder="输入 Emoji"
+                            maxLength={4}
+                            className="w-20 h-5 px-2 text-sm border-none bg-stone-50 rounded outline-none text-center"
+                        />
+                    )}
                 </div>
             )}
         </div>

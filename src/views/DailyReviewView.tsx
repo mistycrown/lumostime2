@@ -103,10 +103,6 @@ export const DailyReviewView: React.FC<DailyReviewViewProps> = ({
             type: item.type || 'manual' // 如果没有 type 字段，默认为 manual
         }));
     });
-    const [newCheckItemText, setNewCheckItemText] = useState('');
-    const [isAddCheckItemOpen, setIsAddCheckItemOpen] = useState(false);
-    const [editingCheckItemId, setEditingCheckItemId] = useState<string | null>(null);
-    const [editingCheckItemText, setEditingCheckItemText] = useState('');
     const [isClearCheckConfirmOpen, setIsClearCheckConfirmOpen] = useState(false);
     const [isReloadConfirmOpen, setIsReloadConfirmOpen] = useState(false);
     const [isReloadGuideConfirmOpen, setIsReloadGuideConfirmOpen] = useState(false);
@@ -172,41 +168,7 @@ export const DailyReviewView: React.FC<DailyReviewViewProps> = ({
         onUpdateReview({ ...review, checkItems: newItems, updatedAt: Date.now() });
     };
 
-    const handleAddCheckItem = () => {
-        if (!newCheckItemText.trim()) return;
-        const newItem: CheckItem = {
-            id: crypto.randomUUID(),
-            content: newCheckItemText.trim(),
-            isCompleted: false
-        };
-        const newItems = [...checkItems, newItem];
-        setCheckItems(newItems);
-        onUpdateReview({ ...review, checkItems: newItems, updatedAt: Date.now() });
-        setNewCheckItemText('');
-        setIsAddCheckItemOpen(false);
-    };
 
-    const handleDeleteCheckItem = (id: string) => {
-        const newItems = checkItems.filter(item => item.id !== id);
-        setCheckItems(newItems);
-        onUpdateReview({ ...review, checkItems: newItems, updatedAt: Date.now() });
-    };
-
-    const startEditingCheckItem = (item: CheckItem) => {
-        setEditingCheckItemId(item.id);
-        setEditingCheckItemText(item.content);
-    };
-
-    const saveEditingCheckItem = () => {
-        if (!editingCheckItemId || !editingCheckItemText.trim()) return;
-        const newItems = checkItems.map(item =>
-            item.id === editingCheckItemId ? { ...item, content: editingCheckItemText.trim() } : item
-        );
-        setCheckItems(newItems);
-        onUpdateReview({ ...review, checkItems: newItems, updatedAt: Date.now() });
-        setEditingCheckItemId(null);
-        setEditingCheckItemText('');
-    };
 
     const handleClearCheckItems = () => {
         setCheckItems([]);
@@ -603,7 +565,7 @@ export const DailyReviewView: React.FC<DailyReviewViewProps> = ({
                         {checkItems.length === 0 ? (
                             <div className="text-center py-12">
                                 <p className="text-stone-400">今日无日课</p>
-                                <p className="text-xs text-stone-300 mt-2">点击右下角添加，或在设置中配置每日模板</p>
+                                <p className="text-xs text-stone-300 mt-2">在设置中配置每日模板，然后点击下方"重新从模板导入"</p>
                             </div>
                         ) : (
                             <div className="space-y-8">
@@ -672,83 +634,21 @@ export const DailyReviewView: React.FC<DailyReviewViewProps> = ({
                                                         </button>
 
                                                         <div className="flex-1 min-w-0 flex items-start gap-2">
-                                                            {editingCheckItemId === item.id ? (
-                                                                <div className="flex-1 flex items-center gap-2" onClick={e => e.stopPropagation()}>
-                                                                    <input
-                                                                        type="text"
-                                                                        value={editingCheckItemText}
-                                                                        onChange={(e) => setEditingCheckItemText(e.target.value)}
-                                                                        className="flex-1 bg-transparent border-b border-stone-800 py-0.5 text-[15px] font-serif text-stone-900 outline-none rounded-none"
-                                                                        autoFocus
-                                                                        onKeyDown={(e) => {
-                                                                            if (e.key === 'Enter') saveEditingCheckItem();
-                                                                            if (e.key === 'Escape') setEditingCheckItemId(null);
-                                                                        }}
-                                                                    />
-                                                                    <button onClick={saveEditingCheckItem} className="text-stone-800 p-1"><LucideIcons.Check size={16} /></button>
-                                                                </div>
-                                                            ) : (
-                                                                <div className="flex-1 flex items-center gap-2">
-                                                                    <p className={`flex-1 text-[15px] font-serif leading-relaxed transition-all ${item.isCompleted ? 'text-stone-400 line-through decoration-stone-300' : 'text-stone-900'}`}>
-                                                                        {item.content}
-                                                                    </p>
-                                                                    {item.type === 'auto' && (
-                                                                        <span className="text-xs text-blue-500 bg-blue-50 px-2 py-0.5 rounded-full shrink-0">
-                                                                            自动
-                                                                        </span>
-                                                                    )}
-                                                                </div>
+                                                            <p className={`flex-1 text-[15px] font-serif leading-relaxed transition-all ${item.isCompleted ? 'text-stone-400 line-through decoration-stone-300' : 'text-stone-900'}`}>
+                                                                {item.content}
+                                                            </p>
+                                                            {item.type === 'auto' && (
+                                                                <span className="text-xs text-blue-500 bg-blue-50 px-2 py-0.5 rounded-full shrink-0">
+                                                                    自动
+                                                                </span>
                                                             )}
                                                         </div>
-
-                                                        {!editingCheckItemId && !item.category && item.type !== 'auto' && (
-                                                            <div className="flex items-center gap-3 opacity-0 group-hover:opacity-100 transition-opacity" onClick={e => e.stopPropagation()}>
-                                                                <button
-                                                                    onClick={() => startEditingCheckItem(item)}
-                                                                    className="text-stone-300 hover:text-stone-600"
-                                                                >
-                                                                    <Edit3 size={14} />
-                                                                </button>
-                                                                <button
-                                                                    onClick={() => handleDeleteCheckItem(item.id)}
-                                                                    className="text-stone-300 hover:text-stone-600"
-                                                                >
-                                                                    <Trash2 size={14} />
-                                                                </button>
-                                                            </div>
-                                                        )}
                                                     </div>
                                                 ))}
                                             </div>
                                         </div>
                                     ));
                                 })()}
-                            </div>
-                        )}
-
-                        {/* Add New Item UI - Simplified to match style */}
-                        {isAddCheckItemOpen && (
-                            <div className="mt-8 bg-stone-50 rounded-xl p-4 border border-stone-100 animate-in fade-in slide-in-from-bottom-2">
-                                <div className="flex items-center gap-3">
-                                    <input
-                                        type="text"
-                                        value={newCheckItemText}
-                                        onChange={(e) => setNewCheckItemText(e.target.value)}
-                                        className="flex-1 bg-transparent border-b border-stone-300 px-2 py-2 text-sm font-serif outline-none focus:border-stone-800 transition-colors"
-                                        placeholder="输入新日课 (默认为通用)..."
-                                        autoFocus
-                                        onKeyDown={(e) => {
-                                            if (e.key === 'Enter') handleAddCheckItem();
-                                            if (e.key === 'Escape') setIsAddCheckItemOpen(false);
-                                        }}
-                                    />
-                                    <button
-                                        onClick={handleAddCheckItem}
-                                        className="p-2 bg-stone-900 text-white rounded-lg shadow-sm active:scale-95 transition-all"
-                                    >
-                                        <LucideIcons.Plus size={18} />
-                                    </button>
-                                </div>
                             </div>
                         )}
 
@@ -892,17 +792,6 @@ export const DailyReviewView: React.FC<DailyReviewViewProps> = ({
                     </div>
                 )}
             </div>
-
-            {/* Floating Action Button for Check Tab */}
-            {activeTab === 'check' && !isAddCheckItemOpen && (
-                <FloatingButton
-                    onClick={() => setIsAddCheckItemOpen(true)}
-                    position="custom"
-                    className="fixed bottom-16 right-6"
-                >
-                    <UIIcon type="add-record" fallbackIcon={LucideIcons.Plus} size={24} className="text-white" />
-                </FloatingButton>
-            )}
 
             {/* Floating Action Button for Guide Tab */}
             {activeTab === 'guide' && templates.filter(t => t.isDailyTemplate).length > 0 && (

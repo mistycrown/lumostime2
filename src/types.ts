@@ -367,6 +367,7 @@ export interface ParsedFilterCondition {
   scopes: string[][];              // % 引导的领域关键词组 (外层AND, 内层OR)
   todos: string[][];               // @ 引导的代办关键词组 (外层AND, 内层OR)
   notes: string[][];               // 无符号的全文备注关键词组 (外层AND, 内层OR)
+  reactions: string[][];           // ^ 引导的 Reaction Emoji 关键词组 (外层AND, 内层OR)
 }
 
 // Memoir 筛选配置

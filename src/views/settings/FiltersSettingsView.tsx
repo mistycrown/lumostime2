@@ -233,12 +233,12 @@ export const FiltersSettingsView: React.FC<FiltersSettingsViewProps> = ({
                                 <input
                                     type="text"
                                     className="w-full bg-stone-50 border border-stone-200 rounded-xl px-4 py-2.5 text-sm text-stone-800 font-mono outline-none focus:border-stone-400"
-                                    placeholder="例如:瑜伽 OR 跑步 #运动 %健康 OR 工作"
+                                    placeholder="例如:瑜伽 OR 跑步 #运动 %健康 ^🌸"
                                     value={filterExpression}
                                     onChange={e => setFilterExpression(e.target.value)}
                                 />
                                 <p className="text-[10px] text-stone-400 mt-1.5">
-                                    # 标签, % 领域, @ 代办, 无符号=备注, OR 表示"或"
+                                    # 标签, % 领域, @ 代办, ^ Reaction, 无符号=备注, OR 表示"或"
                                 </p>
                             </div>
                         </div>

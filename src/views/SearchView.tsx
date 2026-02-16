@@ -176,10 +176,16 @@ export const SearchView: React.FC<SearchViewProps> = ({
                 // Handle possibly missing activity or category gracefully
                 if (!category || !activity) return;
 
+                // 检查是否匹配 Reaction Emoji
+                const hasReactionMatch = log.reactions?.some(reaction => 
+                    reaction.includes(lowerQuery) || lowerQuery.includes(reaction)
+                );
+
                 if (
                     log.title?.toLowerCase().includes(lowerQuery) ||
                     log.note?.toLowerCase().includes(lowerQuery) ||
-                    activity.name.toLowerCase().includes(lowerQuery)
+                    activity.name.toLowerCase().includes(lowerQuery) ||
+                    hasReactionMatch
                 ) {
                     results.records.push({ log, category, activity });
                 }
