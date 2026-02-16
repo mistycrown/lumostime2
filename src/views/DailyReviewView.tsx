@@ -122,7 +122,7 @@ export const DailyReviewView: React.FC<DailyReviewViewProps> = ({
         setNarrative(review.narrative || '');
     }, [review]);
 
-    // 当切换到引导或叙事标签时，根据内容自动切换阅读/编辑模式
+    // 当切换到引导或叙事标签时，根据内容自动切换阅读/编辑模式（仅在标签切换时触发）
     useEffect(() => {
         if (activeTab === 'guide') {
             // 引导标签：检查是否有回答内容
@@ -133,7 +133,7 @@ export const DailyReviewView: React.FC<DailyReviewViewProps> = ({
             const hasContent = (summary && summary.trim() !== '') || (narrative && narrative.trim() !== '');
             setIsReadingMode(hasContent);
         }
-    }, [activeTab, answers, summary, narrative]);
+    }, [activeTab]); // 只依赖 activeTab，仅在标签切换时触发
 
     // 更新自动日课状态（当切换到日课标签或数据变化时）
     useEffect(() => {

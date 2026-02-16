@@ -54,6 +54,7 @@ export const useReviewState = ({
         isDeleteNarrativeConfirmOpen,
         setIsDeleteNarrativeConfirmOpen,
         isReadingMode,
+        setIsReadingMode,
         toggleReadingMode
     };
 };

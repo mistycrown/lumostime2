@@ -127,13 +127,13 @@ export const ReviewNarrativeTab: React.FC<ReviewNarrativeTabProps> = ({
                             type="text"
                             value={summary}
                             onChange={(e) => handleSummaryChange(e.target.value)}
-                            className="flex-1 bg-white border border-stone-200 rounded-xl px-4 py-2 text-stone-800 outline-none text-[15px] leading-relaxed shadow-sm focus:border-stone-400 transition-colors"
+                            className="flex-1 bg-white border border-stone-200 rounded-xl px-4 py-2.5 text-stone-800 outline-none text-[15px] leading-relaxed shadow-sm focus:border-stone-400 transition-colors h-[42px]"
                             placeholder="用一句话总结..."
                         />
                         {onMoodChange && (
                             <button
                                 onClick={() => setIsMoodModalOpen(true)}
-                                className={`flex items-center justify-center w-10 h-10 rounded-xl transition-all flex-shrink-0 ${
+                                className={`flex items-center justify-center w-[42px] h-[42px] rounded-xl transition-all flex-shrink-0 ${
                                     moodEmoji
                                         ? 'bg-stone-100 hover:bg-stone-200'
                                         : 'bg-white border border-stone-200 hover:border-stone-300'
