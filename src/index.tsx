@@ -10,6 +10,7 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
+import './index.css'; // 导入 Tailwind CSS
 import './styles/themes.css';
 
 import { Buffer } from 'buffer';

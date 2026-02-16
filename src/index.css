@@ -1,0 +1,17 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* 自定义基础样式 */
+@layer base {
+  body {
+    /* 使用 Noto Serif SC 作为默认字体 */
+    font-family: 'Noto Serif SC', 'Source Han Serif SC', 'Source Han Serif CN', 'Songti SC', 'STSong', 'SimSun', 'Microsoft YaHei', serif;
+    font-weight: 400;
+  }
+  
+  /* 为手写字体添加系统回退 */
+  .font-handwriting {
+    font-family: 'Bilbo Swash Caps', 'Georgia', 'Times New Roman', cursive, serif !important;
+  }
+}

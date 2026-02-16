@@ -6,76 +6,48 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
   <title>LumosTime</title>
   <link rel="icon" type="image/png" href="/lumostime_icon.png">
-  <!-- 立即应用保存的字体设置，必须在 Tailwind 之前 -->
+  
+  <!-- 立即应用保存的字体设置 -->
   <script>
     (function() {
       try {
         const savedFont = localStorage.getItem('lumostime_font_family');
         const fontMap = {
-          'default': '"Noto Serif SC", serif',
-          'lxgw-wenkai': '"LXGW WenKai", "Noto Serif SC", serif',
-          'lxgw-neo-zhisong': '"LXGW Neo ZhiSong", "Noto Serif SC", serif',
-          'ding-lie-song': '"Ding Lie Song", "Noto Serif SC", serif',
-          'zhuque-fangsong': '"Zhuque Fangsong", "Noto Serif SC", serif'
+          'default': '"Source Han Serif SC", "Source Han Serif CN", "Songti SC", "STSong", "SimSun", "Microsoft YaHei", serif',
+          'lxgw-wenkai': '"LXGW WenKai", "Source Han Serif SC", "SimSun", "Microsoft YaHei", serif',
+          'lxgw-neo-zhisong': '"LXGW Neo ZhiSong", "Source Han Serif SC", "SimSun", "Microsoft YaHei", serif',
+          'ding-lie-song': '"Ding Lie Song", "Source Han Serif SC", "SimSun", "Microsoft YaHei", serif',
+          'zhuque-fangsong': '"Zhuque Fangsong", "Source Han Serif SC", "SimSun", "Microsoft YaHei", serif',
+          'wenquanyi-bitmap': '"WenQuanYi Bitmap Song", "Source Han Serif SC", "SimSun", "Microsoft YaHei", serif'
         };
         const fontFamily = fontMap[savedFont] || fontMap['default'];
-        // 立即设置 CSS 变量
-        document.documentElement.style.setProperty('--font-family', fontFamily);
+        // 立即设置字体
+        document.documentElement.style.fontFamily = fontFamily;
+        document.body.style.fontFamily = fontFamily;
         console.log('[Font Init] Applied font:', savedFont || 'default', '→', fontFamily);
       } catch (e) {
         console.error('[Font Init] Failed:', e);
-        document.documentElement.style.setProperty('--font-family', '"Noto Serif SC", serif');
+        const fallback = '"Source Han Serif SC", "SimSun", "Microsoft YaHei", serif';
+        document.documentElement.style.fontFamily = fallback;
+        document.body.style.fontFamily = fallback;
       }
     })();
   </script>
-  <!-- Tailwind CDN -->
-  <script src="https://cdn.tailwindcss.com"></script>
-  <!-- Tailwind 配置必须在 CDN 加载后 -->
-  <script>
-    // 等待 Tailwind 加载完成
-    (function checkTailwind() {
-      if (typeof tailwind !== 'undefined') {
-        tailwind.config = {
-          theme: {
-            extend: {
-              fontFamily: {
-                // 使用 CSS 变量，这样可以动态切换
-                serif: ['var(--font-family)', '"Noto Serif SC"', 'PingFang SC', 'Microsoft YaHei', 'serif'],
-                sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
-                handwriting: ['Caveat', 'Ma Shan Zheng', 'KaiTi', 'STKaiti', 'cursive'],
-              }
-            }
-          }
-        };
-      } else {
-        setTimeout(checkTailwind, 50);
-      }
-    })();
-  </script>
-  <!-- 预连接到 Google Fonts，但不阻塞渲染 -->
-  <link rel="preconnect" href="https://fonts.googleapis.com" crossorigin>
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   
-  <!-- 异步加载 Google Fonts，不阻塞页面渲染 -->
-  <link
-    href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;500;700&family=Inter:wght@400;500;600;700&family=Caveat:wght@400;700&family=Ma+Shan+Zheng&display=swap"
-    rel="stylesheet"
-    media="print"
-    onload="this.media='all'; this.onload=null;">
-  
-  <!-- 自定义字体（本地优先） -->
-  <link rel="stylesheet" href="/fonts/fonts.css">
+  <!-- 自定义字体（本地） -->
+  <link rel="stylesheet" href="./fonts/fonts.css">
   <style>
     /* 字体加载优化 - 使用系统字体作为回退 */
     body {
-      /* 使用 CSS 变量，由 fontService 动态控制 */
-      font-family: var(--font-family, 'Noto Serif SC', 'PingFang SC', 'Microsoft YaHei', serif);
+      /* 使用 Noto Serif SC 作为默认字体 */
+      font-family: 'Noto Serif SC', 'Source Han Serif SC', 'Source Han Serif CN', 'Songti SC', 'STSong', 'SimSun', 'Microsoft YaHei', serif;
+      font-weight: 400;
       /* Background will be controlled by backgroundService */
     }
     
     /* 为手写字体添加系统回退 */
     .font-handwriting {
-      font-family: 'Caveat', 'Ma Shan Zheng', 'KaiTi', 'STKaiti', cursive, serif;
+      font-family: 'Bilbo Swash Caps', 'Georgia', 'Times New Roman', cursive, serif !important;
     }
 
     /* Ensure numbers use the serif font as requested */
@@ -245,17 +217,6 @@
       }
     }, 5000);
   </script>
-  <script type="importmap">
-{
-  "imports": {
-    "react/": "https://aistudiocdn.com/react@^19.2.1/",
-    "react": "https://aistudiocdn.com/react@^19.2.1",
-    "lucide-react": "https://aistudiocdn.com/lucide-react@^0.555.0",
-    "@google/genai": "https://aistudiocdn.com/@google/genai@^1.31.0",
-    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.1/"
-  }
-}
-</script>
 
 </head>
 

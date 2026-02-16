@@ -1471,7 +1471,7 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ logs, todos, scopes,
                     </div>
                 )}
 
-                {dayTimeline.length === 0 && (
+                {dayTimeline.length === 0 && !shouldShowReviewNode && (
                     <div className="flex flex-col items-center justify-center py-20 opacity-60">
                         <div className="w-16 h-16 border border-stone-200 rounded-full flex items-center justify-center text-stone-300 mb-4">
                             <MoreHorizontal size={32} />

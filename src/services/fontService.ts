@@ -19,7 +19,7 @@ const FONT_OPTIONS: FontOption[] = [
         name: 'default',
         displayName: '默认',
         description: '',
-        fontFamily: '"Noto Serif SC", serif',
+        fontFamily: '"Noto Serif SC", "Source Han Serif SC", "Source Han Serif CN", "Songti SC", "STSong", "SimSun", "Microsoft YaHei", serif',
         type: 'system'
     },
     {
@@ -27,7 +27,7 @@ const FONT_OPTIONS: FontOption[] = [
         name: 'lxgw-wenkai',
         displayName: '霞鹜文楷',
         description: '',
-        fontFamily: '"LXGW WenKai", "Noto Serif SC", serif',
+        fontFamily: '"LXGW WenKai", "Noto Serif SC", "Source Han Serif SC", "SimSun", serif',
         type: 'custom'
     },
     {
@@ -35,7 +35,7 @@ const FONT_OPTIONS: FontOption[] = [
         name: 'lxgw-neo-zhisong',
         displayName: '霞鹜新致宋',
         description: '',
-        fontFamily: '"LXGW Neo ZhiSong", "Noto Serif SC", serif',
+        fontFamily: '"LXGW Neo ZhiSong", "Noto Serif SC", "Source Han Serif SC", "SimSun", serif',
         type: 'custom'
     },
     {
@@ -43,7 +43,7 @@ const FONT_OPTIONS: FontOption[] = [
         name: 'ding-lie-song',
         displayName: '鼎烈宋体',
         description: '',
-        fontFamily: '"Ding Lie Song", "Noto Serif SC", serif',
+        fontFamily: '"Ding Lie Song", "Noto Serif SC", "Source Han Serif SC", "SimSun", serif',
         type: 'custom'
     },
     {
@@ -51,7 +51,7 @@ const FONT_OPTIONS: FontOption[] = [
         name: 'zhuque-fangsong',
         displayName: '朱雀仿宋',
         description: '',
-        fontFamily: '"Zhuque Fangsong", "Noto Serif SC", serif',
+        fontFamily: '"Zhuque Fangsong", "Noto Serif SC", "Source Han Serif SC", "SimSun", serif',
         type: 'custom'
     },
     {
@@ -59,7 +59,7 @@ const FONT_OPTIONS: FontOption[] = [
         name: 'wenquanyi-bitmap',
         displayName: '文泉驿点阵宋',
         description: '',
-        fontFamily: '"WenQuanYi Bitmap Song", "Noto Serif SC", serif',
+        fontFamily: '"WenQuanYi Bitmap Song", "Noto Serif SC", "Source Han Serif SC", "SimSun", serif',
         type: 'custom'
     }
 ];
@@ -145,16 +145,13 @@ class FontService {
         try {
             // 更新 body 字体
             document.body.style.fontFamily = font.fontFamily;
-            
-            // 更新 CSS 变量
-            document.documentElement.style.setProperty('--font-family', font.fontFamily);
+            document.documentElement.style.fontFamily = font.fontFamily;
             
             // 强制重绘
             document.body.offsetHeight;
             
             console.log('[FontService] 字体已应用:', font.fontFamily);
             console.log('[FontService] body.style.fontFamily:', document.body.style.fontFamily);
-            console.log('[FontService] CSS变量:', getComputedStyle(document.documentElement).getPropertyValue('--font-family'));
         } catch (error) {
             console.error('[FontService] 应用字体失败:', error);
         }

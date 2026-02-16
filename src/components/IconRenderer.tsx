@@ -67,9 +67,14 @@ export const IconRenderer: React.FC<IconRendererProps> = ({
     // 解析显示的图标字符串
     const { isUIIcon, value } = uiIconService.parseIconString(displayIcon);
     
-    // 检查是否是自定义图片（格式：image:/path/to/image.png）
+    // 检查是否是自定义图片（格式：image:/path/to/image）
     const isCustomImage = displayIcon.startsWith('image:');
-    const customImagePath = isCustomImage ? displayIcon.substring(6) : null; // 移除 "image:" 前缀
+    let customImagePath = isCustomImage ? displayIcon.substring(6) : null; // 移除 "image:" 前缀
+    
+    // 如果路径没有扩展名，优先尝试 .webp
+    if (customImagePath && !customImagePath.match(/\.(png|webp|jpg|jpeg|gif|svg)$/i)) {
+        customImagePath = `${customImagePath}.webp`;
+    }
     
     // 4. 渲染 Emoji（原生、Twemoji 或 OpenMoji）
     // 显示 Emoji（如果开启 Twemoji 或 OpenMoji，useEffect 会自动转换）
@@ -211,8 +216,24 @@ export const IconRenderer: React.FC<IconRendererProps> = ({
                 className={`inline-block ${className}`}
                 style={sizeStyle}
                 onError={(e) => {
-                    if (!hasFallbackAttempted && fallbackEmoji) {
+                    // 获取当前尝试的路径
+                    const currentSrc = e.currentTarget.src;
+                    const currentPath = new URL(currentSrc).pathname;
+                    
+                    // 如果是 .webp 加载失败，尝试 .png
+                    if (currentPath.endsWith('.webp') && !hasFallbackAttempted) {
+                        const pngPath = customImagePath!.replace(/\.webp$/i, '.png');
                         setHasFallbackAttempted(true);
+                        e.currentTarget.src = pngPath;
+                    } 
+                    // 如果是 .png 加载失败，尝试 .webp
+                    else if (currentPath.endsWith('.png') && !hasFallbackAttempted) {
+                        const webpPath = customImagePath!.replace(/\.png$/i, '.webp');
+                        setHasFallbackAttempted(true);
+                        e.currentTarget.src = webpPath;
+                    }
+                    // 如果都失败了，使用 fallback emoji
+                    else if (fallbackEmoji) {
                         setImageError(true);
                     } else {
                         setImageError(true);
