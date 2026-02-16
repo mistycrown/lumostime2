@@ -11,19 +11,24 @@ import { DailyReview } from '../../types';
 import { IconRenderer } from '../IconRenderer';
 import { Image } from 'lucide-react';
 import { EmojiExportView } from './EmojiExportView';
+import { YearEmojiExportView } from './YearEmojiExportView';
+import { ToastType } from '../../components/Toast';
 
 interface EmojiStatsViewProps {
   dailyReviews: DailyReview[];
   currentDate: Date;
   emojiRange: 'month' | 'year';
+  onToast?: (type: ToastType, message: string) => void;
 }
 
 export const EmojiStatsView: React.FC<EmojiStatsViewProps> = ({
   dailyReviews,
   currentDate,
-  emojiRange
+  emojiRange,
+  onToast
 }) => {
   const [showExportView, setShowExportView] = useState(false);
+  const [showYearExportView, setShowYearExportView] = useState(false);
 
   return (
     <>
@@ -38,7 +43,7 @@ export const EmojiStatsView: React.FC<EmojiStatsViewProps> = ({
         {/* Export Buttons */}
         <div className="flex flex-col items-center gap-3 pt-8 mt-4 mb-4">
           <button
-            onClick={() => setShowExportView(true)}
+            onClick={() => emojiRange === 'year' ? setShowYearExportView(true) : setShowExportView(true)}
             className="flex items-center gap-1 text-stone-400 hover:text-stone-600 transition-colors text-xs font-medium"
           >
             <Image size={12} />
@@ -54,6 +59,17 @@ export const EmojiStatsView: React.FC<EmojiStatsViewProps> = ({
           currentDate={currentDate}
           emojiRange={emojiRange}
           onBack={() => setShowExportView(false)}
+          onToast={onToast} // Pass onToast
+        />,
+        document.body
+      )}
+
+      {showYearExportView && ReactDOM.createPortal(
+        <YearEmojiExportView
+          dailyReviews={dailyReviews}
+          currentDate={currentDate}
+          onBack={() => setShowYearExportView(false)}
+          onToast={onToast}
         />,
         document.body
       )}
@@ -70,7 +86,7 @@ const MonthEmojiView: React.FC<{ dailyReviews: DailyReview[]; currentDate: Date 
     const year = currentDate.getFullYear();
     const month = currentDate.getMonth();
     const daysInMonth = new Date(year, month + 1, 0).getDate();
-    
+
     const data: Array<{
       date: string;
       day: number;
@@ -81,7 +97,7 @@ const MonthEmojiView: React.FC<{ dailyReviews: DailyReview[]; currentDate: Date 
     for (let day = 1; day <= daysInMonth; day++) {
       const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
       const review = dailyReviews.find(r => r.date === dateStr);
-      
+
       if (review && (review.moodEmoji || review.summary)) {
         data.push({
           date: dateStr,
@@ -109,7 +125,7 @@ const MonthEmojiView: React.FC<{ dailyReviews: DailyReview[]; currentDate: Date 
         <div key={item.date}>
           {/* 分割线 */}
           {index > 0 && <div className="border-t border-stone-200" />}
-          
+
           {/* 内容行 */}
           <div className="flex items-center gap-3 py-3 hover:bg-stone-50/30 transition-colors">
             {/* 日期数字 */}
@@ -120,8 +136,8 @@ const MonthEmojiView: React.FC<{ dailyReviews: DailyReview[]; currentDate: Date 
             {/* Emoji */}
             {item.emoji && (
               <div className="flex-shrink-0 w-6 h-6 flex items-center justify-center">
-                <IconRenderer 
-                  icon={item.emoji} 
+                <IconRenderer
+                  icon={item.emoji}
                   className="w-full h-full"
                   size="100%"
                 />
@@ -164,31 +180,31 @@ const YearEmojiView: React.FC<{ dailyReviews: DailyReview[]; currentDate: Date }
       const lastDay = new Date(year, month + 1, 0);
       const daysInMonth = lastDay.getDate();
       const startDayOfWeek = firstDay.getDay();
-      
+
       // 调整为周一开始
       const adjustedStartDay = startDayOfWeek === 0 ? 6 : startDayOfWeek - 1;
-      
+
       const calendar: Array<{ day: number | null; emoji?: string }> = [];
-      
+
       // 填充空白
       for (let i = 0; i < adjustedStartDay; i++) {
         calendar.push({ day: null });
       }
-      
+
       // 填充日期
       let hasData = false;
       for (let day = 1; day <= daysInMonth; day++) {
         const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
         const review = dailyReviews.find(r => r.date === dateStr);
         const emoji = review?.moodEmoji;
-        
+
         if (emoji) {
           hasData = true;
         }
-        
+
         calendar.push({ day, emoji });
       }
-      
+
       // 只添加有数据的月份
       if (hasData) {
         monthsData.push({
@@ -257,8 +273,8 @@ const MonthCard: React.FC<{
             >
               {item.emoji ? (
                 <div className="w-full h-full flex items-center justify-center">
-                  <IconRenderer 
-                    icon={item.emoji} 
+                  <IconRenderer
+                    icon={item.emoji}
                     className="w-full h-full"
                     size="100%"
                   />

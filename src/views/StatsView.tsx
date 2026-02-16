@@ -87,7 +87,7 @@ export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentD
 
   // 复制失败/手动复制确认模态框状态
   const [copyFailureModal, setCopyFailureModal] = useState<{ isOpen: boolean, text: string }>({ isOpen: false, text: '' });
-  
+
   // ChronoPrint 视图状态
   const [showChronoPrint, setShowChronoPrint] = useState(false);
   const [chronoPrintText, setChronoPrintText] = useState('');
@@ -797,7 +797,7 @@ export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentD
             />
           )}
 
-          {/* --- Matrix View Content --- */}
+
           {viewType === 'matrix' && (
             <MatrixView
               matrixData={matrixData}
@@ -836,6 +836,7 @@ export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentD
               dailyReviews={dailyReviews}
               currentDate={currentDate}
               emojiRange={emojiRange}
+              onToast={onToast}
             />
           )}
 

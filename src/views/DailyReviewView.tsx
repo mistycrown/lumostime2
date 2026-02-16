@@ -84,6 +84,7 @@ export const DailyReviewView: React.FC<DailyReviewViewProps> = ({
         isDeleteNarrativeConfirmOpen,
         setIsDeleteNarrativeConfirmOpen,
         isReadingMode,
+        setIsReadingMode,
         toggleReadingMode
     } = useReviewState({
         initialAnswers: review.answers || [],
@@ -120,6 +121,19 @@ export const DailyReviewView: React.FC<DailyReviewViewProps> = ({
         setSummary(review.summary || '');
         setNarrative(review.narrative || '');
     }, [review]);
+
+    // 当切换到引导或叙事标签时，根据内容自动切换阅读/编辑模式
+    useEffect(() => {
+        if (activeTab === 'guide') {
+            // 引导标签：检查是否有回答内容
+            const hasAnswers = answers.some(a => a.answer && a.answer.trim() !== '');
+            setIsReadingMode(hasAnswers);
+        } else if (activeTab === 'narrative') {
+            // 叙事标签：检查是否有一句话总结或AI叙事内容
+            const hasContent = (summary && summary.trim() !== '') || (narrative && narrative.trim() !== '');
+            setIsReadingMode(hasContent);
+        }
+    }, [activeTab, answers, summary, narrative]);
 
     // 更新自动日课状态（当切换到日课标签或数据变化时）
     useEffect(() => {
