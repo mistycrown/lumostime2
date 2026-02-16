@@ -732,6 +732,26 @@ export const JournalView: React.FC<JournalViewProps> = ({
                                             onUpdateDailyReview({ ...existingReview, moodEmoji: undefined, updatedAt: Date.now() });
                                         }
                                     }}
+                                    onUpdateSummary={async (date, summary) => {
+                                        // 找到或创建对应日期的 DailyReview
+                                        const existingReview = dailyReviews.find(r => r.date === date);
+                                        if (existingReview) {
+                                            // 更新现有 review 的 summary
+                                            if (onUpdateDailyReview) {
+                                                onUpdateDailyReview({ ...existingReview, summary, summaryUpdatedAt: Date.now(), updatedAt: Date.now() });
+                                            }
+                                        } else {
+                                            // 创建新的 review
+                                            if (onCreateDailyReviewSilently && onUpdateDailyReview) {
+                                                const dateObj = new Date(date);
+                                                const newReview = await onCreateDailyReviewSilently(dateObj);
+                                                if (newReview) {
+                                                    // 立即更新新创建的 review，添加 summary
+                                                    onUpdateDailyReview({ ...newReview, summary, summaryUpdatedAt: Date.now(), updatedAt: Date.now() });
+                                                }
+                                            }
+                                        }
+                                    }}
                                 />
 
                                 {/* Quote Text - Click to Open Monthly Review */}

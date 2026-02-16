@@ -47,6 +47,8 @@ static/sticker_backup/
 static/chronoprint---time-data-visualizer (1)/
 static/monomood/
 static/serif-diary-layout/
+static/uiicon
+static/time_pal_origin
 
 # 但保留 static 下的文档图片（如 README 引用的图片）
 !static/*.png

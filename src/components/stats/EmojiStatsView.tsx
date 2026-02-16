@@ -6,8 +6,11 @@
  * @description Emoji 统计视图 - 显示不同时间段的情绪 emoji/sticker 统计
  */
 import React, { useMemo, useState } from 'react';
+import ReactDOM from 'react-dom';
 import { DailyReview } from '../../types';
 import { IconRenderer } from '../IconRenderer';
+import { Image } from 'lucide-react';
+import { EmojiExportView } from './EmojiExportView';
 
 interface EmojiStatsViewProps {
   dailyReviews: DailyReview[];
@@ -20,15 +23,41 @@ export const EmojiStatsView: React.FC<EmojiStatsViewProps> = ({
   currentDate,
   emojiRange
 }) => {
+  const [showExportView, setShowExportView] = useState(false);
+
   return (
-    <div className="space-y-6">
-      {emojiRange === 'month' && (
-        <MonthEmojiView dailyReviews={dailyReviews} currentDate={currentDate} />
+    <>
+      <div className="space-y-6">
+        {emojiRange === 'month' && (
+          <MonthEmojiView dailyReviews={dailyReviews} currentDate={currentDate} />
+        )}
+        {emojiRange === 'year' && (
+          <YearEmojiView dailyReviews={dailyReviews} currentDate={currentDate} />
+        )}
+
+        {/* Export Buttons */}
+        <div className="flex flex-col items-center gap-3 pt-8 mt-4 mb-4">
+          <button
+            onClick={() => setShowExportView(true)}
+            className="flex items-center gap-1 text-stone-400 hover:text-stone-600 transition-colors text-xs font-medium"
+          >
+            <Image size={12} />
+            <span>导出统计图片</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Use Portal to render EmojiExportView at body level */}
+      {showExportView && ReactDOM.createPortal(
+        <EmojiExportView
+          dailyReviews={dailyReviews}
+          currentDate={currentDate}
+          emojiRange={emojiRange}
+          onBack={() => setShowExportView(false)}
+        />,
+        document.body
       )}
-      {emojiRange === 'year' && (
-        <YearEmojiView dailyReviews={dailyReviews} currentDate={currentDate} />
-      )}
-    </div>
+    </>
   );
 };
 
@@ -84,7 +113,7 @@ const MonthEmojiView: React.FC<{ dailyReviews: DailyReview[]; currentDate: Date 
           {/* 内容行 */}
           <div className="flex items-center gap-3 py-3 hover:bg-stone-50/30 transition-colors">
             {/* 日期数字 */}
-            <div className="flex-shrink-0 text-stone-900 text-lg w-8 text-right">
+            <div className="flex-shrink-0 text-stone-900 text-base w-8 text-right font-handwriting">
               {item.day}
             </div>
 

@@ -162,8 +162,10 @@ export const ReviewNarrativeTab: React.FC<ReviewNarrativeTabProps> = ({
                     isOpen={isMoodModalOpen}
                     date={date}
                     selectedMood={moodEmoji}
+                    summary={summary}
                     onSelect={onMoodChange}
                     onClear={onMoodClear}
+                    onSummaryChange={onSummaryChange}
                     onClose={() => setIsMoodModalOpen(false)}
                 />
             )}

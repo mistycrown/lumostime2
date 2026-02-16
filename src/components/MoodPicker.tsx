@@ -58,8 +58,10 @@ interface MoodPickerModalProps {
     isOpen: boolean;
     date: string; // YYYY-MM-DD 格式
     selectedMood?: string;
+    summary?: string; // 今日一句话总结
     onSelect: (emoji: string) => void;
     onClear?: () => void;
+    onSummaryChange?: (summary: string) => void; // 一句话总结变化回调
     onClose: () => void;
 }
 
@@ -67,14 +69,20 @@ export const MoodPickerModal: React.FC<MoodPickerModalProps> = ({
     isOpen,
     date,
     selectedMood,
+    summary,
     onSelect,
     onClear,
+    onSummaryChange,
     onClose
 }) => {
     const { defaultSelectorPage } = useSettings();
     const [isCustomMode, setIsCustomMode] = React.useState(false);
     const [customEmoji, setCustomEmoji] = React.useState('');
     const [moodEmojis, setMoodEmojis] = useState(getMoodEmojis());
+    
+    // 一句话总结状态
+    const [localSummary, setLocalSummary] = useState(summary || '');
+    const summaryTimeoutRef = React.useRef<NodeJS.Timeout>();
     
     // 验证状态
     const [isRedeemed, setIsRedeemed] = useState(false);
@@ -127,6 +135,7 @@ export const MoodPickerModal: React.FC<MoodPickerModalProps> = ({
             setCurrentPageIndex(getInitialPageIndex());
             setIsCustomMode(false);
             setCustomEmoji('');
+            setLocalSummary(summary || '');
             
             // 禁用底层页面滚动
             document.body.style.overflow = 'hidden';
@@ -137,8 +146,12 @@ export const MoodPickerModal: React.FC<MoodPickerModalProps> = ({
         
         return () => {
             document.body.style.overflow = '';
+            // 清理定时器
+            if (summaryTimeoutRef.current) {
+                clearTimeout(summaryTimeoutRef.current);
+            }
         };
-    }, [isOpen, getInitialPageIndex]);
+    }, [isOpen, getInitialPageIndex, summary]);
 
     // 监听 emoji 组和贴纸集变化
     useEffect(() => {
@@ -225,6 +238,23 @@ export const MoodPickerModal: React.FC<MoodPickerModalProps> = ({
         setTouchEnd(null);
     };
 
+    // 处理一句话总结变化（实时保存）
+    const handleSummaryChange = (value: string) => {
+        setLocalSummary(value);
+        
+        // 清除之前的定时器
+        if (summaryTimeoutRef.current) {
+            clearTimeout(summaryTimeoutRef.current);
+        }
+        
+        // 设置新的定时器，300ms 后自动保存
+        summaryTimeoutRef.current = setTimeout(() => {
+            if (onSummaryChange) {
+                onSummaryChange(value);
+            }
+        }, 300);
+    };
+
     if (!isOpen) return null;
 
     // 格式化日期显示为中国格式：YYYY/MM/DD
@@ -263,8 +293,21 @@ export const MoodPickerModal: React.FC<MoodPickerModalProps> = ({
                     SELECT YOUR MOOD
                 </p>
 
+                {/* 今日一句话总结输入框 */}
+                {onSummaryChange && (
+                    <div className="mb-4">
+                        <input
+                            type="text"
+                            value={localSummary}
+                            onChange={(e) => handleSummaryChange(e.target.value)}
+                            className="w-full bg-stone-50 border border-stone-200 rounded-xl px-4 py-2.5 text-stone-800 text-sm outline-none focus:border-stone-400 focus:bg-white transition-all placeholder:text-stone-400"
+                            placeholder="今日一句话总结..."
+                        />
+                    </div>
+                )}
+
                 {/* 页面导航 */}
-                <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center justify-between mb-4">{/* 从 mb-6 改为 mb-4 */}
                     {/* 左箭头 - 未验证时隐藏 */}
                     {isRedeemed ? (
                         <button
@@ -307,7 +350,7 @@ export const MoodPickerModal: React.FC<MoodPickerModalProps> = ({
                     <>
                         {/* Emoji 页面 (currentPageIndex === 0) */}
                         {currentPageIndex === 0 && (
-                            <div className="grid grid-cols-4 gap-2 mb-6">
+                            <div className="grid grid-cols-4 gap-2 mb-4">{/* 从 mb-6 改为 mb-4 */}
                                 {moodEmojis.map((emoji) => (
                                     <button
                                         key={emoji}
@@ -354,7 +397,7 @@ export const MoodPickerModal: React.FC<MoodPickerModalProps> = ({
                                     }
                                     
                                     return (
-                                        <div className="grid grid-cols-4 gap-2 mb-6 max-h-[320px] overflow-y-auto">
+                                        <div className="grid grid-cols-4 gap-2 mb-4 max-h-[320px] overflow-y-auto">{/* 从 mb-6 改为 mb-4 */}
                                             {currentStickerSet.stickers.map((sticker) => {
                                                 const stickerIcon = `image:${sticker.path}`;
                                                 
@@ -390,7 +433,7 @@ export const MoodPickerModal: React.FC<MoodPickerModalProps> = ({
 
                         {/* 页码指示器 - 仅在已验证时显示 */}
                         {isRedeemed && (
-                            <div className="flex justify-center gap-1 mb-4">
+                            <div className="flex justify-center gap-1 mb-3">{/* 从 mb-4 改为 mb-3 */}
                                 {Array.from({ length: totalPages }).map((_, index) => (
                                     <button
                                         key={index}
