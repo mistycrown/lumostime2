@@ -12,6 +12,7 @@ import { ReactionPicker, ReactionList } from './ReactionComponents';
 // Helper component for async image loading
 const TimelineImage: React.FC<{ src: string; alt: string; className: string }> = ({ src, alt, className }) => {
     const [imgUrl, setImgUrl] = useState<string>('');
+    const { isPrivacyMode } = usePrivacy();
 
     useEffect(() => {
         let isMounted = true;
@@ -40,7 +41,7 @@ const TimelineImage: React.FC<{ src: string; alt: string; className: string }> =
 
     if (!imgUrl) return <div className={`bg-gray-100 ${className} animate-pulse`} />;
 
-    return <img src={imgUrl} alt={alt} className={className} />;
+    return <img src={imgUrl} alt={alt} className={`${className} ${isPrivacyMode ? 'blur-sm select-none transition-all duration-500' : 'transition-all duration-500'}`} />;
 };
 
 // Helper function to parse and render tag text with icons

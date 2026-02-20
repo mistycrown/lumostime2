@@ -34,6 +34,7 @@ import { GalleryView } from '../components/GalleryView';
 const TimelineImage: React.FC<{ filename: string, className?: string, useThumbnail?: boolean, refreshKey?: number }> = ({ filename, className = "w-16 h-16", useThumbnail = false, refreshKey = 0 }) => {
     const [src, setSrc] = useState<string>('');
     const [error, setError] = useState<string>('');
+    const { isPrivacyMode } = usePrivacy();
 
     React.useEffect(() => {
         const loadImage = async () => {
@@ -80,7 +81,7 @@ const TimelineImage: React.FC<{ filename: string, className?: string, useThumbna
             <img
                 src={src}
                 alt="img"
-                className="w-full h-full object-cover"
+                className={`w-full h-full object-cover ${isPrivacyMode ? 'blur-sm select-none transition-all duration-500' : 'transition-all duration-500'}`}
                 onError={() => {
                     console.error(`[TimelineImage] 图片加载失败: ${filename}, src: ${src}`);
                     setError('图片加载失败');
