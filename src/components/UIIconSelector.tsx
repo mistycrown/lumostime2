@@ -70,7 +70,17 @@ export const UIIconSelector: React.FC<UIIconSelectorProps> = ({
     }, []);
     
     // 处理图标选择
-    const handleIconSelect = (iconType: UIIconType) => {
+    const handleIconSelect = (iconType: UIIconType | null) => {
+        if (iconType === null) {
+            // 清空 UI 图标
+            if (onSelectDual) {
+                onSelectDual(currentIcon, '');
+            } else {
+                onSelect('');
+            }
+            return;
+        }
+        
         const uiIconString = `ui:${iconType}`;
         
         // 如果提供了新接口，使用新接口
@@ -112,6 +122,32 @@ export const UIIconSelector: React.FC<UIIconSelectorProps> = ({
                     gridTemplateColumns: 'repeat(auto-fill, minmax(48px, 1fr))'
                 }}
             >
+                {/* 为空选项 */}
+                <button
+                    onClick={() => handleIconSelect(null)}
+                    className={`
+                        relative aspect-square rounded-lg transition-all
+                        flex items-center justify-center border-2 border-dashed
+                        ${!currentSelectedIconType
+                            ? 'btn-template-filled shadow-md border-transparent'
+                            : 'bg-white hover:bg-stone-100 hover:shadow-sm border-stone-300'
+                        }
+                    `}
+                    title="清空 UI 图标"
+                >
+                    <span className="text-2xl text-stone-400 leading-none flex items-center justify-center">∅</span>
+                    
+                    {/* 选中标记 */}
+                    {!currentSelectedIconType && (
+                        <div 
+                            className="absolute -top-1 -right-1 w-5 h-5 rounded-full flex items-center justify-center shadow-lg"
+                            style={{ backgroundColor: 'var(--accent-color)' }}
+                        >
+                            <Check size={12} className="text-white" />
+                        </div>
+                    )}
+                </button>
+                
                 {ICON_GROUPS[selectedGroup].icons.map((iconType) => {
                     const { primary, fallback } = uiIconService.getIconPathWithFallback(iconType);
                     const isSelected = currentSelectedIconType === iconType;
@@ -158,7 +194,7 @@ export const UIIconSelector: React.FC<UIIconSelectorProps> = ({
             
             {/* 提示信息 */}
             <div className="text-xs text-stone-400 text-center">
-                共 {ICON_GROUPS[selectedGroup].icons.length} 个图标
+                共 {ICON_GROUPS[selectedGroup].icons.length + 1} 个图标（含空选项）
             </div>
         </div>
     );
@@ -192,7 +228,17 @@ export const UIIconSelectorCompact: React.FC<UIIconSelectorProps> = ({
         return uiIconService.getAllIcons();
     }, []);
     
-    const handleIconSelect = (iconType: UIIconType) => {
+    const handleIconSelect = (iconType: UIIconType | null) => {
+        if (iconType === null) {
+            // 清空 UI 图标
+            if (onSelectDual) {
+                onSelectDual(currentIcon, '');
+            } else {
+                onSelect('');
+            }
+            return;
+        }
+        
         const uiIconString = `ui:${iconType}`;
         
         // 如果提供了新接口，使用新接口
@@ -214,6 +260,31 @@ export const UIIconSelectorCompact: React.FC<UIIconSelectorProps> = ({
                     gridTemplateColumns: 'repeat(auto-fill, minmax(40px, 1fr))'
                 }}
             >
+                {/* 为空选项 */}
+                <button
+                    onClick={() => handleIconSelect(null)}
+                    className={`
+                        relative aspect-square rounded-lg transition-all
+                        flex items-center justify-center border-2 border-dashed
+                        ${!currentSelectedIconType
+                            ? 'btn-template-filled shadow-md border-transparent'
+                            : 'bg-white hover:bg-stone-100 border-stone-300'
+                        }
+                    `}
+                    title="清空 UI 图标"
+                >
+                    <span className="text-xl text-stone-400 leading-none flex items-center justify-center">∅</span>
+                    
+                    {!currentSelectedIconType && (
+                        <div 
+                            className="absolute -top-0.5 -right-0.5 w-4 h-4 rounded-full flex items-center justify-center"
+                            style={{ backgroundColor: 'var(--accent-color)' }}
+                        >
+                            <Check size={10} className="text-white" />
+                        </div>
+                    )}
+                </button>
+                
                 {allIcons.map((iconType) => {
                     const { primary, fallback } = uiIconService.getIconPathWithFallback(iconType);
                     const isSelected = currentSelectedIconType === iconType;

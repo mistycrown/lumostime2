@@ -448,7 +448,7 @@ export const TagDetailView: React.FC<TagDetailViewProps> = ({ tagId, logs, todos
                                  currentUiIcon={activity.uiIcon}
                                  onSelectDual={(emoji, uiIcon) => {
                                     // 只更新 uiIcon 字段，不修改 icon（emoji）
-                                    setActivity({ ...activity, uiIcon });
+                                    setActivity(prev => ({ ...prev, uiIcon }));
                                  }}
                               />
                            </div>

@@ -76,6 +76,7 @@ export const ScopeDetailView: React.FC<ScopeDetailViewProps> = ({
             const hasChanges = 
                 scope.name !== initialScope.name ||
                 scope.icon !== initialScope.icon ||
+                scope.uiIcon !== initialScope.uiIcon ||
                 scope.description !== initialScope.description ||
                 scope.themeColor !== initialScope.themeColor ||
                 scope.enableFocusScore !== initialScope.enableFocusScore ||
@@ -389,7 +390,7 @@ export const ScopeDetailView: React.FC<ScopeDetailViewProps> = ({
                                             currentUiIcon={scope.uiIcon}
                                             onSelectDual={(emoji, uiIcon) => {
                                                 // 只更新 uiIcon 字段，不修改 icon（emoji）
-                                                setScope({ ...scope, uiIcon });
+                                                setScope(prev => ({ ...prev, uiIcon }));
                                             }}
                                         />
                                     </div>
