@@ -181,8 +181,31 @@ export const AppRoutes: React.FC<AppRoutesProps> = ({
     if (isMonthlyReviewOpen && currentMonthlyReviewStart && currentMonthlyReviewEnd) {
         const monthStartStr = getLocalDateStr(currentMonthlyReviewStart);
         const monthEndStr = getLocalDateStr(currentMonthlyReviewEnd);
-        const review = monthlyReviews.find(r => r.monthStartDate === monthStartStr && r.monthEndDate === monthEndStr);
-        if (!review) return null;
+        let review = monthlyReviews.find(r => r.monthStartDate === monthStartStr && r.monthEndDate === monthEndStr);
+        
+        // 如果找不到review，创建一个临时的（这种情况通常发生在状态更新的时序问题）
+        if (!review) {
+            const templateSnapshot = reviewTemplates
+                .filter(t => t.isMonthlyTemplate)
+                .sort((a, b) => a.order - b.order)
+                .map(t => ({
+                    id: t.id,
+                    title: t.title,
+                    questions: t.questions,
+                    order: t.order,
+                    syncToTimeline: t.syncToTimeline
+                }));
+
+            review = {
+                id: crypto.randomUUID(),
+                monthStartDate: monthStartStr,
+                monthEndDate: monthEndStr,
+                createdAt: Date.now(),
+                updatedAt: Date.now(),
+                answers: [],
+                templateSnapshot
+            };
+        }
 
         return (
             <MonthlyReviewView
