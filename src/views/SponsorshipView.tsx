@@ -963,6 +963,13 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
                                         </div>
                                     </div>
 
+                                    {/* 重装提醒 */}
+                                    <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-center">
+                                        <p className="text-sm text-amber-800">
+                                            重装应用前需切回默认图标
+                                        </p>
+                                    </div>
+
                                     {/* UI主题部分 */}
                                     <div className="space-y-4">
                                         <h4 className="text-sm font-medium text-stone-600">UI 主题</h4>
