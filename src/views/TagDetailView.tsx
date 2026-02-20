@@ -72,6 +72,7 @@ export const TagDetailView: React.FC<TagDetailViewProps> = ({ tagId, logs, todos
          const hasChanges = 
             activity.name !== initialActivity.name ||
             activity.icon !== initialActivity.icon ||
+            activity.uiIcon !== initialActivity.uiIcon ||
             activity.color !== initialActivity.color ||
             activity.heatmapMin !== initialActivity.heatmapMin ||
             activity.heatmapMax !== initialActivity.heatmapMax ||

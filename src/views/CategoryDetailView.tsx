@@ -52,6 +52,7 @@ export const CategoryDetailView: React.FC<CategoryDetailViewProps> = ({ category
             const hasChanges = 
                 category.name !== initialCategory.name ||
                 category.icon !== initialCategory.icon ||
+                category.uiIcon !== initialCategory.uiIcon ||
                 category.themeColor !== initialCategory.themeColor ||
                 category.heatmapMin !== initialCategory.heatmapMin ||
                 category.heatmapMax !== initialCategory.heatmapMax ||
