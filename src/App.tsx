@@ -384,6 +384,7 @@ const AppContent: React.FC = () => {
                 s.id === updated.id ? updated : s
               ));
             }}
+            autoFocusNote={autoFocusNote}
           />
         );
       })()}

@@ -52,7 +52,7 @@ export const FocusDetailView: React.FC<FocusDetailViewProps> = ({ session, todos
             }
         }, 400);
         return () => clearTimeout(timer);
-    }, []);
+    }, [autoFocusNote]);
 
     // Unified Suggestion State
     const [suggestions, setSuggestions] = useState<{
