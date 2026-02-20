@@ -44,6 +44,49 @@ export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialSta
   // 使用自定义 Hooks 管理状态
   const { setIsShareViewOpen, setSharingLog } = useNavigation();
   
+  // 草稿保存的key
+  const DRAFT_KEY = 'lumostime_addlog_draft';
+  
+  // 检查是否有草稿（仅在新建模式下）
+  const loadDraft = (): Partial<LogFormState> | null => {
+    if (initialLog) return null; // 编辑模式不加载草稿
+    try {
+      const saved = localStorage.getItem(DRAFT_KEY);
+      if (saved) {
+        const draft = JSON.parse(saved);
+        // 检查草稿是否在24小时内
+        if (draft.savedAt && Date.now() - draft.savedAt < 24 * 60 * 60 * 1000) {
+          return draft.formState;
+        }
+      }
+    } catch (e) {
+      console.error('Failed to load draft:', e);
+    }
+    return null;
+  };
+  
+  // 保存草稿
+  const saveDraft = (state: LogFormState) => {
+    if (initialLog) return; // 编辑模式不保存草稿
+    try {
+      localStorage.setItem(DRAFT_KEY, JSON.stringify({
+        formState: state,
+        savedAt: Date.now()
+      }));
+    } catch (e) {
+      console.error('Failed to save draft:', e);
+    }
+  };
+  
+  // 清除草稿
+  const clearDraft = () => {
+    try {
+      localStorage.removeItem(DRAFT_KEY);
+    } catch (e) {
+      console.error('Failed to clear draft:', e);
+    }
+  };
+  
   const { formState, updateField, updateFields, previousLogEndTime } = useLogForm({
     initialLog,
     initialStartTime,
@@ -52,7 +95,8 @@ export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialSta
     todos,
     todoCategories,
     lastLogEndTime,
-    allLogs
+    allLogs,
+    draft: loadDraft() // 传递草稿数据
   });
 
   // 时间计算
@@ -211,7 +255,32 @@ export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialSta
       comments: formState.comments.length > 0 ? formState.comments : undefined,
       reactions: formState.reactions.length > 0 ? formState.reactions : undefined,
     };
+    
+    // 保存成功后清除草稿
+    clearDraft();
+    
     onSave(newLog);
+  };
+  
+  // 在关闭时保存草稿（如果有内容）
+  const handleClose = () => {
+    // 检查是否有值得保存的内容
+    const hasContent = 
+      formState.note.trim() ||
+      formState.linkedTodoId ||
+      formState.progressIncrement > 0 ||
+      formState.focusScore !== undefined ||
+      (formState.scopeIds && formState.scopeIds.length > 0) ||
+      formState.images.length > 0 ||
+      formState.comments.length > 0 ||
+      formState.reactions.length > 0;
+    
+    if (hasContent && !initialLog) {
+      // 只在新建模式下保存草稿
+      saveDraft(formState);
+    }
+    
+    onClose();
   };
 
   const handleDelete = () => {
@@ -285,7 +354,7 @@ export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialSta
   return (
     <div
       className="fixed inset-0 z-[100] flex items-end md:items-center justify-center bg-stone-900/40 backdrop-blur-sm animate-fadeIn pb-[env(safe-area-inset-bottom)]"
-      onClick={onClose}
+      onClick={handleClose}
     >
       {/* Modal Content - Bottom Sheet on Mobile, Center on Desktop */}
       <div
@@ -295,7 +364,7 @@ export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialSta
 
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-stone-100 bg-white/50">
-          <button onClick={onClose} className="p-2 -ml-2 hover:bg-stone-100 rounded-full text-stone-500 transition-colors">
+          <button onClick={handleClose} className="p-2 -ml-2 hover:bg-stone-100 rounded-full text-stone-500 transition-colors">
             <X size={24} />
           </button>
           <div className="flex flex-col items-center">

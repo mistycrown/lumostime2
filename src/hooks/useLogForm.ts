@@ -15,6 +15,7 @@ interface UseLogFormProps {
   todoCategories: TodoCategory[];
   lastLogEndTime?: number;
   allLogs?: Log[];
+  draft?: Partial<LogFormState> | null; // 新增：草稿数据
 }
 
 export interface LogFormState {
@@ -42,7 +43,8 @@ export const useLogForm = ({
   todos,
   todoCategories,
   lastLogEndTime,
-  allLogs = []
+  allLogs = [],
+  draft = null // 新增：草稿数据
 }: UseLogFormProps) => {
   // 合并状态到单个对象
   const [formState, setFormState] = useState<LogFormState>(() => {
@@ -104,13 +106,25 @@ export const useLogForm = ({
       cStart = initialStartTime;
       cEnd = initialEndTime;
 
-      setFormState(prev => ({
-        ...prev,
-        currentStartTime: cStart,
-        currentEndTime: cEnd,
-        trackStartTime: tStart,
-        trackEndTime: tEnd
-      }));
+      // 如果有草稿，恢复草稿数据（除了时间）
+      if (draft) {
+        setFormState(prev => ({
+          ...prev,
+          ...draft,
+          currentStartTime: cStart,
+          currentEndTime: cEnd,
+          trackStartTime: tStart,
+          trackEndTime: tEnd
+        }));
+      } else {
+        setFormState(prev => ({
+          ...prev,
+          currentStartTime: cStart,
+          currentEndTime: cEnd,
+          trackStartTime: tStart,
+          trackEndTime: tEnd
+        }));
+      }
     } else {
       // 新建模式
       const now = Date.now();
@@ -121,15 +135,27 @@ export const useLogForm = ({
       cStart = startTime;
       cEnd = now;
 
-      setFormState(prev => ({
-        ...prev,
-        currentStartTime: cStart,
-        currentEndTime: cEnd,
-        trackStartTime: tStart,
-        trackEndTime: tEnd
-      }));
+      // 如果有草稿，恢复草稿数据（除了时间）
+      if (draft) {
+        setFormState(prev => ({
+          ...prev,
+          ...draft,
+          currentStartTime: cStart,
+          currentEndTime: cEnd,
+          trackStartTime: tStart,
+          trackEndTime: tEnd
+        }));
+      } else {
+        setFormState(prev => ({
+          ...prev,
+          currentStartTime: cStart,
+          currentEndTime: cEnd,
+          trackStartTime: tStart,
+          trackEndTime: tEnd
+        }));
+      }
     }
-  }, [initialLog, initialStartTime, initialEndTime, categories, lastLogEndTime]);
+  }, [initialLog, initialStartTime, initialEndTime, categories, lastLogEndTime, draft]);
 
   // 计算上一条记录的结束时间
   const previousLogEndTime = useMemo(() => {
