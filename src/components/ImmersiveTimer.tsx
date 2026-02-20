@@ -6,17 +6,122 @@
  * @description A landscape-oriented immersive timer view with minimal UI. Shows large timer digits, with controls appearing on tap.
  */
 import React, { useState, useEffect } from 'react';
-import { X, Volume2, VolumeX, Palette } from 'lucide-react';
+import { X, Volume2, VolumeX, Palette, Clock } from 'lucide-react';
 import { ImmersiveSelectorModal } from './ImmersiveSelectorModal';
+import { FlipClock } from './FlipClock';
 
-// Theme configurations
+// Theme configurations with complete visual styles
 const THEMES = [
-    { id: 'midnight', name: '午夜蓝', gradient: 'from-slate-900 via-slate-800 to-slate-900', glow1: 'bg-blue-500/20', glow2: 'bg-purple-500/20' },
-    { id: 'sunset', name: '日落橙', gradient: 'from-orange-900 via-red-900 to-pink-900', glow1: 'bg-orange-500/20', glow2: 'bg-pink-500/20' },
-    { id: 'forest', name: '森林绿', gradient: 'from-emerald-900 via-green-900 to-teal-900', glow1: 'bg-emerald-500/20', glow2: 'bg-teal-500/20' },
-    { id: 'ocean', name: '深海蓝', gradient: 'from-blue-900 via-cyan-900 to-indigo-900', glow1: 'bg-cyan-500/20', glow2: 'bg-blue-500/20' },
-    { id: 'lavender', name: '薰衣草', gradient: 'from-purple-900 via-violet-900 to-fuchsia-900', glow1: 'bg-purple-500/20', glow2: 'bg-fuchsia-500/20' },
-    { id: 'minimal', name: '极简黑', gradient: 'from-black via-gray-900 to-black', glow1: 'bg-gray-500/10', glow2: 'bg-gray-600/10' },
+    {
+        id: 'zen',
+        name: '禅意',
+        gradient: 'from-stone-100 via-stone-50 to-zinc-100',
+        glow1: 'bg-stone-200/20',
+        glow2: 'bg-zinc-200/20',
+        isDark: false,
+        buttonBg: 'rgba(68,64,60,0.1)',
+        buttonBorder: 'rgba(68,64,60,0.2)',
+        buttonText: '#44403c',
+        buttonHoverBg: 'rgba(68,64,60,0.15)',
+        modalBg: 'rgba(250,250,249,0.95)',
+        modalBorder: 'rgba(68,64,60,0.15)',
+        clockStyle: {
+            fontFamily: '"Noto Serif SC", "Source Han Serif SC", serif',
+            fontWeight: '300',
+            color: '#2d2d2d',
+            fontSize: 'min(16vh, 20vw)',
+            letterSpacing: '0.05em',
+            textShadow: '0 2px 8px rgba(0,0,0,0.08)'
+        }
+    },
+    {
+        id: 'retro',
+        name: '复古',
+        gradient: 'from-orange-100 via-amber-50 to-yellow-100',
+        glow1: 'bg-orange-300/30',
+        glow2: 'bg-amber-300/30',
+        isDark: false,
+        buttonBg: 'rgba(217,119,6,0.15)',
+        buttonBorder: 'rgba(217,119,6,0.3)',
+        buttonText: '#d97706',
+        buttonHoverBg: 'rgba(217,119,6,0.25)',
+        modalBg: 'rgba(255,251,235,0.95)',
+        modalBorder: 'rgba(217,119,6,0.2)',
+        clockStyle: {
+            fontFamily: '"Bebas Neue", Impact, sans-serif',
+            fontWeight: '400',
+            color: '#d97706',
+            fontSize: 'min(20vh, 24vw)',
+            letterSpacing: '0.04em',
+            textShadow: '4px 4px 0px rgba(0,0,0,0.1), 8px 8px 0px rgba(0,0,0,0.05)'
+        }
+    },
+    {
+        id: 'midnight',
+        name: '午夜',
+        gradient: 'from-slate-900 via-blue-900 to-slate-900',
+        glow1: 'bg-blue-500/20',
+        glow2: 'bg-indigo-500/20',
+        isDark: true,
+        buttonBg: 'rgba(255,255,255,0.1)',
+        buttonBorder: 'rgba(255,255,255,0.2)',
+        buttonText: '#e0e7ff',
+        buttonHoverBg: 'rgba(255,255,255,0.2)',
+        modalBg: 'rgba(30,41,59,0.95)',
+        modalBorder: 'rgba(255,255,255,0.1)',
+        clockStyle: {
+            fontFamily: 'Georgia, "Times New Roman", serif',
+            fontWeight: '300',
+            color: '#e0e7ff',
+            fontSize: 'min(18vh, 22vw)',
+            letterSpacing: '0.04em',
+            textShadow: '0 0 60px rgba(224,231,255,0.4), 0 0 120px rgba(147,197,253,0.3)'
+        }
+    },
+    {
+        id: 'forest',
+        name: '森林',
+        gradient: 'from-emerald-900 via-green-900 to-teal-900',
+        glow1: 'bg-emerald-500/20',
+        glow2: 'bg-teal-500/20',
+        isDark: true,
+        buttonBg: 'rgba(255,255,255,0.1)',
+        buttonBorder: 'rgba(209,250,229,0.2)',
+        buttonText: '#d1fae5',
+        buttonHoverBg: 'rgba(209,250,229,0.15)',
+        modalBg: 'rgba(6,78,59,0.95)',
+        modalBorder: 'rgba(209,250,229,0.15)',
+        clockStyle: {
+            fontFamily: '"Quicksand", sans-serif',
+            fontWeight: '400',
+            color: '#d1fae5',
+            fontSize: 'min(18vh, 22vw)',
+            letterSpacing: '0.05em',
+            textShadow: '0 0 40px rgba(209,250,229,0.3)'
+        }
+    },
+    {
+        id: 'sunset',
+        name: '日落',
+        gradient: 'from-orange-900 via-red-900 to-pink-900',
+        glow1: 'bg-orange-500/25',
+        glow2: 'bg-pink-500/25',
+        isDark: true,
+        buttonBg: 'rgba(255,255,255,0.1)',
+        buttonBorder: 'rgba(255,228,230,0.2)',
+        buttonText: '#ffe4e6',
+        buttonHoverBg: 'rgba(255,228,230,0.15)',
+        modalBg: 'rgba(127,29,29,0.95)',
+        modalBorder: 'rgba(255,228,230,0.15)',
+        clockStyle: {
+            fontFamily: '"Playfair Display", Georgia, serif',
+            fontWeight: '600',
+            color: '#ffe4e6',
+            fontSize: 'min(16vh, 20vw)',
+            letterSpacing: '0.03em',
+            textShadow: '0 0 50px rgba(255,228,230,0.4), 0 4px 20px rgba(0,0,0,0.3)'
+        }
+    },
 ];
 
 // White noise configurations - using online audio sources
@@ -25,6 +130,12 @@ const WHITE_NOISES = [
     { id: 'white', name: '白噪音' },
     { id: 'pink', name: '粉噪音' },
     { id: 'brown', name: '褐噪音' },
+];
+
+// Clock style configurations
+const CLOCK_STYLES = [
+    { id: 'digital', name: '数字' },
+    { id: 'flip', name: '翻页' },
 ];
 
 interface ImmersiveTimerProps {
@@ -38,10 +149,12 @@ export const ImmersiveTimer: React.FC<ImmersiveTimerProps> = ({ elapsed, onExit 
     const [audioContext, setAudioContext] = useState<AudioContext | null>(null);
     const [whiteNoiseNode, setWhiteNoiseNode] = useState<AudioBufferSourceNode | null>(null);
     const [gainNode, setGainNode] = useState<GainNode | null>(null);
-    const [selectedTheme, setSelectedTheme] = useState('midnight');
+    const [selectedTheme, setSelectedTheme] = useState('zen');
     const [selectedNoise, setSelectedNoise] = useState('none');
+    const [selectedClockStyle, setSelectedClockStyle] = useState('digital');
     const [showThemeModal, setShowThemeModal] = useState(false);
     const [showNoiseModal, setShowNoiseModal] = useState(false);
+    const [showClockStyleModal, setShowClockStyleModal] = useState(false);
 
     const currentTheme = THEMES.find(t => t.id === selectedTheme) || THEMES[0];
 
@@ -243,16 +356,7 @@ export const ImmersiveTimer: React.FC<ImmersiveTimerProps> = ({ elapsed, onExit 
             className={`fixed inset-0 z-[200] bg-gradient-to-br ${currentTheme.gradient} flex items-center justify-center overflow-hidden`}
             onClick={() => setShowControls(!showControls)}
             style={{
-                touchAction: 'manipulation',
-                transform: 'rotate(90deg)',
-                transformOrigin: 'center center',
-                width: '100vh',
-                height: '100vw',
-                position: 'fixed',
-                top: '50%',
-                left: '50%',
-                marginLeft: '-50vh',
-                marginTop: '-50vw'
+                touchAction: 'manipulation'
             }}
         >
             {/* Ambient background effects */}
@@ -261,45 +365,91 @@ export const ImmersiveTimer: React.FC<ImmersiveTimerProps> = ({ elapsed, onExit 
                 <div className={`absolute bottom-1/4 right-1/4 w-96 h-96 ${currentTheme.glow2} rounded-full blur-3xl animate-pulse`} style={{ animationDuration: '6s', animationDelay: '1s' }}></div>
             </div>
 
-            {/* Timer Display - Landscape oriented */}
-            <div 
-                className="relative z-10 text-white select-none"
-                style={{ 
-                    fontSize: 'min(18vw, 22vh)',
-                    fontFamily: 'Georgia, "Times New Roman", serif',
-                    fontWeight: '300',
-                    letterSpacing: '0.08em',
-                    fontVariantNumeric: 'lining-nums tabular-nums',
-                    fontFeatureSettings: '"tnum" 1',
-                    textShadow: '0 0 60px rgba(255,255,255,0.4), 0 0 120px rgba(147,197,253,0.3)'
-                }}
-            >
-                {formatTime(elapsed)}
-            </div>
+            {/* Timer Display - Natural landscape layout */}
+            {selectedClockStyle === 'flip' ? (
+                <FlipClock elapsed={elapsed} theme={currentTheme} />
+            ) : (
+                <div 
+                    className="relative z-10 select-none px-4"
+                    style={{ 
+                        fontSize: 'min(24vw, 36vh)',
+                        fontFamily: currentTheme.clockStyle.fontFamily,
+                        fontWeight: currentTheme.clockStyle.fontWeight,
+                        letterSpacing: currentTheme.clockStyle.letterSpacing,
+                        color: currentTheme.clockStyle.color,
+                        fontVariantNumeric: 'lining-nums tabular-nums',
+                        fontFeatureSettings: '"tnum" 1',
+                        textShadow: currentTheme.clockStyle.textShadow,
+                        maxWidth: '95vw',
+                        overflow: 'hidden',
+                        textAlign: 'center'
+                    }}
+                >
+                    {formatTime(elapsed)}
+                </div>
+            )}
 
             {/* Controls Overlay */}
             {showControls && (
-                <div className="absolute inset-0 pointer-events-none animate-in fade-in duration-300">
+                <div className="absolute inset-0 pointer-events-none animate-in fade-in duration-300 z-[300]">
                     {/* Back Button - Top Left */}
                     <button
                         onClick={(e) => {
                             e.stopPropagation();
                             handleExit();
                         }}
-                        className="pointer-events-auto absolute top-6 left-6 w-16 h-16 rounded-full bg-white/10 backdrop-blur-md flex items-center justify-center text-white hover:bg-white/20 active:scale-95 transition-all border border-white/20 shadow-lg"
+                        className="pointer-events-auto absolute top-4 left-4 w-12 h-12 rounded-full backdrop-blur-md flex items-center justify-center active:scale-95 transition-all shadow-lg"
+                        style={{
+                            backgroundColor: currentTheme.buttonBg,
+                            borderWidth: '1.5px',
+                            borderStyle: 'solid',
+                            borderColor: currentTheme.buttonBorder,
+                            color: currentTheme.buttonText
+                        }}
+                        onMouseEnter={(e) => e.currentTarget.style.backgroundColor = currentTheme.buttonHoverBg}
+                        onMouseLeave={(e) => e.currentTarget.style.backgroundColor = currentTheme.buttonBg}
                     >
-                        <X size={32} strokeWidth={2} />
+                        <X size={24} strokeWidth={2} />
                     </button>
 
-                    {/* Theme Button - Top Right (left of noise button) */}
+                    {/* Clock Style Button - Top Right (third from right) */}
+                    <button
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            setShowClockStyleModal(true);
+                        }}
+                        className="pointer-events-auto absolute top-4 right-[132px] w-12 h-12 rounded-full backdrop-blur-md flex items-center justify-center active:scale-95 transition-all shadow-lg"
+                        style={{
+                            backgroundColor: currentTheme.buttonBg,
+                            borderWidth: '1.5px',
+                            borderStyle: 'solid',
+                            borderColor: currentTheme.buttonBorder,
+                            color: currentTheme.buttonText
+                        }}
+                        onMouseEnter={(e) => e.currentTarget.style.backgroundColor = currentTheme.buttonHoverBg}
+                        onMouseLeave={(e) => e.currentTarget.style.backgroundColor = currentTheme.buttonBg}
+                    >
+                        <Clock size={24} strokeWidth={2} />
+                    </button>
+
+                    {/* Theme Button - Top Right (second from right) */}
                     <button
                         onClick={(e) => {
                             e.stopPropagation();
                             setShowThemeModal(true);
                         }}
-                        className="pointer-events-auto absolute top-6 right-24 w-16 h-16 rounded-full bg-white/10 backdrop-blur-md flex items-center justify-center text-white hover:bg-white/20 active:scale-95 transition-all border border-white/20 shadow-lg"
+                        className="pointer-events-auto absolute top-4 right-[72px] w-12 h-12 rounded-full backdrop-blur-md flex items-center justify-center active:scale-95 transition-all shadow-lg"
+                        style={{
+                            backgroundColor: currentTheme.buttonBg,
+                            borderWidth: '1.5px',
+                            borderStyle: 'solid',
+                            borderColor: currentTheme.buttonBorder,
+                            color: currentTheme.buttonText
+                        }}
+                        onMouseEnter={(e) => e.currentTarget.style.backgroundColor = currentTheme.buttonHoverBg}
+                        onMouseLeave={(e) => e.currentTarget.style.backgroundColor = currentTheme.buttonBg}
                     >
-                        <Palette size={32} strokeWidth={2} />
+                        <Palette size={24} strokeWidth={2} />
                     </button>
 
                     {/* White Noise Button - Top Right */}
@@ -308,16 +458,48 @@ export const ImmersiveTimer: React.FC<ImmersiveTimerProps> = ({ elapsed, onExit 
                             e.stopPropagation();
                             setShowNoiseModal(true);
                         }}
-                        className={`pointer-events-auto absolute top-6 right-6 w-16 h-16 rounded-full backdrop-blur-md flex items-center justify-center active:scale-95 transition-all border shadow-lg ${
-                            isWhiteNoiseOn 
-                                ? 'bg-blue-500/30 text-white border-blue-400/40 hover:bg-blue-500/40' 
-                                : 'bg-white/10 text-white/60 border-white/20 hover:bg-white/20 hover:text-white'
-                        }`}
+                        className="pointer-events-auto absolute top-4 right-4 w-12 h-12 rounded-full backdrop-blur-md flex items-center justify-center active:scale-95 transition-all shadow-lg"
+                        style={{
+                            backgroundColor: isWhiteNoiseOn 
+                                ? `${currentTheme.buttonText}20` // Use theme color with 20% opacity
+                                : currentTheme.buttonBg,
+                            borderWidth: '1.5px',
+                            borderStyle: 'solid',
+                            borderColor: isWhiteNoiseOn 
+                                ? `${currentTheme.buttonText}80` // Use theme color with 80% opacity
+                                : currentTheme.buttonBorder,
+                            color: isWhiteNoiseOn 
+                                ? currentTheme.buttonText 
+                                : currentTheme.buttonText
+                        }}
+                        onMouseEnter={(e) => {
+                            if (!isWhiteNoiseOn) {
+                                e.currentTarget.style.backgroundColor = currentTheme.buttonHoverBg;
+                            }
+                        }}
+                        onMouseLeave={(e) => {
+                            if (!isWhiteNoiseOn) {
+                                e.currentTarget.style.backgroundColor = currentTheme.buttonBg;
+                            } else {
+                                e.currentTarget.style.backgroundColor = `${currentTheme.buttonText}20`;
+                            }
+                        }}
                     >
-                        {isWhiteNoiseOn ? <Volume2 size={32} strokeWidth={2} /> : <VolumeX size={32} strokeWidth={2} />}
+                        {isWhiteNoiseOn ? <Volume2 size={24} strokeWidth={2} /> : <VolumeX size={24} strokeWidth={2} />}
                     </button>
                 </div>
             )}
+
+            {/* Clock Style Selection Modal */}
+            <ImmersiveSelectorModal
+                isOpen={showClockStyleModal}
+                onClose={() => setShowClockStyleModal(false)}
+                title="时钟样式"
+                options={CLOCK_STYLES}
+                selectedId={selectedClockStyle}
+                onSelect={setSelectedClockStyle}
+                theme={currentTheme}
+            />
 
             {/* Theme Selection Modal */}
             <ImmersiveSelectorModal
@@ -327,6 +509,7 @@ export const ImmersiveTimer: React.FC<ImmersiveTimerProps> = ({ elapsed, onExit 
                 options={THEMES.map(t => ({ id: t.id, name: t.name }))}
                 selectedId={selectedTheme}
                 onSelect={setSelectedTheme}
+                theme={currentTheme}
             />
 
             {/* Noise Selection Modal */}
@@ -337,6 +520,7 @@ export const ImmersiveTimer: React.FC<ImmersiveTimerProps> = ({ elapsed, onExit 
                 options={WHITE_NOISES}
                 selectedId={selectedNoise}
                 onSelect={handleNoiseSelect}
+                theme={currentTheme}
             />
         </div>
     );
