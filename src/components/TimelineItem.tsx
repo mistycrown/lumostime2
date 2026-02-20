@@ -87,6 +87,7 @@ const TimelineItem: React.FC<TimelineItemProps> = ({ entry, isLast, isFirstOfDay
     const [isCommenting, setIsCommenting] = useState(false);
     const [commentText, setCommentText] = useState('');
     const [previewImage, setPreviewImage] = useState<string | null>(null);
+    const { isPrivacyMode } = usePrivacy();
 
     const dateObj = new Date(entry.date);
     const day = dateObj.getDate().toString().padStart(2, '0');
@@ -192,8 +193,6 @@ const TimelineItem: React.FC<TimelineItemProps> = ({ entry, isLast, isFirstOfDay
                 return <div className="w-2.5 h-2.5 mt-1.5 ml-1.5 rounded-full bg-stone-900 border-2 border-[#faf9f6] z-10" />;
         }
     };
-
-    const { isPrivacyMode } = usePrivacy();
 
     // Background style for summary cards
     const containerClasses = isSummary
@@ -346,7 +345,7 @@ const TimelineItem: React.FC<TimelineItemProps> = ({ entry, isLast, isFirstOfDay
                             <div key={comment.id} className="flex gap-3 text-sm group/comment">
                                 <div className="w-1 h-auto bg-gray-300 rounded-full my-1 opacity-50"></div>
                                 <div className="flex flex-col gap-1">
-                                    <p className="text-sm text-stone-500 leading-relaxed font-light">{comment.text}</p>
+                                    <p className={`text-sm text-stone-500 leading-relaxed font-light ${isPrivacyMode ? 'blur-sm select-none transition-all duration-500' : 'transition-all duration-500'}`}>{comment.text}</p>
                                     <span className="text-[10px] text-stone-300 font-sans tracking-wide mt-0.5">
                                         {(() => {
                                             const d = new Date(comment.createdAt);
