@@ -158,7 +158,17 @@ const SingleTimer: React.FC<{
             ? 40  // 记录页和待办页保持高层级
             : currentView === AppView.TIMELINE || currentView === AppView.REVIEW
               ? 50  // 脉络页和档案页使用最高层级，确保在所有元素之上
-              : 10  // 其他页面使用低层级
+              : 10,  // 其他页面使用低层级
+        // 关键修复：收缩状态下明确设置宽高，确保是正圆
+        ...(isCollapsed ? {
+          width: isBorderAnimating ? '3rem' : '3.5rem',
+          height: isBorderAnimating ? '3rem' : '3.5rem',
+          minWidth: isBorderAnimating ? '3rem' : '3.5rem',
+          minHeight: isBorderAnimating ? '3rem' : '3.5rem',
+          maxWidth: isBorderAnimating ? '3rem' : '3.5rem',
+          maxHeight: isBorderAnimating ? '3rem' : '3.5rem'
+        } : {}),
+        pointerEvents: 'auto'  // SingleTimer本身接收点击事件
       }}
     >
       {isCollapsed ? (
@@ -297,7 +307,13 @@ export const TimerFloating: React.FC<TimerFloatingProps> = ({ sessions, todos, o
   const containerZIndex = currentView === AppView.TIMELINE || currentView === AppView.REVIEW ? 50 : 10;
   
   return (
-    <div className="fixed bottom-[calc(4.5rem+env(safe-area-inset-bottom))] left-4 right-4 md:left-4 md:right-4 flex flex-col-reverse gap-6 animate-in slide-in-from-bottom-5" style={{ zIndex: containerZIndex }}>
+    <div 
+      className="fixed bottom-[calc(4.5rem+env(safe-area-inset-bottom))] left-4 right-4 md:left-4 md:right-4 flex flex-col-reverse gap-6 animate-in slide-in-from-bottom-5" 
+      style={{ 
+        zIndex: containerZIndex,
+        pointerEvents: 'none'  // 关键修复：容器本身不拦截点击事件，让事件穿透到下层
+      }}
+    >
       {sessions.map(session => (
         <SingleTimer
           key={session.id}

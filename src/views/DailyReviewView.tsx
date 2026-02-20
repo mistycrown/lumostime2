@@ -648,6 +648,16 @@ export const DailyReviewView: React.FC<DailyReviewViewProps> = ({
                                                         </button>
 
                                                         <div className="flex-1 min-w-0 flex items-start gap-2">
+                                                            {/* Icon */}
+                                                            {(item.icon || item.uiIcon) && (
+                                                                <span className="shrink-0 mt-[2px]">
+                                                                    <IconRenderer 
+                                                                        icon={item.icon || ''} 
+                                                                        uiIcon={item.uiIcon}
+                                                                        size={14}
+                                                                    />
+                                                                </span>
+                                                            )}
                                                             <p className={`flex-1 text-[15px] font-serif leading-relaxed transition-all ${item.isCompleted ? 'text-stone-400 line-through decoration-stone-300' : 'text-stone-900'}`}>
                                                                 {item.content}
                                                             </p>

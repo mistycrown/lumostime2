@@ -352,7 +352,6 @@ export const GalleryExportView: React.FC<GalleryExportViewProps> = ({
 
     // 切换布局样式
     const handleLayoutChange = (style: LayoutStyle) => {
-        setLoadingTarget(`layout-${style}`);
         setCurrentLayout(style);
     };
 
@@ -364,7 +363,6 @@ export const GalleryExportView: React.FC<GalleryExportViewProps> = ({
 
     // 切换方向
     const handleOrientationChange = (newOrientation: Orientation) => {
-        setLoadingTarget(`orientation-${newOrientation}`);
         setOrientation(newOrientation);
     };
 
@@ -623,66 +621,48 @@ export const GalleryExportView: React.FC<GalleryExportViewProps> = ({
                         <div className="flex justify-between items-center gap-2">
                             {/* 左侧：样式选择 */}
                             <div className="flex gap-2 flex-1">
-                                {LAYOUT_STYLES.map((style) => {
-                                    const isLoadingThis = isLoading && loadingTarget === `layout-${style.key}`;
-                                    return (
-                                        <button
-                                            key={style.key}
-                                            onClick={() => handleLayoutChange(style.key)}
-                                            disabled={isLoading}
-                                            className={`flex-1 px-2 py-1.5 rounded-full text-[10px] font-medium border transition-all font-serif flex items-center justify-center ${
-                                                currentLayout === style.key
-                                                    ? 'bg-stone-100 border-stone-400 text-stone-900'
-                                                    : 'border-stone-300 text-stone-600 hover:border-stone-400'
-                                            } disabled:opacity-50`}
-                                        >
-                                            {isLoadingThis ? (
-                                                <div className="w-3 h-3 border-2 border-stone-300 border-t-stone-600 rounded-full animate-spin" />
-                                            ) : (
-                                                style.label
-                                            )}
-                                        </button>
-                                    );
-                                })}
+                                {LAYOUT_STYLES.map((style) => (
+                                    <button
+                                        key={style.key}
+                                        onClick={() => handleLayoutChange(style.key)}
+                                        className={`flex-1 px-2 py-1.5 rounded-full text-[10px] font-medium border transition-all font-serif flex items-center justify-center ${
+                                            currentLayout === style.key
+                                                ? 'bg-stone-100 border-stone-400 text-stone-900'
+                                                : 'border-stone-300 text-stone-600 hover:border-stone-400'
+                                        }`}
+                                    >
+                                        {style.label}
+                                    </button>
+                                ))}
                             </div>
                             
                             {/* 右侧：横竖屏切换 */}
                             <div className="flex gap-1">
                                 <button
                                     onClick={() => handleOrientationChange('portrait')}
-                                    disabled={isLoading}
                                     className={`p-1.5 rounded-full border transition-all flex items-center justify-center ${
                                         orientation === 'portrait'
                                             ? 'bg-stone-100 border-stone-400 text-stone-900'
                                             : 'border-stone-300 text-stone-600 hover:border-stone-400'
-                                    } disabled:opacity-50`}
+                                    }`}
                                     title="竖屏"
                                 >
-                                    {isLoading && loadingTarget === 'orientation-portrait' ? (
-                                        <div className="w-3 h-3 border-2 border-stone-300 border-t-stone-600 rounded-full animate-spin" />
-                                    ) : (
-                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                            <rect x="7" y="2" width="10" height="20" rx="2" />
-                                        </svg>
-                                    )}
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                        <rect x="7" y="2" width="10" height="20" rx="2" />
+                                    </svg>
                                 </button>
                                 <button
                                     onClick={() => handleOrientationChange('landscape')}
-                                    disabled={isLoading}
                                     className={`p-1.5 rounded-full border transition-all flex items-center justify-center ${
                                         orientation === 'landscape'
                                             ? 'bg-stone-100 border-stone-400 text-stone-900'
                                             : 'border-stone-300 text-stone-600 hover:border-stone-400'
-                                    } disabled:opacity-50`}
+                                    }`}
                                     title="横屏"
                                 >
-                                    {isLoading && loadingTarget === 'orientation-landscape' ? (
-                                        <div className="w-3 h-3 border-2 border-stone-300 border-t-stone-600 rounded-full animate-spin" />
-                                    ) : (
-                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                            <rect x="2" y="7" width="20" height="10" rx="2" />
-                                        </svg>
-                                    )}
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                        <rect x="2" y="7" width="20" height="10" rx="2" />
+                                    </svg>
                                 </button>
                             </div>
                         </div>

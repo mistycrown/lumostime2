@@ -1169,6 +1169,16 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ logs, todos, scopes,
                                                     }`}>
                                                         <LucideIcons.Check size={8} strokeWidth={3} />
                                                     </div>
+                                                    {/* Icon */}
+                                                    {(item.icon || item.uiIcon) && (
+                                                        <span className="shrink-0">
+                                                            <IconRenderer 
+                                                                icon={item.icon || ''} 
+                                                                uiIcon={item.uiIcon}
+                                                                size={12}
+                                                            />
+                                                        </span>
+                                                    )}
                                                     <span className={`text-sm leading-tight ${
                                                         item.isCompleted
                                                             ? 'text-stone-400 line-through'
