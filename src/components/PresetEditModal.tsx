@@ -78,7 +78,7 @@ export const PresetEditModal: React.FC<PresetEditModalProps> = ({
         onDelete();
     };
 
-    // UI 主题选项
+    // UI 主题选项 - 与 uiIconService.ts 中的 UI_ICON_THEMES 保持一致
     const uiThemeOptions = [
         { id: 'default', name: '默认' },
         { id: 'purple', name: 'Purple' },
@@ -87,7 +87,11 @@ export const PresetEditModal: React.FC<PresetEditModalProps> = ({
         { id: 'cat', name: 'Cat' },
         { id: 'forest', name: 'Forest' },
         { id: 'plant', name: 'Plant' },
-        { id: 'water', name: 'Water' }
+        { id: 'water', name: 'Water' },
+        { id: 'knit', name: 'Knit' },
+        { id: 'old', name: 'Old' },
+        { id: 'paper', name: 'Paper' },
+        { id: 'pencil', name: 'Pencil' }
     ];
 
     return (
