@@ -61,11 +61,30 @@ const FlipDigit: React.FC<FlipDigitProps> = ({ digit, theme }) => {
     }
 
     // Optimized sizing for fullscreen without overflow
-    const isLandscape = typeof window !== 'undefined' && window.innerWidth > window.innerHeight;
+    // Detect orientation - use state to ensure reactivity
+    const [isLandscape, setIsLandscape] = useState(
+        typeof window !== 'undefined' && window.innerWidth > window.innerHeight
+    );
+
+    useEffect(() => {
+        const handleResize = () => {
+            setIsLandscape(window.innerWidth > window.innerHeight);
+        };
+        
+        window.addEventListener('resize', handleResize);
+        window.addEventListener('orientationchange', handleResize);
+        
+        return () => {
+            window.removeEventListener('resize', handleResize);
+            window.removeEventListener('orientationchange', handleResize);
+        };
+    }, []);
+
     // In landscape: limit by vh (height), in portrait: limit by vw (width)
-    const digitSize = isLandscape ? 'min(18vh, 15vw)' : 'min(32vw, 26vh)';
-    const cardWidth = isLandscape ? 'min(20vh, 17vw)' : 'min(36vw, 29vh)';
-    const cardHeight = isLandscape ? 'min(30vh, 25vw)' : 'min(54vw, 44vh)';
+    // Portrait mode: smaller cards for vertical layout
+    const digitSize = isLandscape ? 'min(18vh, 15vw)' : 'min(18vw, 14vh)';
+    const cardWidth = isLandscape ? 'min(20vh, 17vw)' : 'min(20vw, 16vh)';
+    const cardHeight = isLandscape ? 'min(30vh, 25vw)' : 'min(30vw, 24vh)';
 
     return (
         <div 
@@ -204,6 +223,25 @@ interface FlipClockProps {
 }
 
 export const FlipClock: React.FC<FlipClockProps> = ({ elapsed, theme }) => {
+    // Detect orientation with state for reactivity
+    const [isLandscape, setIsLandscape] = useState(
+        typeof window !== 'undefined' && window.innerWidth > window.innerHeight
+    );
+
+    useEffect(() => {
+        const handleResize = () => {
+            setIsLandscape(window.innerWidth > window.innerHeight);
+        };
+        
+        window.addEventListener('resize', handleResize);
+        window.addEventListener('orientationchange', handleResize);
+        
+        return () => {
+            window.removeEventListener('resize', handleResize);
+            window.removeEventListener('orientationchange', handleResize);
+        };
+    }, []);
+
     const formatTime = (seconds: number) => {
         const h = Math.floor(seconds / 3600);
         const m = Math.floor((seconds % 3600) / 60);
@@ -219,43 +257,104 @@ export const FlipClock: React.FC<FlipClockProps> = ({ elapsed, theme }) => {
     const hStr = time.hours;
     const mStr = time.minutes;
     const sStr = time.seconds;
-
+    
     // Optimized colon sizing to match flip cards
-    const isLandscape = typeof window !== 'undefined' && window.innerWidth > window.innerHeight;
-    const colonSize = isLandscape ? 'min(15vh, 12vw)' : 'min(26vw, 21vh)';
+    const colonSize = isLandscape ? 'min(15vh, 12vw)' : 'min(14vw, 11vh)';
 
+    // Landscape: horizontal layout
+    if (isLandscape) {
+        return (
+            <div className="flex items-center gap-3 md:gap-4">
+                <FlipDigit digit={hStr[0]} theme={theme} />
+                <FlipDigit digit={hStr[1]} theme={theme} />
+                
+                <div 
+                    className="font-bold pb-4"
+                    style={{ 
+                        color: theme.clockStyle.color,
+                        fontFamily: theme.clockStyle.fontFamily,
+                        fontSize: colonSize
+                    }}
+                >
+                    :
+                </div>
+                
+                <FlipDigit digit={mStr[0]} theme={theme} />
+                <FlipDigit digit={mStr[1]} theme={theme} />
+                
+                <div 
+                    className="font-bold pb-4"
+                    style={{ 
+                        color: theme.clockStyle.color,
+                        fontFamily: theme.clockStyle.fontFamily,
+                        fontSize: colonSize
+                    }}
+                >
+                    :
+                </div>
+                
+                <FlipDigit digit={sStr[0]} theme={theme} />
+                <FlipDigit digit={sStr[1]} theme={theme} />
+            </div>
+        );
+    }
+
+    // Portrait: vertical layout
     return (
-        <div className="flex items-center gap-3 md:gap-4">
-            <FlipDigit digit={hStr[0]} theme={theme} />
-            <FlipDigit digit={hStr[1]} theme={theme} />
-            
-            <div 
-                className="font-bold pb-4"
-                style={{ 
-                    color: theme.clockStyle.color,
-                    fontFamily: theme.clockStyle.fontFamily,
-                    fontSize: colonSize
-                }}
-            >
-                :
+        <div className="flex flex-col items-center gap-3">
+            {/* Hours */}
+            <div className="flex flex-col items-center gap-1">
+                <div className="flex items-center gap-2">
+                    <FlipDigit digit={hStr[0]} theme={theme} />
+                    <FlipDigit digit={hStr[1]} theme={theme} />
+                </div>
+                <div 
+                    className="text-xs font-medium tracking-wider opacity-50"
+                    style={{ color: theme.clockStyle.color }}
+                >
+                    小时
+                </div>
             </div>
-            
-            <FlipDigit digit={mStr[0]} theme={theme} />
-            <FlipDigit digit={mStr[1]} theme={theme} />
-            
+
+            {/* Separator */}
             <div 
-                className="font-bold pb-4"
-                style={{ 
-                    color: theme.clockStyle.color,
-                    fontFamily: theme.clockStyle.fontFamily,
-                    fontSize: colonSize
-                }}
-            >
-                :
+                className="w-12 h-px opacity-30"
+                style={{ backgroundColor: theme.clockStyle.color }}
+            />
+
+            {/* Minutes */}
+            <div className="flex flex-col items-center gap-1">
+                <div className="flex items-center gap-2">
+                    <FlipDigit digit={mStr[0]} theme={theme} />
+                    <FlipDigit digit={mStr[1]} theme={theme} />
+                </div>
+                <div 
+                    className="text-xs font-medium tracking-wider opacity-50"
+                    style={{ color: theme.clockStyle.color }}
+                >
+                    分钟
+                </div>
             </div>
-            
-            <FlipDigit digit={sStr[0]} theme={theme} />
-            <FlipDigit digit={sStr[1]} theme={theme} />
+
+            {/* Separator */}
+            <div 
+                className="w-12 h-px opacity-30"
+                style={{ backgroundColor: theme.clockStyle.color }}
+            />
+
+            {/* Seconds */}
+            <div className="flex flex-col items-center gap-1">
+                <div className="flex items-center gap-2">
+                    <FlipDigit digit={sStr[0]} theme={theme} />
+                    <FlipDigit digit={sStr[1]} theme={theme} />
+                </div>
+                <div 
+                    className="text-xs font-medium tracking-wider opacity-50"
+                    style={{ color: theme.clockStyle.color }}
+                >
+                    秒
+                </div>
+            </div>
         </div>
     );
 };

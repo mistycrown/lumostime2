@@ -124,12 +124,18 @@ const THEMES = [
     },
 ];
 
-// White noise configurations - using online audio sources
+// White noise configurations - both generated and audio files
 const WHITE_NOISES = [
     { id: 'none', name: '无' },
-    { id: 'white', name: '白噪音' },
-    { id: 'pink', name: '粉噪音' },
-    { id: 'brown', name: '褐噪音' },
+    { id: 'white', name: '白噪音', type: 'generated' },
+    { id: 'pink', name: '粉噪音', type: 'generated' },
+    { id: 'brown', name: '褐噪音', type: 'generated' },
+    { id: 'rain', name: '雨声', type: 'audio', file: '/music/dragon-studio-gentle-rain-07-437321.mp3' },
+    { id: 'ocean', name: '海浪', type: 'audio', file: '/music/richardmultimedia-ocean-waves-250310.mp3' },
+    { id: 'forest', name: '森林', type: 'audio', file: '/music/dany_photo-forestbirds-319791.mp3' },
+    { id: 'fireplace', name: '壁炉', type: 'audio', file: '/music/freesound_community-lit-fireplace-6307.mp3' },
+    { id: 'garden', name: '花园', type: 'audio', file: '/music/freesound_community-garden-58202.mp3' },
+    { id: 'library', name: '图书馆', type: 'audio', file: '/music/820017__ultra-edward__library.mp3' },
 ];
 
 // Clock style configurations
@@ -146,17 +152,84 @@ interface ImmersiveTimerProps {
 export const ImmersiveTimer: React.FC<ImmersiveTimerProps> = ({ elapsed, onExit }) => {
     const [showControls, setShowControls] = useState(false);
     const [isWhiteNoiseOn, setIsWhiteNoiseOn] = useState(false);
+    const [audioElement, setAudioElement] = useState<HTMLAudioElement | null>(null);
     const [audioContext, setAudioContext] = useState<AudioContext | null>(null);
     const [whiteNoiseNode, setWhiteNoiseNode] = useState<AudioBufferSourceNode | null>(null);
     const [gainNode, setGainNode] = useState<GainNode | null>(null);
-    const [selectedTheme, setSelectedTheme] = useState('zen');
-    const [selectedNoise, setSelectedNoise] = useState('none');
-    const [selectedClockStyle, setSelectedClockStyle] = useState('digital');
+    
+    // Load saved preferences from localStorage
+    const [selectedTheme, setSelectedTheme] = useState(() => {
+        if (typeof window !== 'undefined') {
+            return localStorage.getItem('immersiveTimerTheme') || 'zen';
+        }
+        return 'zen';
+    });
+    const [selectedNoise, setSelectedNoise] = useState(() => {
+        if (typeof window !== 'undefined') {
+            return localStorage.getItem('immersiveTimerNoise') || 'none';
+        }
+        return 'none';
+    });
+    const [selectedClockStyle, setSelectedClockStyle] = useState(() => {
+        if (typeof window !== 'undefined') {
+            return localStorage.getItem('immersiveTimerClockStyle') || 'digital';
+        }
+        return 'digital';
+    });
+    
     const [showThemeModal, setShowThemeModal] = useState(false);
     const [showNoiseModal, setShowNoiseModal] = useState(false);
     const [showClockStyleModal, setShowClockStyleModal] = useState(false);
+    const [isLandscape, setIsLandscape] = useState(
+        typeof window !== 'undefined' && window.innerWidth > window.innerHeight
+    );
 
     const currentTheme = THEMES.find(t => t.id === selectedTheme) || THEMES[0];
+
+    // Save preferences to localStorage when they change
+    useEffect(() => {
+        if (typeof window !== 'undefined') {
+            localStorage.setItem('immersiveTimerTheme', selectedTheme);
+        }
+    }, [selectedTheme]);
+
+    useEffect(() => {
+        if (typeof window !== 'undefined') {
+            localStorage.setItem('immersiveTimerNoise', selectedNoise);
+        }
+    }, [selectedNoise]);
+
+    useEffect(() => {
+        if (typeof window !== 'undefined') {
+            localStorage.setItem('immersiveTimerClockStyle', selectedClockStyle);
+        }
+    }, [selectedClockStyle]);
+
+    // Monitor orientation changes
+    useEffect(() => {
+        const handleResize = () => {
+            setIsLandscape(window.innerWidth > window.innerHeight);
+        };
+        
+        window.addEventListener('resize', handleResize);
+        window.addEventListener('orientationchange', handleResize);
+        
+        return () => {
+            window.removeEventListener('resize', handleResize);
+            window.removeEventListener('orientationchange', handleResize);
+        };
+    }, []);
+
+    // Auto-play white noise if user had it on last time
+    useEffect(() => {
+        if (selectedNoise && selectedNoise !== 'none') {
+            // Small delay to ensure component is mounted
+            const timer = setTimeout(() => {
+                startWhiteNoise(selectedNoise);
+            }, 300);
+            return () => clearTimeout(timer);
+        }
+    }, []); // Only run on mount
 
     // Format time as HH:MM:SS
     const formatTime = (seconds: number): string => {
@@ -164,6 +237,18 @@ export const ImmersiveTimer: React.FC<ImmersiveTimerProps> = ({ elapsed, onExit 
         const m = Math.floor((seconds % 3600) / 60);
         const s = seconds % 60;
         return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+    };
+
+    // Format time parts for vertical display
+    const formatTimeParts = (seconds: number) => {
+        const h = Math.floor(seconds / 3600);
+        const m = Math.floor((seconds % 3600) / 60);
+        const s = seconds % 60;
+        return {
+            hours: h.toString().padStart(2, '0'),
+            minutes: m.toString().padStart(2, '0'),
+            seconds: s.toString().padStart(2, '0')
+        };
     };
 
     // Keep screen awake using WakeLock API
@@ -200,101 +285,132 @@ export const ImmersiveTimer: React.FC<ImmersiveTimerProps> = ({ elapsed, onExit 
         }
     }, [showControls]);
 
-    // White noise generation with different types - improved algorithms
-    const startWhiteNoise = (type: string = selectedNoise) => {
+    // White noise playback - supports both generated and audio file types
+    const startWhiteNoise = (noiseId: string = selectedNoise) => {
         try {
-            const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
-            const bufferSize = 4 * ctx.sampleRate; // Longer buffer for smoother sound
-            const noiseBuffer = ctx.createBuffer(2, bufferSize, ctx.sampleRate); // Stereo
-            const outputL = noiseBuffer.getChannelData(0);
-            const outputR = noiseBuffer.getChannelData(1);
-            
-            // Generate different noise types with improved algorithms
-            switch (type) {
-                case 'white':
-                    // White noise - equal energy across all frequencies
-                    for (let i = 0; i < bufferSize; i++) {
-                        outputL[i] = Math.random() * 2 - 1;
-                        outputR[i] = Math.random() * 2 - 1;
-                    }
-                    break;
-                    
-                case 'pink':
-                    // Pink noise - 1/f noise (more natural, warmer)
-                    let b0L = 0, b1L = 0, b2L = 0, b3L = 0, b4L = 0, b5L = 0, b6L = 0;
-                    let b0R = 0, b1R = 0, b2R = 0, b3R = 0, b4R = 0, b5R = 0, b6R = 0;
-                    for (let i = 0; i < bufferSize; i++) {
-                        const whiteL = Math.random() * 2 - 1;
-                        const whiteR = Math.random() * 2 - 1;
-                        
-                        b0L = 0.99886 * b0L + whiteL * 0.0555179;
-                        b1L = 0.99332 * b1L + whiteL * 0.0750759;
-                        b2L = 0.96900 * b2L + whiteL * 0.1538520;
-                        b3L = 0.86650 * b3L + whiteL * 0.3104856;
-                        b4L = 0.55000 * b4L + whiteL * 0.5329522;
-                        b5L = -0.7616 * b5L - whiteL * 0.0168980;
-                        outputL[i] = (b0L + b1L + b2L + b3L + b4L + b5L + b6L + whiteL * 0.5362) * 0.11;
-                        b6L = whiteL * 0.115926;
-                        
-                        b0R = 0.99886 * b0R + whiteR * 0.0555179;
-                        b1R = 0.99332 * b1R + whiteR * 0.0750759;
-                        b2R = 0.96900 * b2R + whiteR * 0.1538520;
-                        b3R = 0.86650 * b3R + whiteR * 0.3104856;
-                        b4R = 0.55000 * b4R + whiteR * 0.5329522;
-                        b5R = -0.7616 * b5R - whiteR * 0.0168980;
-                        outputR[i] = (b0R + b1R + b2R + b3R + b4R + b5R + b6R + whiteR * 0.5362) * 0.11;
-                        b6R = whiteR * 0.115926;
-                    }
-                    break;
-                    
-                case 'brown':
-                    // Brown noise - even more bass, very deep and rumbling
-                    let lastOutL = 0;
-                    let lastOutR = 0;
-                    for (let i = 0; i < bufferSize; i++) {
-                        const whiteL = Math.random() * 2 - 1;
-                        const whiteR = Math.random() * 2 - 1;
-                        outputL[i] = (lastOutL + (0.02 * whiteL)) / 1.02;
-                        outputR[i] = (lastOutR + (0.02 * whiteR)) / 1.02;
-                        lastOutL = outputL[i];
-                        lastOutR = outputR[i];
-                        outputL[i] *= 3.5;
-                        outputR[i] *= 3.5;
-                    }
-                    break;
-                    
-                default:
-                    return;
+            const noiseConfig = WHITE_NOISES.find(n => n.id === noiseId);
+            if (!noiseConfig || noiseConfig.id === 'none') {
+                return;
             }
 
-            const source = ctx.createBufferSource();
-            source.buffer = noiseBuffer;
-            source.loop = true;
+            if (noiseConfig.type === 'audio' && noiseConfig.file) {
+                // Play audio file
+                const audio = new Audio(noiseConfig.file);
+                audio.loop = true;
+                audio.volume = 0.3;
+                
+                audio.play().then(() => {
+                    setAudioElement(audio);
+                    setIsWhiteNoiseOn(true);
+                    console.log('Audio white noise started:', noiseConfig.name);
+                }).catch(err => {
+                    console.error('Failed to play audio white noise:', err);
+                });
+            } else if (noiseConfig.type === 'generated') {
+                // Generate white noise using Web Audio API
+                const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+                const bufferSize = 4 * ctx.sampleRate;
+                const noiseBuffer = ctx.createBuffer(2, bufferSize, ctx.sampleRate);
+                const outputL = noiseBuffer.getChannelData(0);
+                const outputR = noiseBuffer.getChannelData(1);
+                
+                // Generate different noise types
+                switch (noiseId) {
+                    case 'white':
+                        for (let i = 0; i < bufferSize; i++) {
+                            outputL[i] = Math.random() * 2 - 1;
+                            outputR[i] = Math.random() * 2 - 1;
+                        }
+                        break;
+                        
+                    case 'pink':
+                        let b0L = 0, b1L = 0, b2L = 0, b3L = 0, b4L = 0, b5L = 0, b6L = 0;
+                        let b0R = 0, b1R = 0, b2R = 0, b3R = 0, b4R = 0, b5R = 0, b6R = 0;
+                        for (let i = 0; i < bufferSize; i++) {
+                            const whiteL = Math.random() * 2 - 1;
+                            const whiteR = Math.random() * 2 - 1;
+                            
+                            b0L = 0.99886 * b0L + whiteL * 0.0555179;
+                            b1L = 0.99332 * b1L + whiteL * 0.0750759;
+                            b2L = 0.96900 * b2L + whiteL * 0.1538520;
+                            b3L = 0.86650 * b3L + whiteL * 0.3104856;
+                            b4L = 0.55000 * b4L + whiteL * 0.5329522;
+                            b5L = -0.7616 * b5L - whiteL * 0.0168980;
+                            outputL[i] = (b0L + b1L + b2L + b3L + b4L + b5L + b6L + whiteL * 0.5362) * 0.11;
+                            b6L = whiteL * 0.115926;
+                            
+                            b0R = 0.99886 * b0R + whiteR * 0.0555179;
+                            b1R = 0.99332 * b1R + whiteR * 0.0750759;
+                            b2R = 0.96900 * b2R + whiteR * 0.1538520;
+                            b3R = 0.86650 * b3R + whiteR * 0.3104856;
+                            b4R = 0.55000 * b4R + whiteR * 0.5329522;
+                            b5R = -0.7616 * b5R - whiteR * 0.0168980;
+                            outputR[i] = (b0R + b1R + b2R + b3R + b4R + b5R + b6R + whiteR * 0.5362) * 0.11;
+                            b6R = whiteR * 0.115926;
+                        }
+                        break;
+                        
+                    case 'brown':
+                        let lastOutL = 0;
+                        let lastOutR = 0;
+                        for (let i = 0; i < bufferSize; i++) {
+                            const whiteL = Math.random() * 2 - 1;
+                            const whiteR = Math.random() * 2 - 1;
+                            outputL[i] = (lastOutL + (0.02 * whiteL)) / 1.02;
+                            outputR[i] = (lastOutR + (0.02 * whiteR)) / 1.02;
+                            lastOutL = outputL[i];
+                            lastOutR = outputR[i];
+                            outputL[i] *= 3.5;
+                            outputR[i] *= 3.5;
+                        }
+                        break;
+                }
 
-            const gain = ctx.createGain();
-            gain.gain.value = 0.2; // Lower volume for comfort
+                const source = ctx.createBufferSource();
+                source.buffer = noiseBuffer;
+                source.loop = true;
 
-            // Add a subtle low-pass filter for all types to reduce harshness
-            const filter = ctx.createBiquadFilter();
-            filter.type = 'lowpass';
-            filter.frequency.value = type === 'brown' ? 800 : type === 'pink' ? 1200 : 2000;
-            filter.Q.value = 0.5;
+                const gain = ctx.createGain();
+                // Different volumes for different noise types
+                if (noiseId === 'white') {
+                    gain.gain.value = 0.02; // White noise - very low
+                } else if (noiseId === 'pink') {
+                    gain.gain.value = 0.08; // Pink noise - higher
+                } else if (noiseId === 'brown') {
+                    gain.gain.value = 0.08; // Brown noise - higher
+                } else {
+                    gain.gain.value = 0.05; // Default
+                }
 
-            source.connect(filter);
-            filter.connect(gain);
-            gain.connect(ctx.destination);
-            source.start(0);
+                const filter = ctx.createBiquadFilter();
+                filter.type = 'lowpass';
+                filter.frequency.value = noiseId === 'brown' ? 800 : noiseId === 'pink' ? 1200 : 2000;
+                filter.Q.value = 0.5;
 
-            setAudioContext(ctx);
-            setWhiteNoiseNode(source);
-            setGainNode(gain);
-            setIsWhiteNoiseOn(true);
+                source.connect(filter);
+                filter.connect(gain);
+                gain.connect(ctx.destination);
+                source.start(0);
+
+                setAudioContext(ctx);
+                setWhiteNoiseNode(source);
+                setGainNode(gain);
+                setIsWhiteNoiseOn(true);
+                console.log('Generated white noise started:', noiseConfig.name);
+            }
         } catch (error) {
             console.error('Failed to start white noise:', error);
         }
     };
 
     const stopWhiteNoise = () => {
+        // Stop audio file
+        if (audioElement) {
+            audioElement.pause();
+            audioElement.currentTime = 0;
+            setAudioElement(null);
+        }
+        // Stop generated noise
         if (whiteNoiseNode) {
             whiteNoiseNode.stop();
             setWhiteNoiseNode(null);
@@ -333,6 +449,10 @@ export const ImmersiveTimer: React.FC<ImmersiveTimerProps> = ({ elapsed, onExit 
     // Cleanup on unmount
     useEffect(() => {
         return () => {
+            if (audioElement) {
+                audioElement.pause();
+                audioElement.currentTime = 0;
+            }
             if (whiteNoiseNode) {
                 try {
                     whiteNoiseNode.stop();
@@ -344,7 +464,7 @@ export const ImmersiveTimer: React.FC<ImmersiveTimerProps> = ({ elapsed, onExit 
                 audioContext.close().catch(() => {});
             }
         };
-    }, [whiteNoiseNode, audioContext]);
+    }, [audioElement, whiteNoiseNode, audioContext]);
 
     const handleExit = () => {
         stopWhiteNoise();
@@ -369,24 +489,126 @@ export const ImmersiveTimer: React.FC<ImmersiveTimerProps> = ({ elapsed, onExit 
             {selectedClockStyle === 'flip' ? (
                 <FlipClock elapsed={elapsed} theme={currentTheme} />
             ) : (
-                <div 
-                    className="relative z-10 select-none px-4"
-                    style={{ 
-                        fontSize: 'min(24vw, 36vh)',
-                        fontFamily: currentTheme.clockStyle.fontFamily,
-                        fontWeight: currentTheme.clockStyle.fontWeight,
-                        letterSpacing: currentTheme.clockStyle.letterSpacing,
-                        color: currentTheme.clockStyle.color,
-                        fontVariantNumeric: 'lining-nums tabular-nums',
-                        fontFeatureSettings: '"tnum" 1',
-                        textShadow: currentTheme.clockStyle.textShadow,
-                        maxWidth: '95vw',
-                        overflow: 'hidden',
-                        textAlign: 'center'
-                    }}
-                >
-                    {formatTime(elapsed)}
-                </div>
+                <>
+                    {isLandscape ? (
+                        // Landscape: horizontal layout
+                        <div 
+                            className="relative z-10 select-none px-4"
+                            style={{ 
+                                fontSize: 'min(24vw, 36vh)',
+                                fontFamily: currentTheme.clockStyle.fontFamily,
+                                fontWeight: currentTheme.clockStyle.fontWeight,
+                                letterSpacing: currentTheme.clockStyle.letterSpacing,
+                                color: currentTheme.clockStyle.color,
+                                fontVariantNumeric: 'lining-nums tabular-nums',
+                                fontFeatureSettings: '"tnum" 1',
+                                textShadow: currentTheme.clockStyle.textShadow,
+                                maxWidth: '95vw',
+                                overflow: 'hidden',
+                                textAlign: 'center'
+                            }}
+                        >
+                            {formatTime(elapsed)}
+                        </div>
+                    ) : (
+                        // Portrait: vertical layout
+                        <div className="flex flex-col items-center gap-3">
+                            {(() => {
+                                const time = formatTimeParts(elapsed);
+                                return (
+                                    <>
+                                        {/* Hours */}
+                                        <div className="flex flex-col items-center gap-1">
+                                            <div 
+                                                className="relative z-10 select-none"
+                                                style={{ 
+                                                    fontSize: 'min(32vw, 20vh)',
+                                                    fontFamily: currentTheme.clockStyle.fontFamily,
+                                                    fontWeight: currentTheme.clockStyle.fontWeight,
+                                                    letterSpacing: currentTheme.clockStyle.letterSpacing,
+                                                    color: currentTheme.clockStyle.color,
+                                                    fontVariantNumeric: 'lining-nums tabular-nums',
+                                                    fontFeatureSettings: '"tnum" 1',
+                                                    textShadow: currentTheme.clockStyle.textShadow
+                                                }}
+                                            >
+                                                {time.hours}
+                                            </div>
+                                            <div 
+                                                className="text-xs font-medium tracking-wider opacity-50"
+                                                style={{ color: currentTheme.clockStyle.color }}
+                                            >
+                                                小时
+                                            </div>
+                                        </div>
+
+                                        {/* Separator */}
+                                        <div 
+                                            className="w-12 h-px opacity-30"
+                                            style={{ backgroundColor: currentTheme.clockStyle.color }}
+                                        />
+
+                                        {/* Minutes */}
+                                        <div className="flex flex-col items-center gap-1">
+                                            <div 
+                                                className="relative z-10 select-none"
+                                                style={{ 
+                                                    fontSize: 'min(32vw, 20vh)',
+                                                    fontFamily: currentTheme.clockStyle.fontFamily,
+                                                    fontWeight: currentTheme.clockStyle.fontWeight,
+                                                    letterSpacing: currentTheme.clockStyle.letterSpacing,
+                                                    color: currentTheme.clockStyle.color,
+                                                    fontVariantNumeric: 'lining-nums tabular-nums',
+                                                    fontFeatureSettings: '"tnum" 1',
+                                                    textShadow: currentTheme.clockStyle.textShadow
+                                                }}
+                                            >
+                                                {time.minutes}
+                                            </div>
+                                            <div 
+                                                className="text-xs font-medium tracking-wider opacity-50"
+                                                style={{ color: currentTheme.clockStyle.color }}
+                                            >
+                                                分钟
+                                            </div>
+                                        </div>
+
+                                        {/* Separator */}
+                                        <div 
+                                            className="w-12 h-px opacity-30"
+                                            style={{ backgroundColor: currentTheme.clockStyle.color }}
+                                        />
+
+                                        {/* Seconds */}
+                                        <div className="flex flex-col items-center gap-1">
+                                            <div 
+                                                className="relative z-10 select-none"
+                                                style={{ 
+                                                    fontSize: 'min(32vw, 20vh)',
+                                                    fontFamily: currentTheme.clockStyle.fontFamily,
+                                                    fontWeight: currentTheme.clockStyle.fontWeight,
+                                                    letterSpacing: currentTheme.clockStyle.letterSpacing,
+                                                    color: currentTheme.clockStyle.color,
+                                                    fontVariantNumeric: 'lining-nums tabular-nums',
+                                                    fontFeatureSettings: '"tnum" 1',
+                                                    textShadow: currentTheme.clockStyle.textShadow
+                                                }}
+                                            >
+                                                {time.seconds}
+                                            </div>
+                                            <div 
+                                                className="text-xs font-medium tracking-wider opacity-50"
+                                                style={{ color: currentTheme.clockStyle.color }}
+                                            >
+                                                秒
+                                            </div>
+                                        </div>
+                                    </>
+                                );
+                            })()}
+                        </div>
+                    )}
+                </>
             )}
 
             {/* Controls Overlay */}
