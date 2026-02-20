@@ -9,10 +9,11 @@
  */
 import React, { useState, useEffect, useRef } from 'react';
 import { ActiveSession, TodoItem, Category, Activity, TodoCategory, Scope, AutoLinkRule } from '../types';
-import { X, Check, ChevronDown, TrendingUp, Plus, Minus, Lightbulb, CheckCircle2 } from 'lucide-react';
+import { X, Check, ChevronDown, TrendingUp, Plus, Minus, Lightbulb, CheckCircle2, Maximize2 } from 'lucide-react';
 import { TodoAssociation } from '../components/TodoAssociation';
 import { ScopeAssociation } from '../components/ScopeAssociation';
 import { FocusScoreSelector } from '../components/FocusScoreSelector';
+import { ImmersiveTimer } from '../components/ImmersiveTimer';
 import FocusNotification from '../plugins/FocusNotificationPlugin';
 import { Capacitor } from '@capacitor/core';
 import { IconRenderer } from '../components/IconRenderer';
@@ -34,6 +35,7 @@ export const FocusDetailView: React.FC<FocusDetailViewProps> = ({ session, todos
     const [elapsed, setElapsed] = useState(0);
     const [note, setNote] = useState(session.note || '');
     const [isActivitySelectorOpen, setIsActivitySelectorOpen] = useState(false);
+    const [isImmersiveMode, setIsImmersiveMode] = useState(false);
 
     // Progress Increment State
     const [progressAmount, setProgressAmount] = useState(0);
@@ -199,25 +201,41 @@ export const FocusDetailView: React.FC<FocusDetailViewProps> = ({ session, todos
     };
 
     return (
-        <div className="fixed inset-0 z-[100] bg-white flex flex-col animate-in slide-in-from-bottom-[100%] duration-500 ease-out pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">
+        <>
+            {isImmersiveMode && (
+                <ImmersiveTimer 
+                    elapsed={elapsed} 
+                    onExit={() => setIsImmersiveMode(false)} 
+                />
+            )}
+            
+            <div className="fixed inset-0 z-[100] bg-white flex flex-col animate-in slide-in-from-bottom-[100%] duration-500 ease-out pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">
 
-            {/* Header */}
-            <div className="flex items-center justify-between px-6 py-6 shrink-0">
-                <button onClick={onClose} className="p-2 -ml-2 rounded-full hover:bg-stone-100 transition-colors text-stone-500">
-                    <X size={28} />
-                </button>
-                <button
-                    onClick={handleComplete}
-                    className="btn-template-filled w-12 h-12 rounded-full flex items-center justify-center shadow-lg active:scale-95 transition-transform"
-                >
-                    <Check size={24} strokeWidth={3} />
-                </button>
-            </div>
+                {/* Header */}
+                <div className="flex items-center justify-between px-6 py-6 shrink-0">
+                    <button onClick={onClose} className="p-2 -ml-2 rounded-full hover:bg-stone-100 transition-colors text-stone-500">
+                        <X size={28} />
+                    </button>
+                    
+                    {/* Immersive Mode Button */}
+                    <button
+                        onClick={() => setIsImmersiveMode(true)}
+                        className="p-2 rounded-full hover:bg-stone-100 transition-colors text-stone-400 hover:text-stone-600"
+                        title="沉浸式计时"
+                    >
+                        <Maximize2 size={24} />
+                    </button>
+                    
+                    <button
+                        onClick={handleComplete}
+                        className="btn-template-filled w-12 h-12 rounded-full flex items-center justify-center shadow-lg active:scale-95 transition-transform"
+                    >
+                        <Check size={24} strokeWidth={3} />
+                    </button>
+                </div>
 
-            {/* Main Content */}
-            <div className="flex-1 flex flex-col items-center overflow-y-auto no-scrollbar pt-4 pb-[50vh]">
-
-                {/* Timer Display */}
+                {/* Main Content */}
+                <div className="flex-1 flex flex-col items-center overflow-y-auto no-scrollbar pt-4 pb-[50vh]">{/* Timer Display */}
                 <div className="flex flex-col items-center mb-10">
                     <div className="text-[90px] mb-4 animate-bounce-slow cursor-pointer hover:scale-105 transition-transform" onClick={() => setIsActivitySelectorOpen(true)}>
                         <IconRenderer 
@@ -434,5 +452,6 @@ export const FocusDetailView: React.FC<FocusDetailViewProps> = ({ session, todos
             </div>
 
         </div>
+        </>
     );
 };
