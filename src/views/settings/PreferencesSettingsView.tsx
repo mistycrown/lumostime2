@@ -10,8 +10,6 @@ import { DefaultArchiveView, DefaultIndexView } from '../../contexts/SettingsCon
 interface PreferencesSettingsViewProps {
     onBack: () => void;
     onToast: (type: ToastType, message: string) => void;
-    startWeekOnSunday?: boolean;
-    onToggleStartWeekOnSunday?: () => void;
     privacyMode?: boolean;
     onTogglePrivacyMode?: () => void;
     dailyReviewTime?: string;
@@ -49,8 +47,6 @@ interface PreferencesSettingsViewProps {
 export const PreferencesSettingsView: React.FC<PreferencesSettingsViewProps> = ({
     onBack,
     onToast,
-    startWeekOnSunday,
-    onToggleStartWeekOnSunday,
     privacyMode,
     onTogglePrivacyMode,
     dailyReviewTime,
@@ -117,24 +113,9 @@ export const PreferencesSettingsView: React.FC<PreferencesSettingsViewProps> = (
                         </button>
                     </div>
 
-                    {/* Start Week Toggle */}
-                    <div className="flex items-center justify-between p-4 border-b border-stone-100 last:border-0 hover:bg-stone-50 transition-colors">
-                        <div>
-                            <h4 className="font-bold text-stone-700">从周日开始</h4>
-                            <p className="text-xs text-stone-400 mt-1">日历视图每周第一天将设为周日</p>
-                        </div>
-                        <button
-                            onClick={onToggleStartWeekOnSunday}
-                            className={`w-12 h-7 rounded-full transition-colors flex items-center px-1 ${
-                                startWeekOnSunday ? 'bg-stone-800' : 'bg-stone-200'
-                            }`}
-                        >
-                            <div
-                                className={`w-5 h-5 bg-white rounded-full shadow-sm transition-transform ${
-                                    startWeekOnSunday ? 'translate-x-5' : 'translate-x-0'
-                                }`}
-                            />
-                        </button>
+                    {/* 回顾设置 */}
+                    <div className="px-4 py-3 bg-stone-50 border-t-8 border-stone-100">
+                        <h3 className="text-xs font-bold text-stone-500 uppercase tracking-wider">回顾</h3>
                     </div>
 
                     {/* Daily Review Time */}

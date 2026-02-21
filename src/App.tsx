@@ -69,7 +69,6 @@ const AppContent: React.FC = () => {
     autoLinkRules, setAutoLinkRules,
     autoApplyAutoLinkRules, setAutoApplyAutoLinkRules,
     autoApplyTodoLink, setAutoApplyTodoLink,
-    startWeekOnSunday, setStartWeekOnSunday,
     minIdleTimeThreshold, setMinIdleTimeThreshold,
     defaultView, setDefaultView,
     defaultArchiveView, setDefaultArchiveView,
@@ -510,8 +509,6 @@ const AppContent: React.FC = () => {
 
           // Settings Props
           onOpenAutoLink={() => setIsAutoLinkOpen(true)}
-          startWeekOnSunday={startWeekOnSunday}
-          onToggleStartWeekOnSunday={() => setStartWeekOnSunday(!startWeekOnSunday)}
 
           minIdleTimeThreshold={minIdleTimeThreshold}
           onSetMinIdleTimeThreshold={setMinIdleTimeThreshold}

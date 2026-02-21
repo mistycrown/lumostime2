@@ -1,6 +1,6 @@
 /**
  * @file DateRangeFilter.tsx
- * @input rangeType (Week/Month/Year/All), date, startWeekOnSunday
+ * @input rangeType (Week/Month/Year/All), date
  * @output Date Range Navigation UI
  * @pos Component (Input)
  * @description Controls for filtering views by date range, including tab switching and previous/next navigation.
@@ -18,15 +18,13 @@ interface DateRangeFilterProps {
     date: Date;
     onRangeChange: (range: RangeType) => void;
     onDateChange: (date: Date) => void;
-    startWeekOnSunday?: boolean;
 }
 
 export const DateRangeFilter: React.FC<DateRangeFilterProps> = ({
     rangeType,
     date,
     onRangeChange,
-    onDateChange,
-    startWeekOnSunday = false
+    onDateChange
 }) => {
     // Range type labels
     const rangeLabels: Record<RangeType, string> = {
@@ -47,8 +45,8 @@ export const DateRangeFilter: React.FC<DateRangeFilterProps> = ({
         if (rangeType === 'Month') return `${y}/${String(m).padStart(2, '0')}`;
 
         if (rangeType === 'Week') {
-            // Use unified week calculation from dateUtils
-            const { start, end } = getWeekRange(date, startWeekOnSunday);
+            // Use unified week calculation from dateUtils (固定使用周一作为一周的开始)
+            const { start, end } = getWeekRange(date, false);
             return `${start.getMonth() + 1}/${start.getDate()} - ${end.getMonth() + 1}/${end.getDate()}`;
         }
         return '';

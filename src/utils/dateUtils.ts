@@ -85,6 +85,8 @@ export const formatRelativeTime = (date: Date | number): string => {
  * @example
  * getWeekRange(new Date('2024-01-15'), false) // { start: Mon, end: Sun }
  * getWeekRange(new Date('2024-01-15'), true)  // { start: Sun, end: Sat }
+ * 
+ * @deprecated startWeekOnSunday参数已弃用，建议始终使用周一作为一周的开始
  */
 export const getWeekRange = (date: Date, startWeekOnSunday: boolean = false): { start: Date; end: Date } => {
     const day = date.getDay();

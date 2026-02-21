@@ -26,6 +26,7 @@ export interface DateRangeOptions {
   /**
    * 是否以周日为一周的开始
    * @default false
+   * @deprecated 此选项已弃用，建议始终使用周一作为一周的开始
    */
   startWeekOnSunday?: boolean;
   
@@ -49,8 +50,8 @@ export interface DateRangeOptions {
  * const weekRange = getDateRange(new Date(), 'week');
  * // { start: 2024-01-15 00:00:00, end: 2024-01-21 23:59:59 }
  * 
- * // 获取某周的范围（周日开始）
- * const weekRange = getDateRange(new Date(), 'week', { startWeekOnSunday: true });
+ * // 获取某周的范围（默认周一开始）
+ * const weekRange = getDateRange(new Date(), 'week');
  * // { start: 2024-01-14 00:00:00, end: 2024-01-20 23:59:59 }
  * ```
  */

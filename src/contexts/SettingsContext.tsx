@@ -13,9 +13,6 @@ export type DefaultSelectorPage = 'emoji' | string; // 'emoji' 或 sticker set I
 
 interface SettingsContextType {
     // 基础偏好设置
-    startWeekOnSunday: boolean;
-    setStartWeekOnSunday: React.Dispatch<React.SetStateAction<boolean>>;
-
     minIdleTimeThreshold: number;
     setMinIdleTimeThreshold: React.Dispatch<React.SetStateAction<number>>;
 
@@ -115,8 +112,6 @@ export const useSettings = () => {
 
 export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
     // 基础偏好
-    const [startWeekOnSunday, setStartWeekOnSunday] = useState(false);
-
     const [minIdleTimeThreshold, setMinIdleTimeThreshold] = useState<number>(() => {
         const saved = localStorage.getItem('lumos_min_idle_time');
         return saved ? parseInt(saved) : 1;
@@ -363,8 +358,6 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
 
     return (
         <SettingsContext.Provider value={{
-            startWeekOnSunday,
-            setStartWeekOnSunday,
             minIdleTimeThreshold,
             setMinIdleTimeThreshold,
             defaultView,

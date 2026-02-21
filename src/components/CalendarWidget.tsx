@@ -21,7 +21,6 @@ interface CalendarWidgetProps {
     extraHeaderControls?: React.ReactNode;
     disableSelection?: boolean;
     preventCollapse?: boolean;
-    startWeekOnSunday?: boolean;
     onResetView?: () => void;
     customScale?: { min: number; max: number };
     heatmapMode?: 'duration' | 'focus';
@@ -33,7 +32,7 @@ interface CalendarWidgetProps {
     onDayClick?: (date: Date) => void; // 点击日期时的回调（用于跳转到时间轴）
 }
 
-export const CalendarWidget: React.FC<CalendarWidgetProps> = ({ currentDate, onDateChange, logs = [], isExpanded, onExpandToggle, extraHeaderControls, disableSelection, customScale, heatmapMode, staticMode, preventCollapse, onResetView, startWeekOnSunday = false, renderCustomDay, hideTopBar = false, galleryMode = false, todos = [], onDayClick }) => {
+export const CalendarWidget: React.FC<CalendarWidgetProps> = ({ currentDate, onDateChange, logs = [], isExpanded, onExpandToggle, extraHeaderControls, disableSelection, customScale, heatmapMode, staticMode, preventCollapse, onResetView, renderCustomDay, hideTopBar = false, galleryMode = false, todos = [], onDayClick }) => {
     const [viewMode, setViewMode] = useState<'calendar' | 'month_year'>('calendar');
 
     // ... (keep existing helper functions)
@@ -48,9 +47,7 @@ export const CalendarWidget: React.FC<CalendarWidgetProps> = ({ currentDate, onD
         return isSameDay(d, new Date());
     };
 
-    const weekDaysShort = startWeekOnSunday
-        ? ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
-        : ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    const weekDaysShort = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
     // Helper to generate calendar grid for current month
     const getMonthDays = () => {
@@ -62,9 +59,8 @@ export const CalendarWidget: React.FC<CalendarWidgetProps> = ({ currentDate, onD
         const days = [];
         // Pad start
         let paddingDays = firstDay.getDay();
-        if (!startWeekOnSunday) {
-            paddingDays = (paddingDays + 6) % 7;
-        }
+        // 周一作为一周的开始
+        paddingDays = (paddingDays + 6) % 7;
 
         for (let i = 0; i < paddingDays; i++) {
             days.push(null);
