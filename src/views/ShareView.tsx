@@ -7,6 +7,7 @@ import { ChevronLeft, Download, Palette, Layout } from 'lucide-react';
 import { toPng } from 'html-to-image';
 import { Capacitor } from '@capacitor/core';
 import { Filesystem, Directory } from '@capacitor/filesystem';
+import { App } from '@capacitor/app';
 import { Log, ToastType } from '../types';
 import { SHARE_THEMES, SHARE_TEMPLATES } from '../components/ShareCard/constants';
 import { ShareCardContent } from '../components/ShareCard/types';
@@ -55,6 +56,30 @@ export const ShareView: React.FC<ShareViewProps> = ({ log, onBack, onToast }) =>
 
     loadImages();
   }, [log.images]);
+
+  // 监听 Android 返回键
+  useEffect(() => {
+    let backButtonListener: any;
+
+    const setupBackButton = async () => {
+      try {
+        backButtonListener = await App.addListener('backButton', () => {
+          onBack();
+        });
+      } catch (error) {
+        // 非 Capacitor 环境下忽略错误
+        console.log('[ShareView] Not in Capacitor environment');
+      }
+    };
+
+    setupBackButton();
+
+    return () => {
+      if (backButtonListener) {
+        backButtonListener.remove();
+      }
+    };
+  }, [onBack]);
 
   // Convert Log to ShareCardContent
   const getShareContent = (): ShareCardContent => {
@@ -194,7 +219,7 @@ export const ShareView: React.FC<ShareViewProps> = ({ log, onBack, onToast }) =>
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-[#fdfbf7] flex flex-col font-serif animate-in slide-in-from-right duration-300 pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">
+    <div className="fixed inset-0 z-[110] bg-[#fdfbf7] flex flex-col font-serif animate-in slide-in-from-right duration-300 pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">
       {/* Header */}
       <div className="flex-shrink-0 flex items-center justify-between gap-3 px-4 h-14 border-b border-stone-100 bg-[#fdfbf7]/80 backdrop-blur-md z-10">
         <button

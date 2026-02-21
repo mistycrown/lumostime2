@@ -936,7 +936,7 @@ export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialSta
                 onClick={() => {
                   setSharingLog(initialLog);
                   setIsShareViewOpen(true);
-                  onClose(); // Close the log detail modal
+                  // 不关闭详情页，让 ShareView 覆盖在上面
                 }}
                 className="w-full py-2.5 text-stone-700 hover:text-stone-900 hover:bg-stone-100 rounded-full font-medium text-sm transition-colors active:scale-95"
               >

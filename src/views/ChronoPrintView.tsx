@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { RefreshCw, Palette, LayoutTemplate, Download } from 'lucide-react';
 import { Capacitor } from '@capacitor/core';
 import { Filesystem, Directory } from '@capacitor/filesystem';
+import { App } from '@capacitor/app';
 import { parseInputText, extractDateFromTitle, THEMES, ColorTheme } from '../components/ChronoPrint/utils';
 import { ParsedData } from '../components/ChronoPrint/types';
 import { PrintCard, PrintBarChart, PrintDonutChart, PrintStyle } from '../components/ChronoPrint/PrintComponents';
@@ -58,6 +59,30 @@ export const ChronoPrintView: React.FC<ChronoPrintViewProps> = ({ inputText, onB
       setMainTitle(parsed.monthStats.title);
     }
   }, [inputText]);
+
+  // 监听 Android 返回键
+  useEffect(() => {
+    let backButtonListener: any;
+
+    const setupBackButton = async () => {
+      try {
+        backButtonListener = await App.addListener('backButton', () => {
+          onBack();
+        });
+      } catch (error) {
+        // 非 Capacitor 环境下忽略错误
+        console.log('[ChronoPrintView] Not in Capacitor environment');
+      }
+    };
+
+    setupBackButton();
+
+    return () => {
+      if (backButtonListener) {
+        backButtonListener.remove();
+      }
+    };
+  }, [onBack]);
 
   const handleExportSingle = async (ref: React.RefObject<HTMLDivElement>, filename: string, key: string) => {
     if (exportingState || !ref.current) return;

@@ -10,6 +10,7 @@ import { imageService } from '../services/imageService';
 import { IconRenderer } from './IconRenderer';
 import { ImagePreviewModal } from './ImagePreviewModal';
 import { GalleryExportView } from './GalleryExportView';
+import { App } from '@capacitor/app';
 
 interface GalleryViewProps {
     logs: Log[];
@@ -142,6 +143,41 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
     }, [galleryItems, displayCount]);
 
     // Note: 瀑布流分配在每个月份组内部完成，不需要全局状态
+
+    // 监听 Android 返回键
+    useEffect(() => {
+        let backButtonListener: any;
+
+        const setupBackButton = async () => {
+            try {
+                backButtonListener = await App.addListener('backButton', () => {
+                    // 如果导出视图打开，先关闭导出视图
+                    if (showExportView) {
+                        setShowExportView(false);
+                    } 
+                    // 如果图片预览打开，先关闭预览
+                    else if (previewImage) {
+                        setPreviewImage(null);
+                    } 
+                    // 否则关闭画廊视图
+                    else {
+                        onClose();
+                    }
+                });
+            } catch (error) {
+                // 非 Capacitor 环境下忽略错误
+                console.log('[GalleryView] Not in Capacitor environment');
+            }
+        };
+
+        setupBackButton();
+
+        return () => {
+            if (backButtonListener) {
+                backButtonListener.remove();
+            }
+        };
+    }, [onClose, showExportView, previewImage]);
 
     // 按月份分组图片
     const monthGroups = useMemo(() => {

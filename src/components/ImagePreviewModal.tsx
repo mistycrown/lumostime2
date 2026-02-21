@@ -7,12 +7,13 @@
  * 
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { ImageOff } from 'lucide-react';
 import { TransformWrapper, TransformComponent } from 'react-zoom-pan-pinch';
 import { ConfirmModal } from './ConfirmModal';
 import { ImagePreviewControls } from './ImagePreviewControls';
+import { App } from '@capacitor/app';
 
 interface ImagePreviewModalProps {
     imageUrl: string | null | undefined;
@@ -26,6 +27,37 @@ export const ImagePreviewModal: React.FC<ImagePreviewModalProps> = ({ imageUrl, 
 
     // Treat null/undefined as "Closed"
     if (imageUrl === null || imageUrl === undefined) return null;
+
+    // 监听 Android 返回键
+    useEffect(() => {
+        let backButtonListener: any;
+
+        const setupBackButton = async () => {
+            try {
+                backButtonListener = await App.addListener('backButton', () => {
+                    // 如果删除确认框打开，先关闭确认框
+                    if (isDeleteConfirmOpen) {
+                        setIsDeleteConfirmOpen(false);
+                    } else {
+                        // 否则关闭预览
+                        setRotation(0);
+                        onClose();
+                    }
+                });
+            } catch (error) {
+                // 非 Capacitor 环境下忽略错误
+                console.log('[ImagePreviewModal] Not in Capacitor environment');
+            }
+        };
+
+        setupBackButton();
+
+        return () => {
+            if (backButtonListener) {
+                backButtonListener.remove();
+            }
+        };
+    }, [onClose, isDeleteConfirmOpen]);
 
     const handleDeleteClick = () => {
         setIsDeleteConfirmOpen(true);

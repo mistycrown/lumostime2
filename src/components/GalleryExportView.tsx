@@ -7,6 +7,7 @@ import { ChevronLeft, Download, Palette, LayoutTemplate, Calendar, Loader2 } fro
 import { Log, DailyReview } from '../types';
 import { Capacitor } from '@capacitor/core';
 import { Filesystem, Directory } from '@capacitor/filesystem';
+import { App } from '@capacitor/app';
 
 // Toast type definition
 type ToastType = 'success' | 'error' | 'info';
@@ -329,6 +330,30 @@ export const GalleryExportView: React.FC<GalleryExportViewProps> = ({
             cancelled = true;
         };
     }, [logs, dateRange]);
+
+    // 监听 Android 返回键
+    useEffect(() => {
+        let backButtonListener: any;
+
+        const setupBackButton = async () => {
+            try {
+                backButtonListener = await App.addListener('backButton', () => {
+                    onBack();
+                });
+            } catch (error) {
+                // 非 Capacitor 环境下忽略错误
+                console.log('[GalleryExportView] Not in Capacitor environment');
+            }
+        };
+
+        setupBackButton();
+
+        return () => {
+            if (backButtonListener) {
+                backButtonListener.remove();
+            }
+        };
+    }, [onBack]);
 
     // 导航逻辑
     const handlePrev = () => {
