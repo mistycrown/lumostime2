@@ -1,7 +1,7 @@
 {
-    "version": "1.1.2",
-    "versionCode": 12,
+    "version": "1.1.3",
+    "versionCode": 13,
     "updateUrl": "https://github.com/mistycrown/lumostime2/releases/latest",
-    "releaseNotes": "v1.1.2\n• StickerSelector 增加快捷填写一句话总结的输入框\n• 禁用手动添加日课\n• 增加自定义reaction图标，并且在自定义筛选器中支持搜索reaction图标\n• 增加月、年表情和总结统计视图的分享导出功能\n• 增加review页阅读/编辑模式的自动感应\n• 增加导出导入图片压缩包备份的功能",
+    "releaseNotes": "v1.1.3\n• 增加应用图标更新提醒\n• 修复memoir无法跳转月回顾的问题\n• 修复日回顾日课emoji不显示的问题\n• 修复正在计时时无法切换分享画廊排版样式的问题\n• 修复自定义主题方案中ui图标选项缺失的问题\n• 修复自动聚焦备注开关失效的问题\n• 增加添加补记的记录缓存功能\n• 增加uiiconselector的默认选项\n• 修复领域标签分类详情中无法保存uiicon的问题\n• 隐私模式增加模糊评论、图片的功能\n• 增加沉浸式计时功能，增加时钟样式、主题颜色、白噪音",
     "forceUpdate": false
 }
