@@ -25,11 +25,11 @@ export const ImagePreviewModal: React.FC<ImagePreviewModalProps> = ({ imageUrl, 
     const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
     const [rotation, setRotation] = useState(0);
 
-    // Treat null/undefined as "Closed"
-    if (imageUrl === null || imageUrl === undefined) return null;
-
     // 监听 Android 返回键
     useEffect(() => {
+        // 如果没有 imageUrl，不需要设置监听器
+        if (!imageUrl) return;
+
         let backButtonListener: any;
 
         const setupBackButton = async () => {
@@ -57,7 +57,10 @@ export const ImagePreviewModal: React.FC<ImagePreviewModalProps> = ({ imageUrl, 
                 backButtonListener.remove();
             }
         };
-    }, [onClose, isDeleteConfirmOpen]);
+    }, [imageUrl, onClose, isDeleteConfirmOpen]);
+
+    // Treat null/undefined as "Closed"
+    if (imageUrl === null || imageUrl === undefined) return null;
 
     const handleDeleteClick = () => {
         setIsDeleteConfirmOpen(true);

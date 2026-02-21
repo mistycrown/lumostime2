@@ -7,14 +7,13 @@
  * 
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { TodoCategory, TodoItem } from '../types';
-import { ChevronDown, ChevronRight, GripVertical, Plus, Trash2, ArrowUp, ArrowDown, X, Check, Palette } from 'lucide-react';
+import { ChevronDown, ChevronRight, GripVertical, Plus, Trash2, ArrowUp, ArrowDown, X, Check } from 'lucide-react';
 import { UIIconSelectorCompact } from '../components/UIIconSelector';
 import { IconRenderer } from '../components/IconRenderer';
 import { uiIconService } from '../services/uiIconService';
 import { useSettings } from '../contexts/SettingsContext';
-import { App } from '@capacitor/app';
 
 interface TodoBatchManageViewProps {
     onBack: () => void;
@@ -46,39 +45,6 @@ export const TodoBatchManageView: React.FC<TodoBatchManageViewProps> = ({ onBack
     // Drag state
     const [draggedItem, setDraggedItem] = useState<{ item: TodoItem, sourceCategoryId: string } | null>(null);
     const [dragOverCategory, setDragOverCategory] = useState<string | null>(null);
-
-    // 监听 Android 返回键
-    useEffect(() => {
-        let backButtonListener: any;
-
-        const setupBackButton = async () => {
-            try {
-                backButtonListener = await App.addListener('backButton', () => {
-                    // 如果图标选择器打开，先关闭选择器
-                    if (iconSelectorOpen) {
-                        setIconSelectorOpen(null);
-                    } else {
-                        // 否则保存并返回
-                        const categories = data.map(({ items, ...cat }) => cat);
-                        const todos = data.flatMap(cat => cat.items);
-                        onSave(categories, todos);
-                        onBack();
-                    }
-                });
-            } catch (error) {
-                // 非 Capacitor 环境下忽略错误
-                console.log('[TodoBatchManageView] Not in Capacitor environment');
-            }
-        };
-
-        setupBackButton();
-
-        return () => {
-            if (backButtonListener) {
-                backButtonListener.remove();
-            }
-        };
-    }, [iconSelectorOpen, data, onSave, onBack]);
 
     const toggleExpand = (id: string) => {
         const newSet = new Set(expandedCats);

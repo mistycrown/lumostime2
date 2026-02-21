@@ -14,7 +14,6 @@ import { IconRenderer } from '../components/IconRenderer';
 import { UIIconSelectorCompact } from '../components/UIIconSelector';
 import { uiIconService } from '../services/uiIconService';
 import { useSettings } from '../contexts/SettingsContext';
-import { App } from '@capacitor/app';
 
 interface ScopeManageViewProps {
     scopes: Scope[];
@@ -38,35 +37,13 @@ export const ScopeManageView: React.FC<ScopeManageViewProps> = ({
     const activeScopes = editingScopes.filter(s => !s.isArchived).sort((a, b) => a.order - b.order);
     const archivedScopes = editingScopes.filter(s => s.isArchived).sort((a, b) => a.order - b.order);
 
-    // 监听 Android 返回键
+    // 组件卸载时自动保存（用于硬件返回键）
     useEffect(() => {
-        let backButtonListener: any;
-
-        const setupBackButton = async () => {
-            try {
-                backButtonListener = await App.addListener('backButton', () => {
-                    // 如果图标选择器打开，先关闭图标选择器
-                    if (iconSelectorOpen) {
-                        setIconSelectorOpen(null);
-                    } else {
-                        // 否则保存并返回
-                        handleSave();
-                    }
-                });
-            } catch (error) {
-                // 非 Capacitor 环境下忽略错误
-                console.log('[ScopeManageView] Not in Capacitor environment');
-            }
-        };
-
-        setupBackButton();
-
         return () => {
-            if (backButtonListener) {
-                backButtonListener.remove();
-            }
+            // 组件卸载时保存
+            onUpdate(editingScopes);
         };
-    }, [iconSelectorOpen, editingScopes, onUpdate, onBack]);
+    }, [editingScopes, onUpdate]);
 
     const handleAddScope = () => {
         const newScope: Scope = {

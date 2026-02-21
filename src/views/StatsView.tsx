@@ -16,6 +16,7 @@ import { COLOR_OPTIONS } from '../constants';
 import { Minimize2, Share, PieChart, Grid, Calendar, ChevronLeft, ChevronRight, TrendingUp, TrendingDown, CheckCircle2, Smile } from 'lucide-react';
 import { ToastType } from '../components/Toast';
 import { usePrivacy } from '../contexts/PrivacyContext';
+import { useNavigation } from '../contexts/NavigationContext';
 import { IconRenderer } from '../components/IconRenderer';
 import { ConfirmModal } from '../components/ConfirmModal';
 import { ChronoPrintView } from './ChronoPrintView';
@@ -72,6 +73,7 @@ interface CategoryStat extends Category {
 
 export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentDate, onBack, onDateChange, isFullScreen, onToggleFullScreen, onToast, onTitleChange, todos, todoCategories, scopes, dailyReviews = [], hideControls = false, hideRangeControls = false, hideDateNavigation = false, forcedView, forcedRange, allowedViews = ['pie', 'matrix', 'line', 'schedule', 'check', 'emoji'] }) => {
   const { isPrivacyMode } = usePrivacy();
+  const { setIsExportViewOpen } = useNavigation();
   const [viewType, setViewType] = useState<ViewType>(forcedView || 'pie');
   const [pieRange, setPieRange] = useState<PieRange>(forcedRange || 'day');
   const [scheduleRange, setScheduleRange] = useState<ScheduleRange>(
@@ -92,6 +94,10 @@ export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentD
   const [showChronoPrint, setShowChronoPrint] = useState(false);
   const [chronoPrintText, setChronoPrintText] = useState('');
 
+  // 同步导出视图状态到全局
+  useEffect(() => {
+    setIsExportViewOpen(showChronoPrint);
+  }, [showChronoPrint, setIsExportViewOpen]);
 
   // 日期导航函数
   const handleNavigateDate = (direction: 'prev' | 'next') => {

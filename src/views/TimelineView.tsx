@@ -26,6 +26,7 @@ import { FloatingButton } from '../components/FloatingButton';
 import { UIIcon } from '../components/UIIcon';
 import { IconRenderer } from '../components/IconRenderer';
 import { usePrivacy } from '../contexts/PrivacyContext';
+import { useNavigation } from '../contexts/NavigationContext';
 import { CollapsibleText } from '../components/CollapsibleText';
 import { calculateGoalProgress } from '../utils/goalUtils';
 import { GalleryView } from '../components/GalleryView';
@@ -180,7 +181,7 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ logs, todos, scopes,
     const [previewImage, setPreviewImage] = useState<string | null>(null);
     const [copyFailureModal, setCopyFailureModal] = useState<{ isOpen: boolean; text: string }>({ isOpen: false, text: '' });
     const [showTimePalDebugger, setShowTimePalDebugger] = useState(false);
-    const [showGalleryView, setShowGalleryView] = useState(false);
+    const { isGalleryViewOpen, setIsGalleryViewOpen } = useNavigation();
 
     React.useEffect(() => {
         localStorage.setItem('lumos_timeline_sort', sortOrder);
@@ -829,7 +830,7 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ logs, todos, scopes,
                                 <BarChart2 size={20} />
                             </button>
                             <button
-                                onClick={() => setShowGalleryView(true)}
+                                onClick={() => setIsGalleryViewOpen(true)}
                                 className="p-2 text-stone-400 hover:text-stone-600 hover:bg-stone-100 rounded-full transition-colors"
                                 title="Gallery View"
                             >
@@ -1563,12 +1564,12 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ logs, todos, scopes,
             )}
 
             {/* 画廊视图 */}
-            {showGalleryView && (
+            {isGalleryViewOpen && (
                 <GalleryView
                     logs={logs}
                     categories={categories}
                     dailyReviews={dailyReview ? [dailyReview] : []}
-                    onClose={() => setShowGalleryView(false)}
+                    onClose={() => setIsGalleryViewOpen(false)}
                     onEditLog={onEditLog}
                     refreshKey={refreshKey}
                     onToast={onToast}

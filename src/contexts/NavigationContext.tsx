@@ -108,6 +108,14 @@ interface NavigationContextType {
     sharingLog: Log | null;
     setSharingLog: (log: Log | null) => void;
 
+    // Gallery View
+    isGalleryViewOpen: boolean;
+    setIsGalleryViewOpen: (open: boolean) => void;
+
+    // Export Views (ChronoPrint, EmojiExport, etc.)
+    isExportViewOpen: boolean;
+    setIsExportViewOpen: (open: boolean) => void;
+
     // Global Date State
     currentDate: Date;
     setCurrentDate: (date: Date) => void;
@@ -213,6 +221,8 @@ export const NavigationProvider: React.FC<NavigationProviderProps> = ({
     const [focusDetailSessionId, setFocusDetailSessionId] = useState<string | null>(null);
     const [isShareViewOpen, setIsShareViewOpen] = useState(false);
     const [sharingLog, setSharingLog] = useState<Log | null>(null);
+    const [isGalleryViewOpen, setIsGalleryViewOpen] = useState(false);
+    const [isExportViewOpen, setIsExportViewOpen] = useState(false);
     const [currentDate, setCurrentDate] = useState<Date>(new Date());
 
     return (
@@ -295,6 +305,10 @@ export const NavigationProvider: React.FC<NavigationProviderProps> = ({
             setIsShareViewOpen,
             sharingLog,
             setSharingLog,
+            isGalleryViewOpen,
+            setIsGalleryViewOpen,
+            isExportViewOpen,
+            setIsExportViewOpen,
             currentDate,
             setCurrentDate
         }}>

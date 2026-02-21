@@ -7,7 +7,7 @@
  * 
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Category, Activity } from '../types';
 import { ChevronDown, ChevronRight, GripVertical, Plus, Trash2, ArrowUp, ArrowDown, X, Check, Palette } from 'lucide-react';
 import { UIIconSelectorCompact } from '../components/UIIconSelector';
@@ -16,7 +16,6 @@ import { uiIconService } from '../services/uiIconService';
 import { useSettings } from '../contexts/SettingsContext';
 import { COLOR_OPTIONS } from '../constants';
 import { extractActivityColor, extractCategoryColor } from '../utils/colorUtils';
-import { App } from '@capacitor/app';
 
 interface BatchManageViewProps {
     onBack: () => void;
@@ -40,38 +39,6 @@ export const BatchManageView: React.FC<BatchManageViewProps> = ({ onBack, catego
     // Drag state (kept for reference, but user said it's unusable, so we rely on buttons now)
     const [draggedActivity, setDraggedActivity] = useState<{ activity: Activity, sourceCategoryId: string } | null>(null);
     const [dragOverCategory, setDragOverCategory] = useState<string | null>(null);
-
-    // 监听 Android 返回键
-    useEffect(() => {
-        let backButtonListener: any;
-
-        const setupBackButton = async () => {
-            try {
-                backButtonListener = await App.addListener('backButton', () => {
-                    // 如果有选择器打开，先关闭选择器
-                    if (iconSelectorOpen || colorPickerOpen) {
-                        setIconSelectorOpen(null);
-                        setColorPickerOpen(null);
-                    } else {
-                        // 否则保存并返回
-                        onSave(categories);
-                        onBack();
-                    }
-                });
-            } catch (error) {
-                // 非 Capacitor 环境下忽略错误
-                console.log('[BatchManageView] Not in Capacitor environment');
-            }
-        };
-
-        setupBackButton();
-
-        return () => {
-            if (backButtonListener) {
-                backButtonListener.remove();
-            }
-        };
-    }, [iconSelectorOpen, colorPickerOpen, categories, onSave, onBack]);
 
     const toggleExpand = (id: string) => {
         const newSet = new Set(expandedCats);

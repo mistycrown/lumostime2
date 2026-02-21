@@ -5,7 +5,7 @@
  * @pos Component (Statistics - Emoji)
  * @description Emoji 统计视图 - 显示不同时间段的情绪 emoji/sticker 统计
  */
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import ReactDOM from 'react-dom';
 import { DailyReview } from '../../types';
 import { IconRenderer } from '../IconRenderer';
@@ -13,6 +13,7 @@ import { Image } from 'lucide-react';
 import { EmojiExportView } from './EmojiExportView';
 import { YearEmojiExportView } from './YearEmojiExportView';
 import { ToastType } from '../../components/Toast';
+import { useNavigation } from '../../contexts/NavigationContext';
 
 interface EmojiStatsViewProps {
   dailyReviews: DailyReview[];
@@ -27,8 +28,14 @@ export const EmojiStatsView: React.FC<EmojiStatsViewProps> = ({
   emojiRange,
   onToast
 }) => {
+  const { setIsExportViewOpen } = useNavigation();
   const [showExportView, setShowExportView] = useState(false);
   const [showYearExportView, setShowYearExportView] = useState(false);
+
+  // 同步导出视图状态到全局
+  useEffect(() => {
+    setIsExportViewOpen(showExportView || showYearExportView);
+  }, [showExportView, showYearExportView, setIsExportViewOpen]);
 
   return (
     <>

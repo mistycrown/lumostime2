@@ -2,13 +2,12 @@
  * @file YearEmojiExportView.tsx
  * @description Emoji 统计导出视图 - 用于导出全年的情绪统计图片 (支持四种年度样式)
  */
-import React, { useState, useMemo, useRef, useEffect } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
 import { DailyReview } from '../../types';
 import { Palette, LayoutTemplate, Download, ChevronLeft, CalendarRange, Check, Grid3X3, AlignLeft, ArrowDown, Columns, ScanLine } from 'lucide-react';
 import { toPng } from 'html-to-image';
 import { Capacitor } from '@capacitor/core';
 import { Filesystem, Directory } from '@capacitor/filesystem';
-import { App } from '@capacitor/app';
 import { ToastType } from '../../components/Toast';
 import { IconRenderer } from '../IconRenderer';
 
@@ -161,30 +160,6 @@ export const YearEmojiExportView: React.FC<YearEmojiExportViewProps> = ({
             summary: r.summary || ''
         })).sort((a, b) => a.date.localeCompare(b.date));
     }, [dailyReviews, currentDate, year]);
-
-    // 监听 Android 返回键
-    useEffect(() => {
-        let backButtonListener: any;
-
-        const setupBackButton = async () => {
-            try {
-                backButtonListener = await App.addListener('backButton', () => {
-                    onBack();
-                });
-            } catch (error) {
-                // 非 Capacitor 环境下忽略错误
-                console.log('[YearEmojiExportView] Not in Capacitor environment');
-            }
-        };
-
-        setupBackButton();
-
-        return () => {
-            if (backButtonListener) {
-                backButtonListener.remove();
-            }
-        };
-    }, [onBack]);
 
     // --- Export Functionality (Identical to EmojiExportView / ChronoPrintView) ---
     const handleExport = async () => {

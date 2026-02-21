@@ -7,7 +7,6 @@ import { ChevronLeft, Download, Palette, LayoutTemplate, Calendar, Loader2 } fro
 import { Log, DailyReview } from '../types';
 import { Capacitor } from '@capacitor/core';
 import { Filesystem, Directory } from '@capacitor/filesystem';
-import { App } from '@capacitor/app';
 
 // Toast type definition
 type ToastType = 'success' | 'error' | 'info';
@@ -331,30 +330,6 @@ export const GalleryExportView: React.FC<GalleryExportViewProps> = ({
         };
     }, [logs, dateRange]);
 
-    // 监听 Android 返回键
-    useEffect(() => {
-        let backButtonListener: any;
-
-        const setupBackButton = async () => {
-            try {
-                backButtonListener = await App.addListener('backButton', () => {
-                    onBack();
-                });
-            } catch (error) {
-                // 非 Capacitor 环境下忽略错误
-                console.log('[GalleryExportView] Not in Capacitor environment');
-            }
-        };
-
-        setupBackButton();
-
-        return () => {
-            if (backButtonListener) {
-                backButtonListener.remove();
-            }
-        };
-    }, [onBack]);
-
     // 导航逻辑
     const handlePrev = () => {
         setLoadingTarget('nav-prev');
@@ -538,7 +513,7 @@ export const GalleryExportView: React.FC<GalleryExportViewProps> = ({
     };
 
     return (
-        <div className="fixed inset-0 bg-[#faf9f6] flex flex-col text-slate-800 font-sans z-50">
+        <div className="fixed inset-0 bg-[#faf9f6] flex flex-col text-slate-800 font-sans z-[60]">
             {/* Header - 标题栏 */}
             <div className="flex-shrink-0 pt-[env(safe-area-inset-top)]">
                 <div className="flex items-center justify-between gap-3 px-4 h-14 border-b border-stone-100 bg-[#fdfbf7]/80 backdrop-blur-md sticky top-0 z-10">

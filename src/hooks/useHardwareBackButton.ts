@@ -32,6 +32,10 @@ export const useHardwareBackButton = () => {
         isStatsFullScreen, setIsStatsFullScreen,
         isTodoManaging, setIsTodoManaging,
         isTagsManaging, setIsTagsManaging,
+        isScopeManaging, setIsScopeManaging,
+        isShareViewOpen, setIsShareViewOpen,
+        isGalleryViewOpen, setIsGalleryViewOpen,
+        isExportViewOpen, setIsExportViewOpen,
         currentView, setCurrentView,
         selectedTagId, setSelectedTagId,
         selectedCategoryId, setSelectedCategoryId,
@@ -85,6 +89,18 @@ export const useHardwareBackButton = () => {
                 setIsSearchOpen(false);
                 return;
             }
+            if (isExportViewOpen) {
+                setIsExportViewOpen(false);
+                return;
+            }
+            if (isGalleryViewOpen) {
+                setIsGalleryViewOpen(false);
+                return;
+            }
+            if (isShareViewOpen) {
+                setIsShareViewOpen(false);
+                return;
+            }
             if (focusDetailSessionId) {
                 setFocusDetailSessionId(null);
                 return;
@@ -130,6 +146,10 @@ export const useHardwareBackButton = () => {
                 setIsTagsManaging(false);
                 return;
             }
+            if (isScopeManaging) {
+                setIsScopeManaging(false);
+                return;
+            }
 
             // 3. Navigation (View Hierarchy)
             if (currentView === AppView.STATS) {
@@ -155,9 +175,9 @@ export const useHardwareBackButton = () => {
             listener.then(l => l.remove());
         };
     }, [
-        isSettingsOpen, isAutoLinkOpen, isSearchOpen, focusDetailSessionId, isAddModalOpen, isTodoModalOpen,
+        isSettingsOpen, isAutoLinkOpen, isSearchOpen, isExportViewOpen, isGalleryViewOpen, isShareViewOpen, focusDetailSessionId, isAddModalOpen, isTodoModalOpen,
         isDailyReviewOpen, isWeeklyReviewOpen, isMonthlyReviewOpen,
-        isStatsFullScreen, isTodoManaging, isTagsManaging,
+        isStatsFullScreen, isTodoManaging, isTagsManaging, isScopeManaging,
         currentView, selectedTagId, selectedCategoryId, selectedScopeId
     ]);
 };
