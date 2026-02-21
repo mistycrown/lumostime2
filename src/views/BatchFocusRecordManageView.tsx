@@ -331,6 +331,7 @@ interface RecordItemProps {
     todos: TodoItem[];
     isSelected: boolean;
     onToggle: () => void;
+    isPrivacyMode: boolean;
 }
 
 const RecordItem: React.FC<RecordItemProps> = ({
@@ -339,7 +340,8 @@ const RecordItem: React.FC<RecordItemProps> = ({
     scopes,
     todos,
     isSelected,
-    onToggle
+    onToggle,
+    isPrivacyMode
 }) => {
     // Find category and activity
     const category = categories.find(c => c.id === log.categoryId);
@@ -499,6 +501,7 @@ interface RecordListSectionProps {
     onToggleSelect: (id: string) => void;
     onSelectAll: () => void;
     onDeselectAll: () => void;
+    isPrivacyMode: boolean;
 }
 
 const RecordListSection: React.FC<RecordListSectionProps> = ({
@@ -509,7 +512,8 @@ const RecordListSection: React.FC<RecordListSectionProps> = ({
     selectedIds,
     onToggleSelect,
     onSelectAll,
-    onDeselectAll
+    onDeselectAll,
+    isPrivacyMode
 }) => {
     // Empty state
     if (logs.length === 0) {
@@ -547,6 +551,7 @@ const RecordListSection: React.FC<RecordListSectionProps> = ({
                         todos={todos}
                         isSelected={selectedIds.has(log.id)}
                         onToggle={() => onToggleSelect(log.id)}
+                        isPrivacyMode={isPrivacyMode}
                     />
                 ))}
             </div>
@@ -1330,6 +1335,7 @@ export const BatchFocusRecordManageView: React.FC<BatchFocusRecordManageViewProp
                         onToggleSelect={handleToggleSelect}
                         onSelectAll={handleSelectAll}
                         onDeselectAll={handleDeselectAll}
+                        isPrivacyMode={isPrivacyMode}
                     />
                 )}
 
