@@ -188,7 +188,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
     // Hooks for full data access during backup
     const { logs: ctxLogs, todos: ctxTodos, todoCategories: ctxTodoCategories } = useData();
     const { categories: ctxCategories, scopes: ctxScopes, goals: ctxGoals } = useCategoryScope();
-    const { autoLinkRules: ctxAutoLinkRules, userPersonalInfo: ctxUserPersonalInfo, filters: ctxFilters, customNarrativeTemplates: ctxCustomNarrativeTemplates, updateDataLastModified, useTwemoji, setUseTwemoji } = useSettings();
+    const { autoLinkRules: ctxAutoLinkRules, autoApplyAutoLinkRules, setAutoApplyAutoLinkRules, userPersonalInfo: ctxUserPersonalInfo, filters: ctxFilters, customNarrativeTemplates: ctxCustomNarrativeTemplates, updateDataLastModified, useTwemoji, setUseTwemoji } = useSettings();
     const { dailyReviews: ctxDailyReviews, weeklyReviews: ctxWeeklyReviews, monthlyReviews: ctxMonthlyReviews, reviewTemplates: ctxReviewTemplates } = useReview();
 
     const [activeSubmenu, setActiveSubmenu] = useState<'main' | 'data' | 'cloud' | 's3' | 'ai' | 'preferences' | 'guide' | 'nfc' | 'templates' | 'check_templates' | 'narrative_prompt' | 'auto_record' | 'autolink' | 'obsidian_export' | 'filters' | 'memoir_filter' | 'batch_manage' | 'sponsorship_preview'>('main');
@@ -837,6 +837,8 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
                 onToggleAutoGenerateMonthlyReview={onToggleAutoGenerateMonthlyReview}
                 autoFocusNote={autoFocusNote}
                 onToggleAutoFocusNote={onToggleAutoFocusNote}
+                autoApplyAutoLinkRules={autoApplyAutoLinkRules}
+                onToggleAutoApplyAutoLinkRules={() => setAutoApplyAutoLinkRules(!autoApplyAutoLinkRules)}
                 timelineGalleryMode={timelineGalleryMode}
                 onToggleTimelineGalleryMode={onToggleTimelineGalleryMode}
                 collapseThreshold={collapseThreshold}

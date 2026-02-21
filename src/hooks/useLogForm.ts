@@ -3,7 +3,7 @@
  * @description Custom hook for managing log form state
  */
 
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { Log, Category, TodoItem, TodoCategory, Scope, AutoLinkRule, Comment } from '../types';
 
 interface UseLogFormProps {
@@ -46,6 +46,10 @@ export const useLogForm = ({
   allLogs = [],
   draft = null // 新增：草稿数据
 }: UseLogFormProps) => {
+  // 使用 ref 保存草稿，避免重复加载
+  const draftRef = useRef(draft);
+  const isInitializedRef = useRef(false);
+  
   // 合并状态到单个对象
   const [formState, setFormState] = useState<LogFormState>(() => {
     const defaultCategory = categories[0];
@@ -69,8 +73,11 @@ export const useLogForm = ({
     };
   });
 
-  // 初始化表单状态
+  // 初始化表单状态 - 只在首次挂载时执行
   useEffect(() => {
+    // 如果已经初始化过，不再执行
+    if (isInitializedRef.current) return;
+    isInitializedRef.current = true;
     let tStart = 0;
     let tEnd = 0;
     let cStart = 0;
@@ -107,10 +114,10 @@ export const useLogForm = ({
       cEnd = initialEndTime;
 
       // 如果有草稿，恢复草稿数据（除了时间）
-      if (draft) {
+      if (draftRef.current) {
         setFormState(prev => ({
           ...prev,
-          ...draft,
+          ...draftRef.current,
           currentStartTime: cStart,
           currentEndTime: cEnd,
           trackStartTime: tStart,
@@ -136,10 +143,10 @@ export const useLogForm = ({
       cEnd = now;
 
       // 如果有草稿，恢复草稿数据（除了时间）
-      if (draft) {
+      if (draftRef.current) {
         setFormState(prev => ({
           ...prev,
-          ...draft,
+          ...draftRef.current,
           currentStartTime: cStart,
           currentEndTime: cEnd,
           trackStartTime: tStart,
@@ -155,7 +162,7 @@ export const useLogForm = ({
         }));
       }
     }
-  }, [initialLog, initialStartTime, initialEndTime, categories, lastLogEndTime, draft]);
+  }, [initialLog, initialStartTime, initialEndTime, lastLogEndTime]); // 移除 draft 和 categories 依赖
 
   // 计算上一条记录的结束时间
   const previousLogEndTime = useMemo(() => {

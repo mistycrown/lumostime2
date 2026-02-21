@@ -35,12 +35,13 @@ interface AddLogModalProps {
   todoCategories: TodoCategory[];
   scopes: Scope[];
   autoLinkRules?: AutoLinkRule[];
+  autoApplyAutoLinkRules?: boolean;
   lastLogEndTime?: number;
   autoFocusNote?: boolean;
   allLogs?: Log[]; // 添加所有日志用于计算上一条记录
 }
 
-export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialStartTime, initialEndTime, onClose, onSave, onDelete, onImageRemove, categories, todos, todoCategories, scopes, autoLinkRules = [], lastLogEndTime, autoFocusNote = true, allLogs = [] }) => {
+export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialStartTime, initialEndTime, onClose, onSave, onDelete, onImageRemove, categories, todos, todoCategories, scopes, autoLinkRules = [], autoApplyAutoLinkRules = true, lastLogEndTime, autoFocusNote = true, allLogs = [] }) => {
   // 使用自定义 Hooks 管理状态
   const { setIsShareViewOpen, setSharingLog } = useNavigation();
   
@@ -126,11 +127,27 @@ export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialSta
   const [isNoteExpanded, setIsNoteExpanded] = useState(false);
   const [isDraggingStart, setIsDraggingStart] = useState(false);
   const [isDraggingEnd, setIsDraggingEnd] = useState(false);
+  const [hasDraft, setHasDraft] = useState(false);
 
   // Refs
   const sliderRef = useRef<HTMLDivElement>(null);
   const noteRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  
+  // 跟踪已自动应用的规则，避免重复应用
+  const autoAppliedRulesRef = useRef<Set<string>>(new Set());
+  
+  // 检查是否有草稿
+  useEffect(() => {
+    if (!initialLog) {
+      try {
+        const saved = localStorage.getItem(DRAFT_KEY);
+        setHasDraft(!!saved);
+      } catch (e) {
+        setHasDraft(false);
+      }
+    }
+  }, [initialLog]);
 
   // Auto-focus note on new log
   useEffect(() => {
@@ -149,6 +166,35 @@ export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialSta
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [imageManager.images]); // 只依赖 imageManager.images，避免循环
+
+  // 自动应用规则（如果开关开启）
+  useEffect(() => {
+    if (autoApplyAutoLinkRules && suggestions.scopes.length > 0) {
+      const currentScopeIds = formState.scopeIds || [];
+      const scopesToAdd = suggestions.scopes
+        .filter(s => {
+          // 只自动应用"自动规则"类型的建议
+          if (s.reason !== '自动规则') return false;
+          // 检查是否已经在当前scopeIds中
+          if (currentScopeIds.includes(s.id)) return false;
+          // 检查是否已经自动应用过
+          const ruleKey = `${formState.selectedActivityId}-${s.id}`;
+          if (autoAppliedRulesRef.current.has(ruleKey)) return false;
+          return true;
+        })
+        .map(s => s.id);
+      
+      if (scopesToAdd.length > 0) {
+        // 标记这些规则已经应用
+        scopesToAdd.forEach(scopeId => {
+          const ruleKey = `${formState.selectedActivityId}-${scopeId}`;
+          autoAppliedRulesRef.current.add(ruleKey);
+        });
+        updateField('scopeIds', [...currentScopeIds, ...scopesToAdd]);
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [suggestions.scopes, autoApplyAutoLinkRules]); // 只在建议变化时触发
 
   // 事件处理函数
   const handleTimeInput = (type: 'start' | 'end', field: 'h' | 'm', value: number) => {
@@ -282,6 +328,33 @@ export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialSta
     
     onClose();
   };
+  
+  // 清除草稿并重置表单
+  const handleClearDraft = () => {
+    clearDraft();
+    setHasDraft(false);
+    
+    // 重置表单到初始状态
+    const defaultCategory = categories[0];
+    const defaultActivity = defaultCategory?.activities[0];
+    const now = Date.now();
+    const startTime = lastLogEndTime || now - 60 * 60 * 1000;
+    
+    updateFields({
+      selectedCategoryId: defaultCategory?.id || '',
+      selectedActivityId: defaultActivity?.id || '',
+      note: '',
+      linkedTodoId: undefined,
+      progressIncrement: 0,
+      focusScore: undefined,
+      scopeIds: undefined,
+      images: [],
+      comments: [],
+      reactions: [],
+      currentStartTime: startTime,
+      currentEndTime: now,
+    });
+  };
 
   const handleDelete = () => {
     if (initialLog && onDelete) {
@@ -370,6 +443,15 @@ export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialSta
           <div className="flex flex-col items-center">
             <span className="text-[10px] uppercase tracking-widest text-stone-400 font-bold mb-1">Total Time</span>
             <span className="text-2xl font-bold text-stone-900 tabular-nums font-mono">{timeCalc.durationDisplay}</span>
+            {!initialLog && hasDraft && (
+              <button
+                onClick={handleClearDraft}
+                className="mt-1 text-[10px] text-stone-400 hover:text-red-500 transition-colors"
+                title="清除草稿并重置表单"
+              >
+                清除草稿
+              </button>
+            )}
           </div>
           <div className="w-10 flex justify-end">
             <button

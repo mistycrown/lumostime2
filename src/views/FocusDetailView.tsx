@@ -25,13 +25,14 @@ interface FocusDetailViewProps {
     todoCategories: TodoCategory[];
     scopes: Scope[];
     autoLinkRules?: AutoLinkRule[];
+    autoApplyAutoLinkRules?: boolean;
     onClose: () => void;
     onComplete: (session: ActiveSession) => void;
     onUpdate: (session: ActiveSession) => void;
     autoFocusNote?: boolean;
 }
 
-export const FocusDetailView: React.FC<FocusDetailViewProps> = ({ session, todos, categories, todoCategories, scopes, autoLinkRules = [], onClose, onComplete, onUpdate, autoFocusNote = true }) => {
+export const FocusDetailView: React.FC<FocusDetailViewProps> = ({ session, todos, categories, todoCategories, scopes, autoLinkRules = [], autoApplyAutoLinkRules = true, onClose, onComplete, onUpdate, autoFocusNote = true }) => {
     const [elapsed, setElapsed] = useState(0);
     const [note, setNote] = useState(session.note || '');
     const [isActivitySelectorOpen, setIsActivitySelectorOpen] = useState(false);
@@ -40,6 +41,9 @@ export const FocusDetailView: React.FC<FocusDetailViewProps> = ({ session, todos
     // Progress Increment State
     const [progressAmount, setProgressAmount] = useState(0);
     const noteRef = useRef<HTMLTextAreaElement>(null);
+    
+    // 跟踪已自动应用的规则，避免重复应用
+    const autoAppliedRulesRef = useRef<Set<string>>(new Set());
 
     // Auto-focus note input
     useEffect(() => {
@@ -130,7 +134,33 @@ export const FocusDetailView: React.FC<FocusDetailViewProps> = ({ session, todos
         newSuggestions.scopes = Array.from(candidateScopes.values());
         setSuggestions(newSuggestions);
 
-    }, [session.linkedTodoId, note, session.activityId, session.scopeIds, categories, todos, scopes, autoLinkRules]);
+        // 自动应用规则（如果开关开启）
+        if (autoApplyAutoLinkRules && newSuggestions.scopes.length > 0) {
+            const currentScopeIds = session.scopeIds || [];
+            const scopesToAdd = newSuggestions.scopes
+                .filter(s => {
+                    // 只自动应用"自动规则"类型的建议
+                    if (s.reason !== '自动规则') return false;
+                    // 检查是否已经在当前scopeIds中
+                    if (currentScopeIds.includes(s.id)) return false;
+                    // 检查是否已经自动应用过
+                    const ruleKey = `${session.activityId}-${s.id}`;
+                    if (autoAppliedRulesRef.current.has(ruleKey)) return false;
+                    return true;
+                })
+                .map(s => s.id);
+            
+            if (scopesToAdd.length > 0) {
+                // 标记这些规则已经应用
+                scopesToAdd.forEach(scopeId => {
+                    const ruleKey = `${session.activityId}-${scopeId}`;
+                    autoAppliedRulesRef.current.add(ruleKey);
+                });
+                onUpdate({ ...session, scopeIds: [...currentScopeIds, ...scopesToAdd] });
+            }
+        }
+
+    }, [session.linkedTodoId, note, session.activityId, session.scopeIds, categories, todos, scopes, autoLinkRules, autoApplyAutoLinkRules]);
 
     const handleAcceptActivity = () => {
         if (suggestions.activity) {

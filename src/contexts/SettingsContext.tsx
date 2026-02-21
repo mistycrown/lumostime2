@@ -32,6 +32,10 @@ interface SettingsContextType {
     autoLinkRules: AutoLinkRule[];
     setAutoLinkRules: React.Dispatch<React.SetStateAction<AutoLinkRule[]>>;
 
+    // 自动应用规则开关
+    autoApplyAutoLinkRules: boolean;
+    setAutoApplyAutoLinkRules: React.Dispatch<React.SetStateAction<boolean>>;
+
     // 交互偏好
     autoFocusNote: boolean;
     setAutoFocusNote: React.Dispatch<React.SetStateAction<boolean>>;
@@ -135,6 +139,12 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
         return stored ? JSON.parse(stored) : [];
     });
 
+    // 自动应用规则开关
+    const [autoApplyAutoLinkRules, setAutoApplyAutoLinkRules] = useState<boolean>(() => {
+        const stored = localStorage.getItem('lumostime_autoApplyAutoLinkRules');
+        return stored ? JSON.parse(stored) : true; // 默认开启
+    });
+
     const [appRules, setAppRules] = useState<{ [packageName: string]: string }>({});
 
     // AI 设置
@@ -221,6 +231,10 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
     useEffect(() => {
         localStorage.setItem('lumostime_autoLinkRules', JSON.stringify(autoLinkRules));
     }, [autoLinkRules]);
+
+    useEffect(() => {
+        localStorage.setItem('lumostime_autoApplyAutoLinkRules', JSON.stringify(autoApplyAutoLinkRules));
+    }, [autoApplyAutoLinkRules]);
 
     const [autoFocusNote, setAutoFocusNote] = useState<boolean>(() => {
         const stored = localStorage.getItem('lumostime_auto_focus_note');
@@ -347,6 +361,8 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
             setDefaultIndexView,
             autoLinkRules,
             setAutoLinkRules,
+            autoApplyAutoLinkRules,
+            setAutoApplyAutoLinkRules,
             autoFocusNote,
             setAutoFocusNote,
             timelineGalleryMode,

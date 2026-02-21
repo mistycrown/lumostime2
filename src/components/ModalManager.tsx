@@ -67,6 +67,7 @@ interface ModalManagerProps {
     categories: Category[];
     scopes: any[];
     autoLinkRules: AutoLinkRule[];
+    autoApplyAutoLinkRules?: boolean;
     logs: Log[];
     todos: TodoItem[];
     autoFocusNote?: boolean;
@@ -109,6 +110,7 @@ export const ModalManager: React.FC<ModalManagerProps> = ({
     categories,
     scopes,
     autoLinkRules,
+    autoApplyAutoLinkRules,
     logs,
     todos,
     autoFocusNote = true
@@ -124,6 +126,7 @@ export const ModalManager: React.FC<ModalManagerProps> = ({
                     todoCategories={todoCategories}
                     scopes={scopes}
                     autoLinkRules={autoLinkRules}
+                    autoApplyAutoLinkRules={autoApplyAutoLinkRules}
                     onClose={onCloseFocusDetail}
                     onComplete={(s) => onStopActivity(s.id)}
                     onUpdate={onUpdateSession}
@@ -157,6 +160,7 @@ export const ModalManager: React.FC<ModalManagerProps> = ({
                     todoCategories={todoCategories}
                     scopes={scopes}
                     autoLinkRules={autoLinkRules}
+                    autoApplyAutoLinkRules={autoApplyAutoLinkRules}
                     lastLogEndTime={lastLogEndTime}
                     autoFocusNote={autoFocusNote}
                     allLogs={logs}

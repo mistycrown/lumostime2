@@ -67,6 +67,7 @@ const AppContent: React.FC = () => {
   // Use Contexts
   const {
     autoLinkRules, setAutoLinkRules,
+    autoApplyAutoLinkRules, setAutoApplyAutoLinkRules,
     startWeekOnSunday, setStartWeekOnSunday,
     minIdleTimeThreshold, setMinIdleTimeThreshold,
     defaultView, setDefaultView,
@@ -298,6 +299,7 @@ const AppContent: React.FC = () => {
           todoCategories={todoCategories}
           scopes={scopes}
           autoLinkRules={autoLinkRules}
+          autoApplyAutoLinkRules={autoApplyAutoLinkRules}
           autoFocusNote={autoFocusNote}
           allLogs={logs}
         />
@@ -368,6 +370,7 @@ const AppContent: React.FC = () => {
             todoCategories={todoCategories}
             scopes={scopes}
             autoLinkRules={autoLinkRules}
+            autoApplyAutoLinkRules={autoApplyAutoLinkRules}
             onClose={() => setFocusDetailSessionId(null)}
             onComplete={(finalSession) => {
               stopActivity(
