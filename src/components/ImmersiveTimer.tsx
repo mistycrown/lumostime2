@@ -621,8 +621,8 @@ export const ImmersiveTimer: React.FC<ImmersiveTimerProps> = ({ elapsed, onExit 
                             handleExit();
                         }}
                         className="pointer-events-auto absolute left-4 w-12 h-12 rounded-full backdrop-blur-md flex items-center justify-center active:scale-95 transition-all shadow-lg"
-                        style={{ top: 'calc(1rem + env(safe-area-inset-top))' }}
                         style={{
+                            top: 'max(3.5rem, calc(1rem + env(safe-area-inset-top)))',
                             backgroundColor: currentTheme.buttonBg,
                             borderWidth: '1.5px',
                             borderStyle: 'solid',
@@ -642,8 +642,8 @@ export const ImmersiveTimer: React.FC<ImmersiveTimerProps> = ({ elapsed, onExit 
                             setShowClockStyleModal(true);
                         }}
                         className="pointer-events-auto absolute right-[132px] w-12 h-12 rounded-full backdrop-blur-md flex items-center justify-center active:scale-95 transition-all shadow-lg"
-                        style={{ top: 'calc(1rem + env(safe-area-inset-top))' }}
                         style={{
+                            top: 'max(3.5rem, calc(1rem + env(safe-area-inset-top)))',
                             backgroundColor: currentTheme.buttonBg,
                             borderWidth: '1.5px',
                             borderStyle: 'solid',
@@ -663,8 +663,8 @@ export const ImmersiveTimer: React.FC<ImmersiveTimerProps> = ({ elapsed, onExit 
                             setShowThemeModal(true);
                         }}
                         className="pointer-events-auto absolute right-[72px] w-12 h-12 rounded-full backdrop-blur-md flex items-center justify-center active:scale-95 transition-all shadow-lg"
-                        style={{ top: 'calc(1rem + env(safe-area-inset-top))' }}
                         style={{
+                            top: 'max(3.5rem, calc(1rem + env(safe-area-inset-top)))',
                             backgroundColor: currentTheme.buttonBg,
                             borderWidth: '1.5px',
                             borderStyle: 'solid',
@@ -685,7 +685,7 @@ export const ImmersiveTimer: React.FC<ImmersiveTimerProps> = ({ elapsed, onExit 
                         }}
                         className="pointer-events-auto absolute right-4 w-12 h-12 rounded-full backdrop-blur-md flex items-center justify-center active:scale-95 transition-all shadow-lg"
                         style={{ 
-                            top: 'calc(1rem + env(safe-area-inset-top))',
+                            top: 'max(3.5rem, calc(1rem + env(safe-area-inset-top)))',
                             backgroundColor: isWhiteNoiseOn 
                                 ? `${currentTheme.buttonText}20` // Use theme color with 20% opacity
                                 : currentTheme.buttonBg,
