@@ -171,6 +171,8 @@ export const useSyncManager = () => {
             // [Fix] Clear pending flag immediately when starting sync.
             // If new changes happen *during* sync, useEffect will set it to true again,
             // allowing the finally block to catch them. This prevents infinite loops on error.
+            // IMPORTANT: Save the pending flag state BEFORE clearing it for startup check
+            const hadPendingAutoSync = pendingAutoSyncRef.current;
             pendingAutoSyncRef.current = false;
 
             const webdavConfig = webdavService.getConfig();
@@ -216,36 +218,79 @@ export const useSyncManager = () => {
             let dataSyncStatus: 'restored' | 'uploaded' | 'equal' | 'error' = 'equal';
             let dataSyncMsg = '';
 
+            // 容错阈值：8秒（处理上传延迟导致的时间差）
+            const SYNC_TOLERANCE_MS = 8000;
+
             // 1. 获取本地时间戳
             const localTimestamp = localDataTimestamp;
             console.log(`[Sync][Step 1] 获取本地时间戳: ${localTimestamp} (${new Date(localTimestamp).toLocaleString()})`);
 
-            // 1. Sync Data - 获取云端时间戳
+            // 2. 获取云端时间戳
+            // 策略：先用 statFile 快速判断，如果时间差在容错范围内，直接认为一致
+            // 只有当时间差明显时，才下载完整数据获取准确的 timestamp
             let cloudTimestamp = 0;
             let cloudData: any = null;
 
             try {
-                cloudData = await activeService.downloadData();
-                cloudTimestamp = cloudData?.timestamp || 0;
+                // 第一步：使用 statFile() 快速获取文件修改时间
+                const cloudFileDate = await activeService.statFile?.();
+                
+                if (cloudFileDate) {
+                    const fileModTime = cloudFileDate.getTime();
+                    console.log(`[Sync][Step 2a] 快速获取云端文件修改时间: ${fileModTime} (${cloudFileDate.toLocaleString()})`);
+                    
+                    // 快速判断：如果文件修改时间和本地时间戳差异在容错范围内，直接认为一致
+                    const quickDiff = Math.abs(fileModTime - localTimestamp);
+                    if (quickDiff <= SYNC_TOLERANCE_MS) {
+                        console.log(`[Sync][Step 2b] 文件修改时间差异在容错范围内 (${quickDiff}ms)，跳过下载`);
+                        cloudTimestamp = localTimestamp;  // 视为一致
+                    } else {
+                        // 时间差明显，需要下载完整数据获取准确的 timestamp
+                        console.log(`[Sync][Step 2b] 文件修改时间差异较大 (${quickDiff}ms)，下载数据获取准确时间戳`);
+                        cloudData = await activeService.downloadData();
+                        cloudTimestamp = cloudData?.timestamp || 0;
+                        console.log(`[Sync][Step 2c] 从数据内容获取时间戳: ${cloudTimestamp} (${new Date(cloudTimestamp).toLocaleString()})`);
+                    }
+                } else {
+                    // statFile 不可用或文件不存在，fallback 到下载数据
+                    console.log(`[Sync][Step 2] statFile 不可用，尝试下载数据获取时间戳`);
+                    cloudData = await activeService.downloadData();
+                    cloudTimestamp = cloudData?.timestamp || 0;
+                }
             } catch (err) {
-                console.log('[App] 云端无数据，准备上传本地数据');
+                console.log('[Sync][Step 2] 云端无数据或获取失败，准备上传本地数据');
+                cloudTimestamp = 0;
             }
-            console.log(`[Sync][Step 1] 获取云端时间戳: ${cloudTimestamp} (${new Date(cloudTimestamp).toLocaleString()})`);
 
-            // 2. 比较时间戳
-            console.log(`[Sync][Step 2] 比较时间戳: 本地=${localTimestamp} vs 云端=${cloudTimestamp}, 差值=${localTimestamp - cloudTimestamp}ms`);
+            // 3. 比较时间戳（使用容错阈值）
+            const timeDiff = localTimestamp - cloudTimestamp;
+            console.log(`[Sync][Step 3] 比较时间戳: 本地=${localTimestamp} vs 云端=${cloudTimestamp}, 差值=${timeDiff}ms (容错阈值: ±${SYNC_TOLERANCE_MS}ms)`);
 
-            // 3. 执行操作
-            if (cloudTimestamp > localTimestamp) {
-                // Case 1: Cloud is Newer -> Restore
-                console.log('[Sync][Step 3] 判定: 云端较新 -> 执行下载恢复');
+            // 4. 执行操作（使用容错阈值判断）
+            if (cloudTimestamp > localTimestamp + SYNC_TOLERANCE_MS) {
+                // Case 1: Cloud is Newer (超过容错阈值) -> Restore
+                console.log('[Sync][Step 4] 判定: 云端明显较新 -> 执行下载恢复');
 
                 // Check if there's a pending auto-sync (user just made changes)
-                if (mode === 'startup' && pendingAutoSyncRef.current) {
+                if (mode === 'startup' && hadPendingAutoSync) {
                     console.log('[Sync] Skipping cloud restore: Auto-sync pending (user just made changes)');
                     dataSyncStatus = 'equal';
                     dataSyncMsg = '检测到本地变更，跳过云端恢复';
                 } else {
+                    // 如果还没有下载完整数据，现在下载
+                    if (!cloudData) {
+                        console.log('[Sync][Step 4] 下载完整云端数据...');
+                        try {
+                            cloudData = await activeService.downloadData();
+                        } catch (downloadErr) {
+                            console.error('[Sync] 下载云端数据失败:', downloadErr);
+                            dataSyncStatus = 'error';
+                            dataSyncMsg = '下载云端数据失败';
+                            if (mode === 'manual') addToast('error', '下载云端数据失败');
+                            return;
+                        }
+                    }
+                    
                     if (cloudData) {
                         const backupSuccess = await backupLocalData(activeService, mode === 'startup' ? 'startup_backup' : 'pre_restore');
                         if (!backupSuccess) {
@@ -261,8 +306,9 @@ export const useSyncManager = () => {
                     }
                 }
             }
-            else if (localTimestamp > cloudTimestamp) {
-                // Case 2: Local is Newer -> Upload
+            else if (localTimestamp > cloudTimestamp + SYNC_TOLERANCE_MS) {
+                // Case 2: Local is Newer (超过容错阈值) -> Upload
+                console.log('[Sync][Step 4] 判定: 本地明显较新 -> 执行上传');
                 const localData = getFullLocalData();
 
                 // Safety check
@@ -272,6 +318,7 @@ export const useSyncManager = () => {
                     return;
                 }
 
+                // 上传完整数据
                 await activeService.uploadData(localData);
 
                 // Update legacy tracking ref if needed
@@ -282,7 +329,8 @@ export const useSyncManager = () => {
                 dataSyncMsg = '已上传本地数据至云端';
             }
             else {
-                // Case 3: Equal
+                // Case 3: Equal (时间差在容错阈值内)
+                console.log('[Sync][Step 4] 判定: 时间戳一致（差值在容错范围内）');
                 dataSyncStatus = 'equal';
                 dataSyncMsg = '数据已是一致';
             }

@@ -620,7 +620,8 @@ export const ImmersiveTimer: React.FC<ImmersiveTimerProps> = ({ elapsed, onExit 
                             e.stopPropagation();
                             handleExit();
                         }}
-                        className="pointer-events-auto absolute top-4 left-4 w-12 h-12 rounded-full backdrop-blur-md flex items-center justify-center active:scale-95 transition-all shadow-lg"
+                        className="pointer-events-auto absolute left-4 w-12 h-12 rounded-full backdrop-blur-md flex items-center justify-center active:scale-95 transition-all shadow-lg"
+                        style={{ top: 'calc(1rem + env(safe-area-inset-top))' }}
                         style={{
                             backgroundColor: currentTheme.buttonBg,
                             borderWidth: '1.5px',
@@ -640,7 +641,8 @@ export const ImmersiveTimer: React.FC<ImmersiveTimerProps> = ({ elapsed, onExit 
                             e.stopPropagation();
                             setShowClockStyleModal(true);
                         }}
-                        className="pointer-events-auto absolute top-4 right-[132px] w-12 h-12 rounded-full backdrop-blur-md flex items-center justify-center active:scale-95 transition-all shadow-lg"
+                        className="pointer-events-auto absolute right-[132px] w-12 h-12 rounded-full backdrop-blur-md flex items-center justify-center active:scale-95 transition-all shadow-lg"
+                        style={{ top: 'calc(1rem + env(safe-area-inset-top))' }}
                         style={{
                             backgroundColor: currentTheme.buttonBg,
                             borderWidth: '1.5px',
@@ -660,7 +662,8 @@ export const ImmersiveTimer: React.FC<ImmersiveTimerProps> = ({ elapsed, onExit 
                             e.stopPropagation();
                             setShowThemeModal(true);
                         }}
-                        className="pointer-events-auto absolute top-4 right-[72px] w-12 h-12 rounded-full backdrop-blur-md flex items-center justify-center active:scale-95 transition-all shadow-lg"
+                        className="pointer-events-auto absolute right-[72px] w-12 h-12 rounded-full backdrop-blur-md flex items-center justify-center active:scale-95 transition-all shadow-lg"
+                        style={{ top: 'calc(1rem + env(safe-area-inset-top))' }}
                         style={{
                             backgroundColor: currentTheme.buttonBg,
                             borderWidth: '1.5px',
@@ -680,8 +683,9 @@ export const ImmersiveTimer: React.FC<ImmersiveTimerProps> = ({ elapsed, onExit 
                             e.stopPropagation();
                             setShowNoiseModal(true);
                         }}
-                        className="pointer-events-auto absolute top-4 right-4 w-12 h-12 rounded-full backdrop-blur-md flex items-center justify-center active:scale-95 transition-all shadow-lg"
-                        style={{
+                        className="pointer-events-auto absolute right-4 w-12 h-12 rounded-full backdrop-blur-md flex items-center justify-center active:scale-95 transition-all shadow-lg"
+                        style={{ 
+                            top: 'calc(1rem + env(safe-area-inset-top))',
                             backgroundColor: isWhiteNoiseOn 
                                 ? `${currentTheme.buttonText}20` // Use theme color with 20% opacity
                                 : currentTheme.buttonBg,
