@@ -30,6 +30,8 @@ interface PreferencesSettingsViewProps {
     onToggleAutoFocusNote?: () => void;
     autoApplyAutoLinkRules?: boolean;
     onToggleAutoApplyAutoLinkRules?: () => void;
+    autoApplyTodoLink?: boolean;
+    onToggleAutoApplyTodoLink?: () => void;
     minIdleTimeThreshold?: number;
     onSetMinIdleTimeThreshold?: (val: number) => void;
     defaultView?: string;
@@ -67,6 +69,8 @@ export const PreferencesSettingsView: React.FC<PreferencesSettingsViewProps> = (
     onToggleAutoFocusNote,
     autoApplyAutoLinkRules = true,
     onToggleAutoApplyAutoLinkRules,
+    autoApplyTodoLink = true,
+    onToggleAutoApplyTodoLink,
     minIdleTimeThreshold = 1,
     onSetMinIdleTimeThreshold,
     defaultView = 'RECORD',
@@ -287,6 +291,23 @@ export const PreferencesSettingsView: React.FC<PreferencesSettingsViewProps> = (
                                 type="checkbox"
                                 checked={autoApplyAutoLinkRules}
                                 onChange={onToggleAutoApplyAutoLinkRules}
+                                className="sr-only peer"
+                            />
+                            <div className="w-11 h-6 bg-stone-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-stone-800"></div>
+                        </label>
+                    </div>
+
+                    {/* Auto Apply Todo Link Toggle */}
+                    <div className="flex items-center justify-between p-4 border-b border-stone-100 hover:bg-stone-50 transition-colors">
+                        <div>
+                            <h4 className="font-bold text-stone-700">自动应用待办关联</h4>
+                            <p className="text-xs text-stone-400 mt-1">开启后，选择待办时会自动应用待办关联的标签；关闭后仅发出提醒</p>
+                        </div>
+                        <label className="relative inline-flex items-center cursor-pointer">
+                            <input
+                                type="checkbox"
+                                checked={autoApplyTodoLink}
+                                onChange={onToggleAutoApplyTodoLink}
                                 className="sr-only peer"
                             />
                             <div className="w-11 h-6 bg-stone-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-stone-800"></div>

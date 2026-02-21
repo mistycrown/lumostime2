@@ -36,12 +36,13 @@ interface AddLogModalProps {
   scopes: Scope[];
   autoLinkRules?: AutoLinkRule[];
   autoApplyAutoLinkRules?: boolean;
+  autoApplyTodoLink?: boolean;
   lastLogEndTime?: number;
   autoFocusNote?: boolean;
   allLogs?: Log[]; // 添加所有日志用于计算上一条记录
 }
 
-export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialStartTime, initialEndTime, onClose, onSave, onDelete, onImageRemove, categories, todos, todoCategories, scopes, autoLinkRules = [], autoApplyAutoLinkRules = true, lastLogEndTime, autoFocusNote = true, allLogs = [] }) => {
+export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialStartTime, initialEndTime, onClose, onSave, onDelete, onImageRemove, categories, todos, todoCategories, scopes, autoLinkRules = [], autoApplyAutoLinkRules = true, autoApplyTodoLink = true, lastLogEndTime, autoFocusNote = true, allLogs = [] }) => {
   // 使用自定义 Hooks 管理状态
   const { setIsShareViewOpen, setSharingLog } = useNavigation();
   
@@ -169,32 +170,67 @@ export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialSta
 
   // 自动应用规则（如果开关开启）
   useEffect(() => {
-    if (autoApplyAutoLinkRules && suggestions.scopes.length > 0) {
+    if (suggestions.scopes.length > 0) {
       const currentScopeIds = formState.scopeIds || [];
       const scopesToAdd = suggestions.scopes
         .filter(s => {
-          // 只自动应用"自动规则"类型的建议
-          if (s.reason !== '自动规则') return false;
           // 检查是否已经在当前scopeIds中
           if (currentScopeIds.includes(s.id)) return false;
-          // 检查是否已经自动应用过
-          const ruleKey = `${formState.selectedActivityId}-${s.id}`;
-          if (autoAppliedRulesRef.current.has(ruleKey)) return false;
-          return true;
+          
+          // 自动应用"自动规则"类型的建议（如果开关开启）
+          if (s.reason === '自动规则' && autoApplyAutoLinkRules) {
+            const ruleKey = `${formState.selectedActivityId}-${s.id}`;
+            if (autoAppliedRulesRef.current.has(ruleKey)) return false;
+            return true;
+          }
+          
+          // 自动应用"关联待办"类型的建议（如果开关开启）
+          if (s.reason === '关联待办' && autoApplyTodoLink) {
+            const todoKey = `todo-scope-${formState.linkedTodoId}-${s.id}`;
+            if (autoAppliedRulesRef.current.has(todoKey)) return false;
+            return true;
+          }
+          
+          return false;
         })
         .map(s => s.id);
       
       if (scopesToAdd.length > 0) {
         // 标记这些规则已经应用
-        scopesToAdd.forEach(scopeId => {
-          const ruleKey = `${formState.selectedActivityId}-${scopeId}`;
-          autoAppliedRulesRef.current.add(ruleKey);
+        suggestions.scopes.forEach(s => {
+          if (scopesToAdd.includes(s.id)) {
+            if (s.reason === '自动规则') {
+              const ruleKey = `${formState.selectedActivityId}-${s.id}`;
+              autoAppliedRulesRef.current.add(ruleKey);
+            } else if (s.reason === '关联待办') {
+              const todoKey = `todo-scope-${formState.linkedTodoId}-${s.id}`;
+              autoAppliedRulesRef.current.add(todoKey);
+            }
+          }
         });
         updateField('scopeIds', [...currentScopeIds, ...scopesToAdd]);
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [suggestions.scopes, autoApplyAutoLinkRules]); // 只在建议变化时触发
+  }, [suggestions.scopes, autoApplyAutoLinkRules, autoApplyTodoLink, formState.linkedTodoId]); // 添加 autoApplyTodoLink 和 linkedTodoId 依赖
+  
+  // 自动应用待办关联的标签（如果开关开启）
+  useEffect(() => {
+    if (autoApplyTodoLink && suggestions.activity && suggestions.activity.reason === '关联待办') {
+      // 检查是否已经应用过这个待办的标签建议
+      const suggestionKey = `todo-${formState.linkedTodoId}-${suggestions.activity.id}`;
+      if (!autoAppliedRulesRef.current.has(suggestionKey)) {
+        // 自动应用标签
+        updateFields({
+          selectedCategoryId: suggestions.activity.categoryId,
+          selectedActivityId: suggestions.activity.id
+        });
+        // 标记已应用
+        autoAppliedRulesRef.current.add(suggestionKey);
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [suggestions.activity, autoApplyTodoLink, formState.linkedTodoId]); // 只在建议变化时触发
 
   // 事件处理函数
   const handleTimeInput = (type: 'start' | 'end', field: 'h' | 'm', value: number) => {

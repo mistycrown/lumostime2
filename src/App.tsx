@@ -68,6 +68,7 @@ const AppContent: React.FC = () => {
   const {
     autoLinkRules, setAutoLinkRules,
     autoApplyAutoLinkRules, setAutoApplyAutoLinkRules,
+    autoApplyTodoLink, setAutoApplyTodoLink,
     startWeekOnSunday, setStartWeekOnSunday,
     minIdleTimeThreshold, setMinIdleTimeThreshold,
     defaultView, setDefaultView,
@@ -300,6 +301,7 @@ const AppContent: React.FC = () => {
           scopes={scopes}
           autoLinkRules={autoLinkRules}
           autoApplyAutoLinkRules={autoApplyAutoLinkRules}
+          autoApplyTodoLink={autoApplyTodoLink}
           autoFocusNote={autoFocusNote}
           allLogs={logs}
         />
@@ -371,6 +373,7 @@ const AppContent: React.FC = () => {
             scopes={scopes}
             autoLinkRules={autoLinkRules}
             autoApplyAutoLinkRules={autoApplyAutoLinkRules}
+            autoApplyTodoLink={autoApplyTodoLink}
             onClose={() => setFocusDetailSessionId(null)}
             onComplete={(finalSession) => {
               stopActivity(
@@ -383,9 +386,15 @@ const AppContent: React.FC = () => {
             }}
             onUpdate={(updated) => {
               // Update the session in activeSessions
-              setActiveSessions(prev => prev.map(s =>
-                s.id === updated.id ? updated : s
-              ));
+              console.log('[App.tsx] onUpdate 被调用，更新的 session:', updated);
+              console.log('[App.tsx] 更新的 scopeIds:', updated.scopeIds);
+              setActiveSessions(prev => {
+                const newSessions = prev.map(s =>
+                  s.id === updated.id ? updated : s
+                );
+                console.log('[App.tsx] 更新后的 activeSessions:', newSessions);
+                return newSessions;
+              });
             }}
             autoFocusNote={autoFocusNote}
           />

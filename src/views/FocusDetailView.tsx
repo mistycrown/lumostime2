@@ -14,8 +14,6 @@ import { TodoAssociation } from '../components/TodoAssociation';
 import { ScopeAssociation } from '../components/ScopeAssociation';
 import { FocusScoreSelector } from '../components/FocusScoreSelector';
 import { ImmersiveTimer } from '../components/ImmersiveTimer';
-import FocusNotification from '../plugins/FocusNotificationPlugin';
-import { Capacitor } from '@capacitor/core';
 import { IconRenderer } from '../components/IconRenderer';
 
 interface FocusDetailViewProps {
@@ -26,13 +24,14 @@ interface FocusDetailViewProps {
     scopes: Scope[];
     autoLinkRules?: AutoLinkRule[];
     autoApplyAutoLinkRules?: boolean;
+    autoApplyTodoLink?: boolean;
     onClose: () => void;
     onComplete: (session: ActiveSession) => void;
     onUpdate: (session: ActiveSession) => void;
     autoFocusNote?: boolean;
 }
 
-export const FocusDetailView: React.FC<FocusDetailViewProps> = ({ session, todos, categories, todoCategories, scopes, autoLinkRules = [], autoApplyAutoLinkRules = true, onClose, onComplete, onUpdate, autoFocusNote = true }) => {
+export const FocusDetailView: React.FC<FocusDetailViewProps> = ({ session, todos, categories, todoCategories, scopes, autoLinkRules = [], autoApplyAutoLinkRules = true, autoApplyTodoLink = true, onClose, onComplete, onUpdate, autoFocusNote = true }) => {
     const [elapsed, setElapsed] = useState(0);
     const [note, setNote] = useState(session.note || '');
     const [isActivitySelectorOpen, setIsActivitySelectorOpen] = useState(false);
@@ -44,6 +43,11 @@ export const FocusDetailView: React.FC<FocusDetailViewProps> = ({ session, todos
     
     // 跟踪已自动应用的规则，避免重复应用
     const autoAppliedRulesRef = useRef<Set<string>>(new Set());
+
+    // 清除已应用规则的记录，当关联的待办改变时
+    useEffect(() => {
+        autoAppliedRulesRef.current.clear();
+    }, [session.linkedTodoId, session.activityId]);
 
     // Auto-focus note input
     useEffect(() => {
@@ -134,33 +138,73 @@ export const FocusDetailView: React.FC<FocusDetailViewProps> = ({ session, todos
         newSuggestions.scopes = Array.from(candidateScopes.values());
         setSuggestions(newSuggestions);
 
-        // 自动应用规则（如果开关开启）
-        if (autoApplyAutoLinkRules && newSuggestions.scopes.length > 0) {
+        // 自动应用领域建议（如果开关开启）
+        if (newSuggestions.scopes.length > 0) {
             const currentScopeIds = session.scopeIds || [];
             const scopesToAdd = newSuggestions.scopes
                 .filter(s => {
-                    // 只自动应用"自动规则"类型的建议
-                    if (s.reason !== '自动规则') return false;
                     // 检查是否已经在当前scopeIds中
                     if (currentScopeIds.includes(s.id)) return false;
-                    // 检查是否已经自动应用过
-                    const ruleKey = `${session.activityId}-${s.id}`;
-                    if (autoAppliedRulesRef.current.has(ruleKey)) return false;
-                    return true;
+                    
+                    // 自动应用"自动规则"类型的建议（如果开关开启）
+                    if (s.reason === '自动规则' && autoApplyAutoLinkRules) {
+                        const ruleKey = `${session.activityId}-${s.id}`;
+                        if (autoAppliedRulesRef.current.has(ruleKey)) return false;
+                        return true;
+                    }
+                    
+                    // 自动应用"关联待办"类型的建议（如果开关开启）
+                    if (s.reason === '关联待办' && autoApplyTodoLink) {
+                        const todoKey = `todo-scope-${session.linkedTodoId}-${s.id}`;
+                        if (autoAppliedRulesRef.current.has(todoKey)) return false;
+                        return true;
+                    }
+                    
+                    return false;
                 })
                 .map(s => s.id);
             
             if (scopesToAdd.length > 0) {
                 // 标记这些规则已经应用
-                scopesToAdd.forEach(scopeId => {
-                    const ruleKey = `${session.activityId}-${scopeId}`;
-                    autoAppliedRulesRef.current.add(ruleKey);
+                newSuggestions.scopes.forEach(s => {
+                    if (scopesToAdd.includes(s.id)) {
+                        if (s.reason === '自动规则') {
+                            const ruleKey = `${session.activityId}-${s.id}`;
+                            autoAppliedRulesRef.current.add(ruleKey);
+                        } else if (s.reason === '关联待办') {
+                            const todoKey = `todo-scope-${session.linkedTodoId}-${s.id}`;
+                            autoAppliedRulesRef.current.add(todoKey);
+                        }
+                    }
                 });
-                onUpdate({ ...session, scopeIds: [...currentScopeIds, ...scopesToAdd] });
+                const updatedSession = { ...session, scopeIds: [...currentScopeIds, ...scopesToAdd] };
+                onUpdate(updatedSession);
+            }
+        }
+        
+        // 自动应用待办关联的标签（如果开关开启）
+        if (autoApplyTodoLink && newSuggestions.activity && newSuggestions.activity.reason === '关联待办') {
+            if (session.activityId !== newSuggestions.activity.id) {
+                const suggestionKey = `todo-${session.linkedTodoId}-${newSuggestions.activity.id}`;
+                if (!autoAppliedRulesRef.current.has(suggestionKey)) {
+                    const cat = categories.find(c => c.id === newSuggestions.activity!.categoryId);
+                    const act = cat?.activities.find(a => a.id === newSuggestions.activity!.id);
+                    if (act && cat) {
+                        onUpdate({ 
+                            ...session, 
+                            categoryId: cat.id,
+                            activityId: act.id,
+                            activityName: act.name,
+                            activityIcon: act.icon,
+                            activityUiIcon: act.uiIcon
+                        });
+                        autoAppliedRulesRef.current.add(suggestionKey);
+                    }
+                }
             }
         }
 
-    }, [session.linkedTodoId, note, session.activityId, session.scopeIds, categories, todos, scopes, autoLinkRules, autoApplyAutoLinkRules]);
+    }, [session.linkedTodoId, note, session.activityId, session.scopeIds, categories, todos, scopes, autoLinkRules, autoApplyAutoLinkRules, autoApplyTodoLink]);
 
     const handleAcceptActivity = () => {
         if (suggestions.activity) {
@@ -198,10 +242,19 @@ export const FocusDetailView: React.FC<FocusDetailViewProps> = ({ session, todos
         return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
     };
 
-    // Auto-save note
+    // Auto-save note - 使用 useRef 避免过时的闭包
+    const sessionRef = useRef(session);
+    const onUpdateRef = useRef(onUpdate);
+    
     useEffect(() => {
-        onUpdate({ ...session, note });
-    }, [note]);
+        sessionRef.current = session;
+        onUpdateRef.current = onUpdate;
+    });
+    
+    useEffect(() => {
+        onUpdateRef.current({ ...sessionRef.current, note });
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [note]); // 只依赖 note
 
     const handleActivitySelect = (activity: Activity, categoryId: string) => {
         onUpdate({
@@ -219,8 +272,6 @@ export const FocusDetailView: React.FC<FocusDetailViewProps> = ({ session, todos
         onUpdate({ ...session, linkedTodoId: todoId });
         setProgressAmount(0); // Reset progress check when changing todo
     };
-
-    const linkedTodo = todos.find(t => t.id === session.linkedTodoId);
 
     const handleComplete = () => {
         onComplete({
