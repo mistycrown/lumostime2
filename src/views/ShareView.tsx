@@ -145,7 +145,8 @@ export const ShareView: React.FC<ShareViewProps> = ({ log, onBack, onToast }) =>
         // 移动端：保存到 Pictures 目录
         try {
           const base64Data = dataUrl.replace(/^data:image\/\w+;base64,/, '');
-          const filename = `LumosTime_${Date.now()}.png`;
+          const randomStr = Math.random().toString(36).substring(2, 8);
+          const filename = `LumosTime_${randomStr}.png`;
           
           await Filesystem.writeFile({
             path: `Pictures/LumosTime/${filename}`,
@@ -172,7 +173,8 @@ export const ShareView: React.FC<ShareViewProps> = ({ log, onBack, onToast }) =>
       } else {
         // 桌面端/Web端：直接下载
         const link = document.createElement('a');
-        link.download = `lumostime-share-${Date.now()}.png`;
+        const randomStr = Math.random().toString(36).substring(2, 8);
+        link.download = `lumostime-share-${randomStr}.png`;
         link.href = dataUrl;
         link.click();
         

@@ -9,6 +9,7 @@
  */
 import { useEffect, useRef } from 'react';
 import { Capacitor } from '@capacitor/core';
+import { StatusBar, Style } from '@capacitor/status-bar';
 import { useSettings } from '../contexts/SettingsContext';
 import { useToast } from '../contexts/ToastContext';
 import AppUsage from '../plugins/AppUsagePlugin';
@@ -26,6 +27,23 @@ export const useAppInitialization = () => {
     const { logs, setLogs } = useData();
     const hasCleanedImagesRef = useRef(false);
     const hasRepairedDataRef = useRef(false);
+
+    // Initialize StatusBar for mobile devices
+    useEffect(() => {
+        const initStatusBar = async () => {
+            if (Capacitor.isNativePlatform()) {
+                try {
+                    await StatusBar.setStyle({ style: Style.Light });
+                    await StatusBar.setBackgroundColor({ color: '#fdfbf7' });
+                    await StatusBar.setOverlaysWebView({ overlay: false });
+                    console.log('📱 StatusBar initialized');
+                } catch (error) {
+                    console.error('❌ StatusBar initialization failed:', error);
+                }
+            }
+        };
+        initStatusBar();
+    }, []);
 
     // Expose UpdateService to window for debugging
     useEffect(() => {

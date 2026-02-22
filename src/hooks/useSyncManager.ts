@@ -617,7 +617,10 @@ export const useSyncManager = () => {
     // --- Effects ---
     // 1. Startup Pull
     useEffect(() => {
-        performSync('startup');
+        // 如果开启了手动同步模式，跳过启动同步
+        if (!manualSyncMode) {
+            performSync('startup');
+        }
     }, []);
 
     // 2. Data Auto Sync
@@ -743,8 +746,11 @@ export const useSyncManager = () => {
                 // On native platforms, use App state
                 // On web, visibilitychange handles this
                 if (state.isActive && Capacitor.isNativePlatform()) {
-                    console.log('[App] App resumed. Checking for updates...');
-                    performSync('resume');
+                    // 如果开启了手动同步模式，跳过恢复同步
+                    if (!manualSyncMode) {
+                        console.log('[App] App resumed. Checking for updates...');
+                        performSync('resume');
+                    }
                 }
             });
         };
@@ -754,6 +760,11 @@ export const useSyncManager = () => {
         const handleVisibilityChange = () => {
             // Web Visibility API
             if (document.visibilityState === 'hidden') {
+                // 如果开启了手动同步模式，跳过后台上传
+                if (manualSyncMode) {
+                    return;
+                }
+                
                 const webdavConfig = webdavService.getConfig();
                 const s3Config = s3Service.getConfig();
 
@@ -787,8 +798,11 @@ export const useSyncManager = () => {
                 // But on Mobile, 'appStateChange' handles this better.
                 // We can leave this for Web or just let it be.
                 if (!Capacitor.isNativePlatform()) {
-                    console.log('[App] Tab visible. Checking for updates...');
-                    performSync('resume');
+                    // 如果开启了手动同步模式，跳过恢复同步
+                    if (!manualSyncMode) {
+                        console.log('[App] Tab visible. Checking for updates...');
+                        performSync('resume');
+                    }
                 }
             }
         };

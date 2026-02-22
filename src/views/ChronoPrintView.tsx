@@ -303,7 +303,10 @@ export const ChronoPrintView: React.FC<ChronoPrintViewProps> = ({ inputText, onB
           </div>
           <div className="flex justify-between gap-2">
             <button 
-              onClick={() => handleExportSingle(monthRef, `chrono-tags-${globalDateLabel}.png`, 'tags')}
+              onClick={() => {
+                const randomStr = Math.random().toString(36).substring(2, 8);
+                handleExportSingle(monthRef, `chrono-tags-${globalDateLabel}-${randomStr}.png`, 'tags');
+              }}
               disabled={!!exportingState || !data?.monthStats}
               className={`flex-1 px-2 py-1.5 rounded-full text-[10px] font-medium border transition-all font-serif ${
                 exportingState === 'tags'
@@ -315,7 +318,10 @@ export const ChronoPrintView: React.FC<ChronoPrintViewProps> = ({ inputText, onB
             </button>
 
             <button 
-              onClick={() => handleExportSingle(todoRef, `chrono-todos-${globalDateLabel}.png`, 'todos')}
+              onClick={() => {
+                const randomStr = Math.random().toString(36).substring(2, 8);
+                handleExportSingle(todoRef, `chrono-todos-${globalDateLabel}-${randomStr}.png`, 'todos');
+              }}
               disabled={!!exportingState || !data?.todoStats}
               className={`flex-1 px-2 py-1.5 rounded-full text-[10px] font-medium border transition-all font-serif ${
                 exportingState === 'todos'
@@ -327,7 +333,10 @@ export const ChronoPrintView: React.FC<ChronoPrintViewProps> = ({ inputText, onB
             </button>
 
             <button 
-              onClick={() => handleExportSingle(domainRef, `chrono-scopes-${globalDateLabel}.png`, 'scopes')}
+              onClick={() => {
+                const randomStr = Math.random().toString(36).substring(2, 8);
+                handleExportSingle(domainRef, `chrono-scopes-${globalDateLabel}-${randomStr}.png`, 'scopes');
+              }}
               disabled={!!exportingState || !data?.domainStats}
               className={`flex-1 px-2 py-1.5 rounded-full text-[10px] font-medium border transition-all font-serif ${
                 exportingState === 'scopes'

@@ -167,7 +167,8 @@ export const YearEmojiExportView: React.FC<YearEmojiExportViewProps> = ({
         setExportingState(true);
 
         try {
-            const filename = `lumos-mood-year-${currentStyle}-${year}.png`;
+            const randomStr = Math.random().toString(36).substring(2, 8);
+            const filename = `lumos-mood-year-${currentStyle}-${year}-${randomStr}.png`;
 
             // Determine background color based on style/theme
             const bgColor = theme.bg;

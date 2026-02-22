@@ -458,7 +458,8 @@ export const GalleryExportView: React.FC<GalleryExportViewProps> = ({
                     // 手机端：保存到 Pictures 目录
                     try {
                         const base64Data = dataUrl.replace(/^data:image\/\w+;base64,/, '');
-                        const filename = `Gallery_${currentPeriod}_${format(currentDate, 'yyyy-MM-dd')}_${Date.now()}.png`;
+                        const randomStr = Math.random().toString(36).substring(2, 8);
+                        const filename = `Gallery_${currentPeriod}_${format(currentDate, 'yyyy-MM-dd')}_${randomStr}.png`;
                         
                         await Filesystem.writeFile({
                             path: `Pictures/LumosTime/${filename}`,
@@ -485,7 +486,8 @@ export const GalleryExportView: React.FC<GalleryExportViewProps> = ({
                 } else {
                     // 桌面端/Web端：直接下载
                     const link = document.createElement('a');
-                    link.download = `gallery-${currentPeriod}-${format(currentDate, 'yyyy-MM-dd')}.png`;
+                    const randomStr = Math.random().toString(36).substring(2, 8);
+                    link.download = `gallery-${currentPeriod}-${format(currentDate, 'yyyy-MM-dd')}-${randomStr}.png`;
                     link.href = dataUrl;
                     link.click();
                     
