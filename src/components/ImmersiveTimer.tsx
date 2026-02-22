@@ -156,6 +156,8 @@ export const ImmersiveTimer: React.FC<ImmersiveTimerProps> = ({ elapsed, onExit 
     const [audioContext, setAudioContext] = useState<AudioContext | null>(null);
     const [whiteNoiseNode, setWhiteNoiseNode] = useState<AudioBufferSourceNode | null>(null);
     const [gainNode, setGainNode] = useState<GainNode | null>(null);
+    const [landscapeFontSize, setLandscapeFontSize] = useState('min(24vw, 36vh)');
+    const timerRef = React.useRef<HTMLDivElement>(null);
     
     // Load saved preferences from localStorage
     const [selectedTheme, setSelectedTheme] = useState(() => {
@@ -219,6 +221,49 @@ export const ImmersiveTimer: React.FC<ImmersiveTimerProps> = ({ elapsed, onExit 
             window.removeEventListener('orientationchange', handleResize);
         };
     }, []);
+
+    // Auto-adjust font size for landscape mode to prevent overflow
+    useEffect(() => {
+        if (!isLandscape || !timerRef.current || selectedClockStyle !== 'digital') {
+            return;
+        }
+
+        const adjustFontSize = () => {
+            const container = timerRef.current;
+            if (!container) return;
+
+            const containerWidth = window.innerWidth * 0.95; // 95vw max
+            const containerHeight = window.innerHeight;
+            
+            // Start with a large font size
+            let fontSize = Math.min(containerWidth * 0.24, containerHeight * 0.36);
+            
+            // Temporarily set the font size to measure
+            container.style.fontSize = `${fontSize}px`;
+            
+            // Check if content overflows
+            let iterations = 0;
+            while ((container.scrollWidth > containerWidth || container.scrollHeight > containerHeight) && iterations < 20) {
+                fontSize *= 0.95; // Reduce by 5% each iteration
+                container.style.fontSize = `${fontSize}px`;
+                iterations++;
+            }
+            
+            // Set the final font size with a small safety margin
+            fontSize *= 0.98;
+            setLandscapeFontSize(`${fontSize}px`);
+        };
+
+        // Adjust on mount and when elapsed changes
+        adjustFontSize();
+        
+        // Also adjust on window resize
+        window.addEventListener('resize', adjustFontSize);
+        
+        return () => {
+            window.removeEventListener('resize', adjustFontSize);
+        };
+    }, [isLandscape, elapsed, selectedClockStyle]);
 
     // Auto-play white noise if user had it on last time
     useEffect(() => {
@@ -491,11 +536,12 @@ export const ImmersiveTimer: React.FC<ImmersiveTimerProps> = ({ elapsed, onExit 
             ) : (
                 <>
                     {isLandscape ? (
-                        // Landscape: horizontal layout
+                        // Landscape: horizontal layout with auto-adjusting font size
                         <div 
+                            ref={timerRef}
                             className="relative z-10 select-none px-4"
                             style={{ 
-                                fontSize: 'min(24vw, 36vh)',
+                                fontSize: landscapeFontSize,
                                 fontFamily: currentTheme.clockStyle.fontFamily,
                                 fontWeight: currentTheme.clockStyle.fontWeight,
                                 letterSpacing: currentTheme.clockStyle.letterSpacing,
@@ -505,7 +551,8 @@ export const ImmersiveTimer: React.FC<ImmersiveTimerProps> = ({ elapsed, onExit 
                                 textShadow: currentTheme.clockStyle.textShadow,
                                 maxWidth: '95vw',
                                 overflow: 'hidden',
-                                textAlign: 'center'
+                                textAlign: 'center',
+                                whiteSpace: 'nowrap'
                             }}
                         >
                             {formatTime(elapsed)}

@@ -423,7 +423,7 @@ export const PreferencesSettingsView: React.FC<PreferencesSettingsViewProps> = (
                     <h3 className="text-[10px] font-bold text-stone-400 uppercase tracking-wider pl-2">默认页面</h3>
                     <div className="bg-white rounded-2xl overflow-visible shadow-[0_2px_10px_rgba(0,0,0,0.03)]">
                         {/* Default View Config */}
-                        <div className="flex items-center justify-between p-4 border-b border-stone-100 relative z-20 hover:bg-stone-50 transition-colors">
+                        <div className="flex items-center justify-between p-4 border-b border-stone-100 relative z-20 hover:bg-stone-50 transition-colors rounded-t-2xl">
                             <div>
                                 <h4 className="font-bold text-stone-700">启动默认页</h4>
                                 <p className="text-xs text-stone-400 mt-1">应用启动时默认显示的页面</p>
@@ -513,7 +513,7 @@ export const PreferencesSettingsView: React.FC<PreferencesSettingsViewProps> = (
                         </div>
 
                         {/* Default Index Page Config */}
-                        <div className="flex items-center justify-between p-4 relative hover:bg-stone-50 transition-colors">
+                        <div className="flex items-center justify-between p-4 relative hover:bg-stone-50 transition-colors rounded-b-2xl">
                             <div>
                                 <h4 className="font-bold text-stone-700">索引页默认页面</h4>
                                 <p className="text-xs text-stone-400 mt-1">进入索引页时默认显示的视图</p>

@@ -1013,8 +1013,8 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
                                         <h4 className="text-sm font-medium text-stone-600">Sticker 集</h4>
                                         <p className="text-xs text-stone-500 mb-3">在已开启 Emoji 和 Sticker 的选择器中查看</p>
                                         
-                                        {/* Sticker 集预览网格 - 限制最大宽度 */}
-                                        <div className="grid gap-2" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(80px, 1fr))', maxWidth: '400px' }}>
+                                        {/* Sticker 集预览网格 */}
+                                        <div className="grid gap-2" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(64px, 1fr))', maxWidth: '600px' }}>
                                             {stickerService.getAllStickerSets().map((stickerSet) => (
                                                 <div
                                                     key={stickerSet.id}
