@@ -42,6 +42,8 @@ interface PreferencesSettingsViewProps {
     onToggleTimelineGalleryMode?: () => void;
     collapseThreshold?: number;
     onSetCollapseThreshold?: (val: number) => void;
+    manualSyncMode?: boolean;
+    onToggleManualSyncMode?: () => void;
 }
 
 export const PreferencesSettingsView: React.FC<PreferencesSettingsViewProps> = ({
@@ -78,7 +80,9 @@ export const PreferencesSettingsView: React.FC<PreferencesSettingsViewProps> = (
     timelineGalleryMode = false,
     onToggleTimelineGalleryMode,
     collapseThreshold = 9999,
-    onSetCollapseThreshold
+    onSetCollapseThreshold,
+    manualSyncMode = false,
+    onToggleManualSyncMode
 }) => {
     const [isDefaultViewDropdownOpen, setIsDefaultViewDropdownOpen] = useState(false);
 
@@ -97,7 +101,7 @@ export const PreferencesSettingsView: React.FC<PreferencesSettingsViewProps> = (
                     <h3 className="text-[10px] font-bold text-stone-400 uppercase tracking-wider pl-2">通用</h3>
                     <div className="bg-white rounded-2xl overflow-hidden shadow-[0_2px_10px_rgba(0,0,0,0.03)]">
                         {/* Privacy Mode Toggle */}
-                        <div className="flex items-center justify-between p-4 hover:bg-stone-50 transition-colors">
+                        <div className="flex items-center justify-between p-4 border-b border-stone-100 hover:bg-stone-50 transition-colors">
                             <div>
                                 <h4 className="font-bold text-stone-700">隐私模式</h4>
                                 <p className="text-xs text-stone-400 mt-1">开启后将模糊显示备注等敏感信息</p>
@@ -111,6 +115,26 @@ export const PreferencesSettingsView: React.FC<PreferencesSettingsViewProps> = (
                                 <div
                                     className={`w-5 h-5 bg-white rounded-full shadow-sm transition-transform ${
                                         privacyMode ? 'translate-x-5' : 'translate-x-0'
+                                    }`}
+                                />
+                            </button>
+                        </div>
+                        
+                        {/* Manual Sync Mode Toggle */}
+                        <div className="flex items-center justify-between p-4 hover:bg-stone-50 transition-colors">
+                            <div>
+                                <h4 className="font-bold text-stone-700">手动同步模式</h4>
+                                <p className="text-xs text-stone-400 mt-1">开启后点击同步按钮将弹出方向选择，关闭则自动检测</p>
+                            </div>
+                            <button
+                                onClick={onToggleManualSyncMode}
+                                className={`w-12 h-7 rounded-full transition-colors flex items-center px-1 ${
+                                    manualSyncMode ? 'bg-stone-800' : 'bg-stone-200'
+                                }`}
+                            >
+                                <div
+                                    className={`w-5 h-5 bg-white rounded-full shadow-sm transition-transform ${
+                                        manualSyncMode ? 'translate-x-5' : 'translate-x-0'
                                     }`}
                                 />
                             </button>

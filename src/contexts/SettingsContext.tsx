@@ -98,6 +98,10 @@ interface SettingsContextType {
     isRestoring: React.MutableRefObject<boolean>;
     isSyncing: boolean;
     setIsSyncing: React.Dispatch<React.SetStateAction<boolean>>;
+    
+    // 手动同步模式
+    manualSyncMode: boolean;
+    setManualSyncMode: React.Dispatch<React.SetStateAction<boolean>>;
 }
 
 const SettingsContext = createContext<SettingsContextType | undefined>(undefined);
@@ -209,6 +213,12 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
 
     const isRestoring = useRef(false);
     const [isSyncing, setIsSyncing] = useState(false);
+    
+    // 手动同步模式
+    const [manualSyncMode, setManualSyncMode] = useState<boolean>(() => {
+        const stored = localStorage.getItem('lumostime_manual_sync_mode');
+        return stored === 'true'; // 默认为 false（自动同步）
+    });
 
     const updateLastSyncTime = () => {
         const now = Date.now();
@@ -355,6 +365,10 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
     useEffect(() => {
         localStorage.setItem('lumos_data_last_modified', dataLastModified.toString());
     }, [dataLastModified]);
+    
+    useEffect(() => {
+        localStorage.setItem('lumostime_manual_sync_mode', manualSyncMode.toString());
+    }, [manualSyncMode]);
 
     return (
         <SettingsContext.Provider value={{
@@ -410,7 +424,9 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
             },
             isRestoring,
             isSyncing,
-            setIsSyncing
+            setIsSyncing,
+            manualSyncMode,
+            setManualSyncMode
         }}>
             {children}
         </SettingsContext.Provider>

@@ -32,7 +32,8 @@ export const useSyncManager = () => {
         filters, setFilters,
         lastSyncTime, updateLastSyncTime,
         dataLastModified, setDataLastModified, isRestoring,
-        isSyncing, setIsSyncing
+        isSyncing, setIsSyncing,
+        manualSyncMode
     } = useSettings();
     const { categories, setCategories, scopes, setScopes, goals, setGoals } = useCategoryScope();
     const {
@@ -47,6 +48,7 @@ export const useSyncManager = () => {
 
     // Removed local isSyncing state to use global state
     const [refreshKey, setRefreshKey] = useState(0);
+    const [isSyncDirectionModalOpen, setIsSyncDirectionModalOpen] = useState(false);
     const imageSyncTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
     // --- Helpers ---
@@ -436,7 +438,180 @@ export const useSyncManager = () => {
 
     const handleQuickSync = async (e?: React.MouseEvent) => {
         e?.stopPropagation();
+        
+        // 如果开启了手动同步模式，弹出方向选择模态框
+        if (manualSyncMode) {
+            setIsSyncDirectionModalOpen(true);
+            return;
+        }
+        
+        // 否则执行自动检测同步
         await performSync('manual');
+    };
+    
+    // 手动上传到云端
+    const handleManualUpload = async () => {
+        if (syncLock.current || isSyncing) {
+            console.log('[Sync] Skipped manual upload: Already syncing.');
+            return;
+        }
+
+        syncLock.current = true;
+        setIsSyncing(true);
+
+        try {
+            const webdavConfig = webdavService.getConfig();
+            const s3Config = s3Service.getConfig();
+
+            if (!webdavConfig && !s3Config) {
+                setIsSettingsOpen(true);
+                return;
+            }
+
+            const activeService = s3Config ? s3Service : webdavService;
+            
+            // 验证连接
+            if (activeService.checkConnection) {
+                const result = await activeService.checkConnection();
+                const isConnected = (typeof result === 'object' && 'success' in result) ? result.success : !!result;
+                if (!isConnected) {
+                    const msg = (typeof result === 'object' && result.message) ? result.message : '连接测试失败，请检查网络或配置';
+                    addToast('error', msg);
+                    return;
+                }
+            }
+
+            const localData = getFullLocalData();
+
+            if (!localData.logs || !localData.todos) {
+                console.error('[Sync] Critical: Logs or Todos are undefined in upload payload!');
+                addToast('error', '同步取消：本地数据为空');
+                return;
+            }
+
+            // 上传数据
+            await activeService.uploadData(localData);
+            setDataLastModified(localData.timestamp);
+
+            // 同步图片
+            const localImageList = imageService.getReferencedImagesList();
+            const imageResult = await handleImageSync(localImageList);
+            
+            // 更新图片列表
+            await activeService.uploadImageList(localImageList);
+
+            // 构建反馈消息
+            const imageActions = [];
+            if (imageResult.uploaded > 0) imageActions.push(`上传 ${imageResult.uploaded} 张图片`);
+            
+            let finalMsg = '已上传本地数据至云端';
+            if (imageActions.length > 0) {
+                finalMsg += `，并${imageActions.join('，')}`;
+            }
+
+            addToast('success', finalMsg);
+
+            if (currentView === AppView.TIMELINE) {
+                await new Promise(resolve => setTimeout(resolve, 100));
+                setRefreshKey(prev => prev + 1);
+            }
+
+        } catch (error) {
+            console.error("Manual upload failed", error);
+            addToast('error', '上传失败，请检查网络或配置');
+        } finally {
+            setIsSyncing(false);
+            syncLock.current = false;
+        }
+    };
+    
+    // 手动从云端下载
+    const handleManualDownload = async () => {
+        if (syncLock.current || isSyncing) {
+            console.log('[Sync] Skipped manual download: Already syncing.');
+            return;
+        }
+
+        syncLock.current = true;
+        setIsSyncing(true);
+
+        try {
+            const webdavConfig = webdavService.getConfig();
+            const s3Config = s3Service.getConfig();
+
+            if (!webdavConfig && !s3Config) {
+                setIsSettingsOpen(true);
+                return;
+            }
+
+            const activeService = s3Config ? s3Service : webdavService;
+            
+            // 验证连接
+            if (activeService.checkConnection) {
+                const result = await activeService.checkConnection();
+                const isConnected = (typeof result === 'object' && 'success' in result) ? result.success : !!result;
+                if (!isConnected) {
+                    const msg = (typeof result === 'object' && result.message) ? result.message : '连接测试失败，请检查网络或配置';
+                    addToast('error', msg);
+                    return;
+                }
+            }
+
+            // 下载云端数据
+            const cloudData = await activeService.downloadData();
+            
+            if (!cloudData) {
+                addToast('error', '云端无数据');
+                return;
+            }
+
+            // 备份本地数据
+            const backupSuccess = await backupLocalData(activeService, 'manual_download_backup');
+            if (!backupSuccess) {
+                addToast('error', '备份失败，为保护本地数据已取消下载');
+                return;
+            }
+
+            // 更新本地数据
+            await handleSyncDataUpdate(cloudData);
+
+            // 同步图片
+            const localImageList = imageService.getReferencedImagesList();
+            let cloudImageList: string[] = [];
+            try {
+                const cloudImageData = await activeService.downloadImageList();
+                if (cloudImageData) {
+                    cloudImageList = cloudImageData.images || [];
+                }
+            } catch (err) {
+                console.log('[Sync] 云端无图片列表');
+            }
+
+            const mergedImageList = Array.from(new Set([...localImageList, ...cloudImageList]));
+            const imageResult = await handleImageSync(mergedImageList);
+
+            // 构建反馈消息
+            const imageActions = [];
+            if (imageResult.downloaded > 0) imageActions.push(`下载 ${imageResult.downloaded} 张图片`);
+            
+            const cloudTimestamp = cloudData.timestamp || 0;
+            let finalMsg = `已下载云端数据 (${new Date(cloudTimestamp).toLocaleDateString()})`;
+            if (imageActions.length > 0) {
+                finalMsg += `，并${imageActions.join('，')}`;
+            }
+
+            addToast('success', finalMsg);
+
+            await new Promise(resolve => setTimeout(resolve, 100));
+            setRefreshKey(prev => prev + 1);
+
+        } catch (error) {
+            console.error("Manual download failed", error);
+            addToast('error', '下载失败，请检查网络或配置');
+        } finally {
+            setIsSyncing(false);
+            syncLock.current = false;
+        }
     };
 
     // --- Effects ---
@@ -457,6 +632,11 @@ export const useSyncManager = () => {
     useEffect(() => {
         if (isFirstRun.current) {
             isFirstRun.current = false;
+            return;
+        }
+
+        // 如果开启了手动同步模式，不触发自动同步
+        if (manualSyncMode) {
             return;
         }
 
@@ -490,7 +670,7 @@ export const useSyncManager = () => {
             clearTimeout(timer);
             // Don't clear the pending flag here, only clear it when sync completes or is skipped
         };
-    }, [logs, todos, categories, todoCategories, scopes, goals, autoLinkRules, reviewTemplates, checkTemplates, dailyReviews, weeklyReviews, monthlyReviews, customNarrativeTemplates, userPersonalInfo, filters]); // Removed lastSyncTime to prevent potential loops
+    }, [logs, todos, categories, todoCategories, scopes, goals, autoLinkRules, reviewTemplates, checkTemplates, dailyReviews, weeklyReviews, monthlyReviews, customNarrativeTemplates, userPersonalInfo, filters, manualSyncMode]); // 添加 manualSyncMode 依赖
 
     // 3. Image Auto Sync Listeners
     useEffect(() => {
@@ -626,6 +806,10 @@ export const useSyncManager = () => {
         setRefreshKey,
         handleQuickSync,
         handleImageSync,
-        handleSyncDataUpdate
+        handleSyncDataUpdate,
+        isSyncDirectionModalOpen,
+        setIsSyncDirectionModalOpen,
+        handleManualUpload,
+        handleManualDownload
     };
 };

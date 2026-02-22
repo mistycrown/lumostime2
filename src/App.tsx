@@ -26,6 +26,7 @@ import { AddLogModal } from './components/AddLogModal';
 import { TodoDetailModal } from './components/TodoDetailModal';
 import { GoalEditor } from './components/GoalEditor';
 import { ConfirmModal } from './components/ConfirmModal';
+import { SyncDirectionModal } from './components/SyncDirectionModal';
 import { SearchView } from './views/SearchView';
 import { FocusDetailView } from './views/FocusDetailView';
 import { ShareView } from './views/ShareView';
@@ -78,7 +79,8 @@ const AppContent: React.FC = () => {
     filters, setFilters,
     autoFocusNote, setAutoFocusNote,
     timelineGalleryMode, setTimelineGalleryMode,
-    collapseThreshold, setCollapseThreshold
+    collapseThreshold, setCollapseThreshold,
+    manualSyncMode, setManualSyncMode
   } = useSettings();
 
   const { addToast } = useToast();
@@ -571,6 +573,9 @@ const AppContent: React.FC = () => {
 
           filters={filters}
           onUpdateFilters={setFilters}
+          
+          manualSyncMode={manualSyncMode}
+          onToggleManualSyncMode={() => setManualSyncMode(!manualSyncMode)}
 
           onEditLog={logManager.openEditModal}
         />
@@ -594,6 +599,14 @@ const AppContent: React.FC = () => {
         onStop={handleStopActivityWrapper}
         onCancel={cancelSession}
         onClick={(session) => setFocusDetailSessionId(session.id)}
+      />
+      
+      {/* Sync Direction Modal */}
+      <SyncDirectionModal
+        isOpen={syncManager.isSyncDirectionModalOpen}
+        onClose={() => syncManager.setIsSyncDirectionModalOpen(false)}
+        onUpload={syncManager.handleManualUpload}
+        onDownload={syncManager.handleManualDownload}
       />
 
     </MainLayout>
