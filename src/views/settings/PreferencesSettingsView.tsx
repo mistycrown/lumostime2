@@ -26,6 +26,8 @@ interface PreferencesSettingsViewProps {
     onToggleAutoGenerateMonthlyReview?: () => void;
     autoFocusNote?: boolean;
     onToggleAutoFocusNote?: () => void;
+    autoOpenFocusDetail?: boolean;
+    onToggleAutoOpenFocusDetail?: () => void;
     autoApplyAutoLinkRules?: boolean;
     onToggleAutoApplyAutoLinkRules?: () => void;
     autoApplyTodoLink?: boolean;
@@ -65,6 +67,8 @@ export const PreferencesSettingsView: React.FC<PreferencesSettingsViewProps> = (
     onToggleAutoGenerateMonthlyReview,
     autoFocusNote,
     onToggleAutoFocusNote,
+    autoOpenFocusDetail = false,
+    onToggleAutoOpenFocusDetail,
     autoApplyAutoLinkRules = true,
     onToggleAutoApplyAutoLinkRules,
     autoApplyTodoLink = true,
@@ -295,6 +299,23 @@ export const PreferencesSettingsView: React.FC<PreferencesSettingsViewProps> = (
                             </label>
                         </div>
 
+                        {/* Auto Open Focus Detail Toggle */}
+                        <div className="flex items-center justify-between p-4 border-b border-stone-100 hover:bg-stone-50 transition-colors">
+                            <div>
+                                <h4 className="font-bold text-stone-700">开始计时后自动跳转</h4>
+                                <p className="text-xs text-stone-400 mt-1">开启后开始计时将直接进入正在计时页面</p>
+                            </div>
+                            <label className="relative inline-flex items-center cursor-pointer">
+                                <input
+                                    type="checkbox"
+                                    checked={autoOpenFocusDetail}
+                                    onChange={onToggleAutoOpenFocusDetail}
+                                    className="sr-only peer"
+                                />
+                                <div className="w-11 h-6 bg-stone-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-stone-800"></div>
+                            </label>
+                        </div>
+
                         {/* Auto Apply Auto Link Rules Toggle */}
                         <div className="flex items-center justify-between p-4 border-b border-stone-100 hover:bg-stone-50 transition-colors">
                             <div>
@@ -430,7 +451,7 @@ export const PreferencesSettingsView: React.FC<PreferencesSettingsViewProps> = (
                                 {isDefaultViewDropdownOpen && (
                                     <>
                                         <div className="fixed inset-0 z-10" onClick={() => setIsDefaultViewDropdownOpen(false)} />
-                                        <div className="absolute right-0 bottom-full mb-2 w-32 bg-white rounded-xl shadow-xl border border-stone-100 overflow-hidden z-20 flex flex-col py-1 animate-in fade-in zoom-in-95 duration-200 origin-bottom-right">
+                                        <div className="absolute right-0 top-full mt-2 w-32 bg-white rounded-xl shadow-xl border border-stone-100 overflow-hidden z-20 flex flex-col py-1 animate-in fade-in zoom-in-95 duration-200 origin-top-right">
                                             {[
                                                 { label: '记录', value: 'RECORD' },
                                                 { label: '待办', value: 'TODO' },

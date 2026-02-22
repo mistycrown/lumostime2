@@ -41,6 +41,9 @@ interface SettingsContextType {
     autoFocusNote: boolean;
     setAutoFocusNote: React.Dispatch<React.SetStateAction<boolean>>;
 
+    autoOpenFocusDetail: boolean;
+    setAutoOpenFocusDetail: React.Dispatch<React.SetStateAction<boolean>>;
+
     timelineGalleryMode: boolean;
     setTimelineGalleryMode: React.Dispatch<React.SetStateAction<boolean>>;
 
@@ -264,6 +267,15 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
         localStorage.setItem('lumostime_auto_focus_note', autoFocusNote.toString());
     }, [autoFocusNote]);
 
+    const [autoOpenFocusDetail, setAutoOpenFocusDetail] = useState<boolean>(() => {
+        const stored = localStorage.getItem('lumostime_auto_open_focus_detail');
+        return stored === 'true'; // Default to false
+    });
+
+    useEffect(() => {
+        localStorage.setItem('lumostime_auto_open_focus_detail', autoOpenFocusDetail.toString());
+    }, [autoOpenFocusDetail]);
+
     const [timelineGalleryMode, setTimelineGalleryMode] = useState<boolean>(() => {
         const stored = localStorage.getItem('lumostime_timeline_gallery_mode');
         return stored === 'true'; // Default to false
@@ -388,6 +400,8 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
             setAutoApplyTodoLink,
             autoFocusNote,
             setAutoFocusNote,
+            autoOpenFocusDetail,
+            setAutoOpenFocusDetail,
             timelineGalleryMode,
             setTimelineGalleryMode,
             collapseThreshold,

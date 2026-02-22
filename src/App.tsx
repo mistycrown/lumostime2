@@ -78,6 +78,7 @@ const AppContent: React.FC = () => {
     userPersonalInfo, setUserPersonalInfo,
     filters, setFilters,
     autoFocusNote, setAutoFocusNote,
+    autoOpenFocusDetail, setAutoOpenFocusDetail,
     timelineGalleryMode, setTimelineGalleryMode,
     collapseThreshold, setCollapseThreshold,
     manualSyncMode, setManualSyncMode
@@ -177,9 +178,25 @@ const AppContent: React.FC = () => {
   // 注意：自动生成回顾的逻辑已经集成到 TimelineView 中，不需要单独的 hook
 
   const [sessionToStop, setSessionToStop] = React.useState<string | null>(null);
+  const [shouldAutoOpenFocus, setShouldAutoOpenFocus] = React.useState(false);
+  
+  // 监听activeSessions变化，自动打开FocusDetailView
+  React.useEffect(() => {
+    if (shouldAutoOpenFocus && activeSessions.length > 0) {
+      const latestSession = activeSessions[activeSessions.length - 1];
+      setFocusDetailSessionId(latestSession.id);
+      setShouldAutoOpenFocus(false);
+    }
+  }, [activeSessions, shouldAutoOpenFocus, setFocusDetailSessionId]);
+  
   // Wrappers for Session Actions to match original signature (injecting autoLinkRules)
   const handleStartActivityWrapper = (activity: any, categoryId: string, todoId?: string, scopeIdOrIds?: string | string[], note?: string) => {
     startActivity(activity, categoryId, autoLinkRules, todoId, scopeIdOrIds, note);
+    
+    // 如果开启了自动跳转设置，标记需要自动打开
+    if (autoOpenFocusDetail) {
+      setShouldAutoOpenFocus(true);
+    }
   };
   const handleStopActivityWrapper = (sessionId: string) => {
     stopActivity(
