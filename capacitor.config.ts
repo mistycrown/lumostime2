@@ -8,10 +8,11 @@ const config: CapacitorConfig = {
     CapacitorHttp: {
       enabled: false,  // 禁用以避免拦截COS SDK的请求
     },
-    StatusBar: {
-      style: 'Light',  // 或 'Dark'，根据你的主题
+    SystemBars: {
+      insetsHandling: 'disable',  // 禁用内置的 insets 处理，使用 EdgeToEdge 插件
+    },
+    EdgeToEdge: {
       backgroundColor: '#fdfbf7',  // 匹配你的应用背景色
-      overlaysWebView: false,  // 关键：不让状态栏覆盖 WebView
     },
   },
   server: {

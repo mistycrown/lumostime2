@@ -9,7 +9,6 @@
  */
 import { useEffect, useRef } from 'react';
 import { Capacitor } from '@capacitor/core';
-import { StatusBar, Style } from '@capacitor/status-bar';
 import { useSettings } from '../contexts/SettingsContext';
 import { useToast } from '../contexts/ToastContext';
 import AppUsage from '../plugins/AppUsagePlugin';
@@ -21,51 +20,22 @@ import { dataRepairService } from '../services/dataRepairService';
 import { dualIconMigrationService } from '../services/dualIconMigrationService';
 import { initResetDataTool } from '../utils/resetDataTool';
 
+// Edge-to-Edge 支持（仅在 Android 上可用）
+let EdgeToEdge: any = null;
+if (Capacitor.getPlatform() === 'android') {
+    try {
+        EdgeToEdge = require('@capawesome/capacitor-android-edge-to-edge-support').EdgeToEdge;
+    } catch (e) {
+        console.warn('EdgeToEdge plugin not available:', e);
+    }
+}
+
 export const useAppInitialization = () => {
     const { setAppRules } = useSettings();
     const { addToast } = useToast();
     const { logs, setLogs } = useData();
     const hasCleanedImagesRef = useRef(false);
     const hasRepairedDataRef = useRef(false);
-
-    // Initialize StatusBar for mobile devices
-    useEffect(() => {
-        const initStatusBar = async () => {
-            if (Capacitor.isNativePlatform()) {
-                try {
-                    console.log('📱 开始初始化 StatusBar...');
-                    console.log('Platform:', Capacitor.getPlatform());
-                    
-                    // 获取状态栏信息
-                    const info = await StatusBar.getInfo();
-                    console.log('📱 StatusBar info:', info);
-                    
-                    // 设置背景色
-                    await StatusBar.setBackgroundColor({ color: '#fdfbf7' });
-                    console.log('✅ StatusBar 背景色设置为 #fdfbf7');
-                    
-                    // 设置样式（深色图标，适合浅色背景）
-                    await StatusBar.setStyle({ style: Style.Light });
-                    console.log('✅ StatusBar 样式设置为 Light');
-                    
-                    // 关键：设置不覆盖 WebView
-                    await StatusBar.setOverlaysWebView({ overlay: false });
-                    console.log('✅ StatusBar overlay 设置为 false');
-                    
-                    // 再次获取信息确认
-                    const infoAfter = await StatusBar.getInfo();
-                    console.log('📱 StatusBar info after config:', infoAfter);
-                    
-                    console.log('📱 StatusBar 初始化完成');
-                } catch (error) {
-                    console.error('❌ StatusBar initialization failed:', error);
-                }
-            } else {
-                console.log('⚠️ 非原生平台，跳过 StatusBar 初始化');
-            }
-        };
-        initStatusBar();
-    }, []);
 
     // Expose UpdateService to window for debugging
     useEffect(() => {
@@ -160,6 +130,36 @@ export const useAppInitialization = () => {
             }
         };
         initFont();
+    }, []);
+
+    // Initialize Edge-to-Edge support for Android
+    useEffect(() => {
+        const initEdgeToEdge = async () => {
+            if (Capacitor.getPlatform() !== 'android' || !EdgeToEdge) return;
+
+            try {
+                // 确保 Edge-to-Edge 已启用（插件默认启用）
+                await EdgeToEdge.enable();
+                
+                // 获取并记录当前的 insets
+                const insets = await EdgeToEdge.getInsets();
+                console.log('📱 Edge-to-Edge insets:', insets);
+                
+                // 如果需要，可以将 insets 应用到 CSS 变量
+                if (insets.top > 0) {
+                    document.documentElement.style.setProperty('--status-bar-height', `${insets.top}px`);
+                }
+                if (insets.bottom > 0) {
+                    document.documentElement.style.setProperty('--navigation-bar-height', `${insets.bottom}px`);
+                }
+                
+                console.log('✅ Edge-to-Edge initialized successfully');
+            } catch (error) {
+                console.error('❌ Edge-to-Edge initialization failed:', error);
+            }
+        };
+        
+        initEdgeToEdge();
     }, []);
 
     /**
