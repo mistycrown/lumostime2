@@ -9,6 +9,8 @@ import React, { useState, useEffect } from 'react';
 import { X, Volume2, VolumeX, Palette, Clock } from 'lucide-react';
 import { ImmersiveSelectorModal } from './ImmersiveSelectorModal';
 import { FlipClock } from './FlipClock';
+import { Capacitor } from '@capacitor/core';
+import { StatusBar, Style } from '@capacitor/status-bar';
 
 // Theme configurations with complete visual styles
 const THEMES = [
@@ -187,6 +189,67 @@ export const ImmersiveTimer: React.FC<ImmersiveTimerProps> = ({ elapsed, onExit 
     );
 
     const currentTheme = THEMES.find(t => t.id === selectedTheme) || THEMES[0];
+
+    // Set status bar style to match theme
+    useEffect(() => {
+        const setStatusBarStyle = async () => {
+            if (Capacitor.getPlatform() !== 'android' && Capacitor.getPlatform() !== 'ios') {
+                return;
+            }
+
+            try {
+                // Map theme gradients to actual colors
+                const colorMap: Record<string, string> = {
+                    'from-stone-100': '#f5f5f4',
+                    'from-orange-100': '#ffedd5',
+                    'from-slate-900': '#0f172a',
+                    'from-emerald-900': '#064e3b',
+                    'from-orange-900': '#7c2d12',
+                };
+                
+                // Extract the first gradient color
+                const gradientParts = currentTheme.gradient.split(' ');
+                const fromColor = gradientParts.find(part => part.startsWith('from-'));
+                const backgroundColor = fromColor && colorMap[fromColor] 
+                    ? colorMap[fromColor] 
+                    : (currentTheme.isDark ? '#000000' : '#ffffff');
+                
+                // For Android with EdgeToEdge, use the plugin's method to set status bar color
+                if (Capacitor.getPlatform() === 'android') {
+                    try {
+                        const { EdgeToEdge } = await import('@capawesome/capacitor-android-edge-to-edge-support');
+                        await EdgeToEdge.setBackgroundColor({ color: backgroundColor });
+                    } catch (e) {
+                        console.error('Failed to set EdgeToEdge background color:', e);
+                    }
+                }
+                
+                // Set the style (icon colors) via StatusBar plugin
+                await StatusBar.setStyle({ 
+                    style: currentTheme.isDark ? Style.Dark : Style.Light 
+                });
+                
+            } catch (error) {
+                console.error('Failed to set status bar style:', error);
+            }
+        };
+
+        setStatusBarStyle();
+
+        // Cleanup: restore default status bar on unmount
+        return () => {
+            if (Capacitor.getPlatform() === 'android' || Capacitor.getPlatform() === 'ios') {
+                if (Capacitor.getPlatform() === 'android') {
+                    import('@capawesome/capacitor-android-edge-to-edge-support')
+                        .then(({ EdgeToEdge }) => {
+                            EdgeToEdge.setBackgroundColor({ color: '#ffffff' }).catch(() => {});
+                        })
+                        .catch(() => {});
+                }
+                StatusBar.setStyle({ style: Style.Light }).catch(() => {});
+            }
+        };
+    }, [currentTheme]);
 
     // Save preferences to localStorage when they change
     useEffect(() => {
@@ -669,7 +732,7 @@ export const ImmersiveTimer: React.FC<ImmersiveTimerProps> = ({ elapsed, onExit 
                         }}
                         className="pointer-events-auto absolute left-4 w-12 h-12 rounded-full backdrop-blur-md flex items-center justify-center active:scale-95 transition-all shadow-lg"
                         style={{
-                            top: 'max(3.5rem, calc(1rem + env(safe-area-inset-top)))',
+                            top: 'calc(0.5rem + env(safe-area-inset-top, 0px))',
                             backgroundColor: currentTheme.buttonBg,
                             borderWidth: '1.5px',
                             borderStyle: 'solid',
@@ -690,7 +753,7 @@ export const ImmersiveTimer: React.FC<ImmersiveTimerProps> = ({ elapsed, onExit 
                         }}
                         className="pointer-events-auto absolute right-[132px] w-12 h-12 rounded-full backdrop-blur-md flex items-center justify-center active:scale-95 transition-all shadow-lg"
                         style={{
-                            top: 'max(3.5rem, calc(1rem + env(safe-area-inset-top)))',
+                            top: 'calc(0.5rem + env(safe-area-inset-top, 0px))',
                             backgroundColor: currentTheme.buttonBg,
                             borderWidth: '1.5px',
                             borderStyle: 'solid',
@@ -711,7 +774,7 @@ export const ImmersiveTimer: React.FC<ImmersiveTimerProps> = ({ elapsed, onExit 
                         }}
                         className="pointer-events-auto absolute right-[72px] w-12 h-12 rounded-full backdrop-blur-md flex items-center justify-center active:scale-95 transition-all shadow-lg"
                         style={{
-                            top: 'max(3.5rem, calc(1rem + env(safe-area-inset-top)))',
+                            top: 'calc(0.5rem + env(safe-area-inset-top, 0px))',
                             backgroundColor: currentTheme.buttonBg,
                             borderWidth: '1.5px',
                             borderStyle: 'solid',
@@ -732,7 +795,7 @@ export const ImmersiveTimer: React.FC<ImmersiveTimerProps> = ({ elapsed, onExit 
                         }}
                         className="pointer-events-auto absolute right-4 w-12 h-12 rounded-full backdrop-blur-md flex items-center justify-center active:scale-95 transition-all shadow-lg"
                         style={{ 
-                            top: 'max(3.5rem, calc(1rem + env(safe-area-inset-top)))',
+                            top: 'calc(0.5rem + env(safe-area-inset-top, 0px))',
                             backgroundColor: isWhiteNoiseOn 
                                 ? `${currentTheme.buttonText}20` // Use theme color with 20% opacity
                                 : currentTheme.buttonBg,
