@@ -2,7 +2,7 @@
  * @file GalleryView.tsx
  * @description 画廊视图 - 以瀑布流方式展示所有带图片的记录
  */
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Log, Category, DailyReview } from '../types';
 import { ChevronLeft, Share2 } from 'lucide-react';
 import { ToastType } from './Toast';
@@ -33,7 +33,7 @@ interface GalleryItem {
     activityUiIcon?: string;
 }
 
-// 图片组件
+// 图片组件 - 优化：使用缩略图 + 懒加载
 const GalleryImage: React.FC<{ 
     filename: string; 
     refreshKey?: number;
@@ -41,12 +41,40 @@ const GalleryImage: React.FC<{
     const [src, setSrc] = useState<string>('');
     const [error, setError] = useState<string>('');
     const [isLoading, setIsLoading] = useState(true);
+    const imgRef = useRef<HTMLDivElement>(null);
+    const [isInView, setIsInView] = useState(false);
+
+    // 懒加载：使用 IntersectionObserver
+    useEffect(() => {
+        if (!imgRef.current) return;
+
+        const observer = new IntersectionObserver(
+            (entries) => {
+                entries.forEach((entry) => {
+                    if (entry.isIntersecting) {
+                        setIsInView(true);
+                        observer.disconnect();
+                    }
+                });
+            },
+            {
+                rootMargin: '200px', // 提前200px开始加载
+            }
+        );
+
+        observer.observe(imgRef.current);
+
+        return () => observer.disconnect();
+    }, []);
 
     useEffect(() => {
+        if (!isInView) return;
+
         const loadImage = async () => {
             try {
                 setIsLoading(true);
-                const url = await imageService.getImageUrl(filename, 'original');
+                // 优化：使用缩略图而不是原图
+                const url = await imageService.getImageUrl(filename, 'thumbnail');
                 if (url) {
                     setSrc(url);
                     setError('');
@@ -62,29 +90,31 @@ const GalleryImage: React.FC<{
         };
 
         loadImage();
-    }, [filename, refreshKey]);
+    }, [filename, refreshKey, isInView]);
 
     if (error) {
         return (
-            <div className="w-full aspect-square bg-stone-50 flex items-center justify-center border border-stone-200">
+            <div ref={imgRef} className="w-full aspect-square bg-stone-50 flex items-center justify-center border border-stone-200">
                 <span className="text-stone-300 text-xs font-serif">Image unavailable</span>
             </div>
         );
     }
 
-    if (isLoading || !src) {
+    if (!isInView || isLoading || !src) {
         return (
-            <div className="w-full aspect-square bg-stone-50 flex items-center justify-center border border-stone-200">
-                <div className="w-8 h-8 border-2 border-stone-200 border-t-stone-400 rounded-full animate-spin" />
+            <div ref={imgRef} className="w-full aspect-square bg-stone-50 flex items-center justify-center border border-stone-200">
+                {isInView && <div className="w-8 h-8 border-2 border-stone-200 border-t-stone-400 rounded-full animate-spin" />}
             </div>
         );
     }
 
     return (
         <img
+            ref={imgRef as any}
             src={src}
             alt="gallery"
             className="w-full object-cover border border-stone-200"
+            loading="lazy"
             onError={() => setError('图片加载失败')}
         />
     );
@@ -100,8 +130,8 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
     onToast
 }) => {
     const [isScrolled, setIsScrolled] = useState(false);
-    const [displayCount, setDisplayCount] = useState(20); // 初始显示20张图片
-    const LOAD_MORE_COUNT = 20; // 每次加载20张
+    const [displayCount, setDisplayCount] = useState(12); // 优化：初始显示12张图片
+    const LOAD_MORE_COUNT = 12; // 优化：每次加载12张
     const [previewImage, setPreviewImage] = useState<string | null>(null);
     const [activeMonth, setActiveMonth] = useState<string | null>(null);
     const [showSidebar, setShowSidebar] = useState(false);

@@ -621,7 +621,7 @@ export const useSyncManager = () => {
         if (!manualSyncMode) {
             performSync('startup');
         }
-    }, []);
+    }, [manualSyncMode]); // 添加 manualSyncMode 依赖，以便在切换模式时重新评估
 
     // 2. Data Auto Sync
     const isFirstRun = useRef(true);
@@ -812,7 +812,7 @@ export const useSyncManager = () => {
             if (appListener) appListener.remove();
             document.removeEventListener('visibilitychange', handleVisibilityChange);
         };
-    }, [logs, todos, categories, todoCategories, scopes, goals, autoLinkRules, reviewTemplates, checkTemplates, dailyReviews, weeklyReviews, monthlyReviews, customNarrativeTemplates, userPersonalInfo, dataLastModified]); // Add dataLastModified dependancy
+    }, [logs, todos, categories, todoCategories, scopes, goals, autoLinkRules, reviewTemplates, checkTemplates, dailyReviews, weeklyReviews, monthlyReviews, customNarrativeTemplates, userPersonalInfo, dataLastModified, manualSyncMode]); // 添加 manualSyncMode 依赖
 
     return {
         isSyncing,

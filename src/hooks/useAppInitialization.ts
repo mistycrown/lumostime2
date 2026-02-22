@@ -33,13 +33,35 @@ export const useAppInitialization = () => {
         const initStatusBar = async () => {
             if (Capacitor.isNativePlatform()) {
                 try {
-                    await StatusBar.setStyle({ style: Style.Light });
+                    console.log('📱 开始初始化 StatusBar...');
+                    console.log('Platform:', Capacitor.getPlatform());
+                    
+                    // 获取状态栏信息
+                    const info = await StatusBar.getInfo();
+                    console.log('📱 StatusBar info:', info);
+                    
+                    // 设置背景色
                     await StatusBar.setBackgroundColor({ color: '#fdfbf7' });
+                    console.log('✅ StatusBar 背景色设置为 #fdfbf7');
+                    
+                    // 设置样式（深色图标，适合浅色背景）
+                    await StatusBar.setStyle({ style: Style.Light });
+                    console.log('✅ StatusBar 样式设置为 Light');
+                    
+                    // 关键：设置不覆盖 WebView
                     await StatusBar.setOverlaysWebView({ overlay: false });
-                    console.log('📱 StatusBar initialized');
+                    console.log('✅ StatusBar overlay 设置为 false');
+                    
+                    // 再次获取信息确认
+                    const infoAfter = await StatusBar.getInfo();
+                    console.log('📱 StatusBar info after config:', infoAfter);
+                    
+                    console.log('📱 StatusBar 初始化完成');
                 } catch (error) {
                     console.error('❌ StatusBar initialization failed:', error);
                 }
+            } else {
+                console.log('⚠️ 非原生平台，跳过 StatusBar 初始化');
             }
         };
         initStatusBar();
