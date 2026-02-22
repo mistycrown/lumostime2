@@ -129,7 +129,8 @@ export const SessionProvider: React.FC<SessionProviderProps> = ({ children, spli
                     note: finalSessionData?.note || session.note,
                     progressIncrement: finalSessionData?.progressIncrement,
                     focusScore: finalSessionData?.focusScore || session.focusScore,
-                    scopeIds: session.scopeIds
+                    scopeIds: session.scopeIds,
+                    reactions: finalSessionData?.reactions || session.reactions
                 };
 
                 const logs = splitLogByDays(baseLog);

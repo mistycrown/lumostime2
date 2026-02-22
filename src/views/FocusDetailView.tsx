@@ -15,6 +15,7 @@ import { ScopeAssociation } from '../components/ScopeAssociation';
 import { FocusScoreSelector } from '../components/FocusScoreSelector';
 import { ImmersiveTimer } from '../components/ImmersiveTimer';
 import { IconRenderer } from '../components/IconRenderer';
+import { ReactionPicker, ReactionList } from '../components/ReactionComponents';
 
 interface FocusDetailViewProps {
     session: ActiveSession;
@@ -40,6 +41,9 @@ export const FocusDetailView: React.FC<FocusDetailViewProps> = ({ session, todos
     // Progress Increment State
     const [progressAmount, setProgressAmount] = useState(0);
     const noteRef = useRef<HTMLTextAreaElement>(null);
+    
+    // Reactions State
+    const [reactions, setReactions] = useState<string[]>(session.reactions || []);
     
     // 跟踪已自动应用的规则，避免重复应用
     const autoAppliedRulesRef = useRef<Set<string>>(new Set());
@@ -273,11 +277,28 @@ export const FocusDetailView: React.FC<FocusDetailViewProps> = ({ session, todos
         setProgressAmount(0); // Reset progress check when changing todo
     };
 
+    const handleToggleReaction = (emoji: string) => {
+        setReactions(prev => {
+            if (prev.includes(emoji)) {
+                return prev.filter(r => r !== emoji);
+            } else {
+                return [...prev, emoji];
+            }
+        });
+    };
+
+    // Auto-save reactions
+    useEffect(() => {
+        onUpdateRef.current({ ...sessionRef.current, reactions });
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [reactions]);
+
     const handleComplete = () => {
         onComplete({
             ...session,
             note,
-            progressIncrement: progressAmount
+            progressIncrement: progressAmount,
+            reactions: reactions.length > 0 ? reactions : undefined
         });
     };
 
@@ -528,6 +549,27 @@ export const FocusDetailView: React.FC<FocusDetailViewProps> = ({ session, todos
                         placeholder="Add a note..."
                         className="w-full bg-white border border-stone-200 rounded-2xl p-4 text-stone-800 text-sm min-h-[100px] shadow-sm focus:outline-none focus:ring-1 focus:ring-stone-900 focus:border-stone-900 transition-all resize-none placeholder:text-stone-300 font-serif"
                     />
+                </div>
+
+                {/* Reactions Section */}
+                <div className="w-full px-8 mb-8">
+                    <div className="flex items-center justify-between mb-2 px-1">
+                        <span className="text-xs font-bold text-stone-400 uppercase tracking-widest">Reactions</span>
+                        <ReactionPicker
+                            onSelect={handleToggleReaction}
+                            currentReactions={reactions}
+                            align="inline-slide-left"
+                        />
+                    </div>
+                    {reactions.length > 0 ? (
+                        <ReactionList
+                            reactions={reactions}
+                            onToggle={handleToggleReaction}
+                            className="mt-2 px-1"
+                        />
+                    ) : (
+                        <div className="text-xs text-stone-300 italic pt-1 pb-2 px-1">No reactions yet</div>
+                    )}
                 </div>
 
             </div>

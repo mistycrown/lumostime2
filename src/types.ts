@@ -96,6 +96,7 @@ export interface ActiveSession {
   note?: string;
   progressIncrement?: number; // New: Carry over to Log
   focusScore?: number; // 1-5
+  reactions?: string[]; // Emoji reactions
 }
 
 // 评论接口
