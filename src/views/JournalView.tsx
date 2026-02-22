@@ -155,6 +155,10 @@ export const JournalView: React.FC<JournalViewProps> = ({
     const [activeDay, setActiveDay] = useState<string | null>(null);
     const [showSidebar, setShowSidebar] = useState(false);
 
+    // 性能优化：分页加载
+    const [displayCount, setDisplayCount] = useState(30); // 初始显示30条
+    const LOAD_MORE_COUNT = 20; // 每次加载20条
+
     // Transform and Filter entries
     const filteredEntries = useMemo(() => {
         const diaryEntries: DiaryEntry[] = [];
@@ -400,20 +404,26 @@ export const JournalView: React.FC<JournalViewProps> = ({
         const container = scrollContainerRef.current;
         if (!container) return;
 
+        let scrollTimeout: NodeJS.Timeout;
+        let loadMoreTimeout: NodeJS.Timeout;
+
         const handleScroll = () => {
             const scrollTop = container.scrollTop;
             setIsScrolled(scrollTop > 0);
             setShowSidebar(scrollTop > 10);
 
-            // Determine active day
-            // Find the day section that is closest to the top of the viewport
-            const dayElements = document.querySelectorAll('[id^="journal-day-"]');
-            let currentActive = null;
-            let minDistance = Infinity;
+            // 防抖处理 active day 的更新
+            clearTimeout(scrollTimeout);
+            scrollTimeout = setTimeout(() => {
+                // Determine active day
+                // Find the day section that is closest to the top of the viewport
+                const dayElements = document.querySelectorAll('[id^="journal-day-"]');
+                let currentActive = null;
+                let minDistance = Infinity;
 
-            dayElements.forEach((el) => {
-                const rect = el.getBoundingClientRect();
-                // Distance from top (approx 100px offset for header)
+                dayElements.forEach((el) => {
+                    const rect = el.getBoundingClientRect();
+                    // Distance from top (approx 100px offset for header)
                 const distance = Math.abs(rect.top - 100);
                 if (distance < minDistance) {
                     minDistance = distance;
@@ -424,13 +434,37 @@ export const JournalView: React.FC<JournalViewProps> = ({
             if (currentActive) {
                 setActiveDay(currentActive);
             }
+            }, 100); // 100ms 防抖
+
+            // 性能优化：检测是否接近底部，加载更多（也使用防抖）
+            const scrollHeight = container.scrollHeight;
+            const clientHeight = container.clientHeight;
+            const scrollBottom = scrollHeight - scrollTop - clientHeight;
+            
+            // 距离底部 500px 时加载更多
+            if (scrollBottom < 500) {
+                clearTimeout(loadMoreTimeout);
+                loadMoreTimeout = setTimeout(() => {
+                    setDisplayCount(prev => {
+                        const totalEntries = filteredEntries.reduce((sum, group) => sum + group.entries.length, 0);
+                        if (prev < totalEntries) {
+                            return Math.min(prev + LOAD_MORE_COUNT, totalEntries);
+                        }
+                        return prev;
+                    });
+                }, 150); // 150ms 防抖
+            }
         };
 
-        container.addEventListener('scroll', handleScroll);
+        container.addEventListener('scroll', handleScroll, { passive: true }); // passive 提升性能
         // Initial check
         handleScroll();
-        return () => container.removeEventListener('scroll', handleScroll);
-    }, [filteredEntries]);
+        return () => {
+            container.removeEventListener('scroll', handleScroll);
+            clearTimeout(scrollTimeout);
+            clearTimeout(loadMoreTimeout);
+        };
+    }, [filteredEntries, LOAD_MORE_COUNT]);
 
     // Get Current Month's Cite
     const currentMonthCite = useMemo(() => {
@@ -443,6 +477,33 @@ export const JournalView: React.FC<JournalViewProps> = ({
         });
         return review?.cite;
     }, [monthlyReviews, selectedDate]);
+
+    // 性能优化：限制显示的条目数量
+    const displayedEntries = useMemo(() => {
+        let count = 0;
+        const result: typeof filteredEntries = [];
+        
+        for (const dayGroup of filteredEntries) {
+            if (count >= displayCount) break;
+            
+            const remainingSlots = displayCount - count;
+            if (dayGroup.entries.length <= remainingSlots) {
+                // 整个 day group 都可以显示
+                result.push(dayGroup);
+                count += dayGroup.entries.length;
+            } else {
+                // 只显示部分 entries
+                result.push({
+                    date: dayGroup.date,
+                    entries: dayGroup.entries.slice(0, remainingSlots)
+                });
+                count += remainingSlots;
+                break;
+            }
+        }
+        
+        return result;
+    }, [filteredEntries, displayCount]);
 
     const handleAddComment = useCallback((entryId: string, text: string) => {
         const newComment: GlobalComment = {
@@ -463,7 +524,7 @@ export const JournalView: React.FC<JournalViewProps> = ({
     }, [setLogs]);
 
     // Handle Entry Click
-    const handleEntryClick = (entry: DiaryEntry) => {
+    const handleEntryClick = useCallback((entry: DiaryEntry) => {
         if (entry.type === 'normal') {
             const log = logs.find(l => l.id === entry.id);
             if (log) {
@@ -478,7 +539,7 @@ export const JournalView: React.FC<JournalViewProps> = ({
                 onOpenWeeklyReview(new Date(review.weekStartDate), new Date(review.weekEndDate));
             }
         }
-    };
+    }, [logs, weeklyReviews, onEditLog, onOpenDailyReview, onOpenWeeklyReview]);
 
     const handleToggleReaction = useCallback((entryId: string, emoji: string) => {
         setLogs(prev => prev.map(log => {
@@ -513,12 +574,14 @@ export const JournalView: React.FC<JournalViewProps> = ({
         newDate.setMonth(monthIndex);
         setSelectedDate(newDate);
         setIsMonthPickerOpen(false);
+        setDisplayCount(30); // 重置显示数量
     };
 
     const changeYear = (offset: number) => {
         const newDate = new Date(selectedDate);
         newDate.setFullYear(newDate.getFullYear() + offset);
         setSelectedDate(newDate);
+        setDisplayCount(30); // 重置显示数量
     };
 
     // 触摸滑动手势处理 - 切换月份
@@ -549,11 +612,13 @@ export const JournalView: React.FC<JournalViewProps> = ({
             const nextMonth = new Date(selectedDate);
             nextMonth.setMonth(nextMonth.getMonth() + 1);
             setSelectedDate(nextMonth);
+            setDisplayCount(30); // 重置显示数量
         } else if (isRightSwipe) {
             // 向右滑动 = 上个�?(Previous Month)
             const prevMonth = new Date(selectedDate);
             prevMonth.setMonth(prevMonth.getMonth() - 1);
             setSelectedDate(prevMonth);
+            setDisplayCount(30); // 重置显示数量
         }
     };
 
@@ -700,7 +765,7 @@ export const JournalView: React.FC<JournalViewProps> = ({
                         </div>
 
                         {/* Mood Calendar Card */}
-                        {filteredEntries.length > 0 && (
+                        {displayedEntries.length > 0 && (
                             <>
                                 <MoodCalendar
                                     year={selectedDate.getFullYear()}
@@ -773,9 +838,9 @@ export const JournalView: React.FC<JournalViewProps> = ({
 
                     {/* Timeline Section */}
                     <div className="relative">
-                        {filteredEntries.length > 0 ? (
+                        {displayedEntries.length > 0 ? (
                             <div className="flex flex-col">
-                                {filteredEntries.map((dayGroup, groupIndex) => {
+                                {displayedEntries.map((dayGroup, groupIndex) => {
                                     const dateObj = new Date(dayGroup.date);
                                     const day = dateObj.getDate().toString();
                                     const month = dateObj.toLocaleDateString('en-US', { month: 'short' }).toUpperCase();
@@ -798,7 +863,7 @@ export const JournalView: React.FC<JournalViewProps> = ({
                                                     <TimelineItem
                                                         key={entry.id}
                                                         entry={entry}
-                                                        isLast={groupIndex === filteredEntries.length - 1 && entryIndex === dayGroup.entries.length - 1}
+                                                        isLast={groupIndex === displayedEntries.length - 1 && entryIndex === dayGroup.entries.length - 1}
                                                         isFirstOfDay={entryIndex === 0}
                                                         onAddComment={handleAddComment}
                                                         onToggleReaction={handleToggleReaction}
@@ -811,13 +876,28 @@ export const JournalView: React.FC<JournalViewProps> = ({
                                     );
                                 })}
 
-                                {/* End of Feed Indicator */}
-                                <div className="mt-12 flex flex-col items-center justify-center gap-2 text-gray-300">
-                                    <div className="w-1 h-1 rounded-full bg-gray-300"></div>
-                                    <div className="w-1 h-1 rounded-full bg-gray-300"></div>
-                                    <div className="w-1 h-1 rounded-full bg-gray-300"></div>
-                                    <span className="text-xs font-serif italic mt-2">End of {MONTHS[selectedDate.getMonth()]} {selectedDate.getFullYear()}</span>
-                                </div>
+                                {/* Loading More Indicator or End of Feed */}
+                                {(() => {
+                                    const totalEntries = filteredEntries.reduce((sum, group) => sum + group.entries.length, 0);
+                                    const hasMore = displayCount < totalEntries;
+                                    
+                                    return (
+                                        <div className="mt-12 flex flex-col items-center justify-center gap-2 text-gray-300">
+                                            <div className="w-1 h-1 rounded-full bg-gray-300"></div>
+                                            <div className="w-1 h-1 rounded-full bg-gray-300"></div>
+                                            <div className="w-1 h-1 rounded-full bg-gray-300"></div>
+                                            {hasMore ? (
+                                                <span className="text-xs font-serif italic mt-2 text-stone-400">
+                                                    Loading more... ({displayCount} / {totalEntries})
+                                                </span>
+                                            ) : (
+                                                <span className="text-xs font-serif italic mt-2">
+                                                    End of {MONTHS[selectedDate.getMonth()]} {selectedDate.getFullYear()}
+                                                </span>
+                                            )}
+                                        </div>
+                                    );
+                                })()}
                             </div>
                         ) : (
                             <div className="flex flex-col items-center justify-center py-20 text-gray-400">

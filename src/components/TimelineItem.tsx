@@ -9,12 +9,42 @@ import { CollapsibleText } from './CollapsibleText';
 
 import { ReactionPicker, ReactionList } from './ReactionComponents';
 
-// Helper component for async image loading
+// Helper component for async image loading with lazy loading
 const TimelineImage: React.FC<{ src: string; alt: string; className: string }> = ({ src, alt, className }) => {
     const [imgUrl, setImgUrl] = useState<string>('');
+    const [isInView, setIsInView] = useState(false);
+    const imgRef = React.useRef<HTMLDivElement>(null);
     const { isPrivacyMode } = usePrivacy();
 
+    // Intersection Observer for lazy loading
     useEffect(() => {
+        const observer = new IntersectionObserver(
+            (entries) => {
+                entries.forEach((entry) => {
+                    if (entry.isIntersecting) {
+                        setIsInView(true);
+                        observer.disconnect(); // 只需要触发一次
+                    }
+                });
+            },
+            {
+                rootMargin: '200px', // 提前 200px 开始加载
+                threshold: 0.01
+            }
+        );
+
+        if (imgRef.current) {
+            observer.observe(imgRef.current);
+        }
+
+        return () => {
+            observer.disconnect();
+        };
+    }, []);
+
+    useEffect(() => {
+        if (!isInView) return; // 只有在视口内才加载
+        
         let isMounted = true;
 
         const load = async () => {
@@ -24,8 +54,9 @@ const TimelineImage: React.FC<{ src: string; alt: string; className: string }> =
             }
 
             // It's a local filename, fetch via service
+            // 优先使用缩略图以提升性能
             try {
-                const url = await imageService.getImageUrl(src);
+                const url = await imageService.getImageUrl(src, 'thumbnail');
                 if (isMounted && url) {
                     setImgUrl(url);
                 }
@@ -37,11 +68,22 @@ const TimelineImage: React.FC<{ src: string; alt: string; className: string }> =
         load();
 
         return () => { isMounted = false; };
-    }, [src]);
+    }, [src, isInView]);
 
-    if (!imgUrl) return <div className={`bg-gray-100 ${className} animate-pulse`} />;
+    if (!imgUrl) {
+        return <div ref={imgRef} className={`bg-gray-100 ${className} animate-pulse`} />;
+    }
 
-    return <img src={imgUrl} alt={alt} className={`${className} ${isPrivacyMode ? 'blur-sm select-none transition-all duration-500' : 'transition-all duration-500'}`} />;
+    return (
+        <div ref={imgRef}>
+            <img 
+                src={imgUrl} 
+                alt={alt} 
+                className={`${className} ${isPrivacyMode ? 'blur-sm select-none transition-all duration-500' : 'transition-all duration-500'}`}
+                loading="lazy"
+            />
+        </div>
+    );
 };
 
 // Helper function to parse and render tag text with icons
@@ -129,8 +171,8 @@ const TimelineItem: React.FC<TimelineItemProps> = ({ entry, isLast, isFirstOfDay
                     className="mt-4 rounded-lg overflow-hidden shadow-sm border border-gray-100 cursor-zoom-in"
                     onClick={async (e) => {
                         e.stopPropagation();
-                        // Resolve URL before showing
-                        const url = await imageService.getImageUrl(entry.media![0].url);
+                        // 点击时加载原图用于预览
+                        const url = await imageService.getImageUrl(entry.media![0].url, 'original');
                         if (url) setPreviewImage(url);
                     }}
                 >
@@ -152,7 +194,8 @@ const TimelineItem: React.FC<TimelineItemProps> = ({ entry, isLast, isFirstOfDay
                             className="rounded-lg overflow-hidden aspect-[3/4] shadow-sm border border-gray-100 cursor-zoom-in"
                             onClick={async (e) => {
                                 e.stopPropagation();
-                                const url = await imageService.getImageUrl(m.url);
+                                // 点击时加载原图用于预览
+                                const url = await imageService.getImageUrl(m.url, 'original');
                                 if (url) setPreviewImage(url);
                             }}
                         >
@@ -171,7 +214,8 @@ const TimelineItem: React.FC<TimelineItemProps> = ({ entry, isLast, isFirstOfDay
                         className="rounded-md overflow-hidden aspect-square shadow-sm border border-gray-100 cursor-zoom-in"
                         onClick={async (e) => {
                             e.stopPropagation();
-                            const url = await imageService.getImageUrl(m.url);
+                            // 点击时加载原图用于预览
+                            const url = await imageService.getImageUrl(m.url, 'original');
                             if (url) setPreviewImage(url);
                         }}
                     >
@@ -374,4 +418,16 @@ const TimelineItem: React.FC<TimelineItemProps> = ({ entry, isLast, isFirstOfDay
     );
 };
 
-export default TimelineItem;
+// 使用 React.memo 优化性能，避免不必要的重渲染
+export default React.memo(TimelineItem, (prevProps, nextProps) => {
+    // 自定义比较函数，只在关键属性变化时才重新渲染
+    return (
+        prevProps.entry.id === nextProps.entry.id &&
+        prevProps.entry.content === nextProps.entry.content &&
+        prevProps.entry.comments?.length === nextProps.entry.comments?.length &&
+        prevProps.entry.reactions?.length === nextProps.entry.reactions?.length &&
+        prevProps.isLast === nextProps.isLast &&
+        prevProps.isFirstOfDay === nextProps.isFirstOfDay &&
+        prevProps.collapseThreshold === nextProps.collapseThreshold
+    );
+});

@@ -1,5 +1,7 @@
 # LumosTime 🌟
 
+📚 **完整文档**（正在建设中）: [飞书知识库](https://my.feishu.cn/wiki/Y397wIO41iePzwkOjG7cQTp3nne?from=from_copylink)
+
 LumosTime 是一款专注于个人成长与生活记录的全能时间管理应用。它融合了**时间追踪**、**待办管理**、**每日回顾**、**领域目标 (Scope & Goals)**、**数据统计**以及**WebDAV 云同步**等功能，旨在通过精美的 UI 设计和流畅的交互体验，帮助用户将被动的时间流逝转化为主动的生命积累。
 
 支持 **Web** 、 **Windows** 与 **Android** 原生应用。
@@ -169,68 +171,6 @@ LumosTime 是一款专注于个人成长与生活记录的全能时间管理应�
 ├── types.ts         # TypeScript 类型定义
 └── constants.ts     # 全局常量与预设数据
 ```
-
-## 🚀 快速开始
-
-### 开发环境准备
-
-1. **Node.js**: 确保已安装 Node.js 18+
-2. **Android Studio**: (仅移动端开发需要)
-
-### 安装与运行
-
-```bash
-# 安装依赖
-npm install
-
-# 启动开发服务器
-npm run dev
-```
-
-### 📱 Android 应用打包
-
-```bash
-# 1. 构建 Web 资源
-npm run build
-
-# 2. 同步到 Android 项目
-npx cap sync android
-
-# 3. 打开 Android Studio
-npx cap open android
-```
-
-在 Android Studio 中：
-- **调试版**：Build → Build APK(s)
-- **发布版**：Build → Generate Signed Bundle / APK
-
-### 💻 Electron 桌面端
-
-开发模式下，`npm run dev` 会同时启动 Web 服务和 Electron 窗口。
-
-打包生产环境安装包：
-
-```bash
-# 构建 Windows 安装包 (默认配置)
-npm run electron:build
-```
-
-构建产物位于 `release/` 目录下。
-
-### 🌐 Vercel 部署
-
-本项目支持一键部署到 Vercel。
-
-```bash
-# 安装 Vercel CLI
-npm install -g vercel
-
-# 部署
-vercel
-```
-
-> ⚠️ 注意：Web 端的 WebDAV 云同步功能可能受到 CORS 限制
-
 
 ## 📄 License
 
