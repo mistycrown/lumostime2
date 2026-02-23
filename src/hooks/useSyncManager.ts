@@ -610,54 +610,25 @@ export const useSyncManager = () => {
                 }
             }
 
-            // 1. 下载云端主数据（backup.json）
-            const cloudData = await activeService.downloadData();
-            
-            if (!cloudData) {
-                addToast('error', '云端无数据');
-                return;
+            const localData = getFullLocalData();
+
+            // 使用统一的下载函数（包含备份）
+            const result = await downloadWithBackup(
+                activeService,
+                localData,
+                undefined,
+                async (message) => window.confirm(message)
+            );
+
+            if (result.success && result.data) {
+                await handleSyncDataUpdate(result.data);
+                addToast('success', result.message);
+                
+                await new Promise(resolve => setTimeout(resolve, 100));
+                setRefreshKey(prev => prev + 1);
+            } else {
+                addToast('error', result.message);
             }
-
-            // 2. 备份本地数据到云端
-            const backupSuccess = await backupLocalData(activeService, 'manual_download_backup');
-            if (!backupSuccess) {
-                addToast('error', '备份失败，为保护本地数据已取消下载');
-                return;
-            }
-
-            // 3. 更新本地数据
-            await handleSyncDataUpdate(cloudData);
-
-            // 4. 下载图片列表 JSON
-            const localImageList = imageService.getReferencedImagesList();
-            let cloudImageList: string[] = [];
-            try {
-                const cloudImageData = await activeService.downloadImageList();
-                if (cloudImageData) {
-                    cloudImageList = cloudImageData.images || [];
-                }
-            } catch (err) {
-                console.log('[Sync] 云端无图片列表');
-            }
-
-            // 5. 同步图片文件
-            const mergedImageList = Array.from(new Set([...localImageList, ...cloudImageList]));
-            const imageResult = await handleImageSync(mergedImageList);
-
-            // 构建反馈消息
-            const imageActions = [];
-            if (imageResult.downloaded > 0) imageActions.push(`下载 ${imageResult.downloaded} 张图片`);
-            
-            const cloudTimestamp = cloudData.timestamp || 0;
-            let finalMsg = `已下载云端数据 (${new Date(cloudTimestamp).toLocaleDateString()})`;
-            if (imageActions.length > 0) {
-                finalMsg += `，并${imageActions.join('，')}`;
-            }
-
-            addToast('success', finalMsg);
-
-            await new Promise(resolve => setTimeout(resolve, 100));
-            setRefreshKey(prev => prev + 1);
 
         } catch (error) {
             console.error("Manual download failed", error);

@@ -194,7 +194,14 @@ export async function uploadDataToCloud(
 }
 
 /**
- * 从云端下载数据
+ * 从云端下载数据（完整流程：主数据 + 图片列表 JSON + 图片文件）
+ * 
+ * 下载顺序：
+ * 1. 下载主数据 JSON (backup.json)
+ * 2. 下载图片列表 JSON (lumostime_images.json)
+ * 3. 同步图片文件：
+ *    - 桌面端 WebDAV & S3: syncImages 扫描云端实际文件，下载缺失的
+ *    - 移动端 WebDAV: syncImages 使用 JSON，下载缺失的
  * 
  * @param service - 云服务实例 (webdavService 或 s3Service)
  * @param onProgress - 进度回调
@@ -210,7 +217,8 @@ export async function downloadDataFromCloud(
   try {
     onProgress?.(`正在从 ${displayName} 下载数据...`);
 
-    // 1. 下载主数据
+    // 1. 下载主数据 JSON
+    console.log(`[syncUtils] 步骤 1: 下载主数据 JSON`);
     const data = await service.downloadData();
     
     if (!data) {
@@ -220,48 +228,52 @@ export async function downloadDataFromCloud(
       };
     }
 
-    // 2. 同步图片（仅 S3）
-    if (serviceName === 's3') {
-      try {
-        // 获取云端图片列表
-        const cloudImageData = await s3Service.downloadImageList();
-        const cloudImageList = cloudImageData?.images || [];
-        const localImageList = imageService.getReferencedImagesList();
+    // 2. 下载图片列表 JSON
+    console.log(`[syncUtils] 步骤 2: 下载图片列表 JSON`);
+    let cloudImageList: string[] = [];
+    try {
+      const cloudImageData = await service.downloadImageList();
+      if (cloudImageData && cloudImageData.images) {
+        cloudImageList = cloudImageData.images;
+        console.log(`[syncUtils] 云端图片列表: ${cloudImageList.length} 张`);
+      } else {
+        console.log(`[syncUtils] 云端无图片列表 JSON`);
+      }
+    } catch (err) {
+      console.log(`[syncUtils] 云端无图片列表 JSON`);
+    }
 
-        // 合并并更新本地图片列表
-        const mergedImageList = Array.from(new Set([...localImageList, ...cloudImageList]));
+    // 3. 同步图片文件
+    if (cloudImageList.length > 0) {
+      console.log(`[syncUtils] 步骤 3: 开始同步图片文件`);
+      onProgress?.(`正在同步 ${cloudImageList.length} 张图片...`);
+
+      const localImageList = imageService.getReferencedImagesList();
+      
+      // 合并本地和云端图片列表
+      const mergedImageList = Array.from(new Set([...localImageList, ...cloudImageList]));
+      
+      // 更新本地图片列表
+      imageService.updateReferencedImagesList(mergedImageList);
+
+      const imageResult = await syncService.syncImages(
+        onProgress,
+        mergedImageList,  // 本地引用列表（已合并）
+        cloudImageList    // 云端引用列表（从 JSON 获取）
+      );
+
+      console.log(`[syncUtils] 图片同步结果:`, imageResult);
+
+      if (imageResult.downloaded > 0 || imageResult.errors.length > 0) {
+        const message = imageResult.errors.length > 0
+          ? `数据已还原。图片: ${imageResult.downloaded} 张下载成功，${imageResult.errors.length} 张失败`
+          : `数据及 ${imageResult.downloaded} 张图片已成功从 ${displayName} 还原！`;
         
-        if (mergedImageList.length > 0) {
-          imageService.updateReferencedImagesList(mergedImageList);
-
-          console.log(`[syncUtils] 开始从 ${displayName} 同步 ${mergedImageList.length} 张图片...`);
-          onProgress?.(`正在同步 ${mergedImageList.length} 张图片...`);
-
-          const imageResult = await syncService.syncImages(
-            undefined,
-            localImageList,
-            [] // 强制检查/上传
-          );
-
-          if (imageResult.downloaded > 0 || imageResult.errors.length > 0) {
-            const message = imageResult.errors.length > 0
-              ? `数据已还原。图片: ${imageResult.downloaded} 张下载成功，${imageResult.errors.length} 张失败`
-              : `数据及 ${imageResult.downloaded} 张图片已成功从 ${displayName} 还原！`;
-            
-            return {
-              success: imageResult.errors.length === 0,
-              message,
-              data,
-              imageStats: imageResult
-            };
-          }
-        }
-      } catch (imageError) {
-        console.warn(`[syncUtils] ${displayName} 图片同步失败:`, imageError);
         return {
-          success: true,
-          message: `数据已恢复，但图片同步失败`,
-          data
+          success: imageResult.errors.length === 0,
+          message,
+          data,
+          imageStats: imageResult
         };
       }
     }
