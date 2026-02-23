@@ -56,27 +56,23 @@ export function getServiceDisplayName(service: CloudService): string {
 }
 
 /**
- * 上传数据到云端（完整流程：主数据 + 图片列表 JSON + 图片文件）
+ * 上传数据到云端（单向操作：只上传，不下载）
  * 
- * 正确的上传顺序：
+ * 上传顺序：
  * 1. 上传主数据 JSON (backup.json)
  * 2. 下载云端旧的图片列表 JSON - 获取云端已有的图片记录
  * 3. 上传新的图片列表 JSON (lumostime_images.json) - 更新云端记录
- * 4. 同步图片文件：
- *    - 桌面端 WebDAV & S3: syncImages 扫描云端实际文件，对比后上传缺失的
- *    - 移动端 WebDAV: syncImages 使用旧的 JSON，对比后上传缺失的
+ * 4. 上传图片文件：只上传本地有但云端没有的图片
  * 
  * @param service - 云服务实例 (webdavService 或 s3Service)
  * @param localData - 本地数据
  * @param onProgress - 进度回调
- * @param updateDataLastModified - 更新数据修改时间的回调
- * @returns 同步结果
+ * @returns 同步结果（包含上传的时间戳，调用者应使用此时间戳更新本地）
  */
 export async function uploadDataToCloud(
   service: CloudService,
   localData: any,
-  onProgress?: ProgressCallback,
-  updateDataLastModified?: () => void
+  onProgress?: ProgressCallback
 ): Promise<SyncResult> {
   const serviceName = getServiceName(service);
   const displayName = getServiceDisplayName(service);
@@ -91,7 +87,7 @@ export async function uploadDataToCloud(
       };
     }
 
-    // 2. 准备上传数据
+    // 2. 准备上传数据（使用统一的时间戳）
     const uploadTimestamp = Date.now();
     const dataToSync = {
       ...localData,
@@ -102,9 +98,9 @@ export async function uploadDataToCloud(
     onProgress?.(`正在上传数据到 ${displayName}...`);
 
     // 3. 上传主数据（backup.json）
-    console.log(`[syncUtils] 步骤 1: 上传主数据 JSON`);
+    console.log(`[syncUtils] 步骤 1: 上传主数据 JSON (时间戳: ${uploadTimestamp})`);
     await service.uploadData(dataToSync);
-    updateDataLastModified?.();
+    console.log(`[syncUtils] ✓ 主数据已上传，时间戳: ${uploadTimestamp}`);
 
     // 4. 获取本地引用的图片列表
     const localImageList = imageService.getReferencedImagesList();
@@ -121,12 +117,12 @@ export async function uploadDataToCloud(
       
       return {
         success: true,
-        message: `数据已成功上传至 ${displayName}！`
+        message: `数据已成功上传至 ${displayName}！`,
+        data: { timestamp: uploadTimestamp }
       };
     }
 
     // 5. 获取云端旧的图片列表 JSON（在上传新的之前）
-    // 这个旧的 JSON 将用于判断哪些图片已经在云端
     let oldCloudImageList: string[] = [];
     try {
       const cloudImageData = await service.downloadImageList();
@@ -140,7 +136,7 @@ export async function uploadDataToCloud(
       console.log(`[syncUtils] 步骤 3: 云端无图片列表 JSON（首次上传）`);
     }
 
-    // 6. 上传新的图片列表 JSON - 更新云端记录
+    // 6. 上传新的图片列表 JSON
     console.log(`[syncUtils] 步骤 4: 上传新图片列表 JSON (${localImageList.length} 张)`);
     try {
       await service.uploadImageList(localImageList);
@@ -149,24 +145,24 @@ export async function uploadDataToCloud(
       console.error(`[syncUtils] ✗ 图片列表 JSON 上传失败:`, listErr);
       return {
         success: false,
-        message: `数据已上传，但图片列表上传失败: ${listErr.message}`
+        message: `数据已上传，但图片列表上传失败: ${listErr.message}`,
+        data: { timestamp: uploadTimestamp }
       };
     }
 
-    // 7. 同步图片文件
-    // 使用旧的云端 JSON 作为参照，判断哪些图片需要上传
-    console.log(`[syncUtils] 步骤 5: 开始同步图片文件`);
-    onProgress?.(`正在同步 ${localImageList.length} 张图片...`);
+    // 7. 上传图片文件（单向：只上传，不下载）
+    console.log(`[syncUtils] 步骤 5: 开始上传图片文件`);
+    onProgress?.(`正在上传图片...`);
 
-    const imageResult = await syncService.syncImages(
+    const imageResult = await syncService.uploadImages(
       onProgress,
       localImageList,      // 本地引用列表
-      oldCloudImageList    // 云端旧的引用列表（上传前获取的）
+      oldCloudImageList    // 云端旧的引用列表（用于判断哪些需要上传）
     );
 
-    console.log(`[syncUtils] 图片同步结果:`, imageResult);
+    console.log(`[syncUtils] 图片上传结果:`, imageResult);
 
-    // 7. 构建返回消息
+    // 8. 构建返回消息
     if (imageResult.uploaded > 0 || imageResult.errors.length > 0) {
       const message = imageResult.errors.length > 0
         ? `数据已上传。图片: ${imageResult.uploaded} 张上传成功, ${imageResult.errors.length} 张失败`
@@ -175,13 +171,15 @@ export async function uploadDataToCloud(
       return {
         success: imageResult.errors.length === 0,
         message,
+        data: { timestamp: uploadTimestamp },
         imageStats: imageResult
       };
     }
 
     return {
       success: true,
-      message: `数据已成功上传至 ${displayName}！`
+      message: `数据已成功上传至 ${displayName}！`,
+      data: { timestamp: uploadTimestamp }
     };
 
   } catch (error: any) {
@@ -194,14 +192,12 @@ export async function uploadDataToCloud(
 }
 
 /**
- * 从云端下载数据（完整流程：主数据 + 图片列表 JSON + 图片文件）
+ * 从云端下载数据（单向操作：只下载，不上传）
  * 
  * 下载顺序：
  * 1. 下载主数据 JSON (backup.json)
  * 2. 下载图片列表 JSON (lumostime_images.json)
- * 3. 同步图片文件：
- *    - 桌面端 WebDAV & S3: syncImages 扫描云端实际文件，下载缺失的
- *    - 移动端 WebDAV: syncImages 使用 JSON，下载缺失的
+ * 3. 下载图片文件：只下载云端有但本地没有的图片
  * 
  * @param service - 云服务实例 (webdavService 或 s3Service)
  * @param onProgress - 进度回调
@@ -243,10 +239,10 @@ export async function downloadDataFromCloud(
       console.log(`[syncUtils] 云端无图片列表 JSON`);
     }
 
-    // 3. 同步图片文件
+    // 3. 下载图片文件（单向：只下载，不上传）
     if (cloudImageList.length > 0) {
-      console.log(`[syncUtils] 步骤 3: 开始同步图片文件`);
-      onProgress?.(`正在同步 ${cloudImageList.length} 张图片...`);
+      console.log(`[syncUtils] 步骤 3: 开始下载图片文件`);
+      onProgress?.(`正在下载图片...`);
 
       const localImageList = imageService.getReferencedImagesList();
       
@@ -256,13 +252,12 @@ export async function downloadDataFromCloud(
       // 更新本地图片列表
       imageService.updateReferencedImagesList(mergedImageList);
 
-      const imageResult = await syncService.syncImages(
+      const imageResult = await syncService.downloadImages(
         onProgress,
-        mergedImageList,  // 本地引用列表（已合并）
-        cloudImageList    // 云端引用列表（从 JSON 获取）
+        cloudImageList    // 云端引用列表
       );
 
-      console.log(`[syncUtils] 图片同步结果:`, imageResult);
+      console.log(`[syncUtils] 图片下载结果:`, imageResult);
 
       if (imageResult.downloaded > 0 || imageResult.errors.length > 0) {
         const message = imageResult.errors.length > 0

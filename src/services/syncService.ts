@@ -1,12 +1,13 @@
 /**
  * @file syncService.ts
  * @input WebDAV/S3 Storage Services, Local Image Service, Image Reference Lists
- * @output Image Sync Operations (syncImages), Storage Service Selection (getActiveStorageService), File Operations (forceDeleteLocalFile)
+ * @output Image Sync Operations (uploadImages, downloadImages), Storage Service Selection (getActiveStorageService), File Operations (forceDeleteLocalFile)
  * @pos Service
- * @description 同步服务 - 处理本地和云端图片的双向同步，支持 WebDAV 和 S3/COS 存储
+ * @description 同步服务 - 处理本地和云端图片的单向同步，支持 WebDAV 和 S3/COS 存储
  * 
  * 核心功能：
- * - 图片上传/下载同步
+ * - 图片上传同步（uploadImages）
+ * - 图片下载同步（downloadImages）
  * - 删除操作同步
  * - 引用列表管理
  * - 存储服务抽象层
@@ -82,29 +83,26 @@ export const syncService = {
     },
 
     /**
-     * 完整的图片同步流程
+     * 上传图片到云端（单向操作）
      * @param onProgress 进度回调
-     * @param localReferencedImages 本地引用的图片列表（从logs中提取）
-     * @param cloudReferencedImages 云端引用的图片列表（从云端数据中获取）
+     * @param localReferencedImages 本地引用的图片列表
+     * @param cloudReferencedImages 云端引用的图片列表（用于判断哪些需要上传）
      */
-    syncImages: async (
+    uploadImages: async (
         onProgress?: (message: string) => void,
         localReferencedImages?: string[],
         cloudReferencedImages?: string[]
     ): Promise<SyncResult> => {
-        // console.log(`[Sync] syncImages: 本地引用 ${localReferencedImages?.length || 0}, 云端引用 ${cloudReferencedImages?.length || 0}`);
-
         const result: SyncResult = { uploaded: 0, downloaded: 0, deletedRemote: 0, errors: [] };
 
-        // 获取活跃的存储服务
         const storageService = syncService.getActiveStorageService();
         if (!storageService) {
-            console.log('[Sync] ⚠️ 没有配置存储服务，跳过图片同步');
+            console.log('[Sync] ⚠️ 没有配置存储服务，跳过图片上传');
             return result;
         }
 
         try {
-            if (onProgress) onProgress('正在初始化图片同步...');
+            if (onProgress) onProgress('正在初始化图片上传...');
 
             // 1. 对于WebDAV，检查云端 /images 目录是否存在
             if (storageService === webdavService) {
@@ -112,77 +110,27 @@ export const syncService = {
                     await webdavService.getDirectoryContents('/images');
                     console.log('[Sync] ✓ WebDAV /images 目录存在');
                 } catch (error) {
-                    const errorMsg = '图片同步失败：云端缺少 /images 文件夹。请在WebDAV根目录下手动创建 "images" 文件夹后重试。';
+                    const errorMsg = '图片上传失败：云端缺少 /images 文件夹。请在WebDAV根目录下手动创建 "images" 文件夹后重试。';
                     console.error('[Sync] ✗ WebDAV /images 目录不存在');
                     result.errors.push(errorMsg);
                     throw new Error(errorMsg);
                 }
-            } else {
-                // S3/COS 不需要预先创建目录
-                // console.log('[Sync] ✓ S3/COS 存储，无需检查目录');
             }
 
-            // 2. 确定最终的引用列表（合并本地和云端）
-            const localSet = new Set(localReferencedImages || []);
-
-            // [Unified] 尝试扫描云端实际文件列表
-            // 优先级：实际文件扫描 > 图片列表 JSON
-            // 
-            // 对于 S3/COS：可以扫描实际文件，使用实际文件作为判定依据
-            // 对于 WebDAV 桌面端：可以扫描实际文件，使用实际文件作为判定依据
-            // 对于 WebDAV 移动端：无法扫描（PROPFIND 不支持），使用传入的 cloudReferencedImages（来自 JSON）
-            let actualCloudFiles: Set<string> | null = null;
-
-            try {
-                console.log('[Sync] 正在扫描云端实际文件列表...');
-                const contents = await storageService.getDirectoryContents!('images');
-                
-                if (Array.isArray(contents) && contents.length > 0) {
-                    actualCloudFiles = new Set(contents.map((item: any) => {
-                        const rawName = item.filename || item.basename || item.Key || item;
-                        const parts = String(rawName).split('/');
-                        return parts[parts.length - 1];
-                    }));
-                    console.log(`[Sync] ✓ 云端实际扫描结果: ${actualCloudFiles.size} 个文件`);
-                } else if (Array.isArray(contents) && contents.length === 0) {
-                    console.log('[Sync] ⚠️ 云端目录扫描返回空（可能是移动端 WebDAV 限制或目录确实为空）');
-                    actualCloudFiles = null;
-                }
-            } catch (e) {
-                console.warn('[Sync] 云端扫描失败或不支持，使用传入的 cloudReferencedImages', e);
-            }
-
-            // 判定逻辑：
-            // 1. 如果成功扫描到实际文件（actualCloudFiles 不为 null），使用实际文件
-            // 2. 否则使用传入的 cloudReferencedImages（来自 JSON）
-            const cloudSet = actualCloudFiles !== null ? actualCloudFiles : new Set(cloudReferencedImages || []);
-
-            const mergedSet = new Set([...localSet, ...(cloudReferencedImages || [])]);
-
-            console.log('[Sync] ========== 引用列表分析 ==========');
-            console.log(`[Sync] 本地引用: ${localSet.size} 个`);
-            console.log(`[Sync] 云端引用 (JSON): ${(cloudReferencedImages || []).length} 个`);
-            if (actualCloudFiles !== null) {
-                console.log(`[Sync] 云端实际: ${actualCloudFiles.size} 个 (作为判定依据)`);
-            } else {
-                console.log(`[Sync] 云端实际: 无法扫描，使用 JSON (${cloudSet.size} 个) 作为判定依据`);
-            }
-            console.log(`[Sync] 合并后计划: ${mergedSet.size} 个`);
+            // 2. 获取云端已有的图片列表
+            const cloudSet = new Set(cloudReferencedImages || []);
+            console.log(`[Sync] 云端已有图片: ${cloudSet.size} 个`);
 
             // 3. 获取本地实际存在的文件
             const localFiles = await imageService.listImages();
             const localFileSet = new Set(localFiles);
-            // console.log(`[Sync] 本地实际文件: ${localFiles.length} 个`);
+            console.log(`[Sync] 本地实际文件: ${localFiles.length} 个`);
 
-            // 4. 处理删除操作
+            // 4. 处理删除操作（上传时同步删除）
             const deletedImages = imageService.getDeletedImages();
-            const justDeletedFiles = new Set<string>();
-
             if (deletedImages.length > 0) {
                 if (onProgress) onProgress(`正在同步删除 ${deletedImages.length} 张图片...`);
                 console.log(`[Sync] 处理本地删除记录: ${deletedImages.length} 个`);
-
-                deletedImages.forEach(filename => justDeletedFiles.add(filename));
 
                 for (const filename of deletedImages) {
                     try {
@@ -200,28 +148,11 @@ export const syncService = {
                 console.log(`[Sync] 已清除 ${deletedImages.length} 个删除记录`);
             }
 
-            // 5. 清理本地残留的已删除文件
-            if (justDeletedFiles.size > 0) {
-                const filesToCleanup = localFiles.filter(file => justDeletedFiles.has(file));
-                if (filesToCleanup.length > 0) {
-                    console.log(`[Sync] 清理本地残留: ${filesToCleanup.length} 个`);
-                    for (const file of filesToCleanup) {
-                        try {
-                            await syncService.forceDeleteLocalFile(file);
-                            localFileSet.delete(file);
-                        } catch (e) {
-                            console.warn(`[Sync] 清理失败: ${file}`, e);
-                        }
-                    }
-                }
-            }
-
-            // 6. 分析上传需求：本地有 && 被引用 && (云端可能没有)
+            // 5. 分析上传需求：本地有 && 被引用 && 云端没有
+            const localSet = new Set(localReferencedImages || []);
             const toUpload: string[] = [];
-            for (const filename of mergedSet) {
-                // 跳过刚删除的
-                if (justDeletedFiles.has(filename)) continue;
-
+            
+            for (const filename of localSet) {
                 // 本地有这个文件，且云端没有，才需要上传
                 if (localFileSet.has(filename) && !cloudSet.has(filename)) {
                     toUpload.push(filename);
@@ -232,19 +163,7 @@ export const syncService = {
                 console.log(`[Sync] 需要上传: ${toUpload.length} 个图片`);
             }
 
-            // 7. 分析下载需求：被引用 && 本地没有
-            const toDownload: string[] = [];
-            for (const filename of mergedSet) {
-                // 本地没有这个文件，需要下载
-                if (!localFileSet.has(filename)) {
-                    toDownload.push(filename);
-                }
-            }
-
-            if (toDownload.length > 0) {
-                console.log(`[Sync] 需要下载: ${toDownload.length} 个图片`);            }
-
-            // 8. 执行上传
+            // 6. 执行上传
             for (const filename of toUpload) {
                 if (onProgress) onProgress(`正在上传: ${filename}...`);
                 console.log(`[Sync] 上传: ${filename}`);
@@ -259,17 +178,64 @@ export const syncService = {
                 }
             }
 
-            // 9. 执行下载
+            if (onProgress) onProgress('图片上传完成');
+            console.log('[Sync] 图片上传结果:', result);
+
+        } catch (error: any) {
+            console.error('[Sync] 图片上传错误', error);
+            result.errors.push(`Upload error: ${error.message}`);
+        }
+
+        return result;
+    },
+
+    /**
+     * 从云端下载图片（单向操作）
+     * @param onProgress 进度回调
+     * @param cloudReferencedImages 云端引用的图片列表
+     */
+    downloadImages: async (
+        onProgress?: (message: string) => void,
+        cloudReferencedImages?: string[]
+    ): Promise<SyncResult> => {
+        const result: SyncResult = { uploaded: 0, downloaded: 0, deletedRemote: 0, errors: [] };
+
+        const storageService = syncService.getActiveStorageService();
+        if (!storageService) {
+            console.log('[Sync] ⚠️ 没有配置存储服务，跳过图片下载');
+            return result;
+        }
+
+        try {
+            if (onProgress) onProgress('正在初始化图片下载...');
+
+            // 1. 获取本地实际存在的文件
+            const localFiles = await imageService.listImages();
+            const localFileSet = new Set(localFiles);
+            console.log(`[Sync] 本地实际文件: ${localFiles.length} 个`);
+
+            // 2. 分析下载需求：云端有 && 本地没有
+            const cloudSet = new Set(cloudReferencedImages || []);
+            const toDownload: string[] = [];
+            
+            for (const filename of cloudSet) {
+                // 本地没有这个文件，需要下载
+                if (!localFileSet.has(filename)) {
+                    toDownload.push(filename);
+                }
+            }
+
+            if (toDownload.length > 0) {
+                console.log(`[Sync] 需要下载: ${toDownload.length} 个图片`);
+            }
+
+            // 3. 执行下载
             for (const filename of toDownload) {
                 if (onProgress) onProgress(`正在下载: ${filename}...`);
                 console.log(`[Sync] 下载: ${filename}`);
                 try {
                     const buffer = await storageService.downloadImage(filename);
-                    // console.log(`[Sync] 存储服务下载完成: ${filename}, 大小: ${buffer.byteLength} bytes`);
-
                     await imageService.writeImage(filename, buffer);
-                    // console.log(`[Sync] 本地写入完成: ${filename}`);
-
                     result.downloaded++;
                     console.log(`[Sync] ✓ 下载完成: ${filename}`);
                 } catch (err: any) {
@@ -278,29 +244,15 @@ export const syncService = {
                 }
             }
 
-            // 10. 上传图片引用列表 (在 useSyncManager 里通常已经上传了，但这里保留作为完整流程的一部分，或者可以 conditional)
-            // 用户抱怨重复上传，但这里是 syncService，它被设计为独立流程。
-            // 暂时注释掉日志，逻辑保留
-            if (mergedSet.size > 0) {
-                try {
-                    if (onProgress) onProgress('正在同步图片列表...');
-                    const imageList = Array.from(mergedSet);
-                    await storageService.uploadImageList(imageList);
-                    // console.log(`[Sync] ✓ 图片列表上传成功: ${imageList.length} 个图片`);
-                } catch (err: any) {
-                    console.error(`[Sync] ✗ 图片列表上传失败:`, err);
-                    result.errors.push(`Image list upload failed: ${err.message}`);
-                }
-            }
-
-            if (onProgress) onProgress('图片同步完成');
-            // console.log('[Sync] 图片同步结果:', result);
+            if (onProgress) onProgress('图片下载完成');
+            console.log('[Sync] 图片下载结果:', result);
 
         } catch (error: any) {
-            console.error('[Sync] 图片同步总流程错误', error);
-            result.errors.push(`General error: ${error.message}`);
+            console.error('[Sync] 图片下载错误', error);
+            result.errors.push(`Download error: ${error.message}`);
         }
 
         return result;
-    }
+    },
+
 };

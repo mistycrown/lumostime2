@@ -50,9 +50,7 @@ export const useSyncManager = () => {
     // Removed local isSyncing state to use global state
     const [refreshKey, setRefreshKey] = useState(0);
     const [isSyncDirectionModalOpen, setIsSyncDirectionModalOpen] = useState(false);
-    const imageSyncTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-    // --- Helpers ---
     const handleSyncDataUpdate = async (data: any) => {
         // console.log('[App] 开始更新同步数据...');
         isRestoring.current = true;
@@ -99,35 +97,6 @@ export const useSyncManager = () => {
                 const currentTimestamp = localStorage.getItem('lumostime_local_timestamp');
                 console.log(`[Sync] Unlocked timestamp updates. Current localStorage value: ${currentTimestamp}`);
             }, 500);
-        }
-    };
-
-    const handleImageSync = async (imageList: string[]) => {
-        const webdavConfig = webdavService.getConfig();
-        const s3Config = s3Service.getConfig();
-
-        if (!webdavConfig && !s3Config) return { uploaded: 0, downloaded: 0, deletedRemote: 0, errors: [] };
-
-        try {
-            const result = await syncService.syncImages(
-                (msg) => { }, // console.log(`[App] ${msg}`),
-                imageList,
-                imageList
-            );
-
-            // Log details but don't toast immediately during Quick Sync
-            if (result.errors.length > 0) {
-                console.error('[App] Image sync errors:', result.errors);
-            }
-
-            if ((result.uploaded > 0 || result.downloaded > 0 || result.deletedRemote > 0) && currentView === AppView.TIMELINE) {
-                setRefreshKey(prev => prev + 1);
-            }
-
-            return result;
-        } catch (e) {
-            console.error('[App] Image sync error', e);
-            return { uploaded: 0, downloaded: 0, deletedRemote: 0, errors: [e] };
         }
     };
 
@@ -243,103 +212,93 @@ export const useSyncManager = () => {
 
             // 1. 获取本地时间戳
             const localTimestamp = localDataTimestamp;
-            console.log(`[Sync][Step 1] 获取本地时间戳: ${localTimestamp} (${new Date(localTimestamp).toLocaleString()})`);
+            console.log(`[Sync][Step 1] 本地时间戳: ${localTimestamp} (${new Date(localTimestamp).toLocaleString()})`);
 
             // 2. 获取云端时间戳
-            // 策略：先用 statFile 快速判断，如果时间差在容错范围内，直接认为一致
-            // 只有当时间差明显时，才下载完整数据获取准确的 timestamp
+            // 策略：优先使用文件修改时间（statFile），如果失败则下载文件获取内部时间戳
             let cloudTimestamp = 0;
             let cloudData: any = null;
+            let usedFileModTime = false;
 
             try {
-                // 第一步：使用 statFile() 快速获取文件修改时间
-                // 注意：在移动端，statFile 可能因为跨域问题失败，所以需要特殊处理
-                const isNative = typeof Capacitor !== 'undefined' && Capacitor.isNativePlatform();
+                console.log(`[Sync][Step 2] 开始获取云端时间戳...`);
                 
-                // 在移动端，跳过 statFile 优化，直接下载数据以避免跨域问题
-                if (isNative) {
-                    console.log(`[Sync][Step 2] 移动端环境，直接下载数据获取时间戳`);
+                // 2a. 尝试获取文件修改时间（优先方案）
+                console.log(`[Sync][Step 2a] 尝试获取文件修改时间 (statFile)...`);
+                const cloudFileDate = await activeService.statFile?.();
+                
+                if (cloudFileDate) {
+                    cloudTimestamp = cloudFileDate.getTime();
+                    usedFileModTime = true;
+                    console.log(`[Sync][Step 2a] ✓ 成功获取文件修改时间: ${cloudTimestamp} (${cloudFileDate.toLocaleString()})`);
+                } else {
+                    console.log(`[Sync][Step 2a] ✗ statFile 返回 null，启动备用方案`);
+                    
+                    // 2b. 备用方案：下载文件获取内部时间戳
+                    console.log(`[Sync][Step 2b] 启动备用方案：下载文件获取内部时间戳...`);
                     cloudData = await activeService.downloadData();
                     cloudTimestamp = cloudData?.timestamp || 0;
-                } else {
-                    // 桌面端使用 statFile 优化
-                    const cloudFileDate = await activeService.statFile?.();
-                    
-                    if (cloudFileDate) {
-                        const fileModTime = cloudFileDate.getTime();
-                        console.log(`[Sync][Step 2a] 快速获取云端文件修改时间: ${fileModTime} (${cloudFileDate.toLocaleString()})`);
-                        
-                        // 快速判断：如果文件修改时间和本地时间戳差异在容错范围内，直接认为一致
-                        const quickDiff = Math.abs(fileModTime - localTimestamp);
-                        if (quickDiff <= SYNC_TOLERANCE_MS) {
-                            console.log(`[Sync][Step 2b] 文件修改时间差异在容错范围内 (${quickDiff}ms)，跳过下载`);
-                            cloudTimestamp = localTimestamp;  // 视为一致
-                        } else {
-                            // 时间差明显，需要下载完整数据获取准确的 timestamp
-                            console.log(`[Sync][Step 2b] 文件修改时间差异较大 (${quickDiff}ms)，下载数据获取准确时间戳`);
-                            cloudData = await activeService.downloadData();
-                            cloudTimestamp = cloudData?.timestamp || 0;
-                            console.log(`[Sync][Step 2c] 从数据内容获取时间戳: ${cloudTimestamp} (${new Date(cloudTimestamp).toLocaleString()})`);
-                        }
-                    } else {
-                        // statFile 不可用或文件不存在，fallback 到下载数据
-                        console.log(`[Sync][Step 2] statFile 不可用，尝试下载数据获取时间戳`);
-                        cloudData = await activeService.downloadData();
-                        cloudTimestamp = cloudData?.timestamp || 0;
-                    }
+                    console.log(`[Sync][Step 2b] ✓ 从文件内部获取时间戳: ${cloudTimestamp} (${new Date(cloudTimestamp).toLocaleString()})`);
                 }
             } catch (err) {
-                console.log('[Sync][Step 2] 云端无数据或获取失败，准备上传本地数据');
+                console.log(`[Sync][Step 2] ✗ 获取云端时间戳失败，可能云端无数据`);
+                console.log(`[Sync][Step 2] 错误详情:`, err);
                 cloudTimestamp = 0;
             }
 
             // 3. 比较时间戳（使用容错阈值）
             const timeDiff = localTimestamp - cloudTimestamp;
-            console.log(`[Sync][Step 3] 比较时间戳: 本地=${localTimestamp} vs 云端=${cloudTimestamp}, 差值=${timeDiff}ms (容错阈值: ±${SYNC_TOLERANCE_MS}ms)`);
+            console.log(`[Sync][Step 3] 时间戳比较:`);
+            console.log(`[Sync][Step 3]   - 本地时间: ${localTimestamp} (${new Date(localTimestamp).toLocaleString()})`);
+            console.log(`[Sync][Step 3]   - 云端时间: ${cloudTimestamp} (${cloudTimestamp > 0 ? new Date(cloudTimestamp).toLocaleString() : '无数据'})`);
+            console.log(`[Sync][Step 3]   - 时间差: ${timeDiff}ms (${(timeDiff / 1000).toFixed(1)}秒)`);
+            console.log(`[Sync][Step 3]   - 容错阈值: ±${SYNC_TOLERANCE_MS}ms (±${SYNC_TOLERANCE_MS / 1000}秒)`);
+            console.log(`[Sync][Step 3]   - 时间来源: ${usedFileModTime ? '文件修改时间' : '文件内部时间戳'}`);
 
             // 4. 执行操作（使用容错阈值判断）
             if (cloudTimestamp > localTimestamp + SYNC_TOLERANCE_MS) {
-                // Case 1: Cloud is Newer (超过容错阈值) -> Restore
+                // Case 1: Cloud is Newer (超过容错阈值) -> Restore (下载)
                 console.log('[Sync][Step 4] 判定: 云端明显较新 -> 执行下载恢复');
+                console.log(`[Sync][Step 4]   - 云端比本地新 ${((cloudTimestamp - localTimestamp) / 1000).toFixed(1)} 秒`);
 
                 // Check if there's a pending auto-sync (user just made changes)
                 if (mode === 'startup' && hadPendingAutoSync) {
-                    console.log('[Sync] Skipping cloud restore: Auto-sync pending (user just made changes)');
+                    console.log('[Sync] 跳过云端恢复：检测到待处理的自动同步（用户刚做了修改）');
                     dataSyncStatus = 'equal';
                     dataSyncMsg = '检测到本地变更，跳过云端恢复';
                 } else {
-                    // 如果还没有下载完整数据，现在下载
-                    if (!cloudData) {
-                        console.log('[Sync][Step 4] 下载完整云端数据...');
-                        try {
-                            cloudData = await activeService.downloadData();
-                        } catch (downloadErr) {
-                            console.error('[Sync] 下载云端数据失败:', downloadErr);
-                            dataSyncStatus = 'error';
-                            dataSyncMsg = '下载云端数据失败';
-                            if (mode === 'manual') addToast('error', '下载云端数据失败');
-                            return;
+                    // 使用统一的下载函数
+                    const localData = getFullLocalData();
+                    const result = await downloadWithBackup(
+                        activeService,
+                        localData,
+                        undefined,
+                        async (message) => {
+                            // 自动同步模式下，不需要用户确认
+                            if (mode === 'manual') {
+                                return window.confirm(message);
+                            }
+                            return true;
                         }
-                    }
-                    
-                    if (cloudData) {
-                        const backupSuccess = await backupLocalData(activeService, mode === 'startup' ? 'startup_backup' : 'pre_restore');
-                        if (!backupSuccess) {
-                            if (mode === 'manual') addToast('error', '备份失败，为保护本地数据已取消还原');
-                            return;
-                        }
-                        await handleSyncDataUpdate(cloudData);
+                    );
 
+                    if (result.success && result.data) {
+                        await handleSyncDataUpdate(result.data);
                         if (mode === 'startup') updateLastSyncTime();
-
                         dataSyncStatus = 'restored';
-                        dataSyncMsg = `已下载云端数据 (${new Date(cloudTimestamp).toLocaleDateString()})`;
+                        dataSyncMsg = result.message;
+                    } else {
+                        dataSyncStatus = 'error';
+                        dataSyncMsg = result.message;
+                        if (mode === 'manual') addToast('error', result.message);
+                        return;
                     }
                 }
             }
             else if (localTimestamp > cloudTimestamp + SYNC_TOLERANCE_MS) {
-                // Case 2: Local is Newer (超过容错阈值) -> Upload
+                // Case 2: Local is Newer (超过容错阈值) -> Upload (上传)
                 console.log('[Sync][Step 4] 判定: 本地明显较新 -> 执行上传');
+                console.log(`[Sync][Step 4]   - 本地比云端新 ${((localTimestamp - cloudTimestamp) / 1000).toFixed(1)} 秒`);
                 const localData = getFullLocalData();
 
                 // Safety check
@@ -349,88 +308,47 @@ export const useSyncManager = () => {
                     return;
                 }
 
-                // 上传完整数据
-                await activeService.uploadData(localData);
+                // 使用统一的上传函数
+                const result = await uploadDataToCloud(
+                    activeService,
+                    localData,
+                    undefined
+                );
 
-                // Update legacy tracking ref if needed
-                setDataLastModified(localData.timestamp);
-                if (mode === 'startup') updateLastSyncTime();
-
-                dataSyncStatus = 'uploaded';
-                dataSyncMsg = '已上传本地数据至云端';
+                if (result.success) {
+                    // 上传成功后，使用上传时生成的时间戳更新本地
+                    if (result.data?.timestamp) {
+                        setDataLastModified(result.data.timestamp);
+                        console.log(`[Sync] 上传完成，本地时间戳已更新为: ${result.data.timestamp}`);
+                    }
+                    if (mode === 'startup') updateLastSyncTime();
+                    dataSyncStatus = 'uploaded';
+                    dataSyncMsg = result.message;
+                } else {
+                    dataSyncStatus = 'error';
+                    dataSyncMsg = result.message;
+                    if (mode === 'manual') addToast('error', result.message);
+                    return;
+                }
             }
             else {
                 // Case 3: Equal (时间差在容错阈值内)
                 console.log('[Sync][Step 4] 判定: 时间戳一致（差值在容错范围内）');
+                console.log(`[Sync][Step 4]   - 时间差 ${Math.abs(timeDiff)}ms < 容错阈值 ${SYNC_TOLERANCE_MS}ms`);
                 dataSyncStatus = 'equal';
                 dataSyncMsg = '数据已是一致';
             }
 
-            // 2. Sync Images (Logic preserved)
-            const localImageList = imageService.getReferencedImagesList();
-            let cloudImageList: string[] = [];
-            try {
-                const cloudImageData = await activeService.downloadImageList();
-                if (cloudImageData) {
-                    cloudImageList = cloudImageData.images || [];
-                }
-            } catch (err) {
-                console.log('[App] 云端无图片列表');
-            }
-
-            const mergedImageList = Array.from(new Set([...localImageList, ...cloudImageList]));
-
-            // 3. Sync Image Files
-            const imageResult = await handleImageSync(mergedImageList);
-
-            // [Fixed Sequence] Update Image List JSON AFTER actual files are synced
-            // This prevents the "Zombie List" issue on mobile WebDAV where list says file exists but upload failed.
-
-            // Re-calculate outdated status (logic moved here)
-            const isCloudListOutdated = mergedImageList.length !== cloudImageList.length ||
-                !mergedImageList.every(img => cloudImageList.includes(img));
-
-            if (dataSyncStatus === 'uploaded' || isCloudListOutdated || imageResult.uploaded > 0 || imageResult.deletedRemote > 0) {
-                try {
-                    // Update list only if we are reasonably sure things are consistent
-                    if (mode === 'startup') imageService.updateReferencedImagesList(mergedImageList);
-                    await activeService.uploadImageList(mergedImageList);
-                    // console.log('[Sync] Image list JSON updated');
-                } catch (e) { console.warn('Image list update failed', e); }
-            }
-
-            // 4. Construct Final Feedback (Only for Manual Mode)
+            // 5. Construct Final Feedback (Only for Manual Mode)
+            // 注意：统一函数已经返回完整的消息，包含图片同步信息
             if (mode === 'manual') {
-                const imageActions = [];
-                if (imageResult.uploaded > 0) imageActions.push(`上传 ${imageResult.uploaded} 张图片`);
-                if (imageResult.downloaded > 0) imageActions.push(`下载 ${imageResult.downloaded} 张图片`);
-
-                const imageSyncMsg = imageActions.length > 0
-                    ? imageActions.join('，')
-                    : (imageResult.errors.length > 0 ? '图片同步出错' : '图片一致');
-
-
-                // Combine messages
-                if (dataSyncStatus === 'equal' && imageActions.length === 0 && imageResult.errors.length === 0) {
+                if (dataSyncStatus === 'equal') {
                     addToast('info', '云端与本地数据一致，无需同步');
-                } else {
-                    let finalMsg = '';
-                    if (dataSyncStatus !== 'equal') {
-                        finalMsg = dataSyncMsg;
-                        if (imageActions.length > 0) {
-                            finalMsg += `，并${imageSyncMsg}`;
-                        } else if (imageResult.errors.length > 0) {
-                            finalMsg += `，但图片同步出错`;
-                        } else {
-                            finalMsg += `，${imageSyncMsg}`;
-                        }
-                    } else {
-                        // Data equal, but images changed
-                        finalMsg = `数据一致，${imageSyncMsg}`;
-                    }
-
-                    const toastType = (imageResult.errors.length > 0 && dataSyncStatus !== 'restored' && dataSyncStatus !== 'uploaded') ? 'warning' : 'success';
-                    addToast(toastType, finalMsg);
+                } else if (dataSyncStatus === 'restored' || dataSyncStatus === 'uploaded') {
+                    // dataSyncMsg 已经包含了图片同步信息（来自统一函数）
+                    addToast('success', dataSyncMsg);
+                } else if (dataSyncStatus === 'error') {
+                    // 错误消息已经在上面显示过了
                 }
             } else if (mode === 'startup' && dataSyncStatus === 'restored') {
                 // Startup mode: Only toast when restored
@@ -538,11 +456,15 @@ export const useSyncManager = () => {
             const result = await uploadDataToCloud(
                 activeService,
                 localData,
-                undefined,
-                () => setDataLastModified(localData.timestamp)
+                undefined
             );
 
             if (result.success) {
+                // 上传成功后，使用上传时生成的时间戳更新本地
+                if (result.data?.timestamp) {
+                    setDataLastModified(result.data.timestamp);
+                    console.log(`[Sync] 手动上传完成，本地时间戳已更新为: ${result.data.timestamp}`);
+                }
                 addToast('success', result.message);
             } else {
                 addToast('error', result.message);
@@ -700,100 +622,47 @@ export const useSyncManager = () => {
         };
     }, [logs, todos, categories, todoCategories, scopes, goals, autoLinkRules, reviewTemplates, checkTemplates, dailyReviews, weeklyReviews, monthlyReviews, customNarrativeTemplates, userPersonalInfo, filters, manualSyncMode]); // 添加 manualSyncMode 依赖
 
-    // 3. Image Auto Sync Listeners
+    // 2b. Image List Auto Sync (监听图片列表 JSON 的变化)
     useEffect(() => {
-        const handleImageListChanged = async (e: CustomEvent) => {
-            const webdavConfig = webdavService.getConfig();
-            const s3Config = s3Service.getConfig();
+        let timer: NodeJS.Timeout | null = null;
+        
+        const handleImageListChanged = () => {
+            // 如果开启了手动同步模式，不触发自动同步
+            if (manualSyncMode) return;
             
-            // 检查手动断开标志
-            const webdavManualDisconnect = localStorage.getItem('lumos_webdav_manual_disconnect') === 'true';
-            const s3ManualDisconnect = localStorage.getItem('lumos_s3_manual_disconnect') === 'true';
+            // 如果正在恢复数据，不触发自动同步
+            if (isRestoring.current) return;
             
-            const hasWebdav = webdavConfig && !webdavManualDisconnect;
-            const hasS3 = s3Config && !s3ManualDisconnect;
+            // 清除之前的定时器
+            if (timer) clearTimeout(timer);
             
-            if (!hasWebdav && !hasS3) return;
-            const activeService = hasS3 ? s3Service : webdavService;
-
-            try {
-                const imageList = e.detail.images || [];
-                await activeService.uploadImageList(imageList);
-            } catch (error) {
-                addToast('warning', '图片列表同步失败，请稍后手动同步');
-            }
-        };
-
-        const handleImageDeleted = async (event: CustomEvent) => {
-            const webdavConfig = webdavService.getConfig();
-            const s3Config = s3Service.getConfig();
+            // 设置待同步标志
+            pendingAutoSyncRef.current = true;
             
-            // 检查手动断开标志
-            const webdavManualDisconnect = localStorage.getItem('lumos_webdav_manual_disconnect') === 'true';
-            const s3ManualDisconnect = localStorage.getItem('lumos_s3_manual_disconnect') === 'true';
-            
-            const hasWebdav = webdavConfig && !webdavManualDisconnect;
-            const hasS3 = s3Config && !s3ManualDisconnect;
-            
-            if (!hasWebdav && !hasS3) return;
-
-            if (imageSyncTimeoutRef.current) clearTimeout(imageSyncTimeoutRef.current);
-            imageSyncTimeoutRef.current = setTimeout(async () => {
-                try {
-                    const imageList = imageService.getReferencedImagesList();
-                    await handleImageSync(imageList); // This uses active service inside
-                } catch (error) {
-                    console.error('[App] 图片删除同步失败:', error);
+            // 2秒后触发自动同步（与数据变化使用相同的防抖时间）
+            timer = setTimeout(async () => {
+                if (!isSyncingRef.current && !isRestoring.current) {
+                    await performSync('auto');
+                    pendingAutoSyncRef.current = false;
                 }
             }, 2000);
         };
-
-        const handleImageUploaded = async (event: CustomEvent) => {
-            const webdavConfig = webdavService.getConfig();
-            const s3Config = s3Service.getConfig();
-            
-            // 检查手动断开标志
-            const webdavManualDisconnect = localStorage.getItem('lumos_webdav_manual_disconnect') === 'true';
-            const s3ManualDisconnect = localStorage.getItem('lumos_s3_manual_disconnect') === 'true';
-            
-            const hasWebdav = webdavConfig && !webdavManualDisconnect;
-            const hasS3 = s3Config && !s3ManualDisconnect;
-            
-            if (!hasWebdav && !hasS3) return;
-
-            if (imageSyncTimeoutRef.current) clearTimeout(imageSyncTimeoutRef.current);
-            imageSyncTimeoutRef.current = setTimeout(async () => {
-                try {
-                    const imageList = imageService.getReferencedImagesList();
-                    await handleImageSync(imageList); // This uses active service inside
-                } catch (error: any) {
-                    if (error.message && error.message.includes('/images')) {
-                        addToast('error', '图片同步失败：请在云端根目录下创建 "images" 文件夹');
-                    }
-                }
-            }, 3000);
-        };
-
+        
         window.addEventListener('imageListChanged', handleImageListChanged as EventListener);
-        window.addEventListener('imageDeleted', handleImageDeleted as EventListener);
-        window.addEventListener('imageUploaded', handleImageUploaded as EventListener);
-
+        
         return () => {
             window.removeEventListener('imageListChanged', handleImageListChanged as EventListener);
-            window.removeEventListener('imageDeleted', handleImageDeleted as EventListener);
-            window.removeEventListener('imageUploaded', handleImageUploaded as EventListener);
-            if (imageSyncTimeoutRef.current) clearTimeout(imageSyncTimeoutRef.current);
+            if (timer) clearTimeout(timer);
         };
-    }, []);
+    }, [manualSyncMode]);
 
-    // 4. App LifeCycle Auto Sync (Resume & Hide)
+    // 3. App LifeCycle Auto Sync (Resume)
     useEffect(() => {
         // A. Resume (Foreground) -> Check for Cloud Updates
         let appListener: any;
         const setupListener = async () => {
             appListener = await App.addListener('appStateChange', async (state) => {
                 // On native platforms, use App state
-                // On web, visibilitychange handles this
                 if (state.isActive && Capacitor.isNativePlatform()) {
                     // 如果开启了手动同步模式，跳过恢复同步
                     if (!manualSyncMode) {
@@ -805,54 +674,10 @@ export const useSyncManager = () => {
         };
         setupListener();
 
-        // B. Hide (Background) -> Upload Local Changes (Smart Sync)
+        // B. Web Visibility API - Resume
         const handleVisibilityChange = () => {
-            // Web Visibility API
-            if (document.visibilityState === 'hidden') {
-                // 如果开启了手动同步模式，跳过后台上传
-                if (manualSyncMode) {
-                    return;
-                }
-                
-                const webdavConfig = webdavService.getConfig();
-                const s3Config = s3Service.getConfig();
-                
-                // 检查手动断开标志
-                const webdavManualDisconnect = localStorage.getItem('lumos_webdav_manual_disconnect') === 'true';
-                const s3ManualDisconnect = localStorage.getItem('lumos_s3_manual_disconnect') === 'true';
-                
-                const hasWebdav = webdavConfig && !webdavManualDisconnect;
-                const hasS3 = s3Config && !s3ManualDisconnect;
-
-                if (hasWebdav || hasS3) {
-                    const activeService = hasS3 ? s3Service : webdavService;
-                    const localData = getFullLocalData(); // Includes current localData.timestamp
-
-                    // Smart Sync: Only upload if local data is NEWER than the last synced version
-                    // Note: dataLastModified tracks the timestamp of the last successful sync/save
-                    // localData.timestamp tracks the time of the last local edit
-                    console.log(`[Sync] Background triggered. Local: ${localData.timestamp}, LastSynced: ${dataLastModified}`);
-
-                    if (localData.timestamp > dataLastModified) {
-                        console.log('[Sync] New local changes detected. Uploading...');
-                        const dataToSync = {
-                            ...localData,
-                            timestamp: localData.timestamp // Ensure we upload the tracking timestamp
-                        };
-                        activeService.uploadData(dataToSync).then(() => {
-                            console.log('[Sync] Background upload success. Updating last modified.');
-                            // Update dataLastModified to match what we just uploaded
-                            // This prevents duplicate uploads next time if no changes occur
-                            setDataLastModified(localData.timestamp);
-                        }).catch(console.error);
-                    } else {
-                        console.log('[Sync] No new changes. Skipping background upload.');
-                    }
-                }
-            } else if (document.visibilityState === 'visible') {
+            if (document.visibilityState === 'visible') {
                 // On Web, switching tabs back to visible should also check (similar to App Resume)
-                // But on Mobile, 'appStateChange' handles this better.
-                // We can leave this for Web or just let it be.
                 if (!Capacitor.isNativePlatform()) {
                     // 如果开启了手动同步模式，跳过恢复同步
                     if (!manualSyncMode) {
@@ -868,14 +693,13 @@ export const useSyncManager = () => {
             if (appListener) appListener.remove();
             document.removeEventListener('visibilitychange', handleVisibilityChange);
         };
-    }, [logs, todos, categories, todoCategories, scopes, goals, autoLinkRules, reviewTemplates, checkTemplates, dailyReviews, weeklyReviews, monthlyReviews, customNarrativeTemplates, userPersonalInfo, dataLastModified, manualSyncMode]); // 添加 manualSyncMode 依赖
+    }, [manualSyncMode]); // 只依赖 manualSyncMode
 
     return {
         isSyncing,
         refreshKey,
         setRefreshKey,
         handleQuickSync,
-        handleImageSync,
         handleSyncDataUpdate,
         isSyncDirectionModalOpen,
         setIsSyncDirectionModalOpen,

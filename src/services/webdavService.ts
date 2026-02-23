@@ -557,11 +557,50 @@ export class WebDAVService {
     }
 
     async downloadImage(filename: string): Promise<ArrayBuffer> {
-        if (!this.client) throw new Error('WebDAV not configured');
+        if (!this.config && !this.client) throw new Error('WebDAV not configured');
 
-        // 只从 /images/ 目录下载，不再fallback到根目录
         const path = `/images/${filename}`;
 
+        // NATIVE: Use Cordova HTTP plugin to avoid CORS issues
+        if (Capacitor.isNativePlatform() && this.config) {
+            try {
+                const url = this.config.url.endsWith('/') 
+                    ? `${this.config.url}images/${filename}` 
+                    : `${this.config.url}/images/${filename}`;
+                
+                console.log(`[WebDAV] 移动端下载图片: ${url}`);
+                
+                const auth = Buffer.from(`${this.config.username}:${this.config.password}`).toString('base64');
+                
+                // Use Cordova HTTP to download as ArrayBuffer
+                const response = await HTTP.sendRequest(url, {
+                    method: 'get',
+                    responseType: 'arraybuffer',
+                    headers: {
+                        'Authorization': `Basic ${auth}`
+                    },
+                    timeout: 30000
+                });
+
+                console.log(`[WebDAV] ✓ 移动端图片下载成功: ${filename}, status: ${response.status}`);
+                
+                // response.data is already an ArrayBuffer when responseType is 'arraybuffer'
+                return response.data as ArrayBuffer;
+                
+            } catch (error: any) {
+                console.error(`[WebDAV] 移动端下载失败: ${filename}`, error);
+                
+                if (error?.status === 404) {
+                    throw new Error(`图片不存在: ${filename}。请确保图片已上传到 /images/ 目录。`);
+                }
+                
+                throw new Error(`图片下载失败: ${filename} - ${error?.message || error?.error || 'Unknown error'}`);
+            }
+        }
+
+        // WEB/ELECTRON: Use webdav client
+        if (!this.client) throw new Error('WebDAV not configured');
+        
         try {
             console.log(`[WebDAV] 尝试从路径下载: ${path}`);
             const buffer = await this.client.getFileContents(path, { format: 'binary' });

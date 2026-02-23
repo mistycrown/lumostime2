@@ -3,7 +3,7 @@
  * @description S3 (腾讯云 COS) 云同步配置页面
  */
 import React, { useState, useEffect } from 'react';
-import { ChevronLeft, Cloud, User, Globe, Database, Server, Save, RefreshCw, Upload, Download, CheckCircle2, LogOut, Trash2 } from 'lucide-react';
+import { ChevronLeft, Cloud, User, Globe, Database, Server, Save, RefreshCw, Upload, Download, CheckCircle2, LogOut, Trash2, Eye, EyeOff } from 'lucide-react';
 import { s3Service, S3Config } from '../../services/s3Service';
 import { ToastType } from '../../components/Toast';
 
@@ -26,6 +26,7 @@ export const S3SyncSettingsView: React.FC<S3SyncSettingsViewProps> = ({
 }) => {
     const [s3ConfigForm, setS3ConfigForm] = useState<S3Config>({ bucketName: '', region: '', secretId: '', secretKey: '', endpoint: '' });
     const [isSyncing, setIsSyncing] = useState(false);
+    const [showPassword, setShowPassword] = useState(false);
 
     useEffect(() => {
         const loadS3Config = () => {
@@ -247,12 +248,20 @@ export const S3SyncSettingsView: React.FC<S3SyncSettingsViewProps> = ({
                                     <div className="flex items-center gap-2 bg-stone-50 px-3 py-2 rounded-xl mt-1 focus-within:ring-2 focus-within:ring-stone-200 transition-all">
                                         <div className="w-[18px] flex justify-center"><Server size={14} className="text-stone-400" /></div>
                                         <input
-                                            type="password"
+                                            type={showPassword ? "text" : "password"}
                                             placeholder="请输入 SecretKey"
                                             className="flex-1 bg-transparent border-none outline-none text-stone-700 placeholder:text-stone-300 text-sm"
                                             value={s3ConfigForm.secretKey}
                                             onChange={e => setS3ConfigForm(prev => ({ ...prev, secretKey: e.target.value }))}
                                         />
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowPassword(!showPassword)}
+                                            className="text-stone-400 hover:text-stone-600 transition-colors p-1"
+                                            aria-label={showPassword ? "Hide password" : "Show password"}
+                                        >
+                                            {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                                        </button>
                                     </div>
                                     {s3ConfigForm.secretId && s3ConfigForm.secretKey &&
                                         s3ConfigForm.secretId === s3ConfigForm.secretKey && (
