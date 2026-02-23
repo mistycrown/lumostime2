@@ -73,9 +73,6 @@ export const useSyncManager = () => {
             if (data.userPersonalInfo) setUserPersonalInfo(data.userPersonalInfo);
             if (data.filters) setFilters(data.filters);
 
-            // 注意：不在这里更新时间戳
-            // 时间戳应该由调用者根据具体情况决定如何更新
-
             await new Promise(resolve => setTimeout(resolve, 10));
 
             // console.log('[App] 同步数据更新完成');
@@ -85,7 +82,6 @@ export const useSyncManager = () => {
         } finally {
             isRestoring.current = false;
             // Delay re-enabling timestamp updates to ensure all state effects have processed
-            // 返回一个 Promise，让调用者知道何时可以安全地更新时间戳
             await new Promise(resolve => setTimeout(resolve, 500));
             disableTimestampUpdateRef.current = false;
             console.log(`[Sync] Unlocked timestamp updates`);
@@ -279,9 +275,11 @@ export const useSyncManager = () => {
                         // 等待数据更新完成（包括 500ms 的解锁延迟）
                         await handleSyncDataUpdate(result.data);
                         
-                        // 数据更新完成后，再更新时间戳
-                        // 注意：不在这里更新时间戳
-                        // 时间戳会在步骤 6 统一更新
+                        // 数据更新完成后，立即更新时间戳（在 localStorage 中）
+                        // 这样可以确保 localStorage 中的数据和时间戳保持一致
+                        const now = Date.now();
+                        localStorage.setItem('lumostime_local_timestamp', now.toString());
+                        console.log(`[Sync] 数据恢复完成，立即更新 localStorage 时间戳: ${now}`);
                         
                         if (mode === 'startup') updateLastSyncTime();
                         dataSyncStatus = 'restored';
@@ -359,16 +357,20 @@ export const useSyncManager = () => {
             }
 
             // 6. 统一更新时间戳（在所有同步工作完成后）
-            if (dataSyncStatus === 'restored' || dataSyncStatus === 'uploaded') {
-                // 同步成功后，使用当前时间作为本地时间戳
-                // 这样可以：
-                // 1. 避免重复同步（本地时间戳已更新）
-                // 2. 保留本地后续修改的能力（新修改会有更新的时间戳）
+            if (dataSyncStatus === 'uploaded') {
+                // 上传成功后，使用当前时间作为本地时间戳
                 const now = Date.now();
-                setLocalDataTimestamp(now);
                 localStorage.setItem('lumostime_local_timestamp', now.toString());
-                console.log(`[Sync] 同步完成，本地时间戳已更新: ${now} (${new Date(now).toLocaleString()})`);
-                console.log(`[Sync] 同步类型: ${dataSyncStatus === 'restored' ? '下载' : '上传'}`);
+                setLocalDataTimestamp(now);
+                console.log(`[Sync] 上传完成，本地时间戳已更新: ${now} (${new Date(now).toLocaleString()})`);
+            } else if (dataSyncStatus === 'restored') {
+                // 下载成功后，时间戳已经在 handleSyncDataUpdate 后立即更新了
+                // 这里只需要更新 React state（确保 UI 同步）
+                const storedTimestamp = localStorage.getItem('lumostime_local_timestamp');
+                if (storedTimestamp) {
+                    setLocalDataTimestamp(parseInt(storedTimestamp));
+                    console.log(`[Sync] 下载完成，同步 React state 时间戳: ${storedTimestamp}`);
+                }
             }
 
             if ((currentView === AppView.TIMELINE) || (mode === 'startup' && dataSyncStatus === 'restored')) {
@@ -557,11 +559,13 @@ export const useSyncManager = () => {
                 // 等待数据更新完成（包括 500ms 的解锁延迟）
                 await handleSyncDataUpdate(result.data);
                 
-                // 数据更新完成后，更新时间戳
+                // 数据更新完成后，立即更新时间戳（在 localStorage 中）
                 const now = Date.now();
-                setLocalDataTimestamp(now);
                 localStorage.setItem('lumostime_local_timestamp', now.toString());
-                console.log(`[Sync] 手动下载完成，本地时间戳已更新: ${now}`);
+                console.log(`[Sync] 手动下载完成，立即更新 localStorage 时间戳: ${now}`);
+                
+                // 然后更新 React state（会在下次渲染时生效）
+                setLocalDataTimestamp(now);
                 
                 addToast('success', result.message);
                 

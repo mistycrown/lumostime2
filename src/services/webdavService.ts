@@ -10,7 +10,7 @@
 import { createClient, WebDAVClient } from 'webdav';
 import { HTTP } from '@awesome-cordova-plugins/http';
 import { Capacitor } from '@capacitor/core';
-import { Filesystem, Directory } from '@capacitor/filesystem';
+import { Filesystem, Directory, Encoding } from '@capacitor/filesystem';
 import { Buffer } from 'buffer';
 
 // Ensure Buffer is available globally for webdav lib
@@ -248,8 +248,16 @@ export class WebDAVService {
     async statFile(filename: string = 'lumostime_backup.json'): Promise<Date | null> {
         if (!this.client) return null;
         try {
-            // @ts-ignore
-            const stat = await this.client.stat(`/${filename}`) as any;
+            // Add cache-busting to force fresh stat
+            const cacheBuster = `?_=${Date.now()}`;
+            // @ts-ignore - stat method may not have proper types for headers
+            const stat = await this.client.stat(`/${filename}${cacheBuster}`, {
+                headers: {
+                    'Cache-Control': 'no-cache, no-store, must-revalidate',
+                    'Pragma': 'no-cache',
+                    'Expires': '0'
+                }
+            }) as any;
             if (stat && stat.lastmod) {
                 return new Date(stat.lastmod);
             }
@@ -449,31 +457,65 @@ export class WebDAVService {
     async downloadData(filename: string = 'lumostime_backup.json'): Promise<any> {
         if (!this.config && !this.client) throw new Error('WebDAV not configured');
 
-        // NATIVE: Use native HTTP plugin directly (webdav client has CORS issues on mobile)
+        // NATIVE: Use Filesystem.downloadFile for better performance
+        // This avoids passing large JSON through WebView bridge
         if (Capacitor.isNativePlatform() && this.config) {
             try {
                 const url = this.config.url.endsWith('/') ? `${this.config.url}${filename}` : `${this.config.url}/${filename}`;
                 const auth = Buffer.from(`${this.config.username}:${this.config.password}`).toString('base64');
                 
-                const response = await HTTP.sendRequest(url, {
-                    method: 'get',
-                    headers: { 
-                        'Authorization': `Basic ${auth}` 
-                    },
-                    timeout: 30000
+                console.log(`[WebDAV] 移动端下载数据（原生方式）: ${filename}`);
+                
+                // Download directly to filesystem
+                await Filesystem.downloadFile({
+                    path: `temp/${filename}`,
+                    url: url,
+                    directory: Directory.Data,
+                    headers: {
+                        'Authorization': `Basic ${auth}`
+                    }
                 });
                 
-                const content = typeof response.data === 'string' ? response.data : JSON.stringify(response.data);
-                return JSON.parse(content);
+                console.log(`[WebDAV] ✓ 数据文件下载完成，正在读取...`);
+                
+                // Read the downloaded file
+                const result = await Filesystem.readFile({
+                    path: `temp/${filename}`,
+                    directory: Directory.Data,
+                    encoding: Encoding.UTF8
+                });
+                
+                // Clean up temp file
+                try {
+                    await Filesystem.deleteFile({
+                        path: `temp/${filename}`,
+                        directory: Directory.Data
+                    });
+                } catch (e) {
+                    // Ignore cleanup errors
+                }
+                
+                console.log(`[WebDAV] ✓ 数据解析完成`);
+                return JSON.parse(result.data as string);
+                
             } catch (error: any) {
                 console.error('WebDAV Download Error (Native):', error);
                 throw error;
             }
         }
 
-        // Browser/Electron: Use webdav client
+        // Browser/Electron: Use webdav client with cache control
         try {
-            const content = await this.client!.getFileContents(`/${filename}`, { format: 'text' });
+            // Add cache-busting query parameter and headers to force fresh download
+            const cacheBuster = `?_=${Date.now()}`;
+            const content = await this.client!.getFileContents(`/${filename}${cacheBuster}`, { 
+                format: 'text',
+                headers: {
+                    'Cache-Control': 'no-cache, no-store, must-revalidate',
+                    'Pragma': 'no-cache',
+                    'Expires': '0'
+                }
+            });
             return JSON.parse(content as string);
         } catch (error) {
             console.error('WebDAV Download Error:', error);
@@ -601,12 +643,21 @@ export class WebDAVService {
             }
         }
 
-        // WEB/ELECTRON: Use webdav client
+        // WEB/ELECTRON: Use webdav client with cache control
         if (!this.client) throw new Error('WebDAV not configured');
         
         try {
             console.log(`[WebDAV] 尝试从路径下载: ${path}`);
-            const buffer = await this.client.getFileContents(path, { format: 'binary' });
+            // Add cache-busting to force fresh download
+            const cacheBuster = `?_=${Date.now()}`;
+            const buffer = await this.client.getFileContents(`${path}${cacheBuster}`, { 
+                format: 'binary',
+                headers: {
+                    'Cache-Control': 'no-cache, no-store, must-revalidate',
+                    'Pragma': 'no-cache',
+                    'Expires': '0'
+                }
+            });
             console.log(`[WebDAV] ✓ 图片下载成功: ${filename} from ${path}`);
             return buffer as ArrayBuffer;
         } catch (error: any) {
@@ -679,24 +730,53 @@ export class WebDAVService {
         const filename = 'lumostime_images.json';
 
         try {
-            // NATIVE: Use native HTTP on mobile
+            // NATIVE: Use Filesystem.downloadFile for better performance
             if (Capacitor.isNativePlatform() && this.config) {
                 const url = this.config.url.endsWith('/') ? `${this.config.url}${filename}` : `${this.config.url}/${filename}`;
                 const auth = Buffer.from(`${this.config.username}:${this.config.password}`).toString('base64');
                 
-                const response = await HTTP.sendRequest(url, {
-                    method: 'get',
-                    headers: { 'Authorization': `Basic ${auth}` },
-                    timeout: 30000
+                // Download directly to filesystem
+                await Filesystem.downloadFile({
+                    path: `temp/${filename}`,
+                    url: url,
+                    directory: Directory.Data,
+                    headers: {
+                        'Authorization': `Basic ${auth}`
+                    }
                 });
-                const content = typeof response.data === 'string' ? response.data : JSON.stringify(response.data);
-                const data = JSON.parse(content);
+                
+                // Read the downloaded file
+                const result = await Filesystem.readFile({
+                    path: `temp/${filename}`,
+                    directory: Directory.Data,
+                    encoding: Encoding.UTF8
+                });
+                
+                // Clean up temp file
+                try {
+                    await Filesystem.deleteFile({
+                        path: `temp/${filename}`,
+                        directory: Directory.Data
+                    });
+                } catch (e) {
+                    // Ignore cleanup errors
+                }
+                
+                const data = JSON.parse(result.data as string);
                 console.log(`[WebDAV] ✓ 图片列表下载成功: ${data.images?.length || 0} 个图片, 时间戳: ${new Date(data.timestamp).toLocaleString()}`);
                 return data;
             }
 
-            // Browser/Electron fallback
-            const content = await this.client!.getFileContents(`/${filename}`, { format: 'text' });
+            // Browser/Electron fallback with cache control
+            const cacheBuster = `?_=${Date.now()}`;
+            const content = await this.client!.getFileContents(`/${filename}${cacheBuster}`, { 
+                format: 'text',
+                headers: {
+                    'Cache-Control': 'no-cache, no-store, must-revalidate',
+                    'Pragma': 'no-cache',
+                    'Expires': '0'
+                }
+            });
             const data = JSON.parse(content as string);
             console.log(`[WebDAV] ✓ 图片列表下载成功: ${data.images?.length || 0} 个图片, 时间戳: ${new Date(data.timestamp).toLocaleString()}`);
             return data;

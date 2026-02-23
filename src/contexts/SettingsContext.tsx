@@ -220,7 +220,7 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
     // 手动同步模式
     const [manualSyncMode, setManualSyncMode] = useState<boolean>(() => {
         const stored = localStorage.getItem('lumostime_manual_sync_mode');
-        return stored === 'true'; // 默认为 false（自动同步）
+        return stored ? stored === 'true' : true; // 默认为 true（手动同步）
     });
 
     const updateLastSyncTime = () => {
