@@ -252,6 +252,16 @@ export const CloudSyncSettingsView: React.FC<CloudSyncSettingsViewProps> = ({
                         </div>
                     )}
                 </div>
+
+                {/* 提示信息框 */}
+                <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4">
+                    <div className="text-sm text-amber-800 space-y-1.5">
+                        <p className="font-medium">使用建议：</p>
+                        <p>1. S3 对象存储会比 WebDAV 同步速度快</p>
+                        <p>2. 自动同步还不是很稳定，建议使用手动同步</p>
+                        <p>3. 上传之后不能马上下载，需要等一会儿</p>
+                    </div>
+                </div>
             </div>
         </div>
     );
