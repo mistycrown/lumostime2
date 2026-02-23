@@ -1,9 +1,9 @@
 /**
  * @file useLogManager.ts
- * @input DataContext (logs, setLogs, setTodos), NavigationContext (modal states, currentDate), CategoryScopeContext (categories), ToastContext (addToast), SettingsContext (updateDataLastModified)
+ * @input DataContext (logs, setLogs, setTodos), NavigationContext (modal states, currentDate), CategoryScopeContext (categories), ToastContext (addToast)
  * @output Log CRUD Operations (handleSaveLog, handleDeleteLog, handleQuickPunch, handleBatchAddLogs), Modal Control (openAddModal, openEditModal, closeModal), Image Management (handleLogImageRemove)
  * @pos Hook (Data Manager)
- * @description 日志数据管理 Hook - 处理日志的增删改查、快速打点、批量添加、图片管理等操作
+ * @description 日志数据管理 Hook - 处理日志的增删改查、快速打点、批量添加、图片管理等操作。时间戳由 DataContext 自动管理。
  * 
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
@@ -26,7 +26,7 @@ export const useLogManager = () => {
     } = useNavigation();
     const { categories } = useCategoryScope();
     const { addToast } = useToast();
-    const { updateDataLastModified } = useSettings();
+    // Note: updateDataLastModified removed - DataContext automatically tracks changes
 
     // Helper to close modal (local needed if we want to bundle actions)
     const closeModal = () => {
@@ -74,7 +74,7 @@ export const useLogManager = () => {
             }
             return [log, ...prev];
         });
-        updateDataLastModified();
+        // Timestamp automatically updated by DataContext
         closeModal();
     };
 
@@ -100,7 +100,7 @@ export const useLogManager = () => {
         }
 
         setLogs(prev => prev.filter(l => l.id !== id));
-        updateDataLastModified();
+        // Timestamp automatically updated by DataContext
         if (shouldCloseModal) closeModal();
     };
 
@@ -153,7 +153,7 @@ export const useLogManager = () => {
         };
 
         setLogs(prev => [newLog, ...prev]);
-        updateDataLastModified();
+        // Timestamp automatically updated by DataContext
         addToast('success', 'Quick Punch Recorded!');
     };
 
@@ -184,7 +184,7 @@ export const useLogManager = () => {
         });
 
         setLogs(prev => [...newLogs, ...prev]);
-        updateDataLastModified();
+        // Timestamp automatically updated by DataContext
         addToast('success', `Successfully backfilled ${newLogs.length} logs!`);
     };
 
@@ -241,7 +241,7 @@ export const useLogManager = () => {
                 ? { ...log, images: log.images.filter(img => img !== filename) }
                 : log
         ));
-        updateDataLastModified();
+        // Timestamp automatically updated by DataContext
     };
 
     return {

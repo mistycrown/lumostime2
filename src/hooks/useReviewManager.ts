@@ -1,9 +1,9 @@
 /**
  * @file useReviewManager.ts
- * @input DataContext (dailyReviews, weeklyReviews, monthlyReviews, reviewTemplates, checkTemplates), ReviewContext (review data setters), NavigationContext (review modal states, currentDate), CategoryScopeContext (scopes), SettingsContext (userPersonalInfo, updateDataLastModified), ToastContext (addToast)
+ * @input DataContext (dailyReviews, weeklyReviews, monthlyReviews, reviewTemplates, checkTemplates), ReviewContext (review data setters), NavigationContext (review modal states, currentDate), CategoryScopeContext (scopes), SettingsContext (userPersonalInfo), ToastContext (addToast)
  * @output Review CRUD Operations (handleOpenDailyReview, handleUpdateReview, handleDeleteReview, handleOpenWeeklyReview, handleUpdateWeeklyReview, handleDeleteWeeklyReview, handleOpenMonthlyReview, handleUpdateMonthlyReview, handleDeleteMonthlyReview), Narrative Generation (handleGenerateNarrative, handleGenerateWeeklyNarrative, handleGenerateMonthlyNarrative), Modal Control (handleCloseWeeklyReview, handleCloseMonthlyReview)
  * @pos Hook (Data Manager)
- * @description 复盘数据管理 Hook - 处理日报、周报、月报的增删改查、AI 叙事生成等操作
+ * @description 复盘数据管理 Hook - 处理日报、周报、月报的增删改查、AI 叙事生成等操作。时间戳由 DataContext 自动管理。
  * 
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
@@ -33,7 +33,8 @@ export const useReviewManager = () => {
         currentDate
     } = useNavigation();
     const { scopes } = useCategoryScope();
-    const { userPersonalInfo, updateDataLastModified } = useSettings();
+    const { userPersonalInfo } = useSettings();
+    // Note: updateDataLastModified removed - DataContext automatically tracks changes
     const { addToast } = useToast();
 
     // --- Daily Review Handlers ---
@@ -97,7 +98,7 @@ export const useReviewManager = () => {
 
         setCurrentReviewDate(dateToUse);
         setIsDailyReviewOpen(true);
-        updateDataLastModified();
+        // Timestamp automatically updated by DataContext
     };
 
     // 后台创建日课（不打开视图）- 用于自动生成
@@ -163,7 +164,7 @@ export const useReviewManager = () => {
                 templateSnapshot
             };
             setDailyReviews(prev => [...prev, review!]);
-            updateDataLastModified();
+            // Timestamp automatically updated by DataContext
             console.log('[AutoGenerate] 已在后台创建每日回顾');
             
             // 返回新创建的 review
@@ -173,7 +174,7 @@ export const useReviewManager = () => {
 
     const handleUpdateReview = (updatedReview: DailyReview) => {
         setDailyReviews(prev => prev.map(r => r.id === updatedReview.id ? updatedReview : r));
-        updateDataLastModified();
+        // Timestamp automatically updated by DataContext
     };
 
     const handleDeleteReview = () => {
@@ -182,7 +183,7 @@ export const useReviewManager = () => {
         setDailyReviews(prev => prev.filter(r => r.date !== dateStr));
         setIsDailyReviewOpen(false);
         setCurrentReviewDate(null);
-        updateDataLastModified();
+        // Timestamp automatically updated by DataContext
     };
 
     const handleGenerateNarrative = async (review: DailyReview, statsText: string, timelineText: string, promptTemplate?: string): Promise<string> => {
@@ -223,7 +224,7 @@ export const useReviewManager = () => {
         setCurrentWeeklyReviewStart(weekStart);
         setCurrentWeeklyReviewEnd(weekEnd);
         setIsWeeklyReviewOpen(true);
-        updateDataLastModified();
+        // Timestamp automatically updated by DataContext
     };
 
     const handleCloseWeeklyReview = () => {
@@ -234,7 +235,7 @@ export const useReviewManager = () => {
 
     const handleUpdateWeeklyReview = (updatedReview: WeeklyReview) => {
         setWeeklyReviews(prev => prev.map(r => r.id === updatedReview.id ? updatedReview : r));
-        updateDataLastModified();
+        // Timestamp automatically updated by DataContext
     };
 
     const handleDeleteWeeklyReview = () => {
@@ -243,7 +244,7 @@ export const useReviewManager = () => {
         const weekEndStr = getLocalDateStr(currentWeeklyReviewEnd);
         setWeeklyReviews(prev => prev.filter(r => !(r.weekStartDate === weekStartStr && r.weekEndDate === weekEndStr)));
         handleCloseWeeklyReview();
-        updateDataLastModified();
+        // Timestamp automatically updated by DataContext
         addToast('success', '周报已删除');
     };
 
@@ -285,7 +286,7 @@ export const useReviewManager = () => {
         setCurrentMonthlyReviewStart(monthStart);
         setCurrentMonthlyReviewEnd(monthEnd);
         setIsMonthlyReviewOpen(true);
-        updateDataLastModified();
+        // Timestamp automatically updated by DataContext
     };
 
     const handleCloseMonthlyReview = () => {
@@ -296,7 +297,7 @@ export const useReviewManager = () => {
 
     const handleUpdateMonthlyReview = (updatedReview: MonthlyReview) => {
         setMonthlyReviews(prev => prev.map(r => r.id === updatedReview.id ? updatedReview : r));
-        updateDataLastModified();
+        // Timestamp automatically updated by DataContext
     };
 
     const handleDeleteMonthlyReview = () => {
@@ -305,7 +306,7 @@ export const useReviewManager = () => {
         const monthEndStr = getLocalDateStr(currentMonthlyReviewEnd);
         setMonthlyReviews(prev => prev.filter(r => !(r.monthStartDate === monthStartStr && r.monthEndDate === monthEndStr)));
         handleCloseMonthlyReview();
-        updateDataLastModified();
+        // Timestamp automatically updated by DataContext
         addToast('success', '月报已删除');
     };
 

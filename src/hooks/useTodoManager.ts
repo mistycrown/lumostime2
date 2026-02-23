@@ -1,9 +1,9 @@
 /**
  * @file useTodoManager.ts
- * @input DataContext (todos, setTodos, todoCategories, setTodoCategories, logs, setLogs), NavigationContext (modal states), CategoryScopeContext (categories), ToastContext (addToast), SessionContext (startActivity), SettingsContext (autoLinkRules, updateDataLastModified)
+ * @input DataContext (todos, setTodos, todoCategories, setTodoCategories, logs, setLogs), NavigationContext (modal states), CategoryScopeContext (categories), ToastContext (addToast), SessionContext (startActivity), SettingsContext (autoLinkRules)
  * @output Todo CRUD Operations (handleSaveTodo, handleDeleteTodo, handleToggleTodo, handleDuplicateTodo, handleBatchAddTodos), Modal Control (openAddTodoModal, openEditTodoModal, closeTodoModal), Focus Management (handleStartTodoFocus), Progress Update (updateTodoProgress)
  * @pos Hook (Data Manager)
- * @description 待办事项数据管理 Hook - 处理待办的增删改查、完成状态切换、专注模式启动、批量操作等
+ * @description 待办事项数据管理 Hook - 处理待办的增删改查、完成状态切换、专注模式启动、批量操作等。时间戳由 DataContext 自动管理。
  * 
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
@@ -28,7 +28,8 @@ export const useTodoManager = () => {
     } = useNavigation();
     const { addToast } = useToast();
     const { startActivity } = useSession();
-    const { autoLinkRules, updateDataLastModified } = useSettings();
+    const { autoLinkRules } = useSettings();
+    // Note: updateDataLastModified removed - DataContext automatically tracks changes
 
     const [isDeleteTodoConfirmOpen, setIsDeleteTodoConfirmOpen] = useState(false);
     const [todoToDeleteId, setTodoToDeleteId] = useState<string | null>(null);
@@ -86,7 +87,7 @@ export const useTodoManager = () => {
             }
             return [todo, ...prev];
         });
-        updateDataLastModified();
+        // Timestamp automatically updated by DataContext
     };
 
     const handleDeleteTodo = (id: string) => {
@@ -115,7 +116,7 @@ export const useTodoManager = () => {
         setTodoToDeleteId(null);
         setIsDeleteTodoConfirmOpen(false);
         closeTodoModal();
-        updateDataLastModified();
+        // Timestamp automatically updated by DataContext
         addToast('success', 'Task deleted (history preserved)');
     };
 
@@ -123,7 +124,7 @@ export const useTodoManager = () => {
         setTodoCategories(newCategories);
         setTodos(newTodos);
         setIsTodoManaging(false);
-        updateDataLastModified();
+        // Timestamp automatically updated by DataContext
     };
 
     const handleDuplicateTodo = (todo: TodoItem) => {
@@ -135,7 +136,7 @@ export const useTodoManager = () => {
             completedUnits: 0,
         };
         setTodos(prev => [newTodo, ...prev]);
-        updateDataLastModified();
+        // Timestamp automatically updated by DataContext
         addToast('success', 'Task duplicated');
     };
 
@@ -154,7 +155,7 @@ export const useTodoManager = () => {
         } as TodoItem));
 
         setTodos(prev => [...newTodos, ...prev]);
-        updateDataLastModified();
+        // Timestamp automatically updated by DataContext
         addToast('success', `${newTodos.length} tasks added`);
     };
 

@@ -432,9 +432,13 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
             dataLastModified,
             setDataLastModified,
             updateDataLastModified: () => {
-                const now = Date.now();
-                setDataLastModified(now);
-                localStorage.setItem('lumos_data_last_modified', now.toString());
+                // 只在未被锁定时更新时间戳
+                // 避免在数据恢复期间更新
+                if (!isRestoring.current) {
+                    const now = Date.now();
+                    setDataLastModified(now);
+                    // localStorage 会由 useEffect 自动同步，无需手动设置
+                }
             },
             isRestoring,
             isSyncing,

@@ -561,36 +561,39 @@ export class WebDAVService {
 
         const path = `/images/${filename}`;
 
-        // NATIVE: Use Cordova HTTP plugin to avoid CORS issues
+        // NATIVE: Use Capacitor Filesystem.downloadFile for better performance
+        // This downloads directly to the filesystem without going through WebView
         if (Capacitor.isNativePlatform() && this.config) {
             try {
                 const url = this.config.url.endsWith('/') 
                     ? `${this.config.url}images/${filename}` 
                     : `${this.config.url}/images/${filename}`;
                 
-                console.log(`[WebDAV] 移动端下载图片: ${url}`);
+                console.log(`[WebDAV] 移动端下载图片（原生方式）: ${url}`);
                 
                 const auth = Buffer.from(`${this.config.username}:${this.config.password}`).toString('base64');
                 
-                // Use Cordova HTTP to download as ArrayBuffer
-                const response = await HTTP.sendRequest(url, {
-                    method: 'get',
-                    responseType: 'arraybuffer',
+                // Use Capacitor Filesystem.downloadFile - downloads directly to filesystem
+                // This is much faster than HTTP.sendRequest with arraybuffer
+                await Filesystem.downloadFile({
+                    path: `images/${filename}`,
+                    url: url,
+                    directory: Directory.Data,
                     headers: {
                         'Authorization': `Basic ${auth}`
-                    },
-                    timeout: 30000
+                    }
                 });
 
-                console.log(`[WebDAV] ✓ 移动端图片下载成功: ${filename}, status: ${response.status}`);
+                console.log(`[WebDAV] ✓ 移动端图片下载成功（原生）: ${filename}`);
                 
-                // response.data is already an ArrayBuffer when responseType is 'arraybuffer'
-                return response.data as ArrayBuffer;
+                // Return empty ArrayBuffer as a placeholder
+                // The file is already saved to the filesystem by downloadFile
+                return new ArrayBuffer(0);
                 
             } catch (error: any) {
                 console.error(`[WebDAV] 移动端下载失败: ${filename}`, error);
                 
-                if (error?.status === 404) {
+                if (error?.message?.includes('404') || error?.message?.includes('Not Found')) {
                     throw new Error(`图片不存在: ${filename}。请确保图片已上传到 /images/ 目录。`);
                 }
                 

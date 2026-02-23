@@ -6,11 +6,16 @@
  * @description 同步服务 - 处理本地和云端图片的单向同步，支持 WebDAV 和 S3/COS 存储
  * 
  * 核心功能：
- * - 图片上传同步（uploadImages）
- * - 图片下载同步（downloadImages）
+ * - 图片上传同步（uploadImages）- 并行上传 3 张图片
+ * - 图片下载同步（downloadImages）- 并行下载 3 张图片
  * - 删除操作同步
  * - 引用列表管理
  * - 存储服务抽象层
+ * 
+ * 性能优化：
+ * - 使用并行上传/下载，显著提升同步速度
+ * - 批量处理，每批 3 个并发请求
+ * - 实时进度反馈
  * 
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
@@ -163,19 +168,39 @@ export const syncService = {
                 console.log(`[Sync] 需要上传: ${toUpload.length} 个图片`);
             }
 
-            // 6. 执行上传
-            for (const filename of toUpload) {
-                if (onProgress) onProgress(`正在上传: ${filename}...`);
-                console.log(`[Sync] 上传: ${filename}`);
-                try {
-                    const data = await imageService.readImage(filename);
-                    await storageService.uploadImage(filename, data as any);
-                    result.uploaded++;
-                    console.log(`[Sync] ✓ 上传完成: ${filename}`);
-                } catch (err: any) {
-                    console.error(`[Sync] ✗ 上传失败: ${filename}`, err);
-                    result.errors.push(`Upload failed: ${filename} - ${err.message}`);
+            // 6. 执行并行上传（提高速度）
+            const CONCURRENT_UPLOADS = 3; // 同时上传 3 张图片
+            const uploadPromises: Promise<void>[] = [];
+            
+            for (let i = 0; i < toUpload.length; i++) {
+                const filename = toUpload[i];
+                
+                const uploadTask = (async () => {
+                    if (onProgress) onProgress(`正在上传 (${i + 1}/${toUpload.length}): ${filename}...`);
+                    console.log(`[Sync] 上传 (${i + 1}/${toUpload.length}): ${filename}`);
+                    try {
+                        const data = await imageService.readImage(filename);
+                        await storageService.uploadImage(filename, data as any);
+                        result.uploaded++;
+                        console.log(`[Sync] ✓ 上传完成 (${result.uploaded}/${toUpload.length}): ${filename}`);
+                    } catch (err: any) {
+                        console.error(`[Sync] ✗ 上传失败: ${filename}`, err);
+                        result.errors.push(`Upload failed: ${filename} - ${err.message}`);
+                    }
+                })();
+                
+                uploadPromises.push(uploadTask);
+                
+                // 每 CONCURRENT_UPLOADS 个任务等待一次，避免同时发起太多请求
+                if (uploadPromises.length >= CONCURRENT_UPLOADS) {
+                    await Promise.all(uploadPromises);
+                    uploadPromises.length = 0; // 清空数组
                 }
+            }
+            
+            // 等待剩余的上传任务完成
+            if (uploadPromises.length > 0) {
+                await Promise.all(uploadPromises);
             }
 
             if (onProgress) onProgress('图片上传完成');
@@ -229,19 +254,45 @@ export const syncService = {
                 console.log(`[Sync] 需要下载: ${toDownload.length} 个图片`);
             }
 
-            // 3. 执行下载
-            for (const filename of toDownload) {
-                if (onProgress) onProgress(`正在下载: ${filename}...`);
-                console.log(`[Sync] 下载: ${filename}`);
-                try {
-                    const buffer = await storageService.downloadImage(filename);
-                    await imageService.writeImage(filename, buffer);
-                    result.downloaded++;
-                    console.log(`[Sync] ✓ 下载完成: ${filename}`);
-                } catch (err: any) {
-                    console.error(`[Sync] ✗ 下载失败: ${filename}`, err);
-                    result.errors.push(`Download failed: ${filename} - ${err.message}`);
+            // 3. 执行并行下载（提高速度）
+            const CONCURRENT_DOWNLOADS = 3; // 同时下载 3 张图片
+            const downloadPromises: Promise<void>[] = [];
+            
+            for (let i = 0; i < toDownload.length; i++) {
+                const filename = toDownload[i];
+                
+                const downloadTask = (async () => {
+                    if (onProgress) onProgress(`正在下载 (${i + 1}/${toDownload.length}): ${filename}...`);
+                    console.log(`[Sync] 下载 (${i + 1}/${toDownload.length}): ${filename}`);
+                    try {
+                        const buffer = await storageService.downloadImage(filename);
+                        // On native platforms with WebDAV, downloadImage uses Filesystem.downloadFile
+                        // which directly saves to filesystem, so buffer will be empty (0 bytes)
+                        if (buffer.byteLength > 0) {
+                            // Web/Electron or S3: need to write the buffer to filesystem
+                            await imageService.writeImage(filename, buffer);
+                        }
+                        // else: Native WebDAV already saved the file, skip writeImage
+                        result.downloaded++;
+                        console.log(`[Sync] ✓ 下载完成 (${result.downloaded}/${toDownload.length}): ${filename}`);
+                    } catch (err: any) {
+                        console.error(`[Sync] ✗ 下载失败: ${filename}`, err);
+                        result.errors.push(`Download failed: ${filename} - ${err.message}`);
+                    }
+                })();
+                
+                downloadPromises.push(downloadTask);
+                
+                // 每 CONCURRENT_DOWNLOADS 个任务等待一次，避免同时发起太多请求
+                if (downloadPromises.length >= CONCURRENT_DOWNLOADS) {
+                    await Promise.all(downloadPromises);
+                    downloadPromises.length = 0; // 清空数组
                 }
+            }
+            
+            // 等待剩余的下载任务完成
+            if (downloadPromises.length > 0) {
+                await Promise.all(downloadPromises);
             }
 
             if (onProgress) onProgress('图片下载完成');
