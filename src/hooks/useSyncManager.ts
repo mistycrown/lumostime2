@@ -20,6 +20,7 @@ import { webdavService } from '../services/webdavService';
 import { s3Service } from '../services/s3Service';
 import { imageService } from '../services/imageService';
 import { syncService } from '../services/syncService';
+import { uploadDataToCloud, downloadWithBackup, CloudService } from '../utils/syncUtils';
 import { AppView } from '../types';
 
 export const useSyncManager = () => {
@@ -179,13 +180,30 @@ export const useSyncManager = () => {
 
             const webdavConfig = webdavService.getConfig();
             const s3Config = s3Service.getConfig();
+            
+            // 检查手动断开标志
+            const webdavManualDisconnect = localStorage.getItem('lumos_webdav_manual_disconnect') === 'true';
+            const s3ManualDisconnect = localStorage.getItem('lumos_s3_manual_disconnect') === 'true';
 
-            if (!webdavConfig && !s3Config) {
+            // 过滤掉已手动断开的服务
+            const hasWebdav = webdavConfig && !webdavManualDisconnect;
+            const hasS3 = s3Config && !s3ManualDisconnect;
+
+            if (!hasWebdav && !hasS3) {
                 if (mode === 'manual') setIsSettingsOpen(true);
                 return;
             }
 
-            const activeService = s3Config ? s3Service : webdavService;
+            // 如果两个都连接了，提示用户只能选择一个
+            if (hasWebdav && hasS3) {
+                if (mode === 'manual') {
+                    addToast('error', '检测到同时连接了 WebDAV 和 S3，请在设置中断开其中一个');
+                    setIsSettingsOpen(true);
+                }
+                return;
+            }
+
+            const activeService = hasS3 ? s3Service : webdavService;
 
             // [Pre-check] Verify connection before attempting sync
             // This prevents infinite loops on Auth errors and avoids unnecessary retries when offline
@@ -460,7 +478,7 @@ export const useSyncManager = () => {
         await performSync('manual');
     };
     
-    // 手动上传到云端
+    // 手动上传到云端（完整流程：主数据 + 图片列表 JSON + 图片文件）
     const handleManualUpload = async () => {
         if (syncLock.current || isSyncing) {
             console.log('[Sync] Skipped manual upload: Already syncing.');
@@ -473,13 +491,29 @@ export const useSyncManager = () => {
         try {
             const webdavConfig = webdavService.getConfig();
             const s3Config = s3Service.getConfig();
+            
+            // 检查手动断开标志
+            const webdavManualDisconnect = localStorage.getItem('lumos_webdav_manual_disconnect') === 'true';
+            const s3ManualDisconnect = localStorage.getItem('lumos_s3_manual_disconnect') === 'true';
 
-            if (!webdavConfig && !s3Config) {
+            // 过滤掉已手动断开的服务
+            const hasWebdav = webdavConfig && !webdavManualDisconnect;
+            const hasS3 = s3Config && !s3ManualDisconnect;
+
+            if (!hasWebdav && !hasS3) {
+                addToast('error', '未连接任何云端服务');
                 setIsSettingsOpen(true);
                 return;
             }
 
-            const activeService = s3Config ? s3Service : webdavService;
+            // 如果两个都连接了，提示用户只能选择一个
+            if (hasWebdav && hasS3) {
+                addToast('error', '检测到同时连接了 WebDAV 和 S3，请在设置中断开其中一个');
+                setIsSettingsOpen(true);
+                return;
+            }
+
+            const activeService = hasS3 ? s3Service : webdavService;
             
             // 验证连接
             if (activeService.checkConnection) {
@@ -500,27 +534,19 @@ export const useSyncManager = () => {
                 return;
             }
 
-            // 上传数据
-            await activeService.uploadData(localData);
-            setDataLastModified(localData.timestamp);
+            // 使用统一的上传函数
+            const result = await uploadDataToCloud(
+                activeService,
+                localData,
+                undefined,
+                () => setDataLastModified(localData.timestamp)
+            );
 
-            // 同步图片
-            const localImageList = imageService.getReferencedImagesList();
-            const imageResult = await handleImageSync(localImageList);
-            
-            // 更新图片列表
-            await activeService.uploadImageList(localImageList);
-
-            // 构建反馈消息
-            const imageActions = [];
-            if (imageResult.uploaded > 0) imageActions.push(`上传 ${imageResult.uploaded} 张图片`);
-            
-            let finalMsg = '已上传本地数据至云端';
-            if (imageActions.length > 0) {
-                finalMsg += `，并${imageActions.join('，')}`;
+            if (result.success) {
+                addToast('success', result.message);
+            } else {
+                addToast('error', result.message);
             }
-
-            addToast('success', finalMsg);
 
             if (currentView === AppView.TIMELINE) {
                 await new Promise(resolve => setTimeout(resolve, 100));
@@ -536,7 +562,7 @@ export const useSyncManager = () => {
         }
     };
     
-    // 手动从云端下载
+    // 手动从云端下载（完整流程：主数据 + 图片列表 JSON + 图片文件）
     const handleManualDownload = async () => {
         if (syncLock.current || isSyncing) {
             console.log('[Sync] Skipped manual download: Already syncing.');
@@ -549,13 +575,29 @@ export const useSyncManager = () => {
         try {
             const webdavConfig = webdavService.getConfig();
             const s3Config = s3Service.getConfig();
+            
+            // 检查手动断开标志
+            const webdavManualDisconnect = localStorage.getItem('lumos_webdav_manual_disconnect') === 'true';
+            const s3ManualDisconnect = localStorage.getItem('lumos_s3_manual_disconnect') === 'true';
 
-            if (!webdavConfig && !s3Config) {
+            // 过滤掉已手动断开的服务
+            const hasWebdav = webdavConfig && !webdavManualDisconnect;
+            const hasS3 = s3Config && !s3ManualDisconnect;
+
+            if (!hasWebdav && !hasS3) {
+                addToast('error', '未连接任何云端服务');
                 setIsSettingsOpen(true);
                 return;
             }
 
-            const activeService = s3Config ? s3Service : webdavService;
+            // 如果两个都连接了，提示用户只能选择一个
+            if (hasWebdav && hasS3) {
+                addToast('error', '检测到同时连接了 WebDAV 和 S3，请在设置中断开其中一个');
+                setIsSettingsOpen(true);
+                return;
+            }
+
+            const activeService = hasS3 ? s3Service : webdavService;
             
             // 验证连接
             if (activeService.checkConnection) {
@@ -568,7 +610,7 @@ export const useSyncManager = () => {
                 }
             }
 
-            // 下载云端数据
+            // 1. 下载云端主数据（backup.json）
             const cloudData = await activeService.downloadData();
             
             if (!cloudData) {
@@ -576,17 +618,17 @@ export const useSyncManager = () => {
                 return;
             }
 
-            // 备份本地数据
+            // 2. 备份本地数据到云端
             const backupSuccess = await backupLocalData(activeService, 'manual_download_backup');
             if (!backupSuccess) {
                 addToast('error', '备份失败，为保护本地数据已取消下载');
                 return;
             }
 
-            // 更新本地数据
+            // 3. 更新本地数据
             await handleSyncDataUpdate(cloudData);
 
-            // 同步图片
+            // 4. 下载图片列表 JSON
             const localImageList = imageService.getReferencedImagesList();
             let cloudImageList: string[] = [];
             try {
@@ -598,6 +640,7 @@ export const useSyncManager = () => {
                 console.log('[Sync] 云端无图片列表');
             }
 
+            // 5. 同步图片文件
             const mergedImageList = Array.from(new Set([...localImageList, ...cloudImageList]));
             const imageResult = await handleImageSync(mergedImageList);
 
@@ -691,8 +734,16 @@ export const useSyncManager = () => {
         const handleImageListChanged = async (e: CustomEvent) => {
             const webdavConfig = webdavService.getConfig();
             const s3Config = s3Service.getConfig();
-            if (!webdavConfig && !s3Config) return;
-            const activeService = s3Config ? s3Service : webdavService;
+            
+            // 检查手动断开标志
+            const webdavManualDisconnect = localStorage.getItem('lumos_webdav_manual_disconnect') === 'true';
+            const s3ManualDisconnect = localStorage.getItem('lumos_s3_manual_disconnect') === 'true';
+            
+            const hasWebdav = webdavConfig && !webdavManualDisconnect;
+            const hasS3 = s3Config && !s3ManualDisconnect;
+            
+            if (!hasWebdav && !hasS3) return;
+            const activeService = hasS3 ? s3Service : webdavService;
 
             try {
                 const imageList = e.detail.images || [];
@@ -705,7 +756,15 @@ export const useSyncManager = () => {
         const handleImageDeleted = async (event: CustomEvent) => {
             const webdavConfig = webdavService.getConfig();
             const s3Config = s3Service.getConfig();
-            if (!webdavConfig && !s3Config) return;
+            
+            // 检查手动断开标志
+            const webdavManualDisconnect = localStorage.getItem('lumos_webdav_manual_disconnect') === 'true';
+            const s3ManualDisconnect = localStorage.getItem('lumos_s3_manual_disconnect') === 'true';
+            
+            const hasWebdav = webdavConfig && !webdavManualDisconnect;
+            const hasS3 = s3Config && !s3ManualDisconnect;
+            
+            if (!hasWebdav && !hasS3) return;
 
             if (imageSyncTimeoutRef.current) clearTimeout(imageSyncTimeoutRef.current);
             imageSyncTimeoutRef.current = setTimeout(async () => {
@@ -721,7 +780,15 @@ export const useSyncManager = () => {
         const handleImageUploaded = async (event: CustomEvent) => {
             const webdavConfig = webdavService.getConfig();
             const s3Config = s3Service.getConfig();
-            if (!webdavConfig && !s3Config) return;
+            
+            // 检查手动断开标志
+            const webdavManualDisconnect = localStorage.getItem('lumos_webdav_manual_disconnect') === 'true';
+            const s3ManualDisconnect = localStorage.getItem('lumos_s3_manual_disconnect') === 'true';
+            
+            const hasWebdav = webdavConfig && !webdavManualDisconnect;
+            const hasS3 = s3Config && !s3ManualDisconnect;
+            
+            if (!hasWebdav && !hasS3) return;
 
             if (imageSyncTimeoutRef.current) clearTimeout(imageSyncTimeoutRef.current);
             imageSyncTimeoutRef.current = setTimeout(async () => {
@@ -778,9 +845,16 @@ export const useSyncManager = () => {
                 
                 const webdavConfig = webdavService.getConfig();
                 const s3Config = s3Service.getConfig();
+                
+                // 检查手动断开标志
+                const webdavManualDisconnect = localStorage.getItem('lumos_webdav_manual_disconnect') === 'true';
+                const s3ManualDisconnect = localStorage.getItem('lumos_s3_manual_disconnect') === 'true';
+                
+                const hasWebdav = webdavConfig && !webdavManualDisconnect;
+                const hasS3 = s3Config && !s3ManualDisconnect;
 
-                if (webdavConfig || s3Config) {
-                    const activeService = s3Config ? s3Service : webdavService;
+                if (hasWebdav || hasS3) {
+                    const activeService = hasS3 ? s3Service : webdavService;
                     const localData = getFullLocalData(); // Includes current localData.timestamp
 
                     // Smart Sync: Only upload if local data is NEWER than the last synced version

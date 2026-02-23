@@ -44,16 +44,24 @@ export const syncService = {
     getActiveStorageService(): StorageService | null {
         const webdavConfig = webdavService.getConfig();
         const s3Config = s3Service.getConfig();
+        
+        // 检查手动断开标志
+        const webdavManualDisconnect = localStorage.getItem('lumos_webdav_manual_disconnect') === 'true';
+        const s3ManualDisconnect = localStorage.getItem('lumos_s3_manual_disconnect') === 'true';
 
-        if (s3Config) {
-            // console.log('[Sync] 使用 S3/COS 存储服务');
+        // 过滤掉已手动断开的服务
+        const hasWebdav = webdavConfig && !webdavManualDisconnect;
+        const hasS3 = s3Config && !s3ManualDisconnect;
+
+        if (hasS3) {
+            console.log('[Sync] 使用 S3/COS 存储服务');
             return s3Service as StorageService;
-        } else if (webdavConfig) {
-            // console.log('[Sync] 使用 WebDAV 存储服务');
+        } else if (hasWebdav) {
+            console.log('[Sync] 使用 WebDAV 存储服务');
             return webdavService as StorageService;
         }
 
-        // console.log('[Sync] 没有配置任何存储服务');
+        console.log('[Sync] 没有配置任何存储服务');
         return null;
     },
 
@@ -118,48 +126,65 @@ export const syncService = {
             const localSet = new Set(localReferencedImages || []);
 
             // [Unified] 尝试扫描云端实际文件列表
-            // 这是为了防止 list json 说"有图片"但实际 bucket/folder 里没有的情况 (Zombie List)
-            // 同时也作为 WebDAV 和 S3 的统一逻辑：优先信任实际文件系统
+            // 优先级：实际文件扫描 > 图片列表 JSON
+            // 
+            // 对于 S3/COS：可以扫描实际文件，使用实际文件作为判定依据
+            // 对于 WebDAV 桌面端：可以扫描实际文件，使用实际文件作为判定依据
+            // 对于 WebDAV 移动端：无法扫描（PROPFIND 不支持），使用传入的 cloudReferencedImages（来自 JSON）
             let actualCloudFiles: Set<string> | null = null;
 
             try {
-                // console.log('[Sync] 正在扫描云端实际文件列表...');
+                console.log('[Sync] 正在扫描云端实际文件列表...');
                 // getDirectoryContents 返回文件列表对象数组
                 const contents = await storageService.getDirectoryContents!('images');
+                console.log(`[Sync] 云端目录内容数量:`, contents.length);
+                
                 if (Array.isArray(contents) && contents.length > 0) {
+                    console.log(`[Sync] 云端目录第一个对象:`, JSON.stringify(contents[0]));
+                    console.log(`[Sync] 云端目录第二个对象:`, JSON.stringify(contents[1]));
+                    
                     actualCloudFiles = new Set(contents.map((item: any) => {
                         // 统一处理 Key/Path，确保去掉前缀
                         // S3 format: "images/filename.jpg"
                         // WebDAV format: "/images/filename.jpg" or "filename.jpg" (depends on client)
-                        const rawName = item.filename || item.basename || item.Key || item; // 兼容不同库的返回结构
+                        const rawName = item.filename || item.basename || item.Key || item;
+
+                        console.log(`[Sync] 处理文件对象:`, JSON.stringify(item), `-> rawName: ${rawName}`);
 
                         // 简单的文件名提取逻辑
                         const parts = String(rawName).split('/');
-                        return parts[parts.length - 1];
+                        const extractedName = parts[parts.length - 1];
+                        console.log(`[Sync] 提取文件名: ${rawName} -> ${extractedName}`);
+                        return extractedName;
                     }));
-                    // console.log(`[Sync] ✓ 云端实际扫描结果: ${actualCloudFiles.size} 个文件`);
+                    console.log(`[Sync] ✓ 云端实际扫描结果: ${actualCloudFiles.size} 个文件`);
+                    console.log(`[Sync] 云端文件列表:`, Array.from(actualCloudFiles).slice(0, 5));
                 } else if (Array.isArray(contents) && contents.length === 0) {
-                    // Empty directory (or supported empty response)
-                    console.log('[Sync] ✓ Cloud directory scanned and is empty.');
-                    actualCloudFiles = new Set();
+                    // Empty directory - 可能是真的空，也可能是移动端 WebDAV 不支持 PROPFIND
+                    // 保持 null，让后续逻辑使用传入的 cloudReferencedImages
+                    console.log('[Sync] ⚠️ 云端目录扫描返回空（可能是移动端 WebDAV 限制或目录确实为空）');
+                    actualCloudFiles = null;
                 }
             } catch (e) {
-                console.warn('[Sync] 云端扫描失败或不支持，回退到使用 list json', e);
+                console.warn('[Sync] 云端扫描失败或不支持，使用传入的 cloudReferencedImages', e);
             }
 
-            // 如果成功扫描到了实际文件，就使用实际文件作为 cloudSet (Source of Truth)
-            // 否则 (WebDAV 或 扫描失败) 继续使用 cloudReferencedImages (来自 JSON)
-            const cloudSet = actualCloudFiles || new Set(cloudReferencedImages || []);
+            // 判定逻辑：
+            // 1. 如果成功扫描到实际文件（actualCloudFiles 不为 null），使用实际文件
+            // 2. 否则使用传入的 cloudReferencedImages（来自 JSON）
+            const cloudSet = actualCloudFiles !== null ? actualCloudFiles : new Set(cloudReferencedImages || []);
 
             const mergedSet = new Set([...localSet, ...(cloudReferencedImages || [])]);
 
-            // console.log('[Sync] ========== 引用列表分析 ==========');
-            // console.log(`[Sync] 本地引用: ${localSet.size} 个`);
-            // console.log(`[Sync] 云端引用 (JSON): ${(cloudReferencedImages || []).length} 个`);
-            // if (actualCloudFiles) {
-            //     console.log(`[Sync] 云端实际: ${actualCloudFiles.size} 个 (作为判定依据)`);
-            // }
-            // console.log(`[Sync] 合并后计划: ${mergedSet.size} 个`);
+            console.log('[Sync] ========== 引用列表分析 ==========');
+            console.log(`[Sync] 本地引用: ${localSet.size} 个`);
+            console.log(`[Sync] 云端引用 (JSON): ${(cloudReferencedImages || []).length} 个`);
+            if (actualCloudFiles !== null) {
+                console.log(`[Sync] 云端实际: ${actualCloudFiles.size} 个 (作为判定依据)`);
+            } else {
+                console.log(`[Sync] 云端实际: 无法扫描，使用 JSON (${cloudSet.size} 个) 作为判定依据`);
+            }
+            console.log(`[Sync] 合并后计划: ${mergedSet.size} 个`);
 
             // 3. 获取本地实际存在的文件
             const localFiles = await imageService.listImages();
@@ -220,9 +245,25 @@ export const syncService = {
                 }
             }
 
-            // console.log(`[Sync] 需要上传: ${toUpload.length} 个`);
+            console.log(`[Sync] 需要上传: ${toUpload.length} 个`);
             if (toUpload.length > 0) {
                 console.log(`[Sync] 上传列表:`, toUpload.slice(0, 10), toUpload.length > 10 ? '...' : '');
+            } else {
+                console.log(`[Sync] ⚠️ 没有需要上传的图片！`);
+                console.log(`[Sync] 调试信息:`);
+                console.log(`[Sync]   - mergedSet.size: ${mergedSet.size}`);
+                console.log(`[Sync]   - localFileSet.size: ${localFileSet.size}`);
+                console.log(`[Sync]   - cloudSet.size: ${cloudSet.size}`);
+                console.log(`[Sync]   - justDeletedFiles.size: ${justDeletedFiles.size}`);
+                
+                // 检查第一个文件为什么不需要上传
+                const firstFile = Array.from(mergedSet)[0];
+                if (firstFile) {
+                    console.log(`[Sync] 检查第一个文件: ${firstFile}`);
+                    console.log(`[Sync]   - 在 localFileSet 中: ${localFileSet.has(firstFile)}`);
+                    console.log(`[Sync]   - 在 cloudSet 中: ${cloudSet.has(firstFile)}`);
+                    console.log(`[Sync]   - 在 justDeletedFiles 中: ${justDeletedFiles.has(firstFile)}`);
+                }
             }
 
             // 7. 分析下载需求：被引用 && 本地没有

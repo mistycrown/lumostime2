@@ -56,7 +56,15 @@ export function getServiceDisplayName(service: CloudService): string {
 }
 
 /**
- * 上传数据到云端
+ * 上传数据到云端（完整流程：主数据 + 图片列表 JSON + 图片文件）
+ * 
+ * 正确的上传顺序：
+ * 1. 上传主数据 JSON (backup.json)
+ * 2. 下载云端旧的图片列表 JSON - 获取云端已有的图片记录
+ * 3. 上传新的图片列表 JSON (lumostime_images.json) - 更新云端记录
+ * 4. 同步图片文件：
+ *    - 桌面端 WebDAV & S3: syncImages 扫描云端实际文件，对比后上传缺失的
+ *    - 移动端 WebDAV: syncImages 使用旧的 JSON，对比后上传缺失的
  * 
  * @param service - 云服务实例 (webdavService 或 s3Service)
  * @param localData - 本地数据
@@ -93,36 +101,82 @@ export async function uploadDataToCloud(
 
     onProgress?.(`正在上传数据到 ${displayName}...`);
 
-    // 3. 上传主数据
+    // 3. 上传主数据（backup.json）
+    console.log(`[syncUtils] 步骤 1: 上传主数据 JSON`);
     await service.uploadData(dataToSync);
     updateDataLastModified?.();
 
-    // 4. 同步图片（仅 S3）
-    if (serviceName === 's3') {
-      const localImageList = imageService.getReferencedImagesList();
-      
-      if (localImageList.length > 0) {
-        console.log(`[syncUtils] 开始同步 ${localImageList.length} 张图片到 ${displayName}...`);
-        onProgress?.(`正在同步 ${localImageList.length} 张图片...`);
-
-        const imageResult = await syncService.syncImages(
-          undefined,
-          localImageList,
-          localImageList
-        );
-
-        if (imageResult.uploaded > 0 || imageResult.errors.length > 0) {
-          const message = imageResult.errors.length > 0
-            ? `数据已上传。图片: ${imageResult.uploaded} 张上传成功, ${imageResult.errors.length} 张失败`
-            : `数据及 ${imageResult.uploaded} 张图片已成功上传至 ${displayName}！`;
-          
-          return {
-            success: imageResult.errors.length === 0,
-            message,
-            imageStats: imageResult
-          };
-        }
+    // 4. 获取本地引用的图片列表
+    const localImageList = imageService.getReferencedImagesList();
+    console.log(`[syncUtils] 步骤 2: 本地引用图片列表: ${localImageList.length} 张`);
+    
+    if (localImageList.length === 0) {
+      // 没有图片，上传空列表
+      try {
+        await service.uploadImageList([]);
+        console.log(`[syncUtils] 空图片列表已上传`);
+      } catch (listErr) {
+        console.warn(`[syncUtils] 空图片列表上传失败:`, listErr);
       }
+      
+      return {
+        success: true,
+        message: `数据已成功上传至 ${displayName}！`
+      };
+    }
+
+    // 5. 获取云端旧的图片列表 JSON（在上传新的之前）
+    // 这个旧的 JSON 将用于判断哪些图片已经在云端
+    let oldCloudImageList: string[] = [];
+    try {
+      const cloudImageData = await service.downloadImageList();
+      if (cloudImageData && cloudImageData.images) {
+        oldCloudImageList = cloudImageData.images;
+        console.log(`[syncUtils] 步骤 3: 云端旧图片列表 JSON: ${oldCloudImageList.length} 张`);
+      } else {
+        console.log(`[syncUtils] 步骤 3: 云端无图片列表 JSON（首次上传）`);
+      }
+    } catch (err) {
+      console.log(`[syncUtils] 步骤 3: 云端无图片列表 JSON（首次上传）`);
+    }
+
+    // 6. 上传新的图片列表 JSON - 更新云端记录
+    console.log(`[syncUtils] 步骤 4: 上传新图片列表 JSON (${localImageList.length} 张)`);
+    try {
+      await service.uploadImageList(localImageList);
+      console.log(`[syncUtils] ✓ 新图片列表 JSON 已上传`);
+    } catch (listErr: any) {
+      console.error(`[syncUtils] ✗ 图片列表 JSON 上传失败:`, listErr);
+      return {
+        success: false,
+        message: `数据已上传，但图片列表上传失败: ${listErr.message}`
+      };
+    }
+
+    // 7. 同步图片文件
+    // 使用旧的云端 JSON 作为参照，判断哪些图片需要上传
+    console.log(`[syncUtils] 步骤 5: 开始同步图片文件`);
+    onProgress?.(`正在同步 ${localImageList.length} 张图片...`);
+
+    const imageResult = await syncService.syncImages(
+      onProgress,
+      localImageList,      // 本地引用列表
+      oldCloudImageList    // 云端旧的引用列表（上传前获取的）
+    );
+
+    console.log(`[syncUtils] 图片同步结果:`, imageResult);
+
+    // 7. 构建返回消息
+    if (imageResult.uploaded > 0 || imageResult.errors.length > 0) {
+      const message = imageResult.errors.length > 0
+        ? `数据已上传。图片: ${imageResult.uploaded} 张上传成功, ${imageResult.errors.length} 张失败`
+        : `数据、图片列表及 ${imageResult.uploaded} 张图片已成功上传至 ${displayName}！`;
+      
+      return {
+        success: imageResult.errors.length === 0,
+        message,
+        imageStats: imageResult
+      };
     }
 
     return {
