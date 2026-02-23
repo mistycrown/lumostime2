@@ -22,6 +22,7 @@
 import { webdavService } from './webdavService';
 import { s3Service } from './s3Service';
 import { imageService } from './imageService';
+import { SYNC_CONFIG } from '../config/syncConfig';
 
 export interface SyncResult {
     uploaded: number;
@@ -169,7 +170,7 @@ export const syncService = {
             }
 
             // 6. 执行并行上传（提高速度）
-            const CONCURRENT_UPLOADS = 3; // 同时上传 3 张图片
+            const CONCURRENT_UPLOADS = SYNC_CONFIG.CONCURRENT_OPERATIONS;
             const uploadPromises: Promise<void>[] = [];
             
             for (let i = 0; i < toUpload.length; i++) {
@@ -255,7 +256,7 @@ export const syncService = {
             }
 
             // 3. 执行并行下载（提高速度）
-            const CONCURRENT_DOWNLOADS = 3; // 同时下载 3 张图片
+            const CONCURRENT_DOWNLOADS = SYNC_CONFIG.CONCURRENT_OPERATIONS;
             const downloadPromises: Promise<void>[] = [];
             
             for (let i = 0; i < toDownload.length; i++) {

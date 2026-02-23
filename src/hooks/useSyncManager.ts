@@ -22,6 +22,7 @@ import { imageService } from '../services/imageService';
 import { syncService } from '../services/syncService';
 import { uploadDataToCloud, downloadWithBackup, CloudService } from '../utils/syncUtils';
 import { AppView } from '../types';
+import { SYNC_CONFIG } from '../config/syncConfig';
 
 export const useSyncManager = () => {
     // Access Contexts at the top level
@@ -82,7 +83,7 @@ export const useSyncManager = () => {
         } finally {
             isRestoring.current = false;
             // Delay re-enabling timestamp updates to ensure all state effects have processed
-            await new Promise(resolve => setTimeout(resolve, 500));
+            await new Promise(resolve => setTimeout(resolve, SYNC_CONFIG.DATA_UPDATE_UNLOCK_DELAY_MS));
             disableTimestampUpdateRef.current = false;
             console.log(`[Sync] Unlocked timestamp updates`);
         }
@@ -115,6 +116,34 @@ export const useSyncManager = () => {
     const syncLock = useRef(false);
 
     /**
+     * 获取活跃的云服务
+     * @returns 服务实例和错误类型
+     */
+    const getActiveCloudService = () => {
+        const webdavConfig = webdavService.getConfig();
+        const s3Config = s3Service.getConfig();
+        
+        // 检查手动断开标志
+        const webdavManualDisconnect = localStorage.getItem('lumos_webdav_manual_disconnect') === 'true';
+        const s3ManualDisconnect = localStorage.getItem('lumos_s3_manual_disconnect') === 'true';
+
+        // 过滤掉已手动断开的服务
+        const hasWebdav = webdavConfig && !webdavManualDisconnect;
+        const hasS3 = s3Config && !s3ManualDisconnect;
+
+        if (!hasWebdav && !hasS3) {
+            return { service: null, error: 'no_service' as const };
+        }
+
+        // 如果两个都连接了，提示用户只能选择一个
+        if (hasWebdav && hasS3) {
+            return { service: null, error: 'multiple_services' as const };
+        }
+
+        return { service: hasS3 ? s3Service : webdavService, error: null };
+    };
+
+    /**
      * Core Sync Logic - Unified for all sync triggers
      * @param mode 'startup' = App launch | 'resume' = App resume/tab visible | 'manual' = User click | 'auto' = Auto-sync
      */
@@ -135,32 +164,21 @@ export const useSyncManager = () => {
             const hadPendingAutoSync = pendingAutoSyncRef.current;
             pendingAutoSyncRef.current = false;
 
-            const webdavConfig = webdavService.getConfig();
-            const s3Config = s3Service.getConfig();
+            // 获取活跃的云服务
+            const { service: activeService, error: serviceError } = getActiveCloudService();
             
-            // 检查手动断开标志
-            const webdavManualDisconnect = localStorage.getItem('lumos_webdav_manual_disconnect') === 'true';
-            const s3ManualDisconnect = localStorage.getItem('lumos_s3_manual_disconnect') === 'true';
-
-            // 过滤掉已手动断开的服务
-            const hasWebdav = webdavConfig && !webdavManualDisconnect;
-            const hasS3 = s3Config && !s3ManualDisconnect;
-
-            if (!hasWebdav && !hasS3) {
+            if (serviceError === 'no_service') {
                 if (mode === 'manual') setIsSettingsOpen(true);
                 return;
             }
-
-            // 如果两个都连接了，提示用户只能选择一个
-            if (hasWebdav && hasS3) {
+            
+            if (serviceError === 'multiple_services') {
                 if (mode === 'manual') {
                     addToast('error', '检测到同时连接了 WebDAV 和 S3，请在设置中断开其中一个');
                     setIsSettingsOpen(true);
                 }
                 return;
             }
-
-            const activeService = hasS3 ? s3Service : webdavService;
 
             // [Pre-check] Verify connection before attempting sync
             // This prevents infinite loops on Auth errors and avoids unnecessary retries when offline
@@ -195,8 +213,8 @@ export const useSyncManager = () => {
             let dataSyncStatus: 'restored' | 'uploaded' | 'equal' | 'error' = 'equal';
             let dataSyncMsg = '';
 
-            // 容错阈值：8秒（处理上传延迟导致的时间差）
-            const SYNC_TOLERANCE_MS = 8000;
+            // 容错阈值：处理上传延迟导致的时间差
+            const SYNC_TOLERANCE_MS = SYNC_CONFIG.TOLERANCE_MS;
 
             // 1. 获取本地时间戳（直接从 localStorage 读取，确保是最新值）
             const localTimestampStr = localStorage.getItem('lumostime_local_timestamp');
@@ -374,7 +392,7 @@ export const useSyncManager = () => {
             }
 
             if ((currentView === AppView.TIMELINE) || (mode === 'startup' && dataSyncStatus === 'restored')) {
-                await new Promise(resolve => setTimeout(resolve, 100));
+                await new Promise(resolve => setTimeout(resolve, SYNC_CONFIG.UI_REFRESH_DELAY_MS));
                 setRefreshKey(prev => prev + 1);
             }
 
@@ -390,7 +408,7 @@ export const useSyncManager = () => {
             if (pendingAutoSyncRef.current) {
                 console.log('[Sync] Pending auto-sync detected after sync finished. Retrying...');
                 // Use setTimeout to break the stack and allow state updates
-                setTimeout(() => performSync('auto'), 1000);
+                setTimeout(() => performSync('auto'), SYNC_CONFIG.PENDING_SYNC_RETRY_DELAY_MS);
             }
         }
     };
@@ -419,31 +437,20 @@ export const useSyncManager = () => {
         setIsSyncing(true);
 
         try {
-            const webdavConfig = webdavService.getConfig();
-            const s3Config = s3Service.getConfig();
+            // 获取活跃的云服务
+            const { service: activeService, error: serviceError } = getActiveCloudService();
             
-            // 检查手动断开标志
-            const webdavManualDisconnect = localStorage.getItem('lumos_webdav_manual_disconnect') === 'true';
-            const s3ManualDisconnect = localStorage.getItem('lumos_s3_manual_disconnect') === 'true';
-
-            // 过滤掉已手动断开的服务
-            const hasWebdav = webdavConfig && !webdavManualDisconnect;
-            const hasS3 = s3Config && !s3ManualDisconnect;
-
-            if (!hasWebdav && !hasS3) {
+            if (serviceError === 'no_service') {
                 addToast('error', '未连接任何云端服务');
                 setIsSettingsOpen(true);
                 return;
             }
-
-            // 如果两个都连接了，提示用户只能选择一个
-            if (hasWebdav && hasS3) {
+            
+            if (serviceError === 'multiple_services') {
                 addToast('error', '检测到同时连接了 WebDAV 和 S3，请在设置中断开其中一个');
                 setIsSettingsOpen(true);
                 return;
             }
-
-            const activeService = hasS3 ? s3Service : webdavService;
             
             // 验证连接
             if (activeService.checkConnection) {
@@ -473,9 +480,10 @@ export const useSyncManager = () => {
 
             if (result.success) {
                 // 上传成功后，使用当前时间更新本地时间戳
+                // 先更新 localStorage（持久化），后更新 React state（UI）
                 const now = Date.now();
-                setLocalDataTimestamp(now);
                 localStorage.setItem('lumostime_local_timestamp', now.toString());
+                setLocalDataTimestamp(now);
                 console.log(`[Sync] 手动上传完成，本地时间戳已更新: ${now}`);
                 
                 addToast('success', result.message);
@@ -484,7 +492,7 @@ export const useSyncManager = () => {
             }
 
             if (currentView === AppView.TIMELINE) {
-                await new Promise(resolve => setTimeout(resolve, 100));
+                await new Promise(resolve => setTimeout(resolve, SYNC_CONFIG.UI_REFRESH_DELAY_MS));
                 setRefreshKey(prev => prev + 1);
             }
 
@@ -508,31 +516,20 @@ export const useSyncManager = () => {
         setIsSyncing(true);
 
         try {
-            const webdavConfig = webdavService.getConfig();
-            const s3Config = s3Service.getConfig();
+            // 获取活跃的云服务
+            const { service: activeService, error: serviceError } = getActiveCloudService();
             
-            // 检查手动断开标志
-            const webdavManualDisconnect = localStorage.getItem('lumos_webdav_manual_disconnect') === 'true';
-            const s3ManualDisconnect = localStorage.getItem('lumos_s3_manual_disconnect') === 'true';
-
-            // 过滤掉已手动断开的服务
-            const hasWebdav = webdavConfig && !webdavManualDisconnect;
-            const hasS3 = s3Config && !s3ManualDisconnect;
-
-            if (!hasWebdav && !hasS3) {
+            if (serviceError === 'no_service') {
                 addToast('error', '未连接任何云端服务');
                 setIsSettingsOpen(true);
                 return;
             }
-
-            // 如果两个都连接了，提示用户只能选择一个
-            if (hasWebdav && hasS3) {
+            
+            if (serviceError === 'multiple_services') {
                 addToast('error', '检测到同时连接了 WebDAV 和 S3，请在设置中断开其中一个');
                 setIsSettingsOpen(true);
                 return;
             }
-
-            const activeService = hasS3 ? s3Service : webdavService;
             
             // 验证连接
             if (activeService.checkConnection) {
@@ -569,7 +566,7 @@ export const useSyncManager = () => {
                 
                 addToast('success', result.message);
                 
-                await new Promise(resolve => setTimeout(resolve, 100));
+                await new Promise(resolve => setTimeout(resolve, SYNC_CONFIG.UI_REFRESH_DELAY_MS));
                 setRefreshKey(prev => prev + 1);
             } else {
                 addToast('error', result.message);
@@ -591,7 +588,12 @@ export const useSyncManager = () => {
         if (!manualSyncMode) {
             performSync('startup');
         }
-    }, [manualSyncMode]); // 添加 manualSyncMode 依赖，以便在切换模式时重新评估
+        // 注意：这里只依赖 manualSyncMode，因为：
+        // 1. performSync 内部直接从 localStorage 读取时间戳（不依赖 state）
+        // 2. 使用 ref 管理锁状态（不依赖 state）
+        // 3. 只在 manualSyncMode 变化时需要重新评估是否启动同步
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [manualSyncMode]);
 
     // 2. Data Auto Sync
     const isFirstRun = useRef(true);
@@ -638,7 +640,7 @@ export const useSyncManager = () => {
 
             pendingAutoSyncRef.current = false;
 
-        }, 2000); // Debounce reduced to 2s for responsiveness
+        }, SYNC_CONFIG.AUTO_SYNC_DEBOUNCE_MS); // 使用配置的防抖时间
         return () => {
             clearTimeout(timer);
             // Don't clear the pending flag here, only clear it when sync completes or is skipped
@@ -662,13 +664,13 @@ export const useSyncManager = () => {
             // 设置待同步标志
             pendingAutoSyncRef.current = true;
             
-            // 2秒后触发自动同步（与数据变化使用相同的防抖时间）
+            // 使用配置的防抖时间触发自动同步
             timer = setTimeout(async () => {
                 if (!isSyncingRef.current && !isRestoring.current) {
                     await performSync('auto');
                     pendingAutoSyncRef.current = false;
                 }
-            }, 2000);
+            }, SYNC_CONFIG.AUTO_SYNC_DEBOUNCE_MS);
         };
         
         window.addEventListener('imageListChanged', handleImageListChanged as EventListener);
