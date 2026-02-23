@@ -85,8 +85,10 @@ export class WebDAVService {
 
         // Use Cordova HTTP on native platform (Android/iOS)
         if (Capacitor.isNativePlatform()) {
+            console.log('[WebDAV] Setting up customFetch for native platform');
             options.customFetch = async (url: string, init: any) => {
                 try {
+                    console.log('[WebDAV] customFetch called:', { url, method: init.method });
                     const method = (init.method || 'GET').toLowerCase();
                     const headers = { ...(init.headers || {}) };
 
@@ -133,26 +135,12 @@ export class WebDAVService {
                 }
             };
         }
-        // Web Platform Proxy
+        // Web Development: Use proxy for CORS bypass (only in dev mode)
         // @ts-ignore
-        else if (!isElectron && !import.meta.env.DEV) {
-            options.customFetch = async (url: string, init: any) => {
-                try {
-                    const proxyUrl = `/api/webdav-proxy?url=${encodeURIComponent(url)}`;
-                    const response = await fetch(proxyUrl, {
-                        ...init,
-                        headers: {
-                            ...init.headers,
-                            'Authorization': init.headers?.Authorization ||
-                                `Basic ${Buffer.from(`${config.username}:${config.password}`).toString('base64')}`
-                        }
-                    });
-                    return response;
-                } catch (error: any) {
-                    console.error("Vercel Proxy Error", error);
-                    throw error;
-                }
-            };
+        else if (!isElectron && import.meta.env.DEV) {
+            // Only use proxy in development mode
+            // In production web, the webdav client will use standard fetch (may have CORS issues)
+            console.log('[WebDAV] Using development proxy for CORS bypass');
         }
 
         this.client = createClient(this.getEffectiveUrl(config.url), options);
@@ -189,17 +177,60 @@ export class WebDAVService {
     async checkConnection(): Promise<boolean> {
         if (Capacitor.isNativePlatform() && this.config) {
             try {
-                const url = this.config.url.endsWith('/') ? this.config.url : this.config.url + '/';
+                // Test by uploading and deleting a small test file
+                const testFileName = '.webdav_test_' + Date.now() + '.txt';
+                const testUrl = this.config.url.endsWith('/') 
+                    ? `${this.config.url}${testFileName}` 
+                    : `${this.config.url}/${testFileName}`;
                 const auth = Buffer.from(`${this.config.username}:${this.config.password}`).toString('base64');
-
-                const response = await HTTP.sendRequest(url, {
-                    method: 'options',
-                    headers: { 'Authorization': `Basic ${auth}` },
+                
+                // Create a small test file content
+                const testContent = 'WebDAV connection test';
+                const encoder = new TextEncoder();
+                const testData = encoder.encode(testContent);
+                
+                console.log('[WebDAV] Testing connection by uploading test file:', testFileName);
+                
+                // Set serializer for raw data
+                HTTP.setDataSerializer('raw');
+                
+                // Try to upload the test file
+                const uploadResponse = await HTTP.sendRequest(testUrl, {
+                    method: 'put',
+                    data: testData.buffer,
+                    headers: {
+                        'Authorization': `Basic ${auth}`,
+                        'Content-Type': 'text/plain'
+                    },
                     timeout: 10000
                 });
-                return response.status === 200 || response.status === 204;
+                
+                console.log('[WebDAV] Test file upload status:', uploadResponse.status);
+                
+                // If upload succeeded, try to delete the test file
+                if (uploadResponse.status === 200 || uploadResponse.status === 201 || uploadResponse.status === 204) {
+                    try {
+                        await HTTP.sendRequest(testUrl, {
+                            method: 'delete',
+                            headers: {
+                                'Authorization': `Basic ${auth}`
+                            },
+                            timeout: 5000
+                        });
+                        console.log('[WebDAV] Test file deleted successfully');
+                    } catch (deleteErr) {
+                        console.warn('[WebDAV] Failed to delete test file (not critical):', deleteErr);
+                    }
+                    return true;
+                }
+                
+                return false;
             } catch (nativeErr: any) {
-                console.error('Native Direct Check Failed', nativeErr);
+                console.error('[WebDAV] Connection test failed:', nativeErr);
+                // 401 means authentication failed
+                if (nativeErr?.status === 401) {
+                    console.error('[WebDAV] Authentication failed - wrong username or password');
+                }
                 return false;
             }
         }
@@ -241,8 +272,6 @@ export class WebDAVService {
             try {
                 const baseUrl = this.config.url.endsWith('/') ? this.config.url : `${this.config.url}/`;
                 const dirUrl = `${baseUrl}${path.startsWith('/') ? path.slice(1) : path}/`;
-                const auth = Buffer.from(`${this.config.username}:${this.config.password}`).toString('base64');
-
                 console.log(`[WebDAV] 尝试创建目录: ${dirUrl}`);
 
                 // 方法1: 尝试上传一个临时文件到目录中来创建目录结构
@@ -251,22 +280,25 @@ export class WebDAVService {
                 const emptyData = new Uint8Array(1);
                 emptyData[0] = 32; // 空格字符
 
-                HTTP.setDataSerializer('raw');
-
                 try {
-                    // 上传临时文件（这会自动创建目录）
-                    const uploadResponse = await HTTP.put(tempUrl, emptyData, {
-                        'Authorization': `Basic ${auth}`,
-                        'Content-Type': 'text/plain'
+                    HTTP.setDataSerializer('raw');
+                    const auth = Buffer.from(`${this.config.username}:${this.config.password}`).toString('base64');
+                    
+                    const uploadResponse = await HTTP.sendRequest(tempUrl, {
+                        method: 'put',
+                        data: emptyData,
+                        headers: {
+                            'Authorization': `Basic ${auth}`,
+                            'Content-Type': 'text/plain'
+                        },
+                        timeout: 30000
                     });
 
                     console.log(`[WebDAV] 临时文件上传状态: ${uploadResponse.status}`);
 
                     // 立即删除临时文件
                     try {
-                        const deleteResponse = await HTTP.delete(tempUrl, {}, {
-                            'Authorization': `Basic ${auth}`
-                        });
+                        const deleteResponse = await HTTP.delete(tempUrl, {}, {});
                         console.log(`[WebDAV] ✓ 临时文件已删除，状态: ${deleteResponse.status}`);
                     } catch (deleteError: any) {
                         console.warn(`[WebDAV] 删除临时文件失败（不影响功能）:`, deleteError?.message);
@@ -362,41 +394,51 @@ export class WebDAVService {
 
         const content = JSON.stringify(data, null, 2);
 
-        // NATIVE: Use put method with Uint8Array for WebDAV
+        // NATIVE: Use native HTTP plugin directly (webdav client has CORS issues on mobile)
         if (Capacitor.isNativePlatform() && this.config) {
             console.log(`[WebDAV] Mobile Upload Data: ${filename}, size: ${content.length}`);
             try {
                 const url = this.config.url.endsWith('/') ? `${this.config.url}${filename}` : `${this.config.url}/${filename}`;
                 const auth = Buffer.from(`${this.config.username}:${this.config.password}`).toString('base64');
 
-                console.log('[WebDAV] Converting string to Uint8Array for WebDAV upload...');
+                console.log('[WebDAV] Upload URL:', url);
 
-                // Convert string to Uint8Array (required by advanced-http plugin)
+                // Convert string to Uint8Array for raw serializer
                 const encoder = new TextEncoder();
                 const uint8Data = encoder.encode(content);
 
-                console.log(`[WebDAV] Converted to Uint8Array, size: ${uint8Data.length} bytes`);
+                console.log(`[WebDAV] Data size: ${uint8Data.length} bytes, type: ${uint8Data.constructor.name}`);
 
-                // Set data serializer to raw for binary data
+                // Set global serializer before sending request
                 HTTP.setDataSerializer('raw');
-
-                // Use put method for WebDAV PUT request
-                const response = await HTTP.put(url, uint8Data, {
-                    'Authorization': `Basic ${auth}`,
-                    'Content-Type': 'application/json; charset=utf-8'
+                
+                const response = await HTTP.sendRequest(url, {
+                    method: 'put',
+                    data: uint8Data.buffer,
+                    headers: {
+                        'Authorization': `Basic ${auth}`,
+                        'Content-Type': 'application/json; charset=utf-8'
+                    },
+                    timeout: 30000
                 });
 
                 console.log(`[WebDAV] Upload Success: status ${response.status}`);
                 return response.status === 200 || response.status === 201 || response.status === 204;
             } catch (error: any) {
-                console.error('[WebDAV] Native Upload Error Details:', JSON.stringify(error, null, 2));
+                console.error('[WebDAV] Native Upload Error:', error);
+                console.error('[WebDAV] Error status:', error?.status);
+                console.error('[WebDAV] Error message:', error?.message);
+                console.error('[WebDAV] Error error:', error?.error);
+                console.error('[WebDAV] Error url:', error?.url);
+                console.error('[WebDAV] Full error JSON:', JSON.stringify(error, null, 2));
                 throw error;
             }
         }
 
-        // Browser/Electron fallback
+        // Browser/Electron: Use webdav client
         try {
             await this.client!.putFileContents(`/${filename}`, content, { overwrite: true });
+            console.log(`[WebDAV] Upload Success: ${filename}`);
             return true;
         } catch (error) {
             console.error('WebDAV Upload Error:', error);
@@ -407,16 +449,20 @@ export class WebDAVService {
     async downloadData(filename: string = 'lumostime_backup.json'): Promise<any> {
         if (!this.config && !this.client) throw new Error('WebDAV not configured');
 
-        // Use native HTTP on mobile to bypass CORS if possible (GET is less strict usually)
+        // NATIVE: Use native HTTP plugin directly (webdav client has CORS issues on mobile)
         if (Capacitor.isNativePlatform() && this.config) {
             try {
                 const url = this.config.url.endsWith('/') ? `${this.config.url}${filename}` : `${this.config.url}/${filename}`;
                 const auth = Buffer.from(`${this.config.username}:${this.config.password}`).toString('base64');
+                
                 const response = await HTTP.sendRequest(url, {
                     method: 'get',
-                    headers: { 'Authorization': `Basic ${auth}` },
+                    headers: { 
+                        'Authorization': `Basic ${auth}` 
+                    },
                     timeout: 30000
                 });
+                
                 const content = typeof response.data === 'string' ? response.data : JSON.stringify(response.data);
                 return JSON.parse(content);
             } catch (error: any) {
@@ -425,7 +471,7 @@ export class WebDAVService {
             }
         }
 
-        // Browser/Electron fallback
+        // Browser/Electron: Use webdav client
         try {
             const content = await this.client!.getFileContents(`/${filename}`, { format: 'text' });
             return JSON.parse(content as string);
@@ -474,12 +520,17 @@ export class WebDAVService {
                 const url = this.config.url.endsWith('/') ? `${this.config.url}images/${filename}` : `${this.config.url}/images/${filename}`;
                 const auth = Buffer.from(`${this.config.username}:${this.config.password}`).toString('base64');
 
-                HTTP.setDataSerializer('raw');
-
                 try {
-                    const response = await HTTP.put(url, uint8Data, {
-                        'Authorization': `Basic ${auth}`,
-                        'Content-Type': 'image/jpeg'
+                    HTTP.setDataSerializer('raw');
+                    
+                    const response = await HTTP.sendRequest(url, {
+                        method: 'put',
+                        data: uint8Data.buffer,
+                        headers: {
+                            'Authorization': `Basic ${auth}`,
+                            'Content-Type': 'image/jpeg'
+                        },
+                        timeout: 30000
                     });
 
                     console.log(`[WebDAV] ✓ 原生上传成功: ${filename}, Status: ${response.status}`);
@@ -548,17 +599,19 @@ export class WebDAVService {
                 const url = this.config.url.endsWith('/') ? `${this.config.url}${filename}` : `${this.config.url}/${filename}`;
                 const auth = Buffer.from(`${this.config.username}:${this.config.password}`).toString('base64');
 
-                // Convert string to Uint8Array
                 const encoder = new TextEncoder();
                 const uint8Data = encoder.encode(content);
 
-                // Set data serializer to raw for binary data
                 HTTP.setDataSerializer('raw');
-
-                // Use put method for WebDAV PUT request
-                const response = await HTTP.put(url, uint8Data, {
-                    'Authorization': `Basic ${auth}`,
-                    'Content-Type': 'application/json; charset=utf-8'
+                
+                const response = await HTTP.sendRequest(url, {
+                    method: 'put',
+                    data: uint8Data.buffer,
+                    headers: {
+                        'Authorization': `Basic ${auth}`,
+                        'Content-Type': 'application/json; charset=utf-8'
+                    },
+                    timeout: 30000
                 });
 
                 console.log(`[WebDAV] ✓ 图片列表上传成功: ${imageList.length} 个图片, status: ${response.status}`);
@@ -588,6 +641,7 @@ export class WebDAVService {
             if (Capacitor.isNativePlatform() && this.config) {
                 const url = this.config.url.endsWith('/') ? `${this.config.url}${filename}` : `${this.config.url}/${filename}`;
                 const auth = Buffer.from(`${this.config.username}:${this.config.password}`).toString('base64');
+                
                 const response = await HTTP.sendRequest(url, {
                     method: 'get',
                     headers: { 'Authorization': `Basic ${auth}` },

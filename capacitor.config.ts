@@ -6,7 +6,7 @@ const config: CapacitorConfig = {
   webDir: 'dist',
   plugins: {
     CapacitorHttp: {
-      enabled: false,  // 禁用以避免拦截COS SDK的请求
+      enabled: false,  // 禁用以避免拦截COS SDK的请求（COS SDK需要直接访问）
     },
     SystemBars: {
       insetsHandling: 'disable',  // 禁用内置的 insets 处理，使用 EdgeToEdge 插件
@@ -20,7 +20,9 @@ const config: CapacitorConfig = {
     allowNavigation: [
       'https://*.myqcloud.com',
       'https://*.tencentcos.cn',
-      'https://*.cos.ap-*.myqcloud.com'
+      'https://*.cos.ap-*.myqcloud.com',
+      'https://dav.jianguoyun.com',
+      'https://*.jianguoyun.com'
     ]
   }
 };

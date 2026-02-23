@@ -235,29 +235,40 @@ export const useSyncManager = () => {
 
             try {
                 // 第一步：使用 statFile() 快速获取文件修改时间
-                const cloudFileDate = await activeService.statFile?.();
+                // 注意：在移动端，statFile 可能因为跨域问题失败，所以需要特殊处理
+                const isNative = typeof Capacitor !== 'undefined' && Capacitor.isNativePlatform();
                 
-                if (cloudFileDate) {
-                    const fileModTime = cloudFileDate.getTime();
-                    console.log(`[Sync][Step 2a] 快速获取云端文件修改时间: ${fileModTime} (${cloudFileDate.toLocaleString()})`);
-                    
-                    // 快速判断：如果文件修改时间和本地时间戳差异在容错范围内，直接认为一致
-                    const quickDiff = Math.abs(fileModTime - localTimestamp);
-                    if (quickDiff <= SYNC_TOLERANCE_MS) {
-                        console.log(`[Sync][Step 2b] 文件修改时间差异在容错范围内 (${quickDiff}ms)，跳过下载`);
-                        cloudTimestamp = localTimestamp;  // 视为一致
-                    } else {
-                        // 时间差明显，需要下载完整数据获取准确的 timestamp
-                        console.log(`[Sync][Step 2b] 文件修改时间差异较大 (${quickDiff}ms)，下载数据获取准确时间戳`);
-                        cloudData = await activeService.downloadData();
-                        cloudTimestamp = cloudData?.timestamp || 0;
-                        console.log(`[Sync][Step 2c] 从数据内容获取时间戳: ${cloudTimestamp} (${new Date(cloudTimestamp).toLocaleString()})`);
-                    }
-                } else {
-                    // statFile 不可用或文件不存在，fallback 到下载数据
-                    console.log(`[Sync][Step 2] statFile 不可用，尝试下载数据获取时间戳`);
+                // 在移动端，跳过 statFile 优化，直接下载数据以避免跨域问题
+                if (isNative) {
+                    console.log(`[Sync][Step 2] 移动端环境，直接下载数据获取时间戳`);
                     cloudData = await activeService.downloadData();
                     cloudTimestamp = cloudData?.timestamp || 0;
+                } else {
+                    // 桌面端使用 statFile 优化
+                    const cloudFileDate = await activeService.statFile?.();
+                    
+                    if (cloudFileDate) {
+                        const fileModTime = cloudFileDate.getTime();
+                        console.log(`[Sync][Step 2a] 快速获取云端文件修改时间: ${fileModTime} (${cloudFileDate.toLocaleString()})`);
+                        
+                        // 快速判断：如果文件修改时间和本地时间戳差异在容错范围内，直接认为一致
+                        const quickDiff = Math.abs(fileModTime - localTimestamp);
+                        if (quickDiff <= SYNC_TOLERANCE_MS) {
+                            console.log(`[Sync][Step 2b] 文件修改时间差异在容错范围内 (${quickDiff}ms)，跳过下载`);
+                            cloudTimestamp = localTimestamp;  // 视为一致
+                        } else {
+                            // 时间差明显，需要下载完整数据获取准确的 timestamp
+                            console.log(`[Sync][Step 2b] 文件修改时间差异较大 (${quickDiff}ms)，下载数据获取准确时间戳`);
+                            cloudData = await activeService.downloadData();
+                            cloudTimestamp = cloudData?.timestamp || 0;
+                            console.log(`[Sync][Step 2c] 从数据内容获取时间戳: ${cloudTimestamp} (${new Date(cloudTimestamp).toLocaleString()})`);
+                        }
+                    } else {
+                        // statFile 不可用或文件不存在，fallback 到下载数据
+                        console.log(`[Sync][Step 2] statFile 不可用，尝试下载数据获取时间戳`);
+                        cloudData = await activeService.downloadData();
+                        cloudTimestamp = cloudData?.timestamp || 0;
+                    }
                 }
             } catch (err) {
                 console.log('[Sync][Step 2] 云端无数据或获取失败，准备上传本地数据');

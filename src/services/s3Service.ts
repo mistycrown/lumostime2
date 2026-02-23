@@ -58,12 +58,30 @@ export class S3Service {
         if (!this.config) return;
 
         try {
-            this.client = new COS({
+            const cosConfig: any = {
                 SecretId: this.config.secretId,
                 SecretKey: this.config.secretKey,
-            });
+            };
 
-            // console.log('[COS] Client initialized successfully');
+            // 在 Capacitor 环境下，配置额外选项以避免跨域问题
+            if (Capacitor.isNativePlatform()) {
+                console.log('[COS] Initializing for native platform (Capacitor)');
+                // 使用更宽松的配置
+                cosConfig.Protocol = 'https:';
+                cosConfig.UseAccelerate = false;
+                cosConfig.Timeout = 60000; // 60秒超时
+                
+                // 禁用预检请求（OPTIONS）
+                cosConfig.ForcePathStyle = false;
+            }
+
+            this.client = new COS(cosConfig);
+
+            console.log('[COS] Client initialized successfully', {
+                isNative: Capacitor.isNativePlatform(),
+                region: this.config.region,
+                bucket: this.config.bucketName
+            });
         } catch (error) {
             console.error('[COS] Failed to initialize client:', error);
             this.client = null;
@@ -169,8 +187,7 @@ export class S3Service {
         if (!this.config || !this.client) return null;
 
         return new Promise((resolve) => {
-            // console.log(`[COS] Getting file stats: ${filename}`);
-
+            console.log(`[COS] Getting file stats: ${filename}`);
 
             this.client.headObject({
                 Bucket: this.config!.bucketName,
@@ -180,12 +197,19 @@ export class S3Service {
                 if (err) {
                     if (err.code !== 'NoSuchKey') {
                         console.error(`[COS] Failed to get file stats: ${filename}`, err);
+                        console.error(`[COS] Error details:`, {
+                            code: err.code,
+                            message: err.message,
+                            statusCode: err.statusCode,
+                            isNative: Capacitor.isNativePlatform()
+                        });
                     }
                     resolve(null);
                 } else {
                     const lastModified = data.headers && data.headers['last-modified']
                         ? new Date(data.headers['last-modified'])
                         : null;
+                    console.log(`[COS] ✓ File stats retrieved: ${filename}, lastModified: ${lastModified?.toLocaleString()}`);
                     resolve(lastModified);
                 }
             });

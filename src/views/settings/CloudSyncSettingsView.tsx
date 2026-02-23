@@ -3,7 +3,7 @@
  * @description WebDAV 云同步配置页面
  */
 import React, { useState, useEffect } from 'react';
-import { ChevronLeft, Server, User, Globe, Save, RefreshCw, Upload, Download, CheckCircle2, LogOut, Trash2 } from 'lucide-react';
+import { ChevronLeft, Server, User, Globe, Save, RefreshCw, Upload, Download, CheckCircle2, LogOut, Trash2, Eye, EyeOff } from 'lucide-react';
 import { webdavService, WebDAVConfig } from '../../services/webdavService';
 import { ToastType } from '../../components/Toast';
 
@@ -26,6 +26,7 @@ export const CloudSyncSettingsView: React.FC<CloudSyncSettingsViewProps> = ({
 }) => {
     const [configForm, setConfigForm] = useState<WebDAVConfig>({ url: '', username: '', password: '' });
     const [isSyncing, setIsSyncing] = useState(false);
+    const [showPassword, setShowPassword] = useState(false);
 
     useEffect(() => {
         const config = webdavService.getConfig();
@@ -39,6 +40,15 @@ export const CloudSyncSettingsView: React.FC<CloudSyncSettingsViewProps> = ({
             onToast('error', 'Please enter a URL');
             return;
         }
+        if (!configForm.username) {
+            onToast('error', 'Please enter username');
+            return;
+        }
+        if (!configForm.password) {
+            onToast('error', 'Please enter password');
+            return;
+        }
+        
         setIsSyncing(true);
         const config = { ...configForm };
         if (!config.url.startsWith('http')) {
@@ -48,13 +58,22 @@ export const CloudSyncSettingsView: React.FC<CloudSyncSettingsViewProps> = ({
         webdavService.saveConfig(config);
         localStorage.removeItem('lumos_webdav_manual_disconnect');
 
-        const success = await webdavService.checkConnection();
+        try {
+            const success = await webdavService.checkConnection();
 
-        if (success) {
-            setWebdavConfig(config);
-            onToast('success', 'WebDAV连接成功');
-        } else {
-            alert('连接失败，请检查 URL 和凭据。');
+            if (success) {
+                setWebdavConfig(config);
+                onToast('success', 'WebDAV 连接成功');
+            } else {
+                onToast('error', '连接失败：用户名或密码错误，或服务器不可访问');
+            }
+        } catch (error: any) {
+            console.error('Connection test error:', error);
+            if (error?.status === 401) {
+                onToast('error', '认证失败：用户名或密码错误');
+            } else {
+                onToast('error', '连接失败：请检查 URL 和网络连接');
+            }
         }
         setIsSyncing(false);
     };
@@ -195,12 +214,20 @@ export const CloudSyncSettingsView: React.FC<CloudSyncSettingsViewProps> = ({
                                     <div className="flex items-center gap-2 bg-stone-50 px-3 py-2 rounded-xl mt-1 focus-within:ring-2 focus-within:ring-stone-200 transition-all">
                                         <div className="w-[18px] flex justify-center"><Server size={14} className="text-stone-400" /></div>
                                         <input
-                                            type="password"
+                                            type={showPassword ? "text" : "password"}
                                             placeholder="Password / App Token"
                                             className="flex-1 bg-transparent border-none outline-none text-stone-700 placeholder:text-stone-300 text-sm"
                                             value={configForm.password}
                                             onChange={e => setConfigForm(prev => ({ ...prev, password: e.target.value }))}
                                         />
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowPassword(!showPassword)}
+                                            className="text-stone-400 hover:text-stone-600 transition-colors p-1"
+                                            aria-label={showPassword ? "Hide password" : "Show password"}
+                                        >
+                                            {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                                        </button>
                                     </div>
                                 </div>
                             </div>
