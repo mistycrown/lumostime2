@@ -178,11 +178,11 @@ export enum AppView {
 // ========== Scene View (场景视图) ==========
 
 // 场景卡片类型
-export type SceneCardType = 'timer' | 'todo' | 'checklist' | 'navigation' | 'text' | 'stats';
+export type SceneCardType = 'timer' | 'todo' | 'checklist' | 'navigation' | 'principle' | 'reference' | 'stats';
 
 // 场景卡片动作配置
 export interface SceneCardAction {
-  type: 'startTimer' | 'startTodo' | 'toggleCheck' | 'navigate' | 'none';
+  type: 'startTimer' | 'startTodo' | 'toggleCheck' | 'navigate' | 'reference' | 'none';
   // 计时动作
   activityId?: string;
   categoryId?: string;
@@ -192,6 +192,11 @@ export interface SceneCardAction {
   checkItemId?: string;
   // 导航动作
   targetView?: string;
+  // 引用动作
+  sourceType?: 'dailyReview' | 'weeklyReview' | 'monthlyReview';
+  dateOffset?: 'today' | 'yesterday' | 'thisWeek' | 'lastWeek' | 'thisMonth' | 'lastMonth';
+  questionId?: string;
+  fallbackText?: string;
 }
 
 // 场景卡片数据
@@ -230,8 +235,9 @@ export interface SceneCardData {
   goalValue?: number; // 目标值（分钟）
   goalType?: 'min' | 'max'; // 目标类型：min=大于该值，max=小于该值
   
-  // 文字内容（仅 text 类型）
-  content?: string;
+  // 引用内容（仅 reference 类型，运行时动态计算）
+  referencedQuestion?: string;  // 引用的问题文本
+  referencedAnswer?: string;    // 引用的回答内容
   
   // 日课状态（仅 checklist 类型）
   isCompleted?: boolean;

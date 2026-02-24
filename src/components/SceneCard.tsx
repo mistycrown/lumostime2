@@ -3,7 +3,7 @@
  * @description 场景卡片组件 - 支持正反面翻转和滑动交互
  */
 import React, { useState, useRef } from 'react';
-import { Check, ChevronRight, Clock, CheckSquare, FileText, ListTodo, BarChart3 } from 'lucide-react';
+import { Check, ChevronRight, Clock, CheckSquare, FileText, ListTodo, BarChart3, BookOpen, Link2 } from 'lucide-react';
 import { SceneCardData, DailyReview, Log } from '../types';
 import { CardStatsBadge } from './CardStatsBadge';
 
@@ -13,7 +13,8 @@ const DEFAULT_COLORS = {
   todo: '#9eadb8',       // 莫兰迪蓝
   checklist: '#d4b896',  // 莫兰迪琥珀
   navigation: '#a8c5d4', // 莫兰迪天蓝
-  text: '#b5b0a8',       // 莫兰迪石灰
+  principle: '#b5b0a8',  // 莫兰迪石灰
+  reference: '#c5a8b5',  // 莫兰迪紫
   stats: '#a8a8c5',      // 莫兰迪靛蓝
 };
 
@@ -174,9 +175,16 @@ export const SceneCard: React.FC<SceneCardProps> = ({ data, dailyReviews = [], l
           break;
         
         case 'checklist':
-        case 'text':
+        case 'principle':
         case 'stats':
           // 这些类型的卡片反面不响应点击
+          break;
+        
+        case 'reference':
+          // 引用卡片反面点击跳转到对应的日报
+          if (data.action.type === 'reference') {
+            onAction?.(data.action);
+          }
           break;
       }
     }
@@ -262,8 +270,10 @@ const CardFront: React.FC<{ data: SceneCardData; cardColor: string }> = ({ data,
         return <CheckSquare {...iconProps} />;
       case 'navigation':
         return <ChevronRight {...iconProps} />;
-      case 'text':
-        return <FileText {...iconProps} />;
+      case 'principle':
+        return <BookOpen {...iconProps} />;
+      case 'reference':
+        return <Link2 {...iconProps} />;
       case 'stats':
         return <BarChart3 {...iconProps} />;
       default:
@@ -329,7 +339,7 @@ const CardFront: React.FC<{ data: SceneCardData; cardColor: string }> = ({ data,
       )}
       
       {/* 第二行：正面文字（如果有） */}
-      {data.frontText && (
+      {data.frontText && data.type !== 'reference' && (
         <div className="flex items-center gap-2">
           <div className="flex-shrink-0 flex items-center justify-center">
             {getFrontIcon()}
@@ -341,6 +351,18 @@ const CardFront: React.FC<{ data: SceneCardData; cardColor: string }> = ({ data,
           {data.type === 'stats' && data.statValue && (
             <p className="text-sm font-bold text-stone-800 whitespace-nowrap ml-2 self-end">{data.statValue}</p>
           )}
+        </div>
+      )}
+      
+      {/* 引用卡片：显示引用的问题 */}
+      {data.type === 'reference' && (
+        <div className="flex items-start gap-2">
+          <div className="flex-shrink-0 flex items-center justify-center mt-0.5">
+            {getFrontIcon()}
+          </div>
+          <p className="text-sm text-stone-600 break-words overflow-wrap-anywhere flex-1 leading-[1.4]">
+            {data.referencedQuestion || data.action.fallbackText || '暂无引用内容'}
+          </p>
         </div>
       )}
       
@@ -493,7 +515,7 @@ const CardBack: React.FC<{
       )}
       
       {/* 第二行：反面文字（如果有） */}
-      {data.backText && (
+      {data.backText && data.type !== 'reference' && (
         <div className="flex items-end gap-2">
           <p className="text-sm text-stone-600 break-words overflow-wrap-anywhere flex-1 leading-[1.4]">
             {data.backText}
@@ -502,6 +524,15 @@ const CardBack: React.FC<{
           {data.type === 'stats' && data.statValue && (
             <p className="text-sm font-bold text-stone-800 whitespace-nowrap">{data.statValue}</p>
           )}
+        </div>
+      )}
+      
+      {/* 引用卡片：显示引用的回答 */}
+      {data.type === 'reference' && (
+        <div className="flex items-start gap-2 pr-8">
+          <p className="text-sm text-stone-700 break-words overflow-wrap-anywhere flex-1 leading-[1.4]">
+            {data.referencedAnswer || data.action.fallbackText || '暂无回答内容'}
+          </p>
         </div>
       )}
       

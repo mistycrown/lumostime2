@@ -46,10 +46,10 @@ export const DEFAULT_SCENE_PRESETS: TimeSlot[] = [
       },
       { 
         id: '5', 
-        type: 'text', 
-        title: '晨间箴言', 
-        frontText: '每天起床第一句，先给自己打个气',
-        backText: '「清晨的第一个小时，决定了一天的基调。」—— 罗宾·夏尔马《凌晨5点俱乐部》',
+        type: 'principle', 
+        title: '拥抱现实', 
+        frontText: '痛苦 + 反思 = 进步',
+        backText: '面对现实，不要逃避问题。每个挫折都是进化的机会，关键在于从中学习和成长。',
         action: { type: 'none' }
       },
     ]
@@ -71,10 +71,10 @@ export const DEFAULT_SCENE_PRESETS: TimeSlot[] = [
       },
       { 
         id: '7', 
-        type: 'text', 
-        title: '专注的智慧', 
-        frontText: '上午，是大脑最清醒的时刻',
-        backText: '「最重要的工作，要在意志力最充沛的时刻完成。」—— 《意志力》罗伊·鲍迈斯特',
+        type: 'principle', 
+        title: '极度求真', 
+        frontText: '真理比正确更重要',
+        backText: '不要让自我妨碍真相。保持开放心态，积极寻求不同意见，勇于承认错误。',
         action: { type: 'none' }
       },
     ]
@@ -121,10 +121,10 @@ export const DEFAULT_SCENE_PRESETS: TimeSlot[] = [
       },
       { 
         id: '11', 
-        type: 'text', 
-        title: '心流时刻', 
-        frontText: '持续的专注，是通往心流的路径',
-        backText: '「心流状态下，时间会消失，自我会消失，只剩下纯粹的体验。」—— 米哈里·契克森米哈赖',
+        type: 'principle', 
+        title: '五步流程', 
+        frontText: '目标 → 问题 → 诊断 → 方案 → 执行',
+        backText: '这是实现任何目标的通用公式。每一步都要做到位，不要跳过任何环节。',
         action: { type: 'none' }
       },
     ]

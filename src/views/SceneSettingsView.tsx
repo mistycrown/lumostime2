@@ -135,8 +135,9 @@ export const SceneSettingsView: React.FC<SceneSettingsViewProps> = ({ onBack }) 
         }
         return '统计：未设置';
       
-      case 'text':
-        return null; // 文本卡片不需要显示关联信息
+      case 'principle':
+      case 'reference':
+        return null; // 原则和引用卡片不需要显示关联信息
       
       default:
         return null;
@@ -324,11 +325,7 @@ export const SceneSettingsView: React.FC<SceneSettingsViewProps> = ({ onBack }) 
         progress: editingCard.progress,
         totalAmount: editingCard.totalAmount
       }),
-      // 保留文字卡片的内容字段
-      ...(editingCard.type === 'text' && {
-        content: editingCard.content
-      }),
-      // 保留日课卡片的完成状态
+      // 日课卡片的完成状态
       ...(editingCard.type === 'checklist' && {
         isCompleted: editingCard.isCompleted
       })
@@ -862,7 +859,8 @@ const CardEditModal: React.FC<{
     { value: 'todo', label: '待办' },
     { value: 'checklist', label: '日课' },
     { value: 'navigation', label: '导航' },
-    { value: 'text', label: '文字' },
+    { value: 'principle', label: '原则' },
+    { value: 'reference', label: '引用' },
     { value: 'stats', label: '统计' }
   ];
 
@@ -1144,9 +1142,9 @@ const CardEditModal: React.FC<{
             />
           )}
 
-          {card?.type === 'text' && (
+          {card?.type === 'reference' && (
             <div className="p-3 bg-stone-50 rounded-lg text-xs sm:text-sm text-stone-600">
-              提示：文字卡片将在后续版本中实现
+              提示：引用卡片将在后续版本中实现
             </div>
           )}
 
