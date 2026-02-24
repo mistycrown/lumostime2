@@ -235,6 +235,7 @@ export interface SceneCardData {
   
   // 日课状态（仅 checklist 类型）
   isCompleted?: boolean;
+  checkItemContent?: string; // 日课内容（用于计算坚持天数）
 }
 
 // 时间段定义

@@ -14,6 +14,7 @@ interface CheckItemStreakBadgeProps {
     dailyReviews: DailyReview[];
     targetDate?: Date;
     className?: string;
+    color?: string; // 卡片颜色，用于奖杯和文字
 }
 
 /**
@@ -23,12 +24,14 @@ interface CheckItemStreakBadgeProps {
  * @param dailyReviews - 所有日报列表
  * @param targetDate - 目标日期（默认为今天）
  * @param className - 额外的 CSS 类名
+ * @param color - 卡片颜色（用于奖杯和文字）
  */
 export const CheckItemStreakBadge: React.FC<CheckItemStreakBadgeProps> = ({
     checkItemContent,
     dailyReviews,
     targetDate,
-    className = ''
+    className = '',
+    color
 }) => {
     const stats = calculateCheckItemStreak(checkItemContent, dailyReviews, targetDate);
 
@@ -38,13 +41,13 @@ export const CheckItemStreakBadge: React.FC<CheckItemStreakBadgeProps> = ({
     }
 
     return (
-        <div className={`flex items-center gap-1.5 text-xs text-amber-600 shrink-0 ${className}`}>
-            <Trophy size={12} className="text-amber-500" />
-            <span className="font-mono font-medium">
+        <div className={`flex items-center gap-1.5 text-xs shrink-0 ${className}`} style={{ color: color || '#d97706' }}>
+            <Trophy size={12} style={{ color: color || '#d97706' }} />
+            <span className="font-mono font-medium tracking-tighter">
                 {stats.totalDays}
             </span>
-            <span className="text-stone-300">/</span>
-            <span className="font-mono font-medium">
+            <span className="opacity-50 -mx-0.5">/</span>
+            <span className="font-mono font-medium tracking-tighter">
                 {stats.currentStreak}
             </span>
         </div>

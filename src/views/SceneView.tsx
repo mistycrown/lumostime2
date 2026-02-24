@@ -52,7 +52,6 @@ export const SceneView: React.FC<SceneViewProps> = ({
   
   // 当前选中的时间段索引
   const [selectedSlotIndex, setSelectedSlotIndex] = useState<number>(0);
-  const [isManualSelection, setIsManualSelection] = useState(false);
   
   // 用于触发统计卡片的重新计算
   const [statsUpdateTrigger, setStatsUpdateTrigger] = useState(0);
@@ -73,25 +72,25 @@ export const SceneView: React.FC<SceneViewProps> = ({
     }
   }, []);
 
-  // 背景更新逻辑
+  // 背景更新逻辑 - 仅在首次加载时执行
   useEffect(() => {
-    const updateBackground = () => {
-      const bg = backgroundService.getCurrentBackgroundOption();
-      const opacity = backgroundService.getBackgroundOpacity();
-      setBackgroundUrl(bg?.url || '');
-      setBackgroundOpacity(opacity);
+    const bg = backgroundService.getCurrentBackgroundOption();
+    const opacity = backgroundService.getBackgroundOpacity();
+    setBackgroundUrl(bg?.url || '');
+    setBackgroundOpacity(opacity);
+    
+    // 监听 storage 事件以响应其他标签页的背景变化
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === 'backgroundOption' || e.key === 'backgroundOpacity') {
+        const bg = backgroundService.getCurrentBackgroundOption();
+        const opacity = backgroundService.getBackgroundOpacity();
+        setBackgroundUrl(bg?.url || '');
+        setBackgroundOpacity(opacity);
+      }
     };
-    updateBackground();
-    const interval = setInterval(updateBackground, 500);
-    return () => clearInterval(interval);
-  }, []);
-
-  // 定时更新统计数据（每分钟更新一次）
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setStatsUpdateTrigger(prev => prev + 1);
-    }, 60000); // 60秒
-    return () => clearInterval(interval);
+    
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
   }, []);
 
   // 获取当前时间对应的时间段索引
@@ -124,25 +123,31 @@ export const SceneView: React.FC<SceneViewProps> = ({
     return 0; // 默认返回第一个
   };
 
-  // 自动切换到当前时间段（仅在非手动选择时）
+  // 自动切换到当前时间段 - 仅在首次加载时执行
   useEffect(() => {
-    if (!isManualSelection && timeSlots.length > 0) {
+    if (timeSlots.length > 0) {
       setSelectedSlotIndex(getCurrentTimeSlotIndex());
     }
-  }, [isManualSelection, timeSlots]);
-
-  // 重置手动选择状态（5分钟后）
-  useEffect(() => {
-    if (isManualSelection) {
-      const timer = setTimeout(() => {
-        setIsManualSelection(false);
-      }, 5 * 60 * 1000); // 5分钟
-      return () => clearTimeout(timer);
-    }
-  }, [isManualSelection]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // 空依赖数组，仅在组件挂载时执行一次
 
   const currentSlot = timeSlots[selectedSlotIndex];
   const currentCards = currentSlot?.cards || [];
+
+  // 统计数据更新 - 仅在有统计卡片时每分钟更新一次
+  useEffect(() => {
+    // 检查当前时间段是否有统计卡片
+    const hasStatsCard = currentCards.some(card => card.type === 'stats');
+    
+    if (!hasStatsCard) {
+      return; // 如果没有统计卡片，不需要定时更新
+    }
+    
+    const interval = setInterval(() => {
+      setStatsUpdateTrigger(prev => prev + 1);
+    }, 60000); // 60秒
+    return () => clearInterval(interval);
+  }, [currentCards]);
 
   // 计算统计卡片的时长数据
   const calculateStatsDuration = (filterActivityIds?: string[]): string => {
@@ -358,6 +363,23 @@ export const SceneView: React.FC<SceneViewProps> = ({
     return checkItem?.isCompleted || false;
   };
 
+  // 获取日课的内容（用于计算坚持天数）
+  const getCheckItemContent = (checkItemId: string): string | undefined => {
+    // 安全检查：确保 checkTemplates 存在
+    if (!checkTemplates || checkTemplates.length === 0) {
+      return undefined;
+    }
+    
+    // 从模板中查找日课项
+    for (const template of checkTemplates) {
+      const item = template.items.find(i => i.id === checkItemId);
+      if (item) {
+        return item.content;
+      }
+    }
+    return undefined;
+  };
+
   // 处理导航
   const handleNavigation = (targetView: string) => {
     // Set Scene as the previous view before navigating away
@@ -543,7 +565,6 @@ export const SceneView: React.FC<SceneViewProps> = ({
               <button
                 key={slot.id}
                 onClick={() => {
-                  setIsManualSelection(true);
                   setSelectedSlotIndex(index);
                 }}
                 className={`
@@ -624,10 +645,18 @@ export const SceneView: React.FC<SceneViewProps> = ({
             </div>
           ) : (
             currentCards.map((card) => {
-              // 如果是日课卡片，获取其完成状态
-              let cardWithStatus = card.type === 'checklist' && card.action.checkItemId
-                ? { ...card, isCompleted: getCheckItemStatus(card.action.checkItemId) }
-                : card;
+              // 如果是日课卡片，获取其完成状态和内容
+              let cardWithStatus = card;
+              
+              if (card.type === 'checklist' && card.action.checkItemId) {
+                const isCompleted = getCheckItemStatus(card.action.checkItemId);
+                const checkItemContent = getCheckItemContent(card.action.checkItemId);
+                cardWithStatus = { 
+                  ...card, 
+                  isCompleted,
+                  checkItemContent
+                };
+              }
               
               // 如果是统计卡片，计算时长数据
               if (card.type === 'stats') {
@@ -644,6 +673,7 @@ export const SceneView: React.FC<SceneViewProps> = ({
                 <SceneCard
                   key={card.id}
                   data={cardWithStatus}
+                  dailyReviews={dailyReviews}
                   onAction={handleCardAction}
                 />
               );

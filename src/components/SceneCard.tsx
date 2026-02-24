@@ -4,7 +4,8 @@
  */
 import React, { useState, useRef } from 'react';
 import { Check, ChevronRight, Clock, CheckSquare, FileText, ListTodo, BarChart3 } from 'lucide-react';
-import { SceneCardData } from '../types';
+import { SceneCardData, DailyReview } from '../types';
+import { CheckItemStreakBadge } from './CheckItemStreakBadge';
 
 // 莫兰迪色系默认颜色映射
 const DEFAULT_COLORS = {
@@ -18,10 +19,11 @@ const DEFAULT_COLORS = {
 
 interface SceneCardProps {
   data: SceneCardData;
+  dailyReviews?: DailyReview[]; // 用于计算日课坚持天数
   onAction?: (action: SceneCardData['action'], autoEnterFocus?: boolean) => void;
 }
 
-export const SceneCard: React.FC<SceneCardProps> = ({ data, onAction }) => {
+export const SceneCard: React.FC<SceneCardProps> = ({ data, dailyReviews = [], onAction }) => {
   // 获取卡片颜色（优先使用自定义颜色，否则使用默认颜色）
   const cardColor = data.color || DEFAULT_COLORS[data.type];
   // 获取今天的日期字符串（YYYY-MM-DD）
@@ -227,6 +229,7 @@ export const SceneCard: React.FC<SceneCardProps> = ({ data, onAction }) => {
           <CardBack 
             data={data}
             cardColor={cardColor}
+            dailyReviews={dailyReviews}
             isSwiping={isSwiping} 
             swipeProgress={swipeOffset / maxSwipeDistance}
             isClickable={data.type === 'timer' || data.type === 'todo' || data.type === 'navigation'}
@@ -353,10 +356,11 @@ const CardFront: React.FC<{ data: SceneCardData; cardColor: string }> = ({ data,
 const CardBack: React.FC<{ 
   data: SceneCardData;
   cardColor: string;
+  dailyReviews?: DailyReview[];
   isSwiping?: boolean; 
   swipeProgress?: number;
   isClickable?: boolean;
-}> = ({ data, cardColor, isSwiping, swipeProgress = 0, isClickable = false }) => {
+}> = ({ data, cardColor, dailyReviews = [], isSwiping, swipeProgress = 0, isClickable = false }) => {
   // 根据卡片颜色获取边框颜色（50%透明度，反面稍深）
   const getBorderColor = () => {
     return `${cardColor}80`; // 80 = 50% opacity in hex
@@ -411,6 +415,17 @@ const CardBack: React.FC<{
           </div>
         )}
       </div>
+      
+      {/* 右下角：日课坚持天数徽章 */}
+      {data.type === 'checklist' && data.checkItemContent && dailyReviews.length > 0 && !isSwiping && (
+        <div className="absolute bottom-4 right-4">
+          <CheckItemStreakBadge
+            checkItemContent={data.checkItemContent}
+            dailyReviews={dailyReviews}
+            color={cardColor}
+          />
+        </div>
+      )}
       
       {/* 第一行：标题 */}
       <div className={data.type === 'stats' ? 'mb-2' : 'pr-12 mb-2'}>
