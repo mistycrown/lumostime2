@@ -408,3 +408,79 @@ export function generateCompleteMonthlyStatsText(
 
     return overviewText + '\n' + weeklyText + checkText;
 }
+
+/**
+ * 日课坚持统计接口
+ */
+export interface CheckItemStreakStats {
+    totalDays: number;      // 总坚持天数
+    currentStreak: number;  // 当前连续坚持天数
+}
+
+/**
+ * 计算单个日课项的坚持天数统计
+ * 
+ * @param checkItemContent - 日课内容（用于匹配）
+ * @param dailyReviews - 所有日报列表（按日期升序排列）
+ * @param targetDate - 目标日期（计算到这一天为止的统计，默认为今天）
+ * @returns 坚持天数统计
+ */
+export function calculateCheckItemStreak(
+    checkItemContent: string,
+    dailyReviews: DailyReview[],
+    targetDate: Date = new Date()
+): CheckItemStreakStats {
+    // 按日期升序排序
+    const sortedReviews = [...dailyReviews].sort((a, b) => 
+        new Date(a.date).getTime() - new Date(b.date).getTime()
+    );
+
+    // 筛选出包含该日课项且已完成的日期
+    const completedDates: string[] = [];
+    sortedReviews.forEach(review => {
+        if (review.checkItems) {
+            const item = review.checkItems.find(
+                ci => ci.content === checkItemContent && ci.isCompleted
+            );
+            if (item) {
+                completedDates.push(review.date);
+            }
+        }
+    });
+
+    const totalDays = completedDates.length;
+
+    // 计算连续坚持天数（从目标日期往前推）
+    let currentStreak = 0;
+    const targetDateStr = targetDate.toISOString().split('T')[0];
+    
+    // 从目标日期开始往前查找连续完成的天数
+    let checkDate = new Date(targetDate);
+    checkDate.setHours(0, 0, 0, 0);
+    
+    while (true) {
+        const dateStr = checkDate.toISOString().split('T')[0];
+        
+        if (completedDates.includes(dateStr)) {
+            currentStreak++;
+            // 往前推一天
+            checkDate.setDate(checkDate.getDate() - 1);
+        } else {
+            // 如果是今天且未完成，继续往前查找昨天
+            if (dateStr === targetDateStr) {
+                checkDate.setDate(checkDate.getDate() - 1);
+                continue;
+            }
+            // 遇到未完成的日期，停止计数
+            break;
+        }
+        
+        // 防止无限循环，最多查找1000天
+        if (currentStreak > 1000) break;
+    }
+
+    return {
+        totalDays,
+        currentStreak
+    };
+}

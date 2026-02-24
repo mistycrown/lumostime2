@@ -139,6 +139,7 @@ export const AppRoutes: React.FC<AppRoutesProps> = ({
                 todos={todos}
                 todoCategories={todoCategories}
                 scopes={scopes}
+                dailyReviews={dailyReviews}
                 customNarrativeTemplates={customNarrativeTemplates}
                 onDelete={handleDeleteReview}
                 onUpdateReview={handleUpdateReview}
@@ -256,7 +257,9 @@ export const AppRoutes: React.FC<AppRoutesProps> = ({
     switch (currentView) {
         case AppView.RECORD:
             return <RecordViewContainer 
-                onStartActivity={handleStartActivity} 
+                onStartActivity={(activity, categoryId, autoEnterFocus) => 
+                    handleStartActivity(activity, categoryId, undefined, undefined, undefined, autoEnterFocus)
+                } 
                 onStartTodoFocus={handleStartTodoFocus}
                 categories={categories}
                 todos={todos}

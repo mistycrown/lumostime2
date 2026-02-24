@@ -19,6 +19,7 @@ import { NarrativeStyleSelectionModal } from '../components/NarrativeStyleSelect
 import { StatsView } from './StatsView';
 import { FloatingButton } from '../components/FloatingButton';
 import { UIIcon } from '../components/UIIcon';
+import { CheckItemStreakBadge } from '../components/CheckItemStreakBadge';
 import { 
     useReviewState, 
     ReviewGuideTab, 
@@ -40,6 +41,7 @@ interface DailyReviewViewProps {
     todos: TodoItem[];
     todoCategories: TodoCategory[];
     scopes: Scope[];
+    dailyReviews: DailyReview[]; // 所有日报数据，用于计算坚持天数
     customNarrativeTemplates?: NarrativeTemplate[];
     onDelete: () => void;
     onUpdateReview: (review: DailyReview) => void;
@@ -59,6 +61,7 @@ export const DailyReviewView: React.FC<DailyReviewViewProps> = ({
     todos,
     todoCategories,
     scopes,
+    dailyReviews,
     customNarrativeTemplates,
     onDelete,
     onUpdateReview,
@@ -661,11 +664,11 @@ export const DailyReviewView: React.FC<DailyReviewViewProps> = ({
                                                             <p className={`flex-1 text-[15px] font-serif leading-relaxed transition-all ${item.isCompleted ? 'text-stone-400 line-through decoration-stone-300' : 'text-stone-900'}`}>
                                                                 {item.content}
                                                             </p>
-                                                            {item.type === 'auto' && (
-                                                                <span className="text-xs text-blue-500 bg-blue-50 px-2 py-0.5 rounded-full shrink-0">
-                                                                    自动
-                                                                </span>
-                                                            )}
+                                                            <CheckItemStreakBadge
+                                                                checkItemContent={item.content}
+                                                                dailyReviews={dailyReviews}
+                                                                targetDate={date}
+                                                            />
                                                         </div>
                                                     </div>
                                                 ))}

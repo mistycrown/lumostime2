@@ -407,7 +407,7 @@ export const EmojiSettingsView: React.FC<EmojiSettingsViewProps> = ({ onBack }) 
                 {isRedeemed && (
                     <div className="bg-white rounded-xl p-4 shadow-sm">
                         <h3 className="text-sm font-bold text-stone-700 mb-3">Selector 默认页</h3>
-                        <p className="text-xs text-stone-500 mb-4">选择打开心情选择器时默认显示的页面</p>
+                        <p className="text-xs text-stone-500 mb-4">选择打开心情选择器时默认显示的页面。emoji和sticker风格不统一，尽量不要混用。</p>
                         
                         <div className="space-y-2">
                             {/* Emoji 页选项 */}
@@ -455,7 +455,7 @@ export const EmojiSettingsView: React.FC<EmojiSettingsViewProps> = ({ onBack }) 
 
                 {/* Selector 图标组 */}
                 <div className="bg-white rounded-xl p-4 shadow-sm">
-                    <h3 className="text-sm font-bold text-stone-700 mb-3">Selector 图标组</h3>
+                    <h3 className="text-sm font-bold text-stone-700 mb-3">Emoji 图标组</h3>
                     <p className="text-xs text-stone-500 mb-4">选择在 Selector 中显示的 emoji 组</p>
 
                     {/* 预设组 */}
