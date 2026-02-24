@@ -28,7 +28,7 @@ const TimelineImage: React.FC<{ src: string; alt: string; className: string }> =
                 });
             },
             {
-                rootMargin: '200px', // 提前 200px 开始加载
+                rootMargin: '400px', // 增加到 400px，更早开始加载
                 threshold: 0.01
             }
         );
@@ -71,7 +71,8 @@ const TimelineImage: React.FC<{ src: string; alt: string; className: string }> =
     }, [src, isInView]);
 
     if (!imgUrl) {
-        return <div ref={imgRef} className={`bg-gray-100 ${className} animate-pulse`} />;
+        // 为占位符添加最小高度，确保 IntersectionObserver 能正确检测
+        return <div ref={imgRef} className={`bg-gray-100 ${className} animate-pulse min-h-[200px]`} />;
     }
 
     return (
