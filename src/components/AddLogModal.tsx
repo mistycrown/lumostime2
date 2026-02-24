@@ -372,13 +372,12 @@ export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialSta
     
     // 重置表单到初始状态
     const defaultCategory = categories[0];
-    const defaultActivity = defaultCategory?.activities[0];
     const now = Date.now();
     const startTime = lastLogEndTime || now - 60 * 60 * 1000;
     
     updateFields({
       selectedCategoryId: defaultCategory?.id || '',
-      selectedActivityId: defaultActivity?.id || '',
+      selectedActivityId: '', // 不默认选中任何活动
       note: '',
       linkedTodoId: undefined,
       progressIncrement: 0,
@@ -952,7 +951,7 @@ export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialSta
                 onClick={handleDelete}
                 className="w-full py-2.5 text-red-500 hover:text-red-600 hover:bg-red-50 rounded-full font-medium text-sm transition-colors active:scale-95"
               >
-                Delete Task
+                Delete Log
               </button>
             </div>
           )}

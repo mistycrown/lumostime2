@@ -454,6 +454,10 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
     };
 
     const getFullLocalData = () => {
+        // 从 localStorage 读取场景设置
+        const sceneTimeSlotsStr = localStorage.getItem('sceneTimeSlots');
+        const sceneTimeSlots = sceneTimeSlotsStr ? JSON.parse(sceneTimeSlotsStr) : [];
+        
         const localData = {
             logs: ctxLogs,
             todos: ctxTodos,
@@ -463,12 +467,14 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
             goals: ctxGoals,
             autoLinkRules: ctxAutoLinkRules,
             reviewTemplates: ctxReviewTemplates,
+            checkTemplates: ctxCheckTemplates,
             dailyReviews: ctxDailyReviews,
             weeklyReviews: ctxWeeklyReviews,
             monthlyReviews: ctxMonthlyReviews,
             customNarrativeTemplates: ctxCustomNarrativeTemplates,
             userPersonalInfo: ctxUserPersonalInfo,
             filters: ctxFilters,
+            sceneTimeSlots, // 添加场景设置
             version: '1.0.0',
             timestamp: Date.now()
         };

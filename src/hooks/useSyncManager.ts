@@ -73,6 +73,11 @@ export const useSyncManager = () => {
             if (data.customNarrativeTemplates) setCustomNarrativeTemplates(data.customNarrativeTemplates);
             if (data.userPersonalInfo) setUserPersonalInfo(data.userPersonalInfo);
             if (data.filters) setFilters(data.filters);
+            
+            // 恢复场景设置到 localStorage
+            if (data.sceneTimeSlots) {
+                localStorage.setItem('sceneTimeSlots', JSON.stringify(data.sceneTimeSlots));
+            }
 
             await new Promise(resolve => setTimeout(resolve, 10));
 
@@ -90,10 +95,15 @@ export const useSyncManager = () => {
     };
 
     const getFullLocalData = () => {
+        // 从 localStorage 读取场景设置
+        const sceneTimeSlotsStr = localStorage.getItem('sceneTimeSlots');
+        const sceneTimeSlots = sceneTimeSlotsStr ? JSON.parse(sceneTimeSlotsStr) : [];
+        
         const localData = {
             logs, todos, categories, todoCategories, scopes, goals,
             autoLinkRules, reviewTemplates, checkTemplates, dailyReviews, weeklyReviews,
             monthlyReviews, customNarrativeTemplates, userPersonalInfo, filters,
+            sceneTimeSlots, // 添加场景设置
             version: '1.0.0',
             timestamp: localDataTimestamp // Use the tracking timestamp
         };

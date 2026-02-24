@@ -127,10 +127,10 @@ export const SceneCard: React.FC<SceneCardProps> = ({ data, onAction }) => {
     const currentTouch = e.targetTouches[0].clientX;
     const diff = currentTouch - touchStart;
     
-    // 只响应向右滑动（从左向右）
+    // 只响应向右滑动（从左向右），但卡片向左移动
     if (diff > 0) {
       setIsSwiping(true);
-      setSwipeOffset(Math.min(diff, maxSwipeDistance)); // 限制最大偏移
+      setSwipeOffset(-Math.min(diff, maxSwipeDistance)); // 负值，卡片向左移动
       setTouchEnd(currentTouch);
     }
   };
@@ -182,11 +182,40 @@ export const SceneCard: React.FC<SceneCardProps> = ({ data, onAction }) => {
       }
     } else {
       // 反面点击 - 根据卡片类型决定是否响应
-      if (data.type === 'timer' || data.type === 'todo') {
-        // 计时卡片和待办卡片的反面可以点击（停止计时）
-        // TODO: 实现停止计时逻辑
+      switch (data.type) {
+        case 'timer':
+          // 计时卡片：反面可点击，支持启动下一次计时（允许多次计时）
+          if (data.action.type !== 'none') {
+            onAction?.(data.action);
+          }
+          break;
+        
+        case 'todo':
+          // 待办卡片：反面可点击，支持重新启动一次计时
+          if (data.action.type !== 'none') {
+            onAction?.(data.action);
+          }
+          break;
+        
+        case 'navigation':
+          // 导航卡片：反面可点击，用于跳转至对应的回顾或统计页面
+          if (data.action.type === 'navigate') {
+            onAction?.(data.action);
+          }
+          break;
+        
+        case 'checklist':
+          // 打卡卡片：反面不可点击，仅可通过滑动返回正面
+          break;
+        
+        case 'text':
+        case 'stats':
+          // 文字和数据卡片：反面无事件绑定
+          break;
+        
+        default:
+          break;
       }
-      // 其他类型的卡片反面不响应点击
     }
   };
 
@@ -220,7 +249,7 @@ export const SceneCard: React.FC<SceneCardProps> = ({ data, onAction }) => {
       {isFlipped && (
         <div
           className={`absolute inset-0 ${getSwipeBackgroundColor()} flex items-center justify-end pr-6 text-white font-medium tracking-wide z-0 transition-opacity duration-200 rounded-2xl overflow-hidden`}
-          style={{ opacity: swipeOffset > 0 ? 1 : 0 }}
+          style={{ opacity: swipeOffset < 0 ? 1 : 0 }}
         >
           <span className="flex items-center gap-2">
             往右滑动返回 <ChevronRight size={20} />
@@ -253,7 +282,12 @@ export const SceneCard: React.FC<SceneCardProps> = ({ data, onAction }) => {
           className="scene-card-face scene-card-back"
           onClick={handleCardClick}
         >
-          <CardBack data={data} isSwiping={isSwiping} swipeProgress={swipeOffset / maxSwipeDistance} />
+          <CardBack 
+            data={data} 
+            isSwiping={isSwiping} 
+            swipeProgress={swipeOffset / maxSwipeDistance}
+            isClickable={data.type === 'timer' || data.type === 'todo' || data.type === 'navigation'}
+          />
         </div>
       </div>
     </div>
@@ -342,7 +376,12 @@ const CardFront: React.FC<{ data: SceneCardData }> = ({ data }) => {
 };
 
 // 卡片反面组件
-const CardBack: React.FC<{ data: SceneCardData; isSwiping?: boolean; swipeProgress?: number }> = ({ data, isSwiping, swipeProgress = 0 }) => {
+const CardBack: React.FC<{ 
+  data: SceneCardData; 
+  isSwiping?: boolean; 
+  swipeProgress?: number;
+  isClickable?: boolean;
+}> = ({ data, isSwiping, swipeProgress = 0, isClickable = false }) => {
   const getBackgroundColor = () => {
     switch (data.type) {
       case 'timer':
@@ -386,9 +425,12 @@ const CardBack: React.FC<{ data: SceneCardData; isSwiping?: boolean; swipeProgre
   const getSwipeHintText = () => {
     if (!isSwiping) return '';
     
-    if (swipeProgress < 0.4) {
+    // swipeProgress 现在是负值，取绝对值
+    const progress = Math.abs(swipeProgress);
+    
+    if (progress < 0.4) {
       return '继续滑动...';
-    } else if (swipeProgress < 0.7) {
+    } else if (progress < 0.7) {
       return '快要成功了';
     } else {
       return '松手即可返回';
@@ -399,8 +441,8 @@ const CardBack: React.FC<{ data: SceneCardData; isSwiping?: boolean; swipeProgre
 
   return (
     <div 
-      className={`rounded-2xl p-4 ${getBackgroundColor()} transition-opacity relative`}
-      style={{ opacity: isSwiping ? Math.max(0.6, 1 - swipeProgress * 0.5) : 1 }}
+      className={`rounded-2xl p-4 ${getBackgroundColor()} transition-opacity relative ${isClickable ? 'cursor-pointer' : ''}`}
+      style={{ opacity: isSwiping ? Math.max(0.6, 1 - Math.abs(swipeProgress) * 0.5) : 1 }}
     >
       {/* 右上角完成按钮、滑动提示或统计值 */}
       <div className="absolute top-4 right-4">

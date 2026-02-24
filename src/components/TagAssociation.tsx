@@ -37,7 +37,8 @@ export const TagAssociation: React.FC<TagAssociationProps> = ({
                         key={cat.id}
                         onClick={() => {
                             onCategorySelect(cat.id);
-                            onActivitySelect(cat.activities[0].id);
+                            // 切换分类时不自动选中活动，清空选中状态
+                            onActivitySelect('');
                         }}
                         className={`
                             px-2 py-2 rounded-lg text-[10px] font-medium text-center transition-colors flex items-center justify-center gap-1.5 truncate

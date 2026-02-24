@@ -133,10 +133,15 @@ const AppContent: React.FC = () => {
 
   // Implement Export/Import
   const handleExportData = () => {
+    // 从 localStorage 读取场景设置
+    const sceneTimeSlotsStr = localStorage.getItem('sceneTimeSlots');
+    const sceneTimeSlots = sceneTimeSlotsStr ? JSON.parse(sceneTimeSlotsStr) : [];
+    
     const data = {
       logs, todos, categories, todoCategories, scopes, goals,
       autoLinkRules, reviewTemplates, checkTemplates, dailyReviews, weeklyReviews,
       monthlyReviews, customNarrativeTemplates, userPersonalInfo, filters,
+      sceneTimeSlots, // 添加场景设置
       version: '1.0.0',
       timestamp: Date.now()
     };

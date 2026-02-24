@@ -53,11 +53,10 @@ export const useLogForm = ({
   // 合并状态到单个对象
   const [formState, setFormState] = useState<LogFormState>(() => {
     const defaultCategory = categories[0];
-    const defaultActivity = defaultCategory?.activities[0];
     
     return {
       selectedCategoryId: defaultCategory?.id || '',
-      selectedActivityId: defaultActivity?.id || '',
+      selectedActivityId: '', // 默认不选中任何活动
       note: '',
       linkedTodoId: undefined,
       progressIncrement: 0,
