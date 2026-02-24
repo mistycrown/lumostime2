@@ -1,4 +1,4 @@
-/**
+﻿/**
  * @file SceneCard.tsx
  * @description 场景卡片组件 - 支持正反面翻转和滑动交互
  */
@@ -6,12 +6,24 @@ import React, { useState, useRef } from 'react';
 import { Check, ChevronRight, Clock, CheckSquare, FileText, ListTodo, BarChart3 } from 'lucide-react';
 import { SceneCardData } from '../types';
 
+// 莫兰迪色系默认颜色映射
+const DEFAULT_COLORS = {
+  timer: '#a8b5a0',      // 莫兰迪绿
+  todo: '#9eadb8',       // 莫兰迪蓝
+  checklist: '#d4b896',  // 莫兰迪琥珀
+  navigation: '#a8c5d4', // 莫兰迪天蓝
+  text: '#b5b0a8',       // 莫兰迪石灰
+  stats: '#a8a8c5',      // 莫兰迪靛蓝
+};
+
 interface SceneCardProps {
   data: SceneCardData;
   onAction?: (action: SceneCardData['action']) => void;
 }
 
 export const SceneCard: React.FC<SceneCardProps> = ({ data, onAction }) => {
+  // 获取卡片颜色（优先使用自定义颜色，否则使用默认颜色）
+  const cardColor = data.color || DEFAULT_COLORS[data.type];
   // 获取今天的日期字符串（YYYY-MM-DD）
   const getTodayDateString = () => {
     const today = new Date();
@@ -219,37 +231,19 @@ export const SceneCard: React.FC<SceneCardProps> = ({ data, onAction }) => {
     }
   };
 
-  // 根据卡片类型获取滑动背景颜色
-  const getSwipeBackgroundColor = () => {
-    switch (data.type) {
-      case 'timer':
-        return 'bg-green-500';
-      case 'todo':
-        return 'bg-blue-500';
-      case 'checklist':
-        return 'bg-amber-500';
-      case 'navigation':
-        return 'bg-sky-500';
-      case 'text':
-        return 'bg-stone-400';
-      case 'stats':
-        return 'bg-indigo-500';
-      default:
-        return 'bg-stone-400';
-    }
-  };
-
   return (
     <div
       ref={cardRef}
       className="relative select-none touch-pan-y"
-      style={{ height: cardHeight }}
     >
-      {/* 滑动背景提示 - 只在反面显示，使用卡片类型对应的颜色 */}
+      {/* 滑动背景提示 - 只在反面显示，使用卡片颜色 */}
       {isFlipped && (
         <div
-          className={`absolute inset-0 ${getSwipeBackgroundColor()} flex items-center justify-end pr-6 text-white font-medium tracking-wide z-0 transition-opacity duration-200 rounded-2xl overflow-hidden`}
-          style={{ opacity: swipeOffset < 0 ? 1 : 0 }}
+          className="absolute inset-0 flex items-center justify-end pr-6 text-white font-medium tracking-wide z-0 transition-opacity duration-200 rounded-2xl overflow-hidden"
+          style={{ 
+            backgroundColor: cardColor,
+            opacity: swipeOffset < 0 ? 1 : 0 
+          }}
         >
           <span className="flex items-center gap-2">
             往右滑动返回 <ChevronRight size={20} />
@@ -273,7 +267,7 @@ export const SceneCard: React.FC<SceneCardProps> = ({ data, onAction }) => {
           className="scene-card-face scene-card-front"
           onClick={handleCardClick}
         >
-          <CardFront data={data} />
+          <CardFront data={data} cardColor={cardColor} />
         </div>
 
         {/* 反面 */}
@@ -283,7 +277,8 @@ export const SceneCard: React.FC<SceneCardProps> = ({ data, onAction }) => {
           onClick={handleCardClick}
         >
           <CardBack 
-            data={data} 
+            data={data}
+            cardColor={cardColor}
             isSwiping={isSwiping} 
             swipeProgress={swipeOffset / maxSwipeDistance}
             isClickable={data.type === 'timer' || data.type === 'todo' || data.type === 'navigation'}
@@ -295,49 +290,39 @@ export const SceneCard: React.FC<SceneCardProps> = ({ data, onAction }) => {
 };
 
 // 卡片正面组件
-const CardFront: React.FC<{ data: SceneCardData }> = ({ data }) => {
-  // 根据卡片类型获取颜色
-  const getCardColor = () => {
-    switch (data.type) {
-      case 'timer':
-        return 'bg-white/90 backdrop-blur-sm shadow-sm border border-green-100';
-      case 'todo':
-        return 'bg-white/90 backdrop-blur-sm shadow-sm border border-blue-100';
-      case 'checklist':
-        return 'bg-white/90 backdrop-blur-sm shadow-sm border border-amber-100';
-      case 'navigation':
-        return 'bg-white/90 backdrop-blur-sm shadow-sm border border-sky-100';
-      case 'text':
-        return 'bg-white/90 backdrop-blur-sm shadow-sm border border-stone-100';
-      case 'stats':
-        return 'bg-white/90 backdrop-blur-sm shadow-sm border border-indigo-100';
-      default:
-        return 'bg-white/90 backdrop-blur-sm shadow-sm border border-stone-100';
-    }
+const CardFront: React.FC<{ data: SceneCardData; cardColor: string }> = ({ data, cardColor }) => {
+  // 根据卡片颜色获取边框颜色（30%透明度）
+  const getBorderColor = () => {
+    return `${cardColor}4D`; // 4D = 30% opacity in hex
   };
 
-  // 根据卡片类型获取图标
+  // 根据卡片颜色获取图标
   const getFrontIcon = () => {
+    const iconProps = { size: 14, style: { color: cardColor } };
+    
     switch (data.type) {
       case 'timer':
-        return <Clock size={14} className="text-green-500" />;
+        return <Clock {...iconProps} />;
       case 'todo':
-        return <ListTodo size={14} className="text-blue-500" />;
+        return <ListTodo {...iconProps} />;
       case 'checklist':
-        return <CheckSquare size={14} className="text-amber-500" />;
+        return <CheckSquare {...iconProps} />;
       case 'navigation':
-        return <ChevronRight size={14} className="text-sky-500" />;
+        return <ChevronRight {...iconProps} />;
       case 'text':
-        return <FileText size={14} className="text-stone-500" />;
+        return <FileText {...iconProps} />;
       case 'stats':
-        return <BarChart3 size={14} className="text-indigo-500" />;
+        return <BarChart3 {...iconProps} />;
       default:
-        return <Check size={14} className="text-stone-500" />;
+        return <Check {...iconProps} />;
     }
   };
 
   return (
-    <div className={`rounded-2xl p-4 ${getCardColor()} relative`}>
+    <div 
+      className="rounded-2xl p-4 bg-white/90 backdrop-blur-sm shadow-sm border relative"
+      style={{ borderColor: getBorderColor() }}
+    >
       {/* 右上角状态指示 */}
       <div className="absolute top-4 right-4">
         {/* 待办进度 */}
@@ -363,16 +348,29 @@ const CardFront: React.FC<{ data: SceneCardData }> = ({ data }) => {
             <span>{Math.min(100, Math.round((data.statMinutes / data.goalValue) * 100))}%</span>
           </div>
           <div 
-            className="h-1 w-full rounded-full overflow-hidden" 
+            className="h-1 w-full rounded-full overflow-hidden relative" 
             style={{ backgroundColor: 'var(--progress-bar-bg)' }}
           >
-            <div
-              className="h-full rounded-full transition-all duration-500"
-              style={{
-                backgroundColor: data.goalType === 'max' ? '#dc2626' : 'var(--progress-bar-fill)',
-                width: `${Math.min(100, (data.statMinutes / data.goalValue) * 100)}%`
-              }}
-            />
+            {data.goalType === 'max' ? (
+              // 小于等于目标：从右向左的反向进度条，半透明
+              <div
+                className="h-full rounded-full transition-all duration-500 absolute right-0"
+                style={{
+                  backgroundColor: 'var(--progress-bar-fill)',
+                  width: `${Math.min(100, (data.statMinutes / data.goalValue) * 100)}%`,
+                  opacity: 0.6
+                }}
+              />
+            ) : (
+              // 大于等于目标：从左向右的正向进度条
+              <div
+                className="h-full rounded-full transition-all duration-500"
+                style={{
+                  backgroundColor: 'var(--progress-bar-fill)',
+                  width: `${Math.min(100, (data.statMinutes / data.goalValue) * 100)}%`
+                }}
+              />
+            )}
           </div>
         </div>
       )}
@@ -405,48 +403,24 @@ const CardFront: React.FC<{ data: SceneCardData }> = ({ data }) => {
 
 // 卡片反面组件
 const CardBack: React.FC<{ 
-  data: SceneCardData; 
+  data: SceneCardData;
+  cardColor: string;
   isSwiping?: boolean; 
   swipeProgress?: number;
   isClickable?: boolean;
-}> = ({ data, isSwiping, swipeProgress = 0, isClickable = false }) => {
-  const getBackgroundColor = () => {
-    switch (data.type) {
-      case 'timer':
-        return 'bg-white/90 backdrop-blur-sm shadow-sm border border-green-200';
-      case 'todo':
-        return 'bg-white/90 backdrop-blur-sm shadow-sm border border-blue-200';
-      case 'checklist':
-        return 'bg-white/90 backdrop-blur-sm shadow-sm border border-amber-200';
-      case 'text':
-        return 'bg-white/90 backdrop-blur-sm shadow-sm border border-stone-100';
-      case 'navigation':
-        return 'bg-white/90 backdrop-blur-sm shadow-sm border border-sky-200';
-      case 'stats':
-        return 'bg-white/90 backdrop-blur-sm shadow-sm border border-indigo-200';
-      default:
-        return 'bg-white/90 backdrop-blur-sm shadow-sm border border-stone-100';
-    }
+}> = ({ data, cardColor, isSwiping, swipeProgress = 0, isClickable = false }) => {
+  // 根据卡片颜色获取边框颜色（50%透明度，反面稍深）
+  const getBorderColor = () => {
+    return `${cardColor}80`; // 80 = 50% opacity in hex
   };
 
-  // 根据卡片类型获取图标和颜色
+  // 根据卡片类型获取图标和背景色
   const getBackIcon = () => {
-    switch (data.type) {
-      case 'timer':
-        return { icon: <Check size={14} className="text-white" />, bgColor: 'bg-green-500' };
-      case 'todo':
-        return { icon: <Check size={14} className="text-white" />, bgColor: 'bg-blue-500' };
-      case 'checklist':
-        return { icon: <Check size={14} className="text-white" />, bgColor: 'bg-amber-500' };
-      case 'navigation':
-        return { icon: <ChevronRight size={14} className="text-white" />, bgColor: 'bg-sky-500' };
-      case 'text':
-        return { icon: <Check size={14} className="text-white" />, bgColor: 'bg-stone-500' };
-      case 'stats':
-        return { icon: <Check size={14} className="text-white" />, bgColor: 'bg-indigo-500' };
-      default:
-        return { icon: <Check size={14} className="text-white" />, bgColor: 'bg-stone-500' };
-    }
+    const icon = data.type === 'navigation' 
+      ? <ChevronRight size={14} className="text-white" />
+      : <Check size={14} className="text-white" />;
+    
+    return { icon, bgColor: cardColor };
   };
 
   // 根据滑动进度获取动态提示文字
@@ -469,15 +443,22 @@ const CardBack: React.FC<{
 
   return (
     <div 
-      className={`rounded-2xl p-4 ${getBackgroundColor()} transition-opacity relative ${isClickable ? 'cursor-pointer' : ''}`}
-      style={{ opacity: isSwiping ? Math.max(0.6, 1 - Math.abs(swipeProgress) * 0.5) : 1 }}
+      className="rounded-2xl p-4 bg-white/90 backdrop-blur-sm shadow-sm border transition-opacity relative"
+      style={{ 
+        borderColor: getBorderColor(),
+        opacity: isSwiping ? Math.max(0.6, 1 - Math.abs(swipeProgress) * 0.5) : 1,
+        cursor: isClickable ? 'pointer' : 'default'
+      }}
     >
       {/* 右上角完成按钮、滑动提示或统计值 */}
       <div className="absolute top-4 right-4">
         {isSwiping ? (
           <p className="text-xs text-stone-400 whitespace-nowrap">{getSwipeHintText()}</p>
         ) : (
-          <div className={`w-5 h-5 rounded-full ${bgColor} flex items-center justify-center`}>
+          <div 
+            className="w-5 h-5 rounded-full flex items-center justify-center"
+            style={{ backgroundColor: bgColor }}
+          >
             {icon}
           </div>
         )}
@@ -498,16 +479,29 @@ const CardBack: React.FC<{
             <span>{Math.min(100, Math.round((data.statMinutes / data.goalValue) * 100))}%</span>
           </div>
           <div 
-            className="h-1 w-full rounded-full overflow-hidden" 
+            className="h-1 w-full rounded-full overflow-hidden relative" 
             style={{ backgroundColor: 'var(--progress-bar-bg)' }}
           >
-            <div
-              className="h-full rounded-full transition-all duration-500"
-              style={{
-                backgroundColor: data.goalType === 'max' ? '#dc2626' : 'var(--progress-bar-fill)',
-                width: `${Math.min(100, (data.statMinutes / data.goalValue) * 100)}%`
-              }}
-            />
+            {data.goalType === 'max' ? (
+              // 小于等于目标：从右向左的反向进度条，半透明
+              <div
+                className="h-full rounded-full transition-all duration-500 absolute right-0"
+                style={{
+                  backgroundColor: 'var(--progress-bar-fill)',
+                  width: `${Math.min(100, (data.statMinutes / data.goalValue) * 100)}%`,
+                  opacity: 0.6
+                }}
+              />
+            ) : (
+              // 大于等于目标：从左向右的正向进度条
+              <div
+                className="h-full rounded-full transition-all duration-500"
+                style={{
+                  backgroundColor: 'var(--progress-bar-fill)',
+                  width: `${Math.min(100, (data.statMinutes / data.goalValue) * 100)}%`
+                }}
+              />
+            )}
           </div>
         </div>
       )}

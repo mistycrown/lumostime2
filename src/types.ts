@@ -203,6 +203,7 @@ export interface SceneCardData {
   title: string; // 卡片标题（可与触发对象名称不同）
   icon?: string; // Emoji 图标
   uiIcon?: string; // UI 图标 ID
+  color?: string; // 卡片主题色（可自定义，不设置则使用类型默认色）
   
   // 自定义文字
   frontText?: string; // 正面自定义文字（激励语等）

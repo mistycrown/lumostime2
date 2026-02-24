@@ -19,6 +19,7 @@ import { useCategoryScope } from '../contexts/CategoryScopeContext';
 import { useReview } from '../contexts/ReviewContext';
 import { useToast } from '../contexts/ToastContext';
 import { DEFAULT_SCENE_PRESETS } from '../constants/scenePresets';
+import { COLOR_OPTIONS } from '../constants';
 
 interface SceneSettingsViewProps {
   onBack: () => void;
@@ -286,6 +287,8 @@ export const SceneSettingsView: React.FC<SceneSettingsViewProps> = ({ onBack }) 
       frontText: editingCard.frontText || '现在开始！',
       backText: editingCard.backText || '完成了！',
       action: editingCard.action || { type: 'none' },
+      // 保存颜色字段
+      ...(editingCard.color && { color: editingCard.color }),
       // 保留统计卡片的特有字段
       ...(editingCard.type === 'stats' && {
         filterActivityIds: editingCard.filterActivityIds,
@@ -936,6 +939,44 @@ const CardEditModal: React.FC<{
               className="w-full px-3 py-2 text-sm border border-stone-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-stone-800"
               placeholder="完成了！"
             />
+          </div>
+
+          {/* 颜色选择器 */}
+          <div>
+            <label className="block text-xs sm:text-sm font-medium text-stone-700 mb-1">
+              卡片颜色（可选）
+            </label>
+            <div className="flex gap-2 flex-wrap">
+              {/* 不选择选项 */}
+              <button
+                onClick={() => onChange({ ...card, color: undefined })}
+                className={`w-8 h-8 rounded-full border-[2px] transition-all hover:scale-110 flex items-center justify-center ${
+                  !card?.color
+                    ? 'border-stone-300'
+                    : 'border-stone-100'
+                }`}
+                title="使用默认颜色"
+              >
+                <span className="text-xs text-stone-400">默</span>
+              </button>
+              
+              {/* 颜色选项 */}
+              {COLOR_OPTIONS.map(opt => (
+                <button
+                  key={opt.id}
+                  onClick={() => onChange({ ...card, color: opt.lightHex })}
+                  title={opt.label}
+                  className={`w-8 h-8 rounded-full ${opt.bg} transition-all hover:scale-110 ${
+                    card?.color === opt.lightHex
+                      ? 'ring-[2px] ring-stone-300 ring-offset-0'
+                      : ''
+                  }`}
+                />
+              ))}
+            </div>
+            <p className="text-[10px] sm:text-xs text-stone-500 mt-1">
+              不选择则使用卡片类型的默认颜色
+            </p>
           </div>
 
           {/* 根据类型显示不同的关联选项 */}
