@@ -230,8 +230,10 @@ export interface TimeSlot {
   id: string;
   name: string;
   icon: string; // Emoji
+  uiIcon?: string; // UI 图标 ID (格式: ui:iconType)
   startTime: string; // HH:mm
   endTime: string; // HH:mm
+  displayTitle?: string; // 可选的显示标题，如果有则显示标题，否则显示时间段
   cards: SceneCardData[]; // 该时间段的卡片列表
 }
 

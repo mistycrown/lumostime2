@@ -15,7 +15,7 @@ import { uiIconService, UIIconType, ICON_GROUPS } from '../services/uiIconServic
 interface UIIconSelectorProps {
     currentIcon: string;              // 当前 emoji 图标
     currentUiIcon?: string;           // 当前 UI 图标（可选）
-    onSelect: (iconString: string) => void;  // 选择回调（兼容旧接口）
+    onSelect?: (iconString: string) => void;  // 选择回调（兼容旧接口，可选）
     onSelectDual?: (emoji: string, uiIcon: string) => void;  // 双图标选择回调（新接口）
     className?: string;
 }
@@ -75,7 +75,7 @@ export const UIIconSelector: React.FC<UIIconSelectorProps> = ({
             // 清空 UI 图标
             if (onSelectDual) {
                 onSelectDual(currentIcon, '');
-            } else {
+            } else if (onSelect) {
                 onSelect('');
             }
             return;
@@ -88,7 +88,7 @@ export const UIIconSelector: React.FC<UIIconSelectorProps> = ({
             // 获取对应的 emoji（如果有映射的话）
             const emoji = uiIconService.convertUIIconToEmoji(uiIconString);
             onSelectDual(emoji, uiIconString);
-        } else {
+        } else if (onSelect) {
             // 兼容旧接口
             onSelect(uiIconString);
         }
@@ -233,7 +233,7 @@ export const UIIconSelectorCompact: React.FC<UIIconSelectorProps> = ({
             // 清空 UI 图标
             if (onSelectDual) {
                 onSelectDual(currentIcon, '');
-            } else {
+            } else if (onSelect) {
                 onSelect('');
             }
             return;
@@ -246,7 +246,7 @@ export const UIIconSelectorCompact: React.FC<UIIconSelectorProps> = ({
             // 获取对应的 emoji（如果有映射的话）
             const emoji = uiIconService.convertUIIconToEmoji(uiIconString);
             onSelectDual(emoji, uiIconString);
-        } else {
+        } else if (onSelect) {
             // 兼容旧接口
             onSelect(uiIconString);
         }

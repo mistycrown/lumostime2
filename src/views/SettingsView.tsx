@@ -106,6 +106,7 @@ import { FiltersSettingsView } from './settings/FiltersSettingsView';
 import { CloudSyncSettingsView } from './settings/CloudSyncSettingsView';
 import { S3SyncSettingsView } from './settings/S3SyncSettingsView';
 import { DataManagementView } from './settings/DataManagementView';
+import { SceneSettingsView } from './SceneSettingsView';
 
 
 interface SettingsViewProps {
@@ -191,7 +192,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
     const { autoLinkRules: ctxAutoLinkRules, autoApplyAutoLinkRules, setAutoApplyAutoLinkRules, autoApplyTodoLink, setAutoApplyTodoLink, autoOpenFocusDetail, setAutoOpenFocusDetail, userPersonalInfo: ctxUserPersonalInfo, filters: ctxFilters, customNarrativeTemplates: ctxCustomNarrativeTemplates, useTwemoji, setUseTwemoji } = useSettings();
     const { dailyReviews: ctxDailyReviews, weeklyReviews: ctxWeeklyReviews, monthlyReviews: ctxMonthlyReviews, reviewTemplates: ctxReviewTemplates } = useReview();
 
-    const [activeSubmenu, setActiveSubmenu] = useState<'main' | 'data' | 'cloud' | 's3' | 'ai' | 'preferences' | 'guide' | 'nfc' | 'templates' | 'check_templates' | 'narrative_prompt' | 'auto_record' | 'autolink' | 'obsidian_export' | 'filters' | 'memoir_filter' | 'batch_manage' | 'sponsorship_preview'>('main');
+    const [activeSubmenu, setActiveSubmenu] = useState<'main' | 'data' | 'cloud' | 's3' | 'ai' | 'preferences' | 'guide' | 'nfc' | 'templates' | 'check_templates' | 'narrative_prompt' | 'auto_record' | 'autolink' | 'obsidian_export' | 'filters' | 'memoir_filter' | 'batch_manage' | 'sponsorship_preview' | 'scene'>('main');
     const [webdavConfig, setWebdavConfig] = useState<WebDAVConfig | null>(null);
     const [s3Config, setS3Config] = useState<S3Config | null>(null);
     // Floating Window State
@@ -953,6 +954,10 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
         );
     }
 
+    if (activeSubmenu === 'scene') {
+        return <SceneSettingsView onBack={() => setActiveSubmenu('main')} />;
+    }
+
     return (
         <div className="fixed inset-0 z-50 bg-[#fdfbf7] flex flex-col font-serif animate-in slide-in-from-right duration-300 pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">
             {/* Header */}
@@ -1004,6 +1009,11 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
                             icon={<AlignLeft size={18} className="text-purple-500" />}
                             label="Memoir 筛选条件"
                             onClick={() => setActiveSubmenu('memoir_filter')}
+                        />
+                        <MenuItem
+                            icon={<LayoutGrid size={18} className="text-blue-500" />}
+                            label="场景设置"
+                            onClick={() => setActiveSubmenu('scene')}
                         />
                         <MenuItem
                             icon={<Settings size={18} />}

@@ -4,7 +4,7 @@
  */
 import React, { useState, useRef } from 'react';
 import { IconRenderer } from './IconRenderer';
-import { Clock, Check, ChevronRight } from 'lucide-react';
+import { Check, ChevronRight } from 'lucide-react';
 import { SceneCardData } from '../types';
 
 interface SceneCardProps {
@@ -22,7 +22,7 @@ export const SceneCard: React.FC<SceneCardProps> = ({ data, onAction }) => {
 
   // 最小滑动距离（像素）
   const minSwipeDistance = 80;
-  const swipeThreshold = 0.3; // 滑动超过卡片宽度的30%就触发
+  const maxSwipeDistance = 150; // 限制最大拖动距离
 
   const handleTouchStart = (e: React.TouchEvent) => {
     // 只在反面时才响应触摸
@@ -42,7 +42,7 @@ export const SceneCard: React.FC<SceneCardProps> = ({ data, onAction }) => {
     // 只响应向右滑动（从左向右）
     if (diff > 0) {
       setIsSwiping(true);
-      setSwipeOffset(Math.min(diff, 200)); // 限制最大偏移
+      setSwipeOffset(Math.min(diff, maxSwipeDistance)); // 限制最大偏移
       setTouchEnd(currentTouch);
     }
   };
@@ -54,16 +54,14 @@ export const SceneCard: React.FC<SceneCardProps> = ({ data, onAction }) => {
       return;
     }
     
-    const cardWidth = cardRef.current?.offsetWidth || 300;
     const swipeDistance = touchEnd ? touchEnd - touchStart : 0;
-    const swipePercentage = swipeDistance / cardWidth;
     
     // 判断是否达到翻转阈值
-    if (swipeDistance > minSwipeDistance || swipePercentage > swipeThreshold) {
+    if (swipeDistance > minSwipeDistance) {
       // 翻转回正面
       setIsFlipped(false);
       
-      // 如果是日课卡片，左滑表示取消完成
+      // 如果是日课卡片，右滑表示取消完成
       if (data.type === 'checklist' && data.action.type === 'toggleCheck') {
         onAction?.({ ...data.action, checkItemId: data.action.checkItemId });
       }
@@ -94,14 +92,43 @@ export const SceneCard: React.FC<SceneCardProps> = ({ data, onAction }) => {
     }
   };
 
+  // 根据卡片类型获取滑动背景颜色
+  const getSwipeBackgroundColor = () => {
+    switch (data.type) {
+      case 'timer':
+        return 'bg-green-500';
+      case 'todo':
+        return 'bg-blue-500';
+      case 'checklist':
+        return 'bg-amber-500';
+      case 'navigation':
+        return 'bg-sky-500';
+      case 'text':
+        return 'bg-stone-400';
+      case 'stats':
+        return 'bg-indigo-500';
+      default:
+        return 'bg-stone-400';
+    }
+  };
+
   return (
     <div
       ref={cardRef}
-      className="scene-card-container"
-      onTouchStart={handleTouchStart}
-      onTouchMove={handleTouchMove}
-      onTouchEnd={handleTouchEnd}
+      className="relative overflow-hidden select-none touch-pan-y"
     >
+      {/* 滑动背景提示 - 只在反面显示，使用卡片类型对应的颜色 */}
+      {isFlipped && (
+        <div
+          className={`absolute inset-0 ${getSwipeBackgroundColor()} flex items-center justify-end pr-6 text-white font-medium tracking-wide z-0 transition-opacity duration-200 rounded-2xl`}
+          style={{ opacity: swipeOffset > 0 ? 1 : 0 }}
+        >
+          <span className="flex items-center gap-2">
+            往右滑动返回 <ChevronRight size={20} />
+          </span>
+        </div>
+      )}
+
       <div 
         className={`scene-card ${isFlipped ? 'flipped' : ''}`}
         style={{
@@ -110,6 +137,9 @@ export const SceneCard: React.FC<SceneCardProps> = ({ data, onAction }) => {
             : undefined,
           transition: isSwiping ? 'none' : undefined
         }}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
       >
         {/* 正面 */}
         <div 
@@ -124,112 +154,69 @@ export const SceneCard: React.FC<SceneCardProps> = ({ data, onAction }) => {
           className="scene-card-face scene-card-back"
           onClick={handleCardClick}
         >
-          <CardBack data={data} isSwiping={isSwiping} swipeProgress={swipeOffset / 200} />
+          <CardBack data={data} isSwiping={isSwiping} swipeProgress={swipeOffset / maxSwipeDistance} />
         </div>
       </div>
-      
-      {/* 滑动提示指示器 */}
-      {isFlipped && !isSwiping && (
-        <div className="absolute top-1/2 left-2 -translate-y-1/2 pointer-events-none z-10 opacity-30">
-          <div className="flex items-center gap-1 text-stone-400">
-            <ChevronRight size={16} className="animate-pulse" />
-            <ChevronRight size={16} className="animate-pulse" style={{ animationDelay: '0.2s' }} />
-          </div>
-        </div>
-      )}
     </div>
   );
 };
 
 // 卡片正面组件
 const CardFront: React.FC<{ data: SceneCardData }> = ({ data }) => {
-  // 根据卡片类型获取默认正面文字（如果用户未自定义）
-  const getDefaultFrontText = () => {
-    if (data.frontText) return data.frontText;
-    
-    switch (data.type) {
-      case 'timer':
-        return '点击开始计时';
-      case 'todo':
-        return '开始这个任务吧';
-      case 'checklist':
-        return '完成今日打卡';
-      case 'navigation':
-        return '查看更多内容';
-      case 'text':
-        return '点击查看详情';
-      case 'stats':
-        return '查看详细数据';
-      default:
-        return '点击开始';
-    }
-  };
-
   // 根据卡片类型获取颜色
   const getCardColor = () => {
     switch (data.type) {
       case 'timer':
-        return 'bg-green-50 border-2 border-green-200';
+        return 'bg-white/90 backdrop-blur-sm shadow-sm border border-green-100';
       case 'todo':
-        return 'bg-blue-50 border-2 border-blue-200';
+        return 'bg-white/90 backdrop-blur-sm shadow-sm border border-blue-100';
       case 'checklist':
-        return 'bg-amber-50 border-2 border-amber-200';
+        return 'bg-white/90 backdrop-blur-sm shadow-sm border border-amber-100';
       case 'navigation':
-        return 'bg-sky-50 border-2 border-sky-200';
+        return 'bg-white/90 backdrop-blur-sm shadow-sm border border-sky-100';
       case 'text':
-        return 'bg-stone-50 border-2 border-stone-200';
+        return 'bg-white/90 backdrop-blur-sm shadow-sm border border-stone-100';
       case 'stats':
-        return 'bg-indigo-50 border-2 border-indigo-200';
+        return 'bg-white/90 backdrop-blur-sm shadow-sm border border-indigo-100';
       default:
-        return 'bg-white border-2 border-stone-200';
+        return 'bg-white/90 backdrop-blur-sm shadow-sm border border-stone-100';
     }
   };
 
   return (
-    <div className={`h-full rounded-2xl p-4 flex flex-col ${getCardColor()}`}>
-      {/* 顶部：图标和标题 */}
-      <div className="flex items-start gap-2.5 mb-auto">
-        {data.icon && (
-          <div className="text-base flex-shrink-0 mt-0.5">
-            <IconRenderer icon={data.icon} uiIcon={data.uiIcon} />
+    <div className={`h-full rounded-2xl p-4 flex items-center gap-3 ${getCardColor()}`}>
+      {/* 左侧：标题 */}
+      <div className="flex-1 min-w-0">
+        <h3 className="font-bold text-stone-800 text-base leading-tight truncate">{data.title}</h3>
+      </div>
+      
+      {/* 右侧：状态指示 */}
+      <div className="flex items-center gap-3 flex-shrink-0">
+        {/* 待办进度 */}
+        {data.type === 'todo' && data.progress !== undefined && data.totalAmount && (
+          <div className="text-sm text-stone-500 font-medium">
+            {data.progress}/{data.totalAmount}
           </div>
         )}
-        <div className="flex-1 min-w-0">
-          <h3 className="font-bold text-stone-800 text-base leading-tight">{data.title}</h3>
-          
-          {/* 待办进度 */}
-          {data.type === 'todo' && data.progress !== undefined && data.totalAmount && (
-            <div className="mt-2">
-              <div className="h-1.5 bg-stone-200 rounded-full overflow-hidden">
-                <div 
-                  className="h-full bg-blue-500 transition-all"
-                  style={{ width: `${Math.min(100, (data.progress / data.totalAmount) * 100)}%` }}
-                />
-              </div>
-              <p className="text-xs text-stone-500 mt-1">
-                已完成 {data.progress} / {data.totalAmount}
-              </p>
-            </div>
-          )}
-          
-          {/* 统计值 */}
-          {data.type === 'stats' && data.statValue && (
-            <div className="mt-2">
-              <p className="text-2xl font-bold text-stone-800">{data.statValue}</p>
-              <p className="text-xs text-stone-500">{data.statLabel}</p>
-            </div>
-          )}
-        </div>
+        
+        {/* 统计值 */}
+        {data.type === 'stats' && data.statValue && (
+          <div className="text-right">
+            <p className="text-base font-bold text-stone-800">{data.statValue}</p>
+          </div>
+        )}
         
         {/* 日课打卡的圆圈 */}
         {data.type === 'checklist' && (
-          <div className="w-5 h-5 rounded-full border-2 border-amber-400 flex-shrink-0"></div>
+          <div className="w-5 h-5 rounded-full border-2 border-amber-400"></div>
         )}
-      </div>
-      
-      {/* 底部：操作文字 */}
-      <div className="mt-3 pt-3 border-t border-current opacity-20">
-        <p className="text-xs text-stone-600 font-medium">{getDefaultFrontText()}</p>
+        
+        {/* 正面文字（如果有） */}
+        {data.frontText && (
+          <div className="text-sm text-stone-500">
+            {data.frontText}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -240,19 +227,19 @@ const CardBack: React.FC<{ data: SceneCardData; isSwiping?: boolean; swipeProgre
   const getBackgroundColor = () => {
     switch (data.type) {
       case 'timer':
-        return 'bg-green-50 border-2 border-green-300';
+        return 'bg-white/90 backdrop-blur-sm shadow-sm border border-green-200';
       case 'todo':
-        return 'bg-blue-50 border-2 border-blue-300';
+        return 'bg-white/90 backdrop-blur-sm shadow-sm border border-blue-200';
       case 'checklist':
-        return 'bg-amber-50 border-2 border-amber-300';
+        return 'bg-white/90 backdrop-blur-sm shadow-sm border border-amber-200';
       case 'text':
-        return 'bg-stone-50 border-2 border-stone-200';
+        return 'bg-white/90 backdrop-blur-sm shadow-sm border border-stone-100';
       case 'navigation':
-        return 'bg-sky-50 border-2 border-sky-300';
+        return 'bg-white/90 backdrop-blur-sm shadow-sm border border-sky-200';
       case 'stats':
-        return 'bg-indigo-50 border-2 border-indigo-300';
+        return 'bg-white/90 backdrop-blur-sm shadow-sm border border-indigo-200';
       default:
-        return 'bg-white border-2 border-stone-200';
+        return 'bg-white/90 backdrop-blur-sm shadow-sm border border-stone-100';
     }
   };
 
@@ -260,76 +247,64 @@ const CardBack: React.FC<{ data: SceneCardData; isSwiping?: boolean; swipeProgre
   const getDefaultBackText = () => {
     if (data.backText) return data.backText;
     
-    switch (data.type) {
-      case 'timer':
-        return '正在专注中，加油！';
-      case 'todo':
-        return '任务进行中，继续努力';
-      case 'checklist':
-        return '太棒了，今天又完成一项！';
-      case 'text':
-        return '';
-      case 'stats':
-        return '';
-      default:
-        return '进行中';
-    }
+    // 如果没有自定义反面文字，返回空字符串
+    return '';
   };
 
   // 根据滑动进度获取动态提示文字
   const getSwipeHintText = () => {
-    if (!isSwiping) return getDefaultBackText();
+    if (!isSwiping) return ''; // 不滑动时不显示提示
     
-    if (swipeProgress < 0.3) {
-      return '→ 继续滑动返回';
-    } else if (swipeProgress < 0.6) {
-      return '→→ 快要成功了';
+    if (swipeProgress < 0.4) {
+      return '继续滑动...';
+    } else if (swipeProgress < 0.7) {
+      return '快要成功了';
     } else {
-      return '→→→ 松手即可返回';
+      return '松手即可返回';
     }
   };
 
   return (
     <div 
-      className={`h-full rounded-2xl p-4 flex flex-col ${getBackgroundColor()} transition-opacity`}
-      style={{ opacity: isSwiping ? Math.max(0.5, 1 - swipeProgress) : 1 }}
+      className={`h-full rounded-2xl p-4 flex items-center gap-3 ${getBackgroundColor()} transition-opacity`}
+      style={{ opacity: isSwiping ? Math.max(0.6, 1 - swipeProgress * 0.5) : 1 }}
     >
-      {/* 计时中状态 */}
+      {/* 计时卡片和待办卡片 - 显示反面文字 */}
       {(data.type === 'timer' || data.type === 'todo') && (
         <>
-          <div className="flex items-start gap-2.5 mb-auto">
-            <div className="text-base flex-shrink-0 mt-0.5">
-              <Clock className="text-green-600" size={16} />
+          <div className="flex items-center gap-2 flex-1 min-w-0">
+            <div className="w-5 h-5 rounded-full bg-green-500 flex items-center justify-center flex-shrink-0">
+              <Check className="text-white" size={14} />
             </div>
-            <div className="flex-1">
-              <h3 className="font-bold text-stone-800 text-base leading-tight">{data.title}</h3>
-              <p className="text-sm text-stone-600 mt-1.5">00:00:00</p>
-            </div>
+            <h3 className="font-bold text-stone-800 text-base leading-tight truncate">{data.title}</h3>
           </div>
-          <div className="mt-3 pt-3 border-t border-current opacity-20">
-            <p className="text-xs text-stone-600 font-medium">{getSwipeHintText()}</p>
+          <div className="flex items-center gap-3 flex-shrink-0">
+            {/* 滑动时显示滑动提示，否则显示反面文字 */}
+            {isSwiping ? (
+              <p className="text-xs text-stone-400">{getSwipeHintText()}</p>
+            ) : (
+              data.backText && <p className="text-sm text-stone-600">{data.backText}</p>
+            )}
           </div>
         </>
       )}
       
-      {/* 日课已完成 */}
+      {/* 日课已完成 - 显示反面文字 */}
       {data.type === 'checklist' && (
         <>
-          <div className="flex items-start gap-2.5 mb-auto">
-            <div className="text-base flex-shrink-0 mt-0.5">
-              <div className="w-4 h-4 rounded-full bg-amber-500 flex items-center justify-center">
-                <Check className="text-white" size={12} />
-              </div>
+          <div className="flex items-center gap-2 flex-1 min-w-0">
+            <div className="w-5 h-5 rounded-full bg-amber-500 flex items-center justify-center flex-shrink-0">
+              <Check className="text-white" size={14} />
             </div>
-            <div className="flex-1">
-              <h3 className="font-bold text-stone-800 text-base leading-tight">{data.title}</h3>
-              <p className="text-sm text-stone-600 mt-1.5">
-                {new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })}
-              </p>
-            </div>
+            <h3 className="font-bold text-stone-800 text-base leading-tight truncate">{data.title}</h3>
           </div>
-          <div className="mt-3 pt-3 border-t border-current opacity-20">
-            <p className="text-xs text-stone-600 font-medium">{getSwipeHintText()}</p>
+          <div className="flex items-center gap-3 flex-shrink-0">
+            {/* 滑动时显示滑动提示，否则显示反面文字 */}
+            {isSwiping ? (
+              <p className="text-xs text-stone-400">{getSwipeHintText()}</p>
+            ) : (
+              data.backText && <p className="text-sm text-stone-600">{data.backText}</p>
+            )}
           </div>
         </>
       )}
@@ -337,36 +312,29 @@ const CardBack: React.FC<{ data: SceneCardData; isSwiping?: boolean; swipeProgre
       {/* 文字内容 */}
       {data.type === 'text' && data.content && (
         <>
-          <div className="flex items-start gap-2.5 mb-auto">
-            {data.icon && (
-              <div className="text-base flex-shrink-0 mt-0.5">
-                <IconRenderer icon={data.icon} uiIcon={data.uiIcon} />
-              </div>
-            )}
-            <div className="flex-1">
-              <h3 className="font-bold text-stone-800 text-base leading-tight mb-2">{data.title}</h3>
-              <p className="text-sm text-stone-600 leading-relaxed">{data.content}</p>
-            </div>
+          <div className="flex-1 min-w-0">
+            <h3 className="font-bold text-stone-800 text-base leading-tight mb-1 truncate">{data.title}</h3>
+            <p className="text-sm text-stone-600 line-clamp-2">{data.content}</p>
           </div>
-          {getDefaultBackText() && (
-            <div className="mt-3 pt-3 border-t border-current opacity-20">
-              <p className="text-xs text-stone-600 font-medium">{getSwipeHintText()}</p>
-            </div>
-          )}
+          <div className="flex items-center gap-3 flex-shrink-0">
+            {isSwiping && <p className="text-xs text-stone-400">{getSwipeHintText()}</p>}
+          </div>
         </>
       )}
       
       {/* 跳转提示 */}
       {data.type === 'navigation' && (
         <>
-          <div className="flex items-start gap-2.5 mb-auto">
-            <div className="text-base flex-shrink-0 mt-0.5">
-              <ChevronRight className="text-stone-400" size={16} />
-            </div>
-            <div className="flex-1">
-              <h3 className="font-bold text-stone-800 text-base leading-tight">{data.title}</h3>
-              <p className="text-sm text-stone-600 mt-1.5">正在为你打开...</p>
-            </div>
+          <div className="flex items-center gap-2 flex-1 min-w-0">
+            <ChevronRight className="text-sky-500 flex-shrink-0" size={18} />
+            <h3 className="font-bold text-stone-800 text-base leading-tight truncate">{data.title}</h3>
+          </div>
+          <div className="flex items-center gap-3 flex-shrink-0">
+            {isSwiping ? (
+              <p className="text-xs text-stone-400">{getSwipeHintText()}</p>
+            ) : (
+              data.backText && <p className="text-sm text-stone-600">{data.backText}</p>
+            )}
           </div>
         </>
       )}
@@ -374,23 +342,14 @@ const CardBack: React.FC<{ data: SceneCardData; isSwiping?: boolean; swipeProgre
       {/* 统计详情 */}
       {data.type === 'stats' && (
         <>
-          <div className="flex items-start gap-2.5 mb-auto">
-            {data.icon && (
-              <div className="text-base flex-shrink-0 mt-0.5">
-                <IconRenderer icon={data.icon} uiIcon={data.uiIcon} />
-              </div>
-            )}
-            <div className="flex-1">
-              <h3 className="font-bold text-stone-800 text-base leading-tight mb-2">{data.title}</h3>
-              <p className="text-2xl font-bold text-stone-800">{data.statValue}</p>
-              <p className="text-xs text-stone-500 mt-1">{data.statLabel}</p>
-            </div>
+          <div className="flex-1 min-w-0">
+            <h3 className="font-bold text-stone-800 text-base leading-tight mb-1 truncate">{data.title}</h3>
+            <p className="text-xs text-stone-500">{data.statLabel}</p>
           </div>
-          {getDefaultBackText() && (
-            <div className="mt-3 pt-3 border-t border-current opacity-20">
-              <p className="text-xs text-stone-600 font-medium">{getSwipeHintText()}</p>
-            </div>
-          )}
+          <div className="flex items-center gap-3 flex-shrink-0">
+            <p className="text-base font-bold text-stone-800">{data.statValue}</p>
+            {isSwiping && <p className="text-xs text-stone-400">{getSwipeHintText()}</p>}
+          </div>
         </>
       )}
     </div>

@@ -3,250 +3,13 @@
  * @description 场景化时间段视图 - 卡片式布局，支持正反面翻转
  */
 import React, { useState, useEffect } from 'react';
-import { Settings } from 'lucide-react';
+import { Clock } from 'lucide-react';
 import { backgroundService } from '../services/backgroundService';
 import { IconRenderer } from '../components/IconRenderer';
+import { UIIcon } from '../components/UIIcon';
 import { SceneCard } from '../components/SceneCard';
 import { TimeSlot, SceneCardData } from '../types';
-
-// Mock 时间段数据
-const MOCK_TIME_SLOTS: TimeSlot[] = [
-  {
-    id: 'morning',
-    name: '早晨',
-    icon: '🌅',
-    startTime: '06:00',
-    endTime: '09:00',
-    cards: [
-      { 
-        id: '1', 
-        type: 'checklist', 
-        title: '早起打卡', 
-        icon: '☀️',
-        frontText: '新的一天，从早起开始',
-        backText: '太棒了，今天又完成一项！',
-        action: { type: 'toggleCheck', checkItemId: 'check-1' }
-      },
-      { 
-        id: '2', 
-        type: 'timer', 
-        title: '洗漱', 
-        icon: '🚿',
-        frontText: '点击开始计时',
-        backText: '正在进行中...',
-        action: { type: 'startTimer', activityId: 'hygiene', categoryId: 'life' }
-      },
-      { 
-        id: '3', 
-        type: 'timer', 
-        title: '享用早餐', 
-        icon: '🍱',
-        action: { type: 'startTimer', activityId: 'meal', categoryId: 'life' }
-      },
-      { 
-        id: '4', 
-        type: 'text', 
-        title: '今日提醒', 
-        icon: '📝',
-        content: '记得今天下午3点有组会，提前准备好汇报材料。晚上和朋友约了晚饭，不要忘记哦！',
-        action: { type: 'none' }
-      },
-    ]
-  },
-  {
-    id: 'forenoon',
-    name: '上午',
-    icon: '☀️',
-    startTime: '09:00',
-    endTime: '12:00',
-    cards: [
-      { 
-        id: '5', 
-        type: 'timer', 
-        title: '上课/开会', 
-        icon: '🏫',
-        frontText: '开始专注学习',
-        action: { type: 'startTimer', activityId: 'meeting', categoryId: 'study' }
-      },
-      { 
-        id: '6', 
-        type: 'timer', 
-        title: '阅读文献', 
-        icon: '📖',
-        action: { type: 'startTimer', activityId: 'reading', categoryId: 'study' }
-      },
-      { 
-        id: '7', 
-        type: 'todo', 
-        title: '完成论文第三章', 
-        icon: '📝',
-        progress: 3,
-        totalAmount: 10,
-        action: { type: 'startTodo', todoId: 'todo-1' }
-      },
-      { 
-        id: '8', 
-        type: 'stats', 
-        title: '今日专注时长', 
-        icon: '⏱️',
-        statValue: '2h 30m',
-        statLabel: '目标: 6小时',
-        action: { type: 'none' }
-      },
-    ]
-  },
-  {
-    id: 'noon',
-    name: '中午',
-    icon: '🌤️',
-    startTime: '12:00',
-    endTime: '14:00',
-    cards: [
-      { 
-        id: '9', 
-        type: 'timer', 
-        title: '午餐时间', 
-        icon: '🍱',
-        action: { type: 'startTimer', activityId: 'meal', categoryId: 'life' }
-      },
-      { 
-        id: '10', 
-        type: 'timer', 
-        title: '午间小憩', 
-        icon: '🔋',
-        frontText: '休息一下，充充电',
-        action: { type: 'startTimer', activityId: 'nap', categoryId: 'sleep' }
-      },
-      { 
-        id: '11', 
-        type: 'checklist', 
-        title: '午后散步', 
-        icon: '🚶',
-        action: { type: 'toggleCheck', checkItemId: 'check-2' }
-      },
-    ]
-  },
-  {
-    id: 'afternoon',
-    name: '下午',
-    icon: '🌞',
-    startTime: '14:00',
-    endTime: '18:00',
-    cards: [
-      { 
-        id: '12', 
-        type: 'timer', 
-        title: '论文写作', 
-        icon: '✒️',
-        frontText: '开始创作吧',
-        backText: '写作中，思绪飞扬',
-        action: { type: 'startTimer', activityId: 'writing', categoryId: 'study' }
-      },
-      { 
-        id: '13', 
-        type: 'timer', 
-        title: '代码编程', 
-        icon: '👾',
-        action: { type: 'startTimer', activityId: 'coding', categoryId: 'study' }
-      },
-      { 
-        id: '14', 
-        type: 'todo', 
-        title: '修复Bug #234', 
-        icon: '🐛',
-        progress: 0,
-        totalAmount: 1,
-        action: { type: 'startTodo', todoId: 'todo-2' }
-      },
-      { 
-        id: '15', 
-        type: 'navigation', 
-        title: '查看时间轴', 
-        icon: '📊',
-        action: { type: 'navigate', targetView: 'timeline' }
-      },
-    ]
-  },
-  {
-    id: 'evening',
-    name: '晚上',
-    icon: '🌆',
-    startTime: '18:00',
-    endTime: '22:00',
-    cards: [
-      { 
-        id: '16', 
-        type: 'timer', 
-        title: '晚餐时光', 
-        icon: '🍱',
-        action: { type: 'startTimer', activityId: 'meal', categoryId: 'life' }
-      },
-      { 
-        id: '17', 
-        type: 'timer', 
-        title: '运动健身', 
-        icon: '🏃',
-        frontText: '动起来，保持活力',
-        action: { type: 'startTimer', activityId: 'workout', categoryId: 'self' }
-      },
-      { 
-        id: '18', 
-        type: 'checklist', 
-        title: '晚间阅读', 
-        icon: '📚',
-        action: { type: 'toggleCheck', checkItemId: 'check-3' }
-      },
-      { 
-        id: '19', 
-        type: 'navigation', 
-        title: '今日回顾', 
-        icon: '📝',
-        frontText: '回顾今天的收获',
-        action: { type: 'navigate', targetView: 'daily-review' }
-      },
-    ]
-  },
-  {
-    id: 'night',
-    name: '深夜',
-    icon: '🌙',
-    startTime: '22:00',
-    endTime: '06:00',
-    cards: [
-      { 
-        id: '20', 
-        type: 'timer', 
-        title: '睡前洗漱', 
-        icon: '🚿',
-        action: { type: 'startTimer', activityId: 'hygiene', categoryId: 'life' }
-      },
-      { 
-        id: '21', 
-        type: 'text', 
-        title: '明日计划', 
-        icon: '📅',
-        content: '明天上午9点开组会，记得提前准备PPT。下午完成实验报告，晚上整理本周笔记。',
-        action: { type: 'none' }
-      },
-      { 
-        id: '22', 
-        type: 'checklist', 
-        title: '睡前冥想', 
-        icon: '🧘',
-        action: { type: 'toggleCheck', checkItemId: 'check-4' }
-      },
-      { 
-        id: '23', 
-        type: 'stats', 
-        title: '今日总结', 
-        icon: '📊',
-        statValue: '8h 45m',
-        statLabel: '有效专注时长',
-        action: { type: 'none' }
-      },
-    ]
-  }
-];
+import { DEFAULT_SCENE_PRESETS } from '../constants/scenePresets';
 
 interface SceneViewProps {
   onConfigureSlots?: () => void;
@@ -255,21 +18,28 @@ interface SceneViewProps {
 export const SceneView: React.FC<SceneViewProps> = ({ onConfigureSlots }) => {
   const [backgroundUrl, setBackgroundUrl] = useState<string>('');
   const [backgroundOpacity, setBackgroundOpacity] = useState<number>(0.1);
-  const [currentTime, setCurrentTime] = useState<string>('');
+  
+  // 时间段数据（从 localStorage 加载，如果没有则使用 mock 数据）
+  const [timeSlots, setTimeSlots] = useState<TimeSlot[]>([]);
   
   // 当前选中的时间段索引
   const [selectedSlotIndex, setSelectedSlotIndex] = useState<number>(0);
   const [isManualSelection, setIsManualSelection] = useState(false);
 
-  // 更新当前时间
+  // 加载时间段数据
   useEffect(() => {
-    const updateTime = () => {
-      const now = new Date();
-      setCurrentTime(now.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }));
-    };
-    updateTime();
-    const interval = setInterval(updateTime, 1000);
-    return () => clearInterval(interval);
+    const saved = localStorage.getItem('sceneTimeSlots');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        setTimeSlots(parsed);
+      } catch (e) {
+        console.error('Failed to parse scene time slots:', e);
+        setTimeSlots(DEFAULT_SCENE_PRESETS);
+      }
+    } else {
+      setTimeSlots(DEFAULT_SCENE_PRESETS);
+    }
   }, []);
 
   // 背景更新逻辑
@@ -287,11 +57,13 @@ export const SceneView: React.FC<SceneViewProps> = ({ onConfigureSlots }) => {
 
   // 获取当前时间对应的时间段索引
   const getCurrentTimeSlotIndex = (): number => {
+    if (timeSlots.length === 0) return 0;
+    
     const now = new Date();
     const currentMinutes = now.getHours() * 60 + now.getMinutes();
     
-    for (let i = 0; i < MOCK_TIME_SLOTS.length; i++) {
-      const slot = MOCK_TIME_SLOTS[i];
+    for (let i = 0; i < timeSlots.length; i++) {
+      const slot = timeSlots[i];
       const [startHour, startMin] = slot.startTime.split(':').map(Number);
       const [endHour, endMin] = slot.endTime.split(':').map(Number);
       
@@ -315,10 +87,10 @@ export const SceneView: React.FC<SceneViewProps> = ({ onConfigureSlots }) => {
 
   // 自动切换到当前时间段（仅在非手动选择时）
   useEffect(() => {
-    if (!isManualSelection) {
+    if (!isManualSelection && timeSlots.length > 0) {
       setSelectedSlotIndex(getCurrentTimeSlotIndex());
     }
-  }, [isManualSelection]);
+  }, [isManualSelection, timeSlots]);
 
   // 重置手动选择状态（5分钟后）
   useEffect(() => {
@@ -330,8 +102,27 @@ export const SceneView: React.FC<SceneViewProps> = ({ onConfigureSlots }) => {
     }
   }, [isManualSelection]);
 
-  const currentSlot = MOCK_TIME_SLOTS[selectedSlotIndex];
-  const currentCards = currentSlot.cards;
+  const currentSlot = timeSlots[selectedSlotIndex];
+  const currentCards = currentSlot?.cards || [];
+
+  // 如果没有时间段数据，显示空状态
+  if (timeSlots.length === 0) {
+    return (
+      <div className="flex h-full items-center justify-center bg-[#faf9f6]">
+        <div className="text-center">
+          <p className="text-stone-400 mb-4">暂无场景配置</p>
+          {onConfigureSlots && (
+            <button
+              onClick={onConfigureSlots}
+              className="px-4 py-2 bg-stone-800 text-white rounded-lg hover:bg-stone-700 transition-colors"
+            >
+              前往配置
+            </button>
+          )}
+        </div>
+      </div>
+    );
+  }
 
   // 卡片动作处理
   const handleCardAction = (action: SceneCardData['action']) => {
@@ -381,7 +172,7 @@ export const SceneView: React.FC<SceneViewProps> = ({ onConfigureSlots }) => {
       {/* 左侧边栏 - 时间段列表 */}
       <div className="flex-shrink-0 flex flex-col overflow-y-auto pt-6 pb-20 pl-0 pr-2 no-scrollbar z-0 transition-all duration-300 relative w-16 items-center">
         <div className="flex-1 w-full">
-          {MOCK_TIME_SLOTS.map((slot, index) => {
+          {timeSlots.map((slot, index) => {
             const isSelected = selectedSlotIndex === index;
             return (
               <button
@@ -403,10 +194,14 @@ export const SceneView: React.FC<SceneViewProps> = ({ onConfigureSlots }) => {
                 {isSelected && (
                   <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-5 rounded-r-full" style={{ backgroundColor: 'var(--accent-color)' }}></div>
                 )}
-                <IconRenderer 
-                  icon={slot.icon}
-                  className={`text-xl flex-shrink-0 ${isSelected ? 'opacity-100' : 'opacity-100'}`} 
-                />
+                {/* 使用 IconRenderer 统一处理图标渲染 */}
+                <div className="flex-shrink-0">
+                  <IconRenderer 
+                    icon={slot.icon || '⏰'}
+                    uiIcon={slot.uiIcon}
+                    size={24}
+                  />
+                </div>
               </button>
             );
           })}
@@ -438,31 +233,18 @@ export const SceneView: React.FC<SceneViewProps> = ({ onConfigureSlots }) => {
           }}
         />
 
-        {/* 头部：当前时间 + 配置按钮 */}
-        <div className="mb-8 md:mb-10 flex items-center justify-between mt-2 md:mt-0">
-          <div className="flex items-center gap-4">
-            <h1 className="text-3xl md:text-4xl font-mono font-light text-stone-700 tracking-tight">
-              {currentTime}
-            </h1>
-          </div>
-
+        {/* 头部：当前时间段标题或时间 */}
+        <div className="mb-8 md:mb-10 flex items-center mt-2 md:mt-0">
+          <h1 className="text-xl md:text-2xl font-mono font-light text-stone-600 tracking-tight">
+            {currentSlot.displayTitle || `${currentSlot.startTime} - ${currentSlot.endTime}`}
+          </h1>
           <div className="h-px flex-1 bg-stone-100 ml-4"></div>
-
-          {onConfigureSlots && (
-            <button
-              onClick={onConfigureSlots}
-              className="p-2 rounded-full hover:bg-white/50 transition-colors active:scale-95 ml-4"
-              title="配置时间段"
-            >
-              <Settings size={20} className="text-stone-600" />
-            </button>
-          )}
         </div>
 
-        {/* 活动卡片网格 */}
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-4 content-start overflow-y-auto pb-24 no-scrollbar">
+        {/* 活动卡片列表 - 单列布局 */}
+        <div className="flex flex-col gap-3 overflow-y-auto pb-24 no-scrollbar">
           {currentCards.length === 0 ? (
-            <div className="col-span-full flex items-center justify-center py-12">
+            <div className="flex items-center justify-center py-12">
               <div className="text-center text-stone-400">
                 <p className="mb-4">该时间段暂无卡片</p>
                 {onConfigureSlots && (

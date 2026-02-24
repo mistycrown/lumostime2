@@ -37,6 +37,11 @@ export const RecordViewContainer: React.FC<RecordViewContainerProps> = ({
     setViewMode(prev => prev === 'tags' ? 'scenes' : 'tags');
   };
 
+  // 配置场景的处理函数
+  const handleConfigureSlots = () => {
+    alert('请前往「设置 → 通用 → 场景设置」配置时间段和快捷方式');
+  };
+
   return (
     <div className="h-full relative">
       {/* 主内容区域 */}
@@ -46,7 +51,7 @@ export const RecordViewContainer: React.FC<RecordViewContainerProps> = ({
           categories={categories}
         />
       ) : (
-        <SceneView />
+        <SceneView onConfigureSlots={handleConfigureSlots} />
       )}
 
       {/* 悬浮切换按钮 */}

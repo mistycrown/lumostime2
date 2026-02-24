@@ -162,9 +162,8 @@ export const IconRenderer: React.FC<IconRendererProps> = ({
             emojiRef.current.innerHTML = '';
             emojiRef.current.appendChild(img);
         } else if (emojiStyle === 'native' && emojiRef.current && !isCustomImage && !isUIIcon) {
-            // 原生 emoji - 放大到 1.2 倍
+            // 原生 emoji - 不再应用额外缩放，保持与 UI icon 一致的大小
             emojiRef.current.innerHTML = displayEmoji;
-            emojiRef.current.style.fontSize = '1.2em';
         }
     }, [displayEmoji, emojiStyle, size, isCustomImage, isUIIcon]);
     
@@ -252,29 +251,35 @@ export const IconRenderer: React.FC<IconRendererProps> = ({
         const { primary, fallback } = uiIconService.getIconPathWithFallback(iconType);
         
         const imageSize = getImageSize();
-        const sizeStyle = { width: imageSize, height: imageSize };
+        const sizeStyle = { 
+            width: imageSize, 
+            height: imageSize,
+            objectFit: 'contain' as const
+        };
 
         return (
-            <img
-                src={primary}
-                alt={alt || uiIconService.getIconLabel(iconType)}
-                className={`inline-block ${className}`}
-                style={sizeStyle}
-                onError={(e) => {
-                    if (!hasFallbackAttempted) {
-                        setHasFallbackAttempted(true);
-                        e.currentTarget.src = fallback;
-                    } else {
-                        setImageError(true);
-                    }
-                }}
-            />
+            <span className={`inline-flex items-center justify-center ${className}`}>
+                <img
+                    src={primary}
+                    alt={alt || uiIconService.getIconLabel(iconType)}
+                    className="inline-block"
+                    style={sizeStyle}
+                    onError={(e) => {
+                        if (!hasFallbackAttempted) {
+                            setHasFallbackAttempted(true);
+                            e.currentTarget.src = fallback;
+                        } else {
+                            setImageError(true);
+                        }
+                    }}
+                />
+            </span>
         );
     }
     
     // 4. 渲染 Emoji（原生、Twemoji 或 OpenMoji）
-    // 原生 emoji 放大 1.2 倍
-    const nativeEmojiScale = emojiStyle === 'native' ? 1.2 : 1;
+    // 为了与 UI icon 保持一致的大小，不再对 native emoji 应用额外的缩放
+    const imageSize = getImageSize();
     
     return (
         <span 
@@ -282,12 +287,15 @@ export const IconRenderer: React.FC<IconRendererProps> = ({
             className={`inline-flex items-center justify-center ${className}`} 
             style={
                 emojiStyle === 'native' && size 
-                    ? typeof size === 'number' 
-                        ? { fontSize: `${size * nativeEmojiScale}px` }
-                        : { fontSize: size, width: size, height: size, transform: `scale(${nativeEmojiScale})` }
+                    ? { 
+                        fontSize: imageSize,
+                        width: imageSize, 
+                        height: imageSize,
+                        lineHeight: 1
+                      }
                     : emojiStyle === 'native'
-                    ? { fontSize: '1.2em' }
-                    : undefined
+                    ? { fontSize: '1.25rem', lineHeight: 1 }
+                    : { width: imageSize, height: imageSize }
             }
         >
             {emojiStyle === 'native' && displayEmoji}
