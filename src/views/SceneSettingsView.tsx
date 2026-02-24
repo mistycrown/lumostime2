@@ -3,12 +3,14 @@
  * @description 场景设置页面 - 管理时间段和快捷方式
  */
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, Plus, Trash2, Edit2, Palette, Clock, RotateCcw } from 'lucide-react';
+import { ArrowLeft, Plus, Trash2, Edit2, Palette, Clock, RotateCcw, ChevronRight } from 'lucide-react';
 import { TimeSlot, SceneCardData, SceneCardType, Category, TodoItem, TodoCategory } from '../types';
 import { CustomSelect } from '../components/CustomSelect';
 import { UIIconSelectorCompact } from '../components/UIIconSelector';
 import { UIIcon } from '../components/UIIcon';
 import { IconRenderer } from '../components/IconRenderer';
+import { TagAssociation } from '../components/TagAssociation';
+import { TodoAssociation } from '../components/TodoAssociation';
 import { uiIconService } from '../services/uiIconService';
 import { useData } from '../contexts/DataContext';
 import { useCategoryScope } from '../contexts/CategoryScopeContext';
@@ -620,17 +622,16 @@ const CardEditModal: React.FC<{
             <label className="block text-xs sm:text-sm font-medium text-stone-700 mb-1">
               类型
             </label>
-            <select
+            <CustomSelect
               value={card?.type || 'timer'}
-              onChange={(e) => onChange({ ...card, type: e.target.value as SceneCardType })}
-              className="w-full px-3 py-2 text-sm border border-stone-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-stone-800"
-            >
-              {cardTypes.map(type => (
-                <option key={type.value} value={type.value}>
-                  {type.label}
-                </option>
-              ))}
-            </select>
+              onChange={(value) => onChange({ ...card, type: value as SceneCardType })}
+              options={cardTypes.map(type => ({
+                value: type.value,
+                label: type.label,
+                icon: null
+              }))}
+              placeholder="选择类型"
+            />
           </div>
 
           <div>
@@ -733,69 +734,58 @@ const ActivitySelector: React.FC<ActivitySelectorProps> = ({
   selectedCategoryId,
   onChange
 }) => {
-  // Create options grouped by category
-  const activityOptions: Array<{
-    value: string;
-    label: string;
-    icon: React.ReactNode;
-    categoryName: string;
-    categoryId: string;
-  }> = [];
+  const [localCategoryId, setLocalCategoryId] = useState<string>(
+    selectedCategoryId || (categories.length > 0 ? categories[0].id : '')
+  );
+  const [localActivityId, setLocalActivityId] = useState<string>(
+    selectedActivityId || ''
+  );
 
-  categories.forEach(category => {
-    category.activities.forEach(activity => {
-      activityOptions.push({
-        value: activity.id,
-        label: `${category.name} / ${activity.name}`,
-        icon: <span>{activity.icon}</span>,
-        categoryName: category.name,
-        categoryId: category.id
-      });
-    });
-  });
-
-  // Sort by category name, then by activity name
-  activityOptions.sort((a, b) => {
-    if (a.categoryName !== b.categoryName) {
-      return a.categoryName.localeCompare(b.categoryName);
+  // 当选择改变时，通知父组件
+  useEffect(() => {
+    if (localActivityId && localCategoryId) {
+      onChange(localActivityId, localCategoryId);
     }
-    return a.label.localeCompare(b.label);
-  });
+  }, [localActivityId, localCategoryId]);
 
-  const handleActivityChange = (activityId: string | undefined) => {
-    if (!activityId) {
-      onChange(undefined, undefined);
-      return;
-    }
-
-    const selectedOption = activityOptions.find(opt => opt.value === activityId);
-    if (selectedOption) {
-      onChange(activityId, selectedOption.categoryId);
+  const handleCategorySelect = (categoryId: string) => {
+    setLocalCategoryId(categoryId);
+    // 自动选择该分类的第一个活动
+    const category = categories.find(c => c.id === categoryId);
+    if (category && category.activities.length > 0) {
+      setLocalActivityId(category.activities[0].id);
     }
   };
 
+  const handleActivitySelect = (activityId: string) => {
+    setLocalActivityId(activityId);
+  };
+
   return (
-    <div className="space-y-3">
-      <label className="block text-sm font-medium text-stone-700">
+    <div className="space-y-2">
+      <label className="block text-xs sm:text-sm font-medium text-stone-700">
         关联标签
       </label>
 
-      {activityOptions.length === 0 ? (
-        <div className="text-sm text-stone-400 py-4 text-center">
+      {categories.length === 0 ? (
+        <div className="text-xs sm:text-sm text-stone-400 py-6 text-center border border-stone-200 rounded-lg">
           暂无可用标签
         </div>
       ) : (
-        <CustomSelect
-          value={selectedActivityId || ''}
-          onChange={handleActivityChange}
-          options={activityOptions}
-          placeholder="请选择标签"
-        />
+        <div className="border border-stone-200 rounded-lg p-3 bg-stone-50/50">
+          <TagAssociation
+            categories={categories}
+            selectedCategoryId={localCategoryId}
+            selectedActivityId={localActivityId}
+            onCategorySelect={handleCategorySelect}
+            onActivitySelect={handleActivitySelect}
+          />
+        </div>
       )}
 
-      {selectedActivityId && selectedCategoryId && (
-        <div className="text-xs text-stone-500 bg-stone-50 p-3 rounded-lg">
-          <p>点击此卡片将开始计时该标签</p>
+      {localActivityId && localCategoryId && (
+        <div className="text-[10px] sm:text-xs text-stone-500 bg-stone-50 p-2 rounded-lg">
+          点击此卡片将开始计时该标签
         </div>
       )}
     </div>
@@ -818,50 +808,20 @@ const TodoSelector: React.FC<TodoSelectorProps> = ({
   selectedTodoId,
   onChange
 }) => {
-  // Group todos by category and filter out completed ones
-  const activeTodos = todos.filter(todo => !todo.isCompleted);
-
-  // Create options grouped by category
-  const todoOptions = activeTodos.map(todo => {
-    const category = todoCategories.find(c => c.id === todo.categoryId);
-    return {
-      value: todo.id,
-      label: todo.title,
-      icon: <span>{category?.icon || '📝'}</span>,
-      categoryName: category?.name || '未分类'
-    };
-  });
-
-  // Sort by category name, then by todo title
-  todoOptions.sort((a, b) => {
-    if (a.categoryName !== b.categoryName) {
-      return a.categoryName.localeCompare(b.categoryName);
-    }
-    return a.label.localeCompare(b.label);
-  });
-
   return (
-    <div className="space-y-3">
-      <label className="block text-sm font-medium text-stone-700">
-        关联待办任务
-      </label>
-
-      {activeTodos.length === 0 ? (
-        <div className="text-sm text-stone-400 py-4 text-center">
-          暂无可用的待办任务
-        </div>
-      ) : (
-        <CustomSelect
-          value={selectedTodoId || ''}
-          onChange={(value) => onChange(value || undefined)}
-          options={todoOptions}
-          placeholder="请选择待办任务"
+    <div className="space-y-2">
+      <div className="border border-stone-200 rounded-lg p-3 bg-stone-50/50">
+        <TodoAssociation
+          todos={todos}
+          todoCategories={todoCategories}
+          linkedTodoId={selectedTodoId}
+          onChange={onChange}
         />
-      )}
+      </div>
 
       {selectedTodoId && (
-        <div className="text-xs text-stone-500 bg-stone-50 p-3 rounded-lg">
-          <p>点击此卡片将开始该待办任务的计时</p>
+        <div className="text-[10px] sm:text-xs text-stone-500 bg-stone-50 p-2 rounded-lg">
+          点击此卡片将开始该待办任务的计时
         </div>
       )}
     </div>
