@@ -50,6 +50,7 @@
 
   /* 强调色 */
   --accent-color: #1c1917;
+  --accent-color-light: rgba(28, 25, 23, 0.08);
   --accent-hover: #292524;
   
   /* 深色文字 */
@@ -103,6 +104,7 @@
 
   /* 强调色 */
   --accent-color: #8b6fa8;
+  --accent-color-light: rgba(139, 111, 168, 0.12);
   --accent-hover: #7d6693;
   
   /* 深色文字 */
@@ -155,6 +157,7 @@
 
   /* 强调色 */
   --accent-color: #6b8ca8;
+  --accent-color-light: rgba(107, 140, 168, 0.12);
   --accent-hover: #5d7a93;
   
   /* 深色文字 */

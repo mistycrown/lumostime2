@@ -346,29 +346,57 @@ const CardFront: React.FC<{ data: SceneCardData }> = ({ data }) => {
             {data.progress}/{data.totalAmount}
           </div>
         )}
-        
-        {/* 统计值 */}
-        {data.type === 'stats' && data.statValue && (
-          <p className="text-base font-bold text-stone-800 whitespace-nowrap">{data.statValue}</p>
-        )}
       </div>
       
       {/* 第一行：名称 */}
-      <div className="pr-12 mb-2">
+      <div className={data.type === 'stats' ? 'mb-2' : 'pr-12 mb-2'}>
         <h3 className="font-bold text-stone-800 text-base leading-tight break-words overflow-wrap-anywhere">
           {data.title}
         </h3>
       </div>
       
+      {/* 统计卡片的进度条（如果启用了目标值） */}
+      {data.type === 'stats' && data.enableGoal && data.goalValue && data.statMinutes !== undefined && (
+        <div className="mb-2">
+          <div className="flex items-center justify-between text-[10px] font-mono text-stone-500 mb-1">
+            <span>{data.statMinutes}m / {data.goalValue}m</span>
+            <span>{Math.min(100, Math.round((data.statMinutes / data.goalValue) * 100))}%</span>
+          </div>
+          <div 
+            className="h-1 w-full rounded-full overflow-hidden" 
+            style={{ backgroundColor: 'var(--progress-bar-bg)' }}
+          >
+            <div
+              className="h-full rounded-full transition-all duration-500"
+              style={{
+                backgroundColor: data.goalType === 'max' ? '#dc2626' : 'var(--progress-bar-fill)',
+                width: `${Math.min(100, (data.statMinutes / data.goalValue) * 100)}%`
+              }}
+            />
+          </div>
+        </div>
+      )}
+      
       {/* 第二行：正面文字（如果有） */}
       {data.frontText && (
-        <div className="flex items-center gap-2">
+        <div className="flex items-start gap-2">
           <div className="flex-shrink-0 flex items-center justify-center">
             {getFrontIcon()}
           </div>
           <p className="text-sm text-stone-600 break-words overflow-wrap-anywhere flex-1 leading-[1.4]">
             {data.frontText}
           </p>
+          {/* 统计卡片：在文字右侧显示统计值 */}
+          {data.type === 'stats' && data.statValue && (
+            <p className="text-base font-bold text-stone-800 whitespace-nowrap ml-2 self-end">{data.statValue}</p>
+          )}
+        </div>
+      )}
+      
+      {/* 统计卡片：如果没有正面文字，单独显示统计值 */}
+      {data.type === 'stats' && data.statValue && !data.frontText && (
+        <div className="flex justify-end">
+          <p className="text-base font-bold text-stone-800 whitespace-nowrap">{data.statValue}</p>
         </div>
       )}
     </div>
@@ -448,9 +476,6 @@ const CardBack: React.FC<{
       <div className="absolute top-4 right-4">
         {isSwiping ? (
           <p className="text-xs text-stone-400 whitespace-nowrap">{getSwipeHintText()}</p>
-        ) : data.type === 'stats' && data.statValue ? (
-          // 统计卡片显示统计值而不是对勾
-          <p className="text-base font-bold text-stone-800 whitespace-nowrap">{data.statValue}</p>
         ) : (
           <div className={`w-5 h-5 rounded-full ${bgColor} flex items-center justify-center`}>
             {icon}
@@ -458,14 +483,54 @@ const CardBack: React.FC<{
         )}
       </div>
       
-      {/* 反面文字 - 不显示左侧图标 */}
-      <div className="pr-12">
-        {data.backText && (
-          <p className="text-sm text-stone-600 break-words overflow-wrap-anywhere">
+      {/* 第一行：标题 */}
+      <div className={data.type === 'stats' ? 'mb-2' : 'pr-12 mb-2'}>
+        <h3 className="font-bold text-stone-800 text-base leading-tight break-words overflow-wrap-anywhere">
+          {data.title}
+        </h3>
+      </div>
+      
+      {/* 统计卡片的进度条（如果启用了目标值） */}
+      {data.type === 'stats' && data.enableGoal && data.goalValue && data.statMinutes !== undefined && (
+        <div className="mb-2">
+          <div className="flex items-center justify-between text-[10px] font-mono text-stone-500 mb-1">
+            <span>{data.statMinutes}m / {data.goalValue}m</span>
+            <span>{Math.min(100, Math.round((data.statMinutes / data.goalValue) * 100))}%</span>
+          </div>
+          <div 
+            className="h-1 w-full rounded-full overflow-hidden" 
+            style={{ backgroundColor: 'var(--progress-bar-bg)' }}
+          >
+            <div
+              className="h-full rounded-full transition-all duration-500"
+              style={{
+                backgroundColor: data.goalType === 'max' ? '#dc2626' : 'var(--progress-bar-fill)',
+                width: `${Math.min(100, (data.statMinutes / data.goalValue) * 100)}%`
+              }}
+            />
+          </div>
+        </div>
+      )}
+      
+      {/* 第二行：反面文字（如果有） */}
+      {data.backText && (
+        <div className="flex items-end gap-2">
+          <p className="text-sm text-stone-600 break-words overflow-wrap-anywhere flex-1 leading-[1.4]">
             {data.backText}
           </p>
-        )}
-      </div>
+          {/* 统计卡片：在文字右侧显示统计值 */}
+          {data.type === 'stats' && data.statValue && (
+            <p className="text-base font-bold text-stone-800 whitespace-nowrap">{data.statValue}</p>
+          )}
+        </div>
+      )}
+      
+      {/* 统计卡片：如果没有反面文字，单独显示统计值 */}
+      {data.type === 'stats' && data.statValue && !data.backText && (
+        <div className="flex justify-end">
+          <p className="text-base font-bold text-stone-800 whitespace-nowrap">{data.statValue}</p>
+        </div>
+      )}
     </div>
   );
 };

@@ -83,12 +83,16 @@ export const CustomSelect: React.FC<CustomSelectProps> = ({
                   handleSelect(option.value);
                 }}
                 className={`w-full px-4 py-2.5 text-sm text-left hover:bg-stone-50 transition-colors flex items-center justify-between ${
-                  option.value === value ? 'bg-blue-50 text-blue-600' : 'text-stone-700'
+                  option.value === value ? 'font-bold' : 'text-stone-700'
                 }`}
+                style={option.value === value ? {
+                  backgroundColor: 'color-mix(in srgb, var(--accent-color) 12%, transparent)',
+                  color: 'var(--accent-color)'
+                } : undefined}
               >
                 <span>{option.label}</span>
                 {option.value === value && (
-                  <Check size={16} className="text-blue-600" />
+                  <Check size={16} style={{ color: 'var(--accent-color)' }} />
                 )}
               </button>
             ))}

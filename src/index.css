@@ -35,35 +35,36 @@
   box-shadow: var(--floating-button-shadow);
 }
 
-/* 场景卡片样式 - 使用淡入淡出 + 缩放动画 */
-.scene-card-container {
-  width: 100%;
-}
-
+/* 场景卡片样式 - 使用相对定位实现自动高度 */
 .scene-card {
   position: relative;
   width: 100%;
+  /* 容器高度由内容决定 */
 }
 
 .scene-card-face {
   width: 100%;
   cursor: pointer;
   transition: opacity 0.3s ease, transform 0.3s ease;
+  box-sizing: border-box;
 }
 
 .scene-card-front {
   opacity: 1;
   transform: scale(1);
+  /* 正面使用正常文档流，撑开容器高度 */
+  position: relative;
 }
 
 .scene-card-back {
+  opacity: 0;
+  transform: scale(0.95);
+  pointer-events: none;
+  /* 背面绝对定位，覆盖在正面上方 */
   position: absolute;
   top: 0;
   left: 0;
   right: 0;
-  opacity: 0;
-  transform: scale(0.95);
-  pointer-events: none;
 }
 
 /* 翻转状态 */
@@ -71,11 +72,18 @@
   opacity: 0;
   transform: scale(0.95);
   pointer-events: none;
+  /* 翻转后正面绝对定位 */
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
 }
 
 .scene-card.flipped .scene-card-back {
   opacity: 1;
   transform: scale(1);
   pointer-events: auto;
+  /* 翻转后背面使用正常文档流，撑开容器高度 */
+  position: relative;
 }
 

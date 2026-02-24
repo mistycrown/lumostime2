@@ -217,8 +217,14 @@ export interface SceneCardData {
   
   // 统计数据（仅 stats 类型）
   statValue?: string;
+  statMinutes?: number; // 统计值（分钟数，用于进度条计算）
   statLabel?: string;
   filterActivityIds?: string[]; // 限定标签 ID 列表（用于统计筛选）
+  
+  // 目标值设置（仅 stats 类型）
+  enableGoal?: boolean; // 是否启用目标值
+  goalValue?: number; // 目标值（分钟）
+  goalType?: 'min' | 'max'; // 目标类型：min=大于该值，max=小于该值
   
   // 文字内容（仅 text 类型）
   content?: string;

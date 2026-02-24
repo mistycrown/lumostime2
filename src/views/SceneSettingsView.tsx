@@ -285,7 +285,27 @@ export const SceneSettingsView: React.FC<SceneSettingsViewProps> = ({ onBack }) 
       title: editingCard.title,
       frontText: editingCard.frontText || '现在开始！',
       backText: editingCard.backText || '完成了！',
-      action: editingCard.action || { type: 'none' }
+      action: editingCard.action || { type: 'none' },
+      // 保留统计卡片的特有字段
+      ...(editingCard.type === 'stats' && {
+        filterActivityIds: editingCard.filterActivityIds,
+        enableGoal: editingCard.enableGoal,
+        goalValue: editingCard.goalValue,
+        goalType: editingCard.goalType
+      }),
+      // 保留待办卡片的进度字段
+      ...(editingCard.type === 'todo' && {
+        progress: editingCard.progress,
+        totalAmount: editingCard.totalAmount
+      }),
+      // 保留文字卡片的内容字段
+      ...(editingCard.type === 'text' && {
+        content: editingCard.content
+      }),
+      // 保留日课卡片的完成状态
+      ...(editingCard.type === 'checklist' && {
+        isCompleted: editingCard.isCompleted
+      })
     };
 
     const updatedSlots = timeSlots.map(slot => {
@@ -970,10 +990,21 @@ const CardEditModal: React.FC<{
             <StatsSelector
               categories={categories}
               selectedActivityIds={card?.filterActivityIds || []}
+              enableGoal={card?.enableGoal}
+              goalValue={card?.goalValue}
+              goalType={card?.goalType}
               onChange={(activityIds) => {
                 onChange({
                   ...card,
                   filterActivityIds: activityIds
+                });
+              }}
+              onGoalChange={(enableGoal, goalValue, goalType) => {
+                onChange({
+                  ...card,
+                  enableGoal,
+                  goalValue,
+                  goalType
                 });
               }}
             />
@@ -1211,13 +1242,21 @@ const NavigationSelector: React.FC<NavigationSelectorProps> = ({
 interface StatsSelectorProps {
   categories: Category[];
   selectedActivityIds: string[];
+  enableGoal?: boolean;
+  goalValue?: number;
+  goalType?: 'min' | 'max';
   onChange: (activityIds: string[]) => void;
+  onGoalChange?: (enableGoal: boolean, goalValue?: number, goalType?: 'min' | 'max') => void;
 }
 
 const StatsSelector: React.FC<StatsSelectorProps> = ({
   categories,
   selectedActivityIds,
-  onChange
+  enableGoal = false,
+  goalValue,
+  goalType = 'min',
+  onChange,
+  onGoalChange
 }) => {
   return (
     <div className="space-y-2">
@@ -1225,7 +1264,7 @@ const StatsSelector: React.FC<StatsSelectorProps> = ({
         统计设置
       </label>
 
-      <div className="border border-stone-200 rounded-lg p-3 bg-stone-50/50">
+      <div className="border border-stone-200 rounded-lg p-3 bg-stone-50/50 space-y-3">
         <TagMultipleAssociation
           categories={categories}
           selectedActivityIds={selectedActivityIds}
@@ -1234,10 +1273,67 @@ const StatsSelector: React.FC<StatsSelectorProps> = ({
           toggleLabel="限定标签（Activity）"
           description="仅统计选中标签的今日时长"
         />
+
+        {/* 目标值设置 */}
+        <div className="pt-3 border-t border-stone-200">
+          <div className="flex items-center justify-between mb-2">
+            <label className="text-xs sm:text-sm font-medium text-stone-700">
+              设定目标值
+            </label>
+            <button
+              onClick={() => onGoalChange?.(!enableGoal, goalValue, goalType)}
+              className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors`}
+              style={{
+                backgroundColor: enableGoal ? 'var(--accent-color)' : '#d6d3d1'
+              }}
+            >
+              <span
+                className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${
+                  enableGoal ? 'translate-x-5' : 'translate-x-0.5'
+                }`}
+              />
+            </button>
+          </div>
+
+          {enableGoal && (
+            <div className="space-y-2">
+              <div className="flex gap-2">
+                <div className="flex-1">
+                  <input
+                    type="number"
+                    min="0"
+                    step="1"
+                    value={goalValue || ''}
+                    onChange={(e) => {
+                      const value = parseInt(e.target.value) || 0;
+                      onGoalChange?.(enableGoal, value, goalType);
+                    }}
+                    className="w-full px-2 py-1.5 text-sm border border-stone-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-stone-800"
+                    placeholder="目标值（分钟）"
+                  />
+                </div>
+                <CustomSelect
+                  value={goalType}
+                  onChange={(value) => onGoalChange?.(enableGoal, goalValue, value as 'min' | 'max')}
+                  options={[
+                    { value: 'min', label: '≥ 大于等于' },
+                    { value: 'max', label: '≤ 小于等于' }
+                  ]}
+                  className="w-32"
+                />
+              </div>
+              <p className="text-[10px] text-stone-500">
+                {goalType === 'min' 
+                  ? '目标：达到或超过此时长' 
+                  : '目标：控制在此时长以内'}
+              </p>
+            </div>
+          )}
+        </div>
       </div>
 
       <div className="text-[10px] sm:text-xs text-stone-500 bg-stone-50 p-2 rounded-lg">
-        此卡片将显示今日指定标签的总时长。正面显示当前时长，反面显示完成提示。
+        此卡片将显示今日指定标签的总时长。{enableGoal ? '通过进度条展示目标完成情况。' : '正面显示当前时长，反面显示完成提示。'}
       </div>
     </div>
   );

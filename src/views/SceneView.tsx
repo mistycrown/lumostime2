@@ -146,6 +146,21 @@ export const SceneView: React.FC<SceneViewProps> = ({
 
   // 计算统计卡片的时长数据
   const calculateStatsDuration = (filterActivityIds?: string[]): string => {
+    const minutes = calculateStatsDurationMinutes(filterActivityIds);
+    
+    // 格式化时长显示
+    const hours = Math.floor(minutes / 60);
+    const mins = minutes % 60;
+    
+    if (hours > 0) {
+      return `${hours}h ${mins}m`;
+    } else {
+      return `${mins}m`;
+    }
+  };
+
+  // 计算统计卡片的时长（返回分钟数）
+  const calculateStatsDurationMinutes = (filterActivityIds?: string[]): number => {
     // 获取今天的开始和结束时间
     const today = new Date();
     const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 0, 0, 0, 0);
@@ -195,15 +210,8 @@ export const SceneView: React.FC<SceneViewProps> = ({
       });
     }
 
-    // 格式化时长显示
-    const hours = Math.floor(totalSeconds / 3600);
-    const minutes = Math.floor((totalSeconds % 3600) / 60);
-    
-    if (hours > 0) {
-      return `${hours}h ${minutes}m`;
-    } else {
-      return `${minutes}m`;
-    }
+    // 返回分钟数
+    return Math.floor(totalSeconds / 60);
   };
 
   // 如果没有时间段数据，显示空状态
@@ -632,7 +640,12 @@ export const SceneView: React.FC<SceneViewProps> = ({
               // 如果是统计卡片，计算时长数据
               if (card.type === 'stats') {
                 const statValue = calculateStatsDuration(card.filterActivityIds);
-                cardWithStatus = { ...cardWithStatus, statValue };
+                const statMinutes = calculateStatsDurationMinutes(card.filterActivityIds);
+                cardWithStatus = { 
+                  ...cardWithStatus, 
+                  statValue,
+                  statMinutes // 添加分钟数用于进度条计算
+                };
               }
               
               return (

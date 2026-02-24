@@ -34,6 +34,11 @@ export const TagMultipleAssociation: React.FC<TagMultipleAssociationProps> = ({
     const [selectedCategoryId, setSelectedCategoryId] = useState<string>('');
     const [isEnabled, setIsEnabled] = useState<boolean>(selectedActivityIds.length > 0);
 
+    // 同步外部 selectedActivityIds 的变化到内部 isEnabled 状态
+    React.useEffect(() => {
+        setIsEnabled(selectedActivityIds.length > 0);
+    }, [selectedActivityIds]);
+
     const handleToggle = () => {
         const newEnabled = !isEnabled;
         setIsEnabled(newEnabled);
