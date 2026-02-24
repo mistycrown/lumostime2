@@ -235,35 +235,23 @@ export const SceneView: React.FC<SceneViewProps> = ({
 
   // 卡片动作处理
   const handleCardAction = (action: SceneCardData['action'], autoEnterFocus?: boolean) => {
-    console.log('[SceneView] handleCardAction:', action.type, 'autoEnterFocus:', autoEnterFocus);
-    
     switch (action.type) {
       case 'startTimer':
         if (action.activityId && action.categoryId) {
-          // 查找对应的活动
           const category = categories.find(c => c.id === action.categoryId);
           const activity = category?.activities.find(a => a.id === action.activityId);
           
           if (activity && category) {
-            console.log('[SceneView] 调用 onStartActivity, autoEnterFocus:', autoEnterFocus);
-            // 调用开始计时回调，传递 autoEnterFocus 参数
             onStartActivity(activity, category.id, autoEnterFocus);
-          } else {
-            console.warn('未找到对应的活动:', action.activityId, action.categoryId);
           }
         }
         break;
       case 'startTodo':
         if (action.todoId && onStartTodoFocus) {
-          // 查找对应的待办任务
           const todo = todos.find(t => t.id === action.todoId);
           
           if (todo) {
-            console.log('[SceneView] 调用 onStartTodoFocus, autoEnterFocus:', autoEnterFocus);
-            // 调用开始待办计时回调，传递 autoEnterFocus 参数
             onStartTodoFocus(todo, autoEnterFocus);
-          } else {
-            console.warn('未找到对应的待办任务:', action.todoId);
           }
         }
         break;

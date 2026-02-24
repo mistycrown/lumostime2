@@ -185,16 +185,13 @@ const AppContent: React.FC = () => {
 
   const [sessionToStop, setSessionToStop] = React.useState<string | null>(null);
   const [shouldAutoOpenFocus, setShouldAutoOpenFocus] = React.useState(false);
-  const [shouldAutoEnterImmersive, setShouldAutoEnterImmersive] = React.useState(false); // 新增：是否自动进入沉浸式模式
+  const [shouldAutoEnterImmersive, setShouldAutoEnterImmersive] = React.useState(false);
   const autoOpenTimeoutRef = React.useRef<NodeJS.Timeout | null>(null);
   
   // 监听activeSessions变化，自动打开FocusDetailView
   React.useEffect(() => {
-    console.log('[App useEffect] activeSessions.length:', activeSessions.length, 'shouldAutoOpenFocus:', shouldAutoOpenFocus);
-    
     if (shouldAutoOpenFocus && activeSessions.length > 0) {
       const latestSession = activeSessions[activeSessions.length - 1];
-      console.log('[App useEffect] 准备打开沉浸式计时, sessionId:', latestSession.id);
       
       // 清除之前的定时器
       if (autoOpenTimeoutRef.current) {
@@ -203,8 +200,6 @@ const AppContent: React.FC = () => {
       
       // 延迟一小段时间，确保 TimerFloating 已经渲染
       autoOpenTimeoutRef.current = setTimeout(() => {
-        console.log('[App useEffect] 执行打开沉浸式计时, sessionId:', latestSession.id);
-        // 直接设置 focusDetailSessionId，这会触发 FocusDetailView 渲染
         setFocusDetailSessionId(latestSession.id);
         setShouldAutoOpenFocus(false);
       }, 300);
@@ -219,41 +214,24 @@ const AppContent: React.FC = () => {
   
   // Wrappers for Session Actions to match original signature (injecting autoLinkRules)
   const handleStartActivityWrapper = (activity: any, categoryId: string, todoId?: string, scopeIdOrIds?: string | string[], note?: string, autoEnterFocus?: boolean) => {
-    console.log('[App] handleStartActivityWrapper, autoEnterFocus:', autoEnterFocus, 'autoOpenFocusDetail:', autoOpenFocusDetail);
-    
-    // 先设置自动打开标记
     const shouldAutoOpen = autoEnterFocus !== undefined ? autoEnterFocus : autoOpenFocusDetail;
-    console.log('[App] shouldAutoOpen:', shouldAutoOpen);
     
     if (shouldAutoOpen) {
-      console.log('[App] 设置 setShouldAutoOpenFocus(true)');
       setShouldAutoOpenFocus(true);
-      // 同时设置自动进入沉浸式模式的标志
       if (autoEnterFocus) {
-        console.log('[App] 设置 setShouldAutoEnterImmersive(true)');
         setShouldAutoEnterImmersive(true);
       }
     }
     
-    // 然后启动活动
-    console.log('[App] 调用 startActivity');
     startActivity(activity, categoryId, autoLinkRules, todoId, scopeIdOrIds, note);
   };
   
   const handleStartTodoFocusWrapper = (todo: TodoItem, autoEnterFocus?: boolean) => {
-    console.log('[App] handleStartTodoFocusWrapper, autoEnterFocus:', autoEnterFocus);
-    
-    // 先设置自动打开标记
     if (autoEnterFocus) {
-      console.log('[App] 设置 setShouldAutoOpenFocus(true)');
       setShouldAutoOpenFocus(true);
-      // 同时设置自动进入沉浸式模式的标志
-      console.log('[App] 设置 setShouldAutoEnterImmersive(true)');
       setShouldAutoEnterImmersive(true);
     }
     
-    // 然后启动 todo
-    console.log('[App] 调用 todoManager.handleStartTodoFocus');
     todoManager.handleStartTodoFocus(todo);
   };
   
@@ -438,12 +416,8 @@ const AppContent: React.FC = () => {
       />
 
       {/* Focus Detail Overlay */}
-      {(() => {
-        console.log('[App.tsx] FocusDetailView 渲染检查, focusDetailSessionId:', focusDetailSessionId, 'activeSessions:', activeSessions);
-        if (!focusDetailSessionId) return null;
-        
+      {focusDetailSessionId && (() => {
         const session = activeSessions.find(s => s.id === focusDetailSessionId);
-        console.log('[App.tsx] 找到的 session:', session);
         if (!session) return null;
         
         return (
@@ -456,10 +430,10 @@ const AppContent: React.FC = () => {
             autoLinkRules={autoLinkRules}
             autoApplyAutoLinkRules={autoApplyAutoLinkRules}
             autoApplyTodoLink={autoApplyTodoLink}
-            autoEnterImmersive={shouldAutoEnterImmersive} // 传递自动进入沉浸式模式的标志
+            autoEnterImmersive={shouldAutoEnterImmersive}
             onClose={() => {
               setFocusDetailSessionId(null);
-              setShouldAutoEnterImmersive(false); // 关闭时重置标志
+              setShouldAutoEnterImmersive(false);
             }}
             onCancel={cancelSession}
             onComplete={(finalSession) => {
@@ -470,19 +444,12 @@ const AppContent: React.FC = () => {
                 todoManager.updateTodoProgress
               );
               setFocusDetailSessionId(null);
-              setShouldAutoEnterImmersive(false); // 完成时重置标志
+              setShouldAutoEnterImmersive(false);
             }}
             onUpdate={(updated) => {
-              // Update the session in activeSessions
-              console.log('[App.tsx] onUpdate 被调用，更新的 session:', updated);
-              console.log('[App.tsx] 更新的 scopeIds:', updated.scopeIds);
-              setActiveSessions(prev => {
-                const newSessions = prev.map(s =>
-                  s.id === updated.id ? updated : s
-                );
-                console.log('[App.tsx] 更新后的 activeSessions:', newSessions);
-                return newSessions;
-              });
+              setActiveSessions(prev => prev.map(s =>
+                s.id === updated.id ? updated : s
+              ));
             }}
             autoFocusNote={autoFocusNote}
           />

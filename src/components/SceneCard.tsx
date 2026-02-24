@@ -64,7 +64,6 @@ export const SceneCard: React.FC<SceneCardProps> = ({ data, onAction }) => {
   const [touchEnd, setTouchEnd] = useState<number | null>(null);
   const [swipeOffset, setSwipeOffset] = useState(0);
   const [isSwiping, setIsSwiping] = useState(false);
-  const [cardHeight, setCardHeight] = useState<number | undefined>(undefined);
   const cardRef = useRef<HTMLDivElement>(null);
   const frontRef = useRef<HTMLDivElement>(null);
   const backRef = useRef<HTMLDivElement>(null);
@@ -84,45 +83,9 @@ export const SceneCard: React.FC<SceneCardProps> = ({ data, onAction }) => {
     localStorage.setItem(`scene_card_flipped_${data.id}`, String(flipped));
   };
 
-  // 动态测量并设置卡片高度 - 在切换动画完成后执行
-  React.useEffect(() => {
-    const updateHeight = () => {
-      if (isFlipped && backRef.current) {
-        setCardHeight(backRef.current.offsetHeight);
-      } else if (!isFlipped && frontRef.current) {
-        setCardHeight(frontRef.current.offsetHeight);
-      }
-    };
-
-    // 等待切换动画完成（0.3s）后再调整高度
-    const timer = setTimeout(updateHeight, 300);
-
-    return () => {
-      clearTimeout(timer);
-    };
-  }, [isFlipped]);
-
-  // 监听内容变化，实时更新高度
-  React.useEffect(() => {
-    const observer = new ResizeObserver(() => {
-      if (isFlipped && backRef.current) {
-        setCardHeight(backRef.current.offsetHeight);
-      } else if (!isFlipped && frontRef.current) {
-        setCardHeight(frontRef.current.offsetHeight);
-      }
-    });
-    
-    if (frontRef.current) observer.observe(frontRef.current);
-    if (backRef.current) observer.observe(backRef.current);
-
-    return () => {
-      observer.disconnect();
-    };
-  }, [isFlipped]);
-
   // 最小滑动距离（像素）
   const minSwipeDistance = 80;
-  const maxSwipeDistance = 150; // 限制最大拖动距离
+  const maxSwipeDistance = 150;
 
   const handleTouchStart = (e: React.TouchEvent) => {
     // 只在反面时才响应触摸
@@ -181,17 +144,13 @@ export const SceneCard: React.FC<SceneCardProps> = ({ data, onAction }) => {
       setIsFlipped(true);
       saveFlipState(true);
       
-      // 执行动作（除了 'none' 类型）
       if (data.action.type !== 'none') {
-        console.log('[SceneCard] 执行动作:', data.action.type, 'autoEnterFocus:', data.autoEnterFocus);
-        
         // 对于导航卡片，延迟执行以显示翻转动画
         if (data.action.type === 'navigate') {
           setTimeout(() => {
             onAction?.(data.action, data.autoEnterFocus);
           }, 300);
         } else {
-          // 对于 timer 和 todo 类型，传递 autoEnterFocus 参数
           onAction?.(data.action, data.autoEnterFocus);
         }
       }
@@ -199,38 +158,22 @@ export const SceneCard: React.FC<SceneCardProps> = ({ data, onAction }) => {
       // 反面点击 - 根据卡片类型决定是否响应
       switch (data.type) {
         case 'timer':
-          // 计时卡片：反面可点击，支持启动下一次计时（允许多次计时）
-          if (data.action.type !== 'none') {
-            console.log('[SceneCard] 反面执行动作:', data.action.type, 'autoEnterFocus:', data.autoEnterFocus);
-            onAction?.(data.action, data.autoEnterFocus);
-          }
-          break;
-        
         case 'todo':
-          // 待办卡片：反面可点击，支持重新启动一次计时
           if (data.action.type !== 'none') {
-            console.log('[SceneCard] 反面执行动作:', data.action.type, 'autoEnterFocus:', data.autoEnterFocus);
             onAction?.(data.action, data.autoEnterFocus);
           }
           break;
         
         case 'navigation':
-          // 导航卡片：反面可点击，用于跳转至对应的回顾或统计页面
           if (data.action.type === 'navigate') {
             onAction?.(data.action, data.autoEnterFocus);
           }
           break;
         
         case 'checklist':
-          // 打卡卡片：反面不可点击，仅可通过滑动返回正面
-          break;
-        
         case 'text':
         case 'stats':
-          // 文字和数据卡片：反面无事件绑定
-          break;
-        
-        default:
+          // 这些类型的卡片反面不响应点击
           break;
       }
     }

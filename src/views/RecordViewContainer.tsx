@@ -61,14 +61,11 @@ export const RecordViewContainer: React.FC<RecordViewContainerProps> = ({
   
   // 包装 onStartActivity 以支持 autoEnterFocus 参数
   const handleStartActivity = (activity: Activity, categoryId: string, autoEnterFocus?: boolean) => {
-    console.log('[RecordViewContainer] handleStartActivity, autoEnterFocus:', autoEnterFocus);
-    // 传递正确的参数顺序：activity, categoryId, todoId, scopeIdOrIds, note, autoEnterFocus
     onStartActivity(activity, categoryId, undefined, undefined, undefined, autoEnterFocus);
   };
   
   // 包装 onStartTodoFocus 以支持 autoEnterFocus 参数
   const handleStartTodoFocus = (todo: TodoItem, autoEnterFocus?: boolean) => {
-    console.log('[RecordViewContainer] handleStartTodoFocus, autoEnterFocus:', autoEnterFocus);
     onStartTodoFocus?.(todo, autoEnterFocus);
   };
 
