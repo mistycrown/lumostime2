@@ -9,6 +9,9 @@ import { SceneView } from './SceneView';
 import { FloatingButton } from '../components/FloatingButton';
 import { UIIcon } from '../components/UIIcon';
 import { Grid3x3, Clock } from 'lucide-react';
+import { useSettings } from '../contexts/SettingsContext';
+import { useNavigation } from '../contexts/NavigationContext';
+import { AppView } from '../types';
 
 export type RecordViewMode = 'tags' | 'scenes';
 
@@ -25,13 +28,23 @@ export const RecordViewContainer: React.FC<RecordViewContainerProps> = ({
   categories,
   todos = []
 }) => {
-  // 从 localStorage 读取上次的视图模式
+  const { defaultRecordView } = useSettings();
+  const { currentView } = useNavigation();
+  
+  // 从默认设置初始化视图模式
   const [viewMode, setViewMode] = useState<RecordViewMode>(() => {
-    const saved = localStorage.getItem('lumostime_recordViewMode');
-    return (saved as RecordViewMode) || 'tags';
+    return defaultRecordView === 'SCENE' ? 'scenes' : 'tags';
   });
+  
+  // 当切换到记录页时，重置为默认视图
+  useEffect(() => {
+    if (currentView === AppView.RECORD) {
+      const defaultMode = defaultRecordView === 'SCENE' ? 'scenes' : 'tags';
+      setViewMode(defaultMode);
+    }
+  }, [currentView, defaultRecordView]);
 
-  // 保存视图模式到 localStorage
+  // 保存视图模式到 localStorage（用于在同一会话中记住用户的手动切换）
   useEffect(() => {
     localStorage.setItem('lumostime_recordViewMode', viewMode);
   }, [viewMode]);

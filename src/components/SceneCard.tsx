@@ -3,8 +3,7 @@
  * @description 场景卡片组件 - 支持正反面翻转和滑动交互
  */
 import React, { useState, useRef } from 'react';
-import { IconRenderer } from './IconRenderer';
-import { Check, ChevronRight } from 'lucide-react';
+import { Check, ChevronRight, Clock, CheckSquare, FileText, ListTodo, BarChart3 } from 'lucide-react';
 import { SceneCardData } from '../types';
 
 interface SceneCardProps {
@@ -73,7 +72,7 @@ export const SceneCard: React.FC<SceneCardProps> = ({ data, onAction }) => {
     localStorage.setItem(`scene_card_flipped_${data.id}`, String(flipped));
   };
 
-  // 动态测量并设置卡片高度
+  // 动态测量并设置卡片高度 - 在切换动画完成后执行
   React.useEffect(() => {
     const updateHeight = () => {
       if (isFlipped && backRef.current) {
@@ -83,22 +82,31 @@ export const SceneCard: React.FC<SceneCardProps> = ({ data, onAction }) => {
       }
     };
 
-    // 初始测量
-    updateHeight();
+    // 等待切换动画完成（0.3s）后再调整高度
+    const timer = setTimeout(updateHeight, 300);
 
-    // 延迟测量以确保内容已渲染
-    const timer = setTimeout(updateHeight, 100);
+    return () => {
+      clearTimeout(timer);
+    };
+  }, [isFlipped]);
 
-    // 监听内容变化
-    const observer = new ResizeObserver(updateHeight);
+  // 监听内容变化，实时更新高度
+  React.useEffect(() => {
+    const observer = new ResizeObserver(() => {
+      if (isFlipped && backRef.current) {
+        setCardHeight(backRef.current.offsetHeight);
+      } else if (!isFlipped && frontRef.current) {
+        setCardHeight(frontRef.current.offsetHeight);
+      }
+    });
+    
     if (frontRef.current) observer.observe(frontRef.current);
     if (backRef.current) observer.observe(backRef.current);
 
     return () => {
-      clearTimeout(timer);
       observer.disconnect();
     };
-  }, [isFlipped, data]);
+  }, [isFlipped]);
 
   // 最小滑动距离（像素）
   const minSwipeDistance = 80;
@@ -205,13 +213,13 @@ export const SceneCard: React.FC<SceneCardProps> = ({ data, onAction }) => {
   return (
     <div
       ref={cardRef}
-      className="relative overflow-hidden select-none touch-pan-y"
+      className="relative select-none touch-pan-y"
       style={{ height: cardHeight }}
     >
       {/* 滑动背景提示 - 只在反面显示，使用卡片类型对应的颜色 */}
       {isFlipped && (
         <div
-          className={`absolute inset-0 ${getSwipeBackgroundColor()} flex items-center justify-end pr-6 text-white font-medium tracking-wide z-0 transition-opacity duration-200 rounded-2xl`}
+          className={`absolute inset-0 ${getSwipeBackgroundColor()} flex items-center justify-end pr-6 text-white font-medium tracking-wide z-0 transition-opacity duration-200 rounded-2xl overflow-hidden`}
           style={{ opacity: swipeOffset > 0 ? 1 : 0 }}
         >
           <span className="flex items-center gap-2">
@@ -221,13 +229,11 @@ export const SceneCard: React.FC<SceneCardProps> = ({ data, onAction }) => {
       )}
 
       <div 
-        className={`scene-card ${isFlipped ? 'flipped' : ''}`}
-        style={{
-          transform: isSwiping && isFlipped 
-            ? `rotateY(180deg) translateX(${swipeOffset}px)` 
-            : undefined,
-          transition: isSwiping ? 'none' : undefined
-        }}
+        className={`scene-card ${isFlipped ? 'flipped' : ''} overflow-hidden rounded-2xl`}
+        style={isSwiping && isFlipped ? {
+          transform: `translateX(${swipeOffset}px)`,
+          transition: 'none'
+        } : undefined}
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
@@ -280,17 +286,17 @@ const CardFront: React.FC<{ data: SceneCardData }> = ({ data }) => {
   const getFrontIcon = () => {
     switch (data.type) {
       case 'timer':
-        return <Check size={14} className="text-green-500" />;
+        return <Clock size={14} className="text-green-500" />;
       case 'todo':
-        return <Check size={14} className="text-blue-500" />;
+        return <ListTodo size={14} className="text-blue-500" />;
       case 'checklist':
-        return <Check size={14} className="text-amber-500" />;
+        return <CheckSquare size={14} className="text-amber-500" />;
       case 'navigation':
         return <ChevronRight size={14} className="text-sky-500" />;
       case 'text':
-        return <Check size={14} className="text-stone-500" />;
+        return <FileText size={14} className="text-stone-500" />;
       case 'stats':
-        return <Check size={14} className="text-indigo-500" />;
+        return <BarChart3 size={14} className="text-indigo-500" />;
       default:
         return <Check size={14} className="text-stone-500" />;
     }
@@ -311,11 +317,6 @@ const CardFront: React.FC<{ data: SceneCardData }> = ({ data }) => {
         {data.type === 'stats' && data.statValue && (
           <p className="text-base font-bold text-stone-800 whitespace-nowrap">{data.statValue}</p>
         )}
-        
-        {/* 日课打卡的圆圈 */}
-        {data.type === 'checklist' && (
-          <div className="w-5 h-5 rounded-full border-2 border-amber-400 flex-shrink-0"></div>
-        )}
       </div>
       
       {/* 第一行：名称 */}
@@ -327,11 +328,11 @@ const CardFront: React.FC<{ data: SceneCardData }> = ({ data }) => {
       
       {/* 第二行：正面文字（如果有） */}
       {data.frontText && (
-        <div className="flex items-start gap-2">
-          <div className="flex-shrink-0 mt-0.5">
+        <div className="flex items-center gap-2">
+          <div className="flex-shrink-0 flex items-center justify-center">
             {getFrontIcon()}
           </div>
-          <p className="text-sm text-stone-600 break-words overflow-wrap-anywhere flex-1">
+          <p className="text-sm text-stone-600 break-words overflow-wrap-anywhere flex-1 leading-[1.4]">
             {data.frontText}
           </p>
         </div>
@@ -401,10 +402,13 @@ const CardBack: React.FC<{ data: SceneCardData; isSwiping?: boolean; swipeProgre
       className={`rounded-2xl p-4 ${getBackgroundColor()} transition-opacity relative`}
       style={{ opacity: isSwiping ? Math.max(0.6, 1 - swipeProgress * 0.5) : 1 }}
     >
-      {/* 右上角完成按钮或滑动提示 */}
+      {/* 右上角完成按钮、滑动提示或统计值 */}
       <div className="absolute top-4 right-4">
         {isSwiping ? (
           <p className="text-xs text-stone-400 whitespace-nowrap">{getSwipeHintText()}</p>
+        ) : data.type === 'stats' && data.statValue ? (
+          // 统计卡片显示统计值而不是对勾
+          <p className="text-base font-bold text-stone-800 whitespace-nowrap">{data.statValue}</p>
         ) : (
           <div className={`w-5 h-5 rounded-full ${bgColor} flex items-center justify-center`}>
             {icon}

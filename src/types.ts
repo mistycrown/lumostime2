@@ -218,6 +218,7 @@ export interface SceneCardData {
   // 统计数据（仅 stats 类型）
   statValue?: string;
   statLabel?: string;
+  filterActivityIds?: string[]; // 限定标签 ID 列表（用于统计筛选）
   
   // 文字内容（仅 text 类型）
   content?: string;

@@ -5,7 +5,7 @@
 import React, { useState } from 'react';
 import { ChevronLeft, ChevronRight, ChevronDown } from 'lucide-react';
 import { ToastType } from '../../components/Toast';
-import { DefaultArchiveView, DefaultIndexView } from '../../contexts/SettingsContext';
+import { DefaultArchiveView, DefaultIndexView, DefaultRecordView } from '../../contexts/SettingsContext';
 
 interface PreferencesSettingsViewProps {
     onBack: () => void;
@@ -40,6 +40,8 @@ interface PreferencesSettingsViewProps {
     onSetDefaultArchiveView?: (view: DefaultArchiveView) => void;
     defaultIndexView?: DefaultIndexView;
     onSetDefaultIndexView?: (view: DefaultIndexView) => void;
+    defaultRecordView?: DefaultRecordView;
+    onSetDefaultRecordView?: (view: DefaultRecordView) => void;
     timelineGalleryMode?: boolean;
     onToggleTimelineGalleryMode?: () => void;
     collapseThreshold?: number;
@@ -81,6 +83,8 @@ export const PreferencesSettingsView: React.FC<PreferencesSettingsViewProps> = (
     onSetDefaultArchiveView,
     defaultIndexView = 'TAGS',
     onSetDefaultIndexView,
+    defaultRecordView = 'TIMER',
+    onSetDefaultRecordView,
     timelineGalleryMode = false,
     onToggleTimelineGalleryMode,
     collapseThreshold = 9999,
@@ -479,6 +483,36 @@ export const PreferencesSettingsView: React.FC<PreferencesSettingsViewProps> = (
                                         </div>
                                     </>
                                 )}
+                            </div>
+                        </div>
+
+                        {/* Default Archive Page Config */}
+                        <div className="flex items-center justify-between p-4 border-b border-stone-100 relative hover:bg-stone-50 transition-colors">
+                            <div>
+                                <h4 className="font-bold text-stone-700">记录页面的默认页面</h4>
+                                <p className="text-xs text-stone-400 mt-1">进入记录页时默认显示的视图</p>
+                            </div>
+                            <div className="flex items-center gap-1 bg-stone-100 p-1 rounded-lg">
+                                <button
+                                    onClick={() => onSetDefaultRecordView?.('TIMER')}
+                                    className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all ${
+                                        defaultRecordView === 'TIMER'
+                                            ? 'bg-white text-stone-800 shadow-sm'
+                                            : 'text-stone-400 hover:text-stone-600'
+                                    }`}
+                                >
+                                    计时
+                                </button>
+                                <button
+                                    onClick={() => onSetDefaultRecordView?.('SCENE')}
+                                    className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all ${
+                                        defaultRecordView === 'SCENE'
+                                            ? 'bg-white text-stone-800 shadow-sm'
+                                            : 'text-stone-400 hover:text-stone-600'
+                                    }`}
+                                >
+                                    场景
+                                </button>
                             </div>
                         </div>
 

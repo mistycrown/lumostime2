@@ -11,10 +11,13 @@ import { IconRenderer } from '../components/IconRenderer';
 import { TagAssociation } from '../components/TagAssociation';
 import { TodoAssociation } from '../components/TodoAssociation';
 import { CheckItemAssociation } from '../components/CheckItemAssociation';
+import { TagMultipleAssociation } from '../components/TagMultipleAssociation';
+import { ConfirmModal } from '../components/ConfirmModal';
 import { uiIconService } from '../services/uiIconService';
 import { useData } from '../contexts/DataContext';
 import { useCategoryScope } from '../contexts/CategoryScopeContext';
 import { useReview } from '../contexts/ReviewContext';
+import { useToast } from '../contexts/ToastContext';
 import { DEFAULT_SCENE_PRESETS } from '../constants/scenePresets';
 
 interface SceneSettingsViewProps {
@@ -28,11 +31,27 @@ export const SceneSettingsView: React.FC<SceneSettingsViewProps> = ({ onBack }) 
   const [isEditingCard, setIsEditingCard] = useState(false);
   const [editingSlot, setEditingSlot] = useState<Partial<TimeSlot> | null>(null);
   const [editingCard, setEditingCard] = useState<Partial<SceneCardData> | null>(null);
+  
+  // 确认模态框状态
+  const [confirmModal, setConfirmModal] = useState<{
+    isOpen: boolean;
+    title: string;
+    description: string;
+    onConfirm: () => void;
+    type?: 'danger' | 'warning' | 'info';
+  }>({
+    isOpen: false,
+    title: '',
+    description: '',
+    onConfirm: () => {},
+    type: 'warning'
+  });
 
   // 获取数据
   const { todos, todoCategories } = useData();
   const { categories } = useCategoryScope();
   const { checkTemplates } = useReview();
+  const { addToast } = useToast();
   const isCustomIconEnabled = uiIconService.isCustomTheme();
 
   // 加载数据
@@ -49,10 +68,164 @@ export const SceneSettingsView: React.FC<SceneSettingsViewProps> = ({ onBack }) 
     localStorage.setItem('sceneTimeSlots', JSON.stringify(slots));
   };
 
+  // 获取卡片关联信息的描述
+  const getCardAssociationText = (card: SceneCardData): string | null => {
+    switch (card.type) {
+      case 'timer':
+        if (card.action.activityId && card.action.categoryId) {
+          const category = categories.find(c => c.id === card.action.categoryId);
+          const activity = category?.activities.find(a => a.id === card.action.activityId);
+          if (activity && category) {
+            return `关联：${category.name} - ${activity.name}`;
+          }
+        }
+        return '关联：未设置';
+      
+      case 'todo':
+        if (card.action.todoId) {
+          const todo = todos.find(t => t.id === card.action.todoId);
+          if (todo) {
+            return `关联：${todo.title}`;
+          }
+        }
+        return '关联：未设置';
+      
+      case 'checklist':
+        if (card.action.checkItemId) {
+          // 查找日课项
+          for (const template of checkTemplates) {
+            const item = template.items.find(i => i.id === card.action.checkItemId);
+            if (item) {
+              return `关联：${template.title} - ${item.content}`;
+            }
+          }
+        }
+        return '关联：未设置';
+      
+      case 'navigation':
+        if (card.action.targetView) {
+          const navigationLabels: Record<string, string> = {
+            'daily-review-today': '今日回顾',
+            'daily-review-yesterday': '昨日回顾',
+            'weekly-review': '本周回顾',
+            'stats-today': '今日统计',
+            'stats-week': '本周统计',
+          };
+          return `跳转：${navigationLabels[card.action.targetView] || card.action.targetView}`;
+        }
+        return '跳转：未设置';
+      
+      case 'text':
+        return null; // 文本卡片不需要显示关联信息
+      
+      default:
+        return null;
+    }
+  };
+
+  // 检测时间段是否重叠
+  const checkTimeOverlap = (slot1Start: string, slot1End: string, slot2Start: string, slot2End: string): boolean => {
+    // 将时间字符串转换为分钟数（从 00:00 开始）
+    const timeToMinutes = (time: string): number => {
+      const [hours, minutes] = time.split(':').map(Number);
+      return hours * 60 + minutes;
+    };
+
+    let start1 = timeToMinutes(slot1Start);
+    let end1 = timeToMinutes(slot1End);
+    let start2 = timeToMinutes(slot2Start);
+    let end2 = timeToMinutes(slot2End);
+
+    // 处理跨天的情况（如 22:00 - 06:00）
+    // 如果结束时间小于开始时间，说明跨天了，结束时间加上 24 小时
+    if (end1 < start1) {
+      end1 += 24 * 60;
+    }
+    if (end2 < start2) {
+      end2 += 24 * 60;
+    }
+
+    // 对于跨天的时间段，需要检查两种情况
+    // 情况1：slot1 跨天
+    if (end1 > 24 * 60) {
+      // 将 slot1 分成两段：[start1, 24*60] 和 [0, end1-24*60]
+      const slot1Part1Start = start1;
+      const slot1Part1End = 24 * 60;
+      const slot1Part2Start = 0;
+      const slot1Part2End = end1 - 24 * 60;
+
+      // 检查 slot2 是否与任一段重叠
+      if (end2 > 24 * 60) {
+        // slot2 也跨天
+        const slot2Part1Start = start2;
+        const slot2Part1End = 24 * 60;
+        const slot2Part2Start = 0;
+        const slot2Part2End = end2 - 24 * 60;
+
+        // 检查所有可能的重叠组合
+        if (
+          (slot1Part1Start < slot2Part1End && slot1Part1End > slot2Part1Start) ||
+          (slot1Part1Start < slot2Part2End && slot1Part1End > slot2Part2Start) ||
+          (slot1Part2Start < slot2Part1End && slot1Part2End > slot2Part1Start) ||
+          (slot1Part2Start < slot2Part2End && slot1Part2End > slot2Part2Start)
+        ) {
+          return true;
+        }
+      } else {
+        // slot2 不跨天
+        if (
+          (slot1Part1Start < end2 && slot1Part1End > start2) ||
+          (slot1Part2Start < end2 && slot1Part2End > start2)
+        ) {
+          return true;
+        }
+      }
+    } else if (end2 > 24 * 60) {
+      // 只有 slot2 跨天
+      const slot2Part1Start = start2;
+      const slot2Part1End = 24 * 60;
+      const slot2Part2Start = 0;
+      const slot2Part2End = end2 - 24 * 60;
+
+      if (
+        (start1 < slot2Part1End && end1 > slot2Part1Start) ||
+        (start1 < slot2Part2End && end1 > slot2Part2Start)
+      ) {
+        return true;
+      }
+    } else {
+      // 两个时间段都不跨天，使用标准重叠检测
+      if (start1 < end2 && end1 > start2) {
+        return true;
+      }
+    }
+
+    return false;
+  };
+
   // 添加/编辑时间段
   const handleSaveSlot = () => {
     if (!editingSlot || !editingSlot.name || !editingSlot.startTime || !editingSlot.endTime) {
-      alert('请填写完整信息');
+      addToast('error', '请填写完整信息');
+      return;
+    }
+
+    // 检查时间段是否与其他时间段重叠
+    const hasOverlap = timeSlots.some(slot => {
+      // 跳过正在编辑的时间段本身
+      if (editingSlot.id && slot.id === editingSlot.id) {
+        return false;
+      }
+      return checkTimeOverlap(
+        editingSlot.startTime!,
+        editingSlot.endTime!,
+        slot.startTime,
+        slot.endTime
+      );
+    });
+
+    if (hasOverlap) {
+      addToast('error', '时间段与现有时间段重叠，请调整时间范围');
       return;
     }
 
@@ -77,22 +250,32 @@ export const SceneSettingsView: React.FC<SceneSettingsViewProps> = ({ onBack }) 
 
     setIsEditingSlot(false);
     setEditingSlot(null);
+    addToast('success', editingSlot.id ? '时间段已更新' : '时间段已添加');
   };
 
   // 删除时间段
   const handleDeleteSlot = (id: string) => {
-    if (confirm('确定删除此时间段？')) {
-      saveTimeSlots(timeSlots.filter(s => s.id !== id));
-      if (selectedSlotId === id) {
-        setSelectedSlotId(null);
+    const slot = timeSlots.find(s => s.id === id);
+    setConfirmModal({
+      isOpen: true,
+      title: '删除时间段',
+      description: `确定删除「${slot?.name}」时间段吗？该时间段下的所有快捷方式也会被删除。`,
+      type: 'danger',
+      onConfirm: () => {
+        saveTimeSlots(timeSlots.filter(s => s.id !== id));
+        if (selectedSlotId === id) {
+          setSelectedSlotId(null);
+        }
+        setConfirmModal({ ...confirmModal, isOpen: false });
+        addToast('success', '时间段已删除');
       }
-    }
+    });
   };
 
   // 添加/编辑快捷方式
   const handleSaveCard = () => {
     if (!selectedSlotId || !editingCard || !editingCard.title || !editingCard.type) {
-      alert('请填写完整信息');
+      addToast('error', '请填写完整信息');
       return;
     }
 
@@ -127,34 +310,53 @@ export const SceneSettingsView: React.FC<SceneSettingsViewProps> = ({ onBack }) 
     saveTimeSlots(updatedSlots);
     setIsEditingCard(false);
     setEditingCard(null);
+    addToast('success', editingCard.id ? '快捷方式已更新' : '快捷方式已添加');
   };
 
   // 删除快捷方式
   const handleDeleteCard = (cardId: string) => {
-    if (!selectedSlotId || !confirm('确定删除此快捷方式？')) return;
+    if (!selectedSlotId) return;
+    
+    const slot = timeSlots.find(s => s.id === selectedSlotId);
+    const card = slot?.cards.find(c => c.id === cardId);
+    
+    setConfirmModal({
+      isOpen: true,
+      title: '删除快捷方式',
+      description: `确定删除「${card?.title}」快捷方式吗？`,
+      type: 'danger',
+      onConfirm: () => {
+        const updatedSlots = timeSlots.map(slot => {
+          if (slot.id === selectedSlotId) {
+            return {
+              ...slot,
+              cards: slot.cards.filter(c => c.id !== cardId)
+            };
+          }
+          return slot;
+        });
 
-    const updatedSlots = timeSlots.map(slot => {
-      if (slot.id === selectedSlotId) {
-        return {
-          ...slot,
-          cards: slot.cards.filter(c => c.id !== cardId)
-        };
+        saveTimeSlots(updatedSlots);
+        setConfirmModal({ ...confirmModal, isOpen: false });
+        addToast('success', '快捷方式已删除');
       }
-      return slot;
     });
-
-    saveTimeSlots(updatedSlots);
   };
 
   // 重设为预设场景
   const handleResetToPresets = () => {
-    if (!confirm('确定要重设为预设场景吗？\n\n这将清除所有自定义配置，恢复为默认的时间段和快捷方式。此操作不可撤销。')) {
-      return;
-    }
-
-    saveTimeSlots(DEFAULT_SCENE_PRESETS);
-    setSelectedSlotId(null);
-    alert('已重设为预设场景');
+    setConfirmModal({
+      isOpen: true,
+      title: '重设为预设场景',
+      description: '确定要重设为预设场景吗？\n\n这将清除所有自定义配置，恢复为默认的时间段和快捷方式。此操作不可撤销。',
+      type: 'warning',
+      onConfirm: () => {
+        saveTimeSlots(DEFAULT_SCENE_PRESETS);
+        setSelectedSlotId(null);
+        setConfirmModal({ ...confirmModal, isOpen: false });
+        addToast('success', '已重设为预设场景');
+      }
+    });
   };
 
   const selectedSlot = timeSlots.find(s => s.id === selectedSlotId);
@@ -278,46 +480,52 @@ export const SceneSettingsView: React.FC<SceneSettingsViewProps> = ({ onBack }) 
             </div>
 
             <div className="space-y-2">
-              {selectedSlot.cards.map(card => (
-                <div
-                  key={card.id}
-                  className="p-3 bg-white rounded-lg border border-stone-200"
-                >
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className="px-1.5 py-0.5 text-[10px] font-medium rounded bg-stone-100 text-stone-600 flex-shrink-0">
-                          {card.type}
-                        </span>
-                        <h3 className="font-bold text-stone-800 text-sm truncate">{card.title}</h3>
+              {selectedSlot.cards.map(card => {
+                const associationText = getCardAssociationText(card);
+                return (
+                  <div
+                    key={card.id}
+                    className="p-3 bg-white rounded-lg border border-stone-200"
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="px-1.5 py-0.5 text-[10px] font-medium rounded bg-stone-100 text-stone-600 flex-shrink-0">
+                            {card.type}
+                          </span>
+                          <h3 className="font-bold text-stone-800 text-sm truncate">{card.title}</h3>
+                        </div>
+                        {associationText && (
+                          <p className="text-xs text-stone-500 mb-0.5 line-clamp-1">{associationText}</p>
+                        )}
+                        {card.frontText && (
+                          <p className="text-xs text-stone-600 mb-0.5 line-clamp-1">正面：{card.frontText}</p>
+                        )}
+                        {card.backText && (
+                          <p className="text-xs text-stone-600 line-clamp-1">反面：{card.backText}</p>
+                        )}
                       </div>
-                      {card.frontText && (
-                        <p className="text-xs text-stone-600 mb-0.5 line-clamp-1">正面：{card.frontText}</p>
-                      )}
-                      {card.backText && (
-                        <p className="text-xs text-stone-600 line-clamp-1">反面：{card.backText}</p>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-1 flex-shrink-0">
-                      <button
-                        onClick={() => {
-                          setEditingCard(card);
-                          setIsEditingCard(true);
-                        }}
-                        className="p-1.5 hover:bg-stone-100 rounded"
-                      >
-                        <Edit2 size={14} />
-                      </button>
-                      <button
-                        onClick={() => handleDeleteCard(card.id!)}
-                        className="p-1.5 hover:bg-red-100 text-red-600 rounded"
-                      >
-                        <Trash2 size={14} />
-                      </button>
+                      <div className="flex items-center gap-1 flex-shrink-0">
+                        <button
+                          onClick={() => {
+                            setEditingCard(card);
+                            setIsEditingCard(true);
+                          }}
+                          className="p-1.5 hover:bg-stone-100 rounded"
+                        >
+                          <Edit2 size={14} />
+                        </button>
+                        <button
+                          onClick={() => handleDeleteCard(card.id!)}
+                          className="p-1.5 hover:bg-red-100 text-red-600 rounded"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         ) : (
@@ -357,6 +565,18 @@ export const SceneSettingsView: React.FC<SceneSettingsViewProps> = ({ onBack }) 
           checkTemplates={checkTemplates}
         />
       )}
+
+      {/* 确认模态框 */}
+      <ConfirmModal
+        isOpen={confirmModal.isOpen}
+        onClose={() => setConfirmModal({ ...confirmModal, isOpen: false })}
+        onConfirm={confirmModal.onConfirm}
+        title={confirmModal.title}
+        description={confirmModal.description}
+        type={confirmModal.type}
+        confirmText="确认"
+        cancelText="取消"
+      />
     </div>
   );
 };
@@ -747,9 +967,16 @@ const CardEditModal: React.FC<{
           )}
 
           {card?.type === 'stats' && (
-            <div className="p-3 bg-stone-50 rounded-lg text-xs sm:text-sm text-stone-600">
-              提示：统计功能将在后续版本中实现
-            </div>
+            <StatsSelector
+              categories={categories}
+              selectedActivityIds={card?.filterActivityIds || []}
+              onChange={(activityIds) => {
+                onChange({
+                  ...card,
+                  filterActivityIds: activityIds
+                });
+              }}
+            />
           )}
         </div>
 
@@ -974,6 +1201,44 @@ const NavigationSelector: React.FC<NavigationSelectorProps> = ({
           点击此卡片将跳转到对应页面
         </div>
       )}
+    </div>
+  );
+};
+
+/**
+ * StatsSelector component - 统计标签选择器
+ */
+interface StatsSelectorProps {
+  categories: Category[];
+  selectedActivityIds: string[];
+  onChange: (activityIds: string[]) => void;
+}
+
+const StatsSelector: React.FC<StatsSelectorProps> = ({
+  categories,
+  selectedActivityIds,
+  onChange
+}) => {
+  return (
+    <div className="space-y-2">
+      <label className="block text-xs sm:text-sm font-medium text-stone-700">
+        统计设置
+      </label>
+
+      <div className="border border-stone-200 rounded-lg p-3 bg-stone-50/50">
+        <TagMultipleAssociation
+          categories={categories}
+          selectedActivityIds={selectedActivityIds}
+          onChange={onChange}
+          showToggle={true}
+          toggleLabel="限定标签（Activity）"
+          description="仅统计选中标签的今日时长"
+        />
+      </div>
+
+      <div className="text-[10px] sm:text-xs text-stone-500 bg-stone-50 p-2 rounded-lg">
+        此卡片将显示今日指定标签的总时长。正面显示当前时长，反面显示完成提示。
+      </div>
     </div>
   );
 };

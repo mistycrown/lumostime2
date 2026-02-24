@@ -74,6 +74,7 @@ const AppContent: React.FC = () => {
     defaultView, setDefaultView,
     defaultArchiveView, setDefaultArchiveView,
     defaultIndexView, setDefaultIndexView,
+    defaultRecordView, setDefaultRecordView,
     customNarrativeTemplates, setCustomNarrativeTemplates,
     userPersonalInfo, setUserPersonalInfo,
     filters, setFilters,
@@ -541,6 +542,9 @@ const AppContent: React.FC = () => {
 
           defaultIndexView={defaultIndexView}
           onSetDefaultIndexView={setDefaultIndexView}
+
+          defaultRecordView={defaultRecordView}
+          onSetDefaultRecordView={setDefaultRecordView}
 
           onOpenSearch={() => {
             setIsSearchOpen(true);

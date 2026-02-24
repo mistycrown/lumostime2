@@ -8,10 +8,11 @@ import { backgroundService } from '../services/backgroundService';
 import { IconRenderer } from '../components/IconRenderer';
 import { UIIcon } from '../components/UIIcon';
 import { SceneCard } from '../components/SceneCard';
-import { TimeSlot, SceneCardData, Activity, Category, TodoItem, DailyReview, CheckItem, WeeklyReview, MonthlyReview, AppView } from '../types';
+import { TimeSlot, SceneCardData, Activity, Category, TodoItem, DailyReview, CheckItem, WeeklyReview, MonthlyReview, AppView, Log, ActiveSession } from '../types';
 import { DEFAULT_SCENE_PRESETS } from '../constants/scenePresets';
 import { useReview } from '../contexts/ReviewContext';
 import { useNavigation } from '../contexts/NavigationContext';
+import { useData } from '../contexts/DataContext';
 
 interface SceneViewProps {
   onConfigureSlots?: () => void;
@@ -29,6 +30,7 @@ export const SceneView: React.FC<SceneViewProps> = ({
   todos = []
 }) => {
   const { dailyReviews, checkTemplates, setDailyReviews, weeklyReviews, setWeeklyReviews, monthlyReviews, setMonthlyReviews } = useReview();
+  const { logs, activeSessions } = useData();
   const { 
     setCurrentView, 
     setIsDailyReviewOpen, 
@@ -51,6 +53,9 @@ export const SceneView: React.FC<SceneViewProps> = ({
   // 当前选中的时间段索引
   const [selectedSlotIndex, setSelectedSlotIndex] = useState<number>(0);
   const [isManualSelection, setIsManualSelection] = useState(false);
+  
+  // 用于触发统计卡片的重新计算
+  const [statsUpdateTrigger, setStatsUpdateTrigger] = useState(0);
 
   // 加载时间段数据
   useEffect(() => {
@@ -78,6 +83,14 @@ export const SceneView: React.FC<SceneViewProps> = ({
     };
     updateBackground();
     const interval = setInterval(updateBackground, 500);
+    return () => clearInterval(interval);
+  }, []);
+
+  // 定时更新统计数据（每分钟更新一次）
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setStatsUpdateTrigger(prev => prev + 1);
+    }, 60000); // 60秒
     return () => clearInterval(interval);
   }, []);
 
@@ -130,6 +143,68 @@ export const SceneView: React.FC<SceneViewProps> = ({
 
   const currentSlot = timeSlots[selectedSlotIndex];
   const currentCards = currentSlot?.cards || [];
+
+  // 计算统计卡片的时长数据
+  const calculateStatsDuration = (filterActivityIds?: string[]): string => {
+    // 获取今天的开始和结束时间
+    const today = new Date();
+    const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 0, 0, 0, 0);
+    const endOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 23, 59, 59, 999);
+    const currentTime = Date.now();
+
+    // 筛选今天的记录
+    const dayLogs = logs.filter(log => {
+      return log.startTime >= startOfDay.getTime() && log.startTime <= endOfDay.getTime();
+    });
+
+    // 计算总时长（秒）
+    let totalSeconds = 0;
+
+    // 统计已完成的记录
+    dayLogs.forEach(log => {
+      // 如果设置了筛选标签，只统计选中的标签
+      if (filterActivityIds && filterActivityIds.length > 0) {
+        if (filterActivityIds.includes(log.activityId)) {
+          totalSeconds += log.duration;
+        }
+      } else {
+        // 如果没有设置筛选，统计所有记录
+        totalSeconds += log.duration;
+      }
+    });
+
+    // 统计正在进行的会话
+    if (activeSessions && activeSessions.length > 0) {
+      activeSessions.forEach(session => {
+        // 检查会话是否在当天
+        if (session.startTime >= startOfDay.getTime() && session.startTime <= endOfDay.getTime()) {
+          let shouldCount = false;
+          
+          if (filterActivityIds && filterActivityIds.length > 0) {
+            shouldCount = filterActivityIds.includes(session.activityId);
+          } else {
+            shouldCount = true;
+          }
+          
+          if (shouldCount) {
+            // 计算从开始到现在的时长（秒）
+            const sessionDuration = Math.floor((currentTime - session.startTime) / 1000);
+            totalSeconds += sessionDuration;
+          }
+        }
+      });
+    }
+
+    // 格式化时长显示
+    const hours = Math.floor(totalSeconds / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    
+    if (hours > 0) {
+      return `${hours}h ${minutes}m`;
+    } else {
+      return `${minutes}m`;
+    }
+  };
 
   // 如果没有时间段数据，显示空状态
   if (timeSlots.length === 0) {
@@ -550,9 +625,15 @@ export const SceneView: React.FC<SceneViewProps> = ({
           ) : (
             currentCards.map((card) => {
               // 如果是日课卡片，获取其完成状态
-              const cardWithStatus = card.type === 'checklist' && card.action.checkItemId
+              let cardWithStatus = card.type === 'checklist' && card.action.checkItemId
                 ? { ...card, isCompleted: getCheckItemStatus(card.action.checkItemId) }
                 : card;
+              
+              // 如果是统计卡片，计算时长数据
+              if (card.type === 'stats') {
+                const statValue = calculateStatsDuration(card.filterActivityIds);
+                cardWithStatus = { ...cardWithStatus, statValue };
+              }
               
               return (
                 <SceneCard

@@ -8,6 +8,7 @@ import { DEFAULT_USER_PERSONAL_INFO } from '../constants';
 
 export type DefaultArchiveView = 'CHRONICLE' | 'MEMOIR';
 export type DefaultIndexView = 'TAGS' | 'SCOPE';
+export type DefaultRecordView = 'TIMER' | 'SCENE';
 export type EmojiStyle = 'native' | 'twemoji' | 'openmoji';
 export type DefaultSelectorPage = 'emoji' | string; // 'emoji' 或 sticker set ID (如 'water', 'water-1', 'water-2')
 
@@ -24,6 +25,9 @@ interface SettingsContextType {
 
     defaultIndexView: DefaultIndexView;
     setDefaultIndexView: React.Dispatch<React.SetStateAction<DefaultIndexView>>;
+
+    defaultRecordView: DefaultRecordView;
+    setDefaultRecordView: React.Dispatch<React.SetStateAction<DefaultRecordView>>;
 
     // 自动关联规则
     autoLinkRules: AutoLinkRule[];
@@ -139,6 +143,11 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
         return (saved as DefaultIndexView) || 'TAGS';
     });
 
+    const [defaultRecordView, setDefaultRecordView] = useState<DefaultRecordView>(() => {
+        const saved = localStorage.getItem('lumos_default_record_view');
+        return (saved as DefaultRecordView) || 'TIMER';
+    });
+
     // 自动关联规则
     const [autoLinkRules, setAutoLinkRules] = useState<AutoLinkRule[]>(() => {
         const stored = localStorage.getItem('lumostime_autoLinkRules');
@@ -245,6 +254,10 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
     useEffect(() => {
         localStorage.setItem('lumos_default_index_view', defaultIndexView);
     }, [defaultIndexView]);
+
+    useEffect(() => {
+        localStorage.setItem('lumos_default_record_view', defaultRecordView);
+    }, [defaultRecordView]);
 
     useEffect(() => {
         localStorage.setItem('lumostime_autoLinkRules', JSON.stringify(autoLinkRules));
@@ -392,6 +405,8 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
             setDefaultArchiveView,
             defaultIndexView,
             setDefaultIndexView,
+            defaultRecordView,
+            setDefaultRecordView,
             autoLinkRules,
             setAutoLinkRules,
             autoApplyAutoLinkRules,
