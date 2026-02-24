@@ -14,11 +14,11 @@
  */
 
 import React, { useMemo } from 'react';
+import ReactECharts from 'echarts-for-react';
 import { Category } from '../../types';
 import { TrendingUp, TrendingDown, Share, Image } from 'lucide-react';
 import { IconRenderer } from '../IconRenderer';
 import { 
-  calculatePieChartPath, 
   getHexColor, 
   formatDuration, 
   secondsToHoursMinutes 
@@ -68,41 +68,151 @@ export const PieChartView: React.FC<PieChartViewProps> = ({
   isFullScreen = false
 }) => {
   
-  // 计算饼图路径数据
-  const pieChartData = useMemo(() => {
-    let currentAngle = 0;
-    return stats.categoryStats.map(cat => {
-      const pathData = calculatePieChartPath(cat.percentage, currentAngle);
-      if (pathData) {
-        currentAngle = pathData.endAngle;
-        return { ...cat, d: pathData.d, hexColor: getHexColor(cat.themeColor) };
+  // 生成 Tags 图表配置
+  const tagsChartOption = useMemo(() => {
+    const data = stats.categoryStats.map(cat => ({
+      value: cat.duration,
+      name: cat.name,
+      itemStyle: {
+        color: getHexColor(cat.themeColor)
       }
-      return null;
-    }).filter(Boolean);
+    }));
+
+    return {
+      tooltip: {
+        trigger: 'item',
+        formatter: '{b}: {c}s ({d}%)'
+      },
+      legend: {
+        show: false
+      },
+      series: [{
+        name: 'Tags',
+        type: 'pie',
+        radius: ['60%', '100%'],
+        avoidLabelOverlap: false,
+        padAngle: 2,
+        itemStyle: {
+          borderRadius: 10,
+          borderColor: 'transparent',
+          borderWidth: 0
+        },
+        label: {
+          show: false,
+          position: 'center'
+        },
+        emphasis: {
+          label: {
+            show: true,
+            fontSize: 20,
+            fontWeight: 'bold',
+            formatter: '{b}\n{d}%'
+          }
+        },
+        labelLine: {
+          show: false
+        },
+        data
+      }]
+    };
   }, [stats]);
 
-  const todoPieChartData = useMemo(() => {
-    let currentAngle = 0;
-    return todoStats.categoryStats.map(cat => {
-      const pathData = calculatePieChartPath(cat.percentage, currentAngle);
-      if (pathData) {
-        currentAngle = pathData.endAngle;
-        return { ...cat, d: pathData.d, hexColor: cat.assignedColor };
+  // 生成 Todos 图表配置
+  const todosChartOption = useMemo(() => {
+    const data = todoStats.categoryStats.map(cat => ({
+      value: cat.duration,
+      name: cat.name,
+      itemStyle: {
+        color: cat.assignedColor
       }
-      return null;
-    }).filter(Boolean);
+    }));
+
+    return {
+      tooltip: {
+        trigger: 'item',
+        formatter: '{b}: {c}s ({d}%)'
+      },
+      legend: {
+        show: false
+      },
+      series: [{
+        name: 'Todos',
+        type: 'pie',
+        radius: ['60%', '100%'],
+        avoidLabelOverlap: false,
+        padAngle: 2,
+        itemStyle: {
+          borderRadius: 10,
+          borderColor: 'transparent',
+          borderWidth: 0
+        },
+        label: {
+          show: false,
+          position: 'center'
+        },
+        emphasis: {
+          label: {
+            show: true,
+            fontSize: 20,
+            fontWeight: 'bold',
+            formatter: '{b}\n{d}%'
+          }
+        },
+        labelLine: {
+          show: false
+        },
+        data
+      }]
+    };
   }, [todoStats]);
 
-  const scopePieChartData = useMemo(() => {
-    let currentAngle = 0;
-    return scopeStats.categoryStats.map(scope => {
-      const pathData = calculatePieChartPath(scope.percentage, currentAngle);
-      if (pathData) {
-        currentAngle = pathData.endAngle;
-        return { ...scope, d: pathData.d, hexColor: getHexColor(scope.themeColor) };
+  // 生成 Scopes 图表配置
+  const scopesChartOption = useMemo(() => {
+    const data = scopeStats.categoryStats.map(scope => ({
+      value: scope.duration,
+      name: scope.name,
+      itemStyle: {
+        color: getHexColor(scope.themeColor)
       }
-      return null;
-    }).filter(Boolean);
+    }));
+
+    return {
+      tooltip: {
+        trigger: 'item',
+        formatter: '{b}: {c}s ({d}%)'
+      },
+      legend: {
+        show: false
+      },
+      series: [{
+        name: 'Scopes',
+        type: 'pie',
+        radius: ['60%', '100%'],
+        avoidLabelOverlap: false,
+        padAngle: 2,
+        itemStyle: {
+          borderRadius: 10,
+          borderColor: 'transparent',
+          borderWidth: 0
+        },
+        label: {
+          show: false,
+          position: 'center'
+        },
+        emphasis: {
+          label: {
+            show: true,
+            fontSize: 20,
+            fontWeight: 'bold',
+            formatter: '{b}\n{d}%'
+          }
+        },
+        labelLine: {
+          show: false
+        },
+        data
+      }]
+    };
   }, [scopeStats]);
 
   // 增长/下降指示器
@@ -134,21 +244,11 @@ export const PieChartView: React.FC<PieChartViewProps> = ({
       {/* Tags Chart */}
       <div className="flex flex-col items-center">
         <div className="relative w-56 h-56 mb-8 mt-2">
-          <svg viewBox="0 0 200 200" className="w-full h-full transform -rotate-90">
-            <circle cx="100" cy="100" r="80" fill="none" stroke="#f5f5f4" strokeWidth="25" />
-            {pieChartData.map((segment, idx) => (
-              <path
-                key={segment && segment.id}
-                d={segment && segment.d}
-                fill="none"
-                stroke={segment && segment.hexColor}
-                strokeWidth="25"
-                strokeLinecap="round"
-                className="animate-in fade-in duration-700"
-                style={{ animationDelay: `${idx * 100}ms` }}
-              />
-            ))}
-          </svg>
+          <ReactECharts 
+            option={tagsChartOption} 
+            style={{ height: '100%', width: '100%' }}
+            opts={{ renderer: 'svg' }}
+          />
           <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
             <span className="text-xs font-bold text-stone-300 uppercase">Tags</span>
             <div className="flex items-baseline gap-0.5 text-stone-800">
@@ -235,21 +335,11 @@ export const PieChartView: React.FC<PieChartViewProps> = ({
       {todoStats.totalDuration > 0 && (
         <div className="flex flex-col items-center pt-8 border-t border-stone-100 mt-8">
           <div className="relative w-56 h-56 mb-8 mt-2">
-            <svg viewBox="0 0 200 200" className="w-full h-full transform -rotate-90">
-              <circle cx="100" cy="100" r="80" fill="none" stroke="#f5f5f4" strokeWidth="25" />
-              {todoPieChartData.map((segment, idx) => (
-                <path
-                  key={segment && segment.id}
-                  d={segment && segment.d}
-                  fill="none"
-                  stroke={segment && segment.hexColor}
-                  strokeWidth="25"
-                  strokeLinecap="round"
-                  className="animate-in fade-in duration-700"
-                  style={{ animationDelay: `${idx * 100}ms` }}
-                />
-              ))}
-            </svg>
+            <ReactECharts 
+              option={todosChartOption} 
+              style={{ height: '100%', width: '100%' }}
+              opts={{ renderer: 'svg' }}
+            />
             <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
               <span className="text-xs font-bold text-stone-300 uppercase">Todos</span>
               <div className="flex items-baseline gap-0.5 text-stone-800">
@@ -324,21 +414,11 @@ export const PieChartView: React.FC<PieChartViewProps> = ({
       {scopeStats.totalDuration > 0 && (
         <div className="flex flex-col items-center pt-8 border-t border-stone-100 mt-8">
           <div className="relative w-56 h-56 mb-8 mt-2">
-            <svg viewBox="0 0 200 200" className="w-full h-full transform -rotate-90">
-              <circle cx="100" cy="100" r="80" fill="none" stroke="#f5f5f4" strokeWidth="25" />
-              {scopePieChartData.map((segment, idx) => (
-                <path
-                  key={segment && segment.id}
-                  d={segment && segment.d}
-                  fill="none"
-                  stroke={segment && segment.hexColor}
-                  strokeWidth="25"
-                  strokeLinecap="round"
-                  className="animate-in fade-in duration-700"
-                  style={{ animationDelay: `${idx * 100}ms` }}
-                />
-              ))}
-            </svg>
+            <ReactECharts 
+              option={scopesChartOption} 
+              style={{ height: '100%', width: '100%' }}
+              opts={{ renderer: 'svg' }}
+            />
             <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
               <span className="text-xs font-bold text-stone-300 uppercase">Scopes</span>
               <div className="flex items-baseline gap-0.5 text-stone-800">

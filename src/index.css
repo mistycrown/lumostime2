@@ -26,3 +26,51 @@
     font-family: var(--font-family) !important;
   }
 }
+
+/* 悬浮按钮样式 - 使用主题CSS变量 */
+.floating-button {
+  background-color: var(--floating-button-bg);
+  color: var(--floating-button-icon);
+  border: 0.5px solid var(--floating-button-border);
+  box-shadow: var(--floating-button-shadow);
+}
+
+/* 场景卡片样式 */
+.scene-card-container {
+  perspective: 1000px;
+  width: 100%;
+  aspect-ratio: 3 / 2;
+}
+
+.scene-card {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  transition: transform 0.6s;
+  transform-style: preserve-3d;
+}
+
+.scene-card.flipped {
+  transform: rotateY(180deg);
+}
+
+.scene-card-face {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  cursor: pointer;
+}
+
+.scene-card-front {
+  transform: rotateY(0deg);
+}
+
+.scene-card-back {
+  transform: rotateY(180deg);
+}
+
+.scene-card-face:active {
+  transform: scale(0.98);
+}

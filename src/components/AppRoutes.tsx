@@ -16,7 +16,7 @@ import { getLocalDateStr } from '../utils/dateUtils';
 import { DailyReviewView } from '../views/DailyReviewView';
 import { WeeklyReviewView } from '../views/WeeklyReviewView';
 import { MonthlyReviewView } from '../views/MonthlyReviewView';
-import { RecordView } from '../views/RecordView';
+import { RecordViewContainer } from '../views/RecordViewContainer';
 import { TimelineView } from '../views/TimelineView';
 import { StatsView } from '../views/StatsView';
 import { JournalView } from '../views/JournalView';
@@ -231,7 +231,7 @@ export const AppRoutes: React.FC<AppRoutesProps> = ({
 
     switch (currentView) {
         case AppView.RECORD:
-            return <RecordView onStartActivity={handleStartActivity} categories={categories} />;
+            return <RecordViewContainer onStartActivity={handleStartActivity} categories={categories} />;
         case AppView.TIMELINE:
             return (
                 <TimelineView

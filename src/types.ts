@@ -174,6 +174,67 @@ export enum AppView {
   SETTINGS = 'SETTINGS',
 }
 
+// ========== Scene View (场景视图) ==========
+
+// 场景卡片类型
+export type SceneCardType = 'timer' | 'todo' | 'checklist' | 'navigation' | 'text' | 'stats';
+
+// 场景卡片动作配置
+export interface SceneCardAction {
+  type: 'startTimer' | 'startTodo' | 'toggleCheck' | 'navigate' | 'none';
+  // 计时动作
+  activityId?: string;
+  categoryId?: string;
+  // 待办动作
+  todoId?: string;
+  // 日课动作
+  checkItemId?: string;
+  // 导航动作
+  targetView?: string;
+}
+
+// 场景卡片数据
+export interface SceneCardData {
+  id: string;
+  type: SceneCardType;
+  
+  // 显示内容
+  title: string; // 卡片标题（可与触发对象名称不同）
+  icon?: string; // Emoji 图标
+  uiIcon?: string; // UI 图标 ID
+  
+  // 自定义文字
+  frontText?: string; // 正面自定义文字（激励语等）
+  backText?: string; // 反面自定义文字（完成提示等）
+  
+  // 快捷触发动作
+  action: SceneCardAction;
+  
+  // 待办进度（仅 todo 类型）
+  progress?: number;
+  totalAmount?: number;
+  
+  // 统计数据（仅 stats 类型）
+  statValue?: string;
+  statLabel?: string;
+  
+  // 文字内容（仅 text 类型）
+  content?: string;
+  
+  // 日课状态（仅 checklist 类型）
+  isCompleted?: boolean;
+}
+
+// 时间段定义
+export interface TimeSlot {
+  id: string;
+  name: string;
+  icon: string; // Emoji
+  startTime: string; // HH:mm
+  endTime: string; // HH:mm
+  cards: SceneCardData[]; // 该时间段的卡片列表
+}
+
 // Stats Types (UI helpers)
 export interface SubStatItem {
   name: string;
