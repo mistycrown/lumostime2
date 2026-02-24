@@ -4,17 +4,17 @@
  */
 import React, { useState, useEffect } from 'react';
 import { ArrowLeft, Plus, Trash2, Edit2, Palette, Clock, RotateCcw, ChevronRight } from 'lucide-react';
-import { TimeSlot, SceneCardData, SceneCardType, Category, TodoItem, TodoCategory } from '../types';
+import { TimeSlot, SceneCardData, SceneCardType, Category, TodoItem, TodoCategory, CheckTemplate } from '../types';
 import { CustomSelect } from '../components/CustomSelect';
 import { UIIconSelectorCompact } from '../components/UIIconSelector';
-import { UIIcon } from '../components/UIIcon';
 import { IconRenderer } from '../components/IconRenderer';
 import { TagAssociation } from '../components/TagAssociation';
 import { TodoAssociation } from '../components/TodoAssociation';
+import { CheckItemAssociation } from '../components/CheckItemAssociation';
 import { uiIconService } from '../services/uiIconService';
 import { useData } from '../contexts/DataContext';
 import { useCategoryScope } from '../contexts/CategoryScopeContext';
-import { useSettings } from '../contexts/SettingsContext';
+import { useReview } from '../contexts/ReviewContext';
 import { DEFAULT_SCENE_PRESETS } from '../constants/scenePresets';
 
 interface SceneSettingsViewProps {
@@ -32,6 +32,7 @@ export const SceneSettingsView: React.FC<SceneSettingsViewProps> = ({ onBack }) 
   // 获取数据
   const { todos, todoCategories } = useData();
   const { categories } = useCategoryScope();
+  const { checkTemplates } = useReview();
   const isCustomIconEnabled = uiIconService.isCustomTheme();
 
   // 加载数据
@@ -353,6 +354,7 @@ export const SceneSettingsView: React.FC<SceneSettingsViewProps> = ({ onBack }) 
           categories={categories}
           todos={todos}
           todoCategories={todoCategories}
+          checkTemplates={checkTemplates}
         />
       )}
     </div>
@@ -545,7 +547,8 @@ const CardEditModal: React.FC<{
   categories: Category[];
   todos: TodoItem[];
   todoCategories: TodoCategory[];
-}> = ({ card, onSave, onCancel, onChange, categories, todos, todoCategories }) => {
+  checkTemplates: CheckTemplate[];
+}> = ({ card, onSave, onCancel, onChange, categories, todos, todoCategories, checkTemplates }) => {
   const cardTypes: { value: SceneCardType; label: string }[] = [
     { value: 'timer', label: '计时' },
     { value: 'todo', label: '待办' },
@@ -568,6 +571,11 @@ const CardEditModal: React.FC<{
     card?.action?.todoId
   );
 
+  // 日课选择状态
+  const [selectedCheckItemId, setSelectedCheckItemId] = useState<string | undefined>(
+    card?.action?.checkItemId
+  );
+
   // 当卡片类型改变时，重置选择
   useEffect(() => {
     if (card?.type === 'timer') {
@@ -575,6 +583,8 @@ const CardEditModal: React.FC<{
       setSelectedCategoryId(card?.action?.categoryId);
     } else if (card?.type === 'todo') {
       setSelectedTodoId(card?.action?.todoId);
+    } else if (card?.type === 'checklist') {
+      setSelectedCheckItemId(card?.action?.checkItemId);
     }
   }, [card?.type]);
 
@@ -605,6 +615,21 @@ const CardEditModal: React.FC<{
         action: {
           type: 'startTodo',
           todoId
+        }
+      });
+    }
+  };
+
+  // 处理日课选择变化
+  const handleCheckItemChange = (checkItemId: string | undefined) => {
+    setSelectedCheckItemId(checkItemId);
+    
+    if (checkItemId) {
+      onChange({
+        ...card,
+        action: {
+          type: 'toggleCheck',
+          checkItemId
         }
       });
     }
@@ -692,9 +717,17 @@ const CardEditModal: React.FC<{
             />
           )}
 
-          {card?.type !== 'timer' && card?.type !== 'todo' && (
+          {card?.type === 'checklist' && (
+            <CheckItemSelector
+              checkTemplates={checkTemplates}
+              selectedCheckItemId={selectedCheckItemId}
+              onChange={handleCheckItemChange}
+            />
+          )}
+
+          {card?.type !== 'timer' && card?.type !== 'todo' && card?.type !== 'checklist' && (
             <div className="p-3 bg-stone-50 rounded-lg text-xs sm:text-sm text-stone-600">
-              提示：{card?.type === 'checklist' ? '日课功能' : card?.type === 'navigation' ? '导航功能' : card?.type === 'text' ? '文字卡片' : '统计功能'}将在后续版本中实现
+              提示：{card?.type === 'navigation' ? '导航功能' : card?.type === 'text' ? '文字卡片' : '统计功能'}将在后续版本中实现
             </div>
           )}
         </div>
@@ -822,6 +855,43 @@ const TodoSelector: React.FC<TodoSelectorProps> = ({
       {selectedTodoId && (
         <div className="text-[10px] sm:text-xs text-stone-500 bg-stone-50 p-2 rounded-lg">
           点击此卡片将开始该待办任务的计时
+        </div>
+      )}
+    </div>
+  );
+};
+
+/**
+ * CheckItemSelector component - 日课选择器
+ */
+interface CheckItemSelectorProps {
+  checkTemplates: CheckTemplate[];
+  selectedCheckItemId: string | undefined;
+  onChange: (checkItemId: string | undefined) => void;
+}
+
+const CheckItemSelector: React.FC<CheckItemSelectorProps> = ({
+  checkTemplates,
+  selectedCheckItemId,
+  onChange
+}) => {
+  return (
+    <div className="space-y-2">
+      <label className="block text-xs sm:text-sm font-medium text-stone-700">
+        关联日课
+      </label>
+
+      <div className="border border-stone-200 rounded-lg p-3 bg-stone-50/50 max-h-60 overflow-y-auto">
+        <CheckItemAssociation
+          checkTemplates={checkTemplates}
+          selectedCheckItemId={selectedCheckItemId}
+          onChange={onChange}
+        />
+      </div>
+
+      {selectedCheckItemId && (
+        <div className="text-[10px] sm:text-xs text-stone-500 bg-stone-50 p-2 rounded-lg">
+          点击此卡片将切换该日课的完成状态
         </div>
       )}
     </div>

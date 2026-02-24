@@ -8,14 +8,26 @@ import { backgroundService } from '../services/backgroundService';
 import { IconRenderer } from '../components/IconRenderer';
 import { UIIcon } from '../components/UIIcon';
 import { SceneCard } from '../components/SceneCard';
-import { TimeSlot, SceneCardData } from '../types';
+import { TimeSlot, SceneCardData, Activity, Category, TodoItem, DailyReview, CheckItem } from '../types';
 import { DEFAULT_SCENE_PRESETS } from '../constants/scenePresets';
+import { useReview } from '../contexts/ReviewContext';
 
 interface SceneViewProps {
   onConfigureSlots?: () => void;
+  onStartActivity: (activity: Activity, categoryId: string) => void;
+  onStartTodoFocus?: (todo: TodoItem) => void;
+  categories: Category[];
+  todos?: TodoItem[];
 }
 
-export const SceneView: React.FC<SceneViewProps> = ({ onConfigureSlots }) => {
+export const SceneView: React.FC<SceneViewProps> = ({ 
+  onConfigureSlots,
+  onStartActivity,
+  onStartTodoFocus,
+  categories,
+  todos = []
+}) => {
+  const { dailyReviews, checkTemplates, setDailyReviews } = useReview();
   const [backgroundUrl, setBackgroundUrl] = useState<string>('');
   const [backgroundOpacity, setBackgroundOpacity] = useState<number>(0.1);
   
@@ -128,22 +140,132 @@ export const SceneView: React.FC<SceneViewProps> = ({ onConfigureSlots }) => {
   const handleCardAction = (action: SceneCardData['action']) => {
     switch (action.type) {
       case 'startTimer':
-        console.log('开始计时:', action.activityId, action.categoryId);
-        // TODO: 实现实际的计时逻辑
+        if (action.activityId && action.categoryId) {
+          // 查找对应的活动
+          const category = categories.find(c => c.id === action.categoryId);
+          const activity = category?.activities.find(a => a.id === action.activityId);
+          
+          if (activity && category) {
+            // 调用开始计时回调
+            onStartActivity(activity, category.id);
+          } else {
+            console.warn('未找到对应的活动:', action.activityId, action.categoryId);
+          }
+        }
         break;
       case 'startTodo':
-        console.log('开始待办计时:', action.todoId);
-        // TODO: 实现待办计时逻辑
+        if (action.todoId && onStartTodoFocus) {
+          // 查找对应的待办任务
+          const todo = todos.find(t => t.id === action.todoId);
+          
+          if (todo) {
+            // 调用开始待办计时回调
+            onStartTodoFocus(todo);
+          } else {
+            console.warn('未找到对应的待办任务:', action.todoId);
+          }
+        }
         break;
       case 'toggleCheck':
-        console.log('日课打卡:', action.checkItemId);
-        // TODO: 实现日课打卡逻辑
+        if (action.checkItemId) {
+          handleToggleCheckItem(action.checkItemId);
+        }
         break;
       case 'navigate':
         console.log('跳转到:', action.targetView);
         // TODO: 实现页面跳转逻辑
         break;
     }
+  };
+
+  // 处理日课打卡
+  const handleToggleCheckItem = (checkItemId: string) => {
+    // 获取今天的日期
+    const today = new Date();
+    const dateStr = today.toISOString().split('T')[0]; // YYYY-MM-DD
+
+    // 查找今天的 DailyReview
+    let todayReview = dailyReviews.find(r => r.date === dateStr);
+
+    // 如果不存在，创建一个新的 DailyReview
+    if (!todayReview) {
+      // 从模板生成日课列表
+      const checkItems: CheckItem[] = [];
+      
+      checkTemplates
+        .filter(template => template.enabled && template.isDaily)
+        .sort((a, b) => a.order - b.order)
+        .forEach(template => {
+          template.items.forEach(item => {
+            checkItems.push({
+              id: item.id,
+              category: template.title,
+              content: item.content,
+              icon: item.icon,
+              uiIcon: item.uiIcon,
+              isCompleted: false,
+              type: item.type,
+              autoConfig: item.autoConfig
+            });
+          });
+        });
+
+      todayReview = {
+        id: `daily-${Date.now()}`,
+        date: dateStr,
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+        answers: [],
+        checkItems: checkItems
+      };
+    }
+
+    // 查找对应的日课项
+    const checkItems = todayReview.checkItems || [];
+    const checkItemIndex = checkItems.findIndex(item => item.id === checkItemId);
+
+    if (checkItemIndex === -1) {
+      console.warn('未找到对应的日课项:', checkItemId);
+      return;
+    }
+
+    // 切换完成状态
+    const updatedCheckItems = [...checkItems];
+    updatedCheckItems[checkItemIndex] = {
+      ...updatedCheckItems[checkItemIndex],
+      isCompleted: !updatedCheckItems[checkItemIndex].isCompleted
+    };
+
+    // 更新 DailyReview
+    const updatedReview: DailyReview = {
+      ...todayReview,
+      checkItems: updatedCheckItems,
+      updatedAt: Date.now()
+    };
+
+    // 更新 dailyReviews 数组
+    const existingReviewIndex = dailyReviews.findIndex(r => r.date === dateStr);
+    if (existingReviewIndex >= 0) {
+      // 更新现有的 review
+      setDailyReviews(dailyReviews.map(r => r.date === dateStr ? updatedReview : r));
+    } else {
+      // 添加新的 review
+      setDailyReviews([...dailyReviews, updatedReview]);
+    }
+  };
+
+  // 获取日课的完成状态
+  const getCheckItemStatus = (checkItemId: string): boolean => {
+    const today = new Date();
+    const dateStr = today.toISOString().split('T')[0];
+    const todayReview = dailyReviews.find(r => r.date === dateStr);
+    
+    if (!todayReview || !todayReview.checkItems) {
+      return false;
+    }
+
+    const checkItem = todayReview.checkItems.find(item => item.id === checkItemId);
+    return checkItem?.isCompleted || false;
   };
 
   return (
@@ -258,13 +380,20 @@ export const SceneView: React.FC<SceneViewProps> = ({ onConfigureSlots }) => {
               </div>
             </div>
           ) : (
-            currentCards.map((card) => (
-              <SceneCard
-                key={card.id}
-                data={card}
-                onAction={handleCardAction}
-              />
-            ))
+            currentCards.map((card) => {
+              // 如果是日课卡片，获取其完成状态
+              const cardWithStatus = card.type === 'checklist' && card.action.checkItemId
+                ? { ...card, isCompleted: getCheckItemStatus(card.action.checkItemId) }
+                : card;
+              
+              return (
+                <SceneCard
+                  key={card.id}
+                  data={cardWithStatus}
+                  onAction={handleCardAction}
+                />
+              );
+            })
           )}
         </div>
       </div>

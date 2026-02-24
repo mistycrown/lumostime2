@@ -15,10 +15,10 @@ export const DEFAULT_SCENE_PRESETS: TimeSlot[] = [
       { 
         id: '1', 
         type: 'checklist', 
-        title: '早起打卡', 
+        title: '起床喝一杯水', 
         frontText: '完成今日打卡',
         backText: '太棒了，今天又完成一项！',
-        action: { type: 'toggleCheck', checkItemId: 'check-1' }
+        action: { type: 'toggleCheck', checkItemId: 'manual_1' }
       },
       { 
         id: '2', 
@@ -30,18 +30,10 @@ export const DEFAULT_SCENE_PRESETS: TimeSlot[] = [
       },
       { 
         id: '3', 
-        type: 'timer', 
-        title: '享用早餐', 
-        frontText: '开始美好的一天',
-        backText: '享受早餐时光',
-        action: { type: 'startTimer', activityId: 'meal', categoryId: 'life' }
-      },
-      { 
-        id: '4', 
         type: 'text', 
-        title: '今日提醒', 
-        frontText: '点击查看详情',
-        content: '记得今天下午3点有组会，提前准备好汇报材料。晚上和朋友约了晚饭，不要忘记哦！',
+        title: '晨间提醒', 
+        frontText: '早晨是一天的开始',
+        backText: '清晨的第一个小时，决定了一天的基调。用心对待每个早晨，就是在善待自己的人生。',
         action: { type: 'none' }
       },
     ]
@@ -54,38 +46,19 @@ export const DEFAULT_SCENE_PRESETS: TimeSlot[] = [
     endTime: '12:00',
     cards: [
       { 
-        id: '5', 
-        type: 'timer', 
-        title: '上课/开会', 
-        frontText: '开始专注学习',
-        backText: '学习中，保持专注',
-        action: { type: 'startTimer', activityId: 'meeting', categoryId: 'study' }
-      },
-      { 
-        id: '6', 
-        type: 'timer', 
-        title: '阅读文献', 
-        frontText: '开始阅读',
-        backText: '阅读中，积累知识',
-        action: { type: 'startTimer', activityId: 'reading', categoryId: 'study' }
-      },
-      { 
-        id: '7', 
+        id: '4', 
         type: 'todo', 
-        title: '完成论文第三章', 
-        frontText: '开始这个任务吧',
-        backText: '任务进行中，继续努力',
-        progress: 3,
-        totalAmount: 10,
-        action: { type: 'startTodo', todoId: 'todo-1' }
+        title: '完成毕业论文第三章', 
+        frontText: '点击开始专注',
+        backText: '专注进行中...',
+        action: { type: 'startTodo', todoId: 't_thesis_1' }
       },
       { 
-        id: '8', 
-        type: 'stats', 
-        title: '今日专注时长', 
-        frontText: '查看详细数据',
-        statValue: '2h 30m',
-        statLabel: '目标: 6小时',
+        id: '5', 
+        type: 'text', 
+        title: '专注力法则', 
+        frontText: '上午是黄金时段',
+        backText: '上午9-12点是大脑最清醒的时段，适合处理需要深度思考的重要任务。珍惜这段时光，远离干扰。',
         action: { type: 'none' }
       },
     ]
@@ -98,28 +71,20 @@ export const DEFAULT_SCENE_PRESETS: TimeSlot[] = [
     endTime: '14:00',
     cards: [
       { 
-        id: '9', 
+        id: '6', 
         type: 'timer', 
-        title: '午餐时间', 
-        frontText: '享用午餐',
-        backText: '用餐中，补充能量',
+        title: '午餐', 
+        frontText: '点击开始计时',
+        backText: '正在用餐中...',
         action: { type: 'startTimer', activityId: 'meal', categoryId: 'life' }
       },
       { 
-        id: '10', 
-        type: 'timer', 
-        title: '午间小憩', 
-        frontText: '休息一下，充充电',
-        backText: '休息中，恢复精力',
-        action: { type: 'startTimer', activityId: 'nap', categoryId: 'sleep' }
-      },
-      { 
-        id: '11', 
-        type: 'checklist', 
-        title: '午后散步', 
-        frontText: '完成今日打卡',
-        backText: '完成了，保持健康习惯',
-        action: { type: 'toggleCheck', checkItemId: 'check-2' }
+        id: '7', 
+        type: 'text', 
+        title: '休息的艺术', 
+        frontText: '休息也是生产力',
+        backText: '真正的休息不是无所事事，而是让身心得到恢复。午休20分钟，能让下午的效率提升30%。',
+        action: { type: 'none' }
       },
     ]
   },
@@ -131,37 +96,20 @@ export const DEFAULT_SCENE_PRESETS: TimeSlot[] = [
     endTime: '18:00',
     cards: [
       { 
-        id: '12', 
-        type: 'timer', 
-        title: '论文写作', 
-        frontText: '开始创作吧',
-        backText: '写作中，思绪飞扬',
-        action: { type: 'startTimer', activityId: 'writing', categoryId: 'study' }
-      },
-      { 
-        id: '13', 
+        id: '8', 
         type: 'timer', 
         title: '代码编程', 
-        frontText: '开始编码',
-        backText: '编程中，创造价值',
+        frontText: '点击开始计时',
+        backText: '正在编程中...',
         action: { type: 'startTimer', activityId: 'coding', categoryId: 'study' }
       },
       { 
-        id: '14', 
-        type: 'todo', 
-        title: '修复Bug #234', 
-        frontText: '开始修复',
-        backText: '修复中，即将完成',
-        progress: 0,
-        totalAmount: 1,
-        action: { type: 'startTodo', todoId: 'todo-2' }
-      },
-      { 
-        id: '15', 
-        type: 'navigation', 
-        title: '查看时间轴', 
-        frontText: '查看更多内容',
-        action: { type: 'navigate', targetView: 'timeline' }
+        id: '9', 
+        type: 'checklist', 
+        title: '写日记/复盘', 
+        frontText: '完成今日打卡',
+        backText: '完成了，保持反思习惯',
+        action: { type: 'toggleCheck', checkItemId: 'manual_3' }
       },
     ]
   },
@@ -173,35 +121,28 @@ export const DEFAULT_SCENE_PRESETS: TimeSlot[] = [
     endTime: '22:00',
     cards: [
       { 
-        id: '16', 
-        type: 'timer', 
-        title: '晚餐时光', 
-        frontText: '享用晚餐',
-        backText: '用餐中，享受美食',
-        action: { type: 'startTimer', activityId: 'meal', categoryId: 'life' }
+        id: '10', 
+        type: 'todo', 
+        title: '看完《百年孤独》', 
+        frontText: '点击开始专注',
+        backText: '阅读进行中...',
+        action: { type: 'startTodo', todoId: 't_hobby_1' }
       },
       { 
-        id: '17', 
-        type: 'timer', 
-        title: '运动健身', 
-        frontText: '动起来，保持活力',
-        backText: '运动中，挥洒汗水',
-        action: { type: 'startTimer', activityId: 'workout', categoryId: 'self' }
-      },
-      { 
-        id: '18', 
+        id: '11', 
         type: 'checklist', 
-        title: '晚间阅读', 
+        title: '感恩三件事', 
         frontText: '完成今日打卡',
         backText: '完成了，充实的一天',
-        action: { type: 'toggleCheck', checkItemId: 'check-3' }
+        action: { type: 'toggleCheck', checkItemId: 'manual_4' }
       },
       { 
-        id: '19', 
-        type: 'navigation', 
-        title: '今日回顾', 
-        frontText: '回顾今天的收获',
-        action: { type: 'navigate', targetView: 'daily-review' }
+        id: '12', 
+        type: 'text', 
+        title: '复盘的力量', 
+        frontText: '每日反思成长',
+        backText: '不复盘的经历只是经历，复盘后的经历才是经验。每天花10分钟回顾，一年后你会感谢今天的自己。',
+        action: { type: 'none' }
       },
     ]
   },
@@ -213,36 +154,27 @@ export const DEFAULT_SCENE_PRESETS: TimeSlot[] = [
     endTime: '06:00',
     cards: [
       { 
-        id: '20', 
+        id: '13', 
         type: 'timer', 
-        title: '睡前洗漱', 
-        frontText: '准备休息',
-        backText: '洗漱中，准备入睡',
-        action: { type: 'startTimer', activityId: 'hygiene', categoryId: 'life' }
+        title: '睡觉', 
+        frontText: '点击开始计时',
+        backText: '正在休息中...',
+        action: { type: 'startTimer', activityId: 'sleep_act', categoryId: 'sleep' }
       },
       { 
-        id: '21', 
-        type: 'text', 
-        title: '明日计划', 
-        frontText: '点击查看详情',
-        content: '明天上午9点开组会，记得提前准备PPT。下午完成实验报告，晚上整理本周笔记。',
-        action: { type: 'none' }
-      },
-      { 
-        id: '22', 
+        id: '14', 
         type: 'checklist', 
-        title: '睡前冥想', 
+        title: '整理床铺', 
         frontText: '完成今日打卡',
-        backText: '完成了，安心入睡',
-        action: { type: 'toggleCheck', checkItemId: 'check-4' }
+        backText: '完成了，准备休息',
+        action: { type: 'toggleCheck', checkItemId: 'manual_2' }
       },
       { 
-        id: '23', 
-        type: 'stats', 
-        title: '今日总结', 
-        frontText: '查看详细数据',
-        statValue: '8h 45m',
-        statLabel: '有效专注时长',
+        id: '15', 
+        type: 'text', 
+        title: '睡眠的重要性', 
+        frontText: '优质睡眠是基石',
+        backText: '睡眠不是浪费时间，而是在为明天充电。保证7-8小时的优质睡眠，是一切高效工作的前提。',
         action: { type: 'none' }
       },
     ]

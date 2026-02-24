@@ -231,7 +231,12 @@ export const AppRoutes: React.FC<AppRoutesProps> = ({
 
     switch (currentView) {
         case AppView.RECORD:
-            return <RecordViewContainer onStartActivity={handleStartActivity} categories={categories} />;
+            return <RecordViewContainer 
+                onStartActivity={handleStartActivity} 
+                onStartTodoFocus={handleStartTodoFocus}
+                categories={categories}
+                todos={todos}
+            />;
         case AppView.TIMELINE:
             return (
                 <TimelineView

@@ -13,12 +13,20 @@ interface SceneCardProps {
 }
 
 export const SceneCard: React.FC<SceneCardProps> = ({ data, onAction }) => {
-  const [isFlipped, setIsFlipped] = useState(false);
+  // 对于日课卡片，如果已完成则初始状态为翻转
+  const [isFlipped, setIsFlipped] = useState(data.type === 'checklist' && data.isCompleted);
   const [touchStart, setTouchStart] = useState<number | null>(null);
   const [touchEnd, setTouchEnd] = useState<number | null>(null);
   const [swipeOffset, setSwipeOffset] = useState(0);
   const [isSwiping, setIsSwiping] = useState(false);
   const cardRef = useRef<HTMLDivElement>(null);
+
+  // 当 isCompleted 状态变化时，更新翻转状态
+  React.useEffect(() => {
+    if (data.type === 'checklist') {
+      setIsFlipped(!!data.isCompleted);
+    }
+  }, [data.isCompleted, data.type]);
 
   // 最小滑动距离（像素）
   const minSwipeDistance = 80;
@@ -310,11 +318,20 @@ const CardBack: React.FC<{ data: SceneCardData; isSwiping?: boolean; swipeProgre
       )}
       
       {/* 文字内容 */}
-      {data.type === 'text' && data.content && (
+      {data.type === 'text' && (
         <>
-          <div className="flex-1 min-w-0">
-            <h3 className="font-bold text-stone-800 text-base leading-tight mb-1 truncate">{data.title}</h3>
-            <p className="text-sm text-stone-600 line-clamp-2">{data.content}</p>
+          <div className="flex items-center gap-2 flex-1 min-w-0">
+            <div className="w-5 h-5 rounded-full bg-stone-500 flex items-center justify-center flex-shrink-0">
+              <Check className="text-white" size={14} />
+            </div>
+            <div className="flex-1 min-w-0">
+              {/* 反面只显示 backText，如果为空则不显示 */}
+              {data.backText && (
+                <p className="text-sm text-stone-600 line-clamp-3">
+                  {data.backText}
+                </p>
+              )}
+            </div>
           </div>
           <div className="flex items-center gap-3 flex-shrink-0">
             {isSwiping && <p className="text-xs text-stone-400">{getSwipeHintText()}</p>}

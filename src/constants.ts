@@ -829,6 +829,9 @@ export const DEFAULT_CHECK_TEMPLATES: CheckTemplate[] = [
   }
 ];
 
+// 导出手动日课模板（从独立文件导入）
+export { DEFAULT_MANUAL_CHECK_TEMPLATES } from './constants/manualCheckTemplates';
+
 
 // ========== AI Narrative  (AI 叙事模板) ==========
 

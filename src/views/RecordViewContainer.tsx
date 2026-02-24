@@ -3,7 +3,7 @@
  * @description 计时页面容器 - 包含标签视图和场景视图的切换
  */
 import React, { useState, useEffect } from 'react';
-import { Category, Activity } from '../types';
+import { Category, Activity, TodoItem } from '../types';
 import { RecordView } from './RecordView';
 import { SceneView } from './SceneView';
 import { FloatingButton } from '../components/FloatingButton';
@@ -14,12 +14,16 @@ export type RecordViewMode = 'tags' | 'scenes';
 
 interface RecordViewContainerProps {
   onStartActivity: (activity: Activity, categoryId: string) => void;
+  onStartTodoFocus?: (todo: TodoItem) => void;
   categories: Category[];
+  todos?: TodoItem[];
 }
 
 export const RecordViewContainer: React.FC<RecordViewContainerProps> = ({
   onStartActivity,
-  categories
+  onStartTodoFocus,
+  categories,
+  todos = []
 }) => {
   // 从 localStorage 读取上次的视图模式
   const [viewMode, setViewMode] = useState<RecordViewMode>(() => {
@@ -51,7 +55,13 @@ export const RecordViewContainer: React.FC<RecordViewContainerProps> = ({
           categories={categories}
         />
       ) : (
-        <SceneView onConfigureSlots={handleConfigureSlots} />
+        <SceneView 
+          onConfigureSlots={handleConfigureSlots}
+          onStartActivity={onStartActivity}
+          onStartTodoFocus={onStartTodoFocus}
+          categories={categories}
+          todos={todos}
+        />
       )}
 
       {/* 悬浮切换按钮 */}

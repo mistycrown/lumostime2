@@ -30,7 +30,7 @@ import { IconRenderer } from '../components/IconRenderer';
 import { useSettings } from '../contexts/SettingsContext';
 import { scanCheckItems, batchRenameCheckItems, batchDeleteCheckItems } from '../utils/checkItemBatchOperations';
 import { CheckTemplateItemRow } from '../components/CheckTemplateItemRow';
-import { DEFAULT_CHECK_TEMPLATES } from '../constants';
+import { DEFAULT_CHECK_TEMPLATES, DEFAULT_MANUAL_CHECK_TEMPLATES } from '../constants';
 
 interface CheckTemplateManageViewProps {
     templates: CheckTemplate[];
@@ -698,11 +698,13 @@ export const CheckTemplateManageView: React.FC<CheckTemplateManageViewProps> = (
                 isOpen={isResetConfirmOpen}
                 onClose={() => setIsResetConfirmOpen(false)}
                 onConfirm={() => {
-                    onUpdateTemplates(DEFAULT_CHECK_TEMPLATES);
+                    // 合并自动日课和手动日课模板
+                    const allDefaultTemplates = [...DEFAULT_CHECK_TEMPLATES, ...DEFAULT_MANUAL_CHECK_TEMPLATES];
+                    onUpdateTemplates(allDefaultTemplates);
                     setIsResetConfirmOpen(false);
                 }}
                 title="重置日课模板"
-                description="确定要重置所有日课模板为默认状态吗？这将覆盖您当前的修改，且无法撤销。默认模板包含时间管理、效率目标、数字健康等实用的自动日课示例。"
+                description="确定要重置所有日课模板为默认状态吗？这将覆盖您当前的修改，且无法撤销。默认模板包含自动日课示例（时间管理、效率目标等）和手动日课示例（喝水、整理床铺、写日记等）。"
                 confirmText="重置"
                 cancelText="取消"
                 type="danger"
