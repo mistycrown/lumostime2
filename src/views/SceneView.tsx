@@ -8,9 +8,10 @@ import { backgroundService } from '../services/backgroundService';
 import { IconRenderer } from '../components/IconRenderer';
 import { UIIcon } from '../components/UIIcon';
 import { SceneCard } from '../components/SceneCard';
-import { TimeSlot, SceneCardData, Activity, Category, TodoItem, DailyReview, CheckItem } from '../types';
+import { TimeSlot, SceneCardData, Activity, Category, TodoItem, DailyReview, CheckItem, WeeklyReview, MonthlyReview, AppView } from '../types';
 import { DEFAULT_SCENE_PRESETS } from '../constants/scenePresets';
 import { useReview } from '../contexts/ReviewContext';
+import { useNavigation } from '../contexts/NavigationContext';
 
 interface SceneViewProps {
   onConfigureSlots?: () => void;
@@ -27,7 +28,20 @@ export const SceneView: React.FC<SceneViewProps> = ({
   categories,
   todos = []
 }) => {
-  const { dailyReviews, checkTemplates, setDailyReviews } = useReview();
+  const { dailyReviews, checkTemplates, setDailyReviews, weeklyReviews, setWeeklyReviews, monthlyReviews, setMonthlyReviews } = useReview();
+  const { 
+    setCurrentView, 
+    setIsDailyReviewOpen, 
+    setCurrentReviewDate, 
+    setIsWeeklyReviewOpen, 
+    setCurrentWeeklyReviewStart,
+    setCurrentWeeklyReviewEnd,
+    setIsMonthlyReviewOpen, 
+    setCurrentMonthlyReviewStart,
+    setCurrentMonthlyReviewEnd,
+    setPreviousView,
+    setStatsRange
+  } = useNavigation();
   const [backgroundUrl, setBackgroundUrl] = useState<string>('');
   const [backgroundOpacity, setBackgroundOpacity] = useState<number>(0.1);
   
@@ -172,8 +186,9 @@ export const SceneView: React.FC<SceneViewProps> = ({
         }
         break;
       case 'navigate':
-        console.log('跳转到:', action.targetView);
-        // TODO: 实现页面跳转逻辑
+        if (action.targetView) {
+          handleNavigation(action.targetView);
+        }
         break;
     }
   };
@@ -266,6 +281,159 @@ export const SceneView: React.FC<SceneViewProps> = ({
 
     const checkItem = todayReview.checkItems.find(item => item.id === checkItemId);
     return checkItem?.isCompleted || false;
+  };
+
+  // 处理导航
+  const handleNavigation = (targetView: string) => {
+    // Set Scene as the previous view before navigating away
+    setPreviousView(AppView.SCENE);
+    
+    switch (targetView) {
+      case 'daily-review-today':
+        handleNavigateToDailyReview(0); // 今天
+        break;
+      case 'daily-review-yesterday':
+        handleNavigateToDailyReview(-1); // 昨天
+        break;
+      case 'weekly-review':
+        handleNavigateToWeeklyReview();
+        break;
+      case 'monthly-review':
+        handleNavigateToMonthlyReview();
+        break;
+      case 'stats-today':
+        setStatsRange('day');
+        setCurrentView(AppView.STATS);
+        break;
+      case 'stats-week':
+        setStatsRange('week');
+        setCurrentView(AppView.STATS);
+        break;
+      default:
+        console.warn('未知的导航目标:', targetView);
+    }
+  };
+
+  // 导航到每日回顾
+  const handleNavigateToDailyReview = (dayOffset: number) => {
+    const targetDate = new Date();
+    targetDate.setDate(targetDate.getDate() + dayOffset);
+    const dateStr = targetDate.toISOString().split('T')[0];
+
+    // 查找是否已存在该日期的回顾
+    let review = dailyReviews.find(r => r.date === dateStr);
+
+    // 如果不存在，创建新的回顾
+    if (!review) {
+      const checkItems: CheckItem[] = [];
+      
+      checkTemplates
+        .filter(template => template.enabled && template.isDaily)
+        .sort((a, b) => a.order - b.order)
+        .forEach(template => {
+          template.items.forEach(item => {
+            checkItems.push({
+              id: item.id,
+              category: template.title,
+              content: item.content,
+              icon: item.icon,
+              uiIcon: item.uiIcon,
+              isCompleted: false,
+              type: item.type,
+              autoConfig: item.autoConfig
+            });
+          });
+        });
+
+      review = {
+        id: `daily-${Date.now()}`,
+        date: dateStr,
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+        answers: [],
+        checkItems: checkItems
+      };
+
+      setDailyReviews([...dailyReviews, review]);
+    }
+
+    // 打开每日回顾 - 传递 Date 对象而不是字符串
+    setCurrentReviewDate(targetDate);
+    setIsDailyReviewOpen(true);
+  };
+
+  // 导航到每周回顾
+  const handleNavigateToWeeklyReview = () => {
+    // 获取本周的开始和结束日期
+    const today = new Date();
+    const dayOfWeek = today.getDay();
+    const diff = dayOfWeek === 0 ? -6 : 1 - dayOfWeek; // 周一为一周的开始
+    
+    const weekStart = new Date(today);
+    weekStart.setDate(today.getDate() + diff);
+    weekStart.setHours(0, 0, 0, 0);
+    
+    const weekEnd = new Date(weekStart);
+    weekEnd.setDate(weekStart.getDate() + 6);
+    weekEnd.setHours(23, 59, 59, 999);
+
+    const weekStartStr = weekStart.toISOString().split('T')[0];
+    const weekEndStr = weekEnd.toISOString().split('T')[0];
+
+    // 查找是否已存在本周的回顾
+    let review = weeklyReviews.find(r => r.weekStartDate === weekStartStr);
+
+    // 如果不存在，创建新的回顾
+    if (!review) {
+      review = {
+        id: `weekly-${Date.now()}`,
+        weekStartDate: weekStartStr,
+        weekEndDate: weekEndStr,
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+        answers: []
+      };
+
+      setWeeklyReviews([...weeklyReviews, review]);
+    }
+
+    // 打开每周回顾 - 传递 Date 对象
+    setCurrentWeeklyReviewStart(weekStart);
+    setCurrentWeeklyReviewEnd(weekEnd);
+    setIsWeeklyReviewOpen(true);
+  };
+
+  // 导航到每月回顾
+  const handleNavigateToMonthlyReview = () => {
+    // 获取本月的开始和结束日期
+    const today = new Date();
+    const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
+    const monthEnd = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+
+    const monthStartStr = monthStart.toISOString().split('T')[0];
+    const monthEndStr = monthEnd.toISOString().split('T')[0];
+
+    // 查找是否已存在本月的回顾
+    let review = monthlyReviews.find(r => r.monthStartDate === monthStartStr);
+
+    // 如果不存在，创建新的回顾
+    if (!review) {
+      review = {
+        id: `monthly-${Date.now()}`,
+        monthStartDate: monthStartStr,
+        monthEndDate: monthEndStr,
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+        answers: []
+      };
+
+      setMonthlyReviews([...monthlyReviews, review]);
+    }
+
+    // 打开每月回顾 - 传递 Date 对象
+    setCurrentMonthlyReviewStart(monthStart);
+    setCurrentMonthlyReviewEnd(monthEnd);
+    setIsMonthlyReviewOpen(true);
   };
 
   return (

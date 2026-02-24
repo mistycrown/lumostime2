@@ -172,6 +172,7 @@ export enum AppView {
   REVIEW = 'REVIEW', // NEW: Review Hub
   TODO = 'TODO',
   SETTINGS = 'SETTINGS',
+  SCENE = 'SCENE', // NEW: Scene View
 }
 
 // ========== Scene View (场景视图) ==========

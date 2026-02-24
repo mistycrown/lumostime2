@@ -84,7 +84,8 @@ export const AppRoutes: React.FC<AppRoutesProps> = ({
         isScopeManaging, setIsScopeManaging,
         selectedTagId, selectedCategoryId, selectedScopeId, setSelectedScopeId,
         isJournalMode,
-        currentDate, setCurrentDate
+        currentDate, setCurrentDate,
+        statsRange, setStatsRange
     } = useNavigation();
 
 
@@ -152,8 +153,31 @@ export const AppRoutes: React.FC<AppRoutesProps> = ({
     if (isWeeklyReviewOpen && currentWeeklyReviewStart && currentWeeklyReviewEnd) {
         const weekStartStr = getLocalDateStr(currentWeeklyReviewStart);
         const weekEndStr = getLocalDateStr(currentWeeklyReviewEnd);
-        const review = weeklyReviews.find(r => r.weekStartDate === weekStartStr && r.weekEndDate === weekEndStr);
-        if (!review) return null;
+        let review = weeklyReviews.find(r => r.weekStartDate === weekStartStr && r.weekEndDate === weekEndStr);
+        
+        // 如果找不到review，创建一个临时的（这种情况通常发生在状态更新的时序问题）
+        if (!review) {
+            const templateSnapshot = reviewTemplates
+                .filter(t => t.isWeeklyTemplate)
+                .sort((a, b) => a.order - b.order)
+                .map(t => ({
+                    id: t.id,
+                    title: t.title,
+                    questions: t.questions,
+                    order: t.order,
+                    syncToTimeline: t.syncToTimeline
+                }));
+
+            review = {
+                id: crypto.randomUUID(),
+                weekStartDate: weekStartStr,
+                weekEndDate: weekEndStr,
+                createdAt: Date.now(),
+                updatedAt: Date.now(),
+                answers: [],
+                templateSnapshot
+            };
+        }
 
         return (
             <WeeklyReviewView
@@ -294,7 +318,11 @@ export const AppRoutes: React.FC<AppRoutesProps> = ({
                     logs={logs}
                     categories={categories}
                     currentDate={currentDate}
-                    onBack={() => setCurrentView(AppView.TIMELINE)}
+                    onBack={() => {
+                        // Clear stats range when going back
+                        setStatsRange(null);
+                        setCurrentView(AppView.TIMELINE);
+                    }}
                     onDateChange={setCurrentDate}
                     isFullScreen={isStatsFullScreen}
                     onToggleFullScreen={() => setIsStatsFullScreen(!isStatsFullScreen)}
@@ -304,6 +332,7 @@ export const AppRoutes: React.FC<AppRoutesProps> = ({
                     todoCategories={todoCategories}
                     scopes={scopes}
                     dailyReviews={dailyReviews}
+                    forcedRange={statsRange || undefined}
                 />
             );
         case AppView.REVIEW:

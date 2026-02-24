@@ -39,14 +39,11 @@
 .scene-card-container {
   perspective: 1000px;
   width: 100%;
-  min-height: 4rem;
 }
 
 .scene-card {
   position: relative;
   width: 100%;
-  height: 100%;
-  min-height: 4rem;
   transition: transform 0.6s;
   transform-style: preserve-3d;
 }
@@ -56,10 +53,7 @@
 }
 
 .scene-card-face {
-  position: absolute;
   width: 100%;
-  height: 100%;
-  min-height: 4rem;
   backface-visibility: hidden;
   -webkit-backface-visibility: hidden;
   cursor: pointer;
@@ -70,9 +64,19 @@
 }
 
 .scene-card-back {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
   transform: rotateY(180deg);
 }
 
-.scene-card-face:active {
-  transform: scale(0.98);
+/* 当卡片翻转时，隐藏正面以避免高度冲突 */
+.scene-card.flipped .scene-card-front {
+  visibility: hidden;
 }
+
+.scene-card:not(.flipped) .scene-card-back {
+  visibility: hidden;
+}
+

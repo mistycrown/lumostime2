@@ -27,12 +27,13 @@ interface FocusDetailViewProps {
     autoApplyAutoLinkRules?: boolean;
     autoApplyTodoLink?: boolean;
     onClose: () => void;
+    onCancel?: (sessionId: string) => void;
     onComplete: (session: ActiveSession) => void;
     onUpdate: (session: ActiveSession) => void;
     autoFocusNote?: boolean;
 }
 
-export const FocusDetailView: React.FC<FocusDetailViewProps> = ({ session, todos, categories, todoCategories, scopes, autoLinkRules = [], autoApplyAutoLinkRules = true, autoApplyTodoLink = true, onClose, onComplete, onUpdate, autoFocusNote = true }) => {
+export const FocusDetailView: React.FC<FocusDetailViewProps> = ({ session, todos, categories, todoCategories, scopes, autoLinkRules = [], autoApplyAutoLinkRules = true, autoApplyTodoLink = true, onClose, onCancel, onComplete, onUpdate, autoFocusNote = true }) => {
     const [elapsed, setElapsed] = useState(0);
     const [note, setNote] = useState(session.note || '');
     const [isActivitySelectorOpen, setIsActivitySelectorOpen] = useState(false);
@@ -300,6 +301,13 @@ export const FocusDetailView: React.FC<FocusDetailViewProps> = ({ session, todos
             progressIncrement: progressAmount,
             reactions: reactions.length > 0 ? reactions : undefined
         });
+    };
+
+    const handleCancel = () => {
+        if (onCancel) {
+            onCancel(session.id);
+        }
+        onClose();
     };
 
     return (
@@ -570,6 +578,16 @@ export const FocusDetailView: React.FC<FocusDetailViewProps> = ({ session, todos
                     ) : (
                         <div className="text-xs text-stone-300 italic pt-1 pb-2 px-1">No reactions yet</div>
                     )}
+                </div>
+
+                {/* Cancel Timer Button */}
+                <div className="w-full px-8 mb-8">
+                    <button
+                        onClick={handleCancel}
+                        className="w-full py-2.5 text-red-500 hover:text-red-600 hover:bg-red-50 rounded-full font-medium text-sm transition-colors active:scale-95"
+                    >
+                        取消计时
+                    </button>
                 </div>
 
             </div>

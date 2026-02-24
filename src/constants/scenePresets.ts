@@ -130,19 +130,19 @@ export const DEFAULT_SCENE_PRESETS: TimeSlot[] = [
       },
       { 
         id: '11', 
+        type: 'navigation', 
+        title: '今日回顾', 
+        frontText: '查看今天的收获',
+        backText: '跳转到今日回顾页面',
+        action: { type: 'navigate', targetView: 'daily-review-today' }
+      },
+      { 
+        id: '12', 
         type: 'checklist', 
         title: '感恩三件事', 
         frontText: '完成今日打卡',
         backText: '完成了，充实的一天',
         action: { type: 'toggleCheck', checkItemId: 'manual_4' }
-      },
-      { 
-        id: '12', 
-        type: 'text', 
-        title: '复盘的力量', 
-        frontText: '每日反思成长',
-        backText: '不复盘的经历只是经历，复盘后的经历才是经验。每天花10分钟回顾，一年后你会感谢今天的自己。',
-        action: { type: 'none' }
       },
     ]
   },
@@ -154,7 +154,15 @@ export const DEFAULT_SCENE_PRESETS: TimeSlot[] = [
     endTime: '06:00',
     cards: [
       { 
-        id: '13', 
+        id: '14', 
+        type: 'navigation', 
+        title: '今日统计', 
+        frontText: '查看时间分布',
+        backText: '跳转到今日统计页面',
+        action: { type: 'navigate', targetView: 'stats-today' }
+      },
+      { 
+        id: '15', 
         type: 'timer', 
         title: '睡觉', 
         frontText: '点击开始计时',
@@ -162,20 +170,12 @@ export const DEFAULT_SCENE_PRESETS: TimeSlot[] = [
         action: { type: 'startTimer', activityId: 'sleep_act', categoryId: 'sleep' }
       },
       { 
-        id: '14', 
+        id: '16', 
         type: 'checklist', 
         title: '整理床铺', 
         frontText: '完成今日打卡',
         backText: '完成了，准备休息',
         action: { type: 'toggleCheck', checkItemId: 'manual_2' }
-      },
-      { 
-        id: '15', 
-        type: 'text', 
-        title: '睡眠的重要性', 
-        frontText: '优质睡眠是基石',
-        backText: '睡眠不是浪费时间，而是在为明天充电。保证7-8小时的优质睡眠，是一切高效工作的前提。',
-        action: { type: 'none' }
       },
     ]
   }

@@ -63,7 +63,9 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
         isScopeManaging, setIsScopeManaging,
         selectedTagId, selectedCategoryId, selectedScopeId,
         isJournalMode, setIsJournalMode,
-        returnToSearch, setReturnToSearch
+        returnToSearch, setReturnToSearch,
+        previousView, setPreviousView,
+        setStatsRange
     } = useNavigation();
 
     const {
@@ -156,18 +158,40 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
 
                                             if (isDailyReviewOpen) {
                                                 handleCloseDailyReview();
+                                                // If navigated from Scene page, return to Record view in scenes mode
+                                                if (previousView === AppView.SCENE) {
+                                                    localStorage.setItem('lumostime_recordViewMode', 'scenes');
+                                                    setCurrentView(AppView.RECORD);
+                                                    setPreviousView(null);
+                                                }
                                             } else if (isWeeklyReviewOpen) {
                                                 handleCloseWeeklyReview();
+                                                // If navigated from Scene page, return to Record view in scenes mode
+                                                if (previousView === AppView.SCENE) {
+                                                    localStorage.setItem('lumostime_recordViewMode', 'scenes');
+                                                    setCurrentView(AppView.RECORD);
+                                                    setPreviousView(null);
+                                                }
                                             } else if (isMonthlyReviewOpen) {
                                                 handleCloseMonthlyReview();
+                                                // If navigated from Scene page, return to Record view in scenes mode
+                                                if (previousView === AppView.SCENE) {
+                                                    localStorage.setItem('lumostime_recordViewMode', 'scenes');
+                                                    setCurrentView(AppView.RECORD);
+                                                    setPreviousView(null);
+                                                }
                                             } else if (currentView === AppView.STATS) {
-                                                setCurrentView(AppView.TIMELINE);
+                                                // Clear stats range when going back
+                                                setStatsRange(null);
+                                                // If navigated from Scene page, return to Record view in scenes mode
+                                                if (previousView === AppView.SCENE) {
+                                                    localStorage.setItem('lumostime_recordViewMode', 'scenes');
+                                                    setCurrentView(AppView.RECORD);
+                                                    setPreviousView(null);
+                                                } else {
+                                                    setCurrentView(AppView.TIMELINE);
+                                                }
                                             } else if (currentView === AppView.SCOPE) {
-                                                // Use history back to trigger popstate logic, ensuring consistency with hardware back button
-                                                // Wait, App.tsx used window.history.back(), but since we are SPA, maybe handleBackFromScope is safer?
-                                                // App.tsx code: window.history.back();
-                                                // Let's stick to handleBackFromScope to avoid hash routing issues if any.
-                                                // Actually original code for SCOPES used window.history.back()... let's try handleBackFromScope first as it is cleaner.
                                                 handleBackFromScope();
                                             } else {
                                                 handleBackFromTag();

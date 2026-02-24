@@ -91,6 +91,8 @@ interface NavigationContextType {
     setIsSearchOpenedFromSettings: (value: boolean) => void;
     statsTitle: string;
     setStatsTitle: (title: string) => void;
+    statsRange: 'day' | 'week' | 'month' | 'year' | null;
+    setStatsRange: (range: 'day' | 'week' | 'month' | 'year' | null) => void;
     todoCategoryToAdd: string;
     setTodoCategoryToAdd: (id: string) => void;
     goalScopeId: string;
@@ -119,6 +121,10 @@ interface NavigationContextType {
     // Global Date State
     currentDate: Date;
     setCurrentDate: (date: Date) => void;
+
+    // Navigation History
+    previousView: AppView | null;
+    setPreviousView: (view: AppView | null) => void;
 }
 
 const NavigationContext = createContext<NavigationContextType | undefined>(undefined);
@@ -212,6 +218,7 @@ export const NavigationProvider: React.FC<NavigationProviderProps> = ({
     const [isOpenedFromSearch, setIsOpenedFromSearch] = useState(false);
     const [isSearchOpenedFromSettings, setIsSearchOpenedFromSettings] = useState(false);
     const [statsTitle, setStatsTitle] = useState<string>('数据统计');
+    const [statsRange, setStatsRange] = useState<'day' | 'week' | 'month' | 'year' | null>(null);
     const [todoCategoryToAdd, setTodoCategoryToAdd] = useState<string>(
         initialTodoCategory || 'work'
     );
@@ -224,6 +231,7 @@ export const NavigationProvider: React.FC<NavigationProviderProps> = ({
     const [isGalleryViewOpen, setIsGalleryViewOpen] = useState(false);
     const [isExportViewOpen, setIsExportViewOpen] = useState(false);
     const [currentDate, setCurrentDate] = useState<Date>(new Date());
+    const [previousView, setPreviousView] = useState<AppView | null>(null);
 
     return (
         <NavigationContext.Provider value={{
@@ -293,6 +301,8 @@ export const NavigationProvider: React.FC<NavigationProviderProps> = ({
             setIsSearchOpenedFromSettings,
             statsTitle,
             setStatsTitle,
+            statsRange,
+            setStatsRange,
             todoCategoryToAdd,
             setTodoCategoryToAdd,
             goalScopeId,
@@ -310,7 +320,9 @@ export const NavigationProvider: React.FC<NavigationProviderProps> = ({
             isExportViewOpen,
             setIsExportViewOpen,
             currentDate,
-            setCurrentDate
+            setCurrentDate,
+            previousView,
+            setPreviousView
         }}>
             {children}
         </NavigationContext.Provider>

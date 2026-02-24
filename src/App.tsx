@@ -393,6 +393,7 @@ const AppContent: React.FC = () => {
             autoApplyAutoLinkRules={autoApplyAutoLinkRules}
             autoApplyTodoLink={autoApplyTodoLink}
             onClose={() => setFocusDetailSessionId(null)}
+            onCancel={cancelSession}
             onComplete={(finalSession) => {
               stopActivity(
                 finalSession.id,

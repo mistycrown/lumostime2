@@ -13,20 +13,92 @@ interface SceneCardProps {
 }
 
 export const SceneCard: React.FC<SceneCardProps> = ({ data, onAction }) => {
-  // 对于日课卡片，如果已完成则初始状态为翻转
-  const [isFlipped, setIsFlipped] = useState(data.type === 'checklist' && data.isCompleted);
+  // 获取今天的日期字符串（YYYY-MM-DD）
+  const getTodayDateString = () => {
+    const today = new Date();
+    return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+  };
+
+  // 检查并重置每日状态
+  const checkAndResetDailyState = () => {
+    const lastResetDate = localStorage.getItem('scene_cards_last_reset_date');
+    const today = getTodayDateString();
+    
+    if (lastResetDate !== today) {
+      // 新的一天，清除所有卡片翻转状态
+      const allKeys = Object.keys(localStorage);
+      allKeys.forEach(key => {
+        if (key.startsWith('scene_card_flipped_')) {
+          localStorage.removeItem(key);
+        }
+      });
+      // 更新最后重置日期
+      localStorage.setItem('scene_cards_last_reset_date', today);
+    }
+  };
+
+  // 从 localStorage 读取翻转状态
+  const getStoredFlipState = (): boolean => {
+    checkAndResetDailyState();
+    const stored = localStorage.getItem(`scene_card_flipped_${data.id}`);
+    if (stored !== null) {
+      return stored === 'true';
+    }
+    // 对于日课卡片，如果已完成则初始状态为翻转
+    return data.type === 'checklist' && !!data.isCompleted;
+  };
+
+  const [isFlipped, setIsFlipped] = useState(getStoredFlipState());
   const [touchStart, setTouchStart] = useState<number | null>(null);
   const [touchEnd, setTouchEnd] = useState<number | null>(null);
   const [swipeOffset, setSwipeOffset] = useState(0);
   const [isSwiping, setIsSwiping] = useState(false);
+  const [cardHeight, setCardHeight] = useState<number | undefined>(undefined);
   const cardRef = useRef<HTMLDivElement>(null);
+  const frontRef = useRef<HTMLDivElement>(null);
+  const backRef = useRef<HTMLDivElement>(null);
 
   // 当 isCompleted 状态变化时，更新翻转状态
   React.useEffect(() => {
     if (data.type === 'checklist') {
-      setIsFlipped(!!data.isCompleted);
+      const newFlipState = !!data.isCompleted;
+      setIsFlipped(newFlipState);
+      // 同步到 localStorage
+      localStorage.setItem(`scene_card_flipped_${data.id}`, String(newFlipState));
     }
-  }, [data.isCompleted, data.type]);
+  }, [data.isCompleted, data.type, data.id]);
+
+  // 保存翻转状态到 localStorage
+  const saveFlipState = (flipped: boolean) => {
+    localStorage.setItem(`scene_card_flipped_${data.id}`, String(flipped));
+  };
+
+  // 动态测量并设置卡片高度
+  React.useEffect(() => {
+    const updateHeight = () => {
+      if (isFlipped && backRef.current) {
+        setCardHeight(backRef.current.offsetHeight);
+      } else if (!isFlipped && frontRef.current) {
+        setCardHeight(frontRef.current.offsetHeight);
+      }
+    };
+
+    // 初始测量
+    updateHeight();
+
+    // 延迟测量以确保内容已渲染
+    const timer = setTimeout(updateHeight, 100);
+
+    // 监听内容变化
+    const observer = new ResizeObserver(updateHeight);
+    if (frontRef.current) observer.observe(frontRef.current);
+    if (backRef.current) observer.observe(backRef.current);
+
+    return () => {
+      clearTimeout(timer);
+      observer.disconnect();
+    };
+  }, [isFlipped, data]);
 
   // 最小滑动距离（像素）
   const minSwipeDistance = 80;
@@ -68,6 +140,7 @@ export const SceneCard: React.FC<SceneCardProps> = ({ data, onAction }) => {
     if (swipeDistance > minSwipeDistance) {
       // 翻转回正面
       setIsFlipped(false);
+      saveFlipState(false);
       
       // 如果是日课卡片，右滑表示取消完成
       if (data.type === 'checklist' && data.action.type === 'toggleCheck') {
@@ -86,9 +159,18 @@ export const SceneCard: React.FC<SceneCardProps> = ({ data, onAction }) => {
     if (!isFlipped) {
       // 正面点击 - 翻转到反面并执行动作
       setIsFlipped(true);
+      saveFlipState(true);
       
+      // 执行动作（除了 'none' 类型）
       if (data.action.type !== 'none') {
-        onAction?.(data.action);
+        // 对于导航卡片，延迟执行以显示翻转动画
+        if (data.action.type === 'navigate') {
+          setTimeout(() => {
+            onAction?.(data.action);
+          }, 300);
+        } else {
+          onAction?.(data.action);
+        }
       }
     } else {
       // 反面点击 - 根据卡片类型决定是否响应
@@ -124,6 +206,7 @@ export const SceneCard: React.FC<SceneCardProps> = ({ data, onAction }) => {
     <div
       ref={cardRef}
       className="relative overflow-hidden select-none touch-pan-y"
+      style={{ height: cardHeight }}
     >
       {/* 滑动背景提示 - 只在反面显示，使用卡片类型对应的颜色 */}
       {isFlipped && (
@@ -151,6 +234,7 @@ export const SceneCard: React.FC<SceneCardProps> = ({ data, onAction }) => {
       >
         {/* 正面 */}
         <div 
+          ref={frontRef}
           className="scene-card-face scene-card-front"
           onClick={handleCardClick}
         >
@@ -159,6 +243,7 @@ export const SceneCard: React.FC<SceneCardProps> = ({ data, onAction }) => {
 
         {/* 反面 */}
         <div 
+          ref={backRef}
           className="scene-card-face scene-card-back"
           onClick={handleCardClick}
         >
@@ -191,41 +276,66 @@ const CardFront: React.FC<{ data: SceneCardData }> = ({ data }) => {
     }
   };
 
+  // 根据卡片类型获取图标
+  const getFrontIcon = () => {
+    switch (data.type) {
+      case 'timer':
+        return <Check size={14} className="text-green-500" />;
+      case 'todo':
+        return <Check size={14} className="text-blue-500" />;
+      case 'checklist':
+        return <Check size={14} className="text-amber-500" />;
+      case 'navigation':
+        return <ChevronRight size={14} className="text-sky-500" />;
+      case 'text':
+        return <Check size={14} className="text-stone-500" />;
+      case 'stats':
+        return <Check size={14} className="text-indigo-500" />;
+      default:
+        return <Check size={14} className="text-stone-500" />;
+    }
+  };
+
   return (
-    <div className={`h-full rounded-2xl p-4 flex items-center gap-3 ${getCardColor()}`}>
-      {/* 左侧：标题 */}
-      <div className="flex-1 min-w-0">
-        <h3 className="font-bold text-stone-800 text-base leading-tight truncate">{data.title}</h3>
-      </div>
-      
-      {/* 右侧：状态指示 */}
-      <div className="flex items-center gap-3 flex-shrink-0">
+    <div className={`rounded-2xl p-4 ${getCardColor()} relative`}>
+      {/* 右上角状态指示 */}
+      <div className="absolute top-4 right-4">
         {/* 待办进度 */}
         {data.type === 'todo' && data.progress !== undefined && data.totalAmount && (
-          <div className="text-sm text-stone-500 font-medium">
+          <div className="text-sm text-stone-500 font-medium whitespace-nowrap">
             {data.progress}/{data.totalAmount}
           </div>
         )}
         
         {/* 统计值 */}
         {data.type === 'stats' && data.statValue && (
-          <div className="text-right">
-            <p className="text-base font-bold text-stone-800">{data.statValue}</p>
-          </div>
+          <p className="text-base font-bold text-stone-800 whitespace-nowrap">{data.statValue}</p>
         )}
         
         {/* 日课打卡的圆圈 */}
         {data.type === 'checklist' && (
-          <div className="w-5 h-5 rounded-full border-2 border-amber-400"></div>
-        )}
-        
-        {/* 正面文字（如果有） */}
-        {data.frontText && (
-          <div className="text-sm text-stone-500">
-            {data.frontText}
-          </div>
+          <div className="w-5 h-5 rounded-full border-2 border-amber-400 flex-shrink-0"></div>
         )}
       </div>
+      
+      {/* 第一行：名称 */}
+      <div className="pr-12 mb-2">
+        <h3 className="font-bold text-stone-800 text-base leading-tight break-words overflow-wrap-anywhere">
+          {data.title}
+        </h3>
+      </div>
+      
+      {/* 第二行：正面文字（如果有） */}
+      {data.frontText && (
+        <div className="flex items-start gap-2">
+          <div className="flex-shrink-0 mt-0.5">
+            {getFrontIcon()}
+          </div>
+          <p className="text-sm text-stone-600 break-words overflow-wrap-anywhere flex-1">
+            {data.frontText}
+          </p>
+        </div>
+      )}
     </div>
   );
 };
@@ -251,17 +361,29 @@ const CardBack: React.FC<{ data: SceneCardData; isSwiping?: boolean; swipeProgre
     }
   };
 
-  // 根据卡片类型获取默认反面文字（如果用户未自定义）
-  const getDefaultBackText = () => {
-    if (data.backText) return data.backText;
-    
-    // 如果没有自定义反面文字，返回空字符串
-    return '';
+  // 根据卡片类型获取图标和颜色
+  const getBackIcon = () => {
+    switch (data.type) {
+      case 'timer':
+        return { icon: <Check size={14} className="text-white" />, bgColor: 'bg-green-500' };
+      case 'todo':
+        return { icon: <Check size={14} className="text-white" />, bgColor: 'bg-blue-500' };
+      case 'checklist':
+        return { icon: <Check size={14} className="text-white" />, bgColor: 'bg-amber-500' };
+      case 'navigation':
+        return { icon: <ChevronRight size={14} className="text-white" />, bgColor: 'bg-sky-500' };
+      case 'text':
+        return { icon: <Check size={14} className="text-white" />, bgColor: 'bg-stone-500' };
+      case 'stats':
+        return { icon: <Check size={14} className="text-white" />, bgColor: 'bg-indigo-500' };
+      default:
+        return { icon: <Check size={14} className="text-white" />, bgColor: 'bg-stone-500' };
+    }
   };
 
   // 根据滑动进度获取动态提示文字
   const getSwipeHintText = () => {
-    if (!isSwiping) return ''; // 不滑动时不显示提示
+    if (!isSwiping) return '';
     
     if (swipeProgress < 0.4) {
       return '继续滑动...';
@@ -272,103 +394,32 @@ const CardBack: React.FC<{ data: SceneCardData; isSwiping?: boolean; swipeProgre
     }
   };
 
+  const { icon, bgColor } = getBackIcon();
+
   return (
     <div 
-      className={`h-full rounded-2xl p-4 flex items-center gap-3 ${getBackgroundColor()} transition-opacity`}
+      className={`rounded-2xl p-4 ${getBackgroundColor()} transition-opacity relative`}
       style={{ opacity: isSwiping ? Math.max(0.6, 1 - swipeProgress * 0.5) : 1 }}
     >
-      {/* 计时卡片和待办卡片 - 显示反面文字 */}
-      {(data.type === 'timer' || data.type === 'todo') && (
-        <>
-          <div className="flex items-center gap-2 flex-1 min-w-0">
-            <div className="w-5 h-5 rounded-full bg-green-500 flex items-center justify-center flex-shrink-0">
-              <Check className="text-white" size={14} />
-            </div>
-            <h3 className="font-bold text-stone-800 text-base leading-tight truncate">{data.title}</h3>
+      {/* 右上角完成按钮或滑动提示 */}
+      <div className="absolute top-4 right-4">
+        {isSwiping ? (
+          <p className="text-xs text-stone-400 whitespace-nowrap">{getSwipeHintText()}</p>
+        ) : (
+          <div className={`w-5 h-5 rounded-full ${bgColor} flex items-center justify-center`}>
+            {icon}
           </div>
-          <div className="flex items-center gap-3 flex-shrink-0">
-            {/* 滑动时显示滑动提示，否则显示反面文字 */}
-            {isSwiping ? (
-              <p className="text-xs text-stone-400">{getSwipeHintText()}</p>
-            ) : (
-              data.backText && <p className="text-sm text-stone-600">{data.backText}</p>
-            )}
-          </div>
-        </>
-      )}
+        )}
+      </div>
       
-      {/* 日课已完成 - 显示反面文字 */}
-      {data.type === 'checklist' && (
-        <>
-          <div className="flex items-center gap-2 flex-1 min-w-0">
-            <div className="w-5 h-5 rounded-full bg-amber-500 flex items-center justify-center flex-shrink-0">
-              <Check className="text-white" size={14} />
-            </div>
-            <h3 className="font-bold text-stone-800 text-base leading-tight truncate">{data.title}</h3>
-          </div>
-          <div className="flex items-center gap-3 flex-shrink-0">
-            {/* 滑动时显示滑动提示，否则显示反面文字 */}
-            {isSwiping ? (
-              <p className="text-xs text-stone-400">{getSwipeHintText()}</p>
-            ) : (
-              data.backText && <p className="text-sm text-stone-600">{data.backText}</p>
-            )}
-          </div>
-        </>
-      )}
-      
-      {/* 文字内容 */}
-      {data.type === 'text' && (
-        <>
-          <div className="flex items-center gap-2 flex-1 min-w-0">
-            <div className="w-5 h-5 rounded-full bg-stone-500 flex items-center justify-center flex-shrink-0">
-              <Check className="text-white" size={14} />
-            </div>
-            <div className="flex-1 min-w-0">
-              {/* 反面只显示 backText，如果为空则不显示 */}
-              {data.backText && (
-                <p className="text-sm text-stone-600 line-clamp-3">
-                  {data.backText}
-                </p>
-              )}
-            </div>
-          </div>
-          <div className="flex items-center gap-3 flex-shrink-0">
-            {isSwiping && <p className="text-xs text-stone-400">{getSwipeHintText()}</p>}
-          </div>
-        </>
-      )}
-      
-      {/* 跳转提示 */}
-      {data.type === 'navigation' && (
-        <>
-          <div className="flex items-center gap-2 flex-1 min-w-0">
-            <ChevronRight className="text-sky-500 flex-shrink-0" size={18} />
-            <h3 className="font-bold text-stone-800 text-base leading-tight truncate">{data.title}</h3>
-          </div>
-          <div className="flex items-center gap-3 flex-shrink-0">
-            {isSwiping ? (
-              <p className="text-xs text-stone-400">{getSwipeHintText()}</p>
-            ) : (
-              data.backText && <p className="text-sm text-stone-600">{data.backText}</p>
-            )}
-          </div>
-        </>
-      )}
-      
-      {/* 统计详情 */}
-      {data.type === 'stats' && (
-        <>
-          <div className="flex-1 min-w-0">
-            <h3 className="font-bold text-stone-800 text-base leading-tight mb-1 truncate">{data.title}</h3>
-            <p className="text-xs text-stone-500">{data.statLabel}</p>
-          </div>
-          <div className="flex items-center gap-3 flex-shrink-0">
-            <p className="text-base font-bold text-stone-800">{data.statValue}</p>
-            {isSwiping && <p className="text-xs text-stone-400">{getSwipeHintText()}</p>}
-          </div>
-        </>
-      )}
+      {/* 反面文字 - 不显示左侧图标 */}
+      <div className="pr-12">
+        {data.backText && (
+          <p className="text-sm text-stone-600 break-words overflow-wrap-anywhere">
+            {data.backText}
+          </p>
+        )}
+      </div>
     </div>
   );
 };

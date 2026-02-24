@@ -100,8 +100,8 @@ export const SceneSettingsView: React.FC<SceneSettingsViewProps> = ({ onBack }) 
       id: editingCard.id || `card-${Date.now()}`,
       type: editingCard.type,
       title: editingCard.title,
-      frontText: editingCard.frontText,
-      backText: editingCard.backText,
+      frontText: editingCard.frontText || '现在开始！',
+      backText: editingCard.backText || '完成了！',
       action: editingCard.action || { type: 'none' }
     };
 
@@ -681,7 +681,7 @@ const CardEditModal: React.FC<{
               value={card?.frontText || ''}
               onChange={(e) => onChange({ ...card, frontText: e.target.value })}
               className="w-full px-3 py-2 text-sm border border-stone-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-stone-800"
-              placeholder="例如：点击开始计时"
+              placeholder="现在开始！"
             />
           </div>
 
@@ -694,7 +694,7 @@ const CardEditModal: React.FC<{
               value={card?.backText || ''}
               onChange={(e) => onChange({ ...card, backText: e.target.value })}
               className="w-full px-3 py-2 text-sm border border-stone-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-stone-800"
-              placeholder="例如：正在进行中..."
+              placeholder="完成了！"
             />
           </div>
 
@@ -725,9 +725,30 @@ const CardEditModal: React.FC<{
             />
           )}
 
-          {card?.type !== 'timer' && card?.type !== 'todo' && card?.type !== 'checklist' && (
+          {card?.type === 'navigation' && (
+            <NavigationSelector
+              selectedTarget={card?.action?.targetView}
+              onChange={(targetView) => {
+                onChange({
+                  ...card,
+                  action: {
+                    type: 'navigate',
+                    targetView
+                  }
+                });
+              }}
+            />
+          )}
+
+          {card?.type === 'text' && (
             <div className="p-3 bg-stone-50 rounded-lg text-xs sm:text-sm text-stone-600">
-              提示：{card?.type === 'navigation' ? '导航功能' : card?.type === 'text' ? '文字卡片' : '统计功能'}将在后续版本中实现
+              提示：文字卡片将在后续版本中实现
+            </div>
+          )}
+
+          {card?.type === 'stats' && (
+            <div className="p-3 bg-stone-50 rounded-lg text-xs sm:text-sm text-stone-600">
+              提示：统计功能将在后续版本中实现
             </div>
           )}
         </div>
@@ -892,6 +913,65 @@ const CheckItemSelector: React.FC<CheckItemSelectorProps> = ({
       {selectedCheckItemId && (
         <div className="text-[10px] sm:text-xs text-stone-500 bg-stone-50 p-2 rounded-lg">
           点击此卡片将切换该日课的完成状态
+        </div>
+      )}
+    </div>
+  );
+};
+
+/**
+ * NavigationSelector component - 导航目标选择器
+ */
+interface NavigationSelectorProps {
+  selectedTarget: string | undefined;
+  onChange: (targetView: string | undefined) => void;
+}
+
+const NavigationSelector: React.FC<NavigationSelectorProps> = ({
+  selectedTarget,
+  onChange
+}) => {
+  const navigationOptions = [
+    { value: 'daily-review-today', label: '今日回顾', description: '查看今天的日课和回顾' },
+    { value: 'daily-review-yesterday', label: '昨日回顾', description: '查看昨天的日课和回顾' },
+    { value: 'weekly-review', label: '本周回顾', description: '查看本周的总结和反思' },
+    { value: 'stats-today', label: '今日统计', description: '查看今天的时间分布' },
+    { value: 'stats-week', label: '本周统计', description: '查看本周的时间统计' },
+  ];
+
+  return (
+    <div className="space-y-2">
+      <label className="block text-xs sm:text-sm font-medium text-stone-700">
+        跳转目标
+      </label>
+
+      <div className="border border-stone-200 rounded-lg bg-stone-50/50 max-h-60 overflow-y-auto">
+        <div className="p-2 space-y-1">
+          {navigationOptions.map((option) => (
+            <button
+              key={option.value}
+              onClick={() => onChange(option.value)}
+              className={`w-full text-left px-3 py-2 rounded-lg transition-all ${
+                selectedTarget === option.value
+                  ? 'bg-white shadow-sm border-2'
+                  : 'hover:bg-white/50'
+              }`}
+              style={
+                selectedTarget === option.value
+                  ? { borderColor: 'var(--accent-color)' }
+                  : undefined
+              }
+            >
+              <div className="font-medium text-sm text-stone-800">{option.label}</div>
+              <div className="text-xs text-stone-500 mt-0.5">{option.description}</div>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {selectedTarget && (
+        <div className="text-[10px] sm:text-xs text-stone-500 bg-stone-50 p-2 rounded-lg">
+          点击此卡片将跳转到对应页面
         </div>
       )}
     </div>

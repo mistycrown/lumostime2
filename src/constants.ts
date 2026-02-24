@@ -598,6 +598,7 @@ export const VIEW_TITLES: Record<AppView, string> = {
   [AppView.TODO]: 'TODO',
   [AppView.REVIEW]: 'Chronicle',
   [AppView.SETTINGS]: '设置',
+  [AppView.SCENE]: '场景',
 };
 
 // ========== Daily Review Templates (每日回顾模板) ==========
