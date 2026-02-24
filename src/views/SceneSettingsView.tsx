@@ -308,6 +308,10 @@ export const SceneSettingsView: React.FC<SceneSettingsViewProps> = ({ onBack }) 
       action: editingCard.action || { type: 'none' },
       // 保存颜色字段
       ...(editingCard.color && { color: editingCard.color }),
+      // 保存自动进入沉浸式计时字段（timer 和 todo 类型）
+      ...((editingCard.type === 'timer' || editingCard.type === 'todo') && {
+        autoEnterFocus: editingCard.autoEnterFocus
+      }),
       // 保留统计卡片的特有字段
       ...(editingCard.type === 'stats' && {
         filterActivityIds: editingCard.filterActivityIds,
@@ -1042,21 +1046,79 @@ const CardEditModal: React.FC<{
 
           {/* 根据类型显示不同的关联选项 */}
           {card?.type === 'timer' && (
-            <ActivitySelector
-              categories={categories}
-              selectedActivityId={selectedActivityId}
-              selectedCategoryId={selectedCategoryId}
-              onChange={handleActivityChange}
-            />
+            <>
+              <ActivitySelector
+                categories={categories}
+                selectedActivityId={selectedActivityId}
+                selectedCategoryId={selectedCategoryId}
+                onChange={handleActivityChange}
+              />
+              
+              {/* 自动进入沉浸式计时开关 */}
+              <div className="pt-3 border-t border-stone-200">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <label className="text-xs sm:text-sm font-medium text-stone-700">
+                      直接跳转沉浸式计时
+                    </label>
+                    <p className="text-[10px] sm:text-xs text-stone-500 mt-0.5">
+                      开启后点击卡片将自动进入沉浸式计时页面
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => onChange({ ...card, autoEnterFocus: !card?.autoEnterFocus })}
+                    className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors`}
+                    style={{
+                      backgroundColor: card?.autoEnterFocus ? 'var(--accent-color)' : '#d6d3d1'
+                    }}
+                  >
+                    <span
+                      className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${
+                        card?.autoEnterFocus ? 'translate-x-5' : 'translate-x-0.5'
+                      }`}
+                    />
+                  </button>
+                </div>
+              </div>
+            </>
           )}
 
           {card?.type === 'todo' && (
-            <TodoSelector
-              todos={todos}
-              todoCategories={todoCategories}
-              selectedTodoId={selectedTodoId}
-              onChange={handleTodoChange}
-            />
+            <>
+              <TodoSelector
+                todos={todos}
+                todoCategories={todoCategories}
+                selectedTodoId={selectedTodoId}
+                onChange={handleTodoChange}
+              />
+              
+              {/* 自动进入沉浸式计时开关 */}
+              <div className="pt-3 border-t border-stone-200">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <label className="text-xs sm:text-sm font-medium text-stone-700">
+                      直接跳转沉浸式计时
+                    </label>
+                    <p className="text-[10px] sm:text-xs text-stone-500 mt-0.5">
+                      开启后点击卡片将自动进入沉浸式计时页面
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => onChange({ ...card, autoEnterFocus: !card?.autoEnterFocus })}
+                    className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors`}
+                    style={{
+                      backgroundColor: card?.autoEnterFocus ? 'var(--accent-color)' : '#d6d3d1'
+                    }}
+                  >
+                    <span
+                      className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${
+                        card?.autoEnterFocus ? 'translate-x-5' : 'translate-x-0.5'
+                      }`}
+                    />
+                  </button>
+                </div>
+              </div>
+            </>
           )}
 
           {card?.type === 'checklist' && (

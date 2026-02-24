@@ -185,25 +185,78 @@ const AppContent: React.FC = () => {
 
   const [sessionToStop, setSessionToStop] = React.useState<string | null>(null);
   const [shouldAutoOpenFocus, setShouldAutoOpenFocus] = React.useState(false);
+  const [shouldAutoEnterImmersive, setShouldAutoEnterImmersive] = React.useState(false); // 新增：是否自动进入沉浸式模式
+  const autoOpenTimeoutRef = React.useRef<NodeJS.Timeout | null>(null);
   
   // 监听activeSessions变化，自动打开FocusDetailView
   React.useEffect(() => {
+    console.log('[App useEffect] activeSessions.length:', activeSessions.length, 'shouldAutoOpenFocus:', shouldAutoOpenFocus);
+    
     if (shouldAutoOpenFocus && activeSessions.length > 0) {
       const latestSession = activeSessions[activeSessions.length - 1];
-      setFocusDetailSessionId(latestSession.id);
-      setShouldAutoOpenFocus(false);
+      console.log('[App useEffect] 准备打开沉浸式计时, sessionId:', latestSession.id);
+      
+      // 清除之前的定时器
+      if (autoOpenTimeoutRef.current) {
+        clearTimeout(autoOpenTimeoutRef.current);
+      }
+      
+      // 延迟一小段时间，确保 TimerFloating 已经渲染
+      autoOpenTimeoutRef.current = setTimeout(() => {
+        console.log('[App useEffect] 执行打开沉浸式计时, sessionId:', latestSession.id);
+        // 直接设置 focusDetailSessionId，这会触发 FocusDetailView 渲染
+        setFocusDetailSessionId(latestSession.id);
+        setShouldAutoOpenFocus(false);
+      }, 300);
     }
+    
+    return () => {
+      if (autoOpenTimeoutRef.current) {
+        clearTimeout(autoOpenTimeoutRef.current);
+      }
+    };
   }, [activeSessions, shouldAutoOpenFocus, setFocusDetailSessionId]);
   
   // Wrappers for Session Actions to match original signature (injecting autoLinkRules)
-  const handleStartActivityWrapper = (activity: any, categoryId: string, todoId?: string, scopeIdOrIds?: string | string[], note?: string) => {
-    startActivity(activity, categoryId, autoLinkRules, todoId, scopeIdOrIds, note);
+  const handleStartActivityWrapper = (activity: any, categoryId: string, todoId?: string, scopeIdOrIds?: string | string[], note?: string, autoEnterFocus?: boolean) => {
+    console.log('[App] handleStartActivityWrapper, autoEnterFocus:', autoEnterFocus, 'autoOpenFocusDetail:', autoOpenFocusDetail);
     
-    // 如果开启了自动跳转设置，标记需要自动打开
-    if (autoOpenFocusDetail) {
+    // 先设置自动打开标记
+    const shouldAutoOpen = autoEnterFocus !== undefined ? autoEnterFocus : autoOpenFocusDetail;
+    console.log('[App] shouldAutoOpen:', shouldAutoOpen);
+    
+    if (shouldAutoOpen) {
+      console.log('[App] 设置 setShouldAutoOpenFocus(true)');
       setShouldAutoOpenFocus(true);
+      // 同时设置自动进入沉浸式模式的标志
+      if (autoEnterFocus) {
+        console.log('[App] 设置 setShouldAutoEnterImmersive(true)');
+        setShouldAutoEnterImmersive(true);
+      }
     }
+    
+    // 然后启动活动
+    console.log('[App] 调用 startActivity');
+    startActivity(activity, categoryId, autoLinkRules, todoId, scopeIdOrIds, note);
   };
+  
+  const handleStartTodoFocusWrapper = (todo: TodoItem, autoEnterFocus?: boolean) => {
+    console.log('[App] handleStartTodoFocusWrapper, autoEnterFocus:', autoEnterFocus);
+    
+    // 先设置自动打开标记
+    if (autoEnterFocus) {
+      console.log('[App] 设置 setShouldAutoOpenFocus(true)');
+      setShouldAutoOpenFocus(true);
+      // 同时设置自动进入沉浸式模式的标志
+      console.log('[App] 设置 setShouldAutoEnterImmersive(true)');
+      setShouldAutoEnterImmersive(true);
+    }
+    
+    // 然后启动 todo
+    console.log('[App] 调用 todoManager.handleStartTodoFocus');
+    todoManager.handleStartTodoFocus(todo);
+  };
+  
   const handleStopActivityWrapper = (sessionId: string) => {
     stopActivity(
       sessionId,
@@ -276,7 +329,7 @@ const AppContent: React.FC = () => {
         openEditTodoModal={todoManager.openEditTodoModal}
         openAddTodoModal={todoManager.openAddTodoModal}
         handleToggleTodo={todoManager.handleToggleTodo}
-        handleStartTodoFocus={todoManager.handleStartTodoFocus}
+        handleStartTodoFocus={handleStartTodoFocusWrapper}
         handleBatchAddTodos={todoManager.handleBatchAddTodos}
         handleDuplicateTodo={todoManager.handleDuplicateTodo}
         handleUpdateTodoData={todoManager.handleUpdateTodoData}
@@ -385,9 +438,14 @@ const AppContent: React.FC = () => {
       />
 
       {/* Focus Detail Overlay */}
-      {focusDetailSessionId && (() => {
+      {(() => {
+        console.log('[App.tsx] FocusDetailView 渲染检查, focusDetailSessionId:', focusDetailSessionId, 'activeSessions:', activeSessions);
+        if (!focusDetailSessionId) return null;
+        
         const session = activeSessions.find(s => s.id === focusDetailSessionId);
+        console.log('[App.tsx] 找到的 session:', session);
         if (!session) return null;
+        
         return (
           <FocusDetailView
             session={session}
@@ -398,7 +456,11 @@ const AppContent: React.FC = () => {
             autoLinkRules={autoLinkRules}
             autoApplyAutoLinkRules={autoApplyAutoLinkRules}
             autoApplyTodoLink={autoApplyTodoLink}
-            onClose={() => setFocusDetailSessionId(null)}
+            autoEnterImmersive={shouldAutoEnterImmersive} // 传递自动进入沉浸式模式的标志
+            onClose={() => {
+              setFocusDetailSessionId(null);
+              setShouldAutoEnterImmersive(false); // 关闭时重置标志
+            }}
             onCancel={cancelSession}
             onComplete={(finalSession) => {
               stopActivity(
@@ -408,6 +470,7 @@ const AppContent: React.FC = () => {
                 todoManager.updateTodoProgress
               );
               setFocusDetailSessionId(null);
+              setShouldAutoEnterImmersive(false); // 完成时重置标志
             }}
             onUpdate={(updated) => {
               // Update the session in activeSessions

@@ -31,13 +31,14 @@ interface FocusDetailViewProps {
     onComplete: (session: ActiveSession) => void;
     onUpdate: (session: ActiveSession) => void;
     autoFocusNote?: boolean;
+    autoEnterImmersive?: boolean; // 新增：是否自动进入沉浸式模式
 }
 
-export const FocusDetailView: React.FC<FocusDetailViewProps> = ({ session, todos, categories, todoCategories, scopes, autoLinkRules = [], autoApplyAutoLinkRules = true, autoApplyTodoLink = true, onClose, onCancel, onComplete, onUpdate, autoFocusNote = true }) => {
+export const FocusDetailView: React.FC<FocusDetailViewProps> = ({ session, todos, categories, todoCategories, scopes, autoLinkRules = [], autoApplyAutoLinkRules = true, autoApplyTodoLink = true, onClose, onCancel, onComplete, onUpdate, autoFocusNote = true, autoEnterImmersive = false }) => {
     const [elapsed, setElapsed] = useState(0);
     const [note, setNote] = useState(session.note || '');
     const [isActivitySelectorOpen, setIsActivitySelectorOpen] = useState(false);
-    const [isImmersiveMode, setIsImmersiveMode] = useState(false);
+    const [isImmersiveMode, setIsImmersiveMode] = useState(autoEnterImmersive); // 根据 autoEnterImmersive 初始化
 
     // Progress Increment State
     const [progressAmount, setProgressAmount] = useState(0);

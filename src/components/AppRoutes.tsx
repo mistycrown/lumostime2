@@ -48,7 +48,7 @@ interface AppRoutesProps {
     // Let's stick to moving Goal/Review first.
 
     // Keeping core Log/Todo handlers for now to avoid breaking too much at once
-    handleStartActivity: (activity: any, categoryId: string, todoId?: string, scopeIdOrIds?: string | string[], note?: string) => void;
+    handleStartActivity: (activity: any, categoryId: string, todoId?: string, scopeIdOrIds?: string | string[], note?: string, autoEnterFocus?: boolean) => void;
     openAddModal: (start?: number, end?: number) => void;
     openEditModal: (log: Log) => void;
     handleBatchAddLogs: (entries: any[]) => void;
@@ -57,7 +57,7 @@ interface AppRoutesProps {
     openEditTodoModal: (todo: TodoItem) => void;
     openAddTodoModal: (catId: string) => void;
     handleToggleTodo: (id: string) => void;
-    handleStartTodoFocus: (todo: TodoItem) => void;
+    handleStartTodoFocus: (todo: TodoItem, autoEnterFocus?: boolean) => void;
     handleBatchAddTodos: (todos: Partial<TodoItem>[]) => void;
     handleDuplicateTodo: (todo: TodoItem) => void;
     handleUpdateTodoData: (cats: TodoCategory[], todos: TodoItem[]) => void;

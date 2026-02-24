@@ -212,6 +212,9 @@ export interface SceneCardData {
   // 快捷触发动作
   action: SceneCardAction;
   
+  // 计时相关（仅 timer 和 todo 类型）
+  autoEnterFocus?: boolean; // 是否自动进入沉浸式计时
+  
   // 待办进度（仅 todo 类型）
   progress?: number;
   totalAmount?: number;

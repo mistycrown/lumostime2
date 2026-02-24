@@ -18,7 +18,7 @@ const DEFAULT_COLORS = {
 
 interface SceneCardProps {
   data: SceneCardData;
-  onAction?: (action: SceneCardData['action']) => void;
+  onAction?: (action: SceneCardData['action'], autoEnterFocus?: boolean) => void;
 }
 
 export const SceneCard: React.FC<SceneCardProps> = ({ data, onAction }) => {
@@ -183,13 +183,16 @@ export const SceneCard: React.FC<SceneCardProps> = ({ data, onAction }) => {
       
       // 执行动作（除了 'none' 类型）
       if (data.action.type !== 'none') {
+        console.log('[SceneCard] 执行动作:', data.action.type, 'autoEnterFocus:', data.autoEnterFocus);
+        
         // 对于导航卡片，延迟执行以显示翻转动画
         if (data.action.type === 'navigate') {
           setTimeout(() => {
-            onAction?.(data.action);
+            onAction?.(data.action, data.autoEnterFocus);
           }, 300);
         } else {
-          onAction?.(data.action);
+          // 对于 timer 和 todo 类型，传递 autoEnterFocus 参数
+          onAction?.(data.action, data.autoEnterFocus);
         }
       }
     } else {
@@ -198,21 +201,23 @@ export const SceneCard: React.FC<SceneCardProps> = ({ data, onAction }) => {
         case 'timer':
           // 计时卡片：反面可点击，支持启动下一次计时（允许多次计时）
           if (data.action.type !== 'none') {
-            onAction?.(data.action);
+            console.log('[SceneCard] 反面执行动作:', data.action.type, 'autoEnterFocus:', data.autoEnterFocus);
+            onAction?.(data.action, data.autoEnterFocus);
           }
           break;
         
         case 'todo':
           // 待办卡片：反面可点击，支持重新启动一次计时
           if (data.action.type !== 'none') {
-            onAction?.(data.action);
+            console.log('[SceneCard] 反面执行动作:', data.action.type, 'autoEnterFocus:', data.autoEnterFocus);
+            onAction?.(data.action, data.autoEnterFocus);
           }
           break;
         
         case 'navigation':
           // 导航卡片：反面可点击，用于跳转至对应的回顾或统计页面
           if (data.action.type === 'navigate') {
-            onAction?.(data.action);
+            onAction?.(data.action, data.autoEnterFocus);
           }
           break;
         

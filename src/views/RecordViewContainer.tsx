@@ -16,8 +16,8 @@ import { AppView } from '../types';
 export type RecordViewMode = 'tags' | 'scenes';
 
 interface RecordViewContainerProps {
-  onStartActivity: (activity: Activity, categoryId: string) => void;
-  onStartTodoFocus?: (todo: TodoItem) => void;
+  onStartActivity: (activity: Activity, categoryId: string, autoEnterFocus?: boolean) => void;
+  onStartTodoFocus?: (todo: TodoItem, autoEnterFocus?: boolean) => void;
   categories: Category[];
   todos?: TodoItem[];
 }
@@ -58,6 +58,19 @@ export const RecordViewContainer: React.FC<RecordViewContainerProps> = ({
   const handleConfigureSlots = () => {
     alert('请前往「设置 → 通用 → 场景设置」配置时间段和快捷方式');
   };
+  
+  // 包装 onStartActivity 以支持 autoEnterFocus 参数
+  const handleStartActivity = (activity: Activity, categoryId: string, autoEnterFocus?: boolean) => {
+    console.log('[RecordViewContainer] handleStartActivity, autoEnterFocus:', autoEnterFocus);
+    // 传递正确的参数顺序：activity, categoryId, todoId, scopeIdOrIds, note, autoEnterFocus
+    onStartActivity(activity, categoryId, undefined, undefined, undefined, autoEnterFocus);
+  };
+  
+  // 包装 onStartTodoFocus 以支持 autoEnterFocus 参数
+  const handleStartTodoFocus = (todo: TodoItem, autoEnterFocus?: boolean) => {
+    console.log('[RecordViewContainer] handleStartTodoFocus, autoEnterFocus:', autoEnterFocus);
+    onStartTodoFocus?.(todo, autoEnterFocus);
+  };
 
   return (
     <div className="h-full relative">
@@ -70,8 +83,8 @@ export const RecordViewContainer: React.FC<RecordViewContainerProps> = ({
       ) : (
         <SceneView 
           onConfigureSlots={handleConfigureSlots}
-          onStartActivity={onStartActivity}
-          onStartTodoFocus={onStartTodoFocus}
+          onStartActivity={handleStartActivity}
+          onStartTodoFocus={handleStartTodoFocus}
           categories={categories}
           todos={todos}
         />
@@ -86,7 +99,7 @@ export const RecordViewContainer: React.FC<RecordViewContainerProps> = ({
         {viewMode === 'tags' ? (
           <UIIcon type="calendar" fallbackIcon={Clock} size={24} className="text-white" />
         ) : (
-          <UIIcon type="tags" fallbackIcon={Grid3x3} size={24} className="text-white" />
+          <UIIcon type="location" fallbackIcon={Grid3x3} size={24} className="text-white" />
         )}
       </FloatingButton>
     </div>
