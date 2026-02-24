@@ -3,7 +3,7 @@
  * @description 场景设置页面 - 管理时间段和快捷方式
  */
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, Plus, Trash2, Edit2, Palette, Clock, RotateCcw, ChevronRight } from 'lucide-react';
+import { ArrowLeft, Plus, Trash2, Edit2, Palette, Clock, RotateCcw, ChevronRight, ArrowUp, ArrowDown } from 'lucide-react';
 import { TimeSlot, SceneCardData, SceneCardType, Category, TodoItem, TodoCategory, CheckTemplate } from '../types';
 import { CustomSelect } from '../components/CustomSelect';
 import { UIIconSelectorCompact } from '../components/UIIconSelector';
@@ -385,6 +385,31 @@ export const SceneSettingsView: React.FC<SceneSettingsViewProps> = ({ onBack }) 
     });
   };
 
+  // 移动快捷方式
+  const handleMoveCard = (cardIndex: number, direction: 'up' | 'down') => {
+    if (!selectedSlotId) return;
+
+    const updatedSlots = timeSlots.map(slot => {
+      if (slot.id === selectedSlotId) {
+        const newCards = [...slot.cards];
+        
+        if (direction === 'up' && cardIndex > 0) {
+          [newCards[cardIndex], newCards[cardIndex - 1]] = [newCards[cardIndex - 1], newCards[cardIndex]];
+        } else if (direction === 'down' && cardIndex < newCards.length - 1) {
+          [newCards[cardIndex], newCards[cardIndex + 1]] = [newCards[cardIndex + 1], newCards[cardIndex]];
+        }
+        
+        return {
+          ...slot,
+          cards: newCards
+        };
+      }
+      return slot;
+    });
+
+    saveTimeSlots(updatedSlots);
+  };
+
   // 重设为预设场景
   const handleResetToPresets = () => {
     setConfirmModal({
@@ -521,7 +546,7 @@ export const SceneSettingsView: React.FC<SceneSettingsViewProps> = ({ onBack }) 
             </div>
 
             <div className="space-y-2">
-              {selectedSlot.cards.map(card => {
+              {selectedSlot.cards.map((card, cardIndex) => {
                 const associationText = getCardAssociationText(card);
                 return (
                   <div
@@ -548,17 +573,35 @@ export const SceneSettingsView: React.FC<SceneSettingsViewProps> = ({ onBack }) 
                       </div>
                       <div className="flex items-center gap-1 flex-shrink-0">
                         <button
+                          onClick={() => handleMoveCard(cardIndex, 'up')}
+                          disabled={cardIndex === 0}
+                          className="p-1.5 hover:bg-stone-100 rounded disabled:opacity-30 disabled:cursor-not-allowed"
+                          title="上移"
+                        >
+                          <ArrowUp size={14} />
+                        </button>
+                        <button
+                          onClick={() => handleMoveCard(cardIndex, 'down')}
+                          disabled={cardIndex === selectedSlot.cards.length - 1}
+                          className="p-1.5 hover:bg-stone-100 rounded disabled:opacity-30 disabled:cursor-not-allowed"
+                          title="下移"
+                        >
+                          <ArrowDown size={14} />
+                        </button>
+                        <button
                           onClick={() => {
                             setEditingCard(card);
                             setIsEditingCard(true);
                           }}
                           className="p-1.5 hover:bg-stone-100 rounded"
+                          title="编辑"
                         >
                           <Edit2 size={14} />
                         </button>
                         <button
                           onClick={() => handleDeleteCard(card.id!)}
                           className="p-1.5 hover:bg-red-100 text-red-600 rounded"
+                          title="删除"
                         >
                           <Trash2 size={14} />
                         </button>
