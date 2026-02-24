@@ -116,6 +116,25 @@ export const SceneSettingsView: React.FC<SceneSettingsViewProps> = ({ onBack }) 
         }
         return '跳转：未设置';
       
+      case 'stats':
+        if (card.filterActivityIds && card.filterActivityIds.length > 0) {
+          // 获取所有选中的活动名称
+          const activityNames: string[] = [];
+          for (const activityId of card.filterActivityIds) {
+            for (const category of categories) {
+              const activity = category.activities.find(a => a.id === activityId);
+              if (activity) {
+                activityNames.push(activity.name);
+                break;
+              }
+            }
+          }
+          if (activityNames.length > 0) {
+            return `统计：${activityNames.join('、')}`;
+          }
+        }
+        return '统计：未设置';
+      
       case 'text':
         return null; // 文本卡片不需要显示关联信息
       
@@ -385,25 +404,24 @@ export const SceneSettingsView: React.FC<SceneSettingsViewProps> = ({ onBack }) 
   const selectedSlot = timeSlots.find(s => s.id === selectedSlotId);
 
   return (
-    <div className="h-full flex flex-col bg-[#faf9f6]">
+    <div className="h-full flex flex-col bg-[#faf9f6] pt-[env(safe-area-inset-top)]">
       {/* 顶部导航 */}
-      <div className="flex items-center gap-2 sm:gap-4 p-3 sm:p-4 border-b border-stone-200 bg-white">
+      <div className="h-14 flex items-center justify-between px-5 bg-[#fdfbf7] border-b border-stone-100 sticky top-0 z-20">
         <button
           onClick={onBack}
-          className="p-2 hover:bg-stone-100 rounded-lg transition-colors flex-shrink-0"
+          className="p-2 -ml-2 text-stone-400 hover:text-stone-600 transition-colors"
         >
-          <ArrowLeft size={20} />
+          <ArrowLeft size={24} />
         </button>
-        <h1 className="text-lg sm:text-xl font-bold text-stone-800 flex-1 min-w-0">场景设置</h1>
+        <h1 className="font-serif font-bold text-lg text-stone-800">场景设置</h1>
         
         {/* 重设为预设场景按钮 */}
         <button
           onClick={handleResetToPresets}
-          className="flex items-center gap-1 sm:gap-2 px-2 sm:px-3 py-2 text-xs sm:text-sm text-stone-600 hover:text-stone-800 hover:bg-stone-100 rounded-lg transition-colors flex-shrink-0"
+          className="p-2 -mr-2 text-stone-400 hover:text-stone-600 transition-colors"
           title="重设为预设场景"
         >
-          <RotateCcw size={14} className="sm:w-4 sm:h-4" />
-          <span className="hidden sm:inline">重设</span>
+          <RotateCcw size={20} />
         </button>
       </div>
 

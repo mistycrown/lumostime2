@@ -377,7 +377,7 @@ const CardFront: React.FC<{ data: SceneCardData; cardColor: string }> = ({ data,
       
       {/* 第二行：正面文字（如果有） */}
       {data.frontText && (
-        <div className="flex items-start gap-2">
+        <div className="flex items-center gap-2">
           <div className="flex-shrink-0 flex items-center justify-center">
             {getFrontIcon()}
           </div>
@@ -386,7 +386,7 @@ const CardFront: React.FC<{ data: SceneCardData; cardColor: string }> = ({ data,
           </p>
           {/* 统计卡片：在文字右侧显示统计值 */}
           {data.type === 'stats' && data.statValue && (
-            <p className="text-base font-bold text-stone-800 whitespace-nowrap ml-2 self-end">{data.statValue}</p>
+            <p className="text-sm font-bold text-stone-800 whitespace-nowrap ml-2 self-end">{data.statValue}</p>
           )}
         </div>
       )}
@@ -514,7 +514,7 @@ const CardBack: React.FC<{
           </p>
           {/* 统计卡片：在文字右侧显示统计值 */}
           {data.type === 'stats' && data.statValue && (
-            <p className="text-base font-bold text-stone-800 whitespace-nowrap">{data.statValue}</p>
+            <p className="text-sm font-bold text-stone-800 whitespace-nowrap">{data.statValue}</p>
           )}
         </div>
       )}
@@ -522,7 +522,7 @@ const CardBack: React.FC<{
       {/* 统计卡片：如果没有反面文字，单独显示统计值 */}
       {data.type === 'stats' && data.statValue && !data.backText && (
         <div className="flex justify-end">
-          <p className="text-base font-bold text-stone-800 whitespace-nowrap">{data.statValue}</p>
+          <p className="text-sm font-bold text-stone-800 whitespace-nowrap">{data.statValue}</p>
         </div>
       )}
     </div>

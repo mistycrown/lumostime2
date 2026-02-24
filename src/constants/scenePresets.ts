@@ -16,24 +16,40 @@ export const DEFAULT_SCENE_PRESETS: TimeSlot[] = [
         id: '1', 
         type: 'checklist', 
         title: '起床喝一杯水', 
-        frontText: '用一杯水迎接崭新的一天',
-        backText: '真棒！身体已经开始苏醒啦',
+        frontText: '一杯清水，唤醒沉睡的细胞',
+        backText: '身体开始苏醒，新的一天从此刻流淌',
         action: { type: 'toggleCheck', checkItemId: 'manual_1' }
       },
       { 
         id: '2', 
-        type: 'timer', 
-        title: '洗漱', 
-        frontText: '用洁净开启清爽的一天',
-        backText: '完成了！焕然一新的感觉真好',
-        action: { type: 'startTimer', activityId: 'hygiene', categoryId: 'life' }
+        type: 'checklist', 
+        title: '整理床铺', 
+        frontText: '整理空间，也是整理内心',
+        backText: '「外在的秩序，带来内在的平静。」—— 《怦然心动的人生整理魔法》',
+        action: { type: 'toggleCheck', checkItemId: 'manual_2' }
       },
       { 
         id: '3', 
+        type: 'timer', 
+        title: '洗漱', 
+        frontText: '以洁净之心，迎接清晨的光',
+        backText: '焕然一新，如同晨露洗过的叶片',
+        action: { type: 'startTimer', activityId: 'hygiene', categoryId: 'life' }
+      },
+      { 
+        id: '4', 
+        type: 'timer', 
+        title: '早餐', 
+        frontText: '用一顿好早餐，开启充实的一天',
+        backText: '晨间的仪式感，从好好吃饭开始',
+        action: { type: 'startTimer', activityId: 'meal', categoryId: 'life' }
+      },
+      { 
+        id: '5', 
         type: 'text', 
-        title: '晨间提醒', 
-        frontText: '早晨是一天的开始',
-        backText: '清晨的第一个小时，决定了一天的基调。用心对待每个早晨，就是在善待自己的人生。',
+        title: '晨间箴言', 
+        frontText: '每天起床第一句，先给自己打个气',
+        backText: '「清晨的第一个小时，决定了一天的基调。」—— 罗宾·夏尔马《凌晨5点俱乐部》',
         action: { type: 'none' }
       },
     ]
@@ -46,19 +62,19 @@ export const DEFAULT_SCENE_PRESETS: TimeSlot[] = [
     endTime: '12:00',
     cards: [
       { 
-        id: '4', 
+        id: '6', 
         type: 'todo', 
         title: '完成毕业论文第三章', 
-        frontText: '趁着思路清晰，攻克这个任务吧',
-        backText: '太棒了！又向目标迈进了一大步',
+        frontText: '趁思维清明，攻克今日之峰',
+        backText: '每一步攀登，都让山顶更近一寸',
         action: { type: 'startTodo', todoId: 't_thesis_1' }
       },
       { 
-        id: '5', 
+        id: '7', 
         type: 'text', 
-        title: '专注力法则', 
-        frontText: '上午是黄金时段',
-        backText: '上午9-12点是大脑最清醒的时段，适合处理需要深度思考的重要任务。珍惜这段时光，远离干扰。',
+        title: '专注的智慧', 
+        frontText: '上午，是大脑最清醒的时刻',
+        backText: '「最重要的工作，要在意志力最充沛的时刻完成。」—— 《意志力》罗伊·鲍迈斯特',
         action: { type: 'none' }
       },
     ]
@@ -71,20 +87,20 @@ export const DEFAULT_SCENE_PRESETS: TimeSlot[] = [
     endTime: '14:00',
     cards: [
       { 
-        id: '6', 
+        id: '8', 
         type: 'timer', 
         title: '午餐', 
-        frontText: '好好享受这顿饭，犒劳辛苦的自己',
-        backText: '完成了！美食让生活更有滋味',
+        frontText: '慢食，是对生活的温柔以待',
+        backText: '每一口咀嚼，都是对当下的感知',
         action: { type: 'startTimer', activityId: 'meal', categoryId: 'life' }
       },
       { 
-        id: '7', 
-        type: 'text', 
-        title: '休息的艺术', 
-        frontText: '休息也是生产力',
-        backText: '真正的休息不是无所事事，而是让身心得到恢复。午休20分钟，能让下午的效率提升30%。',
-        action: { type: 'none' }
+        id: '9', 
+        type: 'timer', 
+        title: '午睡', 
+        frontText: '让身心在午后小憩中复苏',
+        backText: '短暂的休憩，是下午效率的源泉',
+        action: { type: 'startTimer', activityId: 'nap', categoryId: 'sleep' }
       },
     ]
   },
@@ -96,20 +112,20 @@ export const DEFAULT_SCENE_PRESETS: TimeSlot[] = [
     endTime: '18:00',
     cards: [
       { 
-        id: '8', 
+        id: '10', 
         type: 'timer', 
         title: '代码编程', 
-        frontText: '让代码在指尖流淌，创造属于你的世界',
-        backText: '完成了！每一行代码都是你的作品',
+        frontText: '在逻辑与创造之间，构筑你的世界',
+        backText: '专注的时光，是送给未来的礼物',
         action: { type: 'startTimer', activityId: 'coding', categoryId: 'study' }
       },
       { 
-        id: '9', 
-        type: 'checklist', 
-        title: '写日记/复盘', 
-        frontText: '记录今天的思考与成长',
-        backText: '完成了！反思让我们变得更好',
-        action: { type: 'toggleCheck', checkItemId: 'manual_3' }
+        id: '11', 
+        type: 'text', 
+        title: '心流时刻', 
+        frontText: '持续的专注，是通往心流的路径',
+        backText: '「心流状态下，时间会消失，自我会消失，只剩下纯粹的体验。」—— 米哈里·契克森米哈赖',
+        action: { type: 'none' }
       },
     ]
   },
@@ -121,27 +137,51 @@ export const DEFAULT_SCENE_PRESETS: TimeSlot[] = [
     endTime: '22:00',
     cards: [
       { 
-        id: '10', 
+        id: '12', 
+        type: 'timer', 
+        title: '晚餐', 
+        frontText: '在暮色中，享受一天的收尾时光',
+        backText: '晚餐的温度，是生活的温柔',
+        action: { type: 'startTimer', activityId: 'meal', categoryId: 'life' }
+      },
+      { 
+        id: '13', 
+        type: 'timer', 
+        title: '运动健身', 
+        frontText: '让身体舒展，让心灵自由',
+        backText: '汗水是身体写给自己的情书',
+        action: { type: 'startTimer', activityId: 'workout', categoryId: 'self' }
+      },
+      { 
+        id: '14', 
         type: 'todo', 
         title: '看完《百年孤独》', 
-        frontText: '在书中遇见另一个世界',
-        backText: '完成了！阅读让灵魂更加丰盈',
+        frontText: '在文字的迷宫里，寻找另一个自己',
+        backText: '阅读，是灵魂的远行',
         action: { type: 'startTodo', todoId: 't_hobby_1' }
       },
       { 
-        id: '11', 
+        id: '15', 
+        type: 'checklist', 
+        title: '写日记/复盘', 
+        frontText: '记录，是与自己的对话',
+        backText: '「未经审视的人生不值得过。」—— 苏格拉底',
+        action: { type: 'toggleCheck', checkItemId: 'manual_3' }
+      },
+      { 
+        id: '16', 
         type: 'navigation', 
         title: '今日回顾', 
-        frontText: '看看今天收获了什么',
-        backText: '每一天的努力都值得被看见',
+        frontText: '回望来时路',
+        backText: '「每一天都是一次小小的人生。」—— 《微习惯》斯蒂芬·盖斯',
         action: { type: 'navigate', targetView: 'daily-review-today' }
       },
       { 
-        id: '12', 
+        id: '17', 
         type: 'checklist', 
         title: '感恩三件事', 
-        frontText: '回想今天值得感恩的瞬间',
-        backText: '完成了！带着感恩入睡，明天会更好',
+        frontText: '在平凡中，发现值得感激的光',
+        backText: '「感恩是通往幸福的最短路径。」—— 《幸福的方法》泰勒·本-沙哈尔',
         action: { type: 'toggleCheck', checkItemId: 'manual_4' }
       },
     ]
@@ -154,28 +194,56 @@ export const DEFAULT_SCENE_PRESETS: TimeSlot[] = [
     endTime: '06:00',
     cards: [
       { 
-        id: '14', 
+        id: '18', 
+        type: 'stats', 
+        title: '今日深度工作', 
+        frontText: '回望今日的专注时光',
+        backText: '每一分钟的投入，都在塑造更好的自己',
+        action: { type: 'none' },
+        filterActivityIds: ['coding', 'writing', 'reading', 'self_study'],
+        enableGoal: true,
+        goalValue: 180, // 3小时
+        goalType: 'min'
+      },
+      { 
+        id: '19', 
+        type: 'stats', 
+        title: '今日运动时长', 
+        frontText: '身体的觉醒，从规律开始',
+        backText: '「运动不是为了惩罚身体，而是为了庆祝它能做什么。」—— 《运动改造大脑》',
+        action: { type: 'none' },
+        filterActivityIds: ['workout'],
+        enableGoal: true,
+        goalValue: 30, // 30分钟/天
+        goalType: 'min'
+      },
+      { 
+        id: '20', 
+        type: 'stats', 
+        title: '今日摸鱼时长', 
+        frontText: '偶尔放空，也是生活的一部分',
+        backText: '「适度的休闲，是为了更好地出发。」',
+        action: { type: 'none' },
+        filterActivityIds: ['chat', 'surf', 'watch', 'game'],
+        enableGoal: true,
+        goalValue: 120, // 2小时
+        goalType: 'max'
+      },
+      { 
+        id: '21', 
         type: 'navigation', 
         title: '今日统计', 
-        frontText: '看看时间都去哪儿了',
-        backText: '数据会告诉你，每一刻都有意义',
+        frontText: '时间的流向，藏着生命的密码',
+        backText: '「你把时间花在哪里，你就会成为什么样的人。」—— 《奇特的一生》',
         action: { type: 'navigate', targetView: 'stats-today' }
       },
       { 
-        id: '15', 
+        id: '22', 
         type: 'timer', 
         title: '睡觉', 
-        frontText: '放下一切，让身心好好休息',
-        backText: '完成了！充足的睡眠是明天的能量源泉',
+        frontText: '放下执念，让夜晚拥抱疲惫的灵魂',
+        backText: '安眠，是对今日最好的告别',
         action: { type: 'startTimer', activityId: 'sleep_act', categoryId: 'sleep' }
-      },
-      { 
-        id: '16', 
-        type: 'checklist', 
-        title: '整理床铺', 
-        frontText: '为舒适的睡眠做好准备',
-        backText: '完成了！整洁的环境带来安心的睡眠',
-        action: { type: 'toggleCheck', checkItemId: 'manual_2' }
       },
     ]
   }
