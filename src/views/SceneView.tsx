@@ -674,6 +674,7 @@ export const SceneView: React.FC<SceneViewProps> = ({
                   key={card.id}
                   data={cardWithStatus}
                   dailyReviews={dailyReviews}
+                  logs={logs}
                   onAction={handleCardAction}
                 />
               );

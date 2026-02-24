@@ -4,8 +4,8 @@
  */
 import React, { useState, useRef } from 'react';
 import { Check, ChevronRight, Clock, CheckSquare, FileText, ListTodo, BarChart3 } from 'lucide-react';
-import { SceneCardData, DailyReview } from '../types';
-import { CheckItemStreakBadge } from './CheckItemStreakBadge';
+import { SceneCardData, DailyReview, Log } from '../types';
+import { CardStatsBadge } from './CardStatsBadge';
 
 // 莫兰迪色系默认颜色映射
 const DEFAULT_COLORS = {
@@ -19,11 +19,12 @@ const DEFAULT_COLORS = {
 
 interface SceneCardProps {
   data: SceneCardData;
-  dailyReviews?: DailyReview[]; // 用于计算日课坚持天数
+  dailyReviews?: DailyReview[];
+  logs?: Log[]; // 用于计算计时和待办的时长统计
   onAction?: (action: SceneCardData['action'], autoEnterFocus?: boolean) => void;
 }
 
-export const SceneCard: React.FC<SceneCardProps> = ({ data, dailyReviews = [], onAction }) => {
+export const SceneCard: React.FC<SceneCardProps> = ({ data, dailyReviews = [], logs = [], onAction }) => {
   // 获取卡片颜色（优先使用自定义颜色，否则使用默认颜色）
   const cardColor = data.color || DEFAULT_COLORS[data.type];
   // 获取今天的日期字符串（YYYY-MM-DD）
@@ -230,6 +231,7 @@ export const SceneCard: React.FC<SceneCardProps> = ({ data, dailyReviews = [], o
             data={data}
             cardColor={cardColor}
             dailyReviews={dailyReviews}
+            logs={logs}
             isSwiping={isSwiping} 
             swipeProgress={swipeOffset / maxSwipeDistance}
             isClickable={data.type === 'timer' || data.type === 'todo' || data.type === 'navigation'}
@@ -357,10 +359,11 @@ const CardBack: React.FC<{
   data: SceneCardData;
   cardColor: string;
   dailyReviews?: DailyReview[];
+  logs?: Log[];
   isSwiping?: boolean; 
   swipeProgress?: number;
   isClickable?: boolean;
-}> = ({ data, cardColor, dailyReviews = [], isSwiping, swipeProgress = 0, isClickable = false }) => {
+}> = ({ data, cardColor, dailyReviews = [], logs = [], isSwiping, swipeProgress = 0, isClickable = false }) => {
   // 根据卡片颜色获取边框颜色（50%透明度，反面稍深）
   const getBorderColor = () => {
     return `${cardColor}80`; // 80 = 50% opacity in hex
@@ -416,14 +419,34 @@ const CardBack: React.FC<{
         )}
       </div>
       
-      {/* 右下角：日课坚持天数徽章 */}
-      {data.type === 'checklist' && data.checkItemContent && dailyReviews.length > 0 && !isSwiping && (
+      {/* 右下角：统计徽章（日课/计时/待办） */}
+      {!isSwiping && (
         <div className="absolute bottom-4 right-4">
-          <CheckItemStreakBadge
-            checkItemContent={data.checkItemContent}
-            dailyReviews={dailyReviews}
-            color={cardColor}
-          />
+          {data.type === 'checklist' && data.checkItemContent && (
+            <CardStatsBadge
+              type="checklist"
+              color={cardColor}
+              checkItemContent={data.checkItemContent}
+              dailyReviews={dailyReviews}
+            />
+          )}
+          {data.type === 'timer' && data.action.activityId && data.action.categoryId && (
+            <CardStatsBadge
+              type="timer"
+              color={cardColor}
+              activityId={data.action.activityId}
+              categoryId={data.action.categoryId}
+              logs={logs}
+            />
+          )}
+          {data.type === 'todo' && data.action.todoId && (
+            <CardStatsBadge
+              type="todo"
+              color={cardColor}
+              todoId={data.action.todoId}
+              logs={logs}
+            />
+          )}
         </div>
       )}
       
