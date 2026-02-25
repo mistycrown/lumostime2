@@ -79,10 +79,6 @@ export const PieChartView: React.FC<PieChartViewProps> = ({
     }));
 
     return {
-      tooltip: {
-        trigger: 'item',
-        formatter: '{b}: {c}s ({d}%)'
-      },
       legend: {
         show: false
       },
@@ -102,12 +98,8 @@ export const PieChartView: React.FC<PieChartViewProps> = ({
           position: 'center'
         },
         emphasis: {
-          label: {
-            show: true,
-            fontSize: 20,
-            fontWeight: 'bold',
-            formatter: '{b}\n{d}%'
-          }
+          scale: false,
+          scaleSize: 0
         },
         labelLine: {
           show: false
@@ -128,10 +120,6 @@ export const PieChartView: React.FC<PieChartViewProps> = ({
     }));
 
     return {
-      tooltip: {
-        trigger: 'item',
-        formatter: '{b}: {c}s ({d}%)'
-      },
       legend: {
         show: false
       },
@@ -151,12 +139,8 @@ export const PieChartView: React.FC<PieChartViewProps> = ({
           position: 'center'
         },
         emphasis: {
-          label: {
-            show: true,
-            fontSize: 20,
-            fontWeight: 'bold',
-            formatter: '{b}\n{d}%'
-          }
+          scale: false,
+          scaleSize: 0
         },
         labelLine: {
           show: false
@@ -177,10 +161,6 @@ export const PieChartView: React.FC<PieChartViewProps> = ({
     }));
 
     return {
-      tooltip: {
-        trigger: 'item',
-        formatter: '{b}: {c}s ({d}%)'
-      },
       legend: {
         show: false
       },
@@ -200,12 +180,8 @@ export const PieChartView: React.FC<PieChartViewProps> = ({
           position: 'center'
         },
         emphasis: {
-          label: {
-            show: true,
-            fontSize: 20,
-            fontWeight: 'bold',
-            formatter: '{b}\n{d}%'
-          }
+          scale: false,
+          scaleSize: 0
         },
         labelLine: {
           show: false
