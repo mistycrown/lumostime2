@@ -98,6 +98,7 @@ import { NARRATIVE_TEMPLATES } from '../constants';
 import { AISettingsView } from './settings/AISettingsView';
 import { PreferencesSettingsView } from './settings/PreferencesSettingsView';
 import { EmojiSettingsView } from './settings/EmojiSettingsView';
+import { PrincipleLibraryView } from './settings/PrincipleLibraryView';
 import { NarrativeSettingsView } from './settings/NarrativeSettingsView';
 import { NFCSettingsView } from './settings/NFCSettingsView';
 
@@ -194,7 +195,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
     const { autoLinkRules: ctxAutoLinkRules, autoApplyAutoLinkRules, setAutoApplyAutoLinkRules, autoApplyTodoLink, setAutoApplyTodoLink, autoOpenFocusDetail, setAutoOpenFocusDetail, userPersonalInfo: ctxUserPersonalInfo, filters: ctxFilters, customNarrativeTemplates: ctxCustomNarrativeTemplates, useTwemoji, setUseTwemoji } = useSettings();
     const { dailyReviews: ctxDailyReviews, weeklyReviews: ctxWeeklyReviews, monthlyReviews: ctxMonthlyReviews, reviewTemplates: ctxReviewTemplates } = useReview();
 
-    const [activeSubmenu, setActiveSubmenu] = useState<'main' | 'data' | 'cloud' | 's3' | 'ai' | 'preferences' | 'guide' | 'nfc' | 'templates' | 'check_templates' | 'narrative_prompt' | 'auto_record' | 'autolink' | 'obsidian_export' | 'filters' | 'memoir_filter' | 'batch_manage' | 'sponsorship_preview' | 'scene'>('main');
+    const [activeSubmenu, setActiveSubmenu] = useState<'main' | 'data' | 'cloud' | 's3' | 'ai' | 'preferences' | 'guide' | 'nfc' | 'templates' | 'check_templates' | 'narrative_prompt' | 'auto_record' | 'autolink' | 'obsidian_export' | 'filters' | 'memoir_filter' | 'batch_manage' | 'sponsorship_preview' | 'scene' | 'emoji' | 'principle'>('main');
     const [webdavConfig, setWebdavConfig] = useState<WebDAVConfig | null>(null);
     const [s3Config, setS3Config] = useState<S3Config | null>(null);
     // Floating Window State
@@ -458,6 +459,10 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
         const sceneTimeSlotsStr = localStorage.getItem('sceneTimeSlots');
         const sceneTimeSlots = sceneTimeSlotsStr ? JSON.parse(sceneTimeSlotsStr) : [];
         
+        // 从 localStorage 读取原则库
+        const principlesStr = localStorage.getItem('lumostime_principles');
+        const principles = principlesStr ? JSON.parse(principlesStr) : [];
+        
         const localData = {
             logs: ctxLogs,
             todos: ctxTodos,
@@ -475,6 +480,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
             userPersonalInfo: ctxUserPersonalInfo,
             filters: ctxFilters,
             sceneTimeSlots, // 添加场景设置
+            principles, // 添加原则库
             version: '1.0.0',
             timestamp: Date.now()
         };
@@ -751,6 +757,14 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
     if (activeSubmenu === 'emoji') {
         return (
             <EmojiSettingsView
+                onBack={() => setActiveSubmenu('main')}
+            />
+        );
+    }
+
+    if (activeSubmenu === 'principle') {
+        return (
+            <PrincipleLibraryView
                 onBack={() => setActiveSubmenu('main')}
             />
         );
@@ -1033,8 +1047,13 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
                         <MenuItem
                             icon={<Smile size={18} className="text-yellow-500" />}
                             label="Emoji 和 Sticker"
-                            isLast
                             onClick={() => setActiveSubmenu('emoji')}
+                        />
+                        <MenuItem
+                            icon={<BookOpen size={18} className="text-stone-500" />}
+                            label="原则库"
+                            isLast
+                            onClick={() => setActiveSubmenu('principle')}
                         />
                     </div>
                 </div>

@@ -78,6 +78,13 @@ export const useSyncManager = () => {
             if (data.sceneTimeSlots) {
                 localStorage.setItem('sceneTimeSlots', JSON.stringify(data.sceneTimeSlots));
             }
+            
+            // 恢复原则库到 localStorage
+            if (data.principles) {
+                localStorage.setItem('lumostime_principles', JSON.stringify(data.principles));
+                // 触发事件通知原则库页面更新
+                window.dispatchEvent(new Event('principleLibraryChanged'));
+            }
 
             await new Promise(resolve => setTimeout(resolve, 10));
 
@@ -99,11 +106,16 @@ export const useSyncManager = () => {
         const sceneTimeSlotsStr = localStorage.getItem('sceneTimeSlots');
         const sceneTimeSlots = sceneTimeSlotsStr ? JSON.parse(sceneTimeSlotsStr) : [];
         
+        // 从 localStorage 读取原则库
+        const principlesStr = localStorage.getItem('lumostime_principles');
+        const principles = principlesStr ? JSON.parse(principlesStr) : [];
+        
         const localData = {
             logs, todos, categories, todoCategories, scopes, goals,
             autoLinkRules, reviewTemplates, checkTemplates, dailyReviews, weeklyReviews,
             monthlyReviews, customNarrativeTemplates, userPersonalInfo, filters,
             sceneTimeSlots, // 添加场景设置
+            principles, // 添加原则库
             version: '1.0.0',
             timestamp: localDataTimestamp // Use the tracking timestamp
         };

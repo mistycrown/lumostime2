@@ -982,16 +982,35 @@ const CardEditModal: React.FC<{
             <label className="block text-xs sm:text-sm font-medium text-stone-700 mb-1">
               正面文字（可选）
             </label>
+            {card?.type === 'principle' && (
+              <div className="mb-2">
+                <PrincipleSelector
+                  onSelect={(principle) => {
+                    onChange({
+                      ...card,
+                      title: principle.title,
+                      frontText: principle.frontText,
+                      backText: principle.backText
+                    });
+                  }}
+                />
+              </div>
+            )}
             <input
               type="text"
               value={card?.frontText || ''}
               onChange={(e) => onChange({ ...card, frontText: e.target.value })}
               className="w-full px-3 py-2 text-sm border border-stone-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-stone-800"
-              placeholder={card?.type === 'reference' ? '例如：昨日改进' : '现在开始！'}
+              placeholder={card?.type === 'reference' ? '例如：昨日改进' : card?.type === 'principle' ? '例如：痛苦 + 反思 = 进步' : '现在开始！'}
             />
             {card?.type === 'reference' && (
               <p className="text-[10px] sm:text-xs text-stone-500 mt-1">
                 正面显示此文字，反面自动显示引用的答案内容
+              </p>
+            )}
+            {card?.type === 'principle' && (
+              <p className="text-[10px] sm:text-xs text-stone-500 mt-1">
+                可以从原则库中选择，或手动输入
               </p>
             )}
           </div>
@@ -1654,6 +1673,96 @@ const ReferenceSelector: React.FC<{
       <div className="text-[10px] sm:text-xs text-stone-500 bg-stone-50 p-2 rounded-lg">
         引用卡片会动态显示指定来源中某个问题的回答内容。正面显示问题，反面显示回答。
       </div>
+    </div>
+  );
+};
+
+// 原则选择器组件
+const PrincipleSelector: React.FC<{
+  onSelect: (principle: { title: string; frontText: string; backText: string }) => void;
+}> = ({ onSelect }) => {
+  const [principles, setPrinciples] = useState<Array<{ id: string; title: string; frontText: string; backText: string }>>([]);
+  const [isOpen, setIsOpen] = useState(false);
+
+  useEffect(() => {
+    // 加载原则库
+    const loadPrinciples = () => {
+      const stored = localStorage.getItem('lumostime_principles');
+      if (stored) {
+        setPrinciples(JSON.parse(stored));
+      } else {
+        // 如果没有存储，使用默认预设
+        const defaultPrinciples = [
+          {
+            id: 'preset-1',
+            title: '拥抱现实',
+            frontText: '痛苦 + 反思 = 进步',
+            backText: '接受现实，从中学习'
+          },
+          {
+            id: 'preset-2',
+            title: '极度求真',
+            frontText: '真理比正确更重要',
+            backText: '保持开放心态，追求真相'
+          },
+          {
+            id: 'preset-3',
+            title: '五步流程',
+            frontText: '目标 → 问题 → 诊断 → 方案 → 执行',
+            backText: '系统化解决问题'
+          }
+        ];
+        setPrinciples(defaultPrinciples);
+      }
+    };
+
+    loadPrinciples();
+
+    // 监听原则库变化
+    const handlePrincipleChange = () => {
+      loadPrinciples();
+    };
+    window.addEventListener('principleLibraryChanged', handlePrincipleChange);
+    return () => {
+      window.removeEventListener('principleLibraryChanged', handlePrincipleChange);
+    };
+  }, []);
+
+  return (
+    <div className="relative">
+      <button
+        type="button"
+        onClick={() => setIsOpen(!isOpen)}
+        className="w-full px-3 py-2 text-sm border border-stone-300 rounded-lg hover:bg-stone-50 transition-colors flex items-center justify-between"
+      >
+        <span className="text-stone-600">从原则库选择</span>
+        <ChevronRight size={16} className={`text-stone-400 transition-transform ${isOpen ? 'rotate-90' : ''}`} />
+      </button>
+
+      {isOpen && (
+        <div className="absolute z-10 mt-1 w-full bg-white border border-stone-200 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+          {principles.length === 0 ? (
+            <div className="p-3 text-xs text-stone-400 text-center">
+              暂无原则，请先在设置中添加
+            </div>
+          ) : (
+            principles.map((principle) => (
+              <button
+                key={principle.id}
+                type="button"
+                onClick={() => {
+                  onSelect(principle);
+                  setIsOpen(false);
+                }}
+                className="w-full px-3 py-2 text-left hover:bg-stone-50 transition-colors border-b border-stone-100 last:border-b-0"
+              >
+                <div className="text-sm font-medium text-stone-800">{principle.title}</div>
+                <div className="text-xs text-stone-500 mt-0.5 line-clamp-1">{principle.frontText}</div>
+              </button>
+            ))
+          )}
+        </div>
+      )}
     </div>
   );
 };

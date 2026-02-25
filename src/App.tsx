@@ -137,11 +137,16 @@ const AppContent: React.FC = () => {
     const sceneTimeSlotsStr = localStorage.getItem('sceneTimeSlots');
     const sceneTimeSlots = sceneTimeSlotsStr ? JSON.parse(sceneTimeSlotsStr) : [];
     
+    // 从 localStorage 读取原则库
+    const principlesStr = localStorage.getItem('lumostime_principles');
+    const principles = principlesStr ? JSON.parse(principlesStr) : [];
+    
     const data = {
       logs, todos, categories, todoCategories, scopes, goals,
       autoLinkRules, reviewTemplates, checkTemplates, dailyReviews, weeklyReviews,
       monthlyReviews, customNarrativeTemplates, userPersonalInfo, filters,
       sceneTimeSlots, // 添加场景设置
+      principles, // 添加原则库
       version: '1.0.0',
       timestamp: Date.now()
     };
