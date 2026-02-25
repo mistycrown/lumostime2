@@ -48,8 +48,10 @@ export const DEFAULT_SCENE_PRESETS: TimeSlot[] = [
         id: '5', 
         type: 'principle', 
         title: '拥抱现实', 
+        principleSource: 'library',
+        principleId: 'preset-1',
         frontText: '痛苦 + 反思 = 进步',
-        backText: '面对现实，不要逃避问题。每个挫折都是进化的机会，关键在于从中学习和成长。',
+        backText: '接受现实，从中学习',
         action: { type: 'none' }
       },
     ]
@@ -73,8 +75,10 @@ export const DEFAULT_SCENE_PRESETS: TimeSlot[] = [
         id: '7', 
         type: 'principle', 
         title: '极度求真', 
+        principleSource: 'library',
+        principleId: 'preset-2',
         frontText: '真理比正确更重要',
-        backText: '不要让自我妨碍真相。保持开放心态，积极寻求不同意见，勇于承认错误。',
+        backText: '保持开放心态，追求真相',
         action: { type: 'none' }
       },
     ]
@@ -123,8 +127,10 @@ export const DEFAULT_SCENE_PRESETS: TimeSlot[] = [
         id: '11', 
         type: 'principle', 
         title: '五步流程', 
+        principleSource: 'library',
+        principleId: 'preset-3',
         frontText: '目标 → 问题 → 诊断 → 方案 → 执行',
-        backText: '这是实现任何目标的通用公式。每一步都要做到位，不要跳过任何环节。',
+        backText: '系统化解决问题',
         action: { type: 'none' }
       },
     ]

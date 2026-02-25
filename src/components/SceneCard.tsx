@@ -1,4 +1,4 @@
-﻿/**
+﻿﻿﻿﻿﻿﻿﻿﻿/**
  * @file SceneCard.tsx
  * @description 场景卡片组件 - 支持正反面翻转和滑动交互
  */
@@ -28,6 +28,51 @@ interface SceneCardProps {
 export const SceneCard: React.FC<SceneCardProps> = ({ data, dailyReviews = [], logs = [], onAction }) => {
   // 获取卡片颜色（优先使用自定义颜色，否则使用默认颜色）
   const cardColor = data.color || DEFAULT_COLORS[data.type];
+  
+  // 处理原则卡片的内容（支持随机选取和从原则库选择）
+  const [displayData, setDisplayData] = useState(data);
+  
+  React.useEffect(() => {
+    if (data.type === 'principle') {
+      if (data.principleSource === 'random') {
+        // 随机选取模式：从原则库中随机选择一个原则
+        const stored = localStorage.getItem('lumostime_principles');
+        if (stored) {
+          const principles = JSON.parse(stored);
+          if (principles.length > 0) {
+            const randomIndex = Math.floor(Math.random() * principles.length);
+            const randomPrinciple = principles[randomIndex];
+            setDisplayData({
+              ...data,
+              title: randomPrinciple.title,
+              frontText: randomPrinciple.frontText,
+              backText: randomPrinciple.backText
+            });
+            return;
+          }
+        }
+      } else if (data.principleSource === 'library' && data.principleId) {
+        // 从原则库选择模式：根据 principleId 获取原则内容
+        const stored = localStorage.getItem('lumostime_principles');
+        if (stored) {
+          const principles = JSON.parse(stored);
+          const principle = principles.find((p: any) => p.id === data.principleId);
+          if (principle) {
+            setDisplayData({
+              ...data,
+              title: principle.title,
+              frontText: principle.frontText,
+              backText: principle.backText
+            });
+            return;
+          }
+        }
+      }
+    }
+    // 其他情况或手动输入模式，直接使用原始数据
+    setDisplayData(data);
+  }, [data]);
+  
   // 获取今天的日期字符串（YYYY-MM-DD）
   const getTodayDateString = () => {
     const today = new Date();
@@ -226,7 +271,7 @@ export const SceneCard: React.FC<SceneCardProps> = ({ data, dailyReviews = [], l
           className="scene-card-face scene-card-front"
           onClick={handleCardClick}
         >
-          <CardFront data={data} cardColor={cardColor} />
+          <CardFront data={data} displayData={displayData} cardColor={cardColor} />
         </div>
 
         {/* 反面 */}
@@ -237,6 +282,7 @@ export const SceneCard: React.FC<SceneCardProps> = ({ data, dailyReviews = [], l
         >
           <CardBack 
             data={data}
+            displayData={displayData}
             cardColor={cardColor}
             dailyReviews={dailyReviews}
             logs={logs}
@@ -251,7 +297,7 @@ export const SceneCard: React.FC<SceneCardProps> = ({ data, dailyReviews = [], l
 };
 
 // 卡片正面组件
-const CardFront: React.FC<{ data: SceneCardData; cardColor: string }> = ({ data, cardColor }) => {
+const CardFront: React.FC<{ data: SceneCardData; displayData: SceneCardData; cardColor: string }> = ({ data, displayData, cardColor }) => {
   // 根据卡片颜色获取边框颜色（30%透明度）
   const getBorderColor = () => {
     return `${cardColor}4D`; // 4D = 30% opacity in hex
@@ -339,13 +385,13 @@ const CardFront: React.FC<{ data: SceneCardData; cardColor: string }> = ({ data,
       )}
       
       {/* 第二行：正面文字（如果有） */}
-      {data.frontText && (
+      {displayData.frontText && (
         <div className="flex items-center gap-2">
           <div className="flex-shrink-0 flex items-center justify-center">
             {getFrontIcon()}
           </div>
           <p className="text-sm text-stone-600 break-words overflow-wrap-anywhere flex-1 leading-[1.4]">
-            {data.frontText}
+            {displayData.frontText}
           </p>
           {/* 统计卡片：在文字右侧显示统计值 */}
           {data.type === 'stats' && data.statValue && (
@@ -355,7 +401,7 @@ const CardFront: React.FC<{ data: SceneCardData; cardColor: string }> = ({ data,
       )}
       
       {/* 引用卡片：如果没有 frontText，显示引用的问题 */}
-      {data.type === 'reference' && !data.frontText && (
+      {data.type === 'reference' && !displayData.frontText && (
         <div className="flex items-start gap-2">
           <div className="flex-shrink-0 flex items-center justify-center mt-0.5">
             {getFrontIcon()}
@@ -367,7 +413,7 @@ const CardFront: React.FC<{ data: SceneCardData; cardColor: string }> = ({ data,
       )}
       
       {/* 统计卡片：如果没有正面文字，单独显示统计值 */}
-      {data.type === 'stats' && data.statValue && !data.frontText && (
+      {data.type === 'stats' && data.statValue && !displayData.frontText && (
         <div className="flex justify-end">
           <p className="text-base font-bold text-stone-800 whitespace-nowrap">{data.statValue}</p>
         </div>
@@ -379,13 +425,14 @@ const CardFront: React.FC<{ data: SceneCardData; cardColor: string }> = ({ data,
 // 卡片反面组件
 const CardBack: React.FC<{ 
   data: SceneCardData;
+  displayData: SceneCardData;
   cardColor: string;
   dailyReviews?: DailyReview[];
   logs?: Log[];
   isSwiping?: boolean; 
   swipeProgress?: number;
   isClickable?: boolean;
-}> = ({ data, cardColor, dailyReviews = [], logs = [], isSwiping, swipeProgress = 0, isClickable = false }) => {
+}> = ({ data, displayData, cardColor, dailyReviews = [], logs = [], isSwiping, swipeProgress = 0, isClickable = false }) => {
   // 根据卡片颜色获取边框颜色（50%透明度，反面稍深）
   const getBorderColor = () => {
     return `${cardColor}80`; // 80 = 50% opacity in hex
@@ -475,7 +522,7 @@ const CardBack: React.FC<{
       {/* 第一行：标题 */}
       <div className={data.type === 'stats' ? 'mb-2' : 'pr-12 mb-2'}>
         <h3 className="font-bold text-stone-800 text-base leading-tight break-words overflow-wrap-anywhere">
-          {data.title}
+          {displayData.title}
         </h3>
       </div>
       
@@ -515,10 +562,10 @@ const CardBack: React.FC<{
       )}
       
       {/* 第二行：反面文字（如果有） */}
-      {data.backText && data.type !== 'reference' && (
+      {displayData.backText && data.type !== 'reference' && (
         <div className="flex items-end gap-2">
           <p className="text-sm text-stone-600 break-words overflow-wrap-anywhere flex-1 leading-[1.4]">
-            {data.backText}
+            {displayData.backText}
           </p>
           {/* 统计卡片：在文字右侧显示统计值 */}
           {data.type === 'stats' && data.statValue && (
@@ -537,7 +584,7 @@ const CardBack: React.FC<{
       )}
       
       {/* 统计卡片：如果没有反面文字，单独显示统计值 */}
-      {data.type === 'stats' && data.statValue && !data.backText && (
+      {data.type === 'stats' && data.statValue && !displayData.backText && (
         <div className="flex justify-end">
           <p className="text-sm font-bold text-stone-800 whitespace-nowrap">{data.statValue}</p>
         </div>

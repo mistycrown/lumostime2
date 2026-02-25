@@ -3,7 +3,7 @@
  * @description 场景设置页面 - 管理时间段和快捷方式
  */
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, Plus, Trash2, Edit2, Palette, Clock, RotateCcw, ChevronRight, ArrowUp, ArrowDown } from 'lucide-react';
+import { ArrowLeft, Plus, Trash2, Edit2, Palette, Clock, RotateCcw, ChevronRight, ArrowUp, ArrowDown, Check } from 'lucide-react';
 import { TimeSlot, SceneCardData, SceneCardType, Category, TodoItem, TodoCategory, CheckTemplate } from '../types';
 import { CustomSelect } from '../components/CustomSelect';
 import { UIIconSelectorCompact } from '../components/UIIconSelector';
@@ -328,6 +328,11 @@ export const SceneSettingsView: React.FC<SceneSettingsViewProps> = ({ onBack }) 
       // 日课卡片的完成状态
       ...(editingCard.type === 'checklist' && {
         isCompleted: editingCard.isCompleted
+      }),
+      // 保留原则卡片的特有字段
+      ...(editingCard.type === 'principle' && {
+        principleSource: editingCard.principleSource,
+        principleId: editingCard.principleId
       })
     };
 
@@ -565,11 +570,40 @@ export const SceneSettingsView: React.FC<SceneSettingsViewProps> = ({ onBack }) 
                         {associationText && (
                           <p className="text-xs text-stone-500 mb-0.5 line-clamp-1">{associationText}</p>
                         )}
-                        {card.frontText && (
-                          <p className="text-xs text-stone-600 mb-0.5 line-clamp-1">正面：{card.frontText}</p>
-                        )}
-                        {card.backText && (
-                          <p className="text-xs text-stone-600 line-clamp-1">反面：{card.backText}</p>
+                        {/* 原则卡片根据模式显示不同内容 */}
+                        {card.type === 'principle' ? (
+                          <>
+                            {card.principleSource === 'random' ? (
+                              <p className="text-xs text-stone-600 mb-0.5 line-clamp-1">从原则库中随机</p>
+                            ) : card.principleSource === 'library' ? (
+                              <>
+                                {card.frontText && (
+                                  <p className="text-xs text-stone-600 mb-0.5 line-clamp-1">正面：{card.frontText}</p>
+                                )}
+                                {card.backText && (
+                                  <p className="text-xs text-stone-600 line-clamp-1">反面：{card.backText}</p>
+                                )}
+                              </>
+                            ) : (
+                              <>
+                                {card.frontText && (
+                                  <p className="text-xs text-stone-600 mb-0.5 line-clamp-1">正面：{card.frontText}</p>
+                                )}
+                                {card.backText && (
+                                  <p className="text-xs text-stone-600 line-clamp-1">反面：{card.backText}</p>
+                                )}
+                              </>
+                            )}
+                          </>
+                        ) : (
+                          <>
+                            {card.frontText && (
+                              <p className="text-xs text-stone-600 mb-0.5 line-clamp-1">正面：{card.frontText}</p>
+                            )}
+                            {card.backText && (
+                              <p className="text-xs text-stone-600 line-clamp-1">反面：{card.backText}</p>
+                            )}
+                          </>
                         )}
                       </div>
                       <div className="flex items-center gap-1 flex-shrink-0">
@@ -965,6 +999,108 @@ const CardEditModal: React.FC<{
             />
           </div>
 
+          {/* 原则来源选择（仅原则类型） */}
+          {card?.type === 'principle' && (
+            <div>
+              <label className="block text-xs sm:text-sm font-medium text-stone-700 mb-2">
+                原则来源
+              </label>
+              <div className="space-y-2">
+                <button
+                  type="button"
+                  onClick={() => onChange({ 
+                    ...card, 
+                    principleSource: 'library',
+                    frontText: '',
+                    backText: '',
+                    principleId: undefined
+                  })}
+                  className={`w-full text-left p-3 rounded-lg border transition-all ${
+                    card?.principleSource === 'library'
+                      ? 'border-stone-400 bg-stone-50'
+                      : 'border-stone-200 hover:border-stone-300'
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium text-stone-800">从原则库中选择</span>
+                    {card?.principleSource === 'library' && (
+                      <Check size={16} className="text-green-600" />
+                    )}
+                  </div>
+                  <p className="text-xs text-stone-500 mt-1">选择已保存的原则</p>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => onChange({ 
+                    ...card, 
+                    principleSource: 'manual',
+                    principleId: undefined
+                  })}
+                  className={`w-full text-left p-3 rounded-lg border transition-all ${
+                    card?.principleSource === 'manual' || !card?.principleSource
+                      ? 'border-stone-400 bg-stone-50'
+                      : 'border-stone-200 hover:border-stone-300'
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium text-stone-800">手动输入</span>
+                    {(card?.principleSource === 'manual' || !card?.principleSource) && (
+                      <Check size={16} className="text-green-600" />
+                    )}
+                  </div>
+                  <p className="text-xs text-stone-500 mt-1">自定义原则内容</p>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => onChange({ 
+                    ...card, 
+                    principleSource: 'random',
+                    frontText: '',
+                    backText: '',
+                    principleId: undefined
+                  })}
+                  className={`w-full text-left p-3 rounded-lg border transition-all ${
+                    card?.principleSource === 'random'
+                      ? 'border-stone-400 bg-stone-50'
+                      : 'border-stone-200 hover:border-stone-300'
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium text-stone-800">随机选取</span>
+                    {card?.principleSource === 'random' && (
+                      <Check size={16} className="text-green-600" />
+                    )}
+                  </div>
+                  <p className="text-xs text-stone-500 mt-1">每次从原则库中随机选择</p>
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* 从原则库选择（仅当选择了library模式） */}
+          {card?.type === 'principle' && card?.principleSource === 'library' && (
+            <div>
+              <label className="block text-xs sm:text-sm font-medium text-stone-700 mb-2">
+                选择原则
+              </label>
+              <PrincipleLibrarySelector
+                selectedPrincipleId={card?.principleId}
+                onSelect={(principle) => {
+                  onChange({
+                    ...card,
+                    principleId: principle.id,
+                    title: principle.title,
+                    frontText: principle.frontText,
+                    backText: principle.backText
+                  });
+                }}
+              />
+            </div>
+          )}
+
+          {/* 标题（所有类型） */}
           <div>
             <label className="block text-xs sm:text-sm font-medium text-stone-700 mb-1">
               标题
@@ -975,47 +1111,38 @@ const CardEditModal: React.FC<{
               onChange={(e) => onChange({ ...card, title: e.target.value })}
               className="w-full px-3 py-2 text-sm border border-stone-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-stone-800"
               placeholder="例如：洗漱"
+              disabled={card?.type === 'principle' && (card?.principleSource === 'library' || card?.principleSource === 'random')}
             />
-          </div>
-
-          <div>
-            <label className="block text-xs sm:text-sm font-medium text-stone-700 mb-1">
-              正面文字（可选）
-            </label>
-            {card?.type === 'principle' && (
-              <div className="mb-2">
-                <PrincipleSelector
-                  onSelect={(principle) => {
-                    onChange({
-                      ...card,
-                      title: principle.title,
-                      frontText: principle.frontText,
-                      backText: principle.backText
-                    });
-                  }}
-                />
-              </div>
-            )}
-            <input
-              type="text"
-              value={card?.frontText || ''}
-              onChange={(e) => onChange({ ...card, frontText: e.target.value })}
-              className="w-full px-3 py-2 text-sm border border-stone-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-stone-800"
-              placeholder={card?.type === 'reference' ? '例如：昨日改进' : card?.type === 'principle' ? '例如：痛苦 + 反思 = 进步' : '现在开始！'}
-            />
-            {card?.type === 'reference' && (
+            {card?.type === 'principle' && (card?.principleSource === 'library' || card?.principleSource === 'random') && (
               <p className="text-[10px] sm:text-xs text-stone-500 mt-1">
-                正面显示此文字，反面自动显示引用的答案内容
-              </p>
-            )}
-            {card?.type === 'principle' && (
-              <p className="text-[10px] sm:text-xs text-stone-500 mt-1">
-                可以从原则库中选择，或手动输入
+                标题将自动从原则库获取
               </p>
             )}
           </div>
 
-          {card?.type !== 'reference' && (
+          {/* 正面文字（仅手动输入模式或非原则类型） */}
+          {(card?.type !== 'principle' || card?.principleSource === 'manual' || !card?.principleSource) && (
+            <div>
+              <label className="block text-xs sm:text-sm font-medium text-stone-700 mb-1">
+                正面文字（可选）
+              </label>
+              <input
+                type="text"
+                value={card?.frontText || ''}
+                onChange={(e) => onChange({ ...card, frontText: e.target.value })}
+                className="w-full px-3 py-2 text-sm border border-stone-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-stone-800"
+                placeholder={card?.type === 'reference' ? '例如：昨日改进' : card?.type === 'principle' ? '例如：痛苦 + 反思 = 进步' : '现在开始！'}
+              />
+              {card?.type === 'reference' && (
+                <p className="text-[10px] sm:text-xs text-stone-500 mt-1">
+                  正面显示此文字，反面自动显示引用的答案内容
+                </p>
+              )}
+            </div>
+          )}
+
+          {/* 反面文字（仅手动输入模式或非原则/引用类型） */}
+          {card?.type !== 'reference' && (card?.type !== 'principle' || card?.principleSource === 'manual' || !card?.principleSource) && (
             <div>
               <label className="block text-xs sm:text-sm font-medium text-stone-700 mb-1">
                 反面文字（可选）
@@ -1677,7 +1804,95 @@ const ReferenceSelector: React.FC<{
   );
 };
 
-// 原则选择器组件
+// 原则库选择器组件（用于从原则库中选择特定原则）
+const PrincipleLibrarySelector: React.FC<{
+  selectedPrincipleId?: string;
+  onSelect: (principle: { id: string; title: string; frontText: string; backText: string }) => void;
+}> = ({ selectedPrincipleId, onSelect }) => {
+  const [principles, setPrinciples] = useState<Array<{ id: string; title: string; frontText: string; backText: string }>>([]);
+
+  useEffect(() => {
+    // 加载原则库
+    const loadPrinciples = () => {
+      const stored = localStorage.getItem('lumostime_principles');
+      if (stored) {
+        setPrinciples(JSON.parse(stored));
+      } else {
+        // 如果没有存储，使用默认预设
+        const defaultPrinciples = [
+          {
+            id: 'preset-1',
+            title: '拥抱现实',
+            frontText: '痛苦 + 反思 = 进步',
+            backText: '接受现实，从中学习'
+          },
+          {
+            id: 'preset-2',
+            title: '极度求真',
+            frontText: '真理比正确更重要',
+            backText: '保持开放心态，追求真相'
+          },
+          {
+            id: 'preset-3',
+            title: '五步流程',
+            frontText: '目标 → 问题 → 诊断 → 方案 → 执行',
+            backText: '系统化解决问题'
+          }
+        ];
+        setPrinciples(defaultPrinciples);
+      }
+    };
+
+    loadPrinciples();
+
+    // 监听原则库变化
+    const handlePrincipleChange = () => {
+      loadPrinciples();
+    };
+    window.addEventListener('principleLibraryChanged', handlePrincipleChange);
+    return () => {
+      window.removeEventListener('principleLibraryChanged', handlePrincipleChange);
+    };
+  }, []);
+
+  const selectedPrinciple = principles.find(p => p.id === selectedPrincipleId);
+
+  return (
+    <div className="space-y-2">
+      {principles.length === 0 ? (
+        <div className="p-3 text-xs text-stone-400 text-center bg-stone-50 rounded-lg">
+          暂无原则，请先在设置中添加
+        </div>
+      ) : (
+        <>
+          {selectedPrinciple && (
+            <div className="p-3 bg-stone-50 rounded-lg border border-stone-200">
+              <div className="text-sm font-medium text-stone-800 mb-1">{selectedPrinciple.title}</div>
+              <div className="text-xs text-stone-500">{selectedPrinciple.frontText}</div>
+            </div>
+          )}
+          <CustomSelect
+            value={selectedPrincipleId || ''}
+            onChange={(value) => {
+              const principle = principles.find(p => p.id === value);
+              if (principle) {
+                onSelect(principle);
+              }
+            }}
+            options={principles.map(p => ({
+              value: p.id,
+              label: p.title,
+              icon: null
+            }))}
+            placeholder="选择原则"
+          />
+        </>
+      )}
+    </div>
+  );
+};
+
+// 原则选择器组件（已废弃，保留用于兼容）
 const PrincipleSelector: React.FC<{
   onSelect: (principle: { title: string; frontText: string; backText: string }) => void;
 }> = ({ onSelect }) => {

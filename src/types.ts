@@ -239,6 +239,10 @@ export interface SceneCardData {
   referencedQuestion?: string;  // 引用的问题文本
   referencedAnswer?: string;    // 引用的回答内容
   
+  // 原则来源（仅 principle 类型）
+  principleSource?: 'library' | 'manual' | 'random'; // 原则来源：library=从原则库选择，manual=手动输入，random=随机选取
+  principleId?: string; // 原则库中的原则ID（当 principleSource 为 'library' 时使用）
+  
   // 日课状态（仅 checklist 类型）
   isCompleted?: boolean;
   checkItemContent?: string; // 日课内容（用于计算坚持天数）
