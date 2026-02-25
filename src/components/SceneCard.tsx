@@ -35,18 +35,37 @@ export const SceneCard: React.FC<SceneCardProps> = ({ data, dailyReviews = [], l
   React.useEffect(() => {
     if (data.type === 'principle') {
       if (data.principleSource === 'random') {
-        // 随机选取模式：从原则库中随机选择一个原则
+        // 随机选取模式：每天随机选择一个原则
         const stored = localStorage.getItem('lumostime_principles');
         if (stored) {
           const principles = JSON.parse(stored);
           if (principles.length > 0) {
-            const randomIndex = Math.floor(Math.random() * principles.length);
-            const randomPrinciple = principles[randomIndex];
+            // 获取今天的日期
+            const today = getTodayDateString();
+            const cacheKey = `principle_random_${data.id}_${today}`;
+            
+            // 检查是否有今天的缓存
+            const cachedPrincipleId = localStorage.getItem(cacheKey);
+            let selectedPrinciple;
+            
+            if (cachedPrincipleId) {
+              // 使用缓存的原则
+              selectedPrinciple = principles.find((p: any) => p.id === cachedPrincipleId);
+            }
+            
+            // 如果没有缓存或缓存的原则不存在，重新随机选择
+            if (!selectedPrinciple) {
+              const randomIndex = Math.floor(Math.random() * principles.length);
+              selectedPrinciple = principles[randomIndex];
+              // 保存到缓存
+              localStorage.setItem(cacheKey, selectedPrinciple.id);
+            }
+            
             setDisplayData({
               ...data,
-              title: randomPrinciple.title,
-              frontText: randomPrinciple.frontText,
-              backText: randomPrinciple.backText
+              title: selectedPrinciple.title,
+              frontText: selectedPrinciple.frontText,
+              backText: selectedPrinciple.backText
             });
             return;
           }

@@ -43,9 +43,10 @@
   ```
 
 ### 3. 随机选取 (random)
-- **描述**: 每次从原则库中随机选择一个原则
+- **描述**: 每天从原则库中随机选择一个原则
 - **特点**: 
-  - 每次查看卡片时随机选择
+  - 每天随机选择一次，同一天内保持不变
+  - 第二天会重新随机选择新的原则
   - 增加惊喜感和多样性
   - 标题、正面文字、反面文字自动从随机选中的原则获取
 - **适用场景**: 希望每天看到不同原则的场景
@@ -54,9 +55,9 @@
   {
     type: 'principle',
     principleSource: 'random',
-    title: '', // 运行时随机获取
-    frontText: '', // 运行时随机获取
-    backText: '' // 运行时随机获取
+    title: '', // 运行时随机获取（每天一次）
+    frontText: '', // 运行时随机获取（每天一次）
+    backText: '' // 运行时随机获取（每天一次）
   }
   ```
 
@@ -81,18 +82,37 @@ interface SceneCardData {
 React.useEffect(() => {
   if (data.type === 'principle') {
     if (data.principleSource === 'random') {
-      // 随机选取模式：从原则库中随机选择
+      // 随机选取模式：每天随机选择一个原则
       const stored = localStorage.getItem('lumostime_principles');
       if (stored) {
         const principles = JSON.parse(stored);
         if (principles.length > 0) {
-          const randomIndex = Math.floor(Math.random() * principles.length);
-          const randomPrinciple = principles[randomIndex];
+          // 获取今天的日期
+          const today = getTodayDateString();
+          const cacheKey = `principle_random_${data.id}_${today}`;
+          
+          // 检查是否有今天的缓存
+          const cachedPrincipleId = localStorage.getItem(cacheKey);
+          let selectedPrinciple;
+          
+          if (cachedPrincipleId) {
+            // 使用缓存的原则
+            selectedPrinciple = principles.find(p => p.id === cachedPrincipleId);
+          }
+          
+          // 如果没有缓存或缓存的原则不存在，重新随机选择
+          if (!selectedPrinciple) {
+            const randomIndex = Math.floor(Math.random() * principles.length);
+            selectedPrinciple = principles[randomIndex];
+            // 保存到缓存
+            localStorage.setItem(cacheKey, selectedPrinciple.id);
+          }
+          
           setDisplayData({
             ...data,
-            title: randomPrinciple.title,
-            frontText: randomPrinciple.frontText,
-            backText: randomPrinciple.backText
+            title: selectedPrinciple.title,
+            frontText: selectedPrinciple.frontText,
+            backText: selectedPrinciple.backText
           });
           return;
         }
@@ -232,8 +252,9 @@ React.useEffect(() => {
 ## 注意事项
 1. `library` 和 `random` 模式依赖原则库，确保原则库中有内容
 2. 删除原则库中的原则不会影响已创建的卡片（会降级为 manual 模式）
-3. 随机模式每次组件重新渲染时都会重新随机选择
-4. 保存卡片时会正确保存 `principleSource` 和 `principleId` 字段，确保模式设置持久化
+3. 随机模式每天随机选择一次，同一天内保持不变，第二天会重新随机
+4. 随机选择的原则会缓存在 localStorage 中（key 格式：`principle_random_{cardId}_{date}`）
+5. 保存卡片时会正确保存 `principleSource` 和 `principleId` 字段，确保模式设置持久化
 
 ## 实现状态
 ✅ 已完成：

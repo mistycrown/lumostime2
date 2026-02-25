@@ -998,9 +998,55 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
 
             <div className="flex-1 overflow-y-auto p-4 space-y-6 pb-40">
 
-                {/* Section: General */}
+                {/* Section: General - AI & Automation */}
                 <div className="space-y-3">
                     <h3 className="text-[10px] font-bold text-stone-400 uppercase tracking-wider pl-2">通用</h3>
+                    <div className="bg-white rounded-2xl overflow-hidden shadow-[0_2px_10px_rgba(0,0,0,0.03)]">
+                        <MenuItem
+                            icon={<Sparkles size={18} className="text-purple-500" />}
+                            label="AI API"
+                            onClick={() => setActiveSubmenu('ai')}
+                        />
+                        <MenuItem
+                            icon={<Link size={18} className="text-blue-500" />}
+                            label="标签关联领域规则"
+                            isLast
+                            onClick={() => setActiveSubmenu('autolink')}
+                        />
+                    </div>
+                </div>
+
+                {/* Section: Display & Preferences */}
+                <div className="space-y-3">
+                    <h3 className="text-[10px] font-bold text-stone-400 uppercase tracking-wider pl-2">显示与偏好</h3>
+                    <div className="bg-white rounded-2xl overflow-hidden shadow-[0_2px_10px_rgba(0,0,0,0.03)]">
+                        <MenuItem
+                            icon={<Settings size={18} />}
+                            label="偏好设置"
+                            onClick={() => setActiveSubmenu('preferences')}
+                        />
+                        <MenuItem
+                            icon={<Smile size={18} className="text-yellow-500" />}
+                            label="Emoji 和 Sticker"
+                            onClick={() => setActiveSubmenu('emoji')}
+                        />
+                        <MenuItem
+                            icon={<AlignLeft size={18} className="text-purple-500" />}
+                            label="Memoir 筛选条件"
+                            onClick={() => setActiveSubmenu('memoir_filter')}
+                        />
+                        <MenuItem
+                            icon={<LayoutGrid size={18} className="text-blue-500" />}
+                            label="场景设置"
+                            isLast
+                            onClick={() => setActiveSubmenu('scene')}
+                        />
+                    </div>
+                </div>
+
+                {/* Section: Content */}
+                <div className="space-y-3">
+                    <h3 className="text-[10px] font-bold text-stone-400 uppercase tracking-wider pl-2">内容</h3>
                     <div className="bg-white rounded-2xl overflow-hidden shadow-[0_2px_10px_rgba(0,0,0,0.03)]">
                         <MenuItem
                             icon={<Search size={18} className="text-green-500" />}
@@ -1015,41 +1061,6 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
                             onClick={() => setActiveSubmenu('filters')}
                         />
                         <MenuItem
-                            icon={<Sparkles size={18} className="text-purple-500" />}
-                            label="AI API"
-                            onClick={() => setActiveSubmenu('ai')}
-                        />
-                        <MenuItem
-                            icon={<Link size={18} className="text-blue-500" />}
-                            label="标签关联领域规则"
-                            onClick={() => setActiveSubmenu('autolink')}
-                        />
-                        <MenuItem
-                            icon={<Nfc size={18} className="text-orange-500" />}
-                            label="NFC Tags"
-                            onClick={() => setActiveSubmenu('nfc')}
-                        />
-                        <MenuItem
-                            icon={<AlignLeft size={18} className="text-purple-500" />}
-                            label="Memoir 筛选条件"
-                            onClick={() => setActiveSubmenu('memoir_filter')}
-                        />
-                        <MenuItem
-                            icon={<LayoutGrid size={18} className="text-blue-500" />}
-                            label="场景设置"
-                            onClick={() => setActiveSubmenu('scene')}
-                        />
-                        <MenuItem
-                            icon={<Settings size={18} />}
-                            label="偏好设置"
-                            onClick={() => setActiveSubmenu('preferences')}
-                        />
-                        <MenuItem
-                            icon={<Smile size={18} className="text-yellow-500" />}
-                            label="Emoji 和 Sticker"
-                            onClick={() => setActiveSubmenu('emoji')}
-                        />
-                        <MenuItem
                             icon={<BookOpen size={18} className="text-stone-500" />}
                             label="原则库"
                             isLast
@@ -1057,10 +1068,16 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
                         />
                     </div>
                 </div>
+
                 {/* Section: Android Features */}
                 <div className="space-y-3">
                     <h3 className="text-[10px] font-bold text-stone-400 uppercase tracking-wider pl-2">Android 特性</h3>
                     <div className="bg-white rounded-2xl overflow-hidden shadow-[0_2px_10px_rgba(0,0,0,0.03)]">
+                        <MenuItem
+                            icon={<Nfc size={18} className="text-orange-500" />}
+                            label="NFC Tags"
+                            onClick={() => setActiveSubmenu('nfc')}
+                        />
                         <MenuItem
                             icon={<Smartphone size={18} className="text-indigo-500" />}
                             label="应用关联标签规则"
@@ -1117,7 +1134,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
                             onClick={() => setActiveSubmenu('s3')}
                         />
                         <MenuItem
-                            icon={<Database size={18} />}
+                            icon={<FileSpreadsheet size={18} className="text-blue-500" />}
                             label="数据导出导入"
                             isLast={!isElectronEnvironment()}
                             onClick={() => setActiveSubmenu('data')}
