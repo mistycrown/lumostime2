@@ -371,6 +371,7 @@ class ObsidianExportService {
             text += `${sTime}-${eTime} (${mins}m) **[${cat?.name || '未知'}/${act?.name || '未知'}]**${content}`;
 
             if (log.focusScore && log.focusScore > 0) text += ` ⚡️${log.focusScore}`;
+            if (log.moodScore && log.moodScore > 0) text += ` ❤️${log.moodScore}`;
             if (todo) text += ` @${todo.title}`;
             // 只有进度待办才显示进度增量和进度比例
             if (todo?.isProgress) {

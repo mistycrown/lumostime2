@@ -242,6 +242,20 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({ initialTodo, c
   
   const enableFocusScore = hasLogFocusData || linkedActivityFocusEnabled || logActivitiesFocusEnabled;
 
+  // 检查是否应该显示情绪评分
+  const hasLogMoodData = linkedLogs.some(log => log.moodScore !== undefined && log.moodScore > 0);
+  const linkedActivityMoodEnabled = linkedActivity 
+    ? (linkedActivity.enableMoodScore ?? linkedActivityCategory?.enableMoodScore ?? false)
+    : false;
+  
+  const logActivitiesMoodEnabled = linkedLogs.some(log => {
+    const logCategory = categories?.find(c => c.id === log.categoryId);
+    const logActivity = logCategory?.activities.find(a => a.id === log.activityId);
+    return logActivity && (logActivity.enableMoodScore ?? logCategory?.enableMoodScore ?? false);
+  });
+  
+  const enableMoodScore = hasLogMoodData || linkedActivityMoodEnabled || logActivitiesMoodEnabled;
+
   // Unit Heatmap Constants
   const totalSquares = Math.ceil(totalAmount / unitAmount);
   const renderSquares = totalSquares > 3000 ? 3000 : totalSquares;
@@ -537,6 +551,7 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({ initialTodo, c
               coverImage,
             }]}
             enableFocusScore={enableFocusScore}
+            enableMoodScore={enableMoodScore}
             progressTracking={isProgress ? {
               isProgress,
               totalAmount,

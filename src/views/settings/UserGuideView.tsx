@@ -22,6 +22,8 @@ import dataSync from '../../../docs/user-guide/08-data-sync.md?raw';
 // @ts-ignore
 import personalization from '../../../docs/user-guide/09-personalization.md?raw';
 // @ts-ignore
+import sceneSettings from '../../../docs/user-guide/10-scene-settings.md?raw';
+// @ts-ignore
 import timeTrackingMethods from '../../../docs/user-guide/00-time-tracking-methods.md?raw';
 
 interface UserGuideViewProps {
@@ -64,6 +66,7 @@ const guideSections: GuideSection[] = [
     { id: '07', title: '搜索与数据管理', content: search, icon: '🔍' },
     { id: '08', title: '数据同步与导出', content: dataSync, icon: '☁️' },
     { id: '09', title: '个性化设置', content: personalization, icon: '🎨' },
+    { id: '10', title: '场景设置', content: sceneSettings, icon: '🎬' },
 ];
 
 export const UserGuideView: React.FC<UserGuideViewProps> = ({ onBack }) => {
