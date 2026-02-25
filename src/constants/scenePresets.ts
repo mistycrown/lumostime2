@@ -25,7 +25,7 @@ export const DEFAULT_SCENE_PRESETS: TimeSlot[] = [
         type: 'checklist', 
         title: '整理床铺', 
         frontText: '整理空间，也是整理内心',
-        backText: '「外在的秩序，带来内在的平静。」—— 《怦然心动的人生整理魔法》',
+        backText: '外在的秩序，带来内在的平静。',
         action: { type: 'toggleCheck', checkItemId: 'manual_2' }
       },
       { 
@@ -33,7 +33,7 @@ export const DEFAULT_SCENE_PRESETS: TimeSlot[] = [
         type: 'timer', 
         title: '洗漱', 
         frontText: '以洁净之心，迎接清晨的光',
-        backText: '焕然一新，如同晨露洗过的叶片',
+        backText: '焕然一新，给自己打个气！',
         action: { type: 'startTimer', activityId: 'hygiene', categoryId: 'life' }
       },
       { 
@@ -47,10 +47,11 @@ export const DEFAULT_SCENE_PRESETS: TimeSlot[] = [
       { 
         id: '5', 
         type: 'principle', 
-        title: '长期愿景', 
-        principleSource: 'manual',
-        frontText: '在此写下你的长期愿景',
-        backText: '你想成为什么样的人？',
+        title: '在行动中确立主体', 
+        principleSource: 'library',
+        principleId: 'preset-1',
+        frontText: '我想成为什么样的人？',
+        backText: '主体是在行动和时间中确定的，做了这些东西，这成为了我。在行动中，我感受到某种超越表象的、底层的真实秩序向我显现。做一个连接者，承受那些辛苦的劳动，那是世界自我更新的前沿。眼光要看向本体论，手要做最朴素的工作。',
         action: { type: 'none' }
       },
     ]
@@ -73,11 +74,11 @@ export const DEFAULT_SCENE_PRESETS: TimeSlot[] = [
       { 
         id: '7', 
         type: 'principle', 
-        title: '极度求真', 
+        title: '成为情绪的平静观察者', 
         principleSource: 'library',
         principleId: 'preset-2',
-        frontText: '真理比正确更重要',
-        backText: '保持开放心态，追求真相',
+        frontText: '焦虑、烦躁或想要逃避时，是内心的「小我」在制造恐惧。它试图通过驱使你去寻找短暂的快感，来夺取意识的控制权。',
+        backText: '不要与情绪对抗，那只会给它提供能量。退后一步，静静观察这个正在焦躁的自己。当你开始不带评判地注视，喧嚣自然会消散。',
         action: { type: 'none' }
       },
     ]
@@ -125,11 +126,11 @@ export const DEFAULT_SCENE_PRESETS: TimeSlot[] = [
       { 
         id: '11', 
         type: 'principle', 
-        title: '五步流程', 
+        title: '未来决定过去，而非过去决定未来', 
         principleSource: 'library',
         principleId: 'preset-3',
-        frontText: '目标 → 问题 → 诊断 → 方案 → 执行',
-        backText: '系统化解决问题',
+        frontText: '我们常因过去的失败而懊悔，觉得当下的自己是由曾经的经历所塑造的，并因此陷入无力感。',
+        backText: '事情的意义并非在发生时就已注定，而是由你未来的状态所赋予的。不要基于「我过去是个怎样的人」来做当下的选择，而要基于「我想成为的那个未来」去行动。',
         action: { type: 'none' }
       },
     ]
@@ -170,7 +171,7 @@ export const DEFAULT_SCENE_PRESETS: TimeSlot[] = [
         type: 'checklist', 
         title: '写日记/复盘', 
         frontText: '记录，是与自己的对话',
-        backText: '「未经审视的人生不值得过。」—— 苏格拉底',
+        backText: '未经审视的人生不值得过。',
         action: { type: 'toggleCheck', checkItemId: 'manual_3' }
       },
       { 
@@ -178,7 +179,7 @@ export const DEFAULT_SCENE_PRESETS: TimeSlot[] = [
         type: 'navigation', 
         title: '今日回顾', 
         frontText: '回望来时路',
-        backText: '「每一天都是一次小小的人生。」—— 《微习惯》斯蒂芬·盖斯',
+        backText: '每一天都是一次小小的人生。',
         action: { type: 'navigate', targetView: 'daily-review-today' }
       },
       { 
@@ -186,7 +187,7 @@ export const DEFAULT_SCENE_PRESETS: TimeSlot[] = [
         type: 'checklist', 
         title: '感恩三件事', 
         frontText: '在平凡中，发现值得感激的光',
-        backText: '「感恩是通往幸福的最短路径。」—— 《幸福的方法》泰勒·本-沙哈尔',
+        backText: '感恩是通往幸福的最短路径。',
         action: { type: 'toggleCheck', checkItemId: 'manual_4' }
       },
     ]
@@ -215,7 +216,7 @@ export const DEFAULT_SCENE_PRESETS: TimeSlot[] = [
         type: 'stats', 
         title: '今日运动时长', 
         frontText: '身体的觉醒，从规律开始',
-        backText: '「运动不是为了惩罚身体，而是为了庆祝它能做什么。」—— 《运动改造大脑》',
+        backText: '感恩：我拥有健康的身体，我拥有灵活的四肢，我拥有活力和热情。',
         action: { type: 'none' },
         filterActivityIds: ['workout'],
         enableGoal: true,
@@ -226,8 +227,8 @@ export const DEFAULT_SCENE_PRESETS: TimeSlot[] = [
         id: '20', 
         type: 'stats', 
         title: '今日摸鱼时长', 
-        frontText: '偶尔放空，也是生活的一部分',
-        backText: '「适度的休闲，是为了更好地出发。」',
+        frontText: '偶尔放空',
+        backText: '适度的休闲，是为了更好地出发。',
         action: { type: 'none' },
         filterActivityIds: ['chat', 'surf', 'watch', 'game'],
         enableGoal: true,
@@ -239,7 +240,7 @@ export const DEFAULT_SCENE_PRESETS: TimeSlot[] = [
         type: 'navigation', 
         title: '今日统计', 
         frontText: '时间的流向，藏着生命的密码',
-        backText: '「你把时间花在哪里，你就会成为什么样的人。」—— 《奇特的一生》',
+        backText: '你把时间花在哪里，你就会成为什么样的人。',
         action: { type: 'navigate', targetView: 'stats-today' }
       },
       { 

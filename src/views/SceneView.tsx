@@ -13,6 +13,7 @@ import { DEFAULT_SCENE_PRESETS } from '../constants/scenePresets';
 import { useReview } from '../contexts/ReviewContext';
 import { useNavigation } from '../contexts/NavigationContext';
 import { useData } from '../contexts/DataContext';
+import { useToast } from '../contexts/ToastContext';
 
 interface SceneViewProps {
   onConfigureSlots?: () => void;
@@ -31,6 +32,7 @@ export const SceneView: React.FC<SceneViewProps> = ({
 }) => {
   const { dailyReviews, checkTemplates, setDailyReviews, weeklyReviews, setWeeklyReviews, monthlyReviews, setMonthlyReviews } = useReview();
   const { logs, activeSessions } = useData();
+  const { addToast } = useToast();
   const { 
     setCurrentView, 
     setIsDailyReviewOpen, 
@@ -354,6 +356,8 @@ export const SceneView: React.FC<SceneViewProps> = ({
           
           if (activity && category) {
             onStartActivity(activity, category.id, autoEnterFocus);
+          } else {
+            addToast('error', '找不到对应的活动，可能已被删除');
           }
         }
         break;
@@ -363,6 +367,8 @@ export const SceneView: React.FC<SceneViewProps> = ({
           
           if (todo) {
             onStartTodoFocus(todo, autoEnterFocus);
+          } else {
+            addToast('error', '找不到对应的待办，可能已被删除');
           }
         }
         break;
@@ -427,6 +433,7 @@ export const SceneView: React.FC<SceneViewProps> = ({
 
     if (checkItemIndex === -1) {
       console.warn('未找到对应的日课项:', checkItemId);
+      addToast('error', '找不到对应的日课，可能已被删除或未启用');
       return;
     }
 

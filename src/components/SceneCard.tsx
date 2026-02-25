@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿/**
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿/**
  * @file SceneCard.tsx
  * @description 场景卡片组件 - 支持正反面翻转和滑动交互
  */
@@ -339,6 +339,14 @@ const CardFront: React.FC<{ data: SceneCardData; displayData: SceneCardData; car
     return `${cardColor}4D`; // 4D = 30% opacity in hex
   };
 
+  // 根据文字长度获取字号
+  const getFontSize = (text: string) => {
+    const length = text.length;
+    if (length <= 20) return 'text-sm'; // 短文本 (14px)
+    if (length <= 50) return 'text-[13px]'; // 中等文本 (13px)
+    return 'text-xs'; // 长文本 (12px)
+  };
+
   // 根据卡片颜色获取图标
   const getFrontIcon = () => {
     const iconProps = { size: 14, style: { color: cardColor } };
@@ -426,7 +434,7 @@ const CardFront: React.FC<{ data: SceneCardData; displayData: SceneCardData; car
           <div className="flex-shrink-0 flex items-center justify-center">
             {getFrontIcon()}
           </div>
-          <p className="text-sm text-stone-600 break-words overflow-wrap-anywhere flex-1 leading-[1.4]">
+          <p className={`${getFontSize(displayData.frontText)} text-stone-600 break-words overflow-wrap-anywhere flex-1 leading-[1.4]`}>
             {displayData.frontText}
           </p>
           {/* 统计卡片：在文字右侧显示统计值 */}
@@ -442,7 +450,7 @@ const CardFront: React.FC<{ data: SceneCardData; displayData: SceneCardData; car
           <div className="flex-shrink-0 flex items-center justify-center mt-0.5">
             {getFrontIcon()}
           </div>
-          <p className="text-sm text-stone-600 break-words overflow-wrap-anywhere flex-1 leading-[1.4]">
+          <p className={`${getFontSize(data.referencedQuestion || data.action.fallbackText || '暂无引用内容')} text-stone-600 break-words overflow-wrap-anywhere flex-1 leading-[1.4]`}>
             {data.referencedQuestion || data.action.fallbackText || '暂无引用内容'}
           </p>
         </div>
@@ -472,6 +480,14 @@ const CardBack: React.FC<{
   // 根据卡片颜色获取边框颜色（50%透明度，反面稍深）
   const getBorderColor = () => {
     return `${cardColor}80`; // 80 = 50% opacity in hex
+  };
+
+  // 根据文字长度获取字号
+  const getFontSize = (text: string) => {
+    const length = text.length;
+    if (length <= 20) return 'text-sm'; // 短文本 (14px)
+    if (length <= 50) return 'text-[13px]'; // 中等文本 (13px)
+    return 'text-xs'; // 长文本 (12px)
   };
 
   // 根据卡片类型获取图标和背景色
@@ -600,7 +616,7 @@ const CardBack: React.FC<{
       {/* 第二行：反面文字（如果有） */}
       {displayData.backText && data.type !== 'reference' && (
         <div className="flex items-end gap-2">
-          <p className="text-sm text-stone-600 break-words overflow-wrap-anywhere flex-1 leading-[1.4]">
+          <p className={`${getFontSize(displayData.backText)} text-stone-600 break-words overflow-wrap-anywhere flex-1 leading-[1.4]`}>
             {displayData.backText}
           </p>
           {/* 统计卡片：在文字右侧显示统计值 */}
@@ -613,7 +629,7 @@ const CardBack: React.FC<{
       {/* 引用卡片：显示引用的回答 */}
       {data.type === 'reference' && (
         <div className="flex items-start gap-2 pr-8">
-          <p className="text-sm text-stone-700 break-words overflow-wrap-anywhere flex-1 leading-[1.4]">
+          <p className={`${getFontSize(data.referencedAnswer || data.action.fallbackText || '暂无回答内容')} text-stone-700 break-words overflow-wrap-anywhere flex-1 leading-[1.4]`}>
             {data.referencedAnswer || data.action.fallbackText || '暂无回答内容'}
           </p>
         </div>
