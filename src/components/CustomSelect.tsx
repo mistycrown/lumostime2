@@ -17,6 +17,7 @@ interface CustomSelectProps {
   onChange: (value: string) => void;
   placeholder?: string;
   className?: string;
+  dropdownPosition?: 'auto' | 'top' | 'bottom'; // 新增：下拉框位置
 }
 
 export const CustomSelect: React.FC<CustomSelectProps> = ({
@@ -24,12 +25,32 @@ export const CustomSelect: React.FC<CustomSelectProps> = ({
   options,
   onChange,
   placeholder = '请选择',
-  className = ''
+  className = '',
+  dropdownPosition = 'auto'
 }) => {
   const [isOpen, setIsOpen] = useState(false);
+  const [shouldOpenUpward, setShouldOpenUpward] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
   const selectedOption = options.find(opt => opt.value === value);
+
+  // 检测下拉框应该向上还是向下展开
+  useEffect(() => {
+    if (isOpen && dropdownPosition === 'auto' && containerRef.current) {
+      const rect = containerRef.current.getBoundingClientRect();
+      const viewportHeight = window.innerHeight;
+      const spaceBelow = viewportHeight - rect.bottom;
+      const spaceAbove = rect.top;
+      const dropdownHeight = Math.min(options.length * 40 + 16, 240); // 估算下拉框高度
+      
+      // 如果下方空间不足且上方空间更大，则向上展开
+      setShouldOpenUpward(spaceBelow < dropdownHeight && spaceAbove > spaceBelow);
+    } else if (dropdownPosition === 'top') {
+      setShouldOpenUpward(true);
+    } else if (dropdownPosition === 'bottom') {
+      setShouldOpenUpward(false);
+    }
+  }, [isOpen, options.length, dropdownPosition]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -72,7 +93,13 @@ export const CustomSelect: React.FC<CustomSelectProps> = ({
       </button>
 
       {isOpen && (
-        <div className="absolute z-50 w-full mt-1 bg-white border border-stone-200 rounded-xl shadow-lg overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
+        <div 
+          className={`absolute z-50 w-full bg-white border border-stone-200 rounded-xl shadow-lg overflow-hidden animate-in fade-in duration-200 ${
+            shouldOpenUpward 
+              ? 'bottom-full mb-1 slide-in-from-bottom-2' 
+              : 'top-full mt-1 slide-in-from-top-2'
+          }`}
+        >
           <div className="max-h-60 overflow-y-auto">
             {options.map((option) => (
               <button

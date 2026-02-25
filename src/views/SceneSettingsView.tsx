@@ -987,22 +987,29 @@ const CardEditModal: React.FC<{
               value={card?.frontText || ''}
               onChange={(e) => onChange({ ...card, frontText: e.target.value })}
               className="w-full px-3 py-2 text-sm border border-stone-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-stone-800"
-              placeholder="现在开始！"
+              placeholder={card?.type === 'reference' ? '例如：昨日改进' : '现在开始！'}
             />
+            {card?.type === 'reference' && (
+              <p className="text-[10px] sm:text-xs text-stone-500 mt-1">
+                正面显示此文字，反面自动显示引用的答案内容
+              </p>
+            )}
           </div>
 
-          <div>
-            <label className="block text-xs sm:text-sm font-medium text-stone-700 mb-1">
-              反面文字（可选）
-            </label>
-            <input
-              type="text"
-              value={card?.backText || ''}
-              onChange={(e) => onChange({ ...card, backText: e.target.value })}
-              className="w-full px-3 py-2 text-sm border border-stone-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-stone-800"
-              placeholder="完成了！"
-            />
-          </div>
+          {card?.type !== 'reference' && (
+            <div>
+              <label className="block text-xs sm:text-sm font-medium text-stone-700 mb-1">
+                反面文字（可选）
+              </label>
+              <input
+                type="text"
+                value={card?.backText || ''}
+                onChange={(e) => onChange({ ...card, backText: e.target.value })}
+                className="w-full px-3 py-2 text-sm border border-stone-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-stone-800"
+                placeholder="完成了！"
+              />
+            </div>
+          )}
 
           {/* 颜色选择器 */}
           <div>
@@ -1143,9 +1150,21 @@ const CardEditModal: React.FC<{
           )}
 
           {card?.type === 'reference' && (
-            <div className="p-3 bg-stone-50 rounded-lg text-xs sm:text-sm text-stone-600">
-              提示：引用卡片将在后续版本中实现
-            </div>
+            <ReferenceSelector
+              sourceType={card?.action?.sourceType}
+              dateOffset={card?.action?.dateOffset}
+              questionId={card?.action?.questionId}
+              fallbackText={card?.action?.fallbackText}
+              onChange={(config) => {
+                onChange({
+                  ...card,
+                  action: {
+                    type: 'reference',
+                    ...config
+                  }
+                });
+              }}
+            />
           )}
 
           {card?.type === 'stats' && (
@@ -1496,6 +1515,144 @@ const StatsSelector: React.FC<StatsSelectorProps> = ({
 
       <div className="text-[10px] sm:text-xs text-stone-500 bg-stone-50 p-2 rounded-lg">
         此卡片将显示今日指定标签的总时长。{enableGoal ? '通过进度条展示目标完成情况。' : '正面显示当前时长，反面显示完成提示。'}
+      </div>
+    </div>
+  );
+};
+
+
+// 引用选择器组件
+const ReferenceSelector: React.FC<{
+  sourceType?: 'dailyReview' | 'weeklyReview' | 'monthlyReview';
+  dateOffset?: 'today' | 'yesterday' | 'thisWeek' | 'lastWeek' | 'thisMonth' | 'lastMonth';
+  questionId?: string;
+  fallbackText?: string;
+  onChange: (config: {
+    sourceType: 'dailyReview' | 'weeklyReview' | 'monthlyReview';
+    dateOffset: 'today' | 'yesterday' | 'thisWeek' | 'lastWeek' | 'thisMonth' | 'lastMonth';
+    questionId: string;
+    fallbackText?: string;
+  }) => void;
+}> = ({ sourceType, dateOffset, questionId, fallbackText, onChange }) => {
+  const { reviewTemplates } = useReview();
+  
+  // 引用来源选项
+  const sourceOptions = [
+    { value: 'dailyReview-today', label: '今日回顾', sourceType: 'dailyReview' as const, dateOffset: 'today' as const },
+    { value: 'dailyReview-yesterday', label: '昨日回顾', sourceType: 'dailyReview' as const, dateOffset: 'yesterday' as const },
+    { value: 'weeklyReview-thisWeek', label: '本周回顾', sourceType: 'weeklyReview' as const, dateOffset: 'thisWeek' as const },
+    { value: 'weeklyReview-lastWeek', label: '上周回顾', sourceType: 'weeklyReview' as const, dateOffset: 'lastWeek' as const },
+    { value: 'monthlyReview-thisMonth', label: '本月回顾', sourceType: 'monthlyReview' as const, dateOffset: 'thisMonth' as const },
+    { value: 'monthlyReview-lastMonth', label: '上月回顾', sourceType: 'monthlyReview' as const, dateOffset: 'lastMonth' as const },
+  ];
+  
+  // 当前选中的来源
+  const currentSourceValue = sourceType && dateOffset ? `${sourceType}-${dateOffset}` : '';
+  
+  // 获取当前来源类型对应的问题列表
+  const getQuestionOptions = () => {
+    if (!sourceType) return [];
+    
+    // 根据来源类型筛选对应的模板
+    const filteredTemplates = reviewTemplates.filter(template => {
+      if (sourceType === 'dailyReview') {
+        return template.isDailyTemplate === true;
+      } else if (sourceType === 'weeklyReview') {
+        return template.isWeeklyTemplate === true;
+      } else if (sourceType === 'monthlyReview') {
+        return template.isMonthlyTemplate === true;
+      }
+      return false;
+    });
+    
+    // 收集所有问题
+    const questions: { value: string; label: string }[] = [];
+    
+    filteredTemplates.forEach(template => {
+      template.questions.forEach(q => {
+        questions.push({
+          value: q.id,
+          label: q.question
+        });
+      });
+    });
+    
+    return questions;
+  };
+  
+  const questionOptions = getQuestionOptions();
+  
+  return (
+    <div className="space-y-3">
+      <div>
+        <label className="block text-xs sm:text-sm font-medium text-stone-700 mb-2">
+          引用来源
+        </label>
+        <CustomSelect
+          value={currentSourceValue}
+          onChange={(value) => {
+            const selected = sourceOptions.find(opt => opt.value === value);
+            if (selected) {
+              onChange({
+                sourceType: selected.sourceType,
+                dateOffset: selected.dateOffset,
+                questionId: questionId || '',
+                fallbackText
+              });
+            }
+          }}
+          options={sourceOptions}
+        />
+      </div>
+      
+      {sourceType && questionOptions.length > 0 && (
+        <div>
+          <label className="block text-xs sm:text-sm font-medium text-stone-700 mb-2">
+            引用问题
+          </label>
+          <CustomSelect
+            value={questionId || ''}
+            onChange={(value) => {
+              onChange({
+                sourceType,
+                dateOffset: dateOffset || 'today',
+                questionId: value,
+                fallbackText
+              });
+            }}
+            options={questionOptions}
+            dropdownPosition="top"
+          />
+        </div>
+      )}
+      
+      {sourceType && questionId && (
+        <div>
+          <label className="block text-xs sm:text-sm font-medium text-stone-700 mb-2">
+            空状态提示（可选）
+          </label>
+          <input
+            type="text"
+            value={fallbackText || ''}
+            onChange={(e) => {
+              onChange({
+                sourceType,
+                dateOffset: dateOffset || 'today',
+                questionId,
+                fallbackText: e.target.value
+              });
+            }}
+            placeholder="这里空空如也"
+            className="w-full px-3 py-2 text-xs sm:text-sm border border-stone-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-stone-400"
+          />
+          <p className="text-[10px] sm:text-xs text-stone-500 mt-1">
+            当找不到引用内容时显示的提示文字
+          </p>
+        </div>
+      )}
+      
+      <div className="text-[10px] sm:text-xs text-stone-500 bg-stone-50 p-2 rounded-lg">
+        引用卡片会动态显示指定来源中某个问题的回答内容。正面显示问题，反面显示回答。
       </div>
     </div>
   );

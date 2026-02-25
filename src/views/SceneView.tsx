@@ -123,13 +123,44 @@ export const SceneView: React.FC<SceneViewProps> = ({
     return 0; // 默认返回第一个
   };
 
-  // 自动切换到当前时间段 - 仅在首次加载时执行
+  // 自动切换到当前时间段 - 在首次加载和页面可见性变化时执行
   useEffect(() => {
     if (timeSlots.length > 0) {
       setSelectedSlotIndex(getCurrentTimeSlotIndex());
     }
+    
+    // 监听页面可见性变化（切换标签页、最小化窗口等）
+    const handleVisibilityChange = () => {
+      if (!document.hidden && timeSlots.length > 0) {
+        setSelectedSlotIndex(getCurrentTimeSlotIndex());
+      }
+    };
+    
+    // 监听窗口获得焦点（切回应用）
+    const handleFocus = () => {
+      if (timeSlots.length > 0) {
+        setSelectedSlotIndex(getCurrentTimeSlotIndex());
+      }
+    };
+    
+    // 监听记录页面激活事件（从其他标签切回记录标签）
+    const handleRecordViewActivated = () => {
+      if (timeSlots.length > 0) {
+        setSelectedSlotIndex(getCurrentTimeSlotIndex());
+      }
+    };
+    
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('focus', handleFocus);
+    window.addEventListener('recordViewActivated', handleRecordViewActivated);
+    
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('focus', handleFocus);
+      window.removeEventListener('recordViewActivated', handleRecordViewActivated);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // 空依赖数组，仅在组件挂载时执行一次
+  }, [timeSlots]); // 依赖 timeSlots，当时间段配置变化时也重新检测
 
   const currentSlot = timeSlots[selectedSlotIndex];
   const currentCards = currentSlot?.cards || [];
@@ -162,6 +193,81 @@ export const SceneView: React.FC<SceneViewProps> = ({
     } else {
       return `${mins}m`;
     }
+  };
+
+  // 查询引用卡片的内容
+  const getReferencedContent = (
+    sourceType: 'dailyReview' | 'weeklyReview' | 'monthlyReview',
+    dateOffset: 'today' | 'yesterday' | 'thisWeek' | 'lastWeek' | 'thisMonth' | 'lastMonth',
+    questionId: string
+  ): { question: string; answer: string } | null => {
+    // 计算目标日期
+    const getTargetDate = (): string => {
+      const today = new Date();
+      
+      if (sourceType === 'dailyReview') {
+        if (dateOffset === 'today') {
+          return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+        } else if (dateOffset === 'yesterday') {
+          const yesterday = new Date(today);
+          yesterday.setDate(yesterday.getDate() - 1);
+          return `${yesterday.getFullYear()}-${String(yesterday.getMonth() + 1).padStart(2, '0')}-${String(yesterday.getDate()).padStart(2, '0')}`;
+        }
+      } else if (sourceType === 'weeklyReview') {
+        // 获取本周或上周的第一天（周一）
+        const dayOfWeek = today.getDay();
+        const diff = dayOfWeek === 0 ? -6 : 1 - dayOfWeek; // 周日特殊处理
+        const monday = new Date(today);
+        monday.setDate(today.getDate() + diff);
+        
+        if (dateOffset === 'lastWeek') {
+          monday.setDate(monday.getDate() - 7);
+        }
+        
+        return `${monday.getFullYear()}-${String(monday.getMonth() + 1).padStart(2, '0')}-${String(monday.getDate()).padStart(2, '0')}`;
+      } else if (sourceType === 'monthlyReview') {
+        // 获取本月或上月的第一天
+        let year = today.getFullYear();
+        let month = today.getMonth() + 1;
+        
+        if (dateOffset === 'lastMonth') {
+          month -= 1;
+          if (month === 0) {
+            month = 12;
+            year -= 1;
+          }
+        }
+        
+        return `${year}-${String(month).padStart(2, '0')}-01`;
+      }
+      
+      return '';
+    };
+    
+    const targetDate = getTargetDate();
+    if (!targetDate) return null;
+    
+    // 查找对应的回顾
+    let review: DailyReview | WeeklyReview | MonthlyReview | undefined;
+    
+    if (sourceType === 'dailyReview') {
+      review = dailyReviews.find(r => r.date === targetDate);
+    } else if (sourceType === 'weeklyReview') {
+      review = weeklyReviews.find(r => r.weekStartDate === targetDate);
+    } else if (sourceType === 'monthlyReview') {
+      review = monthlyReviews.find(r => r.monthStartDate === targetDate);
+    }
+    
+    if (!review) return null;
+    
+    // 查找对应的问题和答案
+    const answer = review.answers.find(a => a.questionId === questionId);
+    if (!answer) return null;
+    
+    return {
+      question: answer.question,
+      answer: answer.answer
+    };
   };
 
   // 计算统计卡片的时长（返回分钟数）
@@ -667,6 +773,30 @@ export const SceneView: React.FC<SceneViewProps> = ({
                   statValue,
                   statMinutes // 添加分钟数用于进度条计算
                 };
+              }
+              
+              // 如果是引用卡片，查询引用内容
+              if (card.type === 'reference' && card.action.type === 'reference') {
+                const { sourceType, dateOffset, questionId, fallbackText } = card.action;
+                
+                if (sourceType && dateOffset && questionId) {
+                  const referenced = getReferencedContent(sourceType, dateOffset, questionId);
+                  
+                  if (referenced) {
+                    cardWithStatus = {
+                      ...cardWithStatus,
+                      referencedQuestion: referenced.question,
+                      referencedAnswer: referenced.answer
+                    };
+                  } else {
+                    // 找不到内容时使用 fallback
+                    cardWithStatus = {
+                      ...cardWithStatus,
+                      referencedQuestion: fallbackText || '这里空空如也',
+                      referencedAnswer: fallbackText || '这里空空如也'
+                    };
+                  }
+                }
               }
               
               return (

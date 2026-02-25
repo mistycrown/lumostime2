@@ -41,6 +41,9 @@ export const RecordViewContainer: React.FC<RecordViewContainerProps> = ({
     if (currentView === AppView.RECORD) {
       const defaultMode = defaultRecordView === 'SCENE' ? 'scenes' : 'tags';
       setViewMode(defaultMode);
+      
+      // 触发一个自定义事件，通知 SceneView 重新检测时间
+      window.dispatchEvent(new CustomEvent('recordViewActivated'));
     }
   }, [currentView, defaultRecordView]);
 

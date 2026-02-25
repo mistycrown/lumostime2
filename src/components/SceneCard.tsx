@@ -339,7 +339,7 @@ const CardFront: React.FC<{ data: SceneCardData; cardColor: string }> = ({ data,
       )}
       
       {/* 第二行：正面文字（如果有） */}
-      {data.frontText && data.type !== 'reference' && (
+      {data.frontText && (
         <div className="flex items-center gap-2">
           <div className="flex-shrink-0 flex items-center justify-center">
             {getFrontIcon()}
@@ -354,8 +354,8 @@ const CardFront: React.FC<{ data: SceneCardData; cardColor: string }> = ({ data,
         </div>
       )}
       
-      {/* 引用卡片：显示引用的问题 */}
-      {data.type === 'reference' && (
+      {/* 引用卡片：如果没有 frontText，显示引用的问题 */}
+      {data.type === 'reference' && !data.frontText && (
         <div className="flex items-start gap-2">
           <div className="flex-shrink-0 flex items-center justify-center mt-0.5">
             {getFrontIcon()}
