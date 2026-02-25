@@ -717,12 +717,17 @@ const SlotEditModal: React.FC<{
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-2xl p-4 sm:p-6 w-full max-w-md max-h-[90vh] overflow-y-auto">
-        <h2 className="text-lg sm:text-xl font-bold mb-4">
-          {slot?.id ? '编辑时间段' : '添加时间段'}
-        </h2>
+      <div className="bg-white rounded-2xl w-full max-w-md max-h-[90vh] flex flex-col">
+        {/* 标题 */}
+        <div className="p-4 sm:p-6 pb-3 border-b border-stone-200">
+          <h2 className="text-lg sm:text-xl font-bold">
+            {slot?.id ? '编辑时间段' : '添加时间段'}
+          </h2>
+        </div>
 
-        <div className="space-y-3 sm:space-y-4">
+        {/* 内容区域 - 可滚动 */}
+        <div className="flex-1 overflow-y-auto p-4 sm:p-6">
+          <div className="space-y-3 sm:space-y-4">
           <div>
             <label className="block text-xs sm:text-sm font-medium text-stone-700 mb-1">
               名称
@@ -862,8 +867,10 @@ const SlotEditModal: React.FC<{
             </div>
           </div>
         </div>
+      </div>
 
-        <div className="flex gap-2 sm:gap-3 mt-4 sm:mt-6">
+      {/* 底部按钮 - 固定 */}
+      <div className="flex gap-2 sm:gap-3 p-4 sm:p-6 pt-3 border-t border-stone-200">
           <button
             onClick={onCancel}
             className="flex-1 px-4 py-2 text-sm border border-stone-300 rounded-lg hover:bg-stone-50 transition-colors"
@@ -982,12 +989,17 @@ const CardEditModal: React.FC<{
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-2xl p-4 sm:p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto">
-        <h2 className="text-lg sm:text-xl font-bold mb-4">
-          {card?.id ? '编辑快捷方式' : '添加快捷方式'}
-        </h2>
+      <div className="bg-white rounded-2xl w-full max-w-lg max-h-[90vh] flex flex-col">
+        {/* 标题 */}
+        <div className="p-4 sm:p-6 pb-3 border-b border-stone-200">
+          <h2 className="text-lg sm:text-xl font-bold">
+            {card?.id ? '编辑快捷方式' : '添加快捷方式'}
+          </h2>
+        </div>
 
-        <div className="space-y-3 sm:space-y-4">
+        {/* 内容区域 - 可滚动 */}
+        <div className="flex-1 overflow-y-auto p-4 sm:p-6">
+          <div className="space-y-3 sm:space-y-4">
           <div>
             <label className="block text-xs sm:text-sm font-medium text-stone-700 mb-1">
               类型
@@ -1380,8 +1392,10 @@ const CardEditModal: React.FC<{
             />
           )}
         </div>
+      </div>
 
-        <div className="flex gap-2 sm:gap-3 mt-4 sm:mt-6">
+      {/* 底部按钮 - 固定 */}
+      <div className="flex gap-2 sm:gap-3 p-4 sm:p-6 pt-3 border-t border-stone-200">
           <button
             onClick={onCancel}
             className="flex-1 px-4 py-2 text-sm border border-stone-300 rounded-lg hover:bg-stone-50 transition-colors"

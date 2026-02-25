@@ -596,13 +596,26 @@ export const DailyReviewView: React.FC<DailyReviewViewProps> = ({
                                         groupedItems[cat].push(item);
                                     });
 
-                                    return Object.entries(groupedItems).map(([category, items]) => (
+                                    return Object.entries(groupedItems).map(([category, items]) => {
+                                        // 获取该分组第一个条目的 icon（用于分组标题）
+                                        const categoryIcon = items[0]?.icon;
+                                        const categoryUiIcon = items[0]?.uiIcon;
+                                        
+                                        return (
                                         <div key={category} className="space-y-2">
                                             {/* Category Header */}
                                             {category !== '默认' && items.length > 0 && (
                                                 <div className="flex items-center justify-between border-b border-stone-200 pb-1 mb-2">
                                                     <h3 className="text-sm font-bold text-stone-900 font-serif">
-                                                        {category}
+                                                        {(categoryIcon || categoryUiIcon) && (
+                                                            <IconRenderer 
+                                                                icon={categoryIcon || ''} 
+                                                                uiIcon={categoryUiIcon}
+                                                                size={14}
+                                                                className="inline-block align-middle mr-1"
+                                                            />
+                                                        )}
+                                                        <span className="align-middle">{category}</span>
                                                     </h3>
                                                     {/* syncToTimeline toggle */}
                                                     <button
@@ -637,7 +650,7 @@ export const DailyReviewView: React.FC<DailyReviewViewProps> = ({
                                                     >
                                                         {/* Checkbox: Black/White, small, aligned */}
                                                         <button
-                                                            className={`mt-[5px] w-4 h-4 rounded-full border flex items-center justify-center transition-all shrink-0 pointer-events-none ${
+                                                            className={`mt-[3px] w-4 h-4 rounded-full border flex items-center justify-center transition-all shrink-0 pointer-events-none ${
                                                                 item.type === 'auto' 
                                                                     ? item.isCompleted
                                                                         ? 'bg-blue-600 border-blue-600 text-white'
@@ -651,18 +664,17 @@ export const DailyReviewView: React.FC<DailyReviewViewProps> = ({
                                                         </button>
 
                                                         <div className="flex-1 min-w-0 flex items-start gap-2">
-                                                            {/* Icon */}
-                                                            {(item.icon || item.uiIcon) && (
-                                                                <span className="shrink-0 mt-[2px]">
+                                                            {/* Icon and Text in same container */}
+                                                            <p className={`flex-1 text-[15px] font-serif leading-relaxed transition-all ${item.isCompleted ? 'text-stone-400 line-through decoration-stone-300' : 'text-stone-900'}`}>
+                                                                {(item.icon || item.uiIcon) && (
                                                                     <IconRenderer 
                                                                         icon={item.icon || ''} 
                                                                         uiIcon={item.uiIcon}
                                                                         size={14}
+                                                                        className="inline-block align-middle mr-1"
                                                                     />
-                                                                </span>
-                                                            )}
-                                                            <p className={`flex-1 text-[15px] font-serif leading-relaxed transition-all ${item.isCompleted ? 'text-stone-400 line-through decoration-stone-300' : 'text-stone-900'}`}>
-                                                                {item.content}
+                                                                )}
+                                                                <span className="align-middle">{item.content}</span>
                                                             </p>
                                                             <CheckItemStreakBadge
                                                                 checkItemContent={item.content}
@@ -674,7 +686,8 @@ export const DailyReviewView: React.FC<DailyReviewViewProps> = ({
                                                 ))}
                                             </div>
                                         </div>
-                                    ));
+                                        );
+                                    });
                                 })()}
                             </div>
                         )}

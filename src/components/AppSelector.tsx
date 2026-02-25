@@ -22,9 +22,6 @@ export const AppSelector: React.FC<AppSelectorProps> = ({
   const [apps, setApps] = useState<InstalledApp[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
-  const [manualPackageName, setManualPackageName] = useState('');
-  const [manualAppName, setManualAppName] = useState('');
-  const [showManualInput, setShowManualInput] = useState(false);
 
   useEffect(() => {
     loadApps();
@@ -54,13 +51,6 @@ export const AppSelector: React.FC<AppSelectorProps> = ({
   const handleSelectApp = (app: InstalledApp) => {
     onSelect(app.packageName, app.appName);
     onClose();
-  };
-
-  const handleManualSubmit = () => {
-    if (manualPackageName.trim() && manualAppName.trim()) {
-      onSelect(manualPackageName.trim(), manualAppName.trim());
-      onClose();
-    }
   };
 
   return (
@@ -103,89 +93,33 @@ export const AppSelector: React.FC<AppSelectorProps> = ({
           ) : apps.length === 0 ? (
             <div className="text-center py-12">
               <Smartphone className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-              <p className="text-gray-500 mb-4">无法获取应用列表</p>
-              <button
-                onClick={() => setShowManualInput(true)}
-                className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
-              >
-                手动输入应用信息
-              </button>
+              <p className="text-gray-500">无法获取应用列表</p>
             </div>
           ) : (
-            <>
-              <div className="grid gap-2 mb-4">
-                {filteredApps.map((app) => (
-                  <button
-                    key={app.packageName}
-                    onClick={() => handleSelectApp(app)}
-                    className={`flex items-center gap-3 p-3 rounded-lg border-2 transition-all hover:bg-gray-50 ${
-                      selectedPackageName === app.packageName
-                        ? 'border-blue-500 bg-blue-50'
-                        : 'border-gray-200'
-                    }`}
-                  >
-                    {app.icon ? (
-                      <img src={app.icon} alt={app.appName} className="w-10 h-10 rounded-lg" />
-                    ) : (
-                      <div className="w-10 h-10 rounded-lg bg-gray-200 flex items-center justify-center">
-                        <Smartphone className="w-6 h-6 text-gray-400" />
-                      </div>
-                    )}
-                    <div className="flex-1 text-left">
-                      <div className="font-medium">{app.appName}</div>
-                      <div className="text-sm text-gray-500">{app.packageName}</div>
+            <div className="grid gap-2">
+              {filteredApps.map((app) => (
+                <button
+                  key={app.packageName}
+                  onClick={() => handleSelectApp(app)}
+                  className={`flex items-center gap-3 p-3 rounded-lg border-2 transition-all hover:bg-gray-50 ${
+                    selectedPackageName === app.packageName
+                      ? 'border-blue-500 bg-blue-50'
+                      : 'border-gray-200'
+                  }`}
+                >
+                  {app.icon ? (
+                    <img src={app.icon} alt={app.appName} className="w-10 h-10 rounded-lg flex-shrink-0" />
+                  ) : (
+                    <div className="w-10 h-10 rounded-lg bg-gray-200 flex items-center justify-center flex-shrink-0">
+                      <Smartphone className="w-6 h-6 text-gray-400" />
                     </div>
-                  </button>
-                ))}
-              </div>
-
-              {/* 手动输入选项 */}
-              <button
-                onClick={() => setShowManualInput(!showManualInput)}
-                className="w-full py-2 text-sm text-blue-500 hover:text-blue-600 transition-colors"
-              >
-                {showManualInput ? '隐藏手动输入' : '找不到应用？手动输入'}
-              </button>
-            </>
-          )}
-
-          {/* 手动输入表单 */}
-          {showManualInput && (
-            <div className="mt-4 p-4 bg-gray-50 rounded-lg space-y-3">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  应用名称
-                </label>
-                <input
-                  type="text"
-                  value={manualAppName}
-                  onChange={(e) => setManualAppName(e.target.value)}
-                  placeholder="例如：背单词"
-                  className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  应用包名 (Android)
-                </label>
-                <input
-                  type="text"
-                  value={manualPackageName}
-                  onChange={(e) => setManualPackageName(e.target.value)}
-                  placeholder="例如：com.example.app"
-                  className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-                <p className="text-xs text-gray-500 mt-1">
-                  请输入应用的完整包名
-                </p>
-              </div>
-              <button
-                onClick={handleManualSubmit}
-                disabled={!manualPackageName.trim() || !manualAppName.trim()}
-                className="w-full py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed"
-              >
-                确认
-              </button>
+                  )}
+                  <div className="flex-1 text-left min-w-0">
+                    <div className="font-medium truncate">{app.appName}</div>
+                    <div className="text-sm text-gray-500 truncate">{app.packageName}</div>
+                  </div>
+                </button>
+              ))}
             </div>
           )}
         </div>
@@ -194,7 +128,7 @@ export const AppSelector: React.FC<AppSelectorProps> = ({
         {selectedPackageName && (
           <div className="p-4 border-t bg-gray-50">
             <div className="flex items-center justify-between">
-              <div className="text-sm text-gray-600">
+              <div className="text-sm text-gray-600 truncate flex-1 mr-4">
                 已选择: <span className="font-medium">{selectedAppName}</span>
               </div>
               <button
@@ -202,7 +136,7 @@ export const AppSelector: React.FC<AppSelectorProps> = ({
                   onSelect('', '');
                   onClose();
                 }}
-                className="text-sm text-red-500 hover:text-red-600"
+                className="text-sm text-red-500 hover:text-red-600 flex-shrink-0"
               >
                 清除选择
               </button>
