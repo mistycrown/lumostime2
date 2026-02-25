@@ -389,7 +389,7 @@ const CardFront: React.FC<{ data: SceneCardData; displayData: SceneCardData; car
       {/* 第一行：名称 */}
       <div className={data.type === 'stats' ? 'mb-2' : 'pr-12 mb-2'}>
         <h3 className="font-bold text-stone-800 text-base leading-tight break-words overflow-wrap-anywhere">
-          {data.title}
+          {displayData.title}
         </h3>
       </div>
       

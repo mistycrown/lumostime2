@@ -1,18 +1,21 @@
 /**
  * @file backgroundService.ts
  * @input Background image files, DOM elements
- * @output Background display operations, Custom background management
+ * @output Background display operations, Custom background management, Status bar updates
  * @pos Service (UI Customization)
- * @description 背景图片管理服务 - 支持预设背景和自定义背景图片，直接操作 DOM 元素
+ * @description 背景图片管理服务 - 支持预设背景和自定义背景图片，直接操作 DOM 元素，并自动更新状态栏样式
  * 
  * 核心功能：
  * - 预设背景图片管理
  * - 自定义背景上传和存储
  * - DOM 元素背景样式应用
  * - 背景图片删除和清理
+ * - 根据背景自动调整状态栏样式
  * 
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
+
+import { statusBarService } from './statusBarService';
 
 export interface BackgroundOption {
     id: string;
@@ -302,6 +305,9 @@ class BackgroundService {
 
         // 立即应用背景到所有目标元素
         this.applyBackgroundToElements();
+        
+        // 更新状态栏样式
+        this.updateStatusBar();
     }
 
     /**
@@ -327,6 +333,9 @@ class BackgroundService {
 
         // 立即应用透明度到所有目标元素
         this.applyBackgroundToElements();
+        
+        // 更新状态栏样式
+        this.updateStatusBar();
     }
 
     /**
@@ -341,6 +350,21 @@ class BackgroundService {
         const currentId = this.getCurrentBackground();
         const allBackgrounds = this.getAllBackgrounds();
         return allBackgrounds.find(bg => bg.id === currentId) || null;
+    }
+
+    /**
+     * 更新状态栏样式以匹配当前背景
+     */
+    private async updateStatusBar(): Promise<void> {
+        const background = this.getCurrentBackgroundOption();
+        
+        if (!background || background.id === 'default') {
+            // 默认背景，使用浅色状态栏
+            await statusBarService.updateForBackground(null);
+        } else {
+            // 使用背景图片URL更新状态栏
+            await statusBarService.updateForBackground(background.url);
+        }
     }
 
     /**
@@ -457,6 +481,12 @@ class BackgroundService {
      */
     init(): void {
         const currentBackground = this.getCurrentBackground();
+
+        // 初始化状态栏服务
+        statusBarService.init().then(() => {
+            // 状态栏初始化完成后，根据当前背景更新状态栏
+            this.updateStatusBar();
+        });
 
         // 延迟执行确保DOM已经准备好
         setTimeout(() => {

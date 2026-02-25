@@ -313,7 +313,8 @@ export const SceneSettingsView: React.FC<SceneSettingsViewProps> = ({ onBack }) 
     const newCard: SceneCardData = {
       id: editingCard.id || `card-${Date.now()}`,
       type: editingCard.type,
-      title: editingCard.title,
+      // 对于随机选取模式，标题可以为空，会在渲染时从原则库中获取
+      title: editingCard.title || '',
       frontText: editingCard.frontText || '现在开始！',
       backText: editingCard.backText || '完成了！',
       action: editingCard.action || { type: 'none' },
@@ -1123,25 +1124,27 @@ const CardEditModal: React.FC<{
             </div>
           )}
 
-          {/* 标题（所有类型） */}
-          <div>
-            <label className="block text-xs sm:text-sm font-medium text-stone-700 mb-1">
-              标题
-            </label>
-            <input
-              type="text"
-              value={card?.title || ''}
-              onChange={(e) => onChange({ ...card, title: e.target.value })}
-              className="w-full px-3 py-2 text-sm border border-stone-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-stone-800"
-              placeholder="例如：洗漱"
-              disabled={card?.type === 'principle' && (card?.principleSource === 'library' || card?.principleSource === 'random')}
-            />
-            {card?.type === 'principle' && (card?.principleSource === 'library' || card?.principleSource === 'random') && (
-              <p className="text-[10px] sm:text-xs text-stone-500 mt-1">
-                标题将自动从原则库获取
-              </p>
-            )}
-          </div>
+          {/* 标题（所有类型，但随机选取模式下隐藏） */}
+          {!(card?.type === 'principle' && card?.principleSource === 'random') && (
+            <div>
+              <label className="block text-xs sm:text-sm font-medium text-stone-700 mb-1">
+                标题
+              </label>
+              <input
+                type="text"
+                value={card?.title || ''}
+                onChange={(e) => onChange({ ...card, title: e.target.value })}
+                className="w-full px-3 py-2 text-sm border border-stone-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-stone-800"
+                placeholder="例如：洗漱"
+                disabled={card?.type === 'principle' && card?.principleSource === 'library'}
+              />
+              {card?.type === 'principle' && card?.principleSource === 'library' && (
+                <p className="text-[10px] sm:text-xs text-stone-500 mt-1">
+                  标题将自动从原则库获取
+                </p>
+              )}
+            </div>
+          )}
 
           {/* 正面文字（仅手动输入模式或非原则类型） */}
           {(card?.type !== 'principle' || card?.principleSource === 'manual' || !card?.principleSource) && (

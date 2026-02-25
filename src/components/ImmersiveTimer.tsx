@@ -11,6 +11,8 @@ import { ImmersiveSelectorModal } from './ImmersiveSelectorModal';
 import { FlipClock } from './FlipClock';
 import { Capacitor } from '@capacitor/core';
 import { StatusBar, Style } from '@capacitor/status-bar';
+import { backgroundService } from '../services/backgroundService';
+import { statusBarService } from '../services/statusBarService';
 
 // Theme configurations with complete visual styles
 const THEMES = [
@@ -236,7 +238,7 @@ export const ImmersiveTimer: React.FC<ImmersiveTimerProps> = ({ elapsed, onExit 
 
         setStatusBarStyle();
 
-        // Cleanup: restore default status bar on unmount
+        // Cleanup: restore status bar based on current background
         return () => {
             if (Capacitor.getPlatform() === 'android' || Capacitor.getPlatform() === 'ios') {
                 if (Capacitor.getPlatform() === 'android') {
@@ -246,7 +248,13 @@ export const ImmersiveTimer: React.FC<ImmersiveTimerProps> = ({ elapsed, onExit 
                         })
                         .catch(() => {});
                 }
-                StatusBar.setStyle({ style: Style.Light }).catch(() => {});
+                // 恢复到背景服务管理的状态栏样式
+                const background = backgroundService.getCurrentBackgroundOption();
+                if (background && background.id !== 'default') {
+                    statusBarService.updateForBackground(background.url).catch(() => {});
+                } else {
+                    StatusBar.setStyle({ style: Style.Light }).catch(() => {});
+                }
             }
         };
     }, [currentTheme]);
