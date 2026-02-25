@@ -542,7 +542,7 @@ const CardBack: React.FC<{
         cursor: isClickable ? 'pointer' : 'default'
       }}
     >
-      {/* 右上角完成按钮、滑动提示或统计值 */}
+      {/* 右上角完成按钮或滑动提示 */}
       <div className="absolute top-4 right-4">
         {isSwiping ? (
           <p className="text-xs text-stone-400 whitespace-nowrap">{getSwipeHintText()}</p>
@@ -555,37 +555,6 @@ const CardBack: React.FC<{
           </div>
         )}
       </div>
-      
-      {/* 右下角：统计徽章（日课/计时/待办） */}
-      {!isSwiping && (
-        <div className="absolute bottom-4 right-4">
-          {data.type === 'checklist' && data.checkItemContent && (
-            <CardStatsBadge
-              type="checklist"
-              color={cardColor}
-              checkItemContent={data.checkItemContent}
-              dailyReviews={dailyReviews}
-            />
-          )}
-          {data.type === 'timer' && data.action.activityId && data.action.categoryId && (
-            <CardStatsBadge
-              type="timer"
-              color={cardColor}
-              activityId={data.action.activityId}
-              categoryId={data.action.categoryId}
-              logs={logs}
-            />
-          )}
-          {data.type === 'todo' && data.action.todoId && (
-            <CardStatsBadge
-              type="todo"
-              color={cardColor}
-              todoId={data.action.todoId}
-              logs={logs}
-            />
-          )}
-        </div>
-      )}
       
       {/* 第一行：标题 */}
       <div className={data.type === 'stats' ? 'mb-2' : 'pr-12 mb-2'}>
@@ -637,7 +606,43 @@ const CardBack: React.FC<{
           </p>
           {/* 统计卡片：在文字右侧显示统计值 */}
           {data.type === 'stats' && data.statValue && (
-            <p className="text-sm font-bold text-stone-800 whitespace-nowrap">{data.statValue}</p>
+            <p className="text-sm font-bold text-stone-800 whitespace-nowrap ml-2">{data.statValue}</p>
+          )}
+          {/* 计时/待办/日课卡片：在文字右侧显示统计徽章 */}
+          {!isSwiping && (
+            <>
+              {data.type === 'checklist' && data.checkItemContent && (
+                <div className="ml-2">
+                  <CardStatsBadge
+                    type="checklist"
+                    color={cardColor}
+                    checkItemContent={data.checkItemContent}
+                    dailyReviews={dailyReviews}
+                  />
+                </div>
+              )}
+              {data.type === 'timer' && data.action.activityId && data.action.categoryId && (
+                <div className="ml-2">
+                  <CardStatsBadge
+                    type="timer"
+                    color={cardColor}
+                    activityId={data.action.activityId}
+                    categoryId={data.action.categoryId}
+                    logs={logs}
+                  />
+                </div>
+              )}
+              {data.type === 'todo' && data.action.todoId && (
+                <div className="ml-2">
+                  <CardStatsBadge
+                    type="todo"
+                    color={cardColor}
+                    todoId={data.action.todoId}
+                    logs={logs}
+                  />
+                </div>
+              )}
+            </>
           )}
         </div>
       )}
