@@ -72,6 +72,8 @@ export const SceneSettingsView: React.FC<SceneSettingsViewProps> = ({ onBack }) 
   const saveTimeSlots = (slots: TimeSlot[]) => {
     setTimeSlots(slots);
     localStorage.setItem('sceneTimeSlots', JSON.stringify(slots));
+    // 触发自定义事件，通知其他组件数据已更新
+    window.dispatchEvent(new Event('sceneTimeSlotsUpdated'));
   };
 
   // 获取卡片关联信息的描述
@@ -300,7 +302,10 @@ export const SceneSettingsView: React.FC<SceneSettingsViewProps> = ({ onBack }) 
 
   // 添加/编辑快捷方式
   const handleSaveCard = () => {
-    if (!selectedSlotId || !editingCard || !editingCard.title || !editingCard.type) {
+    // 对于原则类型的随机选取模式，标题不是必填的
+    const isTitleRequired = !(editingCard?.type === 'principle' && editingCard?.principleSource === 'random');
+    
+    if (!selectedSlotId || !editingCard || !editingCard.type || (isTitleRequired && !editingCard.title)) {
       addToast('error', '请填写完整信息');
       return;
     }
@@ -315,8 +320,9 @@ export const SceneSettingsView: React.FC<SceneSettingsViewProps> = ({ onBack }) 
       // 保存颜色字段
       ...(editingCard.color && { color: editingCard.color }),
       // 保存自动进入沉浸式计时字段（timer 和 todo 类型）
+      // 注意：即使是 false 也要保存，不能用 && 判断
       ...((editingCard.type === 'timer' || editingCard.type === 'todo') && {
-        autoEnterFocus: editingCard.autoEnterFocus
+        autoEnterFocus: editingCard.autoEnterFocus ?? false
       }),
       // 保留统计卡片的特有字段
       ...(editingCard.type === 'stats' && {

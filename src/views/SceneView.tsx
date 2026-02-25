@@ -60,18 +60,43 @@ export const SceneView: React.FC<SceneViewProps> = ({
 
   // 加载时间段数据
   useEffect(() => {
-    const saved = localStorage.getItem('sceneTimeSlots');
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        setTimeSlots(parsed);
-      } catch (e) {
-        console.error('Failed to parse scene time slots:', e);
+    const loadTimeSlots = () => {
+      const saved = localStorage.getItem('sceneTimeSlots');
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved);
+          setTimeSlots(parsed);
+        } catch (e) {
+          console.error('Failed to parse scene time slots:', e);
+          setTimeSlots(DEFAULT_SCENE_PRESETS);
+        }
+      } else {
         setTimeSlots(DEFAULT_SCENE_PRESETS);
       }
-    } else {
-      setTimeSlots(DEFAULT_SCENE_PRESETS);
-    }
+    };
+
+    // 初始加载
+    loadTimeSlots();
+
+    // 监听 storage 事件，当其他标签页或场景设置页面修改数据时重新加载
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === 'sceneTimeSlots') {
+        loadTimeSlots();
+      }
+    };
+
+    // 监听自定义事件，当同一页面内修改数据时重新加载
+    const handleSceneUpdate = () => {
+      loadTimeSlots();
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+    window.addEventListener('sceneTimeSlotsUpdated', handleSceneUpdate);
+
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+      window.removeEventListener('sceneTimeSlotsUpdated', handleSceneUpdate);
+    };
   }, []);
 
   // 背景更新逻辑 - 仅在首次加载时执行

@@ -219,13 +219,12 @@ const AppContent: React.FC = () => {
   
   // Wrappers for Session Actions to match original signature (injecting autoLinkRules)
   const handleStartActivityWrapper = (activity: any, categoryId: string, todoId?: string, scopeIdOrIds?: string | string[], note?: string, autoEnterFocus?: boolean) => {
+    // 如果明确指定了 autoEnterFocus，使用指定的值；否则使用全局设置
     const shouldAutoOpen = autoEnterFocus !== undefined ? autoEnterFocus : autoOpenFocusDetail;
     
     if (shouldAutoOpen) {
       setShouldAutoOpenFocus(true);
-      if (autoEnterFocus) {
-        setShouldAutoEnterImmersive(true);
-      }
+      setShouldAutoEnterImmersive(true);
     }
     
     startActivity(activity, categoryId, autoLinkRules, todoId, scopeIdOrIds, note);
