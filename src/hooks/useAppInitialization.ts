@@ -132,6 +132,25 @@ export const useAppInitialization = () => {
         initFont();
     }, []);
 
+    // Initialize principle library with default presets
+    useEffect(() => {
+        const initPrincipleLibrary = () => {
+            try {
+                const stored = localStorage.getItem('lumostime_principles');
+                if (!stored) {
+                    // 如果原则库为空，加载默认预设
+                    import('../constants/principlePresets').then(({ DEFAULT_PRINCIPLE_PRESETS }) => {
+                        localStorage.setItem('lumostime_principles', JSON.stringify(DEFAULT_PRINCIPLE_PRESETS));
+                        console.log('📚 Principle library initialized with default presets');
+                    });
+                }
+            } catch (error) {
+                console.error('❌ Principle library initialization failed:', error);
+            }
+        };
+        initPrincipleLibrary();
+    }, []);
+
     // Initialize Edge-to-Edge support for Android
     useEffect(() => {
         const initEdgeToEdge = async () => {

@@ -26,8 +26,10 @@ export const PrincipleLibraryView: React.FC<PrincipleLibraryViewProps> = ({ onBa
         if (stored) {
             return JSON.parse(stored);
         }
-        // 首次加载，使用默认预设
-        return [...DEFAULT_PRINCIPLE_PRESETS];
+        // 首次加载，使用默认预设并立即保存到 localStorage
+        const defaultPrinciples = [...DEFAULT_PRINCIPLE_PRESETS];
+        localStorage.setItem('lumostime_principles', JSON.stringify(defaultPrinciples));
+        return defaultPrinciples;
     });
 
     const [isCreating, setIsCreating] = useState(false);
@@ -142,7 +144,7 @@ export const PrincipleLibraryView: React.FC<PrincipleLibraryViewProps> = ({ onBa
                 {/* 说明 */}
                 <div className="bg-white rounded-xl p-4 shadow-sm">
                     <p className="text-xs text-stone-500">
-                        原则库用于存储核心原则，这些原则可以在场景中的原则卡片中引用。每个原则包含标题、正面文字和反面文字。
+                        原则库用于存储需要时时自己确认的核心原则，这些原则可以在场景中的原则卡片中引用。
                     </p>
                 </div>
 

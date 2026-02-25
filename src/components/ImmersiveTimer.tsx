@@ -200,6 +200,9 @@ export const ImmersiveTimer: React.FC<ImmersiveTimerProps> = ({ elapsed, onExit 
             }
 
             try {
+                // 沉浸式模式：设置状态栏为不透明，使用主题颜色
+                await StatusBar.setOverlaysWebView({ overlay: false });
+                
                 // Map theme gradients to actual colors
                 const colorMap: Record<string, string> = {
                     'from-stone-100': '#f5f5f4',
@@ -238,17 +241,22 @@ export const ImmersiveTimer: React.FC<ImmersiveTimerProps> = ({ elapsed, onExit 
 
         setStatusBarStyle();
 
-        // Cleanup: restore status bar based on current background
+        // Cleanup: 恢复透明状态栏并根据背景调整图标颜色
         return () => {
             if (Capacitor.getPlatform() === 'android' || Capacitor.getPlatform() === 'ios') {
+                // 恢复透明状态栏
+                StatusBar.setOverlaysWebView({ overlay: true }).catch(() => {});
+                
                 if (Capacitor.getPlatform() === 'android') {
                     import('@capawesome/capacitor-android-edge-to-edge-support')
                         .then(({ EdgeToEdge }) => {
-                            EdgeToEdge.setBackgroundColor({ color: '#ffffff' }).catch(() => {});
+                            // 恢复透明背景
+                            EdgeToEdge.setBackgroundColor({ color: '#00000000' }).catch(() => {});
                         })
                         .catch(() => {});
                 }
-                // 恢复到背景服务管理的状态栏样式
+                
+                // 恢复到背景服务管理的图标样式
                 const background = backgroundService.getCurrentBackgroundOption();
                 if (background && background.id !== 'default') {
                     statusBarService.updateForBackground(background.url).catch(() => {});

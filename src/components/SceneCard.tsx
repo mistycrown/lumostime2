@@ -71,6 +71,14 @@ export const SceneCard: React.FC<SceneCardProps> = ({ data, dailyReviews = [], l
             return;
           }
         }
+        // 如果原则库为空，显示提示信息
+        setDisplayData({
+          ...data,
+          title: data.title || '随机原则',
+          frontText: '原则库为空，请先添加原则',
+          backText: '请在设置中添加原则'
+        });
+        return;
       } else if (data.principleSource === 'library' && data.principleId) {
         // 从原则库选择模式：根据 principleId 获取原则内容
         const stored = localStorage.getItem('lumostime_principles');
@@ -87,6 +95,14 @@ export const SceneCard: React.FC<SceneCardProps> = ({ data, dailyReviews = [], l
             return;
           }
         }
+        // 如果找不到对应的原则，显示提示信息
+        setDisplayData({
+          ...data,
+          title: data.title || '原则',
+          frontText: '原则不存在',
+          backText: '请重新选择原则'
+        });
+        return;
       }
     }
     // 其他情况或手动输入模式，直接使用原始数据
@@ -430,8 +446,8 @@ const CardFront: React.FC<{ data: SceneCardData; displayData: SceneCardData; car
       
       {/* 第二行：正面文字（如果有） */}
       {displayData.frontText && (
-        <div className="flex items-center gap-2">
-          <div className="flex-shrink-0 flex items-center justify-center">
+        <div className="flex items-start gap-2">
+          <div className="flex-shrink-0 flex items-center justify-center mt-[3px]">
             {getFrontIcon()}
           </div>
           <p className={`${getFontSize(displayData.frontText)} text-stone-600 break-words overflow-wrap-anywhere flex-1 leading-[1.4]`}>

@@ -315,8 +315,13 @@ export const SceneSettingsView: React.FC<SceneSettingsViewProps> = ({ onBack }) 
       type: editingCard.type,
       // 对于随机选取模式，标题可以为空，会在渲染时从原则库中获取
       title: editingCard.title || '',
-      frontText: editingCard.frontText || '现在开始！',
-      backText: editingCard.backText || '完成了！',
+      // 对于原则类型的随机选取或从库选择模式，frontText 和 backText 应该为空，会在渲染时从原则库中获取
+      frontText: (editingCard.type === 'principle' && (editingCard.principleSource === 'random' || editingCard.principleSource === 'library')) 
+        ? '' 
+        : (editingCard.frontText || '现在开始！'),
+      backText: (editingCard.type === 'principle' && (editingCard.principleSource === 'random' || editingCard.principleSource === 'library')) 
+        ? '' 
+        : (editingCard.backText || '完成了！'),
       action: editingCard.action || { type: 'none' },
       // 保存颜色字段
       ...(editingCard.color && { color: editingCard.color }),

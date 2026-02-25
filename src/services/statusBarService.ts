@@ -1,18 +1,28 @@
 /**
  * @file statusBarService.ts
- * @input Background images, StatusBar plugin
- * @output Dynamic status bar styling based on background
+ * @input Background images, StatusBar plugin, EdgeToEdge plugin
+ * @output Transparent status bar with adaptive icon colors
  * @pos Service (UI Customization)
- * @description 状态栏管理服务 - 根据背景图片自动调整状态栏颜色和样式
+ * @description 状态栏管理服务 - 让状态栏背景透明，并根据背景图片自动调整图标颜色
  * 
  * 核心功能：
- * - 分析背景图片的主色调
- * - 根据背景亮度自动调整状态栏样式
- * - 支持自定义状态栏背景色
+ * - 使用 EdgeToEdge 设置状态栏背景为透明
+ * - 分析背景图片顶部区域的亮度
+ * - 根据背景亮度自动调整状态栏图标颜色
  */
 
 import { Capacitor } from '@capacitor/core';
 import { StatusBar, Style } from '@capacitor/status-bar';
+
+// 动态导入 EdgeToEdge 插件（仅 Android）
+let EdgeToEdge: any = null;
+if (Capacitor.getPlatform() === 'android') {
+    try {
+        EdgeToEdge = require('@capawesome/capacitor-android-edge-to-edge-support').EdgeToEdge;
+    } catch (e) {
+        console.warn('EdgeToEdge plugin not available:', e);
+    }
+}
 
 interface ColorAnalysis {
     isDark: boolean;
@@ -25,7 +35,7 @@ class StatusBarService {
     private isInitialized = false;
 
     /**
-     * 初始化状态栏服务
+     * 初始化状态栏服务 - 设置为透明背景
      */
     async init(): Promise<void> {
         if (this.isInitialized) return;
@@ -37,18 +47,32 @@ class StatusBarService {
         }
 
         try {
-            // 设置默认样式
+            // Android: 使用 EdgeToEdge 设置透明状态栏
+            if (platform === 'android' && EdgeToEdge) {
+                // 设置状态栏背景为透明
+                await EdgeToEdge.setStatusBarColor({ color: '#00000000' });
+                console.log('✅ Android: Status bar set to transparent');
+            }
+            
+            // iOS: 使用 setOverlaysWebView
+            if (platform === 'ios') {
+                await StatusBar.setOverlaysWebView({ overlay: true });
+                console.log('✅ iOS: Status bar overlay enabled');
+            }
+            
+            // 设置默认图标样式
             await StatusBar.setStyle({ style: Style.Light });
             this.currentStyle = Style.Light;
+            
             this.isInitialized = true;
-            console.log('✅ StatusBar service initialized');
+            console.log('✅ StatusBar service initialized with transparent background');
         } catch (error) {
             console.error('❌ StatusBar initialization failed:', error);
         }
     }
 
     /**
-     * 分析图片的主色调和亮度
+     * 分析图片顶部区域的亮度
      */
     private async analyzeImage(imageUrl: string): Promise<ColorAnalysis> {
         return new Promise((resolve, reject) => {
@@ -57,7 +81,6 @@ class StatusBarService {
             
             img.onload = () => {
                 try {
-                    // 创建 canvas 来分析图片
                     const canvas = document.createElement('canvas');
                     const ctx = canvas.getContext('2d');
                     
@@ -66,22 +89,21 @@ class StatusBarService {
                         return;
                     }
 
-                    // 只分析图片顶部区域（状态栏所在位置）
+                    // 只分析图片顶部区域（状态栏所在位置，约50-100px）
                     const sampleHeight = Math.min(100, img.height);
                     canvas.width = img.width;
                     canvas.height = sampleHeight;
                     
                     ctx.drawImage(img, 0, 0, img.width, sampleHeight, 0, 0, img.width, sampleHeight);
                     
-                    // 获取像素数据
                     const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
                     const data = imageData.data;
                     
                     let r = 0, g = 0, b = 0;
                     let count = 0;
                     
-                    // 采样像素（每隔10个像素采样一次以提高性能）
-                    for (let i = 0; i < data.length; i += 40) { // RGBA，所以是4的倍数
+                    // 采样像素（每隔10个像素采样一次）
+                    for (let i = 0; i < data.length; i += 40) {
                         r += data[i];
                         g += data[i + 1];
                         b += data[i + 2];
@@ -93,10 +115,10 @@ class StatusBarService {
                     g = Math.round(g / count);
                     b = Math.round(b / count);
                     
-                    // 计算亮度（使用感知亮度公式）
+                    // 计算感知亮度
                     const brightness = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
                     
-                    // 判断是深色还是浅色（阈值为0.5）
+                    // 判断是深色还是浅色
                     const isDark = brightness < 0.5;
                     
                     const dominantColor = `rgb(${r}, ${g}, ${b})`;
@@ -120,7 +142,7 @@ class StatusBarService {
     }
 
     /**
-     * 根据背景图片URL更新状态栏样式
+     * 根据背景图片URL更新状态栏（保持透明背景，调整图标颜色）
      */
     async updateForBackground(backgroundUrl: string | null): Promise<void> {
         const platform = Capacitor.getPlatform();
@@ -129,55 +151,70 @@ class StatusBarService {
         }
 
         try {
-            // 如果没有背景或是默认背景，使用浅色状态栏
+            // 确保状态栏背景保持透明
+            if (platform === 'android' && EdgeToEdge) {
+                await EdgeToEdge.setStatusBarColor({ color: '#00000000' });
+            } else if (platform === 'ios') {
+                await StatusBar.setOverlaysWebView({ overlay: true });
+            }
+            
+            // 如果没有背景或是默认背景，使用深色图标
             if (!backgroundUrl || backgroundUrl === '') {
-                await this.setStyle(Style.Light);
+                await this.setIconStyle(Style.Light);
                 return;
             }
 
             // 分析背景图片
             const analysis = await this.analyzeImage(backgroundUrl);
             
-            // 根据背景亮度设置状态栏样式
-            // 如果背景是深色的，使用浅色图标（Style.Dark）
-            // 如果背景是浅色的，使用深色图标（Style.Light）
+            // 根据背景亮度设置图标颜色
+            // 深色背景 → 浅色图标（白色）
+            // 浅色背景 → 深色图标（黑色）
             const newStyle = analysis.isDark ? Style.Dark : Style.Light;
             
-            await this.setStyle(newStyle);
+            await this.setIconStyle(newStyle);
             
-            console.log(`🎨 StatusBar updated: brightness=${analysis.brightness.toFixed(2)}, style=${newStyle === Style.Dark ? 'Dark' : 'Light'}`);
+            console.log(`🎨 StatusBar updated: brightness=${analysis.brightness.toFixed(2)}, icons=${newStyle === Style.Dark ? 'Light (White)' : 'Dark (Black)'}`);
         } catch (error) {
             console.error('❌ Failed to update status bar for background:', error);
             // 出错时使用默认样式
-            await this.setStyle(Style.Light);
+            await this.setIconStyle(Style.Light);
         }
     }
 
     /**
-     * 设置状态栏样式
+     * 设置状态栏图标样式（保持透明背景）
      */
-    private async setStyle(style: Style): Promise<void> {
+    private async setIconStyle(style: Style): Promise<void> {
         if (this.currentStyle === style) {
-            return; // 避免重复设置
+            return;
         }
 
         try {
             await StatusBar.setStyle({ style });
             this.currentStyle = style;
         } catch (error) {
-            console.error('❌ Failed to set status bar style:', error);
+            console.error('❌ Failed to set status bar icon style:', error);
         }
     }
 
     /**
-     * 重置状态栏为默认样式
+     * 重置状态栏为默认样式（透明背景 + 深色图标）
      */
     async reset(): Promise<void> {
-        await this.setStyle(Style.Light);
+        const platform = Capacitor.getPlatform();
+        
+        if (platform === 'android' && EdgeToEdge) {
+            await EdgeToEdge.setStatusBarColor({ color: '#00000000' });
+        } else if (platform === 'ios') {
+            await StatusBar.setOverlaysWebView({ overlay: true });
+        }
+        
+        await this.setIconStyle(Style.Light);
     }
 
     /**
-     * 获取当前状态栏样式
+     * 获取当前状态栏图标样式
      */
     getCurrentStyle(): Style {
         return this.currentStyle;
