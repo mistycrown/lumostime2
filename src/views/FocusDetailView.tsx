@@ -13,6 +13,7 @@ import { X, Check, ChevronDown, TrendingUp, Plus, Minus, Lightbulb, CheckCircle2
 import { TodoAssociation } from '../components/TodoAssociation';
 import { ScopeAssociation } from '../components/ScopeAssociation';
 import { FocusScoreSelector } from '../components/FocusScoreSelector';
+import { MoodScoreSelector } from '../components/MoodScoreSelector';
 import { ImmersiveTimer } from '../components/ImmersiveTimer';
 import { IconRenderer } from '../components/IconRenderer';
 import { ReactionPicker, ReactionList } from '../components/ReactionComponents';
@@ -490,6 +491,35 @@ export const FocusDetailView: React.FC<FocusDetailViewProps> = ({ session, todos
                                 <FocusScoreSelector
                                     value={session.focusScore}
                                     onChange={(score) => onUpdate({ ...session, focusScore: score || undefined })}
+                                />
+                            </div>
+                        );
+                    }
+                    return null;
+                })()}
+
+                {/* Mood Score Selector */}
+                {(() => {
+                    const currentCategory = categories.find(c => c.id === session.categoryId);
+                    const currentActivity = currentCategory?.activities.find(a => a.id === session.activityId);
+
+                    // Check if should show mood score: activity > category > any associated scope
+                    let shouldShowMood = currentActivity?.enableMoodScore ?? currentCategory?.enableMoodScore;
+
+                    // Also check if any of the selected scopes has enableMoodScore
+                    if (!shouldShowMood && session.scopeIds && session.scopeIds.length > 0) {
+                        shouldShowMood = session.scopeIds.some(sid => {
+                            const scope = scopes.find(s => s.id === sid);
+                            return scope?.enableMoodScore === true;
+                        });
+                    }
+
+                    if (shouldShowMood) {
+                        return (
+                            <div className="w-full px-8 mb-8">
+                                <MoodScoreSelector
+                                    value={session.moodScore}
+                                    onChange={(score) => onUpdate({ ...session, moodScore: score || undefined })}
                                 />
                             </div>
                         );

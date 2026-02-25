@@ -47,11 +47,10 @@ export const DEFAULT_SCENE_PRESETS: TimeSlot[] = [
       { 
         id: '5', 
         type: 'principle', 
-        title: '拥抱现实', 
-        principleSource: 'library',
-        principleId: 'preset-1',
-        frontText: '痛苦 + 反思 = 进步',
-        backText: '接受现实，从中学习',
+        title: '长期愿景', 
+        principleSource: 'manual',
+        frontText: '在此写下你的长期愿景',
+        backText: '你想成为什么样的人？',
         action: { type: 'none' }
       },
     ]

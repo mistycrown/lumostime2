@@ -80,6 +80,7 @@ export const ScopeDetailView: React.FC<ScopeDetailViewProps> = ({
                 scope.description !== initialScope.description ||
                 scope.themeColor !== initialScope.themeColor ||
                 scope.enableFocusScore !== initialScope.enableFocusScore ||
+                scope.enableMoodScore !== initialScope.enableMoodScore ||
                 JSON.stringify(scope.keywords) !== JSON.stringify(initialScope.keywords);
             
             if (hasChanges) {
@@ -377,6 +378,28 @@ export const ScopeDetailView: React.FC<ScopeDetailViewProps> = ({
                                         </button>
                                     </div>
                                 </div>
+
+                                {/* Mood Score Setting */}
+                                <div>
+                                    <label className="text-xs text-stone-400 font-medium mb-1.5 block">Mood Score</label>
+                                    <div className="flex items-center justify-between">
+                                        <div>
+                                            <p className="text-xs text-stone-400 mt-1">If enabled, activities in this scope will track mood levels (1-5) by default.</p>
+                                        </div>
+                                        <button
+                                            onClick={() => setScope(prev => ({ ...prev, enableMoodScore: !prev.enableMoodScore }))}
+                                            className="w-12 h-6 rounded-full p-1 transition-colors shrink-0 ml-4"
+                                            style={{
+                                                backgroundColor: scope.enableMoodScore ? 'var(--accent-color)' : 'var(--tag-bg)'
+                                            }}
+                                        >
+                                            <div
+                                                className={`w-4 h-4 rounded-full bg-white transition-transform shadow-sm ${scope.enableMoodScore ? 'translate-x-6' : ''
+                                                    }`}
+                                            />
+                                        </button>
+                                    </div>
+                                </div>
                                 
                                 {/* UI Icon Selector - 仅在启用自定义主题时显示 */}
                                 {isCustomThemeEnabled && (
@@ -509,6 +532,7 @@ export const ScopeDetailView: React.FC<ScopeDetailViewProps> = ({
                         todos={todos}
                         keywords={scope.keywords || []}
                         enableFocusScore={scope.enableFocusScore ?? false}
+                        enableMoodScore={scope.enableMoodScore ?? false}
                         renderLogMetadata={(log) => {
                             const category = categories.find(c => c.id === log.categoryId);
                             const activity = category?.activities.find(a => a.id === log.activityId);

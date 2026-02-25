@@ -25,6 +25,7 @@ export interface LogFormState {
   linkedTodoId?: string;
   progressIncrement: number;
   focusScore?: number;
+  moodScore?: number;
   scopeIds?: string[];
   images: string[];
   comments: Comment[];
@@ -61,6 +62,7 @@ export const useLogForm = ({
       linkedTodoId: undefined,
       progressIncrement: 0,
       focusScore: undefined,
+      moodScore: undefined,
       scopeIds: undefined,
       images: [],
       comments: [],
@@ -96,6 +98,7 @@ export const useLogForm = ({
         linkedTodoId: initialLog.linkedTodoId,
         progressIncrement: initialLog.progressIncrement || 0,
         focusScore: initialLog.focusScore,
+        moodScore: initialLog.moodScore,
         scopeIds: initialLog.scopeIds,
         images: initialLog.images || [],
         comments: initialLog.comments || [],

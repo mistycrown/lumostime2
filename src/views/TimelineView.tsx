@@ -11,7 +11,7 @@ import React, { useMemo, useState, useRef } from 'react';
 import { Log, Activity, TodoItem, Category, TodoCategory, Scope, DailyReview, ReviewTemplate, WeeklyReview, MonthlyReview, AutoLinkRule, Goal } from '../types';
 import { CATEGORIES } from '../constants';
 import * as LucideIcons from 'lucide-react';
-import { Plus, MoreHorizontal, BarChart2, ArrowUp, ArrowDown, Sparkles, RefreshCw, Zap, Share, Timer, Clock, Image as ImageIcon } from 'lucide-react';
+import { Plus, MoreHorizontal, BarChart2, ArrowUp, ArrowDown, Sparkles, RefreshCw, Zap, Heart, Share, Timer, Clock, Image as ImageIcon } from 'lucide-react';
 import { CalendarWidget } from '../components/CalendarWidget';
 import { AIBatchModal } from '../components/AIBatchModal';
 import { ParsedTimeEntry } from '../services/aiService';
@@ -729,6 +729,7 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ logs, todos, scopes,
             }
             if (scopes_list.length > 0) text += ` %${scopes_list.map(s => s.name).join(', ')}`;
             if (log.focusScore && log.focusScore > 0) text += ` ⚡️${log.focusScore}`;
+            if (log.moodScore && log.moodScore > 0) text += ` ❤️${log.moodScore}`;
 
             text += '\n';
             if (content) text += `${content}\n`;
@@ -900,9 +901,16 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ logs, todos, scopes,
                                             )}
 
                                             {item.logData.focusScore && item.logData.focusScore > 0 && (
-                                                <span className="text-sm font-bold text-stone-400 font-mono flex items-center gap-0.5">
-                                                    <Zap size={12} fill="currentColor" />
-                                                    {item.logData.focusScore}
+                                                <span className="text-sm font-bold text-stone-400 font-mono inline-flex items-center gap-0.5">
+                                                    <Zap size={12} fill="currentColor" strokeWidth={0} className="align-middle" />
+                                                    <span className="align-middle">{item.logData.focusScore}</span>
+                                                </span>
+                                            )}
+
+                                            {item.logData.moodScore && item.logData.moodScore > 0 && (
+                                                <span className="text-sm font-bold text-stone-400 font-mono inline-flex items-center gap-0.5">
+                                                    <Heart size={12} fill="currentColor" strokeWidth={0} className="align-middle" />
+                                                    <span className="align-middle">{item.logData.moodScore}</span>
                                                 </span>
                                             )}
                                         </div>

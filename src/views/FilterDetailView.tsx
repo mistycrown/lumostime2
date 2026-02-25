@@ -298,6 +298,65 @@ export const FilterDetailView: React.FC<FilterDetailViewProps> = ({
         };
     }, [filteredLogs]);
 
+    // Mood View Data Preparation
+    const moodStats = useMemo(() => {
+        const moodLogs = filteredLogs.filter(l => l.moodScore && l.moodScore > 0);
+        const moodCount = moodLogs.length;
+        const totalMoodScore = moodLogs.reduce((acc, curr) => acc + (curr.moodScore || 0), 0);
+        const avgMood = moodCount > 0 ? (totalMoodScore / moodCount).toFixed(1) : '0.0';
+
+        // Score Distribution (1-5)
+        const scoreDist = [0, 0, 0, 0, 0];
+        moodLogs.forEach(l => {
+            const s = Math.round(l.moodScore || 0);
+            if (s >= 1 && s <= 5) scoreDist[s - 1]++;
+        });
+
+        // Time Distributions for Toggle Chart
+        const hourDist = new Array(24).fill(0);
+        const weekDist = new Array(7).fill(0);
+        const monthDist = new Array(31).fill(0);
+
+        moodLogs.forEach(log => {
+            // Distribute duration for Hour Distribution
+            const start = new Date(log.startTime);
+            const end = new Date(log.startTime + (log.duration * 1000));
+            let current = new Date(start);
+            while (current < end) {
+                const h = current.getHours();
+                const nextHourBoundary = new Date(current);
+                nextHourBoundary.setHours(h + 1, 0, 0, 0);
+                const segmentEnd = nextHourBoundary < end ? nextHourBoundary : end;
+                const segmentDuration = (segmentEnd.getTime() - current.getTime()) / 1000;
+                hourDist[h] += segmentDuration;
+                current = nextHourBoundary;
+            }
+
+            // Week Distribution
+            const d = new Date(log.startTime);
+            const day = d.getDay();
+            const weekIdx = day === 0 ? 6 : day - 1;
+            weekDist[weekIdx] += log.duration;
+
+            // Month Distribution (Day 1-31)
+            const date = d.getDate();
+            if (date >= 1 && date <= 31) {
+                monthDist[date - 1] += log.duration;
+            }
+        });
+
+        const minTime = Math.min(...filteredLogs.map(l => l.startTime));
+        const maxTime = Math.max(...filteredLogs.map(l => l.startTime));
+        const timeSpan = maxTime - minTime || 1;
+        const maxDur = Math.max(...filteredLogs.map(l => l.duration), 1);
+
+        return {
+            moodLogs, moodCount, avgMood, scoreDist,
+            minTime, timeSpan, maxDur,
+            hourDist, weekDist, monthDist
+        };
+    }, [filteredLogs]);
+
 
     // Helper: Generate consistent color from string
     const getThemeColor = (str: string) => {
@@ -785,6 +844,175 @@ export const FilterDetailView: React.FC<FilterDetailViewProps> = ({
                     </div>
                 );
 
+            case '情绪':
+                const { moodLogs, moodCount, avgMood, scoreDist: moodScoreDist, hourDist: moodHourDist, weekDist: moodWeekDist, monthDist: moodMonthDist, minTime: moodMinTime, timeSpan: moodTimeSpan, maxDur: moodMaxDur } = moodStats;
+
+                // Determine data for Mood Time Distribution Chart
+                let moodChartData = [];
+
+                if (focusTimeframe === 'day') {
+                    moodChartData = moodHourDist;
+                } else if (focusTimeframe === 'week') {
+                    moodChartData = moodWeekDist;
+                } else {
+                    moodChartData = moodMonthDist;
+                }
+
+                const maxMoodChartVal = Math.max(...moodChartData, 1);
+
+                return (
+                    <div className="space-y-12 mt-4 px-2">
+                        {/* Mood Stats Cards */}
+                        <div className="flex items-center justify-around py-4">
+                            <div className="flex flex-col items-center gap-2">
+                                <span className="text-xs font-bold text-stone-900 tracking-wider">平均情绪</span>
+                                <div className="flex flex-col items-center">
+                                    <span className="text-4xl font-black font-mono tracking-tight text-stone-800">{avgMood}</span>
+                                    <span className="text-xs text-stone-300 font-bold mt-1">/ 5.0</span>
+                                </div>
+                            </div>
+                            <div className="w-px h-12 bg-stone-100"></div>
+                            <div className="flex flex-col items-center gap-2">
+                                <span className="text-xs font-bold text-stone-900 tracking-wider">情绪记录</span>
+                                <div className="flex flex-col items-center">
+                                    <span className="text-4xl font-black font-mono tracking-tight text-stone-800">{moodCount}</span>
+                                    <span className="text-xs text-stone-300 font-bold mt-1">占比 {filteredLogs.length > 0 ? Math.round((moodCount / filteredLogs.length) * 100) : 0}%</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Mood Distribution */}
+                        <div className="bg-transparent">
+                            <h3 className="text-base font-bold text-stone-700 mb-6 text-center tracking-wider">情绪分布</h3>
+
+                            <div className="h-48 flex items-end justify-between gap-4 px-4">
+                                {moodScoreDist.map((count, idx) => {
+                                    const maxScoreCount = Math.max(...moodScoreDist, 1);
+                                    const heightPct = (count / maxScoreCount) * 100;
+
+                                    return (
+                                        <div key={idx} className="flex-1 flex flex-col items-center h-full justify-end group">
+                                            <div className="w-full relative flex items-end justify-center rounded-sm overflow-hidden h-full">
+                                                <div
+                                                    className="w-full transition-all duration-500 rounded-sm group-hover:opacity-80"
+                                                    style={{
+                                                        height: `${Math.max(heightPct, 4)}%`,
+                                                        backgroundColor: themeColor,
+                                                        opacity: 0.3 + (idx * 0.15)
+                                                    }}
+                                                ></div>
+                                                <div className="absolute bottom-1 text-[10px] font-bold text-white opacity-0 group-hover:opacity-100 transition-opacity">
+                                                    {count}
+                                                </div>
+                                            </div>
+                                            <span className="text-xs font-bold text-stone-400 mt-3 font-mono">{idx + 1}</span>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
+
+                        {/* Scatter Plot - Mood Scale */}
+                        <div className="bg-transparent">
+                            <h3 className="text-base font-bold text-stone-700 text-center tracking-wider">情绪刻度</h3>
+                            <div className="flex justify-center gap-4 text-[10px] text-stone-400 mt-1 mb-2">
+                                <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-stone-300"></span>Y轴: 情绪分</span>
+                                <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full border border-stone-300"></span>大小: 时长</span>
+                                <span className="flex items-center gap-1">X轴: 时间分布</span>
+                            </div>
+
+                            {/* Toggle */}
+                            <div className="flex justify-end pl-4 pr-0 mb-4 mt-2">
+                                <div className="flex bg-stone-100/50 p-0.5 rounded-lg w-fit">
+                                    <button
+                                        className={`px-2.5 py-1 rounded-md text-[10px] font-bold transition-all ${focusTimeframe === 'day' ? 'bg-white text-stone-900 shadow-sm' : 'text-stone-400 hover:text-stone-600'}`}
+                                        onClick={() => setFocusTimeframe('day')}
+                                    >
+                                        日
+                                    </button>
+                                    <button
+                                        className={`px-2.5 py-1 rounded-md text-[10px] font-bold transition-all ${focusTimeframe === 'week' ? 'bg-white text-stone-900 shadow-sm' : 'text-stone-400 hover:text-stone-600'}`}
+                                        onClick={() => setFocusTimeframe('week')}
+                                    >
+                                        周
+                                    </button>
+                                    <button
+                                        className={`px-2.5 py-1 rounded-md text-[10px] font-bold transition-all ${focusTimeframe === 'month' ? 'bg-white text-stone-900 shadow-sm' : 'text-stone-400 hover:text-stone-600'}`}
+                                        onClick={() => setFocusTimeframe('month')}
+                                    >
+                                        月
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div className="h-64 relative border-l border-b border-stone-200 m-4">
+                                {moodStats.moodLogs.map((log, idx) => {
+                                    const score = log.moodScore || 0;
+                                    const d = new Date(log.startTime);
+
+                                    const topPct = 100 - ((score / 5) * 100);
+
+                                    // X-axis
+                                    let leftPct = 0;
+                                    if (focusTimeframe === 'day') {
+                                        const h = d.getHours() + d.getMinutes() / 60;
+                                        leftPct = (h / 24) * 100;
+                                    } else if (focusTimeframe === 'week') {
+                                        let dayIdx = d.getDay() - 1;
+                                        if (dayIdx < 0) dayIdx = 6;
+                                        leftPct = ((dayIdx + (d.getHours() / 24)) / 7) * 100;
+                                    } else {
+                                        const date = d.getDate();
+                                        leftPct = ((date - 1 + (d.getHours() / 24)) / 31) * 100;
+                                    }
+
+                                    const rUnit = (log.duration / moodStats.maxDur) * 3 + 1;
+                                    const radiusPx = Math.max(rUnit * 2.5, 3);
+                                    const diameterPx = radiusPx * 2;
+
+                                    return (
+                                        <div
+                                            key={log.id}
+                                            className="absolute rounded-full shadow-sm hover:scale-110 transition-transform"
+                                            style={{
+                                                left: `${leftPct}%`,
+                                                top: `${topPct}%`,
+                                                width: `${diameterPx}px`,
+                                                height: `${diameterPx}px`,
+                                                backgroundColor: themeColor,
+                                                opacity: 0.3 + (score / 10),
+                                                transform: 'translate(-50%, -50%)',
+                                            }}
+                                            title={`${d.toLocaleString()} - Mood: ${score}, Duration: ${Math.round(log.duration / 60)}m`}
+                                        />
+                                    );
+                                })}
+
+                                {/* X-Axis Labels */}
+                                <div className="absolute -bottom-6 left-0 w-full flex justify-between text-[10px] text-stone-400 font-mono px-1">
+                                    {focusTimeframe === 'day' && (
+                                        <><span>00:00</span><span>06:00</span><span>12:00</span><span>18:00</span><span>23:59</span></>
+                                    )}
+                                    {focusTimeframe === 'week' && (
+                                        <><span>Mon</span><span>Wed</span><span>Fri</span><span>Sun</span></>
+                                    )}
+                                    {focusTimeframe === 'month' && (
+                                        <><span>1st</span><span>15th</span><span>31st</span></>
+                                    )}
+                                </div>
+                                {/* Y-Axis Labels */}
+                                <div className="absolute -left-8 top-0 h-full flex flex-col justify-between text-[10px] text-stone-400 font-mono py-1">
+                                    <span>5</span>
+                                    <span>4</span>
+                                    <span>3</span>
+                                    <span>2</span>
+                                    <span>1</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                );
+
             default:
                 return null;
         }
@@ -822,7 +1050,7 @@ export const FilterDetailView: React.FC<FilterDetailViewProps> = ({
 
                     {/* Tab Navigation */}
                     <div className="flex gap-6 border-b border-stone-200 mb-8 overflow-x-auto no-scrollbar">
-                        {['时间线', '节奏', '趋势', '专注'].map((tab) => (
+                        {['时间线', '节奏', '趋势', '专注', '情绪'].map((tab) => (
                             <button
                                 key={tab}
                                 onClick={() => setActiveTab(tab)}

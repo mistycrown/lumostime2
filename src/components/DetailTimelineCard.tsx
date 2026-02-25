@@ -10,7 +10,7 @@
 import React, { useMemo } from 'react';
 import { Log, Category } from '../types';
 import { CalendarWidget } from './CalendarWidget';
-import { Clock, Zap, MessageCircle, ChevronLeft, ChevronRight, Grid, Image as ImageIcon, Hash } from 'lucide-react';
+import { Clock, Zap, Heart, MessageCircle, ChevronLeft, ChevronRight, Grid, Image as ImageIcon, Hash } from 'lucide-react';
 import { TimelineImage } from './TimelineImage';
 import { IconRenderer } from './IconRenderer';
 import { usePrivacy } from '../contexts/PrivacyContext';
@@ -48,6 +48,9 @@ interface DetailTimelineCardProps {
     
     // 专注分数支持
     enableFocusScore?: boolean;
+
+    // 情绪分数支持
+    enableMoodScore?: boolean;
     
     // 进度追踪支持（Ink Grid）
     progressTracking?: {
@@ -71,6 +74,7 @@ export const DetailTimelineCard: React.FC<DetailTimelineCardProps> = ({
     todos = [],
     keywords = [],
     enableFocusScore = false,
+    enableMoodScore = false,
     progressTracking
 }) => {
     const { isPrivacyMode } = usePrivacy();
@@ -693,6 +697,115 @@ export const DetailTimelineCard: React.FC<DetailTimelineCardProps> = ({
                             }
                             return null;
                         })()}
+
+                        {/* Mood Score Distribution */}
+                        {enableMoodScore && (() => {
+                            // 计算当月情绪分布
+                            const moodDistribution = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
+                            let totalMoodTime = 0;
+                            
+                            monthLogs.forEach(log => {
+                                if (log.moodScore && log.moodScore >= 1 && log.moodScore <= 5) {
+                                    moodDistribution[log.moodScore as 1 | 2 | 3 | 4 | 5] += log.duration;
+                                    totalMoodTime += log.duration;
+                                }
+                            });
+                            
+                            // 如果有情绪数据，显示分布图
+                            if (totalMoodTime > 0) {
+                                const percentages = {
+                                    1: (moodDistribution[1] / totalMoodTime) * 100,
+                                    2: (moodDistribution[2] / totalMoodTime) * 100,
+                                    3: (moodDistribution[3] / totalMoodTime) * 100,
+                                    4: (moodDistribution[4] / totalMoodTime) * 100,
+                                    5: (moodDistribution[5] / totalMoodTime) * 100,
+                                };
+                                
+                                // 检查是否使用主题色（通过检查 CSS 变量是否为默认黑色）
+                                const useThemeColor = getComputedStyle(document.documentElement)
+                                    .getPropertyValue('--accent-color').trim() !== '#1c1917';
+                                
+                                // 获取情绪对应的颜色
+                                const getMoodColor = (score: number) => {
+                                    if (useThemeColor) {
+                                        // 使用主题色的不同透明度
+                                        const opacities = {
+                                            1: 0.1,
+                                            2: 0.3,
+                                            3: 0.5,
+                                            4: 0.75,
+                                            5: 1.0
+                                        };
+                                        return {
+                                            bgStyle: {
+                                                backgroundColor: 'var(--progress-bar-fill)',
+                                                opacity: opacities[score as keyof typeof opacities]
+                                            },
+                                            text: 'text-white',
+                                            useInlineStyle: true
+                                        };
+                                    } else {
+                                        // 使用原有的颜色逻辑
+                                        const colors = {
+                                            1: { bg: 'bg-red-100', text: 'text-red-600' },
+                                            2: { bg: 'bg-orange-100', text: 'text-orange-600' },
+                                            3: { bg: 'bg-amber-100', text: 'text-amber-600' },
+                                            4: { bg: 'bg-lime-100', text: 'text-lime-600' },
+                                            5: { bg: 'bg-green-200', text: 'text-green-600' }
+                                        };
+                                        return {
+                                            ...colors[score as keyof typeof colors],
+                                            useInlineStyle: false
+                                        };
+                                    }
+                                };
+                                
+                                return (
+                                    <>
+                                        {/* Mood 文字行 - 与 Total 和 Average 并列 */}
+                                        <div className="flex items-baseline gap-2">
+                                            <span className="text-xs font-medium text-stone-400 uppercase tracking-wider">Mood</span>
+                                            <div className="flex-1 border-b border-dotted border-stone-200" />
+                                            <span className="text-xs font-medium text-stone-400">
+                                                {Math.floor(totalMoodTime / 3600)}h {Math.floor((totalMoodTime % 3600) / 60)}m
+                                            </span>
+                                        </div>
+                                        
+                                        {/* 条形统计图 - 独立的模块 */}
+                                        <div className="flex h-6 rounded-lg overflow-hidden">
+                                            {[1, 2, 3, 4, 5].map(score => {
+                                                const percentage = percentages[score as keyof typeof percentages];
+                                                if (percentage <= 0) return null;
+                                                const color = getMoodColor(score);
+                                                // 确保至少显示1%的宽度，让用户能看到
+                                                const displayPercentage = Math.max(percentage, 1);
+                                                
+                                                return (
+                                                    <div 
+                                                        key={score}
+                                                        className={`flex items-center justify-center transition-all hover:opacity-80 ${color.useInlineStyle ? '' : color.bg}`}
+                                                        style={color.useInlineStyle ? { 
+                                                            width: `${displayPercentage}%`,
+                                                            minWidth: '4px',
+                                                            ...color.bgStyle
+                                                        } : { 
+                                                            width: `${displayPercentage}%`,
+                                                            minWidth: '4px'
+                                                        }}
+                                                        title={`情绪${score}: ${percentage.toFixed(1)}% (${Math.floor(moodDistribution[score as keyof typeof moodDistribution] / 60)}分钟)`}
+                                                    >
+                                                        {percentage > 8 && (
+                                                            <span className={`text-[10px] font-bold ${color.text}`}>{score}</span>
+                                                        )}
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    </>
+                                );
+                            }
+                            return null;
+                        })()}
                     </div>
                     
                     {/* 关键字图例 - 仅在关键字视图时显示 */}
@@ -982,9 +1095,15 @@ export const DetailTimelineCard: React.FC<DetailTimelineCardProps> = ({
                                                         )}
                                                         <div className="flex items-center gap-2">
                                                             {log.focusScore && log.focusScore > 0 && (
-                                                                <span className="text-sm font-bold text-stone-400 font-mono flex items-center gap-0.5">
-                                                                    <Zap size={12} fill="currentColor" />
-                                                                    {log.focusScore}
+                                                                <span className="text-sm font-bold text-stone-400 font-mono inline-flex items-center gap-0.5">
+                                                                    <Zap size={12} fill="currentColor" strokeWidth={0} className="align-middle" />
+                                                                    <span className="align-middle">{log.focusScore}</span>
+                                                                </span>
+                                                            )}
+                                                            {log.moodScore && log.moodScore > 0 && (
+                                                                <span className="text-sm font-bold text-stone-400 font-mono inline-flex items-center gap-0.5">
+                                                                    <Heart size={12} fill="currentColor" strokeWidth={0} className="align-middle" />
+                                                                    <span className="align-middle">{log.moodScore}</span>
                                                                 </span>
                                                             )}
                                                             {log.comments && log.comments.length > 0 && (

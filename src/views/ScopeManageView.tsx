@@ -54,6 +54,7 @@ export const ScopeManageView: React.FC<ScopeManageViewProps> = ({
             isArchived: false,
             order: Math.max(...editingScopes.map(s => s.order), 0) + 1,
             enableFocusScore: false,
+            enableMoodScore: false,
             themeColor: 'text-stone-600'
         };
         setEditingScopes([...editingScopes, newScope]);
@@ -229,6 +230,21 @@ export const ScopeManageView: React.FC<ScopeManageViewProps> = ({
                                     >
                                         <div
                                             className={`w-4 h-4 rounded-full bg-white transition-transform shadow-sm ${scope.enableFocusScore ? 'translate-x-6' : ''
+                                                }`}
+                                        />
+                                    </button>
+                                </div>
+
+                                {/* Mood Score Toggle */}
+                                <div className="flex items-center justify-between px-1">
+                                    <label className="text-sm font-medium text-stone-600">启用情绪评分</label>
+                                    <button
+                                        onClick={() => handleUpdateScope(scope.id, { enableMoodScore: !scope.enableMoodScore })}
+                                        className={`w-12 h-6 rounded-full p-1 transition-colors shrink-0 ${scope.enableMoodScore ? 'bg-stone-900' : 'bg-stone-200'
+                                            }`}
+                                    >
+                                        <div
+                                            className={`w-4 h-4 rounded-full bg-white transition-transform shadow-sm ${scope.enableMoodScore ? 'translate-x-6' : ''
                                                 }`}
                                         />
                                     </button>

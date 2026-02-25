@@ -77,6 +77,7 @@ export const TagDetailView: React.FC<TagDetailViewProps> = ({ tagId, logs, todos
             activity.heatmapMin !== initialActivity.heatmapMin ||
             activity.heatmapMax !== initialActivity.heatmapMax ||
             activity.enableFocusScore !== initialActivity.enableFocusScore ||
+            activity.enableMoodScore !== initialActivity.enableMoodScore ||
             JSON.stringify(activity.keywords) !== JSON.stringify(initialActivity.keywords);
          
          if (hasChanges) {
@@ -408,6 +409,55 @@ export const TagDetailView: React.FC<TagDetailViewProps> = ({ tagId, logs, todos
                            </div>
                         </div>
 
+                        {/* Mood Score Setting */}
+                        <div>
+                           <label className="text-xs text-stone-400 font-medium mb-1.5 block">Mood Score</label>
+                           <div className="flex bg-stone-100 p-1 rounded-xl">
+                              {[
+                                 { value: 'inherit', label: 'Inherit' },
+                                 { value: 'true', label: 'On' },
+                                 { value: 'false', label: 'Off' }
+                              ].map((option) => {
+                                 const currentValue = activity.enableMoodScore === undefined ? 'inherit' : activity.enableMoodScore.toString();
+                                 const isSelected = currentValue === option.value;
+
+                                 let labelNode = <span className="text-xs font-bold">{option.label}</span>;
+                                 if (option.value === 'inherit') {
+                                    labelNode = (
+                                       <div className="flex flex-col items-center leading-none">
+                                          <span className="text-xs font-bold">Inherit</span>
+                                          <span className="text-[9px] opacity-60 mt-0.5">
+                                             (Cat: {category?.enableMoodScore ? 'On' : 'Off'})
+                                          </span>
+                                       </div>
+                                    );
+                                 }
+
+                                 return (
+                                    <button
+                                       key={option.value}
+                                       onClick={() => {
+                                          let newVal: boolean | undefined = undefined;
+                                          if (option.value === 'true') newVal = true;
+                                          if (option.value === 'false') newVal = false;
+                                          setActivity({ ...activity, enableMoodScore: newVal });
+                                       }}
+                                       className={`
+                                            flex-1 flex items-center justify-center py-2 rounded-lg transition-all
+                                          ${isSelected
+                                             ? 'bg-white text-stone-900 shadow-sm ring-1 ring-black/5'
+                                             : 'text-stone-400 hover:text-stone-600 hover:bg-stone-200/50'
+                                          }
+`}
+                                       title={option.value === 'inherit' ? `Inherit from Category(${category?.enableMoodScore ? 'Enabled' : 'Disabled'})` : ''}
+                                    >
+                                       {labelNode}
+                                    </button>
+                                 );
+                              })}
+                           </div>
+                        </div>
+
                         {/* Heatmap Scale */}
                         <div>
                            <label className="text-xs text-stone-400 font-medium mb-1.5 block">Heatmap Scale (Minutes)</label>
@@ -545,6 +595,7 @@ export const TagDetailView: React.FC<TagDetailViewProps> = ({ tagId, logs, todos
                   todos={todos}
                   keywords={activity.keywords || []}
                   enableFocusScore={activity.enableFocusScore ?? category?.enableFocusScore ?? false}
+                  enableMoodScore={activity.enableMoodScore ?? category?.enableMoodScore ?? false}
                   renderLogMetadata={(log) => {
                      return (
                         <div className="flex flex-wrap items-center gap-2 mt-1">

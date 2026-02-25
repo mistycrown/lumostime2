@@ -435,6 +435,14 @@ const RecordItem: React.FC<RecordItemProps> = ({
                     <span>专注度: {log.focusScore}/5</span>
                 </div>
             )}
+
+            {/* Mood Score */}
+            {log.moodScore !== undefined && (
+                <div className="flex items-center gap-1 text-xs text-stone-500">
+                    <span>❤️</span>
+                    <span>情绪: {log.moodScore}/5</span>
+                </div>
+            )}
         </div>
     );
 };

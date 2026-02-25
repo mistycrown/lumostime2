@@ -16,6 +16,7 @@ export interface Activity {
   heatmapMin?: number; // Custom heatmap scale (Minutes)
   heatmapMax?: number;
   enableFocusScore?: boolean; // Override parent setting
+  enableMoodScore?: boolean; // Override parent setting for mood tracking
   keywords?: string[]; // (NEW) Keywords for finer classification
 }
 
@@ -27,6 +28,7 @@ export interface Category {
   activities: Activity[];
   themeColor: string; // Hex color for stats chart
   enableFocusScore?: boolean; // Default for all activities in category
+  enableMoodScore?: boolean; // Default for all activities in category for mood tracking
   heatmapMin?: number; // Custom heatmap scale (Minutes)
   heatmapMax?: number;
 }
@@ -41,6 +43,7 @@ export interface Scope {
   isArchived: boolean;
   order: number;
   enableFocusScore?: boolean; // Whether to track focus in this scope
+  enableMoodScore?: boolean; // Whether to track mood in this scope
   themeColor: string; // Hex color or Tailwind class name
   keywords?: string[]; // 关键字列表，用于快速匹配和统计
 }
@@ -96,6 +99,7 @@ export interface ActiveSession {
   note?: string;
   progressIncrement?: number; // New: Carry over to Log
   focusScore?: number; // 1-5
+  moodScore?: number; // 1-5 mood rating
   reactions?: string[]; // Emoji reactions
 }
 
@@ -119,6 +123,7 @@ export interface Log {
   scopeIds?: string[]; // NEW: Link to multiple Scopes (领域) - changed from scopeId
   progressIncrement?: number; // New: Units of progress contributed by this session
   focusScore?: number; // 1-5
+  moodScore?: number; // 1-5 mood rating
   images?: string[]; // (NEW) Array of image filenames/identifiers
   comments?: Comment[]; // (NEW) 评论列表
   reactions?: string[]; // (NEW) 反应列表 (Emoji list)

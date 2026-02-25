@@ -56,7 +56,8 @@ export const CategoryDetailView: React.FC<CategoryDetailViewProps> = ({ category
                 category.themeColor !== initialCategory.themeColor ||
                 category.heatmapMin !== initialCategory.heatmapMin ||
                 category.heatmapMax !== initialCategory.heatmapMax ||
-                category.enableFocusScore !== initialCategory.enableFocusScore;
+                category.enableFocusScore !== initialCategory.enableFocusScore ||
+                category.enableMoodScore !== initialCategory.enableMoodScore;
             
             if (hasChanges) {
                 onUpdateCategory(category);
@@ -333,6 +334,22 @@ export const CategoryDetailView: React.FC<CategoryDetailViewProps> = ({ category
                                         If enabled, activities in this category will track focus levels (1-5) by default.
                                     </p>
                                 </div>
+
+                                {/* Mood Score */}
+                                <div>
+                                    <div className="flex items-center justify-between">
+                                        <label className="text-xs text-stone-400 font-medium">Enable Mood Score</label>
+                                        <button
+                                            onClick={() => setCategory({ ...category, enableMoodScore: !category.enableMoodScore })}
+                                            className={`w-12 h-6 rounded-full p-1 transition-colors ${category.enableMoodScore ? 'bg-stone-900' : 'bg-stone-200'}`}
+                                        >
+                                            <div className={`w-4 h-4 rounded-full bg-white transition-transform ${category.enableMoodScore ? 'translate-x-6' : ''}`} />
+                                        </button>
+                                    </div>
+                                    <p className="text-xs text-stone-400 mt-1.5">
+                                        If enabled, activities in this category will track mood levels (1-5) by default.
+                                    </p>
+                                </div>
                                 
                                 {/* UI Icon Selector - 仅在启用自定义主题时显示 */}
                                 {isCustomThemeEnabled && (
@@ -387,6 +404,7 @@ export const CategoryDetailView: React.FC<CategoryDetailViewProps> = ({ category
                         categories={categories}
                         todos={todos}
                         enableFocusScore={category.enableFocusScore ?? false}
+                        enableMoodScore={category.enableMoodScore ?? false}
                         renderLogMetadata={(log) => {
                             const category = categories.find(c => c.id === log.categoryId);
                             const activity = category?.activities.find(a => a.id === log.activityId);

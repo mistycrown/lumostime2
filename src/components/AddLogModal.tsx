@@ -14,6 +14,7 @@ import { TodoAssociation } from '../components/TodoAssociation';
 import { TagAssociation } from '../components/TagAssociation';
 import { ScopeAssociation } from '../components/ScopeAssociation';
 import { FocusScoreSelector } from '../components/FocusScoreSelector';
+import { MoodScoreSelector } from '../components/MoodScoreSelector';
 import { CommentSection } from '../components/CommentSection';
 import { ImagePreviewModal } from './ImagePreviewModal';
 import { ReactionPicker, ReactionList } from './ReactionComponents';
@@ -332,6 +333,7 @@ export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialSta
       linkedTodoId: formState.linkedTodoId,
       progressIncrement: formState.linkedTodoId && formState.progressIncrement ? formState.progressIncrement : undefined,
       focusScore: formState.focusScore,
+      moodScore: formState.moodScore,
       scopeIds: formState.scopeIds,
       images: imageManager.images,
       comments: formState.comments.length > 0 ? formState.comments : undefined,
@@ -352,6 +354,7 @@ export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialSta
       formState.linkedTodoId ||
       formState.progressIncrement > 0 ||
       formState.focusScore !== undefined ||
+      formState.moodScore !== undefined ||
       (formState.scopeIds && formState.scopeIds.length > 0) ||
       formState.images.length > 0 ||
       formState.comments.length > 0 ||
@@ -382,6 +385,7 @@ export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialSta
       linkedTodoId: undefined,
       progressIncrement: 0,
       focusScore: undefined,
+      moodScore: undefined,
       scopeIds: undefined,
       images: [],
       comments: [],
@@ -764,6 +768,34 @@ export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialSta
                 return (
                   <div className="space-y-4 animate-in slide-in-from-top-2">
                     <FocusScoreSelector value={formState.focusScore} onChange={(score) => updateField('focusScore', score)} />
+                  </div>
+                );
+              }
+              return null;
+            })()
+          }
+
+          {/* Mood Score Selector */}
+          {
+            (() => {
+              const cat = categories.find(c => c.id === formState.selectedCategoryId);
+              const act = cat?.activities.find(a => a.id === formState.selectedActivityId);
+
+              // Check if should show mood score: activity > category > any associated scope
+              let shouldShowMood = act?.enableMoodScore ?? cat?.enableMoodScore;
+
+              // Also check if any of the selected scopes has enableMoodScore
+              if (!shouldShowMood && formState.scopeIds && formState.scopeIds.length > 0) {
+                shouldShowMood = formState.scopeIds.some(sid => {
+                  const scope = scopes.find(s => s.id === sid);
+                  return scope?.enableMoodScore === true;
+                });
+              }
+
+              if (shouldShowMood) {
+                return (
+                  <div className="space-y-4 animate-in slide-in-from-top-2">
+                    <MoodScoreSelector value={formState.moodScore} onChange={(score) => updateField('moodScore', score)} />
                   </div>
                 );
               }
