@@ -61,6 +61,10 @@ export const SceneSettingsView: React.FC<SceneSettingsViewProps> = ({ onBack }) 
     const saved = localStorage.getItem('sceneTimeSlots');
     if (saved) {
       setTimeSlots(JSON.parse(saved));
+    } else {
+      // 如果没有保存的数据，使用预设并保存到 localStorage
+      setTimeSlots(DEFAULT_SCENE_PRESETS);
+      localStorage.setItem('sceneTimeSlots', JSON.stringify(DEFAULT_SCENE_PRESETS));
     }
   }, []);
 

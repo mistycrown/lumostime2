@@ -745,15 +745,7 @@ export const SceneView: React.FC<SceneViewProps> = ({
           {currentCards.length === 0 ? (
             <div className="flex items-center justify-center py-12">
               <div className="text-center text-stone-400">
-                <p className="mb-4">该时间段暂无卡片</p>
-                {onConfigureSlots && (
-                  <button
-                    onClick={onConfigureSlots}
-                    className="px-4 py-2 bg-stone-100 rounded-lg hover:bg-stone-200 transition-colors text-sm"
-                  >
-                    添加卡片
-                  </button>
-                )}
+                <p className="text-sm leading-relaxed">该时间段暂无卡片，请前往场景设置，配置时间段和快捷方式。</p>
               </div>
             </div>
           ) : (
