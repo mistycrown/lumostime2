@@ -3,9 +3,10 @@
  * @description 场景卡片组件 - 支持正反面翻转和滑动交互
  */
 import React, { useState, useRef } from 'react';
-import { Check, ChevronRight, Clock, CheckSquare, FileText, ListTodo, BarChart3, BookOpen, Link2 } from 'lucide-react';
+import { Check, ChevronRight, Clock, CheckSquare, ListTodo, BarChart3, BookOpen, Link2 } from 'lucide-react';
 import { SceneCardData, DailyReview, Log } from '../types';
 import { CardStatsBadge } from './CardStatsBadge';
+import { AppLauncherService } from '../services/AppLauncherService';
 
 // 莫兰迪色系默认颜色映射
 const DEFAULT_COLORS = {
@@ -206,11 +207,22 @@ export const SceneCard: React.FC<SceneCardProps> = ({ data, dailyReviews = [], l
     setTouchEnd(null);
   };
 
-  const handleCardClick = () => {
+  const handleCardClick = async () => {
     if (!isFlipped) {
       // 正面点击 - 翻转到反面并执行动作
       setIsFlipped(true);
       saveFlipState(true);
+      
+      // 如果配置了应用跳转，先尝试启动应用
+      if (data.action.launchApp && data.action.appPackageName) {
+        const success = await AppLauncherService.launchApp(data.action.appPackageName);
+        
+        if (success) {
+          console.log(`[SceneCard] 成功启动应用: ${data.action.appName}`);
+        } else {
+          console.warn(`[SceneCard] 启动应用失败: ${data.action.appName}`);
+        }
+      }
       
       if (data.action.type !== 'none') {
         // 对于导航卡片，延迟执行以显示翻转动画
@@ -227,6 +239,11 @@ export const SceneCard: React.FC<SceneCardProps> = ({ data, dailyReviews = [], l
       switch (data.type) {
         case 'timer':
         case 'todo':
+          // 如果配置了应用跳转，再次启动应用
+          if (data.action.launchApp && data.action.appPackageName) {
+            await AppLauncherService.launchApp(data.action.appPackageName);
+          }
+          
           if (data.action.type !== 'none') {
             onAction?.(data.action, data.autoEnterFocus);
           }

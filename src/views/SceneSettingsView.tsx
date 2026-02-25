@@ -13,6 +13,7 @@ import { TodoAssociation } from '../components/TodoAssociation';
 import { CheckItemAssociation } from '../components/CheckItemAssociation';
 import { TagMultipleAssociation } from '../components/TagMultipleAssociation';
 import { ConfirmModal } from '../components/ConfirmModal';
+import { AppSelector } from '../components/AppSelector';
 import { uiIconService } from '../services/uiIconService';
 import { useData } from '../contexts/DataContext';
 import { useCategoryScope } from '../contexts/CategoryScopeContext';
@@ -1231,6 +1232,25 @@ const CardEditModal: React.FC<{
                   </button>
                 </div>
               </div>
+
+              {/* 应用跳转配置 */}
+              <AppLaunchConfig
+                launchApp={card?.action?.launchApp}
+                appPackageName={card?.action?.appPackageName}
+                appName={card?.action?.appName}
+                onChange={(launchApp, appPackageName, appName) => {
+                  onChange({
+                    ...card,
+                    action: {
+                      ...card?.action,
+                      type: card?.action?.type || 'startTimer',
+                      launchApp,
+                      appPackageName,
+                      appName
+                    }
+                  });
+                }}
+              />
             </>
           )}
 
@@ -1269,6 +1289,25 @@ const CardEditModal: React.FC<{
                   </button>
                 </div>
               </div>
+
+              {/* 应用跳转配置 */}
+              <AppLaunchConfig
+                launchApp={card?.action?.launchApp}
+                appPackageName={card?.action?.appPackageName}
+                appName={card?.action?.appName}
+                onChange={(launchApp, appPackageName, appName) => {
+                  onChange({
+                    ...card,
+                    action: {
+                      ...card?.action,
+                      type: card?.action?.type || 'startTodo',
+                      launchApp,
+                      appPackageName,
+                      appName
+                    }
+                  });
+                }}
+              />
             </>
           )}
 
@@ -1979,5 +2018,91 @@ const PrincipleSelector: React.FC<{
         </div>
       )}
     </div>
+  );
+};
+
+// 应用跳转配置组件
+const AppLaunchConfig: React.FC<{
+  launchApp?: boolean;
+  appPackageName?: string;
+  appName?: string;
+  onChange: (launchApp: boolean, appPackageName?: string, appName?: string) => void;
+}> = ({ launchApp, appPackageName, appName, onChange }) => {
+  const [showAppSelector, setShowAppSelector] = useState(false);
+
+  return (
+    <>
+      <div className="pt-3 border-t border-stone-200">
+        <div className="flex items-center justify-between mb-3">
+          <div>
+            <label className="text-xs sm:text-sm font-medium text-stone-700">
+              点击时启动应用
+            </label>
+            <p className="text-[10px] sm:text-xs text-stone-500 mt-0.5">
+              点击卡片时自动打开指定的外部应用
+            </p>
+          </div>
+          <button
+            onClick={() => {
+              const newValue = !launchApp;
+              onChange(newValue, appPackageName, appName);
+              if (!newValue) {
+                // 关闭时清除应用选择
+                onChange(false, undefined, undefined);
+              }
+            }}
+            className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors`}
+            style={{
+              backgroundColor: launchApp ? 'var(--accent-color)' : '#d6d3d1'
+            }}
+          >
+            <span
+              className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${
+                launchApp ? 'translate-x-5' : 'translate-x-0.5'
+              }`}
+            />
+          </button>
+        </div>
+
+        {launchApp && (
+          <div className="space-y-2">
+            {appPackageName && appName ? (
+              <div className="p-3 bg-stone-50 rounded-lg border border-stone-200">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="text-sm font-medium text-stone-800">{appName}</div>
+                    <div className="text-xs text-stone-500 mt-0.5 break-all">{appPackageName}</div>
+                  </div>
+                  <button
+                    onClick={() => setShowAppSelector(true)}
+                    className="text-xs text-blue-500 hover:text-blue-600 ml-2"
+                  >
+                    更改
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <button
+                onClick={() => setShowAppSelector(true)}
+                className="w-full px-3 py-2 text-sm border-2 border-dashed border-stone-300 rounded-lg hover:border-stone-400 hover:bg-stone-50 transition-colors text-stone-600"
+              >
+                + 选择应用
+              </button>
+            )}
+          </div>
+        )}
+      </div>
+
+      {showAppSelector && (
+        <AppSelector
+          selectedPackageName={appPackageName}
+          selectedAppName={appName}
+          onSelect={(packageName, name) => {
+            onChange(true, packageName, name);
+          }}
+          onClose={() => setShowAppSelector(false)}
+        />
+      )}
+    </>
   );
 };

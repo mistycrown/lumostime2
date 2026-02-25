@@ -197,6 +197,10 @@ export interface SceneCardAction {
   dateOffset?: 'today' | 'yesterday' | 'thisWeek' | 'lastWeek' | 'thisMonth' | 'lastMonth';
   questionId?: string;
   fallbackText?: string;
+  // 应用跳转配置（仅Android）
+  launchApp?: boolean; // 是否启用应用跳转
+  appPackageName?: string; // Android应用包名
+  appName?: string; // 应用显示名称
 }
 
 // 场景卡片数据

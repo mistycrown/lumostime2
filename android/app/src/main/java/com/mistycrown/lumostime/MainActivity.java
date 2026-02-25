@@ -9,6 +9,7 @@ package com.mistycrown.lumostime;
 
 import com.getcapacitor.BridgeActivity;
 import android.os.Bundle;
+import com.lumostime.app.AppLauncherPlugin;
 
 public class MainActivity extends BridgeActivity {
     @Override
@@ -17,6 +18,7 @@ public class MainActivity extends BridgeActivity {
         registerPlugin(FocusNotificationPlugin.class); // 注册专注通知插件
         registerPlugin(AppUsagePlugin.class);
         registerPlugin(IconPlugin.class); // 注册图标切换插件
+        registerPlugin(AppLauncherPlugin.class); // 注册应用启动插件
         super.onCreate(savedInstanceState);
         
         // 初始化图标状态，确保应用有正确的入口点
