@@ -261,6 +261,7 @@ export const AppRoutes: React.FC<AppRoutesProps> = ({
                     handleStartActivity(activity, categoryId, undefined, undefined, undefined, autoEnterFocus)
                 } 
                 onStartTodoFocus={handleStartTodoFocus}
+                onAddLog={openAddModal}
                 categories={categories}
                 todos={todos}
             />;

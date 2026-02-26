@@ -192,7 +192,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
     // Hooks for full data access during backup
     const { logs: ctxLogs, todos: ctxTodos, todoCategories: ctxTodoCategories, setLocalDataTimestamp } = useData();
     const { categories: ctxCategories, scopes: ctxScopes, goals: ctxGoals } = useCategoryScope();
-    const { autoLinkRules: ctxAutoLinkRules, autoApplyAutoLinkRules, setAutoApplyAutoLinkRules, autoApplyTodoLink, setAutoApplyTodoLink, autoOpenFocusDetail, setAutoOpenFocusDetail, userPersonalInfo: ctxUserPersonalInfo, filters: ctxFilters, customNarrativeTemplates: ctxCustomNarrativeTemplates, useTwemoji, setUseTwemoji } = useSettings();
+    const { autoLinkRules: ctxAutoLinkRules, autoApplyAutoLinkRules, setAutoApplyAutoLinkRules, autoApplyTodoLink, setAutoApplyTodoLink, autoOpenFocusDetail, setAutoOpenFocusDetail, userPersonalInfo: ctxUserPersonalInfo, filters: ctxFilters, customNarrativeTemplates: ctxCustomNarrativeTemplates, useTwemoji, setUseTwemoji, sceneCardTimerMode, setSceneCardTimerMode } = useSettings();
     const { dailyReviews: ctxDailyReviews, weeklyReviews: ctxWeeklyReviews, monthlyReviews: ctxMonthlyReviews, reviewTemplates: ctxReviewTemplates } = useReview();
 
     const [activeSubmenu, setActiveSubmenu] = useState<'main' | 'data' | 'cloud' | 's3' | 'ai' | 'preferences' | 'guide' | 'nfc' | 'templates' | 'check_templates' | 'narrative_prompt' | 'auto_record' | 'autolink' | 'obsidian_export' | 'filters' | 'memoir_filter' | 'batch_manage' | 'sponsorship_preview' | 'scene' | 'emoji' | 'principle'>('main');
@@ -890,6 +890,8 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
                 onSetDefaultRecordView={onSetDefaultRecordView}
                 manualSyncMode={manualSyncMode}
                 onToggleManualSyncMode={onToggleManualSyncMode}
+                sceneCardTimerMode={sceneCardTimerMode}
+                onSetSceneCardTimerMode={setSceneCardTimerMode}
             />
         );
     }

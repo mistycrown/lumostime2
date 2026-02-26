@@ -14,11 +14,13 @@ import { useReview } from '../contexts/ReviewContext';
 import { useNavigation } from '../contexts/NavigationContext';
 import { useData } from '../contexts/DataContext';
 import { useToast } from '../contexts/ToastContext';
+import { useSettings } from '../contexts/SettingsContext';
 
 interface SceneViewProps {
   onConfigureSlots?: () => void;
   onStartActivity: (activity: Activity, categoryId: string, autoEnterFocus?: boolean) => void;
   onStartTodoFocus?: (todo: TodoItem, autoEnterFocus?: boolean) => void;
+  onAddLog?: (startTime?: number, endTime?: number, prefilledData?: { categoryId?: string; activityId?: string; linkedTodoId?: string }) => void;
   categories: Category[];
   todos?: TodoItem[];
 }
@@ -27,12 +29,14 @@ export const SceneView: React.FC<SceneViewProps> = ({
   onConfigureSlots,
   onStartActivity,
   onStartTodoFocus,
+  onAddLog,
   categories,
   todos = []
 }) => {
   const { dailyReviews, checkTemplates, setDailyReviews, weeklyReviews, setWeeklyReviews, monthlyReviews, setMonthlyReviews } = useReview();
   const { logs, activeSessions } = useData();
   const { addToast } = useToast();
+  const { sceneCardTimerMode } = useSettings();
   const { 
     setCurrentView, 
     setIsDailyReviewOpen, 
@@ -431,6 +435,50 @@ export const SceneView: React.FC<SceneViewProps> = ({
 
   // 卡片动作处理
   const handleCardAction = (action: SceneCardData['action'], autoEnterFocus?: boolean) => {
+    // 如果是补记模式，且动作类型是计时或待办，则调用补记功能
+    if (sceneCardTimerMode === 'backfill' && (action.type === 'startTimer' || action.type === 'startTodo')) {
+      if (!onAddLog) {
+        addToast('error', '补记功能不可用');
+        return;
+      }
+
+      // 计算补记的时间范围：从上一条记录结束到现在
+      const now = Date.now();
+      const sortedLogs = [...logs].sort((a, b) => b.endTime - a.endTime);
+      const lastLog = sortedLogs[0];
+      const startTime = lastLog ? lastLog.endTime : now - 3600000; // 默认1小时前
+      
+      // 准备预填充数据
+      const prefilledData: { categoryId?: string; activityId?: string; linkedTodoId?: string } = {};
+      
+      if (action.type === 'startTimer' && action.activityId && action.categoryId) {
+        const category = categories.find(c => c.id === action.categoryId);
+        const activity = category?.activities.find(a => a.id === action.activityId);
+        
+        if (activity && category) {
+          prefilledData.categoryId = category.id;
+          prefilledData.activityId = activity.id;
+        } else {
+          addToast('error', '找不到对应的活动，可能已被删除');
+          return;
+        }
+      } else if (action.type === 'startTodo' && action.todoId) {
+        const todo = todos.find(t => t.id === action.todoId);
+        
+        if (todo) {
+          prefilledData.linkedTodoId = todo.id;
+        } else {
+          addToast('error', '找不到对应的待办，可能已被删除');
+          return;
+        }
+      }
+      
+      // 调用补记功能
+      onAddLog(startTime, now, prefilledData);
+      return;
+    }
+
+    // 正计时模式：原有逻辑
     switch (action.type) {
       case 'startTimer':
         if (action.activityId && action.categoryId) {

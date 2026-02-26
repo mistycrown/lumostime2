@@ -10,6 +10,7 @@ interface UseLogFormProps {
   initialLog?: Log | null;
   initialStartTime?: number;
   initialEndTime?: number;
+  prefilledData?: { categoryId?: string; activityId?: string; linkedTodoId?: string };
   categories: Category[];
   todos: TodoItem[];
   todoCategories: TodoCategory[];
@@ -40,6 +41,7 @@ export const useLogForm = ({
   initialLog,
   initialStartTime,
   initialEndTime,
+  prefilledData,
   categories,
   todos,
   todoCategories,
@@ -109,14 +111,31 @@ export const useLogForm = ({
         trackEndTime: tEnd
       });
     } else if (initialStartTime && initialEndTime) {
-      // 填充间隙模式
+      // 填充间隙模式或补记模式
       tStart = initialStartTime;
       tEnd = initialEndTime;
       cStart = initialStartTime;
       cEnd = initialEndTime;
 
+      // 如果有预填充数据，使用预填充数据
+      if (prefilledData) {
+        const categoryId = prefilledData.categoryId || (categories[0]?.id || '');
+        const activityId = prefilledData.activityId || '';
+        const linkedTodoId = prefilledData.linkedTodoId;
+
+        setFormState(prev => ({
+          ...prev,
+          selectedCategoryId: categoryId,
+          selectedActivityId: activityId,
+          linkedTodoId: linkedTodoId,
+          currentStartTime: cStart,
+          currentEndTime: cEnd,
+          trackStartTime: tStart,
+          trackEndTime: tEnd
+        }));
+      }
       // 如果有草稿，恢复草稿数据（除了时间）
-      if (draftRef.current) {
+      else if (draftRef.current) {
         setFormState(prev => ({
           ...prev,
           ...draftRef.current,

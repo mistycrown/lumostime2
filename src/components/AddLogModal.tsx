@@ -26,6 +26,7 @@ interface AddLogModalProps {
   initialLog?: Log | null;
   initialStartTime?: number;
   initialEndTime?: number;
+  prefilledData?: { categoryId?: string; activityId?: string; linkedTodoId?: string };
   onClose: () => void;
   onSave: (log: Log) => void;
 
@@ -43,7 +44,7 @@ interface AddLogModalProps {
   allLogs?: Log[]; // 添加所有日志用于计算上一条记录
 }
 
-export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialStartTime, initialEndTime, onClose, onSave, onDelete, onImageRemove, categories, todos, todoCategories, scopes, autoLinkRules = [], autoApplyAutoLinkRules = true, autoApplyTodoLink = true, lastLogEndTime, autoFocusNote = true, allLogs = [] }) => {
+export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialStartTime, initialEndTime, prefilledData, onClose, onSave, onDelete, onImageRemove, categories, todos, todoCategories, scopes, autoLinkRules = [], autoApplyAutoLinkRules = true, autoApplyTodoLink = true, lastLogEndTime, autoFocusNote = true, allLogs = [] }) => {
   // 使用自定义 Hooks 管理状态
   const { setIsShareViewOpen, setSharingLog } = useNavigation();
   
@@ -94,6 +95,7 @@ export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialSta
     initialLog,
     initialStartTime,
     initialEndTime,
+    prefilledData,
     categories,
     todos,
     todoCategories,

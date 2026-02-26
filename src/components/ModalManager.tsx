@@ -27,7 +27,7 @@ interface ModalManagerProps {
     // AddLogModal
     isAddModalOpen: boolean;
     editingLog: Log | null;
-    initialLogTimes?: { start?: number; end?: number };
+    initialLogTimes?: { start?: number; end?: number; prefilledData?: { categoryId?: string; activityId?: string; linkedTodoId?: string } };
     onCloseAddLog: () => void;
     onSaveLog: (log: Log) => void;
     onDeleteLog: (id: string) => void;
@@ -154,6 +154,7 @@ export const ModalManager: React.FC<ModalManagerProps> = ({
                     initialLog={editingLog}
                     initialStartTime={initialLogTimes?.start}
                     initialEndTime={initialLogTimes?.end}
+                    prefilledData={initialLogTimes?.prefilledData}
                     onClose={onCloseAddLog}
                     onSave={onSaveLog}
                     onDelete={onDeleteLog}

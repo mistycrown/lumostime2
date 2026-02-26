@@ -188,11 +188,11 @@ export const useLogManager = () => {
         addToast('success', `Successfully backfilled ${newLogs.length} logs!`);
     };
 
-    const openAddModal = (startTime?: number, endTime?: number) => {
+    const openAddModal = (startTime?: number, endTime?: number, prefilledData?: { categoryId?: string; activityId?: string; linkedTodoId?: string }) => {
         setEditingLog(null);
         if (startTime && endTime) {
-            // Gap filling: use provided times
-            setInitialLogTimes({ start: startTime, end: endTime });
+            // Gap filling or backfill: use provided times
+            setInitialLogTimes({ start: startTime, end: endTime, prefilledData });
         } else {
             // New log from button: calculate smart defaults
             const dayStart = new Date(currentDate);
@@ -224,7 +224,7 @@ export const useLogManager = () => {
                 newStart = logsOnDay.reduce((max, log) => Math.max(max, log.endTime), dayStart.getTime());
             }
 
-            setInitialLogTimes({ start: newStart, end: dayEnd.getTime() });
+            setInitialLogTimes({ start: newStart, end: dayEnd.getTime(), prefilledData });
         }
         setIsAddModalOpen(true);
     };

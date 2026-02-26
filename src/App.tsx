@@ -349,6 +349,7 @@ const AppContent: React.FC = () => {
           initialLog={editingLog}
           initialStartTime={initialLogTimes?.start}
           initialEndTime={initialLogTimes?.end}
+          prefilledData={initialLogTimes?.prefilledData}
           lastLogEndTime={lastLogEndTime}
           onClose={logManager.closeModal}
           onSave={logManager.handleSaveLog}

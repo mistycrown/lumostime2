@@ -97,8 +97,8 @@ interface NavigationContextType {
     setTodoCategoryToAdd: (id: string) => void;
     goalScopeId: string;
     setGoalScopeId: (id: string) => void;
-    initialLogTimes: { start?: number; end?: number } | null;
-    setInitialLogTimes: (times: { start?: number; end?: number } | null) => void;
+    initialLogTimes: { start?: number; end?: number; prefilledData?: { categoryId?: string; activityId?: string; linkedTodoId?: string } } | null;
+    setInitialLogTimes: (times: { start?: number; end?: number; prefilledData?: { categoryId?: string; activityId?: string; linkedTodoId?: string } } | null) => void;
 
     // Session Focus Detail
     focusDetailSessionId: string | null;
@@ -223,7 +223,7 @@ export const NavigationProvider: React.FC<NavigationProviderProps> = ({
         initialTodoCategory || 'work'
     );
     const [goalScopeId, setGoalScopeId] = useState<string>('');
-    const [initialLogTimes, setInitialLogTimes] = useState<{ start?: number; end?: number } | null>(null);
+    const [initialLogTimes, setInitialLogTimes] = useState<{ start?: number; end?: number; prefilledData?: { categoryId?: string; activityId?: string; linkedTodoId?: string } } | null>(null);
 
     const [focusDetailSessionId, setFocusDetailSessionId] = useState<string | null>(null);
     const [isShareViewOpen, setIsShareViewOpen] = useState(false);

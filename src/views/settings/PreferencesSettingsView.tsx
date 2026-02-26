@@ -5,7 +5,7 @@
 import React, { useState } from 'react';
 import { ChevronLeft, ChevronRight, ChevronDown } from 'lucide-react';
 import { ToastType } from '../../components/Toast';
-import { DefaultArchiveView, DefaultIndexView, DefaultRecordView } from '../../contexts/SettingsContext';
+import { DefaultArchiveView, DefaultIndexView, DefaultRecordView, SceneCardTimerMode } from '../../contexts/SettingsContext';
 
 interface PreferencesSettingsViewProps {
     onBack: () => void;
@@ -48,6 +48,8 @@ interface PreferencesSettingsViewProps {
     onSetCollapseThreshold?: (val: number) => void;
     manualSyncMode?: boolean;
     onToggleManualSyncMode?: () => void;
+    sceneCardTimerMode?: SceneCardTimerMode;
+    onSetSceneCardTimerMode?: (mode: SceneCardTimerMode) => void;
 }
 
 export const PreferencesSettingsView: React.FC<PreferencesSettingsViewProps> = ({
@@ -90,7 +92,9 @@ export const PreferencesSettingsView: React.FC<PreferencesSettingsViewProps> = (
     collapseThreshold = 9999,
     onSetCollapseThreshold,
     manualSyncMode = false,
-    onToggleManualSyncMode
+    onToggleManualSyncMode,
+    sceneCardTimerMode = 'realtime',
+    onSetSceneCardTimerMode
 }) => {
     const [isDefaultViewDropdownOpen, setIsDefaultViewDropdownOpen] = useState(false);
 
@@ -338,7 +342,7 @@ export const PreferencesSettingsView: React.FC<PreferencesSettingsViewProps> = (
                         </div>
 
                         {/* Auto Apply Todo Link Toggle */}
-                        <div className="flex items-center justify-between p-4 hover:bg-stone-50 transition-colors">
+                        <div className="flex items-center justify-between p-4 border-b border-stone-100 hover:bg-stone-50 transition-colors">
                             <div>
                                 <h4 className="font-bold text-stone-700">自动应用待办关联</h4>
                                 <p className="text-xs text-stone-400 mt-1">开启后，选择待办时会自动应用待办关联的标签；关闭后仅发出提醒</p>
@@ -352,6 +356,39 @@ export const PreferencesSettingsView: React.FC<PreferencesSettingsViewProps> = (
                                 />
                                 <div className="w-11 h-6 bg-stone-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-stone-800"></div>
                             </label>
+                        </div>
+
+                        {/* Scene Card Timer Mode */}
+                        <div className="flex items-center justify-between p-4 hover:bg-stone-50 transition-colors">
+                            <div>
+                                <h4 className="font-bold text-stone-700">场景卡片计时模式</h4>
+                                <p className="text-xs text-stone-400 mt-1">
+                                    正计时：点击卡片开始计时<br />
+                                    补记：点击卡片添加补记
+                                </p>
+                            </div>
+                            <div className="flex items-center gap-1 bg-stone-100 p-1 rounded-lg">
+                                <button
+                                    onClick={() => onSetSceneCardTimerMode?.('realtime')}
+                                    className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all ${
+                                        sceneCardTimerMode === 'realtime'
+                                            ? 'bg-white text-stone-800 shadow-sm'
+                                            : 'text-stone-400 hover:text-stone-600'
+                                    }`}
+                                >
+                                    正计时
+                                </button>
+                                <button
+                                    onClick={() => onSetSceneCardTimerMode?.('backfill')}
+                                    className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all ${
+                                        sceneCardTimerMode === 'backfill'
+                                            ? 'bg-white text-stone-800 shadow-sm'
+                                            : 'text-stone-400 hover:text-stone-600'
+                                    }`}
+                                >
+                                    补记
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>

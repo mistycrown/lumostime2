@@ -18,6 +18,7 @@ export type RecordViewMode = 'tags' | 'scenes';
 interface RecordViewContainerProps {
   onStartActivity: (activity: Activity, categoryId: string, autoEnterFocus?: boolean) => void;
   onStartTodoFocus?: (todo: TodoItem, autoEnterFocus?: boolean) => void;
+  onAddLog?: (startTime?: number, endTime?: number, prefilledData?: { categoryId?: string; activityId?: string; linkedTodoId?: string }) => void;
   categories: Category[];
   todos?: TodoItem[];
 }
@@ -25,6 +26,7 @@ interface RecordViewContainerProps {
 export const RecordViewContainer: React.FC<RecordViewContainerProps> = ({
   onStartActivity,
   onStartTodoFocus,
+  onAddLog,
   categories,
   todos = []
 }) => {
@@ -85,6 +87,7 @@ export const RecordViewContainer: React.FC<RecordViewContainerProps> = ({
           onConfigureSlots={handleConfigureSlots}
           onStartActivity={handleStartActivity}
           onStartTodoFocus={handleStartTodoFocus}
+          onAddLog={onAddLog}
           categories={categories}
           todos={todos}
         />

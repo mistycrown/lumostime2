@@ -11,6 +11,7 @@ export type DefaultIndexView = 'TAGS' | 'SCOPE';
 export type DefaultRecordView = 'TIMER' | 'SCENE';
 export type EmojiStyle = 'native' | 'twemoji' | 'openmoji';
 export type DefaultSelectorPage = 'emoji' | string; // 'emoji' 或 sticker set ID (如 'water', 'water-1', 'water-2')
+export type SceneCardTimerMode = 'realtime' | 'backfill'; // 'realtime' 正计时, 'backfill' 补记
 
 interface SettingsContextType {
     // 基础偏好设置
@@ -109,6 +110,10 @@ interface SettingsContextType {
     // 手动同步模式
     manualSyncMode: boolean;
     setManualSyncMode: React.Dispatch<React.SetStateAction<boolean>>;
+
+    // 场景卡片计时模式
+    sceneCardTimerMode: SceneCardTimerMode;
+    setSceneCardTimerMode: React.Dispatch<React.SetStateAction<SceneCardTimerMode>>;
 }
 
 const SettingsContext = createContext<SettingsContextType | undefined>(undefined);
@@ -230,6 +235,12 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
     const [manualSyncMode, setManualSyncMode] = useState<boolean>(() => {
         const stored = localStorage.getItem('lumostime_manual_sync_mode');
         return stored ? stored === 'true' : true; // 默认为 true（手动同步）
+    });
+
+    // 场景卡片计时模式
+    const [sceneCardTimerMode, setSceneCardTimerMode] = useState<SceneCardTimerMode>(() => {
+        const stored = localStorage.getItem('lumostime_scene_card_timer_mode');
+        return (stored as SceneCardTimerMode) || 'realtime'; // 默认为正计时
     });
 
     const updateLastSyncTime = () => {
@@ -395,6 +406,10 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
         localStorage.setItem('lumostime_manual_sync_mode', manualSyncMode.toString());
     }, [manualSyncMode]);
 
+    useEffect(() => {
+        localStorage.setItem('lumostime_scene_card_timer_mode', sceneCardTimerMode);
+    }, [sceneCardTimerMode]);
+
     return (
         <SettingsContext.Provider value={{
             minIdleTimeThreshold,
@@ -459,7 +474,9 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
             isSyncing,
             setIsSyncing,
             manualSyncMode,
-            setManualSyncMode
+            setManualSyncMode,
+            sceneCardTimerMode,
+            setSceneCardTimerMode
         }}>
             {children}
         </SettingsContext.Provider>
