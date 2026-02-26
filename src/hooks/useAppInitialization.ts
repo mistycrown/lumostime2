@@ -19,6 +19,7 @@ import { useData } from '../contexts/DataContext';
 import { dataRepairService } from '../services/dataRepairService';
 import { dualIconMigrationService } from '../services/dualIconMigrationService';
 import { initResetDataTool } from '../utils/resetDataTool';
+import FocusNotification from '../plugins/FocusNotificationPlugin';
 
 // Edge-to-Edge 支持（仅在 Android 上可用）
 let EdgeToEdge: any = null;
@@ -179,6 +180,36 @@ export const useAppInitialization = () => {
         };
         
         initEdgeToEdge();
+    }, []);
+
+    // Initialize floating window on Android if enabled
+    useEffect(() => {
+        const initFloatingWindow = async () => {
+            if (Capacitor.getPlatform() !== 'android') return;
+
+            try {
+                const floatingWindowEnabled = localStorage.getItem('floating_window_enabled') === 'true';
+                
+                if (floatingWindowEnabled) {
+                    console.log('🎈 检测到悬浮球已启用，尝试启动...');
+                    
+                    // 检查权限
+                    const { granted } = await FocusNotification.checkFloatingPermission();
+                    
+                    if (granted) {
+                        // 启动悬浮球服务
+                        await FocusNotification.startFloatingWindow();
+                        console.log('✅ 悬浮球已自动启动');
+                    } else {
+                        console.log('⚠️ 悬浮球权限未授予，无法自动启动');
+                    }
+                }
+            } catch (error) {
+                console.error('❌ 悬浮球初始化失败:', error);
+            }
+        };
+        
+        initFloatingWindow();
     }, []);
 
     /**

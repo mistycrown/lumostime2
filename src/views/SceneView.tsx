@@ -936,6 +936,7 @@ export const SceneView: React.FC<SceneViewProps> = ({
                   dailyReviews={dailyReviews}
                   logs={logs}
                   onAction={handleCardAction}
+                  sceneCardTimerMode={sceneCardTimerMode}
                 />
               );
             })

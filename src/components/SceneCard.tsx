@@ -24,9 +24,10 @@ interface SceneCardProps {
   dailyReviews?: DailyReview[];
   logs?: Log[]; // 用于计算计时和待办的时长统计
   onAction?: (action: SceneCardData['action'], autoEnterFocus?: boolean) => void;
+  sceneCardTimerMode?: 'realtime' | 'backfill'; // 场景卡片计时模式
 }
 
-export const SceneCard: React.FC<SceneCardProps> = ({ data, dailyReviews = [], logs = [], onAction }) => {
+export const SceneCard: React.FC<SceneCardProps> = ({ data, dailyReviews = [], logs = [], onAction, sceneCardTimerMode = 'realtime' }) => {
   // 获取卡片颜色（优先使用自定义颜色，否则使用默认颜色）
   const cardColor = data.color || DEFAULT_COLORS[data.type];
   
@@ -229,8 +230,8 @@ export const SceneCard: React.FC<SceneCardProps> = ({ data, dailyReviews = [], l
       setIsFlipped(true);
       saveFlipState(true);
       
-      // 如果配置了应用跳转，先尝试启动应用
-      if (data.action.launchApp && data.action.appPackageName) {
+      // 只在正计时模式下启动应用（补记模式下不启动应用）
+      if (sceneCardTimerMode === 'realtime' && data.action.launchApp && data.action.appPackageName) {
         const success = await AppLauncherService.launchApp(data.action.appPackageName);
         
         if (success) {
@@ -255,8 +256,8 @@ export const SceneCard: React.FC<SceneCardProps> = ({ data, dailyReviews = [], l
       switch (data.type) {
         case 'timer':
         case 'todo':
-          // 如果配置了应用跳转，再次启动应用
-          if (data.action.launchApp && data.action.appPackageName) {
+          // 只在正计时模式下启动应用（补记模式下不启动应用）
+          if (sceneCardTimerMode === 'realtime' && data.action.launchApp && data.action.appPackageName) {
             await AppLauncherService.launchApp(data.action.appPackageName);
           }
           
@@ -403,7 +404,7 @@ const CardFront: React.FC<{ data: SceneCardData; displayData: SceneCardData; car
       </div>
       
       {/* 第一行：名称 */}
-      <div className={data.type === 'stats' ? 'mb-2' : 'pr-12 mb-2'}>
+      <div className="mb-2">
         <h3 className="font-bold text-stone-800 text-base leading-tight break-words overflow-wrap-anywhere">
           {displayData.title}
         </h3>
