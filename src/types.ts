@@ -266,6 +266,7 @@ export interface TimeSlot {
   startTime: string; // HH:mm
   endTime: string; // HH:mm
   displayTitle?: string; // 可选的显示标题，如果有则显示标题，否则显示时间段
+  disableAutoSwitch?: boolean; // 是否禁用自动跳转到此时间段
   cards: SceneCardData[]; // 该时间段的卡片列表
 }
 

@@ -265,6 +265,7 @@ export const SceneSettingsView: React.FC<SceneSettingsViewProps> = ({ onBack }) 
       displayTitle: editingSlot.displayTitle,
       startTime: editingSlot.startTime,
       endTime: editingSlot.endTime,
+      disableAutoSwitch: editingSlot.disableAutoSwitch,
       cards: editingSlot.cards || []
     };
 
@@ -877,6 +878,30 @@ const SlotEditModal: React.FC<{
                 maxLength={4}
               />
             </div>
+          </div>
+
+          <div>
+            <div className="flex items-center justify-between">
+              <label className="text-xs sm:text-sm font-medium text-stone-700">
+                不自动跳转到此时间段
+              </label>
+              <button
+                onClick={() => onChange({ ...slot, disableAutoSwitch: !slot?.disableAutoSwitch })}
+                className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors`}
+                style={{
+                  backgroundColor: slot?.disableAutoSwitch ? 'var(--accent-color)' : '#d6d3d1'
+                }}
+              >
+                <span
+                  className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${
+                    slot?.disableAutoSwitch ? 'translate-x-5' : 'translate-x-0.5'
+                  }`}
+                />
+              </button>
+            </div>
+            <p className="text-[10px] sm:text-xs text-stone-500 mt-1">
+              开启后，系统不会根据当前时间自动切换到此时间段
+            </p>
           </div>
         </div>
       </div>

@@ -25,6 +25,26 @@ export const RecordView: React.FC<RecordViewProps> = ({ onStartActivity, categor
   const [backgroundUrl, setBackgroundUrl] = useState<string>('');
   const [backgroundOpacity, setBackgroundOpacity] = useState<number>(0.1);
 
+  // 初始化时从 localStorage 恢复用户上次选择的分组
+  useEffect(() => {
+    const savedCategoryId = localStorage.getItem('lastSelectedCategoryId');
+    
+    if (savedCategoryId && categories.some(c => c.id === savedCategoryId)) {
+      // 如果保存的分组 ID 仍然存在，则使用它
+      setSelectedCategoryId(savedCategoryId);
+    } else if (categories.length > 0) {
+      // 否则使用第一个分组
+      setSelectedCategoryId(categories[0].id);
+    }
+  }, [categories]);
+
+  // 保存用户选择的分组到 localStorage
+  useEffect(() => {
+    if (selectedCategoryId) {
+      localStorage.setItem('lastSelectedCategoryId', selectedCategoryId);
+    }
+  }, [selectedCategoryId]);
+
   useEffect(() => {
     const updateBackground = () => {
       const bg = backgroundService.getCurrentBackgroundOption();

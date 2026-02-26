@@ -129,6 +129,12 @@ export const SceneView: React.FC<SceneViewProps> = ({
     
     for (let i = 0; i < timeSlots.length; i++) {
       const slot = timeSlots[i];
+      
+      // 跳过禁用自动跳转的时间段
+      if (slot.disableAutoSwitch) {
+        continue;
+      }
+      
       const [startHour, startMin] = slot.startTime.split(':').map(Number);
       const [endHour, endMin] = slot.endTime.split(':').map(Number);
       
@@ -152,28 +158,73 @@ export const SceneView: React.FC<SceneViewProps> = ({
 
   // 自动切换到当前时间段 - 在首次加载和页面可见性变化时执行
   useEffect(() => {
-    if (timeSlots.length > 0) {
-      setSelectedSlotIndex(getCurrentTimeSlotIndex());
+    if (timeSlots.length === 0) return;
+    
+    // 获取当前时间对应的时间段索引
+    const autoSlotIndex = getCurrentTimeSlotIndex();
+    
+    // 尝试从 localStorage 获取用户上次选择的时间段
+    const savedSlotIndex = localStorage.getItem('lastSelectedSlotIndex');
+    
+    // 判断是否应该使用保存的索引
+    let targetIndex = autoSlotIndex;
+    
+    if (savedSlotIndex !== null) {
+      const savedIndex = parseInt(savedSlotIndex, 10);
+      
+      // 检查保存的索引是否有效
+      if (savedIndex >= 0 && savedIndex < timeSlots.length) {
+        // 如果当前没有匹配的自动时间段（autoSlotIndex 指向的是被跳过的或默认的第一个）
+        // 并且保存的时间段设置了 disableAutoSwitch，则使用保存的索引
+        const currentSlot = timeSlots[autoSlotIndex];
+        const savedSlot = timeSlots[savedIndex];
+        
+        // 如果自动匹配失败（返回了第一个作为默认值）或者匹配到的时间段禁用了自动跳转
+        // 则使用用户上次选择的时间段
+        if (savedSlot.disableAutoSwitch || currentSlot.disableAutoSwitch) {
+          targetIndex = savedIndex;
+        }
+      }
     }
+    
+    setSelectedSlotIndex(targetIndex);
     
     // 监听页面可见性变化（切换标签页、最小化窗口等）
     const handleVisibilityChange = () => {
       if (!document.hidden && timeSlots.length > 0) {
-        setSelectedSlotIndex(getCurrentTimeSlotIndex());
+        const autoIndex = getCurrentTimeSlotIndex();
+        const currentSlot = timeSlots[selectedSlotIndex];
+        
+        // 只有当前时间段没有禁用自动跳转时，才自动切换
+        if (!currentSlot?.disableAutoSwitch) {
+          setSelectedSlotIndex(autoIndex);
+        }
       }
     };
     
     // 监听窗口获得焦点（切回应用）
     const handleFocus = () => {
       if (timeSlots.length > 0) {
-        setSelectedSlotIndex(getCurrentTimeSlotIndex());
+        const autoIndex = getCurrentTimeSlotIndex();
+        const currentSlot = timeSlots[selectedSlotIndex];
+        
+        // 只有当前时间段没有禁用自动跳转时，才自动切换
+        if (!currentSlot?.disableAutoSwitch) {
+          setSelectedSlotIndex(autoIndex);
+        }
       }
     };
     
     // 监听记录页面激活事件（从其他标签切回记录标签）
     const handleRecordViewActivated = () => {
       if (timeSlots.length > 0) {
-        setSelectedSlotIndex(getCurrentTimeSlotIndex());
+        const autoIndex = getCurrentTimeSlotIndex();
+        const currentSlot = timeSlots[selectedSlotIndex];
+        
+        // 只有当前时间段没有禁用自动跳转时，才自动切换
+        if (!currentSlot?.disableAutoSwitch) {
+          setSelectedSlotIndex(autoIndex);
+        }
       }
     };
     
@@ -188,6 +239,13 @@ export const SceneView: React.FC<SceneViewProps> = ({
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [timeSlots]); // 依赖 timeSlots，当时间段配置变化时也重新检测
+
+  // 保存用户选择的时间段索引
+  useEffect(() => {
+    if (timeSlots.length > 0 && selectedSlotIndex >= 0) {
+      localStorage.setItem('lastSelectedSlotIndex', selectedSlotIndex.toString());
+    }
+  }, [selectedSlotIndex, timeSlots]);
 
   const currentSlot = timeSlots[selectedSlotIndex];
   const currentCards = currentSlot?.cards || [];
