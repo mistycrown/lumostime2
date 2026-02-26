@@ -51,9 +51,10 @@ export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialSta
   // 草稿保存的key
   const DRAFT_KEY = 'lumostime_addlog_draft';
   
-  // 检查是否有草稿（仅在新建模式下）
+  // 检查是否有草稿（仅在新建模式下，且没有预填充数据时）
   const loadDraft = (): Partial<LogFormState> | null => {
     if (initialLog) return null; // 编辑模式不加载草稿
+    if (prefilledData) return null; // 有预填充数据时不加载草稿（避免与场景卡片传递的数据冲突）
     try {
       const saved = localStorage.getItem(DRAFT_KEY);
       if (saved) {
@@ -72,6 +73,7 @@ export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialSta
   // 保存草稿
   const saveDraft = (state: LogFormState) => {
     if (initialLog) return; // 编辑模式不保存草稿
+    if (prefilledData) return; // 有预填充数据时不保存草稿（这是从场景卡片触发的）
     try {
       localStorage.setItem(DRAFT_KEY, JSON.stringify({
         formState: state,
@@ -143,7 +145,7 @@ export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialSta
   
   // 检查是否有草稿
   useEffect(() => {
-    if (!initialLog) {
+    if (!initialLog && !prefilledData) {
       try {
         const saved = localStorage.getItem(DRAFT_KEY);
         setHasDraft(!!saved);
@@ -151,7 +153,7 @@ export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialSta
         setHasDraft(false);
       }
     }
-  }, [initialLog]);
+  }, [initialLog, prefilledData]);
 
   // Auto-focus note on new log
   useEffect(() => {

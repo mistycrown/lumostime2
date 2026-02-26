@@ -183,7 +183,7 @@ export const useLogForm = ({
         }));
       }
     }
-  }, [initialLog, initialStartTime, initialEndTime, lastLogEndTime]); // 移除 draft 和 categories 依赖
+  }, [initialLog, initialStartTime, initialEndTime, lastLogEndTime, prefilledData, categories]); // 添加 prefilledData 和 categories 依赖
 
   // 计算上一条记录的结束时间
   const previousLogEndTime = useMemo(() => {
