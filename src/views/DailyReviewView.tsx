@@ -597,9 +597,10 @@ export const DailyReviewView: React.FC<DailyReviewViewProps> = ({
                                     });
 
                                     return Object.entries(groupedItems).map(([category, items]) => {
-                                        // 获取该分组第一个条目的 icon（用于分组标题）
-                                        const categoryIcon = items[0]?.icon;
-                                        const categoryUiIcon = items[0]?.uiIcon;
+                                        // 从模板中获取该分组的 icon
+                                        const template = checkTemplates.find(t => t.title === category);
+                                        const categoryIcon = template?.icon;
+                                        const categoryUiIcon = template?.uiIcon;
                                         
                                         return (
                                         <div key={category} className="space-y-2">
