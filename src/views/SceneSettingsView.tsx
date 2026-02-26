@@ -19,6 +19,7 @@ import { useData } from '../contexts/DataContext';
 import { useCategoryScope } from '../contexts/CategoryScopeContext';
 import { useReview } from '../contexts/ReviewContext';
 import { useToast } from '../contexts/ToastContext';
+import { useSettings } from '../contexts/SettingsContext';
 import { DEFAULT_SCENE_PRESETS } from '../constants/scenePresets';
 import { COLOR_OPTIONS } from '../constants';
 
@@ -54,6 +55,7 @@ export const SceneSettingsView: React.FC<SceneSettingsViewProps> = ({ onBack }) 
   const { categories } = useCategoryScope();
   const { checkTemplates } = useReview();
   const { addToast } = useToast();
+  const { sceneCardTimerMode } = useSettings();
   const isCustomIconEnabled = uiIconService.isCustomTheme();
 
   // 加载数据
@@ -700,6 +702,7 @@ export const SceneSettingsView: React.FC<SceneSettingsViewProps> = ({ onBack }) 
           todos={todos}
           todoCategories={todoCategories}
           checkTemplates={checkTemplates}
+          sceneCardTimerMode={sceneCardTimerMode}
         />
       )}
 
@@ -936,7 +939,8 @@ const CardEditModal: React.FC<{
   todos: TodoItem[];
   todoCategories: TodoCategory[];
   checkTemplates: CheckTemplate[];
-}> = ({ card, onSave, onCancel, onChange, categories, todos, todoCategories, checkTemplates }) => {
+  sceneCardTimerMode: 'realtime' | 'backfill';
+}> = ({ card, onSave, onCancel, onChange, categories, todos, todoCategories, checkTemplates, sceneCardTimerMode }) => {
   const cardTypes: { value: SceneCardType; label: string }[] = [
     { value: 'timer', label: '计时' },
     { value: 'todo', label: '待办' },
@@ -1261,51 +1265,56 @@ const CardEditModal: React.FC<{
                 onChange={handleActivityChange}
               />
               
-              {/* 自动进入沉浸式计时开关 */}
-              <div className="pt-3 border-t border-stone-200">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <label className="text-xs sm:text-sm font-medium text-stone-700">
-                      直接跳转沉浸式计时
-                    </label>
-                    <p className="text-[10px] sm:text-xs text-stone-500 mt-0.5">
-                      开启后点击卡片将自动进入沉浸式计时页面
-                    </p>
+              {/* 只在正计时模式下显示这两个选项 */}
+              {sceneCardTimerMode === 'realtime' && (
+                <>
+                  {/* 自动进入沉浸式计时开关 */}
+                  <div className="pt-3 border-t border-stone-200">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <label className="text-xs sm:text-sm font-medium text-stone-700">
+                          直接跳转沉浸式计时
+                        </label>
+                        <p className="text-[10px] sm:text-xs text-stone-500 mt-0.5">
+                          开启后点击卡片将自动进入沉浸式计时页面
+                        </p>
+                      </div>
+                      <button
+                        onClick={() => onChange({ ...card, autoEnterFocus: !card?.autoEnterFocus })}
+                        className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors`}
+                        style={{
+                          backgroundColor: card?.autoEnterFocus ? 'var(--accent-color)' : '#d6d3d1'
+                        }}
+                      >
+                        <span
+                          className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${
+                            card?.autoEnterFocus ? 'translate-x-5' : 'translate-x-0.5'
+                          }`}
+                        />
+                      </button>
+                    </div>
                   </div>
-                  <button
-                    onClick={() => onChange({ ...card, autoEnterFocus: !card?.autoEnterFocus })}
-                    className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors`}
-                    style={{
-                      backgroundColor: card?.autoEnterFocus ? 'var(--accent-color)' : '#d6d3d1'
-                    }}
-                  >
-                    <span
-                      className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${
-                        card?.autoEnterFocus ? 'translate-x-5' : 'translate-x-0.5'
-                      }`}
-                    />
-                  </button>
-                </div>
-              </div>
 
-              {/* 应用跳转配置 */}
-              <AppLaunchConfig
-                launchApp={card?.action?.launchApp}
-                appPackageName={card?.action?.appPackageName}
-                appName={card?.action?.appName}
-                onChange={(launchApp, appPackageName, appName) => {
-                  onChange({
-                    ...card,
-                    action: {
-                      ...card?.action,
-                      type: card?.action?.type || 'startTimer',
-                      launchApp,
-                      appPackageName,
-                      appName
-                    }
-                  });
-                }}
-              />
+                  {/* 应用跳转配置 */}
+                  <AppLaunchConfig
+                    launchApp={card?.action?.launchApp}
+                    appPackageName={card?.action?.appPackageName}
+                    appName={card?.action?.appName}
+                    onChange={(launchApp, appPackageName, appName) => {
+                      onChange({
+                        ...card,
+                        action: {
+                          ...card?.action,
+                          type: card?.action?.type || 'startTimer',
+                          launchApp,
+                          appPackageName,
+                          appName
+                        }
+                      });
+                    }}
+                  />
+                </>
+              )}
             </>
           )}
 
@@ -1318,51 +1327,56 @@ const CardEditModal: React.FC<{
                 onChange={handleTodoChange}
               />
               
-              {/* 自动进入沉浸式计时开关 */}
-              <div className="pt-3 border-t border-stone-200">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <label className="text-xs sm:text-sm font-medium text-stone-700">
-                      直接跳转沉浸式计时
-                    </label>
-                    <p className="text-[10px] sm:text-xs text-stone-500 mt-0.5">
-                      开启后点击卡片将自动进入沉浸式计时页面
-                    </p>
+              {/* 只在正计时模式下显示这两个选项 */}
+              {sceneCardTimerMode === 'realtime' && (
+                <>
+                  {/* 自动进入沉浸式计时开关 */}
+                  <div className="pt-3 border-t border-stone-200">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <label className="text-xs sm:text-sm font-medium text-stone-700">
+                          直接跳转沉浸式计时
+                        </label>
+                        <p className="text-[10px] sm:text-xs text-stone-500 mt-0.5">
+                          开启后点击卡片将自动进入沉浸式计时页面
+                        </p>
+                      </div>
+                      <button
+                        onClick={() => onChange({ ...card, autoEnterFocus: !card?.autoEnterFocus })}
+                        className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors`}
+                        style={{
+                          backgroundColor: card?.autoEnterFocus ? 'var(--accent-color)' : '#d6d3d1'
+                        }}
+                      >
+                        <span
+                          className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${
+                            card?.autoEnterFocus ? 'translate-x-5' : 'translate-x-0.5'
+                          }`}
+                        />
+                      </button>
+                    </div>
                   </div>
-                  <button
-                    onClick={() => onChange({ ...card, autoEnterFocus: !card?.autoEnterFocus })}
-                    className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors`}
-                    style={{
-                      backgroundColor: card?.autoEnterFocus ? 'var(--accent-color)' : '#d6d3d1'
-                    }}
-                  >
-                    <span
-                      className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${
-                        card?.autoEnterFocus ? 'translate-x-5' : 'translate-x-0.5'
-                      }`}
-                    />
-                  </button>
-                </div>
-              </div>
 
-              {/* 应用跳转配置 */}
-              <AppLaunchConfig
-                launchApp={card?.action?.launchApp}
-                appPackageName={card?.action?.appPackageName}
-                appName={card?.action?.appName}
-                onChange={(launchApp, appPackageName, appName) => {
-                  onChange({
-                    ...card,
-                    action: {
-                      ...card?.action,
-                      type: card?.action?.type || 'startTodo',
-                      launchApp,
-                      appPackageName,
-                      appName
-                    }
-                  });
-                }}
-              />
+                  {/* 应用跳转配置 */}
+                  <AppLaunchConfig
+                    launchApp={card?.action?.launchApp}
+                    appPackageName={card?.action?.appPackageName}
+                    appName={card?.action?.appName}
+                    onChange={(launchApp, appPackageName, appName) => {
+                      onChange({
+                        ...card,
+                        action: {
+                          ...card?.action,
+                          type: card?.action?.type || 'startTodo',
+                          launchApp,
+                          appPackageName,
+                          appName
+                        }
+                      });
+                    }}
+                  />
+                </>
+              )}
             </>
           )}
 
