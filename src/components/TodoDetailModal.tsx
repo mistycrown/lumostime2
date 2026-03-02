@@ -11,11 +11,12 @@ import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { TodoItem, TodoCategory, Log, Category, Scope } from '../types';
 import { ScopeAssociation } from './ScopeAssociation';
 import { TagAssociation } from './TagAssociation';
-import { Trash2, CheckCircle2, TrendingUp, ChevronLeft, Circle, Image as ImageIcon } from 'lucide-react';
+import { Trash2, CheckCircle2, TrendingUp, ChevronLeft, Circle, Image as ImageIcon, RotateCcw } from 'lucide-react';
 import { DetailTimelineCard } from './DetailTimelineCard';
 import { TimelineImage } from './TimelineImage';
 import { imageService } from '../services/imageService';
 import { IconRenderer } from './IconRenderer';
+import { useToast } from '../contexts/ToastContext';
 
 interface TodoDetailModalProps {
   initialTodo?: TodoItem | null;
@@ -34,6 +35,7 @@ interface TodoDetailModalProps {
 type Tab = '细节' | '時間線';
 
 export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({ initialTodo, currentCategory, onClose, onSave, onDelete, logs, onLogUpdate, onEditLog, todoCategories, categories, scopes }) => {
+  const { addToast } = useToast();
   const [activeTab, setActiveTab] = useState<Tab>(initialTodo ? '時間線' : '细节');
 
   // Stable ID for the session
@@ -210,6 +212,13 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({ initialTodo, c
 
   // Linked Logs
   const linkedLogs = useMemo(() => logs.filter(l => l.linkedTodoId === todoId), [logs, todoId]);
+
+  const handleRecalculateProgressFromLogs = () => {
+    if (!isProgress) return;
+    const recalculated = linkedLogs.reduce((sum, log) => sum + (log.progressIncrement || 0), 0);
+    setCompletedUnits(Math.max(0, recalculated));
+    addToast('success', `已按日志重算进度：${Math.max(0, recalculated)}`);
+  };
 
   // Stats
   const totalSeconds = linkedLogs.reduce((acc, curr) => acc + curr.duration, 0);
@@ -417,12 +426,24 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({ initialTodo, c
               <div>
                 <div className="flex items-center justify-between mb-1.5">
                   <label className="text-xs text-stone-400 font-medium">Progress Tracking</label>
-                  <div
-                    className={`w-12 h-6 rounded-full relative transition-colors cursor-pointer ${isProgress ? '' : 'bg-stone-200'}`}
-                    style={isProgress ? { backgroundColor: 'var(--progress-bar-fill)' } : undefined}
-                    onClick={() => setIsProgress(!isProgress)}
-                  >
-                    <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all shadow-sm ${isProgress ? 'left-7' : 'left-1'}`}></div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={handleRecalculateProgressFromLogs}
+                      disabled={!isProgress}
+                      className={`text-[10px] px-2 py-1 rounded-md border transition-colors flex items-center gap-1 ${isProgress ? 'text-stone-600 border-stone-200 hover:bg-stone-50' : 'text-stone-300 border-stone-100 cursor-not-allowed'}`}
+                      title={isProgress ? '按关联日志重算进度' : '请先开启 Progress Tracking'}
+                    >
+                      <RotateCcw size={10} />
+                      重算
+                    </button>
+                    <div
+                      className={`w-12 h-6 rounded-full relative transition-colors cursor-pointer ${isProgress ? '' : 'bg-stone-200'}`}
+                      style={isProgress ? { backgroundColor: 'var(--progress-bar-fill)' } : undefined}
+                      onClick={() => setIsProgress(!isProgress)}
+                    >
+                      <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all shadow-sm ${isProgress ? 'left-7' : 'left-1'}`}></div>
+                    </div>
                   </div>
                 </div>
 

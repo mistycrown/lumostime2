@@ -961,7 +961,21 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
                 onBack={() => setActiveSubmenu('main')}
                 logs={logs}
                 onUpdateLogs={(updatedLogs) => {
-                    onSyncUpdate({ ...syncData, logs: updatedLogs });
+                    const recalculatedTodos = (todos || []).map(todo => {
+                        if (!todo.isProgress) return todo;
+                        const completedUnits = updatedLogs
+                            .filter(log => log.linkedTodoId === todo.id)
+                            .reduce((sum, log) => sum + (log.progressIncrement || 0), 0);
+                        return {
+                            ...todo,
+                            completedUnits: Math.max(0, completedUnits)
+                        };
+                    });
+                    onSyncUpdate({
+                        ...syncData,
+                        logs: updatedLogs,
+                        todos: recalculatedTodos
+                    });
                 }}
                 categories={categoriesData || []}
                 scopes={scopes || []}

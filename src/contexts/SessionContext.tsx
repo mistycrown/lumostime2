@@ -136,16 +136,22 @@ export const SessionProvider: React.FC<SessionProviderProps> = ({ children, spli
 
                 const logs = splitLogByDays(baseLog);
 
-                // 处理进度增量
-                if (logs[0].progressIncrement && logs[0].progressIncrement > 0 && session.linkedTodoId && onUpdateTodo) {
-                    onUpdateTodo(session.linkedTodoId, logs[0].progressIncrement);
+                // 跨天拆分时，进度增量只应保留在首条日志，避免重复累计
+                logs.forEach((log, index) => {
+                    if (index > 0) {
+                        delete log.progressIncrement;
+                    }
+                });
 
-                    // 清除其他记录的进度增量
-                    logs.forEach((log, index) => {
-                        if (index > 0) {
-                            delete log.progressIncrement;
-                        }
-                    });
+                // 仅在未提供日志保存回调时，才使用直接更新待办进度作为兜底
+                if (
+                    !onSaveLog &&
+                    logs[0].progressIncrement &&
+                    logs[0].progressIncrement > 0 &&
+                    session.linkedTodoId &&
+                    onUpdateTodo
+                ) {
+                    onUpdateTodo(session.linkedTodoId, logs[0].progressIncrement);
                 }
 
                 // 保存日志

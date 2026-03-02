@@ -245,8 +245,7 @@ const AppContent: React.FC = () => {
     stopActivity(
       sessionId,
       undefined,
-      (logs) => logs.forEach(l => logManager.handleSaveLog(l)),
-      todoManager.updateTodoProgress
+      (logs) => logs.forEach(l => logManager.handleSaveLog(l))
     );
   };
 
@@ -447,8 +446,7 @@ const AppContent: React.FC = () => {
               stopActivity(
                 finalSession.id,
                 finalSession,
-                (logs) => logs.forEach(l => logManager.handleSaveLog(l)),
-                todoManager.updateTodoProgress
+                (logs) => logs.forEach(l => logManager.handleSaveLog(l))
               );
               setFocusDetailSessionId(null);
               setShouldAutoEnterImmersive(false);
