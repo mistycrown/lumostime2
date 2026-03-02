@@ -8,6 +8,7 @@
  */
 
 import { Log, Category, Scope, TodoItem, TodoCategory, DailyReview } from '../types';
+import { getLocalDateStr } from './dateUtils';
 
 /**
  * 格式化时长（秒 → 小时分钟）
@@ -448,20 +449,21 @@ export function calculateCheckItemStreak(
         }
     });
 
+    const completedDateSet = new Set(completedDates);
     const totalDays = completedDates.length;
 
     // 计算连续坚持天数（从目标日期往前推）
     let currentStreak = 0;
-    const targetDateStr = targetDate.toISOString().split('T')[0];
+    const targetDateStr = getLocalDateStr(targetDate);
     
     // 从目标日期开始往前查找连续完成的天数
     let checkDate = new Date(targetDate);
     checkDate.setHours(0, 0, 0, 0);
     
     while (true) {
-        const dateStr = checkDate.toISOString().split('T')[0];
-        
-        if (completedDates.includes(dateStr)) {
+        const dateStr = getLocalDateStr(checkDate);
+
+        if (completedDateSet.has(dateStr)) {
             currentStreak++;
             // 往前推一天
             checkDate.setDate(checkDate.getDate() - 1);

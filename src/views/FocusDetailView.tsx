@@ -317,7 +317,8 @@ export const FocusDetailView: React.FC<FocusDetailViewProps> = ({ session, todos
             {isImmersiveMode && (
                 <ImmersiveTimer 
                     elapsed={elapsed} 
-                    onExit={() => setIsImmersiveMode(false)} 
+                    onExit={() => setIsImmersiveMode(false)}
+                    onSubmit={handleComplete}
                 />
             )}
             

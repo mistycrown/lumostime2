@@ -23,6 +23,12 @@ import { syncService } from '../services/syncService';
 import { uploadDataToCloud, downloadWithBackup, CloudService } from '../utils/syncUtils';
 import { AppView } from '../types';
 import { SYNC_CONFIG } from '../config/syncConfig';
+import {
+    buildSceneGroupStateFromLegacySlots,
+    getActiveSceneGroup,
+    loadSceneGroupStateFromStorage,
+    saveSceneGroupStateToStorage
+} from '../utils/sceneGroupStorage';
 
 export const useSyncManager = () => {
     // Access Contexts at the top level
@@ -74,9 +80,16 @@ export const useSyncManager = () => {
             if (data.userPersonalInfo) setUserPersonalInfo(data.userPersonalInfo);
             if (data.filters) setFilters(data.filters);
             
-            // 恢复场景设置到 localStorage
-            if (data.sceneTimeSlots) {
-                localStorage.setItem('sceneTimeSlots', JSON.stringify(data.sceneTimeSlots));
+            // 恢复场景设置到 localStorage（优先新版 sceneGroupState，兼容旧版 sceneTimeSlots）
+            if (data.sceneGroupState) {
+                saveSceneGroupStateToStorage(data.sceneGroupState);
+                window.dispatchEvent(new Event('sceneGroupsUpdated'));
+                window.dispatchEvent(new Event('sceneTimeSlotsUpdated'));
+            } else if (data.sceneTimeSlots) {
+                const migrated = buildSceneGroupStateFromLegacySlots(data.sceneTimeSlots);
+                saveSceneGroupStateToStorage(migrated);
+                window.dispatchEvent(new Event('sceneGroupsUpdated'));
+                window.dispatchEvent(new Event('sceneTimeSlotsUpdated'));
             }
             
             // 恢复原则库到 localStorage
@@ -102,9 +115,9 @@ export const useSyncManager = () => {
     };
 
     const getFullLocalData = () => {
-        // 从 localStorage 读取场景设置
-        const sceneTimeSlotsStr = localStorage.getItem('sceneTimeSlots');
-        const sceneTimeSlots = sceneTimeSlotsStr ? JSON.parse(sceneTimeSlotsStr) : [];
+        // 从 localStorage 读取场景组设置（兼容旧版 sceneTimeSlots）
+        const sceneGroupState = loadSceneGroupStateFromStorage();
+        const sceneTimeSlots = getActiveSceneGroup(sceneGroupState)?.timeSlots || [];
         
         // 从 localStorage 读取原则库
         const principlesStr = localStorage.getItem('lumostime_principles');
@@ -114,6 +127,7 @@ export const useSyncManager = () => {
             logs, todos, categories, todoCategories, scopes, goals,
             autoLinkRules, reviewTemplates, checkTemplates, dailyReviews, weeklyReviews,
             monthlyReviews, customNarrativeTemplates, userPersonalInfo, filters,
+            sceneGroupState, // 新版：场景组状态
             sceneTimeSlots, // 添加场景设置
             principles, // 添加原则库
             version: '1.0.0',

@@ -8,13 +8,15 @@ import { backgroundService } from '../services/backgroundService';
 import { IconRenderer } from '../components/IconRenderer';
 import { UIIcon } from '../components/UIIcon';
 import { SceneCard } from '../components/SceneCard';
-import { TimeSlot, SceneCardData, Activity, Category, TodoItem, DailyReview, CheckItem, WeeklyReview, MonthlyReview, AppView, Log, ActiveSession } from '../types';
+import { TimeSlot, SceneCardData, Activity, Category, TodoItem, DailyReview, CheckItem, WeeklyReview, MonthlyReview, AppView, SceneGroupState } from '../types';
 import { DEFAULT_SCENE_PRESETS } from '../constants/scenePresets';
 import { useReview } from '../contexts/ReviewContext';
 import { useNavigation } from '../contexts/NavigationContext';
 import { useData } from '../contexts/DataContext';
 import { useToast } from '../contexts/ToastContext';
 import { useSettings } from '../contexts/SettingsContext';
+import { getLocalDateStr } from '../utils/dateUtils';
+import { getActiveSceneGroup, loadSceneGroupStateFromStorage } from '../utils/sceneGroupStorage';
 
 interface SceneViewProps {
   onConfigureSlots?: () => void;
@@ -53,8 +55,10 @@ export const SceneView: React.FC<SceneViewProps> = ({
   const [backgroundUrl, setBackgroundUrl] = useState<string>('');
   const [backgroundOpacity, setBackgroundOpacity] = useState<number>(0.1);
   
-  // 时间段数据（从 localStorage 加载，如果没有则使用 mock 数据）
-  const [timeSlots, setTimeSlots] = useState<TimeSlot[]>([]);
+  // 场景组状态（从 localStorage 加载，兼容旧数据迁移）
+  const [sceneGroupState, setSceneGroupState] = useState<SceneGroupState>(() => loadSceneGroupStateFromStorage());
+  const activeGroup = getActiveSceneGroup(sceneGroupState);
+  const timeSlots: TimeSlot[] = activeGroup?.timeSlots || DEFAULT_SCENE_PRESETS;
   
   // 当前选中的时间段索引
   const [selectedSlotIndex, setSelectedSlotIndex] = useState<number>(0);
@@ -64,41 +68,33 @@ export const SceneView: React.FC<SceneViewProps> = ({
 
   // 加载时间段数据
   useEffect(() => {
-    const loadTimeSlots = () => {
-      const saved = localStorage.getItem('sceneTimeSlots');
-      if (saved) {
-        try {
-          const parsed = JSON.parse(saved);
-          setTimeSlots(parsed);
-        } catch (e) {
-          console.error('Failed to parse scene time slots:', e);
-          setTimeSlots(DEFAULT_SCENE_PRESETS);
-        }
-      } else {
-        setTimeSlots(DEFAULT_SCENE_PRESETS);
-      }
+    const loadSceneGroups = () => {
+      const loaded = loadSceneGroupStateFromStorage();
+      setSceneGroupState(loaded);
     };
 
     // 初始加载
-    loadTimeSlots();
+    loadSceneGroups();
 
     // 监听 storage 事件，当其他标签页或场景设置页面修改数据时重新加载
     const handleStorageChange = (e: StorageEvent) => {
-      if (e.key === 'sceneTimeSlots') {
-        loadTimeSlots();
+      if (e.key === 'sceneGroupState' || e.key === 'sceneTimeSlots') {
+        loadSceneGroups();
       }
     };
 
     // 监听自定义事件，当同一页面内修改数据时重新加载
     const handleSceneUpdate = () => {
-      loadTimeSlots();
+      loadSceneGroups();
     };
 
     window.addEventListener('storage', handleStorageChange);
+    window.addEventListener('sceneGroupsUpdated', handleSceneUpdate);
     window.addEventListener('sceneTimeSlotsUpdated', handleSceneUpdate);
 
     return () => {
       window.removeEventListener('storage', handleStorageChange);
+      window.removeEventListener('sceneGroupsUpdated', handleSceneUpdate);
       window.removeEventListener('sceneTimeSlotsUpdated', handleSceneUpdate);
     };
   }, []);
@@ -168,7 +164,8 @@ export const SceneView: React.FC<SceneViewProps> = ({
     const autoSlotIndex = getCurrentTimeSlotIndex();
     
     // 尝试从 localStorage 获取用户上次选择的时间段
-    const savedSlotIndex = localStorage.getItem('lastSelectedSlotIndex');
+    const savedSlotKey = `lastSelectedSlotIndex_${activeGroup.id}`;
+    const savedSlotIndex = localStorage.getItem(savedSlotKey);
     
     // 判断是否应该使用保存的索引
     let targetIndex = autoSlotIndex;
@@ -247,9 +244,10 @@ export const SceneView: React.FC<SceneViewProps> = ({
   // 保存用户选择的时间段索引
   useEffect(() => {
     if (timeSlots.length > 0 && selectedSlotIndex >= 0) {
-      localStorage.setItem('lastSelectedSlotIndex', selectedSlotIndex.toString());
+      const savedSlotKey = `lastSelectedSlotIndex_${activeGroup.id}`;
+      localStorage.setItem(savedSlotKey, selectedSlotIndex.toString());
     }
-  }, [selectedSlotIndex, timeSlots]);
+  }, [selectedSlotIndex, timeSlots, activeGroup.id]);
 
   const currentSlot = timeSlots[selectedSlotIndex];
   const currentCards = currentSlot?.cards || [];
@@ -518,9 +516,9 @@ export const SceneView: React.FC<SceneViewProps> = ({
 
   // 处理日课打卡
   const handleToggleCheckItem = (checkItemId: string) => {
-    // 获取今天的日期
+    // 获取今天的日期（使用本地时间）
     const today = new Date();
-    const dateStr = today.toISOString().split('T')[0]; // YYYY-MM-DD
+    const dateStr = getLocalDateStr(today); // YYYY-MM-DD
 
     // 查找今天的 DailyReview
     let todayReview = dailyReviews.find(r => r.date === dateStr);
@@ -596,7 +594,7 @@ export const SceneView: React.FC<SceneViewProps> = ({
   // 获取日课的完成状态
   const getCheckItemStatus = (checkItemId: string): boolean => {
     const today = new Date();
-    const dateStr = today.toISOString().split('T')[0];
+    const dateStr = getLocalDateStr(today);
     const todayReview = dailyReviews.find(r => r.date === dateStr);
     
     if (!todayReview || !todayReview.checkItems) {

@@ -270,6 +270,20 @@ export interface TimeSlot {
   cards: SceneCardData[]; // 该时间段的卡片列表
 }
 
+// 场景组定义（场景组 -> 时间段）
+export interface SceneGroup {
+  id: string;
+  name: string;
+  timeSlots: TimeSlot[];
+}
+
+// 场景组存储状态
+export interface SceneGroupState {
+  version: 1;
+  activeGroupId: string;
+  groups: SceneGroup[];
+}
+
 // Stats Types (UI helpers)
 export interface SubStatItem {
   name: string;

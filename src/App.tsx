@@ -46,6 +46,7 @@ import { useAppDetection } from './hooks/useAppDetection';
 import { useHardwareBackButton } from './hooks/useHardwareBackButton';
 import { useAppLifecycle } from './hooks/useAppLifecycle';
 import { splitLogByDays } from './utils/logUtils';
+import { getActiveSceneGroup, loadSceneGroupStateFromStorage } from './utils/sceneGroupStorage';
 
 // Polyfill Buffer for webdav library
 if (typeof window !== 'undefined') {
@@ -133,9 +134,9 @@ const AppContent: React.FC = () => {
 
   // Implement Export/Import
   const handleExportData = () => {
-    // 从 localStorage 读取场景设置
-    const sceneTimeSlotsStr = localStorage.getItem('sceneTimeSlots');
-    const sceneTimeSlots = sceneTimeSlotsStr ? JSON.parse(sceneTimeSlotsStr) : [];
+    // 从 localStorage 读取场景组设置（兼容旧版 sceneTimeSlots）
+    const sceneGroupState = loadSceneGroupStateFromStorage();
+    const sceneTimeSlots = getActiveSceneGroup(sceneGroupState)?.timeSlots || [];
     
     // 从 localStorage 读取原则库
     const principlesStr = localStorage.getItem('lumostime_principles');
@@ -145,6 +146,7 @@ const AppContent: React.FC = () => {
       logs, todos, categories, todoCategories, scopes, goals,
       autoLinkRules, reviewTemplates, checkTemplates, dailyReviews, weeklyReviews,
       monthlyReviews, customNarrativeTemplates, userPersonalInfo, filters,
+      sceneGroupState, // 新版：场景组状态
       sceneTimeSlots, // 添加场景设置
       principles, // 添加原则库
       version: '1.0.0',

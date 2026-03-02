@@ -4,7 +4,7 @@
  */
 import React, { useState, useEffect } from 'react';
 import { ArrowLeft, Plus, Trash2, Edit2, Palette, Clock, RotateCcw, ChevronRight, ArrowUp, ArrowDown, Check } from 'lucide-react';
-import { TimeSlot, SceneCardData, SceneCardType, Category, TodoItem, TodoCategory, CheckTemplate } from '../types';
+import { TimeSlot, SceneCardData, SceneCardType, Category, TodoItem, TodoCategory, CheckTemplate, SceneGroup, SceneGroupState } from '../types';
 import { CustomSelect } from '../components/CustomSelect';
 import { UIIconSelectorCompact } from '../components/UIIconSelector';
 import { IconRenderer } from '../components/IconRenderer';
@@ -22,14 +22,18 @@ import { useToast } from '../contexts/ToastContext';
 import { useSettings } from '../contexts/SettingsContext';
 import { DEFAULT_SCENE_PRESETS } from '../constants/scenePresets';
 import { COLOR_OPTIONS } from '../constants';
+import { getActiveSceneGroup, loadSceneGroupStateFromStorage, saveSceneGroupStateToStorage } from '../utils/sceneGroupStorage';
 
 interface SceneSettingsViewProps {
   onBack: () => void;
 }
 
 export const SceneSettingsView: React.FC<SceneSettingsViewProps> = ({ onBack }) => {
-  const [timeSlots, setTimeSlots] = useState<TimeSlot[]>([]);
+  const [sceneGroupState, setSceneGroupState] = useState<SceneGroupState>(() => loadSceneGroupStateFromStorage());
   const [selectedSlotId, setSelectedSlotId] = useState<string | null>(null);
+  const [isEditingGroup, setIsEditingGroup] = useState(false);
+  const [groupEditMode, setGroupEditMode] = useState<'create' | 'rename'>('create');
+  const [groupNameDraft, setGroupNameDraft] = useState('');
   const [isEditingSlot, setIsEditingSlot] = useState(false);
   const [isEditingCard, setIsEditingCard] = useState(false);
   const [editingSlot, setEditingSlot] = useState<Partial<TimeSlot> | null>(null);
@@ -58,24 +62,128 @@ export const SceneSettingsView: React.FC<SceneSettingsViewProps> = ({ onBack }) 
   const { sceneCardTimerMode } = useSettings();
   const isCustomIconEnabled = uiIconService.isCustomTheme();
 
-  // 加载数据
-  useEffect(() => {
-    const saved = localStorage.getItem('sceneTimeSlots');
-    if (saved) {
-      setTimeSlots(JSON.parse(saved));
-    } else {
-      // 如果没有保存的数据，使用预设并保存到 localStorage
-      setTimeSlots(DEFAULT_SCENE_PRESETS);
-      localStorage.setItem('sceneTimeSlots', JSON.stringify(DEFAULT_SCENE_PRESETS));
-    }
-  }, []);
+  const activeGroup = getActiveSceneGroup(sceneGroupState);
+  const timeSlots = activeGroup?.timeSlots || [];
 
-  // 保存数据
-  const saveTimeSlots = (slots: TimeSlot[]) => {
-    setTimeSlots(slots);
-    localStorage.setItem('sceneTimeSlots', JSON.stringify(slots));
-    // 触发自定义事件，通知其他组件数据已更新
+  const persistSceneGroupState = (nextState: SceneGroupState) => {
+    const saved = saveSceneGroupStateToStorage(nextState);
+    setSceneGroupState(saved);
+    // 同时触发新旧事件，保证场景页与旧逻辑都能收到更新通知
+    window.dispatchEvent(new Event('sceneGroupsUpdated'));
     window.dispatchEvent(new Event('sceneTimeSlotsUpdated'));
+  };
+
+  // 保存当前激活分组的时间段
+  const saveTimeSlots = (slots: TimeSlot[]) => {
+    const updatedState: SceneGroupState = {
+      ...sceneGroupState,
+      groups: sceneGroupState.groups.map(group => (
+        group.id === activeGroup.id
+          ? { ...group, timeSlots: slots }
+          : group
+      ))
+    };
+    persistSceneGroupState(updatedState);
+  };
+
+  useEffect(() => {
+    // 切换场景组后，清空当前选中的时间段，避免引用到旧分组的 slot id
+    setSelectedSlotId(null);
+  }, [sceneGroupState.activeGroupId]);
+
+  const handleSwitchGroup = (groupId: string) => {
+    const exists = sceneGroupState.groups.some(group => group.id === groupId);
+    if (!exists) return;
+    persistSceneGroupState({
+      ...sceneGroupState,
+      activeGroupId: groupId
+    });
+  };
+
+  const handleCreateGroup = () => {
+    setGroupEditMode('create');
+    setGroupNameDraft('');
+    setIsEditingGroup(true);
+  };
+
+  const handleRenameGroup = () => {
+    setGroupEditMode('rename');
+    setGroupNameDraft(activeGroup.name);
+    setIsEditingGroup(true);
+  };
+
+  const handleSaveGroup = () => {
+    const trimmedName = groupNameDraft.trim();
+    if (!trimmedName) {
+      addToast('error', '场景组名称不能为空');
+      return;
+    }
+
+    if (groupEditMode === 'create') {
+      const duplicated = sceneGroupState.groups.some(group => group.name === trimmedName);
+      if (duplicated) {
+        addToast('error', '场景组名称已存在');
+        return;
+      }
+
+      const copiedSlots: TimeSlot[] = JSON.parse(JSON.stringify(activeGroup.timeSlots));
+      const newGroup: SceneGroup = {
+        id: `scene-group-${Date.now()}`,
+        name: trimmedName,
+        timeSlots: copiedSlots
+      };
+
+      persistSceneGroupState({
+        ...sceneGroupState,
+        activeGroupId: newGroup.id,
+        groups: [...sceneGroupState.groups, newGroup]
+      });
+      addToast('success', '场景组已创建（已复制当前组配置）');
+    } else {
+      const duplicated = sceneGroupState.groups.some(group => group.id !== activeGroup.id && group.name === trimmedName);
+      if (duplicated) {
+        addToast('error', '场景组名称已存在');
+        return;
+      }
+
+      persistSceneGroupState({
+        ...sceneGroupState,
+        groups: sceneGroupState.groups.map(group => (
+          group.id === activeGroup.id
+            ? { ...group, name: trimmedName }
+            : group
+        ))
+      });
+      addToast('success', '场景组名称已更新');
+    }
+
+    setIsEditingGroup(false);
+    setGroupNameDraft('');
+  };
+
+  const handleDeleteGroup = () => {
+    if (sceneGroupState.groups.length <= 1) {
+      addToast('error', '至少需要保留一个场景组');
+      return;
+    }
+
+    setConfirmModal({
+      isOpen: true,
+      title: '删除场景组',
+      description: `确定删除「${activeGroup.name}」场景组吗？该组下所有时间段和快捷方式都会被删除。`,
+      type: 'danger',
+      onConfirm: () => {
+        const remainingGroups = sceneGroupState.groups.filter(group => group.id !== activeGroup.id);
+        const nextActiveGroupId = remainingGroups[0].id;
+        persistSceneGroupState({
+          ...sceneGroupState,
+          activeGroupId: nextActiveGroupId,
+          groups: remainingGroups
+        });
+        setConfirmModal({ ...confirmModal, isOpen: false });
+        addToast('success', '场景组已删除');
+      }
+    });
   };
 
   // 获取卡片关联信息的描述
@@ -436,18 +544,18 @@ export const SceneSettingsView: React.FC<SceneSettingsViewProps> = ({ onBack }) 
     saveTimeSlots(updatedSlots);
   };
 
-  // 重设为预设场景
+  // 重设当前场景组为预设场景
   const handleResetToPresets = () => {
     setConfirmModal({
       isOpen: true,
-      title: '重设为预设场景',
-      description: '确定要重设为预设场景吗？\n\n这将清除所有自定义配置，恢复为默认的时间段和快捷方式。此操作不可撤销。',
+      title: '重设当前场景组',
+      description: `确定要重设「${activeGroup.name}」吗？\n\n这将清除当前组的自定义配置，恢复为默认的时间段和快捷方式。此操作不可撤销。`,
       type: 'warning',
       onConfirm: () => {
         saveTimeSlots(DEFAULT_SCENE_PRESETS);
         setSelectedSlotId(null);
         setConfirmModal({ ...confirmModal, isOpen: false });
-        addToast('success', '已重设为预设场景');
+        addToast('success', '当前场景组已重设为预设场景');
       }
     });
   };
@@ -466,11 +574,11 @@ export const SceneSettingsView: React.FC<SceneSettingsViewProps> = ({ onBack }) 
         </button>
         <h1 className="font-serif font-bold text-lg text-stone-800">场景设置</h1>
         
-        {/* 重设为预设场景按钮 */}
+        {/* 重设当前场景组按钮 */}
         <button
           onClick={handleResetToPresets}
           className="p-2 -mr-2 text-stone-400 hover:text-stone-600 transition-colors"
-          title="重设为预设场景"
+          title="重设当前场景组"
         >
           <RotateCcw size={20} />
         </button>
@@ -478,6 +586,49 @@ export const SceneSettingsView: React.FC<SceneSettingsViewProps> = ({ onBack }) 
 
       {/* 主体内容 - 单列布局 */}
       <div className="flex-1 overflow-y-auto">
+        {/* 场景组管理 */}
+        <div className="p-3 sm:p-4 border-b-4 border-stone-200 bg-white">
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-sm font-bold text-stone-700">场景组管理</h2>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={handleCreateGroup}
+                className="flex items-center gap-1 px-2.5 py-1.5 text-xs bg-stone-800 text-white rounded-lg hover:bg-stone-700 transition-colors"
+                title="新建场景组"
+              >
+                <Plus size={12} />
+                新建
+              </button>
+              <button
+                onClick={handleRenameGroup}
+                className="p-1.5 text-stone-500 hover:text-stone-700 hover:bg-stone-100 rounded transition-colors"
+                title="重命名场景组"
+              >
+                <Edit2 size={14} />
+              </button>
+              <button
+                onClick={handleDeleteGroup}
+                disabled={sceneGroupState.groups.length <= 1}
+                className="p-1.5 text-red-500 hover:text-red-600 hover:bg-red-50 rounded transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                title="删除场景组"
+              >
+                <Trash2 size={14} />
+              </button>
+            </div>
+          </div>
+          <CustomSelect
+            value={sceneGroupState.activeGroupId}
+            onChange={(value) => handleSwitchGroup(value)}
+            options={sceneGroupState.groups.map(group => ({
+              value: group.id,
+              label: `${group.name}（${group.timeSlots.length} 个时间段）`
+            }))}
+          />
+          <p className="text-xs text-stone-500 mt-2">
+            每个场景组独立保存一套时间段和快捷方式。场景视图将展示当前选中的场景组。
+          </p>
+        </div>
+
         {/* 时间段列表 */}
         <div className="p-3 sm:p-4 border-b-4 border-stone-200 bg-white">
           <div className="flex items-center justify-between mb-3">
@@ -686,6 +837,49 @@ export const SceneSettingsView: React.FC<SceneSettingsViewProps> = ({ onBack }) 
           onChange={setEditingSlot}
           isCustomIconEnabled={isCustomIconEnabled}
         />
+      )}
+
+      {/* 编辑场景组弹窗 */}
+      {isEditingGroup && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl w-full max-w-md p-4 sm:p-6">
+            <h2 className="text-lg sm:text-xl font-bold mb-4">
+              {groupEditMode === 'create' ? '新建场景组' : '重命名场景组'}
+            </h2>
+            <div className="space-y-3">
+              <div>
+                <label className="block text-xs sm:text-sm font-medium text-stone-700 mb-1">
+                  场景组名称
+                </label>
+                <input
+                  type="text"
+                  value={groupNameDraft}
+                  onChange={(e) => setGroupNameDraft(e.target.value)}
+                  className="w-full px-3 py-2 text-sm border border-stone-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-stone-800"
+                  placeholder={groupEditMode === 'create' ? '例如：工作日' : '请输入新的名称'}
+                  autoFocus
+                />
+              </div>
+            </div>
+            <div className="flex gap-2 mt-5">
+              <button
+                onClick={() => {
+                  setIsEditingGroup(false);
+                  setGroupNameDraft('');
+                }}
+                className="flex-1 px-4 py-2 text-sm border border-stone-300 rounded-lg hover:bg-stone-50 transition-colors"
+              >
+                取消
+              </button>
+              <button
+                onClick={handleSaveGroup}
+                className="flex-1 px-4 py-2 text-sm bg-stone-800 text-white rounded-lg hover:bg-stone-700 transition-colors"
+              >
+                保存
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* 编辑快捷方式弹窗 */}

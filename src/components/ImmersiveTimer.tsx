@@ -1,12 +1,12 @@
 /**
  * @file ImmersiveTimer.tsx
- * @input elapsed time, onExit callback
- * @output Immersive fullscreen timer display
+ * @input elapsed time, onExit callback, onSubmit callback
+ * @output Immersive fullscreen timer display, session submit trigger
  * @pos Component (View)
  * @description A landscape-oriented immersive timer view with minimal UI. Shows large timer digits, with controls appearing on tap.
  */
 import React, { useState, useEffect } from 'react';
-import { X, Volume2, VolumeX, Palette, Clock } from 'lucide-react';
+import { X, Volume2, VolumeX, Palette, Clock, Check } from 'lucide-react';
 import { ImmersiveSelectorModal } from './ImmersiveSelectorModal';
 import { FlipClock } from './FlipClock';
 import { Capacitor } from '@capacitor/core';
@@ -151,9 +151,10 @@ const CLOCK_STYLES = [
 interface ImmersiveTimerProps {
     elapsed: number;
     onExit: () => void;
+    onSubmit: () => void;
 }
 
-export const ImmersiveTimer: React.FC<ImmersiveTimerProps> = ({ elapsed, onExit }) => {
+export const ImmersiveTimer: React.FC<ImmersiveTimerProps> = ({ elapsed, onExit, onSubmit }) => {
     const [showControls, setShowControls] = useState(false);
     const [isWhiteNoiseOn, setIsWhiteNoiseOn] = useState(false);
     const [audioElement, setAudioElement] = useState<HTMLAudioElement | null>(null);
@@ -759,6 +760,28 @@ export const ImmersiveTimer: React.FC<ImmersiveTimerProps> = ({ elapsed, onExit 
                         onMouseLeave={(e) => e.currentTarget.style.backgroundColor = currentTheme.buttonBg}
                     >
                         <X size={24} strokeWidth={2} />
+                    </button>
+
+                    {/* Submit Button - Top Left (next to back) */}
+                    <button
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            onSubmit();
+                        }}
+                        title="提交并保存"
+                        className="pointer-events-auto absolute left-[72px] w-12 h-12 rounded-full backdrop-blur-md flex items-center justify-center active:scale-95 transition-all shadow-lg"
+                        style={{
+                            top: 'calc(0.5rem + env(safe-area-inset-top, 0px))',
+                            backgroundColor: currentTheme.buttonBg,
+                            borderWidth: '1.5px',
+                            borderStyle: 'solid',
+                            borderColor: currentTheme.buttonBorder,
+                            color: currentTheme.buttonText
+                        }}
+                        onMouseEnter={(e) => e.currentTarget.style.backgroundColor = currentTheme.buttonHoverBg}
+                        onMouseLeave={(e) => e.currentTarget.style.backgroundColor = currentTheme.buttonBg}
+                    >
+                        <Check size={24} strokeWidth={2.5} />
                     </button>
 
                     {/* Clock Style Button - Top Right (third from right) */}
