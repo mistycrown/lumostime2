@@ -194,7 +194,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
     const { logs: ctxLogs, todos: ctxTodos, todoCategories: ctxTodoCategories, setLocalDataTimestamp } = useData();
     const { categories: ctxCategories, scopes: ctxScopes, goals: ctxGoals } = useCategoryScope();
     const { autoLinkRules: ctxAutoLinkRules, autoApplyAutoLinkRules, setAutoApplyAutoLinkRules, autoApplyTodoLink, setAutoApplyTodoLink, autoOpenFocusDetail, setAutoOpenFocusDetail, userPersonalInfo: ctxUserPersonalInfo, filters: ctxFilters, customNarrativeTemplates: ctxCustomNarrativeTemplates, useTwemoji, setUseTwemoji, sceneCardTimerMode, setSceneCardTimerMode } = useSettings();
-    const { dailyReviews: ctxDailyReviews, weeklyReviews: ctxWeeklyReviews, monthlyReviews: ctxMonthlyReviews, reviewTemplates: ctxReviewTemplates } = useReview();
+    const { dailyReviews: ctxDailyReviews, weeklyReviews: ctxWeeklyReviews, monthlyReviews: ctxMonthlyReviews, reviewTemplates: ctxReviewTemplates, checkTemplates: ctxCheckTemplates } = useReview();
 
     const [activeSubmenu, setActiveSubmenu] = useState<'main' | 'data' | 'cloud' | 's3' | 'ai' | 'preferences' | 'guide' | 'nfc' | 'templates' | 'check_templates' | 'narrative_prompt' | 'auto_record' | 'autolink' | 'obsidian_export' | 'filters' | 'memoir_filter' | 'batch_manage' | 'sponsorship_preview' | 'scene' | 'emoji' | 'principle'>('main');
     const [webdavConfig, setWebdavConfig] = useState<WebDAVConfig | null>(null);
