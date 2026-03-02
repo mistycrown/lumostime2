@@ -5,11 +5,13 @@
  * @description 场景组存储工具：统一读写场景组，并兼容旧版 sceneTimeSlots 数据。
  */
 import { DEFAULT_SCENE_PRESETS } from '../constants/scenePresets';
-import { SceneGroup, SceneGroupState, TimeSlot } from '../types';
+import { SceneGroup, SceneGroupAutoSwitchConfig, SceneGroupState, TimeSlot } from '../types';
 
 export const SCENE_GROUP_STATE_KEY = 'sceneGroupState';
 export const SCENE_TIME_SLOTS_LEGACY_KEY = 'sceneTimeSlots';
 export const DEFAULT_SCENE_GROUP_ID = 'scene-group-default';
+const ISO_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+const DIGIT_DATE_PATTERN = /^\d{8}$/;
 
 const cloneTimeSlots = (timeSlots: TimeSlot[]): TimeSlot[] => {
   return JSON.parse(JSON.stringify(timeSlots));
@@ -21,6 +23,45 @@ const normalizeGroupName = (name?: string): string => {
   return trimmed || '默认分组';
 };
 
+const normalizeAutoSwitchConfig = (config?: Partial<SceneGroupAutoSwitchConfig>): SceneGroupAutoSwitchConfig => {
+  const rawMode = config?.mode;
+  const mode = rawMode === 'weekend' || rawMode === 'dateRange' || rawMode === 'weekday' ? rawMode : 'weekday';
+  const enabled = Boolean(config?.enabled);
+  const startDate = normalizeDateKey(config?.startDate);
+  const endDate = normalizeDateKey(config?.endDate);
+  const isRangeMode = mode === 'dateRange';
+
+  return {
+    enabled,
+    mode,
+    startDate: isRangeMode && startDate ? startDate : undefined,
+    endDate: isRangeMode && endDate ? endDate : undefined
+  };
+};
+
+const getLocalDateKey = (date: Date): string => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
+const normalizeDateKey = (dateStr?: string): string | undefined => {
+  if (!dateStr) return undefined;
+  const trimmed = dateStr.trim();
+  if (DIGIT_DATE_PATTERN.test(trimmed)) {
+    return trimmed;
+  }
+  if (ISO_DATE_PATTERN.test(trimmed)) {
+    return trimmed.replace(/-/g, '');
+  }
+  return undefined;
+};
+
+const isValidDateKey = (dateStr?: string): boolean => {
+  return Boolean(dateStr && DIGIT_DATE_PATTERN.test(dateStr));
+};
+
 export const buildSceneGroupStateFromLegacySlots = (timeSlots: TimeSlot[]): SceneGroupState => {
   const fallbackSlots = timeSlots.length > 0 ? timeSlots : DEFAULT_SCENE_PRESETS;
   return {
@@ -30,7 +71,11 @@ export const buildSceneGroupStateFromLegacySlots = (timeSlots: TimeSlot[]): Scen
       {
         id: DEFAULT_SCENE_GROUP_ID,
         name: '默认分组',
-        timeSlots: cloneTimeSlots(fallbackSlots)
+        timeSlots: cloneTimeSlots(fallbackSlots),
+        autoSwitch: {
+          enabled: false,
+          mode: 'weekday'
+        }
       }
     ]
   };
@@ -44,7 +89,8 @@ const normalizeSceneGroupState = (state: Partial<SceneGroupState> | null | undef
     .map(group => ({
       id: group.id,
       name: normalizeGroupName(group.name),
-      timeSlots: Array.isArray(group.timeSlots) ? group.timeSlots : []
+      timeSlots: Array.isArray(group.timeSlots) ? group.timeSlots : [],
+      autoSwitch: normalizeAutoSwitchConfig(group.autoSwitch)
     }));
 
   if (groups.length === 0) {
@@ -64,6 +110,42 @@ const normalizeSceneGroupState = (state: Partial<SceneGroupState> | null | undef
 export const getActiveSceneGroup = (state: SceneGroupState): SceneGroup => {
   const group = state.groups.find(item => item.id === state.activeGroupId);
   return group || state.groups[0];
+};
+
+export const isSceneGroupAutoSwitchMatched = (group: SceneGroup, date: Date = new Date()): boolean => {
+  const config = normalizeAutoSwitchConfig(group.autoSwitch);
+  if (!config.enabled) return false;
+
+  const day = date.getDay();
+  if (config.mode === 'weekday') {
+    return day >= 1 && day <= 5;
+  }
+
+  if (config.mode === 'weekend') {
+    return day === 0 || day === 6;
+  }
+
+  if (config.mode === 'dateRange') {
+    if (!isValidDateKey(config.startDate) || !isValidDateKey(config.endDate)) {
+      return false;
+    }
+    const todayKey = normalizeDateKey(getLocalDateKey(date));
+    if (!todayKey) {
+      return false;
+    }
+    return todayKey >= config.startDate! && todayKey <= config.endDate!;
+  }
+
+  return false;
+};
+
+export const findAutoSwitchTargetGroup = (state: SceneGroupState, date: Date = new Date()): SceneGroup | null => {
+  for (const group of state.groups) {
+    if (isSceneGroupAutoSwitchMatched(group, date)) {
+      return group;
+    }
+  }
+  return null;
 };
 
 export const saveSceneGroupStateToStorage = (state: SceneGroupState): SceneGroupState => {

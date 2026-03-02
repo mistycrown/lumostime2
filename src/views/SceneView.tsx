@@ -1,6 +1,6 @@
 /**
  * @file SceneView.tsx
- * @description 场景化时间段视图 - 卡片式布局，支持正反面翻转
+ * @description 场景化时间段视图 - 基于当前激活场景组展示卡片式时间段内容
  */
 import React, { useState, useEffect } from 'react';
 import { Clock } from 'lucide-react';
@@ -16,7 +16,7 @@ import { useData } from '../contexts/DataContext';
 import { useToast } from '../contexts/ToastContext';
 import { useSettings } from '../contexts/SettingsContext';
 import { getLocalDateStr } from '../utils/dateUtils';
-import { getActiveSceneGroup, loadSceneGroupStateFromStorage } from '../utils/sceneGroupStorage';
+import { findAutoSwitchTargetGroup, getActiveSceneGroup, loadSceneGroupStateFromStorage, saveSceneGroupStateToStorage } from '../utils/sceneGroupStorage';
 
 interface SceneViewProps {
   onConfigureSlots?: () => void;
@@ -66,26 +66,35 @@ export const SceneView: React.FC<SceneViewProps> = ({
   // 用于触发统计卡片的重新计算
   const [statsUpdateTrigger, setStatsUpdateTrigger] = useState(0);
 
+  const loadSceneGroups = (allowAutoSwitch: boolean = true) => {
+    let loaded = loadSceneGroupStateFromStorage();
+    if (allowAutoSwitch) {
+      const targetGroup = findAutoSwitchTargetGroup(loaded, new Date());
+      if (targetGroup && targetGroup.id !== loaded.activeGroupId) {
+        loaded = saveSceneGroupStateToStorage({
+          ...loaded,
+          activeGroupId: targetGroup.id
+        });
+      }
+    }
+    setSceneGroupState(loaded);
+  };
+
   // 加载时间段数据
   useEffect(() => {
-    const loadSceneGroups = () => {
-      const loaded = loadSceneGroupStateFromStorage();
-      setSceneGroupState(loaded);
-    };
-
     // 初始加载
-    loadSceneGroups();
+    loadSceneGroups(true);
 
     // 监听 storage 事件，当其他标签页或场景设置页面修改数据时重新加载
     const handleStorageChange = (e: StorageEvent) => {
       if (e.key === 'sceneGroupState' || e.key === 'sceneTimeSlots') {
-        loadSceneGroups();
+        loadSceneGroups(true);
       }
     };
 
     // 监听自定义事件，当同一页面内修改数据时重新加载
     const handleSceneUpdate = () => {
-      loadSceneGroups();
+      loadSceneGroups(true);
     };
 
     window.addEventListener('storage', handleStorageChange);
@@ -97,6 +106,33 @@ export const SceneView: React.FC<SceneViewProps> = ({
       window.removeEventListener('sceneGroupsUpdated', handleSceneUpdate);
       window.removeEventListener('sceneTimeSlotsUpdated', handleSceneUpdate);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // 页面重新可见时重新评估场景组自动切换
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        loadSceneGroups(true);
+      }
+    };
+    const handleFocus = () => {
+      loadSceneGroups(true);
+    };
+    const handleRecordViewActivated = () => {
+      loadSceneGroups(true);
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('focus', handleFocus);
+    window.addEventListener('recordViewActivated', handleRecordViewActivated);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('focus', handleFocus);
+      window.removeEventListener('recordViewActivated', handleRecordViewActivated);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // 背景更新逻辑 - 仅在首次加载时执行
@@ -863,9 +899,14 @@ export const SceneView: React.FC<SceneViewProps> = ({
 
         {/* 头部：当前时间段标题或时间 */}
         <div className="mb-8 md:mb-10 flex items-center mt-2 md:mt-0">
-          <h1 className="text-xl md:text-2xl font-mono font-light text-stone-600 tracking-tight">
-            {currentSlot.displayTitle || `${currentSlot.startTime} - ${currentSlot.endTime}`}
-          </h1>
+          <div className="flex items-center gap-2">
+            <h1 className="text-xl md:text-2xl font-mono font-light text-stone-600 tracking-tight">
+              {currentSlot.displayTitle || `${currentSlot.startTime} - ${currentSlot.endTime}`}
+            </h1>
+            <span className="px-2 py-0.5 text-[11px] md:text-xs text-stone-500 border border-stone-200 rounded-full bg-white/70">
+              {activeGroup.name}
+            </span>
+          </div>
           <div className="h-px flex-1 bg-stone-100 ml-4"></div>
         </div>
 

@@ -1,10 +1,10 @@
 /**
  * @file SceneSettingsView.tsx
- * @description 场景设置页面 - 管理时间段和快捷方式
+ * @description 场景设置页面 - 管理场景组、时间段和快捷方式
  */
 import React, { useState, useEffect } from 'react';
 import { ArrowLeft, Plus, Trash2, Edit2, Palette, Clock, RotateCcw, ChevronRight, ArrowUp, ArrowDown, Check } from 'lucide-react';
-import { TimeSlot, SceneCardData, SceneCardType, Category, TodoItem, TodoCategory, CheckTemplate, SceneGroup, SceneGroupState } from '../types';
+import { TimeSlot, SceneCardData, SceneCardType, Category, TodoItem, TodoCategory, CheckTemplate, SceneGroup, SceneGroupAutoSwitchConfig, SceneGroupState } from '../types';
 import { CustomSelect } from '../components/CustomSelect';
 import { UIIconSelectorCompact } from '../components/UIIconSelector';
 import { IconRenderer } from '../components/IconRenderer';
@@ -22,7 +22,7 @@ import { useToast } from '../contexts/ToastContext';
 import { useSettings } from '../contexts/SettingsContext';
 import { DEFAULT_SCENE_PRESETS } from '../constants/scenePresets';
 import { COLOR_OPTIONS } from '../constants';
-import { getActiveSceneGroup, loadSceneGroupStateFromStorage, saveSceneGroupStateToStorage } from '../utils/sceneGroupStorage';
+import { getActiveSceneGroup, isSceneGroupAutoSwitchMatched, loadSceneGroupStateFromStorage, saveSceneGroupStateToStorage } from '../utils/sceneGroupStorage';
 
 interface SceneSettingsViewProps {
   onBack: () => void;
@@ -184,6 +184,44 @@ export const SceneSettingsView: React.FC<SceneSettingsViewProps> = ({ onBack }) 
         addToast('success', '场景组已删除');
       }
     });
+  };
+
+  const updateActiveGroupAutoSwitch = (updater: (current: SceneGroupAutoSwitchConfig) => SceneGroupAutoSwitchConfig) => {
+    const currentConfig: SceneGroupAutoSwitchConfig = activeGroup.autoSwitch || {
+      enabled: false,
+      mode: 'weekday'
+    };
+    const nextConfig = updater(currentConfig);
+    persistSceneGroupState({
+      ...sceneGroupState,
+      groups: sceneGroupState.groups.map(group => (
+        group.id === activeGroup.id
+          ? { ...group, autoSwitch: nextConfig }
+          : group
+      ))
+    });
+  };
+
+  const autoSwitchConfig: SceneGroupAutoSwitchConfig = activeGroup.autoSwitch || {
+    enabled: false,
+    mode: 'weekday'
+  };
+
+  const getRuleSummary = (config: SceneGroupAutoSwitchConfig): string => {
+    if (!config.enabled) return '未启用';
+    if (config.mode === 'weekday') return '每周一至周五';
+    if (config.mode === 'weekend') return '每周六、周日';
+    if (config.mode === 'dateRange') {
+      if (config.startDate && config.endDate) {
+        return `${config.startDate} ~ ${config.endDate}`;
+      }
+      return '日期区间未完整设置';
+    }
+    return '规则未设置';
+  };
+
+  const normalizeEightDigitDateInput = (value: string): string => {
+    return value.replace(/\D/g, '').slice(0, 8);
   };
 
   // 获取卡片关联信息的描述
@@ -627,6 +665,125 @@ export const SceneSettingsView: React.FC<SceneSettingsViewProps> = ({ onBack }) 
           <p className="text-xs text-stone-500 mt-2">
             每个场景组独立保存一套时间段和快捷方式。场景视图将展示当前选中的场景组。
           </p>
+
+          <div className="mt-3 p-3 rounded-lg border border-stone-200 bg-stone-50/60">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <h3 className="text-sm font-bold text-stone-700">自动切换规则</h3>
+                <p className="text-xs text-stone-500 mt-0.5">
+                  命中规则时会自动切换到该场景组。多个组同时命中时，按场景组列表顺序取第一个。
+                </p>
+              </div>
+              <button
+                onClick={() => {
+                  updateActiveGroupAutoSwitch((current) => ({
+                    ...current,
+                    mode: current.mode || 'weekday',
+                    enabled: !current.enabled
+                  }));
+                }}
+                className="relative inline-flex h-5 w-9 items-center rounded-full transition-colors flex-shrink-0 self-end sm:self-auto"
+                style={{
+                  backgroundColor: autoSwitchConfig.enabled ? 'var(--accent-color)' : '#d6d3d1'
+                }}
+                title={autoSwitchConfig.enabled ? '关闭自动切换' : '开启自动切换'}
+              >
+                <span
+                  className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${
+                    autoSwitchConfig.enabled ? 'translate-x-5' : 'translate-x-0.5'
+                  }`}
+                />
+              </button>
+            </div>
+
+            {autoSwitchConfig.enabled && (
+              <div className="mt-3 space-y-3">
+                <div>
+                  <label className="block text-xs font-medium text-stone-700 mb-1">规则类型</label>
+                  <CustomSelect
+                    value={autoSwitchConfig.mode}
+                    onChange={(value) => {
+                      const mode = value as SceneGroupAutoSwitchConfig['mode'];
+                      updateActiveGroupAutoSwitch((current) => ({
+                        ...current,
+                        mode,
+                        startDate: mode === 'dateRange' ? current.startDate : undefined,
+                        endDate: mode === 'dateRange' ? current.endDate : undefined
+                      }));
+                    }}
+                    options={[
+                      { value: 'weekday', label: '工作日（周一至周五）' },
+                      { value: 'weekend', label: '周末（周六和周日）' },
+                      { value: 'dateRange', label: '日期区间' }
+                    ]}
+                  />
+                </div>
+
+                {autoSwitchConfig.mode === 'dateRange' && (
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="block text-xs font-medium text-stone-700 mb-1">开始日期（8位）</label>
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        maxLength={8}
+                        placeholder="YYYYMMDD"
+                        value={autoSwitchConfig.startDate || ''}
+                        onChange={(e) => {
+                          const startDate = normalizeEightDigitDateInput(e.target.value) || undefined;
+                          const endDate = autoSwitchConfig.endDate;
+                          if (startDate?.length === 8 && endDate?.length === 8 && startDate > endDate) {
+                            addToast('error', '开始日期不能晚于结束日期');
+                            return;
+                          }
+                          updateActiveGroupAutoSwitch((current) => ({
+                            ...current,
+                            startDate
+                          }));
+                        }}
+                        className="w-full px-2.5 py-1.5 text-xs sm:text-sm border border-stone-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-stone-800"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-stone-700 mb-1">结束日期（8位）</label>
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        maxLength={8}
+                        placeholder="YYYYMMDD"
+                        value={autoSwitchConfig.endDate || ''}
+                        onChange={(e) => {
+                          const endDate = normalizeEightDigitDateInput(e.target.value) || undefined;
+                          const startDate = autoSwitchConfig.startDate;
+                          if (startDate?.length === 8 && endDate?.length === 8 && startDate > endDate) {
+                            addToast('error', '结束日期不能早于开始日期');
+                            return;
+                          }
+                          updateActiveGroupAutoSwitch((current) => ({
+                            ...current,
+                            endDate
+                          }));
+                        }}
+                        className="w-full px-2.5 py-1.5 text-xs sm:text-sm border border-stone-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-stone-800"
+                      />
+                    </div>
+                  </div>
+                )}
+                {autoSwitchConfig.mode === 'dateRange' && (
+                  <p className="text-[11px] text-stone-500">
+                    请输入 8 位数字日期，例如 20260701。
+                  </p>
+                )}
+              </div>
+            )}
+
+            <div className="mt-3 text-xs text-stone-600">
+              当前规则：{getRuleSummary(autoSwitchConfig)}
+            </div>
+            <div className="mt-1 text-xs text-stone-500">
+              今日命中：{isSceneGroupAutoSwitchMatched(activeGroup, new Date()) ? '是' : '否'}
+            </div>
+          </div>
         </div>
 
         {/* 时间段列表 */}

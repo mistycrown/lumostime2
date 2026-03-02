@@ -270,11 +270,23 @@ export interface TimeSlot {
   cards: SceneCardData[]; // 该时间段的卡片列表
 }
 
+// 场景组自动切换规则模式
+export type SceneGroupAutoSwitchMode = 'weekday' | 'weekend' | 'dateRange';
+
+// 场景组自动切换配置
+export interface SceneGroupAutoSwitchConfig {
+  enabled: boolean;
+  mode: SceneGroupAutoSwitchMode;
+  startDate?: string; // YYYY-MM-DD（仅 dateRange 模式）
+  endDate?: string; // YYYY-MM-DD（仅 dateRange 模式）
+}
+
 // 场景组定义（场景组 -> 时间段）
 export interface SceneGroup {
   id: string;
   name: string;
   timeSlots: TimeSlot[];
+  autoSwitch?: SceneGroupAutoSwitchConfig;
 }
 
 // 场景组存储状态
