@@ -149,10 +149,10 @@ export const DataManagementView: React.FC<DataManagementViewProps> = ({
         setExcelEndInput(formatDateTo8Digits(newEndDate));
     };
 
-    const handleExcelExport = () => {
+    const handleExcelExport = async () => {
         setIsExportingExcel(true);
         try {
-            excelExportService.exportLogsToExcel(
+            const result = await excelExportService.exportLogsToExcel(
                 logs,
                 categories,
                 todos,
@@ -161,7 +161,12 @@ export const DataManagementView: React.FC<DataManagementViewProps> = ({
                 excelStartDate,
                 excelEndDate
             );
-            onToast('success', 'Excel导出成功');
+
+            if (result.mode === 'native' && result.savedPath) {
+                onToast('success', `Excel导出成功：${result.savedPath}`);
+            } else {
+                onToast('success', `Excel导出成功：${result.filename}`);
+            }
         } catch (error: any) {
             console.error('Excel导出失败:', error);
             onToast('error', `Excel导出失败: ${error.message}`);
@@ -265,8 +270,12 @@ export const DataManagementView: React.FC<DataManagementViewProps> = ({
     const handleExportImages = async () => {
         setIsExportingImages(true);
         try {
-            await imageExportService.exportImagesToZip();
-            onToast('success', '图片导出成功');
+            const result = await imageExportService.exportImagesToZip();
+            if (result.mode === 'native' && result.savedPath) {
+                onToast('success', `图片导出成功：${result.savedPath}`);
+            } else {
+                onToast('success', `图片导出成功：${result.filename}`);
+            }
         } catch (error: any) {
             console.error('图片导出失败:', error);
             onToast('error', `图片导出失败: ${error.message}`);

@@ -9,6 +9,8 @@
  */
 import React from 'react';
 import { Buffer } from 'buffer';
+import { Capacitor } from '@capacitor/core';
+import { Filesystem, Directory, Encoding } from '@capacitor/filesystem';
 
 import { ToastProvider, useToast } from './contexts/ToastContext';
 import { DataProvider, useData } from './contexts/DataContext';
@@ -133,7 +135,7 @@ const AppContent: React.FC = () => {
   } = useReview();
 
   // Implement Export/Import
-  const handleExportData = () => {
+  const handleExportData = async () => {
     // 从 localStorage 读取场景组设置（兼容旧版 sceneTimeSlots）
     const sceneGroupState = loadSceneGroupStateFromStorage();
     const sceneTimeSlots = getActiveSceneGroup(sceneGroupState)?.timeSlots || [];
@@ -152,13 +154,46 @@ const AppContent: React.FC = () => {
       version: '1.0.0',
       timestamp: Date.now()
     };
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const jsonContent = JSON.stringify(data, null, 2);
+    const filename = `lumostime_backup_${new Date().toISOString().split('T')[0]}.json`;
+
+    // Native 端优先写入文件系统，避免 WebView 下载文件不可见或无法找到
+    if (Capacitor.isNativePlatform()) {
+      try {
+        const platform = Capacitor.getPlatform();
+        const isAndroid = platform === 'android';
+        const relativePath = isAndroid
+          ? `Download/LumosTime/${filename}`
+          : `LumosTime/${filename}`;
+
+        await Filesystem.writeFile({
+          path: relativePath,
+          data: jsonContent,
+          directory: isAndroid ? Directory.ExternalStorage : Directory.Documents,
+          encoding: Encoding.UTF8,
+          recursive: true
+        });
+
+        addToast(
+          'success',
+          isAndroid
+            ? `备份已导出到 Download/LumosTime/${filename}`
+            : `备份已导出到 Documents/LumosTime/${filename}`
+        );
+        return;
+      } catch (error) {
+        console.error('[Export] Native export failed, fallback to browser download:', error);
+      }
+    }
+
+    const blob = new Blob([jsonContent], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `lumostime_backup_${new Date().toISOString().split('T')[0]}.json`;
+    a.download = filename;
     a.click();
     URL.revokeObjectURL(url);
+    addToast('success', '数据备份已下载');
   };
 
   const handleImportData = (file: File) => {

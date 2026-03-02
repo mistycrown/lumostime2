@@ -5,12 +5,26 @@
 import JSZip from 'jszip';
 import { imageService } from './imageService';
 import { Capacitor } from '@capacitor/core';
+import { Filesystem, Directory } from '@capacitor/filesystem';
 
 class ImageExportService {
+    private blobToBase64(blob: Blob): Promise<string> {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => {
+                const result = reader.result as string;
+                const base64Data = result.includes(',') ? result.split(',')[1] : result;
+                resolve(base64Data);
+            };
+            reader.onerror = () => reject(reader.error);
+            reader.readAsDataURL(blob);
+        });
+    }
+
     /**
      * 导出所有图片为ZIP文件
      */
-    async exportImagesToZip(): Promise<void> {
+    async exportImagesToZip(): Promise<{ filename: string; mode: 'native' | 'web'; savedPath?: string }> {
         console.log('[ImageExportService] 开始导出图片...');
         
         try {
@@ -72,10 +86,29 @@ class ImageExportService {
             
             console.log(`[ImageExportService] ZIP文件生成完成，大小: ${zipBlob.size} bytes`);
 
-            // 5. 下载ZIP文件
+            // 5. 导出ZIP文件
             const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
             const filename = `lumostime-images-${timestamp}.zip`;
-            
+
+            if (Capacitor.isNativePlatform()) {
+                const platform = Capacitor.getPlatform();
+                const isAndroid = platform === 'android';
+                const relativePath = isAndroid
+                    ? `Download/LumosTime/${filename}`
+                    : `LumosTime/${filename}`;
+                const base64Data = await this.blobToBase64(zipBlob);
+
+                await Filesystem.writeFile({
+                    path: relativePath,
+                    data: base64Data,
+                    directory: isAndroid ? Directory.ExternalStorage : Directory.Documents,
+                    recursive: true
+                });
+
+                console.log(`[ImageExportService] 导出完成(Native): ${relativePath}`);
+                return { filename, mode: 'native', savedPath: relativePath };
+            }
+
             const url = URL.createObjectURL(zipBlob);
             const link = document.createElement('a');
             link.href = url;
@@ -84,8 +117,9 @@ class ImageExportService {
             link.click();
             document.body.removeChild(link);
             URL.revokeObjectURL(url);
-            
-            console.log(`[ImageExportService] 导出完成: ${filename}`);
+
+            console.log(`[ImageExportService] 导出完成(Web): ${filename}`);
+            return { filename, mode: 'web' };
             
         } catch (error) {
             console.error('[ImageExportService] 导出失败:', error);

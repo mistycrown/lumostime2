@@ -10,6 +10,8 @@
 
 import * as XLSX from 'xlsx';
 import { Log, Category, TodoItem, Scope, TodoCategory } from '../types';
+import { Capacitor } from '@capacitor/core';
+import { Filesystem, Directory } from '@capacitor/filesystem';
 
 /**
  * 导出时间记录为Excel文件
@@ -29,7 +31,7 @@ export const exportLogsToExcel = (
     scopes: Scope[],
     startDate: Date,
     endDate: Date
-): void => {
+): Promise<{ filename: string; mode: 'native' | 'web'; savedPath?: string }> => {
     // 过滤在日期范围内的logs
     const startTime = new Date(startDate);
     startTime.setHours(0, 0, 0, 0);
@@ -119,7 +121,31 @@ export const exportLogsToExcel = (
     const fileName = `lumostime时间记录_${formatDate(startDate)}_${formatDate(endDate)}.xlsx`;
 
     // 下载文件
+    if (Capacitor.isNativePlatform()) {
+        const platform = Capacitor.getPlatform();
+        const isAndroid = platform === 'android';
+        const relativePath = isAndroid
+            ? `Download/LumosTime/${fileName}`
+            : `LumosTime/${fileName}`;
+        const base64Data = XLSX.write(workbook, { bookType: 'xlsx', type: 'base64' });
+
+        return Filesystem.writeFile({
+            path: relativePath,
+            data: base64Data,
+            directory: isAndroid ? Directory.ExternalStorage : Directory.Documents,
+            recursive: true
+        }).then(() => ({
+            filename: fileName,
+            mode: 'native' as const,
+            savedPath: relativePath
+        }));
+    }
+
     XLSX.writeFile(workbook, fileName);
+    return Promise.resolve({
+        filename: fileName,
+        mode: 'web'
+    });
 };
 
 const excelExportService = {
