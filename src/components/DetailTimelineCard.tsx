@@ -15,6 +15,9 @@ import { TimelineImage } from './TimelineImage';
 import { IconRenderer } from './IconRenderer';
 import { usePrivacy } from '../contexts/PrivacyContext';
 
+const CALENDAR_WEEK_DAYS_MONDAY_FIRST = ['周一', '周二', '周三', '周四', '周五', '周六', '周日'];
+const WEEK_DAYS_SUNDAY_FIRST = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
+
 interface DetailTimelineCardProps {
     // 数据
     filteredLogs: Log[];              // 已过滤的日志（category/activity/scope特定）
@@ -434,7 +437,7 @@ export const DetailTimelineCard: React.FC<DetailTimelineCardProps> = ({
                     <div className="mb-6">
                         {/* 星期标题 */}
                         <div className="grid grid-cols-7 gap-2 mb-2 px-2">
-                            {['周日', '周一', '周二', '周三', '周四', '周五', '周六'].map(day => (
+                            {CALENDAR_WEEK_DAYS_MONDAY_FIRST.map(day => (
                                 <div key={day} className="text-center text-[10px] font-medium text-stone-400">
                                     {day}
                                 </div>
@@ -448,7 +451,8 @@ export const DetailTimelineCard: React.FC<DetailTimelineCardProps> = ({
                                 const month = displayDate.getMonth();
                                 const firstDay = new Date(year, month, 1);
                                 const daysInMonth = new Date(year, month + 1, 0).getDate();
-                                const startDay = firstDay.getDay(); // 0 = Sunday
+                                // 转换为周一开始：周日(0) => 6，周一(1) => 0
+                                const startDay = (firstDay.getDay() + 6) % 7;
                                 
                                 const cells = [];
                                 
@@ -1019,7 +1023,7 @@ export const DetailTimelineCard: React.FC<DetailTimelineCardProps> = ({
                         const date = new Date(timestamp);
                         const month = date.getMonth() + 1;
                         const day = date.getDate();
-                        const weekDay = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'][date.getDay()];
+                        const weekDay = WEEK_DAYS_SUNDAY_FIRST[date.getDay()];
 
                         return (
                             <div 
