@@ -26,6 +26,7 @@ Charts and visual data representations.
 - `FocusCharts.tsx`: Focus score analytics.
 - `HeatmapCalendar.tsx`: Month-view intensity heatmap.
 - `MatrixAnalysisChart.tsx`: Bar charts for activity ranking.
+- `stats/CheckView.tsx`: Habit check statistics with support for manual count mode (shows completed counts).
 
 ## Input & Forms
 Specialized input controls.
@@ -60,3 +61,4 @@ Components for theme and appearance customization.
 - `TimePalSettings.tsx`: 新增 - 从 SponsorshipView 中提取的时光小友设置组件
 
 > ⚠️ 本文档最后更新：2026-02-09
+> Last updated: 2026-03-03

@@ -3,7 +3,7 @@
  * @description 场景设置页面 - 管理场景组、时间段和快捷方式
  */
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, Plus, Trash2, Edit2, Palette, Clock, RotateCcw, ChevronRight, ArrowUp, ArrowDown, Check } from 'lucide-react';
+import { ArrowLeft, Plus, Trash2, Edit2, Palette, Clock, RotateCcw, ChevronRight, ArrowUp, ArrowDown, Check, Copy } from 'lucide-react';
 import { TimeSlot, SceneCardData, SceneCardType, Category, TodoItem, TodoCategory, CheckTemplate, SceneGroup, SceneGroupAutoSwitchConfig, SceneGroupState, SceneGroupSwitchMode } from '../types';
 import { CustomSelect } from '../components/CustomSelect';
 import { UIIconSelectorCompact } from '../components/UIIconSelector';
@@ -242,7 +242,7 @@ export const SceneSettingsView: React.FC<SceneSettingsViewProps> = ({ onBack }) 
       if (weekdays.length === 0) return '自定义星期未选择';
       const labels = weekdayOptions
         .filter(option => weekdays.includes(option.value))
-        .map(option => `周${option.label}`);
+        .map(option => `${option.label}`);
       return labels.length > 0 ? labels.join('、') : '自定义星期未选择';
     }
     if (config.mode === 'dateRange') {
@@ -489,6 +489,28 @@ export const SceneSettingsView: React.FC<SceneSettingsViewProps> = ({ onBack }) 
         addToast('success', '时间段已删除');
       }
     });
+  };
+
+  // 上移时间段
+  const handleMoveSlotUp = (id: string) => {
+    const index = timeSlots.findIndex(s => s.id === id);
+    if (index <= 0) return; // 已经是第一个，无法上移
+    
+    const newSlots = [...timeSlots];
+    [newSlots[index - 1], newSlots[index]] = [newSlots[index], newSlots[index - 1]];
+    saveTimeSlots(newSlots);
+    addToast('success', '时间段已上移');
+  };
+
+  // 下移时间段
+  const handleMoveSlotDown = (id: string) => {
+    const index = timeSlots.findIndex(s => s.id === id);
+    if (index < 0 || index >= timeSlots.length - 1) return; // 已经是最后一个，无法下移
+    
+    const newSlots = [...timeSlots];
+    [newSlots[index], newSlots[index + 1]] = [newSlots[index + 1], newSlots[index]];
+    saveTimeSlots(newSlots);
+    addToast('success', '时间段已下移');
   };
 
   // 添加/编辑快捷方式
@@ -750,7 +772,7 @@ export const SceneSettingsView: React.FC<SceneSettingsViewProps> = ({ onBack }) 
           </div>
 
           <div className="space-y-2">
-            {timeSlots.map(slot => (
+            {timeSlots.map((slot, index) => (
               <div
                 key={slot.id}
                 className={`p-3 rounded-lg border-2 transition-all ${
@@ -784,10 +806,41 @@ export const SceneSettingsView: React.FC<SceneSettingsViewProps> = ({ onBack }) 
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
+                        handleMoveSlotUp(slot.id);
+                      }}
+                      disabled={index === 0}
+                      className={`p-1.5 rounded ${
+                        index === 0
+                          ? 'text-stone-300 cursor-not-allowed'
+                          : 'hover:bg-stone-200 text-stone-600'
+                      }`}
+                      title="上移"
+                    >
+                      <ArrowUp size={14} />
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleMoveSlotDown(slot.id);
+                      }}
+                      disabled={index === timeSlots.length - 1}
+                      className={`p-1.5 rounded ${
+                        index === timeSlots.length - 1
+                          ? 'text-stone-300 cursor-not-allowed'
+                          : 'hover:bg-stone-200 text-stone-600'
+                      }`}
+                      title="下移"
+                    >
+                      <ArrowDown size={14} />
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
                         setEditingSlot(slot);
                         setIsEditingSlot(true);
                       }}
                       className="p-1.5 hover:bg-stone-200 rounded"
+                      title="编辑"
                     >
                       <Edit2 size={14} />
                     </button>
@@ -797,6 +850,7 @@ export const SceneSettingsView: React.FC<SceneSettingsViewProps> = ({ onBack }) 
                         handleDeleteSlot(slot.id);
                       }}
                       className="p-1.5 hover:bg-red-100 text-red-600 rounded"
+                      title="删除"
                     >
                       <Trash2 size={14} />
                     </button>
@@ -1164,13 +1218,13 @@ export const SceneSettingsView: React.FC<SceneSettingsViewProps> = ({ onBack }) 
                                       }`}
                                       title={`周${option.label}`}
                                     >
-                                      周{option.label}
+                                      {option.label}
                                     </button>
                                   );
                                 })}
                               </div>
                               <p className="text-[11px] text-stone-500">
-                                可任意多选星期几。比如周一+周六、周二+周五都支持。
+                                选择该场景组生效的星期（可多选）
                               </p>
                             </div>
                           )}

@@ -1,13 +1,14 @@
-/**
+﻿/**
  * @file StatsView.tsx
  * @input Logs, Categories, Todos, Scopes, Current Date
  * @output Navigation Events (Date Change, Back)
  * @pos View (Statistics Dashboard)
  * @description A comprehensive analytics dashboard supporting multiple visualization modes: Pie (Distribution), Matrix (Consistency), Schedule (Timeline), Line (Trend), and Check (Habit tracking). Analyzes time usage across Activities, Todos, and Scopes.
- * 
+ *
  * 修改历史:
- * - 2026-01-10: 修复日课统计(check)视图的日期导航功能，添加handleNavigateDate和previousRange中对check视图类型的处理
- * 
+ * - 2026-01-10: 修复日课统计（check）视图的日期导航功能，补充 check 视图范围处理。
+ * - 2026-03-03: 数字类型日课统计改为按完成次数展示，避免仅按是否完成呈现。
+ *
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
 import React, { useState, useMemo, useEffect } from 'react';
@@ -21,7 +22,7 @@ import { IconRenderer } from '../components/IconRenderer';
 import { ConfirmModal } from '../components/ConfirmModal';
 import { ChronoPrintView } from './ChronoPrintView';
 
-// 新的 Hooks 和组件
+// 鏂扮殑 Hooks 鍜岀粍浠?
 import { useStatsCalculation } from '../hooks/useStatsCalculation';
 import { useTodoStats } from '../hooks/useTodoStats';
 import { useScopeStats } from '../hooks/useScopeStats';
@@ -47,13 +48,13 @@ interface StatsViewProps {
   todoCategories: TodoCategory[];
   scopes: Scope[];
   dailyReviews?: DailyReview[]; // Add dailyReviews prop
-  // Daily Review 支持
-  hideControls?: boolean;  // 隐藏所有控制条
-  hideRangeControls?: boolean; // 隐藏左侧时间范围选择 (日/周/月/年)
-  hideDateNavigation?: boolean; // 隐藏中间日期导航 (< >)
-  forcedView?: ViewType;   // 强制视图类型
-  forcedRange?: PieRange;  // 强制时间范围
-  allowedViews?: ViewType[]; // 允许切换的视图类型，默认全部
+  // Daily Review 鏀寔
+  hideControls?: boolean;  // 闅愯棌鎵€鏈夋帶鍒舵潯
+  hideRangeControls?: boolean; // 闅愯棌宸︿晶鏃堕棿鑼冨洿閫夋嫨 (鏃?鍛?鏈?骞?
+  hideDateNavigation?: boolean; // 闅愯棌涓棿鏃ユ湡瀵艰埅 (< >)
+  forcedView?: ViewType;   // 寮哄埗瑙嗗浘绫诲瀷
+  forcedRange?: PieRange;  // 寮哄埗鏃堕棿鑼冨洿
+  allowedViews?: ViewType[]; // 鍏佽鍒囨崲鐨勮鍥剧被鍨嬶紝榛樿鍏ㄩ儴
 }
 
 type ViewType = 'pie' | 'matrix' | 'schedule' | 'line' | 'check' | 'emoji';
@@ -87,26 +88,26 @@ export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentD
     setExcludedCategoryIds(prev => prev.includes(id) ? prev.filter(c => c !== id) : [...prev, id]);
   };
 
-  // 复制失败/手动复制确认模态框状态
+  // 澶嶅埗澶辫触/鎵嬪姩澶嶅埗纭妯℃€佹鐘舵€?
   const [copyFailureModal, setCopyFailureModal] = useState<{ isOpen: boolean, text: string }>({ isOpen: false, text: '' });
 
-  // ChronoPrint 视图状态
+  // ChronoPrint 瑙嗗浘鐘舵€?
   const [showChronoPrint, setShowChronoPrint] = useState(false);
   const [chronoPrintText, setChronoPrintText] = useState('');
 
-  // 同步导出视图状态到全局
+  // 鍚屾瀵煎嚭瑙嗗浘鐘舵€佸埌鍏ㄥ眬
   useEffect(() => {
     setIsExportViewOpen(showChronoPrint);
   }, [showChronoPrint, setIsExportViewOpen]);
 
-  // 日期导航函数
+  // 鏃ユ湡瀵艰埅鍑芥暟
   const handleNavigateDate = (direction: 'prev' | 'next') => {
     if (!onDateChange) return;
 
     const newDate = new Date(currentDate);
     let rangeType: PieRange | 'week_fixed' | 'day_fixed';
 
-    // 确定当前时间范围类型
+    // 纭畾褰撳墠鏃堕棿鑼冨洿绫诲瀷
     if (viewType === 'pie') {
       rangeType = pieRange;
     } else if (viewType === 'matrix') {
@@ -118,10 +119,10 @@ export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentD
       else if (scheduleRange === 'month') rangeType = 'month';
       else rangeType = 'week_fixed';
     } else if (viewType === 'check') {
-      // Check view使用pieRange，但不支持day，默认为week
+      // Check view浣跨敤pieRange锛屼絾涓嶆敮鎸乨ay锛岄粯璁や负week
       rangeType = pieRange === 'day' ? 'week' : pieRange;
     } else if (viewType === 'emoji') {
-      // Emoji view使用emojiRange (month/year)
+      // Emoji view浣跨敤emojiRange (month/year)
       rangeType = emojiRange;
     } else {
       rangeType = 'day';
@@ -129,7 +130,7 @@ export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentD
 
     const multiplier = direction === 'prev' ? -1 : 1;
 
-    // 根据范围类型调整日期
+    // 鏍规嵁鑼冨洿绫诲瀷璋冩暣鏃ユ湡
     if (rangeType === 'day' || rangeType === 'day_fixed') {
       newDate.setDate(newDate.getDate() + multiplier);
     } else if (rangeType === 'week' || rangeType === 'week_fixed') {
@@ -143,11 +144,11 @@ export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentD
     onDateChange(newDate);
   };
 
-  // 触摸滑动手势处理
+  // 瑙︽懜婊戝姩鎵嬪娍澶勭悊
   const [touchStart, setTouchStart] = useState<number | null>(null);
   const [touchEnd, setTouchEnd] = useState<number | null>(null);
 
-  // 最小滑动距离（像素）- 增加阈值以降低灵敏度，减少误触
+  // 鏈€灏忔粦鍔ㄨ窛绂伙紙鍍忕礌锛? 澧炲姞闃堝€间互闄嶄綆鐏垫晱搴︼紝鍑忓皯璇Е
   const minSwipeDistance = 100;
 
   const onTouchStart = (e: React.TouchEvent) => {
@@ -167,23 +168,24 @@ export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentD
     const isRightSwipe = distance < -minSwipeDistance;
 
     if (isLeftSwipe) {
-      // 向左滑动 = 下一个时间段
+      // 鍚戝乏婊戝姩 = 涓嬩竴涓椂闂存
       handleNavigateDate('next');
     } else if (isRightSwipe) {
-      // 向右滑动 = 上一个时间段
+      // 鍚戝彸婊戝姩 = 涓婁竴涓椂闂存
       handleNavigateDate('prev');
     }
   };
 
   // 生成动态标题
-  const getDynamicTitle = (date: Date, rangeType: PieRange | 'week_fixed' | 'day_fixed' | 'month'): string => {
-    const formatDateShort = (d: Date) => `${d.getMonth() + 1}/${d.getDate()}`;
-
+  const getDynamicTitle = (
+    date: Date,
+    rangeType: PieRange | 'week_fixed' | 'day_fixed' | 'month'
+  ): string => {
     if (rangeType === 'day' || rangeType === 'day_fixed') {
-      // 日视图：显示完整日期，如「12月14日」
       return `${date.getMonth() + 1}月${date.getDate()}日`;
-    } else if (rangeType === 'week' || rangeType === 'week_fixed') {
-      // 周视图：显示日期范围，如「12/8 - 12/14」
+    }
+
+    if (rangeType === 'week' || rangeType === 'week_fixed') {
       const startDate = new Date(date);
       const day = startDate.getDay();
       const diff = startDate.getDate() - day + (day === 0 ? -6 : 1);
@@ -199,14 +201,15 @@ export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentD
 
       if (startMonth === endMonth) {
         return `${startMonth}月${startDay}日 - ${endDay}日`;
-      } else {
-        return `${startMonth}月${startDay}日 - ${endMonth}月${endDay}日`;
       }
-    } else if (rangeType === 'month') {
-      // 月视图：显示年月，如「2025年12月」
+      return `${startMonth}月${startDay}日 - ${endMonth}月${endDay}日`;
+    }
+
+    if (rangeType === 'month') {
       return `${date.getFullYear()}年${date.getMonth() + 1}月`;
-    } else if (rangeType === 'year') {
-      // 年视图：只显示年份，如「2025年」
+    }
+
+    if (rangeType === 'year') {
       return `${date.getFullYear()}年`;
     }
 
@@ -265,7 +268,7 @@ export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentD
     return getDateRange(currentDate, 'day');
   }, [currentDate, viewType, pieRange, scheduleRange, lineRange, emojiRange]);
 
-  // 当视图类型、时间范围或日期变化时，自动更新标题
+  // 褰撹鍥剧被鍨嬨€佹椂闂磋寖鍥存垨鏃ユ湡鍙樺寲鏃讹紝鑷姩鏇存柊鏍囬
   useEffect(() => {
     if (onTitleChange) {
       let rangeType: PieRange | 'week_fixed' | 'day_fixed' | 'month';
@@ -294,7 +297,7 @@ export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentD
 
   const { start: rangeStart, end: rangeEnd } = effectiveRange;
 
-  // 使用新的统计计算 Hooks
+  // 浣跨敤鏂扮殑缁熻璁＄畻 Hooks
   const { stats, previousStats, filteredLogs } = useStatsCalculation({
     logs,
     categories,
@@ -327,7 +330,7 @@ export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentD
     if (viewType === 'matrix') rangeLabel = 'Week Matrix';
     if (viewType === 'schedule') rangeLabel = scheduleRange === 'day' ? 'Day Schedule' : 'Week Schedule';
 
-    let text = `## 📊 ${dateStr} - ${rangeLabel} 统计\n**总时长**: ${formatDuration(stats.totalDuration)}\n\n`;
+    let text = `## 馃搳 ${dateStr} - ${rangeLabel} 缁熻\n**鎬绘椂闀?*: ${formatDuration(stats.totalDuration)}\n\n`;
     stats.categoryStats.forEach(cat => {
       text += `- **[${cat.name}]** ${formatDuration(cat.duration)} (${cat.percentage.toFixed(1)}%)\n`;
       cat.items.forEach(act => {
@@ -339,7 +342,7 @@ export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentD
 
 
     if (todoStats.totalDuration > 0) {
-      text += `\n## 📋 待办专注分布\n**待办总时长**: ${formatDuration(todoStats.totalDuration)}\n\n`;
+      text += `\n## 馃搵 寰呭姙涓撴敞鍒嗗竷\n**寰呭姙鎬绘椂闀?*: ${formatDuration(todoStats.totalDuration)}\n\n`;
       todoStats.categoryStats.forEach(cat => {
         text += `- **[${cat.name}]** ${formatDuration(cat.duration)} (${cat.percentage.toFixed(1)}%)\n`;
         cat.items.forEach(item => {
@@ -350,7 +353,7 @@ export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentD
     }
 
     if (scopeStats.totalDuration > 0) {
-      text += `\n## 🎯 领域专注分布\n**领域总时长**: ${formatDuration(scopeStats.totalDuration)}\n\n`;
+      text += `\n## 馃幆 棰嗗煙涓撴敞鍒嗗竷\n**棰嗗煙鎬绘椂闀?*: ${formatDuration(scopeStats.totalDuration)}\n\n`;
       scopeStats.categoryStats.forEach(scope => {
         text += `- **[${scope.name}]** ${formatDuration(scope.duration)} (${scope.percentage.toFixed(1)}%)\n`;
         // Removed scope.items.forEach
@@ -370,7 +373,7 @@ export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentD
     if (viewType === 'matrix') rangeLabel = 'Week Matrix';
     if (viewType === 'schedule') rangeLabel = scheduleRange === 'day' ? 'Day Schedule' : 'Week Schedule';
 
-    let text = `## 📊 ${dateStr} - ${rangeLabel} 统计\n**总时长**: ${formatDuration(stats.totalDuration)}\n\n`;
+    let text = `## 馃搳 ${dateStr} - ${rangeLabel} 缁熻\n**鎬绘椂闀?*: ${formatDuration(stats.totalDuration)}\n\n`;
     stats.categoryStats.forEach(cat => {
       text += `- **[${cat.name}]** ${formatDuration(cat.duration)} (${cat.percentage.toFixed(1)}%)\n`;
       cat.items.forEach(act => {
@@ -381,7 +384,7 @@ export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentD
     text += '\n';
 
     if (todoStats.totalDuration > 0) {
-      text += `\n## 📋 待办专注分布\n**待办总时长**: ${formatDuration(todoStats.totalDuration)}\n\n`;
+      text += `\n## 馃搵 寰呭姙涓撴敞鍒嗗竷\n**寰呭姙鎬绘椂闀?*: ${formatDuration(todoStats.totalDuration)}\n\n`;
       todoStats.categoryStats.forEach(cat => {
         text += `- **[${cat.name}]** ${formatDuration(cat.duration)} (${cat.percentage.toFixed(1)}%)\n`;
         cat.items.forEach(item => {
@@ -392,7 +395,7 @@ export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentD
     }
 
     if (scopeStats.totalDuration > 0) {
-      text += `\n## 🎯 领域专注分布\n**领域总时长**: ${formatDuration(scopeStats.totalDuration)}\n\n`;
+      text += `\n## 馃幆 棰嗗煙涓撴敞鍒嗗竷\n**棰嗗煙鎬绘椂闀?*: ${formatDuration(scopeStats.totalDuration)}\n\n`;
       scopeStats.categoryStats.forEach(scope => {
         text += `- **[${scope.name}]** ${formatDuration(scope.duration)} (${scope.percentage.toFixed(1)}%)\n`;
         text += '\n';
@@ -408,7 +411,7 @@ export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentD
     // Try standard API first
     if (navigator.clipboard && navigator.clipboard.writeText) {
       navigator.clipboard.writeText(text).then(() => {
-        onToast?.('success', '已复制到剪贴板');
+        onToast?.('success', '宸插鍒跺埌鍓创鏉?);
       }).catch((err) => {
         console.warn('Clipboard API failed, trying fallback...', err);
         fallbackCopyText(text);
@@ -438,14 +441,14 @@ export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentD
       document.body.removeChild(textArea);
 
       if (successful) {
-        onToast?.('success', '已复制到剪贴板');
+        onToast?.('success', '宸插鍒跺埌鍓创鏉?);
       } else {
-        // onToast?.('error', '复制失败，请手动复制');
+        // onToast?.('error', '澶嶅埗澶辫触锛岃鎵嬪姩澶嶅埗');
         setCopyFailureModal({ isOpen: true, text: text });
       }
     } catch (err) {
       console.error('Fallback copy failed', err);
-      // onToast?.('error', '复制失败，请检查权限');
+      // onToast?.('error', '澶嶅埗澶辫触锛岃妫€鏌ユ潈闄?);
       setCopyFailureModal({ isOpen: true, text: text });
     }
   };
@@ -486,8 +489,8 @@ export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentD
     const dateMap: Record<string, Date> = {};
     let curr = new Date(rangeStart);
 
-    // 根据视图类型限制天数，防止溢出
-    let maxDays = 366; // 默认年视图最大天数
+    // 鏍规嵁瑙嗗浘绫诲瀷闄愬埗澶╂暟锛岄槻姝㈡孩鍑?
+    let maxDays = 366; // 榛樿骞磋鍥炬渶澶уぉ鏁?
     if (pieRange === 'week') maxDays = 7;
     else if (pieRange === 'month') maxDays = 31;
 
@@ -504,7 +507,7 @@ export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentD
     // Structure: Category -> Habit -> Date -> Status
     const habits: Record<string, Record<string, Record<string, boolean>>> = {};
     const habitDayDetails: Record<string, Record<string, { value: number; target: number }>> = {}; // Key: "Category|Habit" -> Date -> Count Detail
-    const habitStats: Record<string, { total: number, checked: number, countTotal: number }> = {}; // Key: "Category|Habit"
+    const habitStats: Record<string, { total: number, checked: number, countTotal: number, isCountMode: boolean }> = {}; // Key: "Category|Habit"
 
     // Track insertion order for categories and habits
     const categoryOrder: string[] = [];
@@ -515,7 +518,7 @@ export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentD
       // Review date is string YYYY-MM-DD
       if (days.includes(review.date) && review.checkItems) {
         review.checkItems.forEach(item => {
-          // 只包含有 category 的项目 (排除手动添加的临时项)
+          // 鍙寘鍚湁 category 鐨勯」鐩?(鎺掗櫎鎵嬪姩娣诲姞鐨勪复鏃堕」)
           if (!item.category) return;
 
           const category = item.category;
@@ -532,13 +535,16 @@ export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentD
             habitOrder[category].push(content); // Track habit order within category
           }
 
-          habits[category][content][review.date] = item.isCompleted;
+          const isCountMode = item.type !== 'auto' && item.manualMode === 'count';
+          let isChecked = item.isCompleted;
 
-          if (!habitStats[key]) habitStats[key] = { total: 0, checked: 0, countTotal: 0 };
+          if (!habitStats[key]) {
+            habitStats[key] = { total: 0, checked: 0, countTotal: 0, isCountMode: false };
+          }
           habitStats[key].total++;
-          if (item.isCompleted) habitStats[key].checked++;
 
-          if (item.type !== 'auto' && item.manualMode === 'count') {
+          if (isCountMode) {
+            habitStats[key].isCountMode = true;
             const target = Math.max(1, Math.floor(item.targetCount || 1));
             const currentRaw = typeof item.currentCount === 'number'
               ? item.currentCount
@@ -547,7 +553,11 @@ export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentD
             if (!habitDayDetails[key]) habitDayDetails[key] = {};
             habitDayDetails[key][review.date] = { value: current, target };
             habitStats[key].countTotal += current;
+            isChecked = current > 0;
           }
+
+          habits[category][content][review.date] = isChecked;
+          if (isChecked) habitStats[key].checked++;
         });
       }
     });
@@ -572,8 +582,8 @@ export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentD
     const sortedCategories = categoryOrder.map(cat => {
       const catHabits = habitOrder[cat].map(hab => {
         const key = `${cat}|${hab}`;
-        const stats = habitStats[key] || { total: 0, checked: 0, countTotal: 0 };
-        const iconData = habitIcons[key] || { icon: '📝' };
+        const stats = habitStats[key] || { total: 0, checked: 0, countTotal: 0, isCountMode: false };
+        const iconData = habitIcons[key] || { icon: '馃摑' };
 
         return {
           name: hab,
@@ -612,7 +622,7 @@ export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentD
       {/* Fullscreen Exit Button - Only visible in fullscreen mode */}
       {isFullScreen && (
         <div className="absolute bottom-4 left-4 z-50">
-          <button onClick={onToggleFullScreen} className="p-2 transition-all text-stone-400 hover:text-stone-800 bg-white/80 hover:bg-white rounded-full shadow-lg backdrop-blur-sm" title="退出全屏">
+          <button onClick={onToggleFullScreen} className="p-2 transition-all text-stone-400 hover:text-stone-800 bg-white/80 hover:bg-white rounded-full shadow-lg backdrop-blur-sm" title="閫€鍑哄叏灞?>
             <Minimize2 size={20} />
           </button>
         </div>
@@ -636,7 +646,7 @@ export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentD
                         onClick={() => setPieRange(r)}
                         className={`px-2.5 py-1 rounded-md text-[10px] font-bold transition-all ${pieRange === r ? 'bg-white text-stone-900 shadow-sm' : 'text-stone-400 hover:text-stone-600'}`}
                       >
-                        {{ day: '日', week: '周', month: '月', year: '年' }[r]}
+                        {{ day: '鏃?, week: '鍛?, month: '鏈?, year: '骞? }[r]}
                       </button>
                     ))}
                   </div>
@@ -649,7 +659,7 @@ export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentD
                         onClick={() => setScheduleRange(r)}
                         className={`px-2.5 py-1 rounded-md text-[10px] font-bold transition-all ${scheduleRange === r ? 'bg-white text-stone-900 shadow-sm' : 'text-stone-400 hover:text-stone-600'}`}
                       >
-                        {{ day: '日', week: '周', month: '月' }[r]}
+                        {{ day: '鏃?, week: '鍛?, month: '鏈? }[r]}
                       </button>
                     ))}
                   </div>
@@ -660,13 +670,13 @@ export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentD
                       onClick={() => setLineRange('week')}
                       className={`px-2.5 py-1 rounded-md text-[10px] font-bold transition-all ${lineRange === 'week' ? 'bg-white text-stone-900 shadow-sm' : 'text-stone-400 hover:text-stone-600'}`}
                     >
-                      周
+                      鍛?
                     </button>
                     <button
                       onClick={() => setLineRange('month')}
                       className={`px-2.5 py-1 rounded-md text-[10px] font-bold transition-all ${lineRange === 'month' ? 'bg-white text-stone-900 shadow-sm' : 'text-stone-400 hover:text-stone-600'}`}
                     >
-                      月
+                      鏈?
                     </button>
                   </div>
                 )}
@@ -678,19 +688,19 @@ export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentD
                       onClick={() => setPieRange('week')}
                       className={`px-2.5 py-1 rounded-md text-[10px] font-bold transition-all ${pieRange === 'week' ? 'bg-white text-stone-900 shadow-sm' : 'text-stone-400 hover:text-stone-600'}`}
                     >
-                      周
+                      鍛?
                     </button>
                     <button
                       onClick={() => setPieRange('month')}
                       className={`px-2.5 py-1 rounded-md text-[10px] font-bold transition-all ${pieRange === 'month' ? 'bg-white text-stone-900 shadow-sm' : 'text-stone-400 hover:text-stone-600'}`}
                     >
-                      月
+                      鏈?
                     </button>
                     <button
                       onClick={() => setPieRange('year')}
                       className={`px-2.5 py-1 rounded-md text-[10px] font-bold transition-all ${pieRange === 'year' ? 'bg-white text-stone-900 shadow-sm' : 'text-stone-400 hover:text-stone-600'}`}
                     >
-                      年
+                      骞?
                     </button>
                   </div>
                 )}
@@ -700,13 +710,13 @@ export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentD
                       onClick={() => setEmojiRange('month')}
                       className={`px-2.5 py-1 rounded-md text-[10px] font-bold transition-all ${emojiRange === 'month' ? 'bg-white text-stone-900 shadow-sm' : 'text-stone-400 hover:text-stone-600'}`}
                     >
-                      月
+                      鏈?
                     </button>
                     <button
                       onClick={() => setEmojiRange('year')}
                       className={`px-2.5 py-1 rounded-md text-[10px] font-bold transition-all ${emojiRange === 'year' ? 'bg-white text-stone-900 shadow-sm' : 'text-stone-400 hover:text-stone-600'}`}
                     >
-                      年
+                      骞?
                     </button>
                   </div>
                 )}
@@ -720,14 +730,14 @@ export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentD
                     <button
                       onClick={() => handleNavigateDate('prev')}
                       className="p-1.5 rounded-md transition-all text-stone-400 hover:text-stone-800 hover:bg-white"
-                      title="上一个时间段"
+                      title="涓婁竴涓椂闂存"
                     >
                       <ChevronLeft size={14} />
                     </button>
                     <button
                       onClick={() => handleNavigateDate('next')}
                       className="p-1.5 rounded-md transition-all text-stone-400 hover:text-stone-800 hover:bg-white"
-                      title="下一个时间段"
+                      title="涓嬩竴涓椂闂存"
                     >
                       <ChevronRight size={14} />
                     </button>
@@ -737,22 +747,22 @@ export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentD
                 {/* View Type Switcher (icon only) */}
                 <div className="flex bg-stone-100 p-0.5 rounded-lg">
                   {allowedViews.includes('pie') && (
-                    <button onClick={() => setViewType('pie')} className={`p-1.5 rounded-md transition-all ${viewType === 'pie' ? 'bg-white text-stone-900 shadow-sm' : 'text-stone-400 hover:text-stone-600'}`} title="饼图">
+                    <button onClick={() => setViewType('pie')} className={`p-1.5 rounded-md transition-all ${viewType === 'pie' ? 'bg-white text-stone-900 shadow-sm' : 'text-stone-400 hover:text-stone-600'}`} title="楗煎浘">
                       <PieChart size={14} />
                     </button>
                   )}
                   {allowedViews.includes('matrix') && (
-                    <button onClick={() => setViewType('matrix')} className={`p-1.5 rounded-md transition-all ${viewType === 'matrix' ? 'bg-white text-stone-900 shadow-sm' : 'text-stone-400 hover:text-stone-600'}`} title="矩阵">
+                    <button onClick={() => setViewType('matrix')} className={`p-1.5 rounded-md transition-all ${viewType === 'matrix' ? 'bg-white text-stone-900 shadow-sm' : 'text-stone-400 hover:text-stone-600'}`} title="鐭╅樀">
                       <Grid size={14} />
                     </button>
                   )}
                   {allowedViews.includes('line') && (
-                    <button onClick={() => setViewType('line')} className={`p-1.5 rounded-md transition-all ${viewType === 'line' ? 'bg-white text-stone-900 shadow-sm' : 'text-stone-400 hover:text-stone-600'}`} title="趋势">
+                    <button onClick={() => setViewType('line')} className={`p-1.5 rounded-md transition-all ${viewType === 'line' ? 'bg-white text-stone-900 shadow-sm' : 'text-stone-400 hover:text-stone-600'}`} title="瓒嬪娍">
                       <TrendingUp size={14} />
                     </button>
                   )}
                   {allowedViews.includes('schedule') && (
-                    <button onClick={() => setViewType('schedule')} className={`p-1.5 rounded-md transition-all ${viewType === 'schedule' ? 'bg-white text-stone-900 shadow-sm' : 'text-stone-400 hover:text-stone-600'}`} title="日程">
+                    <button onClick={() => setViewType('schedule')} className={`p-1.5 rounded-md transition-all ${viewType === 'schedule' ? 'bg-white text-stone-900 shadow-sm' : 'text-stone-400 hover:text-stone-600'}`} title="鏃ョ▼">
                       <Calendar size={14} />
                     </button>
                   )}
@@ -763,7 +773,7 @@ export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentD
                         if (pieRange === 'day') setPieRange('week'); // Default to week if currently day
                       }}
                       className={`p-1.5 rounded-md transition-all ${viewType === 'check' ? 'bg-white text-stone-900 shadow-sm' : 'text-stone-400 hover:text-stone-600'}`}
-                      title="打卡"
+                      title="鎵撳崱"
                     >
                       <CheckCircle2 size={14} />
                     </button>
@@ -772,7 +782,7 @@ export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentD
                     <button
                       onClick={() => setViewType('emoji')}
                       className={`p-1.5 rounded-md transition-all ${viewType === 'emoji' ? 'bg-white text-stone-900 shadow-sm' : 'text-stone-400 hover:text-stone-600'}`}
-                      title="情绪"
+                      title="鎯呯华"
                     >
                       <Smile size={14} />
                     </button>
@@ -875,12 +885,13 @@ export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentD
           executeCopy(copyFailureModal.text);
           setCopyFailureModal({ ...copyFailureModal, isOpen: false });
         }}
-        title="导出统计文本"
+        title="瀵煎嚭缁熻鏂囨湰"
         description={copyFailureModal.text}
-        confirmText="复制内容"
-        cancelText="关闭"
+        confirmText="澶嶅埗鍐呭"
+        cancelText="鍏抽棴"
         type="info"
       />
     </div >
   );
 };
+

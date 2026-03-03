@@ -1,16 +1,12 @@
-/**
+﻿/**
  * @file CheckView.tsx
  * @input checkStats, pieRange, rangeStart
  * @output UI (Check View)
  * @pos Component (Statistics - Check)
- * @description 打卡统计视图 - 显示习惯打卡情况
- * 
- * 支持三种视图模式：
- * 1. Week - 横向打卡列表
- * 2. Month - 卡片式日历网格
- * 3. Year - GitHub 风格热力图
- * 
- * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
+ * @description 打卡统计视图 - 显示习惯打卡情况（周/月/年）
+ *
+ * 修改历史:
+ * - 2026-03-03: 数字类型（manual count）日课改为展示完成次数，而不是仅展示是否完成。
  */
 
 import React from 'react';
@@ -31,6 +27,7 @@ export interface CheckStats {
         total: number;
         checked: number;
         countTotal?: number;
+        isCountMode?: boolean;
       };
     }[];
   }[];
@@ -76,12 +73,13 @@ export const CheckView: React.FC<CheckViewProps> = ({
               <div className="space-y-2">
                 {cat.items.map(habit => {
                   const style = getWeekColorStyle(habit.name);
+                  const isCountMode = Boolean(habit.stats.isCountMode);
 
                   return (
                     <div key={habit.name} className="flex items-center justify-between py-1">
                       <div className="w-28 sm:w-40 shrink-0 flex items-center gap-2">
-                        <IconRenderer 
-                          icon={habit.icon} 
+                        <IconRenderer
+                          icon={habit.icon}
                           uiIcon={habit.uiIcon}
                           className="text-base shrink-0"
                         />
@@ -92,20 +90,29 @@ export const CheckView: React.FC<CheckViewProps> = ({
 
                       <div className="flex items-center gap-1 sm:gap-2 flex-1 justify-end px-2 sm:px-4">
                         {checkStats.allDays.map(dayStr => {
-                          const isChecked = habit.days[dayStr];
-                          const date = checkStats.dateMap[dayStr];
                           const detail = habit.dayDetails?.[dayStr];
+                          const countValue = detail?.value ?? 0;
+                          const isChecked = isCountMode ? countValue > 0 : Boolean(habit.days[dayStr]);
+                          const date = checkStats.dateMap[dayStr];
+
                           return (
                             <div key={dayStr} className="flex flex-col items-center gap-1">
                               <div
-                                title={`${date.toLocaleDateString()} ${isChecked ? '已完成' : '未完成'}${detail ? ` (${detail.value}/${detail.target}次)` : ''}`}
+                                title={isCountMode
+                                  ? `${date.toLocaleDateString()} ${countValue}次`
+                                  : `${date.toLocaleDateString()} ${isChecked ? '已完成' : '未完成'}${detail ? ` (${detail.value}/${detail.target}次)` : ''}`
+                                }
                                 className={`w-6 h-6 sm:w-8 sm:h-8 rounded-full flex items-center justify-center transition-all ${
                                   isChecked
                                     ? `${style.fill} ${style.text}`
                                     : 'bg-white border border-stone-200'
                                 }`}
                               >
-                                {isChecked && <CheckCircle2 className="w-3 h-3 sm:w-4 sm:h-4" strokeWidth={3} />}
+                                {isCountMode && countValue > 0 ? (
+                                  <span className="text-[10px] sm:text-xs font-bold leading-none">{countValue}</span>
+                                ) : (
+                                  isChecked && <CheckCircle2 className="w-3 h-3 sm:w-4 sm:h-4" strokeWidth={3} />
+                                )}
                               </div>
                             </div>
                           );
@@ -125,14 +132,18 @@ export const CheckView: React.FC<CheckViewProps> = ({
         <div className="grid grid-cols-2 gap-3">
           {checkStats.categories.flatMap(cat => cat.items.map(habit => {
             const style = getMonthYearColorStyle(habit.name);
+            const isCountMode = Boolean(habit.stats.isCountMode);
+            const completedDisplay = isCountMode
+              ? (habit.stats.countTotal || 0)
+              : habit.stats.checked;
 
             return (
               <div key={`${cat.name}-${habit.name}`} className="bg-white rounded-2xl p-4 shadow-sm border border-stone-100 flex flex-col">
                 <div className="flex items-start justify-between mb-2">
                   <div className="flex flex-col gap-1">
                     <div className="flex items-center gap-2">
-                      <IconRenderer 
-                        icon={habit.icon} 
+                      <IconRenderer
+                        icon={habit.icon}
                         uiIcon={habit.uiIcon}
                         className="text-base shrink-0"
                       />
@@ -155,16 +166,20 @@ export const CheckView: React.FC<CheckViewProps> = ({
                       return [
                         ...blanks,
                         ...checkStats.allDays.map(dayStr => {
-                          const isChecked = habit.days[dayStr];
                           const detail = habit.dayDetails?.[dayStr];
+                          const countValue = detail?.value ?? 0;
+                          const isChecked = isCountMode ? countValue > 0 : Boolean(habit.days[dayStr]);
                           return (
                             <div
                               key={dayStr}
-                              title={detail ? `${dayStr} ${detail.value}/${detail.target}次` : dayStr}
+                              title={isCountMode
+                                ? `${dayStr} ${countValue}次`
+                                : (detail ? `${dayStr} ${detail.value}/${detail.target}次` : dayStr)}
                               className={`aspect-square rounded-md flex items-center justify-center text-[10px] font-medium transition-colors ${
                                 isChecked ? `${style.fill} text-white` : 'bg-stone-50 text-stone-300'
                               }`}
                             >
+                              {isCountMode && countValue > 0 ? countValue : ''}
                             </div>
                           );
                         })
@@ -176,16 +191,16 @@ export const CheckView: React.FC<CheckViewProps> = ({
                 <div className="flex items-center justify-between mt-3 pt-2 border-t border-stone-50">
                   <div className="flex items-center gap-1.5 text-xs text-stone-500">
                     <CheckCircle2 size={14} className={style.text} />
-                    <span className="font-bold">{habit.stats.checked}</span>
+                    <span className="font-bold">{completedDisplay}</span>
                     <span className="text-[10px] text-stone-300"></span>
                   </div>
-                  {typeof habit.stats.countTotal === 'number' && habit.stats.countTotal > 0 && (
+                  {isCountMode && typeof habit.stats.countTotal === 'number' && (
                     <div className="text-[10px] text-stone-400">
                       累计 {habit.stats.countTotal} 次
                     </div>
                   )}
                   <div className="flex items-center gap-1.5 text-xs text-stone-500">
-                    <span className="text-[10px]">🔥</span>
+                    <span className="text-[10px]">🎟</span>
                     <span className="font-bold">
                       {Math.round((habit.stats.checked / (checkStats.allDays.length || 1)) * 100)}%
                     </span>
@@ -202,12 +217,16 @@ export const CheckView: React.FC<CheckViewProps> = ({
         <div className="space-y-4">
           {checkStats.categories.flatMap(cat => cat.items.map(habit => {
             const style = getMonthYearColorStyle(habit.name);
+            const isCountMode = Boolean(habit.stats.isCountMode);
+            const completedDisplay = isCountMode
+              ? (habit.stats.countTotal || 0)
+              : habit.stats.checked;
 
             return (
               <div key={`${cat.name}-${habit.name}`} className="bg-white rounded-xl py-4 shadow-sm border border-stone-100 overflow-hidden">
                 <div className="flex items-center gap-3 mb-4 px-4">
-                  <IconRenderer 
-                    icon={habit.icon} 
+                  <IconRenderer
+                    icon={habit.icon}
                     uiIcon={habit.uiIcon}
                     className="text-lg shrink-0"
                   />
@@ -215,7 +234,7 @@ export const CheckView: React.FC<CheckViewProps> = ({
                     {habit.name}
                   </span>
                   <span className="text-xs text-stone-400 ml-auto shrink-0">
-                    {cat.name} · {habit.stats.checked}次
+                    {cat.name} · {completedDisplay}次
                   </span>
                 </div>
 
@@ -243,17 +262,27 @@ export const CheckView: React.FC<CheckViewProps> = ({
                         return weeks.map((week, wIdx) => (
                           <div key={wIdx} className="flex flex-col gap-1">
                             {week.map((dayStr, dIdx) => {
-                              if (!dayStr) return <div key={dIdx} className="w-3 h-3" />;
-                              const isChecked = habit.days[dayStr];
+                              if (!dayStr) {
+                                return <div key={dIdx} className={isCountMode ? 'w-5 h-5' : 'w-3 h-3'} />;
+                              }
                               const detail = habit.dayDetails?.[dayStr];
+                              const countValue = detail?.value ?? 0;
+                              const isChecked = isCountMode ? countValue > 0 : Boolean(habit.days[dayStr]);
                               return (
                                 <div
                                   key={dayStr}
-                                  title={`${dayStr}${isChecked ? ' 已完成' : ''}${detail ? ` (${detail.value}/${detail.target}次)` : ''}`}
-                                  className={`w-3 h-3 rounded-[2px] transition-colors ${
-                                    isChecked ? style.fill : 'bg-stone-100'
+                                  title={isCountMode
+                                    ? `${dayStr} ${countValue}次`
+                                    : `${dayStr}${isChecked ? ' 已完成' : ''}${detail ? ` (${detail.value}/${detail.target}次)` : ''}`
+                                  }
+                                  className={`${isCountMode ? 'w-5 h-5 text-[8px] font-bold flex items-center justify-center' : 'w-3 h-3'} rounded-[2px] transition-colors ${
+                                    isChecked
+                                      ? `${style.fill} ${isCountMode ? 'text-white' : ''}`
+                                      : `${isCountMode ? 'bg-stone-100 text-stone-300' : 'bg-stone-100'}`
                                   }`}
-                                />
+                                >
+                                  {isCountMode && countValue > 0 ? (countValue > 99 ? '99+' : countValue) : ''}
+                                </div>
                               );
                             })}
                           </div>
