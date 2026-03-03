@@ -473,6 +473,7 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, categories, activityC
                 <IconRenderer 
                   icon={category.icon} 
                   uiIcon={category.uiIcon}
+                  size={20}
                   className={`text-xl flex-shrink-0 ${isSelected ? 'opacity-100' : 'opacity-100'}`} 
                 />
                 {isSidebarOpen && (

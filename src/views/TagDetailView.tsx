@@ -735,6 +735,7 @@ export const TagDetailView: React.FC<TagDetailViewProps> = ({ tagId, logs, todos
                {activity.icon && <IconRenderer 
                   icon={activity.icon} 
                   uiIcon={activity.uiIcon}
+                  size={17}
                   className="text-2xl" 
                />}
                {activity.name}

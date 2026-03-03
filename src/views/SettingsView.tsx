@@ -3,7 +3,7 @@
  * @input User Settings, Sync Data, AI Config, App State
  * @output Configuration Updates, Data Sync Actions, Navigation
  * @pos View (Settings Modal)
- * @description The central configuration hub. Manages Cloud Sync (WebDAV), AI integration (Providers/Presets), Data (Import/Export), and Application Preferences (Appearance, Habits, etc.).
+ * @description The central configuration hub. Manages Cloud Sync (WebDAV), AI integration (Providers/Presets), Data (Import/Export), and Application Preferences (Appearance, Habits, etc.), including settings subpage hierarchy state.
  * 
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
@@ -82,6 +82,7 @@ import { DefaultArchiveView, DefaultIndexView, DefaultRecordView, useSettings } 
 import { useData } from '../contexts/DataContext';
 import { useCategoryScope } from '../contexts/CategoryScopeContext';
 import { useReview } from '../contexts/ReviewContext';
+import { useNavigation } from '../contexts/NavigationContext';
 import FocusNotification from '../plugins/FocusNotificationPlugin';
 import { AutoRecordSettingsView } from './AutoRecordSettingsView';
 import { AutoLinkView } from './AutoLinkView';
@@ -195,8 +196,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
     const { categories: ctxCategories, scopes: ctxScopes, goals: ctxGoals } = useCategoryScope();
     const { autoLinkRules: ctxAutoLinkRules, autoApplyAutoLinkRules, setAutoApplyAutoLinkRules, autoApplyTodoLink, setAutoApplyTodoLink, autoOpenFocusDetail, setAutoOpenFocusDetail, userPersonalInfo: ctxUserPersonalInfo, filters: ctxFilters, customNarrativeTemplates: ctxCustomNarrativeTemplates, useTwemoji, setUseTwemoji, sceneCardTimerMode, setSceneCardTimerMode } = useSettings();
     const { dailyReviews: ctxDailyReviews, weeklyReviews: ctxWeeklyReviews, monthlyReviews: ctxMonthlyReviews, reviewTemplates: ctxReviewTemplates, checkTemplates: ctxCheckTemplates } = useReview();
-
-    const [activeSubmenu, setActiveSubmenu] = useState<'main' | 'data' | 'cloud' | 's3' | 'ai' | 'preferences' | 'guide' | 'nfc' | 'templates' | 'check_templates' | 'narrative_prompt' | 'auto_record' | 'autolink' | 'obsidian_export' | 'filters' | 'memoir_filter' | 'batch_manage' | 'sponsorship_preview' | 'scene' | 'emoji' | 'principle'>('main');
+    const { settingsSubmenu: activeSubmenu, setSettingsSubmenu: setActiveSubmenu } = useNavigation();
     const [webdavConfig, setWebdavConfig] = useState<WebDAVConfig | null>(null);
     const [s3Config, setS3Config] = useState<S3Config | null>(null);
     // Floating Window State

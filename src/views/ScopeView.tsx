@@ -202,6 +202,7 @@ export const ScopeView: React.FC<ScopeViewProps> = ({
                                         <IconRenderer 
                                             icon={scope.icon} 
                                             uiIcon={scope.uiIcon}
+                                            size={20}
                                             className="text-2xl flex-shrink-0" 
                                         />
                                         <div className="flex-1 min-w-0">

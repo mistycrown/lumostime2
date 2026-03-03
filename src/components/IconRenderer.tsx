@@ -199,6 +199,37 @@ export const IconRenderer: React.FC<IconRendererProps> = ({
         return '1.25rem';
     };
     
+    // 辅助函数：计算 emoji 尺寸（emoji 使用更小的默认尺寸）
+    const getEmojiSize = (): string => {
+        if (size) {
+            return typeof size === 'number' ? `${size}px` : size;
+        }
+        
+        // 从 className 中提取 text-* 尺寸类
+        const textSizeMatch = className.match(/text-(xs|sm|base|lg|xl|2xl|3xl|4xl|5xl|6xl|7xl|8xl|9xl)/);
+        if (textSizeMatch) {
+            const sizeMap: Record<string, string> = {
+                'xs': '0.75rem',
+                'sm': '1.125rem',
+                'base': '1.25rem',
+                'lg': '1.5rem',
+                'xl': '1.625rem',
+                '2xl': '2rem',
+                '3xl': '2.5rem',
+                '4xl': '3rem',
+                '5xl': '4rem',
+                '6xl': '5rem',
+                '7xl': '6rem',
+                '8xl': '8rem',
+                '9xl': '10rem'
+            };
+            return sizeMap[textSizeMatch[1]] || '11px';
+        }
+        
+        // emoji 默认使用 11px
+        return '11px';
+    };
+    
     // 1. 判断是否使用自定义图片
     if (isCustomImage && customImagePath && !imageError) {
         const imageSize = getImageSize();
@@ -278,8 +309,8 @@ export const IconRenderer: React.FC<IconRendererProps> = ({
     }
     
     // 4. 渲染 Emoji（原生、Twemoji 或 OpenMoji）
-    // 为了与 UI icon 保持一致的大小，不再对 native emoji 应用额外的缩放
-    const imageSize = getImageSize();
+    // emoji 使用更小的默认尺寸（11px）
+    const emojiSize = getEmojiSize();
     
     return (
         <span 
@@ -288,14 +319,14 @@ export const IconRenderer: React.FC<IconRendererProps> = ({
             style={
                 emojiStyle === 'native' && size 
                     ? { 
-                        fontSize: imageSize,
-                        width: imageSize, 
-                        height: imageSize,
+                        fontSize: emojiSize,
+                        width: emojiSize, 
+                        height: emojiSize,
                         lineHeight: 1
                       }
                     : emojiStyle === 'native'
-                    ? { fontSize: '1.25rem', lineHeight: 1 }
-                    : { width: imageSize, height: imageSize }
+                    ? { fontSize: '11px', lineHeight: 1 }
+                    : { width: emojiSize, height: emojiSize }
             }
         >
             {emojiStyle === 'native' && displayEmoji}

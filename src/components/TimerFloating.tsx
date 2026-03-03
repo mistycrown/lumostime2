@@ -210,6 +210,7 @@ const SingleTimer: React.FC<{
           <IconRenderer 
             icon={session.activityIcon} 
             uiIcon={session.activityUiIcon}
+            size={20}
             className={isBorderAnimating ? 'text-2xl' : 'text-xl'} 
           />
         </div>
@@ -234,6 +235,7 @@ const SingleTimer: React.FC<{
                 <IconRenderer 
                   icon={session.activityIcon} 
                   uiIcon={session.activityUiIcon}
+                  size={20}
                   className="text-xl" 
                 />
               </div>
@@ -274,6 +276,7 @@ const SingleTimer: React.FC<{
                   <IconRenderer 
                     icon={session.activityIcon} 
                     uiIcon={session.activityUiIcon}
+                    size={20}
                     className="text-xl" 
                   />
                 </div>

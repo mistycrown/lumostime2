@@ -1,9 +1,9 @@
 /**
  * @file useHardwareBackButton.ts
- * @input NavigationContext (all modal and view states)
+ * @input NavigationContext (all modal/view states including settings submenu hierarchy)
  * @output Hardware Back Button Handler (backButton event listener)
  * @pos Hook (System Integration)
- * @description 硬件返回键 Hook - 处理 Android 硬件返回键的层级导航逻辑
+ * @description 硬件返回键 Hook - 处理 Android 硬件返回键的层级导航逻辑（含设置子页逐级返回）
  * 
  * 优先级顺序：
  * 1. 模态框（Settings, AutoLink, Search, FocusDetail, AddLog, Todo, Reviews）
@@ -20,7 +20,7 @@ import { useNavigation } from '../contexts/NavigationContext';
 
 export const useHardwareBackButton = () => {
     const {
-        isSettingsOpen, setIsSettingsOpen,
+        isSettingsOpen, setIsSettingsOpen, settingsSubmenu, setSettingsSubmenu,
         isAutoLinkOpen, setIsAutoLinkOpen,
         isSearchOpen, setIsSearchOpen,
         focusDetailSessionId, setFocusDetailSessionId,
@@ -78,6 +78,10 @@ export const useHardwareBackButton = () => {
         const handleBackButton = ({ canGoBack }: { canGoBack: boolean }) => {
             // 1. Modals (High Priority)
             if (isSettingsOpen) {
+                if (settingsSubmenu !== 'main') {
+                    setSettingsSubmenu('main');
+                    return;
+                }
                 setIsSettingsOpen(false);
                 return;
             }
@@ -178,6 +182,6 @@ export const useHardwareBackButton = () => {
         isSettingsOpen, isAutoLinkOpen, isSearchOpen, isExportViewOpen, isGalleryViewOpen, isShareViewOpen, focusDetailSessionId, isAddModalOpen, isTodoModalOpen,
         isDailyReviewOpen, isWeeklyReviewOpen, isMonthlyReviewOpen,
         isStatsFullScreen, isTodoManaging, isTagsManaging, isScopeManaging,
-        currentView, selectedTagId, selectedCategoryId, selectedScopeId
+        currentView, selectedTagId, selectedCategoryId, selectedScopeId, settingsSubmenu
     ]);
 };

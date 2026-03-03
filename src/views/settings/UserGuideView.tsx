@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -71,6 +71,20 @@ const guideSections: GuideSection[] = [
 
 export const UserGuideView: React.FC<UserGuideViewProps> = ({ onBack }) => {
     const [selectedSection, setSelectedSection] = useState<string | null>(null);
+    const listScrollRef = useRef<HTMLDivElement>(null);
+    const articleScrollRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        if (selectedSection) {
+            if (articleScrollRef.current) {
+                articleScrollRef.current.scrollTop = 0;
+            }
+            return;
+        }
+        if (listScrollRef.current) {
+            listScrollRef.current.scrollTop = 0;
+        }
+    }, [selectedSection]);
 
     // 如果选择了某个章节，显示章节内容
     if (selectedSection) {
@@ -89,7 +103,7 @@ export const UserGuideView: React.FC<UserGuideViewProps> = ({ onBack }) => {
                     <span className="text-stone-800 font-bold text-lg">{section.title}</span>
                 </div>
 
-                <div className="flex-1 overflow-y-auto pb-40">
+                <div ref={articleScrollRef} className="flex-1 overflow-y-auto overscroll-contain pb-40">
                     <div className="max-w-2xl mx-auto px-6 py-8">
                         <div className="markdown-content prose prose-stone">
                             <ReactMarkdown
@@ -186,7 +200,7 @@ export const UserGuideView: React.FC<UserGuideViewProps> = ({ onBack }) => {
                 <span className="text-stone-800 font-bold text-lg">用户指南</span>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-4 pb-40">
+            <div ref={listScrollRef} className="flex-1 overflow-y-auto overscroll-contain p-4 pb-40">
                 <div className="space-y-4">
                     {/* 欢迎语 */}
                     <div className="bg-gradient-to-br from-amber-50 to-orange-50 rounded-2xl p-6 mb-2 border border-amber-100/50">

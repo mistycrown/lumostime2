@@ -127,6 +127,7 @@ export const RecordView: React.FC<RecordViewProps> = ({ onStartActivity, categor
                 <IconRenderer 
                   icon={category.icon} 
                   uiIcon={category.uiIcon}
+                  size={20}
                   className={`text-xl flex-shrink-0 ${isSelected ? 'opacity-100' : 'opacity-100'}`} 
                 />
                 {/* whitespace-nowrap ensures text never wraps */}
@@ -198,6 +199,7 @@ export const RecordView: React.FC<RecordViewProps> = ({ onStartActivity, categor
                 <IconRenderer 
                   icon={activity.icon} 
                   uiIcon={activity.uiIcon}
+                  size={20}
                   className="text-3xl md:text-4xl" 
                 />
               </div>

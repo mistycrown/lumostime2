@@ -1,10 +1,33 @@
 /**
  * @file NavigationContext.tsx
- * @description 统一管理应用的所有导航和模态状态
+ * @description 统一管理应用的所有导航和模态状态（含设置子页层级）
  */
-import React, { createContext, useContext, useState, ReactNode } from 'react';
+import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { AppView, Log, TodoItem, Goal, SearchType } from '../types';
 import { useSettings } from './SettingsContext';
+
+export type SettingsSubmenu =
+    | 'main'
+    | 'data'
+    | 'cloud'
+    | 's3'
+    | 'ai'
+    | 'preferences'
+    | 'guide'
+    | 'nfc'
+    | 'templates'
+    | 'check_templates'
+    | 'narrative_prompt'
+    | 'auto_record'
+    | 'autolink'
+    | 'obsidian_export'
+    | 'filters'
+    | 'memoir_filter'
+    | 'batch_manage'
+    | 'sponsorship_preview'
+    | 'scene'
+    | 'emoji'
+    | 'principle';
 
 interface NavigationContextType {
     // 主视图
@@ -14,6 +37,8 @@ interface NavigationContextType {
     // 模态框状态
     isSettingsOpen: boolean;
     setIsSettingsOpen: (open: boolean) => void;
+    settingsSubmenu: SettingsSubmenu;
+    setSettingsSubmenu: (submenu: SettingsSubmenu) => void;
     isAutoLinkOpen: boolean;
     setIsAutoLinkOpen: (open: boolean) => void;
     isSearchOpen: boolean;
@@ -168,8 +193,15 @@ export const NavigationProvider: React.FC<NavigationProviderProps> = ({
 
     // 模态框状态
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+    const [settingsSubmenu, setSettingsSubmenu] = useState<SettingsSubmenu>('main');
     const [isAutoLinkOpen, setIsAutoLinkOpen] = useState(false);
     const [isSearchOpen, setIsSearchOpen] = useState(false);
+
+    useEffect(() => {
+        if (!isSettingsOpen && settingsSubmenu !== 'main') {
+            setSettingsSubmenu('main');
+        }
+    }, [isSettingsOpen, settingsSubmenu]);
 
     // Search Persistence State
     const [searchQuery, setSearchQuery] = useState('');
@@ -232,13 +264,21 @@ export const NavigationProvider: React.FC<NavigationProviderProps> = ({
     const [isExportViewOpen, setIsExportViewOpen] = useState(false);
     const [currentDate, setCurrentDate] = useState<Date>(new Date());
     const [previousView, setPreviousView] = useState<AppView | null>(null);
+    const handleSetIsSettingsOpen = (open: boolean) => {
+        if (open) {
+            setSettingsSubmenu('main');
+        }
+        setIsSettingsOpen(open);
+    };
 
     return (
         <NavigationContext.Provider value={{
             currentView,
             setCurrentView: handleSetCurrentView,
             isSettingsOpen,
-            setIsSettingsOpen,
+            setIsSettingsOpen: handleSetIsSettingsOpen,
+            settingsSubmenu,
+            setSettingsSubmenu,
             isAutoLinkOpen,
             setIsAutoLinkOpen,
             isSearchOpen,

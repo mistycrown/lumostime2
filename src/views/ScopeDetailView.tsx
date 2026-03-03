@@ -738,6 +738,7 @@ export const ScopeDetailView: React.FC<ScopeDetailViewProps> = ({
                     {scope.icon && <IconRenderer 
                         icon={scope.icon} 
                         uiIcon={scope.uiIcon}
+                        size={17}
                         className="text-2xl" 
                     />}
                     {scope.name}

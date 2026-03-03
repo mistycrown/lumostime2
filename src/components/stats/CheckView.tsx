@@ -7,6 +7,7 @@
  *
  * 修改历史:
  * - 2026-03-03: 数字类型（manual count）日课改为展示完成次数，而不是仅展示是否完成。
+ * - 2026-03-03: 月视图中数字类型日课的完成天数改为按“达标天数（value >= target）”计算并渲染。
  */
 
 import React from 'react';
@@ -133,7 +134,16 @@ export const CheckView: React.FC<CheckViewProps> = ({
           {checkStats.categories.flatMap(cat => cat.items.map(habit => {
             const style = getMonthYearColorStyle(habit.name);
             const isCountMode = Boolean(habit.stats.isCountMode);
-            const completedDisplay = habit.stats.checked;
+            const completedDisplay = isCountMode
+              ? checkStats.allDays.reduce((sum, dayStr) => {
+                  const detail = habit.dayDetails?.[dayStr];
+                  if (!detail) return sum;
+                  const countValue = Math.max(0, Math.floor(Number(detail.value) || 0));
+                  const targetValue = Math.max(1, Math.floor(Number(detail.target) || 1));
+                  return sum + (countValue >= targetValue ? 1 : 0);
+                }, 0)
+              : habit.stats.checked;
+            const completionPercent = Math.round((completedDisplay / (checkStats.allDays.length || 1)) * 100);
 
             return (
               <div key={`${cat.name}-${habit.name}`} className="bg-white rounded-2xl p-4 shadow-sm border border-stone-100 flex flex-col">
@@ -166,12 +176,13 @@ export const CheckView: React.FC<CheckViewProps> = ({
                         ...checkStats.allDays.map(dayStr => {
                           const detail = habit.dayDetails?.[dayStr];
                           const countValue = detail?.value ?? 0;
-                          const isChecked = isCountMode ? countValue > 0 : Boolean(habit.days[dayStr]);
+                          const targetValue = Math.max(1, Math.floor(Number(detail?.target) || 1));
+                          const isChecked = isCountMode ? countValue >= targetValue : Boolean(habit.days[dayStr]);
                           return (
                             <div
                               key={dayStr}
                               title={isCountMode
-                                ? `${dayStr} ${countValue}次`
+                                ? `${dayStr} ${countValue}/${targetValue}次${isChecked ? '（达标）' : '（未达标）'}`
                                 : (detail ? `${dayStr} ${detail.value}/${detail.target}次` : dayStr)}
                               className={`aspect-square rounded-md flex items-center justify-center text-[10px] font-medium transition-colors ${
                                 isChecked ? `${style.fill} text-white` : 'bg-stone-50 text-stone-300'
@@ -200,7 +211,7 @@ export const CheckView: React.FC<CheckViewProps> = ({
                   <div className="flex items-center gap-1.5 text-xs text-stone-500">
                     <Target size={14} className={style.text} />
                     <span className="font-bold">
-                      {Math.round((habit.stats.checked / (checkStats.allDays.length || 1)) * 100)}%
+                      {completionPercent}%
                     </span>
                   </div>
                 </div>

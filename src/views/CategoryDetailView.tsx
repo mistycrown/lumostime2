@@ -465,6 +465,7 @@ export const CategoryDetailView: React.FC<CategoryDetailViewProps> = ({ category
                     {category.icon && <IconRenderer 
                         icon={category.icon} 
                         uiIcon={category.uiIcon}
+                        size={17}
                         className="text-2xl" 
                     />}
                     {category.name}
