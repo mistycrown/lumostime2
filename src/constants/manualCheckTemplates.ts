@@ -20,31 +20,36 @@ export const DEFAULT_MANUAL_CHECK_TEMPLATES: CheckTemplate[] = [
         id: 'manual_1', 
         content: '起床喝一杯水', 
         icon: '💧',
-        type: 'manual'
+        type: 'manual',
+        manualMode: 'binary'
       },
       { 
         id: 'manual_2', 
         content: '整理床铺', 
         icon: '🛏️',
-        type: 'manual'
+        type: 'manual',
+        manualMode: 'binary'
       },
       { 
         id: 'manual_3', 
         content: '写日记/复盘', 
         icon: '📔',
-        type: 'manual'
+        type: 'manual',
+        manualMode: 'binary'
       },
       { 
         id: 'manual_4', 
         content: '感恩三件事', 
         icon: '🙏',
-        type: 'manual'
+        type: 'manual',
+        manualMode: 'binary'
       },
       { 
         id: 'manual_5', 
         content: '今日目标达成', 
         icon: '🎯',
-        type: 'manual'
+        type: 'manual',
+        manualMode: 'binary'
       }
     ],
     enabled: true,

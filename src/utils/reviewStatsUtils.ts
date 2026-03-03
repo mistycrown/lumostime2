@@ -207,6 +207,9 @@ export interface CheckItemStat {
     total: number;
     completed: number;
     rate: number;
+    isCountMode?: boolean;
+    totalCountValue?: number;
+    totalCountTarget?: number;
 }
 
 /**
@@ -234,7 +237,14 @@ export function calculateCheckItemStats(
     });
 
     // 统计每个 check 项的完成情况
-    const checkStats: Record<string, { category: string, total: number, completed: number }> = {};
+    const checkStats: Record<string, {
+        category: string;
+        total: number;
+        completed: number;
+        isCountMode: boolean;
+        totalCountValue: number;
+        totalCountTarget: number;
+    }> = {};
 
     filteredReviews.forEach(review => {
         if (review.checkItems) {
@@ -242,10 +252,27 @@ export function calculateCheckItemStats(
                 if (!item.category) return; // 跳过无分类项
                 const key = `${item.category}|${item.content}`;
                 if (!checkStats[key]) {
-                    checkStats[key] = { category: item.category, total: 0, completed: 0 };
+                    checkStats[key] = {
+                        category: item.category,
+                        total: 0,
+                        completed: 0,
+                        isCountMode: false,
+                        totalCountValue: 0,
+                        totalCountTarget: 0
+                    };
                 }
                 checkStats[key].total++;
                 if (item.isCompleted) checkStats[key].completed++;
+                if (item.type !== 'auto' && item.manualMode === 'count') {
+                    const target = Math.max(1, Math.floor(item.targetCount || 1));
+                    const currentRaw = typeof item.currentCount === 'number'
+                        ? item.currentCount
+                        : (item.isCompleted ? target : 0);
+                    const current = Math.min(target, Math.max(0, Math.floor(currentRaw)));
+                    checkStats[key].isCountMode = true;
+                    checkStats[key].totalCountValue += current;
+                    checkStats[key].totalCountTarget += target;
+                }
             });
         }
     });
@@ -261,7 +288,10 @@ export function calculateCheckItemStats(
             content,
             total: stats.total,
             completed: stats.completed,
-            rate
+            rate,
+            isCountMode: stats.isCountMode,
+            totalCountValue: stats.totalCountValue,
+            totalCountTarget: stats.totalCountTarget
         });
     });
 
@@ -289,7 +319,11 @@ export function generateCheckItemStatsText(
     Object.entries(byCategory).forEach(([category, items]) => {
         text += `\n${category}：\n`;
         items.forEach(item => {
-            text += `  ${item.content}: ${item.completed}/${item.total} (${item.rate.toFixed(0)}%)\n`;
+            if (item.isCountMode) {
+                text += `  ${item.content}: 达标 ${item.completed}/${item.total} (${item.rate.toFixed(0)}%)，累计 ${item.totalCountValue || 0}/${item.totalCountTarget || 0} 次\n`;
+            } else {
+                text += `  ${item.content}: ${item.completed}/${item.total} (${item.rate.toFixed(0)}%)\n`;
+            }
         });
     });
 

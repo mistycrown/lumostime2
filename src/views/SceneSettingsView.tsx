@@ -2159,7 +2159,7 @@ const CheckItemSelector: React.FC<CheckItemSelectorProps> = ({
 
       {selectedCheckItemId && (
         <div className="text-[10px] sm:text-xs text-stone-500 bg-stone-50 p-2 rounded-lg">
-          点击此卡片将切换该日课的完成状态
+          点击此卡片将更新该日课的打卡进度
         </div>
       )}
     </div>

@@ -5,6 +5,7 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { DailyReview, WeeklyReview, MonthlyReview, ReviewTemplate, CheckTemplate } from '../types';
 import { DEFAULT_REVIEW_TEMPLATES, INITIAL_DAILY_REVIEWS, DEFAULT_CHECK_TEMPLATES } from '../constants';
+import { normalizeCheckTemplates, normalizeDailyReviews } from '../utils/checkItemNormalizer';
 
 interface ReviewContextType {
     // Review 模板
@@ -112,17 +113,19 @@ export const ReviewProvider: React.FC<{ children: ReactNode }> = ({ children }) 
                             icon,
                             uiIcon: item.uiIcon,
                             type: item.type || 'manual',
+                            manualMode: item.manualMode,
+                            targetCount: item.targetCount,
                             autoConfig: item.autoConfig
                         };
                     })
                 }));
-                return migrated;
+                return normalizeCheckTemplates(migrated);
             } catch (e) {
                 console.error("Failed to parse checkTemplates, falling back to default", e);
-                return DEFAULT_CHECK_TEMPLATES;
+                return normalizeCheckTemplates(DEFAULT_CHECK_TEMPLATES);
             }
         }
-        return DEFAULT_CHECK_TEMPLATES;
+        return normalizeCheckTemplates(DEFAULT_CHECK_TEMPLATES);
     });
 
     // Review 时间设置
@@ -157,7 +160,13 @@ export const ReviewProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     // Review 数据
     const [dailyReviews, setDailyReviews] = useState<DailyReview[]>(() => {
         const stored = localStorage.getItem('lumostime_dailyReviews');
-        return stored ? JSON.parse(stored) : INITIAL_DAILY_REVIEWS;
+        if (!stored) return normalizeDailyReviews(INITIAL_DAILY_REVIEWS);
+        try {
+            return normalizeDailyReviews(JSON.parse(stored));
+        } catch (e) {
+            console.error('Failed to parse dailyReviews, falling back to initial', e);
+            return normalizeDailyReviews(INITIAL_DAILY_REVIEWS);
+        }
     });
 
     const [weeklyReviews, setWeeklyReviews] = useState<WeeklyReview[]>(() => {

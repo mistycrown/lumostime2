@@ -503,7 +503,8 @@ export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentD
     // 2. Identify unique habits (by content + category)
     // Structure: Category -> Habit -> Date -> Status
     const habits: Record<string, Record<string, Record<string, boolean>>> = {};
-    const habitStats: Record<string, { total: number, checked: number }> = {}; // Key: "Category|Habit"
+    const habitDayDetails: Record<string, Record<string, { value: number; target: number }>> = {}; // Key: "Category|Habit" -> Date -> Count Detail
+    const habitStats: Record<string, { total: number, checked: number, countTotal: number }> = {}; // Key: "Category|Habit"
 
     // Track insertion order for categories and habits
     const categoryOrder: string[] = [];
@@ -533,9 +534,20 @@ export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentD
 
           habits[category][content][review.date] = item.isCompleted;
 
-          if (!habitStats[key]) habitStats[key] = { total: 0, checked: 0 };
+          if (!habitStats[key]) habitStats[key] = { total: 0, checked: 0, countTotal: 0 };
           habitStats[key].total++;
           if (item.isCompleted) habitStats[key].checked++;
+
+          if (item.type !== 'auto' && item.manualMode === 'count') {
+            const target = Math.max(1, Math.floor(item.targetCount || 1));
+            const currentRaw = typeof item.currentCount === 'number'
+              ? item.currentCount
+              : (item.isCompleted ? target : 0);
+            const current = Math.min(target, Math.max(0, Math.floor(currentRaw)));
+            if (!habitDayDetails[key]) habitDayDetails[key] = {};
+            habitDayDetails[key][review.date] = { value: current, target };
+            habitStats[key].countTotal += current;
+          }
         });
       }
     });
@@ -560,7 +572,7 @@ export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentD
     const sortedCategories = categoryOrder.map(cat => {
       const catHabits = habitOrder[cat].map(hab => {
         const key = `${cat}|${hab}`;
-        const stats = habitStats[key] || { total: 0, checked: 0 };
+        const stats = habitStats[key] || { total: 0, checked: 0, countTotal: 0 };
         const iconData = habitIcons[key] || { icon: '📝' };
 
         return {
@@ -568,6 +580,7 @@ export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentD
           icon: iconData.icon,
           uiIcon: iconData.uiIcon,
           days: habits[cat][hab], // Map of DateStr -> Boolean
+          dayDetails: habitDayDetails[key],
           stats
         };
       });

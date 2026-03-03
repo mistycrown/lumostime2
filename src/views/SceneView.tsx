@@ -584,6 +584,19 @@ export const SceneView: React.FC<SceneViewProps> = ({
     return checkItems.findIndex(item => item.content === templateMeta.content);
   };
 
+  const getCountState = (item: CheckItem) => {
+    const target = Math.max(1, Math.floor(item.targetCount || 1));
+    const currentRaw = typeof item.currentCount === 'number'
+      ? item.currentCount
+      : (item.isCompleted ? target : 0);
+    const current = Math.min(target, Math.max(0, Math.floor(currentRaw)));
+    return {
+      current,
+      target,
+      isCompleted: current >= target
+    };
+  };
+
   // 处理日课打卡
   const handleToggleCheckItem = (checkItemId: string) => {
     // 获取今天的日期（使用本地时间）
@@ -603,14 +616,26 @@ export const SceneView: React.FC<SceneViewProps> = ({
         .sort((a, b) => a.order - b.order)
         .forEach(template => {
           template.items.forEach(item => {
+            const type = item.type || 'manual';
+            const manualMode = type === 'manual'
+              ? (item.manualMode === 'count' ? 'count' : 'binary')
+              : undefined;
+            const targetCount = type === 'manual'
+              ? (manualMode === 'count'
+                ? Math.max(1, Math.floor(Number(item.targetCount) || 1))
+                : 1)
+              : undefined;
             checkItems.push({
-              id: item.id,
+              id: item.id || crypto.randomUUID(),
               category: template.title,
               content: item.content,
               icon: item.icon,
               uiIcon: item.uiIcon,
               isCompleted: false,
-              type: item.type,
+              type,
+              manualMode,
+              currentCount: type === 'manual' ? 0 : undefined,
+              targetCount,
               autoConfig: item.autoConfig
             });
           });
@@ -639,11 +664,37 @@ export const SceneView: React.FC<SceneViewProps> = ({
     // 切换完成状态
     const updatedCheckItems = [...checkItems];
     const matchedItem = updatedCheckItems[checkItemIndex];
+    if (matchedItem.type === 'auto') {
+      addToast('error', '自动日课不能手动打卡');
+      return;
+    }
+
+    let nextItem: CheckItem;
+    if (matchedItem.manualMode === 'count') {
+      const { current, target, isCompleted } = getCountState(matchedItem);
+      const nextCurrent = isCompleted ? Math.max(0, current - 1) : Math.min(target, current + 1);
+      nextItem = {
+        ...matchedItem,
+        id: checkItemId,
+        manualMode: 'count',
+        targetCount: target,
+        currentCount: nextCurrent,
+        isCompleted: nextCurrent >= target
+      };
+    } else {
+      const isCompleted = !matchedItem.isCompleted;
+      nextItem = {
+        ...matchedItem,
+        id: checkItemId,
+        manualMode: 'binary',
+        targetCount: 1,
+        currentCount: isCompleted ? 1 : 0,
+        isCompleted
+      };
+    }
+
     updatedCheckItems[checkItemIndex] = {
-      ...matchedItem,
-      // 兼容旧数据：若是按内容匹配到的随机 ID 项，这里顺便对齐为模板 ID，后续可直接按 ID 匹配
-      id: checkItemId,
-      isCompleted: !matchedItem.isCompleted
+      ...nextItem
     };
 
     // 更新 DailyReview
@@ -679,7 +730,12 @@ export const SceneView: React.FC<SceneViewProps> = ({
       return false;
     }
 
-    return todayReview.checkItems[checkItemIndex]?.isCompleted || false;
+    const item = todayReview.checkItems[checkItemIndex];
+    if (!item) return false;
+    if (item.type !== 'auto' && item.manualMode === 'count') {
+      return getCountState(item).isCompleted;
+    }
+    return item.isCompleted || false;
   };
 
   // 获取日课的内容（用于计算坚持天数）
@@ -748,14 +804,26 @@ export const SceneView: React.FC<SceneViewProps> = ({
         .sort((a, b) => a.order - b.order)
         .forEach(template => {
           template.items.forEach(item => {
+            const type = item.type || 'manual';
+            const manualMode = type === 'manual'
+              ? (item.manualMode === 'count' ? 'count' : 'binary')
+              : undefined;
+            const targetCount = type === 'manual'
+              ? (manualMode === 'count'
+                ? Math.max(1, Math.floor(Number(item.targetCount) || 1))
+                : 1)
+              : undefined;
             checkItems.push({
-              id: item.id,
+              id: item.id || crypto.randomUUID(),
               category: template.title,
               content: item.content,
               icon: item.icon,
               uiIcon: item.uiIcon,
               isCompleted: false,
-              type: item.type,
+              type,
+              manualMode,
+              currentCount: type === 'manual' ? 0 : undefined,
+              targetCount,
               autoConfig: item.autoConfig
             });
           });

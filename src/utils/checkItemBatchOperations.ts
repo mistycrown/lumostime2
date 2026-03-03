@@ -344,7 +344,21 @@ export const batchUpdateCheckItemStatus = (
       if (item.content.includes(target) && item.isCompleted !== isCompleted) {
         hasChanges = true;
         affectedCount++;
-        return { ...item, isCompleted };
+        if (item.type !== 'auto' && item.manualMode === 'count') {
+          const targetCount = Math.max(1, Math.floor(item.targetCount || 1));
+          return {
+            ...item,
+            isCompleted,
+            targetCount,
+            currentCount: isCompleted ? targetCount : 0
+          };
+        }
+        return {
+          ...item,
+          isCompleted,
+          currentCount: isCompleted ? 1 : 0,
+          targetCount: 1
+        };
       }
       return item;
     });

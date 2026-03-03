@@ -1186,6 +1186,18 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ logs, todos, scopes,
                                                             : 'text-stone-600'
                                                     }`}>
                                                         {item.content}
+                                                        {item.type !== 'auto' && item.manualMode === 'count' && (
+                                                            <span className="ml-1 text-xs">
+                                                                (
+                                                                {Math.min(
+                                                                    Math.max(0, Math.floor(typeof item.currentCount === 'number' ? item.currentCount : (item.isCompleted ? Math.max(1, Math.floor(item.targetCount || 1)) : 0))),
+                                                                    Math.max(1, Math.floor(item.targetCount || 1))
+                                                                )}
+                                                                /
+                                                                {Math.max(1, Math.floor(item.targetCount || 1))}
+                                                                次)
+                                                            </span>
+                                                        )}
                                                     </span>
                                                 </div>
                                             ))}

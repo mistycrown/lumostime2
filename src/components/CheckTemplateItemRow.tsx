@@ -8,7 +8,7 @@
 
 import React, { useState } from 'react';
 import { CheckTemplateItem } from '../types';
-import { X, Zap, Circle } from 'lucide-react';
+import { X, Zap, Circle, Hash } from 'lucide-react';
 import { AutoCheckItemEditor } from './AutoCheckItemEditor';
 
 interface CheckTemplateItemRowProps {
@@ -26,15 +26,36 @@ export const CheckTemplateItemRow: React.FC<CheckTemplateItemRowProps> = ({
 }) => {
   const [showAutoEditor, setShowAutoEditor] = useState(false);
 
-  // 切换类型（手动 <-> 自动）
-  const handleToggleType = () => {
-    if (item.type === 'auto') {
-      // 切换到手动，清除自动配置
-      onUpdate(index, { ...item, type: 'manual', autoConfig: undefined });
-    } else {
-      // 切换到自动，保持现有配置（如果有）
-      onUpdate(index, { ...item, type: 'auto' });
+  // 切换模式（二值手动 / 次数手动 / 自动）
+  const handleSetMode = (mode: 'manual-binary' | 'manual-count' | 'auto') => {
+    if (mode === 'auto') {
+      onUpdate(index, {
+        ...item,
+        type: 'auto',
+        manualMode: undefined,
+        targetCount: undefined
+      });
+      return;
     }
+
+    if (mode === 'manual-count') {
+      onUpdate(index, {
+        ...item,
+        type: 'manual',
+        manualMode: 'count',
+        targetCount: Math.max(1, Math.floor(Number(item.targetCount) || 1)),
+        autoConfig: undefined
+      });
+      return;
+    }
+
+    onUpdate(index, {
+      ...item,
+      type: 'manual',
+      manualMode: 'binary',
+      targetCount: undefined,
+      autoConfig: undefined
+    });
   };
 
   const handleContentChange = (fullText: string) => {
@@ -50,6 +71,8 @@ export const CheckTemplateItemRow: React.FC<CheckTemplateItemRowProps> = ({
 
   // 显示值：图标 + 内容
   const displayValue = `${item.icon || ''}${item.content || ''}`;
+  const isAuto = item.type === 'auto';
+  const isCountManual = !isAuto && item.manualMode === 'count';
 
   return (
     <>
@@ -63,22 +86,42 @@ export const CheckTemplateItemRow: React.FC<CheckTemplateItemRowProps> = ({
             value={displayValue}
             onChange={(e) => handleContentChange(e.target.value)}
             className="flex-1 bg-white border border-stone-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-stone-400 focus:ring-2 focus:ring-stone-100 transition-all font-serif"
-            placeholder={item.type === 'auto' ? '⚡ 输入自动日课名称...' : '💧 输入检查内容 (首字符作为图标)...'}
+            placeholder={isAuto ? '⚡ 输入自动日课名称...' : '💧 输入日课名称 (首字符作为图标)...'}
           />
           
-          {/* 类型切换图标 */}
-          <button
-            type="button"
-            onClick={handleToggleType}
-            className={`px-2.5 py-2 rounded-lg transition-colors shrink-0 ${
-              item.type === 'auto' 
-                ? 'text-blue-600' 
-                : 'text-stone-400'
-            }`}
-            title={item.type === 'auto' ? '点击切换为手动' : '点击切换为自动'}
-          >
-            {item.type === 'auto' ? <Zap size={16} /> : <Circle size={16} />}
-          </button>
+          {/* 模式切换 */}
+          <div className="flex items-center gap-0.5 rounded-lg bg-stone-100 p-0.5 shrink-0">
+            <button
+              type="button"
+              onClick={() => handleSetMode('manual-binary')}
+              className={`px-1.5 py-1 rounded-md transition-colors ${
+                !isAuto && !isCountManual ? 'bg-white text-stone-700 shadow-sm' : 'text-stone-400'
+              }`}
+              title="手动勾选"
+            >
+              <Circle size={14} />
+            </button>
+            <button
+              type="button"
+              onClick={() => handleSetMode('manual-count')}
+              className={`px-1.5 py-1 rounded-md transition-colors ${
+                isCountManual ? 'bg-white text-stone-700 shadow-sm' : 'text-stone-400'
+              }`}
+              title="手动次数"
+            >
+              <Hash size={14} />
+            </button>
+            <button
+              type="button"
+              onClick={() => handleSetMode('auto')}
+              className={`px-1.5 py-1 rounded-md transition-colors ${
+                isAuto ? 'bg-white text-blue-600 shadow-sm' : 'text-stone-400'
+              }`}
+              title="自动规则"
+            >
+              <Zap size={14} />
+            </button>
+          </div>
 
           {/* 删除按钮 - 始终显示 */}
           <button
@@ -91,8 +134,27 @@ export const CheckTemplateItemRow: React.FC<CheckTemplateItemRowProps> = ({
           </button>
         </div>
 
+        {/* 次数目标配置 */}
+        {isCountManual && (
+          <div className="ml-6 flex items-center gap-2 text-xs text-stone-500">
+            <span>目标次数</span>
+            <input
+              type="number"
+              min={1}
+              step={1}
+              value={Math.max(1, Math.floor(Number(item.targetCount) || 1))}
+              onChange={(e) => {
+                const targetCount = Math.max(1, Math.floor(Number(e.target.value) || 1));
+                onUpdate(index, { ...item, targetCount, manualMode: 'count', type: 'manual' });
+              }}
+              className="w-20 px-2 py-1 rounded border border-stone-200 bg-white text-stone-700"
+            />
+            <span>次</span>
+          </div>
+        )}
+
         {/* 自动规则预览（可点击编辑） */}
-        {item.type === 'auto' && (
+        {isAuto && (
           <div 
             onClick={() => setShowAutoEditor(true)}
             className={`ml-6 text-xs px-3 py-2 rounded-lg flex items-center gap-2 cursor-pointer transition-colors active:opacity-80 ${

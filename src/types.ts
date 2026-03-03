@@ -396,6 +396,9 @@ export interface CheckItem {
   uiIcon?: string; // UI 图标 ID (格式: ui:iconType)
   isCompleted: boolean;
   type?: 'manual' | 'auto'; // 类型：手动或自动（默认为 manual）
+  manualMode?: 'binary' | 'count'; // 手动模式：二值勾选或次数计数（仅当 type='manual' 时有效）
+  currentCount?: number; // 当前次数（仅当 manualMode='count' 时有效）
+  targetCount?: number; // 目标次数（仅当 manualMode='count' 时有效）
   autoConfig?: AutoCheckConfig; // 自动日课配置（仅当 type='auto' 时有效）
 }
 
@@ -406,6 +409,8 @@ export interface CheckTemplateItem {
   icon?: string; // Preset icon (emoji or Lucide name)
   uiIcon?: string; // UI 图标 ID (格式: ui:iconType)
   type?: 'manual' | 'auto'; // 类型：手动或自动（默认为 manual）
+  manualMode?: 'binary' | 'count'; // 手动模式：二值勾选或次数计数（仅当 type='manual' 时有效）
+  targetCount?: number; // 目标次数（仅当 manualMode='count' 时有效）
   autoConfig?: AutoCheckConfig; // 自动日课配置（仅当 type='auto' 时有效）
 }
 

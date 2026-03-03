@@ -26,9 +26,11 @@ export interface CheckStats {
       icon: string;
       uiIcon?: string;
       days: Record<string, boolean>;
+      dayDetails?: Record<string, { value: number; target: number }>;
       stats: {
         total: number;
         checked: number;
+        countTotal?: number;
       };
     }[];
   }[];
@@ -92,10 +94,11 @@ export const CheckView: React.FC<CheckViewProps> = ({
                         {checkStats.allDays.map(dayStr => {
                           const isChecked = habit.days[dayStr];
                           const date = checkStats.dateMap[dayStr];
+                          const detail = habit.dayDetails?.[dayStr];
                           return (
                             <div key={dayStr} className="flex flex-col items-center gap-1">
                               <div
-                                title={`${date.toLocaleDateString()} ${isChecked ? '已完成' : '未完成'}`}
+                                title={`${date.toLocaleDateString()} ${isChecked ? '已完成' : '未完成'}${detail ? ` (${detail.value}/${detail.target}次)` : ''}`}
                                 className={`w-6 h-6 sm:w-8 sm:h-8 rounded-full flex items-center justify-center transition-all ${
                                   isChecked
                                     ? `${style.fill} ${style.text}`
@@ -153,9 +156,11 @@ export const CheckView: React.FC<CheckViewProps> = ({
                         ...blanks,
                         ...checkStats.allDays.map(dayStr => {
                           const isChecked = habit.days[dayStr];
+                          const detail = habit.dayDetails?.[dayStr];
                           return (
                             <div
                               key={dayStr}
+                              title={detail ? `${dayStr} ${detail.value}/${detail.target}次` : dayStr}
                               className={`aspect-square rounded-md flex items-center justify-center text-[10px] font-medium transition-colors ${
                                 isChecked ? `${style.fill} text-white` : 'bg-stone-50 text-stone-300'
                               }`}
@@ -174,6 +179,11 @@ export const CheckView: React.FC<CheckViewProps> = ({
                     <span className="font-bold">{habit.stats.checked}</span>
                     <span className="text-[10px] text-stone-300"></span>
                   </div>
+                  {typeof habit.stats.countTotal === 'number' && habit.stats.countTotal > 0 && (
+                    <div className="text-[10px] text-stone-400">
+                      累计 {habit.stats.countTotal} 次
+                    </div>
+                  )}
                   <div className="flex items-center gap-1.5 text-xs text-stone-500">
                     <span className="text-[10px]">🔥</span>
                     <span className="font-bold">
@@ -235,10 +245,11 @@ export const CheckView: React.FC<CheckViewProps> = ({
                             {week.map((dayStr, dIdx) => {
                               if (!dayStr) return <div key={dIdx} className="w-3 h-3" />;
                               const isChecked = habit.days[dayStr];
+                              const detail = habit.dayDetails?.[dayStr];
                               return (
                                 <div
                                   key={dayStr}
-                                  title={`${dayStr} ${isChecked ? '已完成' : ''}`}
+                                  title={`${dayStr}${isChecked ? ' 已完成' : ''}${detail ? ` (${detail.value}/${detail.target}次)` : ''}`}
                                   className={`w-3 h-3 rounded-[2px] transition-colors ${
                                     isChecked ? style.fill : 'bg-stone-100'
                                   }`}

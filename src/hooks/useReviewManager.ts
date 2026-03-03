@@ -68,6 +68,14 @@ export const useReviewManager = () => {
                         const icon = typeof item === 'string' ? undefined : item.icon;
                         const uiIcon = typeof item === 'string' ? undefined : item.uiIcon;
                         const type = typeof item === 'string' ? 'manual' : (item.type || 'manual');
+                        const manualMode = type === 'manual'
+                            ? (typeof item === 'string' ? 'binary' : (item.manualMode === 'count' ? 'count' : 'binary'))
+                            : undefined;
+                        const targetCount = type === 'manual'
+                            ? (manualMode === 'count'
+                                ? Math.max(1, Math.floor(Number(typeof item === 'string' ? 1 : item.targetCount) || 1))
+                                : 1)
+                            : undefined;
                         const autoConfig = typeof item === 'string' ? undefined : item.autoConfig;
                         const checkItemId = typeof item === 'string' ? crypto.randomUUID() : (item.id || crypto.randomUUID());
                         initialCheckItems.push({
@@ -78,6 +86,9 @@ export const useReviewManager = () => {
                             uiIcon: uiIcon,
                             isCompleted: false,
                             type: type,
+                            manualMode: manualMode,
+                            currentCount: type === 'manual' ? 0 : undefined,
+                            targetCount: targetCount,
                             autoConfig: autoConfig
                         });
                     });
@@ -139,6 +150,14 @@ export const useReviewManager = () => {
                         const icon = typeof item === 'string' ? undefined : item.icon;
                         const uiIcon = typeof item === 'string' ? undefined : item.uiIcon;
                         const type = typeof item === 'string' ? 'manual' : (item.type || 'manual');
+                        const manualMode = type === 'manual'
+                            ? (typeof item === 'string' ? 'binary' : (item.manualMode === 'count' ? 'count' : 'binary'))
+                            : undefined;
+                        const targetCount = type === 'manual'
+                            ? (manualMode === 'count'
+                                ? Math.max(1, Math.floor(Number(typeof item === 'string' ? 1 : item.targetCount) || 1))
+                                : 1)
+                            : undefined;
                         const autoConfig = typeof item === 'string' ? undefined : item.autoConfig;
                         const checkItemId = typeof item === 'string' ? crypto.randomUUID() : (item.id || crypto.randomUUID());
                         initialCheckItems.push({
@@ -149,6 +168,9 @@ export const useReviewManager = () => {
                             uiIcon: uiIcon,
                             isCompleted: false,
                             type: type,
+                            manualMode: manualMode,
+                            currentCount: type === 'manual' ? 0 : undefined,
+                            targetCount: targetCount,
                             autoConfig: autoConfig
                         });
                     });

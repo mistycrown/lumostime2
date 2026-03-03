@@ -23,6 +23,7 @@ import { syncService } from '../services/syncService';
 import { uploadDataToCloud, downloadWithBackup, CloudService } from '../utils/syncUtils';
 import { AppView } from '../types';
 import { SYNC_CONFIG } from '../config/syncConfig';
+import { normalizeCheckTemplates, normalizeDailyReviews } from '../utils/checkItemNormalizer';
 import {
     buildSceneGroupStateFromLegacySlots,
     getActiveSceneGroup,
@@ -72,8 +73,8 @@ export const useSyncManager = () => {
             if (data.goals) setGoals(data.goals);
             if (data.autoLinkRules) setAutoLinkRules(data.autoLinkRules);
             if (data.reviewTemplates) setReviewTemplates(data.reviewTemplates);
-            if (data.checkTemplates) setCheckTemplates(data.checkTemplates);
-            if (data.dailyReviews) setDailyReviews(data.dailyReviews);
+            if (data.checkTemplates) setCheckTemplates(normalizeCheckTemplates(data.checkTemplates));
+            if (data.dailyReviews) setDailyReviews(normalizeDailyReviews(data.dailyReviews));
             if (data.weeklyReviews) setWeeklyReviews(data.weeklyReviews);
             if (data.monthlyReviews) setMonthlyReviews(data.monthlyReviews);
             if (data.customNarrativeTemplates) setCustomNarrativeTemplates(data.customNarrativeTemplates);

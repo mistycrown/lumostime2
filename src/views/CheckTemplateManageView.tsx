@@ -81,7 +81,7 @@ export const CheckTemplateManageView: React.FC<CheckTemplateManageViewProps> = (
             id: crypto.randomUUID(),
             title: '新日课',
             icon: '📝', // 默认 emoji
-            items: [{ id: crypto.randomUUID(), content: '日课 1', icon: '📝' }], // Default item
+            items: [{ id: crypto.randomUUID(), content: '日课 1', icon: '📝', type: 'manual', manualMode: 'binary' }], // Default item
             enabled: true,
             order: (templates.length > 0 ? Math.max(...templates.map(t => t.order)) : 0) + 1,
             isDaily: true
@@ -113,10 +113,22 @@ export const CheckTemplateManageView: React.FC<CheckTemplateManageViewProps> = (
         const invalidAutoItems = cleanItems.filter(
             item => item.type === 'auto' && !item.autoConfig
         );
+        const invalidCountItems = cleanItems.filter(
+            item => item.type !== 'auto' &&
+                item.manualMode === 'count' &&
+                (!item.targetCount || item.targetCount < 1)
+        );
 
         if (invalidAutoItems.length > 0) {
             setErrors({ 
                 title: `有 ${invalidAutoItems.length} 个自动日课未配置规则，请点击配置按钮完成设置` 
+            });
+            return;
+        }
+
+        if (invalidCountItems.length > 0) {
+            setErrors({
+                title: `有 ${invalidCountItems.length} 个次数日课未设置有效目标次数（至少为 1）`
             });
             return;
         }
@@ -232,7 +244,7 @@ export const CheckTemplateManageView: React.FC<CheckTemplateManageViewProps> = (
         if (!templateForm) return;
         setTemplateForm({
             ...templateForm,
-            items: [...templateForm.items, { id: crypto.randomUUID(), content: '', icon: '⚡', type: 'manual' }]
+            items: [...templateForm.items, { id: crypto.randomUUID(), content: '', icon: '⚡', type: 'manual', manualMode: 'binary' }]
         });
     };
 
@@ -403,6 +415,11 @@ export const CheckTemplateManageView: React.FC<CheckTemplateManageViewProps> = (
                                                                     className="text-xs"
                                                                 />
                                                                 <span className="truncate">{item.content}</span>
+                                                                {item.type !== 'auto' && item.manualMode === 'count' && (
+                                                                    <span className="text-[9px] text-stone-400">
+                                                                        ({Math.max(1, Math.floor(Number(item.targetCount) || 1))}次)
+                                                                    </span>
+                                                                )}
                                                             </div>
                                                         );
                                                     })}

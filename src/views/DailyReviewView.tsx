@@ -10,7 +10,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { ChevronLeft, Trash2, Sparkles, Edit3, RefreshCw, Calendar } from 'lucide-react';
 import { DailyReview, ReviewTemplate, ReviewAnswer, Category, Log, TodoCategory, TodoItem, Scope, ReviewQuestion, NarrativeTemplate, CheckTemplate, CheckItem } from '../types';
-import { COLOR_OPTIONS, DEFAULT_CHECK_TEMPLATES } from '../constants';
 import * as LucideIcons from 'lucide-react';
 import { IconRenderer } from '../components/IconRenderer';
 import { useSettings } from '../contexts/SettingsContext';
@@ -30,6 +29,7 @@ import {
 } from '../components/ReviewView';
 import { calculateMonthlyStats } from '../utils/reviewStatsUtils';
 import { updateAutoCheckItems } from '../utils/autoCheckUtils';
+import { normalizeCheckItem } from '../utils/checkItemNormalizer';
 
 interface DailyReviewViewProps {
     review: DailyReview;
@@ -50,6 +50,19 @@ interface DailyReviewViewProps {
 }
 
 type TabType = 'check' | 'data' | 'guide' | 'narrative';
+
+const getCountMetrics = (item: CheckItem) => {
+    const target = Math.max(1, Math.floor(item.targetCount || 1));
+    const currentRaw = typeof item.currentCount === 'number'
+        ? item.currentCount
+        : (item.isCompleted ? target : 0);
+    const current = Math.min(Math.max(0, Math.floor(currentRaw)), target);
+    return {
+        current,
+        target,
+        isCompleted: current >= target
+    };
+};
 
 export const DailyReviewView: React.FC<DailyReviewViewProps> = ({
     review,
@@ -101,11 +114,7 @@ export const DailyReviewView: React.FC<DailyReviewViewProps> = ({
 
     // Check Items Logic
     const [checkItems, setCheckItems] = useState<CheckItem[]>(() => {
-        // 数据迁移：为旧数据添加 type 字段
-        return (review.checkItems || []).map(item => ({
-            ...item,
-            type: item.type || 'manual' // 如果没有 type 字段，默认为 manual
-        }));
+        return (review.checkItems || []).map(item => normalizeCheckItem(item));
     });
     const [isClearCheckConfirmOpen, setIsClearCheckConfirmOpen] = useState(false);
     const [isReloadConfirmOpen, setIsReloadConfirmOpen] = useState(false);
@@ -114,11 +123,7 @@ export const DailyReviewView: React.FC<DailyReviewViewProps> = ({
 
     // Sync state when review prop changes (e.g. deletion and re-creation)
     useEffect(() => {
-        // 数据迁移：为旧数据添加 type 字段
-        const migratedItems = (review.checkItems || []).map(item => ({
-            ...item,
-            type: item.type || 'manual'
-        }));
+        const migratedItems = (review.checkItems || []).map(item => normalizeCheckItem(item));
         setCheckItems(migratedItems);
         setAnswers(review.answers || []);
         setSummary(review.summary || '');
@@ -177,10 +182,50 @@ export const DailyReviewView: React.FC<DailyReviewViewProps> = ({
             console.log('[DailyReview] 阻止自动日课切换');
             return;
         }
-        
-        const newItems = checkItems.map(item =>
-            item.id === id ? { ...item, isCompleted: !item.isCompleted } : item
-        );
+
+        // 次数类型：点击行默认 +1
+        if (item?.manualMode === 'count') {
+            handleAdjustCheckItemCount(id, 1);
+            return;
+        }
+
+        const newItems = checkItems.map(item => {
+            if (item.id !== id) return item;
+            const isCompleted = !item.isCompleted;
+            return {
+                ...item,
+                isCompleted,
+                currentCount: isCompleted ? 1 : 0,
+                targetCount: 1
+            };
+        });
+        setCheckItems(newItems);
+        onUpdateReview({ ...review, checkItems: newItems, updatedAt: Date.now() });
+    };
+
+    const handleAdjustCheckItemCount = (id: string, delta: number) => {
+        const newItems = checkItems.map(item => {
+            if (item.id !== id) return item;
+            if (item.type === 'auto') return item;
+            if (item.manualMode !== 'count') {
+                const isCompleted = delta > 0;
+                return {
+                    ...item,
+                    isCompleted,
+                    currentCount: isCompleted ? 1 : 0,
+                    targetCount: 1
+                };
+            }
+
+            const { current, target } = getCountMetrics(item);
+            const nextCurrent = Math.min(target, Math.max(0, current + delta));
+            return {
+                ...item,
+                targetCount: target,
+                currentCount: nextCurrent,
+                isCompleted: nextCurrent >= target
+            };
+        });
         setCheckItems(newItems);
         onUpdateReview({ ...review, checkItems: newItems, updatedAt: Date.now() });
     };
@@ -207,6 +252,15 @@ export const DailyReviewView: React.FC<DailyReviewViewProps> = ({
         dailyTemplates.forEach(template => {
             template.items.forEach(item => {
                 console.log('[DailyReview] 模板项:', { content: item.content, type: item.type, autoConfig: item.autoConfig });
+                const type = item.type || 'manual';
+                const manualMode = type === 'manual'
+                    ? (item.manualMode === 'count' ? 'count' : 'binary')
+                    : undefined;
+                const targetCount = type === 'manual'
+                    ? (manualMode === 'count'
+                        ? Math.max(1, Math.floor(Number(item.targetCount) || 1))
+                        : 1)
+                    : undefined;
                 newItems.push({
                     id: item.id || crypto.randomUUID(),
                     category: template.title,
@@ -214,7 +268,10 @@ export const DailyReviewView: React.FC<DailyReviewViewProps> = ({
                     icon: item.icon,
                     uiIcon: item.uiIcon,
                     isCompleted: false,
-                    type: item.type || 'manual',
+                    type,
+                    manualMode,
+                    currentCount: type === 'manual' ? 0 : undefined,
+                    targetCount,
                     autoConfig: item.autoConfig
                 });
             });
@@ -408,7 +465,12 @@ export const DailyReviewView: React.FC<DailyReviewViewProps> = ({
                     text += `${category}：\n`;
                     items.forEach(item => {
                         const status = item.isCompleted ? '✓' : '✗';
-                        text += `  ${status} ${item.content}\n`;
+                        if (item.type !== 'auto' && item.manualMode === 'count') {
+                            const { current, target } = getCountMetrics(item);
+                            text += `  ${status} ${item.content} (${current}/${target}次)\n`;
+                        } else {
+                            text += `  ${status} ${item.content}\n`;
+                        }
                     });
                     text += '\n';
                 });
@@ -635,56 +697,94 @@ export const DailyReviewView: React.FC<DailyReviewViewProps> = ({
 
                                             {/* Items List - No background card, printing style */}
                                             <div className="space-y-1 pl-1">
-                                                {items.map((item) => (
-                                                    <div
-                                                        key={item.id}
-                                                        className={`flex items-start gap-4 py-2 px-1 group transition-opacity ${item.isCompleted ? 'opacity-50' : ''} ${item.type === 'auto' ? 'cursor-default' : 'cursor-pointer'}`}
-                                                        onClick={(e) => {
-                                                            if (item.type === 'auto') {
-                                                                e.preventDefault();
-                                                                e.stopPropagation();
-                                                                console.log('[DailyReview] 阻止自动日课点击');
-                                                                return;
-                                                            }
-                                                            handleToggleCheckItem(item.id);
-                                                        }}
-                                                    >
-                                                        {/* Checkbox: Black/White, small, aligned */}
-                                                        <button
-                                                            className={`mt-[3px] w-4 h-4 rounded-full border flex items-center justify-center transition-all shrink-0 pointer-events-none ${
-                                                                item.type === 'auto' 
-                                                                    ? item.isCompleted
-                                                                        ? 'bg-blue-600 border-blue-600 text-white'
-                                                                        : 'border-blue-400 text-transparent'
-                                                                    : item.isCompleted
-                                                                        ? 'bg-stone-900 border-stone-900 text-white'
-                                                                        : 'border-stone-400 text-transparent'
-                                                            }`}
-                                                        >
-                                                            <LucideIcons.Check size={10} strokeWidth={3} />
-                                                        </button>
+                                                {items.map((item) => {
+                                                    const isCountMode = item.type !== 'auto' && item.manualMode === 'count';
+                                                    const countMetrics = isCountMode ? getCountMetrics(item) : null;
 
-                                                        <div className="flex-1 min-w-0 flex items-start gap-2">
-                                                            {/* Icon and Text in same container */}
-                                                            <p className={`flex-1 text-[15px] font-serif leading-relaxed transition-all ${item.isCompleted ? 'text-stone-400 line-through decoration-stone-300' : 'text-stone-900'}`}>
-                                                                {(item.icon || item.uiIcon) && (
-                                                                    <IconRenderer 
-                                                                        icon={item.icon || ''} 
-                                                                        uiIcon={item.uiIcon}
-                                                                        size={14}
-                                                                        className="inline-block align-middle mr-1"
-                                                                    />
+                                                    return (
+                                                        <div
+                                                            key={item.id}
+                                                            className={`flex items-start gap-4 py-2 px-1 group transition-opacity ${item.isCompleted ? 'opacity-50' : ''} ${item.type === 'auto' ? 'cursor-default' : 'cursor-pointer'}`}
+                                                            onClick={(e) => {
+                                                                if (item.type === 'auto') {
+                                                                    e.preventDefault();
+                                                                    e.stopPropagation();
+                                                                    console.log('[DailyReview] 阻止自动日课点击');
+                                                                    return;
+                                                                }
+                                                                handleToggleCheckItem(item.id);
+                                                            }}
+                                                        >
+                                                            {/* Checkbox: Black/White, small, aligned */}
+                                                            <button
+                                                                className={`mt-[3px] w-4 h-4 rounded-full border flex items-center justify-center transition-all shrink-0 pointer-events-none ${
+                                                                    item.type === 'auto'
+                                                                        ? item.isCompleted
+                                                                            ? 'bg-blue-600 border-blue-600 text-white'
+                                                                            : 'border-blue-400 text-transparent'
+                                                                        : item.isCompleted
+                                                                            ? 'bg-stone-900 border-stone-900 text-white'
+                                                                            : 'border-stone-400 text-transparent'
+                                                                }`}
+                                                            >
+                                                                <LucideIcons.Check size={10} strokeWidth={3} />
+                                                            </button>
+
+                                                            <div className="flex-1 min-w-0 flex items-start gap-2">
+                                                                {/* Icon and Text in same container */}
+                                                                <p className={`flex-1 text-[15px] font-serif leading-relaxed transition-all ${item.isCompleted ? 'text-stone-400 line-through decoration-stone-300' : 'text-stone-900'}`}>
+                                                                    {(item.icon || item.uiIcon) && (
+                                                                        <IconRenderer
+                                                                            icon={item.icon || ''}
+                                                                            uiIcon={item.uiIcon}
+                                                                            size={14}
+                                                                            className="inline-block align-middle mr-1"
+                                                                        />
+                                                                    )}
+                                                                    <span className="align-middle">{item.content}</span>
+                                                                    {isCountMode && countMetrics && (
+                                                                        <span className="ml-2 text-xs text-stone-500 align-middle">
+                                                                            {countMetrics.current}/{countMetrics.target} 次
+                                                                        </span>
+                                                                    )}
+                                                                </p>
+
+                                                                {isCountMode && countMetrics && (
+                                                                    <div
+                                                                        className="flex items-center gap-1 mr-1"
+                                                                        onClick={(e) => {
+                                                                            e.preventDefault();
+                                                                            e.stopPropagation();
+                                                                        }}
+                                                                    >
+                                                                        <button
+                                                                            type="button"
+                                                                            className="w-6 h-6 rounded-full border border-stone-200 text-stone-500 hover:bg-stone-100 disabled:opacity-40 disabled:hover:bg-transparent"
+                                                                            disabled={countMetrics.current <= 0}
+                                                                            onClick={() => handleAdjustCheckItemCount(item.id, -1)}
+                                                                        >
+                                                                            -
+                                                                        </button>
+                                                                        <button
+                                                                            type="button"
+                                                                            className="w-6 h-6 rounded-full border border-stone-200 text-stone-500 hover:bg-stone-100 disabled:opacity-40 disabled:hover:bg-transparent"
+                                                                            disabled={countMetrics.current >= countMetrics.target}
+                                                                            onClick={() => handleAdjustCheckItemCount(item.id, 1)}
+                                                                        >
+                                                                            +
+                                                                        </button>
+                                                                    </div>
                                                                 )}
-                                                                <span className="align-middle">{item.content}</span>
-                                                            </p>
-                                                            <CheckItemStreakBadge
-                                                                checkItemContent={item.content}
-                                                                dailyReviews={dailyReviews}
-                                                                targetDate={date}
-                                                            />
+
+                                                                <CheckItemStreakBadge
+                                                                    checkItemContent={item.content}
+                                                                    dailyReviews={dailyReviews}
+                                                                    targetDate={date}
+                                                                />
+                                                            </div>
                                                         </div>
-                                                    </div>
-                                                ))}
+                                                    );
+                                                })}
                                             </div>
                                         </div>
                                         );
