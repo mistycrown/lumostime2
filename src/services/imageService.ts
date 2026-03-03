@@ -8,6 +8,7 @@
  */
 import { Filesystem, Directory } from '@capacitor/filesystem';
 import { Capacitor } from '@capacitor/core';
+import { Log, TodoItem } from '../types';
 
 // DB Configuration for Web Fallback
 const DB_NAME = 'LumosTimeImagesDB';
@@ -703,7 +704,7 @@ class ImageService {
     /**
      * 根据logs重建引用列表（用于修复/同步）
      */
-    rebuildReferencedListFromLogs(logs: any[]): string[] {
+    private collectReferencedImages(logs: Log[] = [], todos: TodoItem[] = []): Set<string> {
         const referencedSet = new Set<string>();
         logs.forEach(log => {
             if (log.images && Array.isArray(log.images)) {
@@ -715,6 +716,20 @@ class ImageService {
                 });
             }
         });
+        todos.forEach(todo => {
+            if (!todo?.coverImage || typeof todo.coverImage !== 'string') {
+                return;
+            }
+            referencedSet.add(todo.coverImage);
+            if (!todo.coverImage.startsWith('thumb_')) {
+                referencedSet.add(`thumb_${todo.coverImage}`);
+            }
+        });
+        return referencedSet;
+    }
+
+    rebuildReferencedListFromLogs(logs: Log[], todos: TodoItem[] = []): string[] {
+        const referencedSet = this.collectReferencedImages(logs, todos);
         const list = Array.from(referencedSet);
         this.updateReferencedImagesList(list);
         // console.log(`[ImageService] 重建引用列表: ${list.length} 个图片`);
@@ -732,21 +747,11 @@ class ImageService {
     /**
      * 清理未引用的图片（从列表和文件系统中删除）
      */
-    async cleanupUnreferencedImages(logs: any[]): Promise<{ cleaned: number, kept: number }> {
+    async cleanupUnreferencedImages(logs: Log[], todos: TodoItem[] = []): Promise<{ cleaned: number, kept: number }> {
         console.log('[ImageService] ========== 开始清理未引用的图片 ==========');
 
         // 1. 从logs重建正确的引用列表
-        const referencedImages = new Set<string>();
-        logs.forEach(log => {
-            if (log.images && Array.isArray(log.images)) {
-                log.images.forEach((img: string) => {
-                    if (img && typeof img === 'string') {
-                        referencedImages.add(img);
-                        referencedImages.add(`thumb_${img}`);
-                    }
-                });
-            }
-        });
+        const referencedImages = this.collectReferencedImages(logs, todos);
 
         // console.log(`[ImageService] Logs中引用的图片: ${referencedImages.size} 个`);
 

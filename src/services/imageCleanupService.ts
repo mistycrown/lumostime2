@@ -8,7 +8,7 @@
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
 
-import { Log } from '../types';
+import { Log, TodoItem } from '../types';
 import { imageService } from './imageService';
 import { webdavService } from './webdavService';
 
@@ -28,7 +28,7 @@ export class ImageCleanupService {
     /**
      * 获取所有 logs 中引用的图片文件名（包括对应的缩略图）
      */
-    private getReferencedImages(logs: Log[]): Set<string> {
+    private getReferencedImages(logs: Log[], todos: TodoItem[] = []): Set<string> {
         const referencedImages = new Set<string>();
         
         logs.forEach(log => {
@@ -41,6 +41,16 @@ export class ImageCleanupService {
                         referencedImages.add(`thumb_${imageName}`);
                     }
                 });
+            }
+        });
+
+        todos.forEach(todo => {
+            if (!todo?.coverImage || typeof todo.coverImage !== 'string') {
+                return;
+            }
+            referencedImages.add(todo.coverImage);
+            if (!todo.coverImage.startsWith('thumb_')) {
+                referencedImages.add(`thumb_${todo.coverImage}`);
             }
         });
         
@@ -107,7 +117,7 @@ export class ImageCleanupService {
     /**
      * 检查未引用的图片
      */
-    async checkUnreferencedImages(logs: Log[]): Promise<{
+    async checkUnreferencedImages(logs: Log[], todos: TodoItem[] = []): Promise<{
         totalImages: number;
         referencedImages: number;
         unreferencedImages: string[];
@@ -122,7 +132,7 @@ export class ImageCleanupService {
             const { originalImages, thumbnailImages, pairedImages } = this.groupImagesByPairs(allImageFiles);
             
             // 获取所有被引用的图片（包括对应的缩略图）
-            const referencedImages = this.getReferencedImages(logs);
+            const referencedImages = this.getReferencedImages(logs, todos);
             
             // 找出未被引用的原图（只检查原图，缩略图会自动跟随）
             const unreferencedOriginals = originalImages.filter(imageName => 
@@ -195,7 +205,8 @@ export class ImageCleanupService {
             deleteLocal?: boolean;
             deleteRemote?: boolean;
             dryRun?: boolean;
-        } = {}
+        } = {},
+        todos: TodoItem[] = []
     ): Promise<CleanupResult> {
         const { deleteLocal = true, deleteRemote = true, dryRun = false } = options;
         
@@ -209,7 +220,7 @@ export class ImageCleanupService {
                     deleteLocal, 
                     deleteRemote: false, 
                     dryRun 
-                });
+                }, todos);
             }
         }
         
@@ -224,7 +235,7 @@ export class ImageCleanupService {
         
         try {
             // 检查未引用的图片
-            const checkResult = await this.checkUnreferencedImages(logs);
+            const checkResult = await this.checkUnreferencedImages(logs, todos);
             result.totalImages = checkResult.totalImages;
             result.referencedImages = checkResult.referencedImages;
             result.unreferencedImages = checkResult.unreferencedImages;
@@ -376,7 +387,7 @@ export class ImageCleanupService {
     /**
      * 获取图片使用统计
      */
-    async getImageUsageStats(logs: Log[]): Promise<{
+    async getImageUsageStats(logs: Log[], todos: TodoItem[] = []): Promise<{
         imageUsage: Map<string, number>;
         totalReferences: number;
         uniqueImages: number;
@@ -392,6 +403,13 @@ export class ImageCleanupService {
                         totalReferences++;
                     }
                 });
+            }
+        });
+
+        todos.forEach(todo => {
+            if (todo?.coverImage && typeof todo.coverImage === 'string') {
+                imageUsage.set(todo.coverImage, (imageUsage.get(todo.coverImage) || 0) + 1);
+                totalReferences++;
             }
         });
         

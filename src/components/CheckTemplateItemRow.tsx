@@ -8,7 +8,7 @@
 
 import React, { useState } from 'react';
 import { CheckTemplateItem } from '../types';
-import { X, Zap, Circle, Hash } from 'lucide-react';
+import { X, Zap, Circle } from 'lucide-react';
 import { AutoCheckItemEditor } from './AutoCheckItemEditor';
 
 interface CheckTemplateItemRowProps {
@@ -25,6 +25,18 @@ export const CheckTemplateItemRow: React.FC<CheckTemplateItemRowProps> = ({
   onDelete
 }) => {
   const [showAutoEditor, setShowAutoEditor] = useState(false);
+
+  const getCurrentMode = (): 'manual-binary' | 'manual-count' | 'auto' => {
+    if (item.type === 'auto') return 'auto';
+    if (item.manualMode === 'count') return 'manual-count';
+    return 'manual-binary';
+  };
+
+  const getNextMode = (mode: 'manual-binary' | 'manual-count' | 'auto'): 'manual-binary' | 'manual-count' | 'auto' => {
+    if (mode === 'manual-binary') return 'manual-count';
+    if (mode === 'manual-count') return 'auto';
+    return 'manual-binary';
+  };
 
   // 切换模式（二值手动 / 次数手动 / 自动）
   const handleSetMode = (mode: 'manual-binary' | 'manual-count' | 'auto') => {
@@ -58,6 +70,12 @@ export const CheckTemplateItemRow: React.FC<CheckTemplateItemRowProps> = ({
     });
   };
 
+  const handleCycleMode = () => {
+    const current = getCurrentMode();
+    const next = getNextMode(current);
+    handleSetMode(next);
+  };
+
   const handleContentChange = (fullText: string) => {
     // 提取第一个字符作为图标
     const firstChar = Array.from(fullText.trim())[0] || '';
@@ -89,39 +107,23 @@ export const CheckTemplateItemRow: React.FC<CheckTemplateItemRowProps> = ({
             placeholder={isAuto ? '⚡ 输入自动日课名称...' : '💧 输入日课名称 (首字符作为图标)...'}
           />
           
-          {/* 模式切换 */}
-          <div className="flex items-center gap-0.5 rounded-lg bg-stone-100 p-0.5 shrink-0">
-            <button
-              type="button"
-              onClick={() => handleSetMode('manual-binary')}
-              className={`px-1.5 py-1 rounded-md transition-colors ${
-                !isAuto && !isCountManual ? 'bg-white text-stone-700 shadow-sm' : 'text-stone-400'
-              }`}
-              title="手动勾选"
-            >
-              <Circle size={14} />
-            </button>
-            <button
-              type="button"
-              onClick={() => handleSetMode('manual-count')}
-              className={`px-1.5 py-1 rounded-md transition-colors ${
-                isCountManual ? 'bg-white text-stone-700 shadow-sm' : 'text-stone-400'
-              }`}
-              title="手动次数"
-            >
-              <Hash size={14} />
-            </button>
-            <button
-              type="button"
-              onClick={() => handleSetMode('auto')}
-              className={`px-1.5 py-1 rounded-md transition-colors ${
-                isAuto ? 'bg-white text-blue-600 shadow-sm' : 'text-stone-400'
-              }`}
-              title="自动规则"
-            >
-              <Zap size={14} />
-            </button>
-          </div>
+          {/* 模式切换（单按钮循环） */}
+          <button
+            type="button"
+            onClick={handleCycleMode}
+            className={`px-2.5 py-2 rounded-lg transition-colors shrink-0 ${
+              isAuto
+                ? 'text-blue-600 bg-blue-50'
+                : isCountManual
+                  ? 'text-stone-700 bg-stone-100'
+                  : 'text-stone-500 bg-stone-100'
+            }`}
+            title={`点击切换类型（当前：${
+              isAuto ? '自动规则' : isCountManual ? '手动次数' : '手动勾选'
+            }）`}
+          >
+            {isAuto ? <Zap size={16} /> : isCountManual ? <span className="text-sm font-bold leading-none">1</span> : <Circle size={16} />}
+          </button>
 
           {/* 删除按钮 - 始终显示 */}
           <button
@@ -143,6 +145,8 @@ export const CheckTemplateItemRow: React.FC<CheckTemplateItemRowProps> = ({
               min={1}
               step={1}
               value={Math.max(1, Math.floor(Number(item.targetCount) || 1))}
+              onFocus={(e) => e.currentTarget.select()}
+              onClick={(e) => e.currentTarget.select()}
               onChange={(e) => {
                 const targetCount = Math.max(1, Math.floor(Number(e.target.value) || 1));
                 onUpdate(index, { ...item, targetCount, manualMode: 'count', type: 'manual' });

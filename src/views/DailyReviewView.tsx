@@ -19,6 +19,7 @@ import { StatsView } from './StatsView';
 import { FloatingButton } from '../components/FloatingButton';
 import { UIIcon } from '../components/UIIcon';
 import { CheckItemStreakBadge } from '../components/CheckItemStreakBadge';
+import { CountInputModal } from '../components/CountInputModal';
 import { 
     useReviewState, 
     ReviewGuideTab, 
@@ -120,6 +121,21 @@ export const DailyReviewView: React.FC<DailyReviewViewProps> = ({
     const [isReloadConfirmOpen, setIsReloadConfirmOpen] = useState(false);
     const [isReloadGuideConfirmOpen, setIsReloadGuideConfirmOpen] = useState(false);
     const [isClearGuideConfirmOpen, setIsClearGuideConfirmOpen] = useState(false);
+    
+    // Count Input Modal State
+    const [countInputModal, setCountInputModal] = useState<{
+        isOpen: boolean;
+        itemId: string;
+        currentCount: number;
+        targetCount: number;
+        content: string;
+    }>({
+        isOpen: false,
+        itemId: '',
+        currentCount: 0,
+        targetCount: 1,
+        content: ''
+    });
 
     // Sync state when review prop changes (e.g. deletion and re-creation)
     useEffect(() => {
@@ -197,6 +213,61 @@ export const DailyReviewView: React.FC<DailyReviewViewProps> = ({
                 isCompleted,
                 currentCount: isCompleted ? 1 : 0,
                 targetCount: 1
+            };
+        });
+        setCheckItems(newItems);
+        onUpdateReview({ ...review, checkItems: newItems, updatedAt: Date.now() });
+    };
+
+    // 点击复选框：对于已完成的次数类型日课，重置为 0
+    const handleCheckboxClick = (id: string, e: React.MouseEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        
+        const item = checkItems.find(i => i.id === id);
+        if (!item || item.type === 'auto') return;
+
+        // 如果是次数类型且已完成，重置为 0
+        if (item.manualMode === 'count' && item.isCompleted) {
+            const newItems = checkItems.map(i => {
+                if (i.id !== id) return i;
+                return {
+                    ...i,
+                    currentCount: 0,
+                    isCompleted: false
+                };
+            });
+            setCheckItems(newItems);
+            onUpdateReview({ ...review, checkItems: newItems, updatedAt: Date.now() });
+        }
+    };
+
+    // 打开次数输入模态框
+    const handleOpenCountInput = (id: string, e: React.MouseEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        
+        const item = checkItems.find(i => i.id === id);
+        if (!item || item.type === 'auto' || item.manualMode !== 'count') return;
+
+        const { current, target } = getCountMetrics(item);
+        setCountInputModal({
+            isOpen: true,
+            itemId: id,
+            currentCount: current,
+            targetCount: target,
+            content: item.content
+        });
+    };
+
+    // 确认设置次数
+    const handleConfirmCount = (count: number) => {
+        const newItems = checkItems.map(item => {
+            if (item.id !== countInputModal.itemId) return item;
+            return {
+                ...item,
+                currentCount: count,
+                isCompleted: count >= (item.targetCount || 1)
             };
         });
         setCheckItems(newItems);
@@ -704,7 +775,7 @@ export const DailyReviewView: React.FC<DailyReviewViewProps> = ({
                                                     return (
                                                         <div
                                                             key={item.id}
-                                                            className={`flex items-start gap-4 py-2 px-1 group transition-opacity ${item.isCompleted ? 'opacity-50' : ''} ${item.type === 'auto' ? 'cursor-default' : 'cursor-pointer'}`}
+                                                            className={`flex items-center gap-4 py-2 px-1 group transition-opacity ${item.isCompleted ? 'opacity-50' : ''} ${item.type === 'auto' ? 'cursor-default' : 'cursor-pointer'}`}
                                                             onClick={(e) => {
                                                                 if (item.type === 'auto') {
                                                                     e.preventDefault();
@@ -717,7 +788,13 @@ export const DailyReviewView: React.FC<DailyReviewViewProps> = ({
                                                         >
                                                             {/* Checkbox: Black/White, small, aligned */}
                                                             <button
-                                                                className={`mt-[3px] w-4 h-4 rounded-full border flex items-center justify-center transition-all shrink-0 pointer-events-none ${
+                                                                className={`w-4 h-4 rounded-full border flex items-center justify-center transition-all shrink-0 ${
+                                                                    item.type === 'auto'
+                                                                        ? 'pointer-events-none'
+                                                                        : isCountMode && item.isCompleted
+                                                                            ? 'cursor-pointer'
+                                                                            : 'pointer-events-none'
+                                                                } ${
                                                                     item.type === 'auto'
                                                                         ? item.isCompleted
                                                                             ? 'bg-blue-600 border-blue-600 text-white'
@@ -726,11 +803,12 @@ export const DailyReviewView: React.FC<DailyReviewViewProps> = ({
                                                                             ? 'bg-stone-900 border-stone-900 text-white'
                                                                             : 'border-stone-400 text-transparent'
                                                                 }`}
+                                                                onClick={(e) => handleCheckboxClick(item.id, e)}
                                                             >
                                                                 <LucideIcons.Check size={10} strokeWidth={3} />
                                                             </button>
 
-                                                            <div className="flex-1 min-w-0 flex items-start gap-2">
+                                                            <div className="flex-1 min-w-0 flex items-center gap-2">
                                                                 {/* Icon and Text in same container */}
                                                                 <p className={`flex-1 text-[15px] font-serif leading-relaxed transition-all ${item.isCompleted ? 'text-stone-400 line-through decoration-stone-300' : 'text-stone-900'}`}>
                                                                     {(item.icon || item.uiIcon) && (
@@ -743,38 +821,14 @@ export const DailyReviewView: React.FC<DailyReviewViewProps> = ({
                                                                     )}
                                                                     <span className="align-middle">{item.content}</span>
                                                                     {isCountMode && countMetrics && (
-                                                                        <span className="ml-2 text-xs text-stone-500 align-middle">
+                                                                        <button
+                                                                            className="ml-2 text-xs text-stone-500 hover:text-stone-700 hover:underline align-middle transition-colors cursor-pointer"
+                                                                            onClick={(e) => handleOpenCountInput(item.id, e)}
+                                                                        >
                                                                             {countMetrics.current}/{countMetrics.target} 次
-                                                                        </span>
+                                                                        </button>
                                                                     )}
                                                                 </p>
-
-                                                                {isCountMode && countMetrics && (
-                                                                    <div
-                                                                        className="flex items-center gap-1 mr-1"
-                                                                        onClick={(e) => {
-                                                                            e.preventDefault();
-                                                                            e.stopPropagation();
-                                                                        }}
-                                                                    >
-                                                                        <button
-                                                                            type="button"
-                                                                            className="w-6 h-6 rounded-full border border-stone-200 text-stone-500 hover:bg-stone-100 disabled:opacity-40 disabled:hover:bg-transparent"
-                                                                            disabled={countMetrics.current <= 0}
-                                                                            onClick={() => handleAdjustCheckItemCount(item.id, -1)}
-                                                                        >
-                                                                            -
-                                                                        </button>
-                                                                        <button
-                                                                            type="button"
-                                                                            className="w-6 h-6 rounded-full border border-stone-200 text-stone-500 hover:bg-stone-100 disabled:opacity-40 disabled:hover:bg-transparent"
-                                                                            disabled={countMetrics.current >= countMetrics.target}
-                                                                            onClick={() => handleAdjustCheckItemCount(item.id, 1)}
-                                                                        >
-                                                                            +
-                                                                        </button>
-                                                                    </div>
-                                                                )}
 
                                                                 <CheckItemStreakBadge
                                                                     checkItemContent={item.content}
@@ -994,6 +1048,16 @@ export const DailyReviewView: React.FC<DailyReviewViewProps> = ({
                 description="确定要删除当前生成的 AI 叙事吗？此操作无法撤销，需要重新生成。"
                 confirmText="确认删除"
                 type="danger"
+            />
+
+            {/* Count Input Modal */}
+            <CountInputModal
+                isOpen={countInputModal.isOpen}
+                currentCount={countInputModal.currentCount}
+                targetCount={countInputModal.targetCount}
+                itemContent={countInputModal.content}
+                onClose={() => setCountInputModal({ ...countInputModal, isOpen: false })}
+                onConfirm={handleConfirmCount}
             />
         </div>
     );
