@@ -534,7 +534,7 @@ export const SceneView: React.FC<SceneViewProps> = ({
         break;
       case 'toggleCheck':
         if (action.checkItemId) {
-          handleToggleCheckItem(action.checkItemId);
+          handleToggleCheckItem(action.checkItemId, action.checkActionMode);
         }
         break;
       case 'navigate':
@@ -546,13 +546,23 @@ export const SceneView: React.FC<SceneViewProps> = ({
   };
 
   // 根据模板日课 ID 获取模板信息（用于兼容旧 dailyReview 数据）
-  const getCheckTemplateMeta = (checkItemId: string): { content: string; category: string } | null => {
+  const getCheckTemplateMeta = (
+    checkItemId: string
+  ): { content: string; category: string; manualMode: 'binary' | 'count'; targetCount: number } | null => {
     for (const template of checkTemplates) {
       const item = template.items.find(i => i.id === checkItemId);
       if (item) {
+        const manualMode = item.type === 'auto'
+          ? 'binary'
+          : (item.manualMode === 'count' ? 'count' : 'binary');
+        const targetCount = manualMode === 'count'
+          ? Math.max(1, Math.floor(Number(item.targetCount) || 1))
+          : 1;
         return {
           content: item.content,
-          category: template.title
+          category: template.title,
+          manualMode,
+          targetCount
         };
       }
     }
@@ -598,7 +608,10 @@ export const SceneView: React.FC<SceneViewProps> = ({
   };
 
   // 处理日课打卡
-  const handleToggleCheckItem = (checkItemId: string) => {
+  const handleToggleCheckItem = (
+    checkItemId: string,
+    actionMode: SceneCardData['action']['checkActionMode'] = 'toggle'
+  ) => {
     // 获取今天的日期（使用本地时间）
     const today = new Date();
     const dateStr = getLocalDateStr(today); // YYYY-MM-DD
@@ -669,10 +682,15 @@ export const SceneView: React.FC<SceneViewProps> = ({
       return;
     }
 
+    const effectiveActionMode = actionMode || 'toggle';
     let nextItem: CheckItem;
     if (matchedItem.manualMode === 'count') {
       const { current, target, isCompleted } = getCountState(matchedItem);
-      const nextCurrent = isCompleted ? Math.max(0, current - 1) : Math.min(target, current + 1);
+      const nextCurrent = effectiveActionMode === 'reset'
+        ? 0
+        : (effectiveActionMode === 'increment'
+          ? Math.min(target, current + 1)
+          : (isCompleted ? Math.max(0, current - 1) : Math.min(target, current + 1)));
       nextItem = {
         ...matchedItem,
         id: checkItemId,
@@ -682,7 +700,9 @@ export const SceneView: React.FC<SceneViewProps> = ({
         isCompleted: nextCurrent >= target
       };
     } else {
-      const isCompleted = !matchedItem.isCompleted;
+      const isCompleted = effectiveActionMode === 'reset'
+        ? false
+        : (effectiveActionMode === 'increment' ? true : !matchedItem.isCompleted);
       nextItem = {
         ...matchedItem,
         id: checkItemId,
@@ -716,26 +736,62 @@ export const SceneView: React.FC<SceneViewProps> = ({
   };
 
   // 获取日课的完成状态
-  const getCheckItemStatus = (checkItemId: string): boolean => {
+  const getCheckItemProgress = (checkItemId: string): {
+    isCompleted: boolean;
+    manualMode: 'binary' | 'count';
+    currentCount: number;
+    targetCount: number;
+  } => {
     const today = new Date();
     const dateStr = getLocalDateStr(today);
     const todayReview = dailyReviews.find(r => r.date === dateStr);
+    const templateMeta = getCheckTemplateMeta(checkItemId);
+    const defaultManualMode = templateMeta?.manualMode || 'binary';
+    const defaultTarget = templateMeta?.targetCount || 1;
     
     if (!todayReview || !todayReview.checkItems) {
-      return false;
+      return {
+        isCompleted: false,
+        manualMode: defaultManualMode,
+        currentCount: 0,
+        targetCount: defaultTarget
+      };
     }
 
     const checkItemIndex = findCheckItemIndexInReview(todayReview, checkItemId);
     if (checkItemIndex === -1) {
-      return false;
+      return {
+        isCompleted: false,
+        manualMode: defaultManualMode,
+        currentCount: 0,
+        targetCount: defaultTarget
+      };
     }
 
     const item = todayReview.checkItems[checkItemIndex];
-    if (!item) return false;
-    if (item.type !== 'auto' && item.manualMode === 'count') {
-      return getCountState(item).isCompleted;
+    if (!item) {
+      return {
+        isCompleted: false,
+        manualMode: defaultManualMode,
+        currentCount: 0,
+        targetCount: defaultTarget
+      };
     }
-    return item.isCompleted || false;
+    if (item.type !== 'auto' && item.manualMode === 'count') {
+      const { current, target, isCompleted } = getCountState(item);
+      return {
+        isCompleted,
+        manualMode: 'count',
+        currentCount: current,
+        targetCount: target
+      };
+    }
+    return {
+      isCompleted: item.isCompleted || false,
+      manualMode: 'binary',
+      currentCount: item.isCompleted ? 1 : 0,
+      targetCount: 1
+    };
   };
 
   // 获取日课的内容（用于计算坚持天数）
@@ -1031,12 +1087,15 @@ export const SceneView: React.FC<SceneViewProps> = ({
               let cardWithStatus = card;
               
               if (card.type === 'checklist' && card.action.checkItemId) {
-                const isCompleted = getCheckItemStatus(card.action.checkItemId);
+                const progress = getCheckItemProgress(card.action.checkItemId);
                 const checkItemContent = getCheckItemContent(card.action.checkItemId);
                 cardWithStatus = { 
                   ...card, 
-                  isCompleted,
-                  checkItemContent
+                  isCompleted: progress.isCompleted,
+                  checkItemContent,
+                  checkManualMode: progress.manualMode,
+                  checkCurrentCount: progress.currentCount,
+                  checkTargetCount: progress.targetCount
                 };
               }
               

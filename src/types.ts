@@ -195,6 +195,7 @@ export interface SceneCardAction {
   todoId?: string;
   // 日课动作
   checkItemId?: string;
+  checkActionMode?: 'toggle' | 'increment' | 'reset';
   // 导航动作
   targetView?: string;
   // 引用动作
@@ -255,6 +256,9 @@ export interface SceneCardData {
   // 日课状态（仅 checklist 类型）
   isCompleted?: boolean;
   checkItemContent?: string; // 日课内容（用于计算坚持天数）
+  checkManualMode?: 'binary' | 'count';
+  checkCurrentCount?: number;
+  checkTargetCount?: number;
 }
 
 // 时间段定义

@@ -42,6 +42,12 @@ export const SceneSettingsView: React.FC<SceneSettingsViewProps> = ({ onBack }) 
   const [editingSlot, setEditingSlot] = useState<Partial<TimeSlot> | null>(null);
   const [editingCard, setEditingCard] = useState<Partial<SceneCardData> | null>(null);
   
+  // 复制快捷方式相关状态
+  const [isCopyCardModalOpen, setIsCopyCardModalOpen] = useState(false);
+  const [copyingCard, setCopyingCard] = useState<SceneCardData | null>(null);
+  const [copyTargetGroupId, setCopyTargetGroupId] = useState('');
+  const [copyTargetSlotId, setCopyTargetSlotId] = useState('');
+  
   // 确认模态框状态
   const [confirmModal, setConfirmModal] = useState<{
     isOpen: boolean;
@@ -646,6 +652,58 @@ export const SceneSettingsView: React.FC<SceneSettingsViewProps> = ({ onBack }) 
     saveTimeSlots(updatedSlots);
   };
 
+  // 打开复制快捷方式模态框
+  const handleOpenCopyCard = (card: SceneCardData) => {
+    setCopyingCard(card);
+    setCopyTargetGroupId(activeGroup.id);
+    setCopyTargetSlotId(selectedSlotId || '');
+    setIsCopyCardModalOpen(true);
+  };
+
+  // 执行复制快捷方式
+  const handleConfirmCopyCard = () => {
+    if (!copyingCard || !copyTargetGroupId || !copyTargetSlotId) {
+      addToast('error', '请选择目标场景组和时间段');
+      return;
+    }
+
+    // 创建新的卡片副本（生成新ID）
+    const newCard: SceneCardData = {
+      ...JSON.parse(JSON.stringify(copyingCard)),
+      id: `card-${Date.now()}`
+    };
+
+    // 更新目标场景组的目标时间段
+    const updatedState: SceneGroupState = {
+      ...sceneGroupState,
+      groups: sceneGroupState.groups.map(group => {
+        if (group.id === copyTargetGroupId) {
+          return {
+            ...group,
+            timeSlots: group.timeSlots.map(slot => {
+              if (slot.id === copyTargetSlotId) {
+                return {
+                  ...slot,
+                  cards: [...slot.cards, newCard]
+                };
+              }
+              return slot;
+            })
+          };
+        }
+        return group;
+      })
+    };
+
+    persistSceneGroupState(updatedState);
+    setIsCopyCardModalOpen(false);
+    setCopyingCard(null);
+    
+    const targetGroup = sceneGroupState.groups.find(g => g.id === copyTargetGroupId);
+    const targetSlot = targetGroup?.timeSlots.find(s => s.id === copyTargetSlotId);
+    addToast('success', `已复制到「${targetGroup?.name} - ${targetSlot?.name}」`);
+  };
+
   // 重设当前场景组为预设场景
   const handleResetToPresets = () => {
     setConfirmModal({
@@ -951,6 +1009,13 @@ export const SceneSettingsView: React.FC<SceneSettingsViewProps> = ({ onBack }) 
                           title="下移"
                         >
                           <ArrowDown size={14} />
+                        </button>
+                        <button
+                          onClick={() => handleOpenCopyCard(card)}
+                          className="p-1.5 hover:bg-stone-100 rounded"
+                          title="复制"
+                        >
+                          <Copy size={14} />
                         </button>
                         <button
                           onClick={() => {
@@ -1310,6 +1375,86 @@ export const SceneSettingsView: React.FC<SceneSettingsViewProps> = ({ onBack }) 
           checkTemplates={checkTemplates}
           sceneCardTimerMode={sceneCardTimerMode}
         />
+      )}
+
+      {/* 复制快捷方式模态框 */}
+      {isCopyCardModalOpen && copyingCard && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl w-full max-w-md flex flex-col">
+            <div className="p-4 sm:p-6 pb-3 border-b border-stone-200">
+              <h2 className="text-lg sm:text-xl font-bold">复制快捷方式</h2>
+              <p className="text-xs text-stone-500 mt-1">
+                将「{copyingCard.title}」复制到指定的场景组和时间段
+              </p>
+            </div>
+
+            <div className="p-4 sm:p-6 space-y-4">
+              <div>
+                <label className="block text-xs font-medium text-stone-700 mb-1">目标场景组</label>
+                <CustomSelect
+                  value={copyTargetGroupId}
+                  onChange={(value) => {
+                    setCopyTargetGroupId(value);
+                    // 切换场景组时，重置时间段选择
+                    const targetGroup = sceneGroupState.groups.find(g => g.id === value);
+                    if (targetGroup && targetGroup.timeSlots.length > 0) {
+                      setCopyTargetSlotId(targetGroup.timeSlots[0].id);
+                    } else {
+                      setCopyTargetSlotId('');
+                    }
+                  }}
+                  options={sceneGroupState.groups.map(group => ({
+                    value: group.id,
+                    label: group.name
+                  }))}
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-stone-700 mb-1">目标时间段</label>
+                {(() => {
+                  const targetGroup = sceneGroupState.groups.find(g => g.id === copyTargetGroupId);
+                  if (!targetGroup || targetGroup.timeSlots.length === 0) {
+                    return (
+                      <div className="text-xs text-stone-500 p-3 bg-stone-50 rounded-lg">
+                        该场景组暂无时间段
+                      </div>
+                    );
+                  }
+                  return (
+                    <CustomSelect
+                      value={copyTargetSlotId}
+                      onChange={(value) => setCopyTargetSlotId(value)}
+                      options={targetGroup.timeSlots.map(slot => ({
+                        value: slot.id,
+                        label: `${slot.name} (${slot.startTime} - ${slot.endTime})`
+                      }))}
+                    />
+                  );
+                })()}
+              </div>
+            </div>
+
+            <div className="p-4 sm:p-6 pt-3 border-t border-stone-200 flex gap-2">
+              <button
+                onClick={() => {
+                  setIsCopyCardModalOpen(false);
+                  setCopyingCard(null);
+                }}
+                className="flex-1 px-4 py-2.5 text-sm bg-stone-100 text-stone-700 rounded-lg hover:bg-stone-200 transition-colors"
+              >
+                取消
+              </button>
+              <button
+                onClick={handleConfirmCopyCard}
+                disabled={!copyTargetGroupId || !copyTargetSlotId}
+                className="flex-1 px-4 py-2.5 text-sm bg-stone-800 text-white rounded-lg hover:bg-stone-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                确认复制
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* 确认模态框 */}

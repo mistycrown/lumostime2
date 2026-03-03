@@ -30,6 +30,9 @@ interface SceneCardProps {
 export const SceneCard: React.FC<SceneCardProps> = ({ data, dailyReviews = [], logs = [], onAction, sceneCardTimerMode = 'realtime' }) => {
   // 获取卡片颜色（优先使用自定义颜色，否则使用默认颜色）
   const cardColor = data.color || DEFAULT_COLORS[data.type];
+  const isCountChecklistCard = data.type === 'checklist'
+    && data.action.type === 'toggleCheck'
+    && data.checkManualMode === 'count';
   
   // 处理原则卡片的内容（支持随机选取和从原则库选择）
   const [displayData, setDisplayData] = useState(data);
@@ -141,8 +144,8 @@ export const SceneCard: React.FC<SceneCardProps> = ({ data, dailyReviews = [], l
     if (stored !== null) {
       return stored === 'true';
     }
-    // 对于日课卡片，如果已完成则初始状态为翻转
-    return data.type === 'checklist' && !!data.isCompleted;
+    // 对于二值日课卡片，如果已完成则初始状态为翻转
+    return data.type === 'checklist' && !isCountChecklistCard && !!data.isCompleted;
   };
 
   const [isFlipped, setIsFlipped] = useState(getStoredFlipState());
@@ -157,12 +160,15 @@ export const SceneCard: React.FC<SceneCardProps> = ({ data, dailyReviews = [], l
   // 当 isCompleted 状态变化时，更新翻转状态
   React.useEffect(() => {
     if (data.type === 'checklist') {
+      if (isCountChecklistCard) {
+        return;
+      }
       const newFlipState = !!data.isCompleted;
       setIsFlipped(newFlipState);
       // 同步到 localStorage
       localStorage.setItem(`scene_card_flipped_${data.id}`, String(newFlipState));
     }
-  }, [data.isCompleted, data.type, data.id]);
+  }, [data.isCompleted, data.type, data.id, isCountChecklistCard]);
 
   // 保存翻转状态到 localStorage
   const saveFlipState = (flipped: boolean) => {
@@ -213,7 +219,11 @@ export const SceneCard: React.FC<SceneCardProps> = ({ data, dailyReviews = [], l
       
       // 如果是日课卡片，右滑表示取消完成
       if (data.type === 'checklist' && data.action.type === 'toggleCheck') {
-        onAction?.({ ...data.action, checkItemId: data.action.checkItemId });
+        onAction?.({
+          ...data.action,
+          checkItemId: data.action.checkItemId,
+          checkActionMode: isCountChecklistCard ? 'reset' : 'toggle'
+        });
       }
     }
     
@@ -242,6 +252,13 @@ export const SceneCard: React.FC<SceneCardProps> = ({ data, dailyReviews = [], l
       }
       
       if (data.action.type !== 'none') {
+        if (data.type === 'checklist' && data.action.type === 'toggleCheck') {
+          onAction?.({
+            ...data.action,
+            checkActionMode: isCountChecklistCard ? 'increment' : 'toggle'
+          }, data.autoEnterFocus);
+          return;
+        }
         // 对于导航卡片，延迟执行以显示翻转动画
         if (data.action.type === 'navigate') {
           setTimeout(() => {
@@ -273,6 +290,13 @@ export const SceneCard: React.FC<SceneCardProps> = ({ data, dailyReviews = [], l
           break;
         
         case 'checklist':
+          if (isCountChecklistCard && data.action.type === 'toggleCheck') {
+            onAction?.({
+              ...data.action,
+              checkActionMode: 'increment'
+            }, data.autoEnterFocus);
+          }
+          break;
         case 'principle':
         case 'stats':
           // 这些类型的卡片反面不响应点击
@@ -399,6 +423,12 @@ const CardFront: React.FC<{ data: SceneCardData; displayData: SceneCardData; car
         {data.type === 'todo' && data.progress !== undefined && data.totalAmount && (
           <div className="text-sm text-stone-500 font-medium whitespace-nowrap">
             {data.progress}/{data.totalAmount}
+          </div>
+        )}
+        {/* 次数日课进度 */}
+        {data.type === 'checklist' && data.checkManualMode === 'count' && (
+          <div className="text-sm text-stone-500 font-medium whitespace-nowrap">
+            {Math.max(0, Math.floor(Number(data.checkCurrentCount) || 0))}/{Math.max(1, Math.floor(Number(data.checkTargetCount) || 1))}
           </div>
         )}
       </div>
@@ -548,11 +578,18 @@ const CardBack: React.FC<{
         {isSwiping ? (
           <p className="text-xs text-stone-400 whitespace-nowrap">{getSwipeHintText()}</p>
         ) : (
-          <div 
-            className="w-5 h-5 rounded-full flex items-center justify-center"
-            style={{ backgroundColor: bgColor }}
-          >
-            {icon}
+          <div className="flex items-center gap-2">
+            {data.type === 'checklist' && data.checkManualMode === 'count' && (
+              <span className="text-xs font-bold text-stone-500 whitespace-nowrap">
+                {Math.max(0, Math.floor(Number(data.checkCurrentCount) || 0))}/{Math.max(1, Math.floor(Number(data.checkTargetCount) || 1))}
+              </span>
+            )}
+            <div 
+              className="w-5 h-5 rounded-full flex items-center justify-center"
+              style={{ backgroundColor: bgColor }}
+            >
+              {icon}
+            </div>
           </div>
         )}
       </div>

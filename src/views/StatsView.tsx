@@ -411,7 +411,7 @@ export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentD
     // Try standard API first
     if (navigator.clipboard && navigator.clipboard.writeText) {
       navigator.clipboard.writeText(text).then(() => {
-        onToast?.('success', '宸插鍒跺埌鍓创鏉?);
+        onToast?.('success', '已复制到剪贴板');
       }).catch((err) => {
         console.warn('Clipboard API failed, trying fallback...', err);
         fallbackCopyText(text);
@@ -441,7 +441,7 @@ export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentD
       document.body.removeChild(textArea);
 
       if (successful) {
-        onToast?.('success', '宸插鍒跺埌鍓创鏉?);
+        onToast?.('success', '已复制到剪贴板');
       } else {
         // onToast?.('error', '澶嶅埗澶辫触锛岃鎵嬪姩澶嶅埗');
         setCopyFailureModal({ isOpen: true, text: text });
@@ -622,7 +622,7 @@ export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentD
       {/* Fullscreen Exit Button - Only visible in fullscreen mode */}
       {isFullScreen && (
         <div className="absolute bottom-4 left-4 z-50">
-          <button onClick={onToggleFullScreen} className="p-2 transition-all text-stone-400 hover:text-stone-800 bg-white/80 hover:bg-white rounded-full shadow-lg backdrop-blur-sm" title="閫€鍑哄叏灞?>
+          <button onClick={onToggleFullScreen} className="p-2 transition-all text-stone-400 hover:text-stone-800 bg-white/80 hover:bg-white rounded-full shadow-lg backdrop-blur-sm" title="退出全屏">
             <Minimize2 size={20} />
           </button>
         </div>
@@ -646,7 +646,7 @@ export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentD
                         onClick={() => setPieRange(r)}
                         className={`px-2.5 py-1 rounded-md text-[10px] font-bold transition-all ${pieRange === r ? 'bg-white text-stone-900 shadow-sm' : 'text-stone-400 hover:text-stone-600'}`}
                       >
-                        {{ day: '鏃?, week: '鍛?, month: '鏈?, year: '骞? }[r]}
+                        {{ day: '日', week: '周', month: '月', year: '年' }[r]}
                       </button>
                     ))}
                   </div>
@@ -659,7 +659,7 @@ export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentD
                         onClick={() => setScheduleRange(r)}
                         className={`px-2.5 py-1 rounded-md text-[10px] font-bold transition-all ${scheduleRange === r ? 'bg-white text-stone-900 shadow-sm' : 'text-stone-400 hover:text-stone-600'}`}
                       >
-                        {{ day: '鏃?, week: '鍛?, month: '鏈? }[r]}
+                        {{ day: '日', week: '周', month: '月' }[r]}
                       </button>
                     ))}
                   </div>
@@ -670,13 +670,13 @@ export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentD
                       onClick={() => setLineRange('week')}
                       className={`px-2.5 py-1 rounded-md text-[10px] font-bold transition-all ${lineRange === 'week' ? 'bg-white text-stone-900 shadow-sm' : 'text-stone-400 hover:text-stone-600'}`}
                     >
-                      鍛?
+                      周
                     </button>
                     <button
                       onClick={() => setLineRange('month')}
                       className={`px-2.5 py-1 rounded-md text-[10px] font-bold transition-all ${lineRange === 'month' ? 'bg-white text-stone-900 shadow-sm' : 'text-stone-400 hover:text-stone-600'}`}
                     >
-                      鏈?
+                      月
                     </button>
                   </div>
                 )}
@@ -688,19 +688,19 @@ export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentD
                       onClick={() => setPieRange('week')}
                       className={`px-2.5 py-1 rounded-md text-[10px] font-bold transition-all ${pieRange === 'week' ? 'bg-white text-stone-900 shadow-sm' : 'text-stone-400 hover:text-stone-600'}`}
                     >
-                      鍛?
+                      周
                     </button>
                     <button
                       onClick={() => setPieRange('month')}
                       className={`px-2.5 py-1 rounded-md text-[10px] font-bold transition-all ${pieRange === 'month' ? 'bg-white text-stone-900 shadow-sm' : 'text-stone-400 hover:text-stone-600'}`}
                     >
-                      鏈?
+                      月
                     </button>
                     <button
                       onClick={() => setPieRange('year')}
                       className={`px-2.5 py-1 rounded-md text-[10px] font-bold transition-all ${pieRange === 'year' ? 'bg-white text-stone-900 shadow-sm' : 'text-stone-400 hover:text-stone-600'}`}
                     >
-                      骞?
+                      年
                     </button>
                   </div>
                 )}
@@ -710,13 +710,13 @@ export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentD
                       onClick={() => setEmojiRange('month')}
                       className={`px-2.5 py-1 rounded-md text-[10px] font-bold transition-all ${emojiRange === 'month' ? 'bg-white text-stone-900 shadow-sm' : 'text-stone-400 hover:text-stone-600'}`}
                     >
-                      鏈?
+                      月
                     </button>
                     <button
                       onClick={() => setEmojiRange('year')}
                       className={`px-2.5 py-1 rounded-md text-[10px] font-bold transition-all ${emojiRange === 'year' ? 'bg-white text-stone-900 shadow-sm' : 'text-stone-400 hover:text-stone-600'}`}
                     >
-                      骞?
+                      年
                     </button>
                   </div>
                 )}

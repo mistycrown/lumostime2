@@ -10,7 +10,7 @@
  */
 
 import React from 'react';
-import { CheckCircle2 } from 'lucide-react';
+import { CheckCircle2, ListChecks, Target } from 'lucide-react';
 import { getWeekColorStyle, getMonthYearColorStyle } from '../../utils/checkViewUtils';
 import { IconRenderer } from '../IconRenderer';
 
@@ -133,9 +133,7 @@ export const CheckView: React.FC<CheckViewProps> = ({
           {checkStats.categories.flatMap(cat => cat.items.map(habit => {
             const style = getMonthYearColorStyle(habit.name);
             const isCountMode = Boolean(habit.stats.isCountMode);
-            const completedDisplay = isCountMode
-              ? (habit.stats.countTotal || 0)
-              : habit.stats.checked;
+            const completedDisplay = habit.stats.checked;
 
             return (
               <div key={`${cat.name}-${habit.name}`} className="bg-white rounded-2xl p-4 shadow-sm border border-stone-100 flex flex-col">
@@ -192,15 +190,15 @@ export const CheckView: React.FC<CheckViewProps> = ({
                   <div className="flex items-center gap-1.5 text-xs text-stone-500">
                     <CheckCircle2 size={14} className={style.text} />
                     <span className="font-bold">{completedDisplay}</span>
-                    <span className="text-[10px] text-stone-300"></span>
+                    {isCountMode && typeof habit.stats.countTotal === 'number' && (
+                      <>
+                        <ListChecks size={14} className={style.text} />
+                        <span className="font-bold">{habit.stats.countTotal}</span>
+                      </>
+                    )}
                   </div>
-                  {isCountMode && typeof habit.stats.countTotal === 'number' && (
-                    <div className="text-[10px] text-stone-400">
-                      累计 {habit.stats.countTotal} 次
-                    </div>
-                  )}
                   <div className="flex items-center gap-1.5 text-xs text-stone-500">
-                    <span className="text-[10px]">🎟</span>
+                    <Target size={14} className={style.text} />
                     <span className="font-bold">
                       {Math.round((habit.stats.checked / (checkStats.allDays.length || 1)) * 100)}%
                     </span>
@@ -262,9 +260,7 @@ export const CheckView: React.FC<CheckViewProps> = ({
                         return weeks.map((week, wIdx) => (
                           <div key={wIdx} className="flex flex-col gap-1">
                             {week.map((dayStr, dIdx) => {
-                              if (!dayStr) {
-                                return <div key={dIdx} className={isCountMode ? 'w-5 h-5' : 'w-3 h-3'} />;
-                              }
+                              if (!dayStr) return <div key={dIdx} className="w-3 h-3" />;
                               const detail = habit.dayDetails?.[dayStr];
                               const countValue = detail?.value ?? 0;
                               const isChecked = isCountMode ? countValue > 0 : Boolean(habit.days[dayStr]);
@@ -275,13 +271,17 @@ export const CheckView: React.FC<CheckViewProps> = ({
                                     ? `${dayStr} ${countValue}次`
                                     : `${dayStr}${isChecked ? ' 已完成' : ''}${detail ? ` (${detail.value}/${detail.target}次)` : ''}`
                                   }
-                                  className={`${isCountMode ? 'w-5 h-5 text-[8px] font-bold flex items-center justify-center' : 'w-3 h-3'} rounded-[2px] transition-colors ${
+                                  className={`w-3 h-3 rounded-[2px] transition-colors flex items-center justify-center ${
                                     isChecked
-                                      ? `${style.fill} ${isCountMode ? 'text-white' : ''}`
-                                      : `${isCountMode ? 'bg-stone-100 text-stone-300' : 'bg-stone-100'}`
+                                      ? style.fill
+                                      : 'bg-stone-100'
                                   }`}
                                 >
-                                  {isCountMode && countValue > 0 ? (countValue > 99 ? '99+' : countValue) : ''}
+                                  {isCountMode && countValue > 0 && (
+                                    <span className="text-[6px] leading-none text-white font-bold tracking-[-0.2px]">
+                                      {countValue > 99 ? '99' : countValue}
+                                    </span>
+                                  )}
                                 </div>
                               );
                             })}
