@@ -212,7 +212,7 @@ export const DataManagementView: React.FC<DataManagementViewProps> = ({
 
         setIsCheckingImages(true);
         try {
-            const list = await imageService.rebuildReferencedListFromLogs(logs);
+            const list = await imageService.rebuildReferencedListFromLogs(logs, todos);
             onToast('success', `图片列表重建完成，当前引用 ${list.length} 张图片`);
         } catch (error: any) {
             console.error('修复图片列表失败:', error);
@@ -226,7 +226,7 @@ export const DataManagementView: React.FC<DataManagementViewProps> = ({
         setIsCheckingImages(true);
         setImageCleanupReport('');
         try {
-            const report = await imageCleanupService.generateCleanupReport(logs);
+            const report = await imageCleanupService.generateCleanupReport(logs, todos);
             setImageCleanupReport(report);
             onToast('success', '检查完成');
         } catch (error: any) {
@@ -244,7 +244,7 @@ export const DataManagementView: React.FC<DataManagementViewProps> = ({
             const result = await imageCleanupService.cleanupUnreferencedImages(logs, {
                 deleteLocal: true,
                 deleteRemote: true
-            });
+            }, todos);
 
             let message = `清理完成: 本地-${result.deletedLocal}, 远程-${result.deletedRemote}`;
             if (result.errors.length > 0) {

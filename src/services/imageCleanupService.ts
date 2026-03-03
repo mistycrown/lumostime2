@@ -423,10 +423,10 @@ export class ImageCleanupService {
     /**
      * 生成清理报告
      */
-    async generateCleanupReport(logs: Log[]): Promise<string> {
+    async generateCleanupReport(logs: Log[], todos: TodoItem[] = []): Promise<string> {
         try {
-            const checkResult = await this.checkUnreferencedImages(logs);
-            const usageStats = await this.getImageUsageStats(logs);
+            const checkResult = await this.checkUnreferencedImages(logs, todos);
+            const usageStats = await this.getImageUsageStats(logs, todos);
             
             let report = `# 图片清理报告\n\n`;
             report += `## 📊 总体统计\n`;
