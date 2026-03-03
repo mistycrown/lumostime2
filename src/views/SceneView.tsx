@@ -1028,7 +1028,7 @@ export const SceneView: React.FC<SceneViewProps> = ({
                   <IconRenderer 
                     icon={slot.icon || '⏰'}
                     uiIcon={slot.uiIcon}
-                    size={24}
+                    size={20}
                   />
                 </div>
               </button>

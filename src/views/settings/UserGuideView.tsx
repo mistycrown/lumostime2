@@ -126,13 +126,13 @@ export const UserGuideView: React.FC<UserGuideViewProps> = ({ onBack }) => {
                                         </p>
                                     ),
                                     ul: ({ node, ...props }) => (
-                                        <ul className="my-4 space-y-2.5 pl-0 break-words" {...props} />
+                                        <ul className="my-4 space-y-2.5 pl-6 list-disc break-words" {...props} />
                                     ),
                                     ol: ({ node, ...props }) => (
                                         <ol className="my-4 space-y-2.5 pl-6 list-decimal break-words" {...props} />
                                     ),
                                     li: ({ node, children, ...props }) => (
-                                        <li className="text-stone-600 text-[15px] leading-relaxed pl-6 relative before:content-['•'] before:absolute before:left-0 before:text-amber-500 before:font-bold before:text-lg break-words" {...props}>
+                                        <li className="text-stone-600 text-[15px] leading-relaxed break-words" {...props}>
                                             {React.Children.map(children, child => 
                                                 typeof child === 'string' ? processHighlight(child) : child
                                             )}
