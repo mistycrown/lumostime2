@@ -208,7 +208,7 @@ export const DailyReviewView: React.FC<DailyReviewViewProps> = ({
             template.items.forEach(item => {
                 console.log('[DailyReview] 模板项:', { content: item.content, type: item.type, autoConfig: item.autoConfig });
                 newItems.push({
-                    id: crypto.randomUUID(),
+                    id: item.id || crypto.randomUUID(),
                     category: template.title,
                     content: item.content,
                     icon: item.icon,

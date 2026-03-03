@@ -199,6 +199,15 @@ export const SceneSettingsView: React.FC<SceneSettingsViewProps> = ({ onBack }) 
   };
 
   const switchMode: SceneGroupSwitchMode = sceneGroupState.switchMode || 'manual';
+  const weekdayOptions = [
+    { value: 1, label: '一' },
+    { value: 2, label: '二' },
+    { value: 3, label: '三' },
+    { value: 4, label: '四' },
+    { value: 5, label: '五' },
+    { value: 6, label: '六' },
+    { value: 0, label: '日' }
+  ];
 
   const updateSwitchMode = (mode: SceneGroupSwitchMode) => {
     persistSceneGroupState({
@@ -228,6 +237,14 @@ export const SceneSettingsView: React.FC<SceneSettingsViewProps> = ({ onBack }) 
     if (config.mode === 'disabled') return '不启用';
     if (config.mode === 'weekday') return '每周一至周五';
     if (config.mode === 'weekend') return '每周六、周日';
+    if (config.mode === 'customWeekdays') {
+      const weekdays = Array.isArray(config.weekdays) ? config.weekdays : [];
+      if (weekdays.length === 0) return '自定义星期未选择';
+      const labels = weekdayOptions
+        .filter(option => weekdays.includes(option.value))
+        .map(option => `周${option.label}`);
+      return labels.length > 0 ? labels.join('、') : '自定义星期未选择';
+    }
     if (config.mode === 'dateRange') {
       if (config.startDate && config.endDate) {
         return `${config.startDate} ~ ${config.endDate}`;
@@ -1108,16 +1125,55 @@ export const SceneSettingsView: React.FC<SceneSettingsViewProps> = ({ onBack }) 
                                 ...current,
                                 mode,
                                 startDate: mode === 'dateRange' ? current.startDate : undefined,
-                                endDate: mode === 'dateRange' ? current.endDate : undefined
+                                endDate: mode === 'dateRange' ? current.endDate : undefined,
+                                weekdays: mode === 'customWeekdays' ? current.weekdays : undefined
                               }));
                             }}
                             options={[
                               { value: 'disabled', label: '不启用' },
                               { value: 'weekday', label: '工作日（周一至周五）' },
                               { value: 'weekend', label: '周末（周六和周日）' },
+                              { value: 'customWeekdays', label: '自定义星期（可多选）' },
                               { value: 'dateRange', label: '时间段（YYYYMMDD）' }
                             ]}
                           />
+
+                          {config.mode === 'customWeekdays' && (
+                            <div className="space-y-2">
+                              <div className="grid grid-cols-7 gap-2">
+                                {weekdayOptions.map(option => {
+                                  const selected = (config.weekdays || []).includes(option.value);
+                                  return (
+                                    <button
+                                      key={option.value}
+                                      type="button"
+                                      onClick={() => {
+                                        const currentWeekdays = config.weekdays || [];
+                                        const nextWeekdays = selected
+                                          ? currentWeekdays.filter(day => day !== option.value)
+                                          : [...currentWeekdays, option.value];
+                                        updateGroupAutoSwitch(group.id, (current) => ({
+                                          ...current,
+                                          weekdays: nextWeekdays
+                                        }));
+                                      }}
+                                      className={`h-8 rounded-lg text-xs border transition-colors ${
+                                        selected
+                                          ? 'bg-stone-800 text-white border-stone-800'
+                                          : 'bg-white text-stone-700 border-stone-300 hover:bg-stone-50'
+                                      }`}
+                                      title={`周${option.label}`}
+                                    >
+                                      周{option.label}
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                              <p className="text-[11px] text-stone-500">
+                                可任意多选星期几。比如周一+周六、周二+周五都支持。
+                              </p>
+                            </div>
+                          )}
 
                           {config.mode === 'dateRange' && (
                             <div className="space-y-2">

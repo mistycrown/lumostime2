@@ -271,7 +271,7 @@ export interface TimeSlot {
 }
 
 // 场景组自动切换规则模式
-export type SceneGroupAutoSwitchMode = 'disabled' | 'weekday' | 'weekend' | 'dateRange';
+export type SceneGroupAutoSwitchMode = 'disabled' | 'weekday' | 'weekend' | 'dateRange' | 'customWeekdays';
 
 // 场景视图切换模式
 export type SceneGroupSwitchMode = 'manual' | 'auto';
@@ -281,6 +281,7 @@ export interface SceneGroupAutoSwitchConfig {
   mode: SceneGroupAutoSwitchMode;
   startDate?: string; // YYYYMMDD（仅 dateRange 模式）
   endDate?: string; // YYYYMMDD（仅 dateRange 模式）
+  weekdays?: number[]; // 0-6（仅 customWeekdays 模式，0=周日）
 }
 
 // 场景组定义（场景组 -> 时间段）

@@ -69,8 +69,9 @@ export const useReviewManager = () => {
                         const uiIcon = typeof item === 'string' ? undefined : item.uiIcon;
                         const type = typeof item === 'string' ? 'manual' : (item.type || 'manual');
                         const autoConfig = typeof item === 'string' ? undefined : item.autoConfig;
+                        const checkItemId = typeof item === 'string' ? crypto.randomUUID() : (item.id || crypto.randomUUID());
                         initialCheckItems.push({
-                            id: crypto.randomUUID(),
+                            id: checkItemId,
                             category: t.title,
                             content: content,
                             icon: icon,
@@ -139,8 +140,9 @@ export const useReviewManager = () => {
                         const uiIcon = typeof item === 'string' ? undefined : item.uiIcon;
                         const type = typeof item === 'string' ? 'manual' : (item.type || 'manual');
                         const autoConfig = typeof item === 'string' ? undefined : item.autoConfig;
+                        const checkItemId = typeof item === 'string' ? crypto.randomUUID() : (item.id || crypto.randomUUID());
                         initialCheckItems.push({
-                            id: crypto.randomUUID(),
+                            id: checkItemId,
                             category: t.title,
                             content: content,
                             icon: icon,

@@ -545,6 +545,45 @@ export const SceneView: React.FC<SceneViewProps> = ({
     }
   };
 
+  // 根据模板日课 ID 获取模板信息（用于兼容旧 dailyReview 数据）
+  const getCheckTemplateMeta = (checkItemId: string): { content: string; category: string } | null => {
+    for (const template of checkTemplates) {
+      const item = template.items.find(i => i.id === checkItemId);
+      if (item) {
+        return {
+          content: item.content,
+          category: template.title
+        };
+      }
+    }
+    return null;
+  };
+
+  // 在指定日报中查找匹配的日课项索引（优先 id，兼容按内容回退）
+  const findCheckItemIndexInReview = (review: DailyReview, checkItemId: string): number => {
+    const checkItems = review.checkItems || [];
+    const idMatchedIndex = checkItems.findIndex(item => item.id === checkItemId);
+    if (idMatchedIndex >= 0) {
+      return idMatchedIndex;
+    }
+
+    const templateMeta = getCheckTemplateMeta(checkItemId);
+    if (!templateMeta) {
+      return -1;
+    }
+
+    // 先按「分组 + 内容」严格匹配，避免不同分组同名日课误匹配
+    const categoryAndContentMatchedIndex = checkItems.findIndex(item =>
+      item.category === templateMeta.category && item.content === templateMeta.content
+    );
+    if (categoryAndContentMatchedIndex >= 0) {
+      return categoryAndContentMatchedIndex;
+    }
+
+    // 再按内容兜底匹配，兼容历史数据缺少 category 的情况
+    return checkItems.findIndex(item => item.content === templateMeta.content);
+  };
+
   // 处理日课打卡
   const handleToggleCheckItem = (checkItemId: string) => {
     // 获取今天的日期（使用本地时间）
@@ -589,7 +628,7 @@ export const SceneView: React.FC<SceneViewProps> = ({
 
     // 查找对应的日课项
     const checkItems = todayReview.checkItems || [];
-    const checkItemIndex = checkItems.findIndex(item => item.id === checkItemId);
+    const checkItemIndex = findCheckItemIndexInReview(todayReview, checkItemId);
 
     if (checkItemIndex === -1) {
       console.warn('未找到对应的日课项:', checkItemId);
@@ -599,9 +638,12 @@ export const SceneView: React.FC<SceneViewProps> = ({
 
     // 切换完成状态
     const updatedCheckItems = [...checkItems];
+    const matchedItem = updatedCheckItems[checkItemIndex];
     updatedCheckItems[checkItemIndex] = {
-      ...updatedCheckItems[checkItemIndex],
-      isCompleted: !updatedCheckItems[checkItemIndex].isCompleted
+      ...matchedItem,
+      // 兼容旧数据：若是按内容匹配到的随机 ID 项，这里顺便对齐为模板 ID，后续可直接按 ID 匹配
+      id: checkItemId,
+      isCompleted: !matchedItem.isCompleted
     };
 
     // 更新 DailyReview
@@ -632,8 +674,12 @@ export const SceneView: React.FC<SceneViewProps> = ({
       return false;
     }
 
-    const checkItem = todayReview.checkItems.find(item => item.id === checkItemId);
-    return checkItem?.isCompleted || false;
+    const checkItemIndex = findCheckItemIndexInReview(todayReview, checkItemId);
+    if (checkItemIndex === -1) {
+      return false;
+    }
+
+    return todayReview.checkItems[checkItemIndex]?.isCompleted || false;
   };
 
   // 获取日课的内容（用于计算坚持天数）
@@ -894,15 +940,13 @@ export const SceneView: React.FC<SceneViewProps> = ({
 
         {/* 头部：当前时间段标题或时间 */}
         <div className="mb-8 md:mb-10 flex items-center mt-2 md:mt-0">
-          <div className="flex items-center gap-2">
-            <h1 className="text-xl md:text-2xl font-mono font-light text-stone-600 tracking-tight">
-              {currentSlot.displayTitle || `${currentSlot.startTime} - ${currentSlot.endTime}`}
-            </h1>
-            <span className="px-2 py-0.5 text-[11px] md:text-xs text-stone-500 border border-stone-200 rounded-full bg-white/70">
-              {displayedGroup.name}
-            </span>
-          </div>
-          <div className="h-px flex-1 bg-stone-100 ml-4"></div>
+          <h1 className="text-xl md:text-2xl font-mono font-light text-stone-600 tracking-tight">
+            {currentSlot.displayTitle || `${currentSlot.startTime} - ${currentSlot.endTime}`}
+          </h1>
+          <div className="h-px flex-1 bg-stone-100 mx-4"></div>
+          <span className="px-2 py-0.5 text-[11px] md:text-xs text-stone-500 border border-stone-200 rounded-full bg-white/70">
+            {displayedGroup.name}
+          </span>
         </div>
 
         {/* 活动卡片列表 - 单列布局 */}

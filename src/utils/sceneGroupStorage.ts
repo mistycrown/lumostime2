@@ -23,12 +23,22 @@ const normalizeGroupName = (name?: string): string => {
   return trimmed || '默认分组';
 };
 
+const normalizeWeekdays = (weekdays?: number[]): number[] | undefined => {
+  if (!Array.isArray(weekdays)) return undefined;
+  const normalized = Array.from(new Set(
+    weekdays
+      .filter((day): day is number => Number.isInteger(day))
+      .filter(day => day >= 0 && day <= 6)
+  )).sort((a, b) => a - b);
+  return normalized.length > 0 ? normalized : undefined;
+};
+
 const normalizeAutoSwitchConfig = (config?: Partial<SceneGroupAutoSwitchConfig>): SceneGroupAutoSwitchConfig => {
   const rawMode = (config as { mode?: string } | undefined)?.mode;
   const legacyEnabled = (config as { enabled?: boolean } | undefined)?.enabled;
   let mode: SceneGroupAutoSwitchConfig['mode'] = 'disabled';
 
-  if (rawMode === 'disabled' || rawMode === 'weekend' || rawMode === 'dateRange' || rawMode === 'weekday') {
+  if (rawMode === 'disabled' || rawMode === 'weekend' || rawMode === 'dateRange' || rawMode === 'weekday' || rawMode === 'customWeekdays') {
     mode = rawMode;
   } else if (legacyEnabled === true) {
     // 兼容旧版 enabled=true 的数据，默认转为工作日规则
@@ -40,11 +50,14 @@ const normalizeAutoSwitchConfig = (config?: Partial<SceneGroupAutoSwitchConfig>)
   const startDate = normalizeDateKey(config?.startDate);
   const endDate = normalizeDateKey(config?.endDate);
   const isRangeMode = mode === 'dateRange';
+  const weekdays = normalizeWeekdays((config as { weekdays?: number[] } | undefined)?.weekdays);
+  const isCustomWeekdaysMode = mode === 'customWeekdays';
 
   return {
     mode,
     startDate: isRangeMode && startDate ? startDate : undefined,
-    endDate: isRangeMode && endDate ? endDate : undefined
+    endDate: isRangeMode && endDate ? endDate : undefined,
+    weekdays: isCustomWeekdaysMode && weekdays ? weekdays : undefined
   };
 };
 
@@ -149,6 +162,10 @@ export const isSceneGroupAutoSwitchMatched = (group: SceneGroup, date: Date = ne
     }
     const todayKey = getLocalDateKey(date);
     return todayKey >= config.startDate! && todayKey <= config.endDate!;
+  }
+
+  if (config.mode === 'customWeekdays') {
+    return Array.isArray(config.weekdays) && config.weekdays.includes(day);
   }
 
   return false;
