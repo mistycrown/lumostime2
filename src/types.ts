@@ -271,14 +271,16 @@ export interface TimeSlot {
 }
 
 // 场景组自动切换规则模式
-export type SceneGroupAutoSwitchMode = 'weekday' | 'weekend' | 'dateRange';
+export type SceneGroupAutoSwitchMode = 'disabled' | 'weekday' | 'weekend' | 'dateRange';
+
+// 场景视图切换模式
+export type SceneGroupSwitchMode = 'manual' | 'auto';
 
 // 场景组自动切换配置
 export interface SceneGroupAutoSwitchConfig {
-  enabled: boolean;
   mode: SceneGroupAutoSwitchMode;
-  startDate?: string; // YYYY-MM-DD（仅 dateRange 模式）
-  endDate?: string; // YYYY-MM-DD（仅 dateRange 模式）
+  startDate?: string; // YYYYMMDD（仅 dateRange 模式）
+  endDate?: string; // YYYYMMDD（仅 dateRange 模式）
 }
 
 // 场景组定义（场景组 -> 时间段）
@@ -292,6 +294,7 @@ export interface SceneGroup {
 // 场景组存储状态
 export interface SceneGroupState {
   version: 1;
+  switchMode: SceneGroupSwitchMode;
   activeGroupId: string;
   groups: SceneGroup[];
 }

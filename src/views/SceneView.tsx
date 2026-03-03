@@ -16,7 +16,7 @@ import { useData } from '../contexts/DataContext';
 import { useToast } from '../contexts/ToastContext';
 import { useSettings } from '../contexts/SettingsContext';
 import { getLocalDateStr } from '../utils/dateUtils';
-import { findAutoSwitchTargetGroup, getActiveSceneGroup, loadSceneGroupStateFromStorage, saveSceneGroupStateToStorage } from '../utils/sceneGroupStorage';
+import { findAutoSwitchTargetGroup, getActiveSceneGroup, loadSceneGroupStateFromStorage } from '../utils/sceneGroupStorage';
 
 interface SceneViewProps {
   onConfigureSlots?: () => void;
@@ -58,7 +58,11 @@ export const SceneView: React.FC<SceneViewProps> = ({
   // 场景组状态（从 localStorage 加载，兼容旧数据迁移）
   const [sceneGroupState, setSceneGroupState] = useState<SceneGroupState>(() => loadSceneGroupStateFromStorage());
   const activeGroup = getActiveSceneGroup(sceneGroupState);
-  const timeSlots: TimeSlot[] = activeGroup?.timeSlots || DEFAULT_SCENE_PRESETS;
+  const matchedAutoGroup = sceneGroupState.switchMode === 'auto'
+    ? findAutoSwitchTargetGroup(sceneGroupState, new Date())
+    : null;
+  const displayedGroup = matchedAutoGroup || activeGroup;
+  const timeSlots: TimeSlot[] = displayedGroup?.timeSlots || DEFAULT_SCENE_PRESETS;
   
   // 当前选中的时间段索引
   const [selectedSlotIndex, setSelectedSlotIndex] = useState<number>(0);
@@ -66,35 +70,26 @@ export const SceneView: React.FC<SceneViewProps> = ({
   // 用于触发统计卡片的重新计算
   const [statsUpdateTrigger, setStatsUpdateTrigger] = useState(0);
 
-  const loadSceneGroups = (allowAutoSwitch: boolean = true) => {
-    let loaded = loadSceneGroupStateFromStorage();
-    if (allowAutoSwitch) {
-      const targetGroup = findAutoSwitchTargetGroup(loaded, new Date());
-      if (targetGroup && targetGroup.id !== loaded.activeGroupId) {
-        loaded = saveSceneGroupStateToStorage({
-          ...loaded,
-          activeGroupId: targetGroup.id
-        });
-      }
-    }
+  const loadSceneGroups = () => {
+    const loaded = loadSceneGroupStateFromStorage();
     setSceneGroupState(loaded);
   };
 
   // 加载时间段数据
   useEffect(() => {
     // 初始加载
-    loadSceneGroups(true);
+    loadSceneGroups();
 
     // 监听 storage 事件，当其他标签页或场景设置页面修改数据时重新加载
     const handleStorageChange = (e: StorageEvent) => {
       if (e.key === 'sceneGroupState' || e.key === 'sceneTimeSlots') {
-        loadSceneGroups(true);
+        loadSceneGroups();
       }
     };
 
     // 监听自定义事件，当同一页面内修改数据时重新加载
     const handleSceneUpdate = () => {
-      loadSceneGroups(true);
+      loadSceneGroups();
     };
 
     window.addEventListener('storage', handleStorageChange);
@@ -113,14 +108,14 @@ export const SceneView: React.FC<SceneViewProps> = ({
   useEffect(() => {
     const handleVisibilityChange = () => {
       if (!document.hidden) {
-        loadSceneGroups(true);
+        loadSceneGroups();
       }
     };
     const handleFocus = () => {
-      loadSceneGroups(true);
+      loadSceneGroups();
     };
     const handleRecordViewActivated = () => {
-      loadSceneGroups(true);
+      loadSceneGroups();
     };
 
     document.addEventListener('visibilitychange', handleVisibilityChange);
@@ -200,7 +195,7 @@ export const SceneView: React.FC<SceneViewProps> = ({
     const autoSlotIndex = getCurrentTimeSlotIndex();
     
     // 尝试从 localStorage 获取用户上次选择的时间段
-    const savedSlotKey = `lastSelectedSlotIndex_${activeGroup.id}`;
+    const savedSlotKey = `lastSelectedSlotIndex_${displayedGroup.id}`;
     const savedSlotIndex = localStorage.getItem(savedSlotKey);
     
     // 判断是否应该使用保存的索引
@@ -275,15 +270,15 @@ export const SceneView: React.FC<SceneViewProps> = ({
       window.removeEventListener('recordViewActivated', handleRecordViewActivated);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [timeSlots]); // 依赖 timeSlots，当时间段配置变化时也重新检测
+  }, [timeSlots, displayedGroup.id]); // 依赖 timeSlots，当时间段配置变化时也重新检测
 
   // 保存用户选择的时间段索引
   useEffect(() => {
     if (timeSlots.length > 0 && selectedSlotIndex >= 0) {
-      const savedSlotKey = `lastSelectedSlotIndex_${activeGroup.id}`;
+      const savedSlotKey = `lastSelectedSlotIndex_${displayedGroup.id}`;
       localStorage.setItem(savedSlotKey, selectedSlotIndex.toString());
     }
-  }, [selectedSlotIndex, timeSlots, activeGroup.id]);
+  }, [selectedSlotIndex, timeSlots, displayedGroup.id]);
 
   const currentSlot = timeSlots[selectedSlotIndex];
   const currentCards = currentSlot?.cards || [];
@@ -904,7 +899,7 @@ export const SceneView: React.FC<SceneViewProps> = ({
               {currentSlot.displayTitle || `${currentSlot.startTime} - ${currentSlot.endTime}`}
             </h1>
             <span className="px-2 py-0.5 text-[11px] md:text-xs text-stone-500 border border-stone-200 rounded-full bg-white/70">
-              {activeGroup.name}
+              {displayedGroup.name}
             </span>
           </div>
           <div className="h-px flex-1 bg-stone-100 ml-4"></div>

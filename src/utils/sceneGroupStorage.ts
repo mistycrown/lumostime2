@@ -5,7 +5,7 @@
  * @description 场景组存储工具：统一读写场景组，并兼容旧版 sceneTimeSlots 数据。
  */
 import { DEFAULT_SCENE_PRESETS } from '../constants/scenePresets';
-import { SceneGroup, SceneGroupAutoSwitchConfig, SceneGroupState, TimeSlot } from '../types';
+import { SceneGroup, SceneGroupAutoSwitchConfig, SceneGroupState, SceneGroupSwitchMode, TimeSlot } from '../types';
 
 export const SCENE_GROUP_STATE_KEY = 'sceneGroupState';
 export const SCENE_TIME_SLOTS_LEGACY_KEY = 'sceneTimeSlots';
@@ -24,15 +24,24 @@ const normalizeGroupName = (name?: string): string => {
 };
 
 const normalizeAutoSwitchConfig = (config?: Partial<SceneGroupAutoSwitchConfig>): SceneGroupAutoSwitchConfig => {
-  const rawMode = config?.mode;
-  const mode = rawMode === 'weekend' || rawMode === 'dateRange' || rawMode === 'weekday' ? rawMode : 'weekday';
-  const enabled = Boolean(config?.enabled);
+  const rawMode = (config as { mode?: string } | undefined)?.mode;
+  const legacyEnabled = (config as { enabled?: boolean } | undefined)?.enabled;
+  let mode: SceneGroupAutoSwitchConfig['mode'] = 'disabled';
+
+  if (rawMode === 'disabled' || rawMode === 'weekend' || rawMode === 'dateRange' || rawMode === 'weekday') {
+    mode = rawMode;
+  } else if (legacyEnabled === true) {
+    // 兼容旧版 enabled=true 的数据，默认转为工作日规则
+    mode = 'weekday';
+  } else if (legacyEnabled === false) {
+    mode = 'disabled';
+  }
+
   const startDate = normalizeDateKey(config?.startDate);
   const endDate = normalizeDateKey(config?.endDate);
   const isRangeMode = mode === 'dateRange';
 
   return {
-    enabled,
     mode,
     startDate: isRangeMode && startDate ? startDate : undefined,
     endDate: isRangeMode && endDate ? endDate : undefined
@@ -43,7 +52,7 @@ const getLocalDateKey = (date: Date): string => {
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, '0');
   const day = String(date.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
+  return `${year}${month}${day}`;
 };
 
 const normalizeDateKey = (dateStr?: string): string | undefined => {
@@ -66,6 +75,7 @@ export const buildSceneGroupStateFromLegacySlots = (timeSlots: TimeSlot[]): Scen
   const fallbackSlots = timeSlots.length > 0 ? timeSlots : DEFAULT_SCENE_PRESETS;
   return {
     version: 1,
+    switchMode: 'manual',
     activeGroupId: DEFAULT_SCENE_GROUP_ID,
     groups: [
       {
@@ -73,8 +83,7 @@ export const buildSceneGroupStateFromLegacySlots = (timeSlots: TimeSlot[]): Scen
         name: '默认分组',
         timeSlots: cloneTimeSlots(fallbackSlots),
         autoSwitch: {
-          enabled: false,
-          mode: 'weekday'
+          mode: 'disabled'
         }
       }
     ]
@@ -99,9 +108,18 @@ const normalizeSceneGroupState = (state: Partial<SceneGroupState> | null | undef
 
   const activeGroupExists = groups.some(group => group.id === state?.activeGroupId);
   const activeGroupId = activeGroupExists ? (state!.activeGroupId as string) : groups[0].id;
+  const rawSwitchMode = (state as { switchMode?: string } | undefined)?.switchMode;
+  let switchMode: SceneGroupSwitchMode;
+  if (rawSwitchMode === 'manual' || rawSwitchMode === 'auto') {
+    switchMode = rawSwitchMode;
+  } else {
+    // 兼容旧版：若任一分组配置了自动规则，则默认自动模式，否则手动模式
+    switchMode = groups.some(group => group.autoSwitch?.mode !== 'disabled') ? 'auto' : 'manual';
+  }
 
   return {
     version: 1,
+    switchMode,
     activeGroupId,
     groups
   };
@@ -114,7 +132,7 @@ export const getActiveSceneGroup = (state: SceneGroupState): SceneGroup => {
 
 export const isSceneGroupAutoSwitchMatched = (group: SceneGroup, date: Date = new Date()): boolean => {
   const config = normalizeAutoSwitchConfig(group.autoSwitch);
-  if (!config.enabled) return false;
+  if (config.mode === 'disabled') return false;
 
   const day = date.getDay();
   if (config.mode === 'weekday') {
@@ -129,10 +147,7 @@ export const isSceneGroupAutoSwitchMatched = (group: SceneGroup, date: Date = ne
     if (!isValidDateKey(config.startDate) || !isValidDateKey(config.endDate)) {
       return false;
     }
-    const todayKey = normalizeDateKey(getLocalDateKey(date));
-    if (!todayKey) {
-      return false;
-    }
+    const todayKey = getLocalDateKey(date);
     return todayKey >= config.startDate! && todayKey <= config.endDate!;
   }
 

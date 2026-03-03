@@ -4,7 +4,7 @@
  */
 import React, { useState, useEffect } from 'react';
 import { ArrowLeft, Plus, Trash2, Edit2, Palette, Clock, RotateCcw, ChevronRight, ArrowUp, ArrowDown, Check } from 'lucide-react';
-import { TimeSlot, SceneCardData, SceneCardType, Category, TodoItem, TodoCategory, CheckTemplate, SceneGroup, SceneGroupAutoSwitchConfig, SceneGroupState } from '../types';
+import { TimeSlot, SceneCardData, SceneCardType, Category, TodoItem, TodoCategory, CheckTemplate, SceneGroup, SceneGroupAutoSwitchConfig, SceneGroupState, SceneGroupSwitchMode } from '../types';
 import { CustomSelect } from '../components/CustomSelect';
 import { UIIconSelectorCompact } from '../components/UIIconSelector';
 import { IconRenderer } from '../components/IconRenderer';
@@ -22,7 +22,7 @@ import { useToast } from '../contexts/ToastContext';
 import { useSettings } from '../contexts/SettingsContext';
 import { DEFAULT_SCENE_PRESETS } from '../constants/scenePresets';
 import { COLOR_OPTIONS } from '../constants';
-import { getActiveSceneGroup, isSceneGroupAutoSwitchMatched, loadSceneGroupStateFromStorage, saveSceneGroupStateToStorage } from '../utils/sceneGroupStorage';
+import { findAutoSwitchTargetGroup, getActiveSceneGroup, isSceneGroupAutoSwitchMatched, loadSceneGroupStateFromStorage, saveSceneGroupStateToStorage } from '../utils/sceneGroupStorage';
 
 interface SceneSettingsViewProps {
   onBack: () => void;
@@ -32,8 +32,11 @@ export const SceneSettingsView: React.FC<SceneSettingsViewProps> = ({ onBack }) 
   const [sceneGroupState, setSceneGroupState] = useState<SceneGroupState>(() => loadSceneGroupStateFromStorage());
   const [selectedSlotId, setSelectedSlotId] = useState<string | null>(null);
   const [isEditingGroup, setIsEditingGroup] = useState(false);
+  const [isModeConfigOpen, setIsModeConfigOpen] = useState(false);
   const [groupEditMode, setGroupEditMode] = useState<'create' | 'rename'>('create');
   const [groupNameDraft, setGroupNameDraft] = useState('');
+  const [groupCreateMode, setGroupCreateMode] = useState<'empty' | 'copy'>('empty');
+  const [groupCopySourceId, setGroupCopySourceId] = useState('');
   const [isEditingSlot, setIsEditingSlot] = useState(false);
   const [isEditingCard, setIsEditingCard] = useState(false);
   const [editingSlot, setEditingSlot] = useState<Partial<TimeSlot> | null>(null);
@@ -63,6 +66,7 @@ export const SceneSettingsView: React.FC<SceneSettingsViewProps> = ({ onBack }) 
   const isCustomIconEnabled = uiIconService.isCustomTheme();
 
   const activeGroup = getActiveSceneGroup(sceneGroupState);
+  const matchedAutoGroup = findAutoSwitchTargetGroup(sceneGroupState, new Date());
   const timeSlots = activeGroup?.timeSlots || [];
 
   const persistSceneGroupState = (nextState: SceneGroupState) => {
@@ -103,6 +107,8 @@ export const SceneSettingsView: React.FC<SceneSettingsViewProps> = ({ onBack }) 
   const handleCreateGroup = () => {
     setGroupEditMode('create');
     setGroupNameDraft('');
+    setGroupCreateMode('empty');
+    setGroupCopySourceId(sceneGroupState.activeGroupId);
     setIsEditingGroup(true);
   };
 
@@ -126,11 +132,15 @@ export const SceneSettingsView: React.FC<SceneSettingsViewProps> = ({ onBack }) 
         return;
       }
 
-      const copiedSlots: TimeSlot[] = JSON.parse(JSON.stringify(activeGroup.timeSlots));
+      const sourceGroup = sceneGroupState.groups.find(group => group.id === groupCopySourceId) || activeGroup;
+      const copiedSlots: TimeSlot[] = groupCreateMode === 'copy'
+        ? JSON.parse(JSON.stringify(sourceGroup.timeSlots))
+        : [];
       const newGroup: SceneGroup = {
         id: `scene-group-${Date.now()}`,
         name: trimmedName,
-        timeSlots: copiedSlots
+        timeSlots: copiedSlots,
+        autoSwitch: { mode: 'disabled' }
       };
 
       persistSceneGroupState({
@@ -138,7 +148,7 @@ export const SceneSettingsView: React.FC<SceneSettingsViewProps> = ({ onBack }) 
         activeGroupId: newGroup.id,
         groups: [...sceneGroupState.groups, newGroup]
       });
-      addToast('success', '场景组已创建（已复制当前组配置）');
+      addToast('success', groupCreateMode === 'copy' ? '场景组已创建（基于已有组复制）' : '场景组已创建（空白组）');
     } else {
       const duplicated = sceneGroupState.groups.some(group => group.id !== activeGroup.id && group.name === trimmedName);
       if (duplicated) {
@@ -159,6 +169,8 @@ export const SceneSettingsView: React.FC<SceneSettingsViewProps> = ({ onBack }) 
 
     setIsEditingGroup(false);
     setGroupNameDraft('');
+    setGroupCreateMode('empty');
+    setGroupCopySourceId(sceneGroupState.activeGroupId);
   };
 
   const handleDeleteGroup = () => {
@@ -186,36 +198,41 @@ export const SceneSettingsView: React.FC<SceneSettingsViewProps> = ({ onBack }) 
     });
   };
 
-  const updateActiveGroupAutoSwitch = (updater: (current: SceneGroupAutoSwitchConfig) => SceneGroupAutoSwitchConfig) => {
-    const currentConfig: SceneGroupAutoSwitchConfig = activeGroup.autoSwitch || {
-      enabled: false,
-      mode: 'weekday'
-    };
-    const nextConfig = updater(currentConfig);
+  const switchMode: SceneGroupSwitchMode = sceneGroupState.switchMode || 'manual';
+
+  const updateSwitchMode = (mode: SceneGroupSwitchMode) => {
+    persistSceneGroupState({
+      ...sceneGroupState,
+      switchMode: mode
+    });
+  };
+
+  const updateGroupAutoSwitch = (
+    groupId: string,
+    updater: (current: SceneGroupAutoSwitchConfig) => SceneGroupAutoSwitchConfig
+  ) => {
     persistSceneGroupState({
       ...sceneGroupState,
       groups: sceneGroupState.groups.map(group => (
-        group.id === activeGroup.id
-          ? { ...group, autoSwitch: nextConfig }
+        group.id === groupId
+          ? {
+            ...group,
+            autoSwitch: updater(group.autoSwitch || { mode: 'disabled' })
+          }
           : group
       ))
     });
   };
 
-  const autoSwitchConfig: SceneGroupAutoSwitchConfig = activeGroup.autoSwitch || {
-    enabled: false,
-    mode: 'weekday'
-  };
-
   const getRuleSummary = (config: SceneGroupAutoSwitchConfig): string => {
-    if (!config.enabled) return '未启用';
+    if (config.mode === 'disabled') return '不启用';
     if (config.mode === 'weekday') return '每周一至周五';
     if (config.mode === 'weekend') return '每周六、周日';
     if (config.mode === 'dateRange') {
       if (config.startDate && config.endDate) {
         return `${config.startDate} ~ ${config.endDate}`;
       }
-      return '日期区间未完整设置';
+      return '时间段未完整设置';
     }
     return '规则未设置';
   };
@@ -223,6 +240,14 @@ export const SceneSettingsView: React.FC<SceneSettingsViewProps> = ({ onBack }) 
   const normalizeEightDigitDateInput = (value: string): string => {
     return value.replace(/\D/g, '').slice(0, 8);
   };
+
+  const getGroupAutoSwitchConfig = (group: SceneGroup): SceneGroupAutoSwitchConfig => {
+    return group.autoSwitch || { mode: 'disabled' };
+  };
+
+  const autoEnabledGroupCount = sceneGroupState.groups.filter(group => (
+    getGroupAutoSwitchConfig(group).mode !== 'disabled'
+  )).length;
 
   // 获取卡片关联信息的描述
   const getCardAssociationText = (card: SceneCardData): string | null => {
@@ -624,10 +649,10 @@ export const SceneSettingsView: React.FC<SceneSettingsViewProps> = ({ onBack }) 
 
       {/* 主体内容 - 单列布局 */}
       <div className="flex-1 overflow-y-auto">
-        {/* 场景组管理 */}
+        {/* 场景组内容管理 */}
         <div className="p-3 sm:p-4 border-b-4 border-stone-200 bg-white">
           <div className="flex items-center justify-between mb-3">
-            <h2 className="text-sm font-bold text-stone-700">场景组管理</h2>
+            <h2 className="text-sm font-bold text-stone-700">场景组内容管理</h2>
             <div className="flex items-center gap-1">
               <button
                 onClick={handleCreateGroup}
@@ -654,6 +679,7 @@ export const SceneSettingsView: React.FC<SceneSettingsViewProps> = ({ onBack }) 
               </button>
             </div>
           </div>
+          <label className="block text-xs font-medium text-stone-700 mb-1">当前编辑场景组</label>
           <CustomSelect
             value={sceneGroupState.activeGroupId}
             onChange={(value) => handleSwitchGroup(value)}
@@ -663,126 +689,30 @@ export const SceneSettingsView: React.FC<SceneSettingsViewProps> = ({ onBack }) 
             }))}
           />
           <p className="text-xs text-stone-500 mt-2">
-            每个场景组独立保存一套时间段和快捷方式。场景视图将展示当前选中的场景组。
+            每个场景组独立保存一套时间段和快捷方式。
+            {switchMode === 'manual'
+              ? ' 当前编辑组会直接用于场景视图展示。'
+              : ' 自动模式下，这里只用于编辑各组内容，实际展示由自动规则决定。'}
           </p>
+        </div>
 
-          <div className="mt-3 p-3 rounded-lg border border-stone-200 bg-stone-50/60">
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <h3 className="text-sm font-bold text-stone-700">自动切换规则</h3>
-                <p className="text-xs text-stone-500 mt-0.5">
-                  命中规则时会自动切换到该场景组。多个组同时命中时，按场景组列表顺序取第一个。
-                </p>
-              </div>
-              <button
-                onClick={() => {
-                  updateActiveGroupAutoSwitch((current) => ({
-                    ...current,
-                    mode: current.mode || 'weekday',
-                    enabled: !current.enabled
-                  }));
-                }}
-                className="relative inline-flex h-5 w-9 items-center rounded-full transition-colors flex-shrink-0 self-end sm:self-auto"
-                style={{
-                  backgroundColor: autoSwitchConfig.enabled ? 'var(--accent-color)' : '#d6d3d1'
-                }}
-                title={autoSwitchConfig.enabled ? '关闭自动切换' : '开启自动切换'}
-              >
-                <span
-                  className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${
-                    autoSwitchConfig.enabled ? 'translate-x-5' : 'translate-x-0.5'
-                  }`}
-                />
-              </button>
+        {/* 切换模式管理入口 */}
+        <div className="p-3 sm:p-4 border-b-4 border-stone-200 bg-white">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <h2 className="text-sm font-bold text-stone-700">切换模式管理</h2>
+              <p className="text-xs text-stone-500 mt-0.5">
+                {switchMode === 'manual'
+                  ? `手动模式：场景视图固定显示「${activeGroup.name}」`
+                  : `自动模式：已为 ${autoEnabledGroupCount} 个场景组启用规则，当前命中「${matchedAutoGroup?.name || activeGroup.name}」`}
+              </p>
             </div>
-
-            {autoSwitchConfig.enabled && (
-              <div className="mt-3 space-y-3">
-                <div>
-                  <label className="block text-xs font-medium text-stone-700 mb-1">规则类型</label>
-                  <CustomSelect
-                    value={autoSwitchConfig.mode}
-                    onChange={(value) => {
-                      const mode = value as SceneGroupAutoSwitchConfig['mode'];
-                      updateActiveGroupAutoSwitch((current) => ({
-                        ...current,
-                        mode,
-                        startDate: mode === 'dateRange' ? current.startDate : undefined,
-                        endDate: mode === 'dateRange' ? current.endDate : undefined
-                      }));
-                    }}
-                    options={[
-                      { value: 'weekday', label: '工作日（周一至周五）' },
-                      { value: 'weekend', label: '周末（周六和周日）' },
-                      { value: 'dateRange', label: '日期区间' }
-                    ]}
-                  />
-                </div>
-
-                {autoSwitchConfig.mode === 'dateRange' && (
-                  <div className="grid grid-cols-2 gap-2">
-                    <div>
-                      <label className="block text-xs font-medium text-stone-700 mb-1">开始日期（8位）</label>
-                      <input
-                        type="text"
-                        inputMode="numeric"
-                        maxLength={8}
-                        placeholder="YYYYMMDD"
-                        value={autoSwitchConfig.startDate || ''}
-                        onChange={(e) => {
-                          const startDate = normalizeEightDigitDateInput(e.target.value) || undefined;
-                          const endDate = autoSwitchConfig.endDate;
-                          if (startDate?.length === 8 && endDate?.length === 8 && startDate > endDate) {
-                            addToast('error', '开始日期不能晚于结束日期');
-                            return;
-                          }
-                          updateActiveGroupAutoSwitch((current) => ({
-                            ...current,
-                            startDate
-                          }));
-                        }}
-                        className="w-full px-2.5 py-1.5 text-xs sm:text-sm border border-stone-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-stone-800"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-medium text-stone-700 mb-1">结束日期（8位）</label>
-                      <input
-                        type="text"
-                        inputMode="numeric"
-                        maxLength={8}
-                        placeholder="YYYYMMDD"
-                        value={autoSwitchConfig.endDate || ''}
-                        onChange={(e) => {
-                          const endDate = normalizeEightDigitDateInput(e.target.value) || undefined;
-                          const startDate = autoSwitchConfig.startDate;
-                          if (startDate?.length === 8 && endDate?.length === 8 && startDate > endDate) {
-                            addToast('error', '结束日期不能早于开始日期');
-                            return;
-                          }
-                          updateActiveGroupAutoSwitch((current) => ({
-                            ...current,
-                            endDate
-                          }));
-                        }}
-                        className="w-full px-2.5 py-1.5 text-xs sm:text-sm border border-stone-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-stone-800"
-                      />
-                    </div>
-                  </div>
-                )}
-                {autoSwitchConfig.mode === 'dateRange' && (
-                  <p className="text-[11px] text-stone-500">
-                    请输入 8 位数字日期，例如 20260701。
-                  </p>
-                )}
-              </div>
-            )}
-
-            <div className="mt-3 text-xs text-stone-600">
-              当前规则：{getRuleSummary(autoSwitchConfig)}
-            </div>
-            <div className="mt-1 text-xs text-stone-500">
-              今日命中：{isSceneGroupAutoSwitchMatched(activeGroup, new Date()) ? '是' : '否'}
-            </div>
+            <button
+              onClick={() => setIsModeConfigOpen(true)}
+              className="px-3 py-1.5 text-xs bg-stone-800 text-white rounded-lg hover:bg-stone-700 transition-colors flex-shrink-0"
+            >
+              打开管理
+            </button>
           </div>
         </div>
 
@@ -1017,12 +947,74 @@ export const SceneSettingsView: React.FC<SceneSettingsViewProps> = ({ onBack }) 
                   autoFocus
                 />
               </div>
+
+              {groupEditMode === 'create' && (
+                <div>
+                  <label className="block text-xs sm:text-sm font-medium text-stone-700 mb-2">
+                    创建方式
+                  </label>
+                  <div className="space-y-2">
+                    <button
+                      type="button"
+                      onClick={() => setGroupCreateMode('empty')}
+                      className={`w-full text-left p-3 rounded-lg border transition-all ${
+                        groupCreateMode === 'empty'
+                          ? 'border-stone-400 bg-stone-50'
+                          : 'border-stone-200 hover:border-stone-300'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm font-medium text-stone-800">从空白开始</span>
+                        {groupCreateMode === 'empty' && (
+                          <Check size={16} className="text-green-600" />
+                        )}
+                      </div>
+                      <p className="text-xs text-stone-500 mt-1">新建后无时间段和快捷方式，手动配置。</p>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setGroupCreateMode('copy')}
+                      className={`w-full text-left p-3 rounded-lg border transition-all ${
+                        groupCreateMode === 'copy'
+                          ? 'border-stone-400 bg-stone-50'
+                          : 'border-stone-200 hover:border-stone-300'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm font-medium text-stone-800">复制已有场景组</span>
+                        {groupCreateMode === 'copy' && (
+                          <Check size={16} className="text-green-600" />
+                        )}
+                      </div>
+                      <p className="text-xs text-stone-500 mt-1">复制模板组内容后再继续编辑。</p>
+                    </button>
+                  </div>
+
+                  {groupCreateMode === 'copy' && (
+                    <div className="mt-2">
+                      <label className="block text-xs text-stone-700 mb-1">复制来源</label>
+                      <CustomSelect
+                        value={groupCopySourceId || activeGroup.id}
+                        onChange={(value) => setGroupCopySourceId(value)}
+                        options={sceneGroupState.groups.map(group => ({
+                          value: group.id,
+                          label: `${group.name}（${group.timeSlots.length} 个时间段）`
+                        }))}
+                        dropdownPosition="top"
+                      />
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
             <div className="flex gap-2 mt-5">
               <button
                 onClick={() => {
                   setIsEditingGroup(false);
                   setGroupNameDraft('');
+                  setGroupCreateMode('empty');
+                  setGroupCopySourceId(sceneGroupState.activeGroupId);
                 }}
                 className="flex-1 px-4 py-2 text-sm border border-stone-300 rounded-lg hover:bg-stone-50 transition-colors"
               >
@@ -1033,6 +1025,159 @@ export const SceneSettingsView: React.FC<SceneSettingsViewProps> = ({ onBack }) 
                 className="flex-1 px-4 py-2 text-sm bg-stone-800 text-white rounded-lg hover:bg-stone-700 transition-colors"
               >
                 保存
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 模式切换管理弹窗 */}
+      {isModeConfigOpen && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl w-full max-w-2xl max-h-[90vh] flex flex-col">
+            <div className="p-4 sm:p-6 pb-3 border-b border-stone-200">
+              <h2 className="text-lg sm:text-xl font-bold">切换模式管理</h2>
+              <p className="text-xs text-stone-500 mt-1">
+                场景组管理包含两部分：场景组内容管理与切换模式管理。这里仅配置切换模式与规则。
+              </p>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4">
+              <div>
+                <label className="block text-xs font-medium text-stone-700 mb-1">切换模式</label>
+                <div className="inline-flex rounded-lg bg-stone-100 p-1">
+                  <button
+                    onClick={() => updateSwitchMode('manual')}
+                    className={`px-3 py-1.5 text-xs rounded-md transition-colors ${
+                      switchMode === 'manual'
+                        ? 'bg-white text-stone-900 shadow-sm'
+                        : 'text-stone-600 hover:text-stone-800'
+                    }`}
+                  >
+                    手动模式
+                  </button>
+                  <button
+                    onClick={() => updateSwitchMode('auto')}
+                    className={`px-3 py-1.5 text-xs rounded-md transition-colors ${
+                      switchMode === 'auto'
+                        ? 'bg-white text-stone-900 shadow-sm'
+                        : 'text-stone-600 hover:text-stone-800'
+                    }`}
+                  >
+                    自动模式
+                  </button>
+                </div>
+                <p className="text-xs text-stone-500 mt-2">
+                  请先选择模式：手动模式只展示一个场景组；自动模式按每个场景组的规则匹配展示。
+                </p>
+              </div>
+
+              {switchMode === 'manual' ? (
+                <div className="p-3 rounded-lg border border-stone-200 bg-stone-50">
+                  <label className="block text-xs font-medium text-stone-700 mb-1">手动模式展示组</label>
+                  <CustomSelect
+                    value={sceneGroupState.activeGroupId}
+                    onChange={(value) => handleSwitchGroup(value)}
+                    options={sceneGroupState.groups.map(group => ({
+                      value: group.id,
+                      label: group.name
+                    }))}
+                    dropdownPosition="top"
+                  />
+                  <p className="text-xs text-stone-500 mt-2">手动模式下，场景视图仅渲染当前选中的场景组。</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {sceneGroupState.groups.map(group => {
+                    const config = getGroupAutoSwitchConfig(group);
+                    return (
+                      <div key={group.id} className="p-3 rounded-lg border border-stone-200 bg-stone-50/60">
+                        <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between mb-2">
+                          <h3 className="text-sm font-bold text-stone-700 truncate">{group.name}</h3>
+                          <span className="text-[11px] text-stone-500 shrink-0">
+                            今日命中：{isSceneGroupAutoSwitchMatched(group, new Date()) ? '是' : '否'}
+                          </span>
+                        </div>
+
+                        <div className="space-y-2">
+                          <CustomSelect
+                            value={config.mode}
+                            onChange={(value) => {
+                              const mode = value as SceneGroupAutoSwitchConfig['mode'];
+                              updateGroupAutoSwitch(group.id, (current) => ({
+                                ...current,
+                                mode,
+                                startDate: mode === 'dateRange' ? current.startDate : undefined,
+                                endDate: mode === 'dateRange' ? current.endDate : undefined
+                              }));
+                            }}
+                            options={[
+                              { value: 'disabled', label: '不启用' },
+                              { value: 'weekday', label: '工作日（周一至周五）' },
+                              { value: 'weekend', label: '周末（周六和周日）' },
+                              { value: 'dateRange', label: '时间段（YYYYMMDD）' }
+                            ]}
+                          />
+
+                          {config.mode === 'dateRange' && (
+                            <div className="space-y-2">
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                <input
+                                  type="text"
+                                  inputMode="numeric"
+                                  maxLength={8}
+                                  placeholder="开始 YYYYMMDD"
+                                  value={config.startDate || ''}
+                                  onChange={(e) => {
+                                    const startDate = normalizeEightDigitDateInput(e.target.value) || undefined;
+                                    const endDate = config.endDate;
+                                    if (startDate?.length === 8 && endDate?.length === 8 && startDate > endDate) {
+                                      addToast('error', '开始日期不能晚于结束日期');
+                                      return;
+                                    }
+                                    updateGroupAutoSwitch(group.id, (current) => ({ ...current, startDate }));
+                                  }}
+                                  className="w-full px-2.5 py-1.5 text-xs sm:text-sm border border-stone-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-stone-800 font-mono"
+                                />
+                                <input
+                                  type="text"
+                                  inputMode="numeric"
+                                  maxLength={8}
+                                  placeholder="结束 YYYYMMDD"
+                                  value={config.endDate || ''}
+                                  onChange={(e) => {
+                                    const endDate = normalizeEightDigitDateInput(e.target.value) || undefined;
+                                    const startDate = config.startDate;
+                                    if (startDate?.length === 8 && endDate?.length === 8 && startDate > endDate) {
+                                      addToast('error', '结束日期不能早于开始日期');
+                                      return;
+                                    }
+                                    updateGroupAutoSwitch(group.id, (current) => ({ ...current, endDate }));
+                                  }}
+                                  className="w-full px-2.5 py-1.5 text-xs sm:text-sm border border-stone-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-stone-800 font-mono"
+                                />
+                              </div>
+                              <p className="text-[11px] text-stone-500">
+                                请输入 8 位数字日期，例如：20260115。
+                              </p>
+                            </div>
+                          )}
+                        </div>
+
+                        <p className="text-xs text-stone-500 mt-2">当前规则：{getRuleSummary(config)}</p>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            <div className="p-4 sm:p-6 pt-3 border-t border-stone-200">
+              <button
+                onClick={() => setIsModeConfigOpen(false)}
+                className="w-full px-4 py-2 text-sm bg-stone-800 text-white rounded-lg hover:bg-stone-700 transition-colors"
+              >
+                完成
               </button>
             </div>
           </div>
