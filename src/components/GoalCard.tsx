@@ -55,21 +55,14 @@ export const GoalCard: React.FC<GoalCardProps> = ({ goal, logs, todos, onEdit, o
 
     const GoalIcon = getGoalIcon();
 
-    // 进度条颜色
-    const progressColor = isLimitGoal
-        ? (percentage > 80 ? 'bg-red-900' : 'bg-red-700')
-        : '';
-
-    const progressBgColor = isLimitGoal ? 'bg-red-50' : '';
-    
-    // 进度条样式（使用CSS变量）
-    const progressStyle = !isLimitGoal ? {
+    // 进度条样式（统一使用主题色）
+    const progressStyle = {
         backgroundColor: 'var(--progress-bar-fill)'
-    } : undefined;
+    };
     
-    const progressBgStyle = !isLimitGoal ? {
+    const progressBgStyle = {
         backgroundColor: 'var(--progress-bar-bg)'
-    } : undefined;
+    };
 
     if (compact) {
         // 紧凑模式：用于ScopeView
@@ -90,65 +83,62 @@ export const GoalCard: React.FC<GoalCardProps> = ({ goal, logs, todos, onEdit, o
                         {formatGoalValue(current, goal.metric)} / {formatGoalValue(target, goal.metric)}
                     </span>
                 </div>
-                <div className={`h-1 w-full rounded-full overflow-hidden ${progressBgColor}`} style={progressBgStyle}>
-                    <div
-                        className={`h-full rounded-full transition-all duration-500 ${progressColor}`}
-                        style={progressStyle ? { ...progressStyle, width: `${percentage}%` } : { width: `${percentage}%` }}
-                    />
+                <div className={`h-1 w-full rounded-full overflow-hidden relative`} style={progressBgStyle}>
+                    {isLimitGoal ? (
+                        // 反向目标：从右侧填充
+                        <div
+                            className="h-full rounded-full transition-all duration-500 absolute right-0"
+                            style={{ ...progressStyle, width: `${percentage}%`, opacity: 0.8 }}
+                        />
+                    ) : (
+                        // 正向目标：从左侧填充
+                        <div
+                            className="h-full rounded-full transition-all duration-500"
+                            style={{ ...progressStyle, width: `${percentage}%` }}
+                        />
+                    )}
                 </div>
             </div>
         );
     }
 
-    // 完整模式：用于ScopeDetailView
+    // 完整模式：用于ScopeDetailView - 印刷极简风格
     return (
         <div
-            className={`rounded-xl p-4 transition-all cursor-pointer ${isArchived
-                ? 'bg-stone-50 border-2 border-dashed border-stone-300 opacity-70 hover:opacity-90'
-                : 'bg-white border border-stone-100 shadow-sm hover:shadow-md'
-                }`}
+            className={`py-4 border-b border-stone-200 last:border-b-0 cursor-pointer ${isArchived ? 'opacity-60' : ''}`}
             onClick={() => onEdit?.(goal)}
         >
-            {/* Header */}
-            <div className="flex items-start justify-between mb-3">
-                <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-1">
-                        <GoalIcon 
-                            size={16} 
-                            className={isLimitGoal ? 'text-red-600' : (isArchived ? 'text-stone-400' : '')}
-                            style={!isLimitGoal && !isArchived ? { color: 'var(--accent-color)' } : undefined}
-                        />
-                        <h4 className={`text-base font-bold truncate ${isArchived ? 'text-stone-400' : 'text-stone-900'
-                            }`}>{goal.title}</h4>
-                        {isArchived && (
-                            <span className="px-2 py-0.5 bg-stone-200 text-stone-500 text-[10px] font-bold rounded-full uppercase tracking-wider">
-                                已归档
-                            </span>
-                        )}
-                    </div>
-                    <div className="flex items-center gap-2 text-[10px] text-stone-400">
-                        <span className="font-medium uppercase tracking-wider">{getGoalMetricLabel(goal.metric)}</span>
-                        <span className="text-stone-300">•</span>
-                        <span>{formatShortDate(goal.startDate)} - {formatShortDate(goal.endDate)}</span>
-                    </div>
+            {/* Header - 印刷风格标题行 */}
+            <div className="flex items-baseline justify-between mb-2">
+                <div className="flex-1 min-w-0 flex items-baseline gap-3">
+                    <GoalIcon 
+                        size={14} 
+                        className={isLimitGoal ? 'text-red-600 flex-shrink-0 mt-0.5' : (isArchived ? 'text-stone-300 flex-shrink-0 mt-0.5' : 'flex-shrink-0 mt-0.5')}
+                        style={!isLimitGoal && !isArchived ? { color: 'var(--accent-color)' } : undefined}
+                    />
+                    <h4 className={`text-lg font-bold leading-tight ${isArchived ? 'text-stone-400' : 'text-stone-900'}`}>
+                        {goal.title}
+                    </h4>
+                    {isArchived && (
+                        <span className="text-[10px] text-stone-400 uppercase tracking-widest font-medium">
+                            已归档
+                        </span>
+                    )}
                 </div>
 
-                {/* Action Buttons */}
+                {/* Action Buttons - 极简图标 */}
                 {(onEdit || onDelete || onArchive) && (
-                    <div className="flex items-center gap-1 ml-2">
+                    <div className="flex items-center gap-2 ml-4">
                         {onArchive && (
                             <button
                                 onClick={(e) => {
                                     e.stopPropagation();
                                     onArchive(goal.id);
                                 }}
-                                title={isArchived ? '恢复目标' : '归档目标'}
-                                className={`p-1.5 rounded-md transition-colors ${isArchived
-                                    ? 'text-stone-600 hover:text-stone-900 hover:bg-stone-100'
-                                    : 'text-stone-400 hover:text-orange-600 hover:bg-orange-50'
-                                    }`}
+                                title={isArchived ? '恢复' : '归档'}
+                                className="text-stone-400 hover:text-stone-700 transition-colors"
                             >
-                                <Archive size={14} />
+                                <Archive size={16} />
                             </button>
                         )}
                         {onEdit && (
@@ -157,9 +147,9 @@ export const GoalCard: React.FC<GoalCardProps> = ({ goal, logs, todos, onEdit, o
                                     e.stopPropagation();
                                     onEdit(goal);
                                 }}
-                                className="p-1.5 text-stone-400 hover:text-stone-600 hover:bg-stone-100 rounded-md transition-colors"
+                                className="text-stone-400 hover:text-stone-700 transition-colors"
                             >
-                                <Edit2 size={14} />
+                                <Edit2 size={16} />
                             </button>
                         )}
                         {onDelete && (
@@ -168,39 +158,63 @@ export const GoalCard: React.FC<GoalCardProps> = ({ goal, logs, todos, onEdit, o
                                     e.stopPropagation();
                                     onDelete(goal.id);
                                 }}
-                                className="p-1.5 text-stone-400 hover:text-red-500 hover:bg-red-50 rounded-md transition-colors"
+                                className="text-stone-400 hover:text-red-600 transition-colors"
                             >
-                                <Trash2 size={14} />
+                                <Trash2 size={16} />
                             </button>
                         )}
                     </div>
                 )}
             </div>
 
-            {/* Progress Bar */}
-            <div className="mb-2">
-                <div className={`h-2 w-full rounded-full overflow-hidden ${progressBgColor}`} style={progressBgStyle}>
-                    <div
-                        className={`h-full rounded-full transition-all duration-500 ${progressColor}`}
-                        style={progressStyle ? { ...progressStyle, width: `${percentage}%` } : { width: `${percentage}%` }}
-                    />
+            {/* Meta Info - 印刷风格元信息 */}
+            <div className="flex items-center gap-3 text-[11px] text-stone-500 mb-3 ml-7">
+                <span className="font-medium uppercase tracking-wider">
+                    {getGoalMetricLabel(goal.metric)}
+                </span>
+                <span className="text-stone-300">·</span>
+                <span className="font-mono">
+                    {formatShortDate(goal.startDate)} / {formatShortDate(goal.endDate)}
+                </span>
+                {!isArchived && !isExpired && daysUntilDeadline > 0 && (
+                    <>
+                        <span className="text-stone-300">·</span>
+                        <span>剩余 {daysUntilDeadline} 天</span>
+                    </>
+                )}
+            </div>
+
+            {/* Progress - 极简进度条 */}
+            <div className="mb-2 ml-7">
+                <div className="flex items-baseline justify-between mb-1.5">
+                    <span className="text-xs font-mono text-stone-600">
+                        {formatGoalValue(current, goal.metric)} / {formatGoalValue(target, goal.metric)}
+                    </span>
+                    <span className="text-base font-bold text-stone-900 tabular-nums">
+                        {percentage.toFixed(1)}%
+                    </span>
+                </div>
+                <div className="h-1 w-full rounded-full overflow-hidden relative" style={progressBgStyle}>
+                    {isLimitGoal ? (
+                        // 反向目标：从右侧填充
+                        <div
+                            className="h-full transition-all duration-500 absolute right-0"
+                            style={{ ...progressStyle, width: `${percentage}%`, opacity: 0.8 }}
+                        />
+                    ) : (
+                        // 正向目标：从左侧填充
+                        <div
+                            className="h-full transition-all duration-500"
+                            style={{ ...progressStyle, width: `${percentage}%` }}
+                        />
+                    )}
                 </div>
             </div>
 
-            {/* Stats */}
-            <div className="flex items-center justify-between text-xs">
-                <span className="font-mono font-bold text-stone-700">
-                    {formatGoalValue(current, goal.metric)} / {formatGoalValue(target, goal.metric)}
-                </span>
-                <span className="font-bold text-stone-900">
-                    {percentage.toFixed(1)}%
-                </span>
-            </div>
-
-            {/* Motivation */}
+            {/* Motivation - 引用样式 */}
             {goal.motivation && (
-                <div className="mt-3 pt-3 border-t border-stone-100">
-                    <p className="text-xs text-stone-500">{goal.motivation}</p>
+                <div className="mt-3 ml-7 pl-3 border-l-2 border-stone-200">
+                    <p className="text-xs text-stone-500 italic leading-relaxed">{goal.motivation}</p>
                 </div>
             )}
         </div>

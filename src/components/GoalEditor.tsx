@@ -1,14 +1,17 @@
 /**
  * @file GoalEditor.tsx
- * @input goal (optional), scopeId, categories, todoCategories
- * @output Goal Creation/Editing Form
+ * @input goal (optional), scopeId, categories, todoCategories, mode, majorGoal, majorGoals
+ * @output Goal/MajorGoal Creation/Editing Form
  * @pos Component (Modal/Form)
- * @description A form modal for creating or editing goals, including title, metric type (duration, count, etc.), target values, and date ranges.
+ * @description A reusable form modal for creating or editing goals and major goals. Supports three modes:
+ *   - independent: Create/edit standalone goals (can optionally link to a major goal)
+ *   - phase: Create/edit phase goals within a major goal (inherits metric and filters)
+ *   - majorGoal: Create/edit major goals (no target value, time range auto-calculated)
  * 
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
 import React, { useState, useEffect } from 'react';
-import { Goal, Category, TodoCategory } from '../types';
+import { Goal, Category, TodoCategory, MajorGoal } from '../types';
 import { X, Check } from 'lucide-react';
 import { TagMultipleAssociation } from './TagMultipleAssociation';
 
@@ -19,6 +22,12 @@ interface GoalEditorProps {
     todoCategories: TodoCategory[];
     onSave: (goal: Goal) => void;
     onClose: () => void;
+    
+    // 新增：支持三种模式
+    mode?: 'independent' | 'phase' | 'majorGoal';
+    majorGoal?: MajorGoal;  // MajorGoal 类型（phase 模式必需）
+    majorGoals?: MajorGoal[];  // 可选的目标系列列表（independent 模式）
+    onSaveMajorGoal?: (majorGoal: MajorGoal) => void;  // 保存目标系列的回调
 }
 
 const metricOptions: { value: Goal['metric']; label: string; hint: string }[] = [
@@ -29,9 +38,30 @@ const metricOptions: { value: Goal['metric']; label: string; hint: string }[] = 
     { value: 'duration_limit', label: '时长上限', hint: '不超过时长（小时）' }
 ];
 
-export const GoalEditor: React.FC<GoalEditorProps> = ({ goal, scopeId, categories, todoCategories, onSave, onClose }) => {
+export const GoalEditor: React.FC<GoalEditorProps> = ({ 
+    goal, 
+    scopeId, 
+    categories, 
+    todoCategories, 
+    onSave, 
+    onClose,
+    mode = 'independent',
+    majorGoal,
+    majorGoals,
+    onSaveMajorGoal
+}) => {
     const [title, setTitle] = useState(goal?.title || '');
-    const [metric, setMetric] = useState<Goal['metric']>(goal?.metric || 'duration_raw');
+    const [metric, setMetric] = useState<Goal['metric']>(
+        mode === 'phase' && majorGoal ? majorGoal.metric : (goal?.metric || 'duration_raw')
+    );
+    
+    // 新增：所属目标系列选择
+    const [selectedMajorGoalId, setSelectedMajorGoalId] = useState<string | undefined>(
+        mode === 'phase' && majorGoal ? majorGoal.id : goal?.majorGoalId
+    );
+    
+    // 新增：目标系列描述（仅 majorGoal 模式）
+    const [description, setDescription] = useState('');
 
     // 初始化targetValue：如果是时长类型且是编辑模式，需要保持原始秒值
     const [targetValue, setTargetValue] = useState(() => {
@@ -58,14 +88,71 @@ export const GoalEditor: React.FC<GoalEditorProps> = ({ goal, scopeId, categorie
     const [motivation, setMotivation] = useState(goal?.motivation || '');
 
     // 🔍 筛选器状态 (Filter States)
-    const [filterTodoCategories, setFilterTodoCategories] = useState<string[]>(goal?.filterTodoCategories || []);
-    const [filterActivityIds, setFilterActivityIds] = useState<string[]>(goal?.filterActivityIds || []);
+    const [filterTodoCategories, setFilterTodoCategories] = useState<string[]>(
+        mode === 'phase' && majorGoal ? (majorGoal.filterTodoCategories || []) : (goal?.filterTodoCategories || [])
+    );
+    const [filterActivityIds, setFilterActivityIds] = useState<string[]>(
+        mode === 'phase' && majorGoal ? (majorGoal.filterActivityIds || []) : (goal?.filterActivityIds || [])
+    );
     const [isTodoFilterEnabled, setIsTodoFilterEnabled] = useState<boolean>(
         (goal?.filterTodoCategories && goal.filterTodoCategories.length > 0) || false
     );
+    
+    // 判断字段是否应该禁用
+    const isFieldDisabled = (fieldName: string): boolean => {
+        // 阶段目标模式：禁用继承字段
+        if (mode === 'phase') {
+            return ['metric', 'filterActivityIds', 'filterTodoCategories'].includes(fieldName);
+        }
+        
+        // 独立目标模式：选择了目标系列后禁用继承字段
+        if (mode === 'independent' && selectedMajorGoalId) {
+            return ['metric', 'filterActivityIds', 'filterTodoCategories'].includes(fieldName);
+        }
+        
+        // 目标系列模式：禁用自动计算字段
+        if (mode === 'majorGoal') {
+            return ['startDate', 'endDate'].includes(fieldName);
+        }
+        
+        return false;
+    };
 
     const handleSave = () => {
-        if (!title.trim() || !startDateStr || !endDateStr || targetValue <= 0) {
+        if (!title.trim()) {
+            alert('请填写标题');
+            return;
+        }
+
+        // 目标系列模式：创建 MajorGoal
+        if (mode === 'majorGoal') {
+            if (!onSaveMajorGoal) {
+                alert('缺少保存目标系列的回调函数');
+                return;
+            }
+
+            const newMajorGoal: MajorGoal = {
+                id: crypto.randomUUID(),
+                title: title.trim(),
+                scopeId: scopeId,
+                metric,
+                startDate: '1970-01-01',  // 占位，将由子目标自动计算
+                endDate: '1970-01-01',    // 占位，将由子目标自动计算
+                description: description.trim() || undefined,
+                motivation: motivation.trim() || undefined,
+                filterActivityIds: metric !== 'task_count' && filterActivityIds.length > 0 ? filterActivityIds : undefined,
+                filterTodoCategories: metric === 'task_count' && filterTodoCategories.length > 0 ? filterTodoCategories : undefined,
+                status: 'active',
+                createdAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString(),
+            };
+
+            onSaveMajorGoal(newMajorGoal);
+            return;
+        }
+
+        // 独立目标和阶段目标模式：创建 Goal
+        if (!startDateStr || !endDateStr || targetValue <= 0) {
             alert('请填写完整信息');
             return;
         }
@@ -85,7 +172,7 @@ export const GoalEditor: React.FC<GoalEditorProps> = ({ goal, scopeId, categorie
             title: title.trim(),
             scopeId: scopeId,
             metric,
-            targetValue: targetValue, // 直接使用秒值
+            targetValue: targetValue,
             startDate,
             endDate,
             status: goal?.status || 'active',
@@ -93,6 +180,9 @@ export const GoalEditor: React.FC<GoalEditorProps> = ({ goal, scopeId, categorie
             // 筛选器字段
             filterTodoCategories: metric === 'task_count' && filterTodoCategories.length > 0 ? filterTodoCategories : undefined,
             filterActivityIds: metric !== 'task_count' && filterActivityIds.length > 0 ? filterActivityIds : undefined,
+            // 目标系列关联
+            majorGoalId: selectedMajorGoalId,
+            order: goal?.order,
         };
 
         onSave(newGoal);
@@ -183,7 +273,7 @@ export const GoalEditor: React.FC<GoalEditorProps> = ({ goal, scopeId, categorie
                         <X size={24} />
                     </button>
                     <h2 className="text-sm font-bold text-stone-400 uppercase tracking-widest">
-                        {goal ? '编辑目标' : '新建目标'}
+                        {mode === 'majorGoal' ? '编辑目标系列' : (goal ? '编辑目标' : '新建目标')}
                     </h2>
                     <div className="w-10 flex justify-end">
                         <button
@@ -218,98 +308,263 @@ export const GoalEditor: React.FC<GoalEditorProps> = ({ goal, scopeId, categorie
                         />
                     </div>
 
+                    {/* 所属目标系列信息（仅阶段目标模式） */}
+                    {mode === 'phase' && majorGoal && (
+                        <div className="bg-stone-50 border border-stone-200 rounded-lg p-4">
+                            <div className="flex items-center gap-2 mb-2">
+                                <span className="text-xs font-medium text-stone-400 uppercase tracking-wider">
+                                    所属目标系列
+                                </span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <span className="text-sm font-bold text-stone-900">
+                                    {majorGoal.title}
+                                </span>
+                                <span className="px-2 py-0.5 bg-stone-200 text-stone-600 text-[10px] font-bold rounded">
+                                    {metricOptions.find(m => m.value === majorGoal.metric)?.label}
+                                </span>
+                            </div>
+                            <p className="mt-2 text-xs text-stone-500">
+                                💡 目标类型和筛选条件继承自目标系列，不可修改
+                            </p>
+                        </div>
+                    )}
+
+                    {/* 所属目标系列选择器（仅独立目标模式） */}
+                    {mode === 'independent' && majorGoals && majorGoals.length > 0 && (
+                        <div>
+                            <label className="block text-xs font-medium text-stone-400 mb-2 uppercase tracking-wider">
+                                所属目标系列
+                                <span className="text-stone-300 ml-1">（可选）</span>
+                            </label>
+                            
+                            <div className="space-y-2">
+                                {/* 无（独立目标）选项 */}
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setSelectedMajorGoalId(undefined);
+                                    }}
+                                    className={`w-full px-4 py-3 rounded-lg text-left transition-all ${
+                                        !selectedMajorGoalId
+                                            ? 'text-white border-2'
+                                            : 'bg-stone-50 text-stone-600 border-2 border-stone-200 hover:border-stone-300'
+                                    }`}
+                                    style={!selectedMajorGoalId ? {
+                                        backgroundColor: 'var(--accent-color)',
+                                        borderColor: 'var(--accent-color)'
+                                    } : undefined}
+                                >
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-sm font-medium">无（独立目标）</span>
+                                        {!selectedMajorGoalId && (
+                                            <Check size={16} strokeWidth={2.5} />
+                                        )}
+                                    </div>
+                                </button>
+
+                                {/* 目标系列选项列表 */}
+                                {majorGoals
+                                    .filter((mg: any) => mg.scopeId === scopeId && mg.status !== 'archived')
+                                    .map((mg: any) => {
+                                        const isSelected = selectedMajorGoalId === mg.id;
+                                        const metricLabel = metricOptions.find(m => m.value === mg.metric)?.label;
+                                        
+                                        return (
+                                            <button
+                                                key={mg.id}
+                                                type="button"
+                                                onClick={() => {
+                                                    setSelectedMajorGoalId(mg.id);
+                                                    setMetric(mg.metric);
+                                                    setFilterActivityIds(mg.filterActivityIds || []);
+                                                    setFilterTodoCategories(mg.filterTodoCategories || []);
+                                                }}
+                                                className={`w-full px-4 py-3 rounded-lg text-left transition-all ${
+                                                    isSelected
+                                                        ? 'text-white border-2'
+                                                        : 'bg-stone-50 text-stone-600 border-2 border-stone-200 hover:border-stone-300'
+                                                }`}
+                                                style={isSelected ? {
+                                                    backgroundColor: 'var(--accent-color)',
+                                                    borderColor: 'var(--accent-color)'
+                                                } : undefined}
+                                            >
+                                                <div className="flex items-center justify-between">
+                                                    <div className="flex-1 min-w-0">
+                                                        <div className="flex items-center gap-2">
+                                                            <span className="text-sm font-medium truncate">
+                                                                {mg.title}
+                                                            </span>
+                                                            <span className={`px-2 py-0.5 text-[10px] font-bold rounded flex-shrink-0 ${
+                                                                isSelected
+                                                                    ? 'bg-white/20 text-white'
+                                                                    : 'bg-stone-200 text-stone-600'
+                                                            }`}>
+                                                                {metricLabel}
+                                                            </span>
+                                                        </div>
+                                                    </div>
+                                                    {isSelected && (
+                                                        <Check size={16} strokeWidth={2.5} className="flex-shrink-0 ml-2" />
+                                                    )}
+                                                </div>
+                                            </button>
+                                        );
+                                    })}
+                            </div>
+                            
+                            {selectedMajorGoalId && (
+                                <p className="mt-2 text-xs text-stone-500">
+                                    💡 目标类型和筛选条件将继承自目标系列
+                                </p>
+                            )}
+                        </div>
+                    )}
+
+                    {/* 目标系列描述（仅目标系列模式） */}
+                    {mode === 'majorGoal' && (
+                        <div>
+                            <label className="block text-xs font-medium text-stone-400 mb-2 uppercase tracking-wider">
+                                系列描述
+                                <span className="text-stone-300 ml-1">（可选）</span>
+                            </label>
+                            <textarea
+                                value={description}
+                                onChange={(e) => setDescription(e.target.value)}
+                                placeholder="详细描述这个目标系列的内容和期望..."
+                                rows={3}
+                                className="w-full px-3 py-2 bg-stone-50 border border-stone-200 rounded-lg text-sm text-stone-900 outline-none focus:border-stone-400 transition-colors resize-none"
+                            />
+                        </div>
+                    )}
+
                     {/* 目标类型 - 胶囊选择 */}
                     <div>
                         <label className="block text-xs font-medium text-stone-400 mb-2 uppercase tracking-wider">
                             目标类型
+                            {isFieldDisabled('metric') && (
+                                <span className="text-stone-300 ml-1">（继承自目标系列）</span>
+                            )}
                         </label>
-                        <div className="flex flex-wrap gap-2">
-                            {metricOptions.map(option => (
-                                <button
-                                    key={option.value}
-                                    onClick={() => setMetric(option.value)}
-                                    className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all ${metric === option.value
-                                        ? 'text-white'
-                                        : 'bg-stone-100 text-stone-600 hover:bg-stone-200'
-                                        }`}
-                                    style={metric === option.value ? { backgroundColor: 'var(--accent-color)' } : {}}
-                                >
-                                    {option.label}
-                                </button>
-                            ))}
-                        </div>
+                        
+                        {isFieldDisabled('metric') ? (
+                            // 只读显示
+                            <div className="px-3 py-2 bg-stone-100 border border-stone-200 rounded-lg">
+                                <span className="text-sm font-bold text-stone-600">
+                                    {metricOptions.find(m => m.value === metric)?.label}
+                                </span>
+                            </div>
+                        ) : (
+                            // 可编辑
+                            <div className="flex flex-wrap gap-2">
+                                {metricOptions.map(option => (
+                                    <button
+                                        key={option.value}
+                                        onClick={() => setMetric(option.value)}
+                                        className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all ${metric === option.value
+                                            ? 'text-white'
+                                            : 'bg-stone-100 text-stone-600 hover:bg-stone-200'
+                                            }`}
+                                        style={metric === option.value ? { backgroundColor: 'var(--accent-color)' } : {}}
+                                    >
+                                        {option.label}
+                                    </button>
+                                ))}
+                            </div>
+                        )}
                         {selectedMetricInfo && (
                             <p className="mt-2 text-xs text-stone-500">{selectedMetricInfo.hint}</p>
                         )}
                     </div>
 
-                    {/* 目标阈值 */}
-                    <div>
-                        <label className="block text-xs font-medium text-stone-400 mb-2 uppercase tracking-wider">
-                            目标阈值
-                        </label>
-                        <input
-                            type="number"
-                            value={getDisplayValue()}
-                            onChange={(e) => handleValueChange(Number(e.target.value) || 0)}
-                            min="1"
-                            className="w-full px-3 py-2 bg-stone-50 border border-stone-200 rounded-lg text-stone-900 font-medium outline-none focus:border-stone-400 transition-colors text-center text-lg font-mono"
-                        />
-                    </div>
+                    {/* 目标阈值（目标系列模式不显示） */}
+                    {mode !== 'majorGoal' && (
+                        <div>
+                            <label className="block text-xs font-medium text-stone-400 mb-2 uppercase tracking-wider">
+                                目标阈值
+                            </label>
+                            <input
+                                type="number"
+                                value={getDisplayValue()}
+                                onChange={(e) => handleValueChange(Number(e.target.value) || 0)}
+                                min="1"
+                                className="w-full px-3 py-2 bg-stone-50 border border-stone-200 rounded-lg text-stone-900 font-medium outline-none focus:border-stone-400 transition-colors text-center text-lg font-mono"
+                            />
+                        </div>
+                    )}
 
                     {/* 起止日期 - 数字输入 */}
                     <div>
                         <div className="flex items-center justify-between mb-2">
                             <label className="block text-xs font-medium text-stone-400 uppercase tracking-wider">
                                 时间范围
+                                {mode === 'majorGoal' && (
+                                    <span className="text-stone-300 ml-1">（自动计算）</span>
+                                )}
                             </label>
-                            {/* 快捷按钮 */}
-                            <div className="flex gap-1">
-                                <button
-                                    onClick={() => setQuickDateRange('month')}
-                                    className="px-2 py-0.5 bg-stone-100 hover:bg-stone-200 text-stone-600 text-[10px] font-medium rounded transition-colors"
-                                >
-                                    本月
-                                </button>
-                                <button
-                                    onClick={() => setQuickDateRange('quarter')}
-                                    className="px-2 py-0.5 bg-stone-100 hover:bg-stone-200 text-stone-600 text-[10px] font-medium rounded transition-colors"
-                                >
-                                    本季度
-                                </button>
-                                <button
-                                    onClick={() => setQuickDateRange('year')}
-                                    className="px-2 py-0.5 bg-stone-100 hover:bg-stone-200 text-stone-600 text-[10px] font-medium rounded transition-colors"
-                                >
-                                    本年
-                                </button>
-                            </div>
+                            {/* 快捷按钮（目标系列模式不显示） */}
+                            {mode !== 'majorGoal' && (
+                                <div className="flex gap-1">
+                                    <button
+                                        onClick={() => setQuickDateRange('month')}
+                                        className="px-2 py-0.5 bg-stone-100 hover:bg-stone-200 text-stone-600 text-[10px] font-medium rounded transition-colors"
+                                    >
+                                        本月
+                                    </button>
+                                    <button
+                                        onClick={() => setQuickDateRange('quarter')}
+                                        className="px-2 py-0.5 bg-stone-100 hover:bg-stone-200 text-stone-600 text-[10px] font-medium rounded transition-colors"
+                                    >
+                                        本季度
+                                    </button>
+                                    <button
+                                        onClick={() => setQuickDateRange('year')}
+                                        className="px-2 py-0.5 bg-stone-100 hover:bg-stone-200 text-stone-600 text-[10px] font-medium rounded transition-colors"
+                                    >
+                                        本年
+                                    </button>
+                                </div>
+                            )}
                         </div>
-                        <div className="grid grid-cols-2 gap-3">
-                            <div>
-                                <label className="block text-[10px] text-stone-400 mb-1.5">开始日期</label>
-                                <input
-                                    type="text"
-                                    value={startDateStr}
-                                    onChange={(e) => setStartDateStr(e.target.value.replace(/\D/g, '').slice(0, 8))}
-                                    placeholder="20250101"
-                                    maxLength={8}
-                                    className="w-full px-3 py-2 bg-stone-50 border border-stone-200 rounded-lg text-sm text-stone-900 font-mono font-medium outline-none focus:border-stone-400 transition-colors text-center"
-                                />
+                        
+                        {mode === 'majorGoal' ? (
+                            // 目标系列模式：只读显示（将由子目标自动计算）
+                            <div className="px-3 py-2 bg-stone-100 border border-stone-200 rounded-lg text-center">
+                                <span className="text-sm text-stone-500">
+                                    时间范围将根据包含的阶段目标自动计算
+                                </span>
                             </div>
-                            <div>
-                                <label className="block text-[10px] text-stone-400 mb-1.5">结束日期</label>
-                                <input
-                                    type="text"
-                                    value={endDateStr}
-                                    onChange={(e) => setEndDateStr(e.target.value.replace(/\D/g, '').slice(0, 8))}
-                                    placeholder="20251231"
-                                    maxLength={8}
-                                    className="w-full px-3 py-2 bg-stone-50 border border-stone-200 rounded-lg text-sm text-stone-900 font-mono font-medium outline-none focus:border-stone-400 transition-colors text-center"
-                                />
-                            </div>
-                        </div>
-                        <p className="mt-1.5 text-xs text-stone-400">格式：YYYYMMDD（例如：20250101）</p>
+                        ) : (
+                            // 独立目标和阶段目标模式：可编辑
+                            <>
+                                <div className="grid grid-cols-2 gap-3">
+                                    <div>
+                                        <label className="block text-[10px] text-stone-400 mb-1.5">开始日期</label>
+                                        <input
+                                            type="text"
+                                            value={startDateStr}
+                                            onChange={(e) => setStartDateStr(e.target.value.replace(/\D/g, '').slice(0, 8))}
+                                            placeholder="20250101"
+                                            maxLength={8}
+                                            className="w-full px-3 py-2 bg-stone-50 border border-stone-200 rounded-lg text-sm text-stone-900 font-mono font-medium outline-none focus:border-stone-400 transition-colors text-center"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-[10px] text-stone-400 mb-1.5">结束日期</label>
+                                        <input
+                                            type="text"
+                                            value={endDateStr}
+                                            onChange={(e) => setEndDateStr(e.target.value.replace(/\D/g, '').slice(0, 8))}
+                                            placeholder="20251231"
+                                            maxLength={8}
+                                            className="w-full px-3 py-2 bg-stone-50 border border-stone-200 rounded-lg text-sm text-stone-900 font-mono font-medium outline-none focus:border-stone-400 transition-colors text-center"
+                                        />
+                                    </div>
+                                </div>
+                                <p className="mt-1.5 text-xs text-stone-400">格式：YYYYMMDD（例如：20250101）</p>
+                            </>
+                        )}
                     </div>
 
                     {/* 🔍 高级筛选器 (Advanced Filters) */}
@@ -320,77 +575,37 @@ export const GoalEditor: React.FC<GoalEditorProps> = ({ goal, scopeId, categorie
                                 <label className="text-xs font-medium text-stone-400 uppercase tracking-wider">
                                     限定待办清单
                                     <span className="text-stone-300 ml-1">（可选）</span>
+                                    {isFieldDisabled('filterTodoCategories') && (
+                                        <span className="text-stone-300 ml-1">（继承自目标系列）</span>
+                                    )}
                                 </label>
                                 {/* Toggle 开关 */}
-                                <button
-                                    type="button"
-                                    onClick={() => {
-                                        setIsTodoFilterEnabled(!isTodoFilterEnabled);
-                                        if (isTodoFilterEnabled) {
-                                            // 关闭时清空选择
-                                            setFilterTodoCategories([]);
-                                        }
-                                    }}
-                                    className={`px-3 py-1 rounded-full text-[10px] font-bold transition-all ${isTodoFilterEnabled
-                                        ? 'text-white'
-                                        : 'bg-stone-100 text-stone-500 hover:bg-stone-200'
-                                        }`}
-                                    style={isTodoFilterEnabled ? { backgroundColor: 'var(--accent-color)' } : {}}
-                                >
-                                    {isTodoFilterEnabled ? '已开启' : '关闭'}
-                                </button>
+                                {!isFieldDisabled('filterTodoCategories') && (
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setIsTodoFilterEnabled(!isTodoFilterEnabled);
+                                            if (isTodoFilterEnabled) {
+                                                // 关闭时清空选择
+                                                setFilterTodoCategories([]);
+                                            }
+                                        }}
+                                        className={`px-3 py-1 rounded-full text-[10px] font-bold transition-all ${isTodoFilterEnabled
+                                            ? 'text-white'
+                                            : 'bg-stone-100 text-stone-500 hover:bg-stone-200'
+                                            }`}
+                                        style={isTodoFilterEnabled ? { backgroundColor: 'var(--accent-color)' } : {}}
+                                    >
+                                        {isTodoFilterEnabled ? '已开启' : '关闭'}
+                                    </button>
+                                )}
                             </div>
-                            <p className="text-xs text-stone-500 mb-3">
-                                仅统计选中清单中的待办任务
-                            </p>
-
-                            {isTodoFilterEnabled && (
-                                <>
-                                    <div className="grid grid-cols-4 gap-2">
-                                        {todoCategories.map(cat => {
-                                            const isSelected = filterTodoCategories.includes(cat.id);
-                                            return (
-                                                <button
-                                                    key={cat.id}
-                                                    type="button"
-                                                    onClick={() => {
-                                                        if (isSelected) {
-                                                            setFilterTodoCategories(filterTodoCategories.filter(id => id !== cat.id));
-                                                        } else {
-                                                            setFilterTodoCategories([...filterTodoCategories, cat.id]);
-                                                        }
-                                                    }}
-                                                    className={`
-                                                        px-2 py-2 rounded-lg text-[10px] font-medium text-center transition-colors flex items-center justify-center gap-1.5 truncate
-                                                        ${isSelected
-                                                            ? 'btn-template-filled'
-                                                            : 'bg-stone-50 text-stone-500 border border-stone-100 hover:bg-stone-100'}
-                                                    `}
-                                                >
-                                                    <span>{cat.icon}</span>
-                                                    <span className="truncate">{cat.name}</span>
-                                                </button>
-                                            );
-                                        })}
-                                    </div>
-
-                                    {/* Clear 按钮 */}
-                                    {filterTodoCategories.length > 0 && (
-                                        <div className="flex justify-end mt-2">
-                                            <button
-                                                type="button"
-                                                onClick={() => setFilterTodoCategories([])}
-                                                className="text-xs font-medium text-stone-400 hover:text-red-400 transition-colors"
-                                            >
-                                                Clear
-                                            </button>
-                                        </div>
-                                    )}
-
-                                    {/* 已选择清单提示 */}
-                                    {filterTodoCategories.length > 0 && (
-                                        <div className="mt-3 text-xs text-stone-500 animate-in fade-in">
-                                            <span className="font-medium">已选择：</span>
+                            
+                            {isFieldDisabled('filterTodoCategories') ? (
+                                // 只读显示
+                                <div className="px-3 py-2 bg-stone-100 border border-stone-200 rounded-lg">
+                                    {filterTodoCategories.length > 0 ? (
+                                        <div className="text-xs text-stone-600">
                                             {filterTodoCategories.map((catId, index) => {
                                                 const category = todoCategories.find(c => c.id === catId);
                                                 return category ? (
@@ -400,6 +615,74 @@ export const GoalEditor: React.FC<GoalEditorProps> = ({ goal, scopeId, categorie
                                                 ) : null;
                                             })}
                                         </div>
+                                    ) : (
+                                        <span className="text-xs text-stone-400">不限定</span>
+                                    )}
+                                </div>
+                            ) : (
+                                <>
+                                    <p className="text-xs text-stone-500 mb-3">
+                                        仅统计选中清单中的待办任务
+                                    </p>
+
+                                    {isTodoFilterEnabled && (
+                                        <>
+                                            <div className="grid grid-cols-4 gap-2">
+                                                {todoCategories.map(cat => {
+                                                    const isSelected = filterTodoCategories.includes(cat.id);
+                                                    return (
+                                                        <button
+                                                            key={cat.id}
+                                                            type="button"
+                                                            onClick={() => {
+                                                                if (isSelected) {
+                                                                    setFilterTodoCategories(filterTodoCategories.filter(id => id !== cat.id));
+                                                                } else {
+                                                                    setFilterTodoCategories([...filterTodoCategories, cat.id]);
+                                                                }
+                                                            }}
+                                                            className={`
+                                                                px-2 py-2 rounded-lg text-[10px] font-medium text-center transition-colors flex items-center justify-center gap-1.5 truncate
+                                                                ${isSelected
+                                                                    ? 'btn-template-filled'
+                                                                    : 'bg-stone-50 text-stone-500 border border-stone-100 hover:bg-stone-100'}
+                                                            `}
+                                                        >
+                                                            <span>{cat.icon}</span>
+                                                            <span className="truncate">{cat.name}</span>
+                                                        </button>
+                                                    );
+                                                })}
+                                            </div>
+
+                                            {/* Clear 按钮 */}
+                                            {filterTodoCategories.length > 0 && (
+                                                <div className="flex justify-end mt-2">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setFilterTodoCategories([])}
+                                                        className="text-xs font-medium text-stone-400 hover:text-red-400 transition-colors"
+                                                    >
+                                                        Clear
+                                                    </button>
+                                                </div>
+                                            )}
+
+                                            {/* 已选择清单提示 */}
+                                            {filterTodoCategories.length > 0 && (
+                                                <div className="mt-3 text-xs text-stone-500 animate-in fade-in">
+                                                    <span className="font-medium">已选择：</span>
+                                                    {filterTodoCategories.map((catId, index) => {
+                                                        const category = todoCategories.find(c => c.id === catId);
+                                                        return category ? (
+                                                            <span key={catId}>
+                                                                {category.icon} {category.name}{index < filterTodoCategories.length - 1 ? '、' : ''}
+                                                            </span>
+                                                        ) : null;
+                                                    })}
+                                                </div>
+                                            )}
+                                        </>
                                     )}
                                 </>
                             )}
@@ -407,14 +690,40 @@ export const GoalEditor: React.FC<GoalEditorProps> = ({ goal, scopeId, categorie
                     ) : (
                         /* 记录模式筛选 - 使用 TagMultipleAssociation 组件 */
                         <div>
-                            <TagMultipleAssociation
-                                categories={categories}
-                                selectedActivityIds={filterActivityIds}
-                                onChange={setFilterActivityIds}
-                                showToggle={true}
-                                toggleLabel="限定标签（Activity）"
-                                description="仅统计选中标签的时间记录"
-                            />
+                            {isFieldDisabled('filterActivityIds') ? (
+                                // 只读显示
+                                <div>
+                                    <label className="block text-xs font-medium text-stone-400 mb-2 uppercase tracking-wider">
+                                        限定标签（Activity）
+                                        <span className="text-stone-300 ml-1">（继承自目标系列）</span>
+                                    </label>
+                                    <div className="px-3 py-2 bg-stone-100 border border-stone-200 rounded-lg">
+                                        {filterActivityIds.length > 0 ? (
+                                            <div className="text-xs text-stone-600">
+                                                {filterActivityIds.map((actId, index) => {
+                                                    const category = categories.find(c => c.id === actId);
+                                                    return category ? (
+                                                        <span key={actId}>
+                                                            {category.icon} {category.name}{index < filterActivityIds.length - 1 ? '、' : ''}
+                                                        </span>
+                                                    ) : null;
+                                                })}
+                                            </div>
+                                        ) : (
+                                            <span className="text-xs text-stone-400">不限定</span>
+                                        )}
+                                    </div>
+                                </div>
+                            ) : (
+                                <TagMultipleAssociation
+                                    categories={categories}
+                                    selectedActivityIds={filterActivityIds}
+                                    onChange={setFilterActivityIds}
+                                    showToggle={true}
+                                    toggleLabel="限定标签（Activity）"
+                                    description="仅统计选中标签的时间记录"
+                                />
+                            )}
                         </div>
                     )}
 

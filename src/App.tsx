@@ -119,7 +119,7 @@ const AppContent: React.FC = () => {
     initialLogTimes,
     setReturnToSearch
   } = useNavigation();
-  const { categories, scopes, goals, setCategories, setScopes, setGoals } = useCategoryScope();
+  const { categories, scopes, goals, majorGoals, setCategories, setScopes, setGoals, setMajorGoals } = useCategoryScope();
   const { startActivity, stopActivity, cancelSession, activeSessions, setActiveSessions } = useSession();
   const { logs, todos, todoCategories, setLogs, setTodos, setTodoCategories } = useData();
   const {
@@ -228,6 +228,12 @@ const AppContent: React.FC = () => {
   const [sessionToStop, setSessionToStop] = React.useState<string | null>(null);
   const [shouldAutoOpenFocus, setShouldAutoOpenFocus] = React.useState(false);
   const [shouldAutoEnterImmersive, setShouldAutoEnterImmersive] = React.useState(false);
+  
+  // 大目标编辑状态
+  const [isMajorGoalEditorOpen, setIsMajorGoalEditorOpen] = React.useState(false);
+  const [editingMajorGoal, setEditingMajorGoal] = React.useState<any>(null);
+  const [majorGoalScopeId, setMajorGoalScopeId] = React.useState<string>('');
+  
   const autoOpenTimeoutRef = React.useRef<NodeJS.Timeout | null>(null);
   
   // 监听activeSessions变化，自动打开FocusDetailView
@@ -352,6 +358,13 @@ const AppContent: React.FC = () => {
         handleDuplicateTodo={todoManager.handleDuplicateTodo}
         handleUpdateTodoData={todoManager.handleUpdateTodoData}
 
+        // 大目标处理
+        onOpenMajorGoalEditor={(scopeId, majorGoal) => {
+          setMajorGoalScopeId(scopeId);
+          setEditingMajorGoal(majorGoal || null);
+          setIsMajorGoalEditorOpen(true);
+        }}
+
         // Misc
         refreshKey={syncManager.refreshKey}
         isSyncing={syncManager.isSyncing}
@@ -439,6 +452,37 @@ const AppContent: React.FC = () => {
           scopeId={goalScopeId || ''}
           categories={categories}
           todoCategories={todoCategories}
+          mode="independent"
+          majorGoals={majorGoals}
+        />
+      )}
+
+      {/* 大目标编辑器 */}
+      {isMajorGoalEditorOpen && (
+        <GoalEditor
+          onClose={() => {
+            setIsMajorGoalEditorOpen(false);
+            setEditingMajorGoal(null);
+            setMajorGoalScopeId('');
+          }}
+          onSaveMajorGoal={(majorGoal) => {
+            if (editingMajorGoal) {
+              // 更新现有大目标
+              setMajorGoals(prev => prev.map(mg => 
+                mg.id === majorGoal.id ? { ...majorGoal, updatedAt: new Date().toISOString() } : mg
+              ));
+            } else {
+              // 创建新大目标
+              setMajorGoals(prev => [...prev, majorGoal]);
+            }
+            setIsMajorGoalEditorOpen(false);
+            setEditingMajorGoal(null);
+            setMajorGoalScopeId('');
+          }}
+          scopeId={majorGoalScopeId}
+          categories={categories}
+          todoCategories={todoCategories}
+          mode="majorGoal"
         />
       )}
 

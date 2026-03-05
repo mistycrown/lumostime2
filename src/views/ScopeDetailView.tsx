@@ -1,20 +1,21 @@
 /**
  * @file ScopeDetailView.tsx
- * @input Scope Data, Logs, Associated Todos/Goals
- * @output Updated Scope, Managed Goals/Keywords
+ * @input Scope Data, Logs, Associated Todos/Goals/MajorGoals
+ * @output Updated Scope, Managed Goals/MajorGoals/Keywords
  * @pos View (Detail Page)
- * @description A comprehensive detail view for a specific Scope (Domain). Features a heatmap, keyword analysis, matrix chart (Tags vs Time), and management of associated Goals and Todos.
+ * @description A comprehensive detail view for a specific Scope (Domain). Features a heatmap, keyword analysis, matrix chart (Tags vs Time), and management of associated Goals, Major Goals, and Todos. The Goals tab displays both major goals (with their phase goals) and independent goals.
  * 
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
 import React, { useState, useMemo } from 'react';
-import { Scope, Log, Category, TodoItem, Goal } from '../types';
+import { Scope, Log, Category, TodoItem, Goal, MajorGoal } from '../types';
 import { CalendarWidget } from '../components/CalendarWidget';
 import { MatrixAnalysisChart } from '../components/MatrixAnalysisChart';
 import { DateRangeFilter, RangeType } from '../components/DateRangeFilter';
 import { Check, Save, Zap, Clock, BarChart2, Archive, Plus, X, ChevronDown } from 'lucide-react';
 import { COLOR_OPTIONS } from '../constants';
 import { GoalCard } from '../components/GoalCard';
+import { MajorGoalCard } from '../components/MajorGoalCard';
 import { DetailTimelineCard } from '../components/DetailTimelineCard';
 import { UIIconSelector } from '../components/UIIconSelector';
 import { useSettings } from '../contexts/SettingsContext';
@@ -28,6 +29,7 @@ interface ScopeDetailViewProps {
     categories: Category[];
     todos: TodoItem[];
     goals: Goal[];
+    majorGoals: MajorGoal[];
     onBack: () => void;
     onUpdate: (scope: Scope) => void;
     onEditLog?: (log: Log) => void;
@@ -37,6 +39,10 @@ interface ScopeDetailViewProps {
     onDeleteGoal?: (goalId: string) => void;
     onArchiveGoal?: (goalId: string) => void;
     onAddGoal?: () => void;
+    onAddMajorGoal?: () => void;
+    onEditMajorGoal?: (majorGoal: MajorGoal) => void;
+    onDeleteMajorGoal?: (majorGoalId: string) => void;
+    onArchiveMajorGoal?: (majorGoalId: string) => void;
 }
 
 export const ScopeDetailView: React.FC<ScopeDetailViewProps> = ({
@@ -45,6 +51,7 @@ export const ScopeDetailView: React.FC<ScopeDetailViewProps> = ({
     categories,
     todos,
     goals,
+    majorGoals,
     onBack,
     onUpdate,
     onEditLog,
@@ -53,7 +60,11 @@ export const ScopeDetailView: React.FC<ScopeDetailViewProps> = ({
     onToggleTodo,
     onDeleteGoal,
     onArchiveGoal,
-    onAddGoal
+    onAddGoal,
+    onAddMajorGoal,
+    onEditMajorGoal,
+    onDeleteMajorGoal,
+    onArchiveMajorGoal
 }) => {
     const [activeTab, setActiveTab] = useState('时间线');
     const [scope, setScope] = useState(initialScope);
@@ -615,12 +626,20 @@ export const ScopeDetailView: React.FC<ScopeDetailViewProps> = ({
                     />
                 );
             case '目标':
-                // 分离未归档和归档目标
+                // 分离目标系列
+                const activeMajorGoals = majorGoals.filter(mg =>
+                    mg.scopeId === scope.id && mg.status !== 'archived'
+                );
+                const archivedMajorGoals = majorGoals.filter(mg =>
+                    mg.scopeId === scope.id && mg.status === 'archived'
+                );
+                
+                // 分离独立目标（没有 majorGoalId 的目标）
                 const activeGoals = goals.filter(g =>
-                    g.scopeId === scope.id && g.status !== 'archived'
+                    g.scopeId === scope.id && g.status !== 'archived' && !g.majorGoalId
                 );
                 const archivedGoals = goals.filter(g =>
-                    g.scopeId === scope.id && g.status === 'archived'
+                    g.scopeId === scope.id && g.status === 'archived' && !g.majorGoalId
                 );
                 
                 // 计算归档目标的成功和失败数量
@@ -641,84 +660,162 @@ export const ScopeDetailView: React.FC<ScopeDetailViewProps> = ({
                     return acc;
                 }, { success: 0, failed: 0 });
                 
-                const archivedCount = archivedGoals.length;
+                const archivedCount = archivedGoals.length + archivedMajorGoals.length;
+                const hasAnyGoals = activeGoals.length > 0 || activeMajorGoals.length > 0 || archivedCount > 0;
 
                 return (
-                    <div className="space-y-4 max-w-3xl mx-auto">
-                        {/* 未归档目标列表 */}
-                        {activeGoals.length === 0 && archivedCount === 0 ? (
-                            <div className="bg-white rounded-2xl p-12 border border-dashed border-stone-200 text-center">
-                                <p className="text-stone-400 mb-4">还没有设置目标</p>
-                                {onAddGoal && (
-                                    <button
-                                        onClick={onAddGoal}
-                                        className="px-6 py-3 bg-stone-900 text-white rounded-xl font-medium hover:bg-black transition-colors"
-                                    >
-                                        创建第一个目标
-                                    </button>
-                                )}
+                    <div className="max-w-3xl mx-auto">
+                        {/* 空状态 */}
+                        {!hasAnyGoals ? (
+                            <div className="py-16 text-center">
+                                <p className="text-stone-400 mb-6 text-sm">还没有设置目标</p>
+                                <div className="flex gap-3 justify-center">
+                                    {onAddMajorGoal && (
+                                        <button
+                                            onClick={onAddMajorGoal}
+                                            className="px-6 py-2 text-stone-700 hover:text-stone-900 transition-colors text-sm font-medium border-b-2 border-stone-300 hover:border-stone-900"
+                                        >
+                                            创建目标系列
+                                        </button>
+                                    )}
+                                    {onAddGoal && (
+                                        <button
+                                            onClick={onAddGoal}
+                                            className="px-6 py-2 text-stone-700 hover:text-stone-900 transition-colors text-sm font-medium border-b-2 border-stone-300 hover:border-stone-900"
+                                        >
+                                            创建独立目标
+                                        </button>
+                                    )}
+                                </div>
                             </div>
                         ) : (
                             <>
-                                {/* 显示未归档目标 */}
-                                {activeGoals.map(goal => (
-                                    <GoalCard
-                                        key={goal.id}
-                                        goal={goal}
-                                        logs={logs}
-                                        todos={todos}
-                                        onEdit={onEditGoal}
-                                        onDelete={onDeleteGoal}
-                                        onArchive={handleArchiveGoal}
-                                    />
-                                ))}
-                                {/* 添加新目标按钮 */}
-                                {onAddGoal && (
-                                    <button
-                                        onClick={onAddGoal}
-                                        className="w-full py-2.5 border-2 border-dashed border-stone-200 rounded-xl text-stone-400 hover:text-stone-600 hover:border-stone-300 transition-colors text-sm font-medium"
-                                    >
-                                        + 添加新目标
-                                    </button>
+                                {/* 目标系列列表 */}
+                                {activeMajorGoals.length > 0 && (
+                                    <div>
+                                        <div className="flex items-center gap-3 mb-4 pb-2 border-b border-stone-300">
+                                            <h3 className="text-xs font-bold text-stone-500 uppercase tracking-widest">
+                                                目标系列
+                                            </h3>
+                                        </div>
+                                        <div>
+                                            {activeMajorGoals.map(majorGoal => (
+                                                <MajorGoalCard
+                                                    key={majorGoal.id}
+                                                    majorGoal={majorGoal}
+                                                    goals={goals.filter(g => g.majorGoalId === majorGoal.id)}
+                                                    logs={logs}
+                                                    todos={todos}
+                                                    onEdit={onEditMajorGoal}
+                                                    onDelete={onDeleteMajorGoal}
+                                                    onArchive={onArchiveMajorGoal}
+                                                    onAddChildGoal={onAddGoal}
+                                                    onEditChildGoal={onEditGoal}
+                                                />
+                                            ))}
+                                        </div>
+                                    </div>
                                 )}
+                                
+                                {/* 独立目标列表 */}
+                                {activeGoals.length > 0 && (
+                                    <div className={activeMajorGoals.length > 0 ? 'mt-8' : ''}>
+                                        {activeMajorGoals.length > 0 && (
+                                            <div className="flex items-center gap-3 mb-4 pb-2 border-b border-stone-300">
+                                                <h3 className="text-xs font-bold text-stone-500 uppercase tracking-widest">
+                                                    独立目标
+                                                </h3>
+                                            </div>
+                                        )}
+                                        <div>
+                                            {activeGoals.map(goal => (
+                                                <GoalCard
+                                                    key={goal.id}
+                                                    goal={goal}
+                                                    logs={logs}
+                                                    todos={todos}
+                                                    onEdit={onEditGoal}
+                                                    onDelete={onDeleteGoal}
+                                                    onArchive={handleArchiveGoal}
+                                                />
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+                                
+                                {/* 添加新目标按钮 */}
+                                <div className="flex gap-4 mt-8 pt-4 border-t border-dashed border-stone-200">
+                                    {onAddMajorGoal && (
+                                        <button
+                                            onClick={onAddMajorGoal}
+                                            className="flex-1 py-2 text-stone-500 hover:text-stone-900 transition-colors text-xs font-medium uppercase tracking-wider"
+                                        >
+                                            + 添加目标系列
+                                        </button>
+                                    )}
+                                    {onAddGoal && (
+                                        <button
+                                            onClick={onAddGoal}
+                                            className="flex-1 py-2 text-stone-500 hover:text-stone-900 transition-colors text-xs font-medium uppercase tracking-wider"
+                                        >
+                                            + 添加独立目标
+                                        </button>
+                                    )}
+                                </div>
 
-                                {/* 显示归档 Toggle（在未归档目标后） */}
+                                {/* 显示归档 Toggle */}
                                 {archivedCount > 0 && (
-                                    <div className="flex items-center justify-between px-2 py-3 bg-stone-50 rounded-xl mt-6">
-                                        <div className="flex items-center gap-2">
-                                            <Archive size={16} className="text-stone-400" />
-                                            <span className="text-sm font-medium text-stone-600">
-                                                显示归档目标
+                                    <div className="flex items-center justify-between py-4 mt-6 border-t border-stone-200">
+                                        <div className="flex items-center gap-3">
+                                            <Archive size={14} className="text-stone-400" />
+                                            <span className="text-xs text-stone-600 font-medium uppercase tracking-wider">
+                                                归档目标
                                             </span>
-                                            <span className="text-xs text-stone-400">
-                                                (成功 {archivedStats.success} 个、失败 {archivedStats.failed} 个)
+                                            <span className="text-[10px] text-stone-400 font-mono">
+                                                {archivedMajorGoals.length + archivedGoals.length}
                                             </span>
                                         </div>
                                         <button
                                             onClick={() => setShowArchived(!showArchived)}
-                                            className={`w-12 h-6 rounded-full p-1 transition-colors ${showArchived ? 'bg-stone-900' : 'bg-stone-200'
-                                                }`}
+                                            className={`w-10 h-5 rounded-full p-0.5 transition-colors ${showArchived ? 'bg-stone-900' : 'bg-stone-200'}`}
                                         >
                                             <div
-                                                className={`w-4 h-4 rounded-full bg-white transition-transform shadow-sm ${showArchived ? 'translate-x-6' : ''
-                                                    }`}
+                                                className={`w-4 h-4 rounded-full bg-white transition-transform ${showArchived ? 'translate-x-5' : ''}`}
                                             />
                                         </button>
                                     </div>
                                 )}
 
-                                {/* 归档目标列表（仅在开启时显示） */}
-                                {showArchived && archivedGoals.map(goal => (
-                                    <GoalCard
-                                        key={goal.id}
-                                        goal={goal}
-                                        logs={logs}
-                                        todos={todos}
-                                        onEdit={onEditGoal}
-                                        onDelete={onDeleteGoal}
-                                        onArchive={handleArchiveGoal}
-                                    />
-                                ))}
+                                {/* 归档目标列表 */}
+                                {showArchived && (
+                                    <div className="mt-4">
+                                        {archivedMajorGoals.map(majorGoal => (
+                                            <MajorGoalCard
+                                                key={majorGoal.id}
+                                                majorGoal={majorGoal}
+                                                goals={goals.filter(g => g.majorGoalId === majorGoal.id)}
+                                                logs={logs}
+                                                todos={todos}
+                                                onEdit={onEditMajorGoal}
+                                                onDelete={onDeleteMajorGoal}
+                                                onArchive={onArchiveMajorGoal}
+                                                onAddChildGoal={onAddGoal}
+                                                onEditChildGoal={onEditGoal}
+                                            />
+                                        ))}
+                                        {archivedGoals.map(goal => (
+                                            <GoalCard
+                                                key={goal.id}
+                                                goal={goal}
+                                                logs={logs}
+                                                todos={todos}
+                                                onEdit={onEditGoal}
+                                                onDelete={onDeleteGoal}
+                                                onArchive={handleArchiveGoal}
+                                            />
+                                        ))}
+                                    </div>
+                                )}
                             </>
                         )}
                     </div>

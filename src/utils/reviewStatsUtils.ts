@@ -466,7 +466,7 @@ export function calculateCheckItemStreak(
     targetDate: Date = new Date()
 ): CheckItemStreakStats {
     // 按日期升序排序
-    const sortedReviews = [...dailyReviews].sort((a, b) => 
+    const sortedReviews = [...dailyReviews].sort((a, b) =>
         new Date(a.date).getTime() - new Date(b.date).getTime()
     );
 
@@ -475,10 +475,27 @@ export function calculateCheckItemStreak(
     sortedReviews.forEach(review => {
         if (review.checkItems) {
             const item = review.checkItems.find(
-                ci => ci.content === checkItemContent && ci.isCompleted
+                ci => ci.content === checkItemContent
             );
             if (item) {
-                completedDates.push(review.date);
+                // 判断是否完成：兼容旧数据（布尔类型转数字类型）
+                let isItemCompleted = false;
+                
+                if (item.manualMode === 'count') {
+                    // 数字类型：需要达到目标值才算完成
+                    const targetCount = Math.max(1, Math.floor(item.targetCount || 1));
+                    const currentCount = Math.max(0, Math.floor(item.currentCount || 0));
+                    isItemCompleted = currentCount >= targetCount;
+                } else {
+                    // 布尔类型：目标值为1，数值为1就算完成
+                    // 兼容旧数据：如果 currentCount 存在且为1，也算完成
+                    const currentCount = Math.max(0, Math.floor(item.currentCount || 0));
+                    isItemCompleted = item.isCompleted || currentCount >= 1;
+                }
+                
+                if (isItemCompleted) {
+                    completedDates.push(review.date);
+                }
             }
         }
     });
@@ -489,11 +506,11 @@ export function calculateCheckItemStreak(
     // 计算连续坚持天数（从目标日期往前推）
     let currentStreak = 0;
     const targetDateStr = getLocalDateStr(targetDate);
-    
+
     // 从目标日期开始往前查找连续完成的天数
     let checkDate = new Date(targetDate);
     checkDate.setHours(0, 0, 0, 0);
-    
+
     while (true) {
         const dateStr = getLocalDateStr(checkDate);
 
@@ -510,7 +527,7 @@ export function calculateCheckItemStreak(
             // 遇到未完成的日期，停止计数
             break;
         }
-        
+
         // 防止无限循环，最多查找1000天
         if (currentStreak > 1000) break;
     }
@@ -520,3 +537,4 @@ export function calculateCheckItemStreak(
         currentStreak
     };
 }
+
