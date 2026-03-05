@@ -448,6 +448,7 @@ const AppContent: React.FC = () => {
         <GoalEditor
           onClose={goalManager.closeGoalEditor}
           onSave={goalManager.handleSaveGoal}
+          onDelete={goalManager.handleDeleteGoal}
           goal={editingGoal || undefined}
           scopeId={goalScopeId || ''}
           categories={categories}
@@ -483,6 +484,7 @@ const AppContent: React.FC = () => {
           categories={categories}
           todoCategories={todoCategories}
           mode="majorGoal"
+          majorGoal={editingMajorGoal || undefined}
         />
       )}
 

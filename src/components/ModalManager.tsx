@@ -51,6 +51,7 @@ interface ModalManagerProps {
     goalScopeId: string;
     onSaveGoal: (goal: Goal) => void;
     onCloseGoal: () => void;
+    onDeleteGoal?: (goalId: string) => void;
 
     // TimerFloating
     activeSessions: ActiveSession[];
@@ -99,6 +100,7 @@ export const ModalManager: React.FC<ModalManagerProps> = ({
     goalScopeId,
     onSaveGoal,
     onCloseGoal,
+    onDeleteGoal,
 
     activeSessions,
     focusDetailSessionId,
@@ -198,6 +200,7 @@ export const ModalManager: React.FC<ModalManagerProps> = ({
                     todoCategories={todoCategories}
                     onSave={onSaveGoal}
                     onClose={onCloseGoal}
+                    onDelete={onDeleteGoal}
                 />
             )}
         </>

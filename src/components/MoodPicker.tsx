@@ -361,10 +361,8 @@ export const MoodPickerModal: React.FC<MoodPickerModalProps> = ({
                                         className="flex items-center justify-center p-2 transition-all hover:bg-stone-50 rounded-2xl relative"
                                     >
                                         {/* Emoji 容器 */}
-                                        <div className="relative flex items-center justify-center w-14 h-14">
-                                            <span className="text-4xl flex items-center justify-center">
-                                                <IconRenderer icon={emoji} />
-                                            </span>
+                                        <div className="relative flex items-center justify-center w-16 h-16">
+                                            <IconRenderer icon={emoji} size={48} />
                                         </div>
                                     </button>
                                 ))}
@@ -374,8 +372,8 @@ export const MoodPickerModal: React.FC<MoodPickerModalProps> = ({
                                     onClick={() => setIsCustomMode(true)}
                                     className="flex items-center justify-center p-2 transition-all hover:bg-stone-50 rounded-2xl relative border-2 border-dashed border-stone-300"
                                 >
-                                    <div className="relative flex items-center justify-center w-14 h-14">
-                                        <span className="text-3xl text-stone-400">+</span>
+                                    <div className="relative flex items-center justify-center w-16 h-16">
+                                        <span className="text-[3rem] text-stone-400">+</span>
                                     </div>
                                 </button>
                             </div>

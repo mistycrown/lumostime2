@@ -8,7 +8,7 @@
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
 import React, { useMemo, useState } from 'react';
-import { Scope, Goal, Log, TodoItem } from '../types';
+import { Scope, Goal, Log, TodoItem, MajorGoal } from '../types';
 import { GoalCard } from '../components/GoalCard';
 import { GoalStatusAlert } from '../components/GoalStatusAlert';
 import { Settings2 } from 'lucide-react';
@@ -20,19 +20,21 @@ interface ScopeViewProps {
     scopes: Scope[];
     logs: Log[];
     goals: Goal[];
+    majorGoals: MajorGoal[]; // 添加目标系列
     todos: TodoItem[];
     onScopeClick: (scopeId: string) => void;
     onManageClick: () => void;
     onArchiveGoal?: (goalId: string) => void;
     onExtendGoal?: (goalId: string, days: number) => void;
     onIncreaseGoalTarget?: (goalId: string, increaseAmount: number) => void;
-    onAddGoal?: (scopeId: string, templateGoal?: Goal) => void; // 修改：支持传递模板目标
+    onAddGoal?: (scopeId: string, templateGoal?: Goal, majorGoalId?: string) => void; // 修改：支持传递目标系列ID
 }
 
 export const ScopeView: React.FC<ScopeViewProps> = ({
     scopes,
     logs,
     goals = [],
+    majorGoals = [],
     todos = [],
     onScopeClick,
     onManageClick,
@@ -140,10 +142,11 @@ export const ScopeView: React.FC<ScopeViewProps> = ({
                         key={goal.id}
                         goal={goal}
                         statusInfo={statusInfo}
+                        majorGoals={majorGoals}
                         onArchive={handleArchive}
                         onExtend={handleExtend}
                         onIncreaseTarget={handleIncreaseTarget}
-                        onCreate={(templateGoal) => onAddGoal?.(scopeId, templateGoal)}
+                        onCreate={(templateGoal, majorGoalId) => onAddGoal?.(scopeId, templateGoal, majorGoalId)}
                         onDismiss={() => handleDismissAlert(goal.id)}
                     />
                 ))}
@@ -154,10 +157,11 @@ export const ScopeView: React.FC<ScopeViewProps> = ({
                         key={goal.id}
                         goal={goal}
                         statusInfo={statusInfo}
+                        majorGoals={majorGoals}
                         onArchive={handleArchive}
                         onExtend={handleExtend}
                         onIncreaseTarget={handleIncreaseTarget}
-                        onCreate={(templateGoal) => onAddGoal?.(scopeId, templateGoal)}
+                        onCreate={(templateGoal, majorGoalId) => onAddGoal?.(scopeId, templateGoal, majorGoalId)}
                         onDismiss={() => handleDismissAlert(goal.id)}
                     />
                 ))}

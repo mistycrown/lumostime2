@@ -1,31 +1,33 @@
 /**
  * @file GoalStatusAlert.tsx
- * @input Goal status information, callback functions
+ * @input Goal status information, callback functions, MajorGoals
  * @output Interactive status alert card
  * @pos Component (Alert)
- * @description Displays interactive alert cards for different goal statuses
+ * @description Displays interactive alert cards for different goal statuses. Supports both independent goals and goals within a major goal series.
  * 
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
 import React from 'react';
 import confetti from 'canvas-confetti';
-import { Goal } from '../types';
+import { Goal, MajorGoal } from '../types';
 import { GoalStatusInfo } from '../hooks/useGoalStatus';
 import { formatGoalValue } from '../utils/goalUtils';
 
 interface GoalStatusAlertProps {
   goal: Goal;
   statusInfo: GoalStatusInfo;
+  majorGoals?: MajorGoal[]; // 目标系列列表
   onArchive: (goalId: string) => void;
   onExtend: (goalId: string, days: number) => void;
   onIncreaseTarget: (goalId: string, increaseAmount: number) => void;
-  onCreate?: (templateGoal?: Goal) => void; // 修改：支持传递模板目标
+  onCreate?: (templateGoal?: Goal, majorGoalId?: string) => void; // 修改：支持传递目标系列ID
   onDismiss: () => void;
 }
 
 export const GoalStatusAlert: React.FC<GoalStatusAlertProps> = ({
   goal,
   statusInfo,
+  majorGoals = [],
   onArchive,
   onExtend,
   onIncreaseTarget,
@@ -37,6 +39,10 @@ export const GoalStatusAlert: React.FC<GoalStatusAlertProps> = ({
   
   // 检查目标是否已归档（用于判断显示第一步还是第二步）
   const isArchived = goal.status === 'archived';
+  
+  // 检查目标是否属于目标系列
+  const belongsToMajorGoal = !!goal.majorGoalId;
+  const majorGoal = belongsToMajorGoal ? majorGoals.find(mg => mg.id === goal.majorGoalId) : undefined;
 
   // 烟花效果函数
   const triggerFireworks = () => {
@@ -84,11 +90,21 @@ export const GoalStatusAlert: React.FC<GoalStatusAlertProps> = ({
           <div className="flex items-start gap-3">
             <div className="flex-1">
               <h3 className="text-sm font-bold mb-1" style={{ color: 'var(--accent-color)' }}>目标已归档</h3>
-              <p className="text-xs mb-3" style={{ color: 'color-mix(in srgb, var(--accent-color) 70%, black)' }}>想要继续挑战吗？</p>
+              <p className="text-xs mb-3" style={{ color: 'color-mix(in srgb, var(--accent-color) 70%, black)' }}>
+                {belongsToMajorGoal && majorGoal 
+                  ? `继续「${majorGoal.title}」系列的下一个阶段？` 
+                  : '想要继续挑战吗？'}
+              </p>
               <div className="flex items-center gap-2">
                 <button
                   onClick={() => {
-                    onCreate?.(goal); // 传递当前目标作为模板
+                    if (belongsToMajorGoal && goal.majorGoalId) {
+                      // 属于目标系列：只传递目标系列ID
+                      onCreate?.(undefined, goal.majorGoalId);
+                    } else {
+                      // 独立目标：传递当前目标作为模板
+                      onCreate?.(goal);
+                    }
                     onDismiss();
                   }}
                   className="px-4 py-2 text-white text-xs font-medium rounded-lg transition-colors"
@@ -96,7 +112,7 @@ export const GoalStatusAlert: React.FC<GoalStatusAlertProps> = ({
                   onMouseEnter={(e) => e.currentTarget.style.opacity = '0.9'}
                   onMouseLeave={(e) => e.currentTarget.style.opacity = '1'}
                 >
-                  创建下一个目标
+                  {belongsToMajorGoal ? '创建下一阶段' : '创建下一个目标'}
                 </button>
                 <button
                   onClick={onDismiss}
@@ -243,7 +259,13 @@ export const GoalStatusAlert: React.FC<GoalStatusAlertProps> = ({
                   <button
                     onClick={() => {
                       onArchive(goal.id);
-                      onCreate?.(goal); // 传递当前目标作为模板
+                      if (belongsToMajorGoal && goal.majorGoalId) {
+                        // 属于目标系列：只传递目标系列ID
+                        onCreate?.(undefined, goal.majorGoalId);
+                      } else {
+                        // 独立目标：传递当前目标作为模板
+                        onCreate?.(goal);
+                      }
                       onDismiss();
                     }}
                     className="px-4 py-2 bg-white text-xs font-medium rounded-lg border transition-colors"
@@ -275,7 +297,13 @@ export const GoalStatusAlert: React.FC<GoalStatusAlertProps> = ({
                   <button
                     onClick={() => {
                       onArchive(goal.id);
-                      onCreate?.(goal); // 传递当前目标作为模板
+                      if (belongsToMajorGoal && goal.majorGoalId) {
+                        // 属于目标系列：只传递目标系列ID
+                        onCreate?.(undefined, goal.majorGoalId);
+                      } else {
+                        // 独立目标：传递当前目标作为模板
+                        onCreate?.(goal);
+                      }
                       onDismiss();
                     }}
                     className="px-4 py-2 bg-white text-xs font-medium rounded-lg border transition-colors"

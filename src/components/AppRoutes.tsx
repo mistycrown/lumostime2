@@ -469,7 +469,7 @@ export const AppRoutes: React.FC<AppRoutesProps> = ({
                         onEditGoal={handleEditGoal}
                         onDeleteGoal={handleDeleteGoal}
                         onArchiveGoal={handleArchiveGoal}
-                        onAddGoal={() => handleAddGoal(selectedScope.id)}
+                        onAddGoal={(majorGoal) => handleAddGoal(selectedScope.id, undefined, majorGoal?.id)}
                         onAddMajorGoal={() => {
                             onOpenMajorGoalEditor(selectedScope.id);
                         }}
@@ -497,6 +497,7 @@ export const AppRoutes: React.FC<AppRoutesProps> = ({
                     scopes={scopes}
                     logs={logs}
                     goals={goals}
+                    majorGoals={majorGoals}
                     todos={todos}
                     onScopeClick={(id) => setSelectedScopeId(id)}
                     onManageClick={() => setIsScopeManaging(true)}

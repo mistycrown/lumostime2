@@ -16,7 +16,7 @@ import {
   getMajorGoalStatus 
 } from '../utils/majorGoalUtils';
 import { calculateGoalProgress, formatGoalValue, getGoalMetricLabel } from '../utils/goalUtils';
-import { formatShortDate } from '../utils/dateUtils';
+import { formatShortDate, formatShortDateWithYear } from '../utils/dateUtils';
 
 interface MajorGoalCardProps {
   majorGoal: MajorGoal;
@@ -100,8 +100,8 @@ export const MajorGoalCard: React.FC<MajorGoalCardProps> = ({
         <div className="flex-1 min-w-0 flex items-baseline gap-3">
           <Target 
             size={14} 
-            className={isLimitGoal ? 'text-red-600 flex-shrink-0 mt-0.5' : (isArchived ? 'text-stone-300 flex-shrink-0 mt-0.5' : 'flex-shrink-0 mt-0.5')}
-            style={!isLimitGoal && !isArchived ? { color: 'var(--accent-color)' } : undefined}
+            className="flex-shrink-0 mt-0.5"
+            style={isArchived ? { color: 'var(--text-tertiary)' } : { color: 'var(--accent-color)' }}
           />
           <h4 className={`text-lg font-bold leading-tight ${
             isArchived ? 'text-stone-400' : 'text-stone-900'
@@ -163,7 +163,7 @@ export const MajorGoalCard: React.FC<MajorGoalCardProps> = ({
         </span>
         <span className="text-stone-300">·</span>
         <span className="font-mono">
-          {majorGoal.startDate ? formatShortDate(majorGoal.startDate) : '—'} / {majorGoal.endDate ? formatShortDate(majorGoal.endDate) : '—'}
+          {majorGoal.startDate ? formatShortDateWithYear(majorGoal.startDate) : '—'} / {majorGoal.endDate ? formatShortDateWithYear(majorGoal.endDate) : '—'}
         </span>
         {!isArchived && !isExpired && daysRemaining > 0 && (
           <>
@@ -234,8 +234,12 @@ export const MajorGoalCard: React.FC<MajorGoalCardProps> = ({
                     onClick={() => onEditChildGoal?.(goal)}
                     className="group cursor-pointer"
                   >
-                    <div className="flex items-baseline gap-2 mb-1">
-                      <GoalIcon size={14} className="flex-shrink-0 mt-0.5 text-stone-400" />
+                    <div className="flex items-center gap-2 mb-1">
+                      <GoalIcon 
+                        size={14} 
+                        className="flex-shrink-0"
+                        style={{ color: 'var(--accent-color)' }}
+                      />
                       <span className="text-sm font-medium text-stone-700 group-hover:text-stone-900 flex-1 leading-tight">
                         {goal.title}
                       </span>

@@ -4,12 +4,13 @@
  */
 import React, { useState, useRef } from 'react';
 import { ChevronLeft, Database, Download, Upload, Trash2, Cloud, FileSpreadsheet, ImageIcon, Search, RefreshCw, Package } from 'lucide-react';
+import { Capacitor } from '@capacitor/core';
 import { ToastType } from '../../components/Toast';
 import { Log, Category, TodoItem, TodoCategory, Scope } from '../../types';
 import excelExportService from '../../services/excelExportService';
 import { imageService } from '../../services/imageService';
 import { imageCleanupService } from '../../services/imageCleanupService';
-import { imageExportService } from '../../services/imageExportService';
+import { imageExportService, type ImageExportProgress } from '../../services/imageExportService';
 import { ConfirmModal } from '../../components/ConfirmModal';
 
 interface DataManagementViewProps {
@@ -41,6 +42,7 @@ export const DataManagementView: React.FC<DataManagementViewProps> = ({
     scopes,
     onCleanupCloudBackups
 }) => {
+    const isNativePlatform = Capacitor.isNativePlatform();
     const fileInputRef = useRef<HTMLInputElement>(null);
     const imageZipInputRef = useRef<HTMLInputElement>(null);
     const [confirmReset, setConfirmReset] = useState(false);
@@ -52,6 +54,8 @@ export const DataManagementView: React.FC<DataManagementViewProps> = ({
     const [isCleaningBackups, setIsCleaningBackups] = useState(false);
     const [isExportingImages, setIsExportingImages] = useState(false);
     const [isImportingImages, setIsImportingImages] = useState(false);
+    const [imageExportProgress, setImageExportProgress] = useState<ImageExportProgress | null>(null);
+    const lastImageExportProgressAt = useRef(0);
 
     // Excel Export State
     const [excelStartDate, setExcelStartDate] = useState(new Date());
@@ -269,8 +273,31 @@ export const DataManagementView: React.FC<DataManagementViewProps> = ({
 
     const handleExportImages = async () => {
         setIsExportingImages(true);
+        setImageExportProgress({
+            stage: 'preparing',
+            message: '正在准备导出...',
+            current: 0,
+            total: 0,
+            percent: 0
+        });
+        lastImageExportProgressAt.current = 0;
         try {
-            const result = await imageExportService.exportImagesToZip();
+            const result = await imageExportService.exportImagesToZip({
+                onProgress: (progress) => {
+                    const now = Date.now();
+                    const shouldForceUpdate =
+                        progress.stage === 'done' ||
+                        progress.stage === 'writing' ||
+                        progress.current === progress.total;
+
+                    if (!shouldForceUpdate && now - lastImageExportProgressAt.current < 100) {
+                        return;
+                    }
+
+                    lastImageExportProgressAt.current = now;
+                    setImageExportProgress(progress);
+                }
+            });
             if (result.mode === 'native' && result.savedPath) {
                 onToast('success', `图片导出成功：${result.savedPath}`);
             } else {
@@ -281,6 +308,7 @@ export const DataManagementView: React.FC<DataManagementViewProps> = ({
             onToast('error', `图片导出失败: ${error.message}`);
         } finally {
             setIsExportingImages(false);
+            setTimeout(() => setImageExportProgress(null), 1200);
         }
     };
 
@@ -522,7 +550,7 @@ export const DataManagementView: React.FC<DataManagementViewProps> = ({
                                 {isExportingImages ? (
                                     <>
                                         <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                                        导出中...
+                                        {imageExportProgress ? `导出中 ${Math.round(imageExportProgress.percent)}%` : '导出中...'}
                                     </>
                                 ) : (
                                     <>
@@ -557,6 +585,27 @@ export const DataManagementView: React.FC<DataManagementViewProps> = ({
                                 className="hidden"
                             />
                         </div>
+                        {isExportingImages && imageExportProgress && (
+                            <div className="space-y-2 px-1">
+                                <div className="flex items-center justify-between text-xs text-stone-500">
+                                    <span className="truncate pr-2">{imageExportProgress.message}</span>
+                                    <span className="font-mono text-stone-700">
+                                        {Math.round(imageExportProgress.percent)}%
+                                    </span>
+                                </div>
+                                <div className="h-1.5 w-full bg-stone-200 rounded-full overflow-hidden">
+                                    <div
+                                        className="h-full bg-stone-700 rounded-full transition-all duration-200"
+                                        style={{ width: `${Math.max(0, Math.round(imageExportProgress.percent))}%` }}
+                                    />
+                                </div>
+                                {isNativePlatform && (
+                                    <p className="text-[11px] leading-relaxed text-amber-700 bg-amber-50 border border-amber-200 rounded-md px-2 py-1">
+                                        移动端导出较慢，建议优先使用电脑端导出。
+                                    </p>
+                                )}
+                            </div>
+                        )}
                         <p className="text-xs text-stone-400 px-1">
                             导出所有图片为ZIP压缩包，或从ZIP文件导入图片
                         </p>

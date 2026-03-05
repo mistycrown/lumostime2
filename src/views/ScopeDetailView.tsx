@@ -38,7 +38,7 @@ interface ScopeDetailViewProps {
     onToggleTodo?: (id: string) => void;
     onDeleteGoal?: (goalId: string) => void;
     onArchiveGoal?: (goalId: string) => void;
-    onAddGoal?: () => void;
+    onAddGoal?: (majorGoal?: MajorGoal) => void;
     onAddMajorGoal?: () => void;
     onEditMajorGoal?: (majorGoal: MajorGoal) => void;
     onDeleteMajorGoal?: (majorGoalId: string) => void;
@@ -680,7 +680,7 @@ export const ScopeDetailView: React.FC<ScopeDetailViewProps> = ({
                                     )}
                                     {onAddGoal && (
                                         <button
-                                            onClick={onAddGoal}
+                                            onClick={() => onAddGoal()}
                                             className="px-6 py-2 text-stone-700 hover:text-stone-900 transition-colors text-sm font-medium border-b-2 border-stone-300 hover:border-stone-900"
                                         >
                                             创建独立目标
@@ -709,7 +709,14 @@ export const ScopeDetailView: React.FC<ScopeDetailViewProps> = ({
                                                     onEdit={onEditMajorGoal}
                                                     onDelete={onDeleteMajorGoal}
                                                     onArchive={onArchiveMajorGoal}
-                                                    onAddChildGoal={onAddGoal}
+                                                    onAddChildGoal={(majorGoalId) => {
+                                                        if (onAddGoal) {
+                                                            const targetMajorGoal = majorGoals.find(mg => mg.id === majorGoalId);
+                                                            if (targetMajorGoal) {
+                                                                onAddGoal(targetMajorGoal);
+                                                            }
+                                                        }
+                                                    }}
                                                     onEditChildGoal={onEditGoal}
                                                 />
                                             ))}
@@ -755,7 +762,7 @@ export const ScopeDetailView: React.FC<ScopeDetailViewProps> = ({
                                     )}
                                     {onAddGoal && (
                                         <button
-                                            onClick={onAddGoal}
+                                            onClick={() => onAddGoal()}
                                             className="flex-1 py-2 text-stone-500 hover:text-stone-900 transition-colors text-xs font-medium uppercase tracking-wider"
                                         >
                                             + 添加独立目标
@@ -799,7 +806,16 @@ export const ScopeDetailView: React.FC<ScopeDetailViewProps> = ({
                                                 onEdit={onEditMajorGoal}
                                                 onDelete={onDeleteMajorGoal}
                                                 onArchive={onArchiveMajorGoal}
-                                                onAddChildGoal={onAddGoal}
+                                                onAddChildGoal={(majorGoalId) => {
+                                                    // 传递 majorGoalId 给 onAddGoal
+                                                    if (onAddGoal) {
+                                                        // 需要找到对应的 majorGoal 对象
+                                                        const targetMajorGoal = majorGoals.find(mg => mg.id === majorGoalId);
+                                                        if (targetMajorGoal) {
+                                                            onAddGoal(targetMajorGoal);
+                                                        }
+                                                    }
+                                                }}
                                                 onEditChildGoal={onEditGoal}
                                             />
                                         ))}

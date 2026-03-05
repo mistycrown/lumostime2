@@ -27,26 +27,79 @@ export const calculateMajorGoalProgress = (
   // 获取该大目标下的所有子目标
   const childGoals = goals.filter(g => g.majorGoalId === majorGoal.id);
   
-  if (childGoals.length === 0) {
-    return { current: 0, target: 0, percentage: 0 };
+  const target = majorGoal.targetValue;
+  
+  // 如果有子目标，累加子目标的当前进度
+  if (childGoals.length > 0) {
+    let totalCurrent = 0;
+    
+    childGoals.forEach(goal => {
+      const { current } = calculateGoalProgress(goal, logs, todos);
+      totalCurrent += current;
+    });
+    
+    const percentage = target > 0 ? (totalCurrent / target) * 100 : 0;
+    
+    return {
+      current: totalCurrent,
+      target,
+      percentage: Math.min(percentage, 100)
+    };
   }
   
+  // 如果没有子目标，直接根据筛选条件计算当前值
   let totalCurrent = 0;
-  let totalTarget = 0;
   
-  // 累加所有子目标的进度
-  childGoals.forEach(goal => {
-    const { current, target } = calculateGoalProgress(goal, logs, todos);
-    totalCurrent += current;
-    totalTarget += target;
-  });
+  if (majorGoal.metric === 'task_count') {
+    // 任务数量：统计完成的待办
+    const filteredTodos = todos.filter(todo => {
+      if (!todo.isCompleted) return false;
+      if (majorGoal.filterTodoCategories && majorGoal.filterTodoCategories.length > 0) {
+        return majorGoal.filterTodoCategories.includes(todo.categoryId);
+      }
+      return true;
+    });
+    totalCurrent = filteredTodos.length;
+  } else if (majorGoal.metric === 'frequency_days') {
+    // 活跃天数：统计有记录的天数
+    const filteredLogs = logs.filter(log => {
+      if (majorGoal.filterActivityIds && majorGoal.filterActivityIds.length > 0) {
+        return majorGoal.filterActivityIds.includes(log.activityId);
+      }
+      return true;
+    });
+    
+    const uniqueDays = new Set(
+      filteredLogs.map(log => new Date(log.startTime).toDateString())
+    );
+    totalCurrent = uniqueDays.size;
+  } else {
+    // 时长相关：duration_raw, duration_weighted, duration_limit
+    const filteredLogs = logs.filter(log => {
+      if (majorGoal.filterActivityIds && majorGoal.filterActivityIds.length > 0) {
+        return majorGoal.filterActivityIds.includes(log.activityId);
+      }
+      return true;
+    });
+    
+    if (majorGoal.metric === 'duration_weighted') {
+      // 有效时长：考虑专注度
+      totalCurrent = filteredLogs.reduce((sum, log) => {
+        const weight = log.focusScore ? log.focusScore / 5 : 1;
+        return sum + log.duration * weight;
+      }, 0);
+    } else {
+      // 原始时长或时长上限
+      totalCurrent = filteredLogs.reduce((sum, log) => sum + log.duration, 0);
+    }
+  }
   
-  const percentage = totalTarget > 0 ? (totalCurrent / totalTarget) * 100 : 0;
+  const percentage = target > 0 ? (totalCurrent / target) * 100 : 0;
   
   return {
     current: totalCurrent,
-    target: totalTarget,
-    percentage: Math.min(percentage, 100) // 限制最大值为 100%
+    target,
+    percentage: Math.min(percentage, 100)
   };
 };
 

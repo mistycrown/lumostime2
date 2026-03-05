@@ -113,8 +113,8 @@ export const GoalCard: React.FC<GoalCardProps> = ({ goal, logs, todos, onEdit, o
                 <div className="flex-1 min-w-0 flex items-baseline gap-3">
                     <GoalIcon 
                         size={14} 
-                        className={isLimitGoal ? 'text-red-600 flex-shrink-0 mt-0.5' : (isArchived ? 'text-stone-300 flex-shrink-0 mt-0.5' : 'flex-shrink-0 mt-0.5')}
-                        style={!isLimitGoal && !isArchived ? { color: 'var(--accent-color)' } : undefined}
+                        className="flex-shrink-0 mt-0.5"
+                        style={isArchived ? { color: 'var(--text-tertiary)' } : { color: 'var(--accent-color)' }}
                     />
                     <h4 className={`text-lg font-bold leading-tight ${isArchived ? 'text-stone-400' : 'text-stone-900'}`}>
                         {goal.title}

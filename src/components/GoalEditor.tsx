@@ -25,9 +25,10 @@ interface GoalEditorProps {
     
     // 新增：支持三种模式
     mode?: 'independent' | 'phase' | 'majorGoal';
-    majorGoal?: MajorGoal;  // MajorGoal 类型（phase 模式必需）
+    majorGoal?: MajorGoal;  // MajorGoal 类型（phase 模式必需，或 majorGoal 模式编辑时使用）
     majorGoals?: MajorGoal[];  // 可选的目标系列列表（independent 模式）
     onSaveMajorGoal?: (majorGoal: MajorGoal) => void;  // 保存目标系列的回调
+    onDelete?: (goalId: string) => void;  // 删除目标的回调
 }
 
 const metricOptions: { value: Goal['metric']; label: string; hint: string }[] = [
@@ -48,71 +49,87 @@ export const GoalEditor: React.FC<GoalEditorProps> = ({
     mode = 'independent',
     majorGoal,
     majorGoals,
-    onSaveMajorGoal
+    onSaveMajorGoal,
+    onDelete
 }) => {
-    const [title, setTitle] = useState(goal?.title || '');
+    const [title, setTitle] = useState(
+        mode === 'majorGoal' && majorGoal ? majorGoal.title : (goal?.title || '')
+    );
     const [metric, setMetric] = useState<Goal['metric']>(
-        mode === 'phase' && majorGoal ? majorGoal.metric : (goal?.metric || 'duration_raw')
+        majorGoal ? majorGoal.metric : (goal?.metric || 'duration_raw')
     );
     
     // 新增：所属目标系列选择
     const [selectedMajorGoalId, setSelectedMajorGoalId] = useState<string | undefined>(
-        mode === 'phase' && majorGoal ? majorGoal.id : goal?.majorGoalId
+        majorGoal ? majorGoal.id : goal?.majorGoalId
     );
     
     // 新增：目标系列描述（仅 majorGoal 模式）
-    const [description, setDescription] = useState('');
+    const [description, setDescription] = useState(
+        mode === 'majorGoal' && majorGoal ? (majorGoal.description || '') : ''
+    );
 
     // 初始化targetValue：如果是时长类型且是编辑模式，需要保持原始秒值
     const [targetValue, setTargetValue] = useState(() => {
+        // majorGoal 模式：使用 majorGoal 的目标值
+        if (mode === 'majorGoal' && majorGoal) {
+            return majorGoal.targetValue;
+        }
+        // goal 模式：使用 goal 的目标值
         if (!goal) return 0;
         return goal.targetValue;
     });
 
     // 使用8位数字格式：YYYYMMDD
     const [startDateStr, setStartDateStr] = useState(() => {
+        // majorGoal 模式：优先使用 majorGoal 的日期
+        if (mode === 'majorGoal' && majorGoal?.startDate) {
+            return majorGoal.startDate.replace(/-/g, '');
+        }
+        // goal 模式：使用 goal 的日期
         if (goal?.startDate) {
             return goal.startDate.replace(/-/g, '');
         }
+        // 默认：当前日期
         const now = new Date();
         return `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}`;
     });
 
     const [endDateStr, setEndDateStr] = useState(() => {
+        // majorGoal 模式：优先使用 majorGoal 的日期
+        if (mode === 'majorGoal' && majorGoal?.endDate) {
+            return majorGoal.endDate.replace(/-/g, '');
+        }
+        // goal 模式：使用 goal 的日期
         if (goal?.endDate) {
             return goal.endDate.replace(/-/g, '');
         }
+        // 默认：空字符串
         return '';
     });
 
-    const [motivation, setMotivation] = useState(goal?.motivation || '');
+    const [motivation, setMotivation] = useState(
+        mode === 'majorGoal' && majorGoal ? (majorGoal.motivation || '') : (goal?.motivation || '')
+    );
 
     // 🔍 筛选器状态 (Filter States)
     const [filterTodoCategories, setFilterTodoCategories] = useState<string[]>(
-        mode === 'phase' && majorGoal ? (majorGoal.filterTodoCategories || []) : (goal?.filterTodoCategories || [])
+        majorGoal ? (majorGoal.filterTodoCategories || []) : (goal?.filterTodoCategories || [])
     );
     const [filterActivityIds, setFilterActivityIds] = useState<string[]>(
-        mode === 'phase' && majorGoal ? (majorGoal.filterActivityIds || []) : (goal?.filterActivityIds || [])
+        majorGoal ? (majorGoal.filterActivityIds || []) : (goal?.filterActivityIds || [])
     );
     const [isTodoFilterEnabled, setIsTodoFilterEnabled] = useState<boolean>(
-        (goal?.filterTodoCategories && goal.filterTodoCategories.length > 0) || false
+        (goal?.filterTodoCategories && goal.filterTodoCategories.length > 0) || 
+        (majorGoal?.filterTodoCategories && majorGoal.filterTodoCategories.length > 0) ||
+        false
     );
     
     // 判断字段是否应该禁用
     const isFieldDisabled = (fieldName: string): boolean => {
-        // 阶段目标模式：禁用继承字段
-        if (mode === 'phase') {
-            return ['metric', 'filterActivityIds', 'filterTodoCategories'].includes(fieldName);
-        }
-        
-        // 独立目标模式：选择了目标系列后禁用继承字段
-        if (mode === 'independent' && selectedMajorGoalId) {
-            return ['metric', 'filterActivityIds', 'filterTodoCategories'].includes(fieldName);
-        }
-        
-        // 目标系列模式：禁用自动计算字段
-        if (mode === 'majorGoal') {
-            return ['startDate', 'endDate'].includes(fieldName);
+        // 阶段目标模式或选择了目标系列：禁用继承字段
+        if ((mode === 'phase' || selectedMajorGoalId) && ['metric', 'filterActivityIds', 'filterTodoCategories'].includes(fieldName)) {
+            return true;
         }
         
         return false;
@@ -131,20 +148,42 @@ export const GoalEditor: React.FC<GoalEditorProps> = ({
                 return;
             }
 
+            // 验证日期格式
+            if (!startDateStr || !endDateStr) {
+                alert('请填写开始时间和结束时间');
+                return;
+            }
+
+            if (startDateStr.length !== 8 || endDateStr.length !== 8) {
+                alert('请输入8位日期格式（YYYYMMDD）');
+                return;
+            }
+
+            if (targetValue <= 0) {
+                alert('请填写目标值');
+                return;
+            }
+
+            // 转换为YYYY-MM-DD格式
+            const startDate = `${startDateStr.slice(0, 4)}-${startDateStr.slice(4, 6)}-${startDateStr.slice(6, 8)}`;
+            const endDate = `${endDateStr.slice(0, 4)}-${endDateStr.slice(4, 6)}-${endDateStr.slice(6, 8)}`;
+
             const newMajorGoal: MajorGoal = {
-                id: crypto.randomUUID(),
+                id: majorGoal?.id || crypto.randomUUID(),
                 title: title.trim(),
                 scopeId: scopeId,
                 metric,
-                startDate: '1970-01-01',  // 占位，将由子目标自动计算
-                endDate: '1970-01-01',    // 占位，将由子目标自动计算
+                targetValue,
+                startDate,
+                endDate,
                 description: description.trim() || undefined,
                 motivation: motivation.trim() || undefined,
                 filterActivityIds: metric !== 'task_count' && filterActivityIds.length > 0 ? filterActivityIds : undefined,
                 filterTodoCategories: metric === 'task_count' && filterTodoCategories.length > 0 ? filterTodoCategories : undefined,
-                status: 'active',
-                createdAt: new Date().toISOString(),
+                status: majorGoal?.status || 'active',
+                createdAt: majorGoal?.createdAt || new Date().toISOString(),
                 updatedAt: new Date().toISOString(),
+                order: majorGoal?.order,
             };
 
             onSaveMajorGoal(newMajorGoal);
@@ -186,6 +225,19 @@ export const GoalEditor: React.FC<GoalEditorProps> = ({
         };
 
         onSave(newGoal);
+    };
+
+    const handleDelete = () => {
+        if (!goal || !onDelete) return;
+        
+        const confirmMessage = mode === 'phase' 
+            ? '确定要删除这个阶段目标吗？' 
+            : '确定要删除这个目标吗？';
+        
+        if (confirm(confirmMessage)) {
+            onDelete(goal.id);
+            onClose();
+        }
     };
 
     // 根据metric类型显示目标值（转换为小时）
@@ -478,93 +530,79 @@ export const GoalEditor: React.FC<GoalEditorProps> = ({
                         )}
                     </div>
 
-                    {/* 目标阈值（目标系列模式不显示） */}
-                    {mode !== 'majorGoal' && (
-                        <div>
-                            <label className="block text-xs font-medium text-stone-400 mb-2 uppercase tracking-wider">
-                                目标阈值
-                            </label>
-                            <input
-                                type="number"
-                                value={getDisplayValue()}
-                                onChange={(e) => handleValueChange(Number(e.target.value) || 0)}
-                                min="1"
-                                className="w-full px-3 py-2 bg-stone-50 border border-stone-200 rounded-lg text-stone-900 font-medium outline-none focus:border-stone-400 transition-colors text-center text-lg font-mono"
-                            />
-                        </div>
-                    )}
+                    {/* 目标阈值 */}
+                    <div>
+                        <label className="block text-xs font-medium text-stone-400 mb-2 uppercase tracking-wider">
+                            {mode === 'majorGoal' ? '目标值' : '目标阈值'}
+                        </label>
+                        <input
+                            type="number"
+                            value={getDisplayValue()}
+                            onChange={(e) => handleValueChange(Number(e.target.value) || 0)}
+                            min="1"
+                            className="w-full px-3 py-2 bg-stone-50 border border-stone-200 rounded-lg text-stone-900 font-medium outline-none focus:border-stone-400 transition-colors text-center text-lg font-mono"
+                        />
+                        {mode === 'majorGoal' && (
+                            <p className="mt-2 text-xs text-stone-500">
+                                💡 当前值将通过所有阶段目标的进度累加计算
+                            </p>
+                        )}
+                    </div>
 
                     {/* 起止日期 - 数字输入 */}
                     <div>
                         <div className="flex items-center justify-between mb-2">
                             <label className="block text-xs font-medium text-stone-400 uppercase tracking-wider">
                                 时间范围
-                                {mode === 'majorGoal' && (
-                                    <span className="text-stone-300 ml-1">（自动计算）</span>
-                                )}
                             </label>
-                            {/* 快捷按钮（目标系列模式不显示） */}
-                            {mode !== 'majorGoal' && (
-                                <div className="flex gap-1">
-                                    <button
-                                        onClick={() => setQuickDateRange('month')}
-                                        className="px-2 py-0.5 bg-stone-100 hover:bg-stone-200 text-stone-600 text-[10px] font-medium rounded transition-colors"
-                                    >
-                                        本月
-                                    </button>
-                                    <button
-                                        onClick={() => setQuickDateRange('quarter')}
-                                        className="px-2 py-0.5 bg-stone-100 hover:bg-stone-200 text-stone-600 text-[10px] font-medium rounded transition-colors"
-                                    >
-                                        本季度
-                                    </button>
-                                    <button
-                                        onClick={() => setQuickDateRange('year')}
-                                        className="px-2 py-0.5 bg-stone-100 hover:bg-stone-200 text-stone-600 text-[10px] font-medium rounded transition-colors"
-                                    >
-                                        本年
-                                    </button>
-                                </div>
-                            )}
+                            {/* 快捷按钮 */}
+                            <div className="flex gap-1">
+                                <button
+                                    onClick={() => setQuickDateRange('month')}
+                                    className="px-2 py-0.5 bg-stone-100 hover:bg-stone-200 text-stone-600 text-[10px] font-medium rounded transition-colors"
+                                >
+                                    本月
+                                </button>
+                                <button
+                                    onClick={() => setQuickDateRange('quarter')}
+                                    className="px-2 py-0.5 bg-stone-100 hover:bg-stone-200 text-stone-600 text-[10px] font-medium rounded transition-colors"
+                                >
+                                    本季度
+                                </button>
+                                <button
+                                    onClick={() => setQuickDateRange('year')}
+                                    className="px-2 py-0.5 bg-stone-100 hover:bg-stone-200 text-stone-600 text-[10px] font-medium rounded transition-colors"
+                                >
+                                    本年
+                                </button>
+                            </div>
                         </div>
                         
-                        {mode === 'majorGoal' ? (
-                            // 目标系列模式：只读显示（将由子目标自动计算）
-                            <div className="px-3 py-2 bg-stone-100 border border-stone-200 rounded-lg text-center">
-                                <span className="text-sm text-stone-500">
-                                    时间范围将根据包含的阶段目标自动计算
-                                </span>
+                        <div className="grid grid-cols-2 gap-3">
+                            <div>
+                                <label className="block text-[10px] text-stone-400 mb-1.5">开始日期</label>
+                                <input
+                                    type="text"
+                                    value={startDateStr}
+                                    onChange={(e) => setStartDateStr(e.target.value.replace(/\D/g, '').slice(0, 8))}
+                                    placeholder="20250101"
+                                    maxLength={8}
+                                    className="w-full px-3 py-2 bg-stone-50 border border-stone-200 rounded-lg text-sm text-stone-900 font-mono font-medium outline-none focus:border-stone-400 transition-colors text-center"
+                                />
                             </div>
-                        ) : (
-                            // 独立目标和阶段目标模式：可编辑
-                            <>
-                                <div className="grid grid-cols-2 gap-3">
-                                    <div>
-                                        <label className="block text-[10px] text-stone-400 mb-1.5">开始日期</label>
-                                        <input
-                                            type="text"
-                                            value={startDateStr}
-                                            onChange={(e) => setStartDateStr(e.target.value.replace(/\D/g, '').slice(0, 8))}
-                                            placeholder="20250101"
-                                            maxLength={8}
-                                            className="w-full px-3 py-2 bg-stone-50 border border-stone-200 rounded-lg text-sm text-stone-900 font-mono font-medium outline-none focus:border-stone-400 transition-colors text-center"
-                                        />
-                                    </div>
-                                    <div>
-                                        <label className="block text-[10px] text-stone-400 mb-1.5">结束日期</label>
-                                        <input
-                                            type="text"
-                                            value={endDateStr}
-                                            onChange={(e) => setEndDateStr(e.target.value.replace(/\D/g, '').slice(0, 8))}
-                                            placeholder="20251231"
-                                            maxLength={8}
-                                            className="w-full px-3 py-2 bg-stone-50 border border-stone-200 rounded-lg text-sm text-stone-900 font-mono font-medium outline-none focus:border-stone-400 transition-colors text-center"
-                                        />
-                                    </div>
-                                </div>
-                                <p className="mt-1.5 text-xs text-stone-400">格式：YYYYMMDD（例如：20250101）</p>
-                            </>
-                        )}
+                            <div>
+                                <label className="block text-[10px] text-stone-400 mb-1.5">结束日期</label>
+                                <input
+                                    type="text"
+                                    value={endDateStr}
+                                    onChange={(e) => setEndDateStr(e.target.value.replace(/\D/g, '').slice(0, 8))}
+                                    placeholder="20251231"
+                                    maxLength={8}
+                                    className="w-full px-3 py-2 bg-stone-50 border border-stone-200 rounded-lg text-sm text-stone-900 font-mono font-medium outline-none focus:border-stone-400 transition-colors text-center"
+                                />
+                            </div>
+                        </div>
+                        <p className="mt-1.5 text-xs text-stone-400">格式：YYYYMMDD（例如：20250101）</p>
                     </div>
 
                     {/* 🔍 高级筛选器 (Advanced Filters) */}
@@ -741,6 +779,19 @@ export const GoalEditor: React.FC<GoalEditorProps> = ({
                             className="w-full px-3 py-2 bg-stone-50 border border-stone-200 rounded-lg text-sm text-stone-900 outline-none focus:border-stone-400 transition-colors resize-none"
                         />
                     </div>
+
+                    {/* 删除目标按钮 - 仅编辑模式显示 */}
+                    {goal && onDelete && mode !== 'majorGoal' && (
+                        <div className="pt-2">
+                            <button
+                                type="button"
+                                onClick={handleDelete}
+                                className="w-full py-2.5 text-red-500 hover:text-red-600 hover:bg-red-50 rounded-full font-medium text-sm transition-colors active:scale-95"
+                            >
+                                删除目标
+                            </button>
+                        </div>
+                    )}
                 </div>
             </div>
 

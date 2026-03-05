@@ -118,8 +118,28 @@ export const getWeekRange = (date: Date, startWeekOnSunday: boolean = false): { 
  * 
  * @example
  * formatShortDate('2024-01-15') // '1/15'
+ * formatShortDate('') // '—'
  */
 export const formatShortDate = (dateStr: string): string => {
+    if (!dateStr) return '—';
     const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return '—';
     return `${d.getMonth() + 1}/${d.getDate()}`;
+};
+
+/**
+ * 格式化带年份的短日期（YY/M/D 格式）
+ * @param dateStr - YYYY-MM-DD 格式的日期字符串
+ * @returns YY/M/D 格式的日期字符串
+ * 
+ * @example
+ * formatShortDateWithYear('2024-01-15') // '24/1/15'
+ * formatShortDateWithYear('') // '—'
+ */
+export const formatShortDateWithYear = (dateStr: string): string => {
+    if (!dateStr) return '—';
+    const [year, month, day] = dateStr.split('-').map(Number);
+    if (!year || !month || !day) return '—';
+    const shortYear = year.toString().slice(-2); // 取后两位年份
+    return `${shortYear}/${month}/${day}`;
 };

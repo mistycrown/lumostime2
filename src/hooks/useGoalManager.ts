@@ -15,9 +15,25 @@ export const useGoalManager = () => {
     const { setGoals } = useCategoryScope();
     const { setIsGoalEditorOpen, setEditingGoal, setGoalScopeId } = useNavigation();
 
-    const handleAddGoal = (scopeId: string, templateGoal?: Goal) => {
-        // 如果提供了模板目标，使用它作为编辑基础（但清除 ID 和状态）
-        if (templateGoal) {
+    const handleAddGoal = (scopeId: string, templateGoal?: Goal, majorGoalId?: string) => {
+        // 如果提供了 majorGoalId，说明是为目标系列创建阶段目标
+        if (majorGoalId) {
+            // 创建一个空的目标模板，关联到目标系列
+            const goalTemplate: Goal = {
+                id: '',
+                title: '',
+                scopeId,
+                metric: 'duration_raw', // 默认值，会被目标系列的类型覆盖
+                targetValue: 0,
+                startDate: new Date().toISOString().split('T')[0],
+                endDate: new Date().toISOString().split('T')[0],
+                status: 'active',
+                majorGoalId, // 关联到目标系列
+                order: 0
+            };
+            setEditingGoal(goalTemplate);
+        } else if (templateGoal) {
+            // 如果提供了模板目标，使用它作为编辑基础（但清除 ID 和状态）
             const goalTemplate: Goal = {
                 ...templateGoal,
                 id: '', // 清除 ID，让保存时生成新 ID

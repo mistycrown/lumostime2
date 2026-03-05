@@ -98,9 +98,12 @@ export interface MajorGoal {
   // 核心：指定统一的目标类型
   metric: Goal['metric'];     // 所有子目标必须是这个类型
   
-  // 时间范围（自动计算）
-  startDate: string;          // 自动计算：最早的子目标开始时间
-  endDate: string;            // 自动计算：最晚的子目标结束时间
+  // 目标值（独立存储）
+  targetValue: number;        // 目标系列的总目标值
+  
+  // 时间范围（手动填写）
+  startDate: string;          // 开始时间
+  endDate: string;            // 结束时间
   
   // 描述与动机
   description?: string;       // 详细描述

@@ -7,52 +7,164 @@ import { imageService } from './imageService';
 import { Capacitor } from '@capacitor/core';
 import { Filesystem, Directory } from '@capacitor/filesystem';
 
+export type ImageExportStage = 'preparing' | 'reading' | 'zipping' | 'writing' | 'done';
+
+export interface ImageExportProgress {
+    stage: ImageExportStage;
+    message: string;
+    current: number;
+    total: number;
+    percent: number;
+}
+
 class ImageExportService {
-    private blobToBase64(blob: Blob): Promise<string> {
-        return new Promise((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onload = () => {
-                const result = reader.result as string;
-                const base64Data = result.includes(',') ? result.split(',')[1] : result;
-                resolve(base64Data);
-            };
-            reader.onerror = () => reject(reader.error);
-            reader.readAsDataURL(blob);
+    private static readonly BASE64_WRITE_CHUNK_SIZE = 131072; // 128KB，且为4的倍数，避免Base64分块解码异常
+
+    private emitProgress(
+        onProgress: ((progress: ImageExportProgress) => void) | undefined,
+        progress: ImageExportProgress
+    ): void {
+        if (!onProgress) {
+            return;
+        }
+
+        onProgress({
+            ...progress,
+            percent: Math.max(0, Math.min(100, progress.percent))
         });
+    }
+
+    private async yieldToUI(): Promise<void> {
+        await new Promise<void>(resolve => setTimeout(resolve, 0));
+    }
+
+    private async withTimeout<T>(
+        promise: Promise<T>,
+        timeoutMs: number,
+        timeoutMessage: string
+    ): Promise<T> {
+        let timer: ReturnType<typeof setTimeout> | null = null;
+        try {
+            return await Promise.race([
+                promise,
+                new Promise<T>((_, reject) => {
+                    timer = setTimeout(() => reject(new Error(timeoutMessage)), timeoutMs);
+                })
+            ]);
+        } finally {
+            if (timer) {
+                clearTimeout(timer);
+            }
+        }
+    }
+
+    private async writeBase64FileInChunks(
+        fileDataBase64: string,
+        path: string,
+        directory: Directory,
+        onProgress?: (progress: ImageExportProgress) => void
+    ): Promise<void> {
+        const pureBase64 = fileDataBase64.includes(',')
+            ? fileDataBase64.split(',')[1]
+            : fileDataBase64;
+        const chunkSize = ImageExportService.BASE64_WRITE_CHUNK_SIZE;
+        const totalChunks = Math.max(1, Math.ceil(pureBase64.length / chunkSize));
+
+        for (let i = 0; i < totalChunks; i++) {
+            const start = i * chunkSize;
+            const end = start + chunkSize;
+            const chunk = pureBase64.slice(start, end);
+            const isFirstChunk = i === 0;
+
+            if (isFirstChunk) {
+                await this.withTimeout(
+                    Filesystem.writeFile({
+                        path,
+                        data: chunk,
+                        directory,
+                        recursive: true
+                    }),
+                    20000,
+                    '写入文件超时（初始化写入）'
+                );
+            } else {
+                await this.withTimeout(
+                    Filesystem.appendFile({
+                        path,
+                        data: chunk,
+                        directory
+                    }),
+                    20000,
+                    '写入文件超时（分块追加）'
+                );
+            }
+
+            this.emitProgress(onProgress, {
+                stage: 'writing',
+                message: `正在写入本地文件 (${i + 1}/${totalChunks})...`,
+                current: i + 1,
+                total: totalChunks,
+                percent: 90 + ((i + 1) / totalChunks) * 10
+            });
+
+            if ((i + 1) % 3 === 0) {
+                await this.yieldToUI();
+            }
+        }
     }
 
     /**
      * 导出所有图片为ZIP文件
      */
-    async exportImagesToZip(): Promise<{ filename: string; mode: 'native' | 'web'; savedPath?: string }> {
+    async exportImagesToZip(options: {
+        onProgress?: (progress: ImageExportProgress) => void;
+    } = {}): Promise<{ filename: string; mode: 'native' | 'web'; savedPath?: string }> {
         console.log('[ImageExportService] 开始导出图片...');
-        
+        const { onProgress } = options;
+
         try {
             // 1. 获取所有图片列表
+            this.emitProgress(onProgress, {
+                stage: 'preparing',
+                message: '正在扫描图片文件...',
+                current: 0,
+                total: 0,
+                percent: 0
+            });
             const imageList = await imageService.listImages();
             console.log(`[ImageExportService] 找到 ${imageList.length} 个图片文件`);
-            
+
             if (imageList.length === 0) {
                 throw new Error('没有图片可以导出');
             }
 
             // 2. 创建ZIP对象
             const zip = new JSZip();
-            
+
             // 3. 读取每个图片并添加到ZIP
             let successCount = 0;
             let failCount = 0;
-            
-            for (const filename of imageList) {
+            const totalCount = imageList.length;
+
+            this.emitProgress(onProgress, {
+                stage: 'reading',
+                message: `正在读取图片 (0/${totalCount})...`,
+                current: 0,
+                total: totalCount,
+                percent: 0
+            });
+
+            for (let i = 0; i < imageList.length; i++) {
+                const filename = imageList[i];
                 try {
                     console.log(`[ImageExportService] 正在处理: ${filename}`);
                     const imageData = await imageService.readImage(filename);
-                    
+
                     // 将图片数据添加到ZIP
                     if (typeof imageData === 'string') {
                         // Base64字符串
-                        const base64Data = imageData.includes(',') 
-                            ? imageData.split(',')[1] 
+                        const base64Data = imageData.includes(',')
+                            ? imageData.split(',')[1]
                             : imageData;
                         zip.file(filename, base64Data, { base64: true });
                     } else if (imageData instanceof ArrayBuffer) {
@@ -68,46 +180,140 @@ class ImageExportService {
                     console.error(`[ImageExportService] 处理图片失败: ${filename}`, error);
                     failCount++;
                 }
+
+                const processed = i + 1;
+                this.emitProgress(onProgress, {
+                    stage: 'reading',
+                    message: `正在读取图片 (${processed}/${totalCount})...`,
+                    current: processed,
+                    total: totalCount,
+                    percent: (processed / totalCount) * 60
+                });
+
+                // 每 5 个文件让出一次主线程，避免移动端长时间无响应
+                if (processed % 5 === 0) {
+                    await this.yieldToUI();
+                }
             }
-            
+
             console.log(`[ImageExportService] 图片处理完成: 成功 ${successCount}, 失败 ${failCount}`);
-            
+
             if (successCount === 0) {
                 throw new Error('没有成功处理任何图片');
             }
 
-            // 4. 生成ZIP文件
-            console.log('[ImageExportService] 正在生成ZIP文件...');
-            const zipBlob = await zip.generateAsync({ 
-                type: 'blob',
-                compression: 'DEFLATE',
-                compressionOptions: { level: 6 }
-            });
-            
-            console.log(`[ImageExportService] ZIP文件生成完成，大小: ${zipBlob.size} bytes`);
-
-            // 5. 导出ZIP文件
+            // 4. 导出ZIP文件
             const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
             const filename = `lumostime-images-${timestamp}.zip`;
+            const platform = Capacitor.getPlatform();
+            const isNative = Capacitor.isNativePlatform();
+            const isAndroid = platform === 'android';
 
-            if (Capacitor.isNativePlatform()) {
-                const platform = Capacitor.getPlatform();
-                const isAndroid = platform === 'android';
+            const onZipGenerateProgress = (metadata: any) => {
+                const percentInZip = typeof metadata?.percent === 'number' ? metadata.percent : 0;
+                const currentFile = typeof metadata?.currentFile === 'string' ? metadata.currentFile : '';
+                this.emitProgress(onProgress, {
+                    stage: 'zipping',
+                    message: currentFile
+                        ? `正在压缩: ${currentFile}`
+                        : '正在生成压缩包...',
+                    current: Math.round(percentInZip),
+                    total: 100,
+                    percent: 60 + percentInZip * 0.3
+                });
+            };
+
+            if (isNative) {
+                console.log('[ImageExportService] 正在生成ZIP文件(Base64)...');
+                const zipBase64 = await zip.generateAsync({
+                    type: 'base64',
+                    compression: 'DEFLATE',
+                    compressionOptions: { level: 6 }
+                }, onZipGenerateProgress);
+
+                this.emitProgress(onProgress, {
+                    stage: 'writing',
+                    message: '正在写入本地文件...',
+                    current: 0,
+                    total: 1,
+                    percent: 95
+                });
+
                 const relativePath = isAndroid
                     ? `Download/LumosTime/${filename}`
                     : `LumosTime/${filename}`;
-                const base64Data = await this.blobToBase64(zipBlob);
 
-                await Filesystem.writeFile({
-                    path: relativePath,
-                    data: base64Data,
-                    directory: isAndroid ? Directory.ExternalStorage : Directory.Documents,
-                    recursive: true
-                });
+                if (isAndroid) {
+                    try {
+                        await this.writeBase64FileInChunks(
+                            zipBase64,
+                            relativePath,
+                            Directory.ExternalStorage,
+                            onProgress
+                        );
+                    } catch (externalWriteError) {
+                        console.warn('[ImageExportService] 外部存储写入失败，回退到Documents目录', externalWriteError);
+                        const fallbackRelativePath = `LumosTime/${filename}`;
+                        this.emitProgress(onProgress, {
+                            stage: 'writing',
+                            message: '外部存储写入失败，正在回退目录重试...',
+                            current: 0,
+                            total: 1,
+                            percent: 92
+                        });
+
+                        await this.writeBase64FileInChunks(
+                            zipBase64,
+                            fallbackRelativePath,
+                            Directory.Documents,
+                            onProgress
+                        );
+
+                        console.log(`[ImageExportService] 导出完成(Native Fallback): ${fallbackRelativePath}`);
+                        this.emitProgress(onProgress, {
+                            stage: 'done',
+                            message: '导出完成',
+                            current: 1,
+                            total: 1,
+                            percent: 100
+                        });
+                        return { filename, mode: 'native', savedPath: fallbackRelativePath };
+                    }
+                } else {
+                    await this.writeBase64FileInChunks(
+                        zipBase64,
+                        relativePath,
+                        Directory.Documents,
+                        onProgress
+                    );
+                }
 
                 console.log(`[ImageExportService] 导出完成(Native): ${relativePath}`);
+                this.emitProgress(onProgress, {
+                    stage: 'done',
+                    message: '导出完成',
+                    current: 1,
+                    total: 1,
+                    percent: 100
+                });
                 return { filename, mode: 'native', savedPath: relativePath };
             }
+
+            console.log('[ImageExportService] 正在生成ZIP文件(Blob)...');
+            const zipBlob = await zip.generateAsync({
+                type: 'blob',
+                compression: 'DEFLATE',
+                compressionOptions: { level: 6 }
+            }, onZipGenerateProgress);
+
+            console.log(`[ImageExportService] ZIP文件生成完成，大小: ${zipBlob.size} bytes`);
+            this.emitProgress(onProgress, {
+                stage: 'writing',
+                message: '正在触发下载...',
+                current: 0,
+                total: 1,
+                percent: 95
+            });
 
             const url = URL.createObjectURL(zipBlob);
             const link = document.createElement('a');
@@ -119,8 +325,15 @@ class ImageExportService {
             URL.revokeObjectURL(url);
 
             console.log(`[ImageExportService] 导出完成(Web): ${filename}`);
+            this.emitProgress(onProgress, {
+                stage: 'done',
+                message: '导出完成',
+                current: 1,
+                total: 1,
+                percent: 100
+            });
             return { filename, mode: 'web' };
-            
+
         } catch (error) {
             console.error('[ImageExportService] 导出失败:', error);
             throw error;
