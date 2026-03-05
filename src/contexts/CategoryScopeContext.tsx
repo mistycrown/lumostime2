@@ -1,9 +1,9 @@
 /**
  * @file CategoryScopeContext.tsx
- * @description 管理 Categories、Scopes、Goals 的状态和逻辑
+ * @description 管理 Categories、Scopes、Goals、MajorGoals 的状态和逻辑
  */
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { Category, Goal, ActiveSession, Scope } from '../types';
+import { Category, Goal, ActiveSession, Scope, MajorGoal } from '../types';
 import { CATEGORIES, SCOPES, INITIAL_GOALS } from '../constants';
 
 interface CategoryScopeContextType {
@@ -21,6 +21,10 @@ interface CategoryScopeContextType {
     // Goals
     goals: Goal[];
     setGoals: React.Dispatch<React.SetStateAction<Goal[]>>;
+
+    // MajorGoals
+    majorGoals: MajorGoal[];
+    setMajorGoals: React.Dispatch<React.SetStateAction<MajorGoal[]>>;
 
     // Activity管理
     handleUpdateActivity: (updatedActivity: any) => void;
@@ -70,6 +74,12 @@ export const CategoryScopeProvider: React.FC<CategoryScopeProviderProps> = ({
         return stored ? JSON.parse(stored) : INITIAL_GOALS;
     });
 
+    // MajorGoals State
+    const [majorGoals, setMajorGoals] = useState<MajorGoal[]>(() => {
+        const stored = localStorage.getItem('lumostime_majorGoals');
+        return stored ? JSON.parse(stored) : [];
+    });
+
     // 持久化到 localStorage
     useEffect(() => {
         localStorage.setItem('lumostime_categories', JSON.stringify(categories));
@@ -82,6 +92,10 @@ export const CategoryScopeProvider: React.FC<CategoryScopeProviderProps> = ({
     useEffect(() => {
         localStorage.setItem('lumostime_goals', JSON.stringify(goals));
     }, [goals]);
+
+    useEffect(() => {
+        localStorage.setItem('lumostime_majorGoals', JSON.stringify(majorGoals));
+    }, [majorGoals]);
 
     // Categories 更新逻辑
     const handleUpdateCategories = (newCategories: Category[]) => {
@@ -228,6 +242,8 @@ export const CategoryScopeProvider: React.FC<CategoryScopeProviderProps> = ({
             handleUpdateScopes,
             goals,
             setGoals,
+            majorGoals,
+            setMajorGoals,
             handleUpdateActivity,
             handleCategoryChange
         }}>

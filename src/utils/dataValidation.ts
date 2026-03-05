@@ -51,6 +51,7 @@ export function validateLocalData(data: any): ValidationResult {
     'todoCategories',
     'scopes',
     'goals',
+    'majorGoals',
     'autoLinkRules',
     'reviewTemplates',
     'dailyReviews',
@@ -124,6 +125,7 @@ export function validateAndFixData(data: any): { data: any; result: ValidationRe
     if (!fixedData.todoCategories) fixedData.todoCategories = [];
     if (!fixedData.scopes) fixedData.scopes = [];
     if (!fixedData.goals) fixedData.goals = [];
+    if (!fixedData.majorGoals) fixedData.majorGoals = [];
     if (!fixedData.autoLinkRules) fixedData.autoLinkRules = [];
     if (!fixedData.reviewTemplates) fixedData.reviewTemplates = [];
     if (!fixedData.dailyReviews) fixedData.dailyReviews = [];

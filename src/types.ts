@@ -82,7 +82,42 @@ export interface Goal {
   status: 'active' | 'completed' | 'failed' | 'archived';
 
   // 📝 奖励/备注 (Gamification)
-  motivation?: string; 
+  motivation?: string;
+  
+  // 🎯 大目标关联 (Major Goal)
+  majorGoalId?: string;  // 关联的大目标 ID（如果为空，则是独立目标）
+  order?: number;        // 在大目标中的排序（按时间自动排序）
+}
+
+// MajorGoal (大目标) - 同类型目标的时间序列分组
+export interface MajorGoal {
+  id: string;
+  title: string;              // 大目标名称，如 "Q1 广韵文献攻坚"
+  scopeId: string;            // 所属领域
+  
+  // 核心：指定统一的目标类型
+  metric: Goal['metric'];     // 所有子目标必须是这个类型
+  
+  // 时间范围（自动计算）
+  startDate: string;          // 自动计算：最早的子目标开始时间
+  endDate: string;            // 自动计算：最晚的子目标结束时间
+  
+  // 描述与动机
+  description?: string;       // 详细描述
+  motivation?: string;        // 设立这个大目标的原因
+  
+  // 筛选器（继承给所有子目标）
+  filterActivityIds?: string[];           // 限定标签 ID 列表
+  filterTodoCategories?: string[];        // 限定待办清单 ID 列表
+  filterTodoCategorySource?: string[];    // 限定关联的待办清单来源
+  
+  // 状态
+  status: 'active' | 'completed' | 'archived';
+  
+  // 元数据
+  createdAt: string;
+  updatedAt: string;
+  order?: number;             // 在领域内的排序
 }
 
 export interface ActiveSession {
