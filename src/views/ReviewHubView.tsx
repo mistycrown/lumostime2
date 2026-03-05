@@ -216,13 +216,12 @@ export const ReviewHubView: React.FC<ReviewHubViewProps> = ({
                                 const isCurrentMonth = new Date().getMonth() === mDate.getMonth() && new Date().getFullYear() === mDate.getFullYear();
 
                                 // 优先使用手动总结，如果没有才使用 AI 叙事
-                                let displayTitle: string;
+                                let displayTitle: string | null;
                                 let displayContent: string;
 
                                 if (m.summary && m.summary.trim()) {
-                                    // 有手动总结：直接使用手动总结作为内容
-                                    // 标题：如果手动总结没有标题，显示"暂无叙事标题"
-                                    displayTitle = '暂无叙事标题';
+                                    // 有手动总结：直接使用手动总结作为内容，不显示标题
+                                    displayTitle = null;
                                     displayContent = m.summary;
                                 } else if (m.narrative && m.narrative.trim()) {
                                     // 没有手动总结但有 AI 叙事：使用 AI 叙事的标题和引用
@@ -255,7 +254,9 @@ export const ReviewHubView: React.FC<ReviewHubViewProps> = ({
                                                     {isCurrentMonth ? 'CURRENT' : 'PAST'}
                                                 </div>
                                             </div>
-                                            <span className="text-[11px] uppercase text-stone-500 block tracking-wider">{displayTitle.slice(0, 30)}...</span>
+                                            {displayTitle && (
+                                                <span className="text-[11px] uppercase text-stone-500 block tracking-wider">{displayTitle.slice(0, 30)}...</span>
+                                            )}
                                         </div>
 
                                         <div className="text-sm text-stone-600 leading-relaxed border-l-2 border-stone-200 pl-3 mb-4 line-clamp-3">

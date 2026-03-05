@@ -8,7 +8,7 @@
 
 import React, { useState } from 'react';
 import { CheckTemplateItem } from '../types';
-import { X, Zap, Circle } from 'lucide-react';
+import { X, Zap, Circle, ChevronUp, ChevronDown } from 'lucide-react';
 import { AutoCheckItemEditor } from './AutoCheckItemEditor';
 
 interface CheckTemplateItemRowProps {
@@ -16,13 +16,19 @@ interface CheckTemplateItemRowProps {
   index: number;
   onUpdate: (index: number, item: CheckTemplateItem) => void;
   onDelete: (index: number) => void;
+  sortingMode?: boolean;
+  onMoveUp?: (index: number) => void;
+  onMoveDown?: (index: number) => void;
 }
 
 export const CheckTemplateItemRow: React.FC<CheckTemplateItemRowProps> = ({
   item,
   index,
   onUpdate,
-  onDelete
+  onDelete,
+  sortingMode = false,
+  onMoveUp,
+  onMoveDown
 }) => {
   const [showAutoEditor, setShowAutoEditor] = useState(false);
 
@@ -107,33 +113,59 @@ export const CheckTemplateItemRow: React.FC<CheckTemplateItemRowProps> = ({
             placeholder={isAuto ? '⚡ 输入自动日课名称...' : '💧 输入日课名称 (首字符作为图标)...'}
           />
           
-          {/* 模式切换（单按钮循环） */}
-          <button
-            type="button"
-            onClick={handleCycleMode}
-            className={`px-2.5 py-2 rounded-lg transition-colors shrink-0 ${
-              isAuto
-                ? 'text-blue-600 bg-blue-50'
-                : isCountManual
-                  ? 'text-stone-700 bg-stone-100'
-                  : 'text-stone-500 bg-stone-100'
-            }`}
-            title={`点击切换类型（当前：${
-              isAuto ? '自动规则' : isCountManual ? '手动次数' : '手动勾选'
-            }）`}
-          >
-            {isAuto ? <Zap size={16} /> : isCountManual ? <span className="text-sm font-bold leading-none">1</span> : <Circle size={16} />}
-          </button>
+          {/* 模式切换（单按钮循环） - 排序模式下隐藏 */}
+          {!sortingMode && (
+            <button
+              type="button"
+              onClick={handleCycleMode}
+              className={`w-9 h-9 flex items-center justify-center rounded-lg transition-colors shrink-0 ${
+                isAuto
+                  ? 'text-blue-600 bg-blue-50'
+                  : isCountManual
+                    ? 'text-stone-700 bg-stone-100'
+                    : 'text-stone-500 bg-stone-100'
+              }`}
+              title={`点击切换类型（当前：${
+                isAuto ? '自动规则' : isCountManual ? '手动次数' : '手动勾选'
+              }）`}
+            >
+              {isAuto ? <Zap size={16} /> : isCountManual ? <span className="text-sm font-bold leading-none">1</span> : <Circle size={16} />}
+            </button>
+          )}
 
-          {/* 删除按钮 - 始终显示 */}
-          <button
-            type="button"
-            onClick={() => onDelete(index)}
-            className="px-2.5 py-2 text-stone-300 active:text-red-500 transition-colors shrink-0"
-            tabIndex={-1}
-          >
-            <X size={16} />
-          </button>
+          {/* 排序按钮 - 排序模式下显示 */}
+          {sortingMode && (
+            <>
+              <button
+                type="button"
+                onClick={() => onMoveUp?.(index)}
+                className="w-9 h-9 flex items-center justify-center text-stone-500 hover:text-stone-700 hover:bg-stone-100 rounded-lg transition-colors shrink-0"
+                title="上移"
+              >
+                <ChevronUp size={16} />
+              </button>
+              <button
+                type="button"
+                onClick={() => onMoveDown?.(index)}
+                className="w-9 h-9 flex items-center justify-center text-stone-500 hover:text-stone-700 hover:bg-stone-100 rounded-lg transition-colors shrink-0"
+                title="下移"
+              >
+                <ChevronDown size={16} />
+              </button>
+            </>
+          )}
+
+          {/* 删除按钮 - 排序模式下隐藏 */}
+          {!sortingMode && (
+            <button
+              type="button"
+              onClick={() => onDelete(index)}
+              className="w-9 h-9 flex items-center justify-center text-stone-300 active:text-red-500 transition-colors shrink-0"
+              tabIndex={-1}
+            >
+              <X size={16} />
+            </button>
+          )}
         </div>
 
         {/* 次数目标配置 */}

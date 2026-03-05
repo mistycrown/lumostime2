@@ -46,6 +46,7 @@ export const CheckTemplateManageView: React.FC<CheckTemplateManageViewProps> = (
     const [templateForm, setTemplateForm] = useState<CheckTemplate | null>(null);
     const [deletingTemplateId, setDeletingTemplateId] = useState<string | null>(null);
     const [isResetConfirmOpen, setIsResetConfirmOpen] = useState(false);
+    const [sortingMode, setSortingMode] = useState(false);
 
     // Batch Modify State
     const [showBatchModal, setShowBatchModal] = useState(false);
@@ -258,6 +259,20 @@ export const CheckTemplateManageView: React.FC<CheckTemplateManageViewProps> = (
     const handleDeleteItem = (index: number) => {
         if (!templateForm) return;
         const newItems = templateForm.items.filter((_, i) => i !== index);
+        setTemplateForm({ ...templateForm, items: newItems });
+    };
+
+    const handleMoveItemUp = (index: number) => {
+        if (!templateForm || index === 0) return;
+        const newItems = [...templateForm.items];
+        [newItems[index - 1], newItems[index]] = [newItems[index], newItems[index - 1]];
+        setTemplateForm({ ...templateForm, items: newItems });
+    };
+
+    const handleMoveItemDown = (index: number) => {
+        if (!templateForm || index === templateForm.items.length - 1) return;
+        const newItems = [...templateForm.items];
+        [newItems[index], newItems[index + 1]] = [newItems[index + 1], newItems[index]];
         setTemplateForm({ ...templateForm, items: newItems });
     };
 
@@ -491,13 +506,26 @@ export const CheckTemplateManageView: React.FC<CheckTemplateManageViewProps> = (
                             <div>
                                 <div className="flex justify-between items-end mb-2">
                                     <label className="block text-xs font-bold text-stone-500 uppercase tracking-wider">日课列表</label>
-                                    <button
-                                        onClick={handleAddItem}
-                                        className="text-xs text-stone-500 hover:text-stone-800 font-bold flex items-center gap-1 px-2 py-1 hover:bg-stone-100 rounded-lg transition-colors"
-                                    >
-                                        <PlusCircle size={12} />
-                                        添加项
-                                    </button>
+                                    <div className="flex items-center gap-2">
+                                        <button
+                                            onClick={() => setSortingMode(!sortingMode)}
+                                            className={`text-xs font-bold flex items-center gap-1 px-2 py-1 rounded-lg transition-colors ${
+                                                sortingMode 
+                                                    ? 'text-blue-600 bg-blue-50 hover:bg-blue-100' 
+                                                    : 'text-stone-500 hover:text-stone-800 hover:bg-stone-100'
+                                            }`}
+                                        >
+                                            <GripVertical size={12} />
+                                            {sortingMode ? '完成排序' : '调整排序'}
+                                        </button>
+                                        <button
+                                            onClick={handleAddItem}
+                                            className="text-xs text-stone-500 hover:text-stone-800 font-bold flex items-center gap-1 px-2 py-1 hover:bg-stone-100 rounded-lg transition-colors"
+                                        >
+                                            <PlusCircle size={12} />
+                                            添加项
+                                        </button>
+                                    </div>
                                 </div>
                                 <div className="space-y-3">
                                     {templateForm.items.map((item, idx) => (
@@ -507,6 +535,9 @@ export const CheckTemplateManageView: React.FC<CheckTemplateManageViewProps> = (
                                             index={idx}
                                             onUpdate={handleUpdateItem}
                                             onDelete={handleDeleteItem}
+                                            sortingMode={sortingMode}
+                                            onMoveUp={handleMoveItemUp}
+                                            onMoveDown={handleMoveItemDown}
                                         />
                                     ))}
                                     {templateForm.items.length === 0 && (

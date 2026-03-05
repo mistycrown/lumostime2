@@ -320,7 +320,9 @@ export const DailyReviewView: React.FC<DailyReviewViewProps> = ({
 
         // 2. Map to CheckItems
         const newItems: CheckItem[] = [];
+        const checkCategorySyncToTimeline: { [category: string]: boolean } = {};
         dailyTemplates.forEach(template => {
+            checkCategorySyncToTimeline[template.title] = template.syncToTimeline || false;
             template.items.forEach(item => {
                 console.log('[DailyReview] 模板项:', { content: item.content, type: item.type, autoConfig: item.autoConfig });
                 const type = item.type || 'manual';
@@ -361,7 +363,12 @@ export const DailyReviewView: React.FC<DailyReviewViewProps> = ({
 
         // 4. Update state
         setCheckItems(updatedItems);
-        onUpdateReview({ ...review, checkItems: updatedItems, updatedAt: Date.now() });
+        onUpdateReview({
+            ...review,
+            checkItems: updatedItems,
+            checkCategorySyncToTimeline,
+            updatedAt: Date.now()
+        });
         setIsReloadConfirmOpen(false);
         addToast('success', '已重新导入模板');
     };

@@ -35,7 +35,7 @@ export const SceneView: React.FC<SceneViewProps> = ({
   categories,
   todos = []
 }) => {
-  const { dailyReviews, checkTemplates, setDailyReviews, weeklyReviews, setWeeklyReviews, monthlyReviews, setMonthlyReviews } = useReview();
+  const { dailyReviews, checkTemplates, reviewTemplates, setDailyReviews, weeklyReviews, setWeeklyReviews, monthlyReviews, setMonthlyReviews } = useReview();
   const { logs, activeSessions } = useData();
   const { addToast } = useToast();
   const { sceneCardTimerMode } = useSettings();
@@ -607,6 +607,114 @@ export const SceneView: React.FC<SceneViewProps> = ({
     };
   };
 
+  // 生成日报中日课分组同步设置（来源于当前日课模板配置）
+  const buildCheckCategorySyncMap = (): { [category: string]: boolean } => {
+    const syncMap: { [category: string]: boolean } = {};
+    checkTemplates
+      .filter(template => template.enabled && template.isDaily)
+      .sort((a, b) => a.order - b.order)
+      .forEach(template => {
+        syncMap[template.title] = template.syncToTimeline || false;
+      });
+    return syncMap;
+  };
+
+  // 生成日报中的日课项（来源于当前日课模板配置）
+  const buildDailyCheckItems = (): CheckItem[] => {
+    const checkItems: CheckItem[] = [];
+
+    checkTemplates
+      .filter(template => template.enabled && template.isDaily)
+      .sort((a, b) => a.order - b.order)
+      .forEach(template => {
+        template.items.forEach(item => {
+          const type = item.type || 'manual';
+          const manualMode = type === 'manual'
+            ? (item.manualMode === 'count' ? 'count' : 'binary')
+            : undefined;
+          const targetCount = type === 'manual'
+            ? (manualMode === 'count'
+              ? Math.max(1, Math.floor(Number(item.targetCount) || 1))
+              : 1)
+            : undefined;
+          checkItems.push({
+            id: item.id || crypto.randomUUID(),
+            category: template.title,
+            content: item.content,
+            icon: item.icon,
+            uiIcon: item.uiIcon,
+            isCompleted: false,
+            type,
+            manualMode,
+            currentCount: type === 'manual' ? 0 : undefined,
+            targetCount,
+            autoConfig: item.autoConfig
+          });
+        });
+      });
+
+    return checkItems;
+  };
+
+  // 生成日报中的引导模板快照（来源于当前日报模板配置）
+  const buildDailyTemplateSnapshot = () => {
+    return reviewTemplates
+      .filter(t => t.isDailyTemplate)
+      .sort((a, b) => a.order - b.order)
+      .map(t => ({
+        id: t.id,
+        title: t.title,
+        questions: t.questions,
+        order: t.order,
+        syncToTimeline: t.syncToTimeline
+      }));
+  };
+
+  // 统一创建日报，确保包含时间轴同步所需字段
+  const createDailyReviewFromTemplates = (dateStr: string): DailyReview => {
+    const now = Date.now();
+    return {
+      id: crypto.randomUUID(),
+      date: dateStr,
+      createdAt: now,
+      updatedAt: now,
+      answers: [],
+      checkItems: buildDailyCheckItems(),
+      checkCategorySyncToTimeline: buildCheckCategorySyncMap(),
+      templateSnapshot: buildDailyTemplateSnapshot()
+    };
+  };
+
+  // 兼容历史日报：补齐时间轴同步配置与模板快照
+  const normalizeDailyReviewForScene = (review: DailyReview): DailyReview => {
+    let updatedReview = review;
+
+    if (!updatedReview.checkCategorySyncToTimeline) {
+      const syncMap = buildCheckCategorySyncMap();
+      const itemCategories = (updatedReview.checkItems || [])
+        .map(item => item.category)
+        .filter((category): category is string => Boolean(category));
+      itemCategories.forEach(category => {
+        if (typeof syncMap[category] === 'undefined') {
+          syncMap[category] = false;
+        }
+      });
+      updatedReview = {
+        ...updatedReview,
+        checkCategorySyncToTimeline: syncMap
+      };
+    }
+
+    if (!updatedReview.templateSnapshot) {
+      updatedReview = {
+        ...updatedReview,
+        templateSnapshot: buildDailyTemplateSnapshot()
+      };
+    }
+
+    return updatedReview;
+  };
+
   // 处理日课打卡
   const handleToggleCheckItem = (
     checkItemId: string,
@@ -621,47 +729,9 @@ export const SceneView: React.FC<SceneViewProps> = ({
 
     // 如果不存在，创建一个新的 DailyReview
     if (!todayReview) {
-      // 从模板生成日课列表
-      const checkItems: CheckItem[] = [];
-      
-      checkTemplates
-        .filter(template => template.enabled && template.isDaily)
-        .sort((a, b) => a.order - b.order)
-        .forEach(template => {
-          template.items.forEach(item => {
-            const type = item.type || 'manual';
-            const manualMode = type === 'manual'
-              ? (item.manualMode === 'count' ? 'count' : 'binary')
-              : undefined;
-            const targetCount = type === 'manual'
-              ? (manualMode === 'count'
-                ? Math.max(1, Math.floor(Number(item.targetCount) || 1))
-                : 1)
-              : undefined;
-            checkItems.push({
-              id: item.id || crypto.randomUUID(),
-              category: template.title,
-              content: item.content,
-              icon: item.icon,
-              uiIcon: item.uiIcon,
-              isCompleted: false,
-              type,
-              manualMode,
-              currentCount: type === 'manual' ? 0 : undefined,
-              targetCount,
-              autoConfig: item.autoConfig
-            });
-          });
-        });
-
-      todayReview = {
-        id: `daily-${Date.now()}`,
-        date: dateStr,
-        createdAt: Date.now(),
-        updatedAt: Date.now(),
-        answers: [],
-        checkItems: checkItems
-      };
+      todayReview = createDailyReviewFromTemplates(dateStr);
+    } else {
+      todayReview = normalizeDailyReviewForScene(todayReview);
     }
 
     // 查找对应的日课项
@@ -846,55 +916,31 @@ export const SceneView: React.FC<SceneViewProps> = ({
   const handleNavigateToDailyReview = (dayOffset: number) => {
     const targetDate = new Date();
     targetDate.setDate(targetDate.getDate() + dayOffset);
-    const dateStr = targetDate.toISOString().split('T')[0];
+    const dateStr = getLocalDateStr(targetDate);
 
     // 查找是否已存在该日期的回顾
     let review = dailyReviews.find(r => r.date === dateStr);
+    let shouldPersistReview = false;
 
     // 如果不存在，创建新的回顾
     if (!review) {
-      const checkItems: CheckItem[] = [];
-      
-      checkTemplates
-        .filter(template => template.enabled && template.isDaily)
-        .sort((a, b) => a.order - b.order)
-        .forEach(template => {
-          template.items.forEach(item => {
-            const type = item.type || 'manual';
-            const manualMode = type === 'manual'
-              ? (item.manualMode === 'count' ? 'count' : 'binary')
-              : undefined;
-            const targetCount = type === 'manual'
-              ? (manualMode === 'count'
-                ? Math.max(1, Math.floor(Number(item.targetCount) || 1))
-                : 1)
-              : undefined;
-            checkItems.push({
-              id: item.id || crypto.randomUUID(),
-              category: template.title,
-              content: item.content,
-              icon: item.icon,
-              uiIcon: item.uiIcon,
-              isCompleted: false,
-              type,
-              manualMode,
-              currentCount: type === 'manual' ? 0 : undefined,
-              targetCount,
-              autoConfig: item.autoConfig
-            });
-          });
-        });
+      review = createDailyReviewFromTemplates(dateStr);
+      shouldPersistReview = true;
+    } else {
+      const normalizedReview = normalizeDailyReviewForScene(review);
+      if (normalizedReview !== review) {
+        review = normalizedReview;
+        shouldPersistReview = true;
+      }
+    }
 
-      review = {
-        id: `daily-${Date.now()}`,
-        date: dateStr,
-        createdAt: Date.now(),
-        updatedAt: Date.now(),
-        answers: [],
-        checkItems: checkItems
-      };
-
-      setDailyReviews([...dailyReviews, review]);
+    if (shouldPersistReview && review) {
+      const exists = dailyReviews.some(r => r.date === dateStr);
+      if (exists) {
+        setDailyReviews(dailyReviews.map(r => r.date === dateStr ? review : r));
+      } else {
+        setDailyReviews([...dailyReviews, review]);
+      }
     }
 
     // 打开每日回顾 - 传递 Date 对象而不是字符串
