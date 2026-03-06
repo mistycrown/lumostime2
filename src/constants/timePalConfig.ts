@@ -20,6 +20,8 @@ export interface TimePalOption {
     emoji: string;
 }
 
+export const CUSTOM_TIMEPAL_PREFIX = 'custom:';
+
 // 所有可用的时光小友选项（不包括 'none'，'none' 通过 UI 单独处理）
 export const TIMEPAL_OPTIONS: TimePalOption[] = [
     // 原有类型
@@ -161,4 +163,28 @@ export const getTimePalEmoji = (type: TimePalType): string => {
 // 获取所有类型列表（用于循环切换）
 export const getAllTimePalTypes = (): TimePalType[] => {
     return TIMEPAL_OPTIONS.map(opt => opt.type);
+};
+
+/**
+ * 判断是否为预设时光小友类型
+ */
+export const isPresetTimePalType = (type: string): type is TimePalType => {
+    return TIMEPAL_OPTIONS.some(option => option.type === type);
+};
+
+/**
+ * 判断是否为自定义时光小友类型（格式：custom:<id>）
+ */
+export const isCustomTimePalType = (type: string | null | undefined): boolean => {
+    return !!type && type.startsWith(CUSTOM_TIMEPAL_PREFIX);
+};
+
+/**
+ * 从自定义类型值中提取自定义 ID
+ */
+export const extractCustomTimePalId = (type: string | null | undefined): string | null => {
+    if (!isCustomTimePalType(type)) {
+        return null;
+    }
+    return type.slice(CUSTOM_TIMEPAL_PREFIX.length) || null;
 };

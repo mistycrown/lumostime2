@@ -1064,7 +1064,7 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
 
                             {activeTab === 'timepal' && (
                                 /* 时光小友设置 */
-                                <TimePalSettings categories={categories} />
+                                <TimePalSettings categories={categories} onToast={onToast} />
                             )}
 
                             {activeTab === 'font' && (

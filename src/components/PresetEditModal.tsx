@@ -12,9 +12,11 @@ import { ColorSchemeSelector } from './ColorSchemeSelector';
 import { BackgroundSelector } from './BackgroundSelector';
 import { NavigationDecorationSelector } from './NavigationDecorationSelector';
 import { ConfirmModal } from './ConfirmModal';
-import { TIMEPAL_OPTIONS, TimePalType, getTimePalEmoji } from '../constants/timePalConfig';
+import { TIMEPAL_OPTIONS, getTimePalEmoji } from '../constants/timePalConfig';
 import { Check } from 'lucide-react';
 import { ToastType } from './Toast';
+import { timePalCustomService, CustomTimePalItem, TIMEPAL_CUSTOM_CHANGED_EVENT } from '../services/timePalCustomService';
+import { imageService } from '../services/imageService';
 
 interface PresetEditModalProps {
     isOpen: boolean;
@@ -36,6 +38,8 @@ export const PresetEditModal: React.FC<PresetEditModalProps> = ({
     const [editedPreset, setEditedPreset] = useState<ThemePreset | null>(null);
     const [hasChanges, setHasChanges] = useState(false);
     const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
+    const [customItems, setCustomItems] = useState<CustomTimePalItem[]>([]);
+    const [customPreviewUrls, setCustomPreviewUrls] = useState<Record<string, string>>({});
 
     // Initialize edited preset when modal opens
     useEffect(() => {
@@ -45,6 +49,54 @@ export const PresetEditModal: React.FC<PresetEditModalProps> = ({
             setIsDeleteConfirmOpen(false);
         }
     }, [isOpen, preset]);
+
+    useEffect(() => {
+        if (!isOpen) {
+            return;
+        }
+
+        const revokeBlobUrls = (urlMap: Record<string, string>) => {
+            Object.values(urlMap).forEach(url => {
+                if (url && url.startsWith('blob:')) {
+                    URL.revokeObjectURL(url);
+                }
+            });
+        };
+
+        const loadCustomItems = async () => {
+            const items = timePalCustomService.getAllItems();
+            setCustomItems(items);
+
+            const nextUrls: Record<string, string> = {};
+            await Promise.all(items.map(async (item) => {
+                try {
+                    const filename = item.stageFilenames[0];
+                    const url = await imageService.getImageUrl(filename, 'original');
+                    if (url) {
+                        nextUrls[item.id] = url;
+                    }
+                } catch (error) {
+                    console.warn('[PresetEditModal] 自定义时间小友预览加载失败:', item.id, error);
+                }
+            }));
+
+            setCustomPreviewUrls(prev => {
+                revokeBlobUrls(prev);
+                return nextUrls;
+            });
+        };
+
+        loadCustomItems();
+        window.addEventListener(TIMEPAL_CUSTOM_CHANGED_EVENT, loadCustomItems);
+
+        return () => {
+            window.removeEventListener(TIMEPAL_CUSTOM_CHANGED_EVENT, loadCustomItems);
+            setCustomPreviewUrls(prev => {
+                revokeBlobUrls(prev);
+                return {};
+            });
+        };
+    }, [isOpen]);
 
     if (!isOpen || !editedPreset) return null;
 
@@ -294,6 +346,52 @@ export const PresetEditModal: React.FC<PresetEditModalProps> = ({
                                     </button>
                                 );
                             })}
+
+                            {customItems.map((item) => {
+                                const selectionValue = timePalCustomService.getSelectionValue(item.id);
+                                const isSelected = editedPreset.timePal === selectionValue;
+                                const previewUrl = customPreviewUrls[item.id];
+                                return (
+                                    <button
+                                        key={item.id}
+                                        onClick={() => handleFieldChange('timePal', selectionValue)}
+                                        className={`relative rounded-lg border-2 transition-all overflow-hidden ${
+                                            isSelected
+                                                ? 'border-stone-400 ring-2 ring-stone-200'
+                                                : 'border-stone-200 hover:border-stone-300'
+                                        }`}
+                                        style={{ aspectRatio: '4/5' }}
+                                        title={item.name}
+                                    >
+                                        <div className="w-full h-full flex items-center justify-center p-1 bg-white">
+                                            {previewUrl ? (
+                                                <img
+                                                    src={previewUrl}
+                                                    alt={item.name}
+                                                    className="w-full h-full object-contain"
+                                                    onError={(e) => {
+                                                        e.currentTarget.style.display = 'none';
+                                                        const parent = e.currentTarget.parentElement;
+                                                        if (parent) {
+                                                            parent.innerHTML = '<span class="text-3xl">🐾</span>';
+                                                        }
+                                                    }}
+                                                />
+                                            ) : (
+                                                <span className="text-3xl">🐾</span>
+                                            )}
+                                        </div>
+                                        {isSelected && (
+                                            <div className="absolute top-1 right-1 w-5 h-5 bg-stone-800 rounded-full flex items-center justify-center shadow-lg">
+                                                <Check size={12} className="text-white" />
+                                            </div>
+                                        )}
+                                    </button>
+                                );
+                            })}
+                        </div>
+                        <div className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg p-2 mt-2">
+                            自定义的时间小友不参加云同步
                         </div>
                     </div>
                 </div>

@@ -124,7 +124,7 @@ export const useAppInitialization = () => {
         const initFont = async () => {
             try {
                 const { fontService } = await import('../services/fontService');
-                fontService.initializeFont();
+                await fontService.initializeFont();
                 console.log('🔤 Font service initialized');
             } catch (error) {
                 console.error('❌ Font service initialization failed:', error);
