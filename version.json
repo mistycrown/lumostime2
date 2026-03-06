@@ -1,7 +1,7 @@
 {
-    "version": "1.1.5",
-    "versionCode": 115,
+    "version": "1.1.6",
+    "versionCode": 116,
     "updateUrl": "https://github.com/mistycrown/lumostime2/releases/latest",
-    "releaseNotes": "v1.1.5\n• 增加沉浸式计时的直接提交按钮\n• 修复从场景页面进行日课打卡时，部分情况下找不到对应日课的问题\n• 修复日课连胜统计徽章的计算问题\n• 增加场景组的设置功能\n• 修复进度计算的问题，增加重算待办进度按钮\n• 标签分类待办详情等月历改从周一开始\n• 增加手机端导出数据/图片/Excel的路径配置\n• 修复从场景页打卡日课找不到日课项的问题\n• 修复图片列表重建功能\n• 增加数字类型的日课\n• 增加场景时间段的排序功能\n• 增加场景快捷方式的复制功能\n• 调整emoji渲染大小\n• 修复设置页面实体返回按键",
+    "releaseNotes": "v1.1.6\n• 增加日课模板排序功能\n• 调整chronicle页月回顾卡片的渲染逻辑\n• 增加目标系列功能\n• 调整emojiselector中emoji选项的大小\n• 增加自定义字体",
     "forceUpdate": false
 }
