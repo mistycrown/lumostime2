@@ -6,9 +6,10 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import { Log, Category, ActiveSession } from '../types';
 import { getRandomQuote } from '../constants/timePalQuotes';
-import { TimePalType, getAllTimePalTypes } from '../constants/timePalConfig';
+import { getAllTimePalTypes, isCustomTimePalType } from '../constants/timePalConfig';
 import { useTimePalImage } from '../hooks/useTimePalImage';
 import { TIMEPAL_KEYS, storage } from '../constants/storageKeys';
+import { timePalCustomService, TIMEPAL_CUSTOM_CHANGED_EVENT } from '../services/timePalCustomService';
 
 interface TimePalCardProps {
     logs: Log[];
@@ -48,16 +49,13 @@ const getFormDescription = (level: number): string => {
 
 export const TimePalCard: React.FC<TimePalCardProps> = ({ logs, currentDate, categories, activeSessions = [] }) => {
     // 从 localStorage 读取用户选择的小动物类型
-    const [timePalType, setTimePalType] = useState<TimePalType | null>(() => {
+    const [timePalType, setTimePalType] = useState<string | null>(() => {
         const saved = storage.get(TIMEPAL_KEYS.TYPE);
         if (saved === 'none' || !saved) return null;
-        return (saved as TimePalType);
+        return saved;
     });
-
-    // 如果用户选择不使用时光小友，直接返回 null
-    if (timePalType === null) {
-        return null;
-    }
+    const [customTypeSelections, setCustomTypeSelections] = useState<string[]>([]);
+    const [isCustomTypesLoaded, setIsCustomTypesLoaded] = useState(false);
 
     // 实时计时器状态 - 用于更新正在进行的会话时长
     const [currentTime, setCurrentTime] = useState(Date.now());
@@ -77,6 +75,40 @@ export const TimePalCard: React.FC<TimePalCardProps> = ({ logs, currentDate, cat
         }
     }, [activeSessions.length]);
 
+    // 加载自定义时光小友列表（用于点击切换）
+    useEffect(() => {
+        const loadCustomTypes = () => {
+            const customTypes = timePalCustomService
+                .getAllItems()
+                .map(item => timePalCustomService.getSelectionValue(item.id));
+            setCustomTypeSelections(customTypes);
+            setIsCustomTypesLoaded(true);
+        };
+
+        loadCustomTypes();
+        window.addEventListener(TIMEPAL_CUSTOM_CHANGED_EVENT, loadCustomTypes);
+
+        return () => {
+            window.removeEventListener(TIMEPAL_CUSTOM_CHANGED_EVENT, loadCustomTypes);
+        };
+    }, []);
+
+    // 如果当前选择的自定义小友被删除，回退为不使用
+    useEffect(() => {
+        if (!isCustomTypesLoaded) {
+            return;
+        }
+        if (!timePalType || !isCustomTimePalType(timePalType)) {
+            return;
+        }
+        if (customTypeSelections.includes(timePalType)) {
+            return;
+        }
+        setTimePalType(null);
+        storage.set(TIMEPAL_KEYS.TYPE, 'none');
+        window.dispatchEvent(new Event('timepal-type-changed'));
+    }, [timePalType, customTypeSelections, isCustomTypesLoaded]);
+
     // 监听 localStorage 变化，实现跨组件同步
     useEffect(() => {
         const handleStorageChange = () => {
@@ -84,7 +116,7 @@ export const TimePalCard: React.FC<TimePalCardProps> = ({ logs, currentDate, cat
             if (saved === 'none' || !saved) {
                 setTimePalType(null);
             } else {
-                setTimePalType(saved as TimePalType);
+                setTimePalType(saved);
             }
         };
 
@@ -96,7 +128,7 @@ export const TimePalCard: React.FC<TimePalCardProps> = ({ logs, currentDate, cat
             if (saved === 'none' || !saved) {
                 setTimePalType(null);
             } else {
-                setTimePalType(saved as TimePalType);
+                setTimePalType(saved);
             }
         };
         window.addEventListener('timepal-type-changed', handleCustomChange);
@@ -120,11 +152,16 @@ export const TimePalCard: React.FC<TimePalCardProps> = ({ logs, currentDate, cat
         };
     }, []);
 
+    const effectiveTimePalType = timePalType || getAllTimePalTypes()[0] || 'cat';
+
     // 切换小动物类型
     const switchTimePal = () => {
-        const types = getAllTimePalTypes();
+        const types = [...getAllTimePalTypes(), ...customTypeSelections];
+        if (types.length === 0) {
+            return;
+        }
         const currentIndex = types.indexOf(timePalType);
-        const nextType = types[(currentIndex + 1) % types.length];
+        const nextType = currentIndex === -1 ? types[0] : types[(currentIndex + 1) % types.length];
         setTimePalType(nextType);
         storage.set(TIMEPAL_KEYS.TYPE, nextType);
         // 触发自定义事件通知其他组件
@@ -202,7 +239,7 @@ export const TimePalCard: React.FC<TimePalCardProps> = ({ logs, currentDate, cat
     }, [logs, currentDate, categories, activeSessions, currentTime, debugMode, debugFocusSeconds, debugLevel]);
 
     // 使用图片加载 Hook
-    const { imageUrl, hasError: imageError, emoji, handleImageError } = useTimePalImage(timePalType, formLevel);
+    const { imageUrl, hasError: imageError, emoji, handleImageError } = useTimePalImage(effectiveTimePalType, formLevel);
     
     const timeDisplay = formatDuration(totalFocusSeconds);
     const formDesc = getFormDescription(formLevel);
@@ -217,7 +254,7 @@ export const TimePalCard: React.FC<TimePalCardProps> = ({ logs, currentDate, cat
     }, [currentDate]);
 
     // 如果不是今天，或者没有专注时长（且不在调试模式），不显示卡片
-    if (!isToday || (totalFocusSeconds === 0 && !debugMode)) {
+    if (!timePalType || !isToday || (totalFocusSeconds === 0 && !debugMode)) {
         return null;
     }
 

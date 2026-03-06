@@ -274,6 +274,35 @@ class ImageService {
         }
     }
 
+    /**
+     * 仅删除本地图片，不写入同步删除记录，也不修改引用列表
+     */
+    async deleteImageLocalOnly(filename: string): Promise<void> {
+        await this.ensureInit();
+
+        if (Capacitor.isNativePlatform()) {
+            await Filesystem.deleteFile({
+                path: `images/${filename}`,
+                directory: Directory.Data,
+            }).catch(() => { });
+
+            return;
+        }
+
+        const db = await this.dbPromise;
+        if (!db) {
+            return;
+        }
+
+        await new Promise<void>((resolve, reject) => {
+            const transaction = db.transaction([STORE_NAME], 'readwrite');
+            const store = transaction.objectStore(STORE_NAME);
+            store.delete(filename);
+            transaction.oncomplete = () => resolve();
+            transaction.onerror = () => reject(transaction.error);
+        });
+    }
+
     private blobToBase64(blob: Blob): Promise<string> {
         // console.log(`[ImageService] blobToBase64 开始，Blob大小: ${blob.size} bytes`);
         return new Promise((resolve, reject) => {

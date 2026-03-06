@@ -12,6 +12,8 @@
 export const TIMEPAL_KEYS = {
     /** 当前选择的小动物类型 */
     TYPE: 'lumostime_timepal_type',
+    /** 自定义时光小友列表 */
+    CUSTOM_ITEMS: 'lumostime_timepal_custom_items',
     /** 是否启用标签筛选 */
     FILTER_ENABLED: 'lumostime_timepal_filter_enabled',
     /** 筛选的活动标签 ID 列表 */
