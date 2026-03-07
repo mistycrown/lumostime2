@@ -1,7 +1,7 @@
 /**
  * @file timePalCustomService.ts
  * @description 自定义时光小友服务 - 负责本地校验、保存、读取和删除（不参加云同步）
- * @input 用户上传的 5 张 PNG 图片、名称
+ * @input 用户上传的 5 张图片（建议 1:1 PNG）、名称
  * @output 自定义时光小友元数据（localStorage）和本地图片文件（imageService）
  * @pos Service (TimePal Customization)
  */
@@ -23,7 +23,6 @@ interface ValidationResult {
 }
 
 const CUSTOM_TIMEPAL_EVENT = 'timepal-custom-changed';
-const MAX_FILE_SIZE_BYTES = 2 * 1024 * 1024;
 const STAGE_COUNT = 5;
 
 class TimePalCustomService {
@@ -93,7 +92,10 @@ class TimePalCustomService {
 
         const now = Date.now();
         const id = `custom_tp_${now}_${Math.random().toString(36).slice(2, 8)}`;
-        const stageFilenames = stageFiles.map((_, idx) => `timepal_custom_${id}_${idx + 1}.png`) as [string, string, string, string, string];
+        const stageFilenames = stageFiles.map((file, idx) => {
+            const ext = this.getSafeExtension(file);
+            return `timepal_custom_${id}_${idx + 1}.${ext}`;
+        }) as [string, string, string, string, string];
         const writtenFilenames: string[] = [];
 
         try {
@@ -185,16 +187,8 @@ class TimePalCustomService {
             if (!file) {
                 return { valid: false, message: `${stageLabel}图片不能为空` };
             }
-            if (file.type !== 'image/png') {
-                return { valid: false, message: `${stageLabel}仅支持 PNG 格式` };
-            }
-            if (file.size > MAX_FILE_SIZE_BYTES) {
-                return { valid: false, message: `${stageLabel}超过 2MB，请压缩后重试` };
-            }
-
-            const squareCheck = await this.checkIsSquare(file);
-            if (!squareCheck.valid) {
-                return { valid: false, message: `${stageLabel}必须是 1:1 比例` };
+            if (!file.type.startsWith('image/')) {
+                return { valid: false, message: `${stageLabel}请选择图片文件` };
             }
         }
 
@@ -211,33 +205,20 @@ class TimePalCustomService {
         }
     }
 
-    private checkIsSquare(file: File): Promise<ValidationResult> {
-        return new Promise((resolve) => {
-            const image = new Image();
-            const objectUrl = URL.createObjectURL(file);
+    private getSafeExtension(file: File): string {
+        const byMime = file.type.split('/')[1]?.toLowerCase();
+        if (byMime && /^[a-z0-9]+$/.test(byMime)) {
+            if (byMime === 'jpeg') return 'jpg';
+            return byMime;
+        }
 
-            image.onload = () => {
-                const width = image.width;
-                const height = image.height;
-                URL.revokeObjectURL(objectUrl);
+        const byName = file.name.split('.').pop()?.toLowerCase();
+        if (byName && /^[a-z0-9]+$/.test(byName)) {
+            if (byName === 'jpeg') return 'jpg';
+            return byName;
+        }
 
-                if (width <= 0 || height <= 0) {
-                    resolve({ valid: false, message: '图片尺寸无效' });
-                    return;
-                }
-
-                const ratio = width / height;
-                const isSquare = Math.abs(ratio - 1) <= 0.01;
-                resolve({ valid: isSquare, message: isSquare ? undefined : '图片比例必须为 1:1' });
-            };
-
-            image.onerror = () => {
-                URL.revokeObjectURL(objectUrl);
-                resolve({ valid: false, message: '图片读取失败' });
-            };
-
-            image.src = objectUrl;
-        });
+        return 'png';
     }
 }
 

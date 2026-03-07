@@ -2,6 +2,6 @@
     "version": "1.1.6",
     "versionCode": 116,
     "updateUrl": "https://github.com/mistycrown/lumostime2/releases/latest",
-    "releaseNotes": "v1.1.6\n• 增加日课模板排序功能\n• 调整chronicle页月回顾卡片的渲染逻辑\n• 增加目标系列功能\n• 调整emojiselector中emoji选项的大小\n• 增加自定义字体",
+    "releaseNotes": "v1.1.6\n• 增加日课模板排序功能\n• 调整chronicle页月回顾卡片的渲染逻辑\n• 增加目标系列功能\n• 调整emojiselector中emoji选项的大小\n• 增加自定义字体\n• 增加时间小友功能",
     "forceUpdate": false
 }
