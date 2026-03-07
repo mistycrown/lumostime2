@@ -240,6 +240,7 @@ export const TimePalCard: React.FC<TimePalCardProps> = ({ logs, currentDate, cat
 
     // 使用图片加载 Hook
     const { imageUrl, hasError: imageError, emoji, handleImageError } = useTimePalImage(effectiveTimePalType, formLevel);
+    const imageFitClass = isCustomTimePalType(effectiveTimePalType) ? 'object-fill' : 'object-cover';
     
     const timeDisplay = formatDuration(totalFocusSeconds);
     const formDesc = getFormDescription(formLevel);
@@ -272,7 +273,7 @@ export const TimePalCard: React.FC<TimePalCardProps> = ({ logs, currentDate, cat
                             <img 
                                 src={imageUrl} 
                                 alt="时光小友" 
-                                className="w-full h-full object-cover"
+                                className={`w-full h-full ${imageFitClass}`}
                                 onError={handleImageError}
                             />
                         ) : (

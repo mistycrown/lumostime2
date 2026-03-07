@@ -1,7 +1,7 @@
 /**
  * @file CustomTimePalModal.tsx
  * @description 自定义时光小友创建模态框
- * @input 名称、5 张阶段图片（PNG 1:1）
+ * @input 名称、5 张阶段图片（建议 PNG 1:1）
  * @output 创建成功后的自定义时光小友
  * @pos Component (Modal)
  */
@@ -118,7 +118,7 @@ export const CustomTimePalModal: React.FC<CustomTimePalModalProps> = ({
                 <div className="p-6 border-b border-stone-100 flex items-center justify-between">
                     <div>
                         <h3 className="text-lg font-bold text-stone-800">添加自定义时间小友</h3>
-                        <p className="text-xs text-stone-500 mt-1">上传 5 张 1:1 PNG，分别对应 5 个阶段</p>
+                        <p className="text-xs text-stone-500 mt-1">上传 5 张图片，分别对应 5 个阶段</p>
                     </div>
                     <button
                         onClick={onClose}
@@ -180,7 +180,7 @@ export const CustomTimePalModal: React.FC<CustomTimePalModalProps> = ({
                                                 fileInputRefs.current[index] = el;
                                             }}
                                             type="file"
-                                            accept="image/png"
+                                            accept="image/*"
                                             className="hidden"
                                             onChange={(e) => handleFileChange(index, e)}
                                         />
@@ -198,7 +198,10 @@ export const CustomTimePalModal: React.FC<CustomTimePalModalProps> = ({
                             自定义的时间小友不参加云同步
                         </p>
                         <p className="text-[11px] text-amber-700 mt-1">
-                            仅保存在当前设备本地，重装应用或清除本地数据后会丢失
+                            建议上传 1:1 的 PNG 图片，否则效果会有所影响
+                        </p>
+                        <p className="text-[11px] text-amber-700 mt-1">
+                            支持 JPG / PNG / WebP 等常见图片格式，仅保存在当前设备本地
                         </p>
                     </div>
                 </div>
