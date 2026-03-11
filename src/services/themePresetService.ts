@@ -24,6 +24,8 @@
 import { Capacitor } from '@capacitor/core';
 import { ThemePreset } from '../hooks/useCustomPresets';
 import { THEME_KEYS, TIMEPAL_KEYS, storage } from '../constants/storageKeys';
+import { backgroundService } from './backgroundService';
+import { navigationDecorationService } from './navigationDecorationService';
 
 export interface ThemeApplyResult {
     success: boolean;
@@ -56,7 +58,6 @@ export class ThemePresetService {
      */
     static async applyBackground(background: string): Promise<void> {
         console.log('[ThemePresetService] 应用背景:', background);
-        const { backgroundService } = await import('./backgroundService');
         backgroundService.setCurrentBackground(background);
         
         // 延迟触发背景重新应用
@@ -70,7 +71,6 @@ export class ThemePresetService {
      */
     static async applyNavigation(navigation: string): Promise<void> {
         console.log('[ThemePresetService] 应用导航装饰:', navigation);
-        const { navigationDecorationService } = await import('./navigationDecorationService');
         navigationDecorationService.setCurrentDecoration(navigation);
     }
 

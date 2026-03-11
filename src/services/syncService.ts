@@ -19,6 +19,8 @@
  * 
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
+import { Capacitor } from '@capacitor/core';
+import { Directory, Filesystem } from '@capacitor/filesystem';
 import { webdavService } from './webdavService';
 import { s3Service } from './s3Service';
 import { imageService } from './imageService';
@@ -74,9 +76,6 @@ export const syncService = {
 
     // 强制删除本地文件（不记录删除操作）
     forceDeleteLocalFile: async (filename: string): Promise<void> => {
-        const { Filesystem, Directory } = await import('@capacitor/filesystem');
-        const { Capacitor } = await import('@capacitor/core');
-
         if (Capacitor.isNativePlatform()) {
             await Filesystem.deleteFile({
                 path: `images/${filename}`,

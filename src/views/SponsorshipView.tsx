@@ -17,7 +17,7 @@ import { BackgroundSelector } from '../components/BackgroundSelector';
 import { NavigationDecorationSelector } from '../components/NavigationDecorationSelector';
 import { ColorSchemeSelector } from '../components/ColorSchemeSelector';
 import { CustomColorGroupManager } from '../components/CustomColorGroupManager';
-import { ICON_OPTIONS } from '../services/iconService';
+import { iconService, ICON_OPTIONS } from '../services/iconService';
 import { Category } from '../types';
 import { useSettings } from '../contexts/SettingsContext';
 import { InputModal } from '../components/InputModal';
@@ -459,7 +459,6 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
         // 加载当前图标设置
         const loadCurrentIcon = async () => {
             try {
-                const { iconService } = await import('../services/iconService');
                 const currentIcon = iconService.getCurrentIcon();
                 setSelectedIcon(currentIcon);
                 console.log('[SponsorshipView] 当前图标:', currentIcon);
@@ -540,7 +539,6 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
 
         setIsChangingIcon(true);
         try {
-            const { iconService } = await import('../services/iconService');
             console.log('[SponsorshipView] ✓ iconService已加载');
             console.log('[SponsorshipView] 开始调用setIcon:', iconId);
             
@@ -912,7 +910,6 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
                                                 <button
                                                     onClick={async () => {
                                                         try {
-                                                            const { iconService } = await import('../services/iconService');
                                                             const result = await iconService.refreshLauncher();
                                                             onToast(result.success ? 'success' : 'info', result.message);
                                                         } catch (error: any) {
