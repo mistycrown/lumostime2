@@ -478,6 +478,10 @@ export const AppRoutes: React.FC<AppRoutesProps> = ({
                         }}
                         onDeleteMajorGoal={deleteMajorGoal}
                         onArchiveMajorGoal={archiveMajorGoal}
+                        onBatchUpdateGoals={(nextMajorGoals, nextGoals) => {
+                            setMajorGoals(nextMajorGoals);
+                            setGoals(nextGoals);
+                        }}
                         onEditTodo={openEditTodoModal}
                         onToggleTodo={handleToggleTodo}
                     />
