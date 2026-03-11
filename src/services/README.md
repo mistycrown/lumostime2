@@ -12,6 +12,7 @@ Contains business logic and external integrations.
 - `obsidianExportService.ts`: [Active] - Exports data to Obsidian markdown files.
 - `syncService.ts`: [Active] - Orchestrates image synchronization between local storage and WebDAV server. Handles deletions and bidirectional sync.
 - `themePresetService.ts`: [Active] - 主题预设应用服务，拆分复杂的主题切换逻辑为独立方法
+- `customColorGroupService.ts`: [Active] - 自定义色组存储服务，负责 HEX 归一化、去重清洗、增删改查与排序持久化
 - `updateService.ts`: [Active] - Checks for app updates from Gitee (primary) or GitHub (fallback).
 - `webdavService.ts`: [Active] - WebDAV client implementation supporting Web (Proxy) and Native (Cordova HTTP) environments. Automatically converts Base64 images to ArrayBuffer for proper upload.
 

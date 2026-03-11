@@ -12,6 +12,7 @@ import { Category, Activity } from '../types';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { backgroundService } from '../services/backgroundService';
 import { IconRenderer } from '../components/IconRenderer';
+import { getSoftColorCircleStyle } from '../utils/colorAdapterUtils';
 
 
 interface RecordViewProps {
@@ -75,6 +76,10 @@ export const RecordView: React.FC<RecordViewProps> = ({ onStartActivity, categor
   // Or if 'recent' is not implemented yet, just default to first.
   // Note: 'recent' logic was not fully implemented in previous code, it just defaulted to CATEGORIES[0] if not found.
   const selectedCategory = categories.find(c => c.id === selectedCategoryId) || categories[0];
+
+  const getActivityButtonStyle = (activity: Activity) => {
+    return getSoftColorCircleStyle(activity.color || '', 0.15);
+  };
 
   return (
     <div 
@@ -195,7 +200,10 @@ export const RecordView: React.FC<RecordViewProps> = ({ onStartActivity, categor
               className="flex flex-col items-center gap-3 cursor-pointer active:scale-95 transition-transform"
             >
               {/* Use activity.color for background */}
-              <div className={`w-16 h-16 md:w-20 md:h-20 rounded-full flex items-center justify-center text-3xl md:text-4xl shadow-sm ${activity.color}`}>
+              <div
+                className="w-16 h-16 md:w-20 md:h-20 rounded-full flex items-center justify-center text-3xl md:text-4xl shadow-sm"
+                style={getActivityButtonStyle(activity)}
+              >
                 <IconRenderer 
                   icon={activity.icon} 
                   uiIcon={activity.uiIcon}

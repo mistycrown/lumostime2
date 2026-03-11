@@ -524,6 +524,20 @@ export interface NarrativeTemplate {
   isMonthly?: boolean;  // 是否用于月回顾
 }
 
+// ==================== Theme: Custom Color Group ====================
+
+export interface CustomColorItem {
+  id: string;
+  color: string; // Hex color value, e.g. "#AABBCC"
+  createdAt: number;
+}
+
+export interface CustomColorGroup {
+  version: 1;
+  colors: CustomColorItem[];
+  updatedAt: number;
+}
+
 // ========== Custom Filter (自定义筛选器) ==========
 
 // 自定义筛选器

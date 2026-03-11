@@ -20,6 +20,8 @@ import { UIIconSelector } from '../components/UIIconSelector';
 import { uiIconService } from '../services/uiIconService';
 import { useSettings } from '../contexts/SettingsContext';
 import { IconRenderer } from '../components/IconRenderer';
+import { useCustomColors } from '../hooks/useCustomColors';
+import { isStoredColorSelected } from '../utils/colorUtils';
 
 
 interface TagDetailViewProps {
@@ -64,6 +66,7 @@ export const TagDetailView: React.FC<TagDetailViewProps> = ({ tagId, logs, todos
    const [analysisDate, setAnalysisDate] = useState(new Date());
    const [newKeyword, setNewKeyword] = useState(''); // New State for adding keyword
    const [isCategoryDropdownOpen, setIsCategoryDropdownOpen] = useState(false); // State for category dropdown
+   const customColors = useCustomColors();
 
    // 实时保存：当 activity 状态变化时自动保存
    useEffect(() => {
@@ -518,7 +521,20 @@ export const TagDetailView: React.FC<TagDetailViewProps> = ({ tagId, logs, todos
                                     key={opt.id}
                                     onClick={() => handleColorChange(`${opt.bg} ${opt.text} `)}
                                     title={opt.label}
-                                    className={`w-7 h-7 rounded-full ${opt.bg} ${activity?.color.includes(opt.bg) ? `ring-1 ${opt.ring} ring-offset-1` : ''}`}
+                                    className={`w-7 h-7 rounded-full ${opt.bg} ${isStoredColorSelected(activity?.color, `${opt.bg} ${opt.text}`) ? `ring-1 ${opt.ring} ring-offset-1` : ''}`}
+                                 />
+                              ))}
+                              {customColors.map((item) => (
+                                 <button
+                                    key={item.id}
+                                    onClick={() => handleColorChange(item.color)}
+                                    title={item.color}
+                                    className={`w-7 h-7 rounded-full border border-stone-300 ${
+                                       isStoredColorSelected(activity?.color, item.color)
+                                          ? 'ring-1 ring-stone-400 ring-offset-1'
+                                          : ''
+                                    }`}
+                                    style={{ backgroundColor: item.color }}
                                  />
                               ))}
                            </div>

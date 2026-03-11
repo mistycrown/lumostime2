@@ -10,6 +10,7 @@
 import React, { useState } from 'react';
 import { ChevronLeft, Plus, Trash2, Link, X } from 'lucide-react';
 import { AutoLinkRule, Category, Scope, Activity } from '../types';
+import { getSoftColorCircleStyle } from '../utils/colorAdapterUtils';
 
 interface AutoLinkViewProps {
     onClose: () => void;
@@ -278,7 +279,10 @@ export const AutoLinkView: React.FC<AutoLinkViewProps> = ({
                                                     >
                                                         {/* Activity Info */}
                                                         <div className="flex items-center gap-3">
-                                                            <div className={`w-8 h-8 rounded-full flex items-center justify-center text-lg ${activityInfo.activity.color} bg-opacity-10`}>
+                                                            <div
+                                                                className="w-8 h-8 rounded-full flex items-center justify-center text-lg"
+                                                                style={getSoftColorCircleStyle(activityInfo.activity.color || '', 0.15)}
+                                                            >
                                                                 {activityInfo.activity.icon}
                                                             </div>
                                                             <div>

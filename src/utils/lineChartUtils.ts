@@ -6,6 +6,7 @@
  */
 
 import { Log, Category, TodoItem, Scope } from '../types';
+import { getChartStrokeColor } from './colorAdapterUtils';
 
 /**
  * 图表线条颜色映射
@@ -98,9 +99,7 @@ export function getMaxValue(dataPoints: number[][]): number {
  * @returns 十六进制颜色值
  */
 export function getStrokeColor(colorClass: string): string {
-  const match = colorClass?.match(/(?:text|bg)-([a-z]+)-/);
-  const colorId = match ? match[1] : 'stone';
-  return CHART_LINE_COLORS[colorId] || '#d6d3d1';
+  return getChartStrokeColor(colorClass);
 }
 
 /**

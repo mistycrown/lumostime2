@@ -19,6 +19,8 @@ import { UIIconSelector } from '../components/UIIconSelector';
 import { useSettings } from '../contexts/SettingsContext';
 import { IconRenderer } from '../components/IconRenderer';
 import { getDateRange } from '../utils/dateRangeUtils';
+import { useCustomColors } from '../hooks/useCustomColors';
+import { isStoredColorSelected } from '../utils/colorUtils';
 
 interface CategoryDetailViewProps {
     categoryId: string;
@@ -39,6 +41,7 @@ export const CategoryDetailView: React.FC<CategoryDetailViewProps> = ({ category
     // 获取当前 UI 图标主题
     const { uiIconTheme } = useSettings();
     const isCustomThemeEnabled = uiIconTheme !== 'default';
+    const customColors = useCustomColors();
 
     const [activeTab, setActiveTab] = useState('Timeline');
     const [displayDate, setDisplayDate] = useState(new Date());
@@ -286,7 +289,20 @@ export const CategoryDetailView: React.FC<CategoryDetailViewProps> = ({ category
                                                 key={opt.id}
                                                 onClick={() => handleColorChange(opt.title)}
                                                 title={opt.label}
-                                                className={`w-7 h-7 rounded-full border-2 ${opt.bg} ${opt.border} ${category.themeColor === opt.title ? `ring-1 ${opt.ring} ring-offset-1` : ''}`}
+                                                className={`w-7 h-7 rounded-full border-2 ${opt.bg} ${opt.border} ${isStoredColorSelected(category.themeColor, opt.title) ? `ring-1 ${opt.ring} ring-offset-1` : ''}`}
+                                            />
+                                        ))}
+                                        {customColors.map((item) => (
+                                            <button
+                                                key={item.id}
+                                                onClick={() => handleColorChange(item.color)}
+                                                title={item.color}
+                                                className={`w-7 h-7 rounded-full border border-stone-300 ${
+                                                    isStoredColorSelected(category.themeColor, item.color)
+                                                        ? 'ring-1 ring-stone-400 ring-offset-1'
+                                                        : ''
+                                                }`}
+                                                style={{ backgroundColor: item.color }}
                                             />
                                         ))}
                                     </div>

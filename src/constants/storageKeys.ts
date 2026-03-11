@@ -34,6 +34,8 @@ export const THEME_KEYS = {
     UI_ICON_THEME: 'lumostime_ui_icon_theme',
     /** 配色方案 */
     COLOR_SCHEME: 'lumostime_color_scheme',
+    /** 自定义色组 */
+    CUSTOM_COLOR_GROUP: 'lumostime_custom_color_group',
     /** 当前背景 */
     CURRENT_BACKGROUND: 'lumos_current_background',
     /** 导航装饰 */

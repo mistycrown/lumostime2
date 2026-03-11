@@ -9,13 +9,14 @@
  */
 import React, { useState } from 'react';
 import { Category, Activity } from '../types';
-import { ChevronDown, ChevronRight, GripVertical, Plus, Trash2, ArrowUp, ArrowDown, X, Check, Palette } from 'lucide-react';
+import { ChevronDown, ChevronRight, GripVertical, Plus, Trash2, ArrowUp, ArrowDown, X, Check } from 'lucide-react';
 import { UIIconSelectorCompact } from '../components/UIIconSelector';
 import { IconRenderer } from '../components/IconRenderer';
 import { uiIconService } from '../services/uiIconService';
 import { useSettings } from '../contexts/SettingsContext';
 import { COLOR_OPTIONS } from '../constants';
-import { extractActivityColor, extractCategoryColor } from '../utils/colorUtils';
+import { useCustomColors } from '../hooks/useCustomColors';
+import { getColorPreviewValue, isStoredColorSelected } from '../utils/colorUtils';
 
 interface BatchManageViewProps {
     onBack: () => void;
@@ -35,6 +36,7 @@ export const BatchManageView: React.FC<BatchManageViewProps> = ({ onBack, catego
     
     const { uiIconTheme } = useSettings();
     const isCustomIconEnabled = uiIconService.isCustomTheme();
+    const customColors = useCustomColors();
 
     // Drag state (kept for reference, but user said it's unusable, so we rely on buttons now)
     const [draggedActivity, setDraggedActivity] = useState<{ activity: Activity, sourceCategoryId: string } | null>(null);
@@ -210,12 +212,12 @@ export const BatchManageView: React.FC<BatchManageViewProps> = ({ onBack, catego
 
     // Get color hex from activity color string (use lightHex for display)
     const getColorFromActivityColor = (colorStr: string): string => {
-        return extractActivityColor(colorStr, true);
+        return getColorPreviewValue(colorStr, 'activity');
     };
 
     // Get color hex from category themeColor (use lightHex for display)
     const getColorFromCategoryThemeColor = (themeColor: string): string => {
-        return extractCategoryColor(themeColor, true);
+        return getColorPreviewValue(themeColor, 'category');
     };
 
     // --- Drag Logic (Kept but optional now) ---
@@ -353,10 +355,23 @@ export const BatchManageView: React.FC<BatchManageViewProps> = ({ onBack, catego
                                             onClick={() => handleCategoryColorChange(category.id, opt.title)}
                                             title={opt.label}
                                             className={`w-8 h-8 rounded-full ${opt.bg} transition-all hover:scale-110 ${
-                                                category.themeColor.includes(opt.id) 
+                                                isStoredColorSelected(category.themeColor, opt.title)
                                                     ? `ring-2 ${opt.ring} ring-offset-2` 
                                                     : ''
                                             }`}
+                                        />
+                                    ))}
+                                    {customColors.map((item) => (
+                                        <button
+                                            key={item.id}
+                                            onClick={() => handleCategoryColorChange(category.id, item.color)}
+                                            title={item.color}
+                                            className={`w-8 h-8 rounded-full border border-stone-300 transition-all hover:scale-110 ${
+                                                isStoredColorSelected(category.themeColor, item.color)
+                                                    ? 'ring-2 ring-stone-400 ring-offset-2'
+                                                    : ''
+                                            }`}
+                                            style={{ backgroundColor: item.color }}
                                         />
                                     ))}
                                 </div>
@@ -462,10 +477,23 @@ export const BatchManageView: React.FC<BatchManageViewProps> = ({ onBack, catego
                                                             onClick={() => handleActivityColorChange(category.id, activity.id, `${opt.bg} ${opt.text}`)}
                                                             title={opt.label}
                                                             className={`w-8 h-8 rounded-full ${opt.bg} transition-all hover:scale-110 ${
-                                                                activity.color.includes(opt.bg) 
+                                                                isStoredColorSelected(activity.color, `${opt.bg} ${opt.text}`)
                                                                     ? `ring-2 ${opt.ring} ring-offset-2` 
                                                                     : ''
                                                             }`}
+                                                        />
+                                                    ))}
+                                                    {customColors.map((item) => (
+                                                        <button
+                                                            key={item.id}
+                                                            onClick={() => handleActivityColorChange(category.id, activity.id, item.color)}
+                                                            title={item.color}
+                                                            className={`w-8 h-8 rounded-full border border-stone-300 transition-all hover:scale-110 ${
+                                                                isStoredColorSelected(activity.color, item.color)
+                                                                    ? 'ring-2 ring-stone-400 ring-offset-2'
+                                                                    : ''
+                                                            }`}
+                                                            style={{ backgroundColor: item.color }}
                                                         />
                                                     ))}
                                                 </div>
