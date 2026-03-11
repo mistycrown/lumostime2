@@ -27,6 +27,7 @@ import { GoalBatchManageView } from './GoalBatchManageView';
 import { useNavigation } from '../contexts/NavigationContext';
 import { useCustomColors } from '../hooks/useCustomColors';
 import { isStoredColorSelected } from '../utils/colorUtils';
+import { getColorHexForCharts } from '../utils/colorAdapterUtils';
 
 interface ScopeDetailViewProps {
     scope: Scope;
@@ -246,11 +247,7 @@ export const ScopeDetailView: React.FC<ScopeDetailViewProps> = ({
                 label: cat && act ? `${cat.name} · ${act.name}` : (act?.name || 'Unknown'),
                 value: duration,
                 color: (() => {
-                    const activityColorClass = act?.color || '';
-                    const match = activityColorClass.match(/(?:text|bg)-([a-z]+)-/);
-                    const colorName = match ? match[1] : 'stone';
-                    const option = COLOR_OPTIONS.find(opt => opt.id === colorName);
-                    return option ? option.lightHex : '#e7e5e4';
+                    return getColorHexForCharts(act?.color || '');
                 })(),
                 icon: act?.icon
             };

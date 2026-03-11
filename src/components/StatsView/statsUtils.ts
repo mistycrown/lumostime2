@@ -3,45 +3,18 @@
  * @description Utility functions for StatsView - color mapping, date handling, formatting
  */
 
-import { COLOR_OPTIONS } from '../../constants';
+import {
+  getHexColor as getSharedHexColor,
+  getScheduleStyle as getSharedScheduleStyle,
+  type ScheduleStyleResult,
+} from '../../utils/chartUtils';
 
-export const getHexColor = (className: string = '') => {
-  if (typeof className !== 'string') return '#e7e5e4';
-  const match = className.match(/(?:text|bg)-([a-z]+)-/);
-  const colorId = match ? match[1] : 'stone';
-  const option = COLOR_OPTIONS.find(opt => opt.id === colorId);
-  return option ? (option.lightHex || option.hex) : '#e7e5e4';
+export const getHexColor = (className: string = ''): string => {
+  return getSharedHexColor(className);
 };
 
-export const getScheduleStyle = (className: string = '') => {
-  if (typeof className !== 'string') return 'bg-stone-100/90 text-stone-700 border-stone-200';
-  const match = className.match(/(?:text|bg)-([a-z]+)-/);
-  const color = match ? match[1] : 'stone';
-  const styles: Record<string, string> = {
-    stone: 'bg-stone-100/90 text-stone-700 border-stone-200',
-    slate: 'bg-slate-100/90 text-slate-700 border-slate-200',
-    gray: 'bg-gray-100/90 text-gray-700 border-gray-200',
-    zinc: 'bg-zinc-100/90 text-zinc-700 border-zinc-200',
-    neutral: 'bg-neutral-100/90 text-neutral-700 border-neutral-200',
-    red: 'bg-red-100/90 text-red-700 border-red-200',
-    orange: 'bg-orange-100/90 text-orange-700 border-orange-200',
-    amber: 'bg-amber-100/90 text-amber-700 border-amber-200',
-    yellow: 'bg-yellow-100/90 text-yellow-700 border-yellow-200',
-    lime: 'bg-lime-100/90 text-lime-700 border-lime-200',
-    green: 'bg-green-100/90 text-green-700 border-green-200',
-    emerald: 'bg-emerald-100/90 text-emerald-700 border-emerald-200',
-    teal: 'bg-teal-100/90 text-teal-700 border-teal-200',
-    cyan: 'bg-cyan-100/90 text-cyan-700 border-cyan-200',
-    sky: 'bg-sky-100/90 text-sky-700 border-sky-200',
-    blue: 'bg-blue-100/90 text-blue-700 border-blue-200',
-    indigo: 'bg-indigo-100/90 text-indigo-700 border-indigo-200',
-    violet: 'bg-violet-100/90 text-violet-700 border-violet-200',
-    purple: 'bg-purple-100/90 text-purple-700 border-purple-200',
-    fuchsia: 'bg-fuchsia-100/90 text-fuchsia-700 border-fuchsia-200',
-    pink: 'bg-pink-100/90 text-pink-700 border-pink-200',
-    rose: 'bg-rose-100/90 text-rose-700 border-rose-200',
-  };
-  return styles[color] || styles['stone'];
+export const getScheduleStyle = (className: string = ''): ScheduleStyleResult => {
+  return getSharedScheduleStyle(className);
 };
 
 export const formatDuration = (seconds: number) => {

@@ -4,7 +4,7 @@
  */
 import React, { useState, useEffect } from 'react';
 import { ArrowLeft, Plus, Trash2, Edit2, Palette, Clock, RotateCcw, ChevronRight, ArrowUp, ArrowDown, Check, Copy } from 'lucide-react';
-import { TimeSlot, SceneCardData, SceneCardType, Category, TodoItem, TodoCategory, CheckTemplate, SceneGroup, SceneGroupAutoSwitchConfig, SceneGroupState, SceneGroupSwitchMode } from '../types';
+import { TimeSlot, SceneCardData, SceneCardType, Category, TodoItem, TodoCategory, CheckTemplate, SceneGroup, SceneGroupAutoSwitchConfig, SceneGroupState, SceneGroupSwitchMode, CustomColorItem } from '../types';
 import { CustomSelect } from '../components/CustomSelect';
 import { UIIconSelectorCompact } from '../components/UIIconSelector';
 import { IconRenderer } from '../components/IconRenderer';
@@ -1376,6 +1376,7 @@ export const SceneSettingsView: React.FC<SceneSettingsViewProps> = ({ onBack }) 
           todos={todos}
           todoCategories={todoCategories}
           checkTemplates={checkTemplates}
+          customColors={customColors}
           sceneCardTimerMode={sceneCardTimerMode}
         />
       )}
@@ -1693,8 +1694,20 @@ const CardEditModal: React.FC<{
   todos: TodoItem[];
   todoCategories: TodoCategory[];
   checkTemplates: CheckTemplate[];
+  customColors: CustomColorItem[];
   sceneCardTimerMode: 'realtime' | 'backfill';
-}> = ({ card, onSave, onCancel, onChange, categories, todos, todoCategories, checkTemplates, sceneCardTimerMode }) => {
+}> = ({
+  card,
+  onSave,
+  onCancel,
+  onChange,
+  categories,
+  todos,
+  todoCategories,
+  checkTemplates,
+  customColors,
+  sceneCardTimerMode,
+}) => {
   const cardTypes: { value: SceneCardType; label: string }[] = [
     { value: 'timer', label: '计时' },
     { value: 'todo', label: '待办' },

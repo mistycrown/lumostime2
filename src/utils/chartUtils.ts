@@ -14,6 +14,8 @@
  */
 
 import {
+  CHART_STROKE_COLORS,
+  getChartStrokeColor,
   getColorHexForCharts,
   getSchedulePresentation,
   type ColorRenderPresentation,
@@ -192,23 +194,7 @@ export const secondsToHoursMinutes = (seconds: number): { h: number; m: number }
  * 折线图颜色映射表
  */
 export const CHART_LINE_COLORS: Record<string, string> = {
-  red: '#fca5a5',
-  blue: '#93c5fd',
-  orange: '#fdba74',
-  purple: '#d8b4fe',
-  emerald: '#6ee7b7',
-  fuchsia: '#f0abfc',
-  yellow: '#fde047',
-  cyan: '#67e8f9',
-  rose: '#fda4af',
-  indigo: '#a5b4fc',
-  lime: '#bef264',
-  violet: '#c4b5fd',
-  amber: '#fcd34d',
-  sky: '#7dd3fc',
-  green: '#86efac',
-  pink: '#f9a8d4',
-  teal: '#5eead4'
+  ...CHART_STROKE_COLORS,
 };
 
 /**
@@ -225,11 +211,7 @@ export const CHART_LINE_COLORS: Record<string, string> = {
  */
 export const getLineChartColor = (colorClass: string = ''): string => {
   if (typeof colorClass !== 'string') return '#d6d3d1';
-  
-  const match = colorClass.match(/(?:text|bg)-([a-z]+)-/);
-  const colorId = match ? match[1] : 'stone';
-  
-  return CHART_LINE_COLORS[colorId] || '#d6d3d1';
+  return getChartStrokeColor(colorClass);
 };
 
 /**
