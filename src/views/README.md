@@ -13,7 +13,7 @@ The views are designed as "dumb" or "presentational" components where possible, 
 *   **Modals/Overlays**: Specialized interaction flows (e.g., `SettingsView`, `RecordView`, `DailyReviewView`).
 *   **Management Views**: Bulk editing interfaces (e.g., `BatchManageView`, `TodoBatchManageView`, `GoalBatchManageView`).
 
-> Note: color pickers in detail and batch management views should keep built-in theme colors and persisted custom HEX colors consistent.
+> Note: color pickers in detail and batch management views should keep built-in theme colors and persisted custom HEX colors consistent, including todo category colors used by stats.
 
 ## Key Components
 

@@ -5,6 +5,7 @@
 
 import { useMemo } from 'react';
 import { Log, Category, Activity, TodoItem, TodoCategory, Scope, DailyReview } from '../../types';
+import { getColorHexForCharts } from '../../utils/colorAdapterUtils';
 
 interface ActivityStat extends Activity {
   duration: number;
@@ -93,7 +94,9 @@ export const useTodoStats = (
         duration: catDuration,
         percentage: totalDuration > 0 ? (catDuration / totalDuration) * 100 : 0,
         items,
-        assignedColor: COLORS[index % COLORS.length]
+        assignedColor: cat.color
+          ? getColorHexForCharts(cat.color)
+          : COLORS[index % COLORS.length]
       };
     }).filter(c => c.duration > 0).sort((a, b) => b.duration - a.duration);
 

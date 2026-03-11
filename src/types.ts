@@ -172,6 +172,7 @@ export interface TodoCategory {
   name: string;
   icon: string; // Emoji icon (for default theme)
   uiIcon?: string; // UI icon ID (for custom theme, e.g., "ui:purple:01")
+  color?: string; // Stored category color for todo stats (Tailwind token or HEX)
 }
 
 export interface TodoItem {

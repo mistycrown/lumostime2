@@ -14,6 +14,7 @@
 
 import { useMemo } from 'react';
 import { Log, TodoItem, TodoCategory } from '../types';
+import { getColorHexForCharts } from '../utils/colorAdapterUtils';
 
 export interface TodoItemStat {
   id: string;
@@ -131,7 +132,9 @@ export const useTodoStats = ({
           duration: catDuration,
           percentage: totalDuration > 0 ? (catDuration / totalDuration) * 100 : 0,
           items,
-          assignedColor: TODO_COLORS[index % TODO_COLORS.length]
+          assignedColor: cat.color
+            ? getColorHexForCharts(cat.color)
+            : TODO_COLORS[index % TODO_COLORS.length]
         };
       })
       .filter(c => c.duration > 0)

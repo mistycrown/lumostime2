@@ -3,7 +3,7 @@
  * @input Todos, Categories
  * @output Updated Categories/Todos (Reorder, CRUD)
  * @pos View (Modal/Page)
- * @description A specialized view for bulk management of To-Do items and categories. Supports drag-and-drop reordering of both categories and items across categories.
+ * @description A specialized view for bulk management of To-Do items and categories. Supports drag-and-drop reordering and category color configuration for todo statistics.
  * 
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
@@ -12,8 +12,10 @@ import { TodoCategory, TodoItem } from '../types';
 import { ChevronDown, ChevronRight, GripVertical, Plus, Trash2, ArrowUp, ArrowDown, X, Check } from 'lucide-react';
 import { UIIconSelectorCompact } from '../components/UIIconSelector';
 import { IconRenderer } from '../components/IconRenderer';
-import { uiIconService } from '../services/uiIconService';
 import { useSettings } from '../contexts/SettingsContext';
+import { COLOR_OPTIONS } from '../constants';
+import { useCustomColors } from '../hooks/useCustomColors';
+import { getColorPreviewValue, isStoredColorSelected } from '../utils/colorUtils';
 
 interface TodoBatchManageViewProps {
     onBack: () => void;
@@ -39,8 +41,10 @@ export const TodoBatchManageView: React.FC<TodoBatchManageViewProps> = ({ onBack
     
     // Icon selector state
     const [iconSelectorOpen, setIconSelectorOpen] = useState<string | null>(null);
+    const [colorPickerOpen, setColorPickerOpen] = useState<string | null>(null);
     const { uiIconTheme } = useSettings();
-    const isCustomIconEnabled = uiIconService.isCustomTheme();
+    const isCustomIconEnabled = uiIconTheme !== 'default';
+    const customColors = useCustomColors();
 
     // Drag state
     const [draggedItem, setDraggedItem] = useState<{ item: TodoItem, sourceCategoryId: string } | null>(null);
@@ -85,6 +89,7 @@ export const TodoBatchManageView: React.FC<TodoBatchManageViewProps> = ({ onBack
             id: crypto.randomUUID(),
             name: '新列表',
             icon: '📝',
+            color: undefined,
             items: []
         };
         setData([...data, newCat]);
@@ -155,6 +160,16 @@ export const TodoBatchManageView: React.FC<TodoBatchManageViewProps> = ({ onBack
         setIconSelectorOpen(null);
     };
 
+    const handleCategoryColorChange = (catId: string, color: string) => {
+        setData(prev => prev.map(c => {
+            if (c.id === catId) {
+                return { ...c, color };
+            }
+            return c;
+        }));
+        setColorPickerOpen(null);
+    };
+
     // --- Drag Logic ---
     const handleDragStart = (e: React.DragEvent, item: TodoItem, categoryId: string) => {
         setDraggedItem({ item, sourceCategoryId: categoryId });
@@ -190,7 +205,7 @@ export const TodoBatchManageView: React.FC<TodoBatchManageViewProps> = ({ onBack
 
     const handleSave = () => {
         // Separate categories and todos
-        const finalCategories: TodoCategory[] = data.map(({ id, name, icon, uiIcon }) => ({ id, name, icon, uiIcon }));
+        const finalCategories: TodoCategory[] = data.map(({ id, name, icon, uiIcon, color }) => ({ id, name, icon, uiIcon, color }));
 
         // Get all edited uncompleted todos
         const editedTodos: TodoItem[] = data.flatMap(c => c.items.map(t => ({ ...t, categoryId: c.id })));
@@ -240,6 +255,16 @@ export const TodoBatchManageView: React.FC<TodoBatchManageViewProps> = ({ onBack
 
                             {/* Category Actions */}
                             <div className="flex items-center gap-1 shrink-0">
+                                <button
+                                    onClick={() => setColorPickerOpen(colorPickerOpen === category.id ? null : category.id)}
+                                    className="p-1.5 rounded-lg transition-all shrink-0 hover:bg-stone-100"
+                                    title="閫夋嫨棰滆壊"
+                                >
+                                    <div
+                                        className="w-4 h-4 rounded-full border border-stone-300"
+                                        style={{ backgroundColor: getColorPreviewValue(category.color || '', 'category') }}
+                                    />
+                                </button>
                                 {/* Icon Selector Button - Show current UI icon preview */}
                                 {isCustomIconEnabled && (
                                     <button 
@@ -273,6 +298,39 @@ export const TodoBatchManageView: React.FC<TodoBatchManageViewProps> = ({ onBack
                                 </button>
                             </div>
                         </div>
+
+                        {/* Color Selector Dropdown */}
+                        {colorPickerOpen === category.id && (
+                            <div className="p-3 border-b border-stone-100 bg-stone-50/30">
+                                <div className="flex gap-2 flex-wrap">
+                                    {COLOR_OPTIONS.map(opt => (
+                                        <button
+                                            key={opt.id}
+                                            onClick={() => handleCategoryColorChange(category.id, opt.title)}
+                                            title={opt.label}
+                                            className={`w-8 h-8 rounded-full ${opt.bg} transition-all hover:scale-110 ${
+                                                isStoredColorSelected(category.color, opt.title)
+                                                    ? `ring-2 ${opt.ring} ring-offset-2`
+                                                    : ''
+                                            }`}
+                                        />
+                                    ))}
+                                    {customColors.map((item) => (
+                                        <button
+                                            key={item.id}
+                                            onClick={() => handleCategoryColorChange(category.id, item.color)}
+                                            title={item.color}
+                                            className={`w-8 h-8 rounded-full border border-stone-300 transition-all hover:scale-110 ${
+                                                isStoredColorSelected(category.color, item.color)
+                                                    ? 'ring-2 ring-stone-400 ring-offset-2'
+                                                    : ''
+                                            }`}
+                                            style={{ backgroundColor: item.color }}
+                                        />
+                                    ))}
+                                </div>
+                            </div>
+                        )}
 
                         {/* Icon Selector Dropdown */}
                         {isCustomIconEnabled && iconSelectorOpen === category.id && (
