@@ -29,8 +29,7 @@ import { TodoView } from '../views/TodoView';
 import { ScopeDetailView } from '../views/ScopeDetailView';
 import { ScopeManageView } from '../views/ScopeManageView';
 import { ScopeView } from '../views/ScopeView';
-
-const StatsView = React.lazy(() => import('../views/StatsView').then((module) => ({ default: module.StatsView })));
+import { StatsViewLazy as StatsView } from '../utils/lazyViews';
 
 const RouteFallback: React.FC<{ label: string }> = ({ label }) => (
     <div className="flex h-full w-full items-center justify-center bg-[#faf9f6]">

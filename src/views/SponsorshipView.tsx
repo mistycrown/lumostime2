@@ -8,7 +8,7 @@
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
 import React, { useState, useEffect } from 'react';
-import { ChevronLeft, Fish, Check, X } from 'lucide-react';
+import { ChevronLeft, ChevronDown, Fish, Check, X } from 'lucide-react';
 import { Capacitor } from '@capacitor/core';
 import { ToastType } from '../components/Toast';
 import { RedemptionService } from '../services/redemptionService';
@@ -283,6 +283,7 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
     // Tab 页状态
     type TabType = 'preset' | 'icon' | 'colorScheme' | 'background' | 'navigation' | 'timepal' | 'font' | 'style';
     const [activeTab, setActiveTab] = useState<TabType>('preset');
+    const [isScheduleStyleDropdownOpen, setIsScheduleStyleDropdownOpen] = useState(false);
 
     // 用户统计数据
     const [userStats, setUserStats] = useState<UserStats | null>(null);
@@ -302,6 +303,10 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
         if (!editingPresetId) return null;
         return customPresets.find(p => p.id === editingPresetId) || null;
     }, [editingPresetId, customPresets]);
+
+    const selectedScheduleStyleOption = React.useMemo(() => {
+        return SCHEDULE_STYLE_OPTIONS.find((option) => option.value === scheduleStyle) || SCHEDULE_STYLE_OPTIONS[0];
+    }, [scheduleStyle]);
 
     // Handle save current settings as preset
     const handleSaveCurrentSettings = (name: string) => {
@@ -1103,25 +1108,48 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
 
                             {activeTab === 'style' && (
                                 <div className="px-5 pt-2">
-                                    <h3 className="mb-3 text-sm font-medium text-stone-700">日程图样式</h3>
-                                    <div className="grid grid-cols-4 gap-1 rounded-xl bg-stone-100/70 p-1">
-                                        {SCHEDULE_STYLE_OPTIONS.map((option) => {
-                                            const isSelected = scheduleStyle === option.value;
+                                    <div className="flex items-center justify-between relative">
+                                        <h3 className="text-sm font-medium text-stone-700">日程图样式</h3>
+                                        <div className="relative">
+                                            <button
+                                                onClick={() => setIsScheduleStyleDropdownOpen((prev) => !prev)}
+                                                className="flex items-center gap-2 bg-stone-100 hover:bg-stone-200 text-stone-700 text-sm font-bold px-4 py-2 rounded-lg transition-colors"
+                                            >
+                                                <span>{selectedScheduleStyleOption.label}</span>
+                                                <ChevronDown
+                                                    size={14}
+                                                    className={`transition-transform ${isScheduleStyleDropdownOpen ? 'rotate-180' : ''}`}
+                                                />
+                                            </button>
 
-                                            return (
-                                                <button
-                                                    key={option.value}
-                                                    onClick={() => setScheduleStyle(option.value)}
-                                                    className={`min-w-0 rounded-lg px-2 py-2 text-center text-sm font-medium transition-all ${
-                                                        isSelected
-                                                            ? 'bg-white text-stone-900 shadow-sm'
-                                                            : 'bg-transparent text-stone-500 hover:text-stone-700'
-                                                    }`}
-                                                >
-                                                    {option.label}
-                                                </button>
-                                            );
-                                        })}
+                                            {isScheduleStyleDropdownOpen && (
+                                                <>
+                                                    <div
+                                                        className="fixed inset-0 z-[100]"
+                                                        onClick={() => setIsScheduleStyleDropdownOpen(false)}
+                                                    />
+                                                    <div className="absolute right-0 top-full mt-2 w-32 bg-white rounded-xl shadow-xl border border-stone-100 overflow-hidden z-[110] flex flex-col py-1 animate-in fade-in zoom-in-95 duration-200 origin-top-right">
+                                                        {SCHEDULE_STYLE_OPTIONS.map((option) => (
+                                                            <button
+                                                                key={option.value}
+                                                                onClick={() => {
+                                                                    setScheduleStyle(option.value);
+                                                                    setIsScheduleStyleDropdownOpen(false);
+                                                                }}
+                                                                className={`px-4 py-2.5 text-left text-sm font-medium transition-colors hover:bg-stone-50 flex items-center justify-between ${
+                                                                    scheduleStyle === option.value ? 'text-stone-900 bg-stone-50' : 'text-stone-500'
+                                                                }`}
+                                                            >
+                                                                {option.label}
+                                                                {scheduleStyle === option.value && (
+                                                                    <div className="w-1.5 h-1.5 rounded-full bg-stone-800" />
+                                                                )}
+                                                            </button>
+                                                        ))}
+                                                    </div>
+                                                </>
+                                            )}
+                                        </div>
                                     </div>
                                 </div>
                             )}
