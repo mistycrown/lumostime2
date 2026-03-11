@@ -124,11 +124,38 @@ export const GoalEditor: React.FC<GoalEditorProps> = ({
         (majorGoal?.filterTodoCategories && majorGoal.filterTodoCategories.length > 0) ||
         false
     );
+
+    const findActivityById = (activityId: string) => {
+        for (const category of categories) {
+            const activity = category.activities?.find(a => a.id === activityId);
+            if (activity) return activity;
+        }
+        return undefined;
+    };
+
+    useEffect(() => {
+        if (mode === 'majorGoal') return;
+        if (!selectedMajorGoalId) return;
+
+        const inheritedMajorGoal = majorGoal || majorGoals?.find(mg => mg.id === selectedMajorGoalId);
+        if (!inheritedMajorGoal) return;
+
+        setMetric(inheritedMajorGoal.metric);
+        setFilterActivityIds(inheritedMajorGoal.filterActivityIds || []);
+        setFilterTodoCategories(inheritedMajorGoal.filterTodoCategories || []);
+
+        if (inheritedMajorGoal.metric === 'task_count') {
+            setIsTodoFilterEnabled((inheritedMajorGoal.filterTodoCategories || []).length > 0);
+        }
+    }, [majorGoal, majorGoals, mode, selectedMajorGoalId]);
     
     // 判断字段是否应该禁用
     const isFieldDisabled = (fieldName: string): boolean => {
+        // 目标系列本身不走继承逻辑，允许编辑
+        if (mode === 'majorGoal') return false;
+
         // 阶段目标模式或选择了目标系列：禁用继承字段
-        if ((mode === 'phase' || selectedMajorGoalId) && ['metric', 'filterActivityIds', 'filterTodoCategories'].includes(fieldName)) {
+        if ((mode === 'phase' || (mode === 'independent' && selectedMajorGoalId)) && ['metric', 'filterActivityIds', 'filterTodoCategories'].includes(fieldName)) {
             return true;
         }
         
@@ -739,12 +766,16 @@ export const GoalEditor: React.FC<GoalEditorProps> = ({
                                         {filterActivityIds.length > 0 ? (
                                             <div className="text-xs text-stone-600">
                                                 {filterActivityIds.map((actId, index) => {
-                                                    const category = categories.find(c => c.id === actId);
-                                                    return category ? (
+                                                    const activity = findActivityById(actId);
+                                                    return activity ? (
                                                         <span key={actId}>
-                                                            {category.icon} {category.name}{index < filterActivityIds.length - 1 ? '、' : ''}
+                                                            {activity.icon} {activity.name}{index < filterActivityIds.length - 1 ? '、' : ''}
                                                         </span>
-                                                    ) : null;
+                                                    ) : (
+                                                        <span key={actId}>
+                                                            {actId}{index < filterActivityIds.length - 1 ? '、' : ''}
+                                                        </span>
+                                                    );
                                                 })}
                                             </div>
                                         ) : (

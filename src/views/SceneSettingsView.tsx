@@ -1741,6 +1741,8 @@ const CardEditModal: React.FC<{
       onChange({
         ...card,
         action: {
+          // 保留 action 里其它配置（比如 launchApp）
+          ...card?.action,
           type: 'startTimer',
           activityId,
           categoryId
@@ -1757,6 +1759,8 @@ const CardEditModal: React.FC<{
       onChange({
         ...card,
         action: {
+          // 保留 action 里其它配置（比如 launchApp）
+          ...card?.action,
           type: 'startTodo',
           todoId
         }
@@ -1772,6 +1776,8 @@ const CardEditModal: React.FC<{
       onChange({
         ...card,
         action: {
+          // 保留 action 里其它配置（比如 checkActionMode）
+          ...card?.action,
           type: 'toggleCheck',
           checkItemId
         }

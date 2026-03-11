@@ -1,10 +1,10 @@
 /**
  * @file useGoalManager.ts
- * @input CategoryScopeContext (setGoals), NavigationContext (goal editor modal states)
+ * @input CategoryScopeContext (setGoals, majorGoals), NavigationContext (goal editor modal states)
  * @output Goal CRUD Operations (handleAddGoal, handleEditGoal, handleSaveGoal, handleDeleteGoal, handleArchiveGoal), Modal Control (closeGoalEditor)
  * @pos Hook (Data Manager)
- * @description 目标数据管理 Hook - 处理目标的增删改查、归档等操作
- * 
+ * @description 目标数据管理 Hook - 处理目标的增删改查、归档等操作；创建阶段目标时会预填目标系列的继承字段。
+ *
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
 import { Goal } from '../types';
@@ -12,22 +12,27 @@ import { useCategoryScope } from '../contexts/CategoryScopeContext';
 import { useNavigation } from '../contexts/NavigationContext';
 
 export const useGoalManager = () => {
-    const { setGoals } = useCategoryScope();
+    const { setGoals, majorGoals } = useCategoryScope();
     const { setIsGoalEditorOpen, setEditingGoal, setGoalScopeId } = useNavigation();
 
     const handleAddGoal = (scopeId: string, templateGoal?: Goal, majorGoalId?: string) => {
         // 如果提供了 majorGoalId，说明是为目标系列创建阶段目标
         if (majorGoalId) {
+            const inheritedMajorGoal = majorGoals.find(mg => mg.id === majorGoalId);
+
             // 创建一个空的目标模板，关联到目标系列
             const goalTemplate: Goal = {
                 id: '',
                 title: '',
                 scopeId,
-                metric: 'duration_raw', // 默认值，会被目标系列的类型覆盖
+                metric: inheritedMajorGoal?.metric || 'duration_raw',
                 targetValue: 0,
                 startDate: new Date().toISOString().split('T')[0],
                 endDate: new Date().toISOString().split('T')[0],
                 status: 'active',
+                filterActivityIds: inheritedMajorGoal?.filterActivityIds,
+                filterTodoCategories: inheritedMajorGoal?.filterTodoCategories,
+                filterTodoCategorySource: inheritedMajorGoal?.filterTodoCategorySource,
                 majorGoalId, // 关联到目标系列
                 order: 0
             };
