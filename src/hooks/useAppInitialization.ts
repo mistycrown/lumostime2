@@ -15,11 +15,13 @@ import AppUsage from '../plugins/AppUsagePlugin';
 import { imageService } from '../services/imageService';
 import { UpdateService } from '../services/updateService';
 import { backgroundService } from '../services/backgroundService';
+import { fontService } from '../services/fontService';
 import { useData } from '../contexts/DataContext';
 import { dataRepairService } from '../services/dataRepairService';
 import { dualIconMigrationService } from '../services/dualIconMigrationService';
 import { initResetDataTool } from '../utils/resetDataTool';
 import FocusNotification from '../plugins/FocusNotificationPlugin';
+import { DEFAULT_PRINCIPLE_PRESETS } from '../constants/principlePresets';
 
 // Edge-to-Edge 支持（仅在 Android 上可用）
 let EdgeToEdge: any = null;
@@ -123,7 +125,6 @@ export const useAppInitialization = () => {
     useEffect(() => {
         const initFont = async () => {
             try {
-                const { fontService } = await import('../services/fontService');
                 await fontService.initializeFont();
                 console.log('🔤 Font service initialized');
             } catch (error) {
@@ -140,10 +141,8 @@ export const useAppInitialization = () => {
                 const stored = localStorage.getItem('lumostime_principles');
                 if (!stored) {
                     // 如果原则库为空，加载默认预设
-                    import('../constants/principlePresets').then(({ DEFAULT_PRINCIPLE_PRESETS }) => {
                         localStorage.setItem('lumostime_principles', JSON.stringify(DEFAULT_PRINCIPLE_PRESETS));
                         console.log('📚 Principle library initialized with default presets');
-                    });
                 }
             } catch (error) {
                 console.error('❌ Principle library initialization failed:', error);

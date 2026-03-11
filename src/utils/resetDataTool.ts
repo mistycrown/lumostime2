@@ -27,6 +27,7 @@
  */
 
 import { CATEGORIES, SCOPES, MOCK_TODO_CATEGORIES } from '../constants';
+import { uiIconService } from '../services/uiIconService';
 
 class ResetDataTool {
     /**
@@ -254,9 +255,6 @@ class ResetDataTool {
         
         try {
             // 动态导入
-            const { uiIconService } = await import('../services/uiIconService');
-            const { CATEGORIES, SCOPES, MOCK_TODO_CATEGORIES } = await import('../constants');
-            
             let totalCount = 0;
             let matchedCount = 0;
             let unmatchedEmojis: string[] = [];

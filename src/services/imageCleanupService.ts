@@ -8,6 +8,8 @@
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
 
+import { Capacitor } from '@capacitor/core';
+import { Directory, Filesystem } from '@capacitor/filesystem';
 import { Log, TodoItem } from '../types';
 import { imageService } from './imageService';
 import { webdavService } from './webdavService';
@@ -364,9 +366,6 @@ export class ImageCleanupService {
      */
     private async deleteSingleImageFile(filename: string): Promise<void> {
         try {
-            const { Filesystem, Directory } = await import('@capacitor/filesystem');
-            const { Capacitor } = await import('@capacitor/core');
-            
             if (Capacitor.isNativePlatform()) {
                 await Filesystem.deleteFile({
                     path: `images/${filename}`,

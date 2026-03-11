@@ -5,6 +5,8 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode, useRef } from 'react';
 import { AppView, AutoLinkRule, Filter, NarrativeTemplate, MemoirFilterConfig } from '../types';
 import { DEFAULT_USER_PERSONAL_INFO } from '../constants';
+import { uiIconService } from '../services/uiIconService';
+import { fontService } from '../services/fontService';
 
 export type DefaultArchiveView = 'CHRONICLE' | 'MEMOIR';
 export type DefaultIndexView = 'TAGS' | 'SCOPE';
@@ -326,9 +328,7 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
     useEffect(() => {
         localStorage.setItem('lumostime_ui_icon_theme', uiIconTheme);
         // 同步到 uiIconService
-        import('../services/uiIconService').then(({ uiIconService }) => {
-            uiIconService.setTheme(uiIconTheme as any);
-        });
+        uiIconService.setTheme(uiIconTheme as any);
     }, [uiIconTheme]);
 
     const [colorScheme, setColorScheme] = useState<string>(() => {
@@ -369,9 +369,7 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
     useEffect(() => {
         localStorage.setItem('lumostime_font_family', fontFamily);
         // 同步到 fontService
-        import('../services/fontService').then(({ fontService }) => {
-            fontService.setFont(fontFamily);
-        });
+        fontService.setFont(fontFamily);
     }, [fontFamily]);
 
     useEffect(() => {
