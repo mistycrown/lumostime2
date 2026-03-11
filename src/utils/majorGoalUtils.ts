@@ -181,7 +181,13 @@ export const getMajorGoalChildren = (
 ): Goal[] => {
   return goals
     .filter(g => g.majorGoalId === majorGoalId)
-    .sort((a, b) => a.startDate.localeCompare(b.startDate));
+    .sort((a, b) => {
+      const orderA = typeof a.order === 'number' ? a.order : Number.POSITIVE_INFINITY;
+      const orderB = typeof b.order === 'number' ? b.order : Number.POSITIVE_INFINITY;
+      const diff = orderA - orderB;
+      if (diff !== 0) return diff;
+      return a.startDate.localeCompare(b.startDate);
+    });
 };
 
 /**

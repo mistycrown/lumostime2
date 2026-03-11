@@ -11,7 +11,7 @@ The views are designed as "dumb" or "presentational" components where possible, 
 *   **Main Tabs**: High-level navigation roots (e.g., `TimelineView`, `StatsView`, `TodoView`, `TagsView`).
 *   **Detail Views**: Dedicated pages for specific entities (e.g., `CategoryDetailView`, `TagDetailView`, `ScopeDetailView`).
 *   **Modals/Overlays**: Specialized interaction flows (e.g., `SettingsView`, `RecordView`, `DailyReviewView`).
-*   **Management Views**: Bulk editing interfaces (e.g., `BatchManageView`, `TodoBatchManageView`).
+*   **Management Views**: Bulk editing interfaces (e.g., `BatchManageView`, `TodoBatchManageView`, `GoalBatchManageView`).
 
 ## Key Components
 

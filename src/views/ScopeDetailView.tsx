@@ -23,6 +23,7 @@ import { IconRenderer } from '../components/IconRenderer';
 import { useGoalStatus } from '../hooks/useGoalStatus';
 import { calculateGoalProgress } from '../utils/goalUtils';
 import { applyMajorGoalInheritance } from '../utils/goalInheritanceUtils';
+import { GoalBatchManageView } from './GoalBatchManageView';
 
 interface ScopeDetailViewProps {
     scope: Scope;
@@ -44,6 +45,7 @@ interface ScopeDetailViewProps {
     onEditMajorGoal?: (majorGoal: MajorGoal) => void;
     onDeleteMajorGoal?: (majorGoalId: string) => void;
     onArchiveMajorGoal?: (majorGoalId: string) => void;
+    onBatchUpdateGoals?: (majorGoals: MajorGoal[], goals: Goal[]) => void;
 }
 
 export const ScopeDetailView: React.FC<ScopeDetailViewProps> = ({
@@ -65,13 +67,15 @@ export const ScopeDetailView: React.FC<ScopeDetailViewProps> = ({
     onAddMajorGoal,
     onEditMajorGoal,
     onDeleteMajorGoal,
-    onArchiveMajorGoal
+    onArchiveMajorGoal,
+    onBatchUpdateGoals
 }) => {
     const [activeTab, setActiveTab] = useState('时间线');
     const [scope, setScope] = useState(initialScope);
     const [displayDate, setDisplayDate] = useState(new Date());
     const [showArchived, setShowArchived] = useState(false); // 是否显示归档目标
     const [newKeyword, setNewKeyword] = useState(''); // 添加关键字输入
+    const [isGoalBatchManaging, setIsGoalBatchManaging] = useState(false);
     
     // 获取当前 UI 图标主题
     const { uiIconTheme } = useSettings();
@@ -628,9 +632,15 @@ export const ScopeDetailView: React.FC<ScopeDetailViewProps> = ({
                 );
             case '目标':
                 // 分离目标系列
-                const activeMajorGoals = majorGoals.filter(mg =>
-                    mg.scopeId === scope.id && mg.status !== 'archived'
-                );
+                const activeMajorGoals = majorGoals
+                    .filter(mg => mg.scopeId === scope.id && mg.status !== 'archived')
+                    .sort((a, b) => {
+                        const orderA = typeof a.order === 'number' ? a.order : Number.POSITIVE_INFINITY;
+                        const orderB = typeof b.order === 'number' ? b.order : Number.POSITIVE_INFINITY;
+                        const diff = orderA - orderB;
+                        if (diff !== 0) return diff;
+                        return (a.createdAt || '').localeCompare(b.createdAt || '');
+                    });
                 const archivedMajorGoals = majorGoals.filter(mg =>
                     mg.scopeId === scope.id && mg.status === 'archived'
                 );
@@ -644,9 +654,15 @@ export const ScopeDetailView: React.FC<ScopeDetailViewProps> = ({
                 });
 
                 // 分离独立目标（没有 majorGoalId 的目标）
-                const activeGoals = inheritedGoals.filter(g =>
-                    g.scopeId === scope.id && g.status !== 'archived' && !g.majorGoalId
-                );
+                const activeGoals = inheritedGoals
+                    .filter(g => g.scopeId === scope.id && g.status !== 'archived' && !g.majorGoalId)
+                    .sort((a, b) => {
+                        const orderA = typeof a.order === 'number' ? a.order : Number.POSITIVE_INFINITY;
+                        const orderB = typeof b.order === 'number' ? b.order : Number.POSITIVE_INFINITY;
+                        const diff = orderA - orderB;
+                        if (diff !== 0) return diff;
+                        return a.startDate.localeCompare(b.startDate);
+                    });
                 const archivedGoals = inheritedGoals.filter(g =>
                     g.scopeId === scope.id && g.status === 'archived' && !g.majorGoalId
                 );
@@ -761,6 +777,14 @@ export const ScopeDetailView: React.FC<ScopeDetailViewProps> = ({
                                 
                                 {/* 添加新目标按钮 */}
                                 <div className="flex gap-4 mt-8 pt-4 border-t border-dashed border-stone-200">
+                                    {onBatchUpdateGoals && (
+                                        <button
+                                            onClick={() => setIsGoalBatchManaging(true)}
+                                            className="flex-1 py-2 text-stone-500 hover:text-stone-900 transition-colors text-xs font-medium uppercase tracking-wider"
+                                        >
+                                            批量管理
+                                        </button>
+                                    )}
                                     {onAddMajorGoal && (
                                         <button
                                             onClick={onAddMajorGoal}
@@ -851,7 +875,18 @@ export const ScopeDetailView: React.FC<ScopeDetailViewProps> = ({
         }
     };
 
-    return (
+    return isGoalBatchManaging ? (
+        <GoalBatchManageView
+            scopeId={scope.id}
+            goals={goals}
+            majorGoals={majorGoals}
+            onBack={() => setIsGoalBatchManaging(false)}
+            onSave={(nextMajorGoals, nextGoals) => {
+                onBatchUpdateGoals?.(nextMajorGoals, nextGoals);
+                setIsGoalBatchManaging(false);
+            }}
+        />
+    ) : (
         <div className="h-full bg-[#faf9f6] overflow-y-auto no-scrollbar pb-24 px-7 pt-4">
             {/* Header */}
             <div className="mb-6">
