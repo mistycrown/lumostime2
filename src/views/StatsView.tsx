@@ -18,6 +18,7 @@ import { Minimize2, Share, PieChart, Grid, Calendar, ChevronLeft, ChevronRight, 
 import { ToastType } from '../components/Toast';
 import { usePrivacy } from '../contexts/PrivacyContext';
 import { useNavigation } from '../contexts/NavigationContext';
+import { useSettings } from '../contexts/SettingsContext';
 import { IconRenderer } from '../components/IconRenderer';
 import { ConfirmModal } from '../components/ConfirmModal';
 import { ChronoPrintView } from './ChronoPrintView';
@@ -75,6 +76,7 @@ interface CategoryStat extends Category {
 export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentDate, onBack, onDateChange, isFullScreen, onToggleFullScreen, onToast, onTitleChange, todos, todoCategories, scopes, dailyReviews = [], hideControls = false, hideRangeControls = false, hideDateNavigation = false, forcedView, forcedRange, allowedViews = ['pie', 'matrix', 'line', 'schedule', 'check', 'emoji'] }) => {
   const { isPrivacyMode } = usePrivacy();
   const { setIsExportViewOpen } = useNavigation();
+  const { scheduleStyle } = useSettings();
   const [viewType, setViewType] = useState<ViewType>(forcedView || 'pie');
   const [pieRange, setPieRange] = useState<PieRange>(forcedRange || 'day');
   const [scheduleRange, setScheduleRange] = useState<ScheduleRange>(
@@ -843,6 +845,7 @@ export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentD
               filteredLogs={filteredLogs}
               categories={categories}
               scheduleRange={scheduleRange}
+              scheduleStyle={scheduleStyle}
               rangeStart={rangeStart}
               currentDate={currentDate}
               isFullScreen={isFullScreen}
