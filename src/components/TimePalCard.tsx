@@ -1,9 +1,13 @@
 /**
  * @file TimePalCard.tsx
- * @description 时光小友卡片 - 根据当日专注时长显示不同形态的小动物
- * 支持实时同步正在进行的计时
+ * @description 时光小友卡片，根据当日专注时长展示当前小友状态，并支持实时计时同步。
+ * @input logs: Log[] - 日志列表
+ * @input currentDate: Date - 当前查看日期
+ * @input categories: Category[] - 分类列表
+ * @input activeSessions?: ActiveSession[] - 正在进行中的会话
+ * @output 顶部时光小友卡片
  */
-import React, { useMemo, useState, useEffect } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Log, Category, ActiveSession } from '../types';
 import { getRandomQuote } from '../constants/timePalQuotes';
 import { getAllTimePalTypes, isCustomTimePalType } from '../constants/timePalConfig';
@@ -11,14 +15,15 @@ import { useTimePalImage } from '../hooks/useTimePalImage';
 import { TIMEPAL_KEYS, storage } from '../constants/storageKeys';
 import { timePalCustomService, TIMEPAL_CUSTOM_CHANGED_EVENT } from '../services/timePalCustomService';
 
+const TIMEPAL_CLICK_SWITCH_CHANGED_EVENT = 'timepal-click-switch-changed';
+
 interface TimePalCardProps {
     logs: Log[];
     currentDate: Date;
     categories: Category[];
-    activeSessions?: ActiveSession[]; // 新增：正在进行的会话
+    activeSessions?: ActiveSession[];
 }
 
-// 根据专注时长计算形态等级 (1-5)
 const calculateFormLevel = (focusHours: number): number => {
     if (focusHours < 2) return 1;
     if (focusHours < 4) return 2;
@@ -27,7 +32,6 @@ const calculateFormLevel = (focusHours: number): number => {
     return 5;
 };
 
-// 格式化时长为 "时:分:秒"
 const formatDuration = (seconds: number): string => {
     const h = Math.floor(seconds / 3600);
     const m = Math.floor((seconds % 3600) / 60);
@@ -35,7 +39,6 @@ const formatDuration = (seconds: number): string => {
     return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
 };
 
-// 获取形态描述
 const getFormDescription = (level: number): string => {
     const descriptions = [
         '破晓时分',
@@ -48,7 +51,6 @@ const getFormDescription = (level: number): string => {
 };
 
 export const TimePalCard: React.FC<TimePalCardProps> = ({ logs, currentDate, categories, activeSessions = [] }) => {
-    // 从 localStorage 读取用户选择的小动物类型
     const [timePalType, setTimePalType] = useState<string | null>(() => {
         const saved = storage.get(TIMEPAL_KEYS.TYPE);
         if (saved === 'none' || !saved) return null;
@@ -56,16 +58,14 @@ export const TimePalCard: React.FC<TimePalCardProps> = ({ logs, currentDate, cat
     });
     const [customTypeSelections, setCustomTypeSelections] = useState<string[]>([]);
     const [isCustomTypesLoaded, setIsCustomTypesLoaded] = useState(false);
-
-    // 实时计时器状态 - 用于更新正在进行的会话时长
+    const [isClickSwitchEnabled, setIsClickSwitchEnabled] = useState<boolean>(() => {
+        return storage.getBoolean(TIMEPAL_KEYS.CLICK_SWITCH_ENABLED, true);
+    });
     const [currentTime, setCurrentTime] = useState(Date.now());
-
-    // 调试模式状态
     const [debugMode, setDebugMode] = useState(false);
     const [debugFocusSeconds, setDebugFocusSeconds] = useState(0);
     const [debugLevel, setDebugLevel] = useState(1);
 
-    // 每秒更新一次当前时间，用于实时显示正在进行的计时
     useEffect(() => {
         if (activeSessions.length > 0) {
             const interval = setInterval(() => {
@@ -75,7 +75,6 @@ export const TimePalCard: React.FC<TimePalCardProps> = ({ logs, currentDate, cat
         }
     }, [activeSessions.length]);
 
-    // 加载自定义时光小友列表（用于点击切换）
     useEffect(() => {
         const loadCustomTypes = () => {
             const customTypes = timePalCustomService
@@ -93,7 +92,6 @@ export const TimePalCard: React.FC<TimePalCardProps> = ({ logs, currentDate, cat
         };
     }, []);
 
-    // 如果当前选择的自定义小友被删除，回退为不使用
     useEffect(() => {
         if (!isCustomTypesLoaded) {
             return;
@@ -109,31 +107,29 @@ export const TimePalCard: React.FC<TimePalCardProps> = ({ logs, currentDate, cat
         window.dispatchEvent(new Event('timepal-type-changed'));
     }, [timePalType, customTypeSelections, isCustomTypesLoaded]);
 
-    // 监听 localStorage 变化，实现跨组件同步
     useEffect(() => {
+        const syncTimePalType = () => {
+            const saved = storage.get(TIMEPAL_KEYS.TYPE);
+            if (saved === 'none' || !saved) {
+                setTimePalType(null);
+            } else {
+                setTimePalType(saved);
+            }
+        };
+        const syncClickSwitchEnabled = () => {
+            setIsClickSwitchEnabled(storage.getBoolean(TIMEPAL_KEYS.CLICK_SWITCH_ENABLED, true));
+        };
+
         const handleStorageChange = () => {
-            const saved = storage.get(TIMEPAL_KEYS.TYPE);
-            if (saved === 'none' || !saved) {
-                setTimePalType(null);
-            } else {
-                setTimePalType(saved);
-            }
+            syncTimePalType();
+            syncClickSwitchEnabled();
         };
-
-        window.addEventListener('storage', handleStorageChange);
-        
-        // 也监听自定义事件（用于同一页面内的更新）
-        const handleCustomChange = () => {
-            const saved = storage.get(TIMEPAL_KEYS.TYPE);
-            if (saved === 'none' || !saved) {
-                setTimePalType(null);
-            } else {
-                setTimePalType(saved);
-            }
+        const handleTypeChange = () => {
+            syncTimePalType();
         };
-        window.addEventListener('timepal-type-changed', handleCustomChange);
-
-        // 监听调试模式事件
+        const handleClickSwitchChange = () => {
+            syncClickSwitchEnabled();
+        };
         const handleDebugMode = (event: CustomEvent) => {
             const { enabled, type, level, focusHours } = event.detail;
             setDebugMode(enabled);
@@ -143,18 +139,22 @@ export const TimePalCard: React.FC<TimePalCardProps> = ({ logs, currentDate, cat
                 setDebugFocusSeconds(focusHours * 3600);
             }
         };
+
+        window.addEventListener('storage', handleStorageChange);
+        window.addEventListener('timepal-type-changed', handleTypeChange);
+        window.addEventListener(TIMEPAL_CLICK_SWITCH_CHANGED_EVENT, handleClickSwitchChange);
         window.addEventListener('timepal-debug-mode', handleDebugMode as EventListener);
 
         return () => {
             window.removeEventListener('storage', handleStorageChange);
-            window.removeEventListener('timepal-type-changed', handleCustomChange);
+            window.removeEventListener('timepal-type-changed', handleTypeChange);
+            window.removeEventListener(TIMEPAL_CLICK_SWITCH_CHANGED_EVENT, handleClickSwitchChange);
             window.removeEventListener('timepal-debug-mode', handleDebugMode as EventListener);
         };
     }, []);
 
     const effectiveTimePalType = timePalType || getAllTimePalTypes()[0] || 'cat';
 
-    // 切换小动物类型
     const switchTimePal = () => {
         const types = [...getAllTimePalTypes(), ...customTypeSelections];
         if (types.length === 0) {
@@ -164,13 +164,17 @@ export const TimePalCard: React.FC<TimePalCardProps> = ({ logs, currentDate, cat
         const nextType = currentIndex === -1 ? types[0] : types[(currentIndex + 1) % types.length];
         setTimePalType(nextType);
         storage.set(TIMEPAL_KEYS.TYPE, nextType);
-        // 触发自定义事件通知其他组件
         window.dispatchEvent(new Event('timepal-type-changed'));
     };
 
-    // 计算当日专注时长
+    const handleImageClick = () => {
+        if (!isClickSwitchEnabled) {
+            return;
+        }
+        switchTimePal();
+    };
+
     const { totalFocusSeconds, formLevel } = useMemo(() => {
-        // 如果是调试模式，直接返回调试数据
         if (debugMode) {
             return {
                 totalFocusSeconds: debugFocusSeconds,
@@ -183,45 +187,35 @@ export const TimePalCard: React.FC<TimePalCardProps> = ({ logs, currentDate, cat
         const endOfDay = new Date(currentDate);
         endOfDay.setHours(23, 59, 59, 999);
 
-        // 筛选当日的专注记录
         const dayLogs = logs.filter(log => {
             return log.startTime >= startOfDay.getTime() && log.startTime <= endOfDay.getTime();
         });
 
-        // 读取筛选配置
         const isFilterEnabled = storage.getBoolean(TIMEPAL_KEYS.FILTER_ENABLED, false);
         const filterActivityIds = storage.getJSON<string[]>(TIMEPAL_KEYS.FILTER_ACTIVITIES, []);
 
-        // 计算总专注时长（已完成的记录）
         let totalSeconds = 0;
         dayLogs.forEach(log => {
-            // 如果启用了筛选，只统计选中的标签
             if (isFilterEnabled && filterActivityIds.length > 0) {
                 if (filterActivityIds.includes(log.activityId)) {
                     totalSeconds += log.duration;
                 }
             } else {
-                // 如果关闭限定标签功能，统计所有已记录的时间
                 totalSeconds += log.duration;
             }
         });
 
-        // 计算正在进行的会话时长
         if (activeSessions.length > 0) {
             activeSessions.forEach(session => {
-                // 检查会话是否在当天
                 if (session.startTime >= startOfDay.getTime() && session.startTime <= endOfDay.getTime()) {
-                    // 应用相同的筛选逻辑
                     let shouldCount = false;
                     if (isFilterEnabled && filterActivityIds.length > 0) {
                         shouldCount = filterActivityIds.includes(session.activityId);
                     } else {
-                        // 如果关闭限定标签功能，统计所有会话
                         shouldCount = true;
                     }
-                    
+
                     if (shouldCount) {
-                        // 计算从开始到现在的时长（秒）
                         const sessionDuration = Math.floor((currentTime - session.startTime) / 1000);
                         totalSeconds += sessionDuration;
                     }
@@ -238,41 +232,42 @@ export const TimePalCard: React.FC<TimePalCardProps> = ({ logs, currentDate, cat
         };
     }, [logs, currentDate, categories, activeSessions, currentTime, debugMode, debugFocusSeconds, debugLevel]);
 
-    // 使用图片加载 Hook
     const { imageUrl, hasError: imageError, emoji, handleImageError } = useTimePalImage(effectiveTimePalType, formLevel);
     const imageFitClass = isCustomTimePalType(effectiveTimePalType) ? 'object-fill' : 'object-cover';
-    
+
     const timeDisplay = formatDuration(totalFocusSeconds);
     const formDesc = getFormDescription(formLevel);
-    const quote = useMemo(() => getRandomQuote(), [currentDate]); // 每天固定一个语录
+    const quote = useMemo(() => getRandomQuote(), [currentDate]);
 
-    // 检查是否是今天
     const isToday = useMemo(() => {
         const today = new Date();
-        return currentDate.getFullYear() === today.getFullYear() &&
-               currentDate.getMonth() === today.getMonth() &&
-               currentDate.getDate() === today.getDate();
+        return currentDate.getFullYear() === today.getFullYear()
+            && currentDate.getMonth() === today.getMonth()
+            && currentDate.getDate() === today.getDate();
     }, [currentDate]);
 
-    // 如果不是今天，或者没有专注时长（且不在调试模式），不显示卡片
     if (!timePalType || !isToday || (totalFocusSeconds === 0 && !debugMode)) {
         return null;
     }
 
     return (
         <div className="mb-4">
-            <div className="relative bg-gradient-to-br from-white/70 to-stone-50/70 rounded-2xl border border-stone-200 p-4 flex items-center gap-4 transition-shadow" style={{ boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.05)' }}>
-                {/* 左侧：小动物图片（可点击切换） */}
-                <button 
-                    onClick={switchTimePal}
-                    className="shrink-0 active:scale-95 transition-transform"
-                    title="点击切换小动物"
+            <div
+                className="relative bg-gradient-to-br from-white/70 to-stone-50/70 rounded-2xl border border-stone-200 p-4 flex items-center gap-4 transition-shadow"
+                style={{ boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.05)' }}
+            >
+                <button
+                    type="button"
+                    onClick={handleImageClick}
+                    className={`shrink-0 transition-transform ${isClickSwitchEnabled ? 'active:scale-95' : 'cursor-default'}`}
+                    title={isClickSwitchEnabled ? '点击切换时光小友' : undefined}
+                    aria-label={isClickSwitchEnabled ? '点击切换时光小友' : '时光小友图片'}
                 >
                     <div className={`w-20 h-20 rounded-xl overflow-hidden flex items-center justify-center animate-level-${formLevel}`}>
-                        {!imageError ? (
-                            <img 
-                                src={imageUrl} 
-                                alt="时光小友" 
+                        {!imageError && imageUrl ? (
+                            <img
+                                src={imageUrl}
+                                alt="时光小友"
                                 className={`w-full h-full ${imageFitClass}`}
                                 onError={handleImageError}
                             />
@@ -282,9 +277,11 @@ export const TimePalCard: React.FC<TimePalCardProps> = ({ logs, currentDate, cat
                     </div>
                 </button>
 
-                {/* 右侧：专注时长和状态 */}
                 <div className="flex-1 flex flex-col justify-center min-w-0">
-                    <div className="text-2xl font-bold tabular-nums leading-none text-stone-800" style={{ fontFamily: '"Playfair Display", "Noto Serif SC", Georgia, serif', letterSpacing: '0.08em' }}>
+                    <div
+                        className="text-2xl font-bold tabular-nums leading-none text-stone-800"
+                        style={{ fontFamily: '"Playfair Display", "Noto Serif SC", Georgia, serif', letterSpacing: '0.08em' }}
+                    >
                         {timeDisplay}
                     </div>
                     <div className="mt-1.5 text-xs text-stone-500 leading-relaxed">
@@ -293,25 +290,20 @@ export const TimePalCard: React.FC<TimePalCardProps> = ({ logs, currentDate, cat
                     </div>
                 </div>
 
-                {/* 形态等级指示器 */}
                 <div className="shrink-0 flex flex-col items-center gap-1">
                     {Array.from({ length: 5 }).map((_, i) => (
-                        <div 
+                        <div
                             key={i}
                             className={`w-1.5 h-1.5 rounded-full transition-all ${
-                                i < formLevel 
-                                    ? 'shadow-sm' 
-                                    : 'bg-stone-200'
+                                i < formLevel ? 'shadow-sm' : 'bg-stone-200'
                             }`}
                             style={i < formLevel ? { backgroundColor: 'var(--accent-color)' } : undefined}
                         />
                     ))}
                 </div>
             </div>
-            
-            {/* 添加自定义动画样式 - 5个等级的不同动画 */}
+
             <style>{`
-                /* Level 1: 刚刚苏醒 - 轻微左右摇晃 */
                 @keyframes level-1-animation {
                     0%, 100% {
                         transform: rotate(0deg);
@@ -323,12 +315,11 @@ export const TimePalCard: React.FC<TimePalCardProps> = ({ logs, currentDate, cat
                         transform: rotate(1.5deg);
                     }
                 }
-                
+
                 .animate-level-1 {
                     animation: level-1-animation 3.5s ease-in-out infinite;
                 }
-                
-                /* Level 2: 精神饱满 - 左右摇晃 + 轻微缩放 */
+
                 @keyframes level-2-animation {
                     0%, 100% {
                         transform: rotate(0deg) scale(1);
@@ -343,12 +334,11 @@ export const TimePalCard: React.FC<TimePalCardProps> = ({ logs, currentDate, cat
                         transform: rotate(2deg) scale(1.02);
                     }
                 }
-                
+
                 .animate-level-2 {
                     animation: level-2-animation 3s ease-in-out infinite;
                 }
-                
-                /* Level 3: 活力四射 - 更大的摇晃 + 明显缩放 */
+
                 @keyframes level-3-animation {
                     0%, 100% {
                         transform: rotate(0deg) scale(1) translateY(0);
@@ -366,12 +356,11 @@ export const TimePalCard: React.FC<TimePalCardProps> = ({ logs, currentDate, cat
                         transform: rotate(3deg) scale(1.05) translateY(-2px);
                     }
                 }
-                
+
                 .animate-level-3 {
                     animation: level-3-animation 2.5s ease-in-out infinite;
                 }
-                
-                /* Level 4: 元气满满 - 弹跳 + 摇晃 */
+
                 @keyframes level-4-animation {
                     0%, 100% {
                         transform: rotate(0deg) scale(1) translateY(0);
@@ -392,12 +381,11 @@ export const TimePalCard: React.FC<TimePalCardProps> = ({ logs, currentDate, cat
                         transform: rotate(0deg) scale(1.03) translateY(-1px);
                     }
                 }
-                
+
                 .animate-level-4 {
                     animation: level-4-animation 2s ease-in-out infinite;
                 }
-                
-                /* Level 5: 超级无敌 - 快速弹跳 + Q弹效果 */
+
                 @keyframes level-5-animation {
                     0%, 100% {
                         transform: rotate(0deg) scale(1) translateY(0);
@@ -427,7 +415,7 @@ export const TimePalCard: React.FC<TimePalCardProps> = ({ logs, currentDate, cat
                         transform: rotate(0deg) scale(1.02) translateY(0);
                     }
                 }
-                
+
                 .animate-level-5 {
                     animation: level-5-animation 1.8s cubic-bezier(0.45, 0.05, 0.55, 0.95) infinite;
                 }
