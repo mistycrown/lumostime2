@@ -22,6 +22,7 @@ import { useSettings } from '../contexts/SettingsContext';
 import { IconRenderer } from '../components/IconRenderer';
 import { useGoalStatus } from '../hooks/useGoalStatus';
 import { calculateGoalProgress } from '../utils/goalUtils';
+import { applyMajorGoalInheritance } from '../utils/goalInheritanceUtils';
 
 interface ScopeDetailViewProps {
     scope: Scope;
@@ -634,11 +635,19 @@ export const ScopeDetailView: React.FC<ScopeDetailViewProps> = ({
                     mg.scopeId === scope.id && mg.status === 'archived'
                 );
                 
+                // 阶段目标：运行时继承目标系列的类型/筛选器，保证“阶段目标读取不到目标系列属性”时不丢信息
+                const inheritedGoals = goals.map(g => {
+                    if (!g.majorGoalId) return g;
+                    const mg = majorGoals.find(m => m.id === g.majorGoalId);
+                    if (!mg) return g;
+                    return applyMajorGoalInheritance(g, mg);
+                });
+
                 // 分离独立目标（没有 majorGoalId 的目标）
-                const activeGoals = goals.filter(g =>
+                const activeGoals = inheritedGoals.filter(g =>
                     g.scopeId === scope.id && g.status !== 'archived' && !g.majorGoalId
                 );
-                const archivedGoals = goals.filter(g =>
+                const archivedGoals = inheritedGoals.filter(g =>
                     g.scopeId === scope.id && g.status === 'archived' && !g.majorGoalId
                 );
                 
@@ -703,7 +712,7 @@ export const ScopeDetailView: React.FC<ScopeDetailViewProps> = ({
                                                 <MajorGoalCard
                                                     key={majorGoal.id}
                                                     majorGoal={majorGoal}
-                                                    goals={goals.filter(g => g.majorGoalId === majorGoal.id)}
+                                                    goals={inheritedGoals.filter(g => g.majorGoalId === majorGoal.id)}
                                                     logs={logs}
                                                     todos={todos}
                                                     onEdit={onEditMajorGoal}
@@ -800,7 +809,7 @@ export const ScopeDetailView: React.FC<ScopeDetailViewProps> = ({
                                             <MajorGoalCard
                                                 key={majorGoal.id}
                                                 majorGoal={majorGoal}
-                                                goals={goals.filter(g => g.majorGoalId === majorGoal.id)}
+                                                goals={inheritedGoals.filter(g => g.majorGoalId === majorGoal.id)}
                                                 logs={logs}
                                                 todos={todos}
                                                 onEdit={onEditMajorGoal}
