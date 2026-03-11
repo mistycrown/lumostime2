@@ -30,6 +30,7 @@ import { useNavigation } from '../contexts/NavigationContext';
 import { CollapsibleText } from '../components/CollapsibleText';
 import { calculateGoalProgress } from '../utils/goalUtils';
 import { GalleryView } from '../components/GalleryView';
+import { toCssColor } from '../utils/colorUtils';
 
 // Image Thumbnail Component
 const TimelineImage: React.FC<{ filename: string, className?: string, useThumbnail?: boolean, refreshKey?: number }> = ({ filename, className = "w-16 h-16", useThumbnail = false, refreshKey = 0 }) => {
@@ -499,7 +500,7 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ logs, todos, scopes,
                     categoryName: category?.name || (currentLog.categoryId === 'uncategorized' ? '未分类' : 'Unknown'),
                     categoryIcon: category?.icon || (currentLog.categoryId === 'uncategorized' ? '⏱️' : '?'),
                     categoryUiIcon: category?.uiIcon,
-                    categoryColor: category?.themeColor || '#a8a29e', // Stone-400 fallback
+                    categoryColor: category ? toCssColor(category.themeColor || '', 'fill') : '#a8a29e',
                     linkedTodoTitle: linkedTodo?.title,
                     linkedTodo: linkedTodo, // 传递完整的待办对象
                     linkedScopeData: linkedScopes.length > 0

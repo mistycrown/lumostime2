@@ -15,6 +15,7 @@ import { ConfirmModal } from '../components/ConfirmModal';
 import { CustomSelect } from '../components/CustomSelect';
 import { parseFilterExpression, matchesFilter, FilterContext } from '../utils/filterUtils';
 import { usePrivacy } from '../contexts/PrivacyContext';
+import { toCssColor } from '../utils/colorUtils';
 
 interface BatchFocusRecordManageViewProps {
     onBack: () => void;
@@ -390,7 +391,7 @@ const RecordItem: React.FC<RecordItemProps> = ({
                 {/* Category Tag */}
                 {category && (
                     <span className="text-[10px] font-medium text-stone-500 border border-stone-200 px-2 py-0.5 rounded flex items-center gap-1 bg-stone-50/30">
-                        <span className="font-bold" style={{ color: category.themeColor || '#a8a29e' }}>#</span>
+                        <span className="font-bold" style={{ color: toCssColor(category.themeColor || '', 'fill') || '#a8a29e' }}>#</span>
                         <span>{category.icon}</span>
                         <span className="flex items-center">
                             <span>{category.name}</span>

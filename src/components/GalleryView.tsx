@@ -10,6 +10,7 @@ import { imageService } from '../services/imageService';
 import { IconRenderer } from './IconRenderer';
 import { ImagePreviewModal } from './ImagePreviewModal';
 import { GalleryExportView } from './GalleryExportView';
+import { toCssColor } from '../utils/colorUtils';
 
 interface GalleryViewProps {
     logs: Log[];
@@ -153,7 +154,7 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
                         categoryName: category?.name,
                         categoryIcon: category?.icon,
                         categoryUiIcon: category?.uiIcon,
-                        categoryColor: category?.themeColor,
+                        categoryColor: category ? toCssColor(category.themeColor || '', 'fill') : undefined,
                         activityName: activity?.name,
                         activityIcon: activity?.icon,
                         activityUiIcon: activity?.uiIcon

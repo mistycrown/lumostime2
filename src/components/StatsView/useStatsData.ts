@@ -5,7 +5,6 @@
 
 import { useMemo } from 'react';
 import { Log, Category, Activity, TodoItem, TodoCategory, Scope, DailyReview } from '../../types';
-import { getHexColor } from './statsUtils';
 
 interface ActivityStat extends Activity {
   duration: number;

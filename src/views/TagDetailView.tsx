@@ -22,6 +22,7 @@ import { useSettings } from '../contexts/SettingsContext';
 import { IconRenderer } from '../components/IconRenderer';
 import { useCustomColors } from '../hooks/useCustomColors';
 import { isStoredColorSelected } from '../utils/colorUtils';
+import { getColorHexForCharts } from '../utils/colorAdapterUtils';
 
 
 interface TagDetailViewProps {
@@ -220,13 +221,7 @@ export const TagDetailView: React.FC<TagDetailViewProps> = ({ tagId, logs, todos
             label: scope ? scope.name : 'unscoped',
             value: duration,
             color: (() => {
-               const colorClass = scope?.themeColor || '';
-               // Try to match tailwind class first, else hex, else default
-               const match = colorClass.match(/(?:text|bg)-([a-z]+)-/);
-               const colorName = match ? match[1] : (colorClass.startsWith('#') ? 'custom' : 'stone');
-               if (colorName === 'custom') return colorClass;
-               const option = COLOR_OPTIONS.find(opt => opt.id === colorName);
-               return option ? option.lightHex : '#e7e5e4';
+               return getColorHexForCharts(scope?.themeColor || '');
             })(),
             icon: scope?.icon
          };

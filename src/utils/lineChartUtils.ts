@@ -6,29 +6,13 @@
  */
 
 import { Log, Category, TodoItem, Scope } from '../types';
-import { getChartStrokeColor } from './colorAdapterUtils';
+import { CHART_STROKE_COLORS, getChartStrokeColor } from './colorAdapterUtils';
 
 /**
  * 图表线条颜色映射
  */
 export const CHART_LINE_COLORS: Record<string, string> = {
-  red: '#fca5a5',
-  blue: '#93c5fd',
-  orange: '#fdba74',
-  purple: '#d8b4fe',
-  emerald: '#6ee7b7',
-  fuchsia: '#f0abfc',
-  yellow: '#fde047',
-  cyan: '#67e8f9',
-  rose: '#fda4af',
-  indigo: '#a5b4fc',
-  lime: '#bef264',
-  violet: '#c4b5fd',
-  amber: '#fcd34d',
-  sky: '#7dd3fc',
-  green: '#86efac',
-  pink: '#f9a8d4',
-  teal: '#5eead4'
+  ...CHART_STROKE_COLORS,
 };
 
 /**

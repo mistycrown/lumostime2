@@ -21,6 +21,7 @@ import { IconRenderer } from '../components/IconRenderer';
 import { getDateRange } from '../utils/dateRangeUtils';
 import { useCustomColors } from '../hooks/useCustomColors';
 import { isStoredColorSelected } from '../utils/colorUtils';
+import { getColorHexForCharts } from '../utils/colorAdapterUtils';
 
 interface CategoryDetailViewProps {
     categoryId: string;
@@ -121,11 +122,7 @@ export const CategoryDetailView: React.FC<CategoryDetailViewProps> = ({ category
                 value: duration,
                 color: (() => {
                     if (!scope || scId === 'uncategorized') return '#e7e5e4'; // Default stone light color
-                    const colorClass = scope.themeColor || '';
-                    const match = colorClass.match(/(?:text|bg)-([a-z]+)-/);
-                    const colorName = match ? match[1] : 'stone';
-                    const option = COLOR_OPTIONS.find(opt => opt.id === colorName);
-                    return option ? option.lightHex : '#e7e5e4';
+                    return getColorHexForCharts(scope.themeColor || '');
                 })(),
                 icon: scope?.icon
             };
