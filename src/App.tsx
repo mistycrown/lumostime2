@@ -45,6 +45,14 @@ import { useHardwareBackButton } from './hooks/useHardwareBackButton';
 import { useAppLifecycle } from './hooks/useAppLifecycle';
 import { splitLogByDays } from './utils/logUtils';
 import { getActiveSceneGroup, loadSceneGroupStateFromStorage } from './utils/sceneGroupStorage';
+import {
+  AutoLinkViewLazy as AutoLinkView,
+  FocusDetailViewLazy as FocusDetailView,
+  SearchViewLazy as SearchView,
+  SettingsViewLazy as SettingsView,
+  ShareViewLazy as ShareView,
+  startLazyViewPreload
+} from './utils/lazyViews';
 
 // Polyfill Buffer for webdav library
 if (typeof window !== 'undefined') {
@@ -61,12 +69,6 @@ import {
   DEFAULT_REVIEW_TEMPLATES,
   DEFAULT_CHECK_TEMPLATES
 } from './constants';
-
-const SearchView = React.lazy(() => import('./views/SearchView').then((module) => ({ default: module.SearchView })));
-const FocusDetailView = React.lazy(() => import('./views/FocusDetailView').then((module) => ({ default: module.FocusDetailView })));
-const ShareView = React.lazy(() => import('./views/ShareView').then((module) => ({ default: module.ShareView })));
-const AutoLinkView = React.lazy(() => import('./views/AutoLinkView').then((module) => ({ default: module.AutoLinkView })));
-const SettingsView = React.lazy(() => import('./views/SettingsView').then((module) => ({ default: module.SettingsView })));
 
 const OverlayFallback: React.FC<{ label: string }> = ({ label }) => (
   <div className="fixed inset-0 z-[70] flex items-center justify-center bg-[#faf9f6]/92 backdrop-blur-sm">
@@ -321,6 +323,11 @@ const AppContent: React.FC = () => {
   useDeepLink(logManager.handleQuickPunch, handleStartActivityWrapper, handleStopActivityWrapper);
   useFloatingWindow(handleStopActivityWrapper);
   useAppDetection(handleStartActivityWrapper);
+
+  React.useEffect(() => {
+    const cleanup = startLazyViewPreload();
+    return cleanup;
+  }, []);
 
   // Calculate lastLogEndTime for AddLogModal
   const lastLogEndTime = React.useMemo(() => {

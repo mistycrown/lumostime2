@@ -8,6 +8,7 @@
  * 修改历史:
  * - 2026-01-10: 修复日课统计（check）视图的日期导航功能，补充 check 视图范围处理。
  * - 2026-03-03: 数字类型日课统计改为按完成次数展示，避免仅按是否完成呈现。
+ * - 2026-03-11: 统一统计分享导出协议，修复分享图片页因解析失败导致的空白问题。
  *
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
@@ -324,15 +325,51 @@ export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentD
     includePrevious: true
   });
 
-  const handleExportStats = () => {
+  const getExportRangeLabel = () => {
+    if (viewType === 'pie') {
+      return {
+        day: '日',
+        week: '周',
+        month: '月',
+        year: '年'
+      }[pieRange];
+    }
+
+    if (viewType === 'matrix') return '周矩阵';
+
+    if (viewType === 'schedule') {
+      return {
+        day: '日程',
+        week: '周日程',
+        month: '月日程'
+      }[scheduleRange];
+    }
+
+    if (viewType === 'line') {
+      return lineRange === 'week' ? '周趋势' : '月趋势';
+    }
+
+    if (viewType === 'check') {
+      return {
+        week: '周打卡',
+        month: '月打卡',
+        year: '年打卡'
+      }[pieRange === 'day' ? 'week' : pieRange];
+    }
+
+    if (viewType === 'emoji') {
+      return emojiRange === 'year' ? '年度情绪' : '月度情绪';
+    }
+
+    return '统计';
+  };
+
+  const buildStatsExportText = () => {
     const { start } = effectiveRange;
     const dateStr = `${start.getFullYear()}/${start.getMonth() + 1}/${start.getDate()}`;
-    let rangeLabel = '';
-    if (viewType === 'pie') rangeLabel = pieRange.charAt(0).toUpperCase() + pieRange.slice(1);
-    if (viewType === 'matrix') rangeLabel = 'Week Matrix';
-    if (viewType === 'schedule') rangeLabel = scheduleRange === 'day' ? 'Day Schedule' : 'Week Schedule';
+    const rangeLabel = getExportRangeLabel();
 
-    let text = `## 馃搳 ${dateStr} - ${rangeLabel} 缁熻\n**鎬绘椂闀?*: ${formatDuration(stats.totalDuration)}\n\n`;
+    let text = `## 📊 ${dateStr} - ${rangeLabel}统计\n**总时长**: ${formatDuration(stats.totalDuration)}\n\n`;
     stats.categoryStats.forEach(cat => {
       text += `- **[${cat.name}]** ${formatDuration(cat.duration)} (${cat.percentage.toFixed(1)}%)\n`;
       cat.items.forEach(act => {
@@ -344,7 +381,7 @@ export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentD
 
 
     if (todoStats.totalDuration > 0) {
-      text += `\n## 馃搵 寰呭姙涓撴敞鍒嗗竷\n**寰呭姙鎬绘椂闀?*: ${formatDuration(todoStats.totalDuration)}\n\n`;
+      text += `\n## 📋 待办专注分布\n**总时长**: ${formatDuration(todoStats.totalDuration)}\n\n`;
       todoStats.categoryStats.forEach(cat => {
         text += `- **[${cat.name}]** ${formatDuration(cat.duration)} (${cat.percentage.toFixed(1)}%)\n`;
         cat.items.forEach(item => {
@@ -355,55 +392,24 @@ export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentD
     }
 
     if (scopeStats.totalDuration > 0) {
-      text += `\n## 馃幆 棰嗗煙涓撴敞鍒嗗竷\n**棰嗗煙鎬绘椂闀?*: ${formatDuration(scopeStats.totalDuration)}\n\n`;
+      text += `\n## 🎯 领域专注分布\n**总时长**: ${formatDuration(scopeStats.totalDuration)}\n\n`;
       scopeStats.categoryStats.forEach(scope => {
         text += `- **[${scope.name}]** ${formatDuration(scope.duration)} (${scope.percentage.toFixed(1)}%)\n`;
-        // Removed scope.items.forEach
         text += '\n';
       });
     }
 
+    return text;
+  };
+
+  const handleExportStats = () => {
+    const text = buildStatsExportText();
     // Instead of direct copy, open modal
     setCopyFailureModal({ isOpen: true, text: text });
   };
 
   const handleExportImage = () => {
-    const { start } = effectiveRange;
-    const dateStr = `${start.getFullYear()}/${start.getMonth() + 1}/${start.getDate()}`;
-    let rangeLabel = '';
-    if (viewType === 'pie') rangeLabel = pieRange.charAt(0).toUpperCase() + pieRange.slice(1);
-    if (viewType === 'matrix') rangeLabel = 'Week Matrix';
-    if (viewType === 'schedule') rangeLabel = scheduleRange === 'day' ? 'Day Schedule' : 'Week Schedule';
-
-    let text = `## 馃搳 ${dateStr} - ${rangeLabel} 缁熻\n**鎬绘椂闀?*: ${formatDuration(stats.totalDuration)}\n\n`;
-    stats.categoryStats.forEach(cat => {
-      text += `- **[${cat.name}]** ${formatDuration(cat.duration)} (${cat.percentage.toFixed(1)}%)\n`;
-      cat.items.forEach(act => {
-        text += `    * ${act.name}: ${formatDuration(act.duration)}\n`;
-      });
-      text += '\n';
-    });
-    text += '\n';
-
-    if (todoStats.totalDuration > 0) {
-      text += `\n## 馃搵 寰呭姙涓撴敞鍒嗗竷\n**寰呭姙鎬绘椂闀?*: ${formatDuration(todoStats.totalDuration)}\n\n`;
-      todoStats.categoryStats.forEach(cat => {
-        text += `- **[${cat.name}]** ${formatDuration(cat.duration)} (${cat.percentage.toFixed(1)}%)\n`;
-        cat.items.forEach(item => {
-          text += `    * ${item.name}: ${formatDuration(item.duration)}\n`;
-        });
-        text += '\n';
-      });
-    }
-
-    if (scopeStats.totalDuration > 0) {
-      text += `\n## 馃幆 棰嗗煙涓撴敞鍒嗗竷\n**棰嗗煙鎬绘椂闀?*: ${formatDuration(scopeStats.totalDuration)}\n\n`;
-      scopeStats.categoryStats.forEach(scope => {
-        text += `- **[${scope.name}]** ${formatDuration(scope.duration)} (${scope.percentage.toFixed(1)}%)\n`;
-        text += '\n';
-      });
-    }
-
+    const text = buildStatsExportText();
     // Open ChronoPrint view
     setChronoPrintText(text);
     setShowChronoPrint(true);
@@ -888,10 +894,10 @@ export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentD
           executeCopy(copyFailureModal.text);
           setCopyFailureModal({ ...copyFailureModal, isOpen: false });
         }}
-        title="瀵煎嚭缁熻鏂囨湰"
+        title="导出统计文本"
         description={copyFailureModal.text}
-        confirmText="澶嶅埗鍐呭"
-        cancelText="鍏抽棴"
+        confirmText="复制内容"
+        cancelText="关闭"
         type="info"
       />
     </div >
