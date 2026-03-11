@@ -60,6 +60,10 @@ interface NavigationContextType {
     setIsTodoModalOpen: (open: boolean) => void;
     isTodoManaging: boolean;
     setIsTodoManaging: (managing: boolean) => void;
+
+    // Goal Batch Manage (Scope > Goals)
+    isGoalBatchManaging: boolean;
+    setIsGoalBatchManaging: (managing: boolean) => void;
     isGoalEditorOpen: boolean;
     setIsGoalEditorOpen: (open: boolean) => void;
     isTagsManaging: boolean;
@@ -212,6 +216,7 @@ export const NavigationProvider: React.FC<NavigationProviderProps> = ({
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
     const [isTodoModalOpen, setIsTodoModalOpen] = useState(false);
     const [isTodoManaging, setIsTodoManaging] = useState(false);
+    const [isGoalBatchManaging, setIsGoalBatchManaging] = useState(false);
     const [isGoalEditorOpen, setIsGoalEditorOpen] = useState(false);
     const [isTagsManaging, setIsTagsManaging] = useState(false);
     const [isScopeManaging, setIsScopeManaging] = useState(false);
@@ -232,6 +237,12 @@ export const NavigationProvider: React.FC<NavigationProviderProps> = ({
     const [selectedTagId, setSelectedTagId] = useState<string | null>(null);
     const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
     const [selectedScopeId, setSelectedScopeId] = useState<string | null>(null);
+
+    useEffect(() => {
+        if (!selectedScopeId) {
+            setIsGoalBatchManaging(false);
+        }
+    }, [selectedScopeId]);
 
     // 编辑状态
     const [editingLog, setEditingLog] = useState<Log | null>(null);
@@ -297,6 +308,8 @@ export const NavigationProvider: React.FC<NavigationProviderProps> = ({
             setIsTodoModalOpen,
             isTodoManaging,
             setIsTodoManaging,
+            isGoalBatchManaging,
+            setIsGoalBatchManaging,
             isGoalEditorOpen,
             setIsGoalEditorOpen,
             isTagsManaging,

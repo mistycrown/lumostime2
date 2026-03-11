@@ -107,6 +107,7 @@ const AppContent: React.FC = () => {
     selectedTagId, setSelectedTagId,
     selectedCategoryId, setSelectedCategoryId,
     selectedScopeId, setSelectedScopeId,
+    setIsGoalBatchManaging,
     editingLog,
     editingTodo,
     editingGoal,
@@ -329,6 +330,7 @@ const AppContent: React.FC = () => {
         setSelectedCategoryId(null);
       }}
       handleBackFromScope={() => {
+        setIsGoalBatchManaging(false);
         setSelectedScopeId(null);
       }}
       handleCloseDailyReview={() => {

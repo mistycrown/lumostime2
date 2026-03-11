@@ -7,12 +7,12 @@
  * 
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
-import React, { useState, useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Scope, Log, Category, TodoItem, Goal, MajorGoal } from '../types';
 import { CalendarWidget } from '../components/CalendarWidget';
 import { MatrixAnalysisChart } from '../components/MatrixAnalysisChart';
 import { DateRangeFilter, RangeType } from '../components/DateRangeFilter';
-import { Check, Save, Zap, Clock, BarChart2, Archive, Plus, X, ChevronDown } from 'lucide-react';
+import { ArrowUpDown, Check, Save, Zap, Clock, BarChart2, Archive, Plus, X, ChevronDown } from 'lucide-react';
 import { COLOR_OPTIONS } from '../constants';
 import { GoalCard } from '../components/GoalCard';
 import { MajorGoalCard } from '../components/MajorGoalCard';
@@ -24,6 +24,7 @@ import { useGoalStatus } from '../hooks/useGoalStatus';
 import { calculateGoalProgress } from '../utils/goalUtils';
 import { applyMajorGoalInheritance } from '../utils/goalInheritanceUtils';
 import { GoalBatchManageView } from './GoalBatchManageView';
+import { useNavigation } from '../contexts/NavigationContext';
 
 interface ScopeDetailViewProps {
     scope: Scope;
@@ -70,12 +71,12 @@ export const ScopeDetailView: React.FC<ScopeDetailViewProps> = ({
     onArchiveMajorGoal,
     onBatchUpdateGoals
 }) => {
+    const { isGoalBatchManaging, setIsGoalBatchManaging } = useNavigation();
     const [activeTab, setActiveTab] = useState('时间线');
     const [scope, setScope] = useState(initialScope);
     const [displayDate, setDisplayDate] = useState(new Date());
     const [showArchived, setShowArchived] = useState(false); // 是否显示归档目标
     const [newKeyword, setNewKeyword] = useState(''); // 添加关键字输入
-    const [isGoalBatchManaging, setIsGoalBatchManaging] = useState(false);
     
     // 获取当前 UI 图标主题
     const { uiIconTheme } = useSettings();
@@ -780,25 +781,28 @@ export const ScopeDetailView: React.FC<ScopeDetailViewProps> = ({
                                     {onBatchUpdateGoals && (
                                         <button
                                             onClick={() => setIsGoalBatchManaging(true)}
-                                            className="flex-1 py-2 text-stone-500 hover:text-stone-900 transition-colors text-xs font-medium uppercase tracking-wider"
+                                            className="flex-1 py-2 text-stone-500 hover:text-stone-900 transition-colors text-xs font-medium uppercase tracking-wider flex items-center justify-center gap-1"
                                         >
+                                            <ArrowUpDown size={14} />
                                             批量管理
                                         </button>
                                     )}
                                     {onAddMajorGoal && (
                                         <button
                                             onClick={onAddMajorGoal}
-                                            className="flex-1 py-2 text-stone-500 hover:text-stone-900 transition-colors text-xs font-medium uppercase tracking-wider"
+                                            className="flex-1 py-2 text-stone-500 hover:text-stone-900 transition-colors text-xs font-medium uppercase tracking-wider flex items-center justify-center gap-1"
                                         >
-                                            + 添加目标系列
+                                            <Plus size={14} />
+                                            添加目标系列
                                         </button>
                                     )}
                                     {onAddGoal && (
                                         <button
                                             onClick={() => onAddGoal()}
-                                            className="flex-1 py-2 text-stone-500 hover:text-stone-900 transition-colors text-xs font-medium uppercase tracking-wider"
+                                            className="flex-1 py-2 text-stone-500 hover:text-stone-900 transition-colors text-xs font-medium uppercase tracking-wider flex items-center justify-center gap-1"
                                         >
-                                            + 添加独立目标
+                                            <Plus size={14} />
+                                            添加独立目标
                                         </button>
                                     )}
                                 </div>

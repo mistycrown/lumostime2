@@ -59,6 +59,7 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
         isMonthlyReviewOpen,
         isStatsFullScreen, setIsStatsFullScreen,
         isTodoManaging, setIsTodoManaging,
+        isGoalBatchManaging,
         isTagsManaging, setIsTagsManaging,
         isScopeManaging, setIsScopeManaging,
         selectedTagId, selectedCategoryId, selectedScopeId,
@@ -113,6 +114,7 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
                 !(currentView === AppView.TODO && isTodoManaging) &&
                 !(currentView === AppView.TAGS && isTagsManaging) &&
                 !(currentView === AppView.SCOPE && isScopeManaging) &&
+                !(currentView === AppView.SCOPE && isGoalBatchManaging) &&
                 // Hide header for REVIEW view (Memoir/Chronicle use their own headers) UNLESS a modal review is open
                 (currentView !== AppView.REVIEW || isDailyReviewOpen || isWeeklyReviewOpen || isMonthlyReviewOpen) && (
                     <header
