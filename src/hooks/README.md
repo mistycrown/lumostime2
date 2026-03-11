@@ -1,5 +1,7 @@
 # Custom Hooks
 
+> `useTodoStats.ts` 优先使用 `TodoCategory.color` 作为待办环形图颜色；旧分类没有保存颜色时，继续回退到历史默认调色板。
+
 这个目录包含从 AddLogModal.tsx 提取的可复用自定义 Hooks。
 
 ## 文件说明
