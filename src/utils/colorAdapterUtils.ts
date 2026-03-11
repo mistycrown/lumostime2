@@ -15,6 +15,8 @@ export interface ColorRenderPresentation {
   style?: CSSProperties;
 }
 
+export type ScheduleThemeVariant = 'default' | 'classic' | 'minimal' | 'solid';
+
 export const CHART_STROKE_COLORS: Record<string, string> = {
   red: '#fca5a5',
   blue: '#93c5fd',
@@ -92,8 +94,48 @@ export const getHeatmapFillColor = (colorValue: string = ''): string => {
 };
 
 export const getSchedulePresentation = (
-  colorValue: string = ''
+  colorValue: string = '',
+  theme: ScheduleThemeVariant = 'default'
 ): ColorRenderPresentation => {
+  if (theme !== 'default') {
+    const baseColor = normalizeHexColor(toCssColor(colorValue, 'fill', 1)) || '#78716c';
+
+    if (theme === 'classic') {
+      return {
+        className: 'rounded-[4px]',
+        style: {
+          backgroundColor: hexToRgba(baseColor, 0.12),
+          color: baseColor,
+          borderColor: hexToRgba(baseColor, 0.18),
+          borderLeftColor: hexToRgba(baseColor, 0.52),
+          borderLeftWidth: '3px',
+        },
+      };
+    }
+
+    if (theme === 'minimal') {
+      return {
+        className: '',
+        style: {
+          backgroundColor: 'transparent',
+          color: baseColor,
+          borderColor: 'transparent',
+          borderLeftColor: baseColor,
+          borderLeftWidth: '4px',
+        },
+      };
+    }
+
+    return {
+      className: 'rounded-md shadow-sm',
+      style: {
+        backgroundColor: baseColor,
+        color: '#ffffff',
+        borderColor: hexToRgba(baseColor, 0.16),
+      },
+    };
+  }
+
   if (typeof colorValue !== 'string') {
     return { className: SCHEDULE_CLASS_MAP.stone };
   }

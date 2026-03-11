@@ -18,6 +18,7 @@ import {
   getChartStrokeColor,
   getColorHexForCharts,
   getSchedulePresentation,
+  type ScheduleThemeVariant,
   type ColorRenderPresentation,
 } from './colorAdapterUtils';
 
@@ -146,8 +147,11 @@ export const getHexColor = (className: string = ''): string => {
  * // 返回: 'bg-red-100/90 text-red-700 border-red-200'
  * ```
  */
-export const getScheduleStyle = (className: string = ''): ScheduleStyleResult => {
-  return getSchedulePresentation(className);
+export const getScheduleStyle = (
+  className: string = '',
+  theme: ScheduleThemeVariant = 'default'
+): ScheduleStyleResult => {
+  return getSchedulePresentation(className, theme);
 };
 
 /**

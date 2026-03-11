@@ -35,6 +35,8 @@ export const THEME_KEYS = {
     UI_ICON_THEME: 'lumostime_ui_icon_theme',
     /** 配色方案 */
     COLOR_SCHEME: 'lumostime_color_scheme',
+    /** 日程图样式 */
+    SCHEDULE_STYLE: 'lumostime_schedule_style',
     /** 自定义色组 */
     CUSTOM_COLOR_GROUP: 'lumostime_custom_color_group',
     /** 当前背景 */

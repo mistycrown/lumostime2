@@ -5,6 +5,7 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode, useRef } from 'react';
 import { AppView, AutoLinkRule, Filter, NarrativeTemplate, MemoirFilterConfig } from '../types';
 import { DEFAULT_USER_PERSONAL_INFO } from '../constants';
+import { THEME_KEYS } from '../constants/storageKeys';
 import { uiIconService } from '../services/uiIconService';
 import { fontService } from '../services/fontService';
 
@@ -12,6 +13,7 @@ export type DefaultArchiveView = 'CHRONICLE' | 'MEMOIR';
 export type DefaultIndexView = 'TAGS' | 'SCOPE';
 export type DefaultRecordView = 'TIMER' | 'SCENE';
 export type EmojiStyle = 'native' | 'twemoji' | 'openmoji';
+export type ScheduleStyle = 'default' | 'classic' | 'minimal' | 'solid';
 export type DefaultSelectorPage = 'emoji' | string; // 'emoji' 或 sticker set ID (如 'water', 'water-1', 'water-2')
 export type SceneCardTimerMode = 'realtime' | 'backfill'; // 'realtime' 正计时, 'backfill' 补记
 
@@ -69,6 +71,10 @@ interface SettingsContextType {
     // 字体设置
     fontFamily: string;
     setFontFamily: React.Dispatch<React.SetStateAction<string>>;
+
+    // 日程图样式
+    scheduleStyle: ScheduleStyle;
+    setScheduleStyle: React.Dispatch<React.SetStateAction<ScheduleStyle>>;
 
     // Emoji 风格设置
     emojiStyle: EmojiStyle;
@@ -341,6 +347,15 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
         return stored || 'default';
     });
 
+    const [scheduleStyle, setScheduleStyle] = useState<ScheduleStyle>(() => {
+        const stored = localStorage.getItem(THEME_KEYS.SCHEDULE_STYLE);
+        if (stored === 'outline') return 'minimal';
+        if (stored === 'classic' || stored === 'minimal' || stored === 'solid' || stored === 'default') {
+            return stored;
+        }
+        return 'default';
+    });
+
     const [emojiStyle, setEmojiStyle] = useState<EmojiStyle>(() => {
         const stored = localStorage.getItem('lumostime_emoji_style');
         // 向后兼容：如果之前使用 useTwemoji，转换为新格式
@@ -371,6 +386,10 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
         // 同步到 fontService
         fontService.setFont(fontFamily);
     }, [fontFamily]);
+
+    useEffect(() => {
+        localStorage.setItem(THEME_KEYS.SCHEDULE_STYLE, scheduleStyle);
+    }, [scheduleStyle]);
 
     useEffect(() => {
         localStorage.setItem('lumostime_emoji_style', emojiStyle);
@@ -440,6 +459,8 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
             setColorScheme,
             fontFamily,
             setFontFamily,
+            scheduleStyle,
+            setScheduleStyle,
             emojiStyle,
             setEmojiStyle,
             defaultSelectorPage,

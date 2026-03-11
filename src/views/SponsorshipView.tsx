@@ -30,12 +30,20 @@ import { FontSelector } from '../components/FontSelector';
 import { userStatsService, UserStats } from '../services/userStatsService';
 import { stickerService } from '../services/stickerService';
 import { IconRenderer } from '../components/IconRenderer';
+import type { ScheduleStyle } from '../contexts/SettingsContext';
 
 interface SponsorshipViewProps {
     onBack: () => void;
     onToast: (type: ToastType, message: string) => void;
     categories: Category[];
 }
+
+const SCHEDULE_STYLE_OPTIONS: Array<{ value: ScheduleStyle; label: string }> = [
+    { value: 'default', label: '默认' },
+    { value: 'classic', label: '经典' },
+    { value: 'minimal', label: '极简' },
+    { value: 'solid', label: '实色' }
+];
 
 // 主题方案数据
 const THEME_PRESETS: ThemePreset[] = [
@@ -198,7 +206,14 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
     // 使用 useMemo 避免重复实例化
     const redemptionService = React.useMemo(() => new RedemptionService(), []);
     const [showDonationModal, setShowDonationModal] = useState(false);
-    const { uiIconTheme, setUiIconTheme, colorScheme, setColorScheme } = useSettings();
+    const {
+        uiIconTheme,
+        setUiIconTheme,
+        colorScheme,
+        setColorScheme,
+        scheduleStyle,
+        setScheduleStyle
+    } = useSettings();
     
     // 根据时间段随机选择背景图片
     const [bannerImage] = useState(() => {
@@ -266,7 +281,7 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
     const [editingPresetId, setEditingPresetId] = useState<string | null>(null);
     
     // Tab 页状态
-    type TabType = 'preset' | 'icon' | 'colorScheme' | 'background' | 'navigation' | 'timepal' | 'font';
+    type TabType = 'preset' | 'icon' | 'colorScheme' | 'background' | 'navigation' | 'timepal' | 'font' | 'style';
     const [activeTab, setActiveTab] = useState<TabType>('preset');
 
     // 用户统计数据
@@ -700,7 +715,7 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
 
                                 {/* Tab 导航 - 简洁风格 */}
                                 <div className="flex gap-4 border-b border-stone-200 overflow-x-auto scrollbar-hide px-5">
-                            {(['preset', 'icon', 'colorScheme', 'background', 'navigation', 'timepal', 'font'] as TabType[]).map(tab => (
+                            {(['preset', 'icon', 'colorScheme', 'background', 'navigation', 'timepal', 'font', 'style'] as TabType[]).map(tab => (
                                 <button
                                     key={tab}
                                     onClick={() => setActiveTab(tab)}
@@ -717,7 +732,8 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
                                         'background': '背景', 
                                         'navigation': '导航', 
                                         'timepal': '小友',
-                                        'font': '字体'
+                                        'font': '字体',
+                                        'style': '样式'
                                     }[tab]}
                                 </button>
                             ))}
@@ -1083,6 +1099,31 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
                             {activeTab === 'font' && (
                                 /* 字体切换 */
                                 <FontSelector onToast={onToast} />
+                            )}
+
+                            {activeTab === 'style' && (
+                                <div className="px-5 pt-2">
+                                    <h3 className="mb-3 text-sm font-medium text-stone-700">日程图样式</h3>
+                                    <div className="grid grid-cols-4 gap-1 rounded-xl bg-stone-100/70 p-1">
+                                        {SCHEDULE_STYLE_OPTIONS.map((option) => {
+                                            const isSelected = scheduleStyle === option.value;
+
+                                            return (
+                                                <button
+                                                    key={option.value}
+                                                    onClick={() => setScheduleStyle(option.value)}
+                                                    className={`min-w-0 rounded-lg px-2 py-2 text-center text-sm font-medium transition-all ${
+                                                        isSelected
+                                                            ? 'bg-white text-stone-900 shadow-sm'
+                                                            : 'bg-transparent text-stone-500 hover:text-stone-700'
+                                                    }`}
+                                                >
+                                                    {option.label}
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
                             )}
                         </div>
 
