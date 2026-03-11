@@ -149,7 +149,7 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
                 const height = calculateEventHeight(log.duration, HOUR_HEIGHT);
                 const cat = categories.find(c => c.id === log.categoryId);
                 const act = cat?.activities.find(a => a.id === log.activityId);
-                const style = getScheduleStyle(act?.color || cat?.themeColor);
+                const scheduleStyle = getScheduleStyle(act?.color || cat?.themeColor);
                 const lay = layout.get(log.id) || { left: '0%', width: '100%' };
 
                 // 动态计算可显示的备注行数
@@ -166,8 +166,9 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
                 return (
                   <div 
                     key={log.id} 
-                    className={`absolute rounded p-1 text-[10px] overflow-hidden leading-tight flex flex-col justify-start ${style} hover:z-10 border border-white/50 shadow-sm`}
+                    className={`absolute rounded p-1 text-[10px] overflow-hidden leading-tight flex flex-col justify-start ${scheduleStyle.className} hover:z-10 border border-white/50 shadow-sm`}
                     style={{ 
+                      ...scheduleStyle.style,
                       top: top + 1, 
                       height: height, 
                       left: `calc(${lay.left} + 2px)`, 
@@ -285,7 +286,7 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
                       const height = calculateEventHeight(log.duration, HOUR_HEIGHT);
                       const cat = categories.find(c => c.id === log.categoryId);
                       const act = cat?.activities.find(a => a.id === log.activityId);
-                      const style = getScheduleStyle(act?.color || cat?.themeColor);
+                      const scheduleStyle = getScheduleStyle(act?.color || cat?.themeColor);
                       const lay = layout.get(log.id) || { left: '0%', width: '100%' };
                       
                       // 动态计算可显示的备注行数
@@ -300,8 +301,9 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
                       return (
                         <div 
                           key={log.id} 
-                          className={`absolute rounded-[2px] p-0.5 overflow-hidden leading-tight flex flex-col justify-start ${style} hover:z-10 border border-white/50 shadow-sm transition-all hover:scale-[1.02]`}
+                          className={`absolute rounded-[2px] p-0.5 overflow-hidden leading-tight flex flex-col justify-start ${scheduleStyle.className} hover:z-10 border border-white/50 shadow-sm transition-all hover:scale-[1.02]`}
                           style={{ 
+                            ...scheduleStyle.style,
                             top: top + 1, 
                             height: height, 
                             left: lay.left, 

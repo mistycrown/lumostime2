@@ -52,6 +52,7 @@ Components for theme and appearance customization.
 - `TimePalCard.tsx`: 时光小友卡片显示组件
 - `BackgroundSelector.tsx`: 背景图片选择器
 - `ColorSchemeSelector.tsx`: 配色方案选择器
+- `CustomColorGroupManager.tsx`: 自定义色组（HEX 输入预览、回车提交、重复校验、上移下移排序、自动保存）
 - `NavigationDecorationSelector.tsx`: 导航装饰选择器
 - `UIIconSelector.tsx`: UI 图标主题选择器
 - `PresetEditModal.tsx`: 主题预设编辑弹窗
@@ -61,4 +62,4 @@ Components for theme and appearance customization.
 - `TimePalSettings.tsx`: 新增 - 从 SponsorshipView 中提取的时光小友设置组件
 
 > ⚠️ 本文档最后更新：2026-02-09
-> Last updated: 2026-03-03
+> Last updated: 2026-03-11

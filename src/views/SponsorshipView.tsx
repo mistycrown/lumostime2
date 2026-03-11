@@ -16,6 +16,7 @@ import { IconPreview } from '../components/IconPreview';
 import { BackgroundSelector } from '../components/BackgroundSelector';
 import { NavigationDecorationSelector } from '../components/NavigationDecorationSelector';
 import { ColorSchemeSelector } from '../components/ColorSchemeSelector';
+import { CustomColorGroupManager } from '../components/CustomColorGroupManager';
 import { ICON_OPTIONS } from '../services/iconService';
 import { Category } from '../types';
 import { useSettings } from '../contexts/SettingsContext';
@@ -1046,10 +1047,25 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
 
                             {activeTab === 'colorScheme' && (
                                 /* 配色方案 */
-                                <ColorSchemeSelector 
-                                    currentScheme={colorScheme as any}
-                                    onSchemeChange={(scheme) => setColorScheme(scheme)}
-                                />
+                                <div className="space-y-6">
+                                    {/* 主题色 */}
+                                    <div className="bg-white rounded-2xl p-5 shadow-sm">
+                                        <ColorSchemeSelector
+                                            currentScheme={colorScheme as any}
+                                            onSchemeChange={(scheme) => setColorScheme(scheme)}
+                                            title="主题色"
+                                        />
+                                    </div>
+
+                                    {/* 自定义色组 */}
+                                    <div className="bg-white rounded-2xl p-5 shadow-sm space-y-3">
+                                        <div className="flex items-center justify-between">
+                                            <h3 className="text-sm font-medium text-stone-600">自定义色组</h3>
+                                            <span className="text-xs text-stone-400">输入色值保存</span>
+                                        </div>
+                                        <CustomColorGroupManager onToast={onToast} />
+                                    </div>
+                                </div>
                             )}
 
                             {activeTab === 'background' && (

@@ -20,9 +20,11 @@ import { useCategoryScope } from '../contexts/CategoryScopeContext';
 import { useReview } from '../contexts/ReviewContext';
 import { useToast } from '../contexts/ToastContext';
 import { useSettings } from '../contexts/SettingsContext';
+import { useCustomColors } from '../hooks/useCustomColors';
 import { DEFAULT_SCENE_PRESETS } from '../constants/scenePresets';
 import { COLOR_OPTIONS } from '../constants';
 import { findAutoSwitchTargetGroup, getActiveSceneGroup, isSceneGroupAutoSwitchMatched, loadSceneGroupStateFromStorage, saveSceneGroupStateToStorage } from '../utils/sceneGroupStorage';
+import { isStoredColorSelected } from '../utils/colorUtils';
 
 interface SceneSettingsViewProps {
   onBack: () => void;
@@ -69,6 +71,7 @@ export const SceneSettingsView: React.FC<SceneSettingsViewProps> = ({ onBack }) 
   const { checkTemplates } = useReview();
   const { addToast } = useToast();
   const { sceneCardTimerMode } = useSettings();
+  const customColors = useCustomColors();
   const isCustomIconEnabled = uiIconService.isCustomTheme();
 
   const activeGroup = getActiveSceneGroup(sceneGroupState);
@@ -2000,10 +2003,23 @@ const CardEditModal: React.FC<{
                   onClick={() => onChange({ ...card, color: opt.lightHex })}
                   title={opt.label}
                   className={`w-8 h-8 rounded-full ${opt.bg} transition-all hover:scale-110 ${
-                    card?.color === opt.lightHex
+                    isStoredColorSelected(card?.color, opt.lightHex)
                       ? 'ring-[2px] ring-stone-300 ring-offset-0'
                       : ''
                   }`}
+                />
+              ))}
+              {customColors.map((item) => (
+                <button
+                  key={item.id}
+                  onClick={() => onChange({ ...card, color: item.color })}
+                  title={item.color}
+                  className={`w-8 h-8 rounded-full border border-stone-300 transition-all hover:scale-110 ${
+                    isStoredColorSelected(card?.color, item.color)
+                      ? 'ring-[2px] ring-stone-300 ring-offset-0'
+                      : ''
+                  }`}
+                  style={{ backgroundColor: item.color }}
                 />
               ))}
             </div>

@@ -25,6 +25,8 @@ import { calculateGoalProgress } from '../utils/goalUtils';
 import { applyMajorGoalInheritance } from '../utils/goalInheritanceUtils';
 import { GoalBatchManageView } from './GoalBatchManageView';
 import { useNavigation } from '../contexts/NavigationContext';
+import { useCustomColors } from '../hooks/useCustomColors';
+import { isStoredColorSelected } from '../utils/colorUtils';
 
 interface ScopeDetailViewProps {
     scope: Scope;
@@ -71,6 +73,7 @@ export const ScopeDetailView: React.FC<ScopeDetailViewProps> = ({
     onArchiveMajorGoal,
     onBatchUpdateGoals
 }) => {
+    const customColors = useCustomColors();
     const { isGoalBatchManaging, setIsGoalBatchManaging } = useNavigation();
     const [activeTab, setActiveTab] = useState('时间线');
     const [scope, setScope] = useState(initialScope);
@@ -523,7 +526,20 @@ export const ScopeDetailView: React.FC<ScopeDetailViewProps> = ({
                                                 key={opt.id}
                                                 onClick={() => setScope(prev => ({ ...prev, themeColor: opt.title }))}
                                                 title={opt.label}
-                                                className={`w-7 h-7 rounded-full border-2 ${opt.bg} ${opt.border} ${scope.themeColor === opt.title ? `ring-1 ${opt.ring} ring-offset-1` : ''}`}
+                                                className={`w-7 h-7 rounded-full border-2 ${opt.bg} ${opt.border} ${isStoredColorSelected(scope.themeColor, opt.title) ? `ring-1 ${opt.ring} ring-offset-1` : ''}`}
+                                            />
+                                        ))}
+                                        {customColors.map((item) => (
+                                            <button
+                                                key={item.id}
+                                                onClick={() => setScope(prev => ({ ...prev, themeColor: item.color }))}
+                                                title={item.color}
+                                                className={`w-7 h-7 rounded-full border border-stone-300 ${
+                                                    isStoredColorSelected(scope.themeColor, item.color)
+                                                        ? 'ring-1 ring-stone-400 ring-offset-1'
+                                                        : ''
+                                                }`}
+                                                style={{ backgroundColor: item.color }}
                                             />
                                         ))}
                                     </div>

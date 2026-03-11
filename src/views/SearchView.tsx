@@ -13,6 +13,7 @@ import { Log, Category, TodoItem, TodoCategory, Scope, Goal, DailyReview, Weekly
 import { useNavigation } from '../contexts/NavigationContext';
 import { IconRenderer } from '../components/IconRenderer';
 import { usePrivacy } from '../contexts/PrivacyContext';
+import { getSoftColorCircleStyle } from '../utils/colorAdapterUtils';
 
 interface SearchViewProps {
     logs: Log[];
@@ -472,7 +473,10 @@ export const SearchView: React.FC<SearchViewProps> = ({
                                             }`}
                                     >
                                         <div className="flex items-center gap-2 mb-1">
-                                            <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm ${activity.color || 'bg-stone-100'}`}>
+                                            <div
+                                                className="w-8 h-8 rounded-full flex items-center justify-center text-sm"
+                                                style={getSoftColorCircleStyle(activity.color || '', 0.15)}
+                                            >
                                                 {activity.icon}
                                             </div>
                                             <div className="flex flex-col">

@@ -257,6 +257,7 @@ export const PresetEditModal: React.FC<PresetEditModalProps> = ({
                         <ColorSchemeSelector
                             currentScheme={editedPreset.colorScheme as any}
                             onSchemeChange={(scheme) => handleFieldChange('colorScheme', scheme)}
+                            title="主题色"
                         />
                     </div>
 

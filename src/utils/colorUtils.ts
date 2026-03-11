@@ -16,6 +16,104 @@
 import { COLOR_OPTIONS } from '../constants';
 
 /**
+ * 检查字符串是否为十六进制颜色（支持 #rgb/#rrggbb/rgb/rrggbb）
+ */
+export const isHexColorString = (value: string): boolean => {
+  if (typeof value !== 'string') return false;
+  const trimmed = value.trim();
+  return (
+    /^#?[0-9a-fA-F]{3}$/.test(trimmed) ||
+    /^#?[0-9a-fA-F]{6}$/.test(trimmed) ||
+    /^#?[0-9a-fA-F]{8}$/.test(trimmed)
+  );
+};
+
+/**
+ * 规范化十六进制颜色为 #rrggbb（无效则返回 null）
+ */
+export const normalizeHexColor = (value: string): string | null => {
+  if (!isHexColorString(value)) return null;
+
+  const trimmed = value.trim();
+  const hex = trimmed.startsWith('#') ? trimmed.slice(1) : trimmed;
+
+  if (hex.length === 3) {
+    const r = hex[0];
+    const g = hex[1];
+    const b = hex[2];
+    return `#${r}${r}${g}${g}${b}${b}`.toLowerCase();
+  }
+
+  if (hex.length === 6) {
+    return `#${hex}`.toLowerCase();
+  }
+
+  if (hex.length === 8) {
+    return `#${hex}`.toLowerCase();
+  }
+
+  return null;
+};
+
+export const isStoredColorSelected = (
+  currentColor: string | undefined,
+  candidateColor: string
+): boolean => {
+  if (!currentColor) return false;
+
+  const normalizedCurrent = normalizeHexColor(currentColor);
+  const normalizedCandidate = normalizeHexColor(candidateColor);
+
+  if (normalizedCurrent && normalizedCandidate) {
+    return normalizedCurrent === normalizedCandidate;
+  }
+
+  return currentColor.trim() === candidateColor.trim();
+};
+
+export const getColorPreviewValue = (
+  colorValue: string,
+  kind: 'activity' | 'category' | 'scope' = 'activity'
+): string => {
+  const normalizedHex = normalizeHexColor(colorValue);
+  if (normalizedHex) return normalizedHex;
+
+  if (kind === 'activity') {
+    return extractColorHex(colorValue, 'bg', true);
+  }
+
+  if (kind === 'category') {
+    return extractColorHex(colorValue, 'text', true);
+  }
+
+  return extractScopeColor(colorValue, true);
+};
+
+export type CustomColorAlphaMode = 'background' | 'fill';
+
+/**
+ * 将“颜色存储值”（可能是 Tailwind class / #hex）转换为可直接用于 style 的颜色字符串。
+ * - background: #hex -> rgba(...,0.2)
+ * - fill: #hex -> #hex
+ * - Tailwind class: 走原先提取逻辑
+ */
+export const toCssColor = (
+  colorValue: string,
+  mode: CustomColorAlphaMode = 'background',
+  backgroundAlpha: number = 0.2
+): string => {
+  const normalizedHex = normalizeHexColor(colorValue);
+  if (normalizedHex) {
+    return mode === 'background' ? hexToRgba(normalizedHex, backgroundAlpha) : normalizedHex;
+  }
+
+  // 对 Tailwind class 兼容：背景取浅色，填充取原色
+  const useLight = mode === 'background';
+  const prefix: 'bg' | 'text' = mode === 'background' ? 'bg' : 'text';
+  return extractColorHex(colorValue, prefix, useLight);
+};
+
+/**
  * 从 Tailwind 颜色类名中提取十六进制颜色
  * 
  * @param colorClass - Tailwind 颜色类名（如 "bg-blue-500" 或 "text-red-600"）
@@ -79,6 +177,9 @@ export const extractActivityColor = (
   activityColor: string,
   useLight: boolean = true
 ): string => {
+  const normalizedHex = normalizeHexColor(activityColor);
+  if (normalizedHex) return useLight ? normalizedHex : normalizedHex;
+
   return extractColorHex(activityColor, 'bg', useLight);
 };
 
@@ -100,6 +201,9 @@ export const extractCategoryColor = (
   themeColor: string,
   useLight: boolean = true
 ): string => {
+  const normalizedHex = normalizeHexColor(themeColor);
+  if (normalizedHex) return useLight ? normalizedHex : normalizedHex;
+
   return extractColorHex(themeColor, 'text', useLight);
 };
 
@@ -121,6 +225,9 @@ export const extractScopeColor = (
   themeColor: string,
   useLight: boolean = true
 ): string => {
+  const normalizedHex = normalizeHexColor(themeColor);
+  if (normalizedHex) return useLight ? hexToRgba(normalizedHex, 0.2) : normalizedHex;
+
   // 尝试 text- 前缀
   let color = extractColorHex(themeColor, 'text', useLight);
   
@@ -145,8 +252,11 @@ export const extractScopeColor = (
  * ```
  */
 export const getContrastTextColor = (hexColor: string): string => {
+  const normalizedHex = normalizeHexColor(hexColor);
+  if (!normalizedHex) return '#000000';
+
   // 移除 # 号
-  const hex = hexColor.replace('#', '');
+  const hex = normalizedHex.replace('#', '');
   
   // 转换为 RGB
   const r = parseInt(hex.substring(0, 2), 16);
@@ -174,8 +284,11 @@ export const getContrastTextColor = (hexColor: string): string => {
  * ```
  */
 export const hexToRgba = (hexColor: string, alpha: number = 1): string => {
+  const normalizedHex = normalizeHexColor(hexColor);
+  if (!normalizedHex) return `rgba(231, 229, 228, ${alpha})`; // stone-200
+
   // 移除 # 号
-  const hex = hexColor.replace('#', '');
+  const hex = normalizedHex.replace('#', '');
   
   // 转换为 RGB
   const r = parseInt(hex.substring(0, 2), 16);
