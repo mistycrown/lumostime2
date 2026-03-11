@@ -86,6 +86,28 @@ import excelExportService from '../services/excelExportService';
 import { imageCleanupService } from '../services/imageCleanupService';
 import { usePrivacy } from '../contexts/PrivacyContext';
 import { RedemptionService } from '../services/redemptionService';
+import {
+    AISettingsViewLazy as AISettingsView,
+    AutoLinkViewLazy as AutoLinkView,
+    AutoRecordSettingsViewLazy as AutoRecordSettingsView,
+    BatchFocusRecordManageViewLazy as BatchFocusRecordManageView,
+    CheckTemplateManageViewLazy as CheckTemplateManageView,
+    CloudSyncSettingsViewLazy as CloudSyncSettingsView,
+    DataManagementViewLazy as DataManagementView,
+    EmojiSettingsViewLazy as EmojiSettingsView,
+    FiltersSettingsViewLazy as FiltersSettingsView,
+    MemoirSettingsViewLazy as MemoirSettingsView,
+    NarrativeSettingsViewLazy as NarrativeSettingsView,
+    NFCSettingsViewLazy as NFCSettingsView,
+    ObsidianExportViewLazy as ObsidianExportView,
+    PreferencesSettingsViewLazy as PreferencesSettingsView,
+    PrincipleLibraryViewLazy as PrincipleLibraryView,
+    ReviewTemplateManageViewLazy as ReviewTemplateManageView,
+    S3SyncSettingsViewLazy as S3SyncSettingsView,
+    SceneSettingsViewLazy as SceneSettingsView,
+    SponsorshipViewLazy as SponsorshipView,
+    UserGuideViewLazy as UserGuideView
+} from '../utils/lazyViews';
 
 import { NARRATIVE_TEMPLATES } from '../constants';
 
@@ -163,31 +185,6 @@ interface SettingsViewProps {
     manualSyncMode?: boolean;
     onToggleManualSyncMode?: () => void;
 }
-
-
-
-
-const ReviewTemplateManageView = React.lazy(() => import('./ReviewTemplateManageView').then((module) => ({ default: module.ReviewTemplateManageView })));
-const CheckTemplateManageView = React.lazy(() => import('./CheckTemplateManageView').then((module) => ({ default: module.CheckTemplateManageView })));
-const AutoRecordSettingsView = React.lazy(() => import('./AutoRecordSettingsView').then((module) => ({ default: module.AutoRecordSettingsView })));
-const AutoLinkView = React.lazy(() => import('./AutoLinkView').then((module) => ({ default: module.AutoLinkView })));
-const ObsidianExportView = React.lazy(() => import('./ObsidianExportView').then((module) => ({ default: module.ObsidianExportView })));
-const MemoirSettingsView = React.lazy(() => import('./MemoirSettingsView').then((module) => ({ default: module.MemoirSettingsView })));
-const BatchFocusRecordManageView = React.lazy(() => import('./BatchFocusRecordManageView').then((module) => ({ default: module.BatchFocusRecordManageView })));
-const SponsorshipView = React.lazy(() => import('./SponsorshipView').then((module) => ({ default: module.SponsorshipView })));
-const AISettingsView = React.lazy(() => import('./settings/AISettingsView').then((module) => ({ default: module.AISettingsView })));
-const PreferencesSettingsView = React.lazy(() => import('./settings/PreferencesSettingsView').then((module) => ({ default: module.PreferencesSettingsView })));
-const EmojiSettingsView = React.lazy(() => import('./settings/EmojiSettingsView').then((module) => ({ default: module.EmojiSettingsView })));
-const PrincipleLibraryView = React.lazy(() => import('./settings/PrincipleLibraryView').then((module) => ({ default: module.PrincipleLibraryView })));
-const NarrativeSettingsView = React.lazy(() => import('./settings/NarrativeSettingsView').then((module) => ({ default: module.NarrativeSettingsView })));
-const NFCSettingsView = React.lazy(() => import('./settings/NFCSettingsView').then((module) => ({ default: module.NFCSettingsView })));
-const UserGuideView = React.lazy(() => import('./settings/UserGuideView').then((module) => ({ default: module.UserGuideView })));
-const FiltersSettingsView = React.lazy(() => import('./settings/FiltersSettingsView').then((module) => ({ default: module.FiltersSettingsView })));
-const CloudSyncSettingsView = React.lazy(() => import('./settings/CloudSyncSettingsView').then((module) => ({ default: module.CloudSyncSettingsView })));
-const S3SyncSettingsView = React.lazy(() => import('./settings/S3SyncSettingsView').then((module) => ({ default: module.S3SyncSettingsView })));
-const DataManagementView = React.lazy(() => import('./settings/DataManagementView').then((module) => ({ default: module.DataManagementView })));
-const SceneSettingsView = React.lazy(() => import('./SceneSettingsView').then((module) => ({ default: module.SceneSettingsView })));
-
 const SettingsSubviewFallback: React.FC<{ label: string }> = ({ label }) => (
     <div className="fixed inset-0 z-50 bg-[#fdfbf7] flex items-center justify-center font-serif">
         <div className="rounded-2xl border border-stone-200 bg-white px-5 py-4 shadow-sm">

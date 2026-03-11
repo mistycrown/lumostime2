@@ -1107,48 +1107,53 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
                             )}
 
                             {activeTab === 'style' && (
-                                <div className="px-5 pt-2">
-                                    <div className="flex items-center justify-between relative">
-                                        <h3 className="text-sm font-medium text-stone-700">日程图样式</h3>
-                                        <div className="relative">
-                                            <button
-                                                onClick={() => setIsScheduleStyleDropdownOpen((prev) => !prev)}
-                                                className="flex items-center gap-2 bg-stone-100 hover:bg-stone-200 text-stone-700 text-sm font-bold px-4 py-2 rounded-lg transition-colors"
-                                            >
-                                                <span>{selectedScheduleStyleOption.label}</span>
-                                                <ChevronDown
-                                                    size={14}
-                                                    className={`transition-transform ${isScheduleStyleDropdownOpen ? 'rotate-180' : ''}`}
-                                                />
-                                            </button>
-
-                                            {isScheduleStyleDropdownOpen && (
-                                                <>
-                                                    <div
-                                                        className="fixed inset-0 z-[100]"
-                                                        onClick={() => setIsScheduleStyleDropdownOpen(false)}
+                                <div className="pt-2">
+                                    <div className="bg-white rounded-2xl shadow-[0_2px_10px_rgba(0,0,0,0.03)]">
+                                        <div className="flex items-center justify-between p-4 relative">
+                                            <div>
+                                                <h4 className="font-bold text-stone-700">日程图样式</h4>
+                                                <p className="text-xs text-stone-400 mt-1">用于统计页日、周日程图的显示风格。</p>
+                                            </div>
+                                            <div className="relative">
+                                                <button
+                                                    onClick={() => setIsScheduleStyleDropdownOpen((prev) => !prev)}
+                                                    className="flex items-center gap-2 bg-stone-100 hover:bg-stone-200 text-stone-700 text-sm font-bold px-4 py-2 rounded-lg transition-colors"
+                                                >
+                                                    <span>{selectedScheduleStyleOption.label}</span>
+                                                    <ChevronDown
+                                                        size={14}
+                                                        className={`transition-transform ${isScheduleStyleDropdownOpen ? 'rotate-180' : ''}`}
                                                     />
-                                                    <div className="absolute right-0 top-full mt-2 w-32 bg-white rounded-xl shadow-xl border border-stone-100 overflow-hidden z-[110] flex flex-col py-1 animate-in fade-in zoom-in-95 duration-200 origin-top-right">
-                                                        {SCHEDULE_STYLE_OPTIONS.map((option) => (
-                                                            <button
-                                                                key={option.value}
-                                                                onClick={() => {
-                                                                    setScheduleStyle(option.value);
-                                                                    setIsScheduleStyleDropdownOpen(false);
-                                                                }}
-                                                                className={`px-4 py-2.5 text-left text-sm font-medium transition-colors hover:bg-stone-50 flex items-center justify-between ${
-                                                                    scheduleStyle === option.value ? 'text-stone-900 bg-stone-50' : 'text-stone-500'
-                                                                }`}
-                                                            >
-                                                                {option.label}
-                                                                {scheduleStyle === option.value && (
-                                                                    <div className="w-1.5 h-1.5 rounded-full bg-stone-800" />
-                                                                )}
-                                                            </button>
-                                                        ))}
-                                                    </div>
-                                                </>
-                                            )}
+                                                </button>
+
+                                                {isScheduleStyleDropdownOpen && (
+                                                    <>
+                                                        <div
+                                                            className="fixed inset-0 z-[100]"
+                                                            onClick={() => setIsScheduleStyleDropdownOpen(false)}
+                                                        />
+                                                        <div className="absolute right-0 top-full mt-2 w-32 bg-white rounded-xl shadow-xl border border-stone-100 overflow-hidden z-[110] flex flex-col py-1 animate-in fade-in zoom-in-95 duration-200 origin-top-right">
+                                                            {SCHEDULE_STYLE_OPTIONS.map((option) => (
+                                                                <button
+                                                                    key={option.value}
+                                                                    onClick={() => {
+                                                                        setScheduleStyle(option.value);
+                                                                        setIsScheduleStyleDropdownOpen(false);
+                                                                    }}
+                                                                    className={`px-4 py-2.5 text-left text-sm font-medium transition-colors hover:bg-stone-50 flex items-center justify-between ${
+                                                                        scheduleStyle === option.value ? 'text-stone-900 bg-stone-50' : 'text-stone-500'
+                                                                    }`}
+                                                                >
+                                                                    {option.label}
+                                                                    {scheduleStyle === option.value && (
+                                                                        <div className="w-1.5 h-1.5 rounded-full bg-stone-800" />
+                                                                    )}
+                                                                </button>
+                                                            ))}
+                                                        </div>
+                                                    </>
+                                                )}
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
