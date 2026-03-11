@@ -29,11 +29,7 @@ import { TodoDetailModal } from './components/TodoDetailModal';
 import { GoalEditor } from './components/GoalEditor';
 import { ConfirmModal } from './components/ConfirmModal';
 import { SyncDirectionModal } from './components/SyncDirectionModal';
-import { SearchView } from './views/SearchView';
-import { FocusDetailView } from './views/FocusDetailView';
-import { ShareView } from './views/ShareView';
 import { BottomNavigation } from './components/BottomNavigation';
-import { AutoLinkView } from './views/AutoLinkView';
 
 import { useLogManager } from './hooks/useLogManager';
 import { useTodoManager } from './hooks/useTodoManager';
@@ -55,7 +51,6 @@ if (typeof window !== 'undefined') {
   window.Buffer = window.Buffer || Buffer;
 }
 
-import { SettingsView } from './views/SettingsView';
 import { 
   CATEGORIES, 
   SCOPES, 
@@ -66,6 +61,20 @@ import {
   DEFAULT_REVIEW_TEMPLATES,
   DEFAULT_CHECK_TEMPLATES
 } from './constants';
+
+const SearchView = React.lazy(() => import('./views/SearchView').then((module) => ({ default: module.SearchView })));
+const FocusDetailView = React.lazy(() => import('./views/FocusDetailView').then((module) => ({ default: module.FocusDetailView })));
+const ShareView = React.lazy(() => import('./views/ShareView').then((module) => ({ default: module.ShareView })));
+const AutoLinkView = React.lazy(() => import('./views/AutoLinkView').then((module) => ({ default: module.AutoLinkView })));
+const SettingsView = React.lazy(() => import('./views/SettingsView').then((module) => ({ default: module.SettingsView })));
+
+const OverlayFallback: React.FC<{ label: string }> = ({ label }) => (
+  <div className="fixed inset-0 z-[70] flex items-center justify-center bg-[#faf9f6]/92 backdrop-blur-sm">
+    <div className="rounded-2xl border border-stone-200 bg-white/90 px-5 py-4 shadow-sm">
+      <div className="text-sm font-medium text-stone-500">{label}</div>
+    </div>
+  </div>
+);
 
 const AppContent: React.FC = () => {
   // Use Contexts
@@ -510,231 +519,241 @@ const AppContent: React.FC = () => {
         if (!session) return null;
         
         return (
-          <FocusDetailView
-            session={session}
-            todos={todos}
-            categories={categories}
-            todoCategories={todoCategories}
-            scopes={scopes}
-            autoLinkRules={autoLinkRules}
-            autoApplyAutoLinkRules={autoApplyAutoLinkRules}
-            autoApplyTodoLink={autoApplyTodoLink}
-            autoEnterImmersive={shouldAutoEnterImmersive}
-            onClose={() => {
-              setFocusDetailSessionId(null);
-              setShouldAutoEnterImmersive(false);
-            }}
-            onCancel={cancelSession}
-            onComplete={(finalSession) => {
-              stopActivity(
-                finalSession.id,
-                finalSession,
-                (logs) => logs.forEach(l => logManager.handleSaveLog(l))
-              );
-              setFocusDetailSessionId(null);
-              setShouldAutoEnterImmersive(false);
-            }}
-            onUpdate={(updated) => {
-              setActiveSessions(prev => prev.map(s =>
-                s.id === updated.id ? updated : s
-              ));
-            }}
-            autoFocusNote={autoFocusNote}
-          />
+          <React.Suspense fallback={<OverlayFallback label="正在加载专注详情..." />}>
+            <FocusDetailView
+              session={session}
+              todos={todos}
+              categories={categories}
+              todoCategories={todoCategories}
+              scopes={scopes}
+              autoLinkRules={autoLinkRules}
+              autoApplyAutoLinkRules={autoApplyAutoLinkRules}
+              autoApplyTodoLink={autoApplyTodoLink}
+              autoEnterImmersive={shouldAutoEnterImmersive}
+              onClose={() => {
+                setFocusDetailSessionId(null);
+                setShouldAutoEnterImmersive(false);
+              }}
+              onCancel={cancelSession}
+              onComplete={(finalSession) => {
+                stopActivity(
+                  finalSession.id,
+                  finalSession,
+                  (logs) => logs.forEach(l => logManager.handleSaveLog(l))
+                );
+                setFocusDetailSessionId(null);
+                setShouldAutoEnterImmersive(false);
+              }}
+              onUpdate={(updated) => {
+                setActiveSessions(prev => prev.map(s =>
+                  s.id === updated.id ? updated : s
+                ));
+              }}
+              autoFocusNote={autoFocusNote}
+            />
+          </React.Suspense>
         );
       })()}
 
       {/* Search Overlay */}
       {isSearchOpen && (
-        <SearchView
-          logs={logs}
-          categories={categories}
-          todos={todos}
-          todoCategories={todoCategories}
-          scopes={scopes}
-          goals={goals}
-          dailyReviews={dailyReviews}
-          weeklyReviews={weeklyReviews}
-          monthlyReviews={monthlyReviews}
-          onClose={searchManager.handleCloseSearch}
-          onSelectLog={(log) => searchManager.handleSelectSearchLogWrapper(log, logManager.openEditModal)}
-          onSelectTodo={(todo) => searchManager.handleSelectSearchTodoWrapper(todo, todoManager.openEditTodoModal)}
-          onSelectScope={searchManager.handleSelectSearchScope}
-          onSelectCategory={searchManager.handleSelectSearchCategory}
-          onSelectActivity={(act, catId) => searchManager.handleSelectSearchActivity(act, catId)}
-          onSelectDailyReview={handleSelectDailyReviewWrapper}
-          onSelectWeeklyReview={handleSelectWeeklyReviewWrapper}
-          onSelectMonthlyReview={handleSelectMonthlyReviewWrapper}
-        />
+        <React.Suspense fallback={<OverlayFallback label="正在加载搜索..." />}>
+          <SearchView
+            logs={logs}
+            categories={categories}
+            todos={todos}
+            todoCategories={todoCategories}
+            scopes={scopes}
+            goals={goals}
+            dailyReviews={dailyReviews}
+            weeklyReviews={weeklyReviews}
+            monthlyReviews={monthlyReviews}
+            onClose={searchManager.handleCloseSearch}
+            onSelectLog={(log) => searchManager.handleSelectSearchLogWrapper(log, logManager.openEditModal)}
+            onSelectTodo={(todo) => searchManager.handleSelectSearchTodoWrapper(todo, todoManager.openEditTodoModal)}
+            onSelectScope={searchManager.handleSelectSearchScope}
+            onSelectCategory={searchManager.handleSelectSearchCategory}
+            onSelectActivity={(act, catId) => searchManager.handleSelectSearchActivity(act, catId)}
+            onSelectDailyReview={handleSelectDailyReviewWrapper}
+            onSelectWeeklyReview={handleSelectWeeklyReviewWrapper}
+            onSelectMonthlyReview={handleSelectMonthlyReviewWrapper}
+          />
+        </React.Suspense>
       )}
 
       {/* Share View Overlay */}
       {isShareViewOpen && sharingLog && (
-        <ShareView
-          log={sharingLog}
-          scopes={scopes}
-          onBack={() => setIsShareViewOpen(false)}
-          onToast={addToast}
-        />
+        <React.Suspense fallback={<OverlayFallback label="正在加载分享..." />}>
+          <ShareView
+            log={sharingLog}
+            scopes={scopes}
+            onBack={() => setIsShareViewOpen(false)}
+            onToast={addToast}
+          />
+        </React.Suspense>
       )}
 
       {/* Full Screen Settings Overlay */}
       {isSettingsOpen && (
-        <SettingsView
-          onClose={() => setIsSettingsOpen(false)}
-          onReset={() => {
-            setLogs(INITIAL_LOGS);
-            setTodos(INITIAL_TODOS);
-            setCategories(CATEGORIES);
-            setScopes(SCOPES);
-            setTodoCategories(MOCK_TODO_CATEGORIES);
-            setGoals(INITIAL_GOALS);
-            setReviewTemplates(DEFAULT_REVIEW_TEMPLATES);
-            setCheckTemplates(DEFAULT_CHECK_TEMPLATES);
-            setDailyReviews([]);
-            setWeeklyReviews([]);
-            setMonthlyReviews([]);
-            setAutoLinkRules([]);
-            setCustomNarrativeTemplates([]);
-            setUserPersonalInfo('');
-            setFilters([]);
-            addToast('success', 'Data reset to defaults');
-            setIsSettingsOpen(false);
-          }}
-          onClearData={() => {
-            setLogs([]);
-            setTodos([]);
-            setGoals([]);
-            setScopes([]);
-            setReviewTemplates([]);
-            setCheckTemplates([]);
-            setDailyReviews([]);
-            setWeeklyReviews([]);
-            setMonthlyReviews([]);
-            setAutoLinkRules([]);
-            setUserPersonalInfo('');
-            setFilters([]);
-            addToast('success', 'All data cleared successfully');
-            setIsSettingsOpen(false);
-          }}
-          // Handler Props
-          onExport={handleExportData}
-          onImport={handleImportData}
-          onToast={addToast}
-          onSyncUpdate={syncManager.handleSyncDataUpdate}
+        <React.Suspense fallback={<OverlayFallback label="正在加载设置..." />}>
+          <SettingsView
+            onClose={() => setIsSettingsOpen(false)}
+            onReset={() => {
+              setLogs(INITIAL_LOGS);
+              setTodos(INITIAL_TODOS);
+              setCategories(CATEGORIES);
+              setScopes(SCOPES);
+              setTodoCategories(MOCK_TODO_CATEGORIES);
+              setGoals(INITIAL_GOALS);
+              setReviewTemplates(DEFAULT_REVIEW_TEMPLATES);
+              setCheckTemplates(DEFAULT_CHECK_TEMPLATES);
+              setDailyReviews([]);
+              setWeeklyReviews([]);
+              setMonthlyReviews([]);
+              setAutoLinkRules([]);
+              setCustomNarrativeTemplates([]);
+              setUserPersonalInfo('');
+              setFilters([]);
+              addToast('success', 'Data reset to defaults');
+              setIsSettingsOpen(false);
+            }}
+            onClearData={() => {
+              setLogs([]);
+              setTodos([]);
+              setGoals([]);
+              setScopes([]);
+              setReviewTemplates([]);
+              setCheckTemplates([]);
+              setDailyReviews([]);
+              setWeeklyReviews([]);
+              setMonthlyReviews([]);
+              setAutoLinkRules([]);
+              setUserPersonalInfo('');
+              setFilters([]);
+              addToast('success', 'All data cleared successfully');
+              setIsSettingsOpen(false);
+            }}
+            // Handler Props
+            onExport={handleExportData}
+            onImport={handleImportData}
+            onToast={addToast}
+            onSyncUpdate={syncManager.handleSyncDataUpdate}
 
-          // Data Props
-          logs={logs}
-          todos={todos}
-          categoriesData={categories}
-          todoCategories={todoCategories}
-          scopes={scopes}
-          dailyReviews={dailyReviews}
-          weeklyReviews={weeklyReviews}
-          monthlyReviews={monthlyReviews}
-          currentDate={new Date()}
-          syncData={{
-            logs,
-            todos,
-            categories,
-            todoCategories,
-            scopes,
-            goals,
-            autoLinkRules,
-            reviewTemplates,
-            checkTemplates,
-            dailyReviews,
-            weeklyReviews,
-            monthlyReviews,
-            customNarrativeTemplates,
-            userPersonalInfo,
-            filters
-          }}
+            // Data Props
+            logs={logs}
+            todos={todos}
+            categoriesData={categories}
+            todoCategories={todoCategories}
+            scopes={scopes}
+            dailyReviews={dailyReviews}
+            weeklyReviews={weeklyReviews}
+            monthlyReviews={monthlyReviews}
+            currentDate={new Date()}
+            syncData={{
+              logs,
+              todos,
+              categories,
+              todoCategories,
+              scopes,
+              goals,
+              autoLinkRules,
+              reviewTemplates,
+              checkTemplates,
+              dailyReviews,
+              weeklyReviews,
+              monthlyReviews,
+              customNarrativeTemplates,
+              userPersonalInfo,
+              filters
+            }}
 
-          // Settings Props
-          onOpenAutoLink={() => setIsAutoLinkOpen(true)}
+            // Settings Props
+            onOpenAutoLink={() => setIsAutoLinkOpen(true)}
 
-          minIdleTimeThreshold={minIdleTimeThreshold}
-          onSetMinIdleTimeThreshold={setMinIdleTimeThreshold}
+            minIdleTimeThreshold={minIdleTimeThreshold}
+            onSetMinIdleTimeThreshold={setMinIdleTimeThreshold}
 
-          defaultView={defaultView}
-          onSetDefaultView={setDefaultView}
+            defaultView={defaultView}
+            onSetDefaultView={setDefaultView}
 
-          defaultArchiveView={defaultArchiveView}
-          onSetDefaultArchiveView={setDefaultArchiveView}
+            defaultArchiveView={defaultArchiveView}
+            onSetDefaultArchiveView={setDefaultArchiveView}
 
-          defaultIndexView={defaultIndexView}
-          onSetDefaultIndexView={setDefaultIndexView}
+            defaultIndexView={defaultIndexView}
+            onSetDefaultIndexView={setDefaultIndexView}
 
-          defaultRecordView={defaultRecordView}
-          onSetDefaultRecordView={setDefaultRecordView}
+            defaultRecordView={defaultRecordView}
+            onSetDefaultRecordView={setDefaultRecordView}
 
-          onOpenSearch={() => {
-            setIsSearchOpen(true);
-            setIsSettingsOpen(false);
-          }}
+            onOpenSearch={() => {
+              setIsSearchOpen(true);
+              setIsSettingsOpen(false);
+            }}
 
-          autoFocusNote={autoFocusNote}
-          onToggleAutoFocusNote={() => setAutoFocusNote(!autoFocusNote)}
+            autoFocusNote={autoFocusNote}
+            onToggleAutoFocusNote={() => setAutoFocusNote(!autoFocusNote)}
 
-          timelineGalleryMode={timelineGalleryMode}
-          onToggleTimelineGalleryMode={() => setTimelineGalleryMode(!timelineGalleryMode)}
+            timelineGalleryMode={timelineGalleryMode}
+            onToggleTimelineGalleryMode={() => setTimelineGalleryMode(!timelineGalleryMode)}
 
-          collapseThreshold={collapseThreshold}
-          onSetCollapseThreshold={setCollapseThreshold}
+            collapseThreshold={collapseThreshold}
+            onSetCollapseThreshold={setCollapseThreshold}
 
-          // Review Props
-          reviewTemplates={reviewTemplates}
-          onUpdateReviewTemplates={setReviewTemplates}
+            // Review Props
+            reviewTemplates={reviewTemplates}
+            onUpdateReviewTemplates={setReviewTemplates}
 
-          checkTemplates={checkTemplates}
-          onUpdateCheckTemplates={setCheckTemplates}
+            checkTemplates={checkTemplates}
+            onUpdateCheckTemplates={setCheckTemplates}
 
-          onUpdateDailyReviews={setDailyReviews}
+            onUpdateDailyReviews={setDailyReviews}
 
-          dailyReviewTime={dailyReviewTime}
-          onSetDailyReviewTime={setDailyReviewTime}
+            dailyReviewTime={dailyReviewTime}
+            onSetDailyReviewTime={setDailyReviewTime}
 
-          weeklyReviewTime={weeklyReviewTime}
-          onSetWeeklyReviewTime={setWeeklyReviewTime}
+            weeklyReviewTime={weeklyReviewTime}
+            onSetWeeklyReviewTime={setWeeklyReviewTime}
 
-          monthlyReviewTime={monthlyReviewTime}
-          onSetMonthlyReviewTime={setMonthlyReviewTime}
+            monthlyReviewTime={monthlyReviewTime}
+            onSetMonthlyReviewTime={setMonthlyReviewTime}
 
-          autoGenerateDailyReview={autoGenerateDailyReview}
-          onToggleAutoGenerateDailyReview={() => setAutoGenerateDailyReview(!autoGenerateDailyReview)}
+            autoGenerateDailyReview={autoGenerateDailyReview}
+            onToggleAutoGenerateDailyReview={() => setAutoGenerateDailyReview(!autoGenerateDailyReview)}
 
-          autoGenerateWeeklyReview={autoGenerateWeeklyReview}
-          onToggleAutoGenerateWeeklyReview={() => setAutoGenerateWeeklyReview(!autoGenerateWeeklyReview)}
+            autoGenerateWeeklyReview={autoGenerateWeeklyReview}
+            onToggleAutoGenerateWeeklyReview={() => setAutoGenerateWeeklyReview(!autoGenerateWeeklyReview)}
 
-          autoGenerateMonthlyReview={autoGenerateMonthlyReview}
-          onToggleAutoGenerateMonthlyReview={() => setAutoGenerateMonthlyReview(!autoGenerateMonthlyReview)}
+            autoGenerateMonthlyReview={autoGenerateMonthlyReview}
+            onToggleAutoGenerateMonthlyReview={() => setAutoGenerateMonthlyReview(!autoGenerateMonthlyReview)}
 
-          customNarrativeTemplates={customNarrativeTemplates}
-          onUpdateCustomNarrativeTemplates={setCustomNarrativeTemplates}
+            customNarrativeTemplates={customNarrativeTemplates}
+            onUpdateCustomNarrativeTemplates={setCustomNarrativeTemplates}
 
-          userPersonalInfo={userPersonalInfo}
-          onSetUserPersonalInfo={setUserPersonalInfo}
+            userPersonalInfo={userPersonalInfo}
+            onSetUserPersonalInfo={setUserPersonalInfo}
 
-          filters={filters}
-          onUpdateFilters={setFilters}
-          
-          manualSyncMode={manualSyncMode}
-          onToggleManualSyncMode={() => setManualSyncMode(!manualSyncMode)}
+            filters={filters}
+            onUpdateFilters={setFilters}
+            
+            manualSyncMode={manualSyncMode}
+            onToggleManualSyncMode={() => setManualSyncMode(!manualSyncMode)}
 
-          onEditLog={logManager.openEditModal}
-        />
+            onEditLog={logManager.openEditModal}
+          />
+        </React.Suspense>
       )}
 
       {/* Auto Link Rules Overlay */}
       {isAutoLinkOpen && (
-        <AutoLinkView
-          onClose={() => setIsAutoLinkOpen(false)}
-          rules={autoLinkRules}
-          onUpdateRules={setAutoLinkRules}
-          categories={categories}
-          scopes={scopes}
-        />
+        <React.Suspense fallback={<OverlayFallback label="正在加载自动关联..." />}>
+          <AutoLinkView
+            onClose={() => setIsAutoLinkOpen(false)}
+            rules={autoLinkRules}
+            onUpdateRules={setAutoLinkRules}
+            categories={categories}
+            scopes={scopes}
+          />
+        </React.Suspense>
       )}
 
       {/* Floating Timer Bubble */}

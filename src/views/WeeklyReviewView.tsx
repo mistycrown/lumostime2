@@ -14,7 +14,6 @@ import { COLOR_OPTIONS } from '../constants';
 import * as LucideIcons from 'lucide-react';
 import { ConfirmModal } from '../components/ConfirmModal';
 import { NarrativeStyleSelectionModal } from '../components/NarrativeStyleSelectionModal';
-import { StatsView } from './StatsView';
 import { FloatingButton } from '../components/FloatingButton';
 import { UIIcon } from '../components/UIIcon';
 import { IconRenderer } from '../components/IconRenderer';
@@ -52,6 +51,14 @@ interface WeeklyReviewViewProps {
 }
 
 type TabType = 'data' | 'guide' | 'narrative';
+
+const StatsView = React.lazy(() => import('./StatsView').then((module) => ({ default: module.StatsView })));
+
+const StatsViewFallback: React.FC = () => (
+    <div className="flex min-h-[320px] items-center justify-center text-sm text-stone-400">
+        统计视图加载中...
+    </div>
+);
 
 export const WeeklyReviewView: React.FC<WeeklyReviewViewProps> = ({
     review,
@@ -427,6 +434,7 @@ export const WeeklyReviewView: React.FC<WeeklyReviewViewProps> = ({
                 {/* Tab 1: Data - 使用 StatsView 组件 */}
                 {activeTab === 'data' && (
                     <div className="flex-1 overflow-hidden animate-in fade-in duration-300">
+                        <React.Suspense fallback={<StatsViewFallback />}>
                         <StatsView
                             logs={logs}
                             categories={categories}
@@ -443,6 +451,7 @@ export const WeeklyReviewView: React.FC<WeeklyReviewViewProps> = ({
                             hideDateNavigation={true} // 隐藏前后切换
                             allowedViews={['pie', 'line', 'schedule', 'check']} // 添加 check 视图
                         />
+                        </React.Suspense>
                     </div>
                 )}
 

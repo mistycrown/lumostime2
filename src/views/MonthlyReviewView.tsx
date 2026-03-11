@@ -15,7 +15,6 @@ import * as LucideIcons from 'lucide-react';
 import { ConfirmModal } from '../components/ConfirmModal';
 import { NarrativeStyleSelectionModal } from '../components/NarrativeStyleSelectionModal';
 import { AIQuoteGenerator } from '../components/AIQuoteGenerator';
-import { StatsView } from './StatsView';
 import { FloatingButton } from '../components/FloatingButton';
 import { UIIcon } from '../components/UIIcon';
 import { IconRenderer } from '../components/IconRenderer';
@@ -52,6 +51,14 @@ interface MonthlyReviewViewProps {
 }
 
 type TabType = 'data' | 'guide' | 'narrative' | 'cite';
+
+const StatsView = React.lazy(() => import('./StatsView').then((module) => ({ default: module.StatsView })));
+
+const StatsViewFallback: React.FC = () => (
+    <div className="flex min-h-[320px] items-center justify-center text-sm text-stone-400">
+        统计视图加载中...
+    </div>
+);
 
 export const MonthlyReviewView: React.FC<MonthlyReviewViewProps> = ({
     review,
@@ -405,6 +412,7 @@ export const MonthlyReviewView: React.FC<MonthlyReviewViewProps> = ({
                 {/* 1. Data Tab */}
                 {activeTab === 'data' && (
                     <div className="animate-in fade-in duration-300 -mx-7 -mt-4 pb-6">
+                        <React.Suspense fallback={<StatsViewFallback />}>
                         <StatsView
                             logs={logs}
                             categories={categories}
@@ -425,6 +433,7 @@ export const MonthlyReviewView: React.FC<MonthlyReviewViewProps> = ({
                             forcedRange="month" // Force month range
                             allowedViews={['pie', 'line', 'schedule', 'check']} // 添加 check 视图
                         />
+                        </React.Suspense>
                     </div>
                 )}
 

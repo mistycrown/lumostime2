@@ -74,8 +74,6 @@ import { uploadDataToCloud, downloadWithBackup, CloudService } from '../utils/sy
 import { validateLocalData, canSafelyUpload } from '../utils/dataValidation';
 import { getActiveSceneGroup, loadSceneGroupStateFromStorage } from '../utils/sceneGroupStorage';
 
-import { ReviewTemplateManageView } from './ReviewTemplateManageView';
-import { CheckTemplateManageView } from './CheckTemplateManageView';
 import { ConfirmModal } from '../components/ConfirmModal';
 import { ReviewTemplate, NarrativeTemplate, Log, TodoItem, Scope, DailyReview, WeeklyReview, MonthlyReview, TodoCategory, Filter, Category, CheckTemplate } from '../types';
 import { DefaultArchiveView, DefaultIndexView, DefaultRecordView, useSettings } from '../contexts/SettingsContext';
@@ -84,32 +82,12 @@ import { useCategoryScope } from '../contexts/CategoryScopeContext';
 import { useReview } from '../contexts/ReviewContext';
 import { useNavigation } from '../contexts/NavigationContext';
 import FocusNotification from '../plugins/FocusNotificationPlugin';
-import { AutoRecordSettingsView } from './AutoRecordSettingsView';
-import { AutoLinkView } from './AutoLinkView';
-import { ObsidianExportView } from './ObsidianExportView';
-
-import { MemoirSettingsView } from './MemoirSettingsView';
 import excelExportService from '../services/excelExportService';
 import { imageCleanupService } from '../services/imageCleanupService';
-import { BatchFocusRecordManageView } from './BatchFocusRecordManageView';
 import { usePrivacy } from '../contexts/PrivacyContext';
 import { RedemptionService } from '../services/redemptionService';
 
-import { SponsorshipView } from './SponsorshipView';
 import { NARRATIVE_TEMPLATES } from '../constants';
-import { AISettingsView } from './settings/AISettingsView';
-import { PreferencesSettingsView } from './settings/PreferencesSettingsView';
-import { EmojiSettingsView } from './settings/EmojiSettingsView';
-import { PrincipleLibraryView } from './settings/PrincipleLibraryView';
-import { NarrativeSettingsView } from './settings/NarrativeSettingsView';
-import { NFCSettingsView } from './settings/NFCSettingsView';
-
-import { UserGuideView } from './settings/UserGuideView';
-import { FiltersSettingsView } from './settings/FiltersSettingsView';
-import { CloudSyncSettingsView } from './settings/CloudSyncSettingsView';
-import { S3SyncSettingsView } from './settings/S3SyncSettingsView';
-import { DataManagementView } from './settings/DataManagementView';
-import { SceneSettingsView } from './SceneSettingsView';
 
 
 interface SettingsViewProps {
@@ -188,6 +166,41 @@ interface SettingsViewProps {
 
 
 
+
+const ReviewTemplateManageView = React.lazy(() => import('./ReviewTemplateManageView').then((module) => ({ default: module.ReviewTemplateManageView })));
+const CheckTemplateManageView = React.lazy(() => import('./CheckTemplateManageView').then((module) => ({ default: module.CheckTemplateManageView })));
+const AutoRecordSettingsView = React.lazy(() => import('./AutoRecordSettingsView').then((module) => ({ default: module.AutoRecordSettingsView })));
+const AutoLinkView = React.lazy(() => import('./AutoLinkView').then((module) => ({ default: module.AutoLinkView })));
+const ObsidianExportView = React.lazy(() => import('./ObsidianExportView').then((module) => ({ default: module.ObsidianExportView })));
+const MemoirSettingsView = React.lazy(() => import('./MemoirSettingsView').then((module) => ({ default: module.MemoirSettingsView })));
+const BatchFocusRecordManageView = React.lazy(() => import('./BatchFocusRecordManageView').then((module) => ({ default: module.BatchFocusRecordManageView })));
+const SponsorshipView = React.lazy(() => import('./SponsorshipView').then((module) => ({ default: module.SponsorshipView })));
+const AISettingsView = React.lazy(() => import('./settings/AISettingsView').then((module) => ({ default: module.AISettingsView })));
+const PreferencesSettingsView = React.lazy(() => import('./settings/PreferencesSettingsView').then((module) => ({ default: module.PreferencesSettingsView })));
+const EmojiSettingsView = React.lazy(() => import('./settings/EmojiSettingsView').then((module) => ({ default: module.EmojiSettingsView })));
+const PrincipleLibraryView = React.lazy(() => import('./settings/PrincipleLibraryView').then((module) => ({ default: module.PrincipleLibraryView })));
+const NarrativeSettingsView = React.lazy(() => import('./settings/NarrativeSettingsView').then((module) => ({ default: module.NarrativeSettingsView })));
+const NFCSettingsView = React.lazy(() => import('./settings/NFCSettingsView').then((module) => ({ default: module.NFCSettingsView })));
+const UserGuideView = React.lazy(() => import('./settings/UserGuideView').then((module) => ({ default: module.UserGuideView })));
+const FiltersSettingsView = React.lazy(() => import('./settings/FiltersSettingsView').then((module) => ({ default: module.FiltersSettingsView })));
+const CloudSyncSettingsView = React.lazy(() => import('./settings/CloudSyncSettingsView').then((module) => ({ default: module.CloudSyncSettingsView })));
+const S3SyncSettingsView = React.lazy(() => import('./settings/S3SyncSettingsView').then((module) => ({ default: module.S3SyncSettingsView })));
+const DataManagementView = React.lazy(() => import('./settings/DataManagementView').then((module) => ({ default: module.DataManagementView })));
+const SceneSettingsView = React.lazy(() => import('./SceneSettingsView').then((module) => ({ default: module.SceneSettingsView })));
+
+const SettingsSubviewFallback: React.FC<{ label: string }> = ({ label }) => (
+    <div className="fixed inset-0 z-50 bg-[#fdfbf7] flex items-center justify-center font-serif">
+        <div className="rounded-2xl border border-stone-200 bg-white px-5 py-4 shadow-sm">
+            <div className="text-sm font-medium text-stone-500">{label}</div>
+        </div>
+    </div>
+);
+
+const renderLazySettingsSubview = (element: React.ReactNode, label: string) => (
+    <React.Suspense fallback={<SettingsSubviewFallback label={label} />}>
+        {element}
+    </React.Suspense>
+);
 
 export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, onImport, onReset, onClearData, onToast, syncData, onSyncUpdate, onOpenAutoLink, onOpenSearch, minIdleTimeThreshold = 1, onSetMinIdleTimeThreshold, defaultView = 'RECORD', onSetDefaultView, defaultArchiveView = 'CHRONICLE', onSetDefaultArchiveView, defaultIndexView = 'TAGS', onSetDefaultIndexView, defaultRecordView = 'TIMER', onSetDefaultRecordView, reviewTemplates = [], onUpdateReviewTemplates, onUpdateDailyReviews, checkTemplates = [], onUpdateCheckTemplates, dailyReviewTime, onSetDailyReviewTime, weeklyReviewTime, onSetWeeklyReviewTime, monthlyReviewTime, onSetMonthlyReviewTime, autoGenerateDailyReview, onToggleAutoGenerateDailyReview, autoGenerateWeeklyReview, onToggleAutoGenerateWeeklyReview, autoGenerateMonthlyReview, onToggleAutoGenerateMonthlyReview, customNarrativeTemplates, onUpdateCustomNarrativeTemplates, userPersonalInfo, onSetUserPersonalInfo, logs = [], todos = [], scopes = [], currentDate = new Date(), dailyReviews = [], weeklyReviews = [], monthlyReviews = [], todoCategories = [], filters = [], onUpdateFilters, categoriesData = [], onEditLog, autoFocusNote, onToggleAutoFocusNote, timelineGalleryMode, onToggleTimelineGalleryMode, collapseThreshold, onSetCollapseThreshold, manualSyncMode, onToggleManualSyncMode }) => {
     const { isPrivacyMode, togglePrivacyMode } = usePrivacy();
@@ -720,11 +733,14 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
 
     // Filters子页面
     if (activeSubmenu === 'memoir_filter') {
-        return <MemoirSettingsView onBack={() => setActiveSubmenu('main')} />;
+        return renderLazySettingsSubview(
+            <MemoirSettingsView onBack={() => setActiveSubmenu('main')} />,
+            '正在加载 Memoir 设置...'
+        );
     }
 
     if (activeSubmenu === 'filters') {
-        return (
+        return renderLazySettingsSubview(
             <FiltersSettingsView
                 onBack={() => setActiveSubmenu('main')}
                 onToast={onToast}
@@ -736,44 +752,51 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
                 todos={todos || []}
                 todoCategories={todoCategories || []}
                 onEditLog={onEditLog}
-            />
+            />,
+            '正在加载筛选器设置...'
         );
     }
 
     if (activeSubmenu === 'check_templates') {
-        return (
+        return renderLazySettingsSubview(
             <CheckTemplateManageView
                 templates={checkTemplates}
                 onUpdateTemplates={(newTemplates) => onUpdateCheckTemplates?.(newTemplates)}
                 dailyReviews={dailyReviews}
                 onBatchUpdateDailyReviewItems={onUpdateDailyReviews || (() => { })}
                 onBack={() => setActiveSubmenu('main')}
-            />
+            />,
+            '正在加载日课模板...'
         );
     }
 
     if (activeSubmenu === 'ai') {
-        return <AISettingsView onBack={() => setActiveSubmenu('main')} onToast={onToast} />;
+        return renderLazySettingsSubview(
+            <AISettingsView onBack={() => setActiveSubmenu('main')} onToast={onToast} />,
+            '正在加载 AI 设置...'
+        );
     }
 
     if (activeSubmenu === 'emoji') {
-        return (
+        return renderLazySettingsSubview(
             <EmojiSettingsView
                 onBack={() => setActiveSubmenu('main')}
-            />
+            />,
+            '正在加载 Emoji 设置...'
         );
     }
 
     if (activeSubmenu === 'principle') {
-        return (
+        return renderLazySettingsSubview(
             <PrincipleLibraryView
                 onBack={() => setActiveSubmenu('main')}
-            />
+            />,
+            '正在加载原则库...'
         );
     }
 
     if (activeSubmenu === 'cloud') {
-        return (
+        return renderLazySettingsSubview(
             <CloudSyncSettingsView
                 onBack={() => setActiveSubmenu('main')}
                 onToast={onToast}
@@ -781,12 +804,13 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
                 setWebdavConfig={setWebdavConfig}
                 onSyncUpload={handleSyncUpload}
                 onSyncDownload={handleSyncDownload}
-            />
+            />,
+            '正在加载 WebDAV 同步设置...'
         );
     }
 
     if (activeSubmenu === 's3') {
-        return (
+        return renderLazySettingsSubview(
             <S3SyncSettingsView
                 onBack={() => setActiveSubmenu('main')}
                 onToast={onToast}
@@ -794,7 +818,8 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
                 setS3Config={setS3Config}
                 onS3SyncUpload={handleS3SyncUpload}
                 onS3SyncDownload={handleS3SyncDownload}
-            />
+            />,
+            '正在加载 S3 同步设置...'
         );
     }
 
@@ -803,10 +828,13 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
     const { categories } = syncData;
 
     if (activeSubmenu === 'auto_record') {
-        return <AutoRecordSettingsView
-            onBack={() => setActiveSubmenu('main')}
-            categories={categories || []}
-        />;
+        return renderLazySettingsSubview(
+            <AutoRecordSettingsView
+                onBack={() => setActiveSubmenu('main')}
+                categories={categories || []}
+            />,
+            '正在加载应用关联规则...'
+        );
     }
 
     if (activeSubmenu === 'obsidian_export') {
@@ -814,24 +842,27 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
         const dateStr = currentDate.toISOString().split('T')[0]; // YYYY-MM-DD
         const todayReview = dailyReviews.find(r => r.date === dateStr);
 
-        return <ObsidianExportView
-            onBack={() => setActiveSubmenu('main')}
-            logs={logs}
-            categories={categoriesData || categories || []}
-            todos={todos}
-            scopes={scopes}
-            currentDate={currentDate}
-            onToast={onToast}
-            dailyReview={todayReview}
-            dailyReviews={dailyReviews}
-            weeklyReviews={weeklyReviews}
-            monthlyReviews={monthlyReviews}
-            todoCategories={todoCategories}
-        />;
+        return renderLazySettingsSubview(
+            <ObsidianExportView
+                onBack={() => setActiveSubmenu('main')}
+                logs={logs}
+                categories={categoriesData || categories || []}
+                todos={todos}
+                scopes={scopes}
+                currentDate={currentDate}
+                onToast={onToast}
+                dailyReview={todayReview}
+                dailyReviews={dailyReviews}
+                weeklyReviews={weeklyReviews}
+                monthlyReviews={monthlyReviews}
+                todoCategories={todoCategories}
+            />,
+            '正在加载 Obsidian 导出...'
+        );
     }
 
     if (activeSubmenu === 'data') {
-        return (
+        return renderLazySettingsSubview(
             <DataManagementView
                 onBack={() => setActiveSubmenu('main')}
                 onToast={onToast}
@@ -845,12 +876,13 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
                 todos={todos}
                 todoCategories={todoCategories}
                 scopes={scopes}
-            />
+            />,
+            '正在加载数据管理...'
         );
     }
 
     if (activeSubmenu === 'preferences') {
-        return (
+        return renderLazySettingsSubview(
             <PreferencesSettingsView
                 onBack={() => setActiveSubmenu('main')}
                 onToast={onToast}
@@ -894,26 +926,31 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
                 onToggleManualSyncMode={onToggleManualSyncMode}
                 sceneCardTimerMode={sceneCardTimerMode}
                 onSetSceneCardTimerMode={setSceneCardTimerMode}
-            />
+            />,
+            '正在加载偏好设置...'
         );
     }
 
     if (activeSubmenu === 'guide') {
-        return <UserGuideView onBack={() => setActiveSubmenu('main')} />;
+        return renderLazySettingsSubview(
+            <UserGuideView onBack={() => setActiveSubmenu('main')} />,
+            '正在加载用户指南...'
+        );
     }
 
     if (activeSubmenu === 'nfc') {
-        return (
+        return renderLazySettingsSubview(
             <NFCSettingsView
                 onBack={() => setActiveSubmenu('main')}
                 onToast={onToast}
                 categories={syncData.categories || []}
-            />
+            />,
+            '正在加载 NFC 设置...'
         );
     }
 
     if (activeSubmenu === 'narrative_prompt') {
-        return (
+        return renderLazySettingsSubview(
             <NarrativeSettingsView
                 onBack={() => setActiveSubmenu('main')}
                 onToast={onToast}
@@ -921,12 +958,13 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
                 onSetUserPersonalInfo={onSetUserPersonalInfo}
                 customNarrativeTemplates={customNarrativeTemplates}
                 onUpdateCustomNarrativeTemplates={onUpdateCustomNarrativeTemplates}
-            />
+            />,
+            '正在加载叙事设置...'
         );
     }
 
     if (activeSubmenu === 'templates') {
-        return (
+        return renderLazySettingsSubview(
             <ReviewTemplateManageView
                 templates={reviewTemplates}
                 onUpdateTemplates={(newTemplates) => {
@@ -937,12 +975,13 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
                     }
                 }}
                 onBack={() => setActiveSubmenu('main')}
-            />
+            />,
+            '正在加载回顾模板...'
         );
     }
 
     if (activeSubmenu === 'autolink') {
-        return (
+        return renderLazySettingsSubview(
             <AutoLinkView
                 onClose={() => setActiveSubmenu('main')}
                 rules={syncData.autoLinkRules || []}
@@ -951,12 +990,13 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
                 }}
                 categories={syncData.categories || []}
                 scopes={syncData.scopes || []}
-            />
+            />,
+            '正在加载自动关联规则...'
         );
     }
 
     if (activeSubmenu === 'batch_manage') {
-        return (
+        return renderLazySettingsSubview(
             <BatchFocusRecordManageView
                 onBack={() => setActiveSubmenu('main')}
                 logs={logs}
@@ -982,22 +1022,27 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
                 todos={todos || []}
                 todoCategories={todoCategories || []}
                 onToast={onToast}
-            />
+            />,
+            '正在加载批量记录管理...'
         );
     }
 
     if (activeSubmenu === 'sponsorship_preview') {
-        return (
+        return renderLazySettingsSubview(
             <SponsorshipView 
                 onBack={() => setActiveSubmenu('main')} 
                 onToast={onToast}
                 categories={categoriesData}
-            />
+            />,
+            '正在加载赞助页...'
         );
     }
 
     if (activeSubmenu === 'scene') {
-        return <SceneSettingsView onBack={() => setActiveSubmenu('main')} />;
+        return renderLazySettingsSubview(
+            <SceneSettingsView onBack={() => setActiveSubmenu('main')} />,
+            '正在加载场景设置...'
+        );
     }
 
     return (

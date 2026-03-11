@@ -15,7 +15,6 @@ import { IconRenderer } from '../components/IconRenderer';
 import { useSettings } from '../contexts/SettingsContext';
 import { ConfirmModal } from '../components/ConfirmModal';
 import { NarrativeStyleSelectionModal } from '../components/NarrativeStyleSelectionModal';
-import { StatsView } from './StatsView';
 import { FloatingButton } from '../components/FloatingButton';
 import { UIIcon } from '../components/UIIcon';
 import { CheckItemStreakBadge } from '../components/CheckItemStreakBadge';
@@ -51,6 +50,14 @@ interface DailyReviewViewProps {
 }
 
 type TabType = 'check' | 'data' | 'guide' | 'narrative';
+
+const StatsView = React.lazy(() => import('./StatsView').then((module) => ({ default: module.StatsView })));
+
+const StatsViewFallback: React.FC = () => (
+    <div className="flex min-h-[320px] items-center justify-center text-sm text-stone-400">
+        统计视图加载中...
+    </div>
+);
 
 const getCountMetrics = (item: CheckItem) => {
     const target = Math.max(1, Math.floor(item.targetCount || 1));
@@ -901,6 +908,7 @@ export const DailyReviewView: React.FC<DailyReviewViewProps> = ({
                 {/* Tab 1: Data - 使用 StatsView 组件 */}
                 {activeTab === 'data' && (
                     <div className="animate-in fade-in duration-300 -mx-7 -mt-4 pb-6">
+                        <React.Suspense fallback={<StatsViewFallback />}>
                         <StatsView
                             logs={logs}
                             categories={categories}
@@ -917,6 +925,7 @@ export const DailyReviewView: React.FC<DailyReviewViewProps> = ({
                             forcedRange="day"    // 强制为日视图
                             allowedViews={['pie', 'schedule']} // 仅允许切换：环形图 & 日程
                         />
+                        </React.Suspense>
                     </div>
                 )}
 

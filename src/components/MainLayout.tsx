@@ -17,7 +17,6 @@ import { useCategoryScope } from '../contexts/CategoryScopeContext';
 import { useReview } from '../contexts/ReviewContext';
 import { useSettings } from '../contexts/SettingsContext';
 import { useToast } from '../contexts/ToastContext';
-import { SettingsView } from '../views/SettingsView';
 import { UIIcon } from './UIIcon';
 import { FloatingButton } from './FloatingButton';
 
