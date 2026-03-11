@@ -19,7 +19,6 @@ import { WeeklyReviewView } from '../views/WeeklyReviewView';
 import { MonthlyReviewView } from '../views/MonthlyReviewView';
 import { RecordViewContainer } from '../views/RecordViewContainer';
 import { TimelineView } from '../views/TimelineView';
-import { StatsView } from '../views/StatsView';
 import { JournalView } from '../views/JournalView';
 import { ReviewHubView } from '../views/ReviewHubView';
 import { TagDetailView } from '../views/TagDetailView';
@@ -30,6 +29,16 @@ import { TodoView } from '../views/TodoView';
 import { ScopeDetailView } from '../views/ScopeDetailView';
 import { ScopeManageView } from '../views/ScopeManageView';
 import { ScopeView } from '../views/ScopeView';
+
+const StatsView = React.lazy(() => import('../views/StatsView').then((module) => ({ default: module.StatsView })));
+
+const RouteFallback: React.FC<{ label: string }> = ({ label }) => (
+    <div className="flex h-full w-full items-center justify-center bg-[#faf9f6]">
+        <div className="rounded-2xl border border-stone-200 bg-white px-5 py-4 shadow-sm">
+            <div className="text-sm font-medium text-stone-500">{label}</div>
+        </div>
+    </div>
+);
 
 // Props Interface to receive all handlers
 // Minimized Props Interface
@@ -331,26 +340,28 @@ export const AppRoutes: React.FC<AppRoutesProps> = ({
             );
         case AppView.STATS:
             return (
-                <StatsView
-                    logs={logs}
-                    categories={categories}
-                    currentDate={currentDate}
-                    onBack={() => {
-                        // Clear stats range when going back
-                        setStatsRange(null);
-                        setCurrentView(AppView.TIMELINE);
-                    }}
-                    onDateChange={setCurrentDate}
-                    isFullScreen={isStatsFullScreen}
-                    onToggleFullScreen={() => setIsStatsFullScreen(!isStatsFullScreen)}
-                    onToast={addToast}
-                    onTitleChange={setStatsTitle}
-                    todos={todos}
-                    todoCategories={todoCategories}
-                    scopes={scopes}
-                    dailyReviews={dailyReviews}
-                    forcedRange={statsRange || undefined}
-                />
+                <React.Suspense fallback={<RouteFallback label="正在加载统计..." />}>
+                    <StatsView
+                        logs={logs}
+                        categories={categories}
+                        currentDate={currentDate}
+                        onBack={() => {
+                            // Clear stats range when going back
+                            setStatsRange(null);
+                            setCurrentView(AppView.TIMELINE);
+                        }}
+                        onDateChange={setCurrentDate}
+                        isFullScreen={isStatsFullScreen}
+                        onToggleFullScreen={() => setIsStatsFullScreen(!isStatsFullScreen)}
+                        onToast={addToast}
+                        onTitleChange={setStatsTitle}
+                        todos={todos}
+                        todoCategories={todoCategories}
+                        scopes={scopes}
+                        dailyReviews={dailyReviews}
+                        forcedRange={statsRange || undefined}
+                    />
+                </React.Suspense>
             );
         case AppView.REVIEW:
             return isJournalMode ? (
