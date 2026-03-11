@@ -6,7 +6,7 @@
  * @description 日课模板项编辑行 - 支持手动和自动类型
  */
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { CheckTemplateItem } from '../types';
 import { X, Zap, Circle, ChevronUp, ChevronDown } from 'lucide-react';
 import { AutoCheckItemEditor } from './AutoCheckItemEditor';
@@ -98,6 +98,23 @@ export const CheckTemplateItemRow: React.FC<CheckTemplateItemRowProps> = ({
   const isAuto = item.type === 'auto';
   const isCountManual = !isAuto && item.manualMode === 'count';
 
+  // 次数输入框允许暂时为空（例如全选后退格），避免出现“1 无法删除”的体验问题。
+  const [targetCountText, setTargetCountText] = useState<string>(
+    item.targetCount === undefined ? '' : String(item.targetCount)
+  );
+  const [isEditingTargetCount, setIsEditingTargetCount] = useState(false);
+
+  useEffect(() => {
+    if (!isCountManual) {
+      // 输入框被卸载时，确保不处于“编辑中”状态，避免下次切回次数模式时不同步。
+      setIsEditingTargetCount(false);
+      setTargetCountText(item.targetCount === undefined ? '' : String(item.targetCount));
+      return;
+    }
+    if (isEditingTargetCount) return;
+    setTargetCountText(item.targetCount === undefined ? '' : String(item.targetCount));
+  }, [isCountManual, isEditingTargetCount, item.targetCount]);
+
   return (
     <>
       <div className="space-y-2">
@@ -173,16 +190,33 @@ export const CheckTemplateItemRow: React.FC<CheckTemplateItemRowProps> = ({
           <div className="ml-6 flex items-center gap-2 text-xs text-stone-500">
             <span>目标次数</span>
             <input
-              type="number"
-              min={1}
-              step={1}
-              value={Math.max(1, Math.floor(Number(item.targetCount) || 1))}
+              type="text"
+              inputMode="numeric"
+              pattern="[0-9]*"
+              value={targetCountText}
               onFocus={(e) => e.currentTarget.select()}
               onClick={(e) => e.currentTarget.select()}
               onChange={(e) => {
-                const targetCount = Math.max(1, Math.floor(Number(e.target.value) || 1));
-                onUpdate(index, { ...item, targetCount, manualMode: 'count', type: 'manual' });
+                const raw = e.target.value;
+                if (!/^\d*$/.test(raw)) return;
+
+                setIsEditingTargetCount(true);
+                setTargetCountText(raw);
+
+                if (raw === '') {
+                  onUpdate(index, { ...item, targetCount: undefined, manualMode: 'count', type: 'manual' });
+                  return;
+                }
+
+                const parsed = Number(raw);
+                if (!Number.isFinite(parsed) || parsed < 1) {
+                  onUpdate(index, { ...item, targetCount: undefined, manualMode: 'count', type: 'manual' });
+                  return;
+                }
+
+                onUpdate(index, { ...item, targetCount: Math.floor(parsed), manualMode: 'count', type: 'manual' });
               }}
+              onBlur={() => setIsEditingTargetCount(false)}
               className="w-20 px-2 py-1 rounded border border-stone-200 bg-white text-stone-700"
             />
             <span>次</span>
