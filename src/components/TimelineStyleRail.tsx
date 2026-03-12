@@ -20,7 +20,7 @@ interface TimelineStyleRailProps {
 
 export const TimelineStyleRail: React.FC<TimelineStyleRailProps> = ({ theme, config, index }) => {
     const renderLine = () => {
-        const { lineWidth, timelineWidth, lineColor, lineOpacity } = config;
+        const { lineWidth, timelineWidth, lineColor, lineOpacity, railOffsetX } = config;
         const opacity = lineOpacity / 100;
         const encodedColor = encodeURIComponent(lineColor);
 
@@ -32,7 +32,7 @@ export const TimelineStyleRail: React.FC<TimelineStyleRailProps> = ({ theme, con
             return (
                 <div
                     className="absolute top-3 bottom-[-2.5rem] left-0 -translate-x-1/2 transition-all duration-500"
-                    style={{ width: `${lineWidth}px`, backgroundColor: lineColor, opacity }}
+                    style={{ width: `${lineWidth}px`, backgroundColor: lineColor, opacity, marginLeft: `${railOffsetX}px` }}
                 />
             );
         }
@@ -41,7 +41,12 @@ export const TimelineStyleRail: React.FC<TimelineStyleRailProps> = ({ theme, con
             return (
                 <div
                     className="absolute top-3 bottom-[-2.5rem] left-0 -translate-x-1/2 border-dotted transition-all duration-500"
-                    style={{ borderLeftWidth: `${lineWidth}px`, borderColor: lineColor, opacity }}
+                    style={{ 
+                        borderLeftWidth: `${Math.max(lineWidth * 1.5, 2)}px`, 
+                        borderColor: lineColor, 
+                        opacity,
+                        marginLeft: `${railOffsetX}px` 
+                    }}
                 />
             );
         }
@@ -111,18 +116,19 @@ export const TimelineStyleRail: React.FC<TimelineStyleRailProps> = ({ theme, con
                     opacity,
                     backgroundImage: `url("${svgString.replace(/"/g, '\'')}")`,
                     backgroundRepeat: 'repeat-y',
-                    backgroundPosition: 'center top'
+                    backgroundPosition: 'center top',
+                    marginLeft: `${railOffsetX}px`
                 }}
             />
         );
     };
 
     const renderNode = () => {
-        const { iconSize, iconAngle, offsetX, uniformNodes, nodeColor } = config;
+        const { iconSize, iconAngle, offsetX, timeNodeOffsetY, uniformNodes, nodeColor } = config;
 
         if (theme === 'default') {
             return (
-                <div className="absolute -left-[11px] top-0 z-20 flex items-center justify-center">
+                <div className="absolute -left-[11px] top-0 z-20 flex items-center justify-center" style={{ marginTop: `${timeNodeOffsetY}px` }}>
                     <div className="w-2.5 h-2.5 mt-1.5 ml-1.5 rounded-full bg-stone-900 border-2 border-[#faf9f6] z-10" />
                 </div>
             );
@@ -138,6 +144,7 @@ export const TimelineStyleRail: React.FC<TimelineStyleRailProps> = ({ theme, con
                         width: dotSize,
                         height: dotSize,
                         marginLeft: `${offsetX}px`,
+                        marginTop: `${timeNodeOffsetY}px`,
                         backgroundColor: nodeColor,
                         boxShadow: '0 0 0 4px #faf9f6',
                         color: nodeColor
@@ -173,6 +180,7 @@ export const TimelineStyleRail: React.FC<TimelineStyleRailProps> = ({ theme, con
                 className="absolute top-1 left-0 -translate-x-1/2 z-10 transition-all duration-500 flex items-center justify-center"
                 style={{
                     marginLeft: `${offsetX}px`,
+                    marginTop: `${timeNodeOffsetY}px`,
                     color: nodeColor,
                     filter: 'drop-shadow(0 0 1px #faf9f6) drop-shadow(0 0 1px #faf9f6)'
                 }}

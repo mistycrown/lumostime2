@@ -217,6 +217,11 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ logs, todos, scopes,
 
     const [isAIModalOpen, setIsAIModalOpen] = useState(false);
 
+    // 计算时间线样式偏移量
+    const currentStyleConfig = timelineStyleConfigs[timelineStyleTheme];
+    const railOffsetX = currentStyleConfig.railOffsetX || 0;
+    const timeNodeOffsetY = currentStyleConfig.timeNodeOffsetY || 0;
+
     // 计算当前日期所在周的范围和周报相关数据
     const weeklyReviewData = useMemo(() => {
         // 使用本地时间获取年月日，避免UTC转换导致的时区偏差
@@ -861,7 +866,34 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ logs, todos, scopes,
                 className="flex-1 overflow-y-auto px-7 py-6 pb-24 no-scrollbar"
                 id="timeline-content"
             >
-                <div className={`relative ml-[70px] space-y-6 ${timelineStyleTheme === 'default' ? 'border-l border-stone-300' : ''}`}>
+                <div className={`relative ml-[70px] space-y-6`}>
+                    {/* default 主题的竖线 */}
+                    {timelineStyleTheme === 'default' && (
+                        <div className="absolute left-0 top-0 bottom-0 w-[1px] border-l border-stone-300 pointer-events-none" />
+                    )}
+                    
+                    {/* 非 default 主题的贯穿竖线 */}
+                    {timelineStyleTheme !== 'default' && (
+                        <div 
+                            className={`absolute left-0 top-0 bottom-0 -translate-x-1/2 pointer-events-none ${timelineStyleTheme === 'paw' ? 'border-l border-dotted' : ''}`}
+                            style={{
+                                marginLeft: `${railOffsetX}px`,
+                                ...(timelineStyleTheme === 'paw' 
+                                    ? {
+                                        borderLeftWidth: `${Math.max(timelineStyleConfigs[timelineStyleTheme].lineWidth * 1.5, 2)}px`,
+                                        borderColor: timelineStyleConfigs[timelineStyleTheme].lineColor,
+                                        opacity: timelineStyleConfigs[timelineStyleTheme].lineOpacity / 100
+                                    }
+                                    : {
+                                        width: '2px',
+                                        backgroundColor: timelineStyleConfigs[timelineStyleTheme].lineColor,
+                                        opacity: timelineStyleConfigs[timelineStyleTheme].lineOpacity / 100
+                                    }
+                                )
+                            }}
+                        />
+                    )}
+                    
                     {/* 时光小友卡片 */}
                     <div className="pl-8 -ml-[70px] mb-6">
                         <TimePalCard 
@@ -1051,7 +1083,7 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ logs, todos, scopes,
                             </div>
 
                             {/* Timeline Dot */}
-                            <div className="absolute -left-[5px] top-1.5 w-2.5 h-2.5 rounded-full bg-stone-400 border-2 border-[#faf9f6] z-10" />
+                            <div className="absolute -left-[5px] top-1.5 w-2.5 h-2.5 rounded-full bg-stone-300 border-2 border-[#faf9f6] z-10" style={{ marginLeft: `${railOffsetX}px` }} />
 
                             {/* Content - 直接显示待办列表 */}
                             <div className="space-y-1.5" style={{ paddingTop: '2px' }}>
@@ -1086,7 +1118,7 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ logs, todos, scopes,
                             </div>
 
                             {/* Timeline Dot */}
-                            <div className="absolute -left-[5px] top-1.5 w-2.5 h-2.5 rounded-full bg-stone-400 border-2 border-[#faf9f6] z-10" />
+                            <div className="absolute -left-[5px] top-1.5 w-2.5 h-2.5 rounded-full bg-stone-300 border-2 border-[#faf9f6] z-10" style={{ marginLeft: `${railOffsetX}px` }} />
 
                             {/* Content - 显示目标列表 */}
                             <div className="space-y-1.5" style={{ paddingTop: '2px' }}>
@@ -1124,7 +1156,7 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ logs, todos, scopes,
                                     </div>
 
                                     {/* Timeline Dot */}
-                                    <div className="absolute -left-[5px] top-1.5 w-2.5 h-2.5 rounded-full bg-amber-400 border-2 border-[#faf9f6] z-10" />
+                                    <div className="absolute -left-[5px] top-1.5 w-2.5 h-2.5 rounded-full bg-amber-400 border-2 border-[#faf9f6] z-10" style={{ marginLeft: `${railOffsetX}px` }} />
 
                                     {/* Content: Simple Text Button */}
                                     <button
@@ -1173,7 +1205,7 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ logs, todos, scopes,
                                         </div>
 
                                         {/* Timeline Dot */}
-                                        <div className="absolute -left-[5px] top-1.5 w-2.5 h-2.5 rounded-full bg-stone-300 border-2 border-[#faf9f6] z-10" />
+                                        <div className="absolute -left-[5px] top-1.5 w-2.5 h-2.5 rounded-full bg-stone-300 border-2 border-[#faf9f6] z-10" style={{ marginLeft: `${railOffsetX}px` }} />
 
                                         {/* Content Wrapper */}
                                         <div className="space-y-2" style={{ paddingTop: '2px' }}>
@@ -1241,7 +1273,7 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ logs, todos, scopes,
                                         </div>
 
                                         {/* Timeline Dot */}
-                                        <div className="absolute -left-[5px] top-1.5 w-2.5 h-2.5 rounded-full bg-stone-300 border-2 border-[#faf9f6] z-10" />
+                                        <div className="absolute -left-[5px] top-1.5 w-2.5 h-2.5 rounded-full bg-stone-300 border-2 border-[#faf9f6] z-10" style={{ marginLeft: `${railOffsetX}px` }} />
 
                                         {/* Content Wrapper */}
                                         <div className="space-y-4">
@@ -1294,7 +1326,7 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ logs, todos, scopes,
                                 </div>
 
                                 {/* Timeline Dot */}
-                                <div className="absolute -left-[5px] top-1.5 w-2.5 h-2.5 rounded-full bg-purple-400 border-2 border-[#faf9f6] z-10" />
+                                <div className="absolute -left-[5px] top-1.5 w-2.5 h-2.5 rounded-full bg-purple-400 border-2 border-[#faf9f6] z-10" style={{ marginLeft: `${railOffsetX}px` }} />
 
                                 {/* Content: Simple Text Button */}
                                 <button
@@ -1325,7 +1357,7 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ logs, todos, scopes,
                                         </div>
 
                                         {/* Timeline Dot */}
-                                        <div className="absolute -left-[5px] top-1.5 w-2.5 h-2.5 rounded-full bg-stone-300 border-2 border-[#faf9f6] z-10" />
+                                        <div className="absolute -left-[5px] top-1.5 w-2.5 h-2.5 rounded-full bg-stone-300 border-2 border-[#faf9f6] z-10" style={{ marginLeft: `${railOffsetX}px` }} />
 
                                         {/* Content Wrapper */}
                                         <div className="space-y-4">
@@ -1377,7 +1409,7 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ logs, todos, scopes,
                                 </div>
 
                                 {/* Timeline Dot */}
-                                <div className="absolute -left-[5px] top-1.5 w-2.5 h-2.5 rounded-full bg-pink-400 border-2 border-[#faf9f6] z-10" />
+                                <div className="absolute -left-[5px] top-1.5 w-2.5 h-2.5 rounded-full bg-pink-400 border-2 border-[#faf9f6] z-10" style={{ marginLeft: `${railOffsetX}px` }} />
 
                                 {/* Content: Simple Text Button */}
                                 <button
@@ -1408,7 +1440,7 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ logs, todos, scopes,
                                         </div>
 
                                         {/* Timeline Dot */}
-                                        <div className="absolute -left-[5px] top-1.5 w-2.5 h-2.5 rounded-full bg-stone-300 border-2 border-[#faf9f6] z-10" />
+                                        <div className="absolute -left-[5px] top-1.5 w-2.5 h-2.5 rounded-full bg-stone-300 border-2 border-[#faf9f6] z-10" style={{ marginLeft: `${railOffsetX}px` }} />
 
                                         {/* Content Wrapper */}
                                         <div className="space-y-4">
