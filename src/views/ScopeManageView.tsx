@@ -3,17 +3,19 @@
  * @input Scope List
  * @output Created/Updated/Archived Scopes
  * @pos View (Settings Sub-page)
- * @description A management interface for Scopes. Allows creating new scopes, renaming, changing icons, reordering, and archiving/restoring scopes.
+ * @description A management interface for Scopes. Allows creating new scopes, renaming, changing colors/icons, reordering, and archiving/restoring scopes.
  * 
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
 import React, { useState, useEffect } from 'react';
 import { Scope } from '../types';
-import { ChevronLeft, Plus, Trash2, Archive, ArchiveRestore, GripVertical, ArrowUp, ArrowDown, X, Check, Palette } from 'lucide-react';
+import { Plus, Trash2, Archive, ArchiveRestore, GripVertical, ArrowUp, ArrowDown, X, Check } from 'lucide-react';
 import { IconRenderer } from '../components/IconRenderer';
 import { UIIconSelectorCompact } from '../components/UIIconSelector';
 import { uiIconService } from '../services/uiIconService';
-import { useSettings } from '../contexts/SettingsContext';
+import { COLOR_OPTIONS } from '../constants';
+import { useCustomColors } from '../hooks/useCustomColors';
+import { getColorPreviewValue, isStoredColorSelected } from '../utils/colorUtils';
 
 interface ScopeManageViewProps {
     scopes: Scope[];
@@ -31,8 +33,9 @@ export const ScopeManageView: React.FC<ScopeManageViewProps> = ({
     
     // Icon selector state
     const [iconSelectorOpen, setIconSelectorOpen] = useState<string | null>(null);
-    const { uiIconTheme } = useSettings();
+    const [colorPickerOpen, setColorPickerOpen] = useState<string | null>(null);
     const isCustomIconEnabled = uiIconService.isCustomTheme();
+    const customColors = useCustomColors();
 
     const activeScopes = editingScopes.filter(s => !s.isArchived).sort((a, b) => a.order - b.order);
     const archivedScopes = editingScopes.filter(s => s.isArchived).sort((a, b) => a.order - b.order);
@@ -89,6 +92,15 @@ export const ScopeManageView: React.FC<ScopeManageViewProps> = ({
     const handleIconSelect = (id: string, uiIconString: string) => {
         handleUpdateScope(id, { uiIcon: uiIconString });
         setIconSelectorOpen(null);
+    };
+
+    const handleColorChange = (id: string, color: string) => {
+        handleUpdateScope(id, { themeColor: color });
+        setColorPickerOpen(null);
+    };
+
+    const getColorFromScopeThemeColor = (themeColor: string): string => {
+        return getColorPreviewValue(themeColor, 'scope');
     };
 
     const handleSave = () => {
@@ -164,6 +176,17 @@ export const ScopeManageView: React.FC<ScopeManageViewProps> = ({
 
                                 {/* Actions */}
                                 <div className="flex items-center gap-1 shrink-0">
+                                    <button
+                                        onClick={() => setColorPickerOpen(colorPickerOpen === scope.id ? null : scope.id)}
+                                        className="p-1.5 rounded-lg transition-all shrink-0 hover:bg-stone-100"
+                                        title="选择颜色"
+                                    >
+                                        <div
+                                            className="w-4 h-4 rounded-full border border-stone-300"
+                                            style={{ backgroundColor: getColorFromScopeThemeColor(scope.themeColor) }}
+                                        />
+                                    </button>
+
                                     {/* Icon Selector Button - Show current UI icon preview */}
                                     {isCustomIconEnabled && (
                                         <button 
@@ -197,6 +220,38 @@ export const ScopeManageView: React.FC<ScopeManageViewProps> = ({
                                     </button>
                                 </div>
                             </div>
+
+                            {colorPickerOpen === scope.id && (
+                                <div className="p-3 border-b border-stone-100 bg-stone-50/30">
+                                    <div className="flex gap-2 flex-wrap">
+                                        {COLOR_OPTIONS.map(opt => (
+                                            <button
+                                                key={opt.id}
+                                                onClick={() => handleColorChange(scope.id, opt.title)}
+                                                title={opt.label}
+                                                className={`w-8 h-8 rounded-full ${opt.bg} transition-all hover:scale-110 ${
+                                                    isStoredColorSelected(scope.themeColor, opt.title)
+                                                        ? `ring-2 ${opt.ring} ring-offset-2`
+                                                        : ''
+                                                }`}
+                                            />
+                                        ))}
+                                        {customColors.map((item) => (
+                                            <button
+                                                key={item.id}
+                                                onClick={() => handleColorChange(scope.id, item.color)}
+                                                title={item.color}
+                                                className={`w-8 h-8 rounded-full border border-stone-300 transition-all hover:scale-110 ${
+                                                    isStoredColorSelected(scope.themeColor, item.color)
+                                                        ? 'ring-2 ring-stone-400 ring-offset-2'
+                                                        : ''
+                                                }`}
+                                                style={{ backgroundColor: item.color }}
+                                            />
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
 
                             {/* Icon Selector Dropdown */}
                             {isCustomIconEnabled && iconSelectorOpen === scope.id && (

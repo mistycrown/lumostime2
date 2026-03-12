@@ -37,6 +37,8 @@ export const THEME_KEYS = {
     COLOR_SCHEME: 'lumostime_color_scheme',
     /** 日程图样式 */
     SCHEDULE_STYLE: 'lumostime_schedule_style',
+    TIMELINE_STYLE_THEME: 'lumostime_timeline_style_theme',
+    TIMELINE_STYLE_CONFIGS: 'lumostime_timeline_style_configs',
     /** 自定义色组 */
     CUSTOM_COLOR_GROUP: 'lumostime_custom_color_group',
     /** 当前背景 */

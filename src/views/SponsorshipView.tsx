@@ -15,6 +15,7 @@ import { RedemptionService } from '../services/redemptionService';
 import { IconPreview } from '../components/IconPreview';
 import { BackgroundSelector } from '../components/BackgroundSelector';
 import { NavigationDecorationSelector } from '../components/NavigationDecorationSelector';
+import { TimelineStyleSelector } from '../components/TimelineStyleSelector';
 import { ColorSchemeSelector } from '../components/ColorSchemeSelector';
 import { CustomColorGroupManager } from '../components/CustomColorGroupManager';
 import { iconService, ICON_OPTIONS } from '../services/iconService';
@@ -1107,7 +1108,8 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
                             )}
 
                             {activeTab === 'style' && (
-                                <div className="pt-2">
+                                <div className="pt-2 space-y-4">
+                                    <TimelineStyleSelector onToast={onToast} />
                                     <div className="bg-white rounded-2xl shadow-[0_2px_10px_rgba(0,0,0,0.03)]">
                                         <div className="flex items-center justify-between p-4 relative">
                                             <div>
