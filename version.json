@@ -1,7 +1,7 @@
 {
-    "version": "1.1.6",
-    "versionCode": 116,
+    "version": "1.1.7",
+    "versionCode": 117,
     "updateUrl": "https://github.com/mistycrown/lumostime2/releases/latest",
-    "releaseNotes": "v1.1.6\n• 增加日课模板排序功能\n• 调整chronicle页月回顾卡片的渲染逻辑\n• 增加目标系列功能\n• 调整emojiselector中emoji选项的大小\n• 增加自定义字体\n• 增加时间小友功能",
+    "releaseNotes": "v1.1.7\n• 修复目标系列继承字段问题\n• 增加目标排序功能\n• 修复场景设置中自动跳转应用的显示问题\n• 修复数字类型日课模板输入次数的问题\n• 增加自定义筛选器排序功能\n• 增加自定义色组的功能\n• 增加标签关联领域规则的重置功能\n• 增加待办分类颜色自定义设置的功能\n• 添加删除自定义字体的功能\n• 增加领域管理中快速选择颜色的功能\n• 增加时间线样式功能",
     "forceUpdate": false
 }
