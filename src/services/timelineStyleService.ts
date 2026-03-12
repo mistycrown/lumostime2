@@ -25,6 +25,7 @@ export interface TimelineStyleConfig {
     iconAngle: number;
     lineWidth: number;
     offsetX: number;
+    memoirOffsetX: number;
     timelineWidth: number;
     railOffsetX: number;
     timeNodeOffsetY: number;
@@ -55,23 +56,23 @@ export const TIMELINE_STYLE_OPTIONS: TimelineStyleOption[] = [
 ];
 
 export const LEGACY_TIMELINE_STYLE_CONFIGS: TimelineStyleConfigMap = {
-    default: { iconSize: 16, iconAngle: 0, lineWidth: 2, offsetX: 0, timelineWidth: 2, railOffsetX: 0, timeNodeOffsetY: 0, uniformNodes: false, nodeColor: '#374151', lineColor: '#d1d5db', lineOpacity: 60 },
-    vine: { iconSize: 12, iconAngle: 94, lineWidth: 1, offsetX: 0, timelineWidth: 6, railOffsetX: 0, timeNodeOffsetY: 0, uniformNodes: false, nodeColor: '#374151', lineColor: '#d1d5db', lineOpacity: 60 },
-    celestial: { iconSize: 12, iconAngle: 0, lineWidth: 2, offsetX: 0, timelineWidth: 2, railOffsetX: 0, timeNodeOffsetY: 0, uniformNodes: false, nodeColor: '#374151', lineColor: '#d1d5db', lineOpacity: 60 },
-    track: { iconSize: 16, iconAngle: 0, lineWidth: 2, offsetX: 0, timelineWidth: 2, railOffsetX: 0, timeNodeOffsetY: 0, uniformNodes: false, nodeColor: '#374151', lineColor: '#d1d5db', lineOpacity: 60 },
-    stitches: { iconSize: 16, iconAngle: 0, lineWidth: 2, offsetX: 0, timelineWidth: 1, railOffsetX: 0, timeNodeOffsetY: 0, uniformNodes: false, nodeColor: '#374151', lineColor: '#d1d5db', lineOpacity: 60 },
-    paw: { iconSize: 12, iconAngle: 0, lineWidth: 2, offsetX: 0, timelineWidth: 2, railOffsetX: 0, timeNodeOffsetY: 0, uniformNodes: false, nodeColor: '#374151', lineColor: '#d1d5db', lineOpacity: 60 },
-    music: { iconSize: 16, iconAngle: 0, lineWidth: 1, offsetX: 0, timelineWidth: 6, railOffsetX: 0, timeNodeOffsetY: 0, uniformNodes: false, nodeColor: '#374151', lineColor: '#d1d5db', lineOpacity: 60 }
+    default: { iconSize: 16, iconAngle: 0, lineWidth: 2, offsetX: 0, memoirOffsetX: 0, timelineWidth: 2, railOffsetX: 0, timeNodeOffsetY: 0, uniformNodes: false, nodeColor: '#374151', lineColor: '#d1d5db', lineOpacity: 60 },
+    vine: { iconSize: 12, iconAngle: 94, lineWidth: 1, offsetX: 0, memoirOffsetX: 0, timelineWidth: 6, railOffsetX: 0, timeNodeOffsetY: 0, uniformNodes: false, nodeColor: '#374151', lineColor: '#d1d5db', lineOpacity: 60 },
+    celestial: { iconSize: 12, iconAngle: 0, lineWidth: 2, offsetX: 0, memoirOffsetX: 0, timelineWidth: 2, railOffsetX: 0, timeNodeOffsetY: 0, uniformNodes: false, nodeColor: '#374151', lineColor: '#d1d5db', lineOpacity: 60 },
+    track: { iconSize: 16, iconAngle: 0, lineWidth: 2, offsetX: 0, memoirOffsetX: 0, timelineWidth: 2, railOffsetX: 0, timeNodeOffsetY: 0, uniformNodes: false, nodeColor: '#374151', lineColor: '#d1d5db', lineOpacity: 60 },
+    stitches: { iconSize: 16, iconAngle: 0, lineWidth: 2, offsetX: 0, memoirOffsetX: 0, timelineWidth: 1, railOffsetX: 0, timeNodeOffsetY: 0, uniformNodes: false, nodeColor: '#374151', lineColor: '#d1d5db', lineOpacity: 60 },
+    paw: { iconSize: 12, iconAngle: 0, lineWidth: 2, offsetX: 0, memoirOffsetX: 0, timelineWidth: 2, railOffsetX: 0, timeNodeOffsetY: 0, uniformNodes: false, nodeColor: '#374151', lineColor: '#d1d5db', lineOpacity: 60 },
+    music: { iconSize: 16, iconAngle: 0, lineWidth: 1, offsetX: 0, memoirOffsetX: 0, timelineWidth: 6, railOffsetX: 0, timeNodeOffsetY: 0, uniformNodes: false, nodeColor: '#374151', lineColor: '#d1d5db', lineOpacity: 60 }
 };
 
 export const DEFAULT_TIMELINE_STYLE_CONFIGS: TimelineStyleConfigMap = {
     default: { ...LEGACY_TIMELINE_STYLE_CONFIGS.default },
-    vine: { iconSize: 12, iconAngle: 94, lineWidth: 1, offsetX: 0, timelineWidth: 6, railOffsetX: 0, timeNodeOffsetY: 0, uniformNodes: false, nodeColor: '#426666', lineColor: '#75878A', lineOpacity: 15 },
-    celestial: { iconSize: 12, iconAngle: 0, lineWidth: 1.5, offsetX: 0, timelineWidth: 3, railOffsetX: 0, timeNodeOffsetY: 0, uniformNodes: false, nodeColor: '#5B647A', lineColor: '#AAB3C1', lineOpacity: 26 },
-    track: { iconSize: 15, iconAngle: 0, lineWidth: 1.5, offsetX: 0, timelineWidth: 4, railOffsetX: 0, timeNodeOffsetY: 0, uniformNodes: false, nodeColor: '#6A6258', lineColor: '#B9B1A6', lineOpacity: 24 },
-    stitches: { iconSize: 15, iconAngle: 0, lineWidth: 1.5, offsetX: 0, timelineWidth: 2, railOffsetX: 0, timeNodeOffsetY: 0, uniformNodes: false, nodeColor: '#7A6A66', lineColor: '#C7B8B1', lineOpacity: 22 },
-    paw: { iconSize: 12, iconAngle: 0, lineWidth: 1.5, offsetX: 0, timelineWidth: 3, railOffsetX: 0, timeNodeOffsetY: 0, uniformNodes: false, nodeColor: '#6B615D', lineColor: '#C6BDB6', lineOpacity: 20 },
-    music: { iconSize: 15, iconAngle: 0, lineWidth: 1, offsetX: 0, timelineWidth: 5, railOffsetX: 0, timeNodeOffsetY: 0, uniformNodes: false, nodeColor: '#596A74', lineColor: '#A7B8BF', lineOpacity: 18 }
+    vine: { iconSize: 12, iconAngle: 94, lineWidth: 1, offsetX: 0, memoirOffsetX: 0, timelineWidth: 6, railOffsetX: 0, timeNodeOffsetY: 0, uniformNodes: false, nodeColor: '#426666', lineColor: '#75878A', lineOpacity: 15 },
+    celestial: { iconSize: 12, iconAngle: 0, lineWidth: 1.5, offsetX: 0, memoirOffsetX: 0, timelineWidth: 3, railOffsetX: 0, timeNodeOffsetY: 0, uniformNodes: false, nodeColor: '#5B647A', lineColor: '#AAB3C1', lineOpacity: 26 },
+    track: { iconSize: 15, iconAngle: 0, lineWidth: 1.5, offsetX: 0, memoirOffsetX: 0, timelineWidth: 4, railOffsetX: 0, timeNodeOffsetY: 0, uniformNodes: false, nodeColor: '#6A6258', lineColor: '#B9B1A6', lineOpacity: 24 },
+    stitches: { iconSize: 15, iconAngle: 0, lineWidth: 1.5, offsetX: 0, memoirOffsetX: 0, timelineWidth: 2, railOffsetX: 0, timeNodeOffsetY: 0, uniformNodes: false, nodeColor: '#7A6A66', lineColor: '#C7B8B1', lineOpacity: 22 },
+    paw: { iconSize: 12, iconAngle: 0, lineWidth: 1.5, offsetX: 0, memoirOffsetX: 0, timelineWidth: 3, railOffsetX: 0, timeNodeOffsetY: 0, uniformNodes: false, nodeColor: '#6B615D', lineColor: '#C6BDB6', lineOpacity: 20 },
+    music: { iconSize: 15, iconAngle: 0, lineWidth: 1, offsetX: 0, memoirOffsetX: 0, timelineWidth: 5, railOffsetX: 0, timeNodeOffsetY: 0, uniformNodes: false, nodeColor: '#596A74', lineColor: '#A7B8BF', lineOpacity: 18 }
 };
 
 const clamp = (value: number, min: number, max: number): number => {
@@ -95,6 +96,7 @@ const normalizeConfig = (
         iconAngle: clamp(Number(config?.iconAngle ?? fallback.iconAngle), -180, 180),
         lineWidth: clamp(Number(config?.lineWidth ?? fallback.lineWidth), 1, 8),
         offsetX: clamp(Number(config?.offsetX ?? fallback.offsetX), -40, 40),
+        memoirOffsetX: clamp(Number(config?.memoirOffsetX ?? fallback.memoirOffsetX), -40, 40),
         timelineWidth: clamp(Number(config?.timelineWidth ?? fallback.timelineWidth), 0, 60),
         railOffsetX: clamp(Number(config?.railOffsetX ?? fallback.railOffsetX), -40, 40),
         timeNodeOffsetY: clamp(Number(config?.timeNodeOffsetY ?? fallback.timeNodeOffsetY), -20, 20),
@@ -148,6 +150,7 @@ export const areTimelineStyleConfigValuesEqual = (
         first.iconAngle === second.iconAngle &&
         first.lineWidth === second.lineWidth &&
         first.offsetX === second.offsetX &&
+        first.memoirOffsetX === second.memoirOffsetX &&
         first.timelineWidth === second.timelineWidth &&
         first.railOffsetX === second.railOffsetX &&
         first.timeNodeOffsetY === second.timeNodeOffsetY &&

@@ -27,7 +27,7 @@ Charts and visual data representations.
 - `HeatmapCalendar.tsx`: Month-view intensity heatmap.
 - `MatrixAnalysisChart.tsx`: Bar charts for activity ranking.
 - `stats/CheckView.tsx`: Habit check statistics with support for manual count mode (shows completed counts).
-- `TimelineStyleRail.tsx`: Styled rail and node renderer shared by TimelineView and detail-page history timelines, with last-node line truncation.
+- `TimelineStyleRail.tsx`: Styled rail and node renderer shared by TimelineView, Memoir, and detail-page history timelines, with last-node line truncation, centered summary dots, optional page-level rail-width caps, and Memoir-side offset support.
 
 ## Input & Forms
 Specialized input controls.
@@ -65,6 +65,7 @@ Components for theme and appearance customization.
 > ⚠️ 本文档最后更新：2026-02-09
 ## Recently Added (2026-03)
 - `TimelineStyleSelector.tsx`: 时间线样式切换与参数调节组件。
-- `TimelineStyleRail.tsx`: TimelineView 普通记录节点的样式轨道渲染组件。
+- `TimelineStyleRail.tsx`: TimelineView、Memoir 与详情页共用的样式轨道渲染组件，支持摘要节点圆点对齐和页面级轨道宽度限制。
+- `TimelineStyleAdjuster.tsx`: 时间线样式调节浮窗，使用更紧凑的半屏宽度布局，并支持档案页专用水平偏移。
 
 > Last updated: 2026-03-12

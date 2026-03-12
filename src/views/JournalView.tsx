@@ -3,13 +3,14 @@
  * @input Daily Reviews, Logs
  * @output Journal Entry Navigation
  * @pos View (Main Tab)
- * @description A journal-style view for daily entries, providing an alternative perspective to the ReviewHubView.
+ * @description A journal-style view for daily entries, providing an alternative perspective to the ReviewHubView and reusing shared timeline styling behavior with Memoir-side timeline adjustment.
  * 
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
 import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import { DailyReview, Log, WeeklyReview, MonthlyReview } from '../types';
 import { DiaryEntry, MOCK_ENTRIES, MONTHS, Comment } from './journalTypes';
+import { TimelineStyleAdjuster } from '../components/TimelineStyleAdjuster';
 import TimelineItem from '../components/TimelineItem';
 import { Search, Menu, PenLine, ChevronDown, ChevronLeft, ChevronRight, SlidersHorizontal, Image as ImageIcon, AlignLeft, X, FilterX, AudioWaveform } from 'lucide-react';
 import { MoodCalendar } from '../components/MoodCalendar';
@@ -121,7 +122,14 @@ export const JournalView: React.FC<JournalViewProps> = ({
 }) => {
     const { categories } = useCategoryScope();
     const { setLogs } = useData();
-    const { memoirFilterConfig, uiTheme } = useSettings();
+    const {
+        memoirFilterConfig,
+        uiTheme,
+        timelineStyleTheme,
+        timelineStyleAdjusterOpen,
+        setTimelineStyleAdjusterOpen
+    } = useSettings();
+    const canAdjustTimelineStyle = timelineStyleTheme !== 'default';
 
     // Default to Today
     const [selectedDate, setSelectedDate] = useState(new Date());
@@ -399,6 +407,15 @@ export const JournalView: React.FC<JournalViewProps> = ({
         return groupedByDay;
 
     }, [logs, dailyReviews, weeklyReviews, monthlyReviews, categories, selectedDate, memoirFilterConfig, todos, scopes, uiTheme]);
+
+    const memoirRailIndexMap = useMemo(() => {
+        return filteredEntries
+            .flatMap((group) => group.entries)
+            .reduce((map, entry, index) => {
+                map.set(entry.id, index);
+                return map;
+            }, new Map<string, number>());
+    }, [filteredEntries]);
 
     useEffect(() => {
         const container = scrollContainerRef.current;
@@ -715,11 +732,23 @@ export const JournalView: React.FC<JournalViewProps> = ({
                 ? 'bg-[#faf9f6]/90 backdrop-blur-md shadow-sm h-[calc(3rem+env(safe-area-inset-top))]'
                 : 'bg-[#faf9f6]/80 backdrop-blur-sm h-[calc(3.5rem+env(safe-area-inset-top))]'
                 }`}>
-                <div className="max-w-xl mx-auto px-6 h-full flex items-center justify-center">
+                <div className="max-w-xl mx-auto px-6 h-full flex items-center justify-center relative">
                     <h1 className={`font-serif text-stone-800 font-bold transition-all duration-300 ${isScrolled ? 'text-[16px]' : 'text-[18px]'
                         }`}>
                         Memoir
                     </h1>
+                    <button
+                        onClick={() => canAdjustTimelineStyle && setTimelineStyleAdjusterOpen(true)}
+                        className={`absolute right-6 inline-flex items-center justify-center w-8 h-8 rounded-full transition-colors ${
+                            canAdjustTimelineStyle
+                                ? 'text-stone-500 hover:text-stone-800 hover:bg-white/80'
+                                : 'text-stone-300'
+                        }`}
+                        aria-label="打开时间线调节器"
+                        title={canAdjustTimelineStyle ? '打开时间线调节器' : '默认样式无需调节'}
+                    >
+                        <SlidersHorizontal size={15} />
+                    </button>
                 </div>
             </header>
 
@@ -854,7 +883,9 @@ export const JournalView: React.FC<JournalViewProps> = ({
                                                     <span className="block font-sans text-[10px] font-bold text-subtle tracking-widest mt-1">{month}</span>
                                                 </div>
                                                 {/* Vertical line */}
-                                                <div className="absolute top-0 right-0 w-px bg-gray-200 h-full" />
+                                                {timelineStyleTheme === 'default' && (
+                                                    <div className="absolute top-0 right-0 w-px bg-gray-200 h-full" />
+                                                )}
                                             </div>
 
                                             {/* Right: Entries for this day */}
@@ -865,6 +896,8 @@ export const JournalView: React.FC<JournalViewProps> = ({
                                                         entry={entry}
                                                         isLast={groupIndex === displayedEntries.length - 1 && entryIndex === dayGroup.entries.length - 1}
                                                         isFirstOfDay={entryIndex === 0}
+                                                        railIndex={memoirRailIndexMap.get(entry.id) ?? 0}
+                                                        extendRailPastContainer={entryIndex < dayGroup.entries.length - 1}
                                                         onAddComment={handleAddComment}
                                                         onToggleReaction={handleToggleReaction}
                                                         onClick={() => handleEntryClick(entry)}
@@ -939,6 +972,10 @@ export const JournalView: React.FC<JournalViewProps> = ({
                     />
                 )
             }
+
+            {timelineStyleAdjusterOpen && timelineStyleTheme !== 'default' && (
+                <TimelineStyleAdjuster onClose={() => setTimelineStyleAdjusterOpen(false)} />
+            )}
 
             {/* Right Edge Line */}
             <div className="fixed top-0 right-0 bottom-0 w-[1px] bg-stone-200/50 z-40 pointer-events-none" />

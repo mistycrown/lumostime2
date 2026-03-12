@@ -3,7 +3,7 @@
  * @input Toast callback
  * @output Timeline style dropdown selector and adjuster launcher
  * @pos Component (Theme & Customization)
- * @description 时间线样式选择器 - 用于投喂功能中的样式切换，并在时间脉络页面开启调节器
+ * @description 时间线样式选择器 - 用于投喂功能中的样式切换，并在时间脉络页或档案页开启调节器
  *
  * Once I am updated, be sure to update my header comment and the folder's md.
  */
@@ -37,7 +37,7 @@ export const TimelineStyleSelector: React.FC<TimelineStyleSelectorProps> = ({ on
         }
 
         setTimelineStyleAdjusterOpen(true);
-        onToast('success', '已开启时间脉络调节器，请返回时间脉络页面查看');
+        onToast('success', '已开启时间线调节器，请返回时间脉络页或档案页查看');
     };
 
     return (
@@ -45,7 +45,6 @@ export const TimelineStyleSelector: React.FC<TimelineStyleSelectorProps> = ({ on
             <div className="flex items-center justify-between p-4 gap-3">
                 <div>
                     <h4 className="font-bold text-stone-700">时间线样式</h4>
-                    <p className="text-xs text-stone-400 mt-1">脉络页面的记录节点</p>
                 </div>
 
                 <div className="flex items-center gap-2">

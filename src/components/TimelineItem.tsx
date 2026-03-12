@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { DiaryEntry } from '../views/journalTypes';
-import { MessageSquarePlus, AudioLines, MessageCircle, Heart, Share2, Bookmark, Moon, Star, Send } from 'lucide-react';
+import { MessageSquarePlus, AudioLines, MessageCircle, Heart, Share2, Bookmark, Send } from 'lucide-react';
 import { imageService } from '../services/imageService';
 import { ImagePreviewModal } from './ImagePreviewModal';
 import { usePrivacy } from '../contexts/PrivacyContext';
 import { IconRenderer } from './IconRenderer';
 import { CollapsibleText } from './CollapsibleText';
+import { useSettings } from '../contexts/SettingsContext';
+import { TimelineStyleRail } from './TimelineStyleRail';
 
 import { ReactionPicker, ReactionList } from './ReactionComponents';
 
@@ -121,17 +123,30 @@ interface TimelineItemProps {
     entry: DiaryEntry;
     isLast: boolean;
     isFirstOfDay?: boolean;  // 是否是当天第一条
+    railIndex?: number;
+    extendRailPastContainer?: boolean;
     onAddComment: (entryId: string, text: string) => void;
     onToggleReaction?: (entryId: string, emoji: string) => void;
     onClick?: () => void;
     collapseThreshold?: number; // 折叠字数阈值
 }
 
-const TimelineItem: React.FC<TimelineItemProps> = ({ entry, isLast, isFirstOfDay = true, onAddComment, onToggleReaction, onClick, collapseThreshold = 9999 }) => {
+const TimelineItem: React.FC<TimelineItemProps> = ({
+    entry,
+    isLast,
+    isFirstOfDay = true,
+    railIndex = 0,
+    extendRailPastContainer = false,
+    onAddComment,
+    onToggleReaction,
+    onClick,
+    collapseThreshold = 9999
+}) => {
     const [isCommenting, setIsCommenting] = useState(false);
     const [commentText, setCommentText] = useState('');
     const [previewImage, setPreviewImage] = useState<string | null>(null);
     const { isPrivacyMode } = usePrivacy();
+    const { timelineStyleTheme, timelineStyleConfigs } = useSettings();
 
     const dateObj = new Date(entry.date);
     const day = dateObj.getDate().toString().padStart(2, '0');
@@ -151,6 +166,8 @@ const TimelineItem: React.FC<TimelineItemProps> = ({ entry, isLast, isFirstOfDay
 
     const type = entry.type || 'normal';
     const isSummary = type !== 'normal';
+    const activeTimelineConfig = timelineStyleConfigs[timelineStyleTheme];
+    const memoirMaxTimelineWidth = 3;
 
     const handleSubmitComment = (e: React.FormEvent) => {
         e.preventDefault();
@@ -231,12 +248,27 @@ const TimelineItem: React.FC<TimelineItemProps> = ({ entry, isLast, isFirstOfDay
     const renderNodeIcon = () => {
         switch (type) {
             case 'daily_summary':
-                return <Moon className="w-4 h-4 p-0.5 ml-0.5 mt-1.5 text-purple-600 fill-current z-10" />;
+                return <div className="w-2.5 h-2.5 mt-1.5 ml-1.5 rounded-full bg-purple-500 border-2 border-[#faf9f6] z-10" />;
             case 'weekly_summary':
-                return <Star className="w-4 h-4 p-0.5 ml-0.5 mt-1.5 text-amber-500 fill-current z-10" />;
+                return <div className="w-2.5 h-2.5 mt-1.5 ml-1.5 rounded-full bg-amber-500 border-2 border-[#faf9f6] z-10" />;
+            case 'monthly_summary':
+                return <div className="w-2.5 h-2.5 mt-1.5 ml-1.5 rounded-full bg-pink-400 border-2 border-[#faf9f6] z-10" />;
             default:
                 // Normal dot
                 return <div className="w-2.5 h-2.5 mt-1.5 ml-1.5 rounded-full bg-stone-900 border-2 border-[#faf9f6] z-10" />;
+        }
+    };
+
+    const getSummaryNodeColor = () => {
+        switch (type) {
+            case 'daily_summary':
+                return '#8b5cf6';
+            case 'weekly_summary':
+                return '#f59e0b';
+            case 'monthly_summary':
+                return '#f472b6';
+            default:
+                return activeTimelineConfig.nodeColor;
         }
     };
 
@@ -257,9 +289,26 @@ const TimelineItem: React.FC<TimelineItemProps> = ({ entry, isLast, isFirstOfDay
             }}
         >
             {/* Node Icon (positioned absolutely on the left edge of parent group) */}
-            <div className="absolute -left-[11px] top-0 z-20 flex items-center justify-center">
-                {renderNodeIcon()}
-            </div>
+            {timelineStyleTheme !== 'default' && (
+                <TimelineStyleRail
+                    theme={timelineStyleTheme}
+                    config={activeTimelineConfig}
+                    index={railIndex}
+                    showLine={true}
+                    showNode={true}
+                    extendLinePastContainer={extendRailPastContainer}
+                    anchorOffsetX={activeTimelineConfig.memoirOffsetX}
+                    forceDotNode={isSummary}
+                    nodeColorOverride={isSummary ? getSummaryNodeColor() : undefined}
+                    maxTimelineWidth={memoirMaxTimelineWidth}
+                />
+            )}
+
+            {timelineStyleTheme === 'default' && (
+                <div className="absolute -left-[11px] top-0 z-20 flex items-center justify-center">
+                    {renderNodeIcon()}
+                </div>
+            )}
 
             {/* Content */}
             <div className={containerClasses}>
