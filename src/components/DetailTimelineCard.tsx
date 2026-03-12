@@ -1,9 +1,9 @@
 /**
  * @file DetailTimelineCard.tsx
  * @input Filtered logs, display date, entity info
- * @output Timeline UI with calendar, stats, and history
+ * @output Timeline UI with calendar, stats, history, and shared custom timeline styling with per-day rail termination
  * @pos Component (Shared Detail View UI)
- * @description 详情页面共享的时间线卡片组件，包括月历热图、统计信息和历史记录列表
+ * @description 详情页面共享的时间线卡片组件，包括月历热图、统计信息、历史记录列表，以及与主时间线同步且在每个分组末端及时收线的自定义轨道样式
  * 
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
@@ -14,6 +14,8 @@ import { Clock, Zap, Heart, MessageCircle, ChevronLeft, ChevronRight, Grid, Imag
 import { TimelineImage } from './TimelineImage';
 import { IconRenderer } from './IconRenderer';
 import { usePrivacy } from '../contexts/PrivacyContext';
+import { useSettings } from '../contexts/SettingsContext';
+import { TimelineStyleRail } from './TimelineStyleRail';
 
 const CALENDAR_WEEK_DAYS_MONDAY_FIRST = ['周一', '周二', '周三', '周四', '周五', '周六', '周日'];
 const WEEK_DAYS_SUNDAY_FIRST = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
@@ -81,6 +83,8 @@ export const DetailTimelineCard: React.FC<DetailTimelineCardProps> = ({
     progressTracking
 }) => {
     const { isPrivacyMode } = usePrivacy();
+    const { timelineStyleTheme, timelineStyleConfigs } = useSettings();
+    const activeConfig = timelineStyleConfigs[timelineStyleTheme];
     const [viewMode, setViewMode] = React.useState<'month' | 'all'>(defaultViewMode);
     const [calendarViewMode, setCalendarViewMode] = React.useState<'heatmap' | 'gallery' | 'keywords'>('heatmap');
     
@@ -180,6 +184,21 @@ export const DetailTimelineCard: React.FC<DetailTimelineCardProps> = ({
 
     // 显示日志：根据模式选择
     const logsToDisplay = viewMode === 'month' ? monthLogs : filteredLogs;
+
+    const styledLogIndexMap = useMemo(() => {
+        return [...logsToDisplay]
+            .sort((first, second) => {
+                if (second.startTime !== first.startTime) {
+                    return second.startTime - first.startTime;
+                }
+
+                return first.id.localeCompare(second.id);
+            })
+            .reduce((map, log, index) => {
+                map.set(log.id, index);
+                return map;
+            }, new Map<string, number>());
+    }, [logsToDisplay]);
 
     // 总计统计
     const totalSeconds = filteredLogs.reduce((acc, curr) => acc + curr.duration, 0);
@@ -1049,8 +1068,12 @@ export const DetailTimelineCard: React.FC<DetailTimelineCardProps> = ({
                                     </div>
                                 </div>
 
-                                <div className="relative border-l border-stone-300 ml-[70px] space-y-6 pb-4">
-                                    {dayLogsFiltered.sort((a, b) => b.startTime - a.startTime).map(log => {
+                                <div className="relative ml-[70px] space-y-6 pb-4">
+                                    {timelineStyleTheme === 'default' && (
+                                        <div className="absolute left-0 top-0 bottom-0 w-[1px] border-l border-stone-300 pointer-events-none" />
+                                    )}
+
+                                    {dayLogsFiltered.sort((a, b) => b.startTime - a.startTime).map((log, index, sortedLogs) => {
                                         // 查找对应的category和activity
                                         const category = categories?.find(c => c.id === log.categoryId);
                                         const activity = category?.activities.find(a => a.id === log.activityId);
@@ -1065,8 +1088,7 @@ export const DetailTimelineCard: React.FC<DetailTimelineCardProps> = ({
                                         return (
                                             <div
                                                 key={log.id}
-                                                className="relative pl-8 group cursor-pointer rounded-xl hover:bg-stone-50/80 transition-colors p-2 -ml-2"
-                                                onClick={() => onEditLog?.(log)}
+                                                className="relative pl-8 group animate-in slide-in-from-bottom-2 duration-500"
                                             >
                                                 {/* Time & Duration - Absolute Left */}
                                                 <div className="absolute -left-[60px] top-0 w-[45px] text-right flex flex-col items-end">
@@ -1078,10 +1100,18 @@ export const DetailTimelineCard: React.FC<DetailTimelineCardProps> = ({
                                                     </span>
                                                 </div>
 
-                                                {/* Timeline Dot */}
-                                                <div className="absolute left-[3px] top-2 w-2.5 h-2.5 rounded-full bg-stone-900 border-2 border-[#faf9f6] z-10" />
+                                                <TimelineStyleRail
+                                                    theme={timelineStyleTheme}
+                                                    config={activeConfig}
+                                                    index={styledLogIndexMap.get(log.id) ?? 0}
+                                                    showLine={true}
+                                                    extendLinePastContainer={index < sortedLogs.length - 1}
+                                                />
 
-                                                <div className="relative top-[-2px]">
+                                                <div
+                                                    className="cursor-pointer rounded-xl hover:bg-stone-50/80 transition-colors px-2 pb-2 -ml-2"
+                                                    onClick={() => onEditLog?.(log)}
+                                                >
                                                     <div className="flex items-center gap-2 mb-1">
                                                         <span className="text-lg font-bold text-stone-900 leading-tight">
                                                             {activity?.name || category?.name || 'Unknown Activity'}
