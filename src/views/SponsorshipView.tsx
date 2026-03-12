@@ -985,7 +985,7 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
                                     {/* 重装提醒 */}
                                     <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-center">
                                         <p className="text-sm text-amber-800">
-                                            重装应用前需切回默认图标
+                                            重装应用前需切回默认图标，部分机型暂不可用。
                                         </p>
                                     </div>
 
