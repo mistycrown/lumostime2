@@ -1,9 +1,9 @@
 /**
  * @file TimelineStyleRail.tsx
  * @input Timeline style theme, active config, and node index
- * @output Styled rail segment and node marker for timeline log items, with optional line truncation on the last node
+ * @output Styled rail segment and node marker for timeline log items, with optional line truncation, anchor offset, centered forced dot nodes, and optional rail-width cap
  * @pos Component (Timeline)
- * @description 时间线样式轨道组件 - 复用参考项目的节点与连线逻辑，用于普通时间记录节点，并支持在最后一个节点处截断连线
+ * @description 时间线样式轨道组件 - 复用参考项目的节点与连线逻辑，用于普通时间记录节点，并支持在最后一个节点处截断连线、整体锚点偏移以及强制圆点节点
  *
  * Once I am updated, be sure to update my header comment and the folder's md.
  */
@@ -19,6 +19,10 @@ interface TimelineStyleRailProps {
     showLine?: boolean;
     showNode?: boolean;
     extendLinePastContainer?: boolean;
+    anchorOffsetX?: number;
+    forceDotNode?: boolean;
+    nodeColorOverride?: string;
+    maxTimelineWidth?: number;
 }
 
 export const TimelineStyleRail: React.FC<TimelineStyleRailProps> = ({
@@ -27,13 +31,19 @@ export const TimelineStyleRail: React.FC<TimelineStyleRailProps> = ({
     index,
     showLine = true,
     showNode = true,
-    extendLinePastContainer = true
+    extendLinePastContainer = true,
+    anchorOffsetX = 0,
+    forceDotNode = false,
+    nodeColorOverride,
+    maxTimelineWidth
 }) => {
     const renderLine = () => {
         const { lineWidth, timelineWidth, lineColor, lineOpacity, railOffsetX } = config;
         const opacity = lineOpacity / 100;
         const encodedColor = encodeURIComponent(lineColor);
         const bottomOffset = extendLinePastContainer ? '-2.5rem' : '0';
+        const sharedOffsetX = railOffsetX + anchorOffsetX;
+        const resolvedTimelineWidth = Math.min(timelineWidth, maxTimelineWidth ?? timelineWidth);
 
         if (theme === 'default' || !showLine) {
             return null;
@@ -43,7 +53,7 @@ export const TimelineStyleRail: React.FC<TimelineStyleRailProps> = ({
             return (
                 <div
                     className="absolute top-3 bottom-[-2.5rem] left-0 -translate-x-1/2 transition-all duration-500"
-                    style={{ width: `${lineWidth}px`, backgroundColor: lineColor, opacity, marginLeft: `${railOffsetX}px`, bottom: bottomOffset }}
+                    style={{ width: `${lineWidth}px`, backgroundColor: lineColor, opacity, marginLeft: `${sharedOffsetX}px`, bottom: bottomOffset }}
                 />
             );
         }
@@ -56,14 +66,14 @@ export const TimelineStyleRail: React.FC<TimelineStyleRailProps> = ({
                         borderLeftWidth: `${Math.max(lineWidth * 1.5, 2)}px`, 
                         borderColor: lineColor, 
                         opacity,
-                        marginLeft: `${railOffsetX}px`,
+                        marginLeft: `${sharedOffsetX}px`,
                         bottom: bottomOffset
                     }}
                 />
             );
         }
 
-        const w = Math.max(timelineWidth, 4);
+        const w = Math.max(resolvedTimelineWidth, 4);
         let h = w * 3;
         let path = '';
 
@@ -129,7 +139,7 @@ export const TimelineStyleRail: React.FC<TimelineStyleRailProps> = ({
                     backgroundImage: `url("${svgString.replace(/"/g, '\'')}")`,
                     backgroundRepeat: 'repeat-y',
                     backgroundPosition: 'center top',
-                    marginLeft: `${railOffsetX}px`,
+                    marginLeft: `${sharedOffsetX}px`,
                     bottom: bottomOffset
                 }}
             />
@@ -142,6 +152,22 @@ export const TimelineStyleRail: React.FC<TimelineStyleRailProps> = ({
         }
 
         const { iconSize, iconAngle, offsetX, timeNodeOffsetY, uniformNodes, nodeColor } = config;
+        const resolvedNodeColor = nodeColorOverride || nodeColor;
+        const sharedOffsetX = offsetX + anchorOffsetX;
+
+        if (forceDotNode) {
+            return (
+                <div
+                    className="absolute top-1 left-0 -translate-x-1/2 z-20 flex items-center justify-center transition-all duration-500"
+                    style={{ marginLeft: `${sharedOffsetX}px`, marginTop: `${timeNodeOffsetY}px` }}
+                >
+                    <div
+                        className="w-2.5 h-2.5 rounded-full border-2 border-[#faf9f6] z-10"
+                        style={{ backgroundColor: resolvedNodeColor }}
+                    />
+                </div>
+            );
+        }
 
         if (theme === 'default') {
             return (
@@ -160,11 +186,11 @@ export const TimelineStyleRail: React.FC<TimelineStyleRailProps> = ({
                     style={{
                         width: dotSize,
                         height: dotSize,
-                        marginLeft: `${offsetX}px`,
+                        marginLeft: `${sharedOffsetX}px`,
                         marginTop: `${timeNodeOffsetY}px`,
-                        backgroundColor: nodeColor,
+                        backgroundColor: resolvedNodeColor,
                         boxShadow: '0 0 0 4px #faf9f6',
-                        color: nodeColor
+                        color: resolvedNodeColor
                     }}
                 />
             );
@@ -196,9 +222,9 @@ export const TimelineStyleRail: React.FC<TimelineStyleRailProps> = ({
             <div
                 className="absolute top-1 left-0 -translate-x-1/2 z-10 transition-all duration-500 flex items-center justify-center"
                 style={{
-                    marginLeft: `${offsetX}px`,
+                    marginLeft: `${sharedOffsetX}px`,
                     marginTop: `${timeNodeOffsetY}px`,
-                    color: nodeColor,
+                    color: resolvedNodeColor,
                     filter: 'drop-shadow(0 0 1px #faf9f6) drop-shadow(0 0 1px #faf9f6)'
                 }}
             >

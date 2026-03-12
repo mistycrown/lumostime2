@@ -1,15 +1,15 @@
 /**
  * @file TimelineStyleAdjuster.tsx
  * @input Close callback
- * @output Floating timeline style adjuster panel for TimelineView
+ * @output Floating compact timeline style adjuster panel for TimelineView and Memoir with text-only color inputs
  * @pos Component (Timeline)
- * @description 时间线样式调节器 - 在时间脉络页面悬浮显示，支持边调边看普通节点效果
+ * @description 时间线样式调节器 - 在时间脉络页与档案页悬浮显示，使用更紧凑的半屏宽度布局，并仅允许通过 HEX 文本输入调整颜色
  *
  * Once I am updated, be sure to update my header comment and the folder's md.
  */
 
 import React, { useMemo } from 'react';
-import { ChevronLeft, ChevronRight, RotateCcw, SlidersHorizontal, X } from 'lucide-react';
+import { ChevronLeft, ChevronRight, RotateCcw, X } from 'lucide-react';
 import { useSettings } from '../contexts/SettingsContext';
 import {
     DEFAULT_TIMELINE_STYLE_CONFIGS,
@@ -106,7 +106,7 @@ export const TimelineStyleAdjuster: React.FC<TimelineStyleAdjusterProps> = ({ on
     };
 
     return (
-        <div className="fixed bottom-28 right-4 z-50 bg-white/95 backdrop-blur rounded-xl shadow-2xl border border-stone-200 p-4 w-72 animate-in fade-in slide-in-from-bottom-4 max-h-[75vh] overflow-y-auto">
+        <div className="fixed bottom-28 right-4 z-50 bg-white/95 backdrop-blur rounded-xl shadow-2xl border border-stone-200 p-4 w-[50vw] min-w-[11rem] max-w-[20rem] animate-in fade-in slide-in-from-bottom-4 max-h-[75vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-4 border-b border-stone-100 pb-3">
                 <div className="flex items-center gap-2">
                     <span className="w-2 h-2 rounded-full bg-amber-400" />
@@ -154,11 +154,6 @@ export const TimelineStyleAdjuster: React.FC<TimelineStyleAdjusterProps> = ({ on
             </div>
 
             <div className="space-y-4">
-                <div className="flex items-center gap-2 text-[11px] text-stone-400 bg-stone-50 rounded-lg px-3 py-2">
-                    <SlidersHorizontal size={12} />
-                    <span>调节结果会即时作用于当前页面的普通记录节点</span>
-                </div>
-
                 <NumberControl
                     label="节点大小"
                     value={currentConfig.iconSize}
@@ -192,6 +187,13 @@ export const TimelineStyleAdjuster: React.FC<TimelineStyleAdjusterProps> = ({ on
                     value={currentConfig.railOffsetX}
                     suffix="px"
                     onStep={(delta) => updateNumber('railOffsetX', delta, -40, 40)}
+                    steps={[-4, -1, 1, 4]}
+                />
+                <NumberControl
+                    label="档案页水平偏移"
+                    value={currentConfig.memoirOffsetX}
+                    suffix="px"
+                    onStep={(delta) => updateNumber('memoirOffsetX', delta, -40, 40)}
                     steps={[-4, -1, 1, 4]}
                 />
                 <NumberControl
@@ -232,11 +234,9 @@ export const TimelineStyleAdjuster: React.FC<TimelineStyleAdjusterProps> = ({ on
                     <label className="space-y-1.5">
                         <span className="text-[11px] font-medium text-stone-500">节点颜色</span>
                         <div className="flex items-center gap-2 bg-stone-50 rounded-xl px-3 py-2">
-                            <input
-                                type="color"
-                                value={safeNodeColor}
-                                onChange={(event) => updateCurrentConfig('nodeColor', event.target.value)}
-                                className="w-7 h-7 rounded cursor-pointer border-0 bg-transparent p-0"
+                            <span
+                                className="w-3 h-3 rounded-full border border-stone-200 shrink-0"
+                                style={{ backgroundColor: safeNodeColor }}
                             />
                             <input
                                 type="text"
@@ -250,11 +250,9 @@ export const TimelineStyleAdjuster: React.FC<TimelineStyleAdjusterProps> = ({ on
                     <label className="space-y-1.5">
                         <span className="text-[11px] font-medium text-stone-500">连线颜色</span>
                         <div className="flex items-center gap-2 bg-stone-50 rounded-xl px-3 py-2">
-                            <input
-                                type="color"
-                                value={safeLineColor}
-                                onChange={(event) => updateCurrentConfig('lineColor', event.target.value)}
-                                className="w-7 h-7 rounded cursor-pointer border-0 bg-transparent p-0"
+                            <span
+                                className="w-3 h-3 rounded-full border border-stone-200 shrink-0"
+                                style={{ backgroundColor: safeLineColor }}
                             />
                             <input
                                 type="text"
