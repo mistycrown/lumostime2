@@ -8,6 +8,14 @@ import { DEFAULT_USER_PERSONAL_INFO } from '../constants';
 import { THEME_KEYS } from '../constants/storageKeys';
 import { uiIconService } from '../services/uiIconService';
 import { fontService } from '../services/fontService';
+import {
+    DEFAULT_TIMELINE_STYLE_THEME,
+    TimelineStyleConfigMap,
+    TimelineStyleTheme,
+    getDefaultTimelineStyleConfigs,
+    isTimelineStyleTheme,
+    normalizeTimelineStyleConfigs
+} from '../services/timelineStyleService';
 
 export type DefaultArchiveView = 'CHRONICLE' | 'MEMOIR';
 export type DefaultIndexView = 'TAGS' | 'SCOPE';
@@ -74,7 +82,15 @@ interface SettingsContextType {
 
     // 日程图样式
     scheduleStyle: ScheduleStyle;
+    scheduleStyle: ScheduleStyle;
     setScheduleStyle: React.Dispatch<React.SetStateAction<ScheduleStyle>>;
+
+    timelineStyleTheme: TimelineStyleTheme;
+    setTimelineStyleTheme: React.Dispatch<React.SetStateAction<TimelineStyleTheme>>;
+    timelineStyleConfigs: TimelineStyleConfigMap;
+    setTimelineStyleConfigs: React.Dispatch<React.SetStateAction<TimelineStyleConfigMap>>;
+    timelineStyleAdjusterOpen: boolean;
+    setTimelineStyleAdjusterOpen: React.Dispatch<React.SetStateAction<boolean>>;
 
     // Emoji 风格设置
     emojiStyle: EmojiStyle;
@@ -356,6 +372,24 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
         return 'default';
     });
 
+    const [timelineStyleTheme, setTimelineStyleTheme] = useState<TimelineStyleTheme>(() => {
+        const stored = localStorage.getItem(THEME_KEYS.TIMELINE_STYLE_THEME);
+        return isTimelineStyleTheme(stored) ? stored : DEFAULT_TIMELINE_STYLE_THEME;
+    });
+
+    const [timelineStyleConfigs, setTimelineStyleConfigs] = useState<TimelineStyleConfigMap>(() => {
+        const stored = localStorage.getItem(THEME_KEYS.TIMELINE_STYLE_CONFIGS);
+        if (!stored) return getDefaultTimelineStyleConfigs();
+
+        try {
+            return normalizeTimelineStyleConfigs(JSON.parse(stored));
+        } catch (error) {
+            console.error('[SettingsContext] Failed to parse timeline style configs:', error);
+            return getDefaultTimelineStyleConfigs();
+        }
+    });
+    const [timelineStyleAdjusterOpen, setTimelineStyleAdjusterOpen] = useState(false);
+
     const [emojiStyle, setEmojiStyle] = useState<EmojiStyle>(() => {
         const stored = localStorage.getItem('lumostime_emoji_style');
         // 向后兼容：如果之前使用 useTwemoji，转换为新格式
@@ -390,6 +424,14 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
     useEffect(() => {
         localStorage.setItem(THEME_KEYS.SCHEDULE_STYLE, scheduleStyle);
     }, [scheduleStyle]);
+
+    useEffect(() => {
+        localStorage.setItem(THEME_KEYS.TIMELINE_STYLE_THEME, timelineStyleTheme);
+    }, [timelineStyleTheme]);
+
+    useEffect(() => {
+        localStorage.setItem(THEME_KEYS.TIMELINE_STYLE_CONFIGS, JSON.stringify(timelineStyleConfigs));
+    }, [timelineStyleConfigs]);
 
     useEffect(() => {
         localStorage.setItem('lumostime_emoji_style', emojiStyle);
@@ -461,6 +503,12 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
             setFontFamily,
             scheduleStyle,
             setScheduleStyle,
+            timelineStyleTheme,
+            setTimelineStyleTheme,
+            timelineStyleConfigs,
+            setTimelineStyleConfigs,
+            timelineStyleAdjusterOpen,
+            setTimelineStyleAdjusterOpen,
             emojiStyle,
             setEmojiStyle,
             defaultSelectorPage,

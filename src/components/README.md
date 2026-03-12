@@ -27,6 +27,7 @@ Charts and visual data representations.
 - `HeatmapCalendar.tsx`: Month-view intensity heatmap.
 - `MatrixAnalysisChart.tsx`: Bar charts for activity ranking.
 - `stats/CheckView.tsx`: Habit check statistics with support for manual count mode (shows completed counts).
+- `TimelineStyleRail.tsx`: Styled rail and node renderer for TimelineView normal records.
 
 ## Input & Forms
 Specialized input controls.
@@ -62,4 +63,8 @@ Components for theme and appearance customization.
 - `TimePalSettings.tsx`: 新增 - 从 SponsorshipView 中提取的时光小友设置组件
 
 > ⚠️ 本文档最后更新：2026-02-09
-> Last updated: 2026-03-11
+## Recently Added (2026-03)
+- `TimelineStyleSelector.tsx`: 时间线样式切换与参数调节组件。
+- `TimelineStyleRail.tsx`: TimelineView 普通记录节点的样式轨道渲染组件。
+
+> Last updated: 2026-03-12

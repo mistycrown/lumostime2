@@ -2,6 +2,8 @@
 
 Contains business logic and external integrations.
 
+Update 2026-03-12: timeline styling for normal timeline records is managed by `timelineStyleService.ts`.
+
 ## Files
 - `aiService.ts`: [Active] - Handles AI integration (OpenAI/Gemini) for text parsing and narrative generation.
 - `excelExportService.ts`: [Active] - Exports time logs to Excel format.
@@ -11,6 +13,7 @@ Contains business logic and external integrations.
 - `NfcService.ts`: [Active] - Wrapper for Capacitor NFC plugin to read/write tags.
 - `obsidianExportService.ts`: [Active] - Exports data to Obsidian markdown files.
 - `syncService.ts`: [Active] - Orchestrates image synchronization between local storage and WebDAV server. Handles deletions and bidirectional sync.
+- `timelineStyleService.ts`: [Active] - Manages timeline style themes, defaults, and config normalization for TimelineView normal nodes.
 - `themePresetService.ts`: [Active] - 主题预设应用服务，拆分复杂的主题切换逻辑为独立方法
 - `customColorGroupService.ts`: [Active] - 自定义色组存储服务，负责 HEX 归一化、去重清洗、增删改查与排序持久化
 - `updateService.ts`: [Active] - Checks for app updates from Gitee (primary) or GitHub (fallback).

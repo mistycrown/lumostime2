@@ -27,10 +27,13 @@ import { UIIcon } from '../components/UIIcon';
 import { IconRenderer } from '../components/IconRenderer';
 import { usePrivacy } from '../contexts/PrivacyContext';
 import { useNavigation } from '../contexts/NavigationContext';
+import { useSettings } from '../contexts/SettingsContext';
 import { CollapsibleText } from '../components/CollapsibleText';
 import { calculateGoalProgress } from '../utils/goalUtils';
 import { GalleryView } from '../components/GalleryView';
 import { toCssColor } from '../utils/colorUtils';
+import { TimelineStyleRail } from '../components/TimelineStyleRail';
+import { TimelineStyleAdjuster } from '../components/TimelineStyleAdjuster';
 
 // Image Thumbnail Component
 const TimelineImage: React.FC<{ filename: string, className?: string, useThumbnail?: boolean, refreshKey?: number }> = ({ filename, className = "w-16 h-16", useThumbnail = false, refreshKey = 0 }) => {
@@ -183,6 +186,12 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ logs, todos, scopes,
     const [copyFailureModal, setCopyFailureModal] = useState<{ isOpen: boolean; text: string }>({ isOpen: false, text: '' });
     const [showTimePalDebugger, setShowTimePalDebugger] = useState(false);
     const { isGalleryViewOpen, setIsGalleryViewOpen } = useNavigation();
+    const {
+        timelineStyleTheme,
+        timelineStyleConfigs,
+        timelineStyleAdjusterOpen,
+        setTimelineStyleAdjusterOpen
+    } = useSettings();
 
     React.useEffect(() => {
         localStorage.setItem('lumos_timeline_sort', sortOrder);
@@ -786,6 +795,8 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ logs, todos, scopes,
         }
     };
 
+    let styledLogIndex = 0;
+
     return (
         <div
             className="h-full bg-[#faf9f6] flex flex-col relative text-stone-900"
@@ -850,7 +861,7 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ logs, todos, scopes,
                 className="flex-1 overflow-y-auto px-7 py-6 pb-24 no-scrollbar"
                 id="timeline-content"
             >
-                <div className="relative border-l border-stone-300 ml-[70px] space-y-6">
+                <div className={`relative ml-[70px] space-y-6 ${timelineStyleTheme === 'default' ? 'border-l border-stone-300' : ''}`}>
                     {/* 时光小友卡片 */}
                     <div className="pl-8 -ml-[70px] mb-6">
                         <TimePalCard 
@@ -863,6 +874,7 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ logs, todos, scopes,
 
                     {dayTimeline.map((item) => {
                         if (item.type === 'log' && item.logData) {
+                            const currentStyledLogIndex = styledLogIndex++;
                             return (
                                 <div key={item.id} className="relative pl-8 animate-in slide-in-from-bottom-2 duration-500">
                                     {/* Time Marker */}
@@ -875,10 +887,11 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ logs, todos, scopes,
                                         </span>
                                     </div>
 
-                                    {/* Timeline Dot */}
-                                    <div className="absolute -left-[11px] top-0 z-20 flex items-center justify-center">
-                                        <div className="w-2.5 h-2.5 mt-1.5 ml-1.5 rounded-full bg-stone-900 border-2 border-[#faf9f6] z-10" />
-                                    </div>
+                                    <TimelineStyleRail
+                                        theme={timelineStyleTheme}
+                                        config={timelineStyleConfigs[timelineStyleTheme]}
+                                        index={currentStyledLogIndex}
+                                    />
 
                                     {/* Content Item */}
                                     <div
@@ -1013,7 +1026,9 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ logs, todos, scopes,
                                         <span className="text-[10px] font-mono text-stone-300">{formatDurationCompact(item.duration)}</span>
                                     </div>
 
-                                    <div className="absolute left-0 top-0 bottom-0 w-[1px] -ml-[0.5px] border-l border-dashed border-stone-300" />
+                                    {timelineStyleTheme === 'default' && (
+                                        <div className="absolute left-0 top-0 bottom-0 w-[1px] -ml-[0.5px] border-l border-dashed border-stone-300" />
+                                    )}
 
                                     {/* Visible Gap Button (No Hover needed) */}
                                     <button className="flex items-center gap-2 px-3 py-1 rounded-full border border-dashed border-stone-300 bg-white shadow-sm active:scale-95 transition-all">
@@ -1582,6 +1597,10 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ logs, todos, scopes,
             {/* TimePal 调试器 */}
             {showTimePalDebugger && (
                 <TimePalDebugger onClose={() => setShowTimePalDebugger(false)} />
+            )}
+
+            {timelineStyleAdjusterOpen && timelineStyleTheme !== 'default' && (
+                <TimelineStyleAdjuster onClose={() => setTimelineStyleAdjusterOpen(false)} />
             )}
 
             {/* 画廊视图 */}

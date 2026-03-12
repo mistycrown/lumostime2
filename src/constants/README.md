@@ -2,6 +2,8 @@
 
 This directory contains application-wide constants, configuration, and static data.
 
+Update 2026-03-12: `storageKeys.ts` now includes timeline appearance storage keys for normal timeline record nodes.
+
 ## Files
 
 ### Storage Management

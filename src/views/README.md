@@ -11,13 +11,13 @@ The views are designed as "dumb" or "presentational" components where possible, 
 *   **Main Tabs**: High-level navigation roots (e.g., `TimelineView`, `StatsView`, `TodoView`, `TagsView`).
 *   **Detail Views**: Dedicated pages for specific entities (e.g., `CategoryDetailView`, `TagDetailView`, `ScopeDetailView`).
 *   **Modals/Overlays**: Specialized interaction flows (e.g., `SettingsView`, `RecordView`, `DailyReviewView`).
-*   **Management Views**: Bulk editing interfaces (e.g., `BatchManageView`, `TodoBatchManageView`, `GoalBatchManageView`).
+*   **Management Views**: Bulk editing interfaces (e.g., `BatchManageView`, `TodoBatchManageView`, `GoalBatchManageView`, `ScopeManageView`).
 
-> Note: color pickers in detail and batch management views should keep built-in theme colors and persisted custom HEX colors consistent, including todo category colors used by stats.
+> Note: color pickers in detail and batch management views should keep built-in theme colors and persisted custom HEX colors consistent, including todo category colors and scope colors used by stats.
 
 ## Key Components
 
-*   **TimelineView**: The core dashboard visualizing daily activities and reviews.
+*   **TimelineView**: The core dashboard visualizing daily activities and reviews, with switchable styling for normal timeline record nodes.
 *   **StatsView**: Comprehensive analytics with multiple visualization modes (Pie, Matrix, Line, Schedule, Check).
 *   **SettingsView**: Central configuration hub for Sync, AI, and App preferences.
 *   **ReviewHubView**: Archive dashboard displaying monthly, weekly, and daily reviews.
