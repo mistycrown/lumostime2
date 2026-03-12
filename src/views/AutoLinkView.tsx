@@ -8,9 +8,10 @@
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
 import React, { useState } from 'react';
-import { ChevronLeft, Plus, Trash2, Link, X } from 'lucide-react';
+import { ChevronLeft, Plus, Trash2, Link, X, RotateCcw } from 'lucide-react';
 import { AutoLinkRule, Category, Scope, Activity } from '../types';
 import { getSoftColorCircleStyle } from '../utils/colorAdapterUtils';
+import { ConfirmModal } from '../components/ConfirmModal';
 
 interface AutoLinkViewProps {
     onClose: () => void;
@@ -31,6 +32,7 @@ export const AutoLinkView: React.FC<AutoLinkViewProps> = ({
     const [selectedCategoryId, setSelectedCategoryId] = useState<string>('');
     const [selectedActivityId, setSelectedActivityId] = useState<string>('');
     const [selectedScopeId, setSelectedScopeId] = useState<string>('');
+    const [isClearConfirmOpen, setIsClearConfirmOpen] = useState(false);
 
     // 获取 Activity 信息
     const getActivityInfo = (activityId: string) => {
@@ -86,7 +88,16 @@ export const AutoLinkView: React.FC<AutoLinkViewProps> = ({
                 >
                     <ChevronLeft size={24} />
                 </button>
-                <span className="text-stone-800 font-bold text-lg">标签关联领域规则</span>
+                <span className="text-stone-800 font-bold text-lg flex-1">标签关联领域规则</span>
+                {rules.length > 0 && (
+                    <button
+                        onClick={() => setIsClearConfirmOpen(true)}
+                        className="text-stone-400 hover:text-red-500 hover:bg-red-50 p-2 rounded-lg transition-colors"
+                        title="清空所有规则"
+                    >
+                        <RotateCcw size={20} />
+                    </button>
+                )}
             </div>
 
             <div className="flex-1 overflow-y-auto p-4 space-y-4 pb-40">
@@ -313,6 +324,21 @@ export const AutoLinkView: React.FC<AutoLinkViewProps> = ({
                     })()}
                 </div>
             </div>
+
+            {/* 清空规则确认弹窗 */}
+            <ConfirmModal
+                isOpen={isClearConfirmOpen}
+                onClose={() => setIsClearConfirmOpen(false)}
+                onConfirm={() => {
+                    onUpdateRules([]);
+                    setIsClearConfirmOpen(false);
+                }}
+                title="清空所有规则"
+                description="确定要清空所有标签关联领域规则吗？此操作无法撤销。"
+                confirmText="清空"
+                cancelText="取消"
+                type="danger"
+            />
         </div>
     );
 };
