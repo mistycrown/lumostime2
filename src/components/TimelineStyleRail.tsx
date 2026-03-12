@@ -1,9 +1,9 @@
 /**
  * @file TimelineStyleRail.tsx
  * @input Timeline style theme, active config, and node index
- * @output Styled rail segment and node marker for TimelineView normal log items
+ * @output Styled rail segment and node marker for timeline log items, with optional line truncation on the last node
  * @pos Component (Timeline)
- * @description 时间线样式轨道组件 - 复用参考项目的节点与连线逻辑，仅用于普通时间记录节点
+ * @description 时间线样式轨道组件 - 复用参考项目的节点与连线逻辑，用于普通时间记录节点，并支持在最后一个节点处截断连线
  *
  * Once I am updated, be sure to update my header comment and the folder's md.
  */
@@ -16,15 +16,26 @@ interface TimelineStyleRailProps {
     theme: TimelineStyleTheme;
     config: TimelineStyleConfig;
     index: number;
+    showLine?: boolean;
+    showNode?: boolean;
+    extendLinePastContainer?: boolean;
 }
 
-export const TimelineStyleRail: React.FC<TimelineStyleRailProps> = ({ theme, config, index }) => {
+export const TimelineStyleRail: React.FC<TimelineStyleRailProps> = ({
+    theme,
+    config,
+    index,
+    showLine = true,
+    showNode = true,
+    extendLinePastContainer = true
+}) => {
     const renderLine = () => {
         const { lineWidth, timelineWidth, lineColor, lineOpacity, railOffsetX } = config;
         const opacity = lineOpacity / 100;
         const encodedColor = encodeURIComponent(lineColor);
+        const bottomOffset = extendLinePastContainer ? '-2.5rem' : '0';
 
-        if (theme === 'default') {
+        if (theme === 'default' || !showLine) {
             return null;
         }
 
@@ -32,7 +43,7 @@ export const TimelineStyleRail: React.FC<TimelineStyleRailProps> = ({ theme, con
             return (
                 <div
                     className="absolute top-3 bottom-[-2.5rem] left-0 -translate-x-1/2 transition-all duration-500"
-                    style={{ width: `${lineWidth}px`, backgroundColor: lineColor, opacity, marginLeft: `${railOffsetX}px` }}
+                    style={{ width: `${lineWidth}px`, backgroundColor: lineColor, opacity, marginLeft: `${railOffsetX}px`, bottom: bottomOffset }}
                 />
             );
         }
@@ -45,7 +56,8 @@ export const TimelineStyleRail: React.FC<TimelineStyleRailProps> = ({ theme, con
                         borderLeftWidth: `${Math.max(lineWidth * 1.5, 2)}px`, 
                         borderColor: lineColor, 
                         opacity,
-                        marginLeft: `${railOffsetX}px` 
+                        marginLeft: `${railOffsetX}px`,
+                        bottom: bottomOffset
                     }}
                 />
             );
@@ -117,13 +129,18 @@ export const TimelineStyleRail: React.FC<TimelineStyleRailProps> = ({ theme, con
                     backgroundImage: `url("${svgString.replace(/"/g, '\'')}")`,
                     backgroundRepeat: 'repeat-y',
                     backgroundPosition: 'center top',
-                    marginLeft: `${railOffsetX}px`
+                    marginLeft: `${railOffsetX}px`,
+                    bottom: bottomOffset
                 }}
             />
         );
     };
 
     const renderNode = () => {
+        if (!showNode) {
+            return null;
+        }
+
         const { iconSize, iconAngle, offsetX, timeNodeOffsetY, uniformNodes, nodeColor } = config;
 
         if (theme === 'default') {
@@ -196,8 +213,23 @@ export const TimelineStyleRail: React.FC<TimelineStyleRailProps> = ({ theme, con
         return <>{renderNode()}</>;
     }
 
+    if (!showNode && !showLine) {
+        return null;
+    }
+
+    if (!showLine) {
+        return (
+            <div className="absolute left-0 top-0 w-0 pointer-events-none overflow-visible">
+                {renderNode()}
+            </div>
+        );
+    }
+
     return (
-        <div className="absolute left-0 top-0 bottom-[-1.75rem] w-0 pointer-events-none overflow-visible">
+        <div
+            className="absolute left-0 top-0 w-0 pointer-events-none overflow-visible"
+            style={{ bottom: extendLinePastContainer ? '-1.75rem' : '0' }}
+        >
             {renderLine()}
             {renderNode()}
         </div>

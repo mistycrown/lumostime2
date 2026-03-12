@@ -27,7 +27,7 @@ Charts and visual data representations.
 - `HeatmapCalendar.tsx`: Month-view intensity heatmap.
 - `MatrixAnalysisChart.tsx`: Bar charts for activity ranking.
 - `stats/CheckView.tsx`: Habit check statistics with support for manual count mode (shows completed counts).
-- `TimelineStyleRail.tsx`: Styled rail and node renderer for TimelineView normal records.
+- `TimelineStyleRail.tsx`: Styled rail and node renderer shared by TimelineView and detail-page history timelines, with last-node line truncation.
 
 ## Input & Forms
 Specialized input controls.
