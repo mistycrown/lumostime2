@@ -145,7 +145,6 @@ export const TagsView: React.FC<TagsViewProps> = ({ logs, onSelectTag, onSelectC
                                           icon={act.icon} 
                                           uiIcon={act.uiIcon}
                                           className="opacity-100"
-                                          size={20}
                                        />}
                                        <span className="text-stone-600 font-medium text-sm">{act.name}</span>
                                     </div>

@@ -1,9 +1,9 @@
-/**
+﻿/**
  * @file RecordView.tsx
  * @input Categories, Activities
  * @output Measurement Start Event
  * @pos View (Main Tab)
- * @description The primary interface for starting new time blocks. Features a category sidebar and a grid of activity buttons.
+ * @description The primary interface for starting new time blocks. Features a category sidebar and a grid of activity buttons with larger start-card icons.
  * 
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
@@ -207,7 +207,7 @@ export const RecordView: React.FC<RecordViewProps> = ({ onStartActivity, categor
                 <IconRenderer 
                   icon={activity.icon} 
                   uiIcon={activity.uiIcon}
-                  size={20}
+                  size={32}
                   className="text-3xl md:text-4xl" 
                 />
               </div>
@@ -221,3 +221,4 @@ export const RecordView: React.FC<RecordViewProps> = ({ onStartActivity, categor
     </div>
   );
 };
+
