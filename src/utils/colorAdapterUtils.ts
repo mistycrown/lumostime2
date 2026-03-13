@@ -1,7 +1,7 @@
 /**
  * @file colorAdapterUtils.ts
  * @input Stored color value (Tailwind class or HEX)
- * @output Unified render adapters for charts, cards, schedules and heatmaps
+ * @output Unified render adapters for charts, cards, schedules, heatmaps and tag selectors
  * @pos Utility (Color Rendering)
  * @description 统一颜色消费端适配逻辑，避免不同页面对 Tailwind class / HEX 的渲染规则分叉。
  */
@@ -81,6 +81,27 @@ export const getSoftColorCircleStyle = (
 ): CSSProperties => {
   return {
     backgroundColor: toCssColor(colorValue, 'background', alpha),
+  };
+};
+
+export const getTagCirclePresentation = (
+  colorValue: string = '',
+  alpha: number = 0.2
+): ColorRenderPresentation => {
+  const normalizedHex = normalizeHexColor(colorValue);
+  if (normalizedHex) {
+    return {
+      className: '',
+      style: {
+        backgroundColor: hexToRgba(normalizedHex, alpha),
+        color: normalizedHex,
+        border: `1px solid ${hexToRgba(normalizedHex, Math.min(alpha + 0.12, 0.4))}`,
+      },
+    };
+  }
+
+  return {
+    className: colorValue,
   };
 };
 
