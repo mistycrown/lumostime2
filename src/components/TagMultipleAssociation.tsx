@@ -5,12 +5,14 @@
  * @pos Component (Input)
  * @description A specialized selector for associating multiple activities (tags) with filtering or configuration.
  * Supports multi-select mode with visual feedback and clear functionality.
+ * Custom HEX colors render as soft translucent circles to match stats and timer color presentation.
  * 
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
 import React, { useState } from 'react';
 import { Category } from '../types';
 import { IconRenderer } from './IconRenderer';
+import { getTagCirclePresentation } from '../utils/colorAdapterUtils';
 
 interface TagMultipleAssociationProps {
     categories: Category[];
@@ -137,6 +139,7 @@ export const TagMultipleAssociation: React.FC<TagMultipleAssociationProps> = ({
                                 .find(c => c.id === selectedCategoryId)
                                 ?.activities.map(act => {
                                     const isActive = selectedActivityIds.includes(act.id);
+                                    const colorPresentation = getTagCirclePresentation(act.color || '', 0.2);
                                     return (
                                         <button
                                             key={act.id}
@@ -147,12 +150,15 @@ export const TagMultipleAssociation: React.FC<TagMultipleAssociationProps> = ({
                                             <div
                                                 className={`
                                                     w-10 h-10 rounded-full flex items-center justify-center text-xl transition-all
-                                                    ${act.color}
+                                                    ${colorPresentation.className}
                                                 `}
-                                                style={isActive ? {
-                                                    boxShadow: `0 0 0 1px ${accentColor || 'var(--accent-color)'}, 0 0 0 3px white, 0 0 0 4px ${accentColor || 'var(--accent-color)'}`,
-                                                    transform: 'scale(1.1)'
-                                                } : {}}
+                                                style={{
+                                                    ...colorPresentation.style,
+                                                    ...(isActive ? {
+                                                        boxShadow: `0 0 0 1px ${accentColor || 'var(--accent-color)'}, 0 0 0 3px white, 0 0 0 4px ${accentColor || 'var(--accent-color)'}`,
+                                                        transform: 'scale(1.1)'
+                                                    } : {})
+                                                }}
                                             >
                                                 <IconRenderer icon={act.icon} uiIcon={act.uiIcon} className="text-xl" />
                                             </div>

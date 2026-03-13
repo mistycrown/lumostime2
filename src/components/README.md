@@ -35,6 +35,8 @@ Specialized input controls.
 - `FocusScoreSelector.tsx`: 5-point focus rater.
 - `DateRangeFilter.tsx`: Tabbed date range picker.
 - `CustomSelect.tsx`: Styled dropdown.
+- `TagAssociation.tsx`: Single tag selector with custom HEX soft-color support.
+- `TagMultipleAssociation.tsx`: Multi-tag selector with custom HEX soft-color support.
 - `ScopeAssociation.tsx`: Tag selection grid.
 - `TodoAssociation.tsx`: Todo linking selector.
 - `CommentSection.tsx`: Comment system for focus logs.
@@ -68,4 +70,4 @@ Components for theme and appearance customization.
 - `TimelineStyleRail.tsx`: TimelineView、Memoir 与详情页共用的样式轨道渲染组件，支持摘要节点圆点对齐和页面级轨道宽度限制。
 - `TimelineStyleAdjuster.tsx`: 时间线样式调节浮窗，使用更紧凑的半屏宽度布局，并支持档案页专用水平偏移。
 
-> Last updated: 2026-03-12
+> Last updated: 2026-03-13

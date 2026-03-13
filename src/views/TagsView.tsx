@@ -3,7 +3,7 @@
  * @input Categories, Logs
  * @output Selection Events, Category Updates
  * @pos View (Main Tab)
- * @description The main "Library" view displaying all Categories and Activities in a hierarchical list. Supports expanding/collapsing categories and switching to a Batch Management mode.
+ * @description The main "Library" view displaying all Categories and Activities in a hierarchical list. Supports expanding/collapsing categories, switching to a Batch Management mode, and clearer activity card icon sizing.
  * 
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
@@ -144,7 +144,8 @@ export const TagsView: React.FC<TagsViewProps> = ({ logs, onSelectTag, onSelectC
                                        {act.icon && <IconRenderer 
                                           icon={act.icon} 
                                           uiIcon={act.uiIcon}
-                                          className="opacity-100 text-sm" 
+                                          className="opacity-100"
+                                          size={20}
                                        />}
                                        <span className="text-stone-600 font-medium text-sm">{act.name}</span>
                                     </div>
