@@ -21,6 +21,6 @@ The views are designed as "dumb" or "presentational" components where possible, 
 *   **StatsView**: Comprehensive analytics with multiple visualization modes (Pie, Matrix, Line, Schedule, Check).
 *   **SettingsView**: Central configuration hub for Sync, AI, and App preferences.
 *   **ReviewHubView**: Archive dashboard displaying monthly, weekly, and daily reviews.
-*   **JournalView**: Journal-style view for daily entries, providing an alternative perspective to ReviewHubView, with Memoir-side timeline adjuster access and per-style archive offset support.
+*   **JournalView**: Journal-style view for daily entries, providing an alternative perspective to ReviewHubView, with shared timeline styling and per-style archive offset support.
 
 > ⚠️ **Note**: When modifying views, ensure that new state requirements are coordinated with `App.tsx` if they affect global data (Logs, Categories, Todos).

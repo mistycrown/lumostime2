@@ -7,6 +7,7 @@ import { Check, ChevronRight, Clock, CheckSquare, ListTodo, BarChart3, BookOpen,
 import { SceneCardData, DailyReview, Log } from '../types';
 import { CardStatsBadge } from './CardStatsBadge';
 import { AppLauncherService } from '../services/AppLauncherService';
+import { getSceneCardColorPresentation, type SceneCardColorPresentation } from '../utils/colorAdapterUtils';
 
 // 莫兰迪色系默认颜色映射
 const DEFAULT_COLORS = {
@@ -30,6 +31,7 @@ interface SceneCardProps {
 export const SceneCard: React.FC<SceneCardProps> = ({ data, dailyReviews = [], logs = [], onAction, sceneCardTimerMode = 'realtime' }) => {
   // 获取卡片颜色（优先使用自定义颜色，否则使用默认颜色）
   const cardColor = data.color || DEFAULT_COLORS[data.type];
+  const cardPresentation = getSceneCardColorPresentation(cardColor);
   const isCountChecklistCard = data.type === 'checklist'
     && data.action.type === 'toggleCheck'
     && data.checkManualMode === 'count';
@@ -322,7 +324,7 @@ export const SceneCard: React.FC<SceneCardProps> = ({ data, dailyReviews = [], l
         <div
           className="absolute inset-0 flex items-center justify-end pr-6 text-white font-medium tracking-wide z-0 transition-opacity duration-200 rounded-2xl overflow-hidden"
           style={{ 
-            backgroundColor: cardColor,
+            backgroundColor: cardPresentation.swipeBackgroundColor,
             opacity: swipeOffset < 0 ? 1 : 0 
           }}
         >
@@ -348,7 +350,11 @@ export const SceneCard: React.FC<SceneCardProps> = ({ data, dailyReviews = [], l
           className="scene-card-face scene-card-front"
           onClick={handleCardClick}
         >
-          <CardFront data={data} displayData={displayData} cardColor={cardColor} />
+          <CardFront
+            data={data}
+            displayData={displayData}
+            cardPresentation={cardPresentation}
+          />
         </div>
 
         {/* 反面 */}
@@ -360,7 +366,7 @@ export const SceneCard: React.FC<SceneCardProps> = ({ data, dailyReviews = [], l
           <CardBack 
             data={data}
             displayData={displayData}
-            cardColor={cardColor}
+            cardPresentation={cardPresentation}
             dailyReviews={dailyReviews}
             logs={logs}
             isSwiping={isSwiping} 
@@ -374,12 +380,11 @@ export const SceneCard: React.FC<SceneCardProps> = ({ data, dailyReviews = [], l
 };
 
 // 卡片正面组件
-const CardFront: React.FC<{ data: SceneCardData; displayData: SceneCardData; cardColor: string }> = ({ data, displayData, cardColor }) => {
-  // 根据卡片颜色获取边框颜色（30%透明度）
-  const getBorderColor = () => {
-    return `${cardColor}4D`; // 4D = 30% opacity in hex
-  };
-
+const CardFront: React.FC<{
+  data: SceneCardData;
+  displayData: SceneCardData;
+  cardPresentation: SceneCardColorPresentation;
+}> = ({ data, displayData, cardPresentation }) => {
   // 根据文字长度获取字号
   const getFontSize = (text: string) => {
     const length = text.length;
@@ -390,7 +395,7 @@ const CardFront: React.FC<{ data: SceneCardData; displayData: SceneCardData; car
 
   // 根据卡片颜色获取图标
   const getFrontIcon = () => {
-    const iconProps = { size: 14, style: { color: cardColor } };
+    const iconProps = { size: 14, style: { color: cardPresentation.accentColor } };
     
     switch (data.type) {
       case 'timer':
@@ -415,7 +420,7 @@ const CardFront: React.FC<{ data: SceneCardData; displayData: SceneCardData; car
   return (
     <div 
       className="rounded-2xl p-4 bg-white/90 backdrop-blur-sm shadow-sm border relative"
-      style={{ borderColor: getBorderColor() }}
+      style={{ borderColor: cardPresentation.frontBorderColor }}
     >
       {/* 右上角状态指示 */}
       <div className="absolute top-4 right-4">
@@ -517,18 +522,13 @@ const CardFront: React.FC<{ data: SceneCardData; displayData: SceneCardData; car
 const CardBack: React.FC<{ 
   data: SceneCardData;
   displayData: SceneCardData;
-  cardColor: string;
+  cardPresentation: SceneCardColorPresentation;
   dailyReviews?: DailyReview[];
   logs?: Log[];
   isSwiping?: boolean; 
   swipeProgress?: number;
   isClickable?: boolean;
-}> = ({ data, displayData, cardColor, dailyReviews = [], logs = [], isSwiping, swipeProgress = 0, isClickable = false }) => {
-  // 根据卡片颜色获取边框颜色（50%透明度，反面稍深）
-  const getBorderColor = () => {
-    return `${cardColor}80`; // 80 = 50% opacity in hex
-  };
-
+}> = ({ data, displayData, cardPresentation, dailyReviews = [], logs = [], isSwiping, swipeProgress = 0, isClickable = false }) => {
   // 根据文字长度获取字号
   const getFontSize = (text: string) => {
     const length = text.length;
@@ -543,7 +543,7 @@ const CardBack: React.FC<{
       ? <ChevronRight size={14} className="text-white" />
       : <Check size={14} className="text-white" />;
     
-    return { icon, bgColor: cardColor };
+    return { icon, bgColor: cardPresentation.accentColor };
   };
 
   // 根据滑动进度获取动态提示文字
@@ -568,7 +568,7 @@ const CardBack: React.FC<{
     <div 
       className="rounded-2xl p-4 bg-white/90 backdrop-blur-sm shadow-sm border transition-opacity relative"
       style={{ 
-        borderColor: getBorderColor(),
+        borderColor: cardPresentation.backBorderColor,
         opacity: isSwiping ? Math.max(0.6, 1 - Math.abs(swipeProgress) * 0.5) : 1,
         cursor: isClickable ? 'pointer' : 'default'
       }}
@@ -653,7 +653,7 @@ const CardBack: React.FC<{
                 <div className="ml-2">
                   <CardStatsBadge
                     type="checklist"
-                    color={cardColor}
+                    color={cardPresentation.accentColor}
                     checkItemContent={data.checkItemContent}
                     dailyReviews={dailyReviews}
                   />
@@ -663,7 +663,7 @@ const CardBack: React.FC<{
                 <div className="ml-2">
                   <CardStatsBadge
                     type="timer"
-                    color={cardColor}
+                    color={cardPresentation.accentColor}
                     activityId={data.action.activityId}
                     categoryId={data.action.categoryId}
                     logs={logs}
@@ -674,7 +674,7 @@ const CardBack: React.FC<{
                 <div className="ml-2">
                   <CardStatsBadge
                     type="todo"
-                    color={cardColor}
+                    color={cardPresentation.accentColor}
                     todoId={data.action.todoId}
                     logs={logs}
                   />

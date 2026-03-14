@@ -1,6 +1,6 @@
 /**
  * @file SettingsContext.tsx
- * @description 管理应用设置和用户偏好（不包括 Review 系统，Review 由 ReviewContext 管理）
+ * @description 管理应用设置和用户偏好（不包括 Review 系统，Review 由 ReviewContext 管理），并兼容自定义筛选器排序。
  */
 import React, { createContext, useContext, useState, useEffect, ReactNode, useRef } from 'react';
 import { AppView, AutoLinkRule, Filter, NarrativeTemplate, MemoirFilterConfig } from '../types';
@@ -16,6 +16,7 @@ import {
     isTimelineStyleTheme,
     normalizeTimelineStyleConfigs
 } from '../services/timelineStyleService';
+import { normalizeFiltersOrder } from '../utils/filterUtils';
 
 export type DefaultArchiveView = 'CHRONICLE' | 'MEMOIR';
 export type DefaultIndexView = 'TAGS' | 'SCOPE';
@@ -224,7 +225,7 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
     // 筛选器
     const [filters, setFilters] = useState<Filter[]>(() => {
         const stored = localStorage.getItem('lumostime_filters');
-        return stored ? JSON.parse(stored) : [];
+        return stored ? normalizeFiltersOrder(JSON.parse(stored)) : [];
     });
 
     // Memoir 筛选配置
@@ -450,7 +451,13 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
     }, [userPersonalInfo]);
 
     useEffect(() => {
-        localStorage.setItem('lumostime_filters', JSON.stringify(filters));
+        const normalizedFilters = normalizeFiltersOrder(filters);
+        if (JSON.stringify(filters) !== JSON.stringify(normalizedFilters)) {
+            setFilters(normalizedFilters);
+            return;
+        }
+
+        localStorage.setItem('lumostime_filters', JSON.stringify(normalizedFilters));
     }, [filters]);
 
     useEffect(() => {

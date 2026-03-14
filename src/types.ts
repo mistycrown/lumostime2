@@ -3,7 +3,7 @@
  * @input None
  * @output TypeScript Interfaces & Types
  * @pos Type Definitions (Shared contract)
- * @description Defines the core data structures (Log, TodoItem, Category, Activity, etc.) used throughout the application.
+ * @description Defines the core data structures (Log, TodoItem, Category, Activity, Filter order metadata, etc.) used throughout the application.
  * 
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
@@ -547,6 +547,7 @@ export interface Filter {
   name: string;                    // 筛选器名称
   filterExpression: string;        // 原始筛选表达式,如"瑜伽 #运动 %健康 @柔韧"
   createdAt: number;               // 创建时间
+  order?: number;                  // 显示顺序，用于自定义排序
   icon?: string;                   // 可选图标
 }
 
