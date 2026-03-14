@@ -1,14 +1,28 @@
 /**
  * @file filterUtils.ts
  * @input Filter表达式, Log数据, App上下文数据
- * @output 解析后的筛选条件, 匹配结果, 统计数据
+ * @output 解析后的筛选条件, 匹配结果, 统计数据, 筛选器排序规整
  * @pos Utils (筛选逻辑)
- * @description 自定义筛选器的核心逻辑,包括表达式解析、记录匹配和统计计算
+ * @description 自定义筛选器的核心逻辑,包括表达式解析、记录匹配、统计计算和排序规整
  * 
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
 
 import { Log, Filter, ParsedFilterCondition, Category, Scope, TodoItem, TodoCategory } from '../types';
+
+export function normalizeFiltersOrder(filters: Filter[]): Filter[] {
+    return [...filters]
+        .map((filter, index) => ({ filter, index }))
+        .sort((a, b) => {
+            const orderA = typeof a.filter.order === 'number' ? a.filter.order : a.index;
+            const orderB = typeof b.filter.order === 'number' ? b.filter.order : b.index;
+            return orderA - orderB || a.index - b.index;
+        })
+        .map(({ filter }, index) => ({
+            ...filter,
+            order: index
+        }));
+}
 
 /**
  * 解析筛选表达式

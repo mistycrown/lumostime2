@@ -15,6 +15,13 @@ export interface ColorRenderPresentation {
   style?: CSSProperties;
 }
 
+export interface SceneCardColorPresentation {
+  accentColor: string;
+  frontBorderColor: string;
+  backBorderColor: string;
+  swipeBackgroundColor: string;
+}
+
 export type ScheduleThemeVariant = 'default' | 'classic' | 'minimal' | 'solid';
 
 export const CHART_STROKE_COLORS: Record<string, string> = {
@@ -176,6 +183,19 @@ export const getSchedulePresentation = (
   const colorId = getTailwindColorId(colorValue);
   return {
     className: SCHEDULE_CLASS_MAP[colorId] || SCHEDULE_CLASS_MAP.stone,
+  };
+};
+
+export const getSceneCardColorPresentation = (
+  colorValue: string = ''
+): SceneCardColorPresentation => {
+  const accentColor = normalizeHexColor(toCssColor(colorValue, 'fill', 1)) || '#78716c';
+
+  return {
+    accentColor,
+    frontBorderColor: hexToRgba(accentColor, 0.3),
+    backBorderColor: hexToRgba(accentColor, 0.5),
+    swipeBackgroundColor: accentColor,
   };
 };
 

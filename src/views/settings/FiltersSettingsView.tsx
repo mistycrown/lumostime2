@@ -1,10 +1,10 @@
 import React, { useState, useMemo } from 'react';
-import { ChevronLeft, PlusCircle, Edit2, Trash2, X } from 'lucide-react';
+import { ChevronLeft, PlusCircle, Edit2, Trash2, X, ArrowUp, ArrowDown } from 'lucide-react';
 import { ToastType } from '../../components/Toast';
 import { Filter, Log, Category, Scope, TodoItem, TodoCategory } from '../../types';
 import { FilterDetailView } from '../FilterDetailView';
 import { ConfirmModal } from '../../components/ConfirmModal';
-import { getFilterStats } from '../../utils/filterUtils';
+import { getFilterStats, normalizeFiltersOrder } from '../../utils/filterUtils';
 
 interface FiltersSettingsViewProps {
     onBack: () => void;
@@ -37,6 +37,7 @@ export const FiltersSettingsView: React.FC<FiltersSettingsViewProps> = ({
     const [filterName, setFilterName] = useState('');
     const [filterExpression, setFilterExpression] = useState('');
     const [deletingFilterId, setDeletingFilterId] = useState<string | null>(null);
+    const orderedFilters = useMemo(() => normalizeFiltersOrder(filters), [filters]);
 
     const handleAddFilter = () => {
         setEditingFilter(null);
@@ -58,10 +59,30 @@ export const FiltersSettingsView: React.FC<FiltersSettingsViewProps> = ({
 
     const confirmDeleteFilter = () => {
         if (!deletingFilterId) return;
-        const newFilters = filters.filter(f => f.id !== deletingFilterId);
+        const newFilters = normalizeFiltersOrder(filters.filter(f => f.id !== deletingFilterId));
         onUpdateFilters(newFilters);
         setDeletingFilterId(null);
         onToast('success', '筛选器已删除');
+    };
+
+    const handleMoveFilter = (filterId: string, direction: 'up' | 'down') => {
+        const currentIndex = orderedFilters.findIndex(filter => filter.id === filterId);
+        if (currentIndex === -1) return;
+
+        const targetIndex = direction === 'up' ? currentIndex - 1 : currentIndex + 1;
+        if (targetIndex < 0 || targetIndex >= orderedFilters.length) return;
+
+        const nextFilters = [...orderedFilters];
+        [nextFilters[currentIndex], nextFilters[targetIndex]] = [nextFilters[targetIndex], nextFilters[currentIndex]];
+
+        onUpdateFilters(
+            normalizeFiltersOrder(
+                nextFilters.map((filter, index) => ({
+                    ...filter,
+                    order: index
+                }))
+            )
+        );
     };
 
     const handleSaveFilter = () => {
@@ -74,17 +95,21 @@ export const FiltersSettingsView: React.FC<FiltersSettingsViewProps> = ({
             id: editingFilter ? editingFilter.id : Date.now().toString(),
             name: filterName.trim(),
             filterExpression: filterExpression.trim(),
-            createdAt: editingFilter ? editingFilter.createdAt : Date.now()
+            createdAt: editingFilter ? editingFilter.createdAt : Date.now(),
+            order: editingFilter?.order
         };
 
-        let newFilters = [...filters];
+        let newFilters = [...orderedFilters];
         if (editingFilter) {
             newFilters = newFilters.map(f => f.id === editingFilter.id ? newFilter : f);
         } else {
-            newFilters.push(newFilter);
+            newFilters.push({
+                ...newFilter,
+                order: newFilters.length
+            });
         }
 
-        onUpdateFilters(newFilters);
+        onUpdateFilters(normalizeFiltersOrder(newFilters));
         setShowAddFilterModal(false);
         onToast('success', editingFilter ? '筛选器已更新' : '筛选器已创建');
     };
@@ -128,7 +153,7 @@ export const FiltersSettingsView: React.FC<FiltersSettingsViewProps> = ({
                     </button>
                 </div>
 
-                {filters.length === 0 ? (
+                {orderedFilters.length === 0 ? (
                     <div className="p-12 text-center text-stone-400 bg-white rounded-2xl shadow-sm">
                         <span className="text-4xl block mb-3 opacity-30 text-stone-800">※</span>
                         <p className="text-sm">还没有自定义筛选器</p>
@@ -136,7 +161,7 @@ export const FiltersSettingsView: React.FC<FiltersSettingsViewProps> = ({
                     </div>
                 ) : (
                     <div>
-                        {filters.map((filter) => {
+                        {orderedFilters.map((filter, index) => {
                             // 计算筛选统计
                             const stats = getFilterStats(
                                 logs,
@@ -174,7 +199,31 @@ export const FiltersSettingsView: React.FC<FiltersSettingsViewProps> = ({
                                                 <span>{timeStr}</span>
                                             </div>
                                         </div>
-                                        <div className="flex items-center gap-2 flex-shrink-0">
+                                        <div className="flex items-center gap-1 flex-shrink-0 self-center">
+                                            <div className="flex items-center gap-1 mr-1">
+                                                <button
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        handleMoveFilter(filter.id, 'up');
+                                                    }}
+                                                    disabled={index === 0}
+                                                    className="p-1.5 text-stone-400 hover:text-stone-600 hover:bg-stone-100 rounded-lg disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-transparent"
+                                                    aria-label={`上移 ${filter.name}`}
+                                                >
+                                                    <ArrowUp size={14} />
+                                                </button>
+                                                <button
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        handleMoveFilter(filter.id, 'down');
+                                                    }}
+                                                    disabled={index === orderedFilters.length - 1}
+                                                    className="p-1.5 text-stone-400 hover:text-stone-600 hover:bg-stone-100 rounded-lg disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-transparent"
+                                                    aria-label={`下移 ${filter.name}`}
+                                                >
+                                                    <ArrowDown size={14} />
+                                                </button>
+                                            </div>
                                             <button
                                                 onClick={(e) => {
                                                     e.stopPropagation();

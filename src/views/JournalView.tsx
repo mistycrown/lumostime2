@@ -3,7 +3,7 @@
  * @input Daily Reviews, Logs
  * @output Journal Entry Navigation
  * @pos View (Main Tab)
- * @description A journal-style view for daily entries, providing an alternative perspective to the ReviewHubView and reusing shared timeline styling behavior with Memoir-side timeline adjustment.
+ * @description A journal-style view for daily entries, providing an alternative perspective to the ReviewHubView and reusing shared timeline styling behavior for archive rendering.
  * 
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
@@ -12,7 +12,7 @@ import { DailyReview, Log, WeeklyReview, MonthlyReview } from '../types';
 import { DiaryEntry, MOCK_ENTRIES, MONTHS, Comment } from './journalTypes';
 import { TimelineStyleAdjuster } from '../components/TimelineStyleAdjuster';
 import TimelineItem from '../components/TimelineItem';
-import { Search, Menu, PenLine, ChevronDown, ChevronLeft, ChevronRight, SlidersHorizontal, Image as ImageIcon, AlignLeft, X, FilterX, AudioWaveform } from 'lucide-react';
+import { Search, Menu, PenLine, ChevronDown, ChevronLeft, ChevronRight, Image as ImageIcon, AlignLeft, X, FilterX, AudioWaveform } from 'lucide-react';
 import { MoodCalendar } from '../components/MoodCalendar';
 
 import { useSettings } from '../contexts/SettingsContext';
@@ -129,7 +129,6 @@ export const JournalView: React.FC<JournalViewProps> = ({
         timelineStyleAdjusterOpen,
         setTimelineStyleAdjusterOpen
     } = useSettings();
-    const canAdjustTimelineStyle = timelineStyleTheme !== 'default';
 
     // Default to Today
     const [selectedDate, setSelectedDate] = useState(new Date());
@@ -737,18 +736,6 @@ export const JournalView: React.FC<JournalViewProps> = ({
                         }`}>
                         Memoir
                     </h1>
-                    <button
-                        onClick={() => canAdjustTimelineStyle && setTimelineStyleAdjusterOpen(true)}
-                        className={`absolute right-6 inline-flex items-center justify-center w-8 h-8 rounded-full transition-colors ${
-                            canAdjustTimelineStyle
-                                ? 'text-stone-500 hover:text-stone-800 hover:bg-white/80'
-                                : 'text-stone-300'
-                        }`}
-                        aria-label="打开时间线调节器"
-                        title={canAdjustTimelineStyle ? '打开时间线调节器' : '默认样式无需调节'}
-                    >
-                        <SlidersHorizontal size={15} />
-                    </button>
                 </div>
             </header>
 
