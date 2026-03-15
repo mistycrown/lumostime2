@@ -941,6 +941,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
                 onBack={() => setActiveSubmenu('main')}
                 onToast={onToast}
                 categories={syncData.categories || []}
+                checkTemplates={syncData.checkTemplates || []}
             />,
             '正在加载 NFC 设置...'
         );
