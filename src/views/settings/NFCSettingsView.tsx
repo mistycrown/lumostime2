@@ -1,24 +1,37 @@
-import React, { useState } from 'react';
-import { ChevronLeft, Nfc, Crosshair, Tag, Search, Trash2 } from 'lucide-react';
+import React, { useMemo, useState } from 'react';
+import { ChevronLeft, Nfc, Crosshair, Tag, Search, Trash2, CheckCircle2 } from 'lucide-react';
 import { ToastType } from '../../components/Toast';
-import { Category } from '../../types';
+import { Category, CheckTemplate } from '../../types';
 import { NfcService } from '../../services/NfcService';
 import { CustomSelect } from '../../components/CustomSelect';
+import { getEligibleNfcDailyCheckItems } from '../../utils/dailyCheckUtils';
 
 interface NFCSettingsViewProps {
     onBack: () => void;
     onToast: (type: ToastType, message: string) => void;
     categories: Category[];
+    checkTemplates: CheckTemplate[];
 }
 
 export const NFCSettingsView: React.FC<NFCSettingsViewProps> = ({
     onBack,
     onToast,
-    categories
+    categories,
+    checkTemplates
 }) => {
     const [isWritingNfc, setIsWritingNfc] = useState(false);
     const [nfcSelectedCatId, setNfcSelectedCatId] = useState<string>('');
     const [nfcSelectedActId, setNfcSelectedActId] = useState<string>('');
+    const [nfcSelectedCheckItemId, setNfcSelectedCheckItemId] = useState<string>('');
+
+    const dailyCheckOptions = useMemo(() => {
+        return getEligibleNfcDailyCheckItems(checkTemplates).map(item => ({
+            value: item.checkItemId,
+            label: item.manualMode === 'count'
+                ? `${item.category} / ${item.content}（目标 ${item.targetCount} 次）`
+                : `${item.category} / ${item.content}`
+        }));
+    }, [checkTemplates]);
 
     const handleWriteNfc = async (uri: string) => {
         setIsWritingNfc(true);
@@ -147,6 +160,40 @@ export const NFCSettingsView: React.FC<NFCSettingsViewProps> = ({
                             >
                                 Write Activity Tag
                             </button>
+                        </div>
+
+                        <div className="bg-white rounded-2xl p-6 shadow-sm space-y-4">
+                            <div className="flex items-center gap-3 mb-2">
+                                <div className="w-10 h-10 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-600">
+                                    <CheckCircle2 size={20} />
+                                </div>
+                                <div>
+                                    <h3 className="font-bold text-stone-800">日课快速打卡</h3>
+                                    <p className="text-xs text-stone-400">Write a tag to complete or increment one daily check item.</p>
+                                </div>
+                            </div>
+
+                            <CustomSelect
+                                label="Daily Check"
+                                placeholder={dailyCheckOptions.length > 0 ? 'Select Daily Check...' : 'No eligible daily checks'}
+                                value={nfcSelectedCheckItemId}
+                                onChange={(val) => setNfcSelectedCheckItemId(val)}
+                                options={dailyCheckOptions}
+                            />
+
+                            <button
+                                disabled={!nfcSelectedCheckItemId}
+                                onClick={() => handleWriteNfc(`lumostime://record?action=daily_check&check_item_id=${nfcSelectedCheckItemId}`)}
+                                className="w-full py-3 bg-emerald-600 text-white rounded-xl font-bold shadow-lg shadow-emerald-200 active:scale-[0.98] transition-all disabled:opacity-50 disabled:shadow-none"
+                            >
+                                Write Daily Check Tag
+                            </button>
+
+                            {dailyCheckOptions.length === 0 && (
+                                <div className="p-3 bg-stone-50 rounded-xl text-xs text-stone-500 border border-dashed border-stone-200">
+                                    No enabled manual daily checks are available. Please enable a daily check template item first.
+                                </div>
+                            )}
                         </div>
 
                         {/* Read/Test Tag */}

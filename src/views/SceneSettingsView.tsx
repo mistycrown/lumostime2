@@ -30,6 +30,34 @@ interface SceneSettingsViewProps {
   onBack: () => void;
 }
 
+interface PrinciplePreviewItem {
+  id: string;
+  title: string;
+  frontText: string;
+  backText: string;
+}
+
+interface SceneCardPreviewContent {
+  title: string;
+  frontText?: string;
+  backText?: string;
+}
+
+const loadPrinciplesFromStorage = (): PrinciplePreviewItem[] => {
+  const stored = localStorage.getItem('lumostime_principles');
+  if (!stored) {
+    return [];
+  }
+
+  try {
+    const parsed = JSON.parse(stored);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (error) {
+    console.error('[SceneSettingsView] Failed to parse principles for preview:', error);
+    return [];
+  }
+};
+
 export const SceneSettingsView: React.FC<SceneSettingsViewProps> = ({ onBack }) => {
   const [sceneGroupState, setSceneGroupState] = useState<SceneGroupState>(() => loadSceneGroupStateFromStorage());
   const [selectedSlotId, setSelectedSlotId] = useState<string | null>(null);
@@ -49,6 +77,7 @@ export const SceneSettingsView: React.FC<SceneSettingsViewProps> = ({ onBack }) 
   const [copyingCard, setCopyingCard] = useState<SceneCardData | null>(null);
   const [copyTargetGroupId, setCopyTargetGroupId] = useState('');
   const [copyTargetSlotId, setCopyTargetSlotId] = useState('');
+  const [principles, setPrinciples] = useState<PrinciplePreviewItem[]>(() => loadPrinciplesFromStorage());
   
   // 确认模态框状态
   const [confirmModal, setConfirmModal] = useState<{
@@ -103,6 +132,17 @@ export const SceneSettingsView: React.FC<SceneSettingsViewProps> = ({ onBack }) 
     // 切换场景组后，清空当前选中的时间段，避免引用到旧分组的 slot id
     setSelectedSlotId(null);
   }, [sceneGroupState.activeGroupId]);
+
+  useEffect(() => {
+    const handlePrincipleLibraryChange = () => {
+      setPrinciples(loadPrinciplesFromStorage());
+    };
+
+    window.addEventListener('principleLibraryChanged', handlePrincipleLibraryChange);
+    return () => {
+      window.removeEventListener('principleLibraryChanged', handlePrincipleLibraryChange);
+    };
+  }, []);
 
   const handleSwitchGroup = (groupId: string) => {
     const exists = sceneGroupState.groups.some(group => group.id === groupId);
@@ -351,6 +391,25 @@ export const SceneSettingsView: React.FC<SceneSettingsViewProps> = ({ onBack }) 
   };
 
   // 检测时间段是否重叠
+  const getCardPreviewContent = (card: SceneCardData): SceneCardPreviewContent => {
+    if (card.type === 'principle' && card.principleSource === 'library') {
+      const principle = principles.find(item => item.id === card.principleId);
+      if (principle) {
+        return {
+          title: principle.title,
+          frontText: principle.frontText,
+          backText: principle.backText
+        };
+      }
+    }
+
+    return {
+      title: card.title,
+      frontText: card.frontText,
+      backText: card.backText
+    };
+  };
+
   const checkTimeOverlap = (slot1Start: string, slot1End: string, slot2Start: string, slot2End: string): boolean => {
     // 将时间字符串转换为分钟数（从 00:00 开始）
     const timeToMinutes = (time: string): number => {
@@ -944,6 +1003,7 @@ export const SceneSettingsView: React.FC<SceneSettingsViewProps> = ({ onBack }) 
             <div className="space-y-2">
               {selectedSlot.cards.map((card, cardIndex) => {
                 const associationText = getCardAssociationText(card);
+                const previewContent = getCardPreviewContent(card);
                 return (
                   <div
                     key={card.id}
@@ -955,7 +1015,7 @@ export const SceneSettingsView: React.FC<SceneSettingsViewProps> = ({ onBack }) 
                           <span className="px-1.5 py-0.5 text-[10px] font-medium rounded bg-stone-100 text-stone-600 flex-shrink-0">
                             {card.type}
                           </span>
-                          <h3 className="font-bold text-stone-800 text-sm truncate">{card.title}</h3>
+                          <h3 className="font-bold text-stone-800 text-sm truncate">{previewContent.title}</h3>
                         </div>
                         {associationText && (
                           <p className="text-xs text-stone-500 mb-0.5 line-clamp-1">{associationText}</p>
@@ -967,31 +1027,31 @@ export const SceneSettingsView: React.FC<SceneSettingsViewProps> = ({ onBack }) 
                               <p className="text-xs text-stone-600 mb-0.5 line-clamp-1">从原则库中随机</p>
                             ) : card.principleSource === 'library' ? (
                               <>
-                                {card.frontText && (
-                                  <p className="text-xs text-stone-600 mb-0.5 line-clamp-1">正面：{card.frontText}</p>
+                                {previewContent.frontText && (
+                                  <p className="text-xs text-stone-600 mb-0.5 line-clamp-1">正面：{previewContent.frontText}</p>
                                 )}
-                                {card.backText && (
-                                  <p className="text-xs text-stone-600 line-clamp-1">反面：{card.backText}</p>
+                                {previewContent.backText && (
+                                  <p className="text-xs text-stone-600 line-clamp-1">反面：{previewContent.backText}</p>
                                 )}
                               </>
                             ) : (
                               <>
-                                {card.frontText && (
-                                  <p className="text-xs text-stone-600 mb-0.5 line-clamp-1">正面：{card.frontText}</p>
+                                {previewContent.frontText && (
+                                  <p className="text-xs text-stone-600 mb-0.5 line-clamp-1">正面：{previewContent.frontText}</p>
                                 )}
-                                {card.backText && (
-                                  <p className="text-xs text-stone-600 line-clamp-1">反面：{card.backText}</p>
+                                {previewContent.backText && (
+                                  <p className="text-xs text-stone-600 line-clamp-1">反面：{previewContent.backText}</p>
                                 )}
                               </>
                             )}
                           </>
                         ) : (
                           <>
-                            {card.frontText && (
-                              <p className="text-xs text-stone-600 mb-0.5 line-clamp-1">正面：{card.frontText}</p>
+                            {previewContent.frontText && (
+                              <p className="text-xs text-stone-600 mb-0.5 line-clamp-1">正面：{previewContent.frontText}</p>
                             )}
-                            {card.backText && (
-                              <p className="text-xs text-stone-600 line-clamp-1">反面：{card.backText}</p>
+                            {previewContent.backText && (
+                              <p className="text-xs text-stone-600 line-clamp-1">反面：{previewContent.backText}</p>
                             )}
                           </>
                         )}

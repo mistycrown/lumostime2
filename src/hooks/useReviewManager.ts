@@ -3,12 +3,9 @@
  * @input DataContext (dailyReviews, weeklyReviews, monthlyReviews, reviewTemplates, checkTemplates), ReviewContext (review data setters), NavigationContext (review modal states, currentDate), CategoryScopeContext (scopes), SettingsContext (userPersonalInfo), ToastContext (addToast)
  * @output Review CRUD Operations (handleOpenDailyReview, handleUpdateReview, handleDeleteReview, handleOpenWeeklyReview, handleUpdateWeeklyReview, handleDeleteWeeklyReview, handleOpenMonthlyReview, handleUpdateMonthlyReview, handleDeleteMonthlyReview), Narrative Generation (handleGenerateNarrative, handleGenerateWeeklyNarrative, handleGenerateMonthlyNarrative), Modal Control (handleCloseWeeklyReview, handleCloseMonthlyReview)
  * @pos Hook (Data Manager)
- * @description 复盘数据管理 Hook - 处理日报、周报、月报的增删改查、AI 叙事生成等操作。时间戳由 DataContext 自动管理。
- * 
- * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
+ * @description Review data manager hook. Handles create/update/delete flows for daily, weekly, and monthly reviews, plus AI narrative generation.
  */
 import { DailyReview, WeeklyReview, MonthlyReview } from '../types';
-import { useData } from '../contexts/DataContext';
 import { useReview } from '../contexts/ReviewContext';
 import { useNavigation } from '../contexts/NavigationContext';
 import { useCategoryScope } from '../contexts/CategoryScopeContext';
@@ -16,189 +13,74 @@ import { useSettings } from '../contexts/SettingsContext';
 import { useToast } from '../contexts/ToastContext';
 import { narrativeService } from '../services/narrativeService';
 import { NARRATIVE_TEMPLATES } from '../constants';
-
 import { getLocalDateStr } from '../utils/dateUtils';
-
-// Helper to get local YYYY-MM-DD string (now imported from utils)
-// const getLocalDateStr = (d: Date) => { ... } // Removed - using utils version
+import { createDailyReviewFromTemplates } from '../utils/dailyCheckUtils';
 
 export const useReviewManager = () => {
-    const { dailyReviews, setDailyReviews, weeklyReviews, setWeeklyReviews, monthlyReviews, setMonthlyReviews, reviewTemplates, checkTemplates } = useReview();
     const {
-        currentReviewDate, setCurrentReviewDate, setIsDailyReviewOpen,
-        currentWeeklyReviewStart, setCurrentWeeklyReviewStart,
-        currentWeeklyReviewEnd, setCurrentWeeklyReviewEnd, setIsWeeklyReviewOpen,
-        currentMonthlyReviewStart, setCurrentMonthlyReviewStart,
-        currentMonthlyReviewEnd, setCurrentMonthlyReviewEnd, setIsMonthlyReviewOpen,
+        dailyReviews,
+        setDailyReviews,
+        weeklyReviews,
+        setWeeklyReviews,
+        monthlyReviews,
+        setMonthlyReviews,
+        reviewTemplates,
+        checkTemplates
+    } = useReview();
+    const {
+        currentReviewDate,
+        setCurrentReviewDate,
+        setIsDailyReviewOpen,
+        currentWeeklyReviewStart,
+        setCurrentWeeklyReviewStart,
+        currentWeeklyReviewEnd,
+        setCurrentWeeklyReviewEnd,
+        setIsWeeklyReviewOpen,
+        currentMonthlyReviewStart,
+        setCurrentMonthlyReviewStart,
+        currentMonthlyReviewEnd,
+        setCurrentMonthlyReviewEnd,
+        setIsMonthlyReviewOpen,
         currentDate
     } = useNavigation();
     const { scopes } = useCategoryScope();
     const { userPersonalInfo } = useSettings();
-    // Note: updateDataLastModified removed - DataContext automatically tracks changes
     const { addToast } = useToast();
 
-    // --- Daily Review Handlers ---
     const handleOpenDailyReview = (targetDate?: Date) => {
         const dateToUse = (targetDate instanceof Date && !isNaN(targetDate.getTime())) ? targetDate : currentDate;
         const dateStr = getLocalDateStr(dateToUse);
         let review = dailyReviews.find(r => r.date === dateStr);
 
         if (!review) {
-            const templateSnapshot = reviewTemplates
-                .filter(t => t.isDailyTemplate)
-                .sort((a, b) => a.order - b.order)
-                .map(t => ({
-                    id: t.id,
-                    title: t.title,
-                    questions: t.questions,
-                    order: t.order,
-                    syncToTimeline: t.syncToTimeline
-                }));
-
-            const initialCheckItems: any[] = [];
-            const checkCategorySyncToTimeline: { [category: string]: boolean } = {};
-            const dailyCheckTemplates = checkTemplates.filter(t => t.enabled && t.isDaily);
-            if (dailyCheckTemplates.length > 0) {
-                dailyCheckTemplates.sort((a, b) => a.order - b.order).forEach(t => {
-                    // 记录该分组的 syncToTimeline 状态
-                    checkCategorySyncToTimeline[t.title] = t.syncToTimeline || false;
-                    
-                    t.items.forEach((item: any) => {
-                        const content = typeof item === 'string' ? item : item.content;
-                        const icon = typeof item === 'string' ? undefined : item.icon;
-                        const uiIcon = typeof item === 'string' ? undefined : item.uiIcon;
-                        const type = typeof item === 'string' ? 'manual' : (item.type || 'manual');
-                        const manualMode = type === 'manual'
-                            ? (typeof item === 'string' ? 'binary' : (item.manualMode === 'count' ? 'count' : 'binary'))
-                            : undefined;
-                        const targetCount = type === 'manual'
-                            ? (manualMode === 'count'
-                                ? Math.max(1, Math.floor(Number(typeof item === 'string' ? 1 : item.targetCount) || 1))
-                                : 1)
-                            : undefined;
-                        const autoConfig = typeof item === 'string' ? undefined : item.autoConfig;
-                        const checkItemId = typeof item === 'string' ? crypto.randomUUID() : (item.id || crypto.randomUUID());
-                        initialCheckItems.push({
-                            id: checkItemId,
-                            category: t.title,
-                            content: content,
-                            icon: icon,
-                            uiIcon: uiIcon,
-                            isCompleted: false,
-                            type: type,
-                            manualMode: manualMode,
-                            currentCount: type === 'manual' ? 0 : undefined,
-                            targetCount: targetCount,
-                            autoConfig: autoConfig
-                        });
-                    });
-                });
-            }
-
-            review = {
-                id: crypto.randomUUID(),
-                date: dateStr,
-                createdAt: Date.now(),
-                updatedAt: Date.now(),
-                answers: [],
-                checkItems: initialCheckItems,
-                checkCategorySyncToTimeline: checkCategorySyncToTimeline,
-                templateSnapshot
-            };
+            review = createDailyReviewFromTemplates(dateStr, checkTemplates, reviewTemplates);
             setDailyReviews(prev => [...prev, review!]);
         }
 
         setCurrentReviewDate(dateToUse);
         setIsDailyReviewOpen(true);
-        // Timestamp automatically updated by DataContext
     };
 
-    // 后台创建日课（不打开视图）- 用于自动生成
     const handleCreateDailyReviewSilently = (targetDate?: Date): Promise<DailyReview> => {
         return new Promise((resolve) => {
             const dateToUse = (targetDate instanceof Date && !isNaN(targetDate.getTime())) ? targetDate : currentDate;
             const dateStr = getLocalDateStr(dateToUse);
             let review = dailyReviews.find(r => r.date === dateStr);
 
-            // 如果已存在，直接返回
             if (review) {
                 resolve(review);
                 return;
             }
 
-            const templateSnapshot = reviewTemplates
-                .filter(t => t.isDailyTemplate)
-                .sort((a, b) => a.order - b.order)
-                .map(t => ({
-                    id: t.id,
-                    title: t.title,
-                    questions: t.questions,
-                    order: t.order,
-                    syncToTimeline: t.syncToTimeline
-                }));
-
-            const initialCheckItems: any[] = [];
-            const checkCategorySyncToTimeline: { [category: string]: boolean } = {};
-            const dailyCheckTemplates = checkTemplates.filter(t => t.enabled && t.isDaily);
-            if (dailyCheckTemplates.length > 0) {
-                dailyCheckTemplates.sort((a, b) => a.order - b.order).forEach(t => {
-                    // 记录该分组的 syncToTimeline 状态
-                    checkCategorySyncToTimeline[t.title] = t.syncToTimeline || false;
-                    
-                    t.items.forEach((item: any) => {
-                        const content = typeof item === 'string' ? item : item.content;
-                        const icon = typeof item === 'string' ? undefined : item.icon;
-                        const uiIcon = typeof item === 'string' ? undefined : item.uiIcon;
-                        const type = typeof item === 'string' ? 'manual' : (item.type || 'manual');
-                        const manualMode = type === 'manual'
-                            ? (typeof item === 'string' ? 'binary' : (item.manualMode === 'count' ? 'count' : 'binary'))
-                            : undefined;
-                        const targetCount = type === 'manual'
-                            ? (manualMode === 'count'
-                                ? Math.max(1, Math.floor(Number(typeof item === 'string' ? 1 : item.targetCount) || 1))
-                                : 1)
-                            : undefined;
-                        const autoConfig = typeof item === 'string' ? undefined : item.autoConfig;
-                        const checkItemId = typeof item === 'string' ? crypto.randomUUID() : (item.id || crypto.randomUUID());
-                        initialCheckItems.push({
-                            id: checkItemId,
-                            category: t.title,
-                            content: content,
-                            icon: icon,
-                            uiIcon: uiIcon,
-                            isCompleted: false,
-                            type: type,
-                            manualMode: manualMode,
-                            currentCount: type === 'manual' ? 0 : undefined,
-                            targetCount: targetCount,
-                            autoConfig: autoConfig
-                        });
-                    });
-                });
-            }
-
-            review = {
-                id: crypto.randomUUID(),
-                date: dateStr,
-                createdAt: Date.now(),
-                updatedAt: Date.now(),
-                answers: [],
-                checkItems: initialCheckItems,
-                checkCategorySyncToTimeline: checkCategorySyncToTimeline,
-                templateSnapshot
-            };
+            review = createDailyReviewFromTemplates(dateStr, checkTemplates, reviewTemplates);
             setDailyReviews(prev => [...prev, review!]);
-            // Timestamp automatically updated by DataContext
-            console.log('[AutoGenerate] 已在后台创建每日回顾');
-            
-            // 返回新创建的 review
+            console.log('[AutoGenerate] Created daily review silently');
             resolve(review);
         });
     };
 
     const handleUpdateReview = (updatedReview: DailyReview) => {
         setDailyReviews(prev => prev.map(r => r.id === updatedReview.id ? updatedReview : r));
-        // Timestamp automatically updated by DataContext
     };
 
     const handleDeleteReview = () => {
@@ -207,15 +89,18 @@ export const useReviewManager = () => {
         setDailyReviews(prev => prev.filter(r => r.date !== dateStr));
         setIsDailyReviewOpen(false);
         setCurrentReviewDate(null);
-        // Timestamp automatically updated by DataContext
     };
 
-    const handleGenerateNarrative = async (review: DailyReview, statsText: string, timelineText: string, promptTemplate?: string): Promise<string> => {
+    const handleGenerateNarrative = async (
+        review: DailyReview,
+        statsText: string,
+        timelineText: string,
+        promptTemplate?: string
+    ): Promise<string> => {
         const finalPrompt = promptTemplate || (NARRATIVE_TEMPLATES.find(t => t.id === 'default')?.prompt || '');
         return narrativeService.generateDailyNarrative(review, statsText, timelineText, finalPrompt, scopes, userPersonalInfo, 'daily');
     };
 
-    // --- Weekly Review Handlers ---
     const handleOpenWeeklyReview = (weekStart: Date, weekEnd: Date) => {
         const weekStartStr = getLocalDateStr(weekStart);
         const weekEndStr = getLocalDateStr(weekEnd);
@@ -248,7 +133,6 @@ export const useReviewManager = () => {
         setCurrentWeeklyReviewStart(weekStart);
         setCurrentWeeklyReviewEnd(weekEnd);
         setIsWeeklyReviewOpen(true);
-        // Timestamp automatically updated by DataContext
     };
 
     const handleCloseWeeklyReview = () => {
@@ -259,7 +143,6 @@ export const useReviewManager = () => {
 
     const handleUpdateWeeklyReview = (updatedReview: WeeklyReview) => {
         setWeeklyReviews(prev => prev.map(r => r.id === updatedReview.id ? updatedReview : r));
-        // Timestamp automatically updated by DataContext
     };
 
     const handleDeleteWeeklyReview = () => {
@@ -268,7 +151,6 @@ export const useReviewManager = () => {
         const weekEndStr = getLocalDateStr(currentWeeklyReviewEnd);
         setWeeklyReviews(prev => prev.filter(r => !(r.weekStartDate === weekStartStr && r.weekEndDate === weekEndStr)));
         handleCloseWeeklyReview();
-        // Timestamp automatically updated by DataContext
         addToast('success', '周报已删除');
     };
 
@@ -277,7 +159,6 @@ export const useReviewManager = () => {
         return narrativeService.generateDailyNarrative(review as any, statsText, '', finalPrompt, scopes, userPersonalInfo, 'weekly');
     };
 
-    // --- Monthly Review Handlers ---
     const handleOpenMonthlyReview = (monthStart: Date, monthEnd: Date) => {
         const monthStartStr = getLocalDateStr(monthStart);
         const monthEndStr = getLocalDateStr(monthEnd);
@@ -310,7 +191,6 @@ export const useReviewManager = () => {
         setCurrentMonthlyReviewStart(monthStart);
         setCurrentMonthlyReviewEnd(monthEnd);
         setIsMonthlyReviewOpen(true);
-        // Timestamp automatically updated by DataContext
     };
 
     const handleCloseMonthlyReview = () => {
@@ -321,7 +201,6 @@ export const useReviewManager = () => {
 
     const handleUpdateMonthlyReview = (updatedReview: MonthlyReview) => {
         setMonthlyReviews(prev => prev.map(r => r.id === updatedReview.id ? updatedReview : r));
-        // Timestamp automatically updated by DataContext
     };
 
     const handleDeleteMonthlyReview = () => {
@@ -330,7 +209,6 @@ export const useReviewManager = () => {
         const monthEndStr = getLocalDateStr(currentMonthlyReviewEnd);
         setMonthlyReviews(prev => prev.filter(r => !(r.monthStartDate === monthStartStr && r.monthEndDate === monthEndStr)));
         handleCloseMonthlyReview();
-        // Timestamp automatically updated by DataContext
         addToast('success', '月报已删除');
     };
 
