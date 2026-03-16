@@ -137,6 +137,22 @@ class FontService {
     };
   }
 
+  private blobToDataUrl(blob: Blob): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        if (typeof reader.result === 'string') {
+          resolve(reader.result);
+          return;
+        }
+
+        reject(new Error('Failed to convert font blob to data URL'));
+      };
+      reader.onerror = () => reject(reader.error || new Error('Failed to read font blob'));
+      reader.readAsDataURL(blob);
+    });
+  }
+
   /**
    * 注册字体到 document.fonts
    */
@@ -300,6 +316,43 @@ class FontService {
    */
   getCurrentFontOption(): FontOption {
     return this.getAllFonts().find((font) => font.id === this.currentFont) || BUILTIN_FONT_OPTIONS[0];
+  }
+
+  async getCurrentFontEmbedCSS(): Promise<string> {
+    const currentFontOption = this.getCurrentFontOption();
+    if (currentFontOption.source !== 'uploaded') {
+      return '';
+    }
+
+    try {
+      const record = await customFontStorageService.getFont(currentFontOption.id);
+      if (!record) {
+        return '';
+      }
+
+      const dataUrl = await this.blobToDataUrl(record.blob);
+      const formatName = record.format === 'ttf' ? 'truetype' : record.format;
+
+      return `
+@font-face {
+  font-family: '${record.familyName}';
+  src: url('${dataUrl}') format('${formatName}');
+  font-weight: 400;
+  font-style: normal;
+  font-display: block;
+}
+@font-face {
+  font-family: '${record.familyName}';
+  src: url('${dataUrl}') format('${formatName}');
+  font-weight: 700;
+  font-style: normal;
+  font-display: block;
+}
+      `.trim();
+    } catch (error) {
+      console.warn('[FontService] Failed to build export font CSS:', error);
+      return '';
+    }
   }
 
   /**

@@ -12,10 +12,42 @@ import { Filesystem, Directory } from '@capacitor/filesystem';
 import { parseInputText, extractDateFromTitle, THEMES, ColorTheme } from '../components/ChronoPrint/utils';
 import { ParsedData } from '../components/ChronoPrint/types';
 import { PrintCard, PrintBarChart, PrintDonutChart, PrintStyle } from '../components/ChronoPrint/PrintComponents';
-import { toPng } from 'html-to-image';
+import { getFontEmbedCSS, toPng } from 'html-to-image';
+import { fontService } from '../services/fontService';
 import { ToastType } from '../types';
 
 const FONT_URL = 'https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;800;900&family=Merriweather:ital,wght@0,300;0,400;0,700;0,900;1,300;1,400&family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&family=Space+Mono:ital,wght@0,400;0,700;1,400&family=DM+Serif+Display:ital@0;1&display=swap';
+const FONT_READY_TIMEOUT = 3000;
+const IMAGE_READY_TIMEOUT = 3000;
+const EXPORT_RENDER_DELAY = 200;
+
+const wait = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
+const waitForFonts = async () => {
+  if (!document.fonts?.ready) {
+    return;
+  }
+
+  await Promise.race([
+    document.fonts.ready,
+    wait(FONT_READY_TIMEOUT)
+  ]);
+};
+
+const waitForImages = async (container: HTMLElement) => {
+  const images = Array.from(container.querySelectorAll('img'));
+  await Promise.all(images.map((img) => {
+    if (img.complete) {
+      return Promise.resolve();
+    }
+
+    return new Promise<void>((resolve) => {
+      img.onload = () => resolve();
+      img.onerror = () => resolve();
+      window.setTimeout(resolve, IMAGE_READY_TIMEOUT);
+    });
+  }));
+};
 
 interface ChronoPrintViewProps {
   inputText: string;
@@ -34,6 +66,13 @@ export const ChronoPrintView: React.FC<ChronoPrintViewProps> = ({ inputText, onB
   const monthRef = useRef<HTMLDivElement>(null);
   const todoRef = useRef<HTMLDivElement>(null);
   const domainRef = useRef<HTMLDivElement>(null);
+  const exportSerifFontFamily = typeof window === 'undefined'
+    ? `'Noto Serif SC', 'Source Han Serif SC', 'Songti SC', 'STSong', 'SimSun', serif`
+    : (
+      getComputedStyle(document.documentElement).getPropertyValue('--font-family').trim()
+      || getComputedStyle(document.body).fontFamily.trim()
+      || `'Noto Serif SC', 'Source Han Serif SC', 'Songti SC', 'STSong', 'SimSun', serif`
+    );
 
   useEffect(() => {
     const loadFonts = async () => {
@@ -70,6 +109,7 @@ export const ChronoPrintView: React.FC<ChronoPrintViewProps> = ({ inputText, onB
   const handleExportSingle = async (ref: React.RefObject<HTMLDivElement>, filename: string, key: string) => {
     if (exportingState || !ref.current) return;
     setExportingState(key);
+    const exportNode = ref.current;
 
     try {
       const bgColor = currentStyle === 'ticket'
@@ -78,12 +118,42 @@ export const ChronoPrintView: React.FC<ChronoPrintViewProps> = ({ inputText, onB
           ? currentTheme.bg
           : '#ffffff';
 
-      const dataUrl = await toPng(ref.current, {
+      exportNode.dataset.exporting = 'true';
+      await waitForFonts();
+      await waitForImages(exportNode);
+      await wait(EXPORT_RENDER_DELAY);
+
+      const [embeddedFontCSS, customFontCSS] = await Promise.all([
+        getFontEmbedCSS(exportNode).catch((error) => {
+          console.warn('ChronoPrint failed to collect embedded font CSS.', error);
+          return '';
+        }),
+        fontService.getCurrentFontEmbedCSS().catch((error) => {
+          console.warn('ChronoPrint failed to collect custom font CSS.', error);
+          return '';
+        })
+      ]);
+      const fontEmbedCSS = [embeddedFontCSS, customFontCSS].filter(Boolean).join('\n');
+
+      const options = {
         cacheBust: true,
         pixelRatio: 2,
+        useCORS: true,
         backgroundColor: bgColor,
-        skipAutoScale: true
-      });
+        skipAutoScale: true,
+        fontEmbedCSS: fontEmbedCSS || undefined
+      };
+
+      let dataUrl: string;
+      try {
+        dataUrl = await toPng(exportNode, options);
+      } catch (firstError) {
+        console.warn('ChronoPrint export failed on first attempt, retrying with skipFonts.', firstError);
+        const fallbackOptions = fontEmbedCSS
+          ? options
+          : { ...options, skipFonts: true };
+        dataUrl = await toPng(exportNode, fallbackOptions);
+      }
 
       if (Capacitor.isNativePlatform()) {
         try {
@@ -110,6 +180,7 @@ export const ChronoPrintView: React.FC<ChronoPrintViewProps> = ({ inputText, onB
       console.error(`Failed to export ${filename}:`, error);
       onToast?.('error', '导出失败');
     } finally {
+      delete exportNode.dataset.exporting;
       setExportingState(null);
     }
   };
@@ -117,9 +188,29 @@ export const ChronoPrintView: React.FC<ChronoPrintViewProps> = ({ inputText, onB
   const hasRenderableCards = Boolean(data?.monthStats || data?.todoStats || data?.domainStats);
 
   return (
-    <div className="fixed inset-0 bg-[#faf9f6] flex flex-col text-slate-800 font-sans z-50">
+    <div className="chrono-print-view fixed inset-0 bg-[#faf9f6] flex flex-col text-slate-800 font-sans z-50">
       <style>{`
-        .font-mono { font-family: 'Space Mono', monospace; }
+        .chrono-print-view .font-display,
+        .chrono-print-view .font-serif {
+          font-family: ${exportSerifFontFamily} !important;
+        }
+
+        .chrono-print-view .font-sans {
+          font-family: 'Inter', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Segoe UI', sans-serif !important;
+        }
+
+        .chrono-print-view .font-mono {
+          font-family: 'Space Mono', 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace !important;
+        }
+
+        .chrono-print-view [data-exporting='true'] .chrono-print-item-name,
+        .chrono-print-view [data-exporting='true'] .chrono-print-subitem-name {
+          display: block;
+          white-space: normal !important;
+          overflow: visible !important;
+          text-overflow: clip !important;
+          word-break: break-word;
+        }
       `}</style>
 
       <div className="flex-shrink-0 pt-[env(safe-area-inset-top)]">
