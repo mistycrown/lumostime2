@@ -21,6 +21,7 @@ import { useToast } from '../contexts/ToastContext';
 interface TodoDetailModalProps {
   initialTodo?: TodoItem | null;
   currentCategory: TodoCategory;
+  isObscured?: boolean;
   onClose: () => void;
   onSave: (todo: TodoItem) => void;
   onDelete?: (id: string) => void;
@@ -34,7 +35,7 @@ interface TodoDetailModalProps {
 
 type Tab = '细节' | '時間線';
 
-export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({ initialTodo, currentCategory, onClose, onSave, onDelete, logs, onLogUpdate, onEditLog, todoCategories, categories, scopes }) => {
+export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({ initialTodo, currentCategory, isObscured = false, onClose, onSave, onDelete, logs, onLogUpdate, onEditLog, todoCategories, categories, scopes }) => {
   const { addToast } = useToast();
   const [activeTab, setActiveTab] = useState<Tab>(initialTodo ? '時間線' : '细节');
 
@@ -270,7 +271,11 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({ initialTodo, c
   const renderSquares = totalSquares > 3000 ? 3000 : totalSquares;
 
   return (
-    <div className="fixed inset-0 z-[60] bg-[#faf9f6] flex flex-col animate-in slide-in-from-right duration-300 pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">
+    <div
+      className={`fixed inset-0 z-[60] bg-[#faf9f6] flex flex-col animate-in slide-in-from-right duration-300 pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] ${isObscured ? 'pointer-events-none' : ''}`}
+      aria-hidden={isObscured}
+      style={isObscured ? { transform: 'translateZ(0)', backfaceVisibility: 'hidden' } : undefined}
+    >
 
       {/* Top Bar */}
       <div className="px-4 py-3 flex items-center shrink-0 justify-center relative">

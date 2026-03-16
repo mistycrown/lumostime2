@@ -1,9 +1,9 @@
 /**
  * @file imageService.ts
- * @input Image Files (Blob/File)
+ * @input Image Files (Blob/File), log references, todo cover references
  * @output Persistence & URL Generation
  * @pos Service (Local Storage)
- * @description Handles saving, retrieving, and deleting images. 
+ * @description Handles saving, retrieving, and deleting images.
  * Uses Capacitor Filesystem for Native/Electron, and IndexedDB for Web fallback.
  */
 import { Filesystem, Directory } from '@capacitor/filesystem';

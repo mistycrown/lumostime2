@@ -234,6 +234,7 @@ const AppContent: React.FC = () => {
   const searchManager = useSearchManager();
   const { isHeaderScrolled } = useAppLifecycle();
   useHardwareBackButton();
+  const isNativeAndroid = Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'android';
 
   // 注意：自动生成回顾的逻辑已经集成到 TimelineView 中，不需要单独的 hook
 
@@ -417,6 +418,7 @@ const AppContent: React.FC = () => {
           initialStartTime={initialLogTimes?.start}
           initialEndTime={initialLogTimes?.end}
           prefilledData={initialLogTimes?.prefilledData}
+          reduceVisualEffects={isNativeAndroid && isTodoModalOpen}
           lastLogEndTime={lastLogEndTime}
           onClose={logManager.closeModal}
           onSave={logManager.handleSaveLog}
@@ -438,6 +440,7 @@ const AppContent: React.FC = () => {
         <TodoDetailModal
           initialTodo={editingTodo}
           currentCategory={todoCategories.find(c => c.id === todoManager.todoCategoryToAdd) || todoCategories[0]}
+          isObscured={isNativeAndroid && isAddModalOpen}
           onClose={todoManager.closeTodoModal}
           onSave={todoManager.handleSaveTodo}
           onDelete={todoManager.handleDeleteTodo}

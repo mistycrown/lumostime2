@@ -8,10 +8,12 @@ Update 2026-03-12: timeline styling for normal timeline records is managed by `t
 - `aiService.ts`: [Active] - Handles AI integration (OpenAI/Gemini) for text parsing and narrative generation.
 - `excelExportService.ts`: [Active] - Exports time logs to Excel format.
 - `geminiService.ts`: [Placeholder] - Simple Gemini test service (likely deprecated/experimental).
+- `imageCleanupService.ts`: [Active] - Checks unreferenced images, protects referenced business/settings images, and executes cleanup/report generation.
 - `imageService.ts`: [Active] - Manages local image storage using Capacitor Filesystem (native) or IndexedDB (web). Handles thumbnail generation.
 - `narrativeService.ts`: [Active] - Generates Daily/Weekly/Monthly narratives using AI.
 - `NfcService.ts`: [Active] - Wrapper for Capacitor NFC plugin to read/write tags.
 - `obsidianExportService.ts`: [Active] - Exports data to Obsidian markdown files.
+- `settingsImageReferenceService.ts`: [Active] - Collects settings-level image references, currently including custom TimePal assets, for cleanup protection.
 - `syncService.ts`: [Active] - Orchestrates image synchronization between local storage and WebDAV server. Handles deletions and bidirectional sync.
 - `timelineStyleService.ts`: [Active] - Manages timeline style themes, defaults, Memoir-specific offset values, and config normalization for shared timeline nodes.
 - `themePresetService.ts`: [Active] - 主题预设应用服务，拆分复杂的主题切换逻辑为独立方法
@@ -23,4 +25,4 @@ Update 2026-03-12: timeline styling for normal timeline records is managed by `t
 - `themePresetService.ts`: 新增 - 主题预设应用服务，将复杂的主题切换逻辑拆分为多个独立方法
 
 > ⚠️ Once the folder I belong to changes, please update me.
-> ⚠️ 本文档最后更新：2026-02-09
+> ⚠️ 本文档最后更新：2026-03-16
