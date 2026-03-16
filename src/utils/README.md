@@ -7,5 +7,6 @@ Contains pure utility functions for data processing and business logic calculati
 - `logUtils.ts`: [Active] - Handles time log manipulation, specifically splitting cross-day logs.
 - `colorAdapterUtils.ts`: [Active] - Unifies chart/card/schedule/tag color rendering across Tailwind palette classes and custom HEX colors.
 - `filterUtils.ts`: [Active] - Parses custom filter expressions, computes stats, and normalizes saved custom filter order.
+- `scopeStatsUtils.ts`: [Active] - Centralizes scope duration aggregation and counts full duration for every linked scope on a log.
 
 > ⚠️ Once the folder I belong to changes, please update me.

@@ -9,6 +9,7 @@
 
 import { Log, Category, Scope, TodoItem, TodoCategory, DailyReview } from '../types';
 import { getLocalDateStr } from './dateUtils';
+import { summarizeScopeDurations } from './scopeStatsUtils';
 
 /**
  * 格式化时长（秒 → 小时分钟）
@@ -112,20 +113,11 @@ export function calculateScopeStats(
     logs: Log[],
     scopes: Scope[]
 ): CategoryStat[] {
-    const scopeDurations = new Map<string, number>();
-    
-    logs.forEach(log => {
-        if (log.scopeIds && log.scopeIds.length > 0) {
-            const duration = (log.endTime - log.startTime) / 1000;
-            log.scopeIds.forEach(sid => {
-                const sName = scopes.find(s => s.id === sid)?.name || '未知';
-                scopeDurations.set(sName, (scopeDurations.get(sName) || 0) + duration);
-            });
-        }
-    });
+    const { scopeDurations } = summarizeScopeDurations(logs);
 
-    return Array.from(scopeDurations.entries())
-        .map(([name, duration]) => ({ name, duration }))
+    return scopes
+        .map((scope) => ({ name: scope.name, duration: scopeDurations.get(scope.id) || 0 }))
+        .filter(({ duration }) => duration > 0)
         .sort((a, b) => b.duration - a.duration);
 }
 
@@ -379,12 +371,10 @@ export function calculateMonthlyStats(
     }).filter(c => c.duration > 0);
 
     // 领域统计
+    const { totalAttributedDuration, scopeDurations } = summarizeScopeDurations(logs);
     const scopeStats = scopes.map(scope => {
-        const scopeLogs = logs.filter(l =>
-            l.scopeIds && l.scopeIds.includes(scope.id)
-        );
-        const duration = scopeLogs.reduce((acc, l) => acc + (l.duration || 0), 0);
-        const percentage = totalDuration > 0 ? (duration / totalDuration) * 100 : 0;
+        const duration = scopeDurations.get(scope.id) || 0;
+        const percentage = totalAttributedDuration > 0 ? (duration / totalAttributedDuration) * 100 : 0;
         return { name: scope.name, duration, percentage };
     }).filter(s => s.duration > 0);
 

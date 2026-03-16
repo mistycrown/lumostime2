@@ -14,6 +14,7 @@ The views are designed as "dumb" or "presentational" components where possible, 
 *   **Management Views**: Bulk editing interfaces (e.g., `BatchManageView`, `TodoBatchManageView`, `GoalBatchManageView`, `ScopeManageView`).
 
 > Note: color pickers in detail and batch management views should keep built-in theme colors and persisted custom HEX colors consistent, including todo category colors and scope colors used by stats.
+> Note: scope-related views should use the shared rule where each linked scope receives the full duration of a log.
 
 ## Key Components
 
