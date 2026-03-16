@@ -14,6 +14,7 @@ import { GoalStatusAlert } from '../components/GoalStatusAlert';
 import { Settings2 } from 'lucide-react';
 import { IconRenderer } from '../components/IconRenderer';
 import { useGoalStatus } from '../hooks/useGoalStatus';
+import { getNormalizedScopeIds } from '../utils/scopeStatsUtils';
 
 
 interface ScopeViewProps {
@@ -57,9 +58,10 @@ export const ScopeView: React.FC<ScopeViewProps> = ({
         const currentYear = now.getFullYear();
 
         logs.forEach(log => {
-            if (!log.scopeIds || log.scopeIds.length === 0) return;
+            const scopeIds = getNormalizedScopeIds(log.scopeIds);
+            if (scopeIds.length === 0) return;
 
-            log.scopeIds.forEach(scopeId => {
+            scopeIds.forEach(scopeId => {
                 const current = stats.get(scopeId) || { allTime: 0, thisMonth: 0 };
                 current.allTime += log.duration;
 

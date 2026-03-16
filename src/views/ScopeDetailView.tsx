@@ -28,6 +28,7 @@ import { useNavigation } from '../contexts/NavigationContext';
 import { useCustomColors } from '../hooks/useCustomColors';
 import { isStoredColorSelected } from '../utils/colorUtils';
 import { getColorHexForCharts } from '../utils/colorAdapterUtils';
+import { getNormalizedScopeIds } from '../utils/scopeStatsUtils';
 
 interface ScopeDetailViewProps {
     scope: Scope;
@@ -111,7 +112,10 @@ export const ScopeDetailView: React.FC<ScopeDetailViewProps> = ({
     }, [scope]); // 只监听 scope 变化
 
     // Filter logs for this scope
-    const scopeLogs = useMemo(() => logs.filter(l => l.scopeIds?.includes(scope.id)), [logs, scope.id]);
+    const scopeLogs = useMemo(
+        () => logs.filter((log) => getNormalizedScopeIds(log.scopeIds).includes(scope.id)),
+        [logs, scope.id]
+    );
 
     // Filter todos linked to this scope
     const scopeTodos = useMemo(() => todos

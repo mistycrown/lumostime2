@@ -22,6 +22,7 @@ import { getDateRange } from '../utils/dateRangeUtils';
 import { useCustomColors } from '../hooks/useCustomColors';
 import { isStoredColorSelected } from '../utils/colorUtils';
 import { getColorHexForCharts } from '../utils/colorAdapterUtils';
+import { getNormalizedScopeIds } from '../utils/scopeStatsUtils';
 
 interface CategoryDetailViewProps {
     categoryId: string;
@@ -105,8 +106,9 @@ export const CategoryDetailView: React.FC<CategoryDetailViewProps> = ({ category
 
         const stats = new Map<string, number>();
         filteredLogs.forEach(log => {
-            if (log.scopeIds && log.scopeIds.length > 0) {
-                log.scopeIds.forEach(scopeId => {
+            const scopeIds = getNormalizedScopeIds(log.scopeIds);
+            if (scopeIds.length > 0) {
+                scopeIds.forEach(scopeId => {
                     stats.set(scopeId, (stats.get(scopeId) || 0) + log.duration);
                 });
             } else {

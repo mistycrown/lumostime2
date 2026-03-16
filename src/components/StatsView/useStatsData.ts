@@ -6,6 +6,7 @@
 import { useMemo } from 'react';
 import { Log, Category, Activity, TodoItem, TodoCategory, Scope, DailyReview } from '../../types';
 import { getColorHexForCharts } from '../../utils/colorAdapterUtils';
+import { getLogDurationSeconds, getNormalizedScopeIds, summarizeScopeDurations } from '../../utils/scopeStatsUtils';
 
 interface ActivityStat extends Activity {
   duration: number;
@@ -110,35 +111,26 @@ export const useScopeStats = (
   categories: Category[]
 ) => {
   return useMemo(() => {
-    const logsWithScopes = filteredLogs.filter(l => l.scopeIds && l.scopeIds.length > 0);
-
-    let totalScopedDuration = 0;
-    const scopeDurations: Record<string, number> = {};
+    const logsWithScopes = filteredLogs.filter(l => getNormalizedScopeIds(l.scopeIds).length > 0);
+    const { totalAttributedDuration, scopeDurations } = summarizeScopeDurations(logsWithScopes);
     const scopeActivityBreakdown: Record<string, Record<string, number>> = {};
 
     logsWithScopes.forEach(l => {
-      const d = Math.max(0, (l.endTime - l.startTime) / 1000);
-      const count = l.scopeIds!.length;
-      const splitDuration = d / count;
+      const duration = getLogDurationSeconds(l);
+      const scopeIds = getNormalizedScopeIds(l.scopeIds);
 
       const cat = categories.find(c => c.id === l.categoryId);
       const act = cat?.activities.find(a => a.id === l.activityId);
       const actName = act?.name || 'Unknown';
 
-      l.scopeIds!.forEach(sId => {
-        scopeDurations[sId] = (scopeDurations[sId] || 0) + splitDuration;
-
+      scopeIds.forEach(sId => {
         if (!scopeActivityBreakdown[sId]) scopeActivityBreakdown[sId] = {};
-        scopeActivityBreakdown[sId][actName] = (scopeActivityBreakdown[sId][actName] || 0) + splitDuration;
+        scopeActivityBreakdown[sId][actName] = (scopeActivityBreakdown[sId][actName] || 0) + duration;
       });
     });
 
-    const distinctTotalDuration = logsWithScopes.reduce((acc, l) => 
-      acc + Math.max(0, (l.endTime - l.startTime) / 1000), 0
-    );
-
     const categoryStats = scopes.map(scope => {
-      const duration = scopeDurations[scope.id] || 0;
+      const duration = scopeDurations.get(scope.id) || 0;
 
       const breakdown = scopeActivityBreakdown[scope.id] || {};
       const items = Object.entries(breakdown).map(([name, d]) => ({
@@ -152,13 +144,13 @@ export const useScopeStats = (
       return {
         ...scope,
         duration,
-        percentage: distinctTotalDuration > 0 ? (duration / distinctTotalDuration) * 100 : 0,
+        percentage: totalAttributedDuration > 0 ? (duration / totalAttributedDuration) * 100 : 0,
         items,
         themeColor: scope.themeColor || 'stone'
       };
     }).filter(s => s.duration > 0).sort((a, b) => b.duration - a.duration);
 
-    return { totalDuration: distinctTotalDuration, categoryStats };
+    return { totalDuration: totalAttributedDuration, categoryStats };
   }, [filteredLogs, scopes, categories]);
 };
 

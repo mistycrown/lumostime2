@@ -23,6 +23,7 @@ import { IconRenderer } from '../components/IconRenderer';
 import { useCustomColors } from '../hooks/useCustomColors';
 import { isStoredColorSelected } from '../utils/colorUtils';
 import { getColorHexForCharts } from '../utils/colorAdapterUtils';
+import { getNormalizedScopeIds } from '../utils/scopeStatsUtils';
 
 
 interface TagDetailViewProps {
@@ -203,11 +204,10 @@ export const TagDetailView: React.FC<TagDetailViewProps> = ({ tagId, logs, todos
 
       const stats = new Map<string, number>();
       filteredLogs.forEach(log => {
-         if (log.scopeIds && log.scopeIds.length > 0) {
-            // 如果有多个scope，将时长平均分配给每个scope
-            const durationPerScope = log.duration / log.scopeIds.length;
-            log.scopeIds.forEach(scopeId => {
-               stats.set(scopeId, (stats.get(scopeId) || 0) + durationPerScope);
+         const scopeIds = getNormalizedScopeIds(log.scopeIds);
+         if (scopeIds.length > 0) {
+            scopeIds.forEach(scopeId => {
+               stats.set(scopeId, (stats.get(scopeId) || 0) + log.duration);
             });
          } else {
             stats.set('uncategorized', (stats.get('uncategorized') || 0) + log.duration);
