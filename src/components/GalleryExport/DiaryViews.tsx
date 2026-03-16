@@ -267,6 +267,7 @@ export const MonthView: React.FC<ViewProps> = ({ date, entries, theme, layoutSty
                                                 className="w-full h-full object-cover" 
                                                 alt="" 
                                                 crossOrigin="anonymous"
+                                                data-image-filename={entry!.imageFilename}
                                             />
                                             {isNewspaper && (
                                                 <div 
@@ -423,6 +424,7 @@ export const YearView: React.FC<ViewProps> = ({ date, entries, theme, layoutStyl
                                                             className="w-full h-full object-cover"
                                                             crossOrigin="anonymous"
                                                             alt=""
+                                                            data-image-filename={entry.imageFilename}
                                                         />
                                                         {isNewspaper && (
                                                             <div 

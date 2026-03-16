@@ -69,6 +69,11 @@ type TimePeriod = 'week' | 'month' | 'year';
 type LayoutStyle = 'magazine' | 'minimal' | 'newspaper' | 'film';
 type Orientation = 'portrait' | 'landscape';
 
+type ExportImageRestoreRecord = {
+    img: HTMLImageElement;
+    src: string;
+};
+
 interface ColorTheme {
     id: string;
     name: string;
@@ -273,6 +278,7 @@ export const GalleryExportView: React.FC<GalleryExportViewProps> = ({
                     id: `entry-${dayStr}`,
                     date: day,
                     content: content || '',
+                    imageFilename,
                     imageUrl: imageFilename ? imageUrls.get(imageFilename) : undefined
                 });
             }
@@ -383,15 +389,73 @@ export const GalleryExportView: React.FC<GalleryExportViewProps> = ({
         }
     };
 
+    const waitForImageLoad = async (img: HTMLImageElement): Promise<void> => {
+        if (img.complete && img.naturalWidth > 0) {
+            return;
+        }
+
+        await new Promise<void>((resolve) => {
+            let settled = false;
+            const finish = () => {
+                if (settled) return;
+                settled = true;
+                img.onload = null;
+                img.onerror = null;
+                resolve();
+            };
+
+            img.onload = finish;
+            img.onerror = () => {
+                console.warn('Image failed to load:', img.src);
+                finish();
+            };
+
+            setTimeout(finish, IMAGE_LOAD_TIMEOUT);
+        });
+    };
+
+    const replaceWeekImagesWithOriginals = async (container: HTMLDivElement): Promise<ExportImageRestoreRecord[]> => {
+        const restoreRecords: ExportImageRestoreRecord[] = [];
+        const images = Array.from(container.querySelectorAll('img'));
+
+        for (const img of images) {
+            const filename = img.dataset.imageFilename;
+            if (!filename) {
+                continue;
+            }
+
+            try {
+                const originalUrl = await imageService.getImageUrl(filename, 'original');
+                if (!originalUrl || originalUrl === img.src) {
+                    continue;
+                }
+
+                restoreRecords.push({ img, src: img.src });
+                img.src = originalUrl;
+            } catch (error) {
+                console.error(`Failed to load original image for export: ${filename}`, error);
+            }
+        }
+
+        await Promise.all(restoreRecords.map(({ img }) => waitForImageLoad(img)));
+        return restoreRecords;
+    };
+
     const handleExport = async () => {
         if (exportRef.current && !isExporting) {
             setIsExporting(true);
             
             // 保存原始图片src，用于失败时恢复
             const originalSrcs = new Map<HTMLImageElement, string>();
+            let weekImageRestoreRecords: ExportImageRestoreRecord[] = [];
             
+
             try {
                 // 1. 将所有blob URL转换为base64 data URL
+                if (currentPeriod === 'week') {
+                    weekImageRestoreRecords = await replaceWeekImagesWithOriginals(exportRef.current);
+                }
+
                 const images = exportRef.current.querySelectorAll('img');
                 const conversionPromises = Array.from(images).map(async (img) => {
                     if (img.src && img.src.startsWith('blob:')) {
@@ -400,10 +464,8 @@ export const GalleryExportView: React.FC<GalleryExportViewProps> = ({
                         
                         const dataUrl = await convertBlobUrlToDataUrl(img.src);
                         if (dataUrl) {
-                            const oldBlobUrl = img.src;
                             img.src = dataUrl;
-                            // 释放blob URL，防止内存泄漏
-                            URL.revokeObjectURL(oldBlobUrl);
+                            // 保留预览 URL，便于周视图导出后恢复缩略图预览
                         } else {
                             console.warn('Failed to convert blob URL, keeping original:', img.src);
                         }
@@ -509,6 +571,11 @@ export const GalleryExportView: React.FC<GalleryExportViewProps> = ({
                     onToast('error', '导出失败，请重试');
                 }
             } finally {
+                weekImageRestoreRecords.forEach(({ img, src }) => {
+                    if (img.src !== src) {
+                        img.src = src;
+                    }
+                });
                 setIsExporting(false);
             }
         }

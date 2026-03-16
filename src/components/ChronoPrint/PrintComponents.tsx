@@ -593,16 +593,20 @@ const CardContent: React.FC<{
                 style={{ borderColor: variantStyle === 'classic' || variantStyle === 'modern' ? theme.primary : (variantStyle === 'ticket' ? `${theme.primary}60` : undefined) }}
             >
                 {/* Left Block */}
-                <div className="flex flex-col justify-between items-start gap-1">
+                <div className="flex min-w-0 flex-1 flex-col justify-between items-start gap-1">
                 <h1 
                     className={`
-                    ${isMobile ? 'text-2xl' : 'text-3xl md:text-4xl'}
+                    ${isMobile ? 'whitespace-nowrap' : 'text-3xl md:text-4xl'}
                     ${variantStyle === 'classic' ? 'font-display font-bold leading-[0.9]' : ''}
                     ${variantStyle === 'modern' ? 'font-sans font-black tracking-tighter uppercase leading-[0.9]' : ''}
                     ${variantStyle === 'retro' ? 'font-display font-black tracking-tight leading-[0.9]' : ''}
                     ${variantStyle === 'ticket' ? 'font-serif font-bold tracking-tight uppercase leading-[1.1]' : ''}
                     `}
-                    style={{ color: theme.primary }}
+                    style={{
+                    color: theme.primary,
+                    fontSize: isMobile ? 'clamp(1rem, 4.8vw, 1.5rem)' : undefined,
+                    maxWidth: '100%'
+                    }}
                 >
                     {title}
                 </h1>
