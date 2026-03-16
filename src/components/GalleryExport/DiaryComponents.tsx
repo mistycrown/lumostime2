@@ -11,6 +11,7 @@ export interface DiaryEntry {
     id: string;
     date: Date;
     content: string;
+    imageFilename?: string;
     imageUrl?: string;
 }
 
@@ -83,6 +84,7 @@ export const DayCard: React.FC<DayCardProps> = ({ day, heightClass, entry, theme
                                 className="w-full h-full object-cover object-center" 
                                 alt="" 
                                 crossOrigin="anonymous"
+                                data-image-filename={entry!.imageFilename}
                             />
                             <div 
                                 className="absolute inset-0 pointer-events-none"
@@ -136,7 +138,7 @@ export const DayCard: React.FC<DayCardProps> = ({ day, heightClass, entry, theme
 
                     {hasImage && (
                         <div className={`relative w-full ${hasText ? 'h-[70%]' : 'h-full'} overflow-hidden`}>
-                            <img src={entry!.imageUrl} className="w-full h-full object-cover object-center" alt="" crossOrigin="anonymous"/>
+                            <img src={entry!.imageUrl} className="w-full h-full object-cover object-center" alt="" crossOrigin="anonymous" data-image-filename={entry!.imageFilename}/>
                             {!hasText && (
                                 <div className="absolute bottom-1 right-1 px-1 py-0.5 rounded font-mono text-[8px] shadow-sm" style={{ backgroundColor: theme.colors.ink, color: theme.colors.paper }}>
                                     REC {format(day, 'MM/dd')}
@@ -192,7 +194,7 @@ export const DayCard: React.FC<DayCardProps> = ({ day, heightClass, entry, theme
 
                 {hasImage && (
                     <div className="absolute inset-0 w-full h-full overflow-hidden">
-                        <img src={entry!.imageUrl} className="w-full h-full object-cover object-center" alt="" crossOrigin="anonymous"/>
+                        <img src={entry!.imageUrl} className="w-full h-full object-cover object-center" alt="" crossOrigin="anonymous" data-image-filename={entry!.imageFilename}/>
                         {hasText && <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent"></div>}
                     </div>
                 )}
@@ -231,7 +233,7 @@ export const DayCard: React.FC<DayCardProps> = ({ day, heightClass, entry, theme
 
                 {hasImage && (
                     <div className={`${hasText ? 'h-[70%]' : 'h-full'} w-full relative border-b overflow-hidden`} style={{ borderColor: theme.colors.border }}>
-                        <img src={entry!.imageUrl} className="w-full h-full object-cover object-center grayscale-[10%] group-hover:grayscale-0 transition-all" alt="" crossOrigin="anonymous"/>
+                        <img src={entry!.imageUrl} className="w-full h-full object-cover object-center grayscale-[10%] group-hover:grayscale-0 transition-all" alt="" crossOrigin="anonymous" data-image-filename={entry!.imageFilename}/>
                     </div>
                 )}
 
