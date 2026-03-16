@@ -15,16 +15,18 @@ interface ViewProps {
     theme: ColorTheme;
     layoutStyle: LayoutStyle;
     orientation: 'portrait' | 'landscape';
+    exportFontFamily?: string;
 }
 
 // 周视图 - 支持横竖屏
-export const WeekView: React.FC<ViewProps> = ({ date, entries, theme, layoutStyle, orientation }) => {
+export const WeekView: React.FC<ViewProps> = ({ date, entries, theme, layoutStyle, orientation, exportFontFamily }) => {
     const start = startOfWeek(date, { weekStartsOn: 1 });
     const end = endOfWeek(date, { weekStartsOn: 1 });
     const days = eachDayOfInterval({ start, end });
 
     const isNewspaper = layoutStyle === 'newspaper';
     const isFilm = layoutStyle === 'film';
+    const magazineTitleStyle = layoutStyle === 'magazine' && exportFontFamily ? { fontFamily: exportFontFamily } : undefined;
 
     const containerStyle = {
         backgroundColor: theme.colors.paper,
@@ -43,19 +45,19 @@ export const WeekView: React.FC<ViewProps> = ({ date, entries, theme, layoutStyl
             >
                 {/* Header */}
                 <div 
-                    className={`${isNewspaper ? 'pb-3' : 'pb-4'} flex justify-between items-end ${isNewspaper ? 'border-b-2 mb-0 px-2' : 'border-b mb-2'}`}
+                    className={isNewspaper ? 'pb-3 grid grid-cols-[1fr_auto] items-end gap-x-3 border-b-2 mb-0 px-2' : 'pb-4 flex justify-between items-end gap-3 border-b mb-2'}
                     style={{ borderColor: theme.colors.ink }}
                 >
-                    <div>
-                        <h2 className={`${isFilm ? 'font-mono tracking-widest uppercase' : getFontClass(layoutStyle)} ${isNewspaper ? 'text-3xl uppercase tracking-tighter' : 'text-2xl font-bold'}`} style={{ color: theme.colors.ink }}>
+                    <div className="min-w-0 overflow-hidden">
+                        <h2 className={`${isFilm ? 'font-mono tracking-widest uppercase' : getFontClass(layoutStyle)} ${isNewspaper ? 'text-[26px] uppercase tracking-tight font-display' : 'text-2xl font-bold'} whitespace-nowrap leading-none overflow-hidden text-ellipsis`} style={{ color: theme.colors.ink, ...magazineTitleStyle }}>
                             {isNewspaper ? 'The Weekly Chronicle' : (isFilm ? 'CINEMA LOG' : 'WEEKLY LOG')}
                         </h2>
-                        <p className={`${isFilm ? 'font-mono' : getFontClass(layoutStyle)} mt-1 tracking-widest text-xs`} style={{ color: theme.colors.inkLight }}>
+                        <p className={`${isFilm ? 'font-mono' : getFontClass(layoutStyle)} mt-1 ${isNewspaper ? 'tracking-[0.16em] text-[11px]' : 'tracking-widest text-xs'} whitespace-nowrap leading-tight`} style={{ color: theme.colors.inkLight, ...magazineTitleStyle }}>
                             {format(start, 'yyyy.MM.dd')} — {format(end, 'yyyy.MM.dd')}
                         </p>
                     </div>
-                    <div className="text-right">
-                        <span className={`${isFilm ? 'font-mono' : getFontClass(layoutStyle)} italic text-xl opacity-40`} style={{ color: theme.colors.ink }}>
+                    <div className="text-right shrink-0">
+                        <span className={`${isFilm ? 'font-mono' : getFontClass(layoutStyle)} ${isNewspaper ? 'font-display text-base' : 'text-xl'} italic opacity-40 whitespace-nowrap leading-none`} style={{ color: theme.colors.ink, ...magazineTitleStyle }}>
                             Vol. {format(date, 'w')}
                         </span>
                     </div>
@@ -79,11 +81,11 @@ export const WeekView: React.FC<ViewProps> = ({ date, entries, theme, layoutStyl
                 
                 {/* Footer */}
                 <div 
-                    className={`pt-3 flex justify-between items-center text-[10px] tracking-widest uppercase ${isNewspaper ? 'mt-2 border-t-2 px-2' : 'border-t'}`}
+                    className={isNewspaper ? 'pt-3 mt-2 border-t-2 px-2 flex flex-col items-start gap-1' : 'pt-3 flex justify-between items-center text-[10px] tracking-widest uppercase border-t'}
                     style={{ borderColor: theme.colors.ink, color: theme.colors.inkLight }}
                 >
-                    <span className={`${isNewspaper ? 'text-base font-display font-bold' : 'font-bold'}`} style={{ color: theme.colors.ink }}>Lumostime</span>
-                    <span className={`${isNewspaper ? 'text-[10px]' : ''}`}>Illuminate your life</span>
+                    <span className={`${isNewspaper ? 'text-sm font-display font-bold leading-none' : 'font-bold'}`} style={{ color: theme.colors.ink, ...magazineTitleStyle }}>Lumostime</span>
+                    <span className={`${isNewspaper ? 'text-[9px] tracking-[0.18em] self-end leading-none' : ''}`}>Illuminate your life</span>
                 </div>
             </div>
         );
@@ -97,19 +99,19 @@ export const WeekView: React.FC<ViewProps> = ({ date, entries, theme, layoutStyl
         >
             {/* Header */}
             <div 
-                className={`${isNewspaper ? 'pb-2' : 'pb-4'} flex justify-between items-end ${isNewspaper ? 'border-b mb-0 px-2 pt-2' : 'border-b mb-2'}`}
+                className={isNewspaper ? 'pb-2 grid grid-cols-[1fr_auto] items-end gap-x-3 border-b mb-0 px-2 pt-2' : 'pb-4 flex justify-between items-end gap-3 border-b mb-2'}
                 style={{ borderColor: theme.colors.ink }}
             >
-                <div>
-                    <h2 className={`${isFilm ? 'font-mono tracking-widest uppercase' : getFontClass(layoutStyle)} ${isNewspaper ? 'text-3xl uppercase tracking-tighter' : 'text-2xl font-bold'}`} style={{ color: theme.colors.ink }}>
+                <div className="min-w-0 overflow-hidden">
+                    <h2 className={`${isFilm ? 'font-mono tracking-widest uppercase' : getFontClass(layoutStyle)} ${isNewspaper ? 'text-[24px] uppercase tracking-tight font-display' : 'text-2xl font-bold'} whitespace-nowrap leading-none overflow-hidden text-ellipsis`} style={{ color: theme.colors.ink, ...magazineTitleStyle }}>
                         {isNewspaper ? 'The Weekly Chronicle' : (isFilm ? 'CINEMA LOG' : 'WEEKLY LOG')}
                     </h2>
-                    <p className={`${isFilm ? 'font-mono' : getFontClass(layoutStyle)} mt-1 tracking-widest text-xs`} style={{ color: theme.colors.inkLight }}>
+                    <p className={`${isFilm ? 'font-mono' : getFontClass(layoutStyle)} mt-1 ${isNewspaper ? 'tracking-[0.14em] text-[10px]' : 'tracking-widest text-xs'} whitespace-nowrap leading-tight`} style={{ color: theme.colors.inkLight, ...magazineTitleStyle }}>
                         {format(start, 'yyyy.MM.dd')} — {format(end, 'yyyy.MM.dd')}
                     </p>
                 </div>
-                <div className="text-right">
-                    <span className={`${isFilm ? 'font-mono' : getFontClass(layoutStyle)} italic text-xl opacity-40`} style={{ color: theme.colors.ink }}>
+                <div className="text-right shrink-0">
+                    <span className={`${isFilm ? 'font-mono' : getFontClass(layoutStyle)} ${isNewspaper ? 'font-display text-sm' : 'text-xl'} italic opacity-40 whitespace-nowrap leading-none`} style={{ color: theme.colors.ink, ...magazineTitleStyle }}>
                         Vol. {format(date, 'w')}
                     </span>
                 </div>
@@ -129,18 +131,18 @@ export const WeekView: React.FC<ViewProps> = ({ date, entries, theme, layoutStyl
             
             {/* Footer */}
             <div 
-                className={`pt-3 flex justify-between items-center text-[10px] tracking-widest uppercase ${isNewspaper ? 'mt-2 border-t-2 px-2' : 'border-t'}`}
+                className={isNewspaper ? 'pt-3 mt-2 border-t-2 px-2 flex flex-col items-start gap-1' : 'pt-3 flex justify-between items-center text-[10px] tracking-widest uppercase border-t'}
                 style={{ borderColor: theme.colors.ink, color: theme.colors.inkLight }}
             >
-                <span className={`${isNewspaper ? 'text-lg font-display font-bold' : 'font-bold'}`} style={{ color: theme.colors.ink }}>Lumostime</span>
-                <span className={`${isNewspaper ? 'text-xs' : ''}`}>Illuminate your life</span>
+                <span className={`${isNewspaper ? 'text-base font-display font-bold leading-none' : 'font-bold'}`} style={{ color: theme.colors.ink, ...magazineTitleStyle }}>Lumostime</span>
+                <span className={`${isNewspaper ? 'text-[10px] tracking-[0.16em] self-end leading-none' : ''}`}>Illuminate your life</span>
             </div>
         </div>
     );
 };
 
 // 月视图 - 支持横竖屏
-export const MonthView: React.FC<ViewProps> = ({ date, entries, theme, layoutStyle, orientation }) => {
+export const MonthView: React.FC<ViewProps> = ({ date, entries, theme, layoutStyle, orientation, exportFontFamily }) => {
     const monthStart = startOfMonth(date);
     const start = startOfWeek(monthStart, { weekStartsOn: 1 }); 
     const end = endOfWeek(endOfMonth(date), { weekStartsOn: 1 });
@@ -149,6 +151,7 @@ export const MonthView: React.FC<ViewProps> = ({ date, entries, theme, layoutSty
     const isNewspaper = layoutStyle === 'newspaper';
     const isMinimal = layoutStyle === 'minimal';
     const isFilm = layoutStyle === 'film';
+    const magazineTitleStyle = layoutStyle === 'magazine' && exportFontFamily ? { fontFamily: exportFontFamily } : undefined;
 
     const bg = isFilm ? theme.colors.ink : theme.colors.paper;
     const headerColor = isFilm ? theme.colors.paper : theme.colors.ink;
@@ -183,7 +186,7 @@ export const MonthView: React.FC<ViewProps> = ({ date, entries, theme, layoutSty
                     <div className="flex flex-col">
                         <h2 
                             className={`${isFilm ? 'font-mono tracking-tighter' : getFontClass(layoutStyle)} ${isNewspaper ? 'text-3xl tracking-tighter font-display' : 'text-2xl font-bold'}`} 
-                            style={{ color: headerColor, lineHeight: 0.9 }}
+                            style={{ color: headerColor, lineHeight: 0.9, ...magazineTitleStyle }}
                         >
                             {format(date, 'MMMM').toUpperCase()}
                         </h2>
@@ -191,7 +194,7 @@ export const MonthView: React.FC<ViewProps> = ({ date, entries, theme, layoutSty
                     <div className="text-right">
                         <span 
                             className={`${isFilm ? 'font-mono' : getFontClass(layoutStyle)} ${isNewspaper ? 'text-xl font-bold' : 'text-lg italic font-serif'}`} 
-                            style={{ color: isFilm ? theme.colors.paper : theme.colors.inkLight }}
+                            style={{ color: isFilm ? theme.colors.paper : theme.colors.inkLight, ...magazineTitleStyle }}
                         >
                             {format(date, 'yyyy')}
                         </span>
@@ -304,7 +307,7 @@ export const MonthView: React.FC<ViewProps> = ({ date, entries, theme, layoutSty
                         color: isFilm ? theme.colors.paper : theme.colors.inkLight,
                     }}
                 >
-                    <span className={`${isNewspaper ? 'text-xs font-display font-bold' : 'font-bold'}`} style={{ color: isFilm ? theme.colors.paper : headerColor }}>Lumostime</span>
+                    <span className={`${isNewspaper ? 'text-xs font-display font-bold' : 'font-bold'}`} style={{ color: isFilm ? theme.colors.paper : headerColor, ...magazineTitleStyle }}>Lumostime</span>
                     <span>Illuminate Your Life</span>
                 </div>
             </div>
@@ -325,7 +328,7 @@ export const MonthView: React.FC<ViewProps> = ({ date, entries, theme, layoutSty
 };
 
 // 年视图 - 支持横竖屏
-export const YearView: React.FC<ViewProps> = ({ date, entries, theme, layoutStyle, orientation }) => {
+export const YearView: React.FC<ViewProps> = ({ date, entries, theme, layoutStyle, orientation, exportFontFamily }) => {
     const months = Array.from({ length: 12 }, (_, i) => new Date(getYear(date), i, 1));
     
     // 根据横竖屏调整布局 - 参照参考代码
@@ -333,6 +336,7 @@ export const YearView: React.FC<ViewProps> = ({ date, entries, theme, layoutStyl
 
     const isNewspaper = layoutStyle === 'newspaper';
     const isFilm = layoutStyle === 'film';
+    const magazineTitleStyle = layoutStyle === 'magazine' && exportFontFamily ? { fontFamily: exportFontFamily } : undefined;
 
     const bg = isFilm ? theme.colors.ink : theme.colors.paper;
     const ink = isFilm ? theme.colors.paper : theme.colors.ink;
@@ -366,7 +370,7 @@ export const YearView: React.FC<ViewProps> = ({ date, entries, theme, layoutStyl
                         borderBottom: isNewspaper ? `2px solid ${border}` : (isFilm ? `1px solid ${border}` : `2px double ${border}`)
                     }}
                 >
-                    <h2 className={`${isFilm ? 'font-mono tracking-widest' : getFontClass(layoutStyle)} ${orientation === 'landscape' ? 'text-3xl' : 'text-3xl'} font-bold ${isFilm ? 'uppercase' : 'tracking-tight'}`} style={{ color: ink }}>
+                    <h2 className={`${isFilm ? 'font-mono tracking-widest' : getFontClass(layoutStyle)} ${orientation === 'landscape' ? 'text-3xl' : 'text-3xl'} font-bold ${isFilm ? 'uppercase' : 'tracking-tight'}`} style={{ color: ink, ...magazineTitleStyle }}>
                         {isFilm ? `FILM ARCHIVE ${format(date, 'yyyy')}` : format(date, 'yyyy')}
                     </h2>
                 </div>
@@ -476,7 +480,7 @@ export const YearView: React.FC<ViewProps> = ({ date, entries, theme, layoutStyl
                         color: isFilm ? theme.colors.paper : theme.colors.inkLight,
                     }}
                 >
-                    <span className={`${isNewspaper ? 'text-xs font-bold' : 'font-bold'} ${isFilm ? 'font-mono' : ''}`} style={{ color: ink }}>Lumostime</span>
+                    <span className={`${isNewspaper ? 'text-xs font-bold' : 'font-bold'} ${isFilm ? 'font-mono' : ''}`} style={{ color: ink, ...magazineTitleStyle }}>Lumostime</span>
                     <span className={isFilm ? 'font-mono' : ''}>Illuminate Your Life</span>
                 </div>
             </div>

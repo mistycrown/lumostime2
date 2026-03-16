@@ -207,6 +207,13 @@ export const GalleryExportView: React.FC<GalleryExportViewProps> = ({
     const [loadingTarget, setLoadingTarget] = useState<string>('');
     
     const exportRef = useRef<HTMLDivElement>(null);
+    const exportFontFamily = typeof window === 'undefined'
+        ? undefined
+        : (
+            getComputedStyle(document.documentElement).getPropertyValue('--font-family').trim()
+            || getComputedStyle(document.body).fontFamily.trim()
+            || undefined
+        );
 
     // 按需计算日期范围（优化：只处理当前视图需要的日期）
     const dateRange = useMemo(() => {
@@ -623,6 +630,7 @@ export const GalleryExportView: React.FC<GalleryExportViewProps> = ({
                                 theme={currentTheme}
                                 layoutStyle={currentLayout}
                                 orientation={orientation}
+                                exportFontFamily={exportFontFamily}
                             />
                         )}
                         {currentPeriod === 'month' && (
@@ -632,6 +640,7 @@ export const GalleryExportView: React.FC<GalleryExportViewProps> = ({
                                 theme={currentTheme}
                                 layoutStyle={currentLayout}
                                 orientation={orientation}
+                                exportFontFamily={exportFontFamily}
                             />
                         )}
                         {currentPeriod === 'year' && (
@@ -641,6 +650,7 @@ export const GalleryExportView: React.FC<GalleryExportViewProps> = ({
                                 theme={currentTheme}
                                 layoutStyle={currentLayout}
                                 orientation={orientation}
+                                exportFontFamily={exportFontFamily}
                             />
                         )}
                         </div>

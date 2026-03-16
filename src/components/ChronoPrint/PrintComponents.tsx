@@ -69,14 +69,14 @@ export const PrintBarChart: React.FC<SimpleBarChartProps> = ({
       {items.map((item, idx) => (
         <div key={idx} className="group">
           {/* Header Row */}
-          <div className="flex flex-wrap items-end justify-between mb-1 gap-1 relative z-10">
-            <div className="flex items-center gap-3 min-w-0">
+          <div className={`flex justify-between mb-1 gap-3 relative z-10 ${variantStyle === 'modern' || variantStyle === 'retro' ? 'items-baseline' : 'items-end'}`}>
+            <div className={`flex min-w-0 flex-1 gap-2.5 ${variantStyle === 'modern' || variantStyle === 'retro' ? 'items-baseline' : 'items-end'}`}>
               <span 
                 className={`
-                  truncate
+                  chrono-print-item-name min-w-0 flex-1 truncate
                   ${variantStyle === 'classic' ? 'font-serif font-bold text-lg' : ''}
-                  ${variantStyle === 'modern' ? 'font-sans font-bold text-lg tracking-tight' : ''}
-                  ${variantStyle === 'retro' ? 'font-display font-black text-xl tracking-tight' : ''}
+                  ${variantStyle === 'modern' ? 'font-sans font-bold text-lg tracking-tight leading-none' : ''}
+                  ${variantStyle === 'retro' ? 'font-display font-black text-xl tracking-tight leading-none' : ''}
                   ${variantStyle === 'ticket' ? 'font-serif font-bold text-lg tracking-tight' : ''}
                 `}
                 style={{ color: theme.primary }}
@@ -85,25 +85,25 @@ export const PrintBarChart: React.FC<SimpleBarChartProps> = ({
               </span>
               <span 
                 className={`
-                  px-1.5 py-0.5
+                  inline-flex flex-shrink-0 self-baseline items-center rounded-full whitespace-nowrap
                   ${variantStyle === 'classic' ? 'text-[10px] font-mono font-medium rounded bg-gray-50' : ''}
-                  ${variantStyle === 'modern' ? 'text-xs font-bold text-white' : ''}
-                  ${variantStyle === 'retro' ? 'text-xs font-bold rounded-full border-2' : ''}
-                  ${variantStyle === 'ticket' ? 'text-xs font-serif font-bold' : ''}
+                  ${variantStyle === 'modern' ? 'border px-1.5 py-0 text-[9px] font-semibold leading-4 tracking-[0.08em]' : ''}
+                  ${variantStyle === 'retro' ? 'border px-1.5 py-0 text-[10px] font-bold leading-4 tracking-[0.04em]' : ''}
+                  ${variantStyle === 'ticket' ? 'border px-1.5 py-0 text-[10px] font-serif font-semibold leading-4 tracking-[0.06em]' : ''}
                 `}
                 style={{
-                  color: variantStyle === 'classic' ? theme.secondary : (variantStyle === 'modern' ? '#fff' : theme.primary),
-                  backgroundColor: variantStyle === 'modern' ? theme.primary : (variantStyle === 'retro' ? 'transparent' : undefined),
-                  borderColor: variantStyle === 'retro' ? theme.primary : undefined,
-                  opacity: variantStyle === 'ticket' ? 0.7 : 1
+                  color: variantStyle === 'classic' ? theme.secondary : theme.primary,
+                  backgroundColor: variantStyle === 'modern' ? `${theme.primary}10` : (variantStyle === 'retro' ? `${theme.primary}08` : (variantStyle === 'ticket' ? `${theme.primary}06` : undefined)),
+                  borderColor: variantStyle === 'modern' ? `${theme.primary}30` : ((variantStyle === 'retro' || variantStyle === 'ticket') ? `${theme.primary}35` : undefined),
+                  opacity: variantStyle === 'ticket' ? 0.85 : 1
                 }}
               >
                 {item.percentageStr}
               </span>
             </div>
             <span 
-              className={`
-                whitespace-nowrap
+                className={`
+                flex-shrink-0 self-baseline whitespace-nowrap leading-none
                 ${variantStyle === 'classic' ? 'font-sans text-sm font-medium' : ''}
                 ${variantStyle === 'modern' ? 'font-sans text-sm font-bold' : ''}
                 ${variantStyle === 'retro' ? 'font-mono text-sm font-bold' : ''}
@@ -172,7 +172,7 @@ export const PrintBarChart: React.FC<SimpleBarChartProps> = ({
             >
               {item.subItems.map((sub, sIdx) => (
                 <div key={sIdx} className={`
-                  flex items-baseline
+                  flex items-baseline gap-2
                   ${variantStyle === 'classic' ? 'justify-between text-xs py-0.5 border-b border-dashed border-gray-100 last:border-0' : ''}
                   ${variantStyle === 'modern' ? 'text-[10px] font-sans font-medium text-gray-500 bg-gray-50 px-2 py-0.5 rounded-sm' : ''}
                   ${variantStyle === 'retro' ? 'justify-between text-xs font-medium border-b border-dotted pb-1' : ''}
@@ -184,7 +184,7 @@ export const PrintBarChart: React.FC<SimpleBarChartProps> = ({
                 }}
                 >
                   <span className={`
-                    truncate
+                    chrono-print-subitem-name min-w-0 flex-1 truncate
                     ${variantStyle === 'classic' ? 'font-serif italic pr-2' : ''}
                     ${variantStyle === 'retro' ? 'font-sans opacity-80' : ''}
                     ${variantStyle === 'ticket' ? 'font-serif opacity-80' : ''}
@@ -193,7 +193,7 @@ export const PrintBarChart: React.FC<SimpleBarChartProps> = ({
                     {variantStyle === 'modern' && <span className="mx-1 text-gray-300">|</span>}
                   </span>
                   <span className={`
-                    whitespace-nowrap
+                    flex-shrink-0 whitespace-nowrap
                     ${variantStyle === 'classic' ? 'font-mono' : ''}
                     ${variantStyle === 'modern' ? 'font-bold text-gray-900' : ''}
                     ${variantStyle === 'retro' ? 'font-mono opacity-60' : ''}
@@ -480,14 +480,14 @@ export const PrintCard = React.forwardRef<HTMLDivElement, PrintCardProps>(({
   // Style configurations
   const containerClasses = {
     classic: "bg-white shadow-lg print:shadow-none print:border print:border-gray-200",
-    modern: "bg-white border-y-8 relative", // Added relative to constrain absolute children (dot grid)
+    modern: "bg-white border relative", // Added relative to constrain absolute children (dot grid)
     retro: "shadow-none relative overflow-hidden", 
     ticket: "shadow-md relative mb-8", // mb-8 for visual spacing in app, but export needs careful handling
   };
 
   const headerBorder = {
     classic: "border-b-4 pb-4",
-    modern: "border-b-2 pb-6",
+    modern: "border-b pb-6",
     retro: "border-b-2 border-black/10 pb-4",
     ticket: "border-b-2 border-dotted pb-4"
   };
@@ -500,7 +500,7 @@ export const PrintCard = React.forwardRef<HTMLDivElement, PrintCardProps>(({
         // For ticket, the main container is transparent to allow the serrated edge bottom to work with the page background.
         // We add an inner container for the background color.
         backgroundColor: variantStyle === 'ticket' ? 'transparent' : (variantStyle === 'retro' ? theme.bg : '#ffffff'),
-        borderColor: variantStyle === 'modern' ? theme.primary : undefined,
+        borderColor: variantStyle === 'modern' ? `${theme.primary}30` : undefined,
         borderRadius: variantStyle === 'retro' ? '1.5rem' : '0',
         padding: variantStyle === 'ticket' ? '0' : (isMobile ? '1.5rem' : '2rem 3rem')
       }}
@@ -512,7 +512,7 @@ export const PrintCard = React.forwardRef<HTMLDivElement, PrintCardProps>(({
       */}
       {variantStyle === 'ticket' ? (
         <>
-           <div className="p-6 md:p-8" style={{ backgroundColor: theme.bg }}>
+            <div className="p-6 md:p-8" style={{ backgroundColor: theme.bg }}>
               <CardContent 
                 title={title} 
                 subtitle={subtitle} 
@@ -523,8 +523,6 @@ export const PrintCard = React.forwardRef<HTMLDivElement, PrintCardProps>(({
                 isMobile={isMobile} 
                 variantStyle={variantStyle}
               >
-                 {/* Top Perforation for Ticket */}
-                 <div className="absolute top-0 left-0 w-full h-3 border-b border-gray-300 opacity-20 pointer-events-none"></div>
                  {children}
               </CardContent>
            </div>
@@ -590,7 +588,7 @@ const CardContent: React.FC<{
             {/* Header Container */}
             <header 
                 className={`flex justify-between mb-6 gap-4 relative z-10 ${headerBorder}`}
-                style={{ borderColor: variantStyle === 'classic' || variantStyle === 'modern' ? theme.primary : (variantStyle === 'ticket' ? `${theme.primary}60` : undefined) }}
+                style={{ borderColor: variantStyle === 'classic' ? theme.primary : (variantStyle === 'modern' ? `${theme.primary}30` : (variantStyle === 'ticket' ? `${theme.primary}60` : undefined)) }}
             >
                 {/* Left Block */}
                 <div className="flex min-w-0 flex-1 flex-col justify-between items-start gap-1">
@@ -641,14 +639,17 @@ const CardContent: React.FC<{
                 >Total Time</div>
                 <div 
                     className={`
-                    leading-[0.85]
+                    whitespace-nowrap leading-[0.85]
                     ${isMobile ? 'text-xl' : 'text-2xl'}
                     ${variantStyle === 'classic' ? 'font-serif font-bold' : ''}
                     ${variantStyle === 'modern' ? 'font-sans font-black' : ''}
                     ${variantStyle === 'retro' ? 'font-display font-black' : ''}
                     ${variantStyle === 'ticket' ? 'font-serif font-bold' : ''}
                     `}
-                    style={{ color: theme.primary }}
+                    style={{
+                    color: theme.primary,
+                    fontSize: isMobile ? 'clamp(1.125rem, 5.5vw, 1.5rem)' : undefined
+                    }}
                 >{total}</div>
                 </div>
 
@@ -661,13 +662,13 @@ const CardContent: React.FC<{
             <footer className={`
                 mt-10 pt-4 flex justify-between items-center text-[10px] uppercase tracking-widest relative z-10
                 ${variantStyle === 'classic' ? 'border-t border-gray-100 font-sans' : ''}
-                ${variantStyle === 'modern' ? 'border-t-4 font-sans font-bold' : ''}
+                ${variantStyle === 'modern' ? 'border-t font-sans font-bold' : ''}
                 ${variantStyle === 'retro' ? 'border-t-2 border-black/5 font-mono opacity-60' : ''}
                 ${variantStyle === 'ticket' ? 'flex-col border-t border-dotted' : ''}
             `}
             style={{
                 color: variantStyle === 'classic' ? theme.secondary : (variantStyle === 'modern' ? theme.primary : theme.primary),
-                borderColor: variantStyle === 'modern' ? theme.primary : (variantStyle === 'ticket' ? `${theme.primary}60` : undefined)
+                borderColor: variantStyle === 'modern' ? `${theme.primary}30` : (variantStyle === 'ticket' ? `${theme.primary}60` : undefined)
             }}
             >
                 {variantStyle === 'ticket' ? (
