@@ -69,8 +69,8 @@ export const PrintBarChart: React.FC<SimpleBarChartProps> = ({
       {items.map((item, idx) => (
         <div key={idx} className="group">
           {/* Header Row */}
-          <div className={`flex justify-between mb-1 gap-3 relative z-10 ${variantStyle === 'modern' || variantStyle === 'retro' ? 'items-baseline' : 'items-end'}`}>
-            <div className={`flex min-w-0 flex-1 gap-2.5 ${variantStyle === 'modern' || variantStyle === 'retro' ? 'items-baseline' : 'items-end'}`}>
+          <div className={`flex justify-between mb-1 gap-3 relative z-10 ${variantStyle === 'modern' || variantStyle === 'retro' ? 'items-baseline' : 'items-center'}`}>
+            <div className={`flex min-w-0 flex-1 gap-2.5 ${variantStyle === 'modern' || variantStyle === 'retro' ? 'items-baseline' : 'items-center'}`}>
               <span 
                 className={`
                   chrono-print-item-name min-w-0 flex-1 truncate
@@ -85,7 +85,8 @@ export const PrintBarChart: React.FC<SimpleBarChartProps> = ({
               </span>
               <span 
                 className={`
-                  inline-flex flex-shrink-0 self-baseline items-center rounded-full whitespace-nowrap
+                  inline-flex flex-shrink-0 items-center rounded-full whitespace-nowrap
+                  self-center
                   ${variantStyle === 'classic' ? 'text-[10px] font-mono font-medium rounded bg-gray-50' : ''}
                   ${variantStyle === 'modern' ? 'border px-1.5 py-0 text-[9px] font-semibold leading-4 tracking-[0.08em]' : ''}
                   ${variantStyle === 'retro' ? 'border px-1.5 py-0 text-[10px] font-bold leading-4 tracking-[0.04em]' : ''}
@@ -103,7 +104,8 @@ export const PrintBarChart: React.FC<SimpleBarChartProps> = ({
             </div>
             <span 
                 className={`
-                flex-shrink-0 self-baseline whitespace-nowrap leading-none
+                flex-shrink-0 whitespace-nowrap leading-none
+                ${variantStyle === 'modern' || variantStyle === 'retro' ? 'self-baseline' : 'self-center'}
                 ${variantStyle === 'classic' ? 'font-sans text-sm font-medium' : ''}
                 ${variantStyle === 'modern' ? 'font-sans text-sm font-bold' : ''}
                 ${variantStyle === 'retro' ? 'font-mono text-sm font-bold' : ''}

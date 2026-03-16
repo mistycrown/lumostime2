@@ -32,6 +32,19 @@ export const WeekView: React.FC<ViewProps> = ({ date, entries, theme, layoutStyl
         backgroundColor: theme.colors.paper,
         border: isNewspaper ? `1px solid ${theme.colors.ink}` : 'none'
     };
+    const weekHeaderSizing = orientation === 'landscape'
+        ? {
+            title: isNewspaper ? 'clamp(20px, 3.9vw, 22px)' : (isFilm ? 'clamp(18px, 3.6vw, 20px)' : 'clamp(19px, 3.8vw, 21px)'),
+            date: isNewspaper ? 'clamp(9px, 1.8vw, 10px)' : 'clamp(9px, 2vw, 10px)',
+            volume: isNewspaper ? 'clamp(12px, 2.5vw, 14px)' : (isFilm ? 'clamp(12px, 2.7vw, 14px)' : 'clamp(13px, 3vw, 16px)'),
+            dateTracking: isNewspaper ? '0.12em' : '0.10em'
+        }
+        : {
+            title: isNewspaper ? 'clamp(17px, 5.2vw, 19px)' : (isFilm ? 'clamp(16px, 4.7vw, 17px)' : 'clamp(17px, 4.9vw, 18px)'),
+            date: isNewspaper ? 'clamp(8px, 2.4vw, 9px)' : 'clamp(8px, 2.6vw, 10px)',
+            volume: isNewspaper ? 'clamp(11px, 3vw, 13px)' : (isFilm ? 'clamp(11px, 3.1vw, 12px)' : 'clamp(12px, 3.4vw, 14px)'),
+            dateTracking: isNewspaper ? '0.08em' : '0.08em'
+        };
 
     // 横屏布局 - A4横向比例
     if (orientation === 'landscape') {
@@ -45,19 +58,19 @@ export const WeekView: React.FC<ViewProps> = ({ date, entries, theme, layoutStyl
             >
                 {/* Header */}
                 <div 
-                    className={isNewspaper ? 'pb-3 grid grid-cols-[1fr_auto] items-end gap-x-3 border-b-2 mb-0 px-2' : 'pb-4 flex justify-between items-end gap-3 border-b mb-2'}
+                    className={isNewspaper ? 'pb-3 grid grid-cols-[minmax(0,1fr)_auto] items-end gap-x-4 border-b-2 mb-0 px-2' : 'pb-4 flex justify-between items-end gap-3 border-b mb-2'}
                     style={{ borderColor: theme.colors.ink }}
                 >
-                    <div className="min-w-0 overflow-hidden">
-                        <h2 className={`${isFilm ? 'font-mono tracking-widest uppercase' : getFontClass(layoutStyle)} ${isNewspaper ? 'text-[26px] uppercase tracking-tight font-display' : 'text-2xl font-bold'} whitespace-nowrap leading-none overflow-hidden text-ellipsis`} style={{ color: theme.colors.ink, ...magazineTitleStyle }}>
+                    <div className="min-w-0">
+                        <h2 className={`${isFilm ? 'font-mono tracking-widest uppercase' : getFontClass(layoutStyle)} ${isNewspaper ? 'uppercase tracking-tight font-display' : 'font-bold'} whitespace-nowrap leading-none`} style={{ color: theme.colors.ink, fontSize: weekHeaderSizing.title, ...magazineTitleStyle }}>
                             {isNewspaper ? 'The Weekly Chronicle' : (isFilm ? 'CINEMA LOG' : 'WEEKLY LOG')}
                         </h2>
-                        <p className={`${isFilm ? 'font-mono' : getFontClass(layoutStyle)} mt-1 ${isNewspaper ? 'tracking-[0.16em] text-[11px]' : 'tracking-widest text-xs'} whitespace-nowrap leading-tight`} style={{ color: theme.colors.inkLight, ...magazineTitleStyle }}>
+                        <p className={`${isFilm ? 'font-mono' : getFontClass(layoutStyle)} mt-1 whitespace-nowrap leading-tight`} style={{ color: theme.colors.inkLight, fontSize: weekHeaderSizing.date, letterSpacing: weekHeaderSizing.dateTracking, ...magazineTitleStyle }}>
                             {format(start, 'yyyy.MM.dd')} — {format(end, 'yyyy.MM.dd')}
                         </p>
                     </div>
                     <div className="text-right shrink-0">
-                        <span className={`${isFilm ? 'font-mono' : getFontClass(layoutStyle)} ${isNewspaper ? 'font-display text-base' : 'text-xl'} italic opacity-40 whitespace-nowrap leading-none`} style={{ color: theme.colors.ink, ...magazineTitleStyle }}>
+                        <span className={`${isFilm ? 'font-mono' : getFontClass(layoutStyle)} ${isNewspaper ? 'font-display' : ''} italic opacity-40 whitespace-nowrap leading-none`} style={{ color: theme.colors.ink, fontSize: weekHeaderSizing.volume, ...magazineTitleStyle }}>
                             Vol. {format(date, 'w')}
                         </span>
                     </div>
@@ -99,19 +112,19 @@ export const WeekView: React.FC<ViewProps> = ({ date, entries, theme, layoutStyl
         >
             {/* Header */}
             <div 
-                className={isNewspaper ? 'pb-2 grid grid-cols-[1fr_auto] items-end gap-x-3 border-b mb-0 px-2 pt-2' : 'pb-4 flex justify-between items-end gap-3 border-b mb-2'}
+                className={isNewspaper ? 'pb-2 grid grid-cols-[minmax(0,1fr)_auto] items-end gap-x-3 border-b mb-0 px-2 pt-2' : 'pb-4 flex justify-between items-end gap-3 border-b mb-2'}
                 style={{ borderColor: theme.colors.ink }}
             >
-                <div className="min-w-0 overflow-hidden">
-                    <h2 className={`${isFilm ? 'font-mono tracking-widest uppercase' : getFontClass(layoutStyle)} ${isNewspaper ? 'text-[24px] uppercase tracking-tight font-display' : 'text-2xl font-bold'} whitespace-nowrap leading-none overflow-hidden text-ellipsis`} style={{ color: theme.colors.ink, ...magazineTitleStyle }}>
+                <div className="min-w-0">
+                    <h2 className={`${isFilm ? 'font-mono tracking-widest uppercase' : getFontClass(layoutStyle)} ${isNewspaper ? 'uppercase tracking-tight font-display' : 'font-bold'} whitespace-nowrap leading-none`} style={{ color: theme.colors.ink, fontSize: weekHeaderSizing.title, ...magazineTitleStyle }}>
                         {isNewspaper ? 'The Weekly Chronicle' : (isFilm ? 'CINEMA LOG' : 'WEEKLY LOG')}
                     </h2>
-                    <p className={`${isFilm ? 'font-mono' : getFontClass(layoutStyle)} mt-1 ${isNewspaper ? 'tracking-[0.14em] text-[10px]' : 'tracking-widest text-xs'} whitespace-nowrap leading-tight`} style={{ color: theme.colors.inkLight, ...magazineTitleStyle }}>
+                    <p className={`${isFilm ? 'font-mono' : getFontClass(layoutStyle)} mt-1 whitespace-nowrap leading-tight`} style={{ color: theme.colors.inkLight, fontSize: weekHeaderSizing.date, letterSpacing: weekHeaderSizing.dateTracking, ...magazineTitleStyle }}>
                         {format(start, 'yyyy.MM.dd')} — {format(end, 'yyyy.MM.dd')}
                     </p>
                 </div>
                 <div className="text-right shrink-0">
-                    <span className={`${isFilm ? 'font-mono' : getFontClass(layoutStyle)} ${isNewspaper ? 'font-display text-sm' : 'text-xl'} italic opacity-40 whitespace-nowrap leading-none`} style={{ color: theme.colors.ink, ...magazineTitleStyle }}>
+                    <span className={`${isFilm ? 'font-mono' : getFontClass(layoutStyle)} ${isNewspaper ? 'font-display' : ''} italic opacity-40 whitespace-nowrap leading-none`} style={{ color: theme.colors.ink, fontSize: weekHeaderSizing.volume, ...magazineTitleStyle }}>
                         Vol. {format(date, 'w')}
                     </span>
                 </div>

@@ -10,6 +10,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Category, Log, TodoItem, TodoCategory, Scope, AutoLinkRule, Comment } from '../types';
 import { X, Trash2, TrendingUp, Plus, Minus, Lightbulb, Check, CheckCircle2, Clock, Camera, Image as ImageIcon, Maximize2, Minimize2, Share2 } from 'lucide-react';
+import { Capacitor } from '@capacitor/core';
 import { TodoAssociation } from '../components/TodoAssociation';
 import { TagAssociation } from '../components/TagAssociation';
 import { ScopeAssociation } from '../components/ScopeAssociation';
@@ -27,6 +28,7 @@ interface AddLogModalProps {
   initialStartTime?: number;
   initialEndTime?: number;
   prefilledData?: { categoryId?: string; activityId?: string; linkedTodoId?: string };
+  reduceVisualEffects?: boolean;
   onClose: () => void;
   onSave: (log: Log) => void;
 
@@ -44,7 +46,7 @@ interface AddLogModalProps {
   allLogs?: Log[]; // 添加所有日志用于计算上一条记录
 }
 
-export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialStartTime, initialEndTime, prefilledData, onClose, onSave, onDelete, onImageRemove, categories, todos, todoCategories, scopes, autoLinkRules = [], autoApplyAutoLinkRules = true, autoApplyTodoLink = true, lastLogEndTime, autoFocusNote = true, allLogs = [] }) => {
+export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialStartTime, initialEndTime, prefilledData, reduceVisualEffects = false, onClose, onSave, onDelete, onImageRemove, categories, todos, todoCategories, scopes, autoLinkRules = [], autoApplyAutoLinkRules = true, autoApplyTodoLink = true, lastLogEndTime, autoFocusNote = true, allLogs = [] }) => {
   // 使用自定义 Hooks 管理状态
   const { setIsShareViewOpen, setSharingLog } = useNavigation();
   
@@ -466,16 +468,19 @@ export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialSta
   const selectedCategory = categories.find(c => c.id === formState.selectedCategoryId) || categories[0];
   const linkedTodo = todos.find(t => t.id === formState.linkedTodoId);
   const hasSuggestions = suggestions.activity || suggestions.scopes.length > 0;
+  const isNativeAndroid = Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'android';
+  const shouldReduceOverlayEffects = reduceVisualEffects && isNativeAndroid;
 
   return (
     <div
-      className="fixed inset-0 z-[100] flex items-end md:items-center justify-center bg-stone-900/40 backdrop-blur-sm animate-fadeIn pb-[env(safe-area-inset-bottom)]"
+      className={`fixed inset-0 z-[100] flex items-end md:items-center justify-center pb-[env(safe-area-inset-bottom)] ${shouldReduceOverlayEffects ? 'bg-stone-900/20' : 'bg-stone-900/40 backdrop-blur-sm animate-fadeIn'}`}
       onClick={handleClose}
     >
       {/* Modal Content - Bottom Sheet on Mobile, Center on Desktop */}
       <div
-        className="w-full h-[85vh] md:h-auto md:max-h-[85vh] md:max-w-2xl bg-[#faf9f6] rounded-t-[2rem] md:rounded-3xl shadow-2xl flex flex-col overflow-hidden relative animate-slideUp"
+        className={`w-full h-[85vh] md:h-auto md:max-h-[85vh] md:max-w-2xl bg-[#faf9f6] rounded-t-[2rem] md:rounded-3xl shadow-2xl flex flex-col overflow-hidden relative ${shouldReduceOverlayEffects ? '' : 'animate-slideUp'}`}
         onClick={(e) => e.stopPropagation()}
+        style={shouldReduceOverlayEffects ? { transform: 'translateZ(0)' } : undefined}
       >
 
         {/* Header */}

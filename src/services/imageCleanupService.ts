@@ -1,9 +1,9 @@
 /**
  * @file imageCleanupService.ts
- * @input Log records, Local images
+ * @input Log records, Todo cover images, settings image references, local images
  * @output Cleanup operations
  * @pos Service (Image Management)
- * @description Automatically detects and removes unreferenced images to free up storage space.
+ * @description Automatically detects and removes unreferenced images to free up storage space, including protected settings images.
  * 
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
@@ -12,6 +12,7 @@ import { Capacitor } from '@capacitor/core';
 import { Directory, Filesystem } from '@capacitor/filesystem';
 import { Log, TodoItem } from '../types';
 import { imageService } from './imageService';
+import { getSettingsReferencedImages } from './settingsImageReferenceService';
 import { webdavService } from './webdavService';
 
 export interface CleanupResult {
@@ -54,6 +55,10 @@ export class ImageCleanupService {
             if (!todo.coverImage.startsWith('thumb_')) {
                 referencedImages.add(`thumb_${todo.coverImage}`);
             }
+        });
+
+        getSettingsReferencedImages().forEach((imageName) => {
+            referencedImages.add(imageName);
         });
         
         return referencedImages;
@@ -411,6 +416,11 @@ export class ImageCleanupService {
                 totalReferences++;
             }
         });
+
+        getSettingsReferencedImages().forEach((imageName) => {
+            imageUsage.set(imageName, (imageUsage.get(imageName) || 0) + 1);
+            totalReferences++;
+        });
         
         return {
             imageUsage,
@@ -430,7 +440,7 @@ export class ImageCleanupService {
             let report = `# 图片清理报告\n\n`;
             report += `## 📊 总体统计\n`;
             report += `- **总图片文件数**: ${checkResult.totalImages}\n`;
-            report += `- **被引用原图数**: ${Math.floor(checkResult.referencedImages / 2)}\n`; // 除以2因为包含了缩略图
+            report += `- **被引用图片文件数**: ${checkResult.referencedImages}\n`;
             report += `- **待清理文件数**: ${checkResult.unreferencedImages.length}\n`;
             report += `- **总引用次数**: ${usageStats.totalReferences}\n\n`;
             
