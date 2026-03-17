@@ -3,14 +3,14 @@
  * @input Installed Apps List, Categories
  * @output Accessibility Permission Request, App Association Rules
  * @pos View (Settings Sub-page)
- * @description Allows users to grant accessibility permissions and configure which third-party apps should trigger automatic time tracking and link to specific activities.
+ * @description Allows users to grant accessibility permissions, configure app-to-activity associations, and mark apps to be ignored by floating-window detection.
  * 
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
 import React, { useEffect, useState, useMemo } from 'react';
-import { ArrowLeft, Check, ShieldAlert, Smartphone, ChevronRight, X, Search, Link as LinkIcon, Trash2 } from 'lucide-react';
+import { ArrowLeft, Check, ShieldAlert, Smartphone, ChevronRight, X, Search, Trash2 } from 'lucide-react';
 import AppUsage from '../plugins/AppUsagePlugin';
-import { Category, Activity } from '../types';
+import { Category } from '../types';
 
 interface Props {
     onBack: () => void;
@@ -23,15 +23,11 @@ interface InstalledApp {
     icon: string; // Base64
 }
 
-interface AppRule {
-    packageName: string;
-    activityId: string;
-}
-
 export const AutoRecordSettingsView: React.FC<Props> = ({ onBack, categories }) => {
     const [hasPermission, setHasPermission] = useState<boolean>(false);
     const [installedApps, setInstalledApps] = useState<InstalledApp[]>([]);
     const [rules, setRules] = useState<{ [key: string]: string }>({});
+    const [ignoredApps, setIgnoredApps] = useState<{ [key: string]: boolean }>({});
     const [isLoading, setIsLoading] = useState(false);
 
     // Selection Modal State
@@ -64,15 +60,16 @@ export const AutoRecordSettingsView: React.FC<Props> = ({ onBack, categories }) 
             // Load rules first
             const rulesRes = await AppUsage.getAppRules();
             setRules(rulesRes.rules || {});
+            setIgnoredApps(rulesRes.ignoredApps || {});
 
             // Load apps
             const appsRes = await AppUsage.getInstalledApps();
-            // Sort: Apps with rules first, then alphabetical
+            // Sort: configured apps first, then alphabetical
             const sorted = (appsRes.apps || []).sort((a, b) => {
-                const hasRuleA = !!rulesRes.rules[a.packageName];
-                const hasRuleB = !!rulesRes.rules[b.packageName];
-                if (hasRuleA && !hasRuleB) return -1;
-                if (!hasRuleA && hasRuleB) return 1;
+                const isConfiguredA = !!rulesRes.rules[a.packageName] || !!rulesRes.ignoredApps?.[a.packageName];
+                const isConfiguredB = !!rulesRes.rules[b.packageName] || !!rulesRes.ignoredApps?.[b.packageName];
+                if (isConfiguredA && !isConfiguredB) return -1;
+                if (!isConfiguredA && isConfiguredB) return 1;
                 return a.label.localeCompare(b.label);
             });
             setInstalledApps(sorted);
@@ -95,7 +92,12 @@ export const AutoRecordSettingsView: React.FC<Props> = ({ onBack, categories }) 
     const handleSaveRule = async (activityId: string) => {
         if (!selectedApp) return;
         try {
-            await AppUsage.saveAppRule({ packageName: selectedApp.packageName, activityId });
+            const activity = getActivityById(activityId);
+            await AppUsage.saveAppRule({
+                packageName: selectedApp.packageName,
+                activityId,
+                activityName: activity?.name
+            });
             setRules(prev => ({ ...prev, [selectedApp.packageName]: activityId }));
             setIsModalOpen(false);
             setSelectedApp(null);
@@ -103,6 +105,30 @@ export const AutoRecordSettingsView: React.FC<Props> = ({ onBack, categories }) 
             // Re-sort apps locally to move updated one to top? No, just keep list stable for now.
         } catch (e) { console.error(e); }
     };
+
+    const handleToggleIgnored = async (app: InstalledApp, ignored: boolean) => {
+        try {
+            await AppUsage.setAppIgnored({ packageName: app.packageName, ignored });
+            setIgnoredApps(prev => ({
+                ...prev,
+                [app.packageName]: ignored
+            }));
+        } catch (e) { console.error(e); }
+    };
+
+    const renderIgnoreButton = (isIgnored: boolean, onClick: () => void, compact = false) => (
+        <button
+            type="button"
+            aria-pressed={isIgnored}
+            onClick={onClick}
+            className={`rounded-full font-medium transition-colors ${compact ? 'px-3 py-1.5 text-xs' : 'px-4 py-2 text-sm'} ${isIgnored
+                ? 'bg-stone-800 text-white'
+                : 'bg-stone-100 text-stone-600 hover:bg-stone-200'
+                }`}
+        >
+            {isIgnored ? '忽略' : '开启'}
+        </button>
+    );
 
     const handleRemoveRule = async () => {
         if (!selectedApp) return;
@@ -172,6 +198,20 @@ export const AutoRecordSettingsView: React.FC<Props> = ({ onBack, categories }) 
                 </div>
 
                 <div className="flex-1 overflow-y-auto p-4">
+                    <div className="mb-5 rounded-2xl border border-stone-200 bg-white p-4">
+                        <div className="flex items-center justify-between gap-4">
+                            <div>
+                                <div className="text-sm font-semibold text-stone-800">忽略此应用</div>
+                                <div className="mt-1 text-xs leading-relaxed text-stone-500">
+                                    开启后，悬浮球不会识别、展示或提醒这个应用，但已关联的标签会保留。
+                                </div>
+                            </div>
+                            {renderIgnoreButton(
+                                !!ignoredApps[selectedApp.packageName],
+                                () => handleToggleIgnored(selectedApp, !ignoredApps[selectedApp.packageName])
+                            )}
+                        </div>
+                    </div>
                     <h3 className="text-xs font-bold text-stone-400 mb-4 uppercase tracking-wider">选择关联标签</h3>
 
                     <div className="space-y-6">
@@ -291,6 +331,7 @@ export const AutoRecordSettingsView: React.FC<Props> = ({ onBack, categories }) 
                                 {filteredApps.map((app, index) => {
                                     const ruleId = rules[app.packageName];
                                     const matched = ruleId ? getActivityById(ruleId) : null;
+                                    const isIgnored = !!ignoredApps[app.packageName];
                                     const isLast = index === filteredApps.length - 1;
 
                                     return (
@@ -312,6 +353,12 @@ export const AutoRecordSettingsView: React.FC<Props> = ({ onBack, categories }) 
                                                 <div className="font-medium text-stone-800 truncate">{app.label}</div>
                                                 <div className="text-[10px] text-stone-400 truncate">{app.packageName}</div>
                                             </div>
+
+                                            {renderIgnoreButton(
+                                                isIgnored,
+                                                () => handleToggleIgnored(app, !isIgnored),
+                                                true
+                                            )}
 
                                             {matched ? (
                                                 <div className="flex items-center gap-2 bg-stone-100 px-2 py-1 rounded-lg">
