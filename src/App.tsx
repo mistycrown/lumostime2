@@ -11,6 +11,7 @@ import React from 'react';
 import { Buffer } from 'buffer';
 import { Capacitor } from '@capacitor/core';
 import { Filesystem, Directory, Encoding } from '@capacitor/filesystem';
+import { AppView } from './types';
 
 import { ToastProvider, useToast } from './contexts/ToastContext';
 import { DataProvider, useData } from './contexts/DataContext';
@@ -234,7 +235,6 @@ const AppContent: React.FC = () => {
   const searchManager = useSearchManager();
   const { isHeaderScrolled } = useAppLifecycle();
   useHardwareBackButton();
-  const isNativeAndroid = Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'android';
 
   // 注意：自动生成回顾的逻辑已经集成到 TimelineView 中，不需要单独的 hook
 
@@ -336,6 +336,23 @@ const AppContent: React.FC = () => {
     const sortedLogs = [...logs].sort((a, b) => b.endTime - a.endTime);
     return sortedLogs[0].endTime;
   }, [logs]);
+  const showTodoDetailPage = currentView === AppView.TODO && isTodoModalOpen;
+  const todoDetailModalNode = isTodoModalOpen ? (
+    <TodoDetailModal
+      initialTodo={editingTodo}
+      currentCategory={todoCategories.find(c => c.id === todoManager.todoCategoryToAdd) || todoCategories[0]}
+      displayMode={showTodoDetailPage ? 'page' : 'overlay'}
+      onClose={todoManager.closeTodoModal}
+      onSave={todoManager.handleSaveTodo}
+      onDelete={todoManager.handleDeleteTodo}
+      logs={logs}
+      onLogUpdate={logManager.handleSaveLog}
+      onEditLog={logManager.openEditModal}
+      todoCategories={todoCategories}
+      categories={categories}
+      scopes={scopes}
+    />
+  ) : null;
 
   return (
     <MainLayout
@@ -358,7 +375,8 @@ const AppContent: React.FC = () => {
       handleCloseMonthlyReview={reviewManager.handleCloseMonthlyReview}
       statsTitle={statsTitle}
     >
-      <AppRoutes
+      <div className={showTodoDetailPage ? 'hidden' : 'h-full'}>
+        <AppRoutes
         // Activity Handlers
         handleStartActivity={handleStartActivityWrapper}
 
@@ -389,12 +407,15 @@ const AppContent: React.FC = () => {
         isSyncing={syncManager.isSyncing}
         handleQuickSync={syncManager.handleQuickSync}
         setStatsTitle={setStatsTitle}
-      />
+        />
+      </div>
+      {showTodoDetailPage && todoDetailModalNode}
       <BottomNavigation
         currentView={currentView}
         onViewChange={setCurrentView}
         isVisible={
           !focusDetailSessionId &&
+          !isTodoModalOpen &&
           !isDailyReviewOpen &&
           !isWeeklyReviewOpen &&
           !isMonthlyReviewOpen &&
@@ -418,7 +439,6 @@ const AppContent: React.FC = () => {
           initialStartTime={initialLogTimes?.start}
           initialEndTime={initialLogTimes?.end}
           prefilledData={initialLogTimes?.prefilledData}
-          reduceVisualEffects={isNativeAndroid && isTodoModalOpen}
           lastLogEndTime={lastLogEndTime}
           onClose={logManager.closeModal}
           onSave={logManager.handleSaveLog}
@@ -436,22 +456,7 @@ const AppContent: React.FC = () => {
         />
       )}
 
-      {isTodoModalOpen && (
-        <TodoDetailModal
-          initialTodo={editingTodo}
-          currentCategory={todoCategories.find(c => c.id === todoManager.todoCategoryToAdd) || todoCategories[0]}
-          isObscured={isNativeAndroid && isAddModalOpen}
-          onClose={todoManager.closeTodoModal}
-          onSave={todoManager.handleSaveTodo}
-          onDelete={todoManager.handleDeleteTodo}
-          logs={logs}
-          onLogUpdate={logManager.handleSaveLog}
-          onEditLog={logManager.openEditModal}
-          todoCategories={todoCategories}
-          categories={categories}
-          scopes={scopes}
-        />
-      )}
+      {!showTodoDetailPage && todoDetailModalNode}
 
       {/* Delete Todo Confirmation */}
       <ConfirmModal
