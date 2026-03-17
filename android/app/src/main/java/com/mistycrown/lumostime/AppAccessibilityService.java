@@ -1,9 +1,9 @@
 /**
  * @file AppAccessibilityService.java
  * @input System Accessibility Events
- * @output App Change Events
+ * @output Foreground App Change Events
  * @pos Native Service
- * @description Accessibility Service detecting foreground application changes. Triggers auto-tracking features by notifying the Plugin layer.
+ * @description Accessibility service detecting foreground app changes and filtering ignored apps before updating the floating window and prompt logic.
  */
 package com.mistycrown.lumostime;
 
@@ -12,21 +12,19 @@ import android.accessibilityservice.AccessibilityServiceInfo;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.content.pm.ResolveInfo;
-import java.util.List;
-import android.os.Handler;
-import android.os.Looper;
 import android.util.Log;
 import android.view.accessibility.AccessibilityEvent;
 
+import java.util.List;
+
 public class AppAccessibilityService extends AccessibilityService {
     private static final String TAG = "AppAccessibilityService";
+
     private String lastPackageName = "";
-    private Handler handler;
 
     @Override
     public void onServiceConnected() {
         super.onServiceConnected();
-        handler = new Handler(Looper.getMainLooper());
 
         AccessibilityServiceInfo info = new AccessibilityServiceInfo();
         info.eventTypes = AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED;
@@ -40,50 +38,39 @@ public class AppAccessibilityService extends AccessibilityService {
 
     @Override
     public void onAccessibilityEvent(AccessibilityEvent event) {
-        if (event.getEventType() == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) {
-            if (event.getPackageName() != null) {
-                String currentPackage = event.getPackageName().toString();
-
-                // Ignore if same as last detected app
-                if (currentPackage.equals(lastPackageName)) {
-                    return;
-                }
-
-                // Filter out system/background apps (ignore apps without launch intent)
-                if (!isInterestingApp(currentPackage)) {
-                    Log.d(TAG, "Ignored non-launchable app: " + currentPackage);
-                    return;
-                }
-
-                Log.i(TAG, "===== APP SWITCHED: " + lastPackageName + " -> " + currentPackage + " =====");
-                lastPackageName = currentPackage;
-
-                // Get app label
-                String appLabel = currentPackage;
-                try {
-                    PackageManager pm = getPackageManager();
-                    appLabel = pm.getApplicationLabel(pm.getApplicationInfo(currentPackage, 0)).toString();
-                } catch (Exception e) {
-                    Log.w(TAG, "Could not get app label for " + currentPackage);
-                }
-
-                // Toast notification removed
-                // String finalAppLabel = appLabel;
-                // handler.post(() -> { ... });
-
-                // Update FloatingWindowService directly via static method
-                Log.i(TAG, "📤 Calling FloatingWindowService.updateCurrentApp");
-                FloatingWindowService.updateCurrentApp(currentPackage, appLabel);
-
-                // Also update AppUsagePlugin for frontend access
-                AppUsagePlugin.updateCurrentPackage(currentPackage);
-
-                // Trigger app detected event to React Native
-                AppUsagePlugin.triggerAppDetected(currentPackage, appLabel);
-
-                Log.i(TAG, "📤 Call completed");
-            }
+        if (event.getEventType() != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED || event.getPackageName() == null) {
+            return;
         }
+
+        String currentPackage = event.getPackageName().toString();
+        if (currentPackage.equals(lastPackageName)) {
+            return;
+        }
+
+        if (!isInterestingApp(currentPackage)) {
+            Log.d(TAG, "Ignored non-launchable app: " + currentPackage);
+            return;
+        }
+
+        String appLabel = currentPackage;
+        try {
+            PackageManager pm = getPackageManager();
+            appLabel = pm.getApplicationLabel(pm.getApplicationInfo(currentPackage, 0)).toString();
+        } catch (Exception e) {
+            Log.w(TAG, "Could not get app label for " + currentPackage, e);
+        }
+
+        if (AppUsagePlugin.shouldIgnoreApp(getApplicationContext(), currentPackage, appLabel)) {
+            Log.d(TAG, "Ignored app by default or user rule: " + currentPackage + " / " + appLabel);
+            return;
+        }
+
+        Log.i(TAG, "APP SWITCHED: " + lastPackageName + " -> " + currentPackage);
+        lastPackageName = currentPackage;
+
+        FloatingWindowService.updateCurrentApp(currentPackage, appLabel);
+        AppUsagePlugin.updateCurrentPackage(currentPackage);
+        AppUsagePlugin.triggerAppDetected(currentPackage, appLabel);
     }
 
     @Override
@@ -95,18 +82,14 @@ public class AppAccessibilityService extends AccessibilityService {
         try {
             PackageManager pm = getPackageManager();
 
-            // 1. Check if it's a Home app (Launcher)
-            // System launchers should be recorded as they signify end of app usage
             Intent homeIntent = new Intent(Intent.ACTION_MAIN);
             homeIntent.addCategory(Intent.CATEGORY_HOME);
 
-            // Check default launcher
             ResolveInfo defaultLauncher = pm.resolveActivity(homeIntent, PackageManager.MATCH_DEFAULT_ONLY);
             if (defaultLauncher != null && packageName.equals(defaultLauncher.activityInfo.packageName)) {
                 return true;
             }
 
-            // Comprehensive check for any home activity
             List<ResolveInfo> homeActivities = pm.queryIntentActivities(homeIntent, PackageManager.MATCH_DEFAULT_ONLY);
             for (ResolveInfo info : homeActivities) {
                 if (packageName.equals(info.activityInfo.packageName)) {
@@ -114,10 +97,10 @@ public class AppAccessibilityService extends AccessibilityService {
                 }
             }
 
-            // 2. Apps that can be launched by user (have a launcher icon)
             Intent launchIntent = pm.getLaunchIntentForPackage(packageName);
             return launchIntent != null;
         } catch (Exception e) {
+            Log.w(TAG, "Failed to inspect app launchability for " + packageName, e);
             return false;
         }
     }

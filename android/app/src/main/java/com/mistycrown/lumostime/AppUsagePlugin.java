@@ -1,46 +1,50 @@
 /**
  * @file AppUsagePlugin.java
  * @input JS Plugin Calls
- * @output Native Usage Stats
+ * @output Native Usage Stats and App Rule State
  * @pos Native Plugin
- * @description Capacitor plugin exposing Android "UsageStats" and accessibility permission controls to the React application.
+ * @description Capacitor plugin exposing Android foreground-app access, app association rules, and per-app ignore state to the React application.
  */
 package com.mistycrown.lumostime;
 
+import android.accessibilityservice.AccessibilityServiceInfo;
 import android.app.AppOpsManager;
-import android.app.usage.UsageStats;
 import android.app.usage.UsageStatsManager;
 import android.content.Context;
 import android.content.Intent;
-import android.provider.Settings;
-import android.util.Log;
-import com.getcapacitor.JSObject;
-import com.getcapacitor.Plugin;
-import com.getcapacitor.PluginCall;
-import com.getcapacitor.PluginMethod;
-import com.getcapacitor.annotation.CapacitorPlugin;
+import android.content.SharedPreferences;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.drawable.BitmapDrawable;
 import android.graphics.drawable.Drawable;
+import android.provider.Settings;
 import android.util.Base64;
+import android.util.Log;
+import android.view.accessibility.AccessibilityManager;
+import android.view.inputmethod.InputMethodInfo;
+import android.view.inputmethod.InputMethodManager;
+
 import com.getcapacitor.JSArray;
+import com.getcapacitor.JSObject;
+import com.getcapacitor.Plugin;
+import com.getcapacitor.PluginCall;
+import com.getcapacitor.PluginMethod;
+import com.getcapacitor.annotation.CapacitorPlugin;
+
 import java.io.ByteArrayOutputStream;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
-import org.json.JSONException;
-import org.json.JSONObject;
-import android.text.TextUtils;
-import android.accessibilityservice.AccessibilityServiceInfo;
-import android.view.accessibility.AccessibilityManager;
 
 @CapacitorPlugin(name = "AppUsage")
 public class AppUsagePlugin extends Plugin {
     private static final String TAG = "AppUsagePlugin";
+    private static final String PREFS_NAME = "AppUsageRules";
+    private static final String RULE_NAME_SUFFIX = "_name";
+    private static final String IGNORE_SUFFIX = "_ignore";
 
-    // Real-time package name from AccessibilityService
     private static String currentRealtimePackage = null;
     private static AppUsagePlugin instance = null;
 
@@ -48,61 +52,55 @@ public class AppUsagePlugin extends Plugin {
     public void load() {
         super.load();
         instance = this;
-        Log.d(TAG, "✅ AppUsagePlugin loaded, instance saved");
+        Log.d(TAG, "AppUsagePlugin loaded");
     }
 
     @Override
     protected void handleOnDestroy() {
         super.handleOnDestroy();
         instance = null;
-        Log.d(TAG, "🔴 AppUsagePlugin destroyed, instance cleared");
+        Log.d(TAG, "AppUsagePlugin destroyed");
     }
 
     public static void updateCurrentPackage(String packageName) {
         currentRealtimePackage = packageName;
     }
 
-    /**
-     * 静态方法: 触发应用检测事件到React Native
-     * 供AppAccessibilityService调用
-     */
     public static void triggerAppDetected(String packageName, String appLabel) {
-        if (instance != null) {
-            // Log.d(TAG, "📤 触发应用检测事件: " + packageName);
-            // 在Java层检查关联并显示提醒 (无需发JS事件)
-            instance.checkAndShowPrompt(packageName, appLabel);
-        } else {
-            Log.w(TAG, "⚠️ 无法触发应用检测: Plugin instance为null");
+        if (instance == null) {
+            Log.w(TAG, "Cannot trigger app detection, plugin instance is null");
+            return;
         }
+        instance.checkAndShowPrompt(packageName, appLabel);
     }
 
     private void checkAndShowPrompt(String packageName, String appLabel) {
         try {
-            // 读取应用关联规则
-            android.content.SharedPreferences prefs = getContext().getSharedPreferences("AppUsageRules",
-                    Context.MODE_PRIVATE);
-            String activityId = prefs.getString(packageName, null);
-            String activityName = prefs.getString(packageName + "_name", null);
-
-            if (activityId != null) {
-                // 优先显示标签名称,如果没有则显示应用名称
-                String displayName = (activityName != null && !activityName.isEmpty()) ? activityName : appLabel;
-                // Log.d(TAG, "✅ 检测到关联: " + appLabel + " → " + displayName);
-                // 显示提醒(持久显示直到点击),显示标签名称, 传递 appLabel (真实应用名) 用于备注, 传递 activityId 用于JS定位
-                FloatingWindowService.showPrompt(packageName, displayName, appLabel, activityId);
-            } else {
-                Log.d(TAG, "ℹ️ 应用未关联: " + appLabel);
+            if (shouldIgnoreApp(getContext(), packageName, appLabel)) {
+                Log.d(TAG, "Ignoring prompt for app: " + packageName + " / " + appLabel);
+                return;
             }
+
+            SharedPreferences prefs = getPrefs(getContext());
+            String activityId = prefs.getString(packageName, null);
+            String activityName = prefs.getString(packageName + RULE_NAME_SUFFIX, null);
+
+            if (activityId == null || activityId.isEmpty()) {
+                Log.d(TAG, "No linked activity for app: " + appLabel);
+                return;
+            }
+
+            String displayName = (activityName != null && !activityName.isEmpty()) ? activityName : appLabel;
+            FloatingWindowService.showPrompt(packageName, displayName, appLabel, activityId);
         } catch (Exception e) {
-            Log.e(TAG, "检查关联失败", e);
+            Log.e(TAG, "Failed to check and show prompt", e);
         }
     }
 
     @PluginMethod
     public void checkPermissions(PluginCall call) {
-        boolean granted = hasUsageStatsPermission();
         JSObject ret = new JSObject();
-        ret.put("granted", granted);
+        ret.put("granted", hasUsageStatsPermission());
         call.resolve(ret);
     }
 
@@ -112,17 +110,14 @@ public class AppUsagePlugin extends Plugin {
             Intent intent = new Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS);
             intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
             getContext().startActivity(intent);
-            call.resolve();
-        } else {
-            call.resolve();
         }
+        call.resolve();
     }
 
     @PluginMethod
     public void checkAccessibilityPermission(PluginCall call) {
-        boolean granted = isAccessibilityServiceEnabled();
         JSObject ret = new JSObject();
-        ret.put("granted", granted);
+        ret.put("granted", isAccessibilityServiceEnabled());
         call.resolve(ret);
     }
 
@@ -136,7 +131,6 @@ public class AppUsagePlugin extends Plugin {
 
     @PluginMethod
     public void getRunningApp(PluginCall call) {
-        // Prioritize real-time data from AccessibilityService if available
         if (currentRealtimePackage != null) {
             JSObject ret = new JSObject();
             ret.put("packageName", currentRealtimePackage);
@@ -159,7 +153,7 @@ public class AppUsagePlugin extends Plugin {
         UsageStatsManager usageStatsManager = (UsageStatsManager) getContext()
                 .getSystemService(Context.USAGE_STATS_SERVICE);
         long endTime = System.currentTimeMillis();
-        long startTime = endTime - 60000; // Look back 60 seconds to ensure we capture the launch
+        long startTime = endTime - 60000;
 
         android.app.usage.UsageEvents.Event event = new android.app.usage.UsageEvents.Event();
         android.app.usage.UsageEvents usageEvents = usageStatsManager.queryEvents(startTime, endTime);
@@ -168,11 +162,10 @@ public class AppUsagePlugin extends Plugin {
 
         while (usageEvents.hasNextEvent()) {
             usageEvents.getNextEvent(event);
-            if (event.getEventType() == android.app.usage.UsageEvents.Event.MOVE_TO_FOREGROUND) {
-                if (event.getTimeStamp() > lastTimestamp) {
-                    lastTimestamp = event.getTimeStamp();
-                    packageName = event.getPackageName();
-                }
+            if (event.getEventType() == android.app.usage.UsageEvents.Event.MOVE_TO_FOREGROUND
+                    && event.getTimeStamp() > lastTimestamp) {
+                lastTimestamp = event.getTimeStamp();
+                packageName = event.getPackageName();
             }
         }
         return packageName;
@@ -192,10 +185,6 @@ public class AppUsagePlugin extends Plugin {
                         JSObject obj = new JSObject();
                         obj.put("packageName", app.packageName);
                         obj.put("label", pm.getApplicationLabel(app).toString());
-                        // Icon conversion is heavy, do it carefully or pagination?
-                        // For now, let's try sending all, but maybe resize?
-                        // Or maybe just names first for speed?
-                        // User requirement: "显示图标". So we must send it.
                         try {
                             Drawable icon = pm.getApplicationIcon(app);
                             obj.put("icon", drawableToBase64(icon));
@@ -222,10 +211,10 @@ public class AppUsagePlugin extends Plugin {
             return;
         }
 
-        android.content.SharedPreferences prefs = getContext().getSharedPreferences("AppUsageRules",
-                Context.MODE_PRIVATE);
-        prefs.edit().putString(packageName, activityId)
-                .putString(packageName + "_name", activityName != null ? activityName : "")
+        SharedPreferences prefs = getPrefs(getContext());
+        prefs.edit()
+                .putString(packageName, activityId)
+                .putString(packageName + RULE_NAME_SUFFIX, activityName != null ? activityName : "")
                 .apply();
         call.resolve();
     }
@@ -238,24 +227,137 @@ public class AppUsagePlugin extends Plugin {
             return;
         }
 
-        android.content.SharedPreferences prefs = getContext().getSharedPreferences("AppUsageRules",
-                Context.MODE_PRIVATE);
-        prefs.edit().remove(packageName).apply();
+        SharedPreferences prefs = getPrefs(getContext());
+        prefs.edit()
+                .remove(packageName)
+                .remove(packageName + RULE_NAME_SUFFIX)
+                .apply();
+        call.resolve();
+    }
+
+    @PluginMethod
+    public void setAppIgnored(PluginCall call) {
+        String packageName = call.getString("packageName");
+        Boolean ignored = call.getBoolean("ignored");
+        if (packageName == null || ignored == null) {
+            call.reject("Missing packageName or ignored");
+            return;
+        }
+
+        SharedPreferences prefs = getPrefs(getContext());
+        prefs.edit()
+                .putBoolean(packageName + IGNORE_SUFFIX, ignored)
+                .apply();
         call.resolve();
     }
 
     @PluginMethod
     public void getAppRules(PluginCall call) {
-        android.content.SharedPreferences prefs = getContext().getSharedPreferences("AppUsageRules",
-                Context.MODE_PRIVATE);
+        SharedPreferences prefs = getPrefs(getContext());
         Map<String, ?> all = prefs.getAll();
         JSObject rules = new JSObject();
+        JSObject ignoredApps = new JSObject();
+
         for (Map.Entry<String, ?> entry : all.entrySet()) {
-            if (entry.getValue() instanceof String) {
-                rules.put(entry.getKey(), entry.getValue());
+            String key = entry.getKey();
+            Object value = entry.getValue();
+
+            if (key.endsWith(RULE_NAME_SUFFIX)) {
+                continue;
+            }
+
+            if (key.endsWith(IGNORE_SUFFIX)) {
+                String packageName = key.substring(0, key.length() - IGNORE_SUFFIX.length());
+                ignoredApps.put(packageName, value instanceof Boolean ? (Boolean) value : false);
+                continue;
+            }
+
+            if (value instanceof String) {
+                rules.put(key, value);
             }
         }
-        call.resolve(new JSObject().put("rules", rules));
+
+        JSObject result = new JSObject();
+        result.put("rules", rules);
+        result.put("ignoredApps", ignoredApps);
+        call.resolve(result);
+    }
+
+    private static SharedPreferences getPrefs(Context context) {
+        return context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+    }
+
+    public static boolean shouldIgnoreApp(Context context, String packageName, String appLabel) {
+        if (context == null || packageName == null || packageName.isEmpty()) {
+            return true;
+        }
+
+        if (packageName.equals(context.getPackageName())) {
+            return true;
+        }
+
+        return isAppIgnoredByUser(context, packageName) || isDefaultIgnoredApp(context, packageName, appLabel);
+    }
+
+    private static boolean isAppIgnoredByUser(Context context, String packageName) {
+        return getPrefs(context).getBoolean(packageName + IGNORE_SUFFIX, false);
+    }
+
+    private static boolean isDefaultIgnoredApp(Context context, String packageName, String appLabel) {
+        if (isLikelyInputMethod(context, packageName, appLabel)) {
+            return true;
+        }
+
+        return isSystemApp(context, packageName);
+    }
+
+    private static boolean isLikelyInputMethod(Context context, String packageName, String appLabel) {
+        try {
+            InputMethodManager imm = (InputMethodManager) context.getSystemService(Context.INPUT_METHOD_SERVICE);
+            if (imm != null) {
+                List<InputMethodInfo> enabledInputMethods = imm.getEnabledInputMethodList();
+                for (InputMethodInfo info : enabledInputMethods) {
+                    if (packageName.equals(info.getPackageName())) {
+                        return true;
+                    }
+                }
+            }
+        } catch (Exception e) {
+            Log.w(TAG, "Failed to inspect input methods for " + packageName, e);
+        }
+
+        String normalizedPackage = packageName.toLowerCase(Locale.ROOT);
+        String normalizedLabel = appLabel == null ? "" : appLabel.toLowerCase(Locale.ROOT);
+        String[] keywords = new String[] {
+                "\u8f93\u5165\u6cd5",
+                "\u952e\u76d8",
+                "keyboard",
+                "input method",
+                "inputmethod",
+                ".ime",
+                "ime.",
+                "gboard",
+                "swiftkey"
+        };
+        for (String keyword : keywords) {
+            if (normalizedPackage.contains(keyword) || normalizedLabel.contains(keyword)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static boolean isSystemApp(Context context, String packageName) {
+        try {
+            PackageManager pm = context.getPackageManager();
+            ApplicationInfo appInfo = pm.getApplicationInfo(packageName, 0);
+            boolean isSystem = (appInfo.flags & ApplicationInfo.FLAG_SYSTEM) != 0;
+            boolean isUpdatedSystem = (appInfo.flags & ApplicationInfo.FLAG_UPDATED_SYSTEM_APP) != 0;
+            return isSystem && !isUpdatedSystem;
+        } catch (Exception e) {
+            Log.w(TAG, "Failed to inspect app info for " + packageName, e);
+            return false;
+        }
     }
 
     private String drawableToBase64(Drawable drawable) {
@@ -265,11 +367,12 @@ public class AppUsagePlugin extends Plugin {
         } else {
             int width = drawable.getIntrinsicWidth();
             int height = drawable.getIntrinsicHeight();
-            // Handle some drawables having 0 intrinsic size
-            if (width <= 0)
+            if (width <= 0) {
                 width = 96;
-            if (height <= 0)
+            }
+            if (height <= 0) {
                 height = 96;
+            }
 
             bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
             Canvas canvas = new Canvas(bitmap);
@@ -278,10 +381,6 @@ public class AppUsagePlugin extends Plugin {
         }
 
         ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
-        // Compress to PNG, quality 100 (PNG ignores quality)
-        // Resize if too big? Icons are usually small (48-96dp).
-        // Let's resize to standard 48x48 to save memory if needed?
-        // No, keep original for quality, usually they are < 20kb.
         bitmap.compress(Bitmap.CompressFormat.PNG, 100, byteArrayOutputStream);
         byte[] byteArray = byteArrayOutputStream.toByteArray();
         return "data:image/png;base64," + Base64.encodeToString(byteArray, Base64.NO_WRAP);
@@ -320,8 +419,11 @@ public class AppUsagePlugin extends Plugin {
 
     private boolean hasUsageStatsPermission() {
         AppOpsManager appOps = (AppOpsManager) getContext().getSystemService(Context.APP_OPS_SERVICE);
-        int mode = appOps.checkOpNoThrow(AppOpsManager.OPSTR_GET_USAGE_STATS,
-                android.os.Process.myUid(), getContext().getPackageName());
+        int mode = appOps.checkOpNoThrow(
+                AppOpsManager.OPSTR_GET_USAGE_STATS,
+                android.os.Process.myUid(),
+                getContext().getPackageName()
+        );
         return mode == AppOpsManager.MODE_ALLOWED;
     }
 
