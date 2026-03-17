@@ -21,7 +21,7 @@ import { useToast } from '../contexts/ToastContext';
 interface TodoDetailModalProps {
   initialTodo?: TodoItem | null;
   currentCategory: TodoCategory;
-  isObscured?: boolean;
+  displayMode?: 'overlay' | 'page';
   onClose: () => void;
   onSave: (todo: TodoItem) => void;
   onDelete?: (id: string) => void;
@@ -35,8 +35,9 @@ interface TodoDetailModalProps {
 
 type Tab = '细节' | '時間線';
 
-export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({ initialTodo, currentCategory, isObscured = false, onClose, onSave, onDelete, logs, onLogUpdate, onEditLog, todoCategories, categories, scopes }) => {
+export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({ initialTodo, currentCategory, displayMode = 'overlay', onClose, onSave, onDelete, logs, onLogUpdate, onEditLog, todoCategories, categories, scopes }) => {
   const { addToast } = useToast();
+  const [isEntering, setIsEntering] = useState(true);
   const [activeTab, setActiveTab] = useState<Tab>(initialTodo ? '時間線' : '细节');
 
   // Stable ID for the session
@@ -73,6 +74,14 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({ initialTodo, c
 
   // Timeline / Calendar State
   const [displayDate, setDisplayDate] = useState(new Date());
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      setIsEntering(false);
+    }, 320);
+
+    return () => window.clearTimeout(timer);
+  }, []);
 
   // Auto-focus Task Name input when creating a new task
   useEffect(() => {
@@ -269,12 +278,13 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({ initialTodo, c
   // Unit Heatmap Constants
   const totalSquares = Math.ceil(totalAmount / unitAmount);
   const renderSquares = totalSquares > 3000 ? 3000 : totalSquares;
+  const containerClassName = displayMode === 'page'
+    ? 'h-full bg-[#faf9f6] flex flex-col pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]'
+    : `absolute inset-0 z-[60] bg-[#faf9f6] flex flex-col pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] ${isEntering ? 'animate-in slide-in-from-right duration-300' : ''}`;
 
   return (
     <div
-      className={`fixed inset-0 z-[60] bg-[#faf9f6] flex flex-col animate-in slide-in-from-right duration-300 pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] ${isObscured ? 'pointer-events-none' : ''}`}
-      aria-hidden={isObscured}
-      style={isObscured ? { transform: 'translateZ(0)', backfaceVisibility: 'hidden' } : undefined}
+      className={containerClassName}
     >
 
       {/* Top Bar */}
@@ -541,7 +551,7 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({ initialTodo, c
 
         {activeTab === '時間線' && (
           <DetailTimelineCard
-              filteredLogs={linkedLogs}
+            filteredLogs={linkedLogs}
               displayDate={displayDate}
               onDateChange={setDisplayDate}
               customScale={

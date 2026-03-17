@@ -57,6 +57,7 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
         isWeeklyReviewOpen,
         isMonthlyReviewOpen,
         isStatsFullScreen, setIsStatsFullScreen,
+        isTodoModalOpen,
         isTodoManaging, setIsTodoManaging,
         isGoalBatchManaging,
         isTagsManaging, setIsTagsManaging,
@@ -110,6 +111,7 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
 
             {/* Top Header Bar */}
             {!isSettingsOpen && (currentView !== AppView.TIMELINE || isDailyReviewOpen || isWeeklyReviewOpen || isMonthlyReviewOpen) && !isStatsFullScreen &&
+                !isTodoModalOpen &&
                 !(currentView === AppView.TODO && isTodoManaging) &&
                 !(currentView === AppView.TAGS && isTagsManaging) &&
                 !(currentView === AppView.SCOPE && isScopeManaging) &&
@@ -256,7 +258,7 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
 
                 {/* Global Floating Action Button for Tags/Scope Toggle */}
                 {(currentView === AppView.TAGS || currentView === AppView.SCOPE) &&
-                    !selectedTagId && !selectedCategoryId && !selectedScopeId && (
+                    !selectedTagId && !selectedCategoryId && !selectedScopeId && !isTodoModalOpen && (
                         <FloatingButton
                             onClick={() => setCurrentView(currentView === AppView.TAGS ? AppView.SCOPE : AppView.TAGS)}
                             ariaLabel={currentView === AppView.TAGS ? "Switch to Scope" : "Switch to Tags"}
@@ -271,7 +273,7 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
                     )}
 
                 {/* Global Floating Action Button for Review/Journal Toggle */}
-                {currentView === AppView.REVIEW && !isDailyReviewOpen && !isWeeklyReviewOpen && !isMonthlyReviewOpen && (
+                {currentView === AppView.REVIEW && !isDailyReviewOpen && !isWeeklyReviewOpen && !isMonthlyReviewOpen && !isTodoModalOpen && (
                     <FloatingButton
                         onClick={() => setIsJournalMode(!isJournalMode)}
                         ariaLabel={isJournalMode ? "Switch to Chronicle" : "Switch to Memoir"}
