@@ -1,6 +1,9 @@
 /**
  * @file SceneSettingsView.tsx
  * @description 场景设置页面 - 管理场景组、时间段和快捷方式
+ *
+ * 修改历史:
+ * - 2026-03-19: 调整根布局为全屏覆盖层，修复页面白屏无法打开的问题。
  */
 import React, { useState, useEffect } from 'react';
 import { ArrowLeft, Plus, Trash2, Edit2, Palette, Clock, RotateCcw, ChevronRight, ArrowUp, ArrowDown, Check, Copy } from 'lucide-react';
@@ -785,7 +788,7 @@ export const SceneSettingsView: React.FC<SceneSettingsViewProps> = ({ onBack }) 
   const selectedSlot = timeSlots.find(s => s.id === selectedSlotId);
 
   return (
-    <div className="h-full flex flex-col bg-[#faf9f6] pt-[env(safe-area-inset-top)]">
+    <div className="fixed inset-0 z-50 bg-[#faf9f6] flex flex-col font-serif animate-in slide-in-from-right duration-300 pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">
       {/* 顶部导航 */}
       <div className="h-14 flex items-center justify-between px-5 bg-[#fdfbf7] border-b border-stone-100 sticky top-0 z-20">
         <button

@@ -47,7 +47,6 @@ const loadFiltersSettingsView = () => import('../views/settings/FiltersSettingsV
 const loadCloudSyncSettingsView = () => import('../views/settings/CloudSyncSettingsView').then((module) => ({ default: module.CloudSyncSettingsView }));
 const loadS3SyncSettingsView = () => import('../views/settings/S3SyncSettingsView').then((module) => ({ default: module.S3SyncSettingsView }));
 const loadDataManagementView = () => import('../views/settings/DataManagementView').then((module) => ({ default: module.DataManagementView }));
-const loadSceneSettingsView = () => import('../views/SceneSettingsView').then((module) => ({ default: module.SceneSettingsView }));
 
 export const SearchViewLazy = lazyWithPreload(loadSearchView);
 export const FocusDetailViewLazy = lazyWithPreload(loadFocusDetailView);
@@ -74,7 +73,6 @@ export const FiltersSettingsViewLazy = lazyWithPreload(loadFiltersSettingsView);
 export const CloudSyncSettingsViewLazy = lazyWithPreload(loadCloudSyncSettingsView);
 export const S3SyncSettingsViewLazy = lazyWithPreload(loadS3SyncSettingsView);
 export const DataManagementViewLazy = lazyWithPreload(loadDataManagementView);
-export const SceneSettingsViewLazy = lazyWithPreload(loadSceneSettingsView);
 
 type Preloader = () => Promise<unknown>;
 
@@ -88,7 +86,6 @@ const primaryPreloaders: Preloader[] = [
 const secondaryPreloaders: Preloader[] = [
   AutoLinkViewLazy.preload,
   FocusDetailViewLazy.preload,
-  SceneSettingsViewLazy.preload,
   DataManagementViewLazy.preload,
   BatchFocusRecordManageViewLazy.preload,
   SponsorshipViewLazy.preload,

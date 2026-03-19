@@ -4,6 +4,9 @@
  * @output Configuration Updates, Data Sync Actions, Navigation
  * @pos View (Settings Modal)
  * @description The central configuration hub. Manages Cloud Sync (WebDAV), AI integration (Providers/Presets), Data (Import/Export), and Application Preferences (Appearance, Habits, etc.), including settings subpage hierarchy state.
+ *
+ * 修改历史:
+ * - 2026-03-19: 恢复场景设置为直接加载，排查并修复子页面白屏无法打开的问题。
  * 
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
@@ -86,6 +89,7 @@ import excelExportService from '../services/excelExportService';
 import { imageCleanupService } from '../services/imageCleanupService';
 import { usePrivacy } from '../contexts/PrivacyContext';
 import { RedemptionService } from '../services/redemptionService';
+import { SceneSettingsView } from './SceneSettingsView';
 import {
     AISettingsViewLazy as AISettingsView,
     AutoLinkViewLazy as AutoLinkView,
@@ -104,7 +108,6 @@ import {
     PrincipleLibraryViewLazy as PrincipleLibraryView,
     ReviewTemplateManageViewLazy as ReviewTemplateManageView,
     S3SyncSettingsViewLazy as S3SyncSettingsView,
-    SceneSettingsViewLazy as SceneSettingsView,
     SponsorshipViewLazy as SponsorshipView,
     UserGuideViewLazy as UserGuideView
 } from '../utils/lazyViews';
@@ -222,7 +225,6 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
     useEffect(() => {
         // We handle local user info state inside the specific submenu render to avoid conflicts
     }, [userPersonalInfo]);
-
 
     const isElectronEnvironment = () => {
         return typeof window !== 'undefined' && !!(window as any).ipcRenderer;
@@ -1037,10 +1039,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
     }
 
     if (activeSubmenu === 'scene') {
-        return renderLazySettingsSubview(
-            <SceneSettingsView onBack={() => setActiveSubmenu('main')} />,
-            '正在加载场景设置...'
-        );
+        return <SceneSettingsView onBack={() => setActiveSubmenu('main')} />;
     }
 
     return (
