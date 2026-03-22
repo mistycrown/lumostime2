@@ -12,7 +12,7 @@ Components that form the structural or global UI elements.
 ## Modals
 Overlay components for complex interactions.
 
-- `AddLogModal.tsx`: Main modal for logging time.
+- `AddLogModal.tsx`: Main modal for logging time, including segmented start/end time inputs that auto-advance from hour to minute after two digits.
 - `TodoDetailModal.tsx`: Detailed view and editing for Todos.
 - `GoalEditor.tsx`: Goal creation and editing.
 - `AIBatchModal.tsx`: AI-powered schedule generation.
@@ -70,4 +70,4 @@ Components for theme and appearance customization.
 - `TimelineStyleRail.tsx`: TimelineView、Memoir 与详情页共用的样式轨道渲染组件，支持摘要节点圆点对齐和页面级轨道宽度限制。
 - `TimelineStyleAdjuster.tsx`: 时间线样式调节浮窗，使用更紧凑的半屏宽度布局，并支持档案页专用水平偏移。
 
-> Last updated: 2026-03-13
+> Last updated: 2026-03-22

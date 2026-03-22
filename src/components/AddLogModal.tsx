@@ -3,7 +3,9 @@
  * @input props: initialLog, time ranges, categories, todos, etc.
  * @output Modal Interaction (Save/Delete Log)
  * @pos Component (Modal)
- * @description A complex modal for creating or editing time logs. Handles duration calculation, activity selection, todo association, and focus scoring.
+ * @description A complex modal for creating or editing time logs. Handles duration calculation, activity selection, todo association, focus scoring, and segmented time entry.
+ * @lastModified 2026-03-22
+ * @change Auto-advance across hour/minute inputs and continue from start time to end time after segmented time entry.
  * 
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
@@ -139,6 +141,9 @@ export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialSta
   const sliderRef = useRef<HTMLDivElement>(null);
   const noteRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const endHourInputRef = useRef<HTMLInputElement>(null);
+  const startMinuteInputRef = useRef<HTMLInputElement>(null);
+  const endMinuteInputRef = useRef<HTMLInputElement>(null);
   
   // 跟踪已自动应用的规则，避免重复应用
   const autoAppliedRulesRef = useRef<Set<string>>(new Set());
@@ -245,6 +250,34 @@ export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialSta
       value
     );
     updateField(type === 'start' ? 'currentStartTime' : 'currentEndTime', newTime);
+  };
+
+  const focusTimeInput = (inputRef: React.RefObject<HTMLInputElement | null>) => {
+    window.setTimeout(() => {
+      inputRef.current?.focus();
+      inputRef.current?.select();
+    }, 0);
+  };
+
+  const handleSegmentedTimeChange = (type: 'start' | 'end', field: 'h' | 'm', rawValue: string) => {
+    const normalizedDigits = rawValue.replace(/\D/g, '').slice(-2);
+    if (normalizedDigits === '') return;
+
+    const num = parseInt(normalizedDigits, 10);
+    if (Number.isNaN(num)) return;
+
+    handleTimeInput(type, field, num);
+
+    if (normalizedDigits.length !== 2) return;
+
+    if (field === 'h') {
+      focusTimeInput(type === 'start' ? startMinuteInputRef : endMinuteInputRef);
+      return;
+    }
+
+    if (type === 'start') {
+      focusTimeInput(endHourInputRef);
+    }
   };
 
   const handleSetStartToNow = () => {
@@ -522,16 +555,11 @@ export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialSta
                 <span className="text-[10px] font-bold text-stone-400 uppercase tracking-wider mb-1">Start</span>
                 <div className="flex items-center bg-white rounded-xl border border-stone-200 px-3 py-2 shadow-sm">
                   <input
-                    type="number"
+                    type="text"
                     inputMode="numeric"
-                    min={0} max={23}
+                    autoComplete="off"
                     value={String(timeCalc.startHM.h).padStart(2, '0')}
-                    onChange={e => {
-                      const val = e.target.value;
-                      if (val === '') return;
-                      const num = parseInt(val);
-                      if (!isNaN(num)) handleTimeInput('start', 'h', num);
-                    }}
+                    onChange={e => handleSegmentedTimeChange('start', 'h', e.target.value)}
                     onBlur={e => {
                       const val = e.target.value;
                       if (val === '') handleTimeInput('start', 'h', 0);
@@ -541,15 +569,16 @@ export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialSta
                   />
                   <span className="text-stone-300 mx-1">:</span>
                   <input
-                    type="number"
+                    ref={startMinuteInputRef}
+                    type="text"
                     inputMode="numeric"
-                    min={0} max={59}
+                    autoComplete="off"
                     value={String(timeCalc.startHM.m).padStart(2, '0')}
                     onChange={e => {
                       const val = e.target.value;
                       if (val === '') return; // 允许清空
                       const num = parseInt(val);
-                      if (!isNaN(num)) handleTimeInput('start', 'm', num);
+                      if (!isNaN(num)) handleSegmentedTimeChange('start', 'm', val);
                     }}
                     onBlur={e => {
                       const val = e.target.value;
@@ -576,16 +605,12 @@ export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialSta
                 <span className="text-[10px] font-bold text-stone-400 uppercase tracking-wider mb-1">End</span>
                 <div className="flex items-center bg-white rounded-xl border border-stone-200 px-3 py-2 shadow-sm">
                   <input
-                    type="number"
+                    ref={endHourInputRef}
+                    type="text"
                     inputMode="numeric"
-                    min={0} max={23}
+                    autoComplete="off"
                     value={String(timeCalc.endHM.h).padStart(2, '0')}
-                    onChange={e => {
-                      const val = e.target.value;
-                      if (val === '') return;
-                      const num = parseInt(val);
-                      if (!isNaN(num)) handleTimeInput('end', 'h', num);
-                    }}
+                    onChange={e => handleSegmentedTimeChange('end', 'h', e.target.value)}
                     onBlur={e => {
                       const val = e.target.value;
                       if (val === '') handleTimeInput('end', 'h', 0);
@@ -595,15 +620,16 @@ export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialSta
                   />
                   <span className="text-stone-300 mx-1">:</span>
                   <input
-                    type="number"
+                    ref={endMinuteInputRef}
+                    type="text"
                     inputMode="numeric"
-                    min={0} max={59}
+                    autoComplete="off"
                     value={String(timeCalc.endHM.m).padStart(2, '0')}
                     onChange={e => {
                       const val = e.target.value;
                       if (val === '') return; // 允许清空
                       const num = parseInt(val);
-                      if (!isNaN(num)) handleTimeInput('end', 'm', num);
+                      if (!isNaN(num)) handleSegmentedTimeChange('end', 'm', val);
                     }}
                     onBlur={e => {
                       const val = e.target.value;
