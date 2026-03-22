@@ -28,6 +28,7 @@ Charts and visual data representations.
 - `MatrixAnalysisChart.tsx`: Bar charts for activity ranking.
 - `stats/CheckView.tsx`: Habit check statistics with support for manual count mode (shows completed counts).
 - `TimelineStyleRail.tsx`: Styled rail and node renderer shared by TimelineView, Memoir, and detail-page history timelines, with last-node line truncation, centered summary dots, optional page-level rail-width caps, and Memoir-side offset support.
+- `TimelineItem.tsx`: Shared Memoir/timeline entry renderer with media grids that keep single-image, two-image, and multi-image cards visually aligned.
 
 ## Input & Forms
 Specialized input controls.
