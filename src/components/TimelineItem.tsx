@@ -1,6 +1,12 @@
+/**
+ * @file TimelineItem.tsx
+ * @input DiaryEntry data, timeline callbacks, shared timeline style settings
+ * @output Memoir/timeline entry cards with text, media, reactions, and comments
+ * @description Renders a single timeline entry, including media grids that keep image containers and images aligned across different image counts.
+ */
 import React, { useState, useEffect } from 'react';
 import { DiaryEntry } from '../views/journalTypes';
-import { MessageSquarePlus, AudioLines, MessageCircle, Heart, Share2, Bookmark, Send } from 'lucide-react';
+import { AudioLines, Send } from 'lucide-react';
 import { imageService } from '../services/imageService';
 import { ImagePreviewModal } from './ImagePreviewModal';
 import { usePrivacy } from '../contexts/PrivacyContext';
@@ -74,15 +80,15 @@ const TimelineImage: React.FC<{ src: string; alt: string; className: string }> =
 
     if (!imgUrl) {
         // 为占位符添加最小高度，确保 IntersectionObserver 能正确检测
-        return <div ref={imgRef} className={`bg-gray-100 ${className} animate-pulse min-h-[200px]`} />;
+        return <div ref={imgRef} className={`w-full h-full bg-gray-100 ${className} animate-pulse min-h-[200px]`} />;
     }
 
     return (
-        <div ref={imgRef}>
+        <div ref={imgRef} className="w-full h-full">
             <img 
                 src={imgUrl} 
                 alt={alt} 
-                className={`${className} ${isPrivacyMode ? 'blur-sm select-none transition-all duration-500' : 'transition-all duration-500'}`}
+                className={`block ${className} ${isPrivacyMode ? 'blur-sm select-none transition-all duration-500' : 'transition-all duration-500'}`}
                 loading="lazy"
             />
         </div>
@@ -209,7 +215,7 @@ const TimelineItem: React.FC<TimelineItemProps> = ({
                     {entry.media.map((m, i) => (
                         <div
                             key={i}
-                            className="rounded-lg overflow-hidden aspect-[3/4] shadow-sm border border-gray-100 cursor-zoom-in"
+                            className="rounded-lg overflow-hidden aspect-[4/3] shadow-sm border border-gray-100 cursor-zoom-in"
                             onClick={async (e) => {
                                 e.stopPropagation();
                                 // 点击时加载原图用于预览
