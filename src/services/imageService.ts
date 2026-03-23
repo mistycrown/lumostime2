@@ -5,6 +5,7 @@
  * @pos Service (Local Storage)
  * @description Handles saving, retrieving, and deleting images.
  * Uses Capacitor Filesystem for Native/Electron, and IndexedDB for Web fallback.
+ * @updated 2026-03-23: Added pure referenced-image list helpers for cloud sync restore/upload flows, and rebuild image manifests using only references that still exist locally.
  */
 import { Filesystem, Directory } from '@capacitor/filesystem';
 import { Capacitor } from '@capacitor/core';
@@ -757,9 +758,14 @@ class ImageService {
         return referencedSet;
     }
 
-    rebuildReferencedListFromLogs(logs: Log[], todos: TodoItem[] = []): string[] {
-        const referencedSet = this.collectReferencedImages(logs, todos);
-        const list = Array.from(referencedSet);
+    buildReferencedImagesList(logs: Log[], todos: TodoItem[] = []): string[] {
+        return Array.from(this.collectReferencedImages(logs, todos));
+    }
+
+    async rebuildReferencedListFromLogs(logs: Log[], todos: TodoItem[] = []): Promise<string[]> {
+        const referencedImages = this.buildReferencedImagesList(logs, todos);
+        const localFiles = new Set(await this.listImages());
+        const list = referencedImages.filter((filename) => localFiles.has(filename));
         this.updateReferencedImagesList(list);
         // console.log(`[ImageService] 重建引用列表: ${list.length} 个图片`);
 

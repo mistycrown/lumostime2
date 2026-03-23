@@ -6,6 +6,7 @@
  * @description The central configuration hub. Manages Cloud Sync (WebDAV), AI integration (Providers/Presets), Data (Import/Export), and Application Preferences (Appearance, Habits, etc.), including settings subpage hierarchy state.
  *
  * 修改历史:
+ * - 2026-03-23: 接入云端图片一致性检查与按本地状态修复入口，补齐数据管理页中的图片清理入口。
  * - 2026-03-19: 恢复场景设置为直接加载，排查并修复子页面白屏无法打开的问题。
  * 
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
@@ -87,6 +88,7 @@ import { useNavigation } from '../contexts/NavigationContext';
 import FocusNotification from '../plugins/FocusNotificationPlugin';
 import excelExportService from '../services/excelExportService';
 import { imageCleanupService } from '../services/imageCleanupService';
+import { cloudImageConsistencyService } from '../services/cloudImageConsistencyService';
 import { usePrivacy } from '../contexts/PrivacyContext';
 import { RedemptionService } from '../services/redemptionService';
 import { SceneSettingsView } from './SceneSettingsView';
@@ -123,7 +125,7 @@ interface SettingsViewProps {
     onClearData: () => void;
     onToast: (type: ToastType, message: string) => void;
     syncData: any;
-    onSyncUpdate: (data: any) => void;
+    onSyncUpdate: (data: any) => void | Promise<void>;
     onOpenAutoLink?: () => void;
     onOpenSearch?: () => void;
     minIdleTimeThreshold?: number;
@@ -407,8 +409,11 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
             );
 
             if (result.success && result.data) {
-                onSyncUpdate(result.data);
-                onToast('success', result.message);
+                await onSyncUpdate(result.data);
+                const now = Date.now();
+                setLocalDataTimestamp(now);
+                localStorage.setItem('lumostime_local_timestamp', now.toString());
+                onToast(result.imageStats?.errors.length ? 'warning' : 'success', result.message);
                 
                 // 同步完成后关闭设置页面，自动刷新到脉络页面
                 setTimeout(() => {
@@ -525,7 +530,10 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
             );
 
             if (result.success && result.data) {
-                onSyncUpdate(result.data);
+                await onSyncUpdate(result.data);
+                const now = Date.now();
+                setLocalDataTimestamp(now);
+                localStorage.setItem('lumostime_local_timestamp', now.toString());
                 onToast(result.imageStats?.errors.length ? 'warning' : 'success', result.message);
                 
                 // 同步完成后关闭设置页面
@@ -728,6 +736,36 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
         }
     };
 
+    const handleCheckCloudImageConsistency = async (): Promise<string> => {
+        const { report, analysis } = await cloudImageConsistencyService.generateReport(logs, todos);
+        if (!analysis.success) {
+            onToast('error', analysis.message);
+            return report;
+        }
+
+        const hasIssues =
+            analysis.localManifestMissingLocalFiles.length > 0 ||
+            analysis.localManifestMissingCloudManifest.length > 0 ||
+            analysis.cloudManifestExtraEntries.length > 0 ||
+            analysis.localManifestMissingCloudFiles.length > 0 ||
+            analysis.cloudFilesExtraEntries.length > 0;
+
+        onToast(hasIssues ? 'warning' : 'success', analysis.message);
+        return report;
+    };
+
+    const handleCleanupCloudImages = async (): Promise<{ message: string; report: string }> => {
+        const repairResult = await cloudImageConsistencyService.repairUsingLocalState(logs, todos);
+        const { report } = await cloudImageConsistencyService.generateReport(logs, todos);
+
+        onToast(repairResult.success ? 'success' : 'warning', repairResult.message);
+
+        return {
+            message: repairResult.message,
+            report
+        };
+    };
+
 
 
     // Filters子页面
@@ -870,6 +908,8 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
                 onReset={onReset}
                 onClearData={onClearData}
                 onCleanupCloudBackups={handleCleanupCloudBackups}
+                onCheckCloudImageConsistency={handleCheckCloudImageConsistency}
+                onCleanupCloudImages={handleCleanupCloudImages}
                 logs={logs}
                 categories={categoriesData || []}
                 todos={todos}
