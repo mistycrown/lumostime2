@@ -15,6 +15,8 @@
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
 
+import { Capacitor } from '@capacitor/core';
+import { Directory, Filesystem } from '@capacitor/filesystem';
 import { statusBarService } from './statusBarService';
 
 export interface BackgroundOption {
@@ -23,6 +25,7 @@ export interface BackgroundOption {
     type: 'preset' | 'custom';
     url: string;
     thumbnail?: string;
+    filePath?: string;
 }
 
 const PRESET_BACKGROUNDS: BackgroundOption[] = [
@@ -191,6 +194,7 @@ export const getBackgroundFallbackUrl = (url: string): string => {
 const STORAGE_KEY = 'lumos_custom_backgrounds';
 const CURRENT_BACKGROUND_KEY = 'lumos_current_background';
 const BACKGROUND_OPACITY_KEY = 'lumos_background_opacity';
+const BACKGROUND_DIRECTORY = 'backgrounds';
 
 // 需要应用背景的页面元素ID
 const TARGET_ELEMENTS = [
@@ -206,6 +210,158 @@ const TARGET_ELEMENTS = [
 class BackgroundService {
     private lastFoundElements?: string;
     private isApplying = false; // 防止重复应用
+    private isMigratingLegacyBackgrounds = false;
+
+    private loadStoredCustomBackgrounds(): BackgroundOption[] {
+        try {
+            const stored = localStorage.getItem(STORAGE_KEY);
+            if (!stored) {
+                return [];
+            }
+
+            const parsed = JSON.parse(stored);
+            return Array.isArray(parsed) ? parsed : [];
+        } catch (error) {
+            console.error('Failed to load custom backgrounds:', error);
+            return [];
+        }
+    }
+
+    private saveCustomBackgrounds(customBackgrounds: BackgroundOption[]): void {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(customBackgrounds));
+    }
+
+    private async ensureBackgroundDirectory(): Promise<void> {
+        if (!Capacitor.isNativePlatform()) {
+            return;
+        }
+
+        try {
+            await Filesystem.mkdir({
+                path: BACKGROUND_DIRECTORY,
+                directory: Directory.Data,
+                recursive: true
+            });
+        } catch (error: any) {
+            if (!String(error?.message || '').includes('exist')) {
+                console.warn('[BackgroundService] Failed to ensure background directory:', error);
+            }
+        }
+    }
+
+    private readBlobAsDataUrl(file: Blob): Promise<string> {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result as string);
+            reader.onerror = () => reject(new Error('Failed to read background file'));
+            reader.readAsDataURL(file);
+        });
+    }
+
+    private getExtensionFromMimeType(mimeType?: string, fallbackName?: string): string {
+        const normalized = mimeType?.toLowerCase() || '';
+
+        if (normalized.includes('png')) return 'png';
+        if (normalized.includes('webp')) return 'webp';
+        if (normalized.includes('gif')) return 'gif';
+        if (normalized.includes('bmp')) return 'bmp';
+        if (normalized.includes('svg')) return 'svg';
+        if (normalized.includes('jpeg') || normalized.includes('jpg')) return 'jpg';
+
+        const fileExt = fallbackName?.split('.').pop()?.toLowerCase();
+        return fileExt || 'jpg';
+    }
+
+    private getMimeTypeFromDataUrl(dataUrl: string): string | undefined {
+        const match = dataUrl.match(/^data:(.+?);base64,/);
+        return match?.[1];
+    }
+
+    private async persistNativeBackgroundFile(
+        dataUrl: string,
+        backgroundId: string,
+        fallbackName?: string
+    ): Promise<Pick<BackgroundOption, 'url' | 'thumbnail' | 'filePath'>> {
+        await this.ensureBackgroundDirectory();
+
+        const pureBase64 = dataUrl.includes(',') ? dataUrl.split(',')[1] : dataUrl;
+        const extension = this.getExtensionFromMimeType(this.getMimeTypeFromDataUrl(dataUrl), fallbackName);
+        const fileName = `${backgroundId}.${extension}`;
+        const relativePath = `${BACKGROUND_DIRECTORY}/${fileName}`;
+
+        await Filesystem.writeFile({
+            path: relativePath,
+            data: pureBase64,
+            directory: Directory.Data,
+            recursive: true
+        });
+
+        const uriResult = await Filesystem.getUri({
+            path: relativePath,
+            directory: Directory.Data
+        });
+        const fileUrl = Capacitor.convertFileSrc(uriResult.uri);
+
+        return {
+            url: fileUrl,
+            thumbnail: fileUrl,
+            filePath: fileName
+        };
+    }
+
+    private async deleteNativeBackgroundFile(filePath?: string): Promise<void> {
+        if (!Capacitor.isNativePlatform() || !filePath) {
+            return;
+        }
+
+        await Filesystem.deleteFile({
+            path: `${BACKGROUND_DIRECTORY}/${filePath}`,
+            directory: Directory.Data
+        }).catch(() => undefined);
+    }
+
+    private async migrateLegacyCustomBackgrounds(): Promise<void> {
+        if (!Capacitor.isNativePlatform() || this.isMigratingLegacyBackgrounds) {
+            return;
+        }
+
+        const customBackgrounds = this.loadStoredCustomBackgrounds();
+        const needsMigration = customBackgrounds.some(bg => bg.type === 'custom' && bg.url.startsWith('data:'));
+        if (!needsMigration) {
+            return;
+        }
+
+        this.isMigratingLegacyBackgrounds = true;
+
+        try {
+            let didMigrate = false;
+            const migratedBackgrounds = await Promise.all(customBackgrounds.map(async (background) => {
+                if (background.type !== 'custom' || !background.url.startsWith('data:')) {
+                    return background;
+                }
+
+                try {
+                    const persisted = await this.persistNativeBackgroundFile(background.url, background.id, background.name);
+                    didMigrate = true;
+                    return {
+                        ...background,
+                        ...persisted
+                    };
+                } catch (error) {
+                    console.error('[BackgroundService] Failed to migrate custom background:', background.id, error);
+                    return background;
+                }
+            }));
+
+            if (didMigrate) {
+                this.saveCustomBackgrounds(migratedBackgrounds);
+                this.applyBackgroundToElements();
+                void this.updateStatusBar();
+            }
+        } finally {
+            this.isMigratingLegacyBackgrounds = false;
+        }
+    }
 
     /**
      * 获取所有背景选项（预设 + 自定义）
@@ -226,44 +382,37 @@ class BackgroundService {
      * 获取自定义背景
      */
     getCustomBackgrounds(): BackgroundOption[] {
-        try {
-            const stored = localStorage.getItem(STORAGE_KEY);
-            return stored ? JSON.parse(stored) : [];
-        } catch (error) {
-            console.error('Failed to load custom backgrounds:', error);
-            return [];
-        }
+        return this.loadStoredCustomBackgrounds();
     }
 
     /**
      * 添加自定义背景
      */
     async addCustomBackground(file: File): Promise<BackgroundOption> {
-        return new Promise((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onload = (e) => {
-                try {
-                    const dataUrl = e.target?.result as string;
-                    const customBackground: BackgroundOption = {
-                        id: `custom_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`,
-                        name: file.name.replace(/\.[^/.]+$/, ''), // 移除文件扩展名
-                        type: 'custom',
-                        url: dataUrl,
-                        thumbnail: dataUrl, // 对于小图片，直接使用原图作为缩略图
-                    };
+        const backgroundId = `custom_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
+        const dataUrl = await this.readBlobAsDataUrl(file);
 
-                    const customBackgrounds = this.getCustomBackgrounds();
-                    customBackgrounds.push(customBackground);
+        let customBackground: BackgroundOption = {
+            id: backgroundId,
+            name: file.name.replace(/\.[^/.]+$/, ''),
+            type: 'custom',
+            url: dataUrl,
+            thumbnail: dataUrl,
+        };
 
-                    localStorage.setItem(STORAGE_KEY, JSON.stringify(customBackgrounds));
-                    resolve(customBackground);
-                } catch (error) {
-                    reject(error);
-                }
+        if (Capacitor.isNativePlatform()) {
+            const persisted = await this.persistNativeBackgroundFile(dataUrl, backgroundId, file.name);
+            customBackground = {
+                ...customBackground,
+                ...persisted
             };
-            reader.onerror = () => reject(new Error('Failed to read file'));
-            reader.readAsDataURL(file);
-        });
+        }
+
+        const customBackgrounds = this.getCustomBackgrounds();
+        customBackgrounds.push(customBackground);
+        this.saveCustomBackgrounds(customBackgrounds);
+
+        return customBackground;
     }
 
     /**
@@ -272,10 +421,15 @@ class BackgroundService {
     deleteCustomBackground(backgroundId: string): boolean {
         try {
             const customBackgrounds = this.getCustomBackgrounds();
+            const backgroundToDelete = customBackgrounds.find(bg => bg.id === backgroundId);
             const filteredBackgrounds = customBackgrounds.filter(bg => bg.id !== backgroundId);
 
             if (filteredBackgrounds.length !== customBackgrounds.length) {
-                localStorage.setItem(STORAGE_KEY, JSON.stringify(filteredBackgrounds));
+                this.saveCustomBackgrounds(filteredBackgrounds);
+
+                if (backgroundToDelete?.filePath) {
+                    void this.deleteNativeBackgroundFile(backgroundToDelete.filePath);
+                }
 
                 // 如果删除的是当前背景，重置为默认
                 const currentBackground = this.getCurrentBackground();
@@ -481,6 +635,7 @@ class BackgroundService {
      */
     init(): void {
         const currentBackground = this.getCurrentBackground();
+        void this.migrateLegacyCustomBackgrounds();
 
         // 初始化状态栏服务
         statusBarService.init().then(() => {
