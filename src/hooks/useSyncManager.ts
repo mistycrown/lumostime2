@@ -250,6 +250,7 @@ export const useSyncManager = () => {
             // Track status
             let dataSyncStatus: 'restored' | 'uploaded' | 'equal' | 'error' = 'equal';
             let dataSyncMsg = '';
+            let hasImageWarnings = false;
 
             // 容错阈值：处理上传延迟导致的时间差
             const SYNC_TOLERANCE_MS = SYNC_CONFIG.TOLERANCE_MS;
@@ -328,6 +329,7 @@ export const useSyncManager = () => {
                     );
 
                     if (result.success && result.data) {
+                        hasImageWarnings = !!result.imageStats?.errors.length;
                         // 等待数据更新完成（包括 500ms 的解锁延迟）
                         await handleSyncDataUpdate(result.data);
                         
@@ -369,6 +371,7 @@ export const useSyncManager = () => {
                 );
 
                 if (result.success) {
+                    hasImageWarnings = !!result.imageStats?.errors.length;
                     // 注意：不在这里更新时间戳
                     // 时间戳会在所有同步工作完成后统一更新
                     
@@ -397,7 +400,7 @@ export const useSyncManager = () => {
                     addToast('info', '云端与本地数据一致，无需同步');
                 } else if (dataSyncStatus === 'restored' || dataSyncStatus === 'uploaded') {
                     // dataSyncMsg 已经包含了图片同步信息（来自统一函数）
-                    addToast('success', dataSyncMsg);
+                    addToast(hasImageWarnings ? 'warning' : 'success', dataSyncMsg);
                 } else if (dataSyncStatus === 'error') {
                     // 错误消息已经在上面显示过了
                 }
@@ -524,7 +527,7 @@ export const useSyncManager = () => {
                 setLocalDataTimestamp(now);
                 console.log(`[Sync] 手动上传完成，本地时间戳已更新: ${now}`);
                 
-                addToast('success', result.message);
+                addToast(result.imageStats?.errors.length ? 'warning' : 'success', result.message);
             } else {
                 addToast('error', result.message);
             }
@@ -602,7 +605,7 @@ export const useSyncManager = () => {
                 // 然后更新 React state（会在下次渲染时生效）
                 setLocalDataTimestamp(now);
                 
-                addToast('success', result.message);
+                addToast(result.imageStats?.errors.length ? 'warning' : 'success', result.message);
                 
                 await new Promise(resolve => setTimeout(resolve, SYNC_CONFIG.UI_REFRESH_DELAY_MS));
                 setRefreshKey(prev => prev + 1);

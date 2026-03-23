@@ -1,6 +1,7 @@
 /**
  * @file DataManagementView.tsx
  * @description 数据管理页面 - 备份、导入、导出、清理等
+ * @updated 2026-03-23: 增加云端图片一致性检查与按本地状态清理云端多余图片入口。
  */
 import React, { useState, useRef } from 'react';
 import { ChevronLeft, Database, Download, Upload, Trash2, Cloud, FileSpreadsheet, ImageIcon, Search, RefreshCw, Package } from 'lucide-react';
@@ -26,6 +27,8 @@ interface DataManagementViewProps {
     todoCategories: TodoCategory[];
     scopes: Scope[];
     onCleanupCloudBackups: () => Promise<void>;
+    onCheckCloudImageConsistency: () => Promise<string>;
+    onCleanupCloudImages: () => Promise<{ message: string; report: string }>;
 }
 
 export const DataManagementView: React.FC<DataManagementViewProps> = ({
@@ -40,7 +43,9 @@ export const DataManagementView: React.FC<DataManagementViewProps> = ({
     todos,
     todoCategories,
     scopes,
-    onCleanupCloudBackups
+    onCleanupCloudBackups,
+    onCheckCloudImageConsistency,
+    onCleanupCloudImages
 }) => {
     const isNativePlatform = Capacitor.isNativePlatform();
     const fileInputRef = useRef<HTMLInputElement>(null);
@@ -52,6 +57,10 @@ export const DataManagementView: React.FC<DataManagementViewProps> = ({
     const [imageCleanupReport, setImageCleanupReport] = useState<string>('');
     const [isImageCleanupConfirmOpen, setIsImageCleanupConfirmOpen] = useState(false);
     const [isCleaningBackups, setIsCleaningBackups] = useState(false);
+    const [isCheckingCloudImages, setIsCheckingCloudImages] = useState(false);
+    const [isCleaningCloudImages, setIsCleaningCloudImages] = useState(false);
+    const [cloudConsistencyReport, setCloudConsistencyReport] = useState('');
+    const [isCloudImageCleanupConfirmOpen, setIsCloudImageCleanupConfirmOpen] = useState(false);
     const [isExportingImages, setIsExportingImages] = useState(false);
     const [isImportingImages, setIsImportingImages] = useState(false);
     const [imageExportProgress, setImageExportProgress] = useState<ImageExportProgress | null>(null);
@@ -210,14 +219,14 @@ export const DataManagementView: React.FC<DataManagementViewProps> = ({
     };
 
     const handleFixImageList = async () => {
-        if (!confirm('这将根据现有记录重建图片引用列表，建议在同步前执行。是否继续？')) {
+        if (!confirm('这将根据本地数据引用和本地实际存在的图片文件重建图片列表，建议在同步前执行。是否继续？')) {
             return;
         }
 
         setIsCheckingImages(true);
         try {
             const list = await imageService.rebuildReferencedListFromLogs(logs, todos);
-            onToast('success', `图片列表重建完成，当前引用 ${list.length} 张图片`);
+            onToast('success', `图片列表重建完成，当前有效图片引用 ${list.length} 个`);
         } catch (error: any) {
             console.error('修复图片列表失败:', error);
             onToast('error', `修复失败: ${error.message}`);
@@ -269,6 +278,33 @@ export const DataManagementView: React.FC<DataManagementViewProps> = ({
         setIsCleaningBackups(true);
         await onCleanupCloudBackups();
         setIsCleaningBackups(false);
+    };
+
+    const handleCheckCloudConsistency = async () => {
+        setIsCheckingCloudImages(true);
+        try {
+            const report = await onCheckCloudImageConsistency();
+            setCloudConsistencyReport(report);
+        } catch (error: any) {
+            console.error('检查云端图片一致性失败:', error);
+            onToast('error', `检查失败: ${error.message}`);
+        } finally {
+            setIsCheckingCloudImages(false);
+        }
+    };
+
+    const handleConfirmCloudImageCleanup = async () => {
+        setIsCloudImageCleanupConfirmOpen(false);
+        setIsCleaningCloudImages(true);
+        try {
+            const result = await onCleanupCloudImages();
+            setCloudConsistencyReport(result.report);
+        } catch (error: any) {
+            console.error('清理云端多余图片失败:', error);
+            onToast('error', `清理失败: ${error.message}`);
+        } finally {
+            setIsCleaningCloudImages(false);
+        }
     };
 
     const handleExportImages = async () => {
@@ -437,6 +473,58 @@ export const DataManagementView: React.FC<DataManagementViewProps> = ({
                             </>
                         )}
                     </button>
+
+                    <div className="pt-4 border-t border-stone-100 space-y-3">
+                        <p className="text-xs font-bold text-stone-400 uppercase tracking-widest px-1">云端图片一致性</p>
+                        <p className="text-sm text-stone-500 leading-relaxed">
+                            以本地图片列表和本地实际图片文件为准，检查云端图片列表与实际文件是否一致，并可清理云端多余图片。
+                        </p>
+
+                        <button
+                            onClick={handleCheckCloudConsistency}
+                            disabled={isCheckingCloudImages}
+                            className="flex items-center justify-center gap-2 w-full py-3 bg-white border border-stone-200 text-stone-800 rounded-xl font-medium active:scale-[0.98] transition-transform disabled:opacity-50 disabled:cursor-not-allowed hover:bg-stone-50"
+                        >
+                            {isCheckingCloudImages ? (
+                                <>
+                                    <div className="w-4 h-4 border-2 border-stone-400 border-t-transparent rounded-full animate-spin" />
+                                    检查中...
+                                </>
+                            ) : (
+                                <>
+                                    <Search size={18} />
+                                    检查本地和云端数据一致性
+                                </>
+                            )}
+                        </button>
+
+                        <button
+                            onClick={() => setIsCloudImageCleanupConfirmOpen(true)}
+                            disabled={isCleaningCloudImages}
+                            className="flex items-center justify-center gap-2 w-full py-3 bg-white border border-stone-200 text-stone-800 rounded-xl font-medium active:scale-[0.98] transition-transform disabled:opacity-50 disabled:cursor-not-allowed hover:bg-stone-50"
+                        >
+                            {isCleaningCloudImages ? (
+                                <>
+                                    <div className="w-4 h-4 border-2 border-stone-400 border-t-transparent rounded-full animate-spin" />
+                                    清理中...
+                                </>
+                            ) : (
+                                <>
+                                    <Trash2 size={18} />
+                                    清除云端多余图片
+                                </>
+                            )}
+                        </button>
+
+                        {cloudConsistencyReport && (
+                            <div className="mt-2 p-4 bg-stone-50 rounded-xl">
+                                <h4 className="font-medium text-stone-700 mb-2">一致性检查报告</h4>
+                                <div className="text-sm text-stone-600 whitespace-pre-line max-h-56 overflow-y-auto">
+                                    {cloudConsistencyReport}
+                                </div>
+                            </div>
+                        )}
+                    </div>
                 </div>
 
                 {/* Excel导出 */}
@@ -689,6 +777,16 @@ export const DataManagementView: React.FC<DataManagementViewProps> = ({
                 title="确认删除图片"
                 description="确定要删除所有未引用的图片吗？此操作将同时删除本地和远程图片，且无法撤销！"
                 confirmText="删除"
+                cancelText="取消"
+                type="danger"
+            />
+            <ConfirmModal
+                isOpen={isCloudImageCleanupConfirmOpen}
+                onClose={() => setIsCloudImageCleanupConfirmOpen(false)}
+                onConfirm={handleConfirmCloudImageCleanup}
+                title="确认清理云端多余图片"
+                description="将以本地图片列表和本地实际图片文件为准，补传云端缺失图片、删除云端多余图片，并重写云端图片列表。此操作不可撤销。"
+                confirmText="继续清理"
                 cancelText="取消"
                 type="danger"
             />
