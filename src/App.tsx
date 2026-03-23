@@ -7,7 +7,7 @@
  *
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import { Buffer } from 'buffer';
 import { Capacitor } from '@capacitor/core';
 import { Filesystem, Directory, Encoding } from '@capacitor/filesystem';
@@ -46,6 +46,7 @@ import { useHardwareBackButton } from './hooks/useHardwareBackButton';
 import { useAppLifecycle } from './hooks/useAppLifecycle';
 import { splitLogByDays } from './utils/logUtils';
 import { getActiveSceneGroup, loadSceneGroupStateFromStorage } from './utils/sceneGroupStorage';
+import { STORAGE_WRITE_ERROR_EVENT, StorageWriteErrorDetail } from './constants/storageKeys';
 import {
   AutoLinkViewLazy as AutoLinkView,
   FocusDetailViewLazy as FocusDetailView,
@@ -101,6 +102,38 @@ const AppContent: React.FC = () => {
   } = useSettings();
 
   const { addToast } = useToast();
+  const lastStorageErrorToastRef = useRef<{ signature: string; timestamp: number } | null>(null);
+
+  useEffect(() => {
+    const handleStorageWriteError = (event: Event) => {
+      const customEvent = event as CustomEvent<StorageWriteErrorDetail>;
+      const detail = customEvent.detail;
+      if (!detail) {
+        return;
+      }
+
+      const now = Date.now();
+      const signature = `${detail.key}:${detail.isQuotaExceeded}`;
+      const lastToast = lastStorageErrorToastRef.current;
+
+      if (lastToast && lastToast.signature === signature && now - lastToast.timestamp < 4000) {
+        return;
+      }
+
+      lastStorageErrorToastRef.current = { signature, timestamp: now };
+      addToast(
+        'error',
+        detail.isQuotaExceeded
+          ? `写入失败：${detail.key}（存储空间不足）`
+          : `写入失败：${detail.key}`
+      );
+    };
+
+    window.addEventListener(STORAGE_WRITE_ERROR_EVENT, handleStorageWriteError as EventListener);
+    return () => {
+      window.removeEventListener(STORAGE_WRITE_ERROR_EVENT, handleStorageWriteError as EventListener);
+    };
+  }, [addToast]);
 
   const {
     isAddModalOpen, setIsAddModalOpen,

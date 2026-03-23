@@ -5,6 +5,7 @@
 import React, { createContext, useContext, useState, useEffect, useRef, ReactNode } from 'react';
 import { Log, TodoItem, TodoCategory } from '../types';
 import { INITIAL_LOGS, INITIAL_TODOS, MOCK_TODO_CATEGORIES } from '../constants';
+import { storage, USER_DATA_KEYS } from '../constants/storageKeys';
 
 interface DataContextType {
     // Logs 状态
@@ -40,14 +41,13 @@ export const useData = () => {
 export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
     // Load from localStorage or use initial data
     const [logs, setLogs] = useState<Log[]>(() => {
-        const stored = localStorage.getItem('lumostime_logs');
-        return stored ? JSON.parse(stored) : INITIAL_LOGS;
+        return storage.getJSON<Log[]>(USER_DATA_KEYS.LOGS, INITIAL_LOGS) || INITIAL_LOGS;
     });
 
     const [todos, setTodos] = useState<TodoItem[]>(() => {
-        const stored = localStorage.getItem('lumostime_todos');
+        const stored = storage.getJSON<TodoItem[]>(USER_DATA_KEYS.TODOS);
         if (stored) {
-            return JSON.parse(stored);
+            return stored;
         }
         return INITIAL_TODOS.map(todo => {
             if (!todo.isProgress) return todo;
@@ -60,13 +60,12 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     });
 
     const [todoCategories, setTodoCategories] = useState<TodoCategory[]>(() => {
-        const stored = localStorage.getItem('lumostime_todoCategories');
-        return stored ? JSON.parse(stored) : MOCK_TODO_CATEGORIES;
+        return storage.getJSON<TodoCategory[]>(USER_DATA_KEYS.TODO_CATEGORIES, MOCK_TODO_CATEGORIES) || MOCK_TODO_CATEGORIES;
     });
 
     // Local Timestamp State
     const [localDataTimestamp, setLocalDataTimestamp] = useState<number>(() => {
-        const stored = localStorage.getItem('lumostime_local_timestamp');
+        const stored = storage.get(USER_DATA_KEYS.LOCAL_TIMESTAMP);
         return stored ? Number(stored) : Date.now();
     });
 
@@ -78,17 +77,17 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
     // 持久化 logs 到 localStorage
     useEffect(() => {
-        localStorage.setItem('lumostime_logs', JSON.stringify(logs));
+        storage.setJSON(USER_DATA_KEYS.LOGS, logs);
     }, [logs]);
 
     // 持久化 todos 到 localStorage
     useEffect(() => {
-        localStorage.setItem('lumostime_todos', JSON.stringify(todos));
+        storage.setJSON(USER_DATA_KEYS.TODOS, todos);
     }, [todos]);
 
     // 持久化 todoCategories 到 localStorage
     useEffect(() => {
-        localStorage.setItem('lumostime_todoCategories', JSON.stringify(todoCategories));
+        storage.setJSON(USER_DATA_KEYS.TODO_CATEGORIES, todoCategories);
     }, [todoCategories]);
 
     // 监控数据变化并更新时间戳
@@ -108,7 +107,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         // 任何数据变化都更新时间戳
         const now = Date.now();
         setLocalDataTimestamp(now);
-        localStorage.setItem('lumostime_local_timestamp', now.toString());
+        storage.set(USER_DATA_KEYS.LOCAL_TIMESTAMP, now.toString());
         console.log(`[DataContext] Data changed, updated local timestamp: ${localDataTimestamp} -> ${now} (${new Date(now).toLocaleTimeString()})`);
     }, [logs, todos, todoCategories]);
 
