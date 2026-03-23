@@ -59,8 +59,12 @@ export const USER_DATA_KEYS = {
     LOGS: 'lumostime_logs',
     /** 待办事项 */
     TODOS: 'lumostime_todos',
+    /** 待办分类 */
+    TODO_CATEGORIES: 'lumostime_todoCategories',
     /** 目标数据 */
     GOALS: 'lumostime_goals',
+    /** 本地修改时间戳 */
+    LOCAL_TIMESTAMP: 'lumostime_local_timestamp',
 } as const;
 
 /**
@@ -73,6 +77,34 @@ export const SETTINGS_KEYS = {
     LANGUAGE: 'lumostime_language',
     /** 首次启动标记 */
     FIRST_LAUNCH: 'lumostime_first_launch',
+    /** 每日回顾时间 */
+    DAILY_REVIEW_TIME: 'lumostime_review_time',
+    /** 每周回顾时间 */
+    WEEKLY_REVIEW_TIME: 'lumostime_weekly_review_time',
+    /** 每月回顾时间 */
+    MONTHLY_REVIEW_TIME: 'lumostime_monthly_review_time',
+    /** 自动生成每日回顾 */
+    AUTO_GENERATE_DAILY_REVIEW: 'lumostime_auto_generate_daily_review',
+    /** 自动生成每周回顾 */
+    AUTO_GENERATE_WEEKLY_REVIEW: 'lumostime_auto_generate_weekly_review',
+    /** 自动生成每月回顾 */
+    AUTO_GENERATE_MONTHLY_REVIEW: 'lumostime_auto_generate_monthly_review',
+} as const;
+
+/**
+ * Review 相关的存储键
+ */
+export const REVIEW_KEYS = {
+    /** Review 模板 */
+    REVIEW_TEMPLATES: 'lumostime_reviewTemplates',
+    /** Check 模板 */
+    CHECK_TEMPLATES: 'lumostime_checkTemplates',
+    /** Daily Review 数据 */
+    DAILY_REVIEWS: 'lumostime_dailyReviews',
+    /** Weekly Review 数据 */
+    WEEKLY_REVIEWS: 'lumostime_weeklyReviews',
+    /** Monthly Review 数据 */
+    MONTHLY_REVIEWS: 'lumostime_monthlyReviews',
 } as const;
 
 /**
@@ -107,6 +139,7 @@ export const STORAGE_KEYS = {
     ...THEME_KEYS,
     ...USER_DATA_KEYS,
     ...SETTINGS_KEYS,
+    ...REVIEW_KEYS,
     ...SYNC_KEYS,
     ...SPONSORSHIP_KEYS,
 } as const;
@@ -115,6 +148,61 @@ export const STORAGE_KEYS = {
  * 存储键类型
  */
 export type StorageKey = typeof STORAGE_KEYS[keyof typeof STORAGE_KEYS];
+export const STORAGE_WRITE_ERROR_EVENT = 'lumostime-storage-write-error';
+
+export interface StorageWriteErrorDetail {
+    key: StorageKey | string;
+    approximateSize: string;
+    isQuotaExceeded: boolean;
+}
+
+const getApproximateBytes = (value: string): number => {
+    try {
+        return new TextEncoder().encode(value).length;
+    } catch {
+        return value.length * 2;
+    }
+};
+
+const formatApproximateSize = (value: string): string => {
+    const bytes = getApproximateBytes(value);
+    if (bytes < 1024) {
+        return `${bytes} B`;
+    }
+    if (bytes < 1024 * 1024) {
+        return `${(bytes / 1024).toFixed(1)} KB`;
+    }
+    return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
+};
+
+const isQuotaExceededError = (error: unknown): boolean => {
+    if (!(error instanceof Error)) {
+        return false;
+    }
+
+    const quotaCodes = [22, 1014];
+    const errorWithCode = error as Error & { code?: number; name?: string };
+    return quotaCodes.includes(errorWithCode.code || 0)
+        || errorWithCode.name === 'QuotaExceededError'
+        || errorWithCode.name === 'NS_ERROR_DOM_QUOTA_REACHED';
+};
+
+const logStorageWriteError = (key: StorageKey, value: string, error: unknown): void => {
+    const approximateSize = formatApproximateSize(value);
+    const quotaExceeded = isQuotaExceededError(error);
+    const errorType = quotaExceeded ? 'QuotaExceededError' : 'StorageWriteError';
+    console.error(`[storage] ${errorType} while writing key "${key}" (~${approximateSize})`, error);
+
+    if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent<StorageWriteErrorDetail>(STORAGE_WRITE_ERROR_EVENT, {
+            detail: {
+                key,
+                approximateSize,
+                isQuotaExceeded: quotaExceeded
+            }
+        }));
+    }
+};
 
 /**
  * 类型安全的 localStorage 工具函数
@@ -124,28 +212,45 @@ export const storage = {
      * 获取存储值
      */
     get: (key: StorageKey): string | null => {
-        return localStorage.getItem(key);
+        try {
+            return localStorage.getItem(key);
+        } catch (e) {
+            console.error(`[storage] Failed to read key "${key}"`, e);
+            return null;
+        }
     },
 
     /**
      * 设置存储值
      */
-    set: (key: StorageKey, value: string): void => {
-        localStorage.setItem(key, value);
+    set: (key: StorageKey, value: string): boolean => {
+        try {
+            localStorage.setItem(key, value);
+            return true;
+        } catch (e) {
+            logStorageWriteError(key, value, e);
+            return false;
+        }
     },
 
     /**
      * 删除存储值
      */
-    remove: (key: StorageKey): void => {
-        localStorage.removeItem(key);
+    remove: (key: StorageKey): boolean => {
+        try {
+            localStorage.removeItem(key);
+            return true;
+        } catch (e) {
+            console.error(`[storage] Failed to remove key "${key}"`, e);
+            return false;
+        }
     },
 
     /**
      * 获取 JSON 格式的存储值
      */
     getJSON: <T = any>(key: StorageKey, defaultValue?: T): T | null => {
-        const value = localStorage.getItem(key);
+        const value = storage.get(key);
         if (!value) return defaultValue ?? null;
         try {
             return JSON.parse(value) as T;
@@ -158,11 +263,13 @@ export const storage = {
     /**
      * 设置 JSON 格式的存储值
      */
-    setJSON: <T = any>(key: StorageKey, value: T): void => {
+    setJSON: <T = any>(key: StorageKey, value: T): boolean => {
         try {
-            localStorage.setItem(key, JSON.stringify(value));
+            const serialized = JSON.stringify(value);
+            return storage.set(key, serialized);
         } catch (e) {
             console.error(`Failed to stringify JSON for localStorage key: ${key}`, e);
+            return false;
         }
     },
 
@@ -170,7 +277,7 @@ export const storage = {
      * 获取布尔值
      */
     getBoolean: (key: StorageKey, defaultValue: boolean = false): boolean => {
-        const value = localStorage.getItem(key);
+        const value = storage.get(key);
         if (value === null) return defaultValue;
         return value === 'true';
     },
@@ -178,7 +285,7 @@ export const storage = {
     /**
      * 设置布尔值
      */
-    setBoolean: (key: StorageKey, value: boolean): void => {
-        localStorage.setItem(key, value.toString());
+    setBoolean: (key: StorageKey, value: boolean): boolean => {
+        return storage.set(key, value.toString());
     },
 };
