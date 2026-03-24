@@ -57,6 +57,8 @@ import {
   startLazyViewPreload
 } from './utils/lazyViews';
 
+const APP_READY_EVENT = 'lumostime:app-ready';
+
 // Polyfill Buffer for webdav library
 if (typeof window !== 'undefined') {
   window.Buffer = window.Buffer || Buffer;
@@ -865,7 +867,9 @@ const App: React.FC = () => {
               <NavigationProvider>
                 <CategoryScopeProviderWithData>
                   <PrivacyProvider>
-                    <AppContent />
+                    <AppBootstrapGate>
+                      <AppContent />
+                    </AppBootstrapGate>
                   </PrivacyProvider>
                 </CategoryScopeProviderWithData>
               </NavigationProvider>
@@ -875,6 +879,31 @@ const App: React.FC = () => {
       </DataProvider>
     </ToastProvider>
   );
+};
+
+const AppBootstrapGate: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { isReady: isDataReady } = useData();
+  const { isReady: isReviewReady } = useReview();
+  const { isReady: isCategoryScopeReady } = useCategoryScope();
+  const isAppReady = isDataReady && isReviewReady && isCategoryScopeReady;
+
+  useEffect(() => {
+    if (!isAppReady) {
+      return;
+    }
+
+    window.dispatchEvent(new Event(APP_READY_EVENT));
+  }, [isAppReady]);
+
+  if (!isAppReady) {
+    return (
+      <div className="min-h-screen bg-[#fafaf9] flex items-center justify-center text-sm text-stone-500 font-serif">
+        正在加载本地数据...
+      </div>
+    );
+  }
+
+  return <>{children}</>;
 };
 
 // Wrapper to inject data into CategoryScopeProvider

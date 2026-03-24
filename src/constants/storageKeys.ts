@@ -55,6 +55,8 @@ export const THEME_KEYS = {
 export const USER_DATA_KEYS = {
     /** 分类数据 */
     CATEGORIES: 'lumostime_categories',
+    /** 棰嗗煙鏁版嵁 */
+    SCOPES: 'lumostime_scopes',
     /** 日志数据 */
     LOGS: 'lumostime_logs',
     /** 待办事项 */
@@ -63,6 +65,8 @@ export const USER_DATA_KEYS = {
     TODO_CATEGORIES: 'lumostime_todoCategories',
     /** 目标数据 */
     GOALS: 'lumostime_goals',
+    /** 澶х洰鏍囨暟鎹 */
+    MAJOR_GOALS: 'lumostime_majorGoals',
     /** 本地修改时间戳 */
     LOCAL_TIMESTAMP: 'lumostime_local_timestamp',
 } as const;

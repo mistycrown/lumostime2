@@ -1,253 +1,328 @@
 /**
  * @file CategoryScopeContext.tsx
- * @description 管理 Categories、Scopes、Goals、MajorGoals 的状态和逻辑
+ * @description Manages categories, scopes, goals, and major goals with async repository hydration and persistence.
  */
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { Category, Goal, ActiveSession, Scope, MajorGoal } from '../types';
-import { CATEGORIES, SCOPES, INITIAL_GOALS } from '../constants';
+import React, { createContext, useContext, useEffect, useRef, useState, ReactNode } from 'react';
+import { CATEGORIES, INITIAL_GOALS, SCOPES } from '../constants';
+import { dataRepository } from '../repositories/dataRepository';
+import { ActiveSession, Category, Goal, MajorGoal, Scope } from '../types';
+import {
+  getLocalDataTimestamp,
+  isLocalDataTimestampUpdateLocked,
+  updateLocalDataTimestamp
+} from '../utils/localDataTimestamp';
 
 interface CategoryScopeContextType {
-    // Categories
-    categories: Category[];
-    setCategories: React.Dispatch<React.SetStateAction<Category[]>>;
-    handleUpdateCategories: (newCategories: Category[]) => void;
-    handleUpdateCategory: (updatedCategory: Category) => void;
+  isReady: boolean;
 
-    // Scopes
-    scopes: Scope[];
-    setScopes: React.Dispatch<React.SetStateAction<Scope[]>>;
-    handleUpdateScopes: (newScopes: Scope[]) => void;
+  categories: Category[];
+  setCategories: React.Dispatch<React.SetStateAction<Category[]>>;
+  handleUpdateCategories: (newCategories: Category[]) => void;
+  handleUpdateCategory: (updatedCategory: Category) => void;
 
-    // Goals
-    goals: Goal[];
-    setGoals: React.Dispatch<React.SetStateAction<Goal[]>>;
+  scopes: Scope[];
+  setScopes: React.Dispatch<React.SetStateAction<Scope[]>>;
+  handleUpdateScopes: (newScopes: Scope[]) => void;
 
-    // MajorGoals
-    majorGoals: MajorGoal[];
-    setMajorGoals: React.Dispatch<React.SetStateAction<MajorGoal[]>>;
+  goals: Goal[];
+  setGoals: React.Dispatch<React.SetStateAction<Goal[]>>;
 
-    // Activity管理
-    handleUpdateActivity: (updatedActivity: any) => void;
-    handleCategoryChange: (activityId: string, newCategoryId: string) => void;
+  majorGoals: MajorGoal[];
+  setMajorGoals: React.Dispatch<React.SetStateAction<MajorGoal[]>>;
+
+  handleUpdateActivity: (updatedActivity: any) => void;
+  handleCategoryChange: (activityId: string, newCategoryId: string) => void;
 }
 
 const CategoryScopeContext = createContext<CategoryScopeContextType | undefined>(undefined);
 
 export const useCategoryScope = () => {
-    const context = useContext(CategoryScopeContext);
-    if (!context) {
-        throw new Error('useCategoryScope must be used within a CategoryScopeProvider');
-    }
-    return context;
+  const context = useContext(CategoryScopeContext);
+  if (!context) {
+    throw new Error('useCategoryScope must be used within a CategoryScopeProvider');
+  }
+  return context;
 };
 
 interface CategoryScopeProviderProps {
-    children: ReactNode;
-    activeSessions: ActiveSession[];
-    setActiveSessions: React.Dispatch<React.SetStateAction<ActiveSession[]>>;
-    logs: any[];  // Log[] type
-    setLogs: React.Dispatch<React.SetStateAction<any[]>>;
+  children: ReactNode;
+  activeSessions: ActiveSession[];
+  setActiveSessions: React.Dispatch<React.SetStateAction<ActiveSession[]>>;
+  logs: any[];
+  setLogs: React.Dispatch<React.SetStateAction<any[]>>;
 }
 
 export const CategoryScopeProvider: React.FC<CategoryScopeProviderProps> = ({
-    children,
-    activeSessions,
-    setActiveSessions,
-    logs,
-    setLogs
+  children,
+  activeSessions,
+  setActiveSessions,
+  logs,
+  setLogs
 }) => {
-    // Categories State
-    const [categories, setCategories] = useState<Category[]>(() => {
-        const stored = localStorage.getItem('lumostime_categories');
-        return stored ? JSON.parse(stored) : CATEGORIES;
-    });
+  const [isReady, setIsReady] = useState(false);
+  const [canPersist, setCanPersist] = useState(false);
+  const [categories, setCategories] = useState<Category[]>(CATEGORIES);
+  const [scopes, setScopes] = useState<Scope[]>(SCOPES);
+  const [goals, setGoals] = useState<Goal[]>(INITIAL_GOALS);
+  const [majorGoals, setMajorGoals] = useState<MajorGoal[]>([]);
+  const isHydratingRef = useRef(true);
 
-    // Scopes State
-    const [scopes, setScopes] = useState<Scope[]>(() => {
-        const stored = localStorage.getItem('lumostime_scopes');
-        return stored ? JSON.parse(stored) : SCOPES;
-    });
+  useEffect(() => {
+    let cancelled = false;
 
-    // Goals State
-    const [goals, setGoals] = useState<Goal[]>(() => {
-        const stored = localStorage.getItem('lumostime_goals');
-        return stored ? JSON.parse(stored) : INITIAL_GOALS;
-    });
+    const hydrate = async () => {
+      let hydratedSuccessfully = false;
 
-    // MajorGoals State
-    const [majorGoals, setMajorGoals] = useState<MajorGoal[]>(() => {
-        const stored = localStorage.getItem('lumostime_majorGoals');
-        return stored ? JSON.parse(stored) : [];
-    });
-
-    // 持久化到 localStorage
-    useEffect(() => {
-        localStorage.setItem('lumostime_categories', JSON.stringify(categories));
-    }, [categories]);
-
-    useEffect(() => {
-        localStorage.setItem('lumostime_scopes', JSON.stringify(scopes));
-    }, [scopes]);
-
-    useEffect(() => {
-        localStorage.setItem('lumostime_goals', JSON.stringify(goals));
-    }, [goals]);
-
-    useEffect(() => {
-        localStorage.setItem('lumostime_majorGoals', JSON.stringify(majorGoals));
-    }, [majorGoals]);
-
-    // Categories 更新逻辑
-    const handleUpdateCategories = (newCategories: Category[]) => {
-        setCategories(newCategories);
-
-        // 同步更新 active sessions 中的 activity 信息
-        setActiveSessions(prevSessions => prevSessions.map(session => {
-            const category = newCategories.find(c => c.id === session.categoryId);
-            if (!category) return session;
-
-            const activity = category.activities.find(a => a.id === session.activityId);
-            if (!activity) return session;
-
-            // 更新 session 如果 name 或 icon 改变了
-            if (session.activityName !== activity.name || session.activityIcon !== activity.icon) {
-                return {
-                    ...session,
-                    activityName: activity.name,
-                    activityIcon: activity.icon,
-                    activityUiIcon: activity.uiIcon
-                };
-            }
-            return session;
-        }));
-    };
-
-    const handleUpdateCategory = (updatedCategory: Category) => {
-        setCategories(prev => prev.map(c => c.id === updatedCategory.id ? updatedCategory : c));
-
-        // 同步更新 active sessions
-        setActiveSessions(prevSessions => prevSessions.map(session => {
-            if (session.categoryId !== updatedCategory.id) return session;
-
-            const activity = updatedCategory.activities.find(a => a.id === session.activityId);
-            if (!activity) return session;
-
-            if (session.activityName !== activity.name || session.activityIcon !== activity.icon) {
-                return {
-                    ...session,
-                    activityName: activity.name,
-                    activityIcon: activity.icon,
-                    activityUiIcon: activity.uiIcon
-                };
-            }
-            return session;
-        }));
-    };
-
-    // Scopes 更新逻辑
-    const handleUpdateScopes = (newScopes: Scope[]) => {
-        setScopes(newScopes);
-    };
-
-    // Activity 更新逻辑
-    const handleUpdateActivity = (updatedActivity: any) => {
-        setCategories(prev => prev.map(cat => {
-            const activityIndex = cat.activities.findIndex(a => a.id === updatedActivity.id);
-            if (activityIndex > -1) {
-                const newActivities = [...cat.activities];
-                newActivities[activityIndex] = updatedActivity;
-                return { ...cat, activities: newActivities };
-            }
-            return cat;
-        }));
-
-        // Sync active sessions
-        setActiveSessions(prev => prev.map(s => {
-            if (s.activityId === updatedActivity.id) {
-                return {
-                    ...s,
-                    activityName: updatedActivity.name,
-                    activityIcon: updatedActivity.icon
-                };
-            }
-            return s;
-        }));
-    };
-
-    // Category 变更逻辑
-    const handleCategoryChange = (activityId: string, newCategoryId: string) => {
-        let activityToMove: any | undefined;
-        let oldCategoryId: string | undefined;
-
-        // Find the activity and its current category
-        for (const cat of categories) {
-            const foundActivity = cat.activities.find(a => a.id === activityId);
-            if (foundActivity) {
-                activityToMove = foundActivity;
-                oldCategoryId = cat.id;
-                break;
-            }
+      try {
+        const snapshot = await dataRepository.loadCategoryScopeSnapshot();
+        if (cancelled) {
+          return;
         }
 
-        if (!activityToMove || !oldCategoryId || oldCategoryId === newCategoryId) {
-            return;
+        hydratedSuccessfully = true;
+        setCategories(snapshot.categories);
+        setScopes(snapshot.scopes);
+        setGoals(snapshot.goals);
+        setMajorGoals(snapshot.majorGoals);
+      } catch (error) {
+        console.error('[CategoryScopeContext] Failed to hydrate category/scope data from repository', error);
+      } finally {
+        if (!cancelled) {
+          setCanPersist(hydratedSuccessfully);
+          setIsReady(true);
+          window.setTimeout(() => {
+            if (!cancelled) {
+              isHydratingRef.current = false;
+            }
+          }, 0);
         }
-
-        // Move the activity to the new category
-        setCategories(prev => prev.map(cat => {
-            if (cat.id === oldCategoryId) {
-                // Remove activity from old category
-                return {
-                    ...cat,
-                    activities: cat.activities.filter(a => a.id !== activityId)
-                };
-            } else if (cat.id === newCategoryId) {
-                // Add activity to new category
-                return {
-                    ...cat,
-                    activities: [...cat.activities, activityToMove!]
-                };
-            }
-            return cat;
-        }));
-
-        // Update categoryId in all logs for this activity
-        setLogs(prev => prev.map(log => {
-            if (log.activityId === activityId) {
-                return { ...log, categoryId: newCategoryId };
-            }
-            return log;
-        }));
-
-        // Update active sessions
-        setActiveSessions(prev => prev.map(s => {
-            if (s.activityId === activityId) {
-                return {
-                    ...s,
-                    categoryId: newCategoryId
-                };
-            }
-            return s;
-        }));
+      }
     };
 
-    return (
-        <CategoryScopeContext.Provider value={{
-            categories,
-            setCategories,
-            handleUpdateCategories,
-            handleUpdateCategory,
-            scopes,
-            setScopes,
-            handleUpdateScopes,
-            goals,
-            setGoals,
-            majorGoals,
-            setMajorGoals,
-            handleUpdateActivity,
-            handleCategoryChange
-        }}>
-            {children}
-        </CategoryScopeContext.Provider>
+    void hydrate();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!isReady || !canPersist) {
+      return;
+    }
+
+    void dataRepository.saveCategories(categories).catch((error) => {
+      console.error('[CategoryScopeContext] Failed to persist categories', error);
+    });
+  }, [canPersist, isReady, categories]);
+
+  useEffect(() => {
+    if (!isReady || !canPersist) {
+      return;
+    }
+
+    void dataRepository.saveScopes(scopes).catch((error) => {
+      console.error('[CategoryScopeContext] Failed to persist scopes', error);
+    });
+  }, [canPersist, isReady, scopes]);
+
+  useEffect(() => {
+    if (!isReady || !canPersist) {
+      return;
+    }
+
+    void dataRepository.saveGoals(goals).catch((error) => {
+      console.error('[CategoryScopeContext] Failed to persist goals', error);
+    });
+  }, [canPersist, isReady, goals]);
+
+  useEffect(() => {
+    if (!isReady || !canPersist) {
+      return;
+    }
+
+    void dataRepository.saveMajorGoals(majorGoals).catch((error) => {
+      console.error('[CategoryScopeContext] Failed to persist major goals', error);
+    });
+  }, [canPersist, isReady, majorGoals]);
+
+  useEffect(() => {
+    if (!isReady || !canPersist || isHydratingRef.current) {
+      return;
+    }
+
+    if (isLocalDataTimestampUpdateLocked()) {
+      console.log('[CategoryScopeContext] Skipping local data timestamp update (locked during restore)');
+      return;
+    }
+
+    const previous = getLocalDataTimestamp();
+    const now = updateLocalDataTimestamp();
+    console.log(
+      `[CategoryScopeContext] Data changed, updated local timestamp: ${previous} -> ${now} (${new Date(now).toLocaleTimeString()})`
     );
+  }, [canPersist, categories, goals, isReady, majorGoals, scopes]);
+
+  const handleUpdateCategories = (newCategories: Category[]) => {
+    setCategories(newCategories);
+
+    setActiveSessions((prevSessions) => prevSessions.map((session) => {
+      const category = newCategories.find((item) => item.id === session.categoryId);
+      if (!category) {
+        return session;
+      }
+
+      const activity = category.activities.find((item) => item.id === session.activityId);
+      if (!activity) {
+        return session;
+      }
+
+      if (session.activityName !== activity.name || session.activityIcon !== activity.icon) {
+        return {
+          ...session,
+          activityName: activity.name,
+          activityIcon: activity.icon,
+          activityUiIcon: activity.uiIcon
+        };
+      }
+
+      return session;
+    }));
+  };
+
+  const handleUpdateCategory = (updatedCategory: Category) => {
+    setCategories((prev) => prev.map((category) => (
+      category.id === updatedCategory.id ? updatedCategory : category
+    )));
+
+    setActiveSessions((prevSessions) => prevSessions.map((session) => {
+      if (session.categoryId !== updatedCategory.id) {
+        return session;
+      }
+
+      const activity = updatedCategory.activities.find((item) => item.id === session.activityId);
+      if (!activity) {
+        return session;
+      }
+
+      if (session.activityName !== activity.name || session.activityIcon !== activity.icon) {
+        return {
+          ...session,
+          activityName: activity.name,
+          activityIcon: activity.icon,
+          activityUiIcon: activity.uiIcon
+        };
+      }
+
+      return session;
+    }));
+  };
+
+  const handleUpdateScopes = (newScopes: Scope[]) => {
+    setScopes(newScopes);
+  };
+
+  const handleUpdateActivity = (updatedActivity: any) => {
+    setCategories((prev) => prev.map((category) => {
+      const activityIndex = category.activities.findIndex((activity) => activity.id === updatedActivity.id);
+      if (activityIndex === -1) {
+        return category;
+      }
+
+      const newActivities = [...category.activities];
+      newActivities[activityIndex] = updatedActivity;
+      return {
+        ...category,
+        activities: newActivities
+      };
+    }));
+
+    setActiveSessions((prev) => prev.map((session) => {
+      if (session.activityId !== updatedActivity.id) {
+        return session;
+      }
+
+      return {
+        ...session,
+        activityName: updatedActivity.name,
+        activityIcon: updatedActivity.icon
+      };
+    }));
+  };
+
+  const handleCategoryChange = (activityId: string, newCategoryId: string) => {
+    let activityToMove: any | undefined;
+    let oldCategoryId: string | undefined;
+
+    for (const category of categories) {
+      const foundActivity = category.activities.find((activity) => activity.id === activityId);
+      if (foundActivity) {
+        activityToMove = foundActivity;
+        oldCategoryId = category.id;
+        break;
+      }
+    }
+
+    if (!activityToMove || !oldCategoryId || oldCategoryId === newCategoryId) {
+      return;
+    }
+
+    setCategories((prev) => prev.map((category) => {
+      if (category.id === oldCategoryId) {
+        return {
+          ...category,
+          activities: category.activities.filter((activity) => activity.id !== activityId)
+        };
+      }
+
+      if (category.id === newCategoryId) {
+        return {
+          ...category,
+          activities: [...category.activities, activityToMove]
+        };
+      }
+
+      return category;
+    }));
+
+    setLogs((prev) => prev.map((log) => {
+      if (log.activityId === activityId) {
+        return { ...log, categoryId: newCategoryId };
+      }
+      return log;
+    }));
+
+    setActiveSessions((prev) => prev.map((session) => {
+      if (session.activityId === activityId) {
+        return {
+          ...session,
+          categoryId: newCategoryId
+        };
+      }
+      return session;
+    }));
+  };
+
+  return (
+    <CategoryScopeContext.Provider
+      value={{
+        isReady,
+        categories,
+        setCategories,
+        handleUpdateCategories,
+        handleUpdateCategory,
+        scopes,
+        setScopes,
+        handleUpdateScopes,
+        goals,
+        setGoals,
+        majorGoals,
+        setMajorGoals,
+        handleUpdateActivity,
+        handleCategoryChange
+      }}
+    >
+      {children}
+    </CategoryScopeContext.Provider>
+  );
 };

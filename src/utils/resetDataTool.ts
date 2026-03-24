@@ -1,375 +1,258 @@
 /**
  * @file resetDataTool.ts
  * @input Browser console commands
- * @output Data reset operations, Migration flag clearing
+ * @output Data reset operations and migration-flag maintenance for debugging
  * @pos Utility (Development Tool)
- * @description 控制台数据重置工具 - 用于在浏览器控制台中重置数据为默认值
- * 
- * 使用方法：
- * 在浏览器控制台中执行：
- * 
- * 1. 重置所有数据（categories + scopes + todoCategories）：
- *    window.resetAllData()
- * 
- * 2. 只重置 categories：
- *    window.resetCategories()
- * 
- * 3. 只重置 scopes：
- *    window.resetScopes()
- * 
- * 4. 只重置 todoCategories：
- *    window.resetTodoCategories()
- * 
- * 5. 清除迁移标记（用于测试首次迁移）：
- *    window.clearMigrationFlags()
- * 
- * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
+ * @description Exposes debug helpers on window so repository-backed data can be reset and inspected without writing stale legacy localStorage payloads.
  */
-
-import { CATEGORIES, SCOPES, MOCK_TODO_CATEGORIES } from '../constants';
+import { CATEGORIES, MOCK_TODO_CATEGORIES, SCOPES } from '../constants';
+import { dataRepository } from '../repositories/dataRepository';
 import { uiIconService } from '../services/uiIconService';
 
 class ResetDataTool {
-    /**
-     * 重置 Categories 为默认值
-     */
-    resetCategories(): void {
-        console.log('[ResetDataTool] 重置 Categories...');
-        console.log('[ResetDataTool] 默认数据:', CATEGORIES);
-        
-        localStorage.setItem('lumostime_categories', JSON.stringify(CATEGORIES));
-        
-        console.log('[ResetDataTool] ✅ Categories 已重置为默认值');
-        console.log('[ResetDataTool] 请刷新页面查看效果');
+  async resetCategories(): Promise<void> {
+    console.log('[ResetDataTool] Resetting categories...');
+    console.log('[ResetDataTool] Default data:', CATEGORIES);
+
+    await dataRepository.saveCategories(CATEGORIES);
+
+    console.log('[ResetDataTool] Categories have been reset to defaults.');
+    console.log('[ResetDataTool] Refresh the page to verify the result.');
+  }
+
+  async resetScopes(): Promise<void> {
+    console.log('[ResetDataTool] Resetting scopes...');
+    console.log('[ResetDataTool] Default data:', SCOPES);
+
+    await dataRepository.saveScopes(SCOPES);
+
+    console.log('[ResetDataTool] Scopes have been reset to defaults.');
+    console.log('[ResetDataTool] Refresh the page to verify the result.');
+  }
+
+  async resetTodoCategories(): Promise<void> {
+    console.log('[ResetDataTool] Resetting todo categories...');
+    console.log('[ResetDataTool] Default data:', MOCK_TODO_CATEGORIES);
+
+    await dataRepository.saveTodoCategories(MOCK_TODO_CATEGORIES);
+
+    console.log('[ResetDataTool] Todo categories have been reset to defaults.');
+    console.log('[ResetDataTool] Refresh the page to verify the result.');
+  }
+
+  async resetAllData(): Promise<void> {
+    console.log('[ResetDataTool] ========== Resetting all supported repository data ==========');
+
+    await this.resetCategories();
+    await this.resetScopes();
+    await this.resetTodoCategories();
+
+    console.log('[ResetDataTool] ========== Reset complete ==========');
+    console.log('[ResetDataTool] Refresh the page to verify the result.');
+  }
+
+  clearMigrationFlags(): void {
+    console.log('[ResetDataTool] Clearing migration flags...');
+
+    const flags = [
+      'lumostime_uiicon_generated',
+      'lumostime_data_repair_v1_done',
+      'lumostime_dual_icon_migrated'
+    ];
+
+    flags.forEach((flag) => {
+      const value = localStorage.getItem(flag);
+      if (value) {
+        localStorage.removeItem(flag);
+        console.log(`[ResetDataTool] Cleared ${flag} (previous value: ${value})`);
+      } else {
+        console.log(`[ResetDataTool] ${flag} does not exist`);
+      }
+    });
+
+    console.log('[ResetDataTool] Migration flags cleared.');
+  }
+
+  async inspectData(): Promise<void> {
+    console.log('[ResetDataTool] ========== Current repository-backed data ==========');
+
+    const categoryScopeSnapshot = await dataRepository.loadCategoryScopeSnapshot();
+    const dataSnapshot = await dataRepository.loadDataContextSnapshot();
+
+    console.log('[Categories] Count:', categoryScopeSnapshot.categories.length);
+    console.log('[Categories] First item:', categoryScopeSnapshot.categories[0]);
+    console.log('[Categories] First activity:', categoryScopeSnapshot.categories[0]?.activities?.[0]);
+
+    console.log('[Scopes] Count:', categoryScopeSnapshot.scopes.length);
+    console.log('[Scopes] First item:', categoryScopeSnapshot.scopes[0]);
+
+    console.log('[TodoCategories] Count:', dataSnapshot.todoCategories.length);
+    console.log('[TodoCategories] First item:', dataSnapshot.todoCategories[0]);
+
+    console.log('\n[Migration Flags]');
+    console.log('- uiicon_generated:', localStorage.getItem('lumostime_uiicon_generated'));
+    console.log('- data_repair_v1_done:', localStorage.getItem('lumostime_data_repair_v1_done'));
+    console.log('- dual_icon_migrated:', localStorage.getItem('lumostime_dual_icon_migrated'));
+
+    console.log('\n[Theme]');
+    console.log('- UI theme:', localStorage.getItem('lumostime_ui_icon_theme'));
+    console.log('- Color scheme:', localStorage.getItem('lumostime_color_scheme'));
+    console.log('- Current preset:', localStorage.getItem('lumostime_current_preset'));
+
+    console.log('[ResetDataTool] ===============================================');
+  }
+
+  help(): void {
+    console.log(`
+LumosTime ResetDataTool
+
+Available commands:
+1. window.resetAllData()
+2. window.resetCategories()
+3. window.resetScopes()
+4. window.resetTodoCategories()
+5. window.clearMigrationFlags()
+6. window.inspectData()
+7. window.resetDataHelp()
+8. window.forceGenerateUiIcons()
+9. window.testEmojiMatching()
+
+Notes:
+- These commands now operate on the repository-backed data path.
+- Refresh the page after reset operations to verify the UI state.
+    `);
+  }
+
+  async forceGenerateUiIcons(): Promise<void> {
+    console.log('[ResetDataTool] ========== Forcing uiIcon generation ==========');
+
+    try {
+      localStorage.removeItem('lumostime_uiicon_generated');
+      console.log('[ResetDataTool] Cleared uiIcon migration flag.');
+
+      const { iconMigrationService } = await import('../services/iconMigrationService');
+      const result = await iconMigrationService.generateAllUiIcons();
+
+      console.log('[ResetDataTool] Generation result:', result);
+
+      if (result.success) {
+        const categories = await dataRepository.getCategories();
+        console.log('[ResetDataTool] First category:', categories[0]);
+        console.log('[ResetDataTool] First activity:', categories[0]?.activities?.[0]);
+        console.log('[ResetDataTool] Refresh the page to verify the result.');
+      }
+    } catch (error) {
+      console.error('[ResetDataTool] uiIcon generation failed:', error);
     }
 
-    /**
-     * 重置 Scopes 为默认值
-     */
-    resetScopes(): void {
-        console.log('[ResetDataTool] 重置 Scopes...');
-        console.log('[ResetDataTool] 默认数据:', SCOPES);
-        
-        localStorage.setItem('lumostime_scopes', JSON.stringify(SCOPES));
-        
-        console.log('[ResetDataTool] ✅ Scopes 已重置为默认值');
-        console.log('[ResetDataTool] 请刷新页面查看效果');
-    }
+    console.log('[ResetDataTool] ===============================================');
+  }
 
-    /**
-     * 重置 TodoCategories 为默认值
-     */
-    resetTodoCategories(): void {
-        console.log('[ResetDataTool] 重置 TodoCategories...');
-        console.log('[ResetDataTool] 默认数据:', MOCK_TODO_CATEGORIES);
-        
-        localStorage.setItem('lumostime_todoCategories', JSON.stringify(MOCK_TODO_CATEGORIES));
-        
-        console.log('[ResetDataTool] ✅ TodoCategories 已重置为默认值');
-        console.log('[ResetDataTool] 请刷新页面查看效果');
-    }
+  async testEmojiMatching(): Promise<void> {
+    console.log('[ResetDataTool] ========== Testing emoji matching ==========');
 
-    /**
-     * 重置所有数据为默认值
-     */
-    resetAllData(): void {
-        console.log('[ResetDataTool] ========== 开始重置所有数据 ==========');
-        
-        this.resetCategories();
-        this.resetScopes();
-        this.resetTodoCategories();
-        
-        console.log('[ResetDataTool] ========== 所有数据已重置 ==========');
-        console.log('[ResetDataTool] 请刷新页面查看效果');
-    }
+    try {
+      let totalCount = 0;
+      let matchedCount = 0;
+      const unmatchedEmojis: string[] = [];
 
-    /**
-     * 清除所有迁移标记（用于测试）
-     */
-    clearMigrationFlags(): void {
-        console.log('[ResetDataTool] 清除迁移标记...');
-        
-        const flags = [
-            'lumostime_uiicon_generated',
-            'lumostime_data_repair_v1_done',
-            'lumostime_dual_icon_migration_done'
-        ];
-        
-        flags.forEach(flag => {
-            const value = localStorage.getItem(flag);
-            if (value) {
-                localStorage.removeItem(flag);
-                console.log(`[ResetDataTool] ✅ 已清除: ${flag} (原值: ${value})`);
-            } else {
-                console.log(`[ResetDataTool] ⚪ 不存在: ${flag}`);
-            }
+      console.log('\n[Categories]');
+      CATEGORIES.forEach((category) => {
+        totalCount += 1;
+        const matched = uiIconService.isDefaultEmoji(category.icon);
+        if (matched) {
+          matchedCount += 1;
+          console.log(`OK ${category.icon} ${category.name} -> ${uiIconService.convertEmojiToUIIcon(category.icon)}`);
+        } else {
+          unmatchedEmojis.push(`${category.icon} (${category.name})`);
+          console.log(`MISS ${category.icon} ${category.name}`);
+        }
+
+        category.activities.forEach((activity) => {
+          totalCount += 1;
+          const activityMatched = uiIconService.isDefaultEmoji(activity.icon);
+          if (activityMatched) {
+            matchedCount += 1;
+            console.log(`  OK ${activity.icon} ${activity.name} -> ${uiIconService.convertEmojiToUIIcon(activity.icon)}`);
+          } else {
+            unmatchedEmojis.push(`${activity.icon} (${activity.name})`);
+            console.log(`  MISS ${activity.icon} ${activity.name}`);
+          }
         });
-        
-        console.log('[ResetDataTool] ✅ 迁移标记已清除');
-    }
+      });
 
-    /**
-     * 查看当前数据状态
-     */
-    inspectData(): void {
-        console.log('[ResetDataTool] ========== 当前数据状态 ==========');
-        
-        // Categories
-        const categoriesStr = localStorage.getItem('lumostime_categories');
-        if (categoriesStr) {
-            const categories = JSON.parse(categoriesStr);
-            console.log('[Categories] 数量:', categories.length);
-            console.log('[Categories] 第一个:', categories[0]);
-            console.log('[Categories] 第一个 activity:', categories[0]?.activities?.[0]);
+      console.log('\n[Scopes]');
+      SCOPES.forEach((scope) => {
+        totalCount += 1;
+        const matched = uiIconService.isDefaultEmoji(scope.icon);
+        if (matched) {
+          matchedCount += 1;
+          console.log(`OK ${scope.icon} ${scope.name} -> ${uiIconService.convertEmojiToUIIcon(scope.icon)}`);
         } else {
-            console.log('[Categories] ❌ 不存在');
+          unmatchedEmojis.push(`${scope.icon} (${scope.name})`);
+          console.log(`MISS ${scope.icon} ${scope.name}`);
         }
-        
-        // Scopes
-        const scopesStr = localStorage.getItem('lumostime_scopes');
-        if (scopesStr) {
-            const scopes = JSON.parse(scopesStr);
-            console.log('[Scopes] 数量:', scopes.length);
-            console.log('[Scopes] 第一个:', scopes[0]);
+      });
+
+      console.log('\n[TodoCategories]');
+      MOCK_TODO_CATEGORIES.forEach((category) => {
+        totalCount += 1;
+        const matched = uiIconService.isDefaultEmoji(category.icon);
+        if (matched) {
+          matchedCount += 1;
+          console.log(`OK ${category.icon} ${category.name} -> ${uiIconService.convertEmojiToUIIcon(category.icon)}`);
         } else {
-            console.log('[Scopes] ❌ 不存在');
+          unmatchedEmojis.push(`${category.icon} (${category.name})`);
+          console.log(`MISS ${category.icon} ${category.name}`);
         }
-        
-        // TodoCategories
-        const todoCategoriesStr = localStorage.getItem('lumostime_todoCategories');
-        if (todoCategoriesStr) {
-            const todoCategories = JSON.parse(todoCategoriesStr);
-            console.log('[TodoCategories] 数量:', todoCategories.length);
-            console.log('[TodoCategories] 第一个:', todoCategories[0]);
-        } else {
-            console.log('[TodoCategories] ❌ 不存在');
-        }
-        
-        // 迁移标记
-        console.log('\n[迁移标记]');
-        console.log('- uiicon_generated:', localStorage.getItem('lumostime_uiicon_generated'));
-        console.log('- data_repair_v1_done:', localStorage.getItem('lumostime_data_repair_v1_done'));
-        console.log('- dual_icon_migration_done:', localStorage.getItem('lumostime_dual_icon_migration_done'));
-        
-        // 当前主题
-        console.log('\n[当前主题]');
-        console.log('- UI 主题:', localStorage.getItem('lumostime_ui_icon_theme'));
-        console.log('- 配色方案:', localStorage.getItem('lumostime_color_scheme'));
-        console.log('- 当前方案:', localStorage.getItem('lumostime_current_preset'));
-        
-        console.log('[ResetDataTool] ========================================');
+      });
+
+      console.log('\n[Summary]');
+      console.log(`Total: ${totalCount}`);
+      console.log(`Matched: ${matchedCount} (${((matchedCount / totalCount) * 100).toFixed(1)}%)`);
+      console.log(`Unmatched: ${unmatchedEmojis.length} (${((unmatchedEmojis.length / totalCount) * 100).toFixed(1)}%)`);
+
+      if (unmatchedEmojis.length > 0) {
+        console.log('\n[Unmatched Emojis]');
+        unmatchedEmojis.forEach((emoji) => console.log(`- ${emoji}`));
+      }
+    } catch (error) {
+      console.error('[ResetDataTool] Emoji matching test failed:', error);
     }
 
-    /**
-     * 显示帮助信息
-     */
-    help(): void {
-        console.log(`
-╔════════════════════════════════════════════════════════════════╗
-║                    LumosTime 数据重置工具                        ║
-╚════════════════════════════════════════════════════════════════╝
-
-📋 可用命令：
-
-1. 重置所有数据（categories + scopes + todoCategories）：
-   window.resetAllData()
-
-2. 只重置 categories：
-   window.resetCategories()
-
-3. 只重置 scopes：
-   window.resetScopes()
-
-4. 只重置 todoCategories：
-   window.resetTodoCategories()
-
-5. 清除迁移标记（用于测试首次迁移）：
-   window.clearMigrationFlags()
-
-6. 查看当前数据状态：
-   window.inspectData()
-
-7. 显示帮助信息：
-   window.resetDataHelp()
-
-8. 🆕 强制生成 uiIcon（用于调试）：
-   window.forceGenerateUiIcons()
-
-⚠️  注意：重置后需要刷新页面才能看到效果！
-
-💡 推荐流程：
-   1. window.inspectData()      // 查看当前状态
-   2. window.resetAllData()     // 重置所有数据
-   3. window.clearMigrationFlags()  // 清除迁移标记
-   4. 刷新页面
-   5. 从默认主题切换到自定义主题（首次生成 uiIcon）
-        `);
-    }
-
-    /**
-     * 强制生成 uiIcon（用于调试）
-     */
-    async forceGenerateUiIcons(): Promise<void> {
-        console.log('[ResetDataTool] ========== 强制生成 uiIcon ==========');
-        
-        try {
-            // 清除迁移标记
-            localStorage.removeItem('lumostime_uiicon_generated');
-            console.log('[ResetDataTool] ✅ 已清除迁移标记');
-            
-            // 动态导入 iconMigrationService
-            const { iconMigrationService } = await import('../services/iconMigrationService');
-            
-            // 执行生成
-            console.log('[ResetDataTool] 开始生成 uiIcon...');
-            const result = await iconMigrationService.generateAllUiIcons();
-            
-            console.log('[ResetDataTool] 生成结果:', result);
-            
-            if (result.success) {
-                console.log(`[ResetDataTool] ✅ ${result.message}`);
-                console.log(`[ResetDataTool] 已匹配: ${result.generatedCount} 个`);
-                console.log(`[ResetDataTool] 未匹配: ${result.unmatchedCount} 个`);
-                
-                // 查看生成后的数据
-                const categories = JSON.parse(localStorage.getItem('lumostime_categories') || '[]');
-                console.log('[ResetDataTool] 第一个 category:', categories[0]);
-                console.log('[ResetDataTool] 第一个 activity:', categories[0]?.activities?.[0]);
-                
-                console.log('[ResetDataTool] 请刷新页面查看效果');
-            } else {
-                console.error('[ResetDataTool] ❌ 生成失败:', result.message);
-            }
-        } catch (error) {
-            console.error('[ResetDataTool] ❌ 生成异常:', error);
-        }
-        
-        console.log('[ResetDataTool] ========================================');
-    }
-
-    /**
-     * 测试 emoji 匹配（用于调试）
-     */
-    async testEmojiMatching(): Promise<void> {
-        console.log('[ResetDataTool] ========== 测试 Emoji 匹配 ==========');
-        
-        try {
-            // 动态导入
-            let totalCount = 0;
-            let matchedCount = 0;
-            let unmatchedEmojis: string[] = [];
-            
-            // 测试 Categories
-            console.log('\n[Categories]');
-            CATEGORIES.forEach(cat => {
-                totalCount++;
-                const matched = uiIconService.isDefaultEmoji(cat.icon);
-                if (matched) {
-                    matchedCount++;
-                    const uiIcon = uiIconService.convertEmojiToUIIcon(cat.icon);
-                    console.log(`✅ ${cat.icon} ${cat.name} -> ${uiIcon}`);
-                } else {
-                    unmatchedEmojis.push(`${cat.icon} (${cat.name})`);
-                    console.log(`❌ ${cat.icon} ${cat.name} -> 无匹配`);
-                }
-                
-                // 测试 Activities
-                cat.activities.forEach(act => {
-                    totalCount++;
-                    const actMatched = uiIconService.isDefaultEmoji(act.icon);
-                    if (actMatched) {
-                        matchedCount++;
-                        const uiIcon = uiIconService.convertEmojiToUIIcon(act.icon);
-                        console.log(`  ✅ ${act.icon} ${act.name} -> ${uiIcon}`);
-                    } else {
-                        unmatchedEmojis.push(`${act.icon} (${act.name})`);
-                        console.log(`  ❌ ${act.icon} ${act.name} -> 无匹配`);
-                    }
-                });
-            });
-            
-            // 测试 Scopes
-            console.log('\n[Scopes]');
-            SCOPES.forEach(scope => {
-                totalCount++;
-                const matched = uiIconService.isDefaultEmoji(scope.icon);
-                if (matched) {
-                    matchedCount++;
-                    const uiIcon = uiIconService.convertEmojiToUIIcon(scope.icon);
-                    console.log(`✅ ${scope.icon} ${scope.name} -> ${uiIcon}`);
-                } else {
-                    unmatchedEmojis.push(`${scope.icon} (${scope.name})`);
-                    console.log(`❌ ${scope.icon} ${scope.name} -> 无匹配`);
-                }
-            });
-            
-            // 测试 TodoCategories
-            console.log('\n[TodoCategories]');
-            MOCK_TODO_CATEGORIES.forEach(cat => {
-                totalCount++;
-                const matched = uiIconService.isDefaultEmoji(cat.icon);
-                if (matched) {
-                    matchedCount++;
-                    const uiIcon = uiIconService.convertEmojiToUIIcon(cat.icon);
-                    console.log(`✅ ${cat.icon} ${cat.name} -> ${uiIcon}`);
-                } else {
-                    unmatchedEmojis.push(`${cat.icon} (${cat.name})`);
-                    console.log(`❌ ${cat.icon} ${cat.name} -> 无匹配`);
-                }
-            });
-            
-            // 总结
-            console.log('\n[总结]');
-            console.log(`总计: ${totalCount} 个`);
-            console.log(`已匹配: ${matchedCount} 个 (${(matchedCount/totalCount*100).toFixed(1)}%)`);
-            console.log(`未匹配: ${unmatchedEmojis.length} 个 (${(unmatchedEmojis.length/totalCount*100).toFixed(1)}%)`);
-            
-            if (unmatchedEmojis.length > 0) {
-                console.log('\n[未匹配的 Emoji]');
-                unmatchedEmojis.forEach(emoji => console.log(`  - ${emoji}`));
-            }
-            
-        } catch (error) {
-            console.error('[ResetDataTool] ❌ 测试异常:', error);
-        }
-        
-        console.log('[ResetDataTool] ========================================');
-    }
+    console.log('[ResetDataTool] ===============================================');
+  }
 }
 
-// 创建单例
 const resetDataTool = new ResetDataTool();
 
-// 挂载到 window 对象
 declare global {
-    interface Window {
-        resetAllData: () => void;
-        resetCategories: () => void;
-        resetScopes: () => void;
-        resetTodoCategories: () => void;
-        clearMigrationFlags: () => void;
-        inspectData: () => void;
-        resetDataHelp: () => void;
-        forceGenerateUiIcons: () => void;
-        testEmojiMatching: () => void;
-    }
+  interface Window {
+    resetAllData: () => Promise<void>;
+    resetCategories: () => Promise<void>;
+    resetScopes: () => Promise<void>;
+    resetTodoCategories: () => Promise<void>;
+    clearMigrationFlags: () => void;
+    inspectData: () => Promise<void>;
+    resetDataHelp: () => void;
+    forceGenerateUiIcons: () => Promise<void>;
+    testEmojiMatching: () => Promise<void>;
+  }
 }
 
-// 导出初始化函数
 export function initResetDataTool(): void {
-    window.resetAllData = () => resetDataTool.resetAllData();
-    window.resetCategories = () => resetDataTool.resetCategories();
-    window.resetScopes = () => resetDataTool.resetScopes();
-    window.resetTodoCategories = () => resetDataTool.resetTodoCategories();
-    window.clearMigrationFlags = () => resetDataTool.clearMigrationFlags();
-    window.inspectData = () => resetDataTool.inspectData();
-    window.resetDataHelp = () => resetDataTool.help();
-    window.forceGenerateUiIcons = () => resetDataTool.forceGenerateUiIcons();
-    window.testEmojiMatching = () => resetDataTool.testEmojiMatching();
-    
-    console.log('[ResetDataTool] ✅ 数据重置工具已加载');
-    console.log('[ResetDataTool] 💡 输入 window.resetDataHelp() 查看帮助');
-    console.log('[ResetDataTool] 🧪 输入 window.testEmojiMatching() 测试 emoji 匹配');
+  window.resetAllData = () => resetDataTool.resetAllData();
+  window.resetCategories = () => resetDataTool.resetCategories();
+  window.resetScopes = () => resetDataTool.resetScopes();
+  window.resetTodoCategories = () => resetDataTool.resetTodoCategories();
+  window.clearMigrationFlags = () => resetDataTool.clearMigrationFlags();
+  window.inspectData = () => resetDataTool.inspectData();
+  window.resetDataHelp = () => resetDataTool.help();
+  window.forceGenerateUiIcons = () => resetDataTool.forceGenerateUiIcons();
+  window.testEmojiMatching = () => resetDataTool.testEmojiMatching();
+
+  console.log('[ResetDataTool] Debug reset tool loaded.');
+  console.log('[ResetDataTool] Run window.resetDataHelp() for available commands.');
 }
 
 export default resetDataTool;

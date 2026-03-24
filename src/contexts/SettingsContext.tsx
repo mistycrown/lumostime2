@@ -17,6 +17,11 @@ import {
     normalizeTimelineStyleConfigs
 } from '../services/timelineStyleService';
 import { normalizeFiltersOrder } from '../utils/filterUtils';
+import {
+    getLocalDataTimestamp,
+    isLocalDataTimestampUpdateLocked,
+    updateLocalDataTimestamp
+} from '../utils/localDataTimestamp';
 
 export type DefaultArchiveView = 'CHRONICLE' | 'MEMOIR';
 export type DefaultIndexView = 'TAGS' | 'SCOPE';
@@ -152,6 +157,8 @@ export const useSettings = () => {
 };
 
 export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+    const hasInitializedSyncRelevantTimestampRef = useRef(false);
+
     // 基础偏好
     const [minIdleTimeThreshold, setMinIdleTimeThreshold] = useState<number>(() => {
         const saved = localStorage.getItem('lumos_min_idle_time');
@@ -459,6 +466,24 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
 
         localStorage.setItem('lumostime_filters', JSON.stringify(normalizedFilters));
     }, [filters]);
+
+    useEffect(() => {
+        if (!hasInitializedSyncRelevantTimestampRef.current) {
+            hasInitializedSyncRelevantTimestampRef.current = true;
+            return;
+        }
+
+        if (isRestoring.current || isLocalDataTimestampUpdateLocked()) {
+            console.log('[SettingsContext] Skipping local data timestamp update (restore/lock active)');
+            return;
+        }
+
+        const previous = getLocalDataTimestamp();
+        const now = updateLocalDataTimestamp();
+        console.log(
+            `[SettingsContext] Sync-relevant settings changed, updated local timestamp: ${previous} -> ${now} (${new Date(now).toLocaleTimeString()})`
+        );
+    }, [autoLinkRules, customNarrativeTemplates, filters, userPersonalInfo]);
 
     useEffect(() => {
         localStorage.setItem('lumostime_memoir_filter_config', JSON.stringify(memoirFilterConfig));
