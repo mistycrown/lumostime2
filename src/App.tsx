@@ -3,7 +3,7 @@
  * @input localStorage (logs, todos, user preferences), Capacitor Plugins (AppUsage, FocusNotification), Services (webdav, ai, nfc)
  * @output Main UI Render, State Management, Data Persistence (JSON in localStorage)
  * @pos Root Component, Application Entry Point (Logic Hub)
- * @description The main component that holds the global state (logs, todos, active sessions) and handles routing between views (Record, Stats, Timeline, etc.).
+ * @description The main component that holds the global state (logs, todos, active sessions) and handles routing between views and overlays, including preserving the Settings -> Search return path.
  *
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
@@ -73,8 +73,8 @@ import {
 } from './constants';
 
 const OverlayFallback: React.FC<{ label: string }> = ({ label }) => (
-  <div className="fixed inset-0 z-[70] flex items-center justify-center bg-[#faf9f6]/92 backdrop-blur-sm">
-    <div className="rounded-2xl border border-stone-200 bg-white/90 px-5 py-4 shadow-sm">
+  <div className="fixed inset-0 z-[70] flex items-center justify-center bg-[#fdfbf7]">
+    <div className="rounded-2xl border border-stone-200 bg-white px-5 py-4 shadow-sm">
       <div className="text-sm font-medium text-stone-500">{label}</div>
     </div>
   </div>
@@ -163,7 +163,8 @@ const AppContent: React.FC = () => {
     statsTitle, setStatsTitle,
     currentView, setCurrentView,
     initialLogTimes,
-    setReturnToSearch
+    setReturnToSearch,
+    setIsSearchOpenedFromSettings
   } = useNavigation();
   const { categories, scopes, goals, majorGoals, setCategories, setScopes, setGoals, setMajorGoals } = useCategoryScope();
   const { startActivity, stopActivity, cancelSession, activeSessions, setActiveSessions } = useSession();
@@ -734,6 +735,7 @@ const AppContent: React.FC = () => {
             onSetDefaultRecordView={setDefaultRecordView}
 
             onOpenSearch={() => {
+              setIsSearchOpenedFromSettings(true);
               setIsSearchOpen(true);
               setIsSettingsOpen(false);
             }}
