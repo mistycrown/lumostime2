@@ -3,7 +3,7 @@
  * @input localStorage (logs, todos, user preferences), Capacitor Plugins (AppUsage, FocusNotification), Services (webdav, ai, nfc)
  * @output Main UI Render, State Management, Data Persistence (JSON in localStorage)
  * @pos Root Component, Application Entry Point (Logic Hub)
- * @description The main component that holds the global state (logs, todos, active sessions) and handles routing between views and overlays, including preserving the Settings -> Search return path.
+ * @description The main component that holds the global state (logs, todos, active sessions) and handles routing between views and overlays, including preserving standalone return paths for search and custom filters.
  *
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
@@ -49,6 +49,7 @@ import { getActiveSceneGroup, loadSceneGroupStateFromStorage } from './utils/sce
 import { STORAGE_WRITE_ERROR_EVENT, StorageWriteErrorDetail } from './constants/storageKeys';
 import {
   AutoLinkViewLazy as AutoLinkView,
+  FiltersSettingsViewLazy as FiltersSettingsView,
   FocusDetailViewLazy as FocusDetailView,
   SearchViewLazy as SearchView,
   SettingsViewLazy as SettingsView,
@@ -145,6 +146,8 @@ const AppContent: React.FC = () => {
     isAutoLinkOpen, setIsAutoLinkOpen,
     isSettingsOpen, setIsSettingsOpen,
     isSearchOpen, setIsSearchOpen,
+    isFiltersOpen, setIsFiltersOpen,
+    activeFilterId, setActiveFilterId,
     isDailyReviewOpen, setIsDailyReviewOpen,
     currentReviewDate, setCurrentReviewDate,
     isWeeklyReviewOpen,
@@ -353,6 +356,11 @@ const AppContent: React.FC = () => {
     setIsSearchOpen(false);
     const r = monthlyReviews.find(r => r.id === id);
     if (r) reviewManager.handleOpenMonthlyReview(new Date(r.monthStartDate), new Date(r.monthEndDate));
+  };
+
+  const closeFiltersOverlay = () => {
+    setActiveFilterId(null);
+    setIsFiltersOpen(false);
   };
 
   useDeepLink(logManager.handleQuickPunch, handleStartActivityWrapper, handleStopActivityWrapper);
@@ -626,6 +634,26 @@ const AppContent: React.FC = () => {
             onSelectDailyReview={handleSelectDailyReviewWrapper}
             onSelectWeeklyReview={handleSelectWeeklyReviewWrapper}
             onSelectMonthlyReview={handleSelectMonthlyReviewWrapper}
+          />
+        </React.Suspense>
+      )}
+
+      {/* Custom Filters Overlay */}
+      {isFiltersOpen && (
+        <React.Suspense fallback={<OverlayFallback label="正在加载自定义筛选器..." />}>
+          <FiltersSettingsView
+            onBack={closeFiltersOverlay}
+            onToast={addToast}
+            filters={filters}
+            onUpdateFilters={setFilters}
+            logs={logs}
+            categories={categories}
+            scopes={scopes}
+            todos={todos}
+            todoCategories={todoCategories}
+            onEditLog={logManager.openEditModal}
+            selectedFilterId={activeFilterId}
+            onSelectedFilterIdChange={setActiveFilterId}
           />
         </React.Suspense>
       )}
