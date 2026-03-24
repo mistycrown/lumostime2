@@ -1,7 +1,7 @@
 /**
  * @file DataManagementView.tsx
  * @description 数据管理页面 - 备份、导入、导出、清理等
- * @updated 2026-03-23: 增加云端图片一致性检查与按本地状态清理云端多余图片入口。
+ * @updated 2026-03-24: 图片备份支持自定义每包张数的分块导出，降低移动端导出时的内存压力。
  */
 import React, { useState, useRef } from 'react';
 import { ChevronLeft, Database, Download, Upload, Trash2, Cloud, FileSpreadsheet, ImageIcon, Search, RefreshCw, Package } from 'lucide-react';
@@ -13,6 +13,11 @@ import { imageService } from '../../services/imageService';
 import { imageCleanupService } from '../../services/imageCleanupService';
 import { imageExportService, type ImageExportProgress } from '../../services/imageExportService';
 import { ConfirmModal } from '../../components/ConfirmModal';
+
+interface ImageExportSummary {
+    totalImages: number;
+    totalFiles: number;
+}
 
 interface DataManagementViewProps {
     onBack: () => void;
@@ -64,6 +69,8 @@ export const DataManagementView: React.FC<DataManagementViewProps> = ({
     const [isExportingImages, setIsExportingImages] = useState(false);
     const [isImportingImages, setIsImportingImages] = useState(false);
     const [imageExportProgress, setImageExportProgress] = useState<ImageExportProgress | null>(null);
+    const [imageExportSummary, setImageExportSummary] = useState<ImageExportSummary | null>(null);
+    const [imageChunkSizeInput, setImageChunkSizeInput] = useState('');
     const lastImageExportProgressAt = useRef(0);
 
     // Excel Export State
@@ -94,6 +101,36 @@ export const DataManagementView: React.FC<DataManagementViewProps> = ({
         const today = new Date();
         setExcelStartInput(formatDateTo8Digits(today));
         setExcelEndInput(formatDateTo8Digits(today));
+    }, []);
+
+    React.useEffect(() => {
+        let cancelled = false;
+
+        const loadImageExportSummary = async () => {
+            try {
+                const summary = await imageExportService.getExportImageSummary();
+                if (cancelled) {
+                    return;
+                }
+
+                setImageExportSummary(summary);
+                setImageChunkSizeInput((currentValue) => currentValue || String(summary.totalImages || ''));
+            } catch (error) {
+                console.error('加载图片导出信息失败:', error);
+            }
+        };
+
+        const handleImageListChanged = () => {
+            void loadImageExportSummary();
+        };
+
+        void loadImageExportSummary();
+        window.addEventListener('imageListChanged', handleImageListChanged as EventListener);
+
+        return () => {
+            cancelled = true;
+            window.removeEventListener('imageListChanged', handleImageListChanged as EventListener);
+        };
     }, []);
 
     const setExcelQuickRange = (type: string) => {
@@ -318,7 +355,12 @@ export const DataManagementView: React.FC<DataManagementViewProps> = ({
         });
         lastImageExportProgressAt.current = 0;
         try {
+            const parsedChunkSize = parseInt(imageChunkSizeInput, 10);
+            const fallbackChunkSize = imageExportSummary?.totalImages;
             const result = await imageExportService.exportImagesToZip({
+                chunkSize: Number.isFinite(parsedChunkSize) && parsedChunkSize > 0
+                    ? parsedChunkSize
+                    : fallbackChunkSize,
                 onProgress: (progress) => {
                     const now = Date.now();
                     const shouldForceUpdate =
@@ -334,10 +376,25 @@ export const DataManagementView: React.FC<DataManagementViewProps> = ({
                     setImageExportProgress(progress);
                 }
             });
-            if (result.mode === 'native' && result.savedPath) {
-                onToast('success', `图片导出成功：${result.savedPath}`);
+
+            setImageChunkSizeInput(String(result.chunkSize));
+            setImageExportSummary({
+                totalImages: result.totalImages,
+                totalFiles: result.totalFiles
+            });
+
+            if (result.mode === 'native' && result.savedPaths?.length) {
+                if (result.totalChunks === 1) {
+                    onToast('success', `图片导出成功：${result.savedPaths[0]}`);
+                } else {
+                    onToast('success', `图片导出成功，共 ${result.totalChunks} 个压缩包`);
+                }
             } else {
-                onToast('success', `图片导出成功：${result.filename}`);
+                if (result.totalChunks === 1) {
+                    onToast('success', `图片导出成功：${result.filenames[0]}`);
+                } else {
+                    onToast('success', `图片导出成功，已开始下载 ${result.totalChunks} 个压缩包`);
+                }
             }
         } catch (error: any) {
             console.error('图片导出失败:', error);
@@ -629,6 +686,33 @@ export const DataManagementView: React.FC<DataManagementViewProps> = ({
                     {/* 图片导出导入 */}
                     <div className="space-y-3 pb-4 border-b border-stone-100">
                         <p className="text-xs font-bold text-stone-400 uppercase tracking-widest px-1">图片备份</p>
+                        <div className="space-y-2 px-1">
+                            <div className="flex items-center justify-between gap-3">
+                                <label htmlFor="image-chunk-size" className="text-sm font-medium text-stone-700">
+                                    每包图片张数
+                                </label>
+                                {imageExportSummary && (
+                                    <span className="text-xs text-stone-400">
+                                        当前共 {imageExportSummary.totalImages} 张
+                                    </span>
+                                )}
+                            </div>
+                            <input
+                                id="image-chunk-size"
+                                type="text"
+                                inputMode="numeric"
+                                value={imageChunkSizeInput}
+                                onChange={(e) => {
+                                    const value = e.target.value.replace(/\D/g, '');
+                                    setImageChunkSizeInput(value);
+                                }}
+                                placeholder={imageExportSummary ? String(imageExportSummary.totalImages) : '留空则单包导出'}
+                                className="w-full bg-white border border-stone-200 rounded-lg px-3 py-2 text-sm font-mono text-stone-800 focus:outline-none focus:ring-2 focus:ring-stone-300"
+                            />
+                            <p className="text-[11px] leading-relaxed text-stone-400">
+                                默认值等于当前全部图片张数，不改就是单包导出；改小后会拆成多个 ZIP 压缩包。
+                            </p>
+                        </div>
                         <div className="grid grid-cols-2 gap-3">
                             <button
                                 onClick={handleExportImages}
@@ -695,7 +779,7 @@ export const DataManagementView: React.FC<DataManagementViewProps> = ({
                             </div>
                         )}
                         <p className="text-xs text-stone-400 px-1">
-                            导出所有图片为ZIP压缩包，或从ZIP文件导入图片
+                            导出所有图片为ZIP压缩包；分块导出时，导入阶段把各个 ZIP 逐个导入即可。
                         </p>
                     </div>
 
