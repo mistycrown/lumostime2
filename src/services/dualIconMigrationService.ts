@@ -1,106 +1,57 @@
 /**
  * @file dualIconMigrationService.ts
- * @input Categories, Scopes, TodoCategories, CheckTemplates without uiIcon field
- * @output Data with uiIcon field added
+ * @input Categories, scopes, todo categories, and check templates without uiIcon fields
+ * @output Data with uiIcon fields populated
  * @pos Service (Data Migration)
- * @description 双图标系统迁移服务 - 为现有数据添加 uiIcon 字段
- * 
- * 核心功能：
- * - 检测是否已完成迁移
- * - 为所有数据实体添加 uiIcon 字段
- * - 使用 ensureUiIconField 工具函数处理
- * - 标记迁移完成状态
- * 
- * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
+ * @description Adds uiIcon fields to legacy data so emoji and custom icon themes can coexist.
  */
-
-import { Category, Scope, TodoCategory, CheckTemplate } from '../types';
+import { dataRepository } from '../repositories/dataRepository';
+import { Category, CheckTemplate, Scope, TodoCategory } from '../types';
 import { ensureUiIconField } from '../utils/iconUtils';
+import { REVIEW_KEYS, storage } from '../constants/storageKeys';
 
 class DualIconMigrationService {
   private readonly MIGRATION_KEY = 'lumostime_dual_icon_migrated';
 
-  /**
-   * 检查是否已经完成迁移
-   */
   isMigrated(): boolean {
     return localStorage.getItem(this.MIGRATION_KEY) === 'true';
   }
 
-  /**
-   * 标记迁移完成
-   */
   markMigrated(): void {
     localStorage.setItem(this.MIGRATION_KEY, 'true');
   }
 
-  /**
-   * 重置迁移状态（用于测试）
-   */
   resetMigration(): void {
     localStorage.removeItem(this.MIGRATION_KEY);
   }
 
-  /**
-   * 迁移 Categories 数据
-   */
   migrateCategories(categories: Category[]): Category[] {
-    return categories.map(category => {
-      const migratedCategory = ensureUiIconField(category);
-      
-      // 迁移 activities
-      const migratedActivities = category.activities.map(activity =>
-        ensureUiIconField(activity)
-      );
-      
-      return {
-        ...migratedCategory,
-        activities: migratedActivities
-      };
-    });
+    return categories.map((category) => ({
+      ...ensureUiIconField(category),
+      activities: category.activities.map((activity) => ensureUiIconField(activity))
+    }));
   }
 
-  /**
-   * 迁移 Scopes 数据
-   */
   migrateScopes(scopes: Scope[]): Scope[] {
-    return scopes.map(scope => ensureUiIconField(scope));
+    return scopes.map((scope) => ensureUiIconField(scope));
   }
 
-  /**
-   * 迁移 TodoCategories 数据
-   */
   migrateTodoCategories(todoCategories: TodoCategory[]): TodoCategory[] {
-    return todoCategories.map(category => ensureUiIconField(category));
+    return todoCategories.map((category) => ensureUiIconField(category));
   }
 
-  /**
-   * 迁移 CheckTemplates 数据
-   */
   migrateCheckTemplates(checkTemplates: CheckTemplate[]): CheckTemplate[] {
-    return checkTemplates.map(template => {
-      // 迁移模板本身的图标
-      const migratedTemplate = ensureUiIconField(template);
-      
-      // 迁移模板中的每个 item 的图标
-      const migratedItems = template.items.map(item => ensureUiIconField(item));
-      
-      return {
-        ...migratedTemplate,
-        items: migratedItems
-      };
-    });
+    return checkTemplates.map((template) => ({
+      ...ensureUiIconField(template),
+      items: template.items.map((item) => ensureUiIconField(item))
+    }));
   }
 
-  /**
-   * 执行完整的数据迁移
-   */
   async migrateAll(): Promise<{
     success: boolean;
     message: string;
   }> {
     try {
-      // 检查是否已经迁移
       if (this.isMigrated()) {
         return {
           success: true,
@@ -108,43 +59,28 @@ class DualIconMigrationService {
         };
       }
 
-      // 读取数据
-      const categoriesStr = localStorage.getItem('lumostime_categories');
-      const scopesStr = localStorage.getItem('lumostime_scopes');
-      const todoCategoriesStr = localStorage.getItem('lumostime_todoCategories');
-      const checkTemplatesStr = localStorage.getItem('lumostime_checkTemplates');
-
       let migrated = false;
+      const categoryScopeSnapshot = await dataRepository.loadCategoryScopeSnapshot();
+      const dataSnapshot = await dataRepository.loadDataContextSnapshot();
+      const checkTemplates = storage.getJSON<CheckTemplate[]>(REVIEW_KEYS.CHECK_TEMPLATES);
 
-      // 迁移 categories
-      if (categoriesStr) {
-        const categories = JSON.parse(categoriesStr) as Category[];
-        const migratedCategories = this.migrateCategories(categories);
-        localStorage.setItem('lumostime_categories', JSON.stringify(migratedCategories));
+      if (categoryScopeSnapshot.categories.length) {
+        await dataRepository.saveCategories(this.migrateCategories(categoryScopeSnapshot.categories));
         migrated = true;
       }
 
-      // 迁移 scopes
-      if (scopesStr) {
-        const scopes = JSON.parse(scopesStr) as Scope[];
-        const migratedScopes = this.migrateScopes(scopes);
-        localStorage.setItem('lumostime_scopes', JSON.stringify(migratedScopes));
+      if (categoryScopeSnapshot.scopes.length) {
+        await dataRepository.saveScopes(this.migrateScopes(categoryScopeSnapshot.scopes));
         migrated = true;
       }
 
-      // 迁移 todoCategories
-      if (todoCategoriesStr) {
-        const todoCategories = JSON.parse(todoCategoriesStr) as TodoCategory[];
-        const migratedTodoCategories = this.migrateTodoCategories(todoCategories);
-        localStorage.setItem('lumostime_todoCategories', JSON.stringify(migratedTodoCategories));
+      if (dataSnapshot.todoCategories.length) {
+        await dataRepository.saveTodoCategories(this.migrateTodoCategories(dataSnapshot.todoCategories));
         migrated = true;
       }
 
-      // 迁移 checkTemplates
-      if (checkTemplatesStr) {
-        const checkTemplates = JSON.parse(checkTemplatesStr) as CheckTemplate[];
-        const migratedCheckTemplates = this.migrateCheckTemplates(checkTemplates);
-        localStorage.setItem('lumostime_checkTemplates', JSON.stringify(migratedCheckTemplates));
+      if (checkTemplates?.length) {
+        storage.setJSON(REVIEW_KEYS.CHECK_TEMPLATES, this.migrateCheckTemplates(checkTemplates));
         migrated = true;
       }
 

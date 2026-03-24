@@ -1,129 +1,170 @@
 /**
  * @file DataContext.tsx
- * @description 管理应用核心数据状态（logs, todos, todoCategories）及其持久化逻辑
+ * @description Manages core application data state (logs, todos, todoCategories) with async repository hydration and persistence.
  */
-import React, { createContext, useContext, useState, useEffect, useRef, ReactNode } from 'react';
-import { Log, TodoItem, TodoCategory } from '../types';
+import React, { createContext, useContext, useEffect, useRef, useState, ReactNode } from 'react';
 import { INITIAL_LOGS, INITIAL_TODOS, MOCK_TODO_CATEGORIES } from '../constants';
-import { storage, USER_DATA_KEYS } from '../constants/storageKeys';
+import { dataRepository } from '../repositories/dataRepository';
+import { Log, TodoCategory, TodoItem } from '../types';
+import {
+  getLocalDataTimestamp,
+  isLocalDataTimestampUpdateLocked,
+  LOCAL_DATA_TIMESTAMP_UPDATED_EVENT,
+  LocalDataTimestampUpdatedDetail,
+  updateLocalDataTimestamp
+} from '../utils/localDataTimestamp';
 
 interface DataContextType {
-    // Logs 状态
-    logs: Log[];
-    setLogs: React.Dispatch<React.SetStateAction<Log[]>>;
+  isReady: boolean;
 
-    // Todos 状态
-    todos: TodoItem[];
-    setTodos: React.Dispatch<React.SetStateAction<TodoItem[]>>;
+  logs: Log[];
+  setLogs: React.Dispatch<React.SetStateAction<Log[]>>;
 
-    // Todo Categories 状态
-    todoCategories: TodoCategory[];
-    setTodoCategories: React.Dispatch<React.SetStateAction<TodoCategory[]>>;
+  todos: TodoItem[];
+  setTodos: React.Dispatch<React.SetStateAction<TodoItem[]>>;
 
-    // Local Modification Timestamp
-    localDataTimestamp: number;
-    setLocalDataTimestamp: React.Dispatch<React.SetStateAction<number>>;
+  todoCategories: TodoCategory[];
+  setTodoCategories: React.Dispatch<React.SetStateAction<TodoCategory[]>>;
 
-    // Control Function
-    disableTimestampUpdateRef: React.MutableRefObject<boolean>;
+  localDataTimestamp: number;
+  setLocalDataTimestamp: React.Dispatch<React.SetStateAction<number>>;
 }
 
 const DataContext = createContext<DataContextType | undefined>(undefined);
 
 export const useData = () => {
-    const context = useContext(DataContext);
-    if (!context) {
-        throw new Error('useData must be used within a DataProvider');
-    }
-    return context;
+  const context = useContext(DataContext);
+  if (!context) {
+    throw new Error('useData must be used within a DataProvider');
+  }
+  return context;
 };
 
 export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-    // Load from localStorage or use initial data
-    const [logs, setLogs] = useState<Log[]>(() => {
-        return storage.getJSON<Log[]>(USER_DATA_KEYS.LOGS, INITIAL_LOGS) || INITIAL_LOGS;
-    });
+  const [isReady, setIsReady] = useState(false);
+  const [canPersist, setCanPersist] = useState(false);
+  const [logs, setLogs] = useState<Log[]>(INITIAL_LOGS);
+  const [todos, setTodos] = useState<TodoItem[]>(INITIAL_TODOS);
+  const [todoCategories, setTodoCategories] = useState<TodoCategory[]>(MOCK_TODO_CATEGORIES);
+  const [localDataTimestamp, setLocalDataTimestamp] = useState<number>(() => getLocalDataTimestamp());
 
-    const [todos, setTodos] = useState<TodoItem[]>(() => {
-        const stored = storage.getJSON<TodoItem[]>(USER_DATA_KEYS.TODOS);
-        if (stored) {
-            return stored;
-        }
-        return INITIAL_TODOS.map(todo => {
-            if (!todo.isProgress) return todo;
-            // Systemic Fix: Recalculate progress from logs to ensure consistency
-            const calculatedProgress = INITIAL_LOGS
-                .filter(log => log.linkedTodoId === todo.id)
-                .reduce((acc, log) => acc + (log.progressIncrement || 0), 0);
-            return { ...todo, completedUnits: calculatedProgress };
-        });
-    });
+  const isHydratingRef = useRef(true);
 
-    const [todoCategories, setTodoCategories] = useState<TodoCategory[]>(() => {
-        return storage.getJSON<TodoCategory[]>(USER_DATA_KEYS.TODO_CATEGORIES, MOCK_TODO_CATEGORIES) || MOCK_TODO_CATEGORIES;
-    });
+  useEffect(() => {
+    const handleTimestampUpdated = (event: Event) => {
+      const customEvent = event as CustomEvent<LocalDataTimestampUpdatedDetail>;
+      const timestamp = customEvent.detail?.timestamp;
+      if (typeof timestamp === 'number') {
+        setLocalDataTimestamp(timestamp);
+      }
+    };
 
-    // Local Timestamp State
-    const [localDataTimestamp, setLocalDataTimestamp] = useState<number>(() => {
-        const stored = storage.get(USER_DATA_KEYS.LOCAL_TIMESTAMP);
-        return stored ? Number(stored) : Date.now();
-    });
+    window.addEventListener(LOCAL_DATA_TIMESTAMP_UPDATED_EVENT, handleTimestampUpdated as EventListener);
+    return () => {
+      window.removeEventListener(LOCAL_DATA_TIMESTAMP_UPDATED_EVENT, handleTimestampUpdated as EventListener);
+    };
+  }, []);
 
-    // Control ref to prevent timestamp updates during restore
-    const disableTimestampUpdateRef = useRef(false);
+  useEffect(() => {
+    let cancelled = false;
 
-    // Refs to skip initial render updates
-    const isFirstRun = useRef(true);
+    const hydrate = async () => {
+      let hydratedSuccessfully = false;
 
-    // 持久化 logs 到 localStorage
-    useEffect(() => {
-        storage.setJSON(USER_DATA_KEYS.LOGS, logs);
-    }, [logs]);
-
-    // 持久化 todos 到 localStorage
-    useEffect(() => {
-        storage.setJSON(USER_DATA_KEYS.TODOS, todos);
-    }, [todos]);
-
-    // 持久化 todoCategories 到 localStorage
-    useEffect(() => {
-        storage.setJSON(USER_DATA_KEYS.TODO_CATEGORIES, todoCategories);
-    }, [todoCategories]);
-
-    // 监控数据变化并更新时间戳
-    useEffect(() => {
-        if (isFirstRun.current) {
-            isFirstRun.current = false;
-            return;
+      try {
+        const snapshot = await dataRepository.loadDataContextSnapshot();
+        if (cancelled) {
+          return;
         }
 
-        // Check if we should update timestamp
-        if (disableTimestampUpdateRef.current) {
-            // Skip update if disabled
-            console.log('[DataContext] Skipping timestamp update (locked during restore)');
-            return;
+        hydratedSuccessfully = true;
+        setLogs(snapshot.logs);
+        setTodos(snapshot.todos);
+        setTodoCategories(snapshot.todoCategories);
+      } catch (error) {
+        console.error('[DataContext] Failed to hydrate core data from repository', error);
+      } finally {
+        if (!cancelled) {
+          setCanPersist(hydratedSuccessfully);
+          setIsReady(true);
+          window.setTimeout(() => {
+            if (!cancelled) {
+              isHydratingRef.current = false;
+            }
+          }, 0);
         }
+      }
+    };
 
-        // 任何数据变化都更新时间戳
-        const now = Date.now();
-        setLocalDataTimestamp(now);
-        storage.set(USER_DATA_KEYS.LOCAL_TIMESTAMP, now.toString());
-        console.log(`[DataContext] Data changed, updated local timestamp: ${localDataTimestamp} -> ${now} (${new Date(now).toLocaleTimeString()})`);
-    }, [logs, todos, todoCategories]);
+    void hydrate();
 
-    return (
-        <DataContext.Provider value={{
-            logs,
-            setLogs,
-            todos,
-            setTodos,
-            todoCategories,
-            setTodoCategories,
-            localDataTimestamp,
-            setLocalDataTimestamp,
-            disableTimestampUpdateRef
-        }}>
-            {children}
-        </DataContext.Provider>
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!isReady || !canPersist) {
+      return;
+    }
+
+    void dataRepository.saveLogs(logs).catch((error) => {
+      console.error('[DataContext] Failed to persist logs', error);
+    });
+  }, [canPersist, isReady, logs]);
+
+  useEffect(() => {
+    if (!isReady || !canPersist) {
+      return;
+    }
+
+    void dataRepository.saveTodos(todos).catch((error) => {
+      console.error('[DataContext] Failed to persist todos', error);
+    });
+  }, [canPersist, isReady, todos]);
+
+  useEffect(() => {
+    if (!isReady || !canPersist) {
+      return;
+    }
+
+    void dataRepository.saveTodoCategories(todoCategories).catch((error) => {
+      console.error('[DataContext] Failed to persist todo categories', error);
+    });
+  }, [canPersist, isReady, todoCategories]);
+
+  useEffect(() => {
+    if (!isReady || !canPersist || isHydratingRef.current) {
+      return;
+    }
+
+    if (isLocalDataTimestampUpdateLocked()) {
+      console.log('[DataContext] Skipping local data timestamp update (locked during restore)');
+      return;
+    }
+
+    const previous = getLocalDataTimestamp();
+    const now = updateLocalDataTimestamp();
+    console.log(
+      `[DataContext] Data changed, updated local timestamp: ${previous} -> ${now} (${new Date(now).toLocaleTimeString()})`
     );
+  }, [canPersist, isReady, logs, todos, todoCategories]);
+
+  return (
+    <DataContext.Provider
+      value={{
+        isReady,
+        logs,
+        setLogs,
+        todos,
+        setTodos,
+        todoCategories,
+        setTodoCategories,
+        localDataTimestamp,
+        setLocalDataTimestamp
+      }}
+    >
+      {children}
+    </DataContext.Provider>
+  );
 };
