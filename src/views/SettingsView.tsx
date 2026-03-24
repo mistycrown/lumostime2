@@ -3,7 +3,7 @@
  * @input User Settings, Sync Data, AI Config, App State
  * @output Configuration Updates, Data Sync Actions, Navigation
  * @pos View (Settings Modal)
- * @description The central configuration hub. Manages Cloud Sync (WebDAV), AI integration (Providers/Presets), Data (Import/Export), and Application Preferences (Appearance, Habits, etc.), including settings subpage hierarchy state.
+ * @description The central configuration hub. Manages Cloud Sync (WebDAV), AI integration (Providers/Presets), Data (Import/Export), and Application Preferences (Appearance, Habits, etc.), including settings subpage hierarchy state and in-session main-list scroll restoration.
  *
  * 修改历史:
  * - 2026-03-23: 接入云端图片一致性检查与按本地状态修复入口，补齐数据管理页中的图片清理入口。
@@ -84,7 +84,7 @@ import { DefaultArchiveView, DefaultIndexView, DefaultRecordView, useSettings } 
 import { useData } from '../contexts/DataContext';
 import { useCategoryScope } from '../contexts/CategoryScopeContext';
 import { useReview } from '../contexts/ReviewContext';
-import { useNavigation } from '../contexts/NavigationContext';
+import { SettingsSubmenu, useNavigation } from '../contexts/NavigationContext';
 import FocusNotification from '../plugins/FocusNotificationPlugin';
 import excelExportService from '../services/excelExportService';
 import { imageCleanupService } from '../services/imageCleanupService';
@@ -212,6 +212,10 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
     const { autoLinkRules: ctxAutoLinkRules, autoApplyAutoLinkRules, setAutoApplyAutoLinkRules, autoApplyTodoLink, setAutoApplyTodoLink, autoOpenFocusDetail, setAutoOpenFocusDetail, userPersonalInfo: ctxUserPersonalInfo, filters: ctxFilters, customNarrativeTemplates: ctxCustomNarrativeTemplates, useTwemoji, setUseTwemoji, sceneCardTimerMode, setSceneCardTimerMode } = useSettings();
     const { dailyReviews: ctxDailyReviews, weeklyReviews: ctxWeeklyReviews, monthlyReviews: ctxMonthlyReviews, reviewTemplates: ctxReviewTemplates, checkTemplates: ctxCheckTemplates } = useReview();
     const { settingsSubmenu: activeSubmenu, setSettingsSubmenu: setActiveSubmenu } = useNavigation();
+    const mainListScrollRef = useRef<HTMLDivElement>(null);
+    const mainListScrollTopRef = useRef(0);
+    const shouldRestoreMainListScrollRef = useRef(false);
+    const previousSubmenuRef = useRef<SettingsSubmenu>(activeSubmenu);
     const [webdavConfig, setWebdavConfig] = useState<WebDAVConfig | null>(null);
     const [s3Config, setS3Config] = useState<S3Config | null>(null);
     // Floating Window State
@@ -227,6 +231,38 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
     useEffect(() => {
         // We handle local user info state inside the specific submenu render to avoid conflicts
     }, [userPersonalInfo]);
+
+    const openSettingsSubmenu = (submenu: SettingsSubmenu) => {
+        if (activeSubmenu === 'main' && mainListScrollRef.current) {
+            mainListScrollTopRef.current = mainListScrollRef.current.scrollTop;
+            shouldRestoreMainListScrollRef.current = true;
+        }
+
+        setActiveSubmenu(submenu);
+    };
+
+    const handleBackToMain = () => {
+        shouldRestoreMainListScrollRef.current = true;
+        setActiveSubmenu('main');
+    };
+
+    useEffect(() => {
+        const previousSubmenu = previousSubmenuRef.current;
+        previousSubmenuRef.current = activeSubmenu;
+
+        if (activeSubmenu !== 'main' || previousSubmenu === 'main' || !shouldRestoreMainListScrollRef.current) {
+            return;
+        }
+
+        const restoreId = window.requestAnimationFrame(() => {
+            if (mainListScrollRef.current) {
+                mainListScrollRef.current.scrollTop = mainListScrollTopRef.current;
+            }
+            shouldRestoreMainListScrollRef.current = false;
+        });
+
+        return () => window.cancelAnimationFrame(restoreId);
+    }, [activeSubmenu]);
 
     const isElectronEnvironment = () => {
         return typeof window !== 'undefined' && !!(window as any).ipcRenderer;
@@ -771,7 +807,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
     // Filters子页面
     if (activeSubmenu === 'memoir_filter') {
         return renderLazySettingsSubview(
-            <MemoirSettingsView onBack={() => setActiveSubmenu('main')} />,
+            <MemoirSettingsView onBack={handleBackToMain} />,
             '正在加载 Memoir 设置...'
         );
     }
@@ -779,7 +815,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
     if (activeSubmenu === 'filters') {
         return renderLazySettingsSubview(
             <FiltersSettingsView
-                onBack={() => setActiveSubmenu('main')}
+                onBack={handleBackToMain}
                 onToast={onToast}
                 filters={filters}
                 onUpdateFilters={(newFilters) => onUpdateFilters?.(newFilters)}
@@ -801,7 +837,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
                 onUpdateTemplates={(newTemplates) => onUpdateCheckTemplates?.(newTemplates)}
                 dailyReviews={dailyReviews}
                 onBatchUpdateDailyReviewItems={onUpdateDailyReviews || (() => { })}
-                onBack={() => setActiveSubmenu('main')}
+                onBack={handleBackToMain}
             />,
             '正在加载日课模板...'
         );
@@ -809,7 +845,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
 
     if (activeSubmenu === 'ai') {
         return renderLazySettingsSubview(
-            <AISettingsView onBack={() => setActiveSubmenu('main')} onToast={onToast} />,
+            <AISettingsView onBack={handleBackToMain} onToast={onToast} />,
             '正在加载 AI 设置...'
         );
     }
@@ -817,7 +853,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
     if (activeSubmenu === 'emoji') {
         return renderLazySettingsSubview(
             <EmojiSettingsView
-                onBack={() => setActiveSubmenu('main')}
+                onBack={handleBackToMain}
             />,
             '正在加载 Emoji 设置...'
         );
@@ -826,7 +862,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
     if (activeSubmenu === 'principle') {
         return renderLazySettingsSubview(
             <PrincipleLibraryView
-                onBack={() => setActiveSubmenu('main')}
+                onBack={handleBackToMain}
             />,
             '正在加载原则库...'
         );
@@ -835,7 +871,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
     if (activeSubmenu === 'cloud') {
         return renderLazySettingsSubview(
             <CloudSyncSettingsView
-                onBack={() => setActiveSubmenu('main')}
+                onBack={handleBackToMain}
                 onToast={onToast}
                 webdavConfig={webdavConfig}
                 setWebdavConfig={setWebdavConfig}
@@ -849,7 +885,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
     if (activeSubmenu === 's3') {
         return renderLazySettingsSubview(
             <S3SyncSettingsView
-                onBack={() => setActiveSubmenu('main')}
+                onBack={handleBackToMain}
                 onToast={onToast}
                 s3Config={s3Config}
                 setS3Config={setS3Config}
@@ -867,7 +903,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
     if (activeSubmenu === 'auto_record') {
         return renderLazySettingsSubview(
             <AutoRecordSettingsView
-                onBack={() => setActiveSubmenu('main')}
+                onBack={handleBackToMain}
                 categories={categories || []}
             />,
             '正在加载应用关联规则...'
@@ -881,7 +917,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
 
         return renderLazySettingsSubview(
             <ObsidianExportView
-                onBack={() => setActiveSubmenu('main')}
+                onBack={handleBackToMain}
                 logs={logs}
                 categories={categoriesData || categories || []}
                 todos={todos}
@@ -901,7 +937,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
     if (activeSubmenu === 'data') {
         return renderLazySettingsSubview(
             <DataManagementView
-                onBack={() => setActiveSubmenu('main')}
+                onBack={handleBackToMain}
                 onToast={onToast}
                 onExport={onExport}
                 onImport={onImport}
@@ -923,7 +959,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
     if (activeSubmenu === 'preferences') {
         return renderLazySettingsSubview(
             <PreferencesSettingsView
-                onBack={() => setActiveSubmenu('main')}
+                onBack={handleBackToMain}
                 onToast={onToast}
                 privacyMode={isPrivacyMode}
                 onTogglePrivacyMode={togglePrivacyMode}
@@ -972,7 +1008,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
 
     if (activeSubmenu === 'guide') {
         return renderLazySettingsSubview(
-            <UserGuideView onBack={() => setActiveSubmenu('main')} />,
+            <UserGuideView onBack={handleBackToMain} />,
             '正在加载用户指南...'
         );
     }
@@ -980,7 +1016,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
     if (activeSubmenu === 'nfc') {
         return renderLazySettingsSubview(
             <NFCSettingsView
-                onBack={() => setActiveSubmenu('main')}
+                onBack={handleBackToMain}
                 onToast={onToast}
                 categories={syncData.categories || []}
                 checkTemplates={syncData.checkTemplates || []}
@@ -992,7 +1028,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
     if (activeSubmenu === 'narrative_prompt') {
         return renderLazySettingsSubview(
             <NarrativeSettingsView
-                onBack={() => setActiveSubmenu('main')}
+                onBack={handleBackToMain}
                 onToast={onToast}
                 userPersonalInfo={userPersonalInfo}
                 onSetUserPersonalInfo={onSetUserPersonalInfo}
@@ -1014,7 +1050,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
                         onSyncUpdate({ ...syncData, reviewTemplates: newTemplates });
                     }
                 }}
-                onBack={() => setActiveSubmenu('main')}
+                onBack={handleBackToMain}
             />,
             '正在加载回顾模板...'
         );
@@ -1023,7 +1059,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
     if (activeSubmenu === 'autolink') {
         return renderLazySettingsSubview(
             <AutoLinkView
-                onClose={() => setActiveSubmenu('main')}
+                onClose={handleBackToMain}
                 rules={syncData.autoLinkRules || []}
                 onUpdateRules={(rules) => {
                     onSyncUpdate({ ...syncData, autoLinkRules: rules });
@@ -1038,7 +1074,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
     if (activeSubmenu === 'batch_manage') {
         return renderLazySettingsSubview(
             <BatchFocusRecordManageView
-                onBack={() => setActiveSubmenu('main')}
+                onBack={handleBackToMain}
                 logs={logs}
                 onUpdateLogs={(updatedLogs) => {
                     const recalculatedTodos = (todos || []).map(todo => {
@@ -1070,7 +1106,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
     if (activeSubmenu === 'sponsorship_preview') {
         return renderLazySettingsSubview(
             <SponsorshipView 
-                onBack={() => setActiveSubmenu('main')} 
+                onBack={handleBackToMain} 
                 onToast={onToast}
                 categories={categoriesData}
             />,
@@ -1079,7 +1115,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
     }
 
     if (activeSubmenu === 'scene') {
-        return <SceneSettingsView onBack={() => setActiveSubmenu('main')} />;
+        return <SceneSettingsView onBack={handleBackToMain} />;
     }
 
     return (
@@ -1096,7 +1132,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
                 <div className="w-8"></div>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-4 space-y-6 pb-40">
+            <div ref={mainListScrollRef} className="flex-1 overflow-y-auto p-4 space-y-6 pb-40">
 
                 {/* Section: General - AI & Automation */}
                 <div className="space-y-3">
@@ -1105,13 +1141,13 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
                         <MenuItem
                             icon={<Sparkles size={18} className="text-purple-500" />}
                             label="AI API"
-                            onClick={() => setActiveSubmenu('ai')}
+                            onClick={() => openSettingsSubmenu('ai')}
                         />
                         <MenuItem
                             icon={<Link size={18} className="text-blue-500" />}
                             label="标签关联领域规则"
                             isLast
-                            onClick={() => setActiveSubmenu('autolink')}
+                            onClick={() => openSettingsSubmenu('autolink')}
                         />
                     </div>
                 </div>
@@ -1123,23 +1159,23 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
                         <MenuItem
                             icon={<Settings size={18} />}
                             label="偏好设置"
-                            onClick={() => setActiveSubmenu('preferences')}
+                            onClick={() => openSettingsSubmenu('preferences')}
                         />
                         <MenuItem
                             icon={<Smile size={18} className="text-yellow-500" />}
                             label="Emoji 和 Sticker"
-                            onClick={() => setActiveSubmenu('emoji')}
+                            onClick={() => openSettingsSubmenu('emoji')}
                         />
                         <MenuItem
                             icon={<AlignLeft size={18} className="text-purple-500" />}
                             label="Memoir 筛选条件"
-                            onClick={() => setActiveSubmenu('memoir_filter')}
+                            onClick={() => openSettingsSubmenu('memoir_filter')}
                         />
                         <MenuItem
                             icon={<LayoutGrid size={18} className="text-blue-500" />}
                             label="场景设置"
                             isLast
-                            onClick={() => setActiveSubmenu('scene')}
+                            onClick={() => openSettingsSubmenu('scene')}
                         />
                     </div>
                 </div>
@@ -1158,13 +1194,13 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
                         <MenuItem
                             icon={<Hash size={18} className="text-amber-500" />}
                             label="自定义筛选器"
-                            onClick={() => setActiveSubmenu('filters')}
+                            onClick={() => openSettingsSubmenu('filters')}
                         />
                         <MenuItem
                             icon={<BookOpen size={18} className="text-stone-500" />}
                             label="原则库"
                             isLast
-                            onClick={() => setActiveSubmenu('principle')}
+                            onClick={() => openSettingsSubmenu('principle')}
                         />
                     </div>
                 </div>
@@ -1176,12 +1212,12 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
                         <MenuItem
                             icon={<Nfc size={18} className="text-orange-500" />}
                             label="NFC Tags"
-                            onClick={() => setActiveSubmenu('nfc')}
+                            onClick={() => openSettingsSubmenu('nfc')}
                         />
                         <MenuItem
                             icon={<Smartphone size={18} className="text-indigo-500" />}
                             label="应用关联标签规则"
-                            onClick={() => setActiveSubmenu('auto_record')}
+                            onClick={() => openSettingsSubmenu('auto_record')}
                         />
                         <ToggleItem
                             icon={<SquareActivity size={18} className="text-teal-500" />}
@@ -1199,18 +1235,18 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
                         <MenuItem
                             icon={<FileText size={18} className="text-orange-500" />}
                             label="回顾模板"
-                            onClick={() => setActiveSubmenu('templates')}
+                            onClick={() => openSettingsSubmenu('templates')}
                         />
                         <MenuItem
                             icon={<CheckCircle2 size={18} className="text-green-500" />}
                             label="日课模板"
-                            onClick={() => setActiveSubmenu('check_templates')}
+                            onClick={() => openSettingsSubmenu('check_templates')}
                         />
                         <MenuItem
                             icon={<MessageSquare size={18} className="text-purple-500" />}
                             label="AI 叙事设定"
                             isLast
-                            onClick={() => setActiveSubmenu('narrative_prompt')}
+                            onClick={() => openSettingsSubmenu('narrative_prompt')}
                         />
                     </div>
                 </div>
@@ -1221,30 +1257,30 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
                         <MenuItem
                             icon={<Edit2 size={18} className="text-blue-500" />}
                             label="批量管理记录"
-                            onClick={() => setActiveSubmenu('batch_manage')}
+                            onClick={() => openSettingsSubmenu('batch_manage')}
                         />
                         <MenuItem
                             icon={<Cloud size={18} />}
                             label="WebDAV 云同步"
-                            onClick={() => setActiveSubmenu('cloud')}
+                            onClick={() => openSettingsSubmenu('cloud')}
                         />
                         <MenuItem
                             icon={<Database size={18} className="text-orange-500" />}
                             label="S3 云同步"
-                            onClick={() => setActiveSubmenu('s3')}
+                            onClick={() => openSettingsSubmenu('s3')}
                         />
                         <MenuItem
                             icon={<FileSpreadsheet size={18} className="text-blue-500" />}
                             label="数据导出导入"
                             isLast={!isElectronEnvironment()}
-                            onClick={() => setActiveSubmenu('data')}
+                            onClick={() => openSettingsSubmenu('data')}
                         />
                         {isElectronEnvironment() && (
                             <MenuItem
                                 icon={<FileText size={18} className="text-indigo-500" />}
                                 label="导出到 Obsidian"
                                 isLast
-                                onClick={() => setActiveSubmenu('obsidian_export')}
+                                onClick={() => openSettingsSubmenu('obsidian_export')}
                             />
                         )}
                     </div>
@@ -1262,13 +1298,13 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
                         <MenuItem
                             icon={<BookOpen size={18} />}
                             label="用户指南"
-                            onClick={() => setActiveSubmenu('guide')}
+                            onClick={() => openSettingsSubmenu('guide')}
                         />
                         <MenuItem
                             icon={<Fish size={18} className="text-pink-500" />}
                             label="投喂小鱼干"
                             isLast
-                            onClick={() => setActiveSubmenu('sponsorship_preview')}
+                            onClick={() => openSettingsSubmenu('sponsorship_preview')}
                         />
                     </div>
                 </div>
