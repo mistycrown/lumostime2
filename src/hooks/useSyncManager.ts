@@ -3,7 +3,7 @@
  * @input DataContext (logs, todos, categories, etc.), SettingsContext (sync config, timestamps), CategoryScopeContext (categories, scopes, goals), ReviewContext (reviews), NavigationContext (currentView, modal states), ToastContext (addToast)
  * @output Sync Operations (performSync, handleQuickSync, handleImageSync, handleSyncDataUpdate), Sync State (isSyncing, refreshKey)
  * @pos Hook (System Integration)
- * @description 同步管理 Hook - 处理数据和图片的云端同步，支持启动同步、恢复同步、手动同步、自动同步等多种模式，并在恢复筛选器时保持顺序稳定。
+ * @description 同步管理 Hook - 处理数据和图片的云端同步，支持启动同步、恢复同步、手动同步、自动同步等多种模式，并在恢复筛选器时保持顺序稳定，同时保证空值恢复与 majorGoals 载荷一致。
  * 
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
@@ -50,7 +50,7 @@ export const useSyncManager = () => {
         isSyncing, setIsSyncing,
         manualSyncMode
     } = useSettings();
-    const { categories, setCategories, scopes, setScopes, goals, setGoals } = useCategoryScope();
+    const { categories, setCategories, scopes, setScopes, goals, setGoals, majorGoals, setMajorGoals } = useCategoryScope();
     const {
         reviewTemplates, setReviewTemplates,
         checkTemplates, setCheckTemplates,
@@ -71,28 +71,31 @@ export const useSyncManager = () => {
         setLocalDataTimestampUpdateLocked(true);
 
         try {
-            if (data.logs) setLogs(data.logs);
-            if (data.categories) setCategories(data.categories);
-            if (data.todos) setTodos(data.todos);
-            if (data.todoCategories) setTodoCategories(data.todoCategories);
-            if (data.scopes) setScopes(data.scopes);
-            if (data.goals) setGoals(data.goals);
-            if (data.autoLinkRules) setAutoLinkRules(data.autoLinkRules);
-            if (data.reviewTemplates) setReviewTemplates(data.reviewTemplates);
-            if (data.checkTemplates) setCheckTemplates(normalizeCheckTemplates(data.checkTemplates));
-            if (data.dailyReviews) setDailyReviews(normalizeDailyReviews(data.dailyReviews));
-            if (data.weeklyReviews) setWeeklyReviews(data.weeklyReviews);
-            if (data.monthlyReviews) setMonthlyReviews(data.monthlyReviews);
-            if (data.customNarrativeTemplates) setCustomNarrativeTemplates(data.customNarrativeTemplates);
-            if (data.userPersonalInfo) setUserPersonalInfo(data.userPersonalInfo);
-            if (data.filters) setFilters(normalizeFiltersOrder(data.filters));
+            const hasField = (key: string) => Object.prototype.hasOwnProperty.call(data, key);
+
+            if (hasField('logs')) setLogs(data.logs);
+            if (hasField('categories')) setCategories(data.categories);
+            if (hasField('todos')) setTodos(data.todos);
+            if (hasField('todoCategories')) setTodoCategories(data.todoCategories);
+            if (hasField('scopes')) setScopes(data.scopes);
+            if (hasField('goals')) setGoals(data.goals);
+            if (hasField('majorGoals')) setMajorGoals(data.majorGoals);
+            if (hasField('autoLinkRules')) setAutoLinkRules(data.autoLinkRules);
+            if (hasField('reviewTemplates')) setReviewTemplates(data.reviewTemplates);
+            if (hasField('checkTemplates')) setCheckTemplates(normalizeCheckTemplates(data.checkTemplates));
+            if (hasField('dailyReviews')) setDailyReviews(normalizeDailyReviews(data.dailyReviews));
+            if (hasField('weeklyReviews')) setWeeklyReviews(data.weeklyReviews);
+            if (hasField('monthlyReviews')) setMonthlyReviews(data.monthlyReviews);
+            if (hasField('customNarrativeTemplates')) setCustomNarrativeTemplates(data.customNarrativeTemplates);
+            if (hasField('userPersonalInfo')) setUserPersonalInfo(data.userPersonalInfo ?? '');
+            if (hasField('filters')) setFilters(normalizeFiltersOrder(data.filters));
             
             // 恢复场景设置到 localStorage（优先新版 sceneGroupState，兼容旧版 sceneTimeSlots）
-            if (data.sceneGroupState) {
+            if (hasField('sceneGroupState')) {
                 saveSceneGroupStateToStorage(data.sceneGroupState);
                 window.dispatchEvent(new Event('sceneGroupsUpdated'));
                 window.dispatchEvent(new Event('sceneTimeSlotsUpdated'));
-            } else if (data.sceneTimeSlots) {
+            } else if (hasField('sceneTimeSlots')) {
                 const migrated = buildSceneGroupStateFromLegacySlots(data.sceneTimeSlots);
                 saveSceneGroupStateToStorage(migrated);
                 window.dispatchEvent(new Event('sceneGroupsUpdated'));
@@ -100,7 +103,7 @@ export const useSyncManager = () => {
             }
             
             // 恢复原则库到 localStorage
-            if (data.principles) {
+            if (hasField('principles')) {
                 localStorage.setItem('lumostime_principles', JSON.stringify(data.principles));
                 // 触发事件通知原则库页面更新
                 window.dispatchEvent(new Event('principleLibraryChanged'));
@@ -131,7 +134,7 @@ export const useSyncManager = () => {
         const principles = principlesStr ? JSON.parse(principlesStr) : [];
         
         const localData = {
-            logs, todos, categories, todoCategories, scopes, goals,
+            logs, todos, categories, todoCategories, scopes, goals, majorGoals,
             autoLinkRules, reviewTemplates, checkTemplates, dailyReviews, weeklyReviews,
             monthlyReviews, customNarrativeTemplates, userPersonalInfo, filters,
             sceneGroupState, // 新版：场景组状态

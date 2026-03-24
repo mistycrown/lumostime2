@@ -8,6 +8,7 @@ import { webdavService } from '../services/webdavService';
 import { s3Service } from '../services/s3Service';
 import { imageService } from '../services/imageService';
 import { syncService } from '../services/syncService';
+import { validateAndFixData, validateLocalData } from './dataValidation';
 
 export type CloudService = typeof webdavService | typeof s3Service;
 export type CloudServiceName = 'webdav' | 's3';
@@ -25,7 +26,7 @@ export interface SyncResult {
 }
 
 function isValidSyncPayload(data: any): boolean {
-  return Array.isArray(data?.logs) && Array.isArray(data?.todos);
+  return validateLocalData(data).isValid;
 }
 
 function getServiceDisplayName(service: CloudService): string {
@@ -150,12 +151,21 @@ export async function downloadDataFromCloud(
 
   try {
     onProgress?.(`正在从${displayName}下载数据...`);
-    const data = await service.downloadData();
+    const rawData = await service.downloadData();
 
-    if (!data) {
+    if (!rawData) {
       return {
         success: false,
         message: `从${displayName}下载数据失败：未获取到数据`
+      };
+    }
+
+    const { data, result } = validateAndFixData(rawData);
+    if (!result.isValid) {
+      console.error('[syncUtils] Invalid restore payload:', result.errors, rawData);
+      return {
+        success: false,
+        message: `从${displayName}下载的数据格式无效: ${result.errors.join('；')}`
       };
     }
 

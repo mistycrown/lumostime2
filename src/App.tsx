@@ -3,7 +3,7 @@
  * @input localStorage (logs, todos, user preferences), Capacitor Plugins (AppUsage, FocusNotification), Services (webdav, ai, nfc)
  * @output Main UI Render, State Management, Data Persistence (JSON in localStorage)
  * @pos Root Component, Application Entry Point (Logic Hub)
- * @description The main component that holds the global state (logs, todos, active sessions) and handles routing between views and overlays, including preserving standalone return paths for search and custom filters.
+ * @description The main component that holds the global state (logs, todos, active sessions) and handles routing between views and overlays, including preserving standalone return paths for search and custom filters while keeping export/import and reset flows aligned with repository-backed data.
  *
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
@@ -45,7 +45,9 @@ import { useAppDetection } from './hooks/useAppDetection';
 import { useHardwareBackButton } from './hooks/useHardwareBackButton';
 import { useAppLifecycle } from './hooks/useAppLifecycle';
 import { splitLogByDays } from './utils/logUtils';
-import { getActiveSceneGroup, loadSceneGroupStateFromStorage } from './utils/sceneGroupStorage';
+import { buildSceneGroupStateFromLegacySlots, getActiveSceneGroup, loadSceneGroupStateFromStorage, saveSceneGroupStateToStorage } from './utils/sceneGroupStorage';
+import { getLocalDataTimestamp, setLocalDataTimestampValue } from './utils/localDataTimestamp';
+import { validateAndFixData } from './utils/dataValidation';
 import { STORAGE_WRITE_ERROR_EVENT, StorageWriteErrorDetail } from './constants/storageKeys';
 import {
   AutoLinkViewLazy as AutoLinkView,
@@ -74,6 +76,8 @@ import {
   DEFAULT_REVIEW_TEMPLATES,
   DEFAULT_CHECK_TEMPLATES
 } from './constants';
+import { DEFAULT_PRINCIPLE_PRESETS } from './constants/principlePresets';
+import { DEFAULT_SCENE_PRESETS } from './constants/scenePresets';
 
 const OverlayFallback: React.FC<{ label: string }> = ({ label }) => (
   <div className="fixed inset-0 z-[70] flex items-center justify-center bg-[#fdfbf7]">
@@ -197,14 +201,14 @@ const AppContent: React.FC = () => {
     const principles = principlesStr ? JSON.parse(principlesStr) : [];
     
     const data = {
-      logs, todos, categories, todoCategories, scopes, goals,
+      logs, todos, categories, todoCategories, scopes, goals, majorGoals,
       autoLinkRules, reviewTemplates, checkTemplates, dailyReviews, weeklyReviews,
       monthlyReviews, customNarrativeTemplates, userPersonalInfo, filters,
       sceneGroupState, // 新版：场景组状态
       sceneTimeSlots, // 添加场景设置
       principles, // 添加原则库
       version: '1.0.0',
-      timestamp: Date.now()
+      timestamp: getLocalDataTimestamp()
     };
     const jsonContent = JSON.stringify(data, null, 2);
     const filename = `lumostime_backup_${new Date().toISOString().split('T')[0]}.json`;
@@ -253,12 +257,19 @@ const AppContent: React.FC = () => {
     reader.onload = async (e) => {
       try {
         const content = e.target?.result as string;
-        const data = JSON.parse(content);
+        const parsedData = JSON.parse(content);
+        const { data, result } = validateAndFixData(parsedData);
+        if (!result.isValid) {
+          throw new Error(result.errors.join('; '));
+        }
+
         await syncManager.handleSyncDataUpdate(data);
+        setLocalDataTimestampValue(Date.now());
         addToast('success', 'Data imported successfully');
       } catch (error) {
         console.error('Import failed', error);
-        addToast('error', 'Import failed: Invalid JSON');
+        const message = error instanceof Error ? error.message : 'Invalid JSON';
+        addToast('error', `Import failed: ${message}`);
       }
     };
     reader.readAsText(file);
@@ -381,6 +392,22 @@ const AppContent: React.FC = () => {
     return sortedLogs[0].endTime;
   }, [logs]);
   const showTodoDetailPage = currentView === AppView.TODO && isTodoModalOpen;
+  const resetPrinciplesToDefaults = () => {
+    localStorage.setItem('lumostime_principles', JSON.stringify(DEFAULT_PRINCIPLE_PRESETS));
+    window.dispatchEvent(new Event('principleLibraryChanged'));
+  };
+
+  const clearPrinciples = () => {
+    localStorage.setItem('lumostime_principles', JSON.stringify([]));
+    window.dispatchEvent(new Event('principleLibraryChanged'));
+  };
+
+  const resetSceneGroupsToDefaults = () => {
+    saveSceneGroupStateToStorage(buildSceneGroupStateFromLegacySlots(DEFAULT_SCENE_PRESETS));
+    window.dispatchEvent(new Event('sceneGroupsUpdated'));
+    window.dispatchEvent(new Event('sceneTimeSlotsUpdated'));
+  };
+
   const todoDetailModalNode = isTodoModalOpen ? (
     <TodoDetailModal
       initialTodo={editingTodo}
@@ -684,6 +711,7 @@ const AppContent: React.FC = () => {
               setScopes(SCOPES);
               setTodoCategories(MOCK_TODO_CATEGORIES);
               setGoals(INITIAL_GOALS);
+              setMajorGoals([]);
               setReviewTemplates(DEFAULT_REVIEW_TEMPLATES);
               setCheckTemplates(DEFAULT_CHECK_TEMPLATES);
               setDailyReviews([]);
@@ -693,6 +721,8 @@ const AppContent: React.FC = () => {
               setCustomNarrativeTemplates([]);
               setUserPersonalInfo('');
               setFilters([]);
+              resetPrinciplesToDefaults();
+              resetSceneGroupsToDefaults();
               addToast('success', 'Data reset to defaults');
               setIsSettingsOpen(false);
             }}
@@ -700,6 +730,7 @@ const AppContent: React.FC = () => {
               setLogs([]);
               setTodos([]);
               setGoals([]);
+              setMajorGoals([]);
               setScopes([]);
               setReviewTemplates([]);
               setCheckTemplates([]);
@@ -707,9 +738,12 @@ const AppContent: React.FC = () => {
               setWeeklyReviews([]);
               setMonthlyReviews([]);
               setAutoLinkRules([]);
+              setCustomNarrativeTemplates([]);
               setUserPersonalInfo('');
               setFilters([]);
-              addToast('success', 'All data cleared successfully');
+              clearPrinciples();
+              resetSceneGroupsToDefaults();
+              addToast('success', 'Core data cleared; default categories were retained');
               setIsSettingsOpen(false);
             }}
             // Handler Props
@@ -735,6 +769,7 @@ const AppContent: React.FC = () => {
               todoCategories,
               scopes,
               goals,
+              majorGoals,
               autoLinkRules,
               reviewTemplates,
               checkTemplates,

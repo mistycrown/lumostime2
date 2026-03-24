@@ -27,6 +27,7 @@ import { useCustomColors } from '../hooks/useCustomColors';
 import { DEFAULT_SCENE_PRESETS } from '../constants/scenePresets';
 import { COLOR_OPTIONS } from '../constants';
 import { findAutoSwitchTargetGroup, getActiveSceneGroup, isSceneGroupAutoSwitchMatched, loadSceneGroupStateFromStorage, saveSceneGroupStateToStorage } from '../utils/sceneGroupStorage';
+import { updateLocalDataTimestamp } from '../utils/localDataTimestamp';
 import { isStoredColorSelected } from '../utils/colorUtils';
 
 interface SceneSettingsViewProps {
@@ -113,6 +114,7 @@ export const SceneSettingsView: React.FC<SceneSettingsViewProps> = ({ onBack }) 
   const persistSceneGroupState = (nextState: SceneGroupState) => {
     const saved = saveSceneGroupStateToStorage(nextState);
     setSceneGroupState(saved);
+    updateLocalDataTimestamp();
     // 同时触发新旧事件，保证场景页与旧逻辑都能收到更新通知
     window.dispatchEvent(new Event('sceneGroupsUpdated'));
     window.dispatchEvent(new Event('sceneTimeSlotsUpdated'));
