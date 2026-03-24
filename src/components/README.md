@@ -23,6 +23,7 @@ Overlay components for complex interactions.
 ## Visualization
 Charts and visual data representations.
 
+- `DetailTimelineCard.tsx`: Shared detail-page timeline card with day navigation in month view and month quick-switch navigation in all-record view.
 - `FocusCharts.tsx`: Focus score analytics.
 - `HeatmapCalendar.tsx`: Month-view intensity heatmap.
 - `MatrixAnalysisChart.tsx`: Bar charts for activity ranking.

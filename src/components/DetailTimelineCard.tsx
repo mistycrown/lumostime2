@@ -1,7 +1,7 @@
 /**
  * @file DetailTimelineCard.tsx
  * @input Filtered logs, display date, entity info
- * @output Timeline UI with calendar, stats, history, and shared custom timeline styling with per-day rail termination
+ * @output Timeline UI with calendar, stats, history, and shared custom timeline styling with per-day rail termination plus month-based quick navigation in all-record mode
  * @pos Component (Shared Detail View UI)
  * @description 详情页面共享的时间线卡片组件，包括月历热图、统计信息、历史记录列表，以及与主时间线同步且在每个分组末端及时收线的自定义轨道样式
  * 
@@ -93,11 +93,20 @@ export const DetailTimelineCard: React.FC<DetailTimelineCardProps> = ({
     
     // 日期悬浮条相关状态
     const [showDateSidebar, setShowDateSidebar] = React.useState(false);
-    const [activeDay, setActiveDay] = React.useState<string | null>(null);
+    const [activeSidebarKey, setActiveSidebarKey] = React.useState<string | null>(null);
     const scrollContainerRef = React.useRef<HTMLDivElement | null>(null);
 
     const displayMonth = displayDate.getMonth();
     const displayYear = displayDate.getFullYear();
+
+    const getSidebarKey = React.useCallback((timestamp: number) => {
+        const date = new Date(timestamp);
+        if (viewMode === 'month') {
+            return String(date.getDate()).padStart(2, '0');
+        }
+
+        return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+    }, [viewMode]);
     
     // 处理日期点击，滚动到对应的时间轴记录
     const handleDayClick = React.useCallback((date: Date) => {
@@ -267,7 +276,7 @@ export const DetailTimelineCard: React.FC<DetailTimelineCardProps> = ({
 
             // 确定当前活跃的日期
             const dayElements = Array.from(dateRefs.current.entries());
-            let currentActive = null;
+            let currentActive: string | null = null;
             let minDistance = Infinity;
 
             dayElements.forEach(([timestamp, el]) => {
@@ -275,25 +284,22 @@ export const DetailTimelineCard: React.FC<DetailTimelineCardProps> = ({
                 const distance = Math.abs(rect.top - 100);
                 if (distance < minDistance) {
                     minDistance = distance;
-                    const date = new Date(timestamp);
-                    currentActive = date.getDate().toString();
+                    currentActive = getSidebarKey(timestamp);
                 }
             });
 
             if (currentActive) {
-                setActiveDay(currentActive);
+                setActiveSidebarKey(currentActive);
             }
         };
 
         container.addEventListener('scroll', handleScroll);
         handleScroll();
         return () => container.removeEventListener('scroll', handleScroll);
-    }, [groupedData.durationMap]);
+    }, [getSidebarKey, groupedData.durationMap]);
     
-    // 日期点击处理
-    const handleDateSidebarClick = React.useCallback((dayStr: string) => {
-        const day = parseInt(dayStr);
-        const timestamp = new Date(displayYear, displayMonth, day).getTime();
+    // 日期/月份点击处理
+    const handleSidebarNavigationClick = React.useCallback((timestamp: number) => {
         const element = dateRefs.current.get(timestamp);
         
         if (element) {
@@ -303,7 +309,7 @@ export const DetailTimelineCard: React.FC<DetailTimelineCardProps> = ({
                 inline: 'nearest'
             });
         }
-    }, [displayMonth, displayYear]);
+    }, []);
 
     // 计算日历数据（包含热力图和画廊数据）
     const calendarData = useMemo(() => {
@@ -1207,12 +1213,13 @@ export const DetailTimelineCard: React.FC<DetailTimelineCardProps> = ({
                 )}
             </div>
             
-            {/* 日期悬浮条 - 仅在月视图且有数据时显示 */}
-            {viewMode === 'month' && logsToDisplay.length > 0 && (
+            {/* 日期/月份悬浮条 - 月视图按日显示，全部视图按月份显示 */}
+            {logsToDisplay.length > 0 && (
                 <DateNavigationSidebar
                     groupedData={groupedData}
-                    activeDay={activeDay}
-                    onDateClick={handleDateSidebarClick}
+                    viewMode={viewMode}
+                    activeKey={activeSidebarKey}
+                    onItemClick={handleSidebarNavigationClick}
                     visible={showDateSidebar}
                 />
             )}
@@ -1223,48 +1230,74 @@ export const DetailTimelineCard: React.FC<DetailTimelineCardProps> = ({
 // 日期导航悬浮条组件
 const DateNavigationSidebar: React.FC<{
     groupedData: { durationMap: Map<number, number>; logsMap: Map<number, Log[]> };
-    activeDay: string | null;
-    onDateClick: (dateStr: string) => void;
+    viewMode: 'month' | 'all';
+    activeKey: string | null;
+    onItemClick: (timestamp: number) => void;
     visible: boolean;
-}> = ({ groupedData, activeDay, onDateClick, visible }) => {
+}> = ({ groupedData, viewMode, activeKey, onItemClick, visible }) => {
     const containerRef = React.useRef<HTMLDivElement>(null);
     
-    // 提取唯一的日期
-    const days = React.useMemo(() => {
-        return Array.from(groupedData.durationMap.keys())
-            .sort((a, b) => b - a) // 降序排列
-            .map(timestamp => {
-                const d = new Date(timestamp);
+    // 提取导航项：月视图按日，全部视图按年月
+    const items = React.useMemo(() => {
+        const timestamps = Array.from(groupedData.durationMap.keys()).sort((a, b) => b - a);
+
+        if (viewMode === 'month') {
+            return timestamps.map(timestamp => {
+                const date = new Date(timestamp);
+                const dayLabel = String(date.getDate()).padStart(2, '0');
                 return {
-                    dayStr: d.getDate().toString(),
+                    key: dayLabel,
+                    label: dayLabel,
                     timestamp
                 };
             });
-    }, [groupedData]);
+        }
 
-    // 自动滚动活跃日期到视图中心
+        const monthItems: Array<{ key: string; label: string; timestamp: number }> = [];
+        const seenMonths = new Set<string>();
+
+        timestamps.forEach(timestamp => {
+            const date = new Date(timestamp);
+            const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+            if (seenMonths.has(monthKey)) {
+                return;
+            }
+
+            seenMonths.add(monthKey);
+            monthItems.push({
+                key: monthKey,
+                label: String(date.getMonth() + 1).padStart(2, '0'),
+                timestamp
+            });
+        });
+
+        return monthItems;
+    }, [groupedData, viewMode]);
+
+    // 自动滚动活跃导航项到视图中心
     React.useEffect(() => {
-        if (activeDay && containerRef.current) {
-            const activeBtn = Array.from(containerRef.current.children).find(child =>
-                child.textContent?.includes(activeDay.padStart(2, '0'))
+        if (activeKey && containerRef.current) {
+            const activeBtn = Array.from(containerRef.current.children).find(
+                child => child instanceof HTMLElement && child.dataset.navKey === activeKey
             );
             if (activeBtn) {
                 activeBtn.scrollIntoView({ behavior: 'smooth', block: 'center' });
             }
         }
-    }, [activeDay]);
+    }, [activeKey]);
 
     return (
         <div
             ref={containerRef}
             className={`fixed right-0 top-1/2 -translate-y-1/2 z-50 flex flex-col items-center gap-3 py-4 rounded-l-xl h-[216px] overflow-y-auto no-scrollbar scroll-smooth transition-opacity duration-300 ${visible ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
         >
-            {days.map(({ dayStr }) => {
-                const isActive = activeDay === dayStr;
+            {items.map(({ key, label, timestamp }) => {
+                const isActive = activeKey === key;
                 return (
                     <button
-                        key={dayStr}
-                        onClick={() => onDateClick(dayStr)}
+                        key={key}
+                        data-nav-key={key}
+                        onClick={() => onItemClick(timestamp)}
                         className="group relative flex items-center justify-center w-6 h-4 select-none touch-manipulation shrink-0"
                     >
                         <span className={`
@@ -1273,7 +1306,7 @@ const DateNavigationSidebar: React.FC<{
                                 ? 'text-stone-900 font-bold scale-150 origin-right'
                                 : 'text-stone-300 font-medium group-hover:text-stone-500'}
              `}>
-                            {dayStr.padStart(2, '0')}
+                            {label}
                         </span>
                         <div className={`
                absolute -left-1 w-1 h-1 rounded-full bg-stone-900 transition-all duration-300
