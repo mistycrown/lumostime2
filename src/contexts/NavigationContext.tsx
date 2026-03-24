@@ -43,6 +43,10 @@ interface NavigationContextType {
     setIsAutoLinkOpen: (open: boolean) => void;
     isSearchOpen: boolean;
     setIsSearchOpen: (open: boolean) => void;
+    isFiltersOpen: boolean;
+    setIsFiltersOpen: (open: boolean) => void;
+    activeFilterId: string | null;
+    setActiveFilterId: (id: string | null) => void;
 
     // Search Persistence
     searchQuery: string;
@@ -200,6 +204,8 @@ export const NavigationProvider: React.FC<NavigationProviderProps> = ({
     const [settingsSubmenu, setSettingsSubmenu] = useState<SettingsSubmenu>('main');
     const [isAutoLinkOpen, setIsAutoLinkOpen] = useState(false);
     const [isSearchOpen, setIsSearchOpen] = useState(false);
+    const [isFiltersOpen, setIsFiltersOpen] = useState(false);
+    const [activeFilterId, setActiveFilterId] = useState<string | null>(null);
 
     useEffect(() => {
         if (!isSettingsOpen && settingsSubmenu !== 'main') {
@@ -294,6 +300,10 @@ export const NavigationProvider: React.FC<NavigationProviderProps> = ({
             setIsAutoLinkOpen,
             isSearchOpen,
             setIsSearchOpen,
+            isFiltersOpen,
+            setIsFiltersOpen,
+            activeFilterId,
+            setActiveFilterId,
             searchQuery,
             setSearchQuery,
             searchMode,

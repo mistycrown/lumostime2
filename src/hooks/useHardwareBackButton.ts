@@ -1,6 +1,6 @@
 /**
  * @file useHardwareBackButton.ts
- * @input NavigationContext (all modal/view states including settings submenu hierarchy and search origin state)
+ * @input NavigationContext (all modal/view states including settings submenu hierarchy, search origin state, and custom filter overlay state)
  * @output Hardware Back Button Handler (backButton event listener)
  * @pos Hook (System Integration)
  * @description 硬件返回键 Hook - 处理 Android 硬件返回键的层级导航逻辑（含设置子页逐级返回）
@@ -23,6 +23,7 @@ export const useHardwareBackButton = () => {
         isSettingsOpen, setIsSettingsOpen, settingsSubmenu, setSettingsSubmenu,
         isAutoLinkOpen, setIsAutoLinkOpen,
         isSearchOpen, setIsSearchOpen, isSearchOpenedFromSettings, setIsSearchOpenedFromSettings,
+        isFiltersOpen, setIsFiltersOpen, activeFilterId, setActiveFilterId,
         focusDetailSessionId, setFocusDetailSessionId,
         isAddModalOpen, setIsAddModalOpen,
         isTodoModalOpen, setIsTodoModalOpen,
@@ -83,6 +84,14 @@ export const useHardwareBackButton = () => {
 
         setIsSearchOpenedFromSettings(false);
     };
+    const closeFilters = () => {
+        if (activeFilterId) {
+            setActiveFilterId(null);
+            return;
+        }
+
+        setIsFiltersOpen(false);
+    };
 
     useEffect(() => {
         const handleBackButton = ({ canGoBack }: { canGoBack: boolean }) => {
@@ -101,6 +110,10 @@ export const useHardwareBackButton = () => {
             }
             if (isSearchOpen) {
                 closeSearch();
+                return;
+            }
+            if (isFiltersOpen) {
+                closeFilters();
                 return;
             }
             if (isExportViewOpen) {
@@ -189,9 +202,9 @@ export const useHardwareBackButton = () => {
             listener.then(l => l.remove());
         };
     }, [
-        isSettingsOpen, isAutoLinkOpen, isSearchOpen, isExportViewOpen, isGalleryViewOpen, isShareViewOpen, focusDetailSessionId, isAddModalOpen, isTodoModalOpen,
+        isSettingsOpen, isAutoLinkOpen, isSearchOpen, isFiltersOpen, isExportViewOpen, isGalleryViewOpen, isShareViewOpen, focusDetailSessionId, isAddModalOpen, isTodoModalOpen,
         isDailyReviewOpen, isWeeklyReviewOpen, isMonthlyReviewOpen,
         isStatsFullScreen, isTodoManaging, isTagsManaging, isScopeManaging,
-        currentView, selectedTagId, selectedCategoryId, selectedScopeId, settingsSubmenu, isSearchOpenedFromSettings
+        currentView, selectedTagId, selectedCategoryId, selectedScopeId, settingsSubmenu, isSearchOpenedFromSettings, activeFilterId
     ]);
 };

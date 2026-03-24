@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { ChevronLeft, PlusCircle, Edit2, Trash2, X, ArrowUp, ArrowDown } from 'lucide-react';
 import { ToastType } from '../../components/Toast';
 import { Filter, Log, Category, Scope, TodoItem, TodoCategory } from '../../types';
@@ -17,6 +17,8 @@ interface FiltersSettingsViewProps {
     todos: TodoItem[];
     todoCategories: TodoCategory[];
     onEditLog?: (log: Log) => void;
+    selectedFilterId?: string | null;
+    onSelectedFilterIdChange?: (id: string | null) => void;
 }
 
 export const FiltersSettingsView: React.FC<FiltersSettingsViewProps> = ({
@@ -29,15 +31,37 @@ export const FiltersSettingsView: React.FC<FiltersSettingsViewProps> = ({
     scopes = [],
     todos = [],
     todoCategories = [],
-    onEditLog
+    onEditLog,
+    selectedFilterId,
+    onSelectedFilterIdChange
 }) => {
-    const [selectedFilter, setSelectedFilter] = useState<Filter | null>(null);
+    const [localSelectedFilterId, setLocalSelectedFilterId] = useState<string | null>(null);
     const [showAddFilterModal, setShowAddFilterModal] = useState(false);
     const [editingFilter, setEditingFilter] = useState<Filter | null>(null);
     const [filterName, setFilterName] = useState('');
     const [filterExpression, setFilterExpression] = useState('');
     const [deletingFilterId, setDeletingFilterId] = useState<string | null>(null);
     const orderedFilters = useMemo(() => normalizeFiltersOrder(filters), [filters]);
+    const activeFilterId = onSelectedFilterIdChange ? (selectedFilterId ?? null) : localSelectedFilterId;
+    const selectedFilter = useMemo(
+        () => orderedFilters.find((filter) => filter.id === activeFilterId) || null,
+        [orderedFilters, activeFilterId]
+    );
+
+    const setSelectedFilterId = (id: string | null) => {
+        if (onSelectedFilterIdChange) {
+            onSelectedFilterIdChange(id);
+            return;
+        }
+
+        setLocalSelectedFilterId(id);
+    };
+
+    useEffect(() => {
+        if (activeFilterId && !orderedFilters.some((filter) => filter.id === activeFilterId)) {
+            setSelectedFilterId(null);
+        }
+    }, [activeFilterId, orderedFilters]);
 
     const handleAddFilter = () => {
         setEditingFilter(null);
@@ -124,7 +148,7 @@ export const FiltersSettingsView: React.FC<FiltersSettingsViewProps> = ({
                 scopes={scopes}
                 todos={todos}
                 todoCategories={todoCategories}
-                onClose={() => setSelectedFilter(null)}
+                onClose={() => setSelectedFilterId(null)}
                 onEditLog={onEditLog}
             />
         );
@@ -182,7 +206,7 @@ export const FiltersSettingsView: React.FC<FiltersSettingsViewProps> = ({
                                 <div
                                     key={filter.id}
                                     className="bg-white rounded-2xl p-4 shadow-sm mb-3 hover:bg-stone-50 transition-colors cursor-pointer"
-                                    onClick={() => setSelectedFilter(filter)}
+                                    onClick={() => setSelectedFilterId(filter.id)}
                                 >
                                     <div className="flex items-start justify-between gap-3">
                                         <div className="flex-1 min-w-0">

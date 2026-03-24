@@ -1,9 +1,9 @@
 /**
  * @file TimelineView.tsx
  * @input Logs, Categories, Todos, Scopes, Reviews (Daily/Weekly/Monthly)
- * @output Log CRUD, Date Navigation, Sync Trigger, Review Navigation
+ * @output Log CRUD, Date Navigation, Search Trigger, Filter Trigger, Review Navigation
  * @pos View (Main Tab)
- * @description The primary daily view. Visualizes time usage on a timeline, supports adding/editing logs, gap detection, and integrates Daily/Weekly/Monthly review entry points.
+ * @description The primary daily view. Visualizes time usage on a timeline, supports adding/editing logs, gap detection, quick search and custom filter entry points, and integrates Daily/Weekly/Monthly review entry points.
  * 
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
@@ -11,7 +11,7 @@ import React, { useMemo, useState, useRef } from 'react';
 import { Log, Activity, TodoItem, Category, TodoCategory, Scope, DailyReview, ReviewTemplate, WeeklyReview, MonthlyReview, AutoLinkRule, Goal } from '../types';
 import { CATEGORIES } from '../constants';
 import * as LucideIcons from 'lucide-react';
-import { Plus, MoreHorizontal, BarChart2, ArrowUp, ArrowDown, Sparkles, RefreshCw, Zap, Heart, Share, Timer, Clock, Image as ImageIcon } from 'lucide-react';
+import { Plus, MoreHorizontal, BarChart2, ArrowUp, ArrowDown, Sparkles, Zap, Heart, Share, Timer, Clock, Search, Filter, Image as ImageIcon } from 'lucide-react';
 import { CalendarWidget } from '../components/CalendarWidget';
 import { AIBatchModal } from '../components/AIBatchModal';
 import { ParsedTimeEntry } from '../services/aiService';
@@ -185,7 +185,7 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ logs, todos, scopes,
     const [previewImage, setPreviewImage] = useState<string | null>(null);
     const [copyFailureModal, setCopyFailureModal] = useState<{ isOpen: boolean; text: string }>({ isOpen: false, text: '' });
     const [showTimePalDebugger, setShowTimePalDebugger] = useState(false);
-    const { isGalleryViewOpen, setIsGalleryViewOpen } = useNavigation();
+    const { isGalleryViewOpen, setIsGalleryViewOpen, setIsSearchOpen, setIsSearchOpenedFromSettings, setIsFiltersOpen, setActiveFilterId } = useNavigation();
     const {
         timelineStyleTheme,
         timelineStyleConfigs,
@@ -947,22 +947,25 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ logs, todos, scopes,
                     todos={todos}
                     extraHeaderControls={
                         <>
-                            {onSync && (
-                                <button
-                                    onClick={onSync}
-                                    disabled={isSyncing}
-                                    className={`p-2 text-stone-400 hover:text-stone-600 rounded-full transition-all active:scale-95 ${isSyncing ? 'animate-spin text-purple-500' : ''}`}
-                                    title="Sync from Cloud"
-                                >
-                                    <RefreshCw size={20} />
-                                </button>
-                            )}
                             <button
-                                onClick={() => setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc')}
+                                onClick={() => {
+                                    setIsSearchOpenedFromSettings(false);
+                                    setIsSearchOpen(true);
+                                }}
                                 className="p-2 text-stone-400 hover:text-stone-600 hover:bg-stone-100 rounded-full transition-colors"
-                                title={sortOrder === 'asc' ? 'Sort Descending' : 'Sort Ascending'}
+                                title="Search All"
                             >
-                                {sortOrder === 'asc' ? <ArrowUp size={20} /> : <ArrowDown size={20} />}
+                                <Search size={20} />
+                            </button>
+                            <button
+                                onClick={() => {
+                                    setActiveFilterId(null);
+                                    setIsFiltersOpen(true);
+                                }}
+                                className="p-2 text-stone-400 hover:text-stone-600 hover:bg-stone-100 rounded-full transition-colors"
+                                title="Custom Filters"
+                            >
+                                <Filter size={20} />
                             </button>
                             <button
                                 onClick={onShowStats}
@@ -977,6 +980,13 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ logs, todos, scopes,
                                 title="Gallery View"
                             >
                                 <ImageIcon size={20} />
+                            </button>
+                            <button
+                                onClick={() => setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc')}
+                                className="p-2 text-stone-400 hover:text-stone-600 hover:bg-stone-100 rounded-full transition-colors"
+                                title={sortOrder === 'asc' ? 'Sort Descending' : 'Sort Ascending'}
+                            >
+                                {sortOrder === 'asc' ? <ArrowUp size={20} /> : <ArrowDown size={20} />}
                             </button>
                         </>
                     }

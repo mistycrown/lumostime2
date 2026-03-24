@@ -1,6 +1,6 @@
 # Custom Hooks
 
-> `useSearchManager.ts` 和 `useHardwareBackButton.ts` 现在会保留“设置页 -> 搜索全部”的来源状态，关闭搜索或按 Android 硬件返回键时会统一回到设置主列表页。
+> `useSearchManager.ts` 和 `useHardwareBackButton.ts` 现在会保留“设置页 -> 搜索全部”的来源状态，关闭搜索或按 Android 硬件返回键时会统一回到设置主列表页；同时支持脉络页直接打开“自定义筛选器”时的详情页 -> 列表 -> 脉络页返回链。
 
 > `useScopeStats.ts` now follows the shared scope aggregation rule: one log linked to multiple scopes contributes its full duration to each linked scope.
 
