@@ -6,6 +6,7 @@ import React, { useState } from 'react';
 import { ChevronLeft, Plus, Trash2, Edit2, Check, X, RotateCcw } from 'lucide-react';
 import { ConfirmModal } from '../../components/ConfirmModal';
 import { DEFAULT_PRINCIPLE_PRESETS } from '../../constants/principlePresets';
+import { updateLocalDataTimestamp } from '../../utils/localDataTimestamp';
 
 // 原则数据结构
 export interface Principle {
@@ -46,6 +47,7 @@ export const PrincipleLibraryView: React.FC<PrincipleLibraryViewProps> = ({ onBa
     const savePrinciples = (newPrinciples: Principle[]) => {
         setPrinciples(newPrinciples);
         localStorage.setItem('lumostime_principles', JSON.stringify(newPrinciples));
+        updateLocalDataTimestamp();
         // 触发事件通知其他组件
         window.dispatchEvent(new Event('principleLibraryChanged'));
     };

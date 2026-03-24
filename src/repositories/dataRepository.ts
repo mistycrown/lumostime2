@@ -11,7 +11,9 @@ import { Category, DailyReview, Goal, Log, MajorGoal, MonthlyReview, Scope, Todo
 import { normalizeDailyReviews } from '../utils/checkItemNormalizer';
 import { storageRepository, StorageRepository } from './storageRepository';
 
-const CORE_DATA_MIGRATION_META_KEY = 'core-data-migration-v1';
+// Use a versioned migration flag so newer repository keys can still be migrated
+// for users who already completed older migration waves.
+const CORE_DATA_MIGRATION_META_KEY = 'core-data-migration-v2';
 
 export const REPOSITORY_KEYS = {
   LOGS: 'logs',

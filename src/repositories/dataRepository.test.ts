@@ -85,7 +85,7 @@ describe('DataRepository', () => {
     expect(await repository.getData(REPOSITORY_KEYS.LOGS)).toEqual(logs);
     expect(await repository.getData(REPOSITORY_KEYS.TODOS)).toEqual(todos);
     expect(await repository.getData(REPOSITORY_KEYS.TODO_CATEGORIES)).toEqual(todoCategories);
-    expect(await repository.getMeta('core-data-migration-v1')).toBe(true);
+    expect(await repository.getMeta('core-data-migration-v2')).toBe(true);
     expect(values.has(USER_DATA_KEYS.LOGS)).toBe(false);
     expect(values.has(USER_DATA_KEYS.TODOS)).toBe(false);
     expect(values.has(USER_DATA_KEYS.TODO_CATEGORIES)).toBe(false);
@@ -125,5 +125,36 @@ describe('DataRepository', () => {
 
     expect(snapshot.logs).toEqual(existingLogs);
     expect(await repository.getData(REPOSITORY_KEYS.LOGS)).toEqual(existingLogs);
+  });
+
+  it('reruns migration for newer repository keys even if an older migration flag exists', async () => {
+    const repository = new InMemoryStorageRepository();
+    const majorGoals = [
+      {
+        id: 'major-goal-1',
+        scopeId: 'scope-1',
+        title: 'Ship repository migration',
+        metric: 'count',
+        targetValue: 1,
+        startDate: '20260324',
+        endDate: '20260331',
+        description: '',
+        motivation: ''
+      }
+    ];
+
+    repository.meta.set('core-data-migration-v1', true);
+
+    const { values, adapter } = createLegacyStorageAdapter(new Map([
+      [USER_DATA_KEYS.MAJOR_GOALS, majorGoals]
+    ]));
+
+    const dataRepository = new DataRepository(repository, adapter);
+    const snapshot = await dataRepository.loadCategoryScopeSnapshot();
+
+    expect(snapshot.majorGoals).toEqual(majorGoals);
+    expect(await repository.getData(REPOSITORY_KEYS.MAJOR_GOALS)).toEqual(majorGoals);
+    expect(await repository.getMeta('core-data-migration-v2')).toBe(true);
+    expect(values.has(USER_DATA_KEYS.MAJOR_GOALS)).toBe(false);
   });
 });

@@ -495,7 +495,7 @@ export const DataManagementView: React.FC<DataManagementViewProps> = ({
                                 }`}
                         >
                             <Trash2 size={18} />
-                            {confirmClear ? "确认清空？将被永久删除" : "清空所有数据"}
+                            {confirmClear ? "确认清空主要数据？分类结构将保留" : "清空主要数据（保留默认分类）"}
                         </button>
                     </div>
                 </div>

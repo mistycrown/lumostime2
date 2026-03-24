@@ -6,6 +6,14 @@
  * 
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
+import {
+  CATEGORIES,
+  DEFAULT_CHECK_TEMPLATES,
+  DEFAULT_REVIEW_TEMPLATES,
+  INITIAL_GOALS,
+  MOCK_TODO_CATEGORIES,
+  SCOPES
+} from '../constants';
 
 /**
  * 验证结果
@@ -54,11 +62,13 @@ export function validateLocalData(data: any): ValidationResult {
     'majorGoals',
     'autoLinkRules',
     'reviewTemplates',
+    'checkTemplates',
     'dailyReviews',
     'weeklyReviews',
     'monthlyReviews',
     'customNarrativeTemplates',
-    'filters'
+    'filters',
+    'principles'
   ];
 
   for (const field of arrayFields) {
@@ -67,6 +77,10 @@ export function validateLocalData(data: any): ValidationResult {
         errors.push(`字段 ${field} 应该是数组类型`);
       }
     }
+  }
+
+  if (data.sceneGroupState !== undefined && data.sceneGroupState !== null && typeof data.sceneGroupState !== 'object') {
+    errors.push('字段 sceneGroupState 应该是对象类型');
   }
 
   // 4. 检查版本信息
@@ -96,6 +110,14 @@ export function validateLocalData(data: any): ValidationResult {
     }
   }
 
+  if (Array.isArray(data.categories) && data.categories.length === 0) {
+    errors.push('分类数据为空，无法恢复');
+  }
+
+  if (Array.isArray(data.todoCategories) && data.todoCategories.length === 0) {
+    errors.push('待办分类数据为空，无法恢复');
+  }
+
   return {
     isValid: errors.length === 0,
     errors,
@@ -119,26 +141,28 @@ export function validateAndFixData(data: any): { data: any; result: ValidationRe
     // 修复缺失的必需字段
     if (!fixedData.logs) fixedData.logs = [];
     if (!fixedData.todos) fixedData.todos = [];
-    if (!fixedData.categories) fixedData.categories = [];
-
+    if (!fixedData.categories) fixedData.categories = CATEGORIES;
+    
     // 修复可选字段
-    if (!fixedData.todoCategories) fixedData.todoCategories = [];
-    if (!fixedData.scopes) fixedData.scopes = [];
-    if (!fixedData.goals) fixedData.goals = [];
+    if (!fixedData.todoCategories) fixedData.todoCategories = MOCK_TODO_CATEGORIES;
+    if (!fixedData.scopes) fixedData.scopes = SCOPES;
+    if (!fixedData.goals) fixedData.goals = INITIAL_GOALS;
     if (!fixedData.majorGoals) fixedData.majorGoals = [];
     if (!fixedData.autoLinkRules) fixedData.autoLinkRules = [];
-    if (!fixedData.reviewTemplates) fixedData.reviewTemplates = [];
+    if (!fixedData.reviewTemplates) fixedData.reviewTemplates = DEFAULT_REVIEW_TEMPLATES;
+    if (!fixedData.checkTemplates) fixedData.checkTemplates = DEFAULT_CHECK_TEMPLATES;
     if (!fixedData.dailyReviews) fixedData.dailyReviews = [];
     if (!fixedData.weeklyReviews) fixedData.weeklyReviews = [];
     if (!fixedData.monthlyReviews) fixedData.monthlyReviews = [];
     if (!fixedData.customNarrativeTemplates) fixedData.customNarrativeTemplates = [];
     if (!fixedData.filters) fixedData.filters = [];
+    if (!fixedData.principles) fixedData.principles = [];
 
     // 添加版本和时间戳
     if (!fixedData.version) fixedData.version = '1.0.0';
     if (!fixedData.timestamp) fixedData.timestamp = Date.now();
 
-    return { data: fixedData, result };
+    return { data: fixedData, result: validateLocalData(fixedData) };
   }
 
   return { data, result };
