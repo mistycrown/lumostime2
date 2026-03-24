@@ -1,6 +1,6 @@
 /**
  * @file useSearchManager.ts
- * @input NavigationContext (search modal state, view navigation states)
+ * @input NavigationContext (search modal state, search origin state, view navigation states)
  * @output Search Control (handleOpenSearch, handleCloseSearch), Navigation (handleSelectSearchScope, handleSelectSearchCategory, handleSelectSearchActivity), Wrapper Functions (handleSelectSearchLogWrapper, handleSelectSearchTodoWrapper)
  * @pos Hook (Data Manager)
  * @description 搜索管理 Hook - 处理搜索界面的打开关闭、搜索结果选择后的导航跳转
@@ -18,11 +18,15 @@ import { useNavigation } from '../contexts/NavigationContext';
 export const useSearchManager = () => {
     const {
         setIsSearchOpen,
+        setIsSettingsOpen,
+        setSettingsSubmenu,
         setCurrentView,
         setReturnToSearch,
         setSelectedScopeId,
         setSelectedCategoryId,
         setSelectedTagId,
+        isSearchOpenedFromSettings,
+        setIsSearchOpenedFromSettings,
         isSearchOpen
     } = useNavigation();
 
@@ -31,12 +35,24 @@ export const useSearchManager = () => {
     // We should probably just expose the navigation logic here, 
     // and let the component calling this hook handle the modal opening if needed, or pass those handlers in.
 
+    const closeSearch = () => {
+        setIsSearchOpen(false);
+
+        if (isSearchOpenedFromSettings) {
+            setSettingsSubmenu('main');
+            setIsSettingsOpen(true);
+        }
+
+        setIsSearchOpenedFromSettings(false);
+    };
+
     const handleOpenSearch = () => {
+        setIsSearchOpenedFromSettings(false);
         setIsSearchOpen(true);
     };
 
     const handleCloseSearch = () => {
-        setIsSearchOpen(false);
+        closeSearch();
     };
 
     const handleSelectSearchScope = (scope: { id: string }) => {

@@ -1,5 +1,7 @@
 # Custom Hooks
 
+> `useSearchManager.ts` 和 `useHardwareBackButton.ts` 现在会保留“设置页 -> 搜索全部”的来源状态，关闭搜索或按 Android 硬件返回键时会统一回到设置主列表页。
+
 > `useScopeStats.ts` now follows the shared scope aggregation rule: one log linked to multiple scopes contributes its full duration to each linked scope.
 
 > `useTodoStats.ts` 优先使用 `TodoCategory.color` 作为待办环形图颜色；旧分类没有保存颜色时，继续回退到历史默认调色板。
