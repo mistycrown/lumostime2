@@ -19,7 +19,7 @@ The views are designed as "dumb" or "presentational" components where possible, 
 ## Key Components
 
 *   **TimelineView**: The core dashboard visualizing daily activities and reviews, with switchable styling for normal timeline record nodes, synchronized gesture/calendar day-switch animation in the main content area, and direct header entries to global search and custom filters.
-*   **StatsView**: Comprehensive analytics with multiple visualization modes (Pie, Matrix, Line, Schedule, Check).
+*   **StatsView**: Comprehensive analytics with multiple visualization modes (Pie, Matrix, Line, Schedule, Check, Emoji), including a subtle top-level fade transition for swipe and header date navigation.
 *   **SettingsView**: Central configuration hub for Sync, AI, and App preferences.
 *   **ReviewHubView**: Archive dashboard displaying monthly, weekly, and daily reviews.
 *   **JournalView**: Journal-style view for daily entries, providing an alternative perspective to ReviewHubView, with shared timeline styling and per-style archive offset support.
