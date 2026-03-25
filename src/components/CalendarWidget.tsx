@@ -1,13 +1,14 @@
 /**
  * @file CalendarWidget.tsx
  * @input currentDate, logs, viewMode
- * @output Interactive Calendar / Heatmap
+ * @output Interactive Calendar / Heatmap with animated expand/collapse
  * @pos Component (Core UI)
- * @description A versatile calendar component supporting Expand/Collapse views, Week/Month modes, and Heatmap visualization (Duration or Focus).
+ * @description A versatile calendar component supporting animated expand/collapse, Week/Month modes, and Heatmap visualization (Duration or Focus).
  * 
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
 import React, { useState } from 'react';
+import { AnimatePresence, motion } from 'framer-motion';
 import { Log } from '../types';
 import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, X } from 'lucide-react';
 import { TimelineImage } from './TimelineImage';
@@ -34,6 +35,10 @@ interface CalendarWidgetProps {
 
 export const CalendarWidget: React.FC<CalendarWidgetProps> = ({ currentDate, onDateChange, logs = [], isExpanded, onExpandToggle, extraHeaderControls, disableSelection, customScale, heatmapMode, staticMode, preventCollapse, onResetView, renderCustomDay, hideTopBar = false, galleryMode = false, todos = [], onDayClick }) => {
     const [viewMode, setViewMode] = useState<'calendar' | 'month_year'>('calendar');
+    const calendarAreaTransition = {
+        duration: 0.18,
+        ease: [0.22, 1, 0.36, 1] as const
+    };
 
     // ... (keep existing helper functions)
     // --- Date Helpers ---
@@ -180,11 +185,26 @@ export const CalendarWidget: React.FC<CalendarWidgetProps> = ({ currentDate, onD
             />
 
             {/* Calendar Area */}
-            <div className={`transition-all duration-500 ease-in-out overflow-hidden ${isExpanded ? 'max-h-[400px] opacity-100' : 'max-h-[75px] opacity-100'}`}>
+            <motion.div
+                initial={false}
+                animate={{ height: isExpanded ? 'auto' : 75 }}
+                transition={calendarAreaTransition}
+                className="overflow-hidden relative"
+            >
+                <AnimatePresence initial={false} mode="popLayout">
 
                 {!isExpanded ? (
                     // Week View (Collapsed) - Original Design with Week Day Labels
-                    <div className="flex justify-between items-center px-4 pb-1 md:justify-center md:gap-8 h-[75px]">
+                    <motion.div
+                        key="calendar-collapsed"
+                        layout="position"
+                        initial={{ opacity: 0, y: -4 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -4 }}
+                        transition={calendarAreaTransition}
+                        className="flex justify-between items-center px-4 pb-1 md:justify-center md:gap-8 h-[75px]"
+                        style={{ width: '100%' }}
+                    >
                         {getWeekDays().map((day, idx) => {
                             const selected = !disableSelection && isSameDay(day, currentDate);
                             const today = isToday(day);
@@ -234,10 +254,19 @@ export const CalendarWidget: React.FC<CalendarWidgetProps> = ({ currentDate, onD
                                 </button>
                             );
                         })}
-                    </div>
+                    </motion.div>
                 ) : (
                     // Expanded View
-                    <div className={hideTopBar ? "px-6 pb-6 pt-6 animate-in fade-in duration-300" : "px-6 pb-6 animate-in fade-in duration-300"}>
+                    <motion.div
+                        key={`calendar-expanded-${viewMode}`}
+                        layout="position"
+                        initial={{ opacity: 0, y: -6 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -6 }}
+                        transition={calendarAreaTransition}
+                        className={hideTopBar ? "px-6 pb-6 pt-6" : "px-6 pb-6"}
+                        style={{ width: '100%' }}
+                    >
                         {viewMode === 'calendar' ? (
                             <>
                                 <div className="flex items-center justify-between mt-3 mb-4 px-2">
@@ -511,9 +540,10 @@ export const CalendarWidget: React.FC<CalendarWidgetProps> = ({ currentDate, onD
                                 </div>
                             </div>
                         )}
-                    </div>
+                    </motion.div>
                 )}
-            </div>
+                </AnimatePresence>
+            </motion.div>
         </div>
     );
 };

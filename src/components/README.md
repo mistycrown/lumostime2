@@ -5,7 +5,7 @@ This directory contains the reusable React components for the application. They 
 ## Core UI
 Components that form the structural or global UI elements.
 
-- `CalendarWidget.tsx`: Versatile calendar component with Heatmap and Expand modes.
+- `CalendarWidget.tsx`: Versatile calendar component with heatmap display, animated expand/collapse, and week/month picker modes.
 - `TimerFloating.tsx`: Global floating timer for active sessions.
 - `Toast.tsx`: Notification system.
 
