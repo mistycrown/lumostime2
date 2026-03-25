@@ -6,7 +6,7 @@ import React, { createContext, useContext, useEffect, useRef, useState, ReactNod
 import { DEFAULT_CHECK_TEMPLATES, DEFAULT_REVIEW_TEMPLATES, INITIAL_DAILY_REVIEWS } from '../constants';
 import { REVIEW_KEYS, SETTINGS_KEYS, storage } from '../constants/storageKeys';
 import { dataRepository } from '../repositories/dataRepository';
-import { CheckTemplate, DailyReview, MonthlyReview, ReviewTemplate, WeeklyReview } from '../types';
+import { CheckTemplate, DailyReview, MonthlyReview, OnThisDayEntry, ReviewTemplate, WeeklyReview } from '../types';
 import { normalizeCheckTemplates, normalizeDailyReviews } from '../utils/checkItemNormalizer';
 import {
   getLocalDataTimestamp,
@@ -49,6 +49,9 @@ interface ReviewContextType {
 
   monthlyReviews: MonthlyReview[];
   setMonthlyReviews: React.Dispatch<React.SetStateAction<MonthlyReview[]>>;
+
+  onThisDayEntries: OnThisDayEntry[];
+  setOnThisDayEntries: React.Dispatch<React.SetStateAction<OnThisDayEntry[]>>;
 }
 
 const ReviewContext = createContext<ReviewContextType | undefined>(undefined);
@@ -154,6 +157,7 @@ export const ReviewProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   const [dailyReviews, setDailyReviews] = useState<DailyReview[]>(normalizeDailyReviews(INITIAL_DAILY_REVIEWS));
   const [weeklyReviews, setWeeklyReviews] = useState<WeeklyReview[]>([]);
   const [monthlyReviews, setMonthlyReviews] = useState<MonthlyReview[]>([]);
+  const [onThisDayEntries, setOnThisDayEntries] = useState<OnThisDayEntry[]>([]);
 
   useEffect(() => {
     let cancelled = false;
@@ -171,6 +175,7 @@ export const ReviewProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         setDailyReviews(snapshot.dailyReviews);
         setWeeklyReviews(snapshot.weeklyReviews);
         setMonthlyReviews(snapshot.monthlyReviews);
+        setOnThisDayEntries(snapshot.onThisDayEntries);
       } catch (error) {
         console.error('[ReviewContext] Failed to hydrate review entries from repository', error);
       } finally {
@@ -256,6 +261,16 @@ export const ReviewProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   }, [canPersist, isReady, monthlyReviews]);
 
   useEffect(() => {
+    if (!isReady || !canPersist) {
+      return;
+    }
+
+    void dataRepository.saveOnThisDayEntries(onThisDayEntries).catch((error) => {
+      console.error('[ReviewContext] Failed to persist On This Day entries', error);
+    });
+  }, [canPersist, isReady, onThisDayEntries]);
+
+  useEffect(() => {
     if (!isReady || !canPersist || isHydratingRef.current) {
       return;
     }
@@ -281,6 +296,7 @@ export const ReviewProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     isReady,
     monthlyReviewTime,
     monthlyReviews,
+    onThisDayEntries,
     reviewTemplates,
     weeklyReviewTime,
     weeklyReviews
@@ -311,7 +327,9 @@ export const ReviewProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         weeklyReviews,
         setWeeklyReviews,
         monthlyReviews,
-        setMonthlyReviews
+        setMonthlyReviews,
+        onThisDayEntries,
+        setOnThisDayEntries
       }}
     >
       {children}

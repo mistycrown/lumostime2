@@ -78,6 +78,8 @@ interface NavigationContextType {
     // Review 模态框
     isDailyReviewOpen: boolean;
     setIsDailyReviewOpen: (open: boolean) => void;
+    isOnThisDayOpen: boolean;
+    setIsOnThisDayOpen: (open: boolean) => void;
     isWeeklyReviewOpen: boolean;
     setIsWeeklyReviewOpen: (open: boolean) => void;
     isMonthlyReviewOpen: boolean;
@@ -106,6 +108,8 @@ interface NavigationContextType {
     // Review 编辑状态
     currentReviewDate: Date | null;
     setCurrentReviewDate: (date: Date | null) => void;
+    currentOnThisDayDate: Date | null;
+    setCurrentOnThisDayDate: (date: Date | null) => void;
     currentWeeklyReviewStart: Date | null;
     setCurrentWeeklyReviewStart: (date: Date | null) => void;
     currentWeeklyReviewEnd: Date | null;
@@ -229,6 +233,7 @@ export const NavigationProvider: React.FC<NavigationProviderProps> = ({
 
     // Review 模态框
     const [isDailyReviewOpen, setIsDailyReviewOpen] = useState(false);
+    const [isOnThisDayOpen, setIsOnThisDayOpen] = useState(false);
     const [isWeeklyReviewOpen, setIsWeeklyReviewOpen] = useState(false);
     const [isMonthlyReviewOpen, setIsMonthlyReviewOpen] = useState(false);
 
@@ -257,6 +262,7 @@ export const NavigationProvider: React.FC<NavigationProviderProps> = ({
 
     // Review 编辑状态
     const [currentReviewDate, setCurrentReviewDate] = useState<Date | null>(null);
+    const [currentOnThisDayDate, setCurrentOnThisDayDate] = useState<Date | null>(null);
     const [currentWeeklyReviewStart, setCurrentWeeklyReviewStart] = useState<Date | null>(null);
     const [currentWeeklyReviewEnd, setCurrentWeeklyReviewEnd] = useState<Date | null>(null);
     const [currentMonthlyReviewStart, setCurrentMonthlyReviewStart] = useState<Date | null>(null);
@@ -328,6 +334,8 @@ export const NavigationProvider: React.FC<NavigationProviderProps> = ({
             setIsScopeManaging,
             isDailyReviewOpen,
             setIsDailyReviewOpen,
+            isOnThisDayOpen,
+            setIsOnThisDayOpen,
             isWeeklyReviewOpen,
             setIsWeeklyReviewOpen,
             isMonthlyReviewOpen,
@@ -348,6 +356,8 @@ export const NavigationProvider: React.FC<NavigationProviderProps> = ({
             setEditingGoal,
             currentReviewDate,
             setCurrentReviewDate,
+            currentOnThisDayDate,
+            setCurrentOnThisDayDate,
             currentWeeklyReviewStart,
             setCurrentWeeklyReviewStart,
             currentWeeklyReviewEnd,

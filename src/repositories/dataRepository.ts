@@ -7,7 +7,7 @@
  */
 import { CATEGORIES, INITIAL_DAILY_REVIEWS, INITIAL_GOALS, INITIAL_LOGS, INITIAL_TODOS, MOCK_TODO_CATEGORIES, SCOPES } from '../constants';
 import { REVIEW_KEYS, StorageKey, USER_DATA_KEYS, storage } from '../constants/storageKeys';
-import { Category, DailyReview, Goal, Log, MajorGoal, MonthlyReview, Scope, TodoCategory, TodoItem, WeeklyReview } from '../types';
+import { Category, DailyReview, Goal, Log, MajorGoal, MonthlyReview, OnThisDayEntry, Scope, TodoCategory, TodoItem, WeeklyReview } from '../types';
 import { normalizeDailyReviews } from '../utils/checkItemNormalizer';
 import { storageRepository, StorageRepository } from './storageRepository';
 
@@ -25,7 +25,8 @@ export const REPOSITORY_KEYS = {
   MAJOR_GOALS: 'majorGoals',
   DAILY_REVIEWS: 'dailyReviews',
   WEEKLY_REVIEWS: 'weeklyReviews',
-  MONTHLY_REVIEWS: 'monthlyReviews'
+  MONTHLY_REVIEWS: 'monthlyReviews',
+  ON_THIS_DAY_ENTRIES: 'onThisDayEntries'
 } as const;
 
 type CoreRepositoryKey = typeof REPOSITORY_KEYS[keyof typeof REPOSITORY_KEYS];
@@ -63,6 +64,7 @@ export interface ReviewEntriesSnapshot {
   dailyReviews: DailyReview[];
   weeklyReviews: WeeklyReview[];
   monthlyReviews: MonthlyReview[];
+  onThisDayEntries: OnThisDayEntry[];
 }
 
 export interface CategoryScopeSnapshot {
@@ -142,11 +144,14 @@ export class DataRepository {
       (await this.repository.getData<WeeklyReview[]>(REPOSITORY_KEYS.WEEKLY_REVIEWS)) ?? [];
     const monthlyReviews =
       (await this.repository.getData<MonthlyReview[]>(REPOSITORY_KEYS.MONTHLY_REVIEWS)) ?? [];
+    const onThisDayEntries =
+      (await this.repository.getData<OnThisDayEntry[]>(REPOSITORY_KEYS.ON_THIS_DAY_ENTRIES)) ?? [];
 
     return {
       dailyReviews,
       weeklyReviews,
-      monthlyReviews
+      monthlyReviews,
+      onThisDayEntries
     };
   }
 
@@ -233,6 +238,11 @@ export class DataRepository {
   async saveMonthlyReviews(monthlyReviews: MonthlyReview[]): Promise<void> {
     await this.initialize();
     await this.repository.setData(REPOSITORY_KEYS.MONTHLY_REVIEWS, monthlyReviews);
+  }
+
+  async saveOnThisDayEntries(onThisDayEntries: OnThisDayEntry[]): Promise<void> {
+    await this.initialize();
+    await this.repository.setData(REPOSITORY_KEYS.ON_THIS_DAY_ENTRIES, onThisDayEntries);
   }
 
   private buildDefaultTodos(logs: Log[]): TodoItem[] {
