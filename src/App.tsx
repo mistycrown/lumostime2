@@ -155,7 +155,9 @@ const AppContent: React.FC = () => {
     isFiltersOpen, setIsFiltersOpen,
     activeFilterId, setActiveFilterId,
     isDailyReviewOpen, setIsDailyReviewOpen,
+    isOnThisDayOpen, setIsOnThisDayOpen,
     currentReviewDate, setCurrentReviewDate,
+    setCurrentOnThisDayDate,
     isWeeklyReviewOpen,
     isMonthlyReviewOpen,
     selectedTagId, setSelectedTagId,
@@ -179,7 +181,7 @@ const AppContent: React.FC = () => {
   const { startActivity, stopActivity, cancelSession, activeSessions, setActiveSessions } = useSession();
   const { logs, todos, todoCategories, setLogs, setTodos, setTodoCategories } = useData();
   const {
-    dailyReviews, weeklyReviews, monthlyReviews, setDailyReviews, setWeeklyReviews, setMonthlyReviews,
+    dailyReviews, weeklyReviews, monthlyReviews, onThisDayEntries, setDailyReviews, setWeeklyReviews, setMonthlyReviews, setOnThisDayEntries,
     reviewTemplates, setReviewTemplates,
     checkTemplates, setCheckTemplates,
     dailyReviewTime, setDailyReviewTime,
@@ -203,7 +205,7 @@ const AppContent: React.FC = () => {
     const data = {
       logs, todos, categories, todoCategories, scopes, goals, majorGoals,
       autoLinkRules, reviewTemplates, checkTemplates, dailyReviews, weeklyReviews,
-      monthlyReviews, customNarrativeTemplates, userPersonalInfo, filters,
+      monthlyReviews, onThisDayEntries, customNarrativeTemplates, userPersonalInfo, filters,
       sceneGroupState, // 新版：场景组状态
       sceneTimeSlots, // 添加场景设置
       principles, // 添加原则库
@@ -442,6 +444,10 @@ const AppContent: React.FC = () => {
         setIsDailyReviewOpen(false);
         setCurrentReviewDate(null);
       }}
+      handleCloseOnThisDay={() => {
+        setIsOnThisDayOpen(false);
+        setCurrentOnThisDayDate(null);
+      }}
       handleCloseWeeklyReview={reviewManager.handleCloseWeeklyReview}
       handleCloseMonthlyReview={reviewManager.handleCloseMonthlyReview}
       statsTitle={statsTitle}
@@ -488,6 +494,7 @@ const AppContent: React.FC = () => {
           !focusDetailSessionId &&
           !isTodoModalOpen &&
           !isDailyReviewOpen &&
+          !isOnThisDayOpen &&
           !isWeeklyReviewOpen &&
           !isMonthlyReviewOpen &&
           !selectedTagId &&
@@ -717,6 +724,7 @@ const AppContent: React.FC = () => {
               setDailyReviews([]);
               setWeeklyReviews([]);
               setMonthlyReviews([]);
+              setOnThisDayEntries([]);
               setAutoLinkRules([]);
               setCustomNarrativeTemplates([]);
               setUserPersonalInfo('');
@@ -737,6 +745,7 @@ const AppContent: React.FC = () => {
               setDailyReviews([]);
               setWeeklyReviews([]);
               setMonthlyReviews([]);
+              setOnThisDayEntries([]);
               setAutoLinkRules([]);
               setCustomNarrativeTemplates([]);
               setUserPersonalInfo('');

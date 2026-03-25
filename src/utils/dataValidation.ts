@@ -66,6 +66,7 @@ export function validateLocalData(data: any): ValidationResult {
     'dailyReviews',
     'weeklyReviews',
     'monthlyReviews',
+    'onThisDayEntries',
     'customNarrativeTemplates',
     'filters',
     'principles'
@@ -154,6 +155,7 @@ export function validateAndFixData(data: any): { data: any; result: ValidationRe
     if (!fixedData.dailyReviews) fixedData.dailyReviews = [];
     if (!fixedData.weeklyReviews) fixedData.weeklyReviews = [];
     if (!fixedData.monthlyReviews) fixedData.monthlyReviews = [];
+    if (!fixedData.onThisDayEntries) fixedData.onThisDayEntries = [];
     if (!fixedData.customNarrativeTemplates) fixedData.customNarrativeTemplates = [];
     if (!fixedData.filters) fixedData.filters = [];
     if (!fixedData.principles) fixedData.principles = [];

@@ -28,6 +28,7 @@ export const useHardwareBackButton = () => {
         isAddModalOpen, setIsAddModalOpen,
         isTodoModalOpen, setIsTodoModalOpen,
         isDailyReviewOpen, setIsDailyReviewOpen, setCurrentReviewDate,
+        isOnThisDayOpen, setIsOnThisDayOpen, setCurrentOnThisDayDate,
         isWeeklyReviewOpen, setIsWeeklyReviewOpen, setCurrentWeeklyReviewStart, setCurrentWeeklyReviewEnd,
         isMonthlyReviewOpen, setIsMonthlyReviewOpen, setCurrentMonthlyReviewStart, setCurrentMonthlyReviewEnd,
         isStatsFullScreen, setIsStatsFullScreen,
@@ -147,6 +148,11 @@ export const useHardwareBackButton = () => {
                 setCurrentReviewDate(null);
                 return;
             }
+            if (isOnThisDayOpen) {
+                setIsOnThisDayOpen(false);
+                setCurrentOnThisDayDate(null);
+                return;
+            }
             if (isWeeklyReviewOpen) {
                 setIsWeeklyReviewOpen(false);
                 setCurrentWeeklyReviewStart(null);
@@ -203,7 +209,7 @@ export const useHardwareBackButton = () => {
         };
     }, [
         isSettingsOpen, isAutoLinkOpen, isSearchOpen, isFiltersOpen, isExportViewOpen, isGalleryViewOpen, isShareViewOpen, focusDetailSessionId, isAddModalOpen, isTodoModalOpen,
-        isDailyReviewOpen, isWeeklyReviewOpen, isMonthlyReviewOpen,
+        isDailyReviewOpen, isOnThisDayOpen, isWeeklyReviewOpen, isMonthlyReviewOpen,
         isStatsFullScreen, isTodoManaging, isTagsManaging, isScopeManaging,
         currentView, selectedTagId, selectedCategoryId, selectedScopeId, settingsSubmenu, isSearchOpenedFromSettings, activeFilterId
     ]);

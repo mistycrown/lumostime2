@@ -513,6 +513,20 @@ export interface MonthlyReview {
 
 
 // Narrative Template (AI 叙事模板)
+export interface OnThisDayNote {
+  id: string;
+  content: string;
+  createdAt: number;
+}
+
+export interface OnThisDayEntry {
+  id: string;
+  monthDay: string; // MM-DD
+  notes: OnThisDayNote[];
+  createdAt: number;
+  updatedAt: number;
+}
+
 export interface NarrativeTemplate {
   id: string;
   title: string;

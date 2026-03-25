@@ -109,6 +109,7 @@ export const REVIEW_KEYS = {
     WEEKLY_REVIEWS: 'lumostime_weeklyReviews',
     /** Monthly Review 数据 */
     MONTHLY_REVIEWS: 'lumostime_monthlyReviews',
+    ON_THIS_DAY_ENTRIES: 'lumostime_onThisDayEntries',
 } as const;
 
 /**
