@@ -12,6 +12,9 @@
  * - 其他需要日期范围计算的组件
  * 
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
+ *
+ * 修改历史:
+ * - 2026-03-25: 修复跨月周范围的结束日期计算，避免周视图错误扩展到下一整月。
  */
 
 export type DateRangeType = 'day' | 'week' | 'month' | 'year' | 'all';
@@ -88,6 +91,7 @@ export const getDateRange = (
       }
       
       start.setDate(start.getDate() - diff);
+      end.setTime(start.getTime());
       end.setDate(start.getDate() + 6);
       end.setHours(23, 59, 59, 999);
       break;

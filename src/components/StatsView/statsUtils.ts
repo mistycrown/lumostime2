@@ -1,6 +1,9 @@
 /**
  * @file statsUtils.ts
  * @description Utility functions for StatsView - color mapping, date handling, formatting
+ *
+ * 修改历史:
+ * - 2026-03-25: 修复跨月周范围结束日期计算错误，统一周视图日期边界。
  */
 
 import {
@@ -47,6 +50,7 @@ export const getDateRange = (date: Date, rangeType: PieRange | 'week_fixed' | 'd
     const diff = start.getDate() - day + (day === 0 ? -6 : 1);
     start.setDate(diff);
     start.setHours(0, 0, 0, 0);
+    end.setTime(start.getTime());
     end.setDate(start.getDate() + 6);
     end.setHours(23, 59, 59, 999);
   } else if (rangeType === 'month') {
