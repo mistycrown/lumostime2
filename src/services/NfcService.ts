@@ -3,11 +3,17 @@
  * @input Capacitor NFC Plugin
  * @output NFC Read/Write Operations
  * @pos Service (Hardware Abstraction)
- * @description Provides a wrapper around the Native NFC capabilities for identifying and writing to NFC tags.
+ * @description Provides a wrapper around the native NFC capabilities for writing tags and receiving retained scan payloads.
  * 
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
 import { registerPlugin } from '@capacitor/core';
+
+export interface NfcTagScannedPayload {
+    type: 'uri' | 'unknown' | 'error';
+    value?: string;
+    message?: string;
+}
 
 interface LumosNfcPlugin {
     /**
@@ -24,7 +30,7 @@ interface LumosNfcPlugin {
     /**
      * Listen for NFC tag scans (read events)
      */
-    addListener(eventName: 'nfcTagScanned', listenerFunc: (data: { type: string, value?: string }) => void): Promise<any>;
+    addListener(eventName: 'nfcTagScanned', listenerFunc: (data: NfcTagScannedPayload) => void): Promise<any>;
 }
 
 const LumosNfc = registerPlugin<LumosNfcPlugin>('LumosNfc');
@@ -53,7 +59,7 @@ export const NfcService = {
         }
     },
 
-    addListener: (eventName: 'nfcTagScanned', listenerFunc: (data: { type: string, value?: string }) => void) => {
+    addListener: (eventName: 'nfcTagScanned', listenerFunc: (data: NfcTagScannedPayload) => void) => {
         return LumosNfc.addListener(eventName, listenerFunc);
     }
 };
