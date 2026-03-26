@@ -3,7 +3,8 @@
  * @input Target date, logs, daily reviews, categories, scopes, todos, and month-day scoped note entries
  * @output Cross-year same-day review UI with DailyReview-style tabs and detail-timeline-style rows
  * @pos View (Review System)
- * @description Renders a read-only archive page for the same month-day across years, with timeline, schedule, review, and persistent notes.
+ * @description Renders a read-only archive page for the same month-day across years, with timeline, schedule, review, and persistent notes, while keeping the default timeline rail aligned with the main timeline/detail views.
+ * @updated 2026-03-26: Restored the default-theme vertical rail for On This Day timeline rows so the connector line renders the same as shared detail timelines.
  *
  * Once I am updated, be sure to update my header comment and the folder's md.
  */
@@ -317,7 +318,10 @@ export const OnThisDayView: React.FC<OnThisDayViewProps> = ({
               </div>
 
               {sortedLogs.length > 0 ? (
-                <div className="relative ml-[70px] space-y-6" style={{ zIndex: 1 }}>
+                <div className="relative ml-[70px] space-y-6 pb-4" style={{ zIndex: 1 }}>
+                  {timelineStyleTheme === 'default' && (
+                    <div className="absolute left-0 top-0 bottom-0 w-[1px] border-l border-stone-300 pointer-events-none" />
+                  )}
                   <div className="pl-8 -ml-[70px] mb-6" />
                   {sortedLogs.map((log, index) => {
                     const category = categories.find((item) => item.id === log.categoryId);

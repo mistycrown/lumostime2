@@ -11,7 +11,7 @@ Update 2026-03-12: timeline styling for normal timeline records is managed by `t
 - `imageCleanupService.ts`: [Active] - Checks unreferenced images, protects referenced business/settings images, and executes cleanup/report generation.
 - `imageService.ts`: [Active] - Manages local image storage using Capacitor Filesystem (native) or IndexedDB (web). Handles thumbnail generation.
 - `narrativeService.ts`: [Active] - Generates Daily/Weekly/Monthly narratives using AI.
-- `NfcService.ts`: [Active] - Wrapper for Capacitor NFC plugin to read/write tags.
+- `NfcService.ts`: [Active] - Wrapper for Capacitor NFC plugin to read/write tags and receive retained scan/error payloads.
 - `obsidianExportService.ts`: [Active] - Exports data to Obsidian markdown files.
 - `settingsImageReferenceService.ts`: [Active] - Collects settings-level image references, currently including custom TimePal assets, for cleanup protection.
 - `syncService.ts`: [Active] - Orchestrates image synchronization between local storage and WebDAV server. Handles deletions and bidirectional sync.

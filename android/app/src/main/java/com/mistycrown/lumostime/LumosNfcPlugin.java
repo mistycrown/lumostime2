@@ -3,7 +3,7 @@
  * @input NFC Tag Scans
  * @output JS Events
  * @pos Native Plugin
- * @description Capacitor plugin for handling NFC tag reading and writing operations.
+ * @description Capacitor plugin for handling retained NFC tag scan events, read fallbacks, and write session cleanup.
  */
 package com.mistycrown.lumostime;
 
@@ -18,50 +18,63 @@ import android.nfc.Tag;
 import android.nfc.tech.Ndef;
 import android.nfc.tech.NdefFormatable;
 import android.os.Build;
+import android.os.Parcelable;
 
+import com.getcapacitor.JSObject;
 import com.getcapacitor.Plugin;
 import com.getcapacitor.PluginCall;
 import com.getcapacitor.PluginMethod;
-import com.getcapacitor.JSObject;
 import com.getcapacitor.annotation.CapacitorPlugin;
 
 @CapacitorPlugin(name = "LumosNfc")
 public class LumosNfcPlugin extends Plugin {
+
+    private static final String EVENT_TAG_SCANNED = "nfcTagScanned";
 
     private boolean isWriting = false;
     private PluginCall activeCall = null;
 
     @PluginMethod
     public void startWriteSession(PluginCall call) {
+        NfcAdapter nfcAdapter = getActivity() == null ? null : NfcAdapter.getDefaultAdapter(getActivity());
+        if (nfcAdapter == null) {
+            call.reject("NFC is not supported on this device");
+            return;
+        }
+
+        if (!nfcAdapter.isEnabled()) {
+            call.reject("NFC is disabled");
+            return;
+        }
+
         isWriting = true;
         activeCall = call;
-        // Keep the call to resolve later when tag is found
         call.setKeepAlive(true);
-
         enableForegroundDispatch();
     }
 
     @PluginMethod
     public void stopWriteSession(PluginCall call) {
-        isWriting = false;
-        disableForegroundDispatch();
         if (activeCall != null) {
             activeCall.reject("Session stopped by user");
-            activeCall = null;
         }
+        resetWriteSession();
+        disableForegroundDispatch();
         call.resolve();
     }
 
     private void enableForegroundDispatch() {
-        if (getActivity() == null)
+        if (getActivity() == null) {
             return;
+        }
+
         NfcAdapter nfcAdapter = NfcAdapter.getDefaultAdapter(getActivity());
         if (nfcAdapter != null && nfcAdapter.isEnabled()) {
             Intent intent = new Intent(getActivity(), getActivity().getClass());
             intent.addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP);
 
             int flags = PendingIntent.FLAG_UPDATE_CURRENT;
-            if (Build.VERSION.SDK_INT >= 31) { // Android 12+
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                 flags |= PendingIntent.FLAG_MUTABLE;
             }
 
@@ -73,8 +86,10 @@ public class LumosNfcPlugin extends Plugin {
     }
 
     private void disableForegroundDispatch() {
-        if (getActivity() == null)
+        if (getActivity() == null) {
             return;
+        }
+
         NfcAdapter nfcAdapter = NfcAdapter.getDefaultAdapter(getActivity());
         if (nfcAdapter != null) {
             nfcAdapter.disableForegroundDispatch(getActivity());
@@ -84,139 +99,251 @@ public class LumosNfcPlugin extends Plugin {
     @Override
     protected void handleOnNewIntent(Intent intent) {
         super.handleOnNewIntent(intent);
+        if (!isNfcIntent(intent)) {
+            return;
+        }
+
+        Tag tag = getTagFromIntent(intent);
+        if (isWriting) {
+            writeTag(tag);
+        } else {
+            readTag(intent, tag);
+        }
+    }
+
+    private boolean isNfcIntent(Intent intent) {
+        if (intent == null) {
+            return false;
+        }
+
         String action = intent.getAction();
-        if (NfcAdapter.ACTION_TAG_DISCOVERED.equals(action) ||
-                NfcAdapter.ACTION_NDEF_DISCOVERED.equals(action) ||
-                NfcAdapter.ACTION_TECH_DISCOVERED.equals(action)) {
+        return NfcAdapter.ACTION_TAG_DISCOVERED.equals(action)
+            || NfcAdapter.ACTION_NDEF_DISCOVERED.equals(action)
+            || NfcAdapter.ACTION_TECH_DISCOVERED.equals(action);
+    }
 
-            Tag tag = intent.getParcelableExtra(NfcAdapter.EXTRA_TAG);
+    private Tag getTagFromIntent(Intent intent) {
+        if (intent == null) {
+            return null;
+        }
 
-            if (isWriting) {
-                writeTag(tag);
-            } else {
-                readTag(intent);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            return intent.getParcelableExtra(NfcAdapter.EXTRA_TAG, Tag.class);
+        }
+
+        return intent.getParcelableExtra(NfcAdapter.EXTRA_TAG);
+    }
+
+    private void readTag(Intent intent, Tag tag) {
+        try {
+            NdefMessage[] messages = extractMessagesFromIntent(intent);
+            if (messages == null || messages.length == 0) {
+                messages = readMessagesFromTag(tag);
+            }
+
+            Uri uri = extractUri(messages);
+            if (uri != null) {
+                emitScanPayload("uri", uri.toString(), null);
+                return;
+            }
+
+            emitScanPayload("unknown", null, "No URI record found on tag");
+        } catch (Exception e) {
+            emitScanPayload("error", null, e.getMessage() != null ? e.getMessage() : "Unknown NFC read error");
+        }
+    }
+
+    private NdefMessage[] extractMessagesFromIntent(Intent intent) {
+        if (intent == null) {
+            return null;
+        }
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            return intent.getParcelableArrayExtra(NfcAdapter.EXTRA_NDEF_MESSAGES, NdefMessage.class);
+        }
+
+        Parcelable[] rawMessages = intent.getParcelableArrayExtra(NfcAdapter.EXTRA_NDEF_MESSAGES);
+        if (rawMessages == null || rawMessages.length == 0) {
+            return null;
+        }
+
+        NdefMessage[] messages = new NdefMessage[rawMessages.length];
+        for (int i = 0; i < rawMessages.length; i++) {
+            messages[i] = (NdefMessage) rawMessages[i];
+        }
+        return messages;
+    }
+
+    private NdefMessage[] readMessagesFromTag(Tag tag) throws Exception {
+        if (tag == null) {
+            return null;
+        }
+
+        Ndef ndef = Ndef.get(tag);
+        if (ndef == null) {
+            return null;
+        }
+
+        boolean connectedHere = false;
+        try {
+            if (!ndef.isConnected()) {
+                ndef.connect();
+                connectedHere = true;
+            }
+
+            NdefMessage cachedMessage = ndef.getCachedNdefMessage();
+            if (cachedMessage != null) {
+                return new NdefMessage[] { cachedMessage };
+            }
+
+            NdefMessage liveMessage = ndef.getNdefMessage();
+            if (liveMessage != null) {
+                return new NdefMessage[] { liveMessage };
+            }
+
+            return null;
+        } finally {
+            if (connectedHere && ndef.isConnected()) {
+                ndef.close();
             }
         }
     }
 
-    private void readTag(Intent intent) {
-        try {
-            NdefMessage[] messages = null;
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                messages = intent.getParcelableArrayExtra(NfcAdapter.EXTRA_NDEF_MESSAGES, NdefMessage.class);
-            } else {
-                android.os.Parcelable[] rawMsgs = intent.getParcelableArrayExtra(NfcAdapter.EXTRA_NDEF_MESSAGES);
-                if (rawMsgs != null) {
-                    messages = new NdefMessage[rawMsgs.length];
-                    for (int i = 0; i < rawMsgs.length; i++) {
-                        messages[i] = (NdefMessage) rawMsgs[i];
-                    }
-                }
-            }
-
-            if (messages != null && messages.length > 0) {
-                NdefRecord[] records = messages[0].getRecords();
-                for (NdefRecord record : records) {
-                    Uri uri = record.toUri();
-                    if (uri != null) {
-                        JSObject ret = new JSObject();
-                        ret.put("type", "uri");
-                        ret.put("value", uri.toString());
-                        notifyListeners("nfcTagScanned", ret);
-                        return; // Found a URI, notify and exit
-                    }
-                }
-            }
-
-            // Fallback if no URI or empty
-            JSObject ret = new JSObject();
-            ret.put("type", "unknown");
-            notifyListeners("nfcTagScanned", ret);
-
-        } catch (Exception e) {
-            e.printStackTrace();
+    private Uri extractUri(NdefMessage[] messages) {
+        if (messages == null) {
+            return null;
         }
+
+        for (NdefMessage message : messages) {
+            if (message == null) {
+                continue;
+            }
+
+            for (NdefRecord record : message.getRecords()) {
+                Uri uri = record.toUri();
+                if (uri != null) {
+                    return uri;
+                }
+            }
+        }
+
+        return null;
+    }
+
+    private void emitScanPayload(String type, String value, String message) {
+        JSObject payload = new JSObject();
+        payload.put("type", type);
+        if (value != null) {
+            payload.put("value", value);
+        }
+        if (message != null) {
+            payload.put("message", message);
+        }
+        notifyListeners(EVENT_TAG_SCANNED, payload, true);
     }
 
     private void writeTag(Tag tag) {
-        if (activeCall == null)
+        if (activeCall == null) {
             return;
+        }
+
+        if (tag == null) {
+            rejectActiveCall("No NFC tag detected");
+            return;
+        }
 
         String uriStr = activeCall.getString("uri");
         if (uriStr == null) {
-            activeCall.reject("URI is required");
-            activeCall = null;
+            rejectActiveCall("URI is required");
             return;
         }
 
         try {
-            // Check for CLEAR command
             if ("lumostime://clear".equals(uriStr)) {
-                // Write empty message
                 NdefMessage message = new NdefMessage(new NdefRecord(NdefRecord.TNF_EMPTY, null, null, null));
                 writeNdefMessageToTag(tag, message);
                 return;
             }
 
             NdefRecord uriRecord = NdefRecord.createUri(Uri.parse(uriStr));
-            // Force AAR to ensuring Xiaomi/other Custom ROMs open THIS app
             NdefRecord aarRecord = NdefRecord.createApplicationRecord("com.mistycrown.lumostime");
-            // Important: URI record must be first for some dispatchers, but AAR ensures app
-            // selection
             NdefMessage message = new NdefMessage(new NdefRecord[] { uriRecord, aarRecord });
-
             writeNdefMessageToTag(tag, message);
-
         } catch (Exception e) {
-            activeCall.reject("Write failed: " + e.getMessage());
+            rejectActiveCall("Write failed: " + (e.getMessage() != null ? e.getMessage() : "Unknown error"));
         }
     }
 
     private void writeNdefMessageToTag(Tag tag, NdefMessage message) {
+        Ndef ndef = null;
+        NdefFormatable formatable = null;
+
         try {
-            Ndef ndef = Ndef.get(tag);
+            ndef = Ndef.get(tag);
             if (ndef != null) {
                 ndef.connect();
                 if (ndef.getMaxSize() < message.toByteArray().length) {
-                    activeCall.reject("Tag capacity is too small");
-                } else if (!ndef.isWritable()) {
-                    activeCall.reject("Tag is read-only");
-                } else {
-                    ndef.writeNdefMessage(message);
-
-                    JSObject ret = new JSObject();
-                    ret.put("status", "success");
-                    activeCall.resolve(ret);
-
-                    // Cleanup
-                    isWriting = false;
-                    activeCall = null;
-                    // disableForegroundDispatch(); // Don't disable global dispatch
+                    rejectActiveCall("Tag capacity is too small");
+                    return;
                 }
-                ndef.close();
-            } else {
-                NdefFormatable formatable = NdefFormatable.get(tag);
-                if (formatable != null) {
-                    formatable.connect();
-                    formatable.format(message);
-                    formatable.close();
 
-                    JSObject ret = new JSObject();
-                    ret.put("status", "success");
-                    activeCall.resolve(ret);
-
-                    isWriting = false;
-                    activeCall = null;
-                    // disableForegroundDispatch();
-                } else {
-                    activeCall.reject("Tag is not NDEF formatted or formatable");
+                if (!ndef.isWritable()) {
+                    rejectActiveCall("Tag is read-only");
+                    return;
                 }
+
+                ndef.writeNdefMessage(message);
+                resolveActiveCall();
+                return;
             }
+
+            formatable = NdefFormatable.get(tag);
+            if (formatable != null) {
+                formatable.connect();
+                formatable.format(message);
+                resolveActiveCall();
+                return;
+            }
+
+            rejectActiveCall("Tag is not NDEF formatted or formatable");
         } catch (Exception e) {
-            if (activeCall != null) {
-                activeCall.reject("Write failed: " + e.getMessage());
+            rejectActiveCall("Write failed: " + (e.getMessage() != null ? e.getMessage() : "Unknown error"));
+        } finally {
+            try {
+                if (ndef != null && ndef.isConnected()) {
+                    ndef.close();
+                }
+            } catch (Exception ignored) {
+            }
+
+            try {
+                if (formatable != null) {
+                    formatable.close();
+                }
+            } catch (Exception ignored) {
             }
         }
+    }
+
+    private void resolveActiveCall() {
+        if (activeCall != null) {
+            JSObject payload = new JSObject();
+            payload.put("status", "success");
+            activeCall.resolve(payload);
+        }
+        resetWriteSession();
+    }
+
+    private void rejectActiveCall(String message) {
+        if (activeCall != null) {
+            activeCall.reject(message);
+        }
+        resetWriteSession();
+    }
+
+    private void resetWriteSession() {
+        isWriting = false;
+        activeCall = null;
     }
 
     @Override
@@ -228,7 +355,6 @@ public class LumosNfcPlugin extends Plugin {
     @Override
     protected void handleOnResume() {
         super.handleOnResume();
-        // Always enable foreground dispatch to capture tags when app is open
         enableForegroundDispatch();
     }
 }
