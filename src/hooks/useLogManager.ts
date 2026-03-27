@@ -3,7 +3,7 @@
  * @input DataContext (logs, setLogs, setTodos), NavigationContext (modal states, currentDate), CategoryScopeContext (categories), ToastContext (addToast)
  * @output Log CRUD Operations (handleSaveLog, handleDeleteLog, handleQuickPunch, handleBatchAddLogs), Modal Control (openAddModal, openEditModal, closeModal), Image Management (handleLogImageRemove)
  * @pos Hook (Data Manager)
- * @description 日志数据管理 Hook - 处理日志的增删改查、快速打点、批量添加、图片管理等操作。时间戳由 DataContext 自动管理。
+ * @description 日志数据管理 Hook - 处理日志的增删改查、快速打点、批量添加、图片管理等操作，并统一维护 NFC 快速打点的文案与时间补记逻辑。时间戳由 DataContext 自动管理。
  * 
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
@@ -128,7 +128,7 @@ export const useLogManager = () => {
 
         if (lastLog) {
             if (lastLog.endTime > endTimestamp) {
-                addToast('error', 'Cannot punch: Future logs exist.');
+                addToast('error', '无法快速打点：存在未来时间的记录');
                 return;
             }
             startTimestamp = Math.max(lastLog.endTime, todayStartTimestamp);
@@ -137,7 +137,7 @@ export const useLogManager = () => {
         }
 
         if (endTimestamp <= startTimestamp) {
-            addToast('info', 'Already up to date.');
+            addToast('info', '当前没有需要补记的时间');
             return;
         }
 
@@ -154,7 +154,7 @@ export const useLogManager = () => {
 
         setLogs(prev => [newLog, ...prev]);
         // Timestamp automatically updated by DataContext
-        addToast('success', 'Quick Punch Recorded!');
+        addToast('success', '快速打点已记录');
     };
 
     const handleBatchAddLogs = (entries: ParsedTimeEntry[]) => {

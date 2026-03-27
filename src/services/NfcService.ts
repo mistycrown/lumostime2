@@ -9,10 +9,18 @@
  */
 import { registerPlugin } from '@capacitor/core';
 
+export const NFC_READ_TEST_MODE_EVENT = 'lumostime:nfc-read-test-mode';
+export const NFC_READ_TEST_RESULT_EVENT = 'lumostime:nfc-read-test-result';
+
 export interface NfcTagScannedPayload {
     type: 'uri' | 'unknown' | 'error';
     value?: string;
     message?: string;
+}
+
+export interface NfcReadTestResultPayload extends NfcTagScannedPayload {
+    source: 'scan' | 'deeplink';
+    scannedAt: number;
 }
 
 interface LumosNfcPlugin {
