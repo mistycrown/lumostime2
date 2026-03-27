@@ -3,7 +3,7 @@
  * @input localStorage (logs, todos, user preferences), Capacitor Plugins (AppUsage, FocusNotification), Services (webdav, ai, nfc)
  * @output Main UI Render, State Management, Data Persistence (JSON in localStorage)
  * @pos Root Component, Application Entry Point (Logic Hub)
- * @description The main component that holds the global state (logs, todos, active sessions) and handles routing between views and overlays, including preserving standalone return paths for search and custom filters while keeping export/import and reset flows aligned with repository-backed data.
+ * @description The main component that holds the global state (logs, todos, active sessions) and handles routing between views and overlays, including preserving standalone return paths for search and custom filters while keeping export/import, NFC stop confirmation, and reset flows aligned with repository-backed data.
  *
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
@@ -355,6 +355,10 @@ const AppContent: React.FC = () => {
     );
   };
 
+  const handleRequestStopActivityWrapper = (sessionId: string) => {
+    setSessionToStop(sessionId);
+  };
+
   const handleSelectDailyReviewWrapper = (dateStr: string) => {
     setReturnToSearch(true);
     setIsSearchOpen(false);
@@ -378,7 +382,12 @@ const AppContent: React.FC = () => {
     setIsFiltersOpen(false);
   };
 
-  useDeepLink(logManager.handleQuickPunch, handleStartActivityWrapper, handleStopActivityWrapper);
+  useDeepLink(
+    logManager.handleQuickPunch,
+    handleStartActivityWrapper,
+    handleStopActivityWrapper,
+    handleRequestStopActivityWrapper
+  );
   useFloatingWindow(handleStopActivityWrapper);
   useAppDetection(handleStartActivityWrapper);
 
@@ -594,15 +603,15 @@ const AppContent: React.FC = () => {
 
       <ConfirmModal
         isOpen={!!sessionToStop}
-        title="Stop Activity?"
-        description="Are you sure you want to stop the current activity?"
+        title="结束活动？"
+        description="扫描到了当前正在计时的活动标签，确认后将结束本次计时。"
         onConfirm={() => {
           if (sessionToStop) handleStopActivityWrapper(sessionToStop);
           setSessionToStop(null);
         }}
         onClose={() => setSessionToStop(null)}
-        confirmText="Stop"
-        cancelText="Cancel"
+        confirmText="结束"
+        cancelText="取消"
         type="warning"
       />
 

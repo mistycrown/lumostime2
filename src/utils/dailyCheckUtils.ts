@@ -3,9 +3,9 @@
  * @input daily review data, check templates, review templates, target check item id
  * @output daily check helpers for creating reviews, locating items, and applying manual actions
  * @pos Utils (Daily Check)
- * @description Shared daily check utilities used by SceneView and NFC flows to keep review creation and habit punch behavior consistent.
+ * @description Shared daily check utilities used by SceneView and NFC flows to keep review creation, legacy item ID compatibility, and habit punch behavior consistent.
  */
-import { CheckItem, CheckTemplate, DailyReview, ReviewTemplate, ReviewTemplateSnapshot } from '../types';
+import { CheckItem, CheckTemplate, CheckTemplateItem, DailyReview, ReviewTemplate, ReviewTemplateSnapshot } from '../types';
 import { normalizeCheckItem } from './checkItemNormalizer';
 
 export type DailyCheckActionMode = 'toggle' | 'increment' | 'reset' | 'complete_once';
@@ -43,6 +43,23 @@ const sortTemplatesByOrder = <T extends { order: number }>(templates: T[]): T[] 
   return [...templates].sort((a, b) => a.order - b.order);
 };
 
+const buildLegacyCheckItemId = (templateId: string, index: number, content: string): string => {
+  const normalizedContent = content.trim().replace(/\s+/g, ' ').slice(0, 80) || 'item';
+  return `legacy:${templateId}:${index}:${encodeURIComponent(normalizedContent)}`;
+};
+
+export const getCheckTemplateItemKey = (
+  template: Pick<CheckTemplate, 'id'>,
+  item: CheckTemplateItem,
+  index: number
+): string => {
+  if (item.id) {
+    return item.id;
+  }
+
+  return buildLegacyCheckItemId(template.id, index, item.content);
+};
+
 export const buildDailyTemplateSnapshot = (reviewTemplates: ReviewTemplate[]): ReviewTemplateSnapshot[] => {
   return sortTemplatesByOrder(reviewTemplates.filter(template => template.isDailyTemplate)).map(template => ({
     id: template.id,
@@ -65,7 +82,7 @@ export const buildDailyCheckItems = (checkTemplates: CheckTemplate[]): CheckItem
   const checkItems: CheckItem[] = [];
 
   sortTemplatesByOrder(checkTemplates.filter(template => template.enabled && template.isDaily)).forEach(template => {
-    template.items.forEach(item => {
+    template.items.forEach((item, index) => {
       const type = item.type || 'manual';
       const manualMode = type === 'manual'
         ? (item.manualMode === 'count' ? 'count' : 'binary')
@@ -77,7 +94,7 @@ export const buildDailyCheckItems = (checkTemplates: CheckTemplate[]): CheckItem
         : undefined;
 
       checkItems.push({
-        id: item.id || crypto.randomUUID(),
+        id: getCheckTemplateItemKey(template, item, index),
         category: template.title,
         content: item.content,
         icon: item.icon,
@@ -154,7 +171,8 @@ export const getDailyCheckTemplateMeta = (
   checkItemId: string
 ): DailyCheckTemplateMeta | null => {
   for (const template of checkTemplates) {
-    const item = template.items.find(entry => entry.id === checkItemId);
+    const itemIndex = template.items.findIndex((entry, index) => getCheckTemplateItemKey(template, entry, index) === checkItemId);
+    const item = itemIndex >= 0 ? template.items[itemIndex] : undefined;
     if (!item) continue;
 
     const type: 'manual' | 'auto' = item.type === 'auto' ? 'auto' : 'manual';
@@ -486,7 +504,7 @@ export const getEligibleNfcDailyCheckItems = (checkTemplates: CheckTemplate[]): 
   const items: DailyCheckTemplateMeta[] = [];
 
   sortTemplatesByOrder(checkTemplates.filter(template => template.enabled && template.isDaily)).forEach(template => {
-    template.items.forEach(item => {
+    template.items.forEach((item, index) => {
       const type: 'manual' | 'auto' = item.type === 'auto' ? 'auto' : 'manual';
       if (type !== 'manual') {
         return;
@@ -494,7 +512,7 @@ export const getEligibleNfcDailyCheckItems = (checkTemplates: CheckTemplate[]): 
 
       const manualMode: 'binary' | 'count' = item.manualMode === 'count' ? 'count' : 'binary';
       items.push({
-        checkItemId: item.id,
+        checkItemId: getCheckTemplateItemKey(template, item, index),
         content: item.content,
         category: template.title,
         type,
