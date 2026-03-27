@@ -1,20 +1,18 @@
 ﻿/**
  * @file StatsView.tsx
  * @input Logs, Categories, Todos, Scopes, Current Date
- * @output Navigation Events (Animated Date Change, Back)
+ * @output Navigation Events (Date Change, Back)
  * @pos View (Statistics Dashboard)
- * @description A comprehensive analytics dashboard supporting multiple visualization modes: Pie (Distribution), Matrix (Consistency), Schedule (Timeline), Line (Trend), and Check (Habit tracking), with smooth top-level date-switch animation for both swipe and button navigation. Analyzes time usage across Activities, Todos, and Scopes.
+ * @description A comprehensive analytics dashboard supporting multiple visualization modes: Pie (Distribution), Matrix (Consistency), Schedule (Timeline), Line (Trend), and Check (Habit tracking). Analyzes time usage across Activities, Todos, and Scopes.
  *
  * 修改历史:
  * - 2026-01-10: 修复日课统计（check）视图的日期导航功能，补充 check 视图范围处理。
  * - 2026-03-03: 数字类型日课统计改为按完成次数展示，避免仅按是否完成呈现。
  * - 2026-03-11: 统一统计分享导出协议，修复分享图片页因解析失败导致的空白问题。
- * - 2026-03-25: 修复周矩阵跨月切换时周结束日期计算错误，避免跨月周被错误扩展到下一整月。
  *
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
- import React, { useState, useMemo, useEffect } from 'react';
- import { AnimatePresence, motion } from 'framer-motion';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Log, Category, Activity, Scope, TodoItem, TodoCategory, DailyReview } from '../types';
 import { COLOR_OPTIONS } from '../constants';
 import { Minimize2, Share, PieChart, Grid, Calendar, ChevronLeft, ChevronRight, TrendingUp, TrendingDown, CheckCircle2, Smile } from 'lucide-react';
@@ -65,10 +63,6 @@ type ViewType = 'pie' | 'matrix' | 'schedule' | 'line' | 'check' | 'emoji';
 type PieRange = 'day' | 'week' | 'month' | 'year';
 type ScheduleRange = 'day' | 'week' | 'month';
 type EmojiRange = 'month' | 'year';
-type StatsRangeType = PieRange | 'week_fixed' | 'day_fixed' | 'month';
-type StatsDateTransitionDirection = 'prev' | 'next';
-
-const STATS_DATE_TRANSITION_MS = 180;
 
 interface ActivityStat extends Activity {
   duration: number;
@@ -92,7 +86,6 @@ export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentD
   const [lineRange, setLineRange] = useState<'week' | 'month'>((forcedRange === 'month' || forcedRange === 'year') ? 'month' : 'week');
   const [emojiRange, setEmojiRange] = useState<EmojiRange>('month');
   const [excludedCategoryIds, setExcludedCategoryIds] = useState<string[]>([]);
-  const [isDateTransitioning, setIsDateTransitioning] = useState(false);
 
   const toggleExclusion = (id: string) => {
     setExcludedCategoryIds(prev => prev.includes(id) ? prev.filter(c => c !== id) : [...prev, id]);
@@ -110,38 +103,37 @@ export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentD
     setIsExportViewOpen(showChronoPrint);
   }, [showChronoPrint, setIsExportViewOpen]);
 
-  const getCurrentRangeType = React.useCallback((): StatsRangeType => {
-    if (viewType === 'pie') {
-      return pieRange;
-    }
-    if (viewType === 'matrix') {
-      return 'week_fixed';
-    }
-    if (viewType === 'line') {
-      return lineRange === 'week' ? 'week_fixed' : 'month';
-    }
-    if (viewType === 'schedule') {
-      if (scheduleRange === 'day') return 'day_fixed';
-      if (scheduleRange === 'month') return 'month';
-      return 'week_fixed';
-    }
-    if (viewType === 'check') {
-      return pieRange === 'day' ? 'week' : pieRange;
-    }
-    if (viewType === 'emoji') {
-      return emojiRange;
-    }
-
-    return 'day';
-  }, [emojiRange, lineRange, pieRange, scheduleRange, viewType]);
-
-  const handleNavigateDate = React.useCallback((direction: StatsDateTransitionDirection) => {
-    if (!onDateChange || isDateTransitioning) return;
+  // 鏃ユ湡瀵艰埅鍑芥暟
+  const handleNavigateDate = (direction: 'prev' | 'next') => {
+    if (!onDateChange) return;
 
     const newDate = new Date(currentDate);
-    const rangeType = getCurrentRangeType();
+    let rangeType: PieRange | 'week_fixed' | 'day_fixed';
+
+    // 纭畾褰撳墠鏃堕棿鑼冨洿绫诲瀷
+    if (viewType === 'pie') {
+      rangeType = pieRange;
+    } else if (viewType === 'matrix') {
+      rangeType = 'week_fixed';
+    } else if (viewType === 'line') {
+      rangeType = lineRange === 'week' ? 'week_fixed' : 'month';
+    } else if (viewType === 'schedule') {
+      if (scheduleRange === 'day') rangeType = 'day_fixed';
+      else if (scheduleRange === 'month') rangeType = 'month';
+      else rangeType = 'week_fixed';
+    } else if (viewType === 'check') {
+      // Check view浣跨敤pieRange锛屼絾涓嶆敮鎸乨ay锛岄粯璁や负week
+      rangeType = pieRange === 'day' ? 'week' : pieRange;
+    } else if (viewType === 'emoji') {
+      // Emoji view浣跨敤emojiRange (month/year)
+      rangeType = emojiRange;
+    } else {
+      rangeType = 'day';
+    }
+
     const multiplier = direction === 'prev' ? -1 : 1;
 
+    // 鏍规嵁鑼冨洿绫诲瀷璋冩暣鏃ユ湡
     if (rangeType === 'day' || rangeType === 'day_fixed') {
       newDate.setDate(newDate.getDate() + multiplier);
     } else if (rangeType === 'week' || rangeType === 'week_fixed') {
@@ -152,9 +144,8 @@ export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentD
       newDate.setFullYear(newDate.getFullYear() + multiplier);
     }
 
-    setIsDateTransitioning(true);
     onDateChange(newDate);
-  }, [currentDate, getCurrentRangeType, isDateTransitioning, onDateChange]);
+  };
 
   // 瑙︽懜婊戝姩鎵嬪娍澶勭悊
   const [touchStart, setTouchStart] = useState<number | null>(null);
@@ -164,26 +155,16 @@ export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentD
   const minSwipeDistance = 100;
 
   const onTouchStart = (e: React.TouchEvent) => {
-    if (isDateTransitioning) {
-      return;
-    }
     setTouchEnd(null);
     setTouchStart(e.targetTouches[0].clientX);
   };
 
   const onTouchMove = (e: React.TouchEvent) => {
-    if (isDateTransitioning) {
-      return;
-    }
     setTouchEnd(e.targetTouches[0].clientX);
   };
 
   const onTouchEnd = () => {
-    if (isDateTransitioning || !touchStart || !touchEnd) {
-      setTouchStart(null);
-      setTouchEnd(null);
-      return;
-    }
+    if (!touchStart || !touchEnd) return;
 
     const distance = touchStart - touchEnd;
     const isLeftSwipe = distance > minSwipeDistance;
@@ -196,15 +177,12 @@ export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentD
       // 鍚戝彸婊戝姩 = 涓婁竴涓椂闂存
       handleNavigateDate('prev');
     }
-
-    setTouchStart(null);
-    setTouchEnd(null);
   };
 
   // 生成动态标题
   const getDynamicTitle = (
     date: Date,
-    rangeType: StatsRangeType
+    rangeType: PieRange | 'week_fixed' | 'day_fixed' | 'month'
   ): string => {
     if (rangeType === 'day' || rangeType === 'day_fixed') {
       return `${date.getMonth() + 1}月${date.getDate()}日`;
@@ -242,7 +220,7 @@ export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentD
   };
 
   // --- Date Helpers ---
-  const getDateRange = (date: Date, rangeType: StatsRangeType) => {
+  const getDateRange = (date: Date, rangeType: PieRange | 'week_fixed' | 'day_fixed' | 'month') => {
     const start = new Date(date);
     const end = new Date(date);
 
@@ -254,7 +232,6 @@ export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentD
       const diff = start.getDate() - day + (day === 0 ? -6 : 1);
       start.setDate(diff);
       start.setHours(0, 0, 0, 0);
-      end.setTime(start.getTime());
       end.setDate(start.getDate() + 6);
       end.setHours(23, 59, 59, 999);
     } else if (rangeType === 'month') {
@@ -274,16 +251,52 @@ export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentD
   };
 
   const effectiveRange = useMemo(() => {
-    return getDateRange(currentDate, getCurrentRangeType());
-  }, [currentDate, getCurrentRangeType]);
+    if (viewType === 'pie') return getDateRange(currentDate, pieRange);
+    if (viewType === 'matrix') return getDateRange(currentDate, 'week_fixed');
+    if (viewType === 'line') return getDateRange(currentDate, lineRange === 'week' ? 'week_fixed' : 'month');
+    if (viewType === 'schedule') {
+      if (scheduleRange === 'day') return getDateRange(currentDate, 'day_fixed');
+      if (scheduleRange === 'month') return getDateRange(currentDate, 'month');
+      return getDateRange(currentDate, 'week_fixed');
+    }
+    if (viewType === 'check') {
+      // Check view uses pieRange but doesn't support 'day'
+      // If pieRange is day, we default to week
+      const actualRange = pieRange === 'day' ? 'week' : pieRange;
+      return getDateRange(currentDate, actualRange);
+    }
+    if (viewType === 'emoji') {
+      return getDateRange(currentDate, emojiRange);
+    }
+    return getDateRange(currentDate, 'day');
+  }, [currentDate, viewType, pieRange, scheduleRange, lineRange, emojiRange]);
 
   // 褰撹鍥剧被鍨嬨€佹椂闂磋寖鍥存垨鏃ユ湡鍙樺寲鏃讹紝鑷姩鏇存柊鏍囬
   useEffect(() => {
     if (onTitleChange) {
-      const title = getDynamicTitle(currentDate, getCurrentRangeType());
+      let rangeType: PieRange | 'week_fixed' | 'day_fixed' | 'month';
+      if (viewType === 'pie') {
+        rangeType = pieRange;
+      } else if (viewType === 'matrix') {
+        rangeType = 'week_fixed';
+      } else if (viewType === 'schedule') {
+        if (scheduleRange === 'day') rangeType = 'day_fixed';
+        else if (scheduleRange === 'month') rangeType = 'month';
+        else rangeType = 'week_fixed';
+      } else if (viewType === 'line') {
+        rangeType = lineRange === 'week' ? 'week_fixed' : 'month';
+      } else if (viewType === 'check') {
+        rangeType = pieRange === 'day' ? 'week' : pieRange;
+      } else if (viewType === 'emoji') {
+        rangeType = emojiRange;
+      } else {
+        rangeType = 'day';
+      }
+
+      const title = getDynamicTitle(currentDate, rangeType);
       onTitleChange(title);
     }
-  }, [currentDate, getCurrentRangeType, onTitleChange]);
+  }, [currentDate, viewType, pieRange, scheduleRange, lineRange, emojiRange, onTitleChange]);
 
   const { start: rangeStart, end: rangeEnd } = effectiveRange;
 
@@ -606,12 +619,6 @@ export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentD
     );
   }
 
-  const currentDateKey = [
-    currentDate.getFullYear(),
-    String(currentDate.getMonth() + 1).padStart(2, '0'),
-    String(currentDate.getDate()).padStart(2, '0')
-  ].join('-');
-
   return (
     <div
       className={`${isFullScreen ? 'fixed inset-0 z-50 bg-stone-50 pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]' : 'h-full bg-[#faf9f6]'} flex flex-col overflow-hidden animate-in slide-in-from-right duration-300`}
@@ -730,17 +737,15 @@ export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentD
                   <div className="flex items-center gap-1 bg-stone-100 p-0.5 rounded-lg">
                     <button
                       onClick={() => handleNavigateDate('prev')}
-                      className="p-1.5 rounded-md transition-all text-stone-400 hover:text-stone-800 hover:bg-white disabled:opacity-40 disabled:cursor-not-allowed"
+                      className="p-1.5 rounded-md transition-all text-stone-400 hover:text-stone-800 hover:bg-white"
                       title="涓婁竴涓椂闂存"
-                      disabled={isDateTransitioning}
                     >
                       <ChevronLeft size={14} />
                     </button>
                     <button
                       onClick={() => handleNavigateDate('next')}
-                      className="p-1.5 rounded-md transition-all text-stone-400 hover:text-stone-800 hover:bg-white disabled:opacity-40 disabled:cursor-not-allowed"
+                      className="p-1.5 rounded-md transition-all text-stone-400 hover:text-stone-800 hover:bg-white"
                       title="涓嬩竴涓椂闂存"
-                      disabled={isDateTransitioning}
                     >
                       <ChevronRight size={14} />
                     </button>
@@ -795,119 +800,83 @@ export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentD
             </div>
           )}
 
-          <div
-            className={`${isDateTransitioning ? 'pointer-events-none select-none ' : ''}${isFullScreen || viewType === 'schedule' ? 'flex-1 min-h-0' : ''}`}
-            style={{ display: 'grid', overflow: 'hidden', position: 'relative' }}
-          >
-            <AnimatePresence
-              initial={false}
-              mode="wait"
-              onExitComplete={() => {
-                setIsDateTransitioning(false);
-              }}
-            >
-              <motion.div
-                key={currentDateKey}
-                initial="initial"
-                animate="animate"
-                exit="exit"
-                variants={{
-                  initial: {
-                    opacity: 0
-                  },
-                  animate: {
-                    opacity: 1
-                  },
-                  exit: {
-                    opacity: 0
-                  }
-                }}
-                transition={{
-                  duration: STATS_DATE_TRANSITION_MS / 1000,
-                  ease: 'easeInOut'
-                }}
-                className={isFullScreen || viewType === 'schedule' ? 'flex-1 min-h-0' : ''}
-                style={{ gridArea: '1 / 1' }}
-              >
-                {/* --- Pie View Content --- */}
-                {viewType === 'pie' && (
-                  <PieChartView
-                    stats={stats}
-                    previousStats={previousStats}
-                    todoStats={todoStats}
-                    previousTodoStats={previousTodoStats}
-                    scopeStats={scopeStats}
-                    previousScopeStats={previousScopeStats}
-                    pieRange={pieRange}
-                    categories={categories}
-                    excludedCategoryIds={excludedCategoryIds}
-                    onToggleExclusion={toggleExclusion}
-                    onExport={handleExportStats}
-                    onExportImage={handleExportImage}
-                    isFullScreen={isFullScreen}
-                  />
-                )}
+          {/* --- Pie View Content --- */}
+          {viewType === 'pie' && (
+            <PieChartView
+              stats={stats}
+              previousStats={previousStats}
+              todoStats={todoStats}
+              previousTodoStats={previousTodoStats}
+              scopeStats={scopeStats}
+              previousScopeStats={previousScopeStats}
+              pieRange={pieRange}
+              categories={categories}
+              excludedCategoryIds={excludedCategoryIds}
+              onToggleExclusion={toggleExclusion}
+              onExport={handleExportStats}
+              onExportImage={handleExportImage}
+              isFullScreen={isFullScreen}
+            />
+          )}
 
-                {/* --- Line Chart View Content --- */}
-                {viewType === 'line' && (
-                  <LineChartView
-                    filteredLogs={filteredLogs}
-                    logs={logs}
-                    categories={categories}
-                    todos={todos}
-                    scopes={scopes}
-                    rangeStart={rangeStart}
-                    rangeEnd={rangeEnd}
-                    excludedCategoryIds={excludedCategoryIds}
-                    onToggleExclusion={toggleExclusion}
-                  />
-                )}
+          {/* --- Line Chart View Content --- */}
+          {viewType === 'line' && (
+            <LineChartView
+              filteredLogs={filteredLogs}
+              logs={logs}
+              categories={categories}
+              todos={todos}
+              scopes={scopes}
+              rangeStart={rangeStart}
+              rangeEnd={rangeEnd}
+              excludedCategoryIds={excludedCategoryIds}
+              onToggleExclusion={toggleExclusion}
+            />
+          )}
 
-                {viewType === 'matrix' && (
-                  <MatrixView
-                    matrixData={matrixData}
-                    categories={categories}
-                    excludedCategoryIds={excludedCategoryIds}
-                    onToggleExclusion={toggleExclusion}
-                    isFullScreen={isFullScreen}
-                  />
-                )}
 
-                {/* --- Schedule View Content --- */}
-                {viewType === 'schedule' && (
-                  <ScheduleView
-                    filteredLogs={filteredLogs}
-                    categories={categories}
-                    scheduleRange={scheduleRange}
-                    scheduleStyle={scheduleStyle}
-                    rangeStart={rangeStart}
-                    currentDate={currentDate}
-                    isFullScreen={isFullScreen}
-                    isPrivacyMode={isPrivacyMode}
-                  />
-                )}
+          {viewType === 'matrix' && (
+            <MatrixView
+              matrixData={matrixData}
+              categories={categories}
+              excludedCategoryIds={excludedCategoryIds}
+              onToggleExclusion={toggleExclusion}
+              isFullScreen={isFullScreen}
+            />
+          )}
 
-                {/* --- Check View Content --- */}
-                {viewType === 'check' && (
-                  <CheckView
-                    checkStats={checkStats}
-                    pieRange={pieRange}
-                    rangeStart={rangeStart}
-                  />
-                )}
+          {/* --- Schedule View Content --- */}
+          {viewType === 'schedule' && (
+            <ScheduleView
+              filteredLogs={filteredLogs}
+              categories={categories}
+              scheduleRange={scheduleRange}
+              scheduleStyle={scheduleStyle}
+              rangeStart={rangeStart}
+              currentDate={currentDate}
+              isFullScreen={isFullScreen}
+              isPrivacyMode={isPrivacyMode}
+            />
+          )}
 
-                {/* --- Emoji View Content --- */}
-                {viewType === 'emoji' && (
-                  <EmojiStatsView
-                    dailyReviews={dailyReviews}
-                    currentDate={currentDate}
-                    emojiRange={emojiRange}
-                    onToast={onToast}
-                  />
-                )}
-              </motion.div>
-            </AnimatePresence>
-          </div>
+          {/* --- Check View Content --- */}
+          {viewType === 'check' && (
+            <CheckView
+              checkStats={checkStats}
+              pieRange={pieRange}
+              rangeStart={rangeStart}
+            />
+          )}
+
+          {/* --- Emoji View Content --- */}
+          {viewType === 'emoji' && (
+            <EmojiStatsView
+              dailyReviews={dailyReviews}
+              currentDate={currentDate}
+              emojiRange={emojiRange}
+              onToast={onToast}
+            />
+          )}
 
 
 
