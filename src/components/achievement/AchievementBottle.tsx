@@ -2,21 +2,32 @@
  * @file AchievementBottle.tsx
  * @description Physics-driven achievement bottle visualization with switchable bottle skins for the achievement page and sponsorship previews.
  *
- * @updated 2026-03-28: Added reusable bottle style variants, filtered numbered star sprite assets only, and relaxed star spacing to reduce visual overlap.
+ * @updated 2026-03-28: Softened the bottle skin palette, added pearl, linen, and mint variants, and kept the one-decimal counter while flooring rendered star bodies inside the chamber.
  */
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { Capacitor } from '@capacitor/core';
 import { Bodies, Body, Composite, Engine, Runner, World } from 'matter-js';
 import { Star } from 'lucide-react';
 import {
   DEFAULT_ACHIEVEMENT_BOTTLE_STYLE,
   type AchievementBottleStyle
 } from '../../services/achievementBottleStyleService';
+import {
+  DEFAULT_ACHIEVEMENT_BOTTLE_ICON_PACK,
+  type AchievementBottleIconPack
+} from '../../services/achievementBottleIconPackService';
+import {
+  formatAchievementStars,
+  getAchievementRenderableStarCount,
+  normalizeAchievementStarValue
+} from '../../utils/achievementUtils';
 
 interface AchievementBottleProps {
   starCount: number;
   rebuildToken: number;
   compact?: boolean;
   styleVariant?: AchievementBottleStyle;
+  iconPack?: AchievementBottleIconPack;
   renderMode?: 'live' | 'preview';
 }
 
@@ -53,6 +64,15 @@ interface PreviewStarSpec {
   opacity: number;
 }
 
+interface GravityState {
+  baselineBeta: number | null;
+  baselineGamma: number | null;
+  currentX: number;
+  currentY: number;
+  targetX: number;
+  targetY: number;
+}
+
 const MAX_VISIBLE_STARS = 120;
 const PREVIEW_VISIBLE_STARS = 12;
 const STAR_SIZE = 26;
@@ -61,21 +81,41 @@ const STAR_SCALE_MIN = 0.92;
 const STAR_SCALE_MAX = 1.08;
 const BOTTLE_PADDING = 16;
 const EMPTY_DIMENSIONS = { width: 0, height: 0 };
-const STAR_IMAGE_PATHS = Object.entries(
+const DEFAULT_GRAVITY = { x: 0, y: 1 };
+const GRAVITY_SCALE = 0.0016;
+const GRAVITY_SMOOTHING = 0.12;
+const MAX_SENSOR_TILT_DEGREES = 32;
+const MAX_GRAVITY_SWAY_X = 0.78;
+const MAX_GRAVITY_SWAY_Y = 0.24;
+const MIN_GRAVITY_Y = 0.64;
+const MAX_GRAVITY_Y = 1.16;
+const BASELINE_RESET_THRESHOLD = 58;
+const STAR_IMAGE_PATH_ENTRIES = Object.entries(
   import.meta.glob<string>(
-    '../../../public/stars/star1/[0-9]*.{png,jpg,jpeg,webp,svg}',
+    '../../../public/stars/*/*.{png,jpg,jpeg,webp,svg}',
     {
       eager: true,
       import: 'default'
     }
   )
 )
-  .sort(([firstPath], [secondPath]) => firstPath.localeCompare(secondPath, undefined, { numeric: true }))
-  .filter(([filePath]) => {
-    const fileName = filePath.split('/').pop() || '';
-    return /^\d+\.(png|jpg|jpeg|webp|svg)$/i.test(fileName);
-  })
-  .map(([, assetUrl]) => assetUrl);
+  .sort(([firstPath], [secondPath]) => firstPath.localeCompare(secondPath, undefined, { numeric: true }));
+
+const STAR_IMAGE_PATHS_BY_PACK = STAR_IMAGE_PATH_ENTRIES.reduce<Record<string, string[]>>((result, [filePath, assetUrl]) => {
+  const segments = filePath.split('/');
+  const packName = segments[segments.length - 2];
+
+  if (!packName) {
+    return result;
+  }
+
+  if (!result[packName]) {
+    result[packName] = [];
+  }
+
+  result[packName].push(assetUrl);
+  return result;
+}, {});
 
 const PREVIEW_STAR_LAYOUTS: PreviewStarSpec[] = [
   { left: '16%', top: '78%', rotate: -12, scale: 0.96, opacity: 0.74 },
@@ -94,100 +134,172 @@ const PREVIEW_STAR_LAYOUTS: PreviewStarSpec[] = [
 
 const BOTTLE_PALETTES: Record<AchievementBottleStyle, BottlePalette> = {
   sunlit: {
-    outerBackground: 'radial-gradient(circle at 50% 0%, rgba(255,255,255,0.95), rgba(255,246,214,0.82) 42%, rgba(246,203,118,0.52) 100%)',
-    outerBorderColor: 'rgba(255,255,255,0.58)',
-    outerShadow: 'inset 0 1px 0 rgba(255,255,255,0.76), 0 20px 60px rgba(180,126,36,0.18)',
+    outerBackground: 'radial-gradient(circle at 50% 0%, rgba(255,255,255,0.98), rgba(255,249,231,0.92) 46%, rgba(247,220,154,0.58) 100%)',
+    outerBorderColor: 'rgba(255,255,255,0.82)',
+    outerShadow: 'inset 0 1px 0 rgba(255,255,255,0.86), 0 18px 42px rgba(191,148,69,0.12)',
     outerRadius: '2rem',
-    haloBackground: 'radial-gradient(circle, rgba(255,232,164,0.55), rgba(255,232,164,0))',
-    neckBackground: 'linear-gradient(90deg, rgba(249,214,127,0.2), rgba(255,247,223,0.82), rgba(249,214,127,0.2))',
-    eyebrowColor: '#c7965f',
-    countColor: '#6a594a',
-    chamberBackground: 'linear-gradient(180deg, rgba(255,255,255,0.36), rgba(255,255,255,0.18))',
-    chamberBorderColor: 'rgba(251,191,36,0.42)',
-    chamberShadow: 'inset 0 1px 0 rgba(255,255,255,0.55), inset 0 -12px 28px rgba(217,119,6,0.08)',
+    haloBackground: 'radial-gradient(circle, rgba(255,233,178,0.42), rgba(255,233,178,0))',
+    neckBackground: 'linear-gradient(90deg, rgba(250,222,153,0.14), rgba(255,251,240,0.9), rgba(250,222,153,0.14))',
+    eyebrowColor: '#be9b6c',
+    countColor: '#74614d',
+    chamberBackground: 'linear-gradient(180deg, rgba(255,255,255,0.54), rgba(255,250,239,0.24))',
+    chamberBorderColor: 'rgba(244,200,109,0.28)',
+    chamberShadow: 'inset 0 1px 0 rgba(255,255,255,0.66), inset 0 -10px 24px rgba(224,181,87,0.05)',
     chamberRadius: '1.75rem',
-    sideHighlight: 'linear-gradient(180deg, rgba(255,255,255,0.52), rgba(255,255,255,0.02))',
-    bottomGlow: 'linear-gradient(180deg, rgba(245,158,11,0), rgba(217,119,6,0.18))',
-    topMist: 'radial-gradient(circle at top, rgba(255,255,255,0.88), rgba(255,255,255,0))',
-    emptyIconColor: '#f5c46c',
-    emptyTitleColor: '#5f5449',
-    emptyBodyColor: '#7c6f65',
-    starColor: '#f59e0b',
-    starShadow: 'drop-shadow(0 4px 12px rgba(245,158,11,0.45))',
-    overflowBackground: 'rgba(255,255,255,0.84)',
-    overflowColor: '#57534e'
+    sideHighlight: 'linear-gradient(180deg, rgba(255,255,255,0.64), rgba(255,255,255,0.04))',
+    bottomGlow: 'linear-gradient(180deg, rgba(247,193,94,0), rgba(232,187,92,0.11))',
+    topMist: 'radial-gradient(circle at top, rgba(255,255,255,0.94), rgba(255,255,255,0))',
+    emptyIconColor: '#e8bb66',
+    emptyTitleColor: '#67584a',
+    emptyBodyColor: '#84776d',
+    starColor: '#efb34a',
+    starShadow: 'drop-shadow(0 4px 12px rgba(239,179,74,0.26))',
+    overflowBackground: 'rgba(255,255,255,0.9)',
+    overflowColor: '#66584d'
   },
   seaGlass: {
-    outerBackground: 'radial-gradient(circle at 50% 0%, rgba(244,255,253,0.96), rgba(211,246,239,0.86) 45%, rgba(126,197,198,0.58) 100%)',
-    outerBorderColor: 'rgba(220,252,248,0.86)',
-    outerShadow: 'inset 0 1px 0 rgba(255,255,255,0.82), 0 22px 62px rgba(36,127,125,0.17)',
+    outerBackground: 'radial-gradient(circle at 50% 0%, rgba(251,255,255,0.98), rgba(232,250,246,0.92) 46%, rgba(169,221,214,0.54) 100%)',
+    outerBorderColor: 'rgba(235,253,249,0.92)',
+    outerShadow: 'inset 0 1px 0 rgba(255,255,255,0.88), 0 18px 44px rgba(71,160,151,0.12)',
     outerRadius: '2.2rem',
-    haloBackground: 'radial-gradient(circle, rgba(168,243,233,0.5), rgba(168,243,233,0))',
-    neckBackground: 'linear-gradient(90deg, rgba(147,230,218,0.18), rgba(247,255,254,0.78), rgba(147,230,218,0.18))',
-    eyebrowColor: '#5f938d',
-    countColor: '#325b58',
-    chamberBackground: 'linear-gradient(180deg, rgba(242,255,254,0.42), rgba(223,248,244,0.18))',
-    chamberBorderColor: 'rgba(45,212,191,0.35)',
-    chamberShadow: 'inset 0 1px 0 rgba(255,255,255,0.58), inset 0 -18px 30px rgba(13,148,136,0.08)',
+    haloBackground: 'radial-gradient(circle, rgba(182,239,230,0.38), rgba(182,239,230,0))',
+    neckBackground: 'linear-gradient(90deg, rgba(166,233,223,0.14), rgba(249,255,254,0.9), rgba(166,233,223,0.14))',
+    eyebrowColor: '#6c9d97',
+    countColor: '#486b67',
+    chamberBackground: 'linear-gradient(180deg, rgba(247,255,254,0.58), rgba(230,248,244,0.24))',
+    chamberBorderColor: 'rgba(92,208,191,0.24)',
+    chamberShadow: 'inset 0 1px 0 rgba(255,255,255,0.68), inset 0 -14px 26px rgba(58,175,159,0.05)',
     chamberRadius: '2rem',
-    sideHighlight: 'linear-gradient(180deg, rgba(255,255,255,0.55), rgba(255,255,255,0.04))',
-    bottomGlow: 'linear-gradient(180deg, rgba(20,184,166,0), rgba(15,118,110,0.2))',
-    topMist: 'radial-gradient(circle at top, rgba(255,255,255,0.72), rgba(224,250,247,0))',
-    emptyIconColor: '#5bc1b3',
-    emptyTitleColor: '#2c615c',
-    emptyBodyColor: '#537b77',
-    starColor: '#14b8a6',
-    starShadow: 'drop-shadow(0 4px 12px rgba(20,184,166,0.34))',
-    overflowBackground: 'rgba(244,255,254,0.8)',
-    overflowColor: '#335b57'
+    sideHighlight: 'linear-gradient(180deg, rgba(255,255,255,0.66), rgba(255,255,255,0.05))',
+    bottomGlow: 'linear-gradient(180deg, rgba(93,201,185,0), rgba(82,186,171,0.12))',
+    topMist: 'radial-gradient(circle at top, rgba(255,255,255,0.88), rgba(232,250,246,0))',
+    emptyIconColor: '#67bcaf',
+    emptyTitleColor: '#3f6661',
+    emptyBodyColor: '#64837f',
+    starColor: '#59bdae',
+    starShadow: 'drop-shadow(0 4px 12px rgba(89,189,174,0.24))',
+    overflowBackground: 'rgba(247,255,253,0.9)',
+    overflowColor: '#496b67'
   },
   midnight: {
-    outerBackground: 'radial-gradient(circle at 50% 0%, rgba(66,85,150,0.95), rgba(34,43,88,0.92) 40%, rgba(13,18,44,0.96) 100%)',
-    outerBorderColor: 'rgba(129,140,248,0.28)',
-    outerShadow: 'inset 0 1px 0 rgba(196,203,255,0.16), 0 24px 72px rgba(7,11,31,0.45)',
+    outerBackground: 'radial-gradient(circle at 50% 0%, rgba(242,246,255,0.98), rgba(213,223,247,0.9) 46%, rgba(150,171,221,0.6) 100%)',
+    outerBorderColor: 'rgba(226,234,255,0.84)',
+    outerShadow: 'inset 0 1px 0 rgba(255,255,255,0.76), 0 20px 48px rgba(92,112,171,0.18)',
     outerRadius: '1.9rem',
-    haloBackground: 'radial-gradient(circle, rgba(99,102,241,0.45), rgba(99,102,241,0))',
-    neckBackground: 'linear-gradient(90deg, rgba(94,108,196,0.18), rgba(202,214,255,0.72), rgba(94,108,196,0.18))',
-    eyebrowColor: '#c7d2fe',
-    countColor: '#f8fafc',
-    chamberBackground: 'linear-gradient(180deg, rgba(16,24,56,0.52), rgba(8,13,33,0.36))',
-    chamberBorderColor: 'rgba(129,140,248,0.26)',
-    chamberShadow: 'inset 0 1px 0 rgba(191,219,254,0.12), inset 0 -16px 36px rgba(56,78,177,0.12)',
+    haloBackground: 'radial-gradient(circle, rgba(177,191,239,0.34), rgba(177,191,239,0))',
+    neckBackground: 'linear-gradient(90deg, rgba(158,176,229,0.14), rgba(244,247,255,0.92), rgba(158,176,229,0.14))',
+    eyebrowColor: '#798ab8',
+    countColor: '#44516f',
+    chamberBackground: 'linear-gradient(180deg, rgba(244,247,255,0.58), rgba(220,227,247,0.26))',
+    chamberBorderColor: 'rgba(133,154,223,0.24)',
+    chamberShadow: 'inset 0 1px 0 rgba(255,255,255,0.64), inset 0 -14px 28px rgba(99,120,189,0.06)',
     chamberRadius: '1.6rem',
-    sideHighlight: 'linear-gradient(180deg, rgba(194,201,255,0.26), rgba(194,201,255,0.02))',
-    bottomGlow: 'linear-gradient(180deg, rgba(79,70,229,0), rgba(129,140,248,0.24))',
-    topMist: 'radial-gradient(circle at top, rgba(165,180,252,0.32), rgba(30,41,59,0))',
-    emptyIconColor: '#f9d273',
-    emptyTitleColor: '#e2e8f0',
-    emptyBodyColor: '#cbd5e1',
-    starColor: '#fbbf24',
-    starShadow: 'drop-shadow(0 4px 14px rgba(251,191,36,0.38))',
-    overflowBackground: 'rgba(15,23,42,0.74)',
-    overflowColor: '#f8fafc'
+    sideHighlight: 'linear-gradient(180deg, rgba(255,255,255,0.54), rgba(255,255,255,0.04))',
+    bottomGlow: 'linear-gradient(180deg, rgba(124,147,226,0), rgba(130,150,221,0.12))',
+    topMist: 'radial-gradient(circle at top, rgba(255,255,255,0.82), rgba(220,228,248,0))',
+    emptyIconColor: '#d3a75b',
+    emptyTitleColor: '#4e5d7d',
+    emptyBodyColor: '#69768f',
+    starColor: '#e3b35a',
+    starShadow: 'drop-shadow(0 4px 14px rgba(227,179,90,0.26))',
+    overflowBackground: 'rgba(245,247,255,0.92)',
+    overflowColor: '#4c5974'
   },
   blushBloom: {
-    outerBackground: 'radial-gradient(circle at 50% 0%, rgba(255,255,255,0.96), rgba(255,232,239,0.88) 45%, rgba(245,178,194,0.58) 100%)',
-    outerBorderColor: 'rgba(255,255,255,0.72)',
-    outerShadow: 'inset 0 1px 0 rgba(255,255,255,0.84), 0 22px 60px rgba(190,104,132,0.18)',
+    outerBackground: 'radial-gradient(circle at 50% 0%, rgba(255,255,255,0.98), rgba(255,241,246,0.92) 46%, rgba(241,196,210,0.56) 100%)',
+    outerBorderColor: 'rgba(255,255,255,0.84)',
+    outerShadow: 'inset 0 1px 0 rgba(255,255,255,0.9), 0 18px 42px rgba(199,132,155,0.12)',
     outerRadius: '2.35rem',
-    haloBackground: 'radial-gradient(circle, rgba(255,196,217,0.55), rgba(255,196,217,0))',
-    neckBackground: 'linear-gradient(90deg, rgba(255,212,225,0.2), rgba(255,248,250,0.8), rgba(255,212,225,0.2))',
-    eyebrowColor: '#c48196',
-    countColor: '#754d5c',
-    chamberBackground: 'linear-gradient(180deg, rgba(255,255,255,0.42), rgba(255,240,245,0.18))',
-    chamberBorderColor: 'rgba(244,114,182,0.26)',
-    chamberShadow: 'inset 0 1px 0 rgba(255,255,255,0.6), inset 0 -16px 28px rgba(244,114,182,0.08)',
+    haloBackground: 'radial-gradient(circle, rgba(248,204,219,0.38), rgba(248,204,219,0))',
+    neckBackground: 'linear-gradient(90deg, rgba(251,218,229,0.16), rgba(255,249,251,0.92), rgba(251,218,229,0.16))',
+    eyebrowColor: '#bf8799',
+    countColor: '#7d5d69',
+    chamberBackground: 'linear-gradient(180deg, rgba(255,255,255,0.58), rgba(255,243,247,0.24))',
+    chamberBorderColor: 'rgba(232,150,184,0.24)',
+    chamberShadow: 'inset 0 1px 0 rgba(255,255,255,0.7), inset 0 -12px 24px rgba(235,157,188,0.05)',
     chamberRadius: '2.1rem',
-    sideHighlight: 'linear-gradient(180deg, rgba(255,255,255,0.58), rgba(255,255,255,0.03))',
-    bottomGlow: 'linear-gradient(180deg, rgba(244,114,182,0), rgba(236,72,153,0.18))',
-    topMist: 'radial-gradient(circle at top, rgba(255,255,255,0.88), rgba(255,241,245,0))',
-    emptyIconColor: '#f59fbe',
-    emptyTitleColor: '#6f4d59',
-    emptyBodyColor: '#85626f',
-    starColor: '#f472b6',
-    starShadow: 'drop-shadow(0 4px 12px rgba(244,114,182,0.34))',
-    overflowBackground: 'rgba(255,250,252,0.86)',
-    overflowColor: '#6b4c57'
+    sideHighlight: 'linear-gradient(180deg, rgba(255,255,255,0.68), rgba(255,255,255,0.04))',
+    bottomGlow: 'linear-gradient(180deg, rgba(234,168,194,0), rgba(228,160,186,0.12))',
+    topMist: 'radial-gradient(circle at top, rgba(255,255,255,0.94), rgba(255,244,248,0))',
+    emptyIconColor: '#e39bb6',
+    emptyTitleColor: '#755863',
+    emptyBodyColor: '#91707b',
+    starColor: '#e58ead',
+    starShadow: 'drop-shadow(0 4px 12px rgba(229,142,173,0.24))',
+    overflowBackground: 'rgba(255,251,252,0.92)',
+    overflowColor: '#775763'
+  },
+  pearlMist: {
+    outerBackground: 'radial-gradient(circle at 50% 0%, rgba(255,255,255,0.99), rgba(244,245,247,0.94) 48%, rgba(221,225,232,0.6) 100%)',
+    outerBorderColor: 'rgba(255,255,255,0.9)',
+    outerShadow: 'inset 0 1px 0 rgba(255,255,255,0.9), 0 16px 36px rgba(160,168,181,0.12)',
+    outerRadius: '2.15rem',
+    haloBackground: 'radial-gradient(circle, rgba(230,234,240,0.36), rgba(230,234,240,0))',
+    neckBackground: 'linear-gradient(90deg, rgba(223,228,236,0.16), rgba(252,253,255,0.94), rgba(223,228,236,0.16))',
+    eyebrowColor: '#8a919c',
+    countColor: '#616874',
+    chamberBackground: 'linear-gradient(180deg, rgba(255,255,255,0.64), rgba(244,246,249,0.28))',
+    chamberBorderColor: 'rgba(192,199,212,0.26)',
+    chamberShadow: 'inset 0 1px 0 rgba(255,255,255,0.76), inset 0 -12px 24px rgba(169,177,189,0.05)',
+    chamberRadius: '1.95rem',
+    sideHighlight: 'linear-gradient(180deg, rgba(255,255,255,0.72), rgba(255,255,255,0.05))',
+    bottomGlow: 'linear-gradient(180deg, rgba(201,209,221,0), rgba(196,203,214,0.11))',
+    topMist: 'radial-gradient(circle at top, rgba(255,255,255,0.95), rgba(245,247,250,0))',
+    emptyIconColor: '#a8afbb',
+    emptyTitleColor: '#666f7a',
+    emptyBodyColor: '#808892',
+    starColor: '#b3bbc7',
+    starShadow: 'drop-shadow(0 4px 12px rgba(179,187,199,0.24))',
+    overflowBackground: 'rgba(252,253,255,0.94)',
+    overflowColor: '#676f79'
+  },
+  linenCream: {
+    outerBackground: 'radial-gradient(circle at 50% 0%, rgba(255,255,255,0.99), rgba(250,246,238,0.94) 48%, rgba(231,217,193,0.58) 100%)',
+    outerBorderColor: 'rgba(255,255,255,0.88)',
+    outerShadow: 'inset 0 1px 0 rgba(255,255,255,0.9), 0 16px 38px rgba(181,154,114,0.12)',
+    outerRadius: '2.2rem',
+    haloBackground: 'radial-gradient(circle, rgba(240,228,205,0.34), rgba(240,228,205,0))',
+    neckBackground: 'linear-gradient(90deg, rgba(235,220,190,0.14), rgba(255,252,247,0.94), rgba(235,220,190,0.14))',
+    eyebrowColor: '#ae9272',
+    countColor: '#766452',
+    chamberBackground: 'linear-gradient(180deg, rgba(255,255,255,0.62), rgba(250,244,234,0.26))',
+    chamberBorderColor: 'rgba(221,194,149,0.25)',
+    chamberShadow: 'inset 0 1px 0 rgba(255,255,255,0.74), inset 0 -12px 24px rgba(200,171,123,0.05)',
+    chamberRadius: '2rem',
+    sideHighlight: 'linear-gradient(180deg, rgba(255,255,255,0.7), rgba(255,255,255,0.04))',
+    bottomGlow: 'linear-gradient(180deg, rgba(227,205,165,0), rgba(219,195,152,0.11))',
+    topMist: 'radial-gradient(circle at top, rgba(255,255,255,0.95), rgba(252,248,241,0))',
+    emptyIconColor: '#ccaf84',
+    emptyTitleColor: '#746352',
+    emptyBodyColor: '#8d7c6a',
+    starColor: '#d4b27d',
+    starShadow: 'drop-shadow(0 4px 12px rgba(212,178,125,0.22))',
+    overflowBackground: 'rgba(255,253,249,0.94)',
+    overflowColor: '#776452'
+  },
+  mintHaze: {
+    outerBackground: 'radial-gradient(circle at 50% 0%, rgba(255,255,255,0.99), rgba(239,251,246,0.94) 48%, rgba(194,230,214,0.56) 100%)',
+    outerBorderColor: 'rgba(245,255,251,0.9)',
+    outerShadow: 'inset 0 1px 0 rgba(255,255,255,0.9), 0 16px 38px rgba(112,181,153,0.12)',
+    outerRadius: '2.22rem',
+    haloBackground: 'radial-gradient(circle, rgba(205,241,226,0.34), rgba(205,241,226,0))',
+    neckBackground: 'linear-gradient(90deg, rgba(193,233,218,0.14), rgba(250,255,253,0.94), rgba(193,233,218,0.14))',
+    eyebrowColor: '#79a696',
+    countColor: '#56756b',
+    chamberBackground: 'linear-gradient(180deg, rgba(252,255,254,0.64), rgba(233,248,242,0.28))',
+    chamberBorderColor: 'rgba(138,211,183,0.24)',
+    chamberShadow: 'inset 0 1px 0 rgba(255,255,255,0.76), inset 0 -12px 24px rgba(111,194,163,0.05)',
+    chamberRadius: '2rem',
+    sideHighlight: 'linear-gradient(180deg, rgba(255,255,255,0.72), rgba(255,255,255,0.04))',
+    bottomGlow: 'linear-gradient(180deg, rgba(167,220,196,0), rgba(153,213,186,0.11))',
+    topMist: 'radial-gradient(circle at top, rgba(255,255,255,0.95), rgba(241,252,247,0))',
+    emptyIconColor: '#7bc3a8',
+    emptyTitleColor: '#5f7e73',
+    emptyBodyColor: '#77938a',
+    starColor: '#74c4a7',
+    starShadow: 'drop-shadow(0 4px 12px rgba(116,196,167,0.22))',
+    overflowBackground: 'rgba(250,255,253,0.94)',
+    overflowColor: '#5d7b70'
   }
 };
 
@@ -205,14 +317,20 @@ const getStableStarHash = (seed: string): number => {
   return hash;
 };
 
-const getStableStarImagePath = (index: number, styleVariant: AchievementBottleStyle): string | null => {
-  if (STAR_IMAGE_PATHS.length === 0) {
+const getStableStarImagePath = (
+  index: number,
+  styleVariant: AchievementBottleStyle,
+  iconPack: AchievementBottleIconPack
+): string | null => {
+  const imagePaths = STAR_IMAGE_PATHS_BY_PACK[iconPack] || STAR_IMAGE_PATHS_BY_PACK[DEFAULT_ACHIEVEMENT_BOTTLE_ICON_PACK] || [];
+
+  if (imagePaths.length === 0) {
     return null;
   }
 
-  const hash = getStableStarHash(`${styleVariant}:${index}:image`);
+  const hash = getStableStarHash(`${styleVariant}:${iconPack}:${index}:image`);
 
-  return STAR_IMAGE_PATHS[hash % STAR_IMAGE_PATHS.length] || null;
+  return imagePaths[hash % imagePaths.length] || null;
 };
 
 const getStableStarScale = (index: number, styleVariant: AchievementBottleStyle): number => {
@@ -222,11 +340,37 @@ const getStableStarScale = (index: number, styleVariant: AchievementBottleStyle)
   return STAR_SCALE_MIN + ((STAR_SCALE_MAX - STAR_SCALE_MIN) * normalized);
 };
 
+const clamp = (value: number, min: number, max: number): number => (
+  Math.min(max, Math.max(min, value))
+);
+
+const createGravityState = (): GravityState => ({
+  baselineBeta: null,
+  baselineGamma: null,
+  currentX: DEFAULT_GRAVITY.x,
+  currentY: DEFAULT_GRAVITY.y,
+  targetX: DEFAULT_GRAVITY.x,
+  targetY: DEFAULT_GRAVITY.y
+});
+
+const isAndroidTiltSupported = (): boolean => {
+  if (typeof window === 'undefined' || !('DeviceOrientationEvent' in window)) {
+    return false;
+  }
+
+  if (Capacitor.isNativePlatform()) {
+    return Capacitor.getPlatform() === 'android';
+  }
+
+  return /Android/i.test(window.navigator.userAgent);
+};
+
 export const AchievementBottle: React.FC<AchievementBottleProps> = ({
   starCount,
   rebuildToken,
   compact = false,
   styleVariant = DEFAULT_ACHIEVEMENT_BOTTLE_STYLE,
+  iconPack = DEFAULT_ACHIEVEMENT_BOTTLE_ICON_PACK,
   renderMode = 'live'
 }) => {
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -236,8 +380,10 @@ export const AchievementBottle: React.FC<AchievementBottleProps> = ({
   const [dimensions, setDimensions] = useState(EMPTY_DIMENSIONS);
 
   const palette = getPalette(styleVariant);
-  const visibleCount = Math.max(0, Math.min(MAX_VISIBLE_STARS, starCount));
-  const overflowCount = Math.max(0, starCount - visibleCount);
+  const normalizedStarCount = normalizeAchievementStarValue(starCount);
+  const renderableStarCount = getAchievementRenderableStarCount(normalizedStarCount);
+  const visibleCount = Math.max(0, Math.min(MAX_VISIBLE_STARS, renderableStarCount));
+  const overflowCount = Math.max(0, renderableStarCount - visibleCount);
 
   const previewStars = useMemo(() => (
     PREVIEW_STAR_LAYOUTS.slice(0, Math.min(PREVIEW_VISIBLE_STARS, visibleCount))
@@ -285,9 +431,10 @@ export const AchievementBottle: React.FC<AchievementBottleProps> = ({
 
     const engine = Engine.create();
     const runner = Runner.create();
-    engine.gravity.x = 0;
-    engine.gravity.y = 1;
-    engine.gravity.scale = 0.0016;
+    const gravityState = createGravityState();
+    engine.gravity.x = DEFAULT_GRAVITY.x;
+    engine.gravity.y = DEFAULT_GRAVITY.y;
+    engine.gravity.scale = GRAVITY_SCALE;
 
     const wallThickness = 40;
     const width = dimensions.width;
@@ -337,7 +484,56 @@ export const AchievementBottle: React.FC<AchievementBottleProps> = ({
     Runner.run(runner, engine);
     starBodiesRef.current = stars;
 
+    const handleDeviceOrientation = (event: DeviceOrientationEvent) => {
+      if (typeof event.beta !== 'number' || typeof event.gamma !== 'number') {
+        return;
+      }
+
+      const nextBeta = event.beta;
+      const nextGamma = event.gamma;
+
+      if (gravityState.baselineBeta === null || gravityState.baselineGamma === null) {
+        gravityState.baselineBeta = nextBeta;
+        gravityState.baselineGamma = nextGamma;
+        gravityState.targetX = DEFAULT_GRAVITY.x;
+        gravityState.targetY = DEFAULT_GRAVITY.y;
+        return;
+      }
+
+      const deltaBeta = nextBeta - gravityState.baselineBeta;
+      const deltaGamma = nextGamma - gravityState.baselineGamma;
+
+      // Re-anchor to a new neutral hold after large posture changes.
+      if (Math.abs(deltaBeta) > BASELINE_RESET_THRESHOLD || Math.abs(deltaGamma) > BASELINE_RESET_THRESHOLD) {
+        gravityState.baselineBeta = nextBeta;
+        gravityState.baselineGamma = nextGamma;
+        gravityState.targetX = DEFAULT_GRAVITY.x;
+        gravityState.targetY = DEFAULT_GRAVITY.y;
+        return;
+      }
+
+      const normalizedGamma = clamp(deltaGamma / MAX_SENSOR_TILT_DEGREES, -1, 1);
+      const normalizedBeta = clamp(deltaBeta / MAX_SENSOR_TILT_DEGREES, -1, 1);
+
+      gravityState.targetX = normalizedGamma * MAX_GRAVITY_SWAY_X;
+      gravityState.targetY = clamp(
+        DEFAULT_GRAVITY.y + (normalizedBeta * MAX_GRAVITY_SWAY_Y),
+        MIN_GRAVITY_Y,
+        MAX_GRAVITY_Y
+      );
+    };
+
+    if (isAndroidTiltSupported()) {
+      window.addEventListener('deviceorientation', handleDeviceOrientation, true);
+    }
+
     const tick = () => {
+      gravityState.currentX += (gravityState.targetX - gravityState.currentX) * GRAVITY_SMOOTHING;
+      gravityState.currentY += (gravityState.targetY - gravityState.currentY) * GRAVITY_SMOOTHING;
+      engine.gravity.x = gravityState.currentX;
+      engine.gravity.y = gravityState.currentY;
+      engine.gravity.scale = GRAVITY_SCALE;
+
       starBodiesRef.current.forEach((body, index) => {
         const node = starNodeRefs.current[index];
         if (!node) {
@@ -357,6 +553,10 @@ export const AchievementBottle: React.FC<AchievementBottleProps> = ({
     return () => {
       if (frameRef.current) {
         window.cancelAnimationFrame(frameRef.current);
+      }
+
+      if (isAndroidTiltSupported()) {
+        window.removeEventListener('deviceorientation', handleDeviceOrientation, true);
       }
 
       Runner.stop(runner);
@@ -405,7 +605,7 @@ export const AchievementBottle: React.FC<AchievementBottleProps> = ({
             className="mt-1 text-[1.85rem] font-semibold leading-none tracking-[-0.045em]"
             style={{ color: palette.countColor }}
           >
-            {starCount}
+            {formatAchievementStars(normalizedStarCount)}
           </div>
         </div>
       </div>
@@ -450,13 +650,13 @@ export const AchievementBottle: React.FC<AchievementBottleProps> = ({
 
             {renderMode === 'preview'
               ? previewStars.map((star, index) => {
-                const imagePath = getStableStarImagePath(index, styleVariant);
+                const imagePath = getStableStarImagePath(index, styleVariant, iconPack);
                 const starScale = getStableStarScale(index, styleVariant);
                 const starImageSize = STAR_IMAGE_SIZE * starScale;
 
                 return (
                   <div
-                    key={`preview-star-${styleVariant}-${index}`}
+                    key={`preview-star-${styleVariant}-${iconPack}-${index}`}
                     className="pointer-events-none absolute flex h-9 w-9 items-center justify-center"
                     style={{
                       left: star.left,
@@ -490,7 +690,7 @@ export const AchievementBottle: React.FC<AchievementBottleProps> = ({
                 );
               })
               : Array.from({ length: visibleCount }, (_, index) => {
-                const imagePath = getStableStarImagePath(index, styleVariant);
+                const imagePath = getStableStarImagePath(index, styleVariant, iconPack);
                 const starScale = getStableStarScale(index, styleVariant);
                 const starImageSize = STAR_IMAGE_SIZE * starScale;
 

@@ -1,12 +1,13 @@
 /**
  * @file AchievementRecordsTab.tsx
- * @description Minimal ledger-style daily snapshot list with modal-based detail view and redemption record history.
+ * @description Minimal ledger-style daily snapshot list with modal-based detail view and one-decimal achievement star values.
  */
 import React, { useMemo, useState } from 'react';
 import { ChevronRight, Trash2 } from 'lucide-react';
 import { AchievementDailySnapshot, AchievementRedemptionRecord } from '../../types';
 import { formatRelativeTime, getLocalDateTimeStr } from '../../utils/dateUtils';
 import { AchievementDialog } from './AchievementDialog';
+import { formatAchievementSignedStars, formatAchievementStars } from '../../utils/achievementUtils';
 
 interface AchievementRecordsTabProps {
   snapshots: AchievementDailySnapshot[];
@@ -62,7 +63,7 @@ export const AchievementRecordsTab: React.FC<AchievementRecordsTabProps> = ({
                   </div>
                   <div className="flex items-center gap-3">
                     <span className="text-[1.2rem] leading-none text-stone-900">
-                      {snapshot.netDelta >= 0 ? `+${snapshot.netDelta}` : snapshot.netDelta}
+                      {formatAchievementSignedStars(snapshot.netDelta)}
                     </span>
                     <ChevronRight size={16} className="text-stone-300" />
                   </div>
@@ -90,7 +91,7 @@ export const AchievementRecordsTab: React.FC<AchievementRecordsTabProps> = ({
                   <div className="min-w-0 flex-1">
                     <div className="text-[16px] leading-none text-stone-900">{record.rewardName}</div>
                     <div className="mt-[6px] text-[13px] leading-6 text-stone-500">
-                      花费 {record.cost} 光点 · {formatRelativeTime(record.redeemedAt)} · {getLocalDateTimeStr(new Date(record.redeemedAt))}
+                      花费 {formatAchievementStars(record.cost)} 光点 · {formatRelativeTime(record.redeemedAt)} · {getLocalDateTimeStr(new Date(record.redeemedAt))}
                     </div>
                   </div>
                   <button
@@ -111,7 +112,7 @@ export const AchievementRecordsTab: React.FC<AchievementRecordsTabProps> = ({
       <AchievementDialog
         isOpen={!!selectedSnapshot}
         title={selectedSnapshot?.date || '记录详情'}
-        subtitle={selectedSnapshot ? `净变化 ${selectedSnapshot.netDelta >= 0 ? `+${selectedSnapshot.netDelta}` : selectedSnapshot.netDelta}` : undefined}
+        subtitle={selectedSnapshot ? `净变化 ${formatAchievementSignedStars(selectedSnapshot.netDelta)}` : undefined}
         onClose={() => setSelectedSnapshotId(null)}
       >
         {selectedSnapshot?.ruleBreakdown.length ? (
@@ -121,13 +122,13 @@ export const AchievementRecordsTab: React.FC<AchievementRecordsTabProps> = ({
                 <div className="flex items-center justify-between gap-4">
                   <div className="text-[1rem] text-stone-900">{item.ruleName}</div>
                   <div className="text-[1rem] text-stone-900">
-                    {item.delta >= 0 ? `+${item.delta}` : item.delta}
+                    {formatAchievementSignedStars(item.delta)}
                   </div>
                 </div>
                 <div className="mt-2 text-sm leading-7 text-stone-500">
                   {item.targetType === 'activity' || item.targetType === 'scope'
-                    ? `${item.matchedValue} 分钟，按每 ${item.unitAmount} 分钟 ${item.effectType === 'earn' ? '+' : '-'}${item.deltaPerUnit} 光点，触发 ${item.appliedUnits} 次。`
-                    : `${item.matchedValue} 项，按每 ${item.unitAmount} 项 ${item.effectType === 'earn' ? '+' : '-'}${item.deltaPerUnit} 光点，触发 ${item.appliedUnits} 次。`}
+                    ? `${item.matchedValue} 分钟，按每 ${item.unitAmount} 分钟 ${formatAchievementSignedStars(item.effectType === 'earn' ? item.deltaPerUnit : -item.deltaPerUnit)} 光点，折算 ${formatAchievementStars(item.appliedUnits)} 单位。`
+                    : `${item.matchedValue} 项，按每 ${item.unitAmount} 项 ${formatAchievementSignedStars(item.effectType === 'earn' ? item.deltaPerUnit : -item.deltaPerUnit)} 光点，折算 ${formatAchievementStars(item.appliedUnits)} 单位。`}
                 </div>
               </div>
             ))}

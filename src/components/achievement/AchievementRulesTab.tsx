@@ -1,6 +1,6 @@
 /**
  * @file AchievementRulesTab.tsx
- * @description Achievement rule list and modal editor, reusing the shared multi-tag selector for target activity picking.
+ * @description Achievement rule list and modal editor, reusing the shared multi-tag selector for target activity picking and decimal-safe star deltas.
  */
 import React, { useEffect, useMemo, useState } from 'react';
 import { ChevronRight, Plus } from 'lucide-react';
@@ -8,6 +8,7 @@ import { AchievementRule, Category, CheckTemplate, Scope, TodoCategory } from '.
 import { AchievementDialog } from './AchievementDialog';
 import { TagMultipleAssociation } from '../TagMultipleAssociation';
 import { IconRenderer } from '../IconRenderer';
+import { formatAchievementStars, formatAchievementSignedStars } from '../../utils/achievementUtils';
 
 interface AchievementRulesTabProps {
   categories: Category[];
@@ -313,12 +314,12 @@ export const AchievementRulesTab: React.FC<AchievementRulesTabProps> = ({
 
             const summaryText = (() => {
               if (rule.targetType === 'activity' || rule.targetType === 'scope') {
-                return `每 ${rule.unitAmount} 分钟 ${rule.effectType === 'earn' ? '+' : '-'}${rule.deltaPerUnit} 光点`;
+                return `每 ${rule.unitAmount} 分钟 ${formatAchievementSignedStars(rule.effectType === 'earn' ? rule.deltaPerUnit : -rule.deltaPerUnit)} 光点`;
               }
               if (rule.targetType === 'todoCategory') {
-                return `每完成 1 项 ${rule.effectType === 'earn' ? '+' : '-'}${rule.deltaPerUnit} 光点`;
+                return `每完成 1 项 ${formatAchievementSignedStars(rule.effectType === 'earn' ? rule.deltaPerUnit : -rule.deltaPerUnit)} 光点`;
               }
-              return `每完成 1 项 ${rule.effectType === 'earn' ? '+' : '-'}${rule.deltaPerUnit} 光点`;
+              return `每完成 1 项 ${formatAchievementSignedStars(rule.effectType === 'earn' ? rule.deltaPerUnit : -rule.deltaPerUnit)} 光点`;
             })();
 
             return (
@@ -479,11 +480,13 @@ export const AchievementRulesTab: React.FC<AchievementRulesTabProps> = ({
               <span className="text-[11px] uppercase tracking-[0.14em] text-stone-400">每次变化</span>
               <input
                 type="number"
-                min={1}
+                min={0.1}
+                step={0.1}
                 value={draft.deltaPerUnit}
                 onChange={(event) => setDraft((previous) => ({ ...previous, deltaPerUnit: Number(event.target.value) || 1 }))}
                 className="mt-2 w-full border-b border-stone-300 bg-transparent px-0 py-2 text-[1rem] text-stone-900 outline-none focus:border-stone-900"
               />
+              <div className="mt-2 text-xs text-stone-400">Current: {formatAchievementStars(draft.deltaPerUnit)} 光点</div>
             </label>
           </div>
 

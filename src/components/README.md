@@ -67,6 +67,10 @@ Components for theme and appearance customization.
 - `UIIconSelector.tsx`: UI 图标主题选择器
 - `PresetEditModal.tsx`: 主题预设编辑弹窗
 
+ - `achievement/AchievementBottleIconPackSelector.tsx`: 投喂页中切换成就瓶图标资源包的下拉选择器，与瓶身样式独立保存。
+
+- `achievement/AchievementBottleStyleSelector.tsx`: 投喂页中切换成就瓶瓶身样式的下拉选择器，当前包含更浅的暖金、海盐、藏蓝、雾粉，以及新增的灰白、奶霜、薄荷系。
+
 ## Recently Added (2026-02)
 - `UiThemeButton.tsx`: 新增 - 从 SponsorshipView 中提取的可复用主题按钮组件
 - `TimePalSettings.tsx`: 新增 - 从 SponsorshipView 中提取的时光小友设置组件

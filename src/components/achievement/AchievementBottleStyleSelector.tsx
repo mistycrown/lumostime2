@@ -24,7 +24,7 @@ export const AchievementBottleStyleSelector: React.FC = () => {
       <div className="flex items-center justify-between p-4 relative">
         <div>
           <h4 className="font-bold text-stone-700">成就瓶样式</h4>
-          <p className="text-xs text-stone-400 mt-1">用于成就页成就瓶的瓶身视觉风格。</p>
+          <p className="text-xs text-stone-400 mt-1">用于切换成就页成就瓶的瓶身配色与玻璃气质。</p>
         </div>
 
         <div className="relative">

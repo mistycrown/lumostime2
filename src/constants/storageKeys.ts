@@ -40,6 +40,7 @@ export const THEME_KEYS = {
     TIMELINE_STYLE_THEME: 'lumostime_timeline_style_theme',
     TIMELINE_STYLE_CONFIGS: 'lumostime_timeline_style_configs',
     ACHIEVEMENT_BOTTLE_STYLE: 'lumostime_achievement_bottle_style',
+    ACHIEVEMENT_BOTTLE_ICON_PACK: 'lumostime_achievement_bottle_icon_pack',
     /** 自定义色组 */
     CUSTOM_COLOR_GROUP: 'lumostime_custom_color_group',
     /** 当前背景 */

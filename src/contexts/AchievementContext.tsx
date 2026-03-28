@@ -1,7 +1,7 @@
 /**
  * @file AchievementContext.tsx
  * @description Manages achievement bottle data, daily snapshots, rewards, and redemption records with repository hydration and selective recent-day recomputation.
- * @updated 2026-03-28: Keep the context instance stable across Fast Refresh so updated consumers still connect to the mounted provider.
+ * @updated 2026-03-28: Allow achievement balances and reward costs to keep one decimal place while preserving integer-based trigger units.
  */
 import React, { createContext, ReactNode, useContext, useEffect, useRef, useState } from 'react';
 import { dataRepository } from '../repositories/dataRepository';
@@ -19,6 +19,7 @@ import {
   computeAchievementDailySnapshot,
   enumerateAchievementDates,
   getAchievementYesterday,
+  normalizeAchievementStarValue,
   normalizeAchievementRule,
   normalizeAchievementSnapshot,
   sortAchievementSnapshots
@@ -118,9 +119,15 @@ export const AchievementProvider: React.FC<{ children: ReactNode }> = ({ childre
         hydratedSuccessfully = true;
         setMeta(snapshot.meta);
         setRules(snapshot.rules.map(normalizeAchievementRule));
-        setRewards(snapshot.rewards);
+        setRewards(snapshot.rewards.map((reward) => ({
+          ...reward,
+          cost: Math.max(0.1, normalizeAchievementStarValue(reward.cost || 0.1))
+        })));
         setDailySnapshots(sortAchievementSnapshots(snapshot.dailySnapshots.map(normalizeAchievementSnapshot)));
-        setRedemptionRecords(snapshot.redemptionRecords);
+        setRedemptionRecords(snapshot.redemptionRecords.map((record) => ({
+          ...record,
+          cost: Math.max(0.1, normalizeAchievementStarValue(record.cost || 0.1))
+        })));
       } catch (error) {
         console.error('[AchievementContext] Failed to hydrate achievement data', error);
       } finally {
@@ -192,7 +199,7 @@ export const AchievementProvider: React.FC<{ children: ReactNode }> = ({ childre
       targetType: input.targetType,
       targetIds: input.targetIds,
       unitAmount: Math.max(1, Math.floor(input.unitAmount)),
-      deltaPerUnit: Math.max(1, Math.floor(input.deltaPerUnit)),
+      deltaPerUnit: Math.max(0.1, normalizeAchievementStarValue(input.deltaPerUnit || 0.1)),
       roundingMode: 'floor',
       note: input.note?.trim() || undefined,
       createdAt: now,
@@ -214,7 +221,7 @@ export const AchievementProvider: React.FC<{ children: ReactNode }> = ({ childre
           ...rule,
           name: rule.name.trim() || '未命名规则',
           unitAmount: Math.max(1, Math.floor(rule.unitAmount)),
-          deltaPerUnit: Math.max(1, Math.floor(rule.deltaPerUnit)),
+          deltaPerUnit: Math.max(0.1, normalizeAchievementStarValue(rule.deltaPerUnit || 0.1)),
           updatedAt: Date.now()
         }
         : item
@@ -241,7 +248,7 @@ export const AchievementProvider: React.FC<{ children: ReactNode }> = ({ childre
     const nextReward: AchievementReward = {
       id: crypto.randomUUID(),
       name: input.name.trim() || '未命名奖励',
-      cost: Math.max(1, Math.floor(input.cost)),
+      cost: Math.max(0.1, normalizeAchievementStarValue(input.cost || 0.1)),
       description: input.description?.trim() || undefined,
       icon: input.icon?.trim() || undefined,
       enabled: true,
@@ -258,7 +265,7 @@ export const AchievementProvider: React.FC<{ children: ReactNode }> = ({ childre
         ? {
           ...reward,
           name: reward.name.trim() || '未命名奖励',
-          cost: Math.max(1, Math.floor(reward.cost)),
+          cost: Math.max(0.1, normalizeAchievementStarValue(reward.cost || 0.1)),
           updatedAt: Date.now()
         }
         : item
@@ -271,7 +278,9 @@ export const AchievementProvider: React.FC<{ children: ReactNode }> = ({ childre
 
   const redeemReward = (reward: AchievementReward, note?: string) => {
     const currentAvailableStars = calculateAchievementAvailableStars(dailySnapshots, redemptionRecords);
-    if (currentAvailableStars < reward.cost) {
+    const normalizedRewardCost = Math.max(0.1, normalizeAchievementStarValue(reward.cost || 0.1));
+
+    if (currentAvailableStars < normalizedRewardCost) {
       return {
         ok: false,
         message: '当前光点不足，暂时无法兑换'
@@ -282,7 +291,7 @@ export const AchievementProvider: React.FC<{ children: ReactNode }> = ({ childre
       id: crypto.randomUUID(),
       rewardId: reward.id,
       rewardName: reward.name,
-      cost: reward.cost,
+      cost: normalizedRewardCost,
       redeemedAt: Date.now(),
       note: note?.trim() || undefined
     };
