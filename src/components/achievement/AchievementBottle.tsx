@@ -81,14 +81,14 @@ const STAR_SCALE_MIN = 0.92;
 const STAR_SCALE_MAX = 1.08;
 const BOTTLE_PADDING = 16;
 const EMPTY_DIMENSIONS = { width: 0, height: 0 };
-const DEFAULT_GRAVITY = { x: 0, y: 1 };
+const DEFAULT_GRAVITY = { x: 0, y: 0.55 };
 const GRAVITY_SCALE = 0.0016;
 const GRAVITY_SMOOTHING = 0.12;
 const MAX_SENSOR_TILT_DEGREES = 32;
 const MAX_GRAVITY_SWAY_X = 0.78;
-const MAX_GRAVITY_SWAY_Y = 0.24;
-const MIN_GRAVITY_Y = 0.64;
-const MAX_GRAVITY_Y = 1.16;
+const MAX_GRAVITY_SWAY_Y = 1.24;
+const MIN_GRAVITY_Y = -0.92;
+const MAX_GRAVITY_Y = 1.48;
 const BASELINE_RESET_THRESHOLD = 58;
 const STAR_IMAGE_PATH_ENTRIES = Object.entries(
   import.meta.glob<string>(
@@ -516,6 +516,8 @@ export const AchievementBottle: React.FC<AchievementBottleProps> = ({
       const normalizedBeta = clamp(deltaBeta / MAX_SENSOR_TILT_DEGREES, -1, 1);
 
       gravityState.targetX = normalizedGamma * MAX_GRAVITY_SWAY_X;
+      // Keep a mild settling bias at rest, but allow front/back tilt to reverse
+      // the vertical pull so stars can visibly drift toward the bottle top.
       gravityState.targetY = clamp(
         DEFAULT_GRAVITY.y + (normalizedBeta * MAX_GRAVITY_SWAY_Y),
         MIN_GRAVITY_Y,
