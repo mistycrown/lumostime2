@@ -41,6 +41,16 @@ const createEmptyDraft = (): RuleDraft => ({
   note: ''
 });
 
+const isSameRuleDraft = (left: RuleDraft, right: RuleDraft) => (
+  left.name === right.name &&
+  left.effectType === right.effectType &&
+  left.unitMinutes === right.unitMinutes &&
+  left.deltaPerUnit === right.deltaPerUnit &&
+  left.note === right.note &&
+  left.targetIds.length === right.targetIds.length &&
+  left.targetIds.every((targetId, index) => targetId === right.targetIds[index])
+);
+
 const collectActivityOptions = (categories: Category[]) => categories.flatMap((category) => (
   category.activities.map((activity) => ({
     categoryId: category.id,
@@ -66,19 +76,21 @@ export const AchievementRulesTab: React.FC<AchievementRulesTabProps> = ({
 
   useEffect(() => {
     if (dialogMode === 'edit' && selectedRule) {
-      setDraft({
+      const nextDraft = {
         name: selectedRule.name,
         effectType: selectedRule.effectType,
         targetIds: selectedRule.targetIds,
         unitMinutes: selectedRule.unitMinutes,
         deltaPerUnit: selectedRule.deltaPerUnit,
         note: selectedRule.note || ''
-      });
+      };
+      setDraft((previous) => (isSameRuleDraft(previous, nextDraft) ? previous : nextDraft));
       return;
     }
 
     if (dialogMode === 'create') {
-      setDraft(createEmptyDraft());
+      const nextDraft = createEmptyDraft();
+      setDraft((previous) => (isSameRuleDraft(previous, nextDraft) ? previous : nextDraft));
     }
   }, [dialogMode, selectedRule]);
 
@@ -182,7 +194,6 @@ export const AchievementRulesTab: React.FC<AchievementRulesTabProps> = ({
       <AchievementDialog
         isOpen={isDialogOpen}
         title={dialogMode === 'create' ? '新增规则' : (selectedRule?.name || '编辑规则')}
-        subtitle={dialogMode === 'create' ? '规则修改不追溯历史快照，只影响今天和昨天。' : undefined}
         onClose={closeDialog}
         footer={(
           <div className="flex items-center justify-between gap-3">

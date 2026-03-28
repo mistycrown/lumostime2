@@ -2,7 +2,7 @@
  * @file AchievementBottle.tsx
  * @description Physics-driven achievement bottle visualization with compact header mode and stable star rendering.
  *
- * @updated 2026-03-28: Prevented resize-driven render loops, replaced corrupted glyph stars with Lucide icons, refined the bottle header into a centered single-focus display, and persisted settled star poses across expand/collapse remounts.
+ * @updated 2026-03-28: Prevented resize-driven render loops, replaced corrupted glyph stars with Lucide icons, and refined the bottle header into a centered single-focus display.
  */
 import React, { useEffect, useRef, useState } from 'react';
 import { Bodies, Body, Composite, Engine, Runner, World } from 'matter-js';
@@ -14,19 +14,10 @@ interface AchievementBottleProps {
   compact?: boolean;
 }
 
-interface CachedStarPose {
-  angle: number;
-  xRatio: number;
-  yRatio: number;
-}
-
 const MAX_VISIBLE_STARS = 120;
 const STAR_SIZE = 26;
 const BOTTLE_PADDING = 16;
 const EMPTY_DIMENSIONS = { width: 0, height: 0 };
-let cachedStarPoses: CachedStarPose[] = [];
-
-const clamp = (value: number, min: number, max: number) => Math.min(Math.max(value, min), max);
 
 export const AchievementBottle: React.FC<AchievementBottleProps> = ({
   starCount,
@@ -95,12 +86,6 @@ export const AchievementBottle: React.FC<AchievementBottleProps> = ({
     const rightWallX = width - BOTTLE_PADDING + (wallThickness / 2);
     const floorY = height - BOTTLE_PADDING + (wallThickness / 2);
     const ceilingY = BOTTLE_PADDING - (wallThickness / 2);
-    const innerMinX = BOTTLE_PADDING + (STAR_SIZE / 2) - 2;
-    const innerMaxX = width - BOTTLE_PADDING - (STAR_SIZE / 2) + 2;
-    const innerMinY = BOTTLE_PADDING + (STAR_SIZE / 2);
-    const innerMaxY = height - BOTTLE_PADDING - (STAR_SIZE / 2);
-    const usableWidth = Math.max(1, innerMaxX - innerMinX);
-    const usableHeight = Math.max(1, innerMaxY - innerMinY);
 
     const boundaries = [
       Bodies.rectangle(width / 2, floorY, width - (BOTTLE_PADDING * 2), wallThickness, { isStatic: true, restitution: 0.2 }),
@@ -110,18 +95,15 @@ export const AchievementBottle: React.FC<AchievementBottleProps> = ({
     ];
 
     const stars = Array.from({ length: visibleCount }, (_, index) => {
-      const cachedPose = cachedStarPoses[index];
+      const innerMinX = BOTTLE_PADDING + (STAR_SIZE / 2) - 2;
+      const innerMaxX = width - BOTTLE_PADDING - (STAR_SIZE / 2) + 2;
       const spreadWidth = Math.max(0, innerMaxX - innerMinX);
       const normalizedX = visibleCount <= 1 ? 0.5 : (index / (visibleCount - 1));
       const baseX = innerMinX + (spreadWidth * normalizedX);
       const jitterLimit = Math.min(22, spreadWidth / Math.max(3, visibleCount * 1.35));
-      const spawnX = cachedPose
-        ? clamp(innerMinX + (cachedPose.xRatio * usableWidth), innerMinX, innerMaxX)
-        : Math.max(innerMinX, Math.min(innerMaxX, baseX + ((Math.random() - 0.5) * jitterLimit * 2)));
+      const spawnX = Math.max(innerMinX, Math.min(innerMaxX, baseX + ((Math.random() - 0.5) * jitterLimit * 2)));
       const laneCount = Math.max(4, Math.floor(width / 64));
-      const spawnY = cachedPose
-        ? clamp(innerMinY + (cachedPose.yRatio * usableHeight), innerMinY, innerMaxY)
-        : BOTTLE_PADDING + 8 + (Math.floor(index / laneCount) * 20) + (Math.random() * 28);
+      const spawnY = BOTTLE_PADDING + 8 + (Math.floor(index / laneCount) * 20) + (Math.random() * 28);
 
       const star = Bodies.circle(spawnX, spawnY, STAR_SIZE / 2, {
         restitution: 0.48,
@@ -131,17 +113,11 @@ export const AchievementBottle: React.FC<AchievementBottleProps> = ({
         chamfer: { radius: 8 }
       });
 
-      if (cachedPose) {
-        Body.setAngle(star, cachedPose.angle);
-        Body.setVelocity(star, { x: 0, y: 0 });
-        Body.setAngularVelocity(star, 0);
-      } else {
-        Body.setVelocity(star, {
-          x: (Math.random() - 0.5) * 3.8,
-          y: Math.random() * 0.9
-        });
-        Body.setAngularVelocity(star, (Math.random() - 0.5) * 0.16);
-      }
+      Body.setVelocity(star, {
+        x: (Math.random() - 0.5) * 3.8,
+        y: Math.random() * 0.9
+      });
+      Body.setAngularVelocity(star, (Math.random() - 0.5) * 0.16);
       return star;
     });
 
@@ -167,12 +143,6 @@ export const AchievementBottle: React.FC<AchievementBottleProps> = ({
     frameRef.current = window.requestAnimationFrame(tick);
 
     return () => {
-      cachedStarPoses = starBodiesRef.current.slice(0, visibleCount).map((body) => ({
-        angle: body.angle,
-        xRatio: usableWidth <= 0 ? 0.5 : (clamp(body.position.x, innerMinX, innerMaxX) - innerMinX) / usableWidth,
-        yRatio: usableHeight <= 0 ? 1 : (clamp(body.position.y, innerMinY, innerMaxY) - innerMinY) / usableHeight
-      }));
-
       if (frameRef.current) {
         window.cancelAnimationFrame(frameRef.current);
       }

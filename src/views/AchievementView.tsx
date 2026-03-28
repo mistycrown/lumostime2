@@ -50,14 +50,16 @@ export const AchievementView: React.FC = () => {
   const [isDetailExpanded, setIsDetailExpanded] = useState(false);
   const [pendingTab, setPendingTab] = useState<AchievementTab | null>(null);
   const [isDetailContentVisible, setIsDetailContentVisible] = useState(false);
+  const [hasEnsuredSnapshots, setHasEnsuredSnapshots] = useState(false);
 
   useEffect(() => {
-    if (!isReady) {
+    if (!isReady || hasEnsuredSnapshots) {
       return;
     }
 
+    setHasEnsuredSnapshots(true);
     void ensureRecentSnapshots();
-  }, [ensureRecentSnapshots, isReady]);
+  }, [ensureRecentSnapshots, hasEnsuredSnapshots, isReady]);
 
   useEffect(() => {
     let timer: number | null = null;
@@ -148,19 +150,26 @@ export const AchievementView: React.FC = () => {
   ]);
 
   return (
-    <div className="flex h-full flex-col overflow-hidden bg-[#faf9f6] text-stone-900">
-      {!isDetailExpanded && (
-        <section className="min-h-0 flex-1 px-4 pb-3 pt-4">
-          <AchievementBottle
-            starCount={availableStars}
-            rebuildToken={availableStars}
-            compact={false}
-          />
-        </section>
-      )}
+    <div className="relative flex h-full flex-col overflow-hidden bg-[#faf9f6] text-stone-900">
+      <section
+        className={`pointer-events-none absolute inset-x-0 top-0 px-4 pb-3 pt-4 transition-all ${
+          isDetailExpanded ? 'translate-y-2 opacity-0' : 'translate-y-0 opacity-100'
+        }`}
+        style={{
+          bottom: COLLAPSED_DETAIL_HEIGHT,
+          transitionDuration: `${DETAIL_EXPAND_DURATION_MS}ms`
+        }}
+        aria-hidden={isDetailExpanded}
+      >
+        <AchievementBottle
+          starCount={availableStars}
+          rebuildToken={availableStars}
+          compact={false}
+        />
+      </section>
 
       <section
-        className={`border-stone-200/80 bg-[#fdfbf7] transition-all duration-300 ease-out ${
+        className={`relative z-10 mt-auto border-stone-200/80 bg-[#fdfbf7] transition-all duration-300 ease-out ${
           isDetailExpanded ? 'min-h-0 flex flex-1 flex-col border-t-0' : 'shrink-0 border-t'
         }`}
         style={{
