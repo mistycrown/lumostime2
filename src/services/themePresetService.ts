@@ -26,6 +26,7 @@ import { ThemePreset } from '../hooks/useCustomPresets';
 import { THEME_KEYS, TIMEPAL_KEYS, storage } from '../constants/storageKeys';
 import { backgroundService } from './backgroundService';
 import { navigationDecorationService } from './navigationDecorationService';
+import { DEFAULT_ACHIEVEMENT_BOTTLE_STYLE, type AchievementBottleStyle } from './achievementBottleStyleService';
 
 export interface ThemeApplyResult {
     success: boolean;
@@ -86,6 +87,14 @@ export class ThemePresetService {
     /**
      * 保存当前预设 ID
      */
+    static async applyAchievementBottleStyle(
+        bottleStyle: AchievementBottleStyle,
+        setAchievementBottleStyle: (style: AchievementBottleStyle) => void
+    ): Promise<void> {
+        console.log('[ThemePresetService] 应用成就瓶样式:', bottleStyle);
+        setAchievementBottleStyle(bottleStyle);
+    }
+
     static saveCurrentPreset(presetId: string, setCurrentPresetId: (id: string) => void): void {
         console.log('[ThemePresetService] 保存当前预设:', presetId);
         storage.set(THEME_KEYS.CURRENT_PRESET, presetId);
@@ -157,6 +166,7 @@ export class ThemePresetService {
         oldTheme: string,
         setUiIconTheme: (theme: string) => void,
         setColorScheme: (scheme: string) => void,
+        setAchievementBottleStyle: (style: AchievementBottleStyle) => void,
         setCurrentPresetId: (id: string) => void
     ): Promise<ThemeApplyResult> {
         try {
@@ -176,6 +186,10 @@ export class ThemePresetService {
             
             // 5. 应用时光小友
             await this.applyTimePal(preset.timePal);
+            await this.applyAchievementBottleStyle(
+                preset.achievementBottleStyle || DEFAULT_ACHIEVEMENT_BOTTLE_STYLE,
+                setAchievementBottleStyle
+            );
             
             // 6. 保存当前预设
             this.saveCurrentPreset(preset.id, setCurrentPresetId);

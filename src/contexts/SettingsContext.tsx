@@ -16,6 +16,10 @@ import {
     isTimelineStyleTheme,
     normalizeTimelineStyleConfigs
 } from '../services/timelineStyleService';
+import {
+    AchievementBottleStyle,
+    DEFAULT_ACHIEVEMENT_BOTTLE_STYLE
+} from '../services/achievementBottleStyleService';
 import { normalizeFiltersOrder } from '../utils/filterUtils';
 import {
     getLocalDataTimestamp,
@@ -90,6 +94,8 @@ interface SettingsContextType {
     scheduleStyle: ScheduleStyle;
     scheduleStyle: ScheduleStyle;
     setScheduleStyle: React.Dispatch<React.SetStateAction<ScheduleStyle>>;
+    achievementBottleStyle: AchievementBottleStyle;
+    setAchievementBottleStyle: React.Dispatch<React.SetStateAction<AchievementBottleStyle>>;
 
     timelineStyleTheme: TimelineStyleTheme;
     setTimelineStyleTheme: React.Dispatch<React.SetStateAction<TimelineStyleTheme>>;
@@ -380,6 +386,19 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
         return 'default';
     });
 
+    const [achievementBottleStyle, setAchievementBottleStyle] = useState<AchievementBottleStyle>(() => {
+        const stored = localStorage.getItem(THEME_KEYS.ACHIEVEMENT_BOTTLE_STYLE);
+        if (
+            stored === 'sunlit'
+            || stored === 'seaGlass'
+            || stored === 'midnight'
+            || stored === 'blushBloom'
+        ) {
+            return stored;
+        }
+        return DEFAULT_ACHIEVEMENT_BOTTLE_STYLE;
+    });
+
     const [timelineStyleTheme, setTimelineStyleTheme] = useState<TimelineStyleTheme>(() => {
         const stored = localStorage.getItem(THEME_KEYS.TIMELINE_STYLE_THEME);
         return isTimelineStyleTheme(stored) ? stored : DEFAULT_TIMELINE_STYLE_THEME;
@@ -432,6 +451,10 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
     useEffect(() => {
         localStorage.setItem(THEME_KEYS.SCHEDULE_STYLE, scheduleStyle);
     }, [scheduleStyle]);
+
+    useEffect(() => {
+        localStorage.setItem(THEME_KEYS.ACHIEVEMENT_BOTTLE_STYLE, achievementBottleStyle);
+    }, [achievementBottleStyle]);
 
     useEffect(() => {
         localStorage.setItem(THEME_KEYS.TIMELINE_STYLE_THEME, timelineStyleTheme);
@@ -535,6 +558,8 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
             setFontFamily,
             scheduleStyle,
             setScheduleStyle,
+            achievementBottleStyle,
+            setAchievementBottleStyle,
             timelineStyleTheme,
             setTimelineStyleTheme,
             timelineStyleConfigs,
