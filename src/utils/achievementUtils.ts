@@ -12,7 +12,9 @@ import {
   AchievementDailyRuleBreakdown,
   AchievementRedemptionRecord,
   AchievementRule,
-  Log
+  DailyReview,
+  Log,
+  TodoItem
 } from '../types';
 import { getLocalDateStr } from './dateUtils';
 
@@ -22,6 +24,40 @@ const createDateAtNoon = (dateStr: string): Date => {
   const [year, month, day] = dateStr.split('-').map(Number);
   return new Date(year, (month || 1) - 1, day || 1, 12, 0, 0, 0);
 };
+
+const normalizeUnitAmount = (rule: AchievementRule | (AchievementRule & { unitMinutes?: number })): number => {
+  return Math.max(1, Math.floor(rule.unitAmount ?? rule.unitMinutes ?? 1));
+};
+
+export const normalizeAchievementRule = (
+  rule: AchievementRule | (AchievementRule & { unitMinutes?: number; targetType?: AchievementRule['targetType'] })
+): AchievementRule => ({
+  ...rule,
+  targetType: rule.targetType ?? 'activity',
+  unitAmount: normalizeUnitAmount(rule),
+  deltaPerUnit: Math.max(1, Math.floor(rule.deltaPerUnit || 1)),
+  targetIds: Array.isArray(rule.targetIds) ? rule.targetIds : []
+});
+
+export const normalizeAchievementSnapshot = (
+  snapshot: AchievementDailySnapshot | (AchievementDailySnapshot & {
+    ruleBreakdown?: Array<AchievementDailyRuleBreakdown & {
+      matchedMinutes?: number;
+      unitMinutes?: number;
+      targetType?: AchievementRule['targetType'];
+    }>;
+  })
+): AchievementDailySnapshot => ({
+  ...snapshot,
+  ruleBreakdown: (snapshot.ruleBreakdown || []).map((item) => ({
+    ...item,
+    targetType: item.targetType ?? 'activity',
+    matchedValue: Math.max(0, Math.floor(item.matchedValue ?? item.matchedMinutes ?? 0)),
+    unitAmount: Math.max(1, Math.floor(item.unitAmount ?? item.unitMinutes ?? 1)),
+    deltaPerUnit: Math.max(1, Math.floor(item.deltaPerUnit || 1)),
+    targetIds: Array.isArray(item.targetIds) ? item.targetIds : []
+  }))
+});
 
 export const getAchievementYesterday = (baseDate: Date = new Date()): string => {
   const yesterday = new Date(baseDate.getTime() - DAY_MS);
@@ -49,18 +85,49 @@ export const enumerateAchievementDates = (startDate: string, endDate: string): s
 export const computeAchievementDailySnapshot = (
   date: string,
   logs: Log[],
+  todos: TodoItem[],
+  dailyReviews: DailyReview[],
   rules: AchievementRule[]
 ): AchievementDailySnapshot => {
-  const activeRules = rules.filter((rule) => rule.enabled && rule.targetIds.length > 0 && rule.unitMinutes > 0 && rule.deltaPerUnit > 0);
+  const activeRules = rules
+    .map(normalizeAchievementRule)
+    .filter((rule) => rule.enabled && rule.targetIds.length > 0 && rule.unitAmount > 0 && rule.deltaPerUnit > 0);
   const dayLogs = logs.filter((log) => getLocalDateStr(new Date(log.startTime)) === date);
+  const completedTodos = todos.filter((todo) => (
+    todo.isCompleted &&
+    todo.completedAt &&
+    getLocalDateStr(new Date(todo.completedAt)) === date
+  ));
+  const dayReview = dailyReviews.find((review) => review.date === date);
+  const completedCheckItems = (dayReview?.checkItems || []).filter((item) => item.isCompleted && item.category);
 
   const ruleBreakdown: AchievementDailyRuleBreakdown[] = activeRules.map((rule) => {
-    const matchedSeconds = dayLogs
-      .filter((log) => rule.targetIds.includes(log.activityId))
-      .reduce((sum, log) => sum + Math.max(0, log.duration || 0), 0);
+    const matchedValue = (() => {
+      if (rule.targetType === 'activity') {
+        const matchedSeconds = dayLogs
+          .filter((log) => rule.targetIds.includes(log.activityId))
+          .reduce((sum, log) => sum + Math.max(0, log.duration || 0), 0);
+        return Math.floor(matchedSeconds / 60);
+      }
 
-    const matchedMinutes = Math.floor(matchedSeconds / 60);
-    const appliedUnits = Math.floor(matchedMinutes / rule.unitMinutes);
+      if (rule.targetType === 'scope') {
+        const matchedSeconds = dayLogs
+          .filter((log) => (
+            Array.isArray(log.scopeIds) &&
+            log.scopeIds.some((scopeId) => rule.targetIds.includes(scopeId))
+          ))
+          .reduce((sum, log) => sum + Math.max(0, log.duration || 0), 0);
+        return Math.floor(matchedSeconds / 60);
+      }
+
+      if (rule.targetType === 'todoCategory') {
+        return completedTodos.filter((todo) => rule.targetIds.includes(todo.categoryId)).length;
+      }
+
+      return completedCheckItems.filter((item) => item.category && rule.targetIds.includes(item.category)).length;
+    })();
+
+    const appliedUnits = Math.floor(matchedValue / rule.unitAmount);
     const rawDelta = appliedUnits * rule.deltaPerUnit;
     const delta = rule.effectType === 'spend' ? -rawDelta : rawDelta;
 
@@ -68,8 +135,9 @@ export const computeAchievementDailySnapshot = (
       ruleId: rule.id,
       ruleName: rule.name,
       effectType: rule.effectType,
-      matchedMinutes,
-      unitMinutes: rule.unitMinutes,
+      targetType: rule.targetType,
+      matchedValue,
+      unitAmount: rule.unitAmount,
       deltaPerUnit: rule.deltaPerUnit,
       appliedUnits,
       delta,

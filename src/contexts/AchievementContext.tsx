@@ -1,6 +1,7 @@
 /**
  * @file AchievementContext.tsx
  * @description Manages achievement bottle data, daily snapshots, rewards, and redemption records with repository hydration and selective recent-day recomputation.
+ * @updated 2026-03-28: Keep the context instance stable across Fast Refresh so updated consumers still connect to the mounted provider.
  */
 import React, { createContext, ReactNode, useContext, useEffect, useRef, useState } from 'react';
 import { dataRepository } from '../repositories/dataRepository';
@@ -18,6 +19,8 @@ import {
   computeAchievementDailySnapshot,
   enumerateAchievementDates,
   getAchievementYesterday,
+  normalizeAchievementRule,
+  normalizeAchievementSnapshot,
   sortAchievementSnapshots
 } from '../utils/achievementUtils';
 import { getLocalDateStr } from '../utils/dateUtils';
@@ -27,12 +30,14 @@ import {
   updateLocalDataTimestamp
 } from '../utils/localDataTimestamp';
 import { useData } from './DataContext';
+import { useReview } from './ReviewContext';
 
 interface CreateAchievementRuleInput {
   name: string;
   effectType: 'earn' | 'spend';
+  targetType: AchievementRule['targetType'];
   targetIds: string[];
-  unitMinutes: number;
+  unitAmount: number;
   deltaPerUnit: number;
   note?: string;
 }
@@ -65,7 +70,17 @@ interface AchievementContextType {
   deleteRedemptionRecord: (recordId: string) => void;
 }
 
-const AchievementContext = createContext<AchievementContextType | undefined>(undefined);
+const achievementContextStore = globalThis as typeof globalThis & {
+  __lumostimeAchievementContext__?: React.Context<AchievementContextType | undefined>;
+};
+
+// Reuse the same context object across module reloads to avoid provider/consumer
+// mismatches while Vite Fast Refresh keeps the app tree mounted.
+const AchievementContext = achievementContextStore.__lumostimeAchievementContext__
+  ?? createContext<AchievementContextType | undefined>(undefined);
+
+AchievementContext.displayName = 'AchievementContext';
+achievementContextStore.__lumostimeAchievementContext__ = AchievementContext;
 
 export const useAchievement = () => {
   const context = useContext(AchievementContext);
@@ -76,7 +91,8 @@ export const useAchievement = () => {
 };
 
 export const AchievementProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const { logs } = useData();
+  const { logs, todos } = useData();
+  const { dailyReviews } = useReview();
   const [isReady, setIsReady] = useState(false);
   const [canPersist, setCanPersist] = useState(false);
   const isHydratingRef = useRef(true);
@@ -101,9 +117,9 @@ export const AchievementProvider: React.FC<{ children: ReactNode }> = ({ childre
 
         hydratedSuccessfully = true;
         setMeta(snapshot.meta);
-        setRules(snapshot.rules);
+        setRules(snapshot.rules.map(normalizeAchievementRule));
         setRewards(snapshot.rewards);
-        setDailySnapshots(sortAchievementSnapshots(snapshot.dailySnapshots));
+        setDailySnapshots(sortAchievementSnapshots(snapshot.dailySnapshots.map(normalizeAchievementSnapshot)));
         setRedemptionRecords(snapshot.redemptionRecords);
       } catch (error) {
         console.error('[AchievementContext] Failed to hydrate achievement data', error);
@@ -142,10 +158,10 @@ export const AchievementProvider: React.FC<{ children: ReactNode }> = ({ childre
       const shouldRecompute = !existing || date === today || date === yesterday;
 
       if (!shouldRecompute && existing) {
-        return existing;
+        return normalizeAchievementSnapshot(existing);
       }
 
-      const computed = computeAchievementDailySnapshot(date, logs, rulesSource);
+      const computed = computeAchievementDailySnapshot(date, logs, todos, dailyReviews, rulesSource);
       if (existing) {
         computed.id = existing.id;
       }
@@ -173,9 +189,9 @@ export const AchievementProvider: React.FC<{ children: ReactNode }> = ({ childre
       name: input.name.trim() || '未命名规则',
       enabled: true,
       effectType: input.effectType,
-      targetType: 'activity',
+      targetType: input.targetType,
       targetIds: input.targetIds,
-      unitMinutes: Math.max(1, Math.floor(input.unitMinutes)),
+      unitAmount: Math.max(1, Math.floor(input.unitAmount)),
       deltaPerUnit: Math.max(1, Math.floor(input.deltaPerUnit)),
       roundingMode: 'floor',
       note: input.note?.trim() || undefined,
@@ -197,7 +213,7 @@ export const AchievementProvider: React.FC<{ children: ReactNode }> = ({ childre
         ? {
           ...rule,
           name: rule.name.trim() || '未命名规则',
-          unitMinutes: Math.max(1, Math.floor(rule.unitMinutes)),
+          unitAmount: Math.max(1, Math.floor(rule.unitAmount)),
           deltaPerUnit: Math.max(1, Math.floor(rule.deltaPerUnit)),
           updatedAt: Date.now()
         }

@@ -126,7 +126,7 @@ export const AchievementRedeemTab: React.FC<AchievementRedeemTabProps> = ({
 
   return (
     <>
-      <div className="space-y-7">
+      <div>
         <header className="flex flex-wrap items-center justify-between gap-3 border-b border-stone-200 pb-[14px]">
           <div className="text-[11px] uppercase tracking-[0.18em] text-stone-400">
             Rewards / {orderedRewards.length}
@@ -154,13 +154,13 @@ export const AchievementRedeemTab: React.FC<AchievementRedeemTabProps> = ({
               const canRedeem = availableStars >= reward.cost;
 
               return (
-                <div key={reward.id} className="flex items-center justify-between gap-4 py-[12px]">
+                <div key={reward.id} className="flex items-center justify-between gap-4 py-[14px]">
                   <div className="min-w-0 flex-1">
                     <div className="truncate text-[16px] leading-none text-stone-900">{reward.name}</div>
-                    <div className="mt-2 text-[13px] leading-6 text-stone-500">成本 {reward.cost} 光点</div>
+                    <div className="mt-[6px] text-[13px] leading-6 text-stone-500">成本 {reward.cost} 光点</div>
                   </div>
 
-                  <div className="flex shrink-0 items-center gap-3">
+                  <div className="flex shrink-0 items-center gap-4">
                     <button
                       type="button"
                       disabled={!canRedeem}
@@ -201,7 +201,6 @@ export const AchievementRedeemTab: React.FC<AchievementRedeemTabProps> = ({
             })}
           </div>
         )}
-
       </div>
 
       <AchievementDialog
@@ -286,7 +285,11 @@ export const AchievementRedeemTab: React.FC<AchievementRedeemTabProps> = ({
               type="button"
               onClick={handleRedeem}
               disabled={!canRedeemSelected}
-              className="rounded-full bg-stone-900 px-4 py-2 text-sm text-white transition-colors disabled:bg-stone-300"
+              className="rounded-full px-4 py-2 text-sm text-white transition-all disabled:bg-stone-300"
+              style={canRedeemSelected ? {
+                backgroundColor: 'var(--accent-color)',
+                boxShadow: '0 10px 24px var(--accent-color-light)'
+              } : undefined}
             >
               确认兑换
             </button>
@@ -296,9 +299,7 @@ export const AchievementRedeemTab: React.FC<AchievementRedeemTabProps> = ({
         {selectedReward && (
           <div className="space-y-5">
             <div
-              className={`rounded-2xl border px-4 py-3 text-sm leading-6 ${
-                canRedeemSelected ? 'border-emerald-200 bg-emerald-50 text-emerald-900' : 'border-rose-200 bg-rose-50 text-rose-900'
-              }`}
+              className="rounded-2xl border border-stone-200 bg-stone-50/80 px-4 py-3 text-sm leading-6 text-stone-600"
             >
               {canRedeemSelected
                 ? `兑换成功后剩余 ${availableStars - selectedReward.cost} 光点，立即记入兑换记录。`

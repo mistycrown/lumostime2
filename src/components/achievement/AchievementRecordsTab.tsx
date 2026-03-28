@@ -33,7 +33,7 @@ export const AchievementRecordsTab: React.FC<AchievementRecordsTabProps> = ({
 
   return (
     <>
-      <div className="space-y-7">
+      <div className="space-y-6">
         <section>
           <div className="flex items-center justify-between border-b border-stone-200 pb-[14px]">
             <div className="text-[11px] uppercase tracking-[0.18em] text-stone-400">
@@ -42,21 +42,21 @@ export const AchievementRecordsTab: React.FC<AchievementRecordsTabProps> = ({
           </div>
 
           {orderedSnapshots.length === 0 ? (
-            <div className="mt-[10px] rounded-2xl border border-dashed border-stone-300 px-4 py-5 text-sm leading-7 text-stone-500">
+            <div className="mt-[14px] rounded-2xl border border-dashed border-stone-300 bg-white/50 px-5 py-6 text-sm leading-7 text-stone-500">
               还没有每日快照。首次进入成就页后，系统会从启用当天开始生成记录。
             </div>
           ) : (
-            <div className="mt-[8px] divide-y divide-stone-200">
+            <div className="mt-[14px] divide-y divide-stone-200">
               {orderedSnapshots.map((snapshot) => (
                 <button
                   key={snapshot.id}
                   type="button"
                   onClick={() => setSelectedSnapshotId(snapshot.id)}
-                  className="flex w-full items-center justify-between gap-4 py-[12px] text-left transition-colors hover:bg-stone-50/70"
+                  className="flex w-full items-center justify-between gap-4 py-[14px] text-left transition-colors hover:bg-stone-50/70"
                 >
                   <div className="min-w-0 flex-1">
                     <div className="text-[16px] leading-none text-stone-900">{snapshot.date}</div>
-                    <div className="mt-2 text-[13px] leading-6 text-stone-500">
+                    <div className="mt-[6px] text-[13px] leading-6 text-stone-500">
                       命中 {snapshot.ruleBreakdown.length} 条规则，更新于 {formatRelativeTime(snapshot.computedAt)}
                     </div>
                   </div>
@@ -80,23 +80,23 @@ export const AchievementRecordsTab: React.FC<AchievementRecordsTabProps> = ({
           </div>
 
           {orderedRecords.length === 0 ? (
-            <div className="mt-[10px] rounded-2xl border border-dashed border-stone-300 px-4 py-5 text-sm leading-7 text-stone-500">
+            <div className="mt-[14px] rounded-2xl border border-dashed border-stone-300 bg-white/50 px-5 py-6 text-sm leading-7 text-stone-500">
               还没有兑换记录。兑换奖励后，最近一次会显示在这里。
             </div>
           ) : (
-            <div className="mt-[8px] divide-y divide-stone-200">
+            <div className="mt-[14px] divide-y divide-stone-200">
               {orderedRecords.map((record) => (
-                <div key={record.id} className="flex items-start justify-between gap-4 py-[12px]">
+                <div key={record.id} className="flex items-center justify-between gap-4 py-[14px]">
                   <div className="min-w-0 flex-1">
                     <div className="text-[16px] leading-none text-stone-900">{record.rewardName}</div>
-                    <div className="mt-1 text-[13px] leading-6 text-stone-500">
+                    <div className="mt-[6px] text-[13px] leading-6 text-stone-500">
                       花费 {record.cost} 光点 · {formatRelativeTime(record.redeemedAt)} · {getLocalDateTimeStr(new Date(record.redeemedAt))}
                     </div>
                   </div>
                   <button
                     type="button"
                     onClick={() => onDeleteRedemptionRecord(record.id)}
-                    className="mt-[10px] inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-stone-300 transition-colors hover:bg-rose-50 hover:text-rose-500"
+                    className="inline-flex h-7 w-7 shrink-0 items-center justify-center self-center rounded-full text-stone-300 transition-colors hover:bg-rose-50 hover:text-rose-500"
                     aria-label="删除兑换记录"
                   >
                     <Trash2 size={14} />
@@ -125,8 +125,9 @@ export const AchievementRecordsTab: React.FC<AchievementRecordsTabProps> = ({
                   </div>
                 </div>
                 <div className="mt-2 text-sm leading-7 text-stone-500">
-                  {item.matchedMinutes} 分钟，按每 {item.unitMinutes} 分钟 {item.effectType === 'earn' ? '+' : '-'}
-                  {item.deltaPerUnit} 光点，触发 {item.appliedUnits} 次。
+                  {item.targetType === 'activity' || item.targetType === 'scope'
+                    ? `${item.matchedValue} 分钟，按每 ${item.unitAmount} 分钟 ${item.effectType === 'earn' ? '+' : '-'}${item.deltaPerUnit} 光点，触发 ${item.appliedUnits} 次。`
+                    : `${item.matchedValue} 项，按每 ${item.unitAmount} 项 ${item.effectType === 'earn' ? '+' : '-'}${item.deltaPerUnit} 光点，触发 ${item.appliedUnits} 次。`}
                 </div>
               </div>
             ))}
