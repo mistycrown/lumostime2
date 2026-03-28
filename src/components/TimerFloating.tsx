@@ -452,7 +452,8 @@ export const TimerFloating: React.FC<TimerFloatingProps> = ({
 }) => {
   if (sessions.length === 0) return null;
 
-  const { currentView } = useNavigation();
+  const { currentView, isAchievementOpen } = useNavigation();
+  if (isAchievementOpen) return null;
   const containerZIndex =
     currentView === AppView.TIMELINE || currentView === AppView.REVIEW ? 50 : 10;
 

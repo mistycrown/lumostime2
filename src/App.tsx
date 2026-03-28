@@ -20,6 +20,7 @@ import { ReviewProvider, useReview } from './contexts/ReviewContext';
 import { SessionProvider, useSession } from './contexts/SessionContext';
 import { NavigationProvider, useNavigation } from './contexts/NavigationContext';
 import { CategoryScopeProvider, useCategoryScope } from './contexts/CategoryScopeContext';
+import { AchievementProvider, useAchievement } from './contexts/AchievementContext';
 import { PrivacyProvider } from './contexts/PrivacyContext';
 
 import { MainLayout } from './components/MainLayout';
@@ -160,6 +161,7 @@ const AppContent: React.FC = () => {
     setCurrentOnThisDayDate,
     isWeeklyReviewOpen,
     isMonthlyReviewOpen,
+    isAchievementOpen,
     selectedTagId, setSelectedTagId,
     selectedCategoryId, setSelectedCategoryId,
     selectedScopeId, setSelectedScopeId,
@@ -506,6 +508,7 @@ const AppContent: React.FC = () => {
           !isOnThisDayOpen &&
           !isWeeklyReviewOpen &&
           !isMonthlyReviewOpen &&
+          !isAchievementOpen &&
           !selectedTagId &&
           !selectedCategoryId &&
           !selectedScopeId &&
@@ -917,15 +920,17 @@ const App: React.FC = () => {
         <SettingsProvider>
           <ReviewProvider>
             <SessionProvider splitLogByDays={splitLogByDays}>
-              <NavigationProvider>
-                <CategoryScopeProviderWithData>
-                  <PrivacyProvider>
-                    <AppBootstrapGate>
-                      <AppContent />
-                    </AppBootstrapGate>
-                  </PrivacyProvider>
-                </CategoryScopeProviderWithData>
-              </NavigationProvider>
+              <AchievementProviderWithData>
+                <NavigationProvider>
+                  <CategoryScopeProviderWithData>
+                    <PrivacyProvider>
+                      <AppBootstrapGate>
+                        <AppContent />
+                      </AppBootstrapGate>
+                    </PrivacyProvider>
+                  </CategoryScopeProviderWithData>
+                </NavigationProvider>
+              </AchievementProviderWithData>
             </SessionProvider>
           </ReviewProvider>
         </SettingsProvider>
@@ -938,7 +943,8 @@ const AppBootstrapGate: React.FC<{ children: React.ReactNode }> = ({ children })
   const { isReady: isDataReady } = useData();
   const { isReady: isReviewReady } = useReview();
   const { isReady: isCategoryScopeReady } = useCategoryScope();
-  const isAppReady = isDataReady && isReviewReady && isCategoryScopeReady;
+  const { isReady: isAchievementReady } = useAchievement();
+  const isAppReady = isDataReady && isReviewReady && isCategoryScopeReady && isAchievementReady;
 
   useEffect(() => {
     if (!isAppReady) {
@@ -973,6 +979,14 @@ const CategoryScopeProviderWithData: React.FC<{ children: React.ReactNode }> = (
     >
       {children}
     </CategoryScopeProvider>
+  );
+};
+
+const AchievementProviderWithData: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  return (
+    <AchievementProvider>
+      {children}
+    </AchievementProvider>
   );
 };
 

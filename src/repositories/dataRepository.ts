@@ -7,7 +7,24 @@
  */
 import { CATEGORIES, INITIAL_DAILY_REVIEWS, INITIAL_GOALS, INITIAL_LOGS, INITIAL_TODOS, MOCK_TODO_CATEGORIES, SCOPES } from '../constants';
 import { REVIEW_KEYS, StorageKey, USER_DATA_KEYS, storage } from '../constants/storageKeys';
-import { Category, DailyReview, Goal, Log, MajorGoal, MonthlyReview, OnThisDayEntry, Scope, TodoCategory, TodoItem, WeeklyReview } from '../types';
+import {
+  AchievementDailySnapshot,
+  AchievementMeta,
+  AchievementRedemptionRecord,
+  AchievementReward,
+  AchievementRule,
+  Category,
+  DailyReview,
+  Goal,
+  Log,
+  MajorGoal,
+  MonthlyReview,
+  OnThisDayEntry,
+  Scope,
+  TodoCategory,
+  TodoItem,
+  WeeklyReview
+} from '../types';
 import { normalizeDailyReviews } from '../utils/checkItemNormalizer';
 import { storageRepository, StorageRepository } from './storageRepository';
 
@@ -26,7 +43,12 @@ export const REPOSITORY_KEYS = {
   DAILY_REVIEWS: 'dailyReviews',
   WEEKLY_REVIEWS: 'weeklyReviews',
   MONTHLY_REVIEWS: 'monthlyReviews',
-  ON_THIS_DAY_ENTRIES: 'onThisDayEntries'
+  ON_THIS_DAY_ENTRIES: 'onThisDayEntries',
+  ACHIEVEMENT_META: 'achievementMeta',
+  ACHIEVEMENT_RULES: 'achievementRules',
+  ACHIEVEMENT_REWARDS: 'achievementRewards',
+  ACHIEVEMENT_DAILY_SNAPSHOTS: 'achievementDailySnapshots',
+  ACHIEVEMENT_REDEMPTION_RECORDS: 'achievementRedemptionRecords'
 } as const;
 
 type CoreRepositoryKey = typeof REPOSITORY_KEYS[keyof typeof REPOSITORY_KEYS];
@@ -72,6 +94,14 @@ export interface CategoryScopeSnapshot {
   scopes: Scope[];
   goals: Goal[];
   majorGoals: MajorGoal[];
+}
+
+export interface AchievementSnapshot {
+  meta: AchievementMeta;
+  rules: AchievementRule[];
+  rewards: AchievementReward[];
+  dailySnapshots: AchievementDailySnapshot[];
+  redemptionRecords: AchievementRedemptionRecord[];
 }
 
 export class DataRepository {
@@ -175,6 +205,31 @@ export class DataRepository {
     };
   }
 
+  async loadAchievementSnapshot(): Promise<AchievementSnapshot> {
+    await this.initialize();
+
+    const meta =
+      (await this.repository.getData<AchievementMeta>(REPOSITORY_KEYS.ACHIEVEMENT_META)) ?? {
+        achievementStartDate: null
+      };
+    const rules =
+      (await this.repository.getData<AchievementRule[]>(REPOSITORY_KEYS.ACHIEVEMENT_RULES)) ?? [];
+    const rewards =
+      (await this.repository.getData<AchievementReward[]>(REPOSITORY_KEYS.ACHIEVEMENT_REWARDS)) ?? [];
+    const dailySnapshots =
+      (await this.repository.getData<AchievementDailySnapshot[]>(REPOSITORY_KEYS.ACHIEVEMENT_DAILY_SNAPSHOTS)) ?? [];
+    const redemptionRecords =
+      (await this.repository.getData<AchievementRedemptionRecord[]>(REPOSITORY_KEYS.ACHIEVEMENT_REDEMPTION_RECORDS)) ?? [];
+
+    return {
+      meta,
+      rules,
+      rewards,
+      dailySnapshots,
+      redemptionRecords
+    };
+  }
+
   async getLogs(): Promise<Log[]> {
     const snapshot = await this.loadDataContextSnapshot();
     return snapshot.logs;
@@ -243,6 +298,31 @@ export class DataRepository {
   async saveOnThisDayEntries(onThisDayEntries: OnThisDayEntry[]): Promise<void> {
     await this.initialize();
     await this.repository.setData(REPOSITORY_KEYS.ON_THIS_DAY_ENTRIES, onThisDayEntries);
+  }
+
+  async saveAchievementMeta(meta: AchievementMeta): Promise<void> {
+    await this.initialize();
+    await this.repository.setData(REPOSITORY_KEYS.ACHIEVEMENT_META, meta);
+  }
+
+  async saveAchievementRules(rules: AchievementRule[]): Promise<void> {
+    await this.initialize();
+    await this.repository.setData(REPOSITORY_KEYS.ACHIEVEMENT_RULES, rules);
+  }
+
+  async saveAchievementRewards(rewards: AchievementReward[]): Promise<void> {
+    await this.initialize();
+    await this.repository.setData(REPOSITORY_KEYS.ACHIEVEMENT_REWARDS, rewards);
+  }
+
+  async saveAchievementDailySnapshots(dailySnapshots: AchievementDailySnapshot[]): Promise<void> {
+    await this.initialize();
+    await this.repository.setData(REPOSITORY_KEYS.ACHIEVEMENT_DAILY_SNAPSHOTS, dailySnapshots);
+  }
+
+  async saveAchievementRedemptionRecords(redemptionRecords: AchievementRedemptionRecord[]): Promise<void> {
+    await this.initialize();
+    await this.repository.setData(REPOSITORY_KEYS.ACHIEVEMENT_REDEMPTION_RECORDS, redemptionRecords);
   }
 
   private buildDefaultTodos(logs: Log[]): TodoItem[] {

@@ -207,6 +207,65 @@ export interface ParsedTimeEntry {
   scopeIds?: string[];
 }
 
+export interface AchievementRule {
+  id: string;
+  name: string;
+  enabled: boolean;
+  effectType: 'earn' | 'spend';
+  targetType: 'activity';
+  targetIds: string[];
+  unitMinutes: number;
+  deltaPerUnit: number;
+  roundingMode: 'floor';
+  note?: string;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface AchievementDailyRuleBreakdown {
+  ruleId: string;
+  ruleName: string;
+  effectType: 'earn' | 'spend';
+  matchedMinutes: number;
+  unitMinutes: number;
+  deltaPerUnit: number;
+  appliedUnits: number;
+  delta: number;
+  targetIds: string[];
+}
+
+export interface AchievementDailySnapshot {
+  id: string;
+  date: string; // YYYY-MM-DD
+  netDelta: number;
+  ruleBreakdown: AchievementDailyRuleBreakdown[];
+  computedAt: number;
+}
+
+export interface AchievementReward {
+  id: string;
+  name: string;
+  cost: number;
+  description?: string;
+  icon?: string;
+  enabled: boolean;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface AchievementRedemptionRecord {
+  id: string;
+  rewardId: string;
+  rewardName: string;
+  cost: number;
+  redeemedAt: number;
+  note?: string;
+}
+
+export interface AchievementMeta {
+  achievementStartDate: string | null;
+}
+
 export enum AppView {
   RECORD = 'RECORD',
   TIMELINE = 'TIMELINE',

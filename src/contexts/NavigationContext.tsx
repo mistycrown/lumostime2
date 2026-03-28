@@ -84,6 +84,8 @@ interface NavigationContextType {
     setIsWeeklyReviewOpen: (open: boolean) => void;
     isMonthlyReviewOpen: boolean;
     setIsMonthlyReviewOpen: (open: boolean) => void;
+    isAchievementOpen: boolean;
+    setIsAchievementOpen: (open: boolean) => void;
 
     // 档案页面模式切换
     isJournalMode: boolean;
@@ -236,6 +238,7 @@ export const NavigationProvider: React.FC<NavigationProviderProps> = ({
     const [isOnThisDayOpen, setIsOnThisDayOpen] = useState(false);
     const [isWeeklyReviewOpen, setIsWeeklyReviewOpen] = useState(false);
     const [isMonthlyReviewOpen, setIsMonthlyReviewOpen] = useState(false);
+    const [isAchievementOpen, setIsAchievementOpen] = useState(false);
 
     // 档案页面模式切换
     const [isJournalMode, setIsJournalMode] = useState(() => defaultArchiveView === 'MEMOIR');
@@ -340,6 +343,8 @@ export const NavigationProvider: React.FC<NavigationProviderProps> = ({
             setIsWeeklyReviewOpen,
             isMonthlyReviewOpen,
             setIsMonthlyReviewOpen,
+            isAchievementOpen,
+            setIsAchievementOpen,
             isJournalMode,
             setIsJournalMode,
             selectedTagId,
