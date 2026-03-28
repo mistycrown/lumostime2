@@ -18,6 +18,7 @@ import { NavigationDecorationSelector } from '../components/NavigationDecoration
 import { TimelineStyleSelector } from '../components/TimelineStyleSelector';
 import { ColorSchemeSelector } from '../components/ColorSchemeSelector';
 import { CustomColorGroupManager } from '../components/CustomColorGroupManager';
+import { AchievementBottleIconPackSelector } from '../components/achievement/AchievementBottleIconPackSelector';
 import { AchievementBottleStyleSelector } from '../components/achievement/AchievementBottleStyleSelector';
 import { iconService, ICON_OPTIONS } from '../services/iconService';
 import { Category } from '../types';
@@ -214,6 +215,7 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
         colorScheme,
         setColorScheme,
         setAchievementBottleStyle,
+        setAchievementBottleIconPack,
         scheduleStyle,
         setScheduleStyle
     } = useSettings();
@@ -392,6 +394,7 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
             setUiIconTheme,
             setColorScheme,
             setAchievementBottleStyle,
+            setAchievementBottleIconPack,
             setCurrentPresetId
         );
         
@@ -1112,6 +1115,7 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
 
                             {activeTab === 'style' && (
                                 <div className="pt-2 space-y-4">
+                                    <AchievementBottleIconPackSelector />
                                     <AchievementBottleStyleSelector />
                                     <TimelineStyleSelector onToast={onToast} />
                                     <div className="bg-white rounded-2xl shadow-[0_2px_10px_rgba(0,0,0,0.03)]">

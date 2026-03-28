@@ -5,7 +5,7 @@
  * @pos View (Achievement Overlay)
  * @description Achievement bottle full-screen page opened from Timeline. The collapsed state emphasizes the bottle, while the expanded state turns the screen into a full ledger workspace.
  *
- * @updated 2026-03-28: Expanded ledger now fills the screen, keeps the collapsed nav lower, uses theme accent colors instead of pure black, and removes the temporary bottle debug controls.
+ * @updated 2026-03-28: Expanded ledger now fills the screen, keeps one-decimal star balances in the UI, and floors only the bottle's rendered star bodies.
  */
 import React, { useEffect, useMemo, useState } from 'react';
 import { ChevronDown, Gift, ScrollText, SlidersHorizontal } from 'lucide-react';
@@ -18,6 +18,7 @@ import { AchievementRedeemTab } from '../components/achievement/AchievementRedee
 import { useData } from '../contexts/DataContext';
 import { useReview } from '../contexts/ReviewContext';
 import { useSettings } from '../contexts/SettingsContext';
+import { getAchievementRenderableStarCount } from '../utils/achievementUtils';
 
 type AchievementTab = 'records' | 'rules' | 'redeem';
 
@@ -51,12 +52,13 @@ export const AchievementView: React.FC = () => {
   const { categories, scopes } = useCategoryScope();
   const { todoCategories } = useData();
   const { checkTemplates } = useReview();
-  const { achievementBottleStyle } = useSettings();
+  const { achievementBottleStyle, achievementBottleIconPack } = useSettings();
   const [activeTab, setActiveTab] = useState<AchievementTab>('records');
   const [isDetailExpanded, setIsDetailExpanded] = useState(false);
   const [pendingTab, setPendingTab] = useState<AchievementTab | null>(null);
   const [isDetailContentVisible, setIsDetailContentVisible] = useState(false);
   const [hasEnsuredSnapshots, setHasEnsuredSnapshots] = useState(false);
+  const renderedBottleStars = getAchievementRenderableStarCount(availableStars);
 
   useEffect(() => {
     if (!isReady || hasEnsuredSnapshots) {
@@ -175,9 +177,10 @@ export const AchievementView: React.FC = () => {
       >
         <AchievementBottle
           starCount={availableStars}
-          rebuildToken={availableStars}
+          rebuildToken={renderedBottleStars}
           compact={false}
           styleVariant={achievementBottleStyle}
+          iconPack={achievementBottleIconPack}
         />
       </section>
 

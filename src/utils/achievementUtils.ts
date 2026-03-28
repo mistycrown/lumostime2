@@ -5,7 +5,7 @@
  * @pos Utility (Achievement)
  * @description 成就系统计算工具 - 负责每日快照计算、日期枚举和账本汇总。
  *
- * @updated 2026-03-28: Added initial achievement snapshot and balance helpers for the achievement bottle system.
+ * @updated 2026-03-28: Added decimal-safe star helpers so achievement balances and rule settlement keep one decimal place while bottle rendering can floor the visible star count.
  */
 import {
   AchievementDailySnapshot,
@@ -19,6 +19,8 @@ import {
 import { getLocalDateStr } from './dateUtils';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
+const ACHIEVEMENT_STAR_DECIMALS = 1;
+const ACHIEVEMENT_STAR_FACTOR = 10 ** ACHIEVEMENT_STAR_DECIMALS;
 
 const createDateAtNoon = (dateStr: string): Date => {
   const [year, month, day] = dateStr.split('-').map(Number);
@@ -29,13 +31,32 @@ const normalizeUnitAmount = (rule: AchievementRule | (AchievementRule & { unitMi
   return Math.max(1, Math.floor(rule.unitAmount ?? rule.unitMinutes ?? 1));
 };
 
+export const normalizeAchievementStarValue = (value: number): number => {
+  const safeValue = Number.isFinite(value) ? value : 0;
+  const rounded = Math.round((safeValue + Number.EPSILON) * ACHIEVEMENT_STAR_FACTOR) / ACHIEVEMENT_STAR_FACTOR;
+  return Object.is(rounded, -0) ? 0 : rounded;
+};
+
+export const formatAchievementStars = (value: number): string => {
+  return normalizeAchievementStarValue(value).toFixed(ACHIEVEMENT_STAR_DECIMALS);
+};
+
+export const formatAchievementSignedStars = (value: number): string => {
+  const normalized = normalizeAchievementStarValue(value);
+  return normalized > 0 ? `+${formatAchievementStars(normalized)}` : formatAchievementStars(normalized);
+};
+
+export const getAchievementRenderableStarCount = (value: number): number => {
+  return Math.max(0, Math.floor(normalizeAchievementStarValue(value)));
+};
+
 export const normalizeAchievementRule = (
   rule: AchievementRule | (AchievementRule & { unitMinutes?: number; targetType?: AchievementRule['targetType'] })
 ): AchievementRule => ({
   ...rule,
   targetType: rule.targetType ?? 'activity',
   unitAmount: normalizeUnitAmount(rule),
-  deltaPerUnit: Math.max(1, Math.floor(rule.deltaPerUnit || 1)),
+  deltaPerUnit: Math.max(0.1, normalizeAchievementStarValue(rule.deltaPerUnit || 1)),
   targetIds: Array.isArray(rule.targetIds) ? rule.targetIds : []
 });
 
@@ -49,12 +70,14 @@ export const normalizeAchievementSnapshot = (
   })
 ): AchievementDailySnapshot => ({
   ...snapshot,
+  netDelta: normalizeAchievementStarValue(snapshot.netDelta || 0),
   ruleBreakdown: (snapshot.ruleBreakdown || []).map((item) => ({
     ...item,
     targetType: item.targetType ?? 'activity',
     matchedValue: Math.max(0, Math.floor(item.matchedValue ?? item.matchedMinutes ?? 0)),
     unitAmount: Math.max(1, Math.floor(item.unitAmount ?? item.unitMinutes ?? 1)),
-    deltaPerUnit: Math.max(1, Math.floor(item.deltaPerUnit || 1)),
+    deltaPerUnit: Math.max(0.1, normalizeAchievementStarValue(item.deltaPerUnit || 1)),
+    delta: normalizeAchievementStarValue(item.delta || 0),
     targetIds: Array.isArray(item.targetIds) ? item.targetIds : []
   }))
 });
@@ -127,9 +150,9 @@ export const computeAchievementDailySnapshot = (
       return completedCheckItems.filter((item) => item.category && rule.targetIds.includes(item.category)).length;
     })();
 
-    const appliedUnits = Math.floor(matchedValue / rule.unitAmount);
-    const rawDelta = appliedUnits * rule.deltaPerUnit;
-    const delta = rule.effectType === 'spend' ? -rawDelta : rawDelta;
+    const appliedUnits = normalizeAchievementStarValue(matchedValue / rule.unitAmount);
+    const rawDelta = normalizeAchievementStarValue(appliedUnits * rule.deltaPerUnit);
+    const delta = normalizeAchievementStarValue(rule.effectType === 'spend' ? -rawDelta : rawDelta);
 
     return {
       ruleId: rule.id,
@@ -148,7 +171,7 @@ export const computeAchievementDailySnapshot = (
   return {
     id: crypto.randomUUID(),
     date,
-    netDelta: ruleBreakdown.reduce((sum, item) => sum + item.delta, 0),
+    netDelta: normalizeAchievementStarValue(ruleBreakdown.reduce((sum, item) => sum + item.delta, 0)),
     ruleBreakdown,
     computedAt: Date.now()
   };
@@ -164,13 +187,13 @@ export const calculateAchievementAvailableStars = (
 ): number => {
   const earned = snapshots.reduce((sum, item) => sum + item.netDelta, 0);
   const spent = redemptionRecords.reduce((sum, item) => sum + item.cost, 0);
-  return earned - spent;
+  return normalizeAchievementStarValue(earned - spent);
 };
 
 export const calculateAchievementTotalEarned = (snapshots: AchievementDailySnapshot[]): number => {
-  return snapshots.reduce((sum, item) => sum + Math.max(0, item.netDelta), 0);
+  return normalizeAchievementStarValue(snapshots.reduce((sum, item) => sum + Math.max(0, item.netDelta), 0));
 };
 
 export const calculateAchievementTotalRedeemed = (redemptionRecords: AchievementRedemptionRecord[]): number => {
-  return redemptionRecords.reduce((sum, item) => sum + item.cost, 0);
+  return normalizeAchievementStarValue(redemptionRecords.reduce((sum, item) => sum + item.cost, 0));
 };

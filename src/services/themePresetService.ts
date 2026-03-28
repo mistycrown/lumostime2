@@ -1,32 +1,19 @@
 /**
  * @file themePresetService.ts
- * @input ThemePreset data, LocalStorage settings
- * @output Theme application result, Settings updates
+ * @input ThemePreset data and setter callbacks from settings-related views
+ * @output Theme application result and synchronized preset updates
  * @pos Service (Theme Management)
- * @description 主题预设应用服务 - 拆分复杂的主题切换逻辑
- * 
- * 核心功能：
- * - 主题预设应用
- * - 设置项批量更新
- * - 主题切换验证
- * - 错误处理和回滚
- * 
- * 支持的设置项：
- * - UI 图标主题
- * - 配色方案
- * - 背景图片
- * - 导航栏装饰
- * - TimePal 角色
- * 
- * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
+ * @description Centralized theme preset application service. Applies theme-related settings in a consistent order and handles icon migration side effects.
+ *
+ * @updated 2026-03-28: Added achievement bottle icon-pack support so preset save/apply keeps bottle sprites in sync.
  */
 
-import { Capacitor } from '@capacitor/core';
 import { ThemePreset } from '../hooks/useCustomPresets';
 import { THEME_KEYS, TIMEPAL_KEYS, storage } from '../constants/storageKeys';
 import { backgroundService } from './backgroundService';
 import { navigationDecorationService } from './navigationDecorationService';
 import { DEFAULT_ACHIEVEMENT_BOTTLE_STYLE, type AchievementBottleStyle } from './achievementBottleStyleService';
+import { DEFAULT_ACHIEVEMENT_BOTTLE_ICON_PACK, type AchievementBottleIconPack } from './achievementBottleIconPackService';
 
 export interface ThemeApplyResult {
     success: boolean;
@@ -34,188 +21,148 @@ export interface ThemeApplyResult {
     needsReload?: boolean;
 }
 
-/**
- * 主题预设应用服务
- */
 export class ThemePresetService {
-    /**
-     * 应用 UI 主题
-     */
     static async applyUiTheme(theme: string, setUiIconTheme: (theme: string) => void): Promise<void> {
-        console.log('[ThemePresetService] 应用 UI 主题:', theme);
+        console.log('[ThemePresetService] apply UI theme:', theme);
         setUiIconTheme(theme);
     }
 
-    /**
-     * 应用配色方案
-     */
     static async applyColorScheme(scheme: string, setColorScheme: (scheme: string) => void): Promise<void> {
-        console.log('[ThemePresetService] 应用配色方案:', scheme);
+        console.log('[ThemePresetService] apply color scheme:', scheme);
         setColorScheme(scheme);
     }
 
-    /**
-     * 应用背景图片
-     */
     static async applyBackground(background: string): Promise<void> {
-        console.log('[ThemePresetService] 应用背景:', background);
+        console.log('[ThemePresetService] apply background:', background);
         backgroundService.setCurrentBackground(background);
-        
-        // 延迟触发背景重新应用
+
         setTimeout(() => {
             backgroundService.applyBackgroundToElements();
         }, 100);
     }
 
-    /**
-     * 应用导航装饰
-     */
     static async applyNavigation(navigation: string): Promise<void> {
-        console.log('[ThemePresetService] 应用导航装饰:', navigation);
+        console.log('[ThemePresetService] apply navigation decoration:', navigation);
         navigationDecorationService.setCurrentDecoration(navigation);
     }
 
-    /**
-     * 应用时光小友设置
-     */
     static async applyTimePal(timePal: string): Promise<void> {
-        console.log('[ThemePresetService] 应用时光小友:', timePal);
+        console.log('[ThemePresetService] apply time pal:', timePal);
         storage.set(TIMEPAL_KEYS.TYPE, timePal);
         window.dispatchEvent(new Event('timepal-type-changed'));
     }
 
-    /**
-     * 保存当前预设 ID
-     */
     static async applyAchievementBottleStyle(
         bottleStyle: AchievementBottleStyle,
         setAchievementBottleStyle: (style: AchievementBottleStyle) => void
     ): Promise<void> {
-        console.log('[ThemePresetService] 应用成就瓶样式:', bottleStyle);
+        console.log('[ThemePresetService] apply achievement bottle style:', bottleStyle);
         setAchievementBottleStyle(bottleStyle);
     }
 
+    static async applyAchievementBottleIconPack(
+        iconPack: AchievementBottleIconPack,
+        setAchievementBottleIconPack: (pack: AchievementBottleIconPack) => void
+    ): Promise<void> {
+        console.log('[ThemePresetService] apply achievement bottle icon pack:', iconPack);
+        setAchievementBottleIconPack(iconPack);
+    }
+
     static saveCurrentPreset(presetId: string, setCurrentPresetId: (id: string) => void): void {
-        console.log('[ThemePresetService] 保存当前预设:', presetId);
+        console.log('[ThemePresetService] save current preset:', presetId);
         storage.set(THEME_KEYS.CURRENT_PRESET, presetId);
         setCurrentPresetId(presetId);
     }
 
-    /**
-     * 处理图标迁移（首次从 default 切换到自定义主题）
-     */
     static async handleIconMigration(oldTheme: string, newTheme: string): Promise<ThemeApplyResult> {
-        // 只在首次从 default 切换到自定义主题时生成 uiIcon
         if (oldTheme === 'default' && newTheme !== 'default') {
             try {
                 const { iconMigrationService } = await import('./iconMigrationService');
-                
-                // 检查是否已经生成过 uiIcon
+
                 if (!iconMigrationService.isUiIconGenerated()) {
-                    console.log('[ThemePresetService] 首次切换到自定义主题，生成 uiIcon...');
-                    
-                    // 执行一次性生成
+                    console.log('[ThemePresetService] first custom UI theme switch, generating uiIcon...');
+
                     const result = await iconMigrationService.generateAllUiIcons();
-                    
+
                     if (result.success) {
-                        console.log('[ThemePresetService] uiIcon 生成成功:', result);
+                        console.log('[ThemePresetService] uiIcon generation succeeded:', result);
                         return {
                             success: true,
-                            message: `${result.message}，正在刷新...`,
+                            message: `${result.message}, reloading...`,
                             needsReload: true
                         };
-                    } else {
-                        console.error('[ThemePresetService] uiIcon 生成失败:', result);
-                        return {
-                            success: false,
-                            message: result.message
-                        };
                     }
-                } else {
-                    console.log('[ThemePresetService] uiIcon 已存在，直接切换主题');
+
+                    console.error('[ThemePresetService] uiIcon generation failed:', result);
+                    return {
+                        success: false,
+                        message: result.message
+                    };
                 }
+
+                console.log('[ThemePresetService] uiIcon already exists, switching theme directly');
             } catch (error) {
-                console.error('[ThemePresetService] 图标迁移失败:', error);
+                console.error('[ThemePresetService] icon migration failed:', error);
                 return {
                     success: false,
-                    message: '图标迁移失败，请重试'
+                    message: 'Icon migration failed. Please try again.'
                 };
             }
         }
-        
-        // 从自定义主题切换回 default，或在自定义主题之间切换
+
         if (oldTheme !== 'default' && newTheme === 'default') {
-            console.log('[ThemePresetService] 从自定义主题切换回默认主题，不做数据迁移');
+            console.log('[ThemePresetService] switched back to default UI theme without migration');
         }
-        
+
         return { success: true, message: '' };
     }
 
-    /**
-     * 生成应用图标提示消息
-     */
     static getAppIconMessage(preset: ThemePreset): string {
-        return `已应用"${preset.name}"主题方案`;
+        return `Applied preset "${preset.name}"`;
     }
 
-    /**
-     * 应用完整的主题预设
-     */
     static async applyThemePreset(
         preset: ThemePreset,
         oldTheme: string,
         setUiIconTheme: (theme: string) => void,
         setColorScheme: (scheme: string) => void,
         setAchievementBottleStyle: (style: AchievementBottleStyle) => void,
+        setAchievementBottleIconPack: (pack: AchievementBottleIconPack) => void,
         setCurrentPresetId: (id: string) => void
     ): Promise<ThemeApplyResult> {
         try {
-            console.log('[ThemePresetService] 主题切换:', { from: oldTheme, to: preset.uiTheme });
-            
-            // 1. 应用 UI 主题
+            console.log('[ThemePresetService] switch preset:', { from: oldTheme, to: preset.uiTheme });
+
             await this.applyUiTheme(preset.uiTheme, setUiIconTheme);
-            
-            // 2. 应用配色方案
             await this.applyColorScheme(preset.colorScheme, setColorScheme);
-            
-            // 3. 应用背景
             await this.applyBackground(preset.background);
-            
-            // 4. 应用导航装饰
             await this.applyNavigation(preset.navigation);
-            
-            // 5. 应用时光小友
             await this.applyTimePal(preset.timePal);
             await this.applyAchievementBottleStyle(
                 preset.achievementBottleStyle || DEFAULT_ACHIEVEMENT_BOTTLE_STYLE,
                 setAchievementBottleStyle
             );
-            
-            // 6. 保存当前预设
+            await this.applyAchievementBottleIconPack(
+                preset.achievementBottleIconPack || DEFAULT_ACHIEVEMENT_BOTTLE_ICON_PACK,
+                setAchievementBottleIconPack
+            );
+
             this.saveCurrentPreset(preset.id, setCurrentPresetId);
-            
-            // 7. 处理图标迁移
+
             const migrationResult = await this.handleIconMigration(oldTheme, preset.uiTheme);
-            if (!migrationResult.success) {
+            if (!migrationResult.success || migrationResult.needsReload) {
                 return migrationResult;
             }
-            if (migrationResult.needsReload) {
-                return migrationResult;
-            }
-            
-            // 8. 生成成功消息
-            const message = this.getAppIconMessage(preset);
-            
+
             return {
                 success: true,
-                message
+                message: this.getAppIconMessage(preset)
             };
-            
         } catch (error) {
-            console.error('[ThemePresetService] 执行主题方案切换失败:', error);
+            console.error('[ThemePresetService] preset application failed:', error);
             return {
                 success: false,
-                message: '应用主题方案失败，请重试'
+                message: 'Applying the preset failed. Please try again.'
             };
         }
     }

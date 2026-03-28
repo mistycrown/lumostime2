@@ -18,8 +18,14 @@ import {
 } from '../services/timelineStyleService';
 import {
     AchievementBottleStyle,
-    DEFAULT_ACHIEVEMENT_BOTTLE_STYLE
+    DEFAULT_ACHIEVEMENT_BOTTLE_STYLE,
+    isAchievementBottleStyle
 } from '../services/achievementBottleStyleService';
+import {
+    AchievementBottleIconPack,
+    DEFAULT_ACHIEVEMENT_BOTTLE_ICON_PACK,
+    isAchievementBottleIconPack
+} from '../services/achievementBottleIconPackService';
 import { normalizeFiltersOrder } from '../utils/filterUtils';
 import {
     getLocalDataTimestamp,
@@ -96,6 +102,8 @@ interface SettingsContextType {
     setScheduleStyle: React.Dispatch<React.SetStateAction<ScheduleStyle>>;
     achievementBottleStyle: AchievementBottleStyle;
     setAchievementBottleStyle: React.Dispatch<React.SetStateAction<AchievementBottleStyle>>;
+    achievementBottleIconPack: AchievementBottleIconPack;
+    setAchievementBottleIconPack: React.Dispatch<React.SetStateAction<AchievementBottleIconPack>>;
 
     timelineStyleTheme: TimelineStyleTheme;
     setTimelineStyleTheme: React.Dispatch<React.SetStateAction<TimelineStyleTheme>>;
@@ -388,15 +396,16 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
 
     const [achievementBottleStyle, setAchievementBottleStyle] = useState<AchievementBottleStyle>(() => {
         const stored = localStorage.getItem(THEME_KEYS.ACHIEVEMENT_BOTTLE_STYLE);
-        if (
-            stored === 'sunlit'
-            || stored === 'seaGlass'
-            || stored === 'midnight'
-            || stored === 'blushBloom'
-        ) {
-            return stored;
-        }
-        return DEFAULT_ACHIEVEMENT_BOTTLE_STYLE;
+        return isAchievementBottleStyle(stored)
+            ? stored
+            : DEFAULT_ACHIEVEMENT_BOTTLE_STYLE;
+    });
+
+    const [achievementBottleIconPack, setAchievementBottleIconPack] = useState<AchievementBottleIconPack>(() => {
+        const stored = localStorage.getItem(THEME_KEYS.ACHIEVEMENT_BOTTLE_ICON_PACK);
+        return isAchievementBottleIconPack(stored)
+            ? stored
+            : DEFAULT_ACHIEVEMENT_BOTTLE_ICON_PACK;
     });
 
     const [timelineStyleTheme, setTimelineStyleTheme] = useState<TimelineStyleTheme>(() => {
@@ -455,6 +464,10 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
     useEffect(() => {
         localStorage.setItem(THEME_KEYS.ACHIEVEMENT_BOTTLE_STYLE, achievementBottleStyle);
     }, [achievementBottleStyle]);
+
+    useEffect(() => {
+        localStorage.setItem(THEME_KEYS.ACHIEVEMENT_BOTTLE_ICON_PACK, achievementBottleIconPack);
+    }, [achievementBottleIconPack]);
 
     useEffect(() => {
         localStorage.setItem(THEME_KEYS.TIMELINE_STYLE_THEME, timelineStyleTheme);
@@ -560,6 +573,8 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
             setScheduleStyle,
             achievementBottleStyle,
             setAchievementBottleStyle,
+            achievementBottleIconPack,
+            setAchievementBottleIconPack,
             timelineStyleTheme,
             setTimelineStyleTheme,
             timelineStyleConfigs,

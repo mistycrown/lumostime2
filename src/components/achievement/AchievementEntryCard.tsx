@@ -1,12 +1,13 @@
 /**
  * @file AchievementEntryCard.tsx
- * @description Timeline-top entry card for opening the achievement bottle page with current summary data.
+ * @description Timeline-top entry card for opening the achievement bottle page with decimal-safe star balance display.
  */
 import React from 'react';
 import { Sparkles, Stars } from 'lucide-react';
 import { useAchievement } from '../../contexts/AchievementContext';
 import { useNavigation } from '../../contexts/NavigationContext';
 import { formatRelativeTime } from '../../utils/dateUtils';
+import { formatAchievementStars } from '../../utils/achievementUtils';
 
 export const AchievementEntryCard: React.FC = () => {
   const { availableStars, dailySnapshots, redemptionRecords } = useAchievement();
@@ -33,7 +34,7 @@ export const AchievementEntryCard: React.FC = () => {
             <span className="text-xs font-semibold tracking-[0.18em] uppercase">Achievement Bottle</span>
           </div>
           <div className="mt-2 flex items-end gap-3">
-            <span className="text-3xl font-black text-stone-900">{availableStars}</span>
+            <span className="text-3xl font-black text-stone-900">{formatAchievementStars(availableStars)}</span>
             <span className="pb-1 text-sm font-medium text-stone-500">当前可用光点</span>
           </div>
           <p className="mt-2 text-sm text-stone-600">

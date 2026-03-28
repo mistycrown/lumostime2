@@ -2,12 +2,13 @@
  * @file AchievementRedeemTab.tsx
  * @description Simplified reward catalog and redemption record manager used inside the achievement ledger.
  *
- * @updated 2026-03-28: Render the redeem-result hint as plain background text instead of a bordered callout box.
+ * @updated 2026-03-28: Support one-decimal reward costs and star balance display while keeping redemption checks precise.
  */
 import React, { useEffect, useMemo, useState } from 'react';
 import { Gift, Pencil, Plus } from 'lucide-react';
 import { AchievementReward } from '../../types';
 import { AchievementDialog } from './AchievementDialog';
+import { formatAchievementStars, normalizeAchievementStarValue } from '../../utils/achievementUtils';
 
 interface AchievementRedeemTabProps {
   availableStars: number;
@@ -82,7 +83,7 @@ export const AchievementRedeemTab: React.FC<AchievementRedeemTabProps> = ({
       return;
     }
 
-    const sanitizedCost = Math.max(1, Math.floor(Number(draft.cost) || 1));
+    const sanitizedCost = Math.max(0.1, normalizeAchievementStarValue(Number(draft.cost) || 0.1));
 
     if (dialogMode === 'create') {
       onCreateReward({
@@ -159,7 +160,7 @@ export const AchievementRedeemTab: React.FC<AchievementRedeemTabProps> = ({
                 <div key={reward.id} className="flex items-center justify-between gap-4 py-[14px]">
                   <div className="min-w-0 flex-1">
                     <div className="truncate text-[16px] leading-none text-stone-900">{reward.name}</div>
-                    <div className="mt-[6px] text-[13px] leading-6 text-stone-500">成本 {reward.cost} 光点</div>
+                    <div className="mt-[6px] text-[13px] leading-6 text-stone-500">成本 {formatAchievementStars(reward.cost)} 光点</div>
                   </div>
 
                   <div className="flex shrink-0 items-center gap-4">
@@ -261,11 +262,13 @@ export const AchievementRedeemTab: React.FC<AchievementRedeemTabProps> = ({
             <span className="text-[11px] uppercase tracking-[0.14em] text-stone-400">成本（光点）</span>
             <input
               type="number"
-              min={1}
+              min={0.1}
+              step={0.1}
               value={draft.cost}
               onChange={(event) => setDraft((previous) => ({ ...previous, cost: Number(event.target.value) }))}
               className="mt-2 w-full border-b border-stone-300 bg-transparent px-0 py-2 text-[1rem] text-stone-900 outline-none focus:border-stone-900"
             />
+            <div className="mt-2 text-xs text-stone-400">Current: {formatAchievementStars(draft.cost)} 光点</div>
           </label>
         </div>
       </AchievementDialog>
@@ -273,7 +276,7 @@ export const AchievementRedeemTab: React.FC<AchievementRedeemTabProps> = ({
       <AchievementDialog
         isOpen={dialogMode === 'redeem' && !!selectedReward}
         title={selectedReward ? `兑换 ${selectedReward.name}` : '兑换奖励'}
-        subtitle={selectedReward ? `需要 ${selectedReward.cost} 光点 · 当前可用 ${availableStars} 光点` : undefined}
+        subtitle={selectedReward ? `需要 ${formatAchievementStars(selectedReward.cost)} 光点 · 当前可用 ${formatAchievementStars(availableStars)} 光点` : undefined}
         onClose={closeDialog}
         footer={(
           <div className="flex items-center gap-3">
@@ -303,7 +306,7 @@ export const AchievementRedeemTab: React.FC<AchievementRedeemTabProps> = ({
           <div className="space-y-5">
             <p className="text-sm leading-6 text-stone-500">
               {canRedeemSelected
-                ? `兑换成功后剩余 ${availableStars - selectedReward.cost} 光点，立即记入兑换记录。`
+                ? `兑换成功后剩余 ${formatAchievementStars(normalizeAchievementStarValue(availableStars - selectedReward.cost))} 光点，立即记入兑换记录。`
                 : '当前光点不足，暂时无法兑换。'}
             </p>
             {redeemError && (
