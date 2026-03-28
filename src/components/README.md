@@ -48,8 +48,8 @@ Small, atomic display components.
 
 - `ActivityItem.tsx`: Circular activity icon.
 - `GoalCard.tsx`: Goal progress summary card.
-- `achievement/AchievementEntryCard.tsx`: Timeline 顶部的成就入口卡片，展示当前可用星星并进入成就页。
-- `achievement/AchievementBottle.tsx`: 成就页星星瓶主容器，使用物理引擎驱动星星碰撞与测试按钮。
+- `achievement/AchievementEntryCard.tsx`: Timeline 顶部的成就入口卡片，展示当前可用光点并进入成就页。
+- `achievement/AchievementBottle.tsx`: 成就页光点瓶主容器，使用物理引擎驱动光点碰撞效果。
 - `achievement/AchievementRecordsTab.tsx`: 每日快照记录列表，支持展开查看规则命中明细。
 - `achievement/AchievementRulesTab.tsx`: 成就规则编辑区，按活动标签配置获星与扣星规则。
 - `achievement/AchievementRedeemTab.tsx`: 奖励兑换与兑换记录管理区。

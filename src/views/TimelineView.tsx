@@ -3,7 +3,7 @@
  * @input Logs, Categories, Todos, Scopes, Reviews (Daily/Weekly/Monthly)
  * @output Log CRUD, Date Navigation, Gesture/Calendar Animated Day Navigation, Search Trigger, Filter Trigger, Review Navigation
  * @pos View (Main Tab)
- * @description The primary daily view. Visualizes time usage on a timeline, supports adding/editing logs, gap detection, gesture and lightweight calendar date-switch animation, quick search and custom filter entry points, and integrates Daily/Weekly/Monthly review entry points.
+ * @description The primary daily view. Visualizes time usage on a timeline, supports adding/editing logs, gap detection, gesture and lightweight calendar date-switch animation, quick search and custom filter entry points, and integrates Daily/Weekly/Monthly review plus achievement bottle entry points.
  * 
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
@@ -12,7 +12,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { Log, Activity, TodoItem, Category, TodoCategory, Scope, DailyReview, ReviewTemplate, WeeklyReview, MonthlyReview, AutoLinkRule, Goal } from '../types';
 import { CATEGORIES } from '../constants';
 import * as LucideIcons from 'lucide-react';
-import { Plus, MoreHorizontal, BarChart2, ArrowUp, ArrowDown, Sparkles, Zap, Heart, Share, Timer, Clock, Search, Filter, Image as ImageIcon } from 'lucide-react';
+import { Plus, MoreHorizontal, BarChart2, ArrowUp, ArrowDown, FlaskConical, Sparkles, Zap, Heart, Share, Timer, Clock, Search, Filter, Image as ImageIcon } from 'lucide-react';
 import { CalendarWidget } from '../components/CalendarWidget';
 import { AIBatchModal } from '../components/AIBatchModal';
 import { ParsedTimeEntry } from '../services/aiService';
@@ -35,7 +35,6 @@ import { GalleryView } from '../components/GalleryView';
 import { toCssColor } from '../utils/colorUtils';
 import { TimelineStyleRail } from '../components/TimelineStyleRail';
 import { TimelineStyleAdjuster } from '../components/TimelineStyleAdjuster';
-import { AchievementEntryCard } from '../components/achievement/AchievementEntryCard';
 
 // Image Thumbnail Component
 const TimelineImage: React.FC<{ filename: string, className?: string, useThumbnail?: boolean, refreshKey?: number }> = ({ filename, className = "w-16 h-16", useThumbnail = false, refreshKey = 0 }) => {
@@ -205,7 +204,7 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ logs, todos, scopes,
     const [previewImage, setPreviewImage] = useState<string | null>(null);
     const [copyFailureModal, setCopyFailureModal] = useState<{ isOpen: boolean; text: string }>({ isOpen: false, text: '' });
     const [showTimePalDebugger, setShowTimePalDebugger] = useState(false);
-    const { isGalleryViewOpen, setIsGalleryViewOpen, setIsSearchOpen, setIsSearchOpenedFromSettings, setIsFiltersOpen, setActiveFilterId } = useNavigation();
+    const { isGalleryViewOpen, setIsGalleryViewOpen, setIsSearchOpen, setIsSearchOpenedFromSettings, setIsFiltersOpen, setActiveFilterId, setIsAchievementOpen } = useNavigation();
     const {
         timelineStyleTheme,
         timelineStyleConfigs,
@@ -1065,6 +1064,13 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ logs, todos, scopes,
                                 <ImageIcon size={20} />
                             </button>
                             <button
+                                onClick={() => setIsAchievementOpen(true)}
+                                className="p-2 text-stone-400 hover:text-stone-600 hover:bg-stone-100 rounded-full transition-colors"
+                                title="Achievement Bottle"
+                            >
+                                <FlaskConical size={20} />
+                            </button>
+                            <button
                                 onClick={() => setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc')}
                                 className="p-2 text-stone-400 hover:text-stone-600 hover:bg-stone-100 rounded-full transition-colors"
                                 title={sortOrder === 'asc' ? 'Sort Descending' : 'Sort Ascending'}
@@ -1140,9 +1146,6 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ logs, todos, scopes,
                     
                     {/* 时光小友卡片 */}
                     <div className="pl-8 -ml-[70px] mb-6">
-                        <div className="mb-4">
-                            <AchievementEntryCard />
-                        </div>
                         <TimePalCard 
                             logs={logs}
                             currentDate={currentDate}
