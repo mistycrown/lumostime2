@@ -67,7 +67,8 @@ interface TargetOption {
 }
 
 const getSelectedOutlineStyle = () => ({
-  borderColor: 'var(--accent-color)',
+  borderColor: '#d6d3d1',
+  backgroundColor: '#f5f5f4',
   color: 'rgb(28 25 23)'
 });
 

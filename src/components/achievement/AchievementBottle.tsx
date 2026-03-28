@@ -2,7 +2,7 @@
  * @file AchievementBottle.tsx
  * @description Physics-driven achievement bottle visualization with switchable bottle skins for the achievement page and sponsorship previews.
  *
- * @updated 2026-03-28: Added reusable bottle style variants plus static preview rendering for the sponsorship style picker.
+ * @updated 2026-03-28: Added reusable bottle style variants, filtered numbered star sprite assets only, and relaxed star spacing to reduce visual overlap.
  */
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Bodies, Body, Composite, Engine, Runner, World } from 'matter-js';
@@ -56,11 +56,14 @@ interface PreviewStarSpec {
 const MAX_VISIBLE_STARS = 120;
 const PREVIEW_VISIBLE_STARS = 12;
 const STAR_SIZE = 26;
+const STAR_IMAGE_SIZE = 20;
+const STAR_SCALE_MIN = 0.92;
+const STAR_SCALE_MAX = 1.08;
 const BOTTLE_PADDING = 16;
 const EMPTY_DIMENSIONS = { width: 0, height: 0 };
 const STAR_IMAGE_PATHS = Object.entries(
   import.meta.glob<string>(
-    '../../../public/stars/star1/*.{png,jpg,jpeg,webp,svg}',
+    '../../../public/stars/star1/[0-9]*.{png,jpg,jpeg,webp,svg}',
     {
       eager: true,
       import: 'default'
@@ -68,6 +71,10 @@ const STAR_IMAGE_PATHS = Object.entries(
   )
 )
   .sort(([firstPath], [secondPath]) => firstPath.localeCompare(secondPath, undefined, { numeric: true }))
+  .filter(([filePath]) => {
+    const fileName = filePath.split('/').pop() || '';
+    return /^\d+\.(png|jpg|jpeg|webp|svg)$/i.test(fileName);
+  })
   .map(([, assetUrl]) => assetUrl);
 
 const PREVIEW_STAR_LAYOUTS: PreviewStarSpec[] = [
@@ -188,19 +195,31 @@ const getPalette = (styleVariant: AchievementBottleStyle): BottlePalette => {
   return BOTTLE_PALETTES[styleVariant] || BOTTLE_PALETTES[DEFAULT_ACHIEVEMENT_BOTTLE_STYLE];
 };
 
-const getStableStarImagePath = (index: number, styleVariant: AchievementBottleStyle): string | null => {
-  if (STAR_IMAGE_PATHS.length === 0) {
-    return null;
-  }
-
+const getStableStarHash = (seed: string): number => {
   let hash = 17;
-  const seed = `${styleVariant}:${index}`;
 
   for (let i = 0; i < seed.length; i += 1) {
     hash = ((hash * 31) + seed.charCodeAt(i)) >>> 0;
   }
 
+  return hash;
+};
+
+const getStableStarImagePath = (index: number, styleVariant: AchievementBottleStyle): string | null => {
+  if (STAR_IMAGE_PATHS.length === 0) {
+    return null;
+  }
+
+  const hash = getStableStarHash(`${styleVariant}:${index}:image`);
+
   return STAR_IMAGE_PATHS[hash % STAR_IMAGE_PATHS.length] || null;
+};
+
+const getStableStarScale = (index: number, styleVariant: AchievementBottleStyle): number => {
+  const hash = getStableStarHash(`${styleVariant}:${index}:scale`);
+  const normalized = (hash % 1000) / 999;
+
+  return STAR_SCALE_MIN + ((STAR_SCALE_MAX - STAR_SCALE_MIN) * normalized);
 };
 
 export const AchievementBottle: React.FC<AchievementBottleProps> = ({
@@ -286,17 +305,19 @@ export const AchievementBottle: React.FC<AchievementBottleProps> = ({
     ];
 
     const stars = Array.from({ length: visibleCount }, (_, index) => {
-      const innerMinX = BOTTLE_PADDING + (STAR_SIZE / 2) - 2;
-      const innerMaxX = width - BOTTLE_PADDING - (STAR_SIZE / 2) + 2;
+      const starScale = getStableStarScale(index, styleVariant);
+      const starRadius = (STAR_SIZE * starScale) / 2;
+      const innerMinX = BOTTLE_PADDING + starRadius - 2;
+      const innerMaxX = width - BOTTLE_PADDING - starRadius + 2;
       const spreadWidth = Math.max(0, innerMaxX - innerMinX);
       const normalizedX = visibleCount <= 1 ? 0.5 : (index / (visibleCount - 1));
       const baseX = innerMinX + (spreadWidth * normalizedX);
       const jitterLimit = Math.min(22, spreadWidth / Math.max(3, visibleCount * 1.35));
       const spawnX = Math.max(innerMinX, Math.min(innerMaxX, baseX + ((Math.random() - 0.5) * jitterLimit * 2)));
-      const laneCount = Math.max(4, Math.floor(width / 64));
-      const spawnY = BOTTLE_PADDING + 8 + (Math.floor(index / laneCount) * 20) + (Math.random() * 28);
+      const laneCount = Math.max(4, Math.floor(width / 70));
+      const spawnY = BOTTLE_PADDING + 10 + (Math.floor(index / laneCount) * 24) + (Math.random() * 24);
 
-      const star = Bodies.circle(spawnX, spawnY, STAR_SIZE / 2, {
+      const star = Bodies.circle(spawnX, spawnY, starRadius, {
         restitution: 0.48,
         friction: 0.028,
         frictionAir: 0.011 + (Math.random() * 0.008),
@@ -344,7 +365,7 @@ export const AchievementBottle: React.FC<AchievementBottleProps> = ({
       starBodiesRef.current = [];
       starNodeRefs.current = [];
     };
-  }, [compact, dimensions.height, dimensions.width, rebuildToken, renderMode, visibleCount]);
+  }, [compact, dimensions.height, dimensions.width, rebuildToken, renderMode, styleVariant, visibleCount]);
 
   return (
     <div
@@ -430,11 +451,13 @@ export const AchievementBottle: React.FC<AchievementBottleProps> = ({
             {renderMode === 'preview'
               ? previewStars.map((star, index) => {
                 const imagePath = getStableStarImagePath(index, styleVariant);
+                const starScale = getStableStarScale(index, styleVariant);
+                const starImageSize = STAR_IMAGE_SIZE * starScale;
 
                 return (
                   <div
                     key={`preview-star-${styleVariant}-${index}`}
-                    className="pointer-events-none absolute flex h-8 w-8 items-center justify-center"
+                    className="pointer-events-none absolute flex h-9 w-9 items-center justify-center"
                     style={{
                       left: star.left,
                       top: star.top,
@@ -449,14 +472,15 @@ export const AchievementBottle: React.FC<AchievementBottleProps> = ({
                           src={imagePath}
                           alt=""
                           aria-hidden="true"
-                          className="h-6 w-6 object-contain select-none"
+                          className="object-contain select-none"
+                          style={{ width: starImageSize, height: starImageSize }}
                           draggable={false}
                         />
                       )
                       : (
                         <Star
                           aria-hidden="true"
-                          size={20}
+                          size={starImageSize}
                           fill="currentColor"
                           strokeWidth={1.75}
                           style={{ color: palette.starColor }}
@@ -467,6 +491,8 @@ export const AchievementBottle: React.FC<AchievementBottleProps> = ({
               })
               : Array.from({ length: visibleCount }, (_, index) => {
                 const imagePath = getStableStarImagePath(index, styleVariant);
+                const starScale = getStableStarScale(index, styleVariant);
+                const starImageSize = STAR_IMAGE_SIZE * starScale;
 
                 return (
                   <div
@@ -474,7 +500,7 @@ export const AchievementBottle: React.FC<AchievementBottleProps> = ({
                     ref={(node) => {
                       starNodeRefs.current[index] = node;
                     }}
-                    className="pointer-events-none absolute flex h-8 w-8 items-center justify-center"
+                    className="pointer-events-none absolute flex h-9 w-9 items-center justify-center"
                     style={{
                       left: 0,
                       top: 0,
@@ -489,14 +515,15 @@ export const AchievementBottle: React.FC<AchievementBottleProps> = ({
                           src={imagePath}
                           alt=""
                           aria-hidden="true"
-                          className="h-6 w-6 object-contain select-none"
+                          className="object-contain select-none"
+                          style={{ width: starImageSize, height: starImageSize }}
                           draggable={false}
                         />
                       )
                       : (
                         <Star
                           aria-hidden="true"
-                          size={20}
+                          size={starImageSize}
                           fill="currentColor"
                           strokeWidth={1.75}
                           style={{ color: palette.starColor }}
