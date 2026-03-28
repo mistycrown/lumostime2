@@ -18,6 +18,7 @@ import { NavigationDecorationSelector } from '../components/NavigationDecoration
 import { TimelineStyleSelector } from '../components/TimelineStyleSelector';
 import { ColorSchemeSelector } from '../components/ColorSchemeSelector';
 import { CustomColorGroupManager } from '../components/CustomColorGroupManager';
+import { AchievementBottleStyleSelector } from '../components/achievement/AchievementBottleStyleSelector';
 import { iconService, ICON_OPTIONS } from '../services/iconService';
 import { Category } from '../types';
 import { useSettings } from '../contexts/SettingsContext';
@@ -212,6 +213,7 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
         setUiIconTheme,
         colorScheme,
         setColorScheme,
+        setAchievementBottleStyle,
         scheduleStyle,
         setScheduleStyle
     } = useSettings();
@@ -389,6 +391,7 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
             oldTheme,
             setUiIconTheme,
             setColorScheme,
+            setAchievementBottleStyle,
             setCurrentPresetId
         );
         
@@ -1109,6 +1112,7 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
 
                             {activeTab === 'style' && (
                                 <div className="pt-2 space-y-4">
+                                    <AchievementBottleStyleSelector />
                                     <TimelineStyleSelector onToast={onToast} />
                                     <div className="bg-white rounded-2xl shadow-[0_2px_10px_rgba(0,0,0,0.03)]">
                                         <div className="flex items-center justify-between p-4 relative">

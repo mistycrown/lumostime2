@@ -17,6 +17,7 @@ import { AchievementRulesTab } from '../components/achievement/AchievementRulesT
 import { AchievementRedeemTab } from '../components/achievement/AchievementRedeemTab';
 import { useData } from '../contexts/DataContext';
 import { useReview } from '../contexts/ReviewContext';
+import { useSettings } from '../contexts/SettingsContext';
 
 type AchievementTab = 'records' | 'rules' | 'redeem';
 
@@ -50,6 +51,7 @@ export const AchievementView: React.FC = () => {
   const { categories, scopes } = useCategoryScope();
   const { todoCategories } = useData();
   const { checkTemplates } = useReview();
+  const { achievementBottleStyle } = useSettings();
   const [activeTab, setActiveTab] = useState<AchievementTab>('records');
   const [isDetailExpanded, setIsDetailExpanded] = useState(false);
   const [pendingTab, setPendingTab] = useState<AchievementTab | null>(null);
@@ -175,6 +177,7 @@ export const AchievementView: React.FC = () => {
           starCount={availableStars}
           rebuildToken={availableStars}
           compact={false}
+          styleVariant={achievementBottleStyle}
         />
       </section>
 

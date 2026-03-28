@@ -10,6 +10,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useSettings } from '../contexts/SettingsContext';
 import { THEME_KEYS, TIMEPAL_KEYS, storage } from '../constants/storageKeys';
+import type { AchievementBottleStyle } from '../services/achievementBottleStyleService';
 
 // Theme preset interface
 export interface ThemePreset {
@@ -23,6 +24,7 @@ export interface ThemePreset {
     background: string;
     navigation: string;
     timePal: string;
+    achievementBottleStyle?: AchievementBottleStyle;
     isCustom?: boolean;
     createdAt?: number;
     updatedAt?: number;
@@ -133,7 +135,7 @@ export const getValidationErrorMessage = (error: ValidationError): string => {
  * Hook for managing custom theme presets
  */
 export const useCustomPresets = () => {
-    const { uiIconTheme, colorScheme } = useSettings();
+    const { uiIconTheme, colorScheme, achievementBottleStyle } = useSettings();
     const [customPresets, setCustomPresets] = useState<ThemePreset[]>([]);
     const [isLoading, setIsLoading] = useState(true);
 
@@ -161,11 +163,12 @@ export const useCustomPresets = () => {
             background: storage.get(THEME_KEYS.CURRENT_BACKGROUND) || 'default',
             navigation: storage.get(THEME_KEYS.NAVIGATION_DECORATION) || 'default',
             timePal: storage.get(TIMEPAL_KEYS.TYPE) || 'none',
+            achievementBottleStyle,
             isCustom: true,
             createdAt: timestamp,
             updatedAt: timestamp
         };
-    }, [uiIconTheme, colorScheme]);
+    }, [achievementBottleStyle, colorScheme, uiIconTheme]);
 
     /**
      * Add a new custom preset
