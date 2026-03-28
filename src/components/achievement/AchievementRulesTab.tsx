@@ -1,10 +1,11 @@
 /**
  * @file AchievementRulesTab.tsx
- * @description Editable achievement rule list and creation form for activity-based star conversion rules.
+ * @description Minimal ledger-style rule list with modal-based create and edit flows.
  */
-import React, { useMemo, useState } from 'react';
-import { Plus, Trash2 } from 'lucide-react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { ChevronRight, Plus } from 'lucide-react';
 import { AchievementRule, Category } from '../../types';
+import { AchievementDialog } from './AchievementDialog';
 
 interface AchievementRulesTabProps {
   categories: Category[];
@@ -20,6 +21,24 @@ interface AchievementRulesTabProps {
   onUpdateRule: (rule: AchievementRule) => void;
   onDeleteRule: (ruleId: string) => void;
 }
+
+interface RuleDraft {
+  name: string;
+  effectType: 'earn' | 'spend';
+  targetIds: string[];
+  unitMinutes: number;
+  deltaPerUnit: number;
+  note: string;
+}
+
+const createEmptyDraft = (): RuleDraft => ({
+  name: '',
+  effectType: 'earn',
+  targetIds: [],
+  unitMinutes: 30,
+  deltaPerUnit: 1,
+  note: ''
+});
 
 const collectActivityOptions = (categories: Category[]) => categories.flatMap((category) => (
   category.activities.map((activity) => ({
@@ -38,21 +57,14 @@ const ActivityPicker: React.FC<{
   const options = useMemo(() => collectActivityOptions(categories), [categories]);
 
   return (
-    <div className="grid gap-2 sm:grid-cols-2">
+    <div className="border-t border-stone-200">
       {options.map((option) => {
         const checked = selectedIds.includes(option.activityId);
         return (
-          <label
-            key={option.activityId}
-            className={`flex cursor-pointer items-start gap-3 rounded-2xl border px-3 py-3 text-sm transition-colors ${
-              checked
-                ? 'border-amber-300 bg-amber-50/90'
-                : 'border-stone-200 bg-white'
-            }`}
-          >
+          <label key={option.activityId} className="flex cursor-pointer items-start gap-3 border-b border-stone-200 py-3">
             <input
               type="checkbox"
-              className="mt-1 h-4 w-4 rounded border-stone-300 text-amber-500 focus:ring-amber-400"
+              className="mt-1 h-4 w-4 rounded border-stone-300 text-stone-900 focus:ring-stone-400"
               checked={checked}
               onChange={(event) => {
                 if (event.target.checked) {
@@ -64,102 +76,12 @@ const ActivityPicker: React.FC<{
               }}
             />
             <span className="min-w-0">
-              <span className="block font-medium text-stone-800">{option.activityName}</span>
-              <span className="block text-xs text-stone-500">{option.categoryName}</span>
+              <span className="block text-sm text-stone-900">{option.activityName}</span>
+              <span className="mt-1 block text-xs tracking-[0.08em] text-stone-400">{option.categoryName}</span>
             </span>
           </label>
         );
       })}
-    </div>
-  );
-};
-
-const RuleCard: React.FC<{
-  categories: Category[];
-  rule: AchievementRule;
-  onUpdateRule: (rule: AchievementRule) => void;
-  onDeleteRule: (ruleId: string) => void;
-}> = ({ categories, rule, onUpdateRule, onDeleteRule }) => {
-  return (
-    <div className="rounded-3xl border border-stone-200 bg-white p-4 shadow-sm">
-      <div className="flex items-center justify-between gap-3">
-        <input
-          value={rule.name}
-          onChange={(event) => onUpdateRule({ ...rule, name: event.target.value })}
-          className="min-w-0 flex-1 rounded-2xl border border-stone-200 bg-stone-50 px-3 py-2 text-sm font-semibold text-stone-900 outline-none focus:border-amber-300"
-        />
-        <button
-          type="button"
-          onClick={() => onUpdateRule({ ...rule, enabled: !rule.enabled })}
-          className={`rounded-full px-3 py-2 text-xs font-semibold ${
-            rule.enabled
-              ? 'bg-emerald-100 text-emerald-700'
-              : 'bg-stone-100 text-stone-500'
-          }`}
-        >
-          {rule.enabled ? '启用中' : '已停用'}
-        </button>
-        <button
-          type="button"
-          onClick={() => onDeleteRule(rule.id)}
-          className="rounded-full bg-rose-50 p-2 text-rose-500"
-        >
-          <Trash2 size={14} />
-        </button>
-      </div>
-
-      <div className="mt-4 grid gap-3 sm:grid-cols-3">
-        <label className="text-sm">
-          <span className="mb-1 block text-stone-500">方向</span>
-          <select
-            value={rule.effectType}
-            onChange={(event) => onUpdateRule({ ...rule, effectType: event.target.value as 'earn' | 'spend' })}
-            className="w-full rounded-2xl border border-stone-200 bg-stone-50 px-3 py-2 text-stone-800 outline-none focus:border-amber-300"
-          >
-            <option value="earn">获得星星</option>
-            <option value="spend">扣除星星</option>
-          </select>
-        </label>
-        <label className="text-sm">
-          <span className="mb-1 block text-stone-500">每多少分钟</span>
-          <input
-            type="number"
-            min={1}
-            value={rule.unitMinutes}
-            onChange={(event) => onUpdateRule({ ...rule, unitMinutes: Number(event.target.value) || 1 })}
-            className="w-full rounded-2xl border border-stone-200 bg-stone-50 px-3 py-2 text-stone-800 outline-none focus:border-amber-300"
-          />
-        </label>
-        <label className="text-sm">
-          <span className="mb-1 block text-stone-500">每次变化</span>
-          <input
-            type="number"
-            min={1}
-            value={rule.deltaPerUnit}
-            onChange={(event) => onUpdateRule({ ...rule, deltaPerUnit: Number(event.target.value) || 1 })}
-            className="w-full rounded-2xl border border-stone-200 bg-stone-50 px-3 py-2 text-stone-800 outline-none focus:border-amber-300"
-          />
-        </label>
-      </div>
-
-      <label className="mt-3 block text-sm">
-        <span className="mb-1 block text-stone-500">备注</span>
-        <textarea
-          value={rule.note || ''}
-          onChange={(event) => onUpdateRule({ ...rule, note: event.target.value })}
-          rows={2}
-          className="w-full rounded-2xl border border-stone-200 bg-stone-50 px-3 py-2 text-stone-700 outline-none focus:border-amber-300"
-        />
-      </label>
-
-      <div className="mt-4">
-        <div className="mb-2 text-sm font-semibold text-stone-700">关联活动</div>
-        <ActivityPicker
-          categories={categories}
-          selectedIds={rule.targetIds}
-          onChange={(targetIds) => onUpdateRule({ ...rule, targetIds })}
-        />
-      </div>
     </div>
   );
 };
@@ -171,125 +93,236 @@ export const AchievementRulesTab: React.FC<AchievementRulesTabProps> = ({
   onUpdateRule,
   onDeleteRule
 }) => {
-  const [draft, setDraft] = useState({
-    name: '',
-    effectType: 'earn' as 'earn' | 'spend',
-    targetIds: [] as string[],
-    unitMinutes: 30,
-    deltaPerUnit: 1,
-    note: ''
-  });
+  const [dialogMode, setDialogMode] = useState<'create' | 'edit' | null>(null);
+  const [selectedRuleId, setSelectedRuleId] = useState<string | null>(null);
+  const [draft, setDraft] = useState<RuleDraft>(createEmptyDraft);
 
-  const handleCreate = () => {
+  const selectedRule = rules.find((rule) => rule.id === selectedRuleId) || null;
+  const isDialogOpen = dialogMode !== null;
+
+  useEffect(() => {
+    if (dialogMode === 'edit' && selectedRule) {
+      setDraft({
+        name: selectedRule.name,
+        effectType: selectedRule.effectType,
+        targetIds: selectedRule.targetIds,
+        unitMinutes: selectedRule.unitMinutes,
+        deltaPerUnit: selectedRule.deltaPerUnit,
+        note: selectedRule.note || ''
+      });
+      return;
+    }
+
+    if (dialogMode === 'create') {
+      setDraft(createEmptyDraft());
+    }
+  }, [dialogMode, selectedRule]);
+
+  const activityNameMap = useMemo(() => {
+    const entries = collectActivityOptions(categories).map((option) => [option.activityId, option.activityName]);
+    return new Map(entries);
+  }, [categories]);
+
+  const closeDialog = () => {
+    setDialogMode(null);
+    setSelectedRuleId(null);
+  };
+
+  const handleSave = () => {
     if (!draft.name.trim() || draft.targetIds.length === 0) {
       return;
     }
 
-    onCreateRule(draft);
-    setDraft({
-      name: '',
-      effectType: 'earn',
-      targetIds: [],
-      unitMinutes: 30,
-      deltaPerUnit: 1,
-      note: ''
-    });
+    if (dialogMode === 'create') {
+      onCreateRule({
+        name: draft.name.trim(),
+        effectType: draft.effectType,
+        targetIds: draft.targetIds,
+        unitMinutes: draft.unitMinutes,
+        deltaPerUnit: draft.deltaPerUnit,
+        note: draft.note.trim() || undefined
+      });
+      closeDialog();
+      return;
+    }
+
+    if (dialogMode === 'edit' && selectedRule) {
+      onUpdateRule({
+        ...selectedRule,
+        name: draft.name.trim(),
+        effectType: draft.effectType,
+        targetIds: draft.targetIds,
+        unitMinutes: draft.unitMinutes,
+        deltaPerUnit: draft.deltaPerUnit,
+        note: draft.note.trim() || undefined
+      });
+      closeDialog();
+    }
   };
 
   return (
-    <div className="space-y-4">
-      <div className="rounded-[1.75rem] border border-amber-200 bg-amber-50/80 p-4">
-        <div className="text-sm font-semibold text-amber-800">新增规则</div>
-        <div className="mt-3 grid gap-3 sm:grid-cols-3">
-          <label className="text-sm">
-            <span className="mb-1 block text-stone-500">规则名称</span>
-            <input
-              value={draft.name}
-              onChange={(event) => setDraft((previous) => ({ ...previous, name: event.target.value }))}
-              className="w-full rounded-2xl border border-amber-200 bg-white px-3 py-2 text-stone-800 outline-none focus:border-amber-300"
-              placeholder="例如：阅读半小时一颗星"
-            />
-          </label>
-          <label className="text-sm">
-            <span className="mb-1 block text-stone-500">方向</span>
-            <select
-              value={draft.effectType}
-              onChange={(event) => setDraft((previous) => ({ ...previous, effectType: event.target.value as 'earn' | 'spend' }))}
-              className="w-full rounded-2xl border border-amber-200 bg-white px-3 py-2 text-stone-800 outline-none focus:border-amber-300"
-            >
-              <option value="earn">获得星星</option>
-              <option value="spend">扣除星星</option>
-            </select>
-          </label>
-          <label className="text-sm">
-            <span className="mb-1 block text-stone-500">每次变化</span>
-            <input
-              type="number"
-              min={1}
-              value={draft.deltaPerUnit}
-              onChange={(event) => setDraft((previous) => ({ ...previous, deltaPerUnit: Number(event.target.value) || 1 }))}
-              className="w-full rounded-2xl border border-amber-200 bg-white px-3 py-2 text-stone-800 outline-none focus:border-amber-300"
-            />
-          </label>
-        </div>
-        <div className="mt-3 grid gap-3 sm:grid-cols-2">
-          <label className="text-sm">
-            <span className="mb-1 block text-stone-500">每多少分钟触发一次</span>
-            <input
-              type="number"
-              min={1}
-              value={draft.unitMinutes}
-              onChange={(event) => setDraft((previous) => ({ ...previous, unitMinutes: Number(event.target.value) || 1 }))}
-              className="w-full rounded-2xl border border-amber-200 bg-white px-3 py-2 text-stone-800 outline-none focus:border-amber-300"
-            />
-          </label>
-          <label className="text-sm">
-            <span className="mb-1 block text-stone-500">备注</span>
-            <input
-              value={draft.note}
-              onChange={(event) => setDraft((previous) => ({ ...previous, note: event.target.value }))}
-              className="w-full rounded-2xl border border-amber-200 bg-white px-3 py-2 text-stone-800 outline-none focus:border-amber-300"
-              placeholder="可选"
-            />
-          </label>
-        </div>
-
-        <div className="mt-4">
-          <div className="mb-2 text-sm font-semibold text-stone-700">关联活动</div>
-          <ActivityPicker
-            categories={categories}
-            selectedIds={draft.targetIds}
-            onChange={(targetIds) => setDraft((previous) => ({ ...previous, targetIds }))}
-          />
-        </div>
-
+    <>
+      <div className="flex items-center justify-between border-b border-stone-200 pb-3">
+        <div className="text-sm tracking-[0.12em] text-stone-400">RULES / {rules.length}</div>
         <button
           type="button"
-          onClick={handleCreate}
-          className="mt-4 inline-flex items-center gap-2 rounded-full bg-amber-500 px-4 py-2 text-sm font-semibold text-white shadow-sm"
+          onClick={() => setDialogMode('create')}
+          className="inline-flex items-center gap-2 text-sm text-stone-900 transition-colors hover:text-stone-600"
         >
-          <Plus size={14} />
-          添加规则
+          <Plus size={15} />
+          新增规则
         </button>
       </div>
 
       {rules.length === 0 ? (
-        <div className="rounded-3xl border border-dashed border-stone-200 bg-stone-50/80 px-5 py-8 text-center text-sm text-stone-500">
-          还没有规则。先添加“阅读 30 分钟 +1 星”之类的规则，成就页才能开始产出每日快照。
+        <div className="border-b border-dashed border-stone-300 py-5 text-sm leading-7 text-stone-500">
+          还没有规则。先新增一条类似“阅读 30 分钟 +1 星”的规则，成就页才会开始生成每日快照。
         </div>
       ) : (
-        <div className="space-y-4">
-          {rules.map((rule) => (
-            <RuleCard
-              key={rule.id}
-              categories={categories}
-              rule={rule}
-              onUpdateRule={onUpdateRule}
-              onDeleteRule={onDeleteRule}
-            />
-          ))}
+        <div className="border-t border-stone-200">
+          {rules.map((rule) => {
+            const targetPreview = rule.targetIds
+              .map((targetId) => activityNameMap.get(targetId) || '未命名活动')
+              .slice(0, 3)
+              .join(' / ');
+
+            return (
+              <button
+                key={rule.id}
+                type="button"
+                onClick={() => {
+                  setSelectedRuleId(rule.id);
+                  setDialogMode('edit');
+                }}
+                className="flex w-full items-center justify-between gap-4 border-b border-stone-200 py-4 text-left transition-colors hover:bg-stone-50/70"
+              >
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-3">
+                    <span className="text-[1rem] text-stone-900">{rule.name}</span>
+                    <span className={`text-[11px] uppercase tracking-[0.14em] ${rule.enabled ? 'text-stone-400' : 'text-stone-300'}`}>
+                      {rule.enabled ? 'Enabled' : 'Paused'}
+                    </span>
+                  </div>
+                  <div className="mt-2 text-[13px] leading-6 text-stone-500">
+                    每 {rule.unitMinutes} 分钟 {rule.effectType === 'earn' ? '+' : '-'}{rule.deltaPerUnit} 星
+                    {targetPreview ? ` · ${targetPreview}` : ''}
+                  </div>
+                </div>
+                <ChevronRight size={16} className="text-stone-300" />
+              </button>
+            );
+          })}
         </div>
       )}
-    </div>
+
+      <AchievementDialog
+        isOpen={isDialogOpen}
+        title={dialogMode === 'create' ? '新增规则' : (selectedRule?.name || '编辑规则')}
+        subtitle={dialogMode === 'create' ? '规则修改不追溯历史快照，只影响今天和昨天。' : undefined}
+        onClose={closeDialog}
+        footer={(
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              {dialogMode === 'edit' && selectedRule && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    onDeleteRule(selectedRule.id);
+                    closeDialog();
+                  }}
+                  className="text-sm text-stone-400 transition-colors hover:text-rose-500"
+                >
+                  删除规则
+                </button>
+              )}
+            </div>
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={closeDialog}
+                className="rounded-full border border-stone-200 px-4 py-2 text-sm text-stone-600 transition-colors hover:bg-stone-100"
+              >
+                取消
+              </button>
+              <button
+                type="button"
+                onClick={handleSave}
+                disabled={!draft.name.trim() || draft.targetIds.length === 0}
+                className="rounded-full bg-stone-900 px-4 py-2 text-sm text-white transition-colors disabled:bg-stone-300"
+              >
+                保存
+              </button>
+            </div>
+          </div>
+        )}
+      >
+        <div className="space-y-5">
+          <div className="grid gap-4 sm:grid-cols-2">
+            <label className="block">
+              <span className="text-[11px] uppercase tracking-[0.14em] text-stone-400">规则名称</span>
+              <input
+                value={draft.name}
+                onChange={(event) => setDraft((previous) => ({ ...previous, name: event.target.value }))}
+                className="mt-2 w-full border-b border-stone-300 bg-transparent px-0 py-2 text-[1rem] text-stone-900 outline-none focus:border-stone-900"
+                placeholder="例如：阅读半小时一颗星"
+              />
+            </label>
+            <label className="block">
+              <span className="text-[11px] uppercase tracking-[0.14em] text-stone-400">方向</span>
+              <select
+                value={draft.effectType}
+                onChange={(event) => setDraft((previous) => ({ ...previous, effectType: event.target.value as 'earn' | 'spend' }))}
+                className="mt-2 w-full border-b border-stone-300 bg-transparent px-0 py-2 text-[1rem] text-stone-900 outline-none focus:border-stone-900"
+              >
+                <option value="earn">获得星星</option>
+                <option value="spend">扣除星星</option>
+              </select>
+            </label>
+            <label className="block">
+              <span className="text-[11px] uppercase tracking-[0.14em] text-stone-400">触发分钟</span>
+              <input
+                type="number"
+                min={1}
+                value={draft.unitMinutes}
+                onChange={(event) => setDraft((previous) => ({ ...previous, unitMinutes: Number(event.target.value) || 1 }))}
+                className="mt-2 w-full border-b border-stone-300 bg-transparent px-0 py-2 text-[1rem] text-stone-900 outline-none focus:border-stone-900"
+              />
+            </label>
+            <label className="block">
+              <span className="text-[11px] uppercase tracking-[0.14em] text-stone-400">每次变化</span>
+              <input
+                type="number"
+                min={1}
+                value={draft.deltaPerUnit}
+                onChange={(event) => setDraft((previous) => ({ ...previous, deltaPerUnit: Number(event.target.value) || 1 }))}
+                className="mt-2 w-full border-b border-stone-300 bg-transparent px-0 py-2 text-[1rem] text-stone-900 outline-none focus:border-stone-900"
+              />
+            </label>
+          </div>
+
+          <label className="block">
+            <span className="text-[11px] uppercase tracking-[0.14em] text-stone-400">备注</span>
+            <textarea
+              value={draft.note}
+              onChange={(event) => setDraft((previous) => ({ ...previous, note: event.target.value }))}
+              rows={3}
+              className="mt-2 w-full border border-stone-200 bg-transparent px-3 py-3 text-sm leading-7 text-stone-900 outline-none focus:border-stone-900"
+              placeholder="可选"
+            />
+          </label>
+
+          <div>
+            <div className="text-[11px] uppercase tracking-[0.14em] text-stone-400">关联活动</div>
+            <div className="mt-3">
+              <ActivityPicker
+                categories={categories}
+                selectedIds={draft.targetIds}
+                onChange={(targetIds) => setDraft((previous) => ({ ...previous, targetIds }))}
+              />
+            </div>
+          </div>
+        </div>
+      </AchievementDialog>
+    </>
   );
 };
