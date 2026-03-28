@@ -28,6 +28,11 @@ const createEmptyRewardDraft = (): RewardDraft => ({
   cost: 10
 });
 
+const isSameRewardDraft = (left: RewardDraft, right: RewardDraft) => (
+  left.name === right.name &&
+  left.cost === right.cost
+);
+
 export const AchievementRedeemTab: React.FC<AchievementRedeemTabProps> = ({
   availableStars,
   rewards,
@@ -49,15 +54,17 @@ export const AchievementRedeemTab: React.FC<AchievementRedeemTabProps> = ({
 
   useEffect(() => {
     if (dialogMode === 'edit' && selectedReward) {
-      setDraft({
+      const nextDraft = {
         name: selectedReward.name,
         cost: selectedReward.cost
-      });
+      };
+      setDraft((previous) => (isSameRewardDraft(previous, nextDraft) ? previous : nextDraft));
       return;
     }
 
     if (dialogMode === 'create') {
-      setDraft(createEmptyRewardDraft());
+      const nextDraft = createEmptyRewardDraft();
+      setDraft((previous) => (isSameRewardDraft(previous, nextDraft) ? previous : nextDraft));
     }
   }, [dialogMode, selectedReward]);
 
@@ -200,7 +207,7 @@ export const AchievementRedeemTab: React.FC<AchievementRedeemTabProps> = ({
       <AchievementDialog
         isOpen={dialogMode === 'create' || (dialogMode === 'edit' && !!selectedReward)}
         title={dialogMode === 'edit' ? selectedReward?.name || '编辑奖励' : '新增奖励'}
-        subtitle={dialogMode === 'edit' ? '修改奖励不会影响历史兑换记录。' : '只需要填写名称和成本，先把奖励建起来。'}
+        subtitle={dialogMode === 'edit' ? '修改奖励不会影响历史兑换记录。' : undefined}
         onClose={closeDialog}
         footer={(
           <div className="flex items-center justify-between gap-3">
