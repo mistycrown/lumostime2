@@ -5,7 +5,7 @@
 import React, { useState } from 'react';
 import { ChevronLeft, ChevronRight, ChevronDown } from 'lucide-react';
 import { ToastType } from '../../components/Toast';
-import { DefaultArchiveView, DefaultIndexView, DefaultRecordView, SceneCardTimerMode } from '../../contexts/SettingsContext';
+import { DefaultArchiveView, DefaultIndexView, DefaultRecordView, SceneCardTimerMode, TimelineSortOrder } from '../../contexts/SettingsContext';
 
 interface PreferencesSettingsViewProps {
     onBack: () => void;
@@ -44,6 +44,8 @@ interface PreferencesSettingsViewProps {
     onSetDefaultRecordView?: (view: DefaultRecordView) => void;
     timelineGalleryMode?: boolean;
     onToggleTimelineGalleryMode?: () => void;
+    timelineSortOrder?: TimelineSortOrder;
+    onSetTimelineSortOrder?: (sortOrder: TimelineSortOrder) => void;
     collapseThreshold?: number;
     onSetCollapseThreshold?: (val: number) => void;
     manualSyncMode?: boolean;
@@ -89,6 +91,8 @@ export const PreferencesSettingsView: React.FC<PreferencesSettingsViewProps> = (
     onSetDefaultRecordView,
     timelineGalleryMode = false,
     onToggleTimelineGalleryMode,
+    timelineSortOrder = 'asc',
+    onSetTimelineSortOrder,
     collapseThreshold = 9999,
     onSetCollapseThreshold,
     manualSyncMode = false,
@@ -424,6 +428,25 @@ export const PreferencesSettingsView: React.FC<PreferencesSettingsViewProps> = (
                                 <div
                                     className={`w-5 h-5 bg-white rounded-full shadow-sm transition-transform ${
                                         timelineGalleryMode ? 'translate-x-5' : 'translate-x-0'
+                                    }`}
+                                />
+                            </button>
+                        </div>
+
+                        <div className="flex items-center justify-between gap-3 p-4 border-b border-stone-100 hover:bg-stone-50 transition-colors">
+                            <div className="flex-1 min-w-0">
+                                <h4 className="font-bold text-stone-700">脉络页最新在上</h4>
+                                <p className="text-xs text-stone-400 mt-1">开启后按时间倒序显示，最新记录排在顶部</p>
+                            </div>
+                            <button
+                                onClick={() => onSetTimelineSortOrder?.(timelineSortOrder === 'desc' ? 'asc' : 'desc')}
+                                className={`flex-shrink-0 w-12 h-7 rounded-full transition-colors flex items-center px-1 ${
+                                    timelineSortOrder === 'desc' ? 'bg-stone-800' : 'bg-stone-200'
+                                }`}
+                            >
+                                <div
+                                    className={`w-5 h-5 bg-white rounded-full shadow-sm transition-transform ${
+                                        timelineSortOrder === 'desc' ? 'translate-x-5' : 'translate-x-0'
                                     }`}
                                 />
                             </button>

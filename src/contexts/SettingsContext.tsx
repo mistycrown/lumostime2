@@ -36,6 +36,7 @@ import {
 export type DefaultArchiveView = 'CHRONICLE' | 'MEMOIR';
 export type DefaultIndexView = 'TAGS' | 'SCOPE';
 export type DefaultRecordView = 'TIMER' | 'SCENE';
+export type TimelineSortOrder = 'asc' | 'desc';
 export type EmojiStyle = 'native' | 'twemoji' | 'openmoji';
 export type ScheduleStyle = 'default' | 'classic' | 'minimal' | 'solid';
 export type DefaultSelectorPage = 'emoji' | string; // 'emoji' 或 sticker set ID (如 'water', 'water-1', 'water-2')
@@ -79,6 +80,8 @@ interface SettingsContextType {
 
     timelineGalleryMode: boolean;
     setTimelineGalleryMode: React.Dispatch<React.SetStateAction<boolean>>;
+    timelineSortOrder: TimelineSortOrder;
+    setTimelineSortOrder: React.Dispatch<React.SetStateAction<TimelineSortOrder>>;
 
     // 折叠字数设置
     collapseThreshold: number;
@@ -355,6 +358,18 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
         localStorage.setItem('lumostime_timeline_gallery_mode', timelineGalleryMode.toString());
     }, [timelineGalleryMode]);
 
+    const [timelineSortOrder, setTimelineSortOrder] = useState<TimelineSortOrder>(() => {
+        const stored =
+            localStorage.getItem('lumostime_timeline_sort_order') ||
+            localStorage.getItem('lumos_timeline_sort');
+        return stored === 'desc' ? 'desc' : 'asc';
+    });
+
+    useEffect(() => {
+        localStorage.setItem('lumostime_timeline_sort_order', timelineSortOrder);
+        localStorage.setItem('lumos_timeline_sort', timelineSortOrder);
+    }, [timelineSortOrder]);
+
     const [collapseThreshold, setCollapseThreshold] = useState<number>(() => {
         const stored = localStorage.getItem('lumostime_collapse_threshold');
         return stored ? parseInt(stored) : 9999; // Default to 9999 (no collapse)
@@ -561,6 +576,8 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
             setAutoOpenFocusDetail,
             timelineGalleryMode,
             setTimelineGalleryMode,
+            timelineSortOrder,
+            setTimelineSortOrder,
             collapseThreshold,
             setCollapseThreshold,
             uiIconTheme,
