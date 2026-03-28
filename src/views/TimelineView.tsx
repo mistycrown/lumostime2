@@ -35,6 +35,7 @@ import { GalleryView } from '../components/GalleryView';
 import { toCssColor } from '../utils/colorUtils';
 import { TimelineStyleRail } from '../components/TimelineStyleRail';
 import { TimelineStyleAdjuster } from '../components/TimelineStyleAdjuster';
+import { AchievementEntryCard } from '../components/achievement/AchievementEntryCard';
 
 // Image Thumbnail Component
 const TimelineImage: React.FC<{ filename: string, className?: string, useThumbnail?: boolean, refreshKey?: number }> = ({ filename, className = "w-16 h-16", useThumbnail = false, refreshKey = 0 }) => {
@@ -1139,6 +1140,9 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ logs, todos, scopes,
                     
                     {/* 时光小友卡片 */}
                     <div className="pl-8 -ml-[70px] mb-6">
+                        <div className="mb-4">
+                            <AchievementEntryCard />
+                        </div>
                         <TimePalCard 
                             logs={logs}
                             currentDate={currentDate}

@@ -48,6 +48,11 @@ Small, atomic display components.
 
 - `ActivityItem.tsx`: Circular activity icon.
 - `GoalCard.tsx`: Goal progress summary card.
+- `achievement/AchievementEntryCard.tsx`: Timeline 顶部的成就入口卡片，展示当前可用星星并进入成就页。
+- `achievement/AchievementBottle.tsx`: 成就页星星瓶主容器，使用物理引擎驱动星星碰撞与测试按钮。
+- `achievement/AchievementRecordsTab.tsx`: 每日快照记录列表，支持展开查看规则命中明细。
+- `achievement/AchievementRulesTab.tsx`: 成就规则编辑区，按活动标签配置获星与扣星规则。
+- `achievement/AchievementRedeemTab.tsx`: 奖励兑换与兑换记录管理区。
 
 ## Theme & Customization
 Components for theme and appearance customization.
@@ -72,4 +77,4 @@ Components for theme and appearance customization.
 - `TimelineStyleRail.tsx`: TimelineView、Memoir 与详情页共用的样式轨道渲染组件，支持摘要节点圆点对齐和页面级轨道宽度限制。
 - `TimelineStyleAdjuster.tsx`: 时间线样式调节浮窗，使用更紧凑的半屏宽度布局，并支持档案页专用水平偏移。
 
-> Last updated: 2026-03-22
+> Last updated: 2026-03-28

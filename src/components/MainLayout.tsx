@@ -59,6 +59,7 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
         isOnThisDayOpen,
         isWeeklyReviewOpen,
         isMonthlyReviewOpen,
+        isAchievementOpen, setIsAchievementOpen,
         isStatsFullScreen, setIsStatsFullScreen,
         isTodoModalOpen,
         isTodoManaging, setIsTodoManaging,
@@ -92,6 +93,7 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
         if (isOnThisDayOpen) return 'On This Day';
         if (isWeeklyReviewOpen) return 'Weekly Review';
         if (isMonthlyReviewOpen) return 'Monthly Review';
+        if (isAchievementOpen) return '成就瓶';
         if (currentView === AppView.TAGS) {
             if (selectedTagId) return 'Tag Details';
             if (selectedCategoryId) return 'Category Details';
@@ -114,7 +116,7 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
         <div className={`h-screen w-screen flex flex-col text-stone-800 overflow-hidden select-none font-serif relative pb-[env(safe-area-inset-bottom)]`}>
 
             {/* Top Header Bar */}
-            {!isSettingsOpen && (currentView !== AppView.TIMELINE || isDailyReviewOpen || isOnThisDayOpen || isWeeklyReviewOpen || isMonthlyReviewOpen) && !isStatsFullScreen &&
+            {!isSettingsOpen && (currentView !== AppView.TIMELINE || isDailyReviewOpen || isOnThisDayOpen || isWeeklyReviewOpen || isMonthlyReviewOpen || isAchievementOpen) && !isStatsFullScreen &&
                 !isTodoModalOpen &&
                 !(currentView === AppView.TODO && isTodoManaging) &&
                 !(currentView === AppView.TAGS && isTagsManaging) &&
@@ -146,7 +148,8 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
                                 isDailyReviewOpen ||
                                 isOnThisDayOpen ||
                                 isWeeklyReviewOpen ||
-                                isMonthlyReviewOpen) && (
+                                isMonthlyReviewOpen ||
+                                isAchievementOpen) && (
                                     <button
                                         onClick={() => {
                                             if (returnToSearch) {
@@ -159,6 +162,7 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
                                                 else if (isOnThisDayOpen) handleCloseOnThisDay();
                                                 else if (isWeeklyReviewOpen) handleCloseWeeklyReview();
                                                 else if (isMonthlyReviewOpen) handleCloseMonthlyReview();
+                                                else if (isAchievementOpen) setIsAchievementOpen(false);
                                                 else if (currentView === AppView.STATS) setCurrentView(AppView.TIMELINE);
                                                 else if (currentView === AppView.SCOPE) handleBackFromScope();
                                                 else handleBackFromTag();
@@ -196,6 +200,8 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
                                                     setCurrentView(AppView.RECORD);
                                                     setPreviousView(null);
                                                 }
+                                            } else if (isAchievementOpen) {
+                                                setIsAchievementOpen(false);
                                             } else if (currentView === AppView.STATS) {
                                                 // Clear stats range when going back
                                                 setStatsRange(null);
@@ -222,7 +228,7 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
                         <h1 className="text-lg font-bold text-stone-700 tracking-wide">
                             {getHeaderTitle()}
                         </h1>
-                        {(isDailyReviewOpen || isOnThisDayOpen || isWeeklyReviewOpen || isMonthlyReviewOpen) ? (
+                        {(isDailyReviewOpen || isOnThisDayOpen || isWeeklyReviewOpen || isMonthlyReviewOpen || isAchievementOpen) ? (
                             <div className="w-8" />
                         ) : currentView === AppView.RECORD ? (
                             <button

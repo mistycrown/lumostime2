@@ -18,6 +18,7 @@ import { DailyReviewView } from '../views/DailyReviewView';
 import { WeeklyReviewView } from '../views/WeeklyReviewView';
 import { MonthlyReviewView } from '../views/MonthlyReviewView';
 import { OnThisDayView } from '../views/OnThisDayView';
+import { AchievementView } from '../views/AchievementView';
 import { RecordViewContainer } from '../views/RecordViewContainer';
 import { TimelineView } from '../views/TimelineView';
 import { JournalView } from '../views/JournalView';
@@ -92,6 +93,7 @@ export const AppRoutes: React.FC<AppRoutesProps> = ({
         isDailyReviewOpen, isOnThisDayOpen, setIsOnThisDayOpen, currentReviewDate, currentOnThisDayDate, setCurrentOnThisDayDate,
         isWeeklyReviewOpen, currentWeeklyReviewStart, currentWeeklyReviewEnd,
         isMonthlyReviewOpen, currentMonthlyReviewStart, currentMonthlyReviewEnd,
+        isAchievementOpen,
         isStatsFullScreen, setIsStatsFullScreen,
         isTodoManaging, setIsTodoManaging,
         isTagsManaging, setIsTagsManaging,
@@ -185,6 +187,10 @@ export const AppRoutes: React.FC<AppRoutesProps> = ({
                 onUpdateOnThisDayEntries={setOnThisDayEntries}
             />
         );
+    }
+
+    if (isAchievementOpen) {
+        return <AchievementView />;
     }
 
     // Weekly Review

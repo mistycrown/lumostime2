@@ -31,6 +31,7 @@ export const useHardwareBackButton = () => {
         isOnThisDayOpen, setIsOnThisDayOpen, setCurrentOnThisDayDate,
         isWeeklyReviewOpen, setIsWeeklyReviewOpen, setCurrentWeeklyReviewStart, setCurrentWeeklyReviewEnd,
         isMonthlyReviewOpen, setIsMonthlyReviewOpen, setCurrentMonthlyReviewStart, setCurrentMonthlyReviewEnd,
+        isAchievementOpen, setIsAchievementOpen,
         isStatsFullScreen, setIsStatsFullScreen,
         isTodoManaging, setIsTodoManaging,
         isTagsManaging, setIsTagsManaging,
@@ -165,6 +166,10 @@ export const useHardwareBackButton = () => {
                 setCurrentMonthlyReviewEnd(null);
                 return;
             }
+            if (isAchievementOpen) {
+                setIsAchievementOpen(false);
+                return;
+            }
 
             // 2. Full Screen / Management Modes
             if (isStatsFullScreen) {
@@ -209,7 +214,7 @@ export const useHardwareBackButton = () => {
         };
     }, [
         isSettingsOpen, isAutoLinkOpen, isSearchOpen, isFiltersOpen, isExportViewOpen, isGalleryViewOpen, isShareViewOpen, focusDetailSessionId, isAddModalOpen, isTodoModalOpen,
-        isDailyReviewOpen, isOnThisDayOpen, isWeeklyReviewOpen, isMonthlyReviewOpen,
+        isDailyReviewOpen, isOnThisDayOpen, isWeeklyReviewOpen, isMonthlyReviewOpen, isAchievementOpen,
         isStatsFullScreen, isTodoManaging, isTagsManaging, isScopeManaging,
         currentView, selectedTagId, selectedCategoryId, selectedScopeId, settingsSubmenu, isSearchOpenedFromSettings, activeFilterId
     ]);
