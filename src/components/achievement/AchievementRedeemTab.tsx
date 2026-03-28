@@ -1,6 +1,8 @@
 /**
  * @file AchievementRedeemTab.tsx
  * @description Simplified reward catalog and redemption record manager used inside the achievement ledger.
+ *
+ * @updated 2026-03-28: Render the redeem-result hint as plain background text instead of a bordered callout box.
  */
 import React, { useEffect, useMemo, useState } from 'react';
 import { Gift, Pencil, Plus } from 'lucide-react';
@@ -170,11 +172,11 @@ export const AchievementRedeemTab: React.FC<AchievementRedeemTabProps> = ({
                         setDialogMode('redeem');
                       }}
                       className={`inline-flex h-8 w-8 items-center justify-center rounded-full transition-all ${
-                        canRedeem ? 'text-white' : 'bg-stone-200 text-stone-400'
+                        canRedeem ? 'text-stone-900' : 'bg-stone-200 text-stone-400'
                       }`}
                       style={canRedeem ? {
-                        backgroundColor: 'var(--accent-color)',
-                        boxShadow: '0 8px 18px var(--accent-color-light)'
+                        backgroundColor: '#e7e5e4',
+                        boxShadow: '0 8px 18px rgba(120, 113, 108, 0.14)'
                       } : undefined}
                       aria-label="兑换奖励"
                     >
@@ -188,8 +190,9 @@ export const AchievementRedeemTab: React.FC<AchievementRedeemTabProps> = ({
                       }}
                       className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-stone-200 text-stone-500 transition-colors"
                       style={{
-                        color: 'var(--accent-color)',
-                        borderColor: 'color-mix(in srgb, var(--accent-color) 24%, white)'
+                        color: '#57534e',
+                        borderColor: '#d6d3d1',
+                        backgroundColor: '#fafaf9'
                       }}
                       aria-label="编辑奖励"
                     >
@@ -285,10 +288,10 @@ export const AchievementRedeemTab: React.FC<AchievementRedeemTabProps> = ({
               type="button"
               onClick={handleRedeem}
               disabled={!canRedeemSelected}
-              className="rounded-full px-4 py-2 text-sm text-white transition-all disabled:bg-stone-300"
+              className="rounded-full px-4 py-2 text-sm text-stone-900 transition-all disabled:bg-stone-300 disabled:text-white"
               style={canRedeemSelected ? {
-                backgroundColor: 'var(--accent-color)',
-                boxShadow: '0 10px 24px var(--accent-color-light)'
+                backgroundColor: '#e7e5e4',
+                boxShadow: '0 10px 24px rgba(120, 113, 108, 0.14)'
               } : undefined}
             >
               确认兑换
@@ -298,13 +301,11 @@ export const AchievementRedeemTab: React.FC<AchievementRedeemTabProps> = ({
       >
         {selectedReward && (
           <div className="space-y-5">
-            <div
-              className="rounded-2xl border border-stone-200 bg-stone-50/80 px-4 py-3 text-sm leading-6 text-stone-600"
-            >
+            <p className="text-sm leading-6 text-stone-500">
               {canRedeemSelected
                 ? `兑换成功后剩余 ${availableStars - selectedReward.cost} 光点，立即记入兑换记录。`
                 : '当前光点不足，暂时无法兑换。'}
-            </div>
+            </p>
             {redeemError && (
               <div className="text-sm text-rose-500">{redeemError}</div>
             )}

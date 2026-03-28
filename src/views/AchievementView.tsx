@@ -225,12 +225,12 @@ export const AchievementView: React.FC = () => {
                   onClick={() => openDetailPanel(tab.id)}
                   className={`flex min-w-0 flex-1 items-center justify-center gap-2 rounded-[1.1rem] px-3 py-2.5 text-[14px] font-medium transition-all ${
                     activeTab === tab.id
-                      ? 'text-white'
+                      ? 'text-stone-900'
                       : 'text-stone-900 hover:text-stone-900'
                   }`}
                   style={activeTab === tab.id ? {
-                    backgroundColor: 'var(--accent-color)',
-                    boxShadow: '0 10px 25px var(--accent-color-light)'
+                    backgroundColor: '#e7e5e4',
+                    boxShadow: '0 8px 18px rgba(120, 113, 108, 0.14)'
                   } : undefined}
                 >
                   {tab.icon}
