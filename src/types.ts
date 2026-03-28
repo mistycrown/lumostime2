@@ -212,9 +212,9 @@ export interface AchievementRule {
   name: string;
   enabled: boolean;
   effectType: 'earn' | 'spend';
-  targetType: 'activity';
+  targetType: 'activity' | 'scope' | 'todoCategory' | 'checkCategory';
   targetIds: string[];
-  unitMinutes: number;
+  unitAmount: number;
   deltaPerUnit: number;
   roundingMode: 'floor';
   note?: string;
@@ -226,8 +226,9 @@ export interface AchievementDailyRuleBreakdown {
   ruleId: string;
   ruleName: string;
   effectType: 'earn' | 'spend';
-  matchedMinutes: number;
-  unitMinutes: number;
+  targetType: 'activity' | 'scope' | 'todoCategory' | 'checkCategory';
+  matchedValue: number;
+  unitAmount: number;
   deltaPerUnit: number;
   appliedUnits: number;
   delta: number;

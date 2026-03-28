@@ -15,6 +15,8 @@ import { AchievementBottle } from '../components/achievement/AchievementBottle';
 import { AchievementRecordsTab } from '../components/achievement/AchievementRecordsTab';
 import { AchievementRulesTab } from '../components/achievement/AchievementRulesTab';
 import { AchievementRedeemTab } from '../components/achievement/AchievementRedeemTab';
+import { useData } from '../contexts/DataContext';
+import { useReview } from '../contexts/ReviewContext';
 
 type AchievementTab = 'records' | 'rules' | 'redeem';
 
@@ -45,7 +47,9 @@ export const AchievementView: React.FC = () => {
     redeemReward,
     deleteRedemptionRecord
   } = useAchievement();
-  const { categories } = useCategoryScope();
+  const { categories, scopes } = useCategoryScope();
+  const { todoCategories } = useData();
+  const { checkTemplates } = useReview();
   const [activeTab, setActiveTab] = useState<AchievementTab>('records');
   const [isDetailExpanded, setIsDetailExpanded] = useState(false);
   const [pendingTab, setPendingTab] = useState<AchievementTab | null>(null);
@@ -113,6 +117,9 @@ export const AchievementView: React.FC = () => {
       return (
         <AchievementRulesTab
           categories={categories}
+          scopes={scopes}
+          todoCategories={todoCategories}
+          checkTemplates={checkTemplates}
           rules={rules}
           onCreateRule={createRule}
           onUpdateRule={updateRule}
@@ -135,6 +142,7 @@ export const AchievementView: React.FC = () => {
     activeTab,
     availableStars,
     categories,
+    checkTemplates,
     createReward,
     createRule,
     dailySnapshots,
@@ -145,6 +153,8 @@ export const AchievementView: React.FC = () => {
     redeemReward,
     rewards,
     rules,
+    scopes,
+    todoCategories,
     updateReward,
     updateRule
   ]);
