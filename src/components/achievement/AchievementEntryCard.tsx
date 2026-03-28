@@ -34,7 +34,7 @@ export const AchievementEntryCard: React.FC = () => {
           </div>
           <div className="mt-2 flex items-end gap-3">
             <span className="text-3xl font-black text-stone-900">{availableStars}</span>
-            <span className="pb-1 text-sm font-medium text-stone-500">当前可用星星</span>
+            <span className="pb-1 text-sm font-medium text-stone-500">当前可用光点</span>
           </div>
           <p className="mt-2 text-sm text-stone-600">
             {latestActivityTime > 0

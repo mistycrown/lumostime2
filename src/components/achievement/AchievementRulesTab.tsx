@@ -1,11 +1,12 @@
 /**
  * @file AchievementRulesTab.tsx
- * @description Minimal ledger-style rule list with modal-based create and edit flows.
+ * @description Achievement rule list and modal editor, reusing the shared multi-tag selector for target activity picking.
  */
 import React, { useEffect, useMemo, useState } from 'react';
 import { ChevronRight, Plus } from 'lucide-react';
 import { AchievementRule, Category } from '../../types';
 import { AchievementDialog } from './AchievementDialog';
+import { TagMultipleAssociation } from '../TagMultipleAssociation';
 
 interface AchievementRulesTabProps {
   categories: Category[];
@@ -48,43 +49,6 @@ const collectActivityOptions = (categories: Category[]) => categories.flatMap((c
     activityName: activity.name
   }))
 ));
-
-const ActivityPicker: React.FC<{
-  categories: Category[];
-  selectedIds: string[];
-  onChange: (targetIds: string[]) => void;
-}> = ({ categories, selectedIds, onChange }) => {
-  const options = useMemo(() => collectActivityOptions(categories), [categories]);
-
-  return (
-    <div className="border-t border-stone-200">
-      {options.map((option) => {
-        const checked = selectedIds.includes(option.activityId);
-        return (
-          <label key={option.activityId} className="flex cursor-pointer items-start gap-3 border-b border-stone-200 py-3">
-            <input
-              type="checkbox"
-              className="mt-1 h-4 w-4 rounded border-stone-300 text-stone-900 focus:ring-stone-400"
-              checked={checked}
-              onChange={(event) => {
-                if (event.target.checked) {
-                  onChange([...selectedIds, option.activityId]);
-                  return;
-                }
-
-                onChange(selectedIds.filter((item) => item !== option.activityId));
-              }}
-            />
-            <span className="min-w-0">
-              <span className="block text-sm text-stone-900">{option.activityName}</span>
-              <span className="mt-1 block text-xs tracking-[0.08em] text-stone-400">{option.categoryName}</span>
-            </span>
-          </label>
-        );
-      })}
-    </div>
-  );
-};
 
 export const AchievementRulesTab: React.FC<AchievementRulesTabProps> = ({
   categories,
@@ -162,8 +126,8 @@ export const AchievementRulesTab: React.FC<AchievementRulesTabProps> = ({
 
   return (
     <>
-      <div className="flex items-center justify-between border-b border-stone-200 pb-3">
-        <div className="text-sm tracking-[0.12em] text-stone-400">RULES / {rules.length}</div>
+      <div className="flex items-center justify-between border-b border-stone-200 pb-[14px]">
+        <div className="text-[11px] uppercase tracking-[0.18em] text-stone-400">Rules / {rules.length}</div>
         <button
           type="button"
           onClick={() => setDialogMode('create')}
@@ -175,11 +139,11 @@ export const AchievementRulesTab: React.FC<AchievementRulesTabProps> = ({
       </div>
 
       {rules.length === 0 ? (
-        <div className="border-b border-dashed border-stone-300 py-5 text-sm leading-7 text-stone-500">
-          还没有规则。先新增一条类似“阅读 30 分钟 +1 星”的规则，成就页才会开始生成每日快照。
+        <div className="mt-[14px] rounded-2xl border border-dashed border-stone-300 px-4 py-5 text-sm leading-7 text-stone-500">
+          还没有规则。先新增一条类似“阅读 30 分钟 +1 光点”的规则，成就页才会开始生成每日快照。
         </div>
       ) : (
-        <div className="border-t border-stone-200">
+        <div className="mt-[14px] divide-y divide-stone-200">
           {rules.map((rule) => {
             const targetPreview = rule.targetIds
               .map((targetId) => activityNameMap.get(targetId) || '未命名活动')
@@ -194,17 +158,17 @@ export const AchievementRulesTab: React.FC<AchievementRulesTabProps> = ({
                   setSelectedRuleId(rule.id);
                   setDialogMode('edit');
                 }}
-                className="flex w-full items-center justify-between gap-4 border-b border-stone-200 py-4 text-left transition-colors hover:bg-stone-50/70"
+                className="flex w-full items-center justify-between gap-4 py-[12px] text-left transition-colors hover:bg-stone-50/70"
               >
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-3">
-                    <span className="text-[1rem] text-stone-900">{rule.name}</span>
+                    <span className="text-[16px] leading-none text-stone-900">{rule.name}</span>
                     <span className={`text-[11px] uppercase tracking-[0.14em] ${rule.enabled ? 'text-stone-400' : 'text-stone-300'}`}>
                       {rule.enabled ? 'Enabled' : 'Paused'}
                     </span>
                   </div>
                   <div className="mt-2 text-[13px] leading-6 text-stone-500">
-                    每 {rule.unitMinutes} 分钟 {rule.effectType === 'earn' ? '+' : '-'}{rule.deltaPerUnit} 星
+                    每 {rule.unitMinutes} 分钟 {rule.effectType === 'earn' ? '+' : '-'}{rule.deltaPerUnit} 光点
                     {targetPreview ? ` · ${targetPreview}` : ''}
                   </div>
                 </div>
@@ -264,20 +228,36 @@ export const AchievementRulesTab: React.FC<AchievementRulesTabProps> = ({
                 value={draft.name}
                 onChange={(event) => setDraft((previous) => ({ ...previous, name: event.target.value }))}
                 className="mt-2 w-full border-b border-stone-300 bg-transparent px-0 py-2 text-[1rem] text-stone-900 outline-none focus:border-stone-900"
-                placeholder="例如：阅读半小时一颗星"
+                placeholder="例如：阅读半小时一点光"
               />
             </label>
-            <label className="block">
+            <div className="block">
               <span className="text-[11px] uppercase tracking-[0.14em] text-stone-400">方向</span>
-              <select
-                value={draft.effectType}
-                onChange={(event) => setDraft((previous) => ({ ...previous, effectType: event.target.value as 'earn' | 'spend' }))}
-                className="mt-2 w-full border-b border-stone-300 bg-transparent px-0 py-2 text-[1rem] text-stone-900 outline-none focus:border-stone-900"
-              >
-                <option value="earn">获得星星</option>
-                <option value="spend">扣除星星</option>
-              </select>
-            </label>
+              <div className="mt-3 grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setDraft((previous) => ({ ...previous, effectType: 'earn' }))}
+                  className={`rounded-2xl border px-4 py-3 text-sm transition-colors ${
+                    draft.effectType === 'earn'
+                      ? 'border-stone-900 bg-stone-900 text-white'
+                      : 'border-stone-200 bg-white text-stone-600 hover:border-stone-300'
+                  }`}
+                >
+                  获得光点
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setDraft((previous) => ({ ...previous, effectType: 'spend' }))}
+                  className={`rounded-2xl border px-4 py-3 text-sm transition-colors ${
+                    draft.effectType === 'spend'
+                      ? 'border-stone-900 bg-stone-900 text-white'
+                      : 'border-stone-200 bg-white text-stone-600 hover:border-stone-300'
+                  }`}
+                >
+                  扣除光点
+                </button>
+              </div>
+            </div>
             <label className="block">
               <span className="text-[11px] uppercase tracking-[0.14em] text-stone-400">触发分钟</span>
               <input
@@ -300,24 +280,14 @@ export const AchievementRulesTab: React.FC<AchievementRulesTabProps> = ({
             </label>
           </div>
 
-          <label className="block">
-            <span className="text-[11px] uppercase tracking-[0.14em] text-stone-400">备注</span>
-            <textarea
-              value={draft.note}
-              onChange={(event) => setDraft((previous) => ({ ...previous, note: event.target.value }))}
-              rows={3}
-              className="mt-2 w-full border border-stone-200 bg-transparent px-3 py-3 text-sm leading-7 text-stone-900 outline-none focus:border-stone-900"
-              placeholder="可选"
-            />
-          </label>
-
           <div>
             <div className="text-[11px] uppercase tracking-[0.14em] text-stone-400">关联活动</div>
-            <div className="mt-3">
-              <ActivityPicker
+            <div className="mt-3 rounded-3xl border border-stone-200 px-4 py-4">
+              <TagMultipleAssociation
                 categories={categories}
-                selectedIds={draft.targetIds}
+                selectedActivityIds={draft.targetIds}
                 onChange={(targetIds) => setDraft((previous) => ({ ...previous, targetIds }))}
+                description="选择命中这条成就规则的标签，可跨分类多选。"
               />
             </div>
           </div>

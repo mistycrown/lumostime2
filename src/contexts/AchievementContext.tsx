@@ -258,7 +258,7 @@ export const AchievementProvider: React.FC<{ children: ReactNode }> = ({ childre
     if (currentAvailableStars < reward.cost) {
       return {
         ok: false,
-        message: '当前星星不足，暂时无法兑换'
+        message: '当前光点不足，暂时无法兑换'
       };
     }
 
@@ -339,15 +339,10 @@ export const AchievementProvider: React.FC<{ children: ReactNode }> = ({ childre
     }
 
     if (isLocalDataTimestampUpdateLocked()) {
-      console.log('[AchievementContext] Skipping local data timestamp update (locked during restore)');
       return;
     }
 
-    const previous = getLocalDataTimestamp();
-    const now = updateLocalDataTimestamp();
-    console.log(
-      `[AchievementContext] Sync-relevant data changed, updated local timestamp: ${previous} -> ${now} (${new Date(now).toLocaleTimeString()})`
-    );
+    updateLocalDataTimestamp();
   }, [canPersist, dailySnapshots, isReady, meta, redemptionRecords, rewards, rules]);
 
   return (
