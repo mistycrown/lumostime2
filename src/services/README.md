@@ -22,7 +22,7 @@ Update 2026-03-12: timeline styling for normal timeline records is managed by `t
 - `updateService.ts`: [Active] - Checks for app updates from Gitee (primary) or GitHub (fallback).
 - `webdavService.ts`: [Active] - WebDAV client implementation supporting Web (Proxy) and Native (Cordova HTTP) environments. Automatically converts Base64 images to ArrayBuffer for proper upload.
 
-- `achievementBottleIconPackService.ts`: [Active] - Stores achievement bottle icon-pack options and defaults for sponsorship settings, preset persistence, and bottle rendering.
+- `achievementBottleIconPackService.ts`: [Active] - Stores achievement bottle icon-pack options, dynamic discovery, and stable WebP preview paths for sponsorship settings, preset persistence, and bottle rendering.
 
 ## Recently Added (2026-02)
 - `themePresetService.ts`: 新增 - 主题预设应用服务，将复杂的主题切换逻辑拆分为多个独立方法

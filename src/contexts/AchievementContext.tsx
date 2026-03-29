@@ -1,11 +1,13 @@
-/**
+﻿/**
  * @file AchievementContext.tsx
- * @description Manages achievement bottle data, daily snapshots, rewards, and redemption records with repository hydration and selective recent-day recomputation.
- * @updated 2026-03-28: Allow achievement balances and reward costs to keep one decimal place while preserving integer-based trigger units.
+ * @description Manages achievement bottle data, daily snapshots, rewards, collectible bottles, and redemption records with repository hydration and selective recent-day recomputation.
+ * @updated 2026-03-28: Added collectible bottle catalog and collection redemption records, and now computes available stars across both reward and collection spending.
  */
 import React, { createContext, ReactNode, useContext, useEffect, useRef, useState } from 'react';
 import { dataRepository } from '../repositories/dataRepository';
 import {
+  AchievementCollection,
+  AchievementCollectionRecord,
   AchievementDailySnapshot,
   AchievementMeta,
   AchievementRedemptionRecord,
@@ -26,7 +28,6 @@ import {
 } from '../utils/achievementUtils';
 import { getLocalDateStr } from '../utils/dateUtils';
 import {
-  getLocalDataTimestamp,
   isLocalDataTimestampUpdateLocked,
   updateLocalDataTimestamp
 } from '../utils/localDataTimestamp';
@@ -50,13 +51,22 @@ interface CreateAchievementRewardInput {
   icon?: string;
 }
 
+interface CreateAchievementCollectionInput {
+  name: string;
+  cost: number;
+  imagePath?: string;
+  description?: string;
+}
+
 interface AchievementContextType {
   isReady: boolean;
   achievementStartDate: string | null;
   rules: AchievementRule[];
   rewards: AchievementReward[];
+  collections: AchievementCollection[];
   dailySnapshots: AchievementDailySnapshot[];
   redemptionRecords: AchievementRedemptionRecord[];
+  collectionRecords: AchievementCollectionRecord[];
   availableStars: number;
   totalEarnedStars: number;
   totalRedeemedStars: number;
@@ -68,20 +78,50 @@ interface AchievementContextType {
   updateReward: (reward: AchievementReward) => void;
   deleteReward: (rewardId: string) => void;
   redeemReward: (reward: AchievementReward, note?: string) => { ok: boolean; message?: string };
+  createCollection: (input: CreateAchievementCollectionInput) => void;
+  updateCollection: (collection: AchievementCollection) => void;
+  deleteCollection: (collectionId: string) => void;
+  redeemCollection: (collection: AchievementCollection, note?: string) => { ok: boolean; message?: string };
   deleteRedemptionRecord: (recordId: string) => void;
+  deleteCollectionRecord: (recordId: string) => void;
 }
 
 const achievementContextStore = globalThis as typeof globalThis & {
   __lumostimeAchievementContext__?: React.Context<AchievementContextType | undefined>;
 };
 
-// Reuse the same context object across module reloads to avoid provider/consumer
-// mismatches while Vite Fast Refresh keeps the app tree mounted.
 const AchievementContext = achievementContextStore.__lumostimeAchievementContext__
   ?? createContext<AchievementContextType | undefined>(undefined);
 
 AchievementContext.displayName = 'AchievementContext';
 achievementContextStore.__lumostimeAchievementContext__ = AchievementContext;
+
+const normalizeReward = (reward: AchievementReward): AchievementReward => ({
+  ...reward,
+  cost: Math.max(0.1, normalizeAchievementStarValue(reward.cost || 0.1)),
+  description: reward.description?.trim() || undefined,
+  icon: reward.icon?.trim() || undefined
+});
+
+const normalizeCollection = (collection: AchievementCollection): AchievementCollection => ({
+  ...collection,
+  cost: Math.max(0.1, normalizeAchievementStarValue(collection.cost || 0.1)),
+  imagePath: collection.imagePath?.trim() || undefined,
+  description: collection.description?.trim() || undefined
+});
+
+const normalizeRedemptionRecord = (record: AchievementRedemptionRecord): AchievementRedemptionRecord => ({
+  ...record,
+  cost: Math.max(0.1, normalizeAchievementStarValue(record.cost || 0.1)),
+  note: record.note?.trim() || undefined
+});
+
+const normalizeCollectionRecord = (record: AchievementCollectionRecord): AchievementCollectionRecord => ({
+  ...record,
+  cost: Math.max(0.1, normalizeAchievementStarValue(record.cost || 0.1)),
+  imagePath: record.imagePath?.trim() || undefined,
+  note: record.note?.trim() || undefined
+});
 
 export const useAchievement = () => {
   const context = useContext(AchievementContext);
@@ -101,8 +141,10 @@ export const AchievementProvider: React.FC<{ children: ReactNode }> = ({ childre
   const [meta, setMeta] = useState<AchievementMeta>({ achievementStartDate: null });
   const [rules, setRules] = useState<AchievementRule[]>([]);
   const [rewards, setRewards] = useState<AchievementReward[]>([]);
+  const [collections, setCollections] = useState<AchievementCollection[]>([]);
   const [dailySnapshots, setDailySnapshots] = useState<AchievementDailySnapshot[]>([]);
   const [redemptionRecords, setRedemptionRecords] = useState<AchievementRedemptionRecord[]>([]);
+  const [collectionRecords, setCollectionRecords] = useState<AchievementCollectionRecord[]>([]);
 
   useEffect(() => {
     let cancelled = false;
@@ -119,15 +161,11 @@ export const AchievementProvider: React.FC<{ children: ReactNode }> = ({ childre
         hydratedSuccessfully = true;
         setMeta(snapshot.meta);
         setRules(snapshot.rules.map(normalizeAchievementRule));
-        setRewards(snapshot.rewards.map((reward) => ({
-          ...reward,
-          cost: Math.max(0.1, normalizeAchievementStarValue(reward.cost || 0.1))
-        })));
+        setRewards(snapshot.rewards.map(normalizeReward));
+        setCollections(snapshot.collections.map(normalizeCollection));
         setDailySnapshots(sortAchievementSnapshots(snapshot.dailySnapshots.map(normalizeAchievementSnapshot)));
-        setRedemptionRecords(snapshot.redemptionRecords.map((record) => ({
-          ...record,
-          cost: Math.max(0.1, normalizeAchievementStarValue(record.cost || 0.1))
-        })));
+        setRedemptionRecords(snapshot.redemptionRecords.map(normalizeRedemptionRecord));
+        setCollectionRecords(snapshot.collectionRecords.map(normalizeCollectionRecord));
       } catch (error) {
         console.error('[AchievementContext] Failed to hydrate achievement data', error);
       } finally {
@@ -266,6 +304,8 @@ export const AchievementProvider: React.FC<{ children: ReactNode }> = ({ childre
           ...reward,
           name: reward.name.trim() || '未命名奖励',
           cost: Math.max(0.1, normalizeAchievementStarValue(reward.cost || 0.1)),
+          description: reward.description?.trim() || undefined,
+          icon: reward.icon?.trim() || undefined,
           updatedAt: Date.now()
         }
         : item
@@ -276,8 +316,46 @@ export const AchievementProvider: React.FC<{ children: ReactNode }> = ({ childre
     setRewards((previous) => previous.filter((item) => item.id !== rewardId));
   };
 
+  const createCollection = (input: CreateAchievementCollectionInput) => {
+    const now = Date.now();
+    const nextCollection: AchievementCollection = {
+      id: crypto.randomUUID(),
+      name: input.name.trim() || '未命名收藏',
+      cost: Math.max(0.1, normalizeAchievementStarValue(input.cost || 0.1)),
+      imagePath: input.imagePath?.trim() || undefined,
+      description: input.description?.trim() || undefined,
+      enabled: true,
+      createdAt: now,
+      updatedAt: now
+    };
+
+    setCollections((previous) => [...previous, nextCollection]);
+  };
+
+  const updateCollection = (collection: AchievementCollection) => {
+    setCollections((previous) => previous.map((item) => (
+      item.id === collection.id
+        ? {
+          ...collection,
+          name: collection.name.trim() || '未命名收藏',
+          cost: Math.max(0.1, normalizeAchievementStarValue(collection.cost || 0.1)),
+          imagePath: collection.imagePath?.trim() || undefined,
+          description: collection.description?.trim() || undefined,
+          updatedAt: Date.now()
+        }
+        : item
+    )));
+  };
+
+  const deleteCollection = (collectionId: string) => {
+    setCollections((previous) => previous.filter((item) => item.id !== collectionId));
+  };
+
   const redeemReward = (reward: AchievementReward, note?: string) => {
-    const currentAvailableStars = calculateAchievementAvailableStars(dailySnapshots, redemptionRecords);
+    const currentAvailableStars = calculateAchievementAvailableStars(
+      dailySnapshots,
+      [...redemptionRecords, ...collectionRecords]
+    );
     const normalizedRewardCost = Math.max(0.1, normalizeAchievementStarValue(reward.cost || 0.1));
 
     if (currentAvailableStars < normalizedRewardCost) {
@@ -300,13 +378,46 @@ export const AchievementProvider: React.FC<{ children: ReactNode }> = ({ childre
     return { ok: true };
   };
 
+  const redeemCollection = (collection: AchievementCollection, note?: string) => {
+    const currentAvailableStars = calculateAchievementAvailableStars(
+      dailySnapshots,
+      [...redemptionRecords, ...collectionRecords]
+    );
+    const normalizedCollectionCost = Math.max(0.1, normalizeAchievementStarValue(collection.cost || 0.1));
+
+    if (currentAvailableStars < normalizedCollectionCost) {
+      return {
+        ok: false,
+        message: '当前光点不足，暂时无法兑换'
+      };
+    }
+
+    const nextRecord: AchievementCollectionRecord = {
+      id: crypto.randomUUID(),
+      collectionId: collection.id,
+      collectionName: collection.name,
+      cost: normalizedCollectionCost,
+      imagePath: collection.imagePath,
+      redeemedAt: Date.now(),
+      note: note?.trim() || undefined
+    };
+
+    setCollectionRecords((previous) => [nextRecord, ...previous]);
+    return { ok: true };
+  };
+
   const deleteRedemptionRecord = (recordId: string) => {
     setRedemptionRecords((previous) => previous.filter((item) => item.id !== recordId));
   };
 
-  const availableStars = calculateAchievementAvailableStars(dailySnapshots, redemptionRecords);
+  const deleteCollectionRecord = (recordId: string) => {
+    setCollectionRecords((previous) => previous.filter((item) => item.id !== recordId));
+  };
+
+  const spendRecords = [...redemptionRecords, ...collectionRecords];
+  const availableStars = calculateAchievementAvailableStars(dailySnapshots, spendRecords);
   const totalEarnedStars = calculateAchievementTotalEarned(dailySnapshots);
-  const totalRedeemedStars = calculateAchievementTotalRedeemed(redemptionRecords);
+  const totalRedeemedStars = calculateAchievementTotalRedeemed(spendRecords);
 
   useEffect(() => {
     if (!isReady || !canPersist) {
@@ -343,6 +454,16 @@ export const AchievementProvider: React.FC<{ children: ReactNode }> = ({ childre
       return;
     }
 
+    void dataRepository.saveAchievementCollections(collections).catch((error) => {
+      console.error('[AchievementContext] Failed to persist achievement collections', error);
+    });
+  }, [canPersist, collections, isReady]);
+
+  useEffect(() => {
+    if (!isReady || !canPersist) {
+      return;
+    }
+
     void dataRepository.saveAchievementDailySnapshots(dailySnapshots).catch((error) => {
       console.error('[AchievementContext] Failed to persist achievement daily snapshots', error);
     });
@@ -359,6 +480,16 @@ export const AchievementProvider: React.FC<{ children: ReactNode }> = ({ childre
   }, [canPersist, isReady, redemptionRecords]);
 
   useEffect(() => {
+    if (!isReady || !canPersist) {
+      return;
+    }
+
+    void dataRepository.saveAchievementCollectionRecords(collectionRecords).catch((error) => {
+      console.error('[AchievementContext] Failed to persist achievement collection records', error);
+    });
+  }, [canPersist, collectionRecords, isReady]);
+
+  useEffect(() => {
     if (!isReady || !canPersist || isHydratingRef.current) {
       return;
     }
@@ -368,7 +499,7 @@ export const AchievementProvider: React.FC<{ children: ReactNode }> = ({ childre
     }
 
     updateLocalDataTimestamp();
-  }, [canPersist, dailySnapshots, isReady, meta, redemptionRecords, rewards, rules]);
+  }, [canPersist, collectionRecords, collections, dailySnapshots, isReady, meta, redemptionRecords, rewards, rules]);
 
   return (
     <AchievementContext.Provider
@@ -377,8 +508,10 @@ export const AchievementProvider: React.FC<{ children: ReactNode }> = ({ childre
         achievementStartDate: meta.achievementStartDate,
         rules,
         rewards,
+        collections,
         dailySnapshots,
         redemptionRecords,
+        collectionRecords,
         availableStars,
         totalEarnedStars,
         totalRedeemedStars,
@@ -390,7 +523,12 @@ export const AchievementProvider: React.FC<{ children: ReactNode }> = ({ childre
         updateReward,
         deleteReward,
         redeemReward,
-        deleteRedemptionRecord
+        createCollection,
+        updateCollection,
+        deleteCollection,
+        redeemCollection,
+        deleteRedemptionRecord,
+        deleteCollectionRecord
       }}
     >
       {children}

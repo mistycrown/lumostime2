@@ -2,7 +2,7 @@
  * @file AchievementBottle.tsx
  * @description Physics-driven achievement bottle visualization with switchable bottle skins for the achievement page and sponsorship previews.
  *
- * @updated 2026-03-28: Softened the bottle skin palette, added pearl, linen, and mint variants, and kept the one-decimal counter while flooring rendered star bodies inside the chamber.
+ * @updated 2026-03-28: Raised the bottle render cap to a fixed 200 stars and enlarged star bodies so the chamber reads as visually full before overflow is summarized.
  */
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Capacitor } from '@capacitor/core';
@@ -73,10 +73,10 @@ interface GravityState {
   targetY: number;
 }
 
-const MAX_VISIBLE_STARS = 120;
+const MAX_VISIBLE_STARS = 200;
 const PREVIEW_VISIBLE_STARS = 12;
-const STAR_SIZE = 26;
-const STAR_IMAGE_SIZE = 20;
+const STAR_SIZE = 32;
+const STAR_IMAGE_SIZE = 25;
 const STAR_SCALE_MIN = 0.92;
 const STAR_SCALE_MAX = 1.08;
 const BOTTLE_PADDING = 16;
@@ -461,8 +461,9 @@ export const AchievementBottle: React.FC<AchievementBottleProps> = ({
       const baseX = innerMinX + (spreadWidth * normalizedX);
       const jitterLimit = Math.min(22, spreadWidth / Math.max(3, visibleCount * 1.35));
       const spawnX = Math.max(innerMinX, Math.min(innerMaxX, baseX + ((Math.random() - 0.5) * jitterLimit * 2)));
-      const laneCount = Math.max(4, Math.floor(width / 70));
-      const spawnY = BOTTLE_PADDING + 10 + (Math.floor(index / laneCount) * 24) + (Math.random() * 24);
+      // 在整个瓶子高度范围内均匀分层生成，确保200个元素能填满整个空间
+      const innerHeight = height - BOTTLE_PADDING * 2;
+      const spawnY = BOTTLE_PADDING + (index / Math.max(1, visibleCount - 1)) * innerHeight * 0.95 + (Math.random() - 0.5) * (innerHeight / visibleCount) * 2;
 
       const star = Bodies.circle(spawnX, spawnY, starRadius, {
         restitution: 0.48,

@@ -1,17 +1,18 @@
-/**
+﻿/**
  * @file AchievementView.tsx
  * @input Achievement context state, categories for rule editing
  * @output Full-screen achievement bottle experience with a bottle-first collapsed state and a ledger-first expanded state
  * @pos View (Achievement Overlay)
  * @description Achievement bottle full-screen page opened from Timeline. The collapsed state emphasizes the bottle, while the expanded state turns the screen into a full ledger workspace.
  *
- * @updated 2026-03-28: Expanded ledger now fills the screen, keeps one-decimal star balances in the UI, and floors only the bottle's rendered star bodies.
+ * @updated 2026-03-28: Expanded ledger now fills the screen, keeps one-decimal star balances in the UI, and adds a collectible bottle tab with collection records.
  */
 import React, { useEffect, useMemo, useState } from 'react';
-import { ChevronDown, Gift, ScrollText, SlidersHorizontal } from 'lucide-react';
+import { Archive, ChevronDown, Gift, ScrollText, SlidersHorizontal } from 'lucide-react';
 import { useAchievement } from '../contexts/AchievementContext';
 import { useCategoryScope } from '../contexts/CategoryScopeContext';
 import { AchievementBottle } from '../components/achievement/AchievementBottle';
+import { AchievementCollectionsTab } from '../components/achievement/AchievementCollectionsTab';
 import { AchievementRecordsTab } from '../components/achievement/AchievementRecordsTab';
 import { AchievementRulesTab } from '../components/achievement/AchievementRulesTab';
 import { AchievementRedeemTab } from '../components/achievement/AchievementRedeemTab';
@@ -20,12 +21,13 @@ import { useReview } from '../contexts/ReviewContext';
 import { useSettings } from '../contexts/SettingsContext';
 import { getAchievementRenderableStarCount } from '../utils/achievementUtils';
 
-type AchievementTab = 'records' | 'rules' | 'redeem';
+type AchievementTab = 'records' | 'rules' | 'redeem' | 'collections';
 
 const TAB_CONFIG: Array<{ id: AchievementTab; label: string; icon: React.ReactNode }> = [
   { id: 'records', label: '记录', icon: <ScrollText size={15} /> },
   { id: 'rules', label: '规则', icon: <SlidersHorizontal size={15} /> },
-  { id: 'redeem', label: '兑换', icon: <Gift size={15} /> }
+  { id: 'redeem', label: '兑换', icon: <Gift size={15} /> },
+  { id: 'collections', label: '收藏', icon: <Archive size={15} /> }
 ];
 
 const COLLAPSED_DETAIL_HEIGHT = '8.5rem';
@@ -36,8 +38,10 @@ export const AchievementView: React.FC = () => {
     isReady,
     rules,
     rewards,
+    collections,
     dailySnapshots,
     redemptionRecords,
+    collectionRecords,
     availableStars,
     ensureRecentSnapshots,
     createRule,
@@ -47,7 +51,11 @@ export const AchievementView: React.FC = () => {
     updateReward,
     deleteReward,
     redeemReward,
-    deleteRedemptionRecord
+    updateCollection,
+    deleteCollection,
+    redeemCollection,
+    deleteRedemptionRecord,
+    deleteCollectionRecord
   } = useAchievement();
   const { categories, scopes } = useCategoryScope();
   const { todoCategories } = useData();
@@ -112,7 +120,9 @@ export const AchievementView: React.FC = () => {
         <AchievementRecordsTab
           snapshots={dailySnapshots}
           redemptionRecords={redemptionRecords}
+          collectionRecords={collectionRecords}
           onDeleteRedemptionRecord={deleteRedemptionRecord}
+          onDeleteCollectionRecord={deleteCollectionRecord}
         />
       );
     }
@@ -132,14 +142,27 @@ export const AchievementView: React.FC = () => {
       );
     }
 
+    if (activeTab === 'redeem') {
+      return (
+        <AchievementRedeemTab
+          availableStars={availableStars}
+          rewards={rewards}
+          onCreateReward={createReward}
+          onUpdateReward={updateReward}
+          onDeleteReward={deleteReward}
+          onRedeemReward={redeemReward}
+        />
+      );
+    }
+
     return (
-      <AchievementRedeemTab
+      <AchievementCollectionsTab
         availableStars={availableStars}
-        rewards={rewards}
-        onCreateReward={createReward}
-        onUpdateReward={updateReward}
-        onDeleteReward={deleteReward}
-        onRedeemReward={redeemReward}
+        collections={collections}
+        collectionRecords={collectionRecords}
+        onUpdateCollection={updateCollection}
+        onDeleteCollection={deleteCollection}
+        onRedeemCollection={redeemCollection}
       />
     );
   }, [
@@ -147,18 +170,24 @@ export const AchievementView: React.FC = () => {
     availableStars,
     categories,
     checkTemplates,
+    collectionRecords,
+    collections,
     createReward,
     createRule,
     dailySnapshots,
+    deleteCollection,
+    deleteCollectionRecord,
     deleteRedemptionRecord,
     deleteReward,
     deleteRule,
-    redemptionRecords,
+    redeemCollection,
     redeemReward,
+    redemptionRecords,
     rewards,
     rules,
     scopes,
     todoCategories,
+    updateCollection,
     updateReward,
     updateRule
   ]);
@@ -260,3 +289,4 @@ export const AchievementView: React.FC = () => {
     </div>
   );
 };
+
