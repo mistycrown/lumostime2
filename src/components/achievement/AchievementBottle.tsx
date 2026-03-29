@@ -73,7 +73,7 @@ interface GravityState {
   targetY: number;
 }
 
-const MAX_VISIBLE_STARS = 200;
+const MAX_VISIBLE_STARS = 250;
 const PREVIEW_VISIBLE_STARS = 12;
 const STAR_SIZE = 32;
 const STAR_IMAGE_SIZE = 25;
