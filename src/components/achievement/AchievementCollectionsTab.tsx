@@ -77,18 +77,18 @@ const BottlePreview: React.FC<{
 }> = ({ imagePath, alt, size = 'sm', transparent = false }) => {
   const wrapperClassName = size === 'lg'
     ? transparent
-      ? 'flex h-28 items-end justify-center px-4 pb-0 pt-4'
-      : 'flex h-28 items-end justify-center rounded-[1.75rem] bg-white/75 px-4 pb-3 pt-4'
+      ? 'flex h-20 items-end justify-center px-3 pb-0 pt-3'
+      : 'flex h-20 items-end justify-center rounded-[1.5rem] bg-white/75 px-3 pb-2 pt-3'
     : size === 'picker'
       ? 'flex h-24 items-end justify-center rounded-[1.6rem] bg-stone-50 px-3 pb-3 pt-4 transition-all'
       : 'flex h-14 w-14 items-end justify-center rounded-2xl bg-stone-100/80 px-2 pb-1 pt-2';
   const imageClassName = size === 'lg'
-    ? 'max-h-[90px] w-auto max-w-none object-contain drop-shadow-[0_10px_16px_rgba(120,113,108,0.18)]'
+    ? 'max-h-[70px] w-auto max-w-none object-contain drop-shadow-[0_8px_12px_rgba(120,113,108,0.16)]'
     : size === 'picker'
       ? 'max-h-[72px] w-auto max-w-none object-contain drop-shadow-[0_10px_16px_rgba(120,113,108,0.16)]'
       : 'max-h-[42px] w-auto max-w-none object-contain drop-shadow-[0_8px_12px_rgba(120,113,108,0.14)]';
   const placeholderClassName = size === 'lg'
-    ? 'flex h-[90px] w-[58px] items-center justify-center rounded-[1.4rem] border border-dashed border-stone-300 text-stone-400'
+    ? 'flex h-[70px] w-[46px] items-center justify-center rounded-[1.2rem] border border-dashed border-stone-300 text-stone-400'
     : size === 'picker'
       ? 'flex h-[72px] w-[44px] items-center justify-center rounded-[1.1rem] border border-dashed border-stone-300 text-stone-400'
       : 'flex h-[42px] w-[28px] items-center justify-center rounded-[0.9rem] border border-dashed border-stone-300 text-stone-400';
@@ -136,7 +136,7 @@ export const AchievementCollectionsTab: React.FC<AchievementCollectionsTabProps>
       const containerWidth = containerRef.current.offsetWidth;
       const padding = 32; // px-4 = 16px * 2
       const availableWidth = containerWidth - padding;
-      const bottleWidth = 96; // 固定瓶子容器宽度
+      const bottleWidth = 76; // 固定瓶子容器宽度（缩小后）
       
       const count = Math.floor(availableWidth / bottleWidth);
       setBottlesPerRow(Math.max(3, count));
@@ -323,8 +323,8 @@ export const AchievementCollectionsTab: React.FC<AchievementCollectionsTabProps>
             {/* 动态分组的多层货架 */}
             {bottleRows.map((rowBottles, rowIndex) => (
               <div key={`row-${rowIndex}`} className="relative">
-                {/* 瓶子行 - 网格布局，固定大小 */}
-                <div className="relative z-10 grid gap-0.5 px-4 -mb-3" style={{ gridTemplateColumns: `repeat(${bottlesPerRow}, 96px)` }}>
+                {/* 瓶子行 - 网格布局，固定大小，居中对齐 */}
+                <div className="relative z-10 grid gap-0.5 px-4 -mb-3 justify-center" style={{ gridTemplateColumns: `repeat(${bottlesPerRow}, 76px)` }}>
                   {rowBottles.map((record, colIndex) => {
                     const index = rowIndex * bottlesPerRow + colIndex;
                     return (
