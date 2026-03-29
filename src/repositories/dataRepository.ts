@@ -5,9 +5,13 @@
  * @pos Repository (Application Data)
  * @description Loads and persists large core datasets through a single async repository and migrates legacy localStorage payloads into IndexedDB on first run.
  *
- * @updated 2026-03-28: Added achievement collection catalog defaults plus persisted collection redemption records.
+ * @updated 2026-03-29: Migrates bundled achievement bottle names, descriptions, and collection record labels away from placeholder defaults.
  */
-import { DEFAULT_ACHIEVEMENT_COLLECTION_COST, DEFAULT_ACHIEVEMENT_COLLECTIONS } from '../constants/achievementCollections';
+import {
+  DEFAULT_ACHIEVEMENT_COLLECTION_COST,
+  DEFAULT_ACHIEVEMENT_COLLECTIONS,
+  getDefaultAchievementCollectionPreset
+} from '../constants/achievementCollections';
 import { CATEGORIES, INITIAL_DAILY_REVIEWS, INITIAL_GOALS, INITIAL_LOGS, INITIAL_TODOS, MOCK_TODO_CATEGORIES, SCOPES } from '../constants';
 import { REVIEW_KEYS, StorageKey, USER_DATA_KEYS, storage } from '../constants/storageKeys';
 import {
@@ -110,6 +114,47 @@ export interface AchievementSnapshot {
   redemptionRecords: AchievementRedemptionRecord[];
   collectionRecords: AchievementCollectionRecord[];
 }
+
+const LEGACY_DEFAULT_BOTTLE_NAME_PATTERN = /^(?:收藏瓶|玻璃瓶)\s*\d{2}$/;
+
+const shouldReplaceLegacyBottleName = (value?: string) => {
+  const normalizedValue = value?.trim();
+  return !normalizedValue || LEGACY_DEFAULT_BOTTLE_NAME_PATTERN.test(normalizedValue);
+};
+
+const migrateDefaultAchievementCollection = (collection: AchievementCollection): AchievementCollection => {
+  if (!collection.id.startsWith('default-bottle-')) {
+    return collection;
+  }
+
+  const preset = getDefaultAchievementCollectionPreset(collection.id);
+  if (!preset) {
+    return collection;
+  }
+
+  return {
+    ...collection,
+    name: shouldReplaceLegacyBottleName(collection.name) ? preset.name : collection.name,
+    cost: DEFAULT_ACHIEVEMENT_COLLECTION_COST,
+    imagePath: preset.imagePath,
+    description: collection.description?.trim() ? collection.description : preset.description
+  };
+};
+
+const migrateDefaultAchievementCollectionRecord = (
+  record: AchievementCollectionRecord
+): AchievementCollectionRecord => {
+  const preset = getDefaultAchievementCollectionPreset(record.collectionId);
+  if (!preset) {
+    return record;
+  }
+
+  return {
+    ...record,
+    collectionName: shouldReplaceLegacyBottleName(record.collectionName) ? preset.name : record.collectionName,
+    imagePath: preset.imagePath
+  };
+};
 
 export class DataRepository {
   private initPromise: Promise<void> | null = null;
@@ -225,16 +270,14 @@ export class DataRepository {
       (await this.repository.getData<AchievementReward[]>(REPOSITORY_KEYS.ACHIEVEMENT_REWARDS)) ?? [];
     const collections =
       (await this.repository.getData<AchievementCollection[]>(REPOSITORY_KEYS.ACHIEVEMENT_COLLECTIONS)) ?? DEFAULT_ACHIEVEMENT_COLLECTIONS;
-    // migrate: reset default bottle costs to the current default
-    const migratedCollections = collections.map((c) =>
-      c.id.startsWith('default-bottle-') ? { ...c, cost: DEFAULT_ACHIEVEMENT_COLLECTION_COST } : c
-    );
+    const migratedCollections = collections.map(migrateDefaultAchievementCollection);
     const dailySnapshots =
       (await this.repository.getData<AchievementDailySnapshot[]>(REPOSITORY_KEYS.ACHIEVEMENT_DAILY_SNAPSHOTS)) ?? [];
     const redemptionRecords =
       (await this.repository.getData<AchievementRedemptionRecord[]>(REPOSITORY_KEYS.ACHIEVEMENT_REDEMPTION_RECORDS)) ?? [];
     const collectionRecords =
-      (await this.repository.getData<AchievementCollectionRecord[]>(REPOSITORY_KEYS.ACHIEVEMENT_COLLECTION_RECORDS)) ?? [];
+      ((await this.repository.getData<AchievementCollectionRecord[]>(REPOSITORY_KEYS.ACHIEVEMENT_COLLECTION_RECORDS)) ?? [])
+        .map(migrateDefaultAchievementCollectionRecord);
 
     return {
       meta,

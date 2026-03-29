@@ -1,7 +1,7 @@
 ﻿/**
  * @file AchievementContext.tsx
  * @description Manages achievement bottle data, daily snapshots, rewards, collectible bottles, and redemption records with repository hydration and selective recent-day recomputation.
- * @updated 2026-03-28: Added collectible bottle catalog and collection redemption records, and now computes available stars across both reward and collection spending.
+ * @updated 2026-03-29: Added single-day snapshot recomputation so a daily record can be recalculated from the current rule set on demand.
  */
 import React, { createContext, ReactNode, useContext, useEffect, useRef, useState } from 'react';
 import { dataRepository } from '../repositories/dataRepository';
@@ -71,6 +71,7 @@ interface AchievementContextType {
   totalEarnedStars: number;
   totalRedeemedStars: number;
   ensureRecentSnapshots: () => Promise<void>;
+  recomputeSnapshotForDate: (date: string) => { ok: boolean; message?: string };
   createRule: (input: CreateAchievementRuleInput) => void;
   updateRule: (rule: AchievementRule) => void;
   deleteRule: (ruleId: string) => void;
@@ -225,6 +226,40 @@ export const AchievementProvider: React.FC<{ children: ReactNode }> = ({ childre
     }
 
     setDailySnapshots((previous) => reconcileSnapshots(startDate, previous, rules));
+  };
+
+  const recomputeSnapshotForDate = (date: string) => {
+    const normalizedDate = date.trim();
+
+    if (!normalizedDate) {
+      return {
+        ok: false,
+        message: '缺少需要重新计算的日期'
+      };
+    }
+
+    setDailySnapshots((previous) => {
+      const existingSnapshot = previous.find((item) => item.date === normalizedDate);
+      const recomputedSnapshot = computeAchievementDailySnapshot(
+        normalizedDate,
+        logs,
+        todos,
+        dailyReviews,
+        rules
+      );
+
+      if (existingSnapshot) {
+        recomputedSnapshot.id = existingSnapshot.id;
+      }
+
+      const nextSnapshots = existingSnapshot
+        ? previous.map((item) => (item.date === normalizedDate ? recomputedSnapshot : item))
+        : [...previous, recomputedSnapshot];
+
+      return sortAchievementSnapshots(nextSnapshots);
+    });
+
+    return { ok: true };
   };
 
   const createRule = (input: CreateAchievementRuleInput) => {
@@ -516,6 +551,7 @@ export const AchievementProvider: React.FC<{ children: ReactNode }> = ({ childre
         totalEarnedStars,
         totalRedeemedStars,
         ensureRecentSnapshots,
+        recomputeSnapshotForDate,
         createRule,
         updateRule,
         deleteRule,
