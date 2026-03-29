@@ -2,11 +2,11 @@
  * @file AchievementBottle.tsx
  * @description Physics-driven achievement bottle visualization with switchable bottle skins for the achievement page and sponsorship previews.
  *
- * @updated 2026-03-28: Raised the bottle render cap to a fixed 200 stars and enlarged star bodies so the chamber reads as visually full before overflow is summarized.
+ * @updated 2026-03-29: Added layered glass collision sound playback for bottle-wall impacts and occasional star-to-star accents during shake interactions.
  */
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Capacitor } from '@capacitor/core';
-import { Bodies, Body, Composite, Engine, Runner, World } from 'matter-js';
+import { Bodies, Body, Composite, Engine, Events, Runner, World, type IEventCollision } from 'matter-js';
 import { Star } from 'lucide-react';
 import {
   DEFAULT_ACHIEVEMENT_BOTTLE_STYLE,
@@ -73,6 +73,15 @@ interface GravityState {
   targetY: number;
 }
 
+type CollisionSoundKind = 'boundary' | 'scatter';
+
+interface CollisionSoundController {
+  preload: () => void;
+  unlock: () => void;
+  playImpact: (kind: CollisionSoundKind, intensity: number, pan: number) => void;
+  dispose: () => void;
+}
+
 const MAX_VISIBLE_STARS = 250;
 const PREVIEW_VISIBLE_STARS = 12;
 const STAR_SIZE = 32;
@@ -90,6 +99,16 @@ const MAX_GRAVITY_SWAY_Y = 1.24;
 const MIN_GRAVITY_Y = -0.92;
 const MAX_GRAVITY_Y = 1.48;
 const BASELINE_RESET_THRESHOLD = 58;
+const BOUNDARY_COOLDOWN_MS = 48;
+const SCATTER_COOLDOWN_MS = 130;
+const PAIR_COOLDOWN_MS = 160;
+const MAX_ACTIVE_SOUND_SOURCES = 5;
+const SOUND_MASTER_GAIN = 0.7;
+const BOUNDARY_INTENSITY_THRESHOLD = 0.95;
+const SCATTER_INTENSITY_THRESHOLD = 2.1;
+const SCATTER_INTENSITY_CAP = 5.2;
+const BOUNDARY_LABEL_PREFIX = 'achievement-boundary-';
+const STAR_BODY_LABEL = 'achievement-star';
 const STAR_IMAGE_PATH_ENTRIES = Object.entries(
   import.meta.glob<string>(
     '../../../public/stars/*/*.{png,jpg,jpeg,webp,svg}',
@@ -344,6 +363,15 @@ const clamp = (value: number, min: number, max: number): number => (
   Math.min(max, Math.max(min, value))
 );
 
+const AVAILABLE_COLLISION_SOUND_SOURCES: string[] = [
+  '/shakersound/01.WAV',
+  '/shakersound/02.WAV',
+  '/shakersound/03.WAV',
+  '/shakersound/04.WAV',
+  '/shakersound/05.wav',
+  '/shakersound/06.wav'
+];
+
 const createGravityState = (): GravityState => ({
   baselineBeta: null,
   baselineGamma: null,
@@ -352,6 +380,215 @@ const createGravityState = (): GravityState => ({
   targetX: DEFAULT_GRAVITY.x,
   targetY: DEFAULT_GRAVITY.y
 });
+
+const getBoundaryLabel = (zone: 'floor' | 'left' | 'right' | 'ceiling'): string => (
+  `${BOUNDARY_LABEL_PREFIX}${zone}`
+);
+
+const isBoundaryLabel = (label: string | undefined): boolean => (
+  typeof label === 'string' && label.startsWith(BOUNDARY_LABEL_PREFIX)
+);
+
+const getBoundaryWeight = (label: string | undefined): number => {
+  switch (label) {
+    case getBoundaryLabel('floor'):
+      return 1.08;
+    case getBoundaryLabel('ceiling'):
+      return 0.84;
+    case getBoundaryLabel('left'):
+    case getBoundaryLabel('right'):
+      return 0.96;
+    default:
+      return 1;
+  }
+};
+
+const getImpactIntensity = (firstBody: Body, secondBody: Body): number => {
+  const relativeVelocityX = firstBody.velocity.x - secondBody.velocity.x;
+  const relativeVelocityY = firstBody.velocity.y - secondBody.velocity.y;
+
+  return Math.hypot(relativeVelocityX, relativeVelocityY);
+};
+
+const pickCollisionSoundLayer = (kind: CollisionSoundKind, intensity: number): CollisionSoundLayer => {
+  if (kind === 'boundary') {
+    if (intensity >= 3.3) {
+      return 'accent';
+    }
+
+    return intensity >= 1.8 ? 'mid' : 'light';
+  }
+
+  if (intensity >= 4.1) {
+    return 'mid';
+  }
+
+  return 'light';
+};
+
+const getCollisionGain = (kind: CollisionSoundKind, intensity: number): number => {
+  const normalizedIntensity = kind === 'boundary'
+    ? clamp((intensity - BOUNDARY_INTENSITY_THRESHOLD) / 3.4, 0, 1)
+    : clamp((intensity - SCATTER_INTENSITY_THRESHOLD) / 2.4, 0, 1);
+  const shape = kind === 'boundary'
+    ? 0.6 + (normalizedIntensity * 0.85)
+    : 0.34 + (normalizedIntensity * 0.46);
+  return shape;
+};
+
+const pickSingleCollisionSoundSource = (
+  styleVariant: AchievementBottleStyle,
+  iconPack: AchievementBottleIconPack,
+  rebuildToken: number
+): string => {
+  const seed = `${styleVariant}:${iconPack}:${rebuildToken}:audio`;
+  const idx = AVAILABLE_COLLISION_SOUND_SOURCES.length > 0
+    ? (getStableStarHash(seed) % AVAILABLE_COLLISION_SOUND_SOURCES.length)
+    : 0;
+  return AVAILABLE_COLLISION_SOUND_SOURCES[idx] ?? AVAILABLE_COLLISION_SOUND_SOURCES[0];
+};
+
+const createCollisionSoundController = (selectedSource: string): CollisionSoundController => {
+  let audioContext: AudioContext | null = null;
+  let masterGainNode: GainNode | null = null;
+  let preloadPromise: Promise<void> | null = null;
+  let audioBuffer: AudioBuffer | null = null;
+  const BASE_GAIN = 0.22;
+  const RATE_MIN = 0.9;
+  const RATE_MAX = 1.08;
+  const activeSources = new Set<AudioBufferSourceNode>();
+
+  const getAudioContext = (): AudioContext | null => {
+    if (typeof window === 'undefined') {
+      return null;
+    }
+
+    if (audioContext) {
+      return audioContext;
+    }
+
+    const AudioContextCtor = window.AudioContext
+      || (window as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+
+    if (!AudioContextCtor) {
+      return null;
+    }
+
+    audioContext = new AudioContextCtor();
+    masterGainNode = audioContext.createGain();
+    masterGainNode.gain.value = SOUND_MASTER_GAIN;
+    masterGainNode.connect(audioContext.destination);
+    return audioContext;
+  };
+
+  const preload = () => {
+    const context = getAudioContext();
+
+    if (!context || preloadPromise) {
+      return;
+    }
+
+    preloadPromise = fetch(selectedSource)
+      .then((response) => {
+        if (!response.ok) {
+          throw new Error(`Failed to load collision sound: ${selectedSource}`);
+        }
+        return response.arrayBuffer();
+      })
+      .then((buffer) => context.decodeAudioData(buffer.slice(0)))
+      .then((decoded) => {
+        audioBuffer = decoded;
+      })
+      .catch((error) => {
+        console.warn('[AchievementBottle] Failed to preload collision sounds', error);
+      });
+  };
+
+  const unlock = () => {
+    const context = getAudioContext();
+    if (!context) {
+      return;
+    }
+
+    preload();
+
+    if (context.state === 'suspended') {
+      void context.resume().catch((error) => {
+        console.warn('[AchievementBottle] Failed to resume collision audio context', error);
+      });
+    }
+  };
+
+  const playImpact = (kind: CollisionSoundKind, intensity: number, pan: number) => {
+    const context = getAudioContext();
+    if (!context || context.state !== 'running' || !masterGainNode) {
+      return;
+    }
+
+    const buffer = audioBuffer;
+
+    if (!buffer || activeSources.size >= MAX_ACTIVE_SOUND_SOURCES) {
+      return;
+    }
+
+    const source = context.createBufferSource();
+    source.buffer = buffer;
+    const baseRate = RATE_MIN + (Math.random() * (RATE_MAX - RATE_MIN));
+    const rateJitter = 1 + ((Math.random() * 0.2) - 0.1);
+    source.playbackRate.value = Math.max(0.5, Math.min(2, baseRate * rateJitter));
+    if ('detune' in source && typeof source.detune?.value === 'number') {
+      source.detune.value = (Math.random() * 240) - 120;
+    }
+
+    const gainNode = context.createGain();
+    gainNode.gain.value = BASE_GAIN * getCollisionGain(kind, intensity) * (0.92 + (Math.random() * 0.16));
+
+    source.connect(gainNode);
+
+    if ('createStereoPanner' in context) {
+      const panner = context.createStereoPanner();
+      panner.pan.value = clamp(pan, -0.85, 0.85);
+      gainNode.connect(panner);
+      panner.connect(masterGainNode);
+    } else {
+      gainNode.connect(masterGainNode);
+    }
+
+    source.onended = () => {
+      activeSources.delete(source);
+    };
+
+    activeSources.add(source);
+    source.start(0);
+  };
+
+  const dispose = () => {
+    activeSources.forEach((source) => {
+      try {
+        source.stop();
+      } catch (error) {
+        // Ignore duplicate stop attempts during teardown.
+      }
+    });
+    activeSources.clear();
+    audioBuffer = null;
+
+    if (audioContext) {
+      void audioContext.close().catch(() => {});
+      audioContext = null;
+    }
+
+    masterGainNode = null;
+    preloadPromise = null;
+  };
+
+  return {
+    preload,
+    unlock,
+    playImpact,
+    dispose
+  };
+};
 
 const isAndroidTiltSupported = (): boolean => {
   if (typeof window === 'undefined' || !('DeviceOrientationEvent' in window)) {
@@ -377,6 +614,7 @@ export const AchievementBottle: React.FC<AchievementBottleProps> = ({
   const starBodiesRef = useRef<Body[]>([]);
   const starNodeRefs = useRef<Array<HTMLDivElement | null>>([]);
   const frameRef = useRef<number | null>(null);
+  const collisionSoundRef = useRef<CollisionSoundController | null>(null);
   const [dimensions, setDimensions] = useState(EMPTY_DIMENSIONS);
 
   const palette = getPalette(styleVariant);
@@ -388,6 +626,33 @@ export const AchievementBottle: React.FC<AchievementBottleProps> = ({
   const previewStars = useMemo(() => (
     PREVIEW_STAR_LAYOUTS.slice(0, Math.min(PREVIEW_VISIBLE_STARS, visibleCount))
   ), [visibleCount]);
+
+  useEffect(() => {
+    if (compact || renderMode !== 'live' || typeof window === 'undefined') {
+      return undefined;
+    }
+
+    const selectedSound = pickSingleCollisionSoundSource(styleVariant, iconPack, rebuildToken);
+    const collisionSound = createCollisionSoundController(selectedSound);
+    collisionSoundRef.current = collisionSound;
+    collisionSound.preload();
+
+    const unlockCollisionSounds = () => {
+      collisionSoundRef.current?.unlock();
+    };
+
+    window.addEventListener('pointerdown', unlockCollisionSounds, true);
+    window.addEventListener('touchstart', unlockCollisionSounds, true);
+    window.addEventListener('keydown', unlockCollisionSounds, true);
+
+    return () => {
+      window.removeEventListener('pointerdown', unlockCollisionSounds, true);
+      window.removeEventListener('touchstart', unlockCollisionSounds, true);
+      window.removeEventListener('keydown', unlockCollisionSounds, true);
+      collisionSound.dispose();
+      collisionSoundRef.current = null;
+    };
+  }, [compact, renderMode, styleVariant, iconPack, rebuildToken]);
 
   useEffect(() => {
     if (compact || renderMode !== 'live' || !containerRef.current) {
@@ -443,12 +708,33 @@ export const AchievementBottle: React.FC<AchievementBottleProps> = ({
     const rightWallX = width - BOTTLE_PADDING + (wallThickness / 2);
     const floorY = height - BOTTLE_PADDING + (wallThickness / 2);
     const ceilingY = BOTTLE_PADDING - (wallThickness / 2);
+    const pairCollisionTimestamps = new Map<string, number>();
+    const collisionCooldowns = {
+      boundary: 0,
+      scatter: 0
+    };
 
     const boundaries = [
-      Bodies.rectangle(width / 2, floorY, width - (BOTTLE_PADDING * 2), wallThickness, { isStatic: true, restitution: 0.2 }),
-      Bodies.rectangle(leftWallX, height / 2, wallThickness, height - (BOTTLE_PADDING * 2), { isStatic: true, restitution: 0.2 }),
-      Bodies.rectangle(rightWallX, height / 2, wallThickness, height - (BOTTLE_PADDING * 2), { isStatic: true, restitution: 0.2 }),
-      Bodies.rectangle(width / 2, ceilingY, width - (BOTTLE_PADDING * 2), wallThickness, { isStatic: true, restitution: 0.2 })
+      Bodies.rectangle(width / 2, floorY, width - (BOTTLE_PADDING * 2), wallThickness, {
+        isStatic: true,
+        restitution: 0.2,
+        label: getBoundaryLabel('floor')
+      }),
+      Bodies.rectangle(leftWallX, height / 2, wallThickness, height - (BOTTLE_PADDING * 2), {
+        isStatic: true,
+        restitution: 0.2,
+        label: getBoundaryLabel('left')
+      }),
+      Bodies.rectangle(rightWallX, height / 2, wallThickness, height - (BOTTLE_PADDING * 2), {
+        isStatic: true,
+        restitution: 0.2,
+        label: getBoundaryLabel('right')
+      }),
+      Bodies.rectangle(width / 2, ceilingY, width - (BOTTLE_PADDING * 2), wallThickness, {
+        isStatic: true,
+        restitution: 0.2,
+        label: getBoundaryLabel('ceiling')
+      })
     ];
 
     const stars = Array.from({ length: visibleCount }, (_, index) => {
@@ -467,6 +753,7 @@ export const AchievementBottle: React.FC<AchievementBottleProps> = ({
       const spawnY = BOTTLE_PADDING + (index / Math.max(1, visibleCount - 1)) * innerHeight * 0.95 + (Math.random() - 0.5) * (innerHeight / visibleCount) * 2;
 
       const star = Bodies.circle(spawnX, spawnY, starRadius, {
+        label: STAR_BODY_LABEL,
         restitution: 0.48,
         friction: 0.028,
         frictionAir: 0.011 + (Math.random() * 0.008),
@@ -485,6 +772,79 @@ export const AchievementBottle: React.FC<AchievementBottleProps> = ({
     World.add(engine.world, [...boundaries, ...stars]);
     Runner.run(runner, engine);
     starBodiesRef.current = stars;
+
+    const handleCollisions = (event: IEventCollision<Engine>) => {
+      const collisionSound = collisionSoundRef.current;
+
+      if (!collisionSound) {
+        return;
+      }
+
+      const now = window.performance.now();
+
+      event.pairs.forEach((pair) => {
+        const { bodyA, bodyB } = pair;
+        const pairKey = bodyA.id < bodyB.id
+          ? `${bodyA.id}:${bodyB.id}`
+          : `${bodyB.id}:${bodyA.id}`;
+        const lastPairCollisionAt = pairCollisionTimestamps.get(pairKey) ?? 0;
+
+        if ((now - lastPairCollisionAt) < PAIR_COOLDOWN_MS) {
+          return;
+        }
+
+        const boundaryBody = isBoundaryLabel(bodyA.label)
+          ? bodyA
+          : (isBoundaryLabel(bodyB.label) ? bodyB : null);
+        const boundaryKind = boundaryBody ? 'boundary' : 'scatter';
+        const rawIntensity = getImpactIntensity(bodyA, bodyB);
+
+        if (boundaryKind === 'boundary') {
+          const weightedIntensity = rawIntensity * getBoundaryWeight(boundaryBody?.label);
+
+          if (
+            weightedIntensity < BOUNDARY_INTENSITY_THRESHOLD
+            || (now - collisionCooldowns.boundary) < BOUNDARY_COOLDOWN_MS
+          ) {
+            return;
+          }
+
+          pairCollisionTimestamps.set(pairKey, now);
+          collisionCooldowns.boundary = now;
+          collisionSound.playImpact('boundary', weightedIntensity, ((pair.collision.supports[0]?.x ?? width / 2) / width * 2) - 1);
+          return;
+        }
+
+        if (bodyA.label !== STAR_BODY_LABEL || bodyB.label !== STAR_BODY_LABEL) {
+          return;
+        }
+
+        const cappedIntensity = Math.min(rawIntensity, SCATTER_INTENSITY_CAP);
+        const scatterChance = clamp((cappedIntensity - SCATTER_INTENSITY_THRESHOLD) / 2.3, 0.15, 0.5);
+
+        if (
+          cappedIntensity < SCATTER_INTENSITY_THRESHOLD
+          || (now - collisionCooldowns.scatter) < SCATTER_COOLDOWN_MS
+          || Math.random() > scatterChance
+        ) {
+          return;
+        }
+
+        pairCollisionTimestamps.set(pairKey, now);
+        collisionCooldowns.scatter = now;
+        collisionSound.playImpact('scatter', cappedIntensity, ((pair.collision.supports[0]?.x ?? width / 2) / width * 2) - 1);
+      });
+
+      if (pairCollisionTimestamps.size > 80) {
+        pairCollisionTimestamps.forEach((timestamp, key) => {
+          if ((now - timestamp) > (PAIR_COOLDOWN_MS * 3)) {
+            pairCollisionTimestamps.delete(key);
+          }
+        });
+      }
+    };
+
+    Events.on(engine, 'collisionStart', handleCollisions);
 
     const handleDeviceOrientation = (event: DeviceOrientationEvent) => {
       if (typeof event.beta !== 'number' || typeof event.gamma !== 'number') {
@@ -563,13 +923,14 @@ export const AchievementBottle: React.FC<AchievementBottleProps> = ({
         window.removeEventListener('deviceorientation', handleDeviceOrientation, true);
       }
 
+      Events.off(engine, 'collisionStart', handleCollisions);
       Runner.stop(runner);
       Composite.clear(engine.world, false);
       Engine.clear(engine);
       starBodiesRef.current = [];
       starNodeRefs.current = [];
     };
-  }, [compact, dimensions.height, dimensions.width, rebuildToken, renderMode, styleVariant, visibleCount]);
+  }, [compact, dimensions.height, dimensions.width, rebuildToken, renderMode, styleVariant, visibleCount, iconPack]);
 
   return (
     <div

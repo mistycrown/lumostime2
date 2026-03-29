@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import { DEFAULT_ACHIEVEMENT_COLLECTION_COST } from '../constants/achievementCollections';
 import { REVIEW_KEYS, USER_DATA_KEYS } from '../constants/storageKeys';
 import { DataRepository, REPOSITORY_KEYS } from './dataRepository';
 
@@ -156,5 +157,96 @@ describe('DataRepository', () => {
     expect(await repository.getData(REPOSITORY_KEYS.MAJOR_GOALS)).toEqual(majorGoals);
     expect(await repository.getMeta('core-data-migration-v2')).toBe(true);
     expect(values.has(USER_DATA_KEYS.MAJOR_GOALS)).toBe(false);
+  });
+
+  it('migrates legacy default achievement bottle names in collections and records', async () => {
+    const repository = new InMemoryStorageRepository();
+
+    repository.data.set(REPOSITORY_KEYS.ACHIEVEMENT_COLLECTIONS, [
+      {
+        id: 'default-bottle-03',
+        name: '收藏瓶 03',
+        cost: 999,
+        imagePath: '/bottle/03.png',
+        description: '',
+        enabled: true,
+        createdAt: 1,
+        updatedAt: 1
+      },
+      {
+        id: 'default-bottle-08',
+        name: '自定义星瓶',
+        cost: 333,
+        imagePath: '/bottle/08.png',
+        description: '我的备注',
+        enabled: true,
+        createdAt: 2,
+        updatedAt: 2
+      }
+    ]);
+
+    repository.data.set(REPOSITORY_KEYS.ACHIEVEMENT_COLLECTION_RECORDS, [
+      {
+        id: 'record-1',
+        collectionId: 'default-bottle-03',
+        collectionName: '玻璃瓶 03',
+        cost: 200,
+        imagePath: '',
+        redeemedAt: 10
+      },
+      {
+        id: 'record-2',
+        collectionId: 'default-bottle-08',
+        collectionName: '我的夜空瓶',
+        cost: 200,
+        imagePath: '',
+        redeemedAt: 20
+      }
+    ]);
+
+    const dataRepository = new DataRepository(repository, createLegacyStorageAdapter(new Map()).adapter);
+    const snapshot = await dataRepository.loadAchievementSnapshot();
+
+    expect(snapshot.collections).toEqual([
+      {
+        id: 'default-bottle-03',
+        name: '摘星许愿瓶',
+        cost: DEFAULT_ACHIEVEMENT_COLLECTION_COST,
+        imagePath: '/bottle/03.png',
+        description: '散发着温暖光芒，装满小星星的方形玻璃瓶，带着占星与祈愿的氛围。',
+        enabled: true,
+        createdAt: 1,
+        updatedAt: 1
+      },
+      {
+        id: 'default-bottle-08',
+        name: '自定义星瓶',
+        cost: DEFAULT_ACHIEVEMENT_COLLECTION_COST,
+        imagePath: '/bottle/08.png',
+        description: '我的备注',
+        enabled: true,
+        createdAt: 2,
+        updatedAt: 2
+      }
+    ]);
+
+    expect(snapshot.collectionRecords).toEqual([
+      {
+        id: 'record-1',
+        collectionId: 'default-bottle-03',
+        collectionName: '摘星许愿瓶',
+        cost: 200,
+        imagePath: '/bottle/03.png',
+        redeemedAt: 10
+      },
+      {
+        id: 'record-2',
+        collectionId: 'default-bottle-08',
+        collectionName: '我的夜空瓶',
+        cost: 200,
+        imagePath: '/bottle/08.png',
+        redeemedAt: 20
+      }
+    ]);
   });
 });

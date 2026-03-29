@@ -5,7 +5,7 @@
  * @pos View (Achievement Overlay)
  * @description Achievement bottle full-screen page opened from Timeline. The collapsed state emphasizes the bottle, while the expanded state turns the screen into a full ledger workspace.
  *
- * @updated 2026-03-28: Expanded ledger now fills the screen, keeps one-decimal star balances in the UI, and adds a collectible bottle tab with collection records.
+ * @updated 2026-03-29: Daily record detail now supports recomputing a single day's snapshot from the current rules.
  */
 import React, { useEffect, useMemo, useState } from 'react';
 import { Archive, ChevronDown, Gift, ScrollText, SlidersHorizontal } from 'lucide-react';
@@ -44,6 +44,7 @@ export const AchievementView: React.FC = () => {
     collectionRecords,
     availableStars,
     ensureRecentSnapshots,
+    recomputeSnapshotForDate,
     createRule,
     updateRule,
     deleteRule,
@@ -123,6 +124,7 @@ export const AchievementView: React.FC = () => {
           collectionRecords={collectionRecords}
           onDeleteRedemptionRecord={deleteRedemptionRecord}
           onDeleteCollectionRecord={deleteCollectionRecord}
+          onRecomputeSnapshot={recomputeSnapshotForDate}
         />
       );
     }
@@ -180,6 +182,7 @@ export const AchievementView: React.FC = () => {
     deleteRedemptionRecord,
     deleteReward,
     deleteRule,
+    recomputeSnapshotForDate,
     redeemCollection,
     redeemReward,
     redemptionRecords,

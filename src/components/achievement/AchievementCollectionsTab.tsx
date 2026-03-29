@@ -5,7 +5,7 @@
  * @pos Component (Achievement Collection Tab)
  * @description Renders collectible bottle exchange controls, a visual bottle picker inspired by the emoji selector, and a tightly packed shelf view for redeemed collections.
  *
- * @updated 2026-03-29: Bottle picker allows repeat redemption; shelf wraps into grid; removed inter-shelf spacing for layered feel.
+ * @updated 2026-03-29: Bottle picker allows repeat redemption; shelf wraps into grid; redeem dialog now uses a side-by-side preview and copy layout.
  */
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
@@ -492,16 +492,20 @@ export const AchievementCollectionsTab: React.FC<AchievementCollectionsTabProps>
         )}
       >
         {selectedCollection && (
-          <div className="space-y-5">
-            <BottlePreview imagePath={selectedCollection.imagePath} alt={selectedCollection.name} size="lg" />
-            <p className="text-sm leading-6 text-stone-500">
-              {canRedeemSelected
-                ? `兑换成功后剩余 ${formatAchievementStars(normalizeAchievementStarValue(availableStars - selectedCollection.cost))} 光点，这个瓶子会立刻摆进你的收藏货架。`
-                : '当前光点不足，暂时无法兑换这个收藏瓶子。'}
-            </p>
-            {redeemError && (
-              <div className="text-sm text-rose-500">{redeemError}</div>
-            )}
+          <div className="flex items-center gap-4 rounded-[1.75rem] bg-stone-50/70 px-4 py-4">
+            <div className="w-[120px] shrink-0">
+              <BottlePreview imagePath={selectedCollection.imagePath} alt={selectedCollection.name} size="lg" />
+            </div>
+            <div className="min-w-0 flex-1 space-y-3">
+              <p className="text-sm leading-6 text-stone-500">
+                {canRedeemSelected
+                  ? `兑换成功后剩余 ${formatAchievementStars(normalizeAchievementStarValue(availableStars - selectedCollection.cost))} 光点，这个瓶子会立刻摆进你的收藏货架。`
+                  : '当前光点不足，暂时无法兑换这个收藏瓶子。'}
+              </p>
+              {redeemError && (
+                <div className="text-sm text-rose-500">{redeemError}</div>
+              )}
+            </div>
           </div>
         )}
       </AchievementDialog>

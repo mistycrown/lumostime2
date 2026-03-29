@@ -4,9 +4,11 @@
  *
  * @updated 2026-03-28: Added dedicated collection redemption records so collectible bottle exchanges appear alongside reward records.
  * @updated 2026-03-29: Each section shows at most 10 items initially; clicking "展开更多" loads the next 10.
+ * @updated 2026-03-29: Daily snapshot detail now supports recalculating the selected day from the current achievement rules.
  */
 import React, { useMemo, useState } from 'react';
-import { ChevronRight, Trash2 } from 'lucide-react';
+import { ChevronRight, RotateCcw, Trash2 } from 'lucide-react';
+import { useToast } from '../../contexts/ToastContext';
 import { AchievementCollectionRecord, AchievementDailySnapshot, AchievementRedemptionRecord } from '../../types';
 import { formatRelativeTime, getLocalDateTimeStr } from '../../utils/dateUtils';
 import { AchievementDialog } from './AchievementDialog';
@@ -18,6 +20,7 @@ interface AchievementRecordsTabProps {
   collectionRecords: AchievementCollectionRecord[];
   onDeleteRedemptionRecord: (recordId: string) => void;
   onDeleteCollectionRecord: (recordId: string) => void;
+  onRecomputeSnapshot: (date: string) => { ok: boolean; message?: string };
 }
 
 const PAGE_SIZE = 10;
@@ -36,8 +39,10 @@ export const AchievementRecordsTab: React.FC<AchievementRecordsTabProps> = ({
   redemptionRecords,
   collectionRecords,
   onDeleteRedemptionRecord,
-  onDeleteCollectionRecord
+  onDeleteCollectionRecord,
+  onRecomputeSnapshot
 }) => {
+  const { addToast } = useToast();
   const [selectedSnapshotId, setSelectedSnapshotId] = useState<string | null>(null);
 
   const orderedSnapshots = useMemo(() => {
@@ -57,6 +62,20 @@ export const AchievementRecordsTab: React.FC<AchievementRecordsTabProps> = ({
   const snapshotsPaged = usePagedList(orderedSnapshots);
   const rewardsPaged = usePagedList(orderedRewardRecords);
   const collectionsPaged = usePagedList(orderedCollectionRecords);
+
+  const handleRecomputeSelectedSnapshot = () => {
+    if (!selectedSnapshot) {
+      return;
+    }
+
+    const result = onRecomputeSnapshot(selectedSnapshot.date);
+    if (result.ok) {
+      addToast('success', `${selectedSnapshot.date} 已按当前规则重新计算`);
+      return;
+    }
+
+    addToast('error', result.message || '重新计算失败，请稍后重试');
+  };
 
   return (
     <>
@@ -211,6 +230,25 @@ export const AchievementRecordsTab: React.FC<AchievementRecordsTabProps> = ({
         title={selectedSnapshot?.date || '记录详情'}
         subtitle={selectedSnapshot ? `净变化 ${formatAchievementSignedStars(selectedSnapshot.netDelta)}` : undefined}
         onClose={() => setSelectedSnapshotId(null)}
+        footer={selectedSnapshot ? (
+          <div className="flex items-center justify-between gap-3">
+            <button
+              type="button"
+              onClick={() => setSelectedSnapshotId(null)}
+              className="rounded-full border border-stone-200 px-4 py-2 text-sm text-stone-600 transition-colors hover:bg-stone-50"
+            >
+              关闭
+            </button>
+            <button
+              type="button"
+              onClick={handleRecomputeSelectedSnapshot}
+              className="inline-flex items-center gap-2 rounded-full bg-stone-900 px-4 py-2 text-sm text-white transition-colors hover:bg-stone-800"
+            >
+              <RotateCcw size={14} />
+              重新计算当天得分
+            </button>
+          </div>
+        ) : undefined}
       >
         {selectedSnapshot?.ruleBreakdown.length ? (
           <div className="border-t border-stone-200">
