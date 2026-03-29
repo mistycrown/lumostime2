@@ -9,7 +9,7 @@
  */
 import { AchievementCollection } from '../types';
 
-export const DEFAULT_ACHIEVEMENT_COLLECTION_COST = 500;
+export const DEFAULT_ACHIEVEMENT_COLLECTION_COST = 200;
 
 export const DEFAULT_ACHIEVEMENT_COLLECTION_IMAGE_PATHS = Array.from({ length: 16 }, (_, index) => {
   const assetId = String(index + 1).padStart(2, '0');

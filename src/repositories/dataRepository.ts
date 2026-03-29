@@ -7,7 +7,7 @@
  *
  * @updated 2026-03-28: Added achievement collection catalog defaults plus persisted collection redemption records.
  */
-import { DEFAULT_ACHIEVEMENT_COLLECTIONS } from '../constants/achievementCollections';
+import { DEFAULT_ACHIEVEMENT_COLLECTION_COST, DEFAULT_ACHIEVEMENT_COLLECTIONS } from '../constants/achievementCollections';
 import { CATEGORIES, INITIAL_DAILY_REVIEWS, INITIAL_GOALS, INITIAL_LOGS, INITIAL_TODOS, MOCK_TODO_CATEGORIES, SCOPES } from '../constants';
 import { REVIEW_KEYS, StorageKey, USER_DATA_KEYS, storage } from '../constants/storageKeys';
 import {
@@ -225,6 +225,10 @@ export class DataRepository {
       (await this.repository.getData<AchievementReward[]>(REPOSITORY_KEYS.ACHIEVEMENT_REWARDS)) ?? [];
     const collections =
       (await this.repository.getData<AchievementCollection[]>(REPOSITORY_KEYS.ACHIEVEMENT_COLLECTIONS)) ?? DEFAULT_ACHIEVEMENT_COLLECTIONS;
+    // migrate: reset default bottle costs to the current default
+    const migratedCollections = collections.map((c) =>
+      c.id.startsWith('default-bottle-') ? { ...c, cost: DEFAULT_ACHIEVEMENT_COLLECTION_COST } : c
+    );
     const dailySnapshots =
       (await this.repository.getData<AchievementDailySnapshot[]>(REPOSITORY_KEYS.ACHIEVEMENT_DAILY_SNAPSHOTS)) ?? [];
     const redemptionRecords =
@@ -236,7 +240,7 @@ export class DataRepository {
       meta,
       rules,
       rewards,
-      collections,
+      collections: migratedCollections,
       dailySnapshots,
       redemptionRecords,
       collectionRecords
