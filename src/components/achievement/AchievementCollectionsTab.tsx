@@ -7,13 +7,35 @@
  *
  * @updated 2026-03-29: Bottle picker allows repeat redemption; shelf wraps into grid; removed inter-shelf spacing for layered feel.
  */
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { ImageOff, Plus, X } from 'lucide-react';
 import { DEFAULT_ACHIEVEMENT_COLLECTION_COST } from '../../constants/achievementCollections';
 import { AchievementCollection, AchievementCollectionRecord } from '../../types';
 import { formatAchievementStars, normalizeAchievementStarValue } from '../../utils/achievementUtils';
 import { AchievementDialog } from './AchievementDialog';
+
+// 添加瓶子入场动画样式
+if (typeof document !== 'undefined') {
+  const styleId = 'achievement-bottle-animation';
+  if (!document.getElementById(styleId)) {
+    const style = document.createElement('style');
+    style.id = styleId;
+    style.textContent = `
+      @keyframes fadeInUp {
+        from {
+          opacity: 0;
+          transform: translateY(12px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+    `;
+    document.head.appendChild(style);
+  }
+}
 
 interface AchievementCollectionsTabProps {
   availableStars: number;
@@ -51,9 +73,12 @@ const BottlePreview: React.FC<{
   imagePath?: string;
   alt: string;
   size?: 'sm' | 'lg' | 'picker';
-}> = ({ imagePath, alt, size = 'sm' }) => {
+  transparent?: boolean;
+}> = ({ imagePath, alt, size = 'sm', transparent = false }) => {
   const wrapperClassName = size === 'lg'
-    ? 'flex h-28 items-end justify-center rounded-[1.75rem] bg-white/75 px-4 pb-3 pt-4'
+    ? transparent
+      ? 'flex h-28 items-end justify-center px-4 pb-0 pt-4'
+      : 'flex h-28 items-end justify-center rounded-[1.75rem] bg-white/75 px-4 pb-3 pt-4'
     : size === 'picker'
       ? 'flex h-24 items-end justify-center rounded-[1.6rem] bg-stone-50 px-3 pb-3 pt-4 transition-all'
       : 'flex h-14 w-14 items-end justify-center rounded-2xl bg-stone-100/80 px-2 pb-1 pt-2';
@@ -93,6 +118,8 @@ export const AchievementCollectionsTab: React.FC<AchievementCollectionsTabProps>
   const [selectedCollectionId, setSelectedCollectionId] = useState<string | null>(null);
   const [draft, setDraft] = useState<CollectionDraft>(createCollectionDraft());
   const [redeemError, setRedeemError] = useState<string | null>(null);
+  const [bottlesPerRow, setBottlesPerRow] = useState(4);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   const ownedCollections = useMemo(() => {
     return [...collectionRecords].sort((first, second) => first.redeemedAt - second.redeemedAt);
@@ -101,6 +128,32 @@ export const AchievementCollectionsTab: React.FC<AchievementCollectionsTabProps>
   const ownedCollectionIds = useMemo(() => {
     return new Set(collectionRecords.map((record) => record.collectionId));
   }, [collectionRecords]);
+
+  // 动态计算每行瓶子数量
+  useEffect(() => {
+    const calculateBottlesPerRow = () => {
+      if (!containerRef.current) return;
+      const containerWidth = containerRef.current.offsetWidth;
+      const padding = 32; // px-4 = 16px * 2
+      const availableWidth = containerWidth - padding;
+      const bottleWidth = 96; // 固定瓶子容器宽度
+      
+      const count = Math.floor(availableWidth / bottleWidth);
+      setBottlesPerRow(Math.max(3, count));
+    };
+
+    calculateBottlesPerRow();
+    window.addEventListener('resize', calculateBottlesPerRow);
+    return () => window.removeEventListener('resize', calculateBottlesPerRow);
+  }, []);
+
+  const bottleRows = useMemo(() => {
+    const rows: AchievementCollectionRecord[][] = [];
+    for (let i = 0; i < ownedCollections.length; i += bottlesPerRow) {
+      rows.push(ownedCollections.slice(i, i + bottlesPerRow));
+    }
+    return rows;
+  }, [ownedCollections, bottlesPerRow]);
 
   const selectedCollection = selectedCollectionId
     ? collections.find((collection) => collection.id === selectedCollectionId) || null
@@ -266,15 +319,63 @@ export const AchievementCollectionsTab: React.FC<AchievementCollectionsTabProps>
             还没有收藏瓶子。点击"新增收藏"后，会打开预览选择器让你直接挑瓶子兑换。
           </div>
         ) : (
-          <div className="mt-3 rounded-[2rem] border border-stone-200/70 bg-white/60 px-3 pb-2 pt-3 shadow-[0_18px_40px_rgba(120,113,108,0.06)]">
-            <div className="flex flex-wrap items-end pb-2">
-              {ownedCollections.map((record) => (
-                <div key={record.id} className="flex items-end justify-center" style={{ width: '25%' }}>
-                  <BottlePreview imagePath={record.imagePath} alt={record.collectionName} size="lg" />
+          <div ref={containerRef} className="relative mt-3 space-y-4">
+            {/* 动态分组的多层货架 */}
+            {bottleRows.map((rowBottles, rowIndex) => (
+              <div key={`row-${rowIndex}`} className="relative">
+                {/* 瓶子行 - 网格布局，固定大小 */}
+                <div className="relative z-10 grid gap-0.5 px-4 -mb-3" style={{ gridTemplateColumns: `repeat(${bottlesPerRow}, 96px)` }}>
+                  {rowBottles.map((record, colIndex) => {
+                    const index = rowIndex * bottlesPerRow + colIndex;
+                    return (
+                      <div 
+                        key={record.id} 
+                        className="group flex items-end justify-center transition-all duration-300 hover:-translate-y-2 hover:z-20" 
+                        style={{ 
+                          animation: `fadeInUp 0.4s ease-out ${index * 0.06}s both`,
+                          filter: 'drop-shadow(0 8px 12px rgba(120, 80, 50, 0.25))'
+                        }}
+                      >
+                        <BottlePreview 
+                          imagePath={record.imagePath} 
+                          alt={record.collectionName} 
+                          size="lg"
+                          transparent={true}
+                        />
+                      </div>
+                    );
+                  })}
                 </div>
-              ))}
-            </div>
-            <div className="h-[4px] rounded-full bg-[linear-gradient(90deg,rgba(214,211,209,0.3),rgba(168,162,158,0.7),rgba(214,211,209,0.3))]" />
+                
+                {/* 木板货架 - 浅色，在瓶子下方 */}
+                <div className="relative z-0 mx-2">
+                  {/* 木板主体 */}
+                  <div className="h-4 rounded-lg bg-gradient-to-b from-amber-600/50 via-amber-500/55 to-amber-700/60 shadow-[0_6px_20px_rgba(120,80,50,0.35)]">
+                    {/* 木纹 */}
+                    <div 
+                      className="h-full rounded-lg opacity-20" 
+                      style={{
+                        backgroundImage: `
+                          repeating-linear-gradient(
+                            90deg,
+                            transparent,
+                            transparent 5px,
+                            rgba(139, 69, 19, 0.4) 5px,
+                            rgba(139, 69, 19, 0.4) 6px
+                          )
+                        `
+                      }} 
+                    />
+                  </div>
+                  
+                  {/* 木板顶部高光 */}
+                  <div className="absolute inset-x-0 top-0 h-[2px] rounded-t-lg bg-gradient-to-r from-transparent via-amber-200/50 to-transparent" />
+                  
+                  {/* 木板前缘立体感 */}
+                  <div className="absolute inset-x-0 -bottom-1 h-2 rounded-b-lg bg-gradient-to-b from-amber-800/40 to-amber-900/50 shadow-[0_3px_8px_rgba(0,0,0,0.3)]" />
+                </div>
+              </div>
+            ))}
           </div>
         )}
       </section>
