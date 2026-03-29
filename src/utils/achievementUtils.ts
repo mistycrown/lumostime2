@@ -1,16 +1,15 @@
-/**
+﻿/**
  * @file achievementUtils.ts
  * @input Achievement rules, logs, and date ranges
  * @output Achievement daily snapshot helpers and summary calculations
  * @pos Utility (Achievement)
  * @description 成就系统计算工具 - 负责每日快照计算、日期枚举和账本汇总。
  *
- * @updated 2026-03-28: Added decimal-safe star helpers so achievement balances and rule settlement keep one decimal place while bottle rendering can floor the visible star count.
+ * @updated 2026-03-28: Added decimal-safe star helpers and support for combining reward plus collection spending records.
  */
 import {
   AchievementDailySnapshot,
   AchievementDailyRuleBreakdown,
-  AchievementRedemptionRecord,
   AchievementRule,
   DailyReview,
   Log,
@@ -21,6 +20,10 @@ import { getLocalDateStr } from './dateUtils';
 const DAY_MS = 24 * 60 * 60 * 1000;
 const ACHIEVEMENT_STAR_DECIMALS = 1;
 const ACHIEVEMENT_STAR_FACTOR = 10 ** ACHIEVEMENT_STAR_DECIMALS;
+
+interface AchievementSpendRecordLike {
+  cost: number;
+}
 
 const createDateAtNoon = (dateStr: string): Date => {
   const [year, month, day] = dateStr.split('-').map(Number);
@@ -117,9 +120,9 @@ export const computeAchievementDailySnapshot = (
     .filter((rule) => rule.enabled && rule.targetIds.length > 0 && rule.unitAmount > 0 && rule.deltaPerUnit > 0);
   const dayLogs = logs.filter((log) => getLocalDateStr(new Date(log.startTime)) === date);
   const completedTodos = todos.filter((todo) => (
-    todo.isCompleted &&
-    todo.completedAt &&
-    getLocalDateStr(new Date(todo.completedAt)) === date
+    todo.isCompleted
+    && todo.completedAt
+    && getLocalDateStr(new Date(todo.completedAt)) === date
   ));
   const dayReview = dailyReviews.find((review) => review.date === date);
   const completedCheckItems = (dayReview?.checkItems || []).filter((item) => item.isCompleted && item.category);
@@ -136,8 +139,8 @@ export const computeAchievementDailySnapshot = (
       if (rule.targetType === 'scope') {
         const matchedSeconds = dayLogs
           .filter((log) => (
-            Array.isArray(log.scopeIds) &&
-            log.scopeIds.some((scopeId) => rule.targetIds.includes(scopeId))
+            Array.isArray(log.scopeIds)
+            && log.scopeIds.some((scopeId) => rule.targetIds.includes(scopeId))
           ))
           .reduce((sum, log) => sum + Math.max(0, log.duration || 0), 0);
         return Math.floor(matchedSeconds / 60);
@@ -183,10 +186,10 @@ export const sortAchievementSnapshots = (snapshots: AchievementDailySnapshot[]):
 
 export const calculateAchievementAvailableStars = (
   snapshots: AchievementDailySnapshot[],
-  redemptionRecords: AchievementRedemptionRecord[]
+  spendRecords: AchievementSpendRecordLike[]
 ): number => {
   const earned = snapshots.reduce((sum, item) => sum + item.netDelta, 0);
-  const spent = redemptionRecords.reduce((sum, item) => sum + item.cost, 0);
+  const spent = spendRecords.reduce((sum, item) => sum + item.cost, 0);
   return normalizeAchievementStarValue(earned - spent);
 };
 
@@ -194,6 +197,6 @@ export const calculateAchievementTotalEarned = (snapshots: AchievementDailySnaps
   return normalizeAchievementStarValue(snapshots.reduce((sum, item) => sum + Math.max(0, item.netDelta), 0));
 };
 
-export const calculateAchievementTotalRedeemed = (redemptionRecords: AchievementRedemptionRecord[]): number => {
-  return normalizeAchievementStarValue(redemptionRecords.reduce((sum, item) => sum + item.cost, 0));
+export const calculateAchievementTotalRedeemed = (spendRecords: AchievementSpendRecordLike[]): number => {
+  return normalizeAchievementStarValue(spendRecords.reduce((sum, item) => sum + item.cost, 0));
 };

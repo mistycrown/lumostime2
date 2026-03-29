@@ -16,7 +16,8 @@
     "process-icons": "node scripts/process-icon-corners.js",
     "restore-icons": "node scripts/process-icon-corners.js --restore",
     "optimize-images": "node scripts/optimize-images.js",
-    "convert-uiicon": "node scripts/convert-uiicon-to-webp.js"
+    "convert-uiicon": "node scripts/convert-uiicon-to-webp.js",
+    "convert-achievement-bottle-icons": "node scripts/convert-achievement-bottle-icons-to-webp.js"
   },
   "dependencies": {
     "@awesome-cordova-plugins/core": "^8.1.0",

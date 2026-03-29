@@ -1,11 +1,11 @@
-/**
+﻿/**
  * @file types.ts
  * @input None
  * @output TypeScript Interfaces & Types
  * @pos Type Definitions (Shared contract)
  * @description Defines the core data structures (Log, TodoItem, Category, Activity, Filter order metadata, etc.) used throughout the application.
  * 
- * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
+ * 鈿狅笍 Once I am updated, be sure to update my header comment and the folder's md.
  */
 export interface Activity {
   id: string;
@@ -33,7 +33,7 @@ export interface Category {
   heatmapMax?: number;
 }
 
-// Scope (领域) - orthogonal to Tags
+// Scope (棰嗗煙) - orthogonal to Tags
 export interface Scope {
   id: string;
   name: string;
@@ -45,82 +45,82 @@ export interface Scope {
   enableFocusScore?: boolean; // Whether to track focus in this scope
   enableMoodScore?: boolean; // Whether to track mood in this scope
   themeColor: string; // Hex color or Tailwind class name
-  keywords?: string[]; // 关键字列表，用于快速匹配和统计
+  keywords?: string[]; // 鍏抽敭瀛楀垪琛紝鐢ㄤ簬蹇€熷尮閰嶅拰缁熻
 }
 
-// Goal (目标) - attached to Scope
+// Goal (鐩爣) - attached to Scope
 export interface Goal {
   id: string;
-  title: string;        // e.g., "Q1 广韵文献攻坚"
+  title: string;        // e.g., "Q1 骞块煹鏂囩尞鏀诲潥"
 
-  // 🔗 关联逻辑
-  scopeId: string;      // 必填：隶属于哪个领域 (e.g., 🚩 专业输入)
+  // 馃敆 鍏宠仈閫昏緫
+  scopeId: string;      // 蹇呭～锛氶毝灞炰簬鍝釜棰嗗煙 (e.g., 馃毄 涓撲笟杈撳叆)
 
-  // 🎯 核心指标 (Metrics)
+  // 馃幆 鏍稿績鎸囨爣 (Metrics)
   metric:
-  | 'duration_raw'      // 原始时长 
-  | 'task_count'        // 待办数量 
-  | 'duration_weighted' // 有效时长 (专注度加权) 
-  | 'frequency_days'    // 活跃天数 
-  | 'duration_limit';   // 时长上限 (反向)
+  | 'duration_raw'      // 鍘熷鏃堕暱 
+  | 'task_count'        // 寰呭姙鏁伴噺 
+  | 'duration_weighted' // 鏈夋晥鏃堕暱 (涓撴敞搴﹀姞鏉? 
+  | 'frequency_days'    // 娲昏穬澶╂暟 
+  | 'duration_limit';   // 鏃堕暱涓婇檺 (鍙嶅悜)
 
-  targetValue: number;  // 目标阈值
+  targetValue: number;  // 鐩爣闃堝€?
 
-  // 📅 时间维度 (Time-bound)
+  // 馃搮 鏃堕棿缁村害 (Time-bound)
   startDate: string;    // YYYY-MM-DD
   endDate: string;      // YYYY-MM-DD
 
-  // 🔍 高级筛选器 (Advanced Filters)
-  // 待办模式筛选（仅用于 task_count）
-  filterTodoCategories?: string[];  // 限定待办清单 ID 列表
+  // 馃攳 楂樼骇绛涢€夊櫒 (Advanced Filters)
+  // 寰呭姙妯″紡绛涢€夛紙浠呯敤浜?task_count锛?
+  filterTodoCategories?: string[];  // 闄愬畾寰呭姙娓呭崟 ID 鍒楄〃
 
-  // 记录模式筛选（用于 duration/frequency 相关指标）
-  filterActivityIds?: string[];     // 限定标签（Activity）ID 列表
-  filterTodoCategorySource?: string[];  // 限定关联的待办清单来源
+  // 璁板綍妯″紡绛涢€夛紙鐢ㄤ簬 duration/frequency 鐩稿叧鎸囨爣锛?
+  filterActivityIds?: string[];     // 闄愬畾鏍囩锛圓ctivity锛塈D 鍒楄〃
+  filterTodoCategorySource?: string[];  // 闄愬畾鍏宠仈鐨勫緟鍔炴竻鍗曟潵婧?
 
-  // 状态
+  // 鐘舵€?
   status: 'active' | 'completed' | 'failed' | 'archived';
 
-  // 📝 奖励/备注 (Gamification)
+  // 馃摑 濂栧姳/澶囨敞 (Gamification)
   motivation?: string;
   
-  // 🎯 大目标关联 (Major Goal)
-  majorGoalId?: string;  // 关联的大目标 ID（如果为空，则是独立目标）
-  order?: number;        // 在大目标中的排序（按时间自动排序）
+  // 馃幆 澶х洰鏍囧叧鑱?(Major Goal)
+  majorGoalId?: string;  // 鍏宠仈鐨勫ぇ鐩爣 ID锛堝鏋滀负绌猴紝鍒欐槸鐙珛鐩爣锛?
+  order?: number;        // 鍦ㄥぇ鐩爣涓殑鎺掑簭锛堟寜鏃堕棿鑷姩鎺掑簭锛?
 }
 
-// MajorGoal (大目标) - 同类型目标的时间序列分组
+// MajorGoal (澶х洰鏍? - 鍚岀被鍨嬬洰鏍囩殑鏃堕棿搴忓垪鍒嗙粍
 export interface MajorGoal {
   id: string;
-  title: string;              // 大目标名称，如 "Q1 广韵文献攻坚"
-  scopeId: string;            // 所属领域
+  title: string;              // 澶х洰鏍囧悕绉帮紝濡?"Q1 骞块煹鏂囩尞鏀诲潥"
+  scopeId: string;            // 鎵€灞為鍩?
   
-  // 核心：指定统一的目标类型
-  metric: Goal['metric'];     // 所有子目标必须是这个类型
+  // 鏍稿績锛氭寚瀹氱粺涓€鐨勭洰鏍囩被鍨?
+  metric: Goal['metric'];     // 鎵€鏈夊瓙鐩爣蹇呴』鏄繖涓被鍨?
   
-  // 目标值（独立存储）
-  targetValue: number;        // 目标系列的总目标值
+  // 鐩爣鍊硷紙鐙珛瀛樺偍锛?
+  targetValue: number;        // 鐩爣绯诲垪鐨勬€荤洰鏍囧€?
   
-  // 时间范围（手动填写）
-  startDate: string;          // 开始时间
-  endDate: string;            // 结束时间
+  // 鏃堕棿鑼冨洿锛堟墜鍔ㄥ～鍐欙級
+  startDate: string;          // 寮€濮嬫椂闂?
+  endDate: string;            // 缁撴潫鏃堕棿
   
-  // 描述与动机
-  description?: string;       // 详细描述
-  motivation?: string;        // 设立这个大目标的原因
+  // 鎻忚堪涓庡姩鏈?
+  description?: string;       // 璇︾粏鎻忚堪
+  motivation?: string;        // 璁剧珛杩欎釜澶х洰鏍囩殑鍘熷洜
   
-  // 筛选器（继承给所有子目标）
-  filterActivityIds?: string[];           // 限定标签 ID 列表
-  filterTodoCategories?: string[];        // 限定待办清单 ID 列表
-  filterTodoCategorySource?: string[];    // 限定关联的待办清单来源
+  // 绛涢€夊櫒锛堢户鎵跨粰鎵€鏈夊瓙鐩爣锛?
+  filterActivityIds?: string[];           // 闄愬畾鏍囩 ID 鍒楄〃
+  filterTodoCategories?: string[];        // 闄愬畾寰呭姙娓呭崟 ID 鍒楄〃
+  filterTodoCategorySource?: string[];    // 闄愬畾鍏宠仈鐨勫緟鍔炴竻鍗曟潵婧?
   
-  // 状态
+  // 鐘舵€?
   status: 'active' | 'completed' | 'archived';
   
-  // 元数据
+  // 鍏冩暟鎹?
   createdAt: string;
   updatedAt: string;
-  order?: number;             // 在领域内的排序
+  order?: number;             // 鍦ㄩ鍩熷唴鐨勬帓搴?
 }
 
 export interface ActiveSession {
@@ -129,10 +129,10 @@ export interface ActiveSession {
   categoryId: string; // Added to link back to category
   activityName: string;
   activityIcon: string;
-  activityUiIcon?: string; // UI 图标（用于自定义主题）
+  activityUiIcon?: string; // UI 鍥炬爣锛堢敤浜庤嚜瀹氫箟涓婚锛?
   startTime: number; // Timestamp
   linkedTodoId?: string; // New: Link to a specific todo task
-  scopeIds?: string[]; // NEW: Link to multiple Scopes (领域) - changed from scopeId
+  scopeIds?: string[]; // NEW: Link to multiple Scopes (棰嗗煙) - changed from scopeId
   title?: string;
   note?: string;
   progressIncrement?: number; // New: Carry over to Log
@@ -141,11 +141,11 @@ export interface ActiveSession {
   reactions?: string[]; // Emoji reactions
 }
 
-// 评论接口
+// 璇勮鎺ュ彛
 export interface Comment {
   id: string;
   content: string;
-  createdAt: number; // 时间戳
+  createdAt: number; // 鏃堕棿鎴?
 }
 
 export interface Log {
@@ -158,13 +158,13 @@ export interface Log {
   title?: string;
   note?: string; // Optional description
   linkedTodoId?: string; // New: Link to a specific todo task
-  scopeIds?: string[]; // NEW: Link to multiple Scopes (领域) - changed from scopeId
+  scopeIds?: string[]; // NEW: Link to multiple Scopes (棰嗗煙) - changed from scopeId
   progressIncrement?: number; // New: Units of progress contributed by this session
   focusScore?: number; // 1-5
   moodScore?: number; // 1-5 mood rating
   images?: string[]; // (NEW) Array of image filenames/identifiers
-  comments?: Comment[]; // (NEW) 评论列表
-  reactions?: string[]; // (NEW) 反应列表 (Emoji list)
+  comments?: Comment[]; // (NEW) 璇勮鍒楄〃
+  reactions?: string[]; // (NEW) 鍙嶅簲鍒楄〃 (Emoji list)
 }
 
 export interface TodoCategory {
@@ -254,11 +254,32 @@ export interface AchievementReward {
   updatedAt: number;
 }
 
+export interface AchievementCollection {
+  id: string;
+  name: string;
+  cost: number;
+  imagePath?: string;
+  description?: string;
+  enabled: boolean;
+  createdAt: number;
+  updatedAt: number;
+}
+
 export interface AchievementRedemptionRecord {
   id: string;
   rewardId: string;
   rewardName: string;
   cost: number;
+  redeemedAt: number;
+  note?: string;
+}
+
+export interface AchievementCollectionRecord {
+  id: string;
+  collectionId: string;
+  collectionName: string;
+  cost: number;
+  imagePath?: string;
   redeemedAt: number;
   note?: string;
 }
@@ -279,115 +300,115 @@ export enum AppView {
   SCENE = 'SCENE', // NEW: Scene View
 }
 
-// ========== Scene View (场景视图) ==========
+// ========== Scene View (鍦烘櫙瑙嗗浘) ==========
 
-// 场景卡片类型
+// 鍦烘櫙鍗＄墖绫诲瀷
 export type SceneCardType = 'timer' | 'todo' | 'checklist' | 'navigation' | 'principle' | 'reference' | 'stats';
 
-// 场景卡片动作配置
+// 鍦烘櫙鍗＄墖鍔ㄤ綔閰嶇疆
 export interface SceneCardAction {
   type: 'startTimer' | 'startTodo' | 'toggleCheck' | 'navigate' | 'reference' | 'none';
-  // 计时动作
+  // 璁℃椂鍔ㄤ綔
   activityId?: string;
   categoryId?: string;
-  // 待办动作
+  // 寰呭姙鍔ㄤ綔
   todoId?: string;
-  // 日课动作
+  // 鏃ヨ鍔ㄤ綔
   checkItemId?: string;
   checkActionMode?: 'toggle' | 'increment' | 'reset';
-  // 导航动作
+  // 瀵艰埅鍔ㄤ綔
   targetView?: string;
-  // 引用动作
+  // 寮曠敤鍔ㄤ綔
   sourceType?: 'dailyReview' | 'weeklyReview' | 'monthlyReview';
   dateOffset?: 'today' | 'yesterday' | 'thisWeek' | 'lastWeek' | 'thisMonth' | 'lastMonth';
   questionId?: string;
   fallbackText?: string;
-  // 应用跳转配置（仅Android）
-  launchApp?: boolean; // 是否启用应用跳转
-  appPackageName?: string; // Android应用包名
-  appName?: string; // 应用显示名称
+  // 搴旂敤璺宠浆閰嶇疆锛堜粎Android锛?
+  launchApp?: boolean; // 鏄惁鍚敤搴旂敤璺宠浆
+  appPackageName?: string; // Android搴旂敤鍖呭悕
+  appName?: string; // 搴旂敤鏄剧ず鍚嶇О
 }
 
-// 场景卡片数据
+// 鍦烘櫙鍗＄墖鏁版嵁
 export interface SceneCardData {
   id: string;
   type: SceneCardType;
   
-  // 显示内容
-  title: string; // 卡片标题（可与触发对象名称不同）
-  icon?: string; // Emoji 图标
-  uiIcon?: string; // UI 图标 ID
-  color?: string; // 卡片主题色（可自定义，不设置则使用类型默认色）
+  // 鏄剧ず鍐呭
+  title: string; // 鍗＄墖鏍囬锛堝彲涓庤Е鍙戝璞″悕绉颁笉鍚岋級
+  icon?: string; // Emoji 鍥炬爣
+  uiIcon?: string; // UI 鍥炬爣 ID
+  color?: string; // 鍗＄墖涓婚鑹诧紙鍙嚜瀹氫箟锛屼笉璁剧疆鍒欎娇鐢ㄧ被鍨嬮粯璁よ壊锛?
   
-  // 自定义文字
-  frontText?: string; // 正面自定义文字（激励语等）
-  backText?: string; // 反面自定义文字（完成提示等）
+  // 鑷畾涔夋枃瀛?
+  frontText?: string; // 姝ｉ潰鑷畾涔夋枃瀛楋紙婵€鍔辫绛夛級
+  backText?: string; // 鍙嶉潰鑷畾涔夋枃瀛楋紙瀹屾垚鎻愮ず绛夛級
   
-  // 快捷触发动作
+  // 蹇嵎瑙﹀彂鍔ㄤ綔
   action: SceneCardAction;
   
-  // 计时相关（仅 timer 和 todo 类型）
-  autoEnterFocus?: boolean; // 是否自动进入沉浸式计时
+  // 璁℃椂鐩稿叧锛堜粎 timer 鍜?todo 绫诲瀷锛?
+  autoEnterFocus?: boolean; // 鏄惁鑷姩杩涘叆娌夋蹈寮忚鏃?
   
-  // 待办进度（仅 todo 类型）
+  // 寰呭姙杩涘害锛堜粎 todo 绫诲瀷锛?
   progress?: number;
   totalAmount?: number;
   
-  // 统计数据（仅 stats 类型）
+  // 缁熻鏁版嵁锛堜粎 stats 绫诲瀷锛?
   statValue?: string;
-  statMinutes?: number; // 统计值（分钟数，用于进度条计算）
+  statMinutes?: number; // 缁熻鍊硷紙鍒嗛挓鏁帮紝鐢ㄤ簬杩涘害鏉¤绠楋級
   statLabel?: string;
-  filterActivityIds?: string[]; // 限定标签 ID 列表（用于统计筛选）
+  filterActivityIds?: string[]; // 闄愬畾鏍囩 ID 鍒楄〃锛堢敤浜庣粺璁＄瓫閫夛級
   
-  // 目标值设置（仅 stats 类型）
-  enableGoal?: boolean; // 是否启用目标值
-  goalValue?: number; // 目标值（分钟）
-  goalType?: 'min' | 'max'; // 目标类型：min=大于该值，max=小于该值
+  // 鐩爣鍊艰缃紙浠?stats 绫诲瀷锛?
+  enableGoal?: boolean; // 鏄惁鍚敤鐩爣鍊?
+  goalValue?: number; // 鐩爣鍊硷紙鍒嗛挓锛?
+  goalType?: 'min' | 'max'; // 鐩爣绫诲瀷锛歮in=澶т簬璇ュ€硷紝max=灏忎簬璇ュ€?
   
-  // 引用内容（仅 reference 类型，运行时动态计算）
-  referencedQuestion?: string;  // 引用的问题文本
-  referencedAnswer?: string;    // 引用的回答内容
+  // 寮曠敤鍐呭锛堜粎 reference 绫诲瀷锛岃繍琛屾椂鍔ㄦ€佽绠楋級
+  referencedQuestion?: string;  // 寮曠敤鐨勯棶棰樻枃鏈?
+  referencedAnswer?: string;    // 寮曠敤鐨勫洖绛斿唴瀹?
   
-  // 原则来源（仅 principle 类型）
-  principleSource?: 'library' | 'manual' | 'random'; // 原则来源：library=从原则库选择，manual=手动输入，random=随机选取
-  principleId?: string; // 原则库中的原则ID（当 principleSource 为 'library' 时使用）
+  // 鍘熷垯鏉ユ簮锛堜粎 principle 绫诲瀷锛?
+  principleSource?: 'library' | 'manual' | 'random'; // 鍘熷垯鏉ユ簮锛歭ibrary=浠庡師鍒欏簱閫夋嫨锛宮anual=鎵嬪姩杈撳叆锛宺andom=闅忔満閫夊彇
+  principleId?: string; // 鍘熷垯搴撲腑鐨勫師鍒橧D锛堝綋 principleSource 涓?'library' 鏃朵娇鐢級
   
-  // 日课状态（仅 checklist 类型）
+  // 鏃ヨ鐘舵€侊紙浠?checklist 绫诲瀷锛?
   isCompleted?: boolean;
-  checkItemContent?: string; // 日课内容（用于计算坚持天数）
+  checkItemContent?: string; // 鏃ヨ鍐呭锛堢敤浜庤绠楀潥鎸佸ぉ鏁帮級
   checkManualMode?: 'binary' | 'count';
   checkCurrentCount?: number;
   checkTargetCount?: number;
 }
 
-// 时间段定义
+// 鏃堕棿娈靛畾涔?
 export interface TimeSlot {
   id: string;
   name: string;
   icon: string; // Emoji
-  uiIcon?: string; // UI 图标 ID (格式: ui:iconType)
+  uiIcon?: string; // UI 鍥炬爣 ID (鏍煎紡: ui:iconType)
   startTime: string; // HH:mm
   endTime: string; // HH:mm
-  displayTitle?: string; // 可选的显示标题，如果有则显示标题，否则显示时间段
-  disableAutoSwitch?: boolean; // 是否禁用自动跳转到此时间段
-  cards: SceneCardData[]; // 该时间段的卡片列表
+  displayTitle?: string; // 鍙€夌殑鏄剧ず鏍囬锛屽鏋滄湁鍒欐樉绀烘爣棰橈紝鍚﹀垯鏄剧ず鏃堕棿娈?
+  disableAutoSwitch?: boolean; // 鏄惁绂佺敤鑷姩璺宠浆鍒版鏃堕棿娈?
+  cards: SceneCardData[]; // 璇ユ椂闂存鐨勫崱鐗囧垪琛?
 }
 
-// 场景组自动切换规则模式
+// 鍦烘櫙缁勮嚜鍔ㄥ垏鎹㈣鍒欐ā寮?
 export type SceneGroupAutoSwitchMode = 'disabled' | 'weekday' | 'weekend' | 'dateRange' | 'customWeekdays';
 
-// 场景视图切换模式
+// 鍦烘櫙瑙嗗浘鍒囨崲妯″紡
 export type SceneGroupSwitchMode = 'manual' | 'auto';
 
-// 场景组自动切换配置
+// 鍦烘櫙缁勮嚜鍔ㄥ垏鎹㈤厤缃?
 export interface SceneGroupAutoSwitchConfig {
   mode: SceneGroupAutoSwitchMode;
-  startDate?: string; // YYYYMMDD（仅 dateRange 模式）
-  endDate?: string; // YYYYMMDD（仅 dateRange 模式）
-  weekdays?: number[]; // 0-6（仅 customWeekdays 模式，0=周日）
+  startDate?: string; // YYYYMMDD锛堜粎 dateRange 妯″紡锛?
+  endDate?: string; // YYYYMMDD锛堜粎 dateRange 妯″紡锛?
+  weekdays?: number[]; // 0-6锛堜粎 customWeekdays 妯″紡锛?=鍛ㄦ棩锛?
 }
 
-// 场景组定义（场景组 -> 时间段）
+// 鍦烘櫙缁勫畾涔夛紙鍦烘櫙缁?-> 鏃堕棿娈碉級
 export interface SceneGroup {
   id: string;
   name: string;
@@ -395,7 +416,7 @@ export interface SceneGroup {
   autoSwitch?: SceneGroupAutoSwitchConfig;
 }
 
-// 场景组存储状态
+// 鍦烘櫙缁勫瓨鍌ㄧ姸鎬?
 export interface SceneGroupState {
   version: 1;
   switchMode: SceneGroupSwitchMode;
@@ -420,159 +441,159 @@ export interface StatCategory {
   items: SubStatItem[];
 }
 
-// Auto Link Rule (自动关联规则)
+// Auto Link Rule (鑷姩鍏宠仈瑙勫垯)
 export interface AutoLinkRule {
   id: string;
-  activityId: string; // 关联的 Activity ID
-  scopeId: string;    // 自动关联的 Scope ID
+  activityId: string; // 鍏宠仈鐨?Activity ID
+  scopeId: string;    // 鑷姩鍏宠仈鐨?Scope ID
 }
 
-// ========== Daily Review (每日回顾) ==========
+// ========== Daily Review (姣忔棩鍥為【) ==========
 
-// 回顾模板问题类型
+// 鍥為【妯℃澘闂绫诲瀷
 export type QuestionType = 'text' | 'choice' | 'rating';
 
-// 回顾模板问题
+// 鍥為【妯℃澘闂
 export interface ReviewQuestion {
   id: string;
   question: string;
   type: QuestionType;
-  choices?: string[]; // 选择题选项，用分号分隔
-  icon?: string; // 打分题的Lucide图标名称，如'star', 'heart'等
-  colorId?: string; // 打分题的颜色ID，对应 COLOR_OPTIONS
+  choices?: string[]; // 閫夋嫨棰橀€夐」锛岀敤鍒嗗彿鍒嗛殧
+  icon?: string; // 鎵撳垎棰樼殑Lucide鍥炬爣鍚嶇О锛屽'star', 'heart'绛?
+  colorId?: string; // 鎵撳垎棰樼殑棰滆壊ID锛屽搴?COLOR_OPTIONS
 }
 
-// 回顾模板
+// 鍥為【妯℃澘
 export interface ReviewTemplate {
   id: string;
   title: string;
   uiIcon?: string; // UI icon ID (for custom theme, e.g., "ui:purple:01")
   questions: ReviewQuestion[];
-  isSystem: boolean; // 是否系统预设
+  isSystem: boolean; // 鏄惁绯荤粺棰勮
   order: number;
-  isDailyTemplate: boolean;         // 是否用于每日回顾
-  isWeeklyTemplate?: boolean;       // 是否用于周回顾
-  isMonthlyTemplate?: boolean;      // 是否用于月回顾
-  syncToTimeline: boolean;          // 是否同步到时间轴显示
+  isDailyTemplate: boolean;         // 鏄惁鐢ㄤ簬姣忔棩鍥為【
+  isWeeklyTemplate?: boolean;       // 鏄惁鐢ㄤ簬鍛ㄥ洖椤?
+  isMonthlyTemplate?: boolean;      // 鏄惁鐢ㄤ簬鏈堝洖椤?
+  syncToTimeline: boolean;          // 鏄惁鍚屾鍒版椂闂磋酱鏄剧ず
 }
 
-// 回顾模板快照 (创建回顾时保存的模板状态)
+// 鍥為【妯℃澘蹇収 (鍒涘缓鍥為【鏃朵繚瀛樼殑妯℃澘鐘舵€?
 export interface ReviewTemplateSnapshot {
   id: string;
   title: string;
   questions: ReviewQuestion[];
-  order?: number; // 可选,用于排序
-  syncToTimeline?: boolean; // 是否同步到时间轴显示
+  order?: number; // 鍙€?鐢ㄤ簬鎺掑簭
+  syncToTimeline?: boolean; // 鏄惁鍚屾鍒版椂闂磋酱鏄剧ず
 }
 
-// 问题回答
+// 闂鍥炵瓟
 export interface ReviewAnswer {
   questionId: string;
-  question: string; // 保存问题文本，以防模板被修改
-  answer: string; // 文本答案或选择的选项
+  question: string; // 淇濆瓨闂鏂囨湰锛屼互闃叉ā鏉胯淇敼
+  answer: string; // 鏂囨湰绛旀鎴栭€夋嫨鐨勯€夐」
 }
 
-// 每日回顾
+// 姣忔棩鍥為【
 export interface DailyReview {
   id: string;
-  date: string; // YYYY-MM-DD格式
+  date: string; // YYYY-MM-DD鏍煎紡
   createdAt: number;
   updatedAt: number;
-  answers: ReviewAnswer[]; // 引导问答的答案
-  checkItems?: CheckItem[]; // New: 每日日课
-  checkCategorySyncToTimeline?: { [category: string]: boolean }; // 日课分组是否同步到时间轴
-  summary?: string; // 手动叙事：一句话总结今天
+  answers: ReviewAnswer[]; // 寮曞闂瓟鐨勭瓟妗?
+  checkItems?: CheckItem[]; // New: 姣忔棩鏃ヨ
+  checkCategorySyncToTimeline?: { [category: string]: boolean }; // 鏃ヨ鍒嗙粍鏄惁鍚屾鍒版椂闂磋酱
+  summary?: string; // 鎵嬪姩鍙欎簨锛氫竴鍙ヨ瘽鎬荤粨浠婂ぉ
   summaryUpdatedAt?: number;
-  moodEmoji?: string; // 今日心情 emoji
-  narrative?: string; // AI生成的叙事
+  moodEmoji?: string; // 浠婃棩蹇冩儏 emoji
+  narrative?: string; // AI鐢熸垚鐨勫彊浜?
   narrativeUpdatedAt?: number;
-  isEdited?: boolean; // 叙事是否被手动编辑过
-  templateSnapshot?: ReviewTemplateSnapshot[]; // 创建时的模板快照
+  isEdited?: boolean; // 鍙欎簨鏄惁琚墜鍔ㄧ紪杈戣繃
+  templateSnapshot?: ReviewTemplateSnapshot[]; // 鍒涘缓鏃剁殑妯℃澘蹇収
 }
 
-// 每日日课
+// 姣忔棩鏃ヨ
 export interface CheckItem {
   id: string;
-  category?: string; // 所属的模板标题或分组
+  category?: string; // 鎵€灞炵殑妯℃澘鏍囬鎴栧垎缁?
   content: string;
   icon?: string; // Icon from template (emoji)
-  uiIcon?: string; // UI 图标 ID (格式: ui:iconType)
+  uiIcon?: string; // UI 鍥炬爣 ID (鏍煎紡: ui:iconType)
   isCompleted: boolean;
-  type?: 'manual' | 'auto'; // 类型：手动或自动（默认为 manual）
-  manualMode?: 'binary' | 'count'; // 手动模式：二值勾选或次数计数（仅当 type='manual' 时有效）
-  currentCount?: number; // 当前次数（仅当 manualMode='count' 时有效）
-  targetCount?: number; // 目标次数（仅当 manualMode='count' 时有效）
-  autoConfig?: AutoCheckConfig; // 自动日课配置（仅当 type='auto' 时有效）
+  type?: 'manual' | 'auto'; // 绫诲瀷锛氭墜鍔ㄦ垨鑷姩锛堥粯璁や负 manual锛?
+  manualMode?: 'binary' | 'count'; // 鎵嬪姩妯″紡锛氫簩鍊煎嬀閫夋垨娆℃暟璁℃暟锛堜粎褰?type='manual' 鏃舵湁鏁堬級
+  currentCount?: number; // 褰撳墠娆℃暟锛堜粎褰?manualMode='count' 鏃舵湁鏁堬級
+  targetCount?: number; // 鐩爣娆℃暟锛堜粎褰?manualMode='count' 鏃舵湁鏁堬級
+  autoConfig?: AutoCheckConfig; // 鑷姩鏃ヨ閰嶇疆锛堜粎褰?type='auto' 鏃舵湁鏁堬級
 }
 
-// 日课定义 (用于模板)
+// 鏃ヨ瀹氫箟 (鐢ㄤ簬妯℃澘)
 export interface CheckTemplateItem {
   id: string; // Add ID for better tracking
   content: string;
   icon?: string; // Preset icon (emoji or Lucide name)
-  uiIcon?: string; // UI 图标 ID (格式: ui:iconType)
-  type?: 'manual' | 'auto'; // 类型：手动或自动（默认为 manual）
-  manualMode?: 'binary' | 'count'; // 手动模式：二值勾选或次数计数（仅当 type='manual' 时有效）
-  targetCount?: number; // 目标次数（仅当 manualMode='count' 时有效）
-  autoConfig?: AutoCheckConfig; // 自动日课配置（仅当 type='auto' 时有效）
+  uiIcon?: string; // UI 鍥炬爣 ID (鏍煎紡: ui:iconType)
+  type?: 'manual' | 'auto'; // 绫诲瀷锛氭墜鍔ㄦ垨鑷姩锛堥粯璁や负 manual锛?
+  manualMode?: 'binary' | 'count'; // 鎵嬪姩妯″紡锛氫簩鍊煎嬀閫夋垨娆℃暟璁℃暟锛堜粎褰?type='manual' 鏃舵湁鏁堬級
+  targetCount?: number; // 鐩爣娆℃暟锛堜粎褰?manualMode='count' 鏃舵湁鏁堬級
+  autoConfig?: AutoCheckConfig; // 鑷姩鏃ヨ閰嶇疆锛堜粎褰?type='auto' 鏃舵湁鏁堬級
 }
 
-// 自动日课配置
+// 鑷姩鏃ヨ閰嶇疆
 export interface AutoCheckConfig {
-  filterExpression: string; // 筛选表达式（如 "#学习 %专业输入"）
-  comparisonType: 'duration' | 'earliestStart' | 'latestStart' | 'earliestEnd' | 'latestEnd' | 'count'; // 判断类型
-  operator: '>=' | '<=' | '>' | '<' | '='; // 比较运算符
-  targetValue: number; // 目标值（分钟数，时刻用分钟表示如 480=8:00，次数就是数字）
+  filterExpression: string; // 绛涢€夎〃杈惧紡锛堝 "#瀛︿範 %涓撲笟杈撳叆"锛?
+  comparisonType: 'duration' | 'earliestStart' | 'latestStart' | 'earliestEnd' | 'latestEnd' | 'count'; // 鍒ゆ柇绫诲瀷
+  operator: '>=' | '<=' | '>' | '<' | '='; // 姣旇緝杩愮畻绗?
+  targetValue: number; // 鐩爣鍊硷紙鍒嗛挓鏁帮紝鏃跺埢鐢ㄥ垎閽熻〃绀哄 480=8:00锛屾鏁板氨鏄暟瀛楋級
 }
 
-// 日课模板
+// 鏃ヨ妯℃澘
 export interface CheckTemplate {
   id: string;
   title: string;
-  icon?: string; // 模板图标 (emoji)
-  uiIcon?: string; // 模板 UI 图标 ID (格式: ui:iconType)
+  icon?: string; // 妯℃澘鍥炬爣 (emoji)
+  uiIcon?: string; // 妯℃澘 UI 鍥炬爣 ID (鏍煎紡: ui:iconType)
   items: CheckTemplateItem[]; // Updated to object array
   enabled: boolean;
   order: number;
-  isDaily: boolean; // 是否是每日必做
-  syncToTimeline?: boolean; // 是否同步到时间轴
+  isDaily: boolean; // 鏄惁鏄瘡鏃ュ繀鍋?
+  syncToTimeline?: boolean; // 鏄惁鍚屾鍒版椂闂磋酱
 }
 
-// 每周回顾
+// 姣忓懆鍥為【
 export interface WeeklyReview {
   id: string;
-  weekStartDate: string; // YYYY-MM-DD格式，周的第一天
-  weekEndDate: string;   // YYYY-MM-DD格式，周的最后一天
+  weekStartDate: string; // YYYY-MM-DD鏍煎紡锛屽懆鐨勭涓€澶?
+  weekEndDate: string;   // YYYY-MM-DD鏍煎紡锛屽懆鐨勬渶鍚庝竴澶?
   createdAt: number;
   updatedAt: number;
-  answers: ReviewAnswer[]; // 引导问答的答案
-  summary?: string; // 手动叙事：一句话总结本周
+  answers: ReviewAnswer[]; // 寮曞闂瓟鐨勭瓟妗?
+  summary?: string; // 鎵嬪姩鍙欎簨锛氫竴鍙ヨ瘽鎬荤粨鏈懆
   summaryUpdatedAt?: number;
-  narrative?: string; // AI生成的叙事
+  narrative?: string; // AI鐢熸垚鐨勫彊浜?
   narrativeUpdatedAt?: number;
-  isEdited?: boolean; // 叙事是否被手动编辑过
-  templateSnapshot?: ReviewTemplateSnapshot[]; // 创建时的模板快照
+  isEdited?: boolean; // 鍙欎簨鏄惁琚墜鍔ㄧ紪杈戣繃
+  templateSnapshot?: ReviewTemplateSnapshot[]; // 鍒涘缓鏃剁殑妯℃澘蹇収
 }
 
-// 每月回顾
+// 姣忔湀鍥為【
 export interface MonthlyReview {
   id: string;
-  monthStartDate: string; // YYYY-MM-DD格式，月的第一天
-  monthEndDate: string;   // YYYY-MM-DD格式，月 的最后一天
+  monthStartDate: string; // YYYY-MM-DD鏍煎紡锛屾湀鐨勭涓€澶?
+  monthEndDate: string;   // YYYY-MM-DD鏍煎紡锛屾湀 鐨勬渶鍚庝竴澶?
   createdAt: number;
   updatedAt: number;
-  answers: ReviewAnswer[]; // 引导问答的答案
-  summary?: string; // 手动叙事：一句话总结本月
+  answers: ReviewAnswer[]; // 寮曞闂瓟鐨勭瓟妗?
+  summary?: string; // 鎵嬪姩鍙欎簨锛氫竴鍙ヨ瘽鎬荤粨鏈湀
   summaryUpdatedAt?: number;
-  narrative?: string; // AI生成的叙事
+  narrative?: string; // AI鐢熸垚鐨勫彊浜?
   narrativeUpdatedAt?: number;
-  isEdited?: boolean; // 叙事是否被手动编辑过
-  templateSnapshot?: ReviewTemplateSnapshot[]; // 创建时的模板快照
-  cite?: string; // 用户自定义的本月引言
+  isEdited?: boolean; // 鍙欎簨鏄惁琚墜鍔ㄧ紪杈戣繃
+  templateSnapshot?: ReviewTemplateSnapshot[]; // 鍒涘缓鏃剁殑妯℃澘蹇収
+  cite?: string; // 鐢ㄦ埛鑷畾涔夌殑鏈湀寮曡█
 }
 
 
-// Narrative Template (AI 叙事模板)
+// Narrative Template (AI 鍙欎簨妯℃澘)
 export interface OnThisDayNote {
   id: string;
   content: string;
@@ -590,13 +611,12 @@ export interface OnThisDayEntry {
 export interface NarrativeTemplate {
   id: string;
   title: string;
-  description: string; // 简短描述，用于UI展示
-  prompt: string; // 提示词内容
-  isCustom?: boolean; // Whether created by user
+  description: string; // 绠€鐭弿杩帮紝鐢ㄤ簬UI灞曠ず
+  prompt: string; // 鎻愮ず璇嶅唴瀹?  isCustom?: boolean; // Whether created by user
   icon?: string;
-  isDaily?: boolean;    // 是否用于日回顾
-  isWeekly?: boolean;   // 是否用于周回顾
-  isMonthly?: boolean;  // 是否用于月回顾
+  isDaily?: boolean;    // 鏄惁鐢ㄤ簬鏃ュ洖椤?
+  isWeekly?: boolean;   // 鏄惁鐢ㄤ簬鍛ㄥ洖椤?
+  isMonthly?: boolean;  // 鏄惁鐢ㄤ簬鏈堝洖椤?
 }
 
 // ==================== Theme: Custom Color Group ====================
@@ -613,37 +633,39 @@ export interface CustomColorGroup {
   updatedAt: number;
 }
 
-// ========== Custom Filter (自定义筛选器) ==========
+// ========== Custom Filter (鑷畾涔夌瓫閫夊櫒) ==========
 
-// 自定义筛选器
+// 鑷畾涔夌瓫閫夊櫒
 export interface Filter {
   id: string;
-  name: string;                    // 筛选器名称
-  filterExpression: string;        // 原始筛选表达式,如"瑜伽 #运动 %健康 @柔韧"
-  createdAt: number;               // 创建时间
-  order?: number;                  // 显示顺序，用于自定义排序
-  icon?: string;                   // 可选图标
+  name: string;                    // 绛涢€夊櫒鍚嶇О
+  filterExpression: string;        // 鍘熷绛涢€夎〃杈惧紡,濡?鐟滀冀 #杩愬姩 %鍋ュ悍 @鏌旈煣"
+  createdAt: number;               // 鍒涘缓鏃堕棿
+  order?: number;                  // 鏄剧ず椤哄簭锛岀敤浜庤嚜瀹氫箟鎺掑簭
+  icon?: string;                   //  鍙€夊浘鏍?
 }
 
-// 解析后的筛选条件
+// 瑙ｆ瀽鍚庣殑绛涢€夋潯浠?
 export interface ParsedFilterCondition {
-  tags: string[][];                // # 引导的标签关键词组 (外层AND, 内层OR)
-  scopes: string[][];              // % 引导的领域关键词组 (外层AND, 内层OR)
-  todos: string[][];               // @ 引导的代办关键词组 (外层AND, 内层OR)
-  notes: string[][];               // 无符号的全文备注关键词组 (外层AND, 内层OR)
-  reactions: string[][];           // ^ 引导的 Reaction Emoji 关键词组 (外层AND, 内层OR)
+  tags: string[][];                // # 寮曞鐨勬爣绛惧叧閿瘝缁?(澶栧眰AND, 鍐呭眰OR)
+  scopes: string[][];              // % 寮曞鐨勯鍩熷叧閿瘝缁?(澶栧眰AND, 鍐呭眰OR)
+  todos: string[][];               // @ 寮曞鐨勪唬鍔炲叧閿瘝缁?(澶栧眰AND, 鍐呭眰OR)
+  notes: string[][];               // 鏃犵鍙风殑鍏ㄦ枃澶囨敞鍏抽敭璇嶇粍 (澶栧眰AND, 鍐呭眰OR)
+  reactions: string[][];           // ^ 寮曞鐨?Reaction Emoji 鍏抽敭璇嶇粍 (澶栧眰AND, 鍐呭眰OR)
 }
 
-// Memoir 筛选配置
+// Memoir 绛涢€夐厤缃?
 export interface MemoirFilterConfig {
-  hasImage: boolean;           // 是否带有图片
-  hasReaction?: boolean;       // 是否带有反应
-  minNoteLength: number;       // 备注最小字数
-  relatedTagIds: string[];     // 关联标签 ID（Activity ID）
-  relatedScopeIds: string[];   // 关联领域 ID
-  showDailyReviews?: boolean;  // 新增：显示每日回顾
-  showWeeklyReviews?: boolean; // 新增：显示每周回顾
+  hasImage: boolean;           // 鏄惁甯︽湁鍥剧墖
+  hasReaction?: boolean;       // 鏄惁甯︽湁鍙嶅簲
+  minNoteLength: number;       // 澶囨敞鏈€灏忓瓧鏁?
+  relatedTagIds: string[];     // 鍏宠仈鏍囩 ID锛圓ctivity ID锛?
+  relatedScopeIds: string[];   // 鍏宠仈棰嗗煙 ID
+  showDailyReviews?: boolean;  // 鏂板锛氭樉绀烘瘡鏃ュ洖椤?
+  showWeeklyReviews?: boolean; // 鏂板锛氭樉绀烘瘡鍛ㄥ洖椤?
 }
 
 
 export type SearchType = 'record' | 'category' | 'activity' | 'todo' | 'scope' | 'review';
+
+

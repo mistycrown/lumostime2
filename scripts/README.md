@@ -106,3 +106,29 @@ npm run convert-uiicon
 2. 运行 `npm run convert-uiicon`
 3. 脚本会自动转换所有 PNG 为 WebP 并删除原文件
 4. 更新 `src/services/uiIconService.ts` 添加新主题配置
+
+
+## convert-achievement-bottle-icons-to-webp.js
+
+专门用于整理 `public/stars` 下的成就瓶图标包素材。
+
+### 功能
+
+- 递归扫描 `public/stars` 下所有图标素材
+- 先备份到 `static/png_backup/public/stars`
+- PNG/JPG/JPEG 会统一转换为 WebP
+- 所有图标会在各自文件夹内重命名为 `01.webp`、`02.webp`、`03.webp`...
+
+### 使用方法
+
+```bash
+npm run convert-achievement-bottle-icons
+```
+
+### 适用场景
+
+当你给成就瓶新增或替换图标包素材时：
+
+1. 把新的 PNG 放进 `public/stars/<pack>/`
+2. 运行 `npm run convert-achievement-bottle-icons`
+3. 脚本会自动转换并把每个图标包整理成统一序号命名

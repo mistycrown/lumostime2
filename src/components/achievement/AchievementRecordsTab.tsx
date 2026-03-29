@@ -1,10 +1,12 @@
-/**
+﻿/**
  * @file AchievementRecordsTab.tsx
  * @description Minimal ledger-style daily snapshot list with modal-based detail view and one-decimal achievement star values.
+ *
+ * @updated 2026-03-28: Added dedicated collection redemption records so collectible bottle exchanges appear alongside reward records.
  */
 import React, { useMemo, useState } from 'react';
 import { ChevronRight, Trash2 } from 'lucide-react';
-import { AchievementDailySnapshot, AchievementRedemptionRecord } from '../../types';
+import { AchievementCollectionRecord, AchievementDailySnapshot, AchievementRedemptionRecord } from '../../types';
 import { formatRelativeTime, getLocalDateTimeStr } from '../../utils/dateUtils';
 import { AchievementDialog } from './AchievementDialog';
 import { formatAchievementSignedStars, formatAchievementStars } from '../../utils/achievementUtils';
@@ -12,13 +14,17 @@ import { formatAchievementSignedStars, formatAchievementStars } from '../../util
 interface AchievementRecordsTabProps {
   snapshots: AchievementDailySnapshot[];
   redemptionRecords: AchievementRedemptionRecord[];
+  collectionRecords: AchievementCollectionRecord[];
   onDeleteRedemptionRecord: (recordId: string) => void;
+  onDeleteCollectionRecord: (recordId: string) => void;
 }
 
 export const AchievementRecordsTab: React.FC<AchievementRecordsTabProps> = ({
   snapshots,
   redemptionRecords,
-  onDeleteRedemptionRecord
+  collectionRecords,
+  onDeleteRedemptionRecord,
+  onDeleteCollectionRecord
 }) => {
   const [selectedSnapshotId, setSelectedSnapshotId] = useState<string | null>(null);
 
@@ -26,9 +32,13 @@ export const AchievementRecordsTab: React.FC<AchievementRecordsTabProps> = ({
     return [...snapshots].sort((first, second) => second.date.localeCompare(first.date));
   }, [snapshots]);
 
-  const orderedRecords = useMemo(() => {
+  const orderedRewardRecords = useMemo(() => {
     return [...redemptionRecords].sort((first, second) => second.redeemedAt - first.redeemedAt);
   }, [redemptionRecords]);
+
+  const orderedCollectionRecords = useMemo(() => {
+    return [...collectionRecords].sort((first, second) => second.redeemedAt - first.redeemedAt);
+  }, [collectionRecords]);
 
   const selectedSnapshot = orderedSnapshots.find((snapshot) => snapshot.id === selectedSnapshotId) || null;
 
@@ -76,17 +86,17 @@ export const AchievementRecordsTab: React.FC<AchievementRecordsTabProps> = ({
         <section>
           <div className="flex items-center justify-between border-b border-stone-200 pb-[14px]">
             <div className="text-[11px] uppercase tracking-[0.18em] text-stone-400">
-              Redemption Records / {orderedRecords.length}
+              Redemption Records / {orderedRewardRecords.length}
             </div>
           </div>
 
-          {orderedRecords.length === 0 ? (
+          {orderedRewardRecords.length === 0 ? (
             <div className="mt-[14px] rounded-2xl border border-dashed border-stone-300 bg-white/50 px-5 py-6 text-sm leading-7 text-stone-500">
-              还没有兑换记录。兑换奖励后，最近一次会显示在这里。
+              还没有奖励兑换记录。兑换奖励后，最近一次会显示在这里。
             </div>
           ) : (
             <div className="mt-[14px] divide-y divide-stone-200">
-              {orderedRecords.map((record) => (
+              {orderedRewardRecords.map((record) => (
                 <div key={record.id} className="flex items-center justify-between gap-4 py-[14px]">
                   <div className="min-w-0 flex-1">
                     <div className="text-[16px] leading-none text-stone-900">{record.rewardName}</div>
@@ -99,6 +109,52 @@ export const AchievementRecordsTab: React.FC<AchievementRecordsTabProps> = ({
                     onClick={() => onDeleteRedemptionRecord(record.id)}
                     className="inline-flex h-7 w-7 shrink-0 items-center justify-center self-center rounded-full text-stone-300 transition-colors hover:bg-rose-50 hover:text-rose-500"
                     aria-label="删除兑换记录"
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
+
+        <section>
+          <div className="flex items-center justify-between border-b border-stone-200 pb-[14px]">
+            <div className="text-[11px] uppercase tracking-[0.18em] text-stone-400">
+              Collection Records / {orderedCollectionRecords.length}
+            </div>
+          </div>
+
+          {orderedCollectionRecords.length === 0 ? (
+            <div className="mt-[14px] rounded-2xl border border-dashed border-stone-300 bg-white/50 px-5 py-6 text-sm leading-7 text-stone-500">
+              还没有收藏记录。兑换收藏瓶子后，对应记录会显示在这里。
+            </div>
+          ) : (
+            <div className="mt-[14px] divide-y divide-stone-200">
+              {orderedCollectionRecords.map((record) => (
+                <div key={record.id} className="flex items-center justify-between gap-4 py-[14px]">
+                  <div className="flex min-w-0 flex-1 items-center gap-3">
+                    {record.imagePath ? (
+                      <div className="flex h-14 w-14 items-end justify-center rounded-2xl bg-stone-100/70 px-2 pb-1 pt-2">
+                        <img
+                          src={record.imagePath}
+                          alt={record.collectionName}
+                          className="max-h-[42px] w-auto max-w-none object-contain drop-shadow-[0_8px_12px_rgba(120,113,108,0.14)]"
+                        />
+                      </div>
+                    ) : null}
+                    <div className="min-w-0 flex-1">
+                      <div className="text-[16px] leading-none text-stone-900">{record.collectionName}</div>
+                      <div className="mt-[6px] text-[13px] leading-6 text-stone-500">
+                        花费 {formatAchievementStars(record.cost)} 光点 · {formatRelativeTime(record.redeemedAt)} · {getLocalDateTimeStr(new Date(record.redeemedAt))}
+                      </div>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => onDeleteCollectionRecord(record.id)}
+                    className="inline-flex h-7 w-7 shrink-0 items-center justify-center self-center rounded-full text-stone-300 transition-colors hover:bg-rose-50 hover:text-rose-500"
+                    aria-label="删除收藏记录"
                   >
                     <Trash2 size={14} />
                   </button>

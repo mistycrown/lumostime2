@@ -1,13 +1,18 @@
-/**
+﻿/**
  * @file dataRepository.ts
  * @input Legacy localStorage keys, IndexedDB-backed storage repository, application defaults
  * @output Unified domain repository for heavy core data and one-time localStorage migration
  * @pos Repository (Application Data)
  * @description Loads and persists large core datasets through a single async repository and migrates legacy localStorage payloads into IndexedDB on first run.
+ *
+ * @updated 2026-03-28: Added achievement collection catalog defaults plus persisted collection redemption records.
  */
+import { DEFAULT_ACHIEVEMENT_COLLECTIONS } from '../constants/achievementCollections';
 import { CATEGORIES, INITIAL_DAILY_REVIEWS, INITIAL_GOALS, INITIAL_LOGS, INITIAL_TODOS, MOCK_TODO_CATEGORIES, SCOPES } from '../constants';
 import { REVIEW_KEYS, StorageKey, USER_DATA_KEYS, storage } from '../constants/storageKeys';
 import {
+  AchievementCollection,
+  AchievementCollectionRecord,
   AchievementDailySnapshot,
   AchievementMeta,
   AchievementRedemptionRecord,
@@ -28,8 +33,6 @@ import {
 import { normalizeDailyReviews } from '../utils/checkItemNormalizer';
 import { storageRepository, StorageRepository } from './storageRepository';
 
-// Use a versioned migration flag so newer repository keys can still be migrated
-// for users who already completed older migration waves.
 const CORE_DATA_MIGRATION_META_KEY = 'core-data-migration-v2';
 
 export const REPOSITORY_KEYS = {
@@ -47,8 +50,10 @@ export const REPOSITORY_KEYS = {
   ACHIEVEMENT_META: 'achievementMeta',
   ACHIEVEMENT_RULES: 'achievementRules',
   ACHIEVEMENT_REWARDS: 'achievementRewards',
+  ACHIEVEMENT_COLLECTIONS: 'achievementCollections',
   ACHIEVEMENT_DAILY_SNAPSHOTS: 'achievementDailySnapshots',
-  ACHIEVEMENT_REDEMPTION_RECORDS: 'achievementRedemptionRecords'
+  ACHIEVEMENT_REDEMPTION_RECORDS: 'achievementRedemptionRecords',
+  ACHIEVEMENT_COLLECTION_RECORDS: 'achievementCollectionRecords'
 } as const;
 
 type CoreRepositoryKey = typeof REPOSITORY_KEYS[keyof typeof REPOSITORY_KEYS];
@@ -100,8 +105,10 @@ export interface AchievementSnapshot {
   meta: AchievementMeta;
   rules: AchievementRule[];
   rewards: AchievementReward[];
+  collections: AchievementCollection[];
   dailySnapshots: AchievementDailySnapshot[];
   redemptionRecords: AchievementRedemptionRecord[];
+  collectionRecords: AchievementCollectionRecord[];
 }
 
 export class DataRepository {
@@ -216,17 +223,23 @@ export class DataRepository {
       (await this.repository.getData<AchievementRule[]>(REPOSITORY_KEYS.ACHIEVEMENT_RULES)) ?? [];
     const rewards =
       (await this.repository.getData<AchievementReward[]>(REPOSITORY_KEYS.ACHIEVEMENT_REWARDS)) ?? [];
+    const collections =
+      (await this.repository.getData<AchievementCollection[]>(REPOSITORY_KEYS.ACHIEVEMENT_COLLECTIONS)) ?? DEFAULT_ACHIEVEMENT_COLLECTIONS;
     const dailySnapshots =
       (await this.repository.getData<AchievementDailySnapshot[]>(REPOSITORY_KEYS.ACHIEVEMENT_DAILY_SNAPSHOTS)) ?? [];
     const redemptionRecords =
       (await this.repository.getData<AchievementRedemptionRecord[]>(REPOSITORY_KEYS.ACHIEVEMENT_REDEMPTION_RECORDS)) ?? [];
+    const collectionRecords =
+      (await this.repository.getData<AchievementCollectionRecord[]>(REPOSITORY_KEYS.ACHIEVEMENT_COLLECTION_RECORDS)) ?? [];
 
     return {
       meta,
       rules,
       rewards,
+      collections,
       dailySnapshots,
-      redemptionRecords
+      redemptionRecords,
+      collectionRecords
     };
   }
 
@@ -315,6 +328,11 @@ export class DataRepository {
     await this.repository.setData(REPOSITORY_KEYS.ACHIEVEMENT_REWARDS, rewards);
   }
 
+  async saveAchievementCollections(collections: AchievementCollection[]): Promise<void> {
+    await this.initialize();
+    await this.repository.setData(REPOSITORY_KEYS.ACHIEVEMENT_COLLECTIONS, collections);
+  }
+
   async saveAchievementDailySnapshots(dailySnapshots: AchievementDailySnapshot[]): Promise<void> {
     await this.initialize();
     await this.repository.setData(REPOSITORY_KEYS.ACHIEVEMENT_DAILY_SNAPSHOTS, dailySnapshots);
@@ -323,6 +341,11 @@ export class DataRepository {
   async saveAchievementRedemptionRecords(redemptionRecords: AchievementRedemptionRecord[]): Promise<void> {
     await this.initialize();
     await this.repository.setData(REPOSITORY_KEYS.ACHIEVEMENT_REDEMPTION_RECORDS, redemptionRecords);
+  }
+
+  async saveAchievementCollectionRecords(collectionRecords: AchievementCollectionRecord[]): Promise<void> {
+    await this.initialize();
+    await this.repository.setData(REPOSITORY_KEYS.ACHIEVEMENT_COLLECTION_RECORDS, collectionRecords);
   }
 
   private buildDefaultTodos(logs: Log[]): TodoItem[] {
