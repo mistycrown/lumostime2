@@ -453,7 +453,8 @@ export const AchievementBottle: React.FC<AchievementBottleProps> = ({
 
     const stars = Array.from({ length: visibleCount }, (_, index) => {
       const starScale = getStableStarScale(index, styleVariant);
-      const starRadius = (STAR_SIZE * starScale) / 2;
+      const effectiveStarSize = (iconPack === 'coin' || iconPack === 'planet') ? STAR_SIZE : STAR_SIZE * 0.85;
+      const starRadius = (effectiveStarSize * starScale) / 2;
       const innerMinX = BOTTLE_PADDING + starRadius - 2;
       const innerMaxX = width - BOTTLE_PADDING - starRadius + 2;
       const spreadWidth = Math.max(0, innerMaxX - innerMinX);

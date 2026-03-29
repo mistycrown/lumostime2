@@ -9,7 +9,7 @@
  */
 import React, { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Gift, ImageOff, Pencil, Plus, X } from 'lucide-react';
+import { ImageOff, Plus, X } from 'lucide-react';
 import { DEFAULT_ACHIEVEMENT_COLLECTION_COST } from '../../constants/achievementCollections';
 import { AchievementCollection, AchievementCollectionRecord } from '../../types';
 import { formatAchievementStars, normalizeAchievementStarValue } from '../../utils/achievementUtils';
@@ -104,10 +104,6 @@ export const AchievementCollectionsTab: React.FC<AchievementCollectionsTabProps>
   const [draft, setDraft] = useState<CollectionDraft>(createCollectionDraft());
   const [redeemError, setRedeemError] = useState<string | null>(null);
 
-  const orderedCollections = useMemo(() => {
-    return [...collections].sort((first, second) => second.updatedAt - first.updatedAt);
-  }, [collections]);
-
   const ownedCollections = useMemo(() => {
     return [...collectionRecords].sort((first, second) => first.redeemedAt - second.redeemedAt);
   }, [collectionRecords]);
@@ -167,7 +163,7 @@ export const AchievementCollectionsTab: React.FC<AchievementCollectionsTabProps>
   };
 
   const canRedeemCollection = (collection: AchievementCollection) => (
-    availableStars >= collection.cost && !ownedCollectionIds.has(collection.id)
+    availableStars >= collection.cost
   );
 
   const canRedeemSelected = Boolean(
@@ -176,36 +172,40 @@ export const AchievementCollectionsTab: React.FC<AchievementCollectionsTabProps>
       && canRedeemCollection(selectedCollection)
   );
 
+  const pickerCollections = useMemo(() => {
+    return [...collections].sort((a, b) => a.createdAt - b.createdAt);
+  }, [collections]);
+
   const pickerModal = dialogMode === 'picker' ? createPortal(
     <div
       className="fixed inset-0 z-[120] flex items-center justify-center bg-black/20 p-4 backdrop-blur-sm animate-in fade-in duration-200"
       onClick={closeDialog}
     >
       <div
-        className="relative w-full max-w-md rounded-[2rem] bg-white px-6 pb-6 pt-7 shadow-2xl animate-in zoom-in-95 duration-200"
+        className="relative w-full max-w-md rounded-3xl bg-white p-8 shadow-2xl animate-in zoom-in-95 duration-200"
         onClick={(event) => event.stopPropagation()}
       >
         <button
           type="button"
           onClick={closeDialog}
-          className="absolute right-4 top-4 rounded-full p-2 text-stone-400 transition-colors hover:bg-stone-100 hover:text-stone-700"
+          className="absolute right-4 top-4 rounded-full p-2 text-stone-400 transition-colors hover:bg-stone-100 hover:text-stone-600"
           aria-label="关闭收藏选择器"
         >
-          <X size={18} />
+          <X size={20} />
         </button>
 
-        <h3 className="text-center text-[2rem] font-normal tracking-tight text-stone-900">
+        <h3 className="text-center text-2xl font-bold text-stone-900">
           Pick A Bottle
         </h3>
-        <p className="mt-2 text-center text-[11px] font-medium uppercase tracking-[0.26em] text-stone-400">
+        <p className="mt-1 text-center text-xs font-bold uppercase tracking-widest text-stone-400">
           SELECT YOUR COLLECTION
         </p>
-        <div className="mt-4 text-center text-sm text-stone-500">
-          当前可用 {formatAchievementStars(availableStars)} 光点
-        </div>
+        <p className="mt-3 text-center text-sm text-stone-500">
+          当前可用 <span className="font-medium text-stone-700">{formatAchievementStars(availableStars)}</span> 光点
+        </p>
 
-        <div className="mt-6 grid max-h-[min(60vh,28rem)] grid-cols-4 gap-3 overflow-y-auto pr-1">
-          {orderedCollections.map((collection) => {
+        <div className="mt-5 grid grid-cols-4 gap-2 max-h-[min(55vh,26rem)] overflow-y-auto">
+          {pickerCollections.map((collection) => {
             const isOwned = ownedCollectionIds.has(collection.id);
             const canRedeem = canRedeemCollection(collection);
 
@@ -213,22 +213,42 @@ export const AchievementCollectionsTab: React.FC<AchievementCollectionsTabProps>
               <button
                 key={collection.id}
                 type="button"
-                disabled={!canRedeem}
                 onClick={() => {
-                  setSelectedCollectionId(collection.id);
-                  setDialogMode('redeem');
+                  if (!isOwned) {
+                    setSelectedCollectionId(collection.id);
+                    setDialogMode('redeem');
+                  }
                 }}
-                className={`relative rounded-[1.7rem] border p-2 transition-all ${
-                  canRedeem
-                    ? 'border-stone-200 bg-white hover:-translate-y-0.5 hover:border-stone-300 hover:shadow-[0_16px_28px_rgba(120,113,108,0.12)]'
-                    : 'border-stone-200 bg-stone-50/80 opacity-70'
+                className={`relative flex flex-col items-center p-2 rounded-2xl transition-all ${
+                  isOwned
+                    ? 'opacity-50 cursor-default'
+                    : canRedeem
+                      ? 'hover:bg-stone-50 cursor-pointer'
+                      : 'opacity-60 cursor-default'
                 }`}
                 aria-label={`选择兑换 ${collection.name}`}
               >
-                <div className="absolute right-2 top-2 rounded-full px-2 py-0.5 text-[10px] font-medium text-stone-500 bg-white/90 shadow-sm">
-                  {isOwned ? '已藏' : formatAchievementStars(collection.cost)}
+                <div className="relative flex items-center justify-center w-16 h-16">
+                  {collection.imagePath ? (
+                    <img
+                      src={collection.imagePath}
+                      alt={collection.name}
+                      className="max-h-[56px] w-auto object-contain drop-shadow-[0_6px_10px_rgba(120,113,108,0.18)]"
+                    />
+                  ) : (
+                    <div className="flex h-14 w-10 items-center justify-center rounded-xl border border-dashed border-stone-300 text-stone-400">
+                      <ImageOff size={14} />
+                    </div>
+                  )}
+                  {isOwned && (
+                    <div className="absolute -right-1 -top-1 rounded-full bg-stone-400 px-1.5 py-0.5 text-[9px] font-bold text-white">
+                      已藏
+                    </div>
+                  )}
                 </div>
-                <BottlePreview imagePath={collection.imagePath} alt={collection.name} size="picker" />
+                <span className="mt-1 text-[10px] leading-tight text-stone-500 text-center line-clamp-1 w-full">
+                  {isOwned ? '已收藏' : `${formatAchievementStars(collection.cost)}✦`}
+                </span>
               </button>
             );
           })}
@@ -243,7 +263,7 @@ export const AchievementCollectionsTab: React.FC<AchievementCollectionsTabProps>
       <section>
         <header className="flex flex-wrap items-center justify-between gap-3 border-b border-stone-200 pb-[14px]">
           <div className="text-[11px] uppercase tracking-[0.18em] text-stone-400">
-            Collections / {orderedCollections.length}
+            My Collection / {ownedCollections.length}
           </div>
           <button
             type="button"
@@ -253,79 +273,6 @@ export const AchievementCollectionsTab: React.FC<AchievementCollectionsTabProps>
             <Plus size={15} />
             新增收藏
           </button>
-        </header>
-
-        {orderedCollections.length === 0 ? (
-          <div className="mt-[14px] rounded-2xl border border-dashed border-stone-300 bg-white/50 px-5 py-6 text-sm leading-7 text-stone-500">
-            还没有可兑换的收藏瓶子。后续补充瓶子资源后，这里会直接显示可选预览。
-          </div>
-        ) : (
-          <div className="mt-[14px] divide-y divide-stone-200">
-            {orderedCollections.map((collection) => {
-              const canRedeem = canRedeemCollection(collection);
-              const isOwned = ownedCollectionIds.has(collection.id);
-
-              return (
-                <div key={collection.id} className="flex items-center justify-between gap-4 py-[14px]">
-                  <div className="flex min-w-0 flex-1 items-center gap-3">
-                    <BottlePreview imagePath={collection.imagePath} alt={collection.name} />
-                    <div className="min-w-0 flex-1">
-                      <div className="truncate text-[16px] leading-none text-stone-900">{collection.name}</div>
-                      <div className="mt-[6px] text-[13px] leading-6 text-stone-500">
-                        {isOwned ? '已收藏' : `成本 ${formatAchievementStars(collection.cost)} 光点`}
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="flex shrink-0 items-center gap-4">
-                    <button
-                      type="button"
-                      disabled={!canRedeem}
-                      onClick={() => {
-                        setRedeemError(null);
-                        setSelectedCollectionId(collection.id);
-                        setDialogMode('redeem');
-                      }}
-                      className={`inline-flex h-8 w-8 items-center justify-center rounded-full transition-all ${
-                        canRedeem ? 'text-stone-900' : 'bg-stone-200 text-stone-400'
-                      }`}
-                      style={canRedeem ? {
-                        backgroundColor: '#e7e5e4',
-                        boxShadow: '0 8px 18px rgba(120, 113, 108, 0.14)'
-                      } : undefined}
-                      aria-label="兑换收藏"
-                    >
-                      <Gift size={14} />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setSelectedCollectionId(collection.id);
-                        setDialogMode('edit');
-                      }}
-                      className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-stone-200 text-stone-500 transition-colors"
-                      style={{
-                        color: '#57534e',
-                        borderColor: '#d6d3d1',
-                        backgroundColor: '#fafaf9'
-                      }}
-                      aria-label="编辑收藏"
-                    >
-                      <Pencil size={14} />
-                    </button>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </section>
-
-      <section>
-        <header className="flex flex-wrap items-center justify-between gap-3 border-b border-stone-200 pb-[14px]">
-          <div className="text-[11px] uppercase tracking-[0.18em] text-stone-400">
-            My Collection / {ownedCollections.length}
-          </div>
         </header>
 
         {collectionShelves.length === 0 ? (

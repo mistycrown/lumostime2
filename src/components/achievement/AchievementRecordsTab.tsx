@@ -3,6 +3,7 @@
  * @description Minimal ledger-style daily snapshot list with modal-based detail view and one-decimal achievement star values.
  *
  * @updated 2026-03-28: Added dedicated collection redemption records so collectible bottle exchanges appear alongside reward records.
+ * @updated 2026-03-29: Each section shows at most 10 items initially; clicking "展开更多" loads the next 10.
  */
 import React, { useMemo, useState } from 'react';
 import { ChevronRight, Trash2 } from 'lucide-react';
@@ -17,6 +18,17 @@ interface AchievementRecordsTabProps {
   collectionRecords: AchievementCollectionRecord[];
   onDeleteRedemptionRecord: (recordId: string) => void;
   onDeleteCollectionRecord: (recordId: string) => void;
+}
+
+const PAGE_SIZE = 10;
+
+/** Returns the visible slice and a loader for the next page. */
+function usePagedList<T>(items: T[]) {
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
+  const visible = items.slice(0, visibleCount);
+  const hasMore = visibleCount < items.length;
+  const loadMore = () => setVisibleCount((n) => n + PAGE_SIZE);
+  return { visible, hasMore, loadMore };
 }
 
 export const AchievementRecordsTab: React.FC<AchievementRecordsTabProps> = ({
@@ -42,6 +54,10 @@ export const AchievementRecordsTab: React.FC<AchievementRecordsTabProps> = ({
 
   const selectedSnapshot = orderedSnapshots.find((snapshot) => snapshot.id === selectedSnapshotId) || null;
 
+  const snapshotsPaged = usePagedList(orderedSnapshots);
+  const rewardsPaged = usePagedList(orderedRewardRecords);
+  const collectionsPaged = usePagedList(orderedCollectionRecords);
+
   return (
     <>
       <div className="space-y-6">
@@ -58,7 +74,7 @@ export const AchievementRecordsTab: React.FC<AchievementRecordsTabProps> = ({
             </div>
           ) : (
             <div className="mt-[14px] divide-y divide-stone-200">
-              {orderedSnapshots.map((snapshot) => (
+              {snapshotsPaged.visible.map((snapshot) => (
                 <button
                   key={snapshot.id}
                   type="button"
@@ -79,6 +95,15 @@ export const AchievementRecordsTab: React.FC<AchievementRecordsTabProps> = ({
                   </div>
                 </button>
               ))}
+              {snapshotsPaged.hasMore && (
+                <button
+                  type="button"
+                  onClick={snapshotsPaged.loadMore}
+                  className="w-full py-3 text-[13px] text-stone-400 transition-colors hover:text-stone-600"
+                >
+                  展开更多（剩余 {orderedSnapshots.length - snapshotsPaged.visible.length} 条）
+                </button>
+              )}
             </div>
           )}
         </section>
@@ -96,12 +121,12 @@ export const AchievementRecordsTab: React.FC<AchievementRecordsTabProps> = ({
             </div>
           ) : (
             <div className="mt-[14px] divide-y divide-stone-200">
-              {orderedRewardRecords.map((record) => (
+              {rewardsPaged.visible.map((record) => (
                 <div key={record.id} className="flex items-center justify-between gap-4 py-[14px]">
                   <div className="min-w-0 flex-1">
                     <div className="text-[16px] leading-none text-stone-900">{record.rewardName}</div>
                     <div className="mt-[6px] text-[13px] leading-6 text-stone-500">
-                      花费 {formatAchievementStars(record.cost)} 光点 · {formatRelativeTime(record.redeemedAt)} · {getLocalDateTimeStr(new Date(record.redeemedAt))}
+                      花费 {formatAchievementStars(record.cost)} 光点 · {getLocalDateTimeStr(new Date(record.redeemedAt))}
                     </div>
                   </div>
                   <button
@@ -114,6 +139,15 @@ export const AchievementRecordsTab: React.FC<AchievementRecordsTabProps> = ({
                   </button>
                 </div>
               ))}
+              {rewardsPaged.hasMore && (
+                <button
+                  type="button"
+                  onClick={rewardsPaged.loadMore}
+                  className="w-full py-3 text-[13px] text-stone-400 transition-colors hover:text-stone-600"
+                >
+                  展开更多（剩余 {orderedRewardRecords.length - rewardsPaged.visible.length} 条）
+                </button>
+              )}
             </div>
           )}
         </section>
@@ -131,7 +165,7 @@ export const AchievementRecordsTab: React.FC<AchievementRecordsTabProps> = ({
             </div>
           ) : (
             <div className="mt-[14px] divide-y divide-stone-200">
-              {orderedCollectionRecords.map((record) => (
+              {collectionsPaged.visible.map((record) => (
                 <div key={record.id} className="flex items-center justify-between gap-4 py-[14px]">
                   <div className="flex min-w-0 flex-1 items-center gap-3">
                     {record.imagePath ? (
@@ -144,10 +178,8 @@ export const AchievementRecordsTab: React.FC<AchievementRecordsTabProps> = ({
                       </div>
                     ) : null}
                     <div className="min-w-0 flex-1">
-                      <div className="text-[16px] leading-none text-stone-900">{record.collectionName}</div>
-                      <div className="mt-[6px] text-[13px] leading-6 text-stone-500">
-                        花费 {formatAchievementStars(record.cost)} 光点 · {formatRelativeTime(record.redeemedAt)} · {getLocalDateTimeStr(new Date(record.redeemedAt))}
-                      </div>
+                      <div className="text-[14px] leading-6 text-stone-500">花费 {formatAchievementStars(record.cost)} 光点</div>
+                      <div className="text-[13px] leading-6 text-stone-400">{getLocalDateTimeStr(new Date(record.redeemedAt))}</div>
                     </div>
                   </div>
                   <button
@@ -160,6 +192,15 @@ export const AchievementRecordsTab: React.FC<AchievementRecordsTabProps> = ({
                   </button>
                 </div>
               ))}
+              {collectionsPaged.hasMore && (
+                <button
+                  type="button"
+                  onClick={collectionsPaged.loadMore}
+                  className="w-full py-3 text-[13px] text-stone-400 transition-colors hover:text-stone-600"
+                >
+                  展开更多（剩余 {orderedCollectionRecords.length - collectionsPaged.visible.length} 条）
+                </button>
+              )}
             </div>
           )}
         </section>
