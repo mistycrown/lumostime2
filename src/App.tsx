@@ -293,7 +293,7 @@ const AppContent: React.FC = () => {
 
   // 注意：自动生成回顾的逻辑已经集成到 TimelineView 中，不需要单独的 hook
 
-  const [sessionToStop, setSessionToStop] = React.useState<string | null>(null);
+
   const [shouldAutoOpenFocus, setShouldAutoOpenFocus] = React.useState(false);
   const [shouldAutoEnterImmersive, setShouldAutoEnterImmersive] = React.useState(false);
   
@@ -359,7 +359,7 @@ const AppContent: React.FC = () => {
   };
 
   const handleRequestStopActivityWrapper = (sessionId: string) => {
-    setSessionToStop(sessionId);
+    handleStopActivityWrapper(sessionId);
   };
 
   const handleSelectDailyReviewWrapper = (dateStr: string) => {
@@ -604,20 +604,6 @@ const AppContent: React.FC = () => {
           majorGoal={editingMajorGoal || undefined}
         />
       )}
-
-      <ConfirmModal
-        isOpen={!!sessionToStop}
-        title="结束活动？"
-        description="扫描到了当前正在计时的活动标签，确认后将结束本次计时。"
-        onConfirm={() => {
-          if (sessionToStop) handleStopActivityWrapper(sessionToStop);
-          setSessionToStop(null);
-        }}
-        onClose={() => setSessionToStop(null)}
-        confirmText="结束"
-        cancelText="取消"
-        type="warning"
-      />
 
       {/* Focus Detail Overlay */}
       {focusDetailSessionId && (() => {

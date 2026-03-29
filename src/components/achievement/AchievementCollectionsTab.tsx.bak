@@ -5,7 +5,7 @@
  * @pos Component (Achievement Collection Tab)
  * @description Renders collectible bottle exchange controls, a visual bottle picker inspired by the emoji selector, and a tightly packed shelf view for redeemed collections.
  *
- * @updated 2026-03-29: Bottle picker allows repeat redemption; shelf wraps into grid; removed inter-shelf spacing for layered feel.
+ * @updated 2026-03-28: Changed the add-collection entry into a preview-based bottle picker for star redemption while keeping collection editing separate.
  */
 import React, { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
@@ -46,6 +46,16 @@ const isSameCollectionDraft = (left: CollectionDraft, right: CollectionDraft) =>
   && left.imagePath === right.imagePath
   && left.description === right.description
 );
+
+const chunkCollectionRecords = (records: AchievementCollectionRecord[], shelfSize: number): AchievementCollectionRecord[][] => {
+  const result: AchievementCollectionRecord[][] = [];
+
+  for (let index = 0; index < records.length; index += shelfSize) {
+    result.push(records.slice(index, index + shelfSize));
+  }
+
+  return result;
+};
 
 const BottlePreview: React.FC<{
   imagePath?: string;
@@ -102,6 +112,8 @@ export const AchievementCollectionsTab: React.FC<AchievementCollectionsTabProps>
     return new Set(collectionRecords.map((record) => record.collectionId));
   }, [collectionRecords]);
 
+  const collectionShelves = useMemo(() => chunkCollectionRecords(ownedCollections, 4), [ownedCollections]);
+
   const selectedCollection = selectedCollectionId
     ? collections.find((collection) => collection.id === selectedCollectionId) || null
     : null;
@@ -150,7 +162,6 @@ export const AchievementCollectionsTab: React.FC<AchievementCollectionsTabProps>
     closeDialog();
   };
 
-  // 只检查光点是否足够，不限制重复兑换
   const canRedeemCollection = (collection: AchievementCollection) => (
     availableStars >= collection.cost
   );
@@ -203,14 +214,17 @@ export const AchievementCollectionsTab: React.FC<AchievementCollectionsTabProps>
                 key={collection.id}
                 type="button"
                 onClick={() => {
-                  setSelectedCollectionId(collection.id);
-                  setDialogMode('redeem');
+                  if (!isOwned) {
+                    setSelectedCollectionId(collection.id);
+                    setDialogMode('redeem');
+                  }
                 }}
-                disabled={!canRedeem}
                 className={`relative flex flex-col items-center p-2 rounded-2xl transition-all ${
-                  canRedeem
-                    ? 'hover:bg-stone-50 cursor-pointer'
-                    : 'opacity-50 cursor-default'
+                  isOwned
+                    ? 'opacity-50 cursor-default'
+                    : canRedeem
+                      ? 'hover:bg-stone-50 cursor-pointer'
+                      : 'opacity-60 cursor-default'
                 }`}
                 aria-label={`选择兑换 ${collection.name}`}
               >
@@ -233,7 +247,7 @@ export const AchievementCollectionsTab: React.FC<AchievementCollectionsTabProps>
                   )}
                 </div>
                 <span className="mt-1 text-[10px] leading-tight text-stone-500 text-center line-clamp-1 w-full">
-                  {`${formatAchievementStars(collection.cost)}✦`}
+                  {isOwned ? '已收藏' : `${formatAchievementStars(collection.cost)}✦`}
                 </span>
               </button>
             );
@@ -261,20 +275,27 @@ export const AchievementCollectionsTab: React.FC<AchievementCollectionsTabProps>
           </button>
         </header>
 
-        {ownedCollections.length === 0 ? (
+        {collectionShelves.length === 0 ? (
           <div className="mt-[14px] rounded-2xl border border-dashed border-stone-300 bg-white/50 px-5 py-6 text-sm leading-7 text-stone-500">
-            还没有收藏瓶子。点击"新增收藏"后，会打开预览选择器让你直接挑瓶子兑换。
+            还没有收藏瓶子。点击“新增收藏”后，会打开预览选择器让你直接挑瓶子兑换。
           </div>
         ) : (
-          <div className="mt-3 rounded-[2rem] border border-stone-200/70 bg-white/60 px-3 pb-2 pt-3 shadow-[0_18px_40px_rgba(120,113,108,0.06)]">
-            <div className="flex flex-wrap items-end pb-2">
-              {ownedCollections.map((record) => (
-                <div key={record.id} className="flex items-end justify-center" style={{ width: '25%' }}>
-                  <BottlePreview imagePath={record.imagePath} alt={record.collectionName} size="lg" />
+          <div className="mt-4 space-y-4">
+            {collectionShelves.map((shelf, shelfIndex) => (
+              <div
+                key={`shelf-${shelfIndex}`}
+                className="rounded-[2rem] border border-stone-200/70 bg-white/60 px-4 pb-3 pt-4 shadow-[0_18px_40px_rgba(120,113,108,0.06)]"
+              >
+                <div className="flex items-end gap-2 overflow-x-auto pb-3">
+                  {shelf.map((record) => (
+                    <div key={record.id} className="flex shrink-0 items-end justify-end">
+                      <BottlePreview imagePath={record.imagePath} alt={record.collectionName} size="lg" />
+                    </div>
+                  ))}
                 </div>
-              ))}
-            </div>
-            <div className="h-[4px] rounded-full bg-[linear-gradient(90deg,rgba(214,211,209,0.3),rgba(168,162,158,0.7),rgba(214,211,209,0.3))]" />
+                <div className="h-[4px] rounded-full bg-[linear-gradient(90deg,rgba(214,211,209,0.3),rgba(168,162,158,0.7),rgba(214,211,209,0.3))]" />
+              </div>
+            ))}
           </div>
         )}
       </section>
@@ -385,7 +406,7 @@ export const AchievementCollectionsTab: React.FC<AchievementCollectionsTabProps>
                 boxShadow: '0 10px 24px rgba(120, 113, 108, 0.14)'
               } : undefined}
             >
-              确认兑换
+              {selectedCollection && ownedCollectionIds.has(selectedCollection.id) ? '已经收藏' : '确认兑换'}
             </button>
           </div>
         )}
@@ -394,9 +415,11 @@ export const AchievementCollectionsTab: React.FC<AchievementCollectionsTabProps>
           <div className="space-y-5">
             <BottlePreview imagePath={selectedCollection.imagePath} alt={selectedCollection.name} size="lg" />
             <p className="text-sm leading-6 text-stone-500">
-              {canRedeemSelected
-                ? `兑换成功后剩余 ${formatAchievementStars(normalizeAchievementStarValue(availableStars - selectedCollection.cost))} 光点，这个瓶子会立刻摆进你的收藏货架。`
-                : '当前光点不足，暂时无法兑换这个收藏瓶子。'}
+              {ownedCollectionIds.has(selectedCollection.id)
+                ? '这个瓶子已经在你的收藏货架上了。'
+                : canRedeemSelected
+                  ? `兑换成功后剩余 ${formatAchievementStars(normalizeAchievementStarValue(availableStars - selectedCollection.cost))} 光点，这个瓶子会立刻摆进你的收藏货架。`
+                  : '当前光点不足，暂时无法兑换这个收藏瓶子。'}
             </p>
             {redeemError && (
               <div className="text-sm text-rose-500">{redeemError}</div>
