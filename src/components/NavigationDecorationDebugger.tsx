@@ -35,10 +35,10 @@ export const NavigationDecorationDebugger: React.FC<NavigationDecorationDebugger
         if (deco) {
             // Include custom settings check which is done inside getDecorationById
             // Parse Offset Y
-            let yVal = 0;
-            if (deco.offsetY === 'bottom') yVal = 0;
-            else if (deco.offsetY === 'top') yVal = 100;
-            else if (deco.offsetY === 'center') yVal = 50;
+            let yVal = 60; // Default fallback
+            if (deco.offsetY === 'bottom') yVal = 140; // Avoid jumping to 0 if an old custom one had 'bottom'
+            else if (deco.offsetY === 'top') yVal = 0;
+            else if (deco.offsetY === 'center') yVal = 80;
             else {
                 const match = deco.offsetY?.match(/^(-?\d+)px$/);
                 if (match) yVal = parseInt(match[1]);
@@ -71,7 +71,7 @@ export const NavigationDecorationDebugger: React.FC<NavigationDecorationDebugger
     // Apply changes in real-time
     useEffect(() => {
         // Construct styles
-        const newOffsetY = offsetY === 0 ? 'bottom' : `${offsetY}px`;
+        const newOffsetY = `${offsetY}px`;
         const newOffsetX = `${offsetX}px`; // 改为像素
         const newScale = scale / 100;
         const newOpacity = opacity / 100;
@@ -106,7 +106,7 @@ export const NavigationDecorationDebugger: React.FC<NavigationDecorationDebugger
 
     const handleSave = () => {
         const settings = {
-            offsetY: offsetY === 0 ? 'bottom' : `${offsetY}px`,
+            offsetY: `${offsetY}px`,
             offsetX: `${offsetX}px`, // 改为像素
             scale: scale / 100,
             opacity: opacity / 100
@@ -144,10 +144,10 @@ export const NavigationDecorationDebugger: React.FC<NavigationDecorationDebugger
         
         // 清除保存的自定义设置
         navigationDecorationService.saveCustomSettings(activeId, {
-            offsetY: 'bottom',
-            offsetX: '0px', // 改为像素
+            offsetY: '60px', // 默认回退值
+            offsetX: '0px', 
             scale: 1,
-            opacity: 0.6
+            opacity: 1
         });
     };
 

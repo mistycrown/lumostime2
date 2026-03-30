@@ -27,5 +27,8 @@ Update 2026-03-12: timeline styling for normal timeline records is managed by `t
 ## Recently Added (2026-02)
 - `themePresetService.ts`: 新增 - 主题预设应用服务，将复杂的主题切换逻辑拆分为多个独立方法
 
+## Recently Added (2026-03)
+- `navigationDecorationService.ts`: 支持自定义导航栏装饰上传和存储
+
 > ⚠️ Once the folder I belong to changes, please update me.
-> ⚠️ 本文档最后更新：2026-03-16
+> ⚠️ 本文档最后更新：2026-03-30
