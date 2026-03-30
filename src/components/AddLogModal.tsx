@@ -21,7 +21,7 @@ import { CommentSection } from '../components/CommentSection';
 import { ImagePreviewModal } from './ImagePreviewModal';
 import { ReactionPicker, ReactionList } from './ReactionComponents';
 import { IconRenderer } from './IconRenderer';
-import { useLogForm, useTimeCalculation, useImageManager, useSuggestions } from '../hooks';
+import { useLogForm, useTimeCalculation, useImageManager, useSuggestions, LogFormState } from '../hooks';
 import { useNavigation } from '../contexts/NavigationContext';
 
 interface AddLogModalProps {
@@ -732,7 +732,14 @@ export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialSta
                       <span className="text-xs font-bold text-stone-400">P.</span>
                       <div className="flex items-center gap-1.5 text-[10px] text-stone-400 px-2 py-1 rounded-md border border-stone-100 bg-stone-50">
                         <TrendingUp size={10} />
-                        <span className="font-mono">{t.completedUnits || 0} / {t.totalAmount}</span>
+                        <span className="font-mono">
+                          {formState.progressIncrement > 0 ? (
+                            <span className="font-bold" style={{ color: 'var(--accent-color)' }}>{(t.completedUnits || 0) + formState.progressIncrement}</span>
+                          ) : (
+                            t.completedUnits || 0
+                          )}
+                          {" / "}{t.totalAmount}
+                        </span>
                       </div>
                     </div>
 
