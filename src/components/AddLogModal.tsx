@@ -4,14 +4,16 @@
  * @output Modal Interaction (Save/Delete Log)
  * @pos Component (Modal)
  * @description A complex modal for creating or editing time logs. Handles duration calculation, activity selection, todo association, focus scoring, and segmented time entry.
- * @lastModified 2026-03-22
- * @change Auto-advance across hour/minute inputs and continue from start time to end time after segmented time entry.
+ * @lastModified 2026-03-30
+ * @change Auto-advance across hour/minute inputs and continue from start time to end time after segmented time entry. Added direct camera capture functionality using Capacitor Camera plugin and native camera-path persistence fallback for Android photo attachments.
  * 
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
 import React, { useState, useEffect, useRef } from 'react';
 import { Category, Log, TodoItem, TodoCategory, Scope, AutoLinkRule, Comment } from '../types';
 import { X, Trash2, TrendingUp, Plus, Minus, Lightbulb, Check, CheckCircle2, Clock, Camera, Image as ImageIcon, Maximize2, Minimize2, Share2 } from 'lucide-react';
+import { Camera as CapCamera, CameraResultType, CameraSource } from '@capacitor/camera';
+import { Capacitor } from '@capacitor/core';
 import { TodoAssociation } from '../components/TodoAssociation';
 import { TagAssociation } from '../components/TagAssociation';
 import { ScopeAssociation } from '../components/ScopeAssociation';
@@ -23,6 +25,8 @@ import { ReactionPicker, ReactionList } from './ReactionComponents';
 import { IconRenderer } from './IconRenderer';
 import { useLogForm, useTimeCalculation, useImageManager, useSuggestions, LogFormState } from '../hooks';
 import { useNavigation } from '../contexts/NavigationContext';
+import { useToast } from '../contexts/ToastContext';
+import { imageService } from '../services/imageService';
 
 interface AddLogModalProps {
   initialLog?: Log | null;
@@ -49,6 +53,7 @@ interface AddLogModalProps {
 export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialStartTime, initialEndTime, prefilledData, onClose, onSave, onDelete, onImageRemove, categories, todos, todoCategories, scopes, autoLinkRules = [], autoApplyAutoLinkRules = true, autoApplyTodoLink = true, lastLogEndTime, autoFocusNote = true, allLogs = [] }) => {
   // 使用自定义 Hooks 管理状态
   const { setIsShareViewOpen, setSharingLog } = useNavigation();
+  const { addToast } = useToast();
   
   // 草稿保存的key
   const DRAFT_KEY = 'lumostime_addlog_draft';
@@ -301,6 +306,47 @@ export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialSta
   const handleAddImage = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files?.[0]) {
       await imageManager.handleAddImage(e.target.files[0]);
+    }
+  };
+
+  const handleTakePhoto = async () => {
+    try {
+      if (Capacitor.isNativePlatform()) {
+        const image = await CapCamera.getPhoto({
+          quality: 60,                   // 降低压缩质量
+          width: 1200,                   // 限制尺寸避免原生系统传输大文件崩溃(TransactionTooLargeException)
+          allowEditing: false,
+          resultType: CameraResultType.Uri,
+          source: CameraSource.Camera
+        });
+
+        if (image.path) {
+          const filename = await imageService.saveNativeCameraImage(image.path, image.format || 'jpeg');
+          updateField('images', [...imageManager.images, filename]);
+        } else if (image.webPath) {
+          const mimeType = `image/${image.format || 'jpeg'}`;
+          // 安全读取缩放后的图片，尺寸足够小，在写入到本地存储时不会突破 IPC 桥接限制
+          const response = await fetch(image.webPath);
+          const blob = await response.blob();
+          
+          if (blob.size === 0) {
+              throw new Error("相片数据为空");
+          }
+          
+          const file = new File([blob], `camera_${Date.now()}.${image.format || 'jpg'}`, { type: mimeType });
+          await imageManager.handleAddImage(file);
+        } else {
+          addToast('error', '未获取到相片路径');
+        }
+      } else {
+        addToast('warning', '相机功能目前仅在手机端可用');
+      }
+    } catch (err: any) {
+      console.error('Failed to take photo', err);
+      // 如果不是用户主动取消拍照，显示报错
+      if (err.message && !err.message.includes('User cancelled')) {
+        addToast('error', `相机调用失败: ${err.message}`);
+      }
     }
   };
 
@@ -919,12 +965,22 @@ export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialSta
           <div>
             <div className="flex items-center justify-between mb-2">
               <span className="text-xs font-bold text-stone-400 uppercase tracking-widest">Images</span>
-              <button
-                onClick={() => fileInputRef.current?.click()}
-                className="text-stone-500 hover:text-stone-800 transition-colors"
-              >
-                <Plus size={18} />
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={handleTakePhoto}
+                  className="text-stone-500 hover:text-stone-800 transition-colors"
+                  title="拍照"
+                >
+                  <Camera size={18} />
+                </button>
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  className="text-stone-500 hover:text-stone-800 transition-colors"
+                  title="添加图片"
+                >
+                  <Plus size={18} />
+                </button>
+              </div>
               <input
                 type="file"
                 ref={fileInputRef}
@@ -954,12 +1010,21 @@ export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialSta
                 ))}
               </div>
             ) : (
-              <div
-                onClick={() => fileInputRef.current?.click()}
-                className="w-full py-4 border border-dashed border-stone-200 rounded-xl flex items-center justify-center gap-2 text-stone-400 hover:text-stone-600 hover:bg-stone-50 cursor-pointer transition-colors"
-              >
-                <Camera size={18} />
-                <span className="text-sm">Add Photos</span>
+              <div className="flex gap-2 w-full">
+                <div
+                  onClick={() => fileInputRef.current?.click()}
+                  className="flex-1 py-4 border border-dashed border-stone-200 rounded-xl flex items-center justify-center gap-2 text-stone-400 hover:text-stone-600 hover:bg-stone-50 cursor-pointer transition-colors"
+                >
+                  <ImageIcon size={18} />
+                  <span className="text-sm">Add Photos</span>
+                </div>
+                <div
+                  onClick={handleTakePhoto}
+                  className="flex-1 py-4 border border-dashed border-stone-200 rounded-xl flex items-center justify-center gap-2 text-stone-400 hover:text-stone-600 hover:bg-stone-50 cursor-pointer transition-colors"
+                >
+                  <Camera size={18} />
+                  <span className="text-sm">Take Photo</span>
+                </div>
               </div>
             )}
           </div>

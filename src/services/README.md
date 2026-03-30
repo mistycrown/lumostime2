@@ -9,7 +9,7 @@ Update 2026-03-12: timeline styling for normal timeline records is managed by `t
 - `excelExportService.ts`: [Active] - Exports time logs to Excel format.
 - `geminiService.ts`: [Placeholder] - Simple Gemini test service (likely deprecated/experimental).
 - `imageCleanupService.ts`: [Active] - Checks unreferenced images, protects referenced business/settings images, and executes cleanup/report generation.
-- `imageService.ts`: [Active] - Manages local image storage using Capacitor Filesystem (native) or IndexedDB (web). Handles thumbnail generation.
+- `imageService.ts`: [Active] - Manages local image storage using Capacitor Filesystem (native) or IndexedDB (web). Handles thumbnail generation and native camera file-path saves.
 - `narrativeService.ts`: [Active] - Generates Daily/Weekly/Monthly narratives using AI.
 - `NfcService.ts`: [Active] - Wrapper for Capacitor NFC plugin to read/write tags and receive retained scan/error payloads.
 - `obsidianExportService.ts`: [Active] - Exports data to Obsidian markdown files.

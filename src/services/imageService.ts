@@ -5,6 +5,7 @@
  * @pos Service (Local Storage)
  * @description Handles saving, retrieving, and deleting images.
  * Uses Capacitor Filesystem for Native/Electron, and IndexedDB for Web fallback.
+ * @updated 2026-03-30: Added native camera-path save flow and normalized Base64 payload handling for Capacitor Filesystem writes.
  * @updated 2026-03-23: Added pure referenced-image list helpers for cloud sync restore/upload flows, and rebuild image manifests using only references that still exist locally.
  */
 import { Filesystem, Directory } from '@capacitor/filesystem';
@@ -128,6 +129,64 @@ class ImageService {
         }
 
         console.log(`[ImageService] saveImage 完成: ${filename}`);
+        return filename;
+    }
+
+    /**
+     * Save a camera image returned from a native file path.
+     * Camera URIs on Android are more reliable when read through Filesystem first.
+     */
+    async saveNativeCameraImage(filePath: string, format = 'jpeg'): Promise<string> {
+        await this.ensureInit();
+
+        const filename = `${Date.now()}_${Math.random().toString(36).substring(2, 11)}.${this.normalizeImageExtension(format)}`;
+        const mimeType = this.getMimeTypeFromFilename(filename);
+        let originalBase64 = '';
+
+        try {
+            const readResult = await Filesystem.readFile({
+                path: filePath
+            });
+
+            if (typeof readResult.data === 'string') {
+                originalBase64 = this.normalizeBase64Payload(readResult.data);
+            } else {
+                const dataUrl = await this.blobToBase64(readResult.data);
+                originalBase64 = this.normalizeBase64Payload(dataUrl);
+            }
+
+            if (!originalBase64) {
+                throw new Error('Camera photo data is empty');
+            }
+
+            await this.writeImage(filename, originalBase64);
+
+            const exists = await this.checkFileExists(filename);
+            if (!exists) {
+                throw new Error(`原图保存后验证失败: ${filename}`);
+            }
+        } catch (e: any) {
+            console.error(`[ImageService] ✗ 相机原图保存失败: ${filename}`, e);
+            throw new Error(`Failed to save original image: ${e.message}`);
+        }
+
+        try {
+            const originalBlob = this.base64ToBlob(originalBase64, mimeType);
+            const thumbBlob = await this.generateThumbnail(originalBlob);
+            await this.writeImage(`thumb_${filename}`, thumbBlob);
+        } catch (e) {
+            console.error(`[ImageService] ✗ 相机缩略图生成/保存失败: thumb_${filename}`, e);
+        }
+
+        this.addToReferencedList(filename);
+
+        if (typeof window !== 'undefined') {
+            window.dispatchEvent(new CustomEvent('imageUploaded', {
+                detail: { filename }
+            }));
+        }
+
+        console.log(`[ImageService] saveNativeCameraImage 完成: ${filename}`);
         return filename;
     }
 
@@ -330,6 +389,24 @@ class ImageService {
         });
     }
 
+    private normalizeBase64Payload(data: string): string {
+        const trimmed = data.trim();
+        const payload = trimmed.includes(',') ? trimmed.split(',').pop() || '' : trimmed;
+        return payload.replace(/\s/g, '');
+    }
+
+    private base64ToBlob(base64Data: string, mimeType: string): Blob {
+        const normalized = this.normalizeBase64Payload(base64Data);
+        const binary = atob(normalized);
+        const bytes = new Uint8Array(binary.length);
+
+        for (let i = 0; i < binary.length; i++) {
+            bytes[i] = binary.charCodeAt(i);
+        }
+
+        return new Blob([bytes], { type: mimeType });
+    }
+
     // --- Helper Methods ---
 
     private async generateThumbnail(file: Blob | File): Promise<Blob> {
@@ -501,8 +578,10 @@ class ImageService {
                     // console.log(`[ImageService] 转换Blob为Base64: ${filename}`);
                     const dataUrl = await this.blobToBase64(data as Blob);
                     // 移除data:image/jpeg;base64,前缀，只保留纯Base64
-                    writeData = dataUrl.split(',')[1] || dataUrl;
+                    writeData = this.normalizeBase64Payload(dataUrl);
                     // console.log(`[ImageService] Blob转Base64完成，长度: ${(writeData as string).length}`);
+                } else {
+                    writeData = this.normalizeBase64Payload(data);
                 }
 
                 // 对于Base64数据，不指定encoding，让Capacitor自动处理
@@ -510,7 +589,8 @@ class ImageService {
                 await Filesystem.writeFile({
                     path: `images/${filename}`,
                     data: writeData as string,
-                    directory: Directory.Data
+                    directory: Directory.Data,
+                    recursive: true
                     // 不指定encoding，Capacitor会将其视为Base64数据
                 });
                 console.log(`[ImageService] ✓ Native写入成功: ${filename}`);
@@ -603,6 +683,17 @@ class ImageService {
                 console.warn(`[ImageService] 未知图片格式: ${ext}, 使用默认MIME类型`);
                 return 'image/jpeg'; // 默认为JPEG
         }
+    }
+
+    private normalizeImageExtension(format: string): string {
+        const normalized = format.toLowerCase().trim();
+        if (normalized === 'jpeg') {
+            return 'jpg';
+        }
+        if (/^[a-z0-9]+$/.test(normalized)) {
+            return normalized;
+        }
+        return 'jpg';
     }
 
     // --- Tombstone Methods for Sync ---
