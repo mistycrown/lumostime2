@@ -44,7 +44,6 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
     const { defaultIndexView } = useSettings();
     const [currentDecoration, setCurrentDecoration] = useState<string>('default');
     const [decorationUrl, setDecorationUrl] = useState<string>('');
-    const [imageError, setImageError] = useState<boolean>(false);
     const [settings, setSettings] = useState({
         offsetY: 'bottom',
         offsetX: '0px',
@@ -58,7 +57,6 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
             setCurrentDecoration(decorationId);
             const decoration = navigationDecorationService.getDecorationById(decorationId);
             setDecorationUrl(decoration?.url || '');
-            setImageError(false); // 重置错误状态
 
             const baseSettings = {
                 offsetY: decoration?.offsetY || 'bottom',
@@ -127,7 +125,8 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
     // Calculate dynamic styles
     const navStyle: React.CSSProperties = {};
     if (currentDecoration !== 'default' && decorationUrl) {
-        navStyle.backgroundImage = `url(${decorationUrl})`;
+        // 使用双引号包裹 url 防止 data: URL 包含导致 CSS 解析失败的特殊字符
+        navStyle.backgroundImage = `url("${decorationUrl}")`;
         navStyle.backgroundRepeat = 'repeat-x';
         navStyle.backgroundPosition = `${settings.offsetX} ${settings.offsetY}`;
         navStyle.backgroundSize = `auto ${settings.scale * 80}px`; // Base height 80px * scale
@@ -138,26 +137,24 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
         <>
             <div className="fixed bottom-0 left-0 w-full z-30">
                 {/* 装饰层 - 仅在非默认时显示 */}
-                {currentDecoration !== 'default' && decorationUrl && !imageError && (
+                {currentDecoration !== 'default' && decorationUrl && (
                     <div
                         className="absolute bottom-0 left-0 w-full h-40 md:h-48 pointer-events-none z-10"
                         style={navStyle}
                     >
-                        {/* 隐藏的 img 标签用于检测图片加载错误 */}
-                        <img
-                            src={decorationUrl}
-                            alt=""
-                            style={{ display: 'none' }}
-                            onError={() => {
-                                // 如果 PNG 加载失败，尝试 webp 格式
-                                if (decorationUrl.endsWith('.png')) {
-                                    setDecorationUrl(getNavigationDecorationFallbackUrl(decorationUrl));
-                                } else {
-                                    // webp 也失败了，隐藏装饰
-                                    setImageError(true);
-                                }
-                            }}
-                        />
+                        {/* 对于系统内置预设图片，如果在极端情况下加载失败，我们尝试把它降级到 webp，但不隐藏 DIV */}
+                        {decorationUrl.includes('/dchh/') && (
+                            <img
+                                src={decorationUrl}
+                                alt=""
+                                style={{ display: 'none' }}
+                                onError={() => {
+                                    if (decorationUrl.endsWith('.png')) {
+                                        setDecorationUrl(getNavigationDecorationFallbackUrl(decorationUrl));
+                                    }
+                                }}
+                            />
+                        )}
                     </div>
                 )}
 

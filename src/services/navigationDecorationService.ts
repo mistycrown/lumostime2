@@ -11,14 +11,20 @@
  * - 装饰位置和样式调整（偏移、缩放、透明度）
  * - 装饰图片删除和清理
  * 
+ * 
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
+
+import { Capacitor } from '@capacitor/core';
+import { Directory, Filesystem } from '@capacitor/filesystem';
 
 export interface NavigationDecorationOption {
     id: string;
     name: string;
+    type?: 'preset' | 'custom';
     url: string;
     thumbnail?: string;
+    filePath?: string;
     offsetY?: string; // 垂直偏移值，如 '0px', '-10px', '50%' 等
     offsetX?: string; // 水平位置（像素），如 '0px', '-20px', '50px' 等
     scale?: number;   // 缩放比例，默认 1 (100%)
@@ -27,6 +33,8 @@ export interface NavigationDecorationOption {
 
 const STORAGE_KEY = 'navigation_decoration';
 const CUSTOM_SETTINGS_KEY = 'navigation_decoration_custom_settings';
+const CUSTOM_DECORATIONS_KEY = 'navigation_decoration_custom_list';
+const DECORATION_DIRECTORY = 'navigation_decorations';
 
 interface NavigationDecorationSettings {
     offsetY?: string;
@@ -73,12 +81,172 @@ class NavigationDecorationService {
         { id: 'siyecao', name: '四叶草', url: '/dchh/siyecao.webp', offsetY: '71px', offsetX: '45px', scale: 0.85, opacity: 0.63 },
         { id: 'songguo', name: '松果', url: '/dchh/songguo.webp', offsetY: '51px', offsetX: '90px', scale: 1.3, opacity: 0.6 },
         { id: 'strawberry', name: '草莓', url: '/dchh/Strawberry.webp', offsetY: '51px', offsetX: '75px', scale: 1.45, opacity: 0.6 },
-        { id: 'sun', name: '太阳', url: '/dchh/sun.webp', offsetY: '61px', offsetX: '80px', scale: 1.35, opacity: 0.75 },
-        { id: 'ya', name: '芽', url: '/dchh/ya.webp', offsetY: '21px', offsetX: '23px', scale: 1.95, opacity: 0.6 },
-    ];
+        { id: 'sun', name: '太阳', type: 'preset', url: '/dchh/sun.webp', offsetY: '61px', offsetX: '80px', scale: 1.35, opacity: 0.75 },
+        { id: 'ya', name: '芽', type: 'preset', url: '/dchh/ya.webp', offsetY: '21px', offsetX: '23px', scale: 1.95, opacity: 0.6 },
+    ].map(d => ({ ...d, type: d.type || 'preset' })) as NavigationDecorationOption[];
+
+    private loadStoredCustomDecorations(): NavigationDecorationOption[] {
+        try {
+            const stored = localStorage.getItem(CUSTOM_DECORATIONS_KEY);
+            if (!stored) return [];
+            const parsed = JSON.parse(stored);
+            return Array.isArray(parsed) ? parsed : [];
+        } catch (error) {
+            console.error('Failed to load custom decorations:', error);
+            return [];
+        }
+    }
+
+    private saveCustomDecorations(customDecorations: NavigationDecorationOption[]): void {
+        localStorage.setItem(CUSTOM_DECORATIONS_KEY, JSON.stringify(customDecorations));
+    }
+
+    private async ensureDecorationDirectory(): Promise<void> {
+        if (!Capacitor.isNativePlatform()) return;
+        try {
+            await Filesystem.mkdir({
+                path: DECORATION_DIRECTORY,
+                directory: Directory.Data,
+                recursive: true
+            });
+        } catch (error: any) {
+            if (!String(error?.message || '').includes('exist')) {
+                console.warn('[NavigationDecorationService] Failed to ensure decoration directory:', error);
+            }
+        }
+    }
+
+    private readBlobAsDataUrl(file: Blob): Promise<string> {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result as string);
+            reader.onerror = () => reject(new Error('Failed to read decoration file'));
+            reader.readAsDataURL(file);
+        });
+    }
+
+    private getExtensionFromMimeType(mimeType?: string, fallbackName?: string): string {
+        const normalized = mimeType?.toLowerCase() || '';
+        if (normalized.includes('png')) return 'png';
+        if (normalized.includes('webp')) return 'webp';
+        if (normalized.includes('gif')) return 'gif';
+        if (normalized.includes('bmp')) return 'bmp';
+        if (normalized.includes('svg')) return 'svg';
+        if (normalized.includes('jpeg') || normalized.includes('jpg')) return 'jpg';
+        const fileExt = fallbackName?.split('.').pop()?.toLowerCase();
+        return fileExt || 'png';
+    }
+
+    private getMimeTypeFromDataUrl(dataUrl: string): string | undefined {
+        const match = dataUrl.match(/^data:(.+?);base64,/);
+        return match?.[1];
+    }
+
+    private async persistNativeDecorationFile(
+        dataUrl: string,
+        decorationId: string,
+        fallbackName?: string
+    ): Promise<Pick<NavigationDecorationOption, 'url' | 'thumbnail' | 'filePath'>> {
+        await this.ensureDecorationDirectory();
+
+        const pureBase64 = dataUrl.includes(',') ? dataUrl.split(',')[1] : dataUrl;
+        const extension = this.getExtensionFromMimeType(this.getMimeTypeFromDataUrl(dataUrl), fallbackName);
+        const fileName = `${decorationId}.${extension}`;
+        const relativePath = `${DECORATION_DIRECTORY}/${fileName}`;
+
+        await Filesystem.writeFile({
+            path: relativePath,
+            data: pureBase64,
+            directory: Directory.Data,
+            recursive: true
+        });
+
+        const uriResult = await Filesystem.getUri({
+            path: relativePath,
+            directory: Directory.Data
+        });
+        const fileUrl = Capacitor.convertFileSrc(uriResult.uri);
+
+        return {
+            url: fileUrl,
+            thumbnail: fileUrl,
+            filePath: fileName
+        };
+    }
+
+    private async deleteNativeDecorationFile(filePath?: string): Promise<void> {
+        if (!Capacitor.isNativePlatform() || !filePath) return;
+        await Filesystem.deleteFile({
+            path: `${DECORATION_DIRECTORY}/${filePath}`,
+            directory: Directory.Data
+        }).catch(() => undefined);
+    }
+
+    getCustomDecorations(): NavigationDecorationOption[] {
+        return this.loadStoredCustomDecorations();
+    }
 
     getAllDecorations(): NavigationDecorationOption[] {
-        return this.decorations;
+        return [...this.decorations, ...this.getCustomDecorations()];
+    }
+
+    async addCustomDecoration(file: File): Promise<NavigationDecorationOption> {
+        const decorationId = `custom_deco_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
+        const dataUrl = await this.readBlobAsDataUrl(file);
+
+        let customDecoration: NavigationDecorationOption = {
+            id: decorationId,
+            name: file.name.replace(/\.[^/.]+$/, ''),
+            type: 'custom',
+            url: dataUrl,
+            thumbnail: dataUrl,
+            offsetY: '60px', // 默认设置，使图片位于顶部附近，与预设对齐
+            offsetX: '0px',
+            scale: 1,
+            opacity: 1
+        };
+
+        if (Capacitor.isNativePlatform()) {
+            const persisted = await this.persistNativeDecorationFile(dataUrl, decorationId, file.name);
+            customDecoration = {
+                ...customDecoration,
+                ...persisted
+            };
+        }
+
+        const customDecorations = this.getCustomDecorations();
+        customDecorations.push(customDecoration);
+        this.saveCustomDecorations(customDecorations);
+
+        return customDecoration;
+    }
+
+    deleteCustomDecoration(decorationId: string): boolean {
+        try {
+            const customDecorations = this.getCustomDecorations();
+            const decorationToDelete = customDecorations.find(d => d.id === decorationId);
+            const filteredDecorations = customDecorations.filter(d => d.id !== decorationId);
+
+            if (filteredDecorations.length !== customDecorations.length) {
+                this.saveCustomDecorations(filteredDecorations);
+
+                if (decorationToDelete?.filePath) {
+                    void this.deleteNativeDecorationFile(decorationToDelete.filePath);
+                }
+
+                // 如果删除的是当前装饰，重置为默认
+                const currentDecoration = this.getCurrentDecoration();
+                if (currentDecoration === decorationId) {
+                    this.setCurrentDecoration('default');
+                }
+
+                return true;
+            }
+            return false;
+        } catch (error) {
+            console.error('Failed to delete custom decoration:', error);
+            return false;
+        }
     }
 
     getCurrentDecoration(): string {
@@ -94,7 +262,8 @@ class NavigationDecorationService {
     }
 
     getDecorationById(id: string): NavigationDecorationOption | undefined {
-        const decoration = this.decorations.find(d => d.id === id);
+        const allDecorations = this.getAllDecorations();
+        const decoration = allDecorations.find(d => d.id === id);
         if (!decoration) return undefined;
 
         // 检查是否有自定义设置
@@ -139,7 +308,8 @@ class NavigationDecorationService {
             return customSettings[decorationId].offsetY!;
         }
 
-        const decoration = this.decorations.find(d => d.id === decorationId);
+        const allDecorations = this.getAllDecorations();
+        const decoration = allDecorations.find(d => d.id === decorationId);
         return decoration?.offsetY || 'bottom';
     }
 }
