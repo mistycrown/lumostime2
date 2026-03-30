@@ -4,12 +4,13 @@
  * @output Cross-year same-day review UI with DailyReview-style tabs and detail-timeline-style rows
  * @pos View (Review System)
  * @description Renders a read-only archive page for the same month-day across years, with timeline, schedule, review, and persistent notes, while keeping the default timeline rail aligned with the main timeline/detail views.
- * @updated 2026-03-26: Restored the default-theme vertical rail for On This Day timeline rows so the connector line renders the same as shared detail timelines.
+ * @updated 2026-03-30: Added deletion functionality for notes (笺注) with a ConfirmModal.
  *
  * Once I am updated, be sure to update my header comment and the folder's md.
  */
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Heart, MessageCircle, Zap } from 'lucide-react';
+import { Heart, MessageCircle, Zap, Trash2 } from 'lucide-react';
+import { ConfirmModal } from '../components/ConfirmModal';
 import { Category, DailyReview, Log, OnThisDayEntry, Scope, TodoItem } from '../types';
 import { TimelineImage } from '../components/TimelineImage';
 import { IconRenderer } from '../components/IconRenderer';
@@ -146,6 +147,7 @@ export const OnThisDayView: React.FC<OnThisDayViewProps> = ({
   const [noteDraft, setNoteDraft] = useState('');
   const [activeYear, setActiveYear] = useState<number | null>(null);
   const [showYearSidebar, setShowYearSidebar] = useState(false);
+  const [deleteNoteId, setDeleteNoteId] = useState<string | null>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const yearSectionRefs = useRef<Map<number, HTMLDivElement>>(new Map());
   const monthDayKey = useMemo(() => getMonthDayKey(date), [date]);
@@ -280,6 +282,29 @@ export const OnThisDayView: React.FC<OnThisDayViewProps> = ({
 
     setNoteDraft('');
     addToast('success', '笺注已保存');
+  };
+
+  const handleDeleteNote = () => {
+    if (!deleteNoteId) return;
+
+    onUpdateOnThisDayEntries((prev) => {
+      const existingIndex = prev.findIndex((entry) => entry.monthDay === monthDayKey);
+      if (existingIndex === -1) {
+        return prev;
+      }
+
+      const nextEntries = [...prev];
+      const existingEntry = nextEntries[existingIndex];
+      nextEntries[existingIndex] = {
+        ...existingEntry,
+        notes: existingEntry.notes.filter(note => note.id !== deleteNoteId),
+        updatedAt: Date.now()
+      };
+      return nextEntries;
+    });
+
+    setDeleteNoteId(null);
+    addToast('success', '笺注已删除');
   };
 
   const renderTimelineTab = () => {
@@ -655,14 +680,23 @@ export const OnThisDayView: React.FC<OnThisDayViewProps> = ({
             {notes.map((note) => (
               <article key={note.id} className="rounded-2xl border border-stone-200 bg-white/80 p-5 shadow-sm">
                 <p className="text-[15px] leading-7 text-stone-700">{note.content}</p>
-                <div className="mt-4 text-xs text-stone-400">
-                  {new Date(note.createdAt).toLocaleString('zh-CN', {
-                    year: 'numeric',
-                    month: '2-digit',
-                    day: '2-digit',
-                    hour: '2-digit',
-                    minute: '2-digit'
-                  })}
+                <div className="mt-4 flex items-center justify-between text-xs text-stone-400">
+                  <span>
+                    {new Date(note.createdAt).toLocaleString('zh-CN', {
+                      year: 'numeric',
+                      month: '2-digit',
+                      day: '2-digit',
+                      hour: '2-digit',
+                      minute: '2-digit'
+                    })}
+                  </span>
+                  <button
+                    onClick={() => setDeleteNoteId(note.id)}
+                    className="flex items-center gap-1 rounded-full p-1.5 text-stone-400 transition-colors hover:bg-red-50 hover:text-red-500"
+                    title="删除"
+                  >
+                    <Trash2 size={14} />
+                  </button>
                 </div>
               </article>
             ))}
@@ -712,6 +746,16 @@ export const OnThisDayView: React.FC<OnThisDayViewProps> = ({
         activeYear={activeYear}
         visible={activeTab === 'timeline' && showYearSidebar}
         onSelectYear={handleSelectYear}
+      />
+
+      <ConfirmModal
+        isOpen={deleteNoteId !== null}
+        onClose={() => setDeleteNoteId(null)}
+        onConfirm={handleDeleteNote}
+        title="删除笺注"
+        description="删除后无法恢复，确定要删除这条笺注吗？"
+        confirmText="删除"
+        type="danger"
       />
     </div>
   );

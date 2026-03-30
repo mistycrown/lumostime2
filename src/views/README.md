@@ -24,6 +24,9 @@ The views are designed as "dumb" or "presentational" components where possible, 
 *   **SettingsView**: Central configuration hub for Sync, AI, and App preferences.
 *   **ReviewHubView**: Archive dashboard displaying monthly, weekly, and daily reviews.
 *   **JournalView**: Journal-style view for daily entries, providing an alternative perspective to ReviewHubView, with shared timeline styling and per-style archive offset support.
-*   **OnThisDayView**: Same-day-across-years archive view with shared timeline styling, schedule comparison, review content, and persistent notes for a month-day.
+*   **OnThisDayView**: Same-day-across-years archive view with shared timeline styling, schedule comparison, review content, and deletable persistent notes for a month-day.
 
 > ⚠️ **Note**: When modifying views, ensure that new state requirements are coordinated with `App.tsx` if they affect global data (Logs, Categories, Todos).
+
+> Last updated: 2026-03-30
+- `FocusDetailView.tsx`: Updated progress display logic to dynamically show progress increments.

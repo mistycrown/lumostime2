@@ -426,7 +426,14 @@ export const FocusDetailView: React.FC<FocusDetailViewProps> = ({ session, todos
                                         <span className="text-xs font-bold text-stone-400">P.</span>
                                         <div className="flex items-center gap-1.5 text-[10px] text-stone-400 px-2 py-1 rounded-md border border-stone-100 bg-stone-50">
                                             <TrendingUp size={10} />
-                                            <span className="font-mono">{t.completedUnits || 0} / {t.totalAmount}</span>
+                                            <span className="font-mono">
+                                                {progressAmount > 0 ? (
+                                                    <span className="font-bold" style={{ color: 'var(--accent-color)' }}>{(t.completedUnits || 0) + progressAmount}</span>
+                                                ) : (
+                                                    t.completedUnits || 0
+                                                )}
+                                                {" / "}{t.totalAmount}
+                                            </span>
                                         </div>
                                     </div>
 
