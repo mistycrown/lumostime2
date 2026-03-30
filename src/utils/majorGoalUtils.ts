@@ -50,47 +50,59 @@ export const calculateMajorGoalProgress = (
   // 如果没有子目标，直接根据筛选条件计算当前值
   let totalCurrent = 0;
   
+  // 转换日期为时间戳
+  const start = new Date(majorGoal.startDate).getTime();
+  const end = new Date(majorGoal.endDate).setHours(23, 59, 59, 999);
+  
   if (majorGoal.metric === 'task_count') {
     // 任务数量：统计完成的待办
     const filteredTodos = todos.filter(todo => {
       if (!todo.isCompleted) return false;
+      
+      // 添加领域和时间过滤
+      if (!todo.defaultScopeIds?.includes(majorGoal.scopeId)) return false;
+      if (!todo.completedAt) return false;
+      const completedTime = new Date(todo.completedAt).getTime();
+      if (completedTime < start || completedTime > end) return false;
+
       if (majorGoal.filterTodoCategories && majorGoal.filterTodoCategories.length > 0) {
         return majorGoal.filterTodoCategories.includes(todo.categoryId);
       }
       return true;
     });
     totalCurrent = filteredTodos.length;
-  } else if (majorGoal.metric === 'frequency_days') {
-    // 活跃天数：统计有记录的天数
-    const filteredLogs = logs.filter(log => {
-      if (majorGoal.filterActivityIds && majorGoal.filterActivityIds.length > 0) {
-        return majorGoal.filterActivityIds.includes(log.activityId);
-      }
-      return true;
-    });
-    
-    const uniqueDays = new Set(
-      filteredLogs.map(log => new Date(log.startTime).toDateString())
-    );
-    totalCurrent = uniqueDays.size;
   } else {
-    // 时长相关：duration_raw, duration_weighted, duration_limit
-    const filteredLogs = logs.filter(log => {
+    // 日志相关指标：先执行基础过滤（时间、领域、标签）
+    const baseFilteredLogs = logs.filter(log => {
+      if (log.startTime < start || log.startTime > end) return false;
+      if (!log.scopeIds?.includes(majorGoal.scopeId)) return false;
       if (majorGoal.filterActivityIds && majorGoal.filterActivityIds.length > 0) {
         return majorGoal.filterActivityIds.includes(log.activityId);
       }
       return true;
     });
-    
-    if (majorGoal.metric === 'duration_weighted') {
-      // 有效时长：考虑专注度
-      totalCurrent = filteredLogs.reduce((sum, log) => {
-        const weight = log.focusScore ? log.focusScore / 5 : 1;
-        return sum + log.duration * weight;
-      }, 0);
+
+    if (majorGoal.metric === 'frequency_days') {
+      // 活跃天数：统计有记录的天数
+      const uniqueDays = new Set(
+        baseFilteredLogs.map(log => new Date(log.startTime).toDateString())
+      );
+      totalCurrent = uniqueDays.size;
+    } else if (majorGoal.metric === 'record_count') {
+      // 记录条数：统计有效记录数
+      totalCurrent = baseFilteredLogs.length;
     } else {
-      // 原始时长或时长上限
-      totalCurrent = filteredLogs.reduce((sum, log) => sum + log.duration, 0);
+      // 时长相关：duration_raw, duration_weighted, duration_limit
+      if (majorGoal.metric === 'duration_weighted') {
+        // 有效时长：考虑专注度
+        totalCurrent = baseFilteredLogs.reduce((sum, log) => {
+          const weight = log.focusScore ? log.focusScore / 5 : 1;
+          return sum + log.duration * weight;
+        }, 0);
+      } else {
+        // 原始时长或时长上限
+        totalCurrent = baseFilteredLogs.reduce((sum, log) => sum + log.duration, 0);
+      }
     }
   }
   

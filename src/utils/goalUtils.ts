@@ -66,6 +66,11 @@ export const calculateGoalProgress = (
             currentValue = uniqueDays.size;
             break;
 
+        case 'record_count':
+            // 记录条数
+            currentValue = relevantLogs.length;
+            break;
+
         case 'task_count':
             // 待办完成数量
             const relevantTodos = todos.filter(todo => {
@@ -123,6 +128,9 @@ export const formatGoalValue = (value: number, metric: Goal['metric']): string =
         case 'task_count':
             return `${Math.floor(value)}个`;
 
+        case 'record_count':
+            return `${Math.floor(value)}条`;
+
         default:
             return `${value}`;
     }
@@ -143,6 +151,8 @@ export const getGoalMetricLabel = (metric: Goal['metric']): string => {
             return '完成任务';
         case 'duration_limit':
             return '时长上限';
+        case 'record_count':
+            return '记录条数';
         default:
             return '未知类型';
     }
@@ -163,6 +173,8 @@ export const getGoalMetricHint = (metric: Goal['metric']): string => {
             return '设置完成待办数量目标（个）';
         case 'duration_limit':
             return '设置时长上限（不超过，小时）';
+        case 'record_count':
+            return '设置记录条数目标（条）';
         default:
             return '设置目标阈值';
     }

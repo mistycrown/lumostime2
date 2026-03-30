@@ -1,4 +1,4 @@
-﻿/**
+/**
  * @file types.ts
  * @input None
  * @output TypeScript Interfaces & Types
@@ -62,7 +62,8 @@ export interface Goal {
   | 'task_count'        // 寰呭姙鏁伴噺 
   | 'duration_weighted' // 鏈夋晥鏃堕暱 (涓撴敞搴﹀姞鏉? 
   | 'frequency_days'    // 娲昏穬澶╂暟 
-  | 'duration_limit';   // 鏃堕暱涓婇檺 (鍙嶅悜)
+  | 'duration_limit'    // 鏃堕暱涓婇檺 (鍙嶅悜)
+  | 'record_count';     // 记录条数
 
   targetValue: number;  // 鐩爣闃堝€?
 
