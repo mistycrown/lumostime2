@@ -20,7 +20,7 @@ The views are designed as "dumb" or "presentational" components where possible, 
 
 *   **TimelineView**: The core dashboard visualizing daily activities and reviews, with switchable styling for normal timeline record nodes, synchronized gesture/calendar day-switch animation in the main content area, and direct header entries to global search and custom filters.
 *   **AchievementView**: Full-screen achievement bottle page entered from Timeline, combining the star container, frozen daily snapshots, editable rules, and reward redemption ledger.
-*   **StatsView**: Comprehensive analytics with multiple visualization modes (Pie, Matrix, Line, Schedule, Check, Emoji), including a subtle top-level fade transition for swipe and header date navigation.
+*   **StatsView**: Comprehensive analytics with multiple visualization modes (Pie, Matrix, Line, Schedule, Check, Emoji), including a subtle top-level fade transition for swipe and header date navigation. Weekly ranges should reuse the shared stats date-range helper so cross-month matrix weeks stay capped at 7 days.
 *   **SettingsView**: Central configuration hub for Sync, AI, and App preferences.
 *   **ReviewHubView**: Archive dashboard displaying monthly, weekly, and daily reviews.
 *   **JournalView**: Journal-style view for daily entries, providing an alternative perspective to ReviewHubView, with shared timeline styling and per-style archive offset support.
@@ -28,5 +28,6 @@ The views are designed as "dumb" or "presentational" components where possible, 
 
 > ⚠️ **Note**: When modifying views, ensure that new state requirements are coordinated with `App.tsx` if they affect global data (Logs, Categories, Todos).
 
-> Last updated: 2026-03-30
+> Last updated: 2026-04-03
+- `StatsView.tsx`: Reused the shared week range helper so matrix weeks no longer overflow when a week spans two months.
 - `FocusDetailView.tsx`: Updated progress display logic to dynamically show progress increments.
