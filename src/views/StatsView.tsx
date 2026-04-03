@@ -9,6 +9,7 @@
  * - 2026-01-10: 修复日课统计（check）视图的日期导航功能，补充 check 视图范围处理。
  * - 2026-03-03: 数字类型日课统计改为按完成次数展示，避免仅按是否完成呈现。
  * - 2026-03-11: 统一统计分享导出协议，修复分享图片页因解析失败导致的空白问题。
+ * - 2026-04-03: 复用共享周范围计算，修复矩阵视图跨月时被错误扩展为超过 7 天的问题。
  *
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
@@ -34,6 +35,7 @@ import { CheckView } from '../components/stats/CheckView';
 import { ScheduleView } from '../components/stats/ScheduleView';
 import { LineChartView } from '../components/stats/LineChartView';
 import { EmojiStatsView } from '../components/stats/EmojiStatsView';
+import { getDateRange as getSharedDateRange, getDynamicTitle as getSharedDynamicTitle } from '../components/StatsView/statsUtils';
 import { formatDuration, getHexColor, getScheduleStyle } from '../utils/chartUtils';
 
 interface StatsViewProps {
@@ -179,75 +181,9 @@ export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentD
     }
   };
 
-  // 生成动态标题
-  const getDynamicTitle = (
-    date: Date,
-    rangeType: PieRange | 'week_fixed' | 'day_fixed' | 'month'
-  ): string => {
-    if (rangeType === 'day' || rangeType === 'day_fixed') {
-      return `${date.getMonth() + 1}月${date.getDate()}日`;
-    }
-
-    if (rangeType === 'week' || rangeType === 'week_fixed') {
-      const startDate = new Date(date);
-      const day = startDate.getDay();
-      const diff = startDate.getDate() - day + (day === 0 ? -6 : 1);
-      startDate.setDate(diff);
-
-      const endDate = new Date(startDate);
-      endDate.setDate(startDate.getDate() + 6);
-
-      const startMonth = startDate.getMonth() + 1;
-      const startDay = startDate.getDate();
-      const endMonth = endDate.getMonth() + 1;
-      const endDay = endDate.getDate();
-
-      if (startMonth === endMonth) {
-        return `${startMonth}月${startDay}日 - ${endDay}日`;
-      }
-      return `${startMonth}月${startDay}日 - ${endMonth}月${endDay}日`;
-    }
-
-    if (rangeType === 'month') {
-      return `${date.getFullYear()}年${date.getMonth() + 1}月`;
-    }
-
-    if (rangeType === 'year') {
-      return `${date.getFullYear()}年`;
-    }
-
-    return '';
-  };
-
   // --- Date Helpers ---
   const getDateRange = (date: Date, rangeType: PieRange | 'week_fixed' | 'day_fixed' | 'month') => {
-    const start = new Date(date);
-    const end = new Date(date);
-
-    if (rangeType === 'day' || rangeType === 'day_fixed') {
-      start.setHours(0, 0, 0, 0);
-      end.setHours(23, 59, 59, 999);
-    } else if (rangeType === 'week' || rangeType === 'week_fixed') {
-      const day = start.getDay();
-      const diff = start.getDate() - day + (day === 0 ? -6 : 1);
-      start.setDate(diff);
-      start.setHours(0, 0, 0, 0);
-      end.setDate(start.getDate() + 6);
-      end.setHours(23, 59, 59, 999);
-    } else if (rangeType === 'month') {
-      start.setDate(1);
-      start.setHours(0, 0, 0, 0);
-      end.setMonth(start.getMonth() + 1);
-      end.setDate(0);
-      end.setHours(23, 59, 59, 999);
-    } else if (rangeType === 'year') {
-      start.setMonth(0, 1);
-      start.setHours(0, 0, 0, 0);
-      end.setMonth(11, 31);
-      end.setHours(23, 59, 59, 999);
-    }
-
-    return { start, end };
+    return getSharedDateRange(date, rangeType);
   };
 
   const effectiveRange = useMemo(() => {
@@ -293,7 +229,7 @@ export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentD
         rangeType = 'day';
       }
 
-      const title = getDynamicTitle(currentDate, rangeType);
+      const title = getSharedDynamicTitle(currentDate, rangeType);
       onTitleChange(title);
     }
   }, [currentDate, viewType, pieRange, scheduleRange, lineRange, emojiRange, onTitleChange]);
