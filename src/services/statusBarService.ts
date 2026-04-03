@@ -13,6 +13,7 @@
 
 import { Capacitor } from '@capacitor/core';
 import { StatusBar, Style } from '@capacitor/status-bar';
+import { applyAndroidEdgeToEdgeBackgroundColor } from '../utils/statusBarTransitions';
 
 // 动态导入 EdgeToEdge 插件（仅 Android）
 let EdgeToEdge: any = null;
@@ -50,7 +51,7 @@ class StatusBarService {
             // Android: 使用 EdgeToEdge 设置透明状态栏
             if (platform === 'android' && EdgeToEdge) {
                 // 设置状态栏背景为透明
-                await EdgeToEdge.setStatusBarColor({ color: '#00000000' });
+                await applyAndroidEdgeToEdgeBackgroundColor(EdgeToEdge, '#00000000');
                 console.log('✅ Android: Status bar set to transparent');
             }
             
@@ -153,7 +154,7 @@ class StatusBarService {
         try {
             // 确保状态栏背景保持透明
             if (platform === 'android' && EdgeToEdge) {
-                await EdgeToEdge.setStatusBarColor({ color: '#00000000' });
+                await applyAndroidEdgeToEdgeBackgroundColor(EdgeToEdge, '#00000000');
             } else if (platform === 'ios') {
                 await StatusBar.setOverlaysWebView({ overlay: true });
             }
@@ -205,7 +206,7 @@ class StatusBarService {
         const platform = Capacitor.getPlatform();
         
         if (platform === 'android' && EdgeToEdge) {
-            await EdgeToEdge.setStatusBarColor({ color: '#00000000' });
+            await applyAndroidEdgeToEdgeBackgroundColor(EdgeToEdge, '#00000000');
         } else if (platform === 'ios') {
             await StatusBar.setOverlaysWebView({ overlay: true });
         }

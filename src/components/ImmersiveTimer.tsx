@@ -10,9 +10,10 @@ import { X, Volume2, VolumeX, Palette, Clock, Check } from 'lucide-react';
 import { ImmersiveSelectorModal } from './ImmersiveSelectorModal';
 import { FlipClock } from './FlipClock';
 import { Capacitor } from '@capacitor/core';
-import { StatusBar, Style } from '@capacitor/status-bar';
+import { StatusBar } from '@capacitor/status-bar';
 import { backgroundService } from '../services/backgroundService';
 import { statusBarService } from '../services/statusBarService';
+import { getImmersiveStatusBarTransition } from '../utils/statusBarTransitions';
 
 // Theme configurations with complete visual styles
 const THEMES = [
@@ -193,80 +194,40 @@ export const ImmersiveTimer: React.FC<ImmersiveTimerProps> = ({ elapsed, onExit,
 
     const currentTheme = THEMES.find(t => t.id === selectedTheme) || THEMES[0];
 
-    // Set status bar style to match theme
+    // Hide the system status bar while immersive mode is active,
+    // then restore regular page-managed behavior on exit.
     useEffect(() => {
-        const setStatusBarStyle = async () => {
-            if (Capacitor.getPlatform() !== 'android' && Capacitor.getPlatform() !== 'ios') {
+        const platform = Capacitor.getPlatform();
+
+        const applyEnterTransition = async () => {
+            const enterTransition = getImmersiveStatusBarTransition(platform, 'enter');
+            if (!enterTransition.hide) {
                 return;
             }
 
             try {
-                // 沉浸式模式：设置状态栏为不透明，使用主题颜色
-                await StatusBar.setOverlaysWebView({ overlay: false });
-                
-                // Map theme gradients to actual colors
-                const colorMap: Record<string, string> = {
-                    'from-stone-100': '#f5f5f4',
-                    'from-orange-100': '#ffedd5',
-                    'from-slate-900': '#0f172a',
-                    'from-emerald-900': '#064e3b',
-                    'from-orange-900': '#7c2d12',
-                };
-                
-                // Extract the first gradient color
-                const gradientParts = currentTheme.gradient.split(' ');
-                const fromColor = gradientParts.find(part => part.startsWith('from-'));
-                const backgroundColor = fromColor && colorMap[fromColor] 
-                    ? colorMap[fromColor] 
-                    : (currentTheme.isDark ? '#000000' : '#ffffff');
-                
-                // For Android with EdgeToEdge, use the plugin's method to set status bar color
-                if (Capacitor.getPlatform() === 'android') {
-                    try {
-                        const { EdgeToEdge } = await import('@capawesome/capacitor-android-edge-to-edge-support');
-                        await EdgeToEdge.setBackgroundColor({ color: backgroundColor });
-                    } catch (e) {
-                        console.error('Failed to set EdgeToEdge background color:', e);
-                    }
-                }
-                
-                // Set the style (icon colors) via StatusBar plugin
-                await StatusBar.setStyle({ 
-                    style: currentTheme.isDark ? Style.Dark : Style.Light 
-                });
-                
+                await StatusBar.hide();
             } catch (error) {
-                console.error('Failed to set status bar style:', error);
+                console.error('Failed to hide status bar in immersive mode:', error);
             }
         };
 
-        setStatusBarStyle();
+        void applyEnterTransition();
 
-        // Cleanup: 恢复透明状态栏并根据背景调整图标颜色
         return () => {
-            if (Capacitor.getPlatform() === 'android' || Capacitor.getPlatform() === 'ios') {
-                // 恢复透明状态栏
-                StatusBar.setOverlaysWebView({ overlay: true }).catch(() => {});
-                
-                if (Capacitor.getPlatform() === 'android') {
-                    import('@capawesome/capacitor-android-edge-to-edge-support')
-                        .then(({ EdgeToEdge }) => {
-                            // 恢复透明背景
-                            EdgeToEdge.setBackgroundColor({ color: '#00000000' }).catch(() => {});
-                        })
-                        .catch(() => {});
-                }
-                
-                // 恢复到背景服务管理的图标样式
+            const exitTransition = getImmersiveStatusBarTransition(platform, 'exit');
+
+            if (exitTransition.show) {
+                StatusBar.show().catch(() => {});
+            }
+
+            if (exitTransition.restoreManagedStatusBar) {
                 const background = backgroundService.getCurrentBackgroundOption();
-                if (background && background.id !== 'default') {
-                    statusBarService.updateForBackground(background.url).catch(() => {});
-                } else {
-                    StatusBar.setStyle({ style: Style.Light }).catch(() => {});
-                }
+                const backgroundUrl = background && background.id !== 'default' ? background.url : null;
+                statusBarService.updateForBackground(backgroundUrl).catch(() => {});
             }
         };
-    }, [currentTheme]);
+    }, []);
 
     // Save preferences to localStorage when they change
     useEffect(() => {
