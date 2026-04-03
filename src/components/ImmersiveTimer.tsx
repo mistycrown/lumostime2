@@ -14,6 +14,7 @@ import { StatusBar } from '@capacitor/status-bar';
 import { backgroundService } from '../services/backgroundService';
 import { statusBarService } from '../services/statusBarService';
 import { getImmersiveStatusBarTransition } from '../utils/statusBarTransitions';
+import { IMMERSIVE_THEMES } from './immersiveThemes';
 
 // Theme configurations with complete visual styles
 const THEMES = [
@@ -192,7 +193,7 @@ export const ImmersiveTimer: React.FC<ImmersiveTimerProps> = ({ elapsed, onExit,
         typeof window !== 'undefined' && window.innerWidth > window.innerHeight
     );
 
-    const currentTheme = THEMES.find(t => t.id === selectedTheme) || THEMES[0];
+    const currentTheme = IMMERSIVE_THEMES.find(t => t.id === selectedTheme) || IMMERSIVE_THEMES[0];
 
     // Hide the system status bar while immersive mode is active,
     // then restore regular page-managed behavior on exit.
@@ -842,7 +843,7 @@ export const ImmersiveTimer: React.FC<ImmersiveTimerProps> = ({ elapsed, onExit,
                 isOpen={showThemeModal}
                 onClose={() => setShowThemeModal(false)}
                 title="选择主题"
-                options={THEMES.map(t => ({ id: t.id, name: t.name }))}
+                options={IMMERSIVE_THEMES.map(t => ({ id: t.id, name: t.name }))}
                 selectedId={selectedTheme}
                 onSelect={setSelectedTheme}
                 theme={currentTheme}
