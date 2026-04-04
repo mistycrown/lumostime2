@@ -14,6 +14,7 @@ dependencies {
     implementation project(':capacitor-filesystem')
     implementation project(':capacitor-status-bar')
     implementation project(':capawesome-capacitor-android-edge-to-edge-support')
+    implementation project(':capawesome-capacitor-screen-orientation')
     implementation "androidx.webkit:webkit:1.4.0"
 }
 

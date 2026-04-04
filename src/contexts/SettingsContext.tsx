@@ -32,6 +32,10 @@ import {
     isLocalDataTimestampUpdateLocked,
     updateLocalDataTimestamp
 } from '../utils/localDataTimestamp';
+import {
+    normalizeImmersiveTimerOrientation,
+    type ImmersiveTimerOrientation
+} from '../utils/immersiveOrientation';
 
 export type DefaultArchiveView = 'CHRONICLE' | 'MEMOIR';
 export type DefaultIndexView = 'TAGS' | 'SCOPE';
@@ -41,6 +45,7 @@ export type EmojiStyle = 'native' | 'twemoji' | 'openmoji';
 export type ScheduleStyle = 'default' | 'classic' | 'minimal' | 'solid';
 export type DefaultSelectorPage = 'emoji' | string; // 'emoji' 或 sticker set ID (如 'water', 'water-1', 'water-2')
 export type SceneCardTimerMode = 'realtime' | 'backfill'; // 'realtime' 正计时, 'backfill' 补记
+export type { ImmersiveTimerOrientation } from '../utils/immersiveOrientation';
 
 interface SettingsContextType {
     // 基础偏好设置
@@ -58,6 +63,8 @@ interface SettingsContextType {
 
     defaultRecordView: DefaultRecordView;
     setDefaultRecordView: React.Dispatch<React.SetStateAction<DefaultRecordView>>;
+    immersiveTimerDefaultOrientation: ImmersiveTimerOrientation;
+    setImmersiveTimerDefaultOrientation: React.Dispatch<React.SetStateAction<ImmersiveTimerOrientation>>;
 
     // 自动关联规则
     autoLinkRules: AutoLinkRule[];
@@ -201,6 +208,10 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
         const saved = localStorage.getItem('lumos_default_record_view');
         return (saved as DefaultRecordView) || 'TIMER';
     });
+    const [immersiveTimerDefaultOrientation, setImmersiveTimerDefaultOrientation] = useState<ImmersiveTimerOrientation>(() => {
+        const stored = localStorage.getItem('lumostime_immersive_timer_default_orientation');
+        return normalizeImmersiveTimerOrientation(stored);
+    });
 
     // 自动关联规则
     const [autoLinkRules, setAutoLinkRules] = useState<AutoLinkRule[]>(() => {
@@ -318,6 +329,10 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
     useEffect(() => {
         localStorage.setItem('lumos_default_record_view', defaultRecordView);
     }, [defaultRecordView]);
+
+    useEffect(() => {
+        localStorage.setItem('lumostime_immersive_timer_default_orientation', immersiveTimerDefaultOrientation);
+    }, [immersiveTimerDefaultOrientation]);
 
     useEffect(() => {
         localStorage.setItem('lumostime_autoLinkRules', JSON.stringify(autoLinkRules));
@@ -564,6 +579,8 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
             setDefaultIndexView,
             defaultRecordView,
             setDefaultRecordView,
+            immersiveTimerDefaultOrientation,
+            setImmersiveTimerDefaultOrientation,
             autoLinkRules,
             setAutoLinkRules,
             autoApplyAutoLinkRules,

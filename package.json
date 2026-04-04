@@ -30,6 +30,7 @@
     "@capacitor/filesystem": "^7.1.6",
     "@capacitor/status-bar": "^7.0.5",
     "@capawesome/capacitor-android-edge-to-edge-support": "^7.2.3",
+    "@capawesome/capacitor-screen-orientation": "^7.1.0",
     "@emotion/is-prop-valid": "^1.4.0",
     "@google/genai": "^1.31.0",
     "@supabase/supabase-js": "^2.86.2",
