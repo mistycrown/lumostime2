@@ -5,7 +5,7 @@
 import React, { useState } from 'react';
 import { ChevronLeft, ChevronRight, ChevronDown } from 'lucide-react';
 import { ToastType } from '../../components/Toast';
-import { DefaultArchiveView, DefaultIndexView, DefaultRecordView, SceneCardTimerMode, TimelineSortOrder } from '../../contexts/SettingsContext';
+import { DefaultArchiveView, DefaultIndexView, DefaultRecordView, ImmersiveTimerOrientation, SceneCardTimerMode, TimelineSortOrder } from '../../contexts/SettingsContext';
 
 interface PreferencesSettingsViewProps {
     onBack: () => void;
@@ -42,6 +42,8 @@ interface PreferencesSettingsViewProps {
     onSetDefaultIndexView?: (view: DefaultIndexView) => void;
     defaultRecordView?: DefaultRecordView;
     onSetDefaultRecordView?: (view: DefaultRecordView) => void;
+    immersiveTimerDefaultOrientation?: ImmersiveTimerOrientation;
+    onSetImmersiveTimerDefaultOrientation?: (orientation: ImmersiveTimerOrientation) => void;
     timelineGalleryMode?: boolean;
     onToggleTimelineGalleryMode?: () => void;
     timelineSortOrder?: TimelineSortOrder;
@@ -89,6 +91,8 @@ export const PreferencesSettingsView: React.FC<PreferencesSettingsViewProps> = (
     onSetDefaultIndexView,
     defaultRecordView = 'TIMER',
     onSetDefaultRecordView,
+    immersiveTimerDefaultOrientation = 'landscape',
+    onSetImmersiveTimerDefaultOrientation,
     timelineGalleryMode = false,
     onToggleTimelineGalleryMode,
     timelineSortOrder = 'asc',
@@ -413,6 +417,35 @@ export const PreferencesSettingsView: React.FC<PreferencesSettingsViewProps> = (
                 <div className="space-y-3">
                     <h3 className="text-[10px] font-bold text-stone-400 uppercase tracking-wider pl-2">显示</h3>
                     <div className="bg-white rounded-2xl overflow-hidden shadow-[0_2px_10px_rgba(0,0,0,0.03)]">
+                        <div className="flex items-center justify-between p-4 border-b border-stone-100 hover:bg-stone-50 transition-colors">
+                            <div>
+                                <h4 className="font-bold text-stone-700">沉浸式计时默认方向</h4>
+                                <p className="text-xs text-stone-400 mt-1">控制进入沉浸式计时时默认使用横屏还是竖屏布局</p>
+                            </div>
+                            <div className="flex items-center gap-1 bg-stone-100 p-1 rounded-lg">
+                                <button
+                                    onClick={() => onSetImmersiveTimerDefaultOrientation?.('landscape')}
+                                    className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all ${
+                                        immersiveTimerDefaultOrientation === 'landscape'
+                                            ? 'bg-white text-stone-800 shadow-sm'
+                                            : 'text-stone-400 hover:text-stone-600'
+                                    }`}
+                                >
+                                    横屏
+                                </button>
+                                <button
+                                    onClick={() => onSetImmersiveTimerDefaultOrientation?.('portrait')}
+                                    className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all ${
+                                        immersiveTimerDefaultOrientation === 'portrait'
+                                            ? 'bg-white text-stone-800 shadow-sm'
+                                            : 'text-stone-400 hover:text-stone-600'
+                                    }`}
+                                >
+                                    竖屏
+                                </button>
+                            </div>
+                        </div>
+
                         {/* Timeline Gallery Mode Toggle */}
                         <div className="flex items-center justify-between gap-3 p-4 border-b border-stone-100 hover:bg-stone-50 transition-colors">
                             <div className="flex-1 min-w-0">

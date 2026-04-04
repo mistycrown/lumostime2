@@ -212,7 +212,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
     // Hooks for full data access during backup
     const { logs: ctxLogs, todos: ctxTodos, todoCategories: ctxTodoCategories } = useData();
     const { categories: ctxCategories, scopes: ctxScopes, goals: ctxGoals, majorGoals: ctxMajorGoals } = useCategoryScope();
-    const { autoLinkRules: ctxAutoLinkRules, autoApplyAutoLinkRules, setAutoApplyAutoLinkRules, autoApplyTodoLink, setAutoApplyTodoLink, autoOpenFocusDetail, setAutoOpenFocusDetail, userPersonalInfo: ctxUserPersonalInfo, filters: ctxFilters, customNarrativeTemplates: ctxCustomNarrativeTemplates, useTwemoji, setUseTwemoji, sceneCardTimerMode, setSceneCardTimerMode } = useSettings();
+    const { autoLinkRules: ctxAutoLinkRules, autoApplyAutoLinkRules, setAutoApplyAutoLinkRules, autoApplyTodoLink, setAutoApplyTodoLink, autoOpenFocusDetail, setAutoOpenFocusDetail, userPersonalInfo: ctxUserPersonalInfo, filters: ctxFilters, customNarrativeTemplates: ctxCustomNarrativeTemplates, useTwemoji, setUseTwemoji, sceneCardTimerMode, setSceneCardTimerMode, immersiveTimerDefaultOrientation, setImmersiveTimerDefaultOrientation } = useSettings();
     const { dailyReviews: ctxDailyReviews, weeklyReviews: ctxWeeklyReviews, monthlyReviews: ctxMonthlyReviews, reviewTemplates: ctxReviewTemplates, checkTemplates: ctxCheckTemplates } = useReview();
     const { settingsSubmenu: activeSubmenu, setSettingsSubmenu: setActiveSubmenu } = useNavigation();
     const mainListScrollRef = useRef<HTMLDivElement>(null);
@@ -999,6 +999,8 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
                 onSetDefaultIndexView={onSetDefaultIndexView}
                 defaultRecordView={defaultRecordView}
                 onSetDefaultRecordView={onSetDefaultRecordView}
+                immersiveTimerDefaultOrientation={immersiveTimerDefaultOrientation}
+                onSetImmersiveTimerDefaultOrientation={setImmersiveTimerDefaultOrientation}
                 manualSyncMode={manualSyncMode}
                 onToggleManualSyncMode={onToggleManualSyncMode}
                 sceneCardTimerMode={sceneCardTimerMode}

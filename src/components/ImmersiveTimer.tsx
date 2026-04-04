@@ -11,10 +11,13 @@ import { ImmersiveSelectorModal } from './ImmersiveSelectorModal';
 import { FlipClock } from './FlipClock';
 import { Capacitor } from '@capacitor/core';
 import { StatusBar } from '@capacitor/status-bar';
+import { OrientationType, ScreenOrientation } from '@capawesome/capacitor-screen-orientation';
 import { backgroundService } from '../services/backgroundService';
 import { statusBarService } from '../services/statusBarService';
 import { getImmersiveStatusBarTransition } from '../utils/statusBarTransitions';
 import { IMMERSIVE_THEMES } from './immersiveThemes';
+import { useSettings } from '../contexts/SettingsContext';
+import { getScreenOrientationLockValue } from '../utils/immersiveOrientation';
 
 // Theme configurations with complete visual styles
 const THEMES = [
@@ -157,6 +160,7 @@ interface ImmersiveTimerProps {
 }
 
 export const ImmersiveTimer: React.FC<ImmersiveTimerProps> = ({ elapsed, onExit, onSubmit }) => {
+    const { immersiveTimerDefaultOrientation } = useSettings();
     const [showControls, setShowControls] = useState(false);
     const [isWhiteNoiseOn, setIsWhiteNoiseOn] = useState(false);
     const [audioElement, setAudioElement] = useState<HTMLAudioElement | null>(null);
@@ -194,6 +198,29 @@ export const ImmersiveTimer: React.FC<ImmersiveTimerProps> = ({ elapsed, onExit,
     );
 
     const currentTheme = IMMERSIVE_THEMES.find(t => t.id === selectedTheme) || IMMERSIVE_THEMES[0];
+
+    useEffect(() => {
+        const applyPreferredOrientation = async () => {
+            try {
+                const preferredLock = getScreenOrientationLockValue(immersiveTimerDefaultOrientation);
+                const type = preferredLock === 'portrait-primary'
+                    ? OrientationType.PORTRAIT_PRIMARY
+                    : OrientationType.LANDSCAPE_PRIMARY;
+
+                await ScreenOrientation.lock({ type });
+            } catch (error) {
+                console.error('Failed to lock immersive timer orientation:', error);
+            }
+        };
+
+        void applyPreferredOrientation();
+
+        return () => {
+            ScreenOrientation.unlock().catch((error) => {
+                console.error('Failed to unlock immersive timer orientation:', error);
+            });
+        };
+    }, [immersiveTimerDefaultOrientation]);
 
     // Hide the system status bar while immersive mode is active,
     // then restore regular page-managed behavior on exit.
