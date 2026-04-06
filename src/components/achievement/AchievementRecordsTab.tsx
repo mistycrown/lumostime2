@@ -2,14 +2,12 @@
  * @file AchievementRecordsTab.tsx
  * @description Minimal ledger-style daily snapshot list with modal-based detail view and one-decimal achievement star values.
  *
- * @updated 2026-03-28: Added dedicated collection redemption records so collectible bottle exchanges appear alongside reward records.
- * @updated 2026-03-29: Each section shows at most 10 items initially; clicking "展开更多" loads the next 10.
- * @updated 2026-03-29: Daily snapshot detail now supports recalculating the selected day from the current achievement rules.
+ * @updated 2026-04-06: Removed archived bottle exchange records so the tab only shows the current active bottle ledger.
  */
 import React, { useMemo, useState } from 'react';
 import { ChevronRight, RotateCcw, Trash2 } from 'lucide-react';
 import { useToast } from '../../contexts/ToastContext';
-import { AchievementCollectionRecord, AchievementDailySnapshot, AchievementRedemptionRecord } from '../../types';
+import { AchievementDailySnapshot, AchievementRedemptionRecord } from '../../types';
 import { formatRelativeTime, getLocalDateTimeStr } from '../../utils/dateUtils';
 import { AchievementDialog } from './AchievementDialog';
 import { formatAchievementSignedStars, formatAchievementStars } from '../../utils/achievementUtils';
@@ -17,9 +15,7 @@ import { formatAchievementSignedStars, formatAchievementStars } from '../../util
 interface AchievementRecordsTabProps {
   snapshots: AchievementDailySnapshot[];
   redemptionRecords: AchievementRedemptionRecord[];
-  collectionRecords: AchievementCollectionRecord[];
   onDeleteRedemptionRecord: (recordId: string) => void;
-  onDeleteCollectionRecord: (recordId: string) => void;
   onRecomputeSnapshot: (date: string) => { ok: boolean; message?: string };
 }
 
@@ -37,9 +33,7 @@ function usePagedList<T>(items: T[]) {
 export const AchievementRecordsTab: React.FC<AchievementRecordsTabProps> = ({
   snapshots,
   redemptionRecords,
-  collectionRecords,
   onDeleteRedemptionRecord,
-  onDeleteCollectionRecord,
   onRecomputeSnapshot
 }) => {
   const { addToast } = useToast();
@@ -53,15 +47,10 @@ export const AchievementRecordsTab: React.FC<AchievementRecordsTabProps> = ({
     return [...redemptionRecords].sort((first, second) => second.redeemedAt - first.redeemedAt);
   }, [redemptionRecords]);
 
-  const orderedCollectionRecords = useMemo(() => {
-    return [...collectionRecords].sort((first, second) => second.redeemedAt - first.redeemedAt);
-  }, [collectionRecords]);
-
   const selectedSnapshot = orderedSnapshots.find((snapshot) => snapshot.id === selectedSnapshotId) || null;
 
   const snapshotsPaged = usePagedList(orderedSnapshots);
   const rewardsPaged = usePagedList(orderedRewardRecords);
-  const collectionsPaged = usePagedList(orderedCollectionRecords);
 
   const handleRecomputeSelectedSnapshot = () => {
     if (!selectedSnapshot) {
@@ -165,59 +154,6 @@ export const AchievementRecordsTab: React.FC<AchievementRecordsTabProps> = ({
                   className="w-full py-3 text-[13px] text-stone-400 transition-colors hover:text-stone-600"
                 >
                   展开更多（剩余 {orderedRewardRecords.length - rewardsPaged.visible.length} 条）
-                </button>
-              )}
-            </div>
-          )}
-        </section>
-
-        <section>
-          <div className="flex items-center justify-between border-b border-stone-200 pb-[14px]">
-            <div className="text-[11px] uppercase tracking-[0.18em] text-stone-400">
-              Collection Records / {orderedCollectionRecords.length}
-            </div>
-          </div>
-
-          {orderedCollectionRecords.length === 0 ? (
-            <div className="mt-[14px] rounded-2xl border border-dashed border-stone-300 bg-white/50 px-5 py-6 text-sm leading-7 text-stone-500">
-              还没有收藏记录。兑换收藏瓶子后，对应记录会显示在这里。
-            </div>
-          ) : (
-            <div className="mt-[14px] divide-y divide-stone-200">
-              {collectionsPaged.visible.map((record) => (
-                <div key={record.id} className="flex items-center justify-between gap-4 py-[14px]">
-                  <div className="flex min-w-0 flex-1 items-center gap-3">
-                    {record.imagePath ? (
-                      <div className="flex h-14 w-14 items-end justify-center rounded-2xl bg-stone-100/70 px-2 pb-1 pt-2">
-                        <img
-                          src={record.imagePath}
-                          alt={record.collectionName}
-                          className="max-h-[42px] w-auto max-w-none object-contain drop-shadow-[0_8px_12px_rgba(120,113,108,0.14)]"
-                        />
-                      </div>
-                    ) : null}
-                    <div className="min-w-0 flex-1">
-                      <div className="text-[14px] leading-6 text-stone-500">花费 {formatAchievementStars(record.cost)} 光点</div>
-                      <div className="text-[13px] leading-6 text-stone-400">{getLocalDateTimeStr(new Date(record.redeemedAt))}</div>
-                    </div>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => onDeleteCollectionRecord(record.id)}
-                    className="inline-flex h-7 w-7 shrink-0 items-center justify-center self-center rounded-full text-stone-300 transition-colors hover:bg-rose-50 hover:text-rose-500"
-                    aria-label="删除收藏记录"
-                  >
-                    <Trash2 size={14} />
-                  </button>
-                </div>
-              ))}
-              {collectionsPaged.hasMore && (
-                <button
-                  type="button"
-                  onClick={collectionsPaged.loadMore}
-                  className="w-full py-3 text-[13px] text-stone-400 transition-colors hover:text-stone-600"
-                >
-                  展开更多（剩余 {orderedCollectionRecords.length - collectionsPaged.visible.length} 条）
                 </button>
               )}
             </div>

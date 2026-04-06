@@ -1,17 +1,20 @@
 ﻿/**
  * @file AchievementContext.tsx
- * @description Manages achievement bottle data, daily snapshots, rewards, collectible bottles, and redemption records with repository hydration and selective recent-day recomputation.
- * @updated 2026-03-29: Added single-day snapshot recomputation so a daily record can be recalculated from the current rule set on demand.
+ * @description Manages achievement bottle data, live snapshots, archived bottles, and reward redemption records with repository hydration and selective recent-day recomputation.
+ * @updated 2026-04-06: Replaced collectible bottle purchases with sealable archived bottles and shatter return logic.
  */
 import React, { createContext, ReactNode, useContext, useEffect, useRef, useState } from 'react';
 import { dataRepository } from '../repositories/dataRepository';
 import {
+  AchievementArchivedBottle,
+  AchievementBottleActionRecord,
   AchievementCollection,
   AchievementCollectionRecord,
   AchievementDailySnapshot,
   AchievementMeta,
   AchievementRedemptionRecord,
   AchievementReward,
+  AchievementSealPreview,
   AchievementRule
 } from '../types';
 import {
@@ -20,6 +23,8 @@ import {
   calculateAchievementTotalRedeemed,
   computeAchievementDailySnapshot,
   enumerateAchievementDates,
+  getAchievementActiveStartDate,
+  getAchievementSealPreview,
   getAchievementYesterday,
   normalizeAchievementStarValue,
   normalizeAchievementRule,
@@ -51,22 +56,19 @@ interface CreateAchievementRewardInput {
   icon?: string;
 }
 
-interface CreateAchievementCollectionInput {
-  name: string;
-  cost: number;
-  imagePath?: string;
-  description?: string;
-}
-
 interface AchievementContextType {
   isReady: boolean;
   achievementStartDate: string | null;
+  activeBottleCarryoverStars: number;
   rules: AchievementRule[];
   rewards: AchievementReward[];
   collections: AchievementCollection[];
   dailySnapshots: AchievementDailySnapshot[];
   redemptionRecords: AchievementRedemptionRecord[];
   collectionRecords: AchievementCollectionRecord[];
+  archivedBottles: AchievementArchivedBottle[];
+  bottleActionRecords: AchievementBottleActionRecord[];
+  sealPreview: AchievementSealPreview | null;
   availableStars: number;
   totalEarnedStars: number;
   totalRedeemedStars: number;
@@ -79,12 +81,9 @@ interface AchievementContextType {
   updateReward: (reward: AchievementReward) => void;
   deleteReward: (rewardId: string) => void;
   redeemReward: (reward: AchievementReward, note?: string) => { ok: boolean; message?: string };
-  createCollection: (input: CreateAchievementCollectionInput) => void;
-  updateCollection: (collection: AchievementCollection) => void;
-  deleteCollection: (collectionId: string) => void;
-  redeemCollection: (collection: AchievementCollection, note?: string) => { ok: boolean; message?: string };
+  sealBottle: (collection: AchievementCollection) => { ok: boolean; message?: string; archivedBottleId?: string };
+  shatterBottle: (bottleId: string) => { ok: boolean; message?: string };
   deleteRedemptionRecord: (recordId: string) => void;
-  deleteCollectionRecord: (recordId: string) => void;
 }
 
 const achievementContextStore = globalThis as typeof globalThis & {
@@ -114,6 +113,7 @@ const normalizeCollection = (collection: AchievementCollection): AchievementColl
 const normalizeRedemptionRecord = (record: AchievementRedemptionRecord): AchievementRedemptionRecord => ({
   ...record,
   cost: Math.max(0.1, normalizeAchievementStarValue(record.cost || 0.1)),
+  paidFromCarryover: Math.max(0, normalizeAchievementStarValue(record.paidFromCarryover || 0)),
   note: record.note?.trim() || undefined
 });
 
@@ -122,6 +122,26 @@ const normalizeCollectionRecord = (record: AchievementCollectionRecord): Achieve
   cost: Math.max(0.1, normalizeAchievementStarValue(record.cost || 0.1)),
   imagePath: record.imagePath?.trim() || undefined,
   note: record.note?.trim() || undefined
+});
+
+const normalizeAchievementMeta = (meta: AchievementMeta): AchievementMeta => ({
+  achievementStartDate: meta.achievementStartDate ?? null,
+  activeBottleCarryoverStars: Math.max(0, normalizeAchievementStarValue(meta.activeBottleCarryoverStars || 0))
+});
+
+const normalizeArchivedBottle = (bottle: AchievementArchivedBottle): AchievementArchivedBottle => ({
+  ...bottle,
+  imagePath: bottle.imagePath?.trim() || undefined,
+  earnedStars: Math.max(0, normalizeAchievementStarValue(bottle.earnedStars || 0)),
+  spentStars: Math.max(0, normalizeAchievementStarValue(bottle.spentStars || 0)),
+  sealedAmount: Math.max(0, normalizeAchievementStarValue(bottle.sealedAmount || 0)),
+  dailySnapshots: sortAchievementSnapshots((bottle.dailySnapshots || []).map(normalizeAchievementSnapshot)),
+  redemptionRecords: (bottle.redemptionRecords || []).map(normalizeRedemptionRecord)
+});
+
+const normalizeBottleActionRecord = (record: AchievementBottleActionRecord): AchievementBottleActionRecord => ({
+  ...record,
+  amount: Math.max(0, normalizeAchievementStarValue(record.amount || 0))
 });
 
 export const useAchievement = () => {
@@ -139,13 +159,18 @@ export const AchievementProvider: React.FC<{ children: ReactNode }> = ({ childre
   const [canPersist, setCanPersist] = useState(false);
   const isHydratingRef = useRef(true);
 
-  const [meta, setMeta] = useState<AchievementMeta>({ achievementStartDate: null });
+  const [meta, setMeta] = useState<AchievementMeta>({
+    achievementStartDate: null,
+    activeBottleCarryoverStars: 0
+  });
   const [rules, setRules] = useState<AchievementRule[]>([]);
   const [rewards, setRewards] = useState<AchievementReward[]>([]);
   const [collections, setCollections] = useState<AchievementCollection[]>([]);
   const [dailySnapshots, setDailySnapshots] = useState<AchievementDailySnapshot[]>([]);
   const [redemptionRecords, setRedemptionRecords] = useState<AchievementRedemptionRecord[]>([]);
   const [collectionRecords, setCollectionRecords] = useState<AchievementCollectionRecord[]>([]);
+  const [archivedBottles, setArchivedBottles] = useState<AchievementArchivedBottle[]>([]);
+  const [bottleActionRecords, setBottleActionRecords] = useState<AchievementBottleActionRecord[]>([]);
 
   useEffect(() => {
     let cancelled = false;
@@ -160,13 +185,15 @@ export const AchievementProvider: React.FC<{ children: ReactNode }> = ({ childre
         }
 
         hydratedSuccessfully = true;
-        setMeta(snapshot.meta);
+        setMeta(normalizeAchievementMeta(snapshot.meta));
         setRules(snapshot.rules.map(normalizeAchievementRule));
         setRewards(snapshot.rewards.map(normalizeReward));
         setCollections(snapshot.collections.map(normalizeCollection));
         setDailySnapshots(sortAchievementSnapshots(snapshot.dailySnapshots.map(normalizeAchievementSnapshot)));
         setRedemptionRecords(snapshot.redemptionRecords.map(normalizeRedemptionRecord));
         setCollectionRecords(snapshot.collectionRecords.map(normalizeCollectionRecord));
+        setArchivedBottles(snapshot.archivedBottles.map(normalizeArchivedBottle));
+        setBottleActionRecords(snapshot.bottleActionRecords.map(normalizeBottleActionRecord));
       } catch (error) {
         console.error('[AchievementContext] Failed to hydrate achievement data', error);
       } finally {
@@ -219,10 +246,13 @@ export const AchievementProvider: React.FC<{ children: ReactNode }> = ({ childre
 
   const ensureRecentSnapshots = async () => {
     const today = getLocalDateStr(new Date());
-    const startDate = meta.achievementStartDate || today;
+    const startDate = getAchievementActiveStartDate(meta.achievementStartDate, archivedBottles) || today;
 
     if (!meta.achievementStartDate) {
-      setMeta({ achievementStartDate: startDate });
+      setMeta((previous) => ({
+        ...previous,
+        achievementStartDate: startDate
+      }));
     }
 
     setDailySnapshots((previous) => reconcileSnapshots(startDate, previous, rules));
@@ -282,8 +312,9 @@ export const AchievementProvider: React.FC<{ children: ReactNode }> = ({ childre
     const nextRules = [...rules, nextRule];
     setRules(nextRules);
 
-    if (meta.achievementStartDate) {
-      setDailySnapshots((previous) => reconcileSnapshots(meta.achievementStartDate!, previous, nextRules));
+    const activeStartDate = getAchievementActiveStartDate(meta.achievementStartDate, archivedBottles);
+    if (activeStartDate) {
+      setDailySnapshots((previous) => reconcileSnapshots(activeStartDate, previous, nextRules));
     }
   };
 
@@ -302,8 +333,9 @@ export const AchievementProvider: React.FC<{ children: ReactNode }> = ({ childre
 
     setRules(nextRules);
 
-    if (meta.achievementStartDate) {
-      setDailySnapshots((previous) => reconcileSnapshots(meta.achievementStartDate!, previous, nextRules));
+    const activeStartDate = getAchievementActiveStartDate(meta.achievementStartDate, archivedBottles);
+    if (activeStartDate) {
+      setDailySnapshots((previous) => reconcileSnapshots(activeStartDate, previous, nextRules));
     }
   };
 
@@ -311,8 +343,9 @@ export const AchievementProvider: React.FC<{ children: ReactNode }> = ({ childre
     const nextRules = rules.filter((item) => item.id !== ruleId);
     setRules(nextRules);
 
-    if (meta.achievementStartDate) {
-      setDailySnapshots((previous) => reconcileSnapshots(meta.achievementStartDate!, previous, nextRules));
+    const activeStartDate = getAchievementActiveStartDate(meta.achievementStartDate, archivedBottles);
+    if (activeStartDate) {
+      setDailySnapshots((previous) => reconcileSnapshots(activeStartDate, previous, nextRules));
     }
   };
 
@@ -351,45 +384,11 @@ export const AchievementProvider: React.FC<{ children: ReactNode }> = ({ childre
     setRewards((previous) => previous.filter((item) => item.id !== rewardId));
   };
 
-  const createCollection = (input: CreateAchievementCollectionInput) => {
-    const now = Date.now();
-    const nextCollection: AchievementCollection = {
-      id: crypto.randomUUID(),
-      name: input.name.trim() || '未命名收藏',
-      cost: Math.max(0.1, normalizeAchievementStarValue(input.cost || 0.1)),
-      imagePath: input.imagePath?.trim() || undefined,
-      description: input.description?.trim() || undefined,
-      enabled: true,
-      createdAt: now,
-      updatedAt: now
-    };
-
-    setCollections((previous) => [...previous, nextCollection]);
-  };
-
-  const updateCollection = (collection: AchievementCollection) => {
-    setCollections((previous) => previous.map((item) => (
-      item.id === collection.id
-        ? {
-          ...collection,
-          name: collection.name.trim() || '未命名收藏',
-          cost: Math.max(0.1, normalizeAchievementStarValue(collection.cost || 0.1)),
-          imagePath: collection.imagePath?.trim() || undefined,
-          description: collection.description?.trim() || undefined,
-          updatedAt: Date.now()
-        }
-        : item
-    )));
-  };
-
-  const deleteCollection = (collectionId: string) => {
-    setCollections((previous) => previous.filter((item) => item.id !== collectionId));
-  };
-
   const redeemReward = (reward: AchievementReward, note?: string) => {
     const currentAvailableStars = calculateAchievementAvailableStars(
       dailySnapshots,
-      [...redemptionRecords, ...collectionRecords]
+      [...redemptionRecords, ...collectionRecords],
+      bottleActionRecords
     );
     const normalizedRewardCost = Math.max(0.1, normalizeAchievementStarValue(reward.cost || 0.1));
 
@@ -400,57 +399,154 @@ export const AchievementProvider: React.FC<{ children: ReactNode }> = ({ childre
       };
     }
 
+    const paidFromCarryover = Math.min(meta.activeBottleCarryoverStars, normalizedRewardCost);
     const nextRecord: AchievementRedemptionRecord = {
       id: crypto.randomUUID(),
       rewardId: reward.id,
       rewardName: reward.name,
       cost: normalizedRewardCost,
       redeemedAt: Date.now(),
+      paidFromCarryover: paidFromCarryover || undefined,
       note: note?.trim() || undefined
     };
 
     setRedemptionRecords((previous) => [nextRecord, ...previous]);
-    return { ok: true };
-  };
-
-  const redeemCollection = (collection: AchievementCollection, note?: string) => {
-    const currentAvailableStars = calculateAchievementAvailableStars(
-      dailySnapshots,
-      [...redemptionRecords, ...collectionRecords]
-    );
-    const normalizedCollectionCost = Math.max(0.1, normalizeAchievementStarValue(collection.cost || 0.1));
-
-    if (currentAvailableStars < normalizedCollectionCost) {
-      return {
-        ok: false,
-        message: '当前光点不足，暂时无法兑换'
-      };
+    if (paidFromCarryover > 0) {
+      setMeta((previous) => ({
+        ...previous,
+        activeBottleCarryoverStars: normalizeAchievementStarValue(previous.activeBottleCarryoverStars - paidFromCarryover)
+      }));
     }
-
-    const nextRecord: AchievementCollectionRecord = {
-      id: crypto.randomUUID(),
-      collectionId: collection.id,
-      collectionName: collection.name,
-      cost: normalizedCollectionCost,
-      imagePath: collection.imagePath,
-      redeemedAt: Date.now(),
-      note: note?.trim() || undefined
-    };
-
-    setCollectionRecords((previous) => [nextRecord, ...previous]);
     return { ok: true };
   };
 
   const deleteRedemptionRecord = (recordId: string) => {
+    const targetRecord = redemptionRecords.find((item) => item.id === recordId);
+    if (targetRecord?.paidFromCarryover) {
+      setMeta((currentMeta) => ({
+        ...currentMeta,
+        activeBottleCarryoverStars: normalizeAchievementStarValue(
+          currentMeta.activeBottleCarryoverStars + targetRecord.paidFromCarryover!
+        )
+      }));
+    }
     setRedemptionRecords((previous) => previous.filter((item) => item.id !== recordId));
   };
 
-  const deleteCollectionRecord = (recordId: string) => {
-    setCollectionRecords((previous) => previous.filter((item) => item.id !== recordId));
+  const sealPreview = getAchievementSealPreview({
+    achievementStartDate: meta.achievementStartDate,
+    archivedBottles,
+    dailySnapshots,
+    redemptionRecords
+  });
+
+  const sealBottle = (collection: AchievementCollection) => {
+    if (!sealPreview) {
+      return {
+        ok: false,
+        message: '昨天之前还没有可封存的光点'
+      };
+    }
+
+    const snapshotMap = new Set(sealPreview.snapshotIds);
+    const redemptionMap = new Set(sealPreview.redemptionRecordIds);
+    const snapshotsToArchive = dailySnapshots.filter((snapshot) => snapshotMap.has(snapshot.id));
+    const redemptionsToArchive = redemptionRecords.filter((record) => redemptionMap.has(record.id));
+
+    if (!snapshotsToArchive.length && !redemptionsToArchive.length) {
+      return {
+        ok: false,
+        message: '昨天之前还没有新的历史可封存'
+      };
+    }
+
+    if (sealPreview.sealableStars <= 0) {
+      return {
+        ok: false,
+        message: '这段时间还没有可封存的正向余额'
+      };
+    }
+
+    const now = Date.now();
+    const nextArchivedBottle: AchievementArchivedBottle = {
+      id: crypto.randomUUID(),
+      collectionId: collection.id,
+      collectionName: collection.name,
+      imagePath: collection.imagePath,
+      periodStartDate: sealPreview.startDate,
+      periodEndDate: sealPreview.endDate,
+      earnedStars: sealPreview.earnedStars,
+      spentStars: sealPreview.spentStars,
+      sealedAmount: sealPreview.sealableStars,
+      status: 'sealed',
+      sealedAt: now,
+      dailySnapshots: snapshotsToArchive,
+      redemptionRecords: redemptionsToArchive
+    };
+    const nextActionRecord: AchievementBottleActionRecord = {
+      id: crypto.randomUUID(),
+      bottleId: nextArchivedBottle.id,
+      actionType: 'seal',
+      amount: nextArchivedBottle.sealedAmount,
+      occurredAt: now
+    };
+
+    setArchivedBottles((previous) => [...previous, nextArchivedBottle]);
+    setBottleActionRecords((previous) => [nextActionRecord, ...previous]);
+    setDailySnapshots((previous) => previous.filter((snapshot) => !snapshotMap.has(snapshot.id)));
+    setRedemptionRecords((previous) => previous.filter((record) => !redemptionMap.has(record.id)));
+
+    return {
+      ok: true,
+      archivedBottleId: nextArchivedBottle.id
+    };
+  };
+
+  const shatterBottle = (bottleId: string) => {
+    const targetBottle = archivedBottles.find((bottle) => bottle.id === bottleId);
+    if (!targetBottle) {
+      return {
+        ok: false,
+        message: '没有找到这个历史瓶子'
+      };
+    }
+
+    if (targetBottle.status === 'shattered') {
+      return {
+        ok: false,
+        message: '这个瓶子已经砸碎过了'
+      };
+    }
+
+    const now = Date.now();
+    const nextActionRecord: AchievementBottleActionRecord = {
+      id: crypto.randomUUID(),
+      bottleId,
+      actionType: 'shatter',
+      amount: targetBottle.sealedAmount,
+      occurredAt: now
+    };
+
+    setArchivedBottles((previous) => previous.map((bottle) => (
+      bottle.id === bottleId
+        ? {
+          ...bottle,
+          status: 'shattered',
+          shatteredAt: now
+        }
+        : bottle
+    )));
+    setBottleActionRecords((previous) => [nextActionRecord, ...previous]);
+    setMeta((previous) => ({
+      ...previous,
+      activeBottleCarryoverStars: normalizeAchievementStarValue(previous.activeBottleCarryoverStars + targetBottle.sealedAmount)
+    }));
+
+    return { ok: true };
   };
 
   const spendRecords = [...redemptionRecords, ...collectionRecords];
-  const availableStars = calculateAchievementAvailableStars(dailySnapshots, spendRecords);
+  const availableStars = calculateAchievementAvailableStars(dailySnapshots, spendRecords, bottleActionRecords);
   const totalEarnedStars = calculateAchievementTotalEarned(dailySnapshots);
   const totalRedeemedStars = calculateAchievementTotalRedeemed(spendRecords);
 
@@ -525,6 +621,26 @@ export const AchievementProvider: React.FC<{ children: ReactNode }> = ({ childre
   }, [canPersist, collectionRecords, isReady]);
 
   useEffect(() => {
+    if (!isReady || !canPersist) {
+      return;
+    }
+
+    void dataRepository.saveAchievementArchivedBottles(archivedBottles).catch((error) => {
+      console.error('[AchievementContext] Failed to persist archived achievement bottles', error);
+    });
+  }, [archivedBottles, canPersist, isReady]);
+
+  useEffect(() => {
+    if (!isReady || !canPersist) {
+      return;
+    }
+
+    void dataRepository.saveAchievementBottleActionRecords(bottleActionRecords).catch((error) => {
+      console.error('[AchievementContext] Failed to persist achievement bottle action records', error);
+    });
+  }, [bottleActionRecords, canPersist, isReady]);
+
+  useEffect(() => {
     if (!isReady || !canPersist || isHydratingRef.current) {
       return;
     }
@@ -534,19 +650,23 @@ export const AchievementProvider: React.FC<{ children: ReactNode }> = ({ childre
     }
 
     updateLocalDataTimestamp();
-  }, [canPersist, collectionRecords, collections, dailySnapshots, isReady, meta, redemptionRecords, rewards, rules]);
+  }, [archivedBottles, bottleActionRecords, canPersist, collectionRecords, collections, dailySnapshots, isReady, meta, redemptionRecords, rewards, rules]);
 
   return (
     <AchievementContext.Provider
       value={{
         isReady,
         achievementStartDate: meta.achievementStartDate,
+        activeBottleCarryoverStars: meta.activeBottleCarryoverStars,
         rules,
         rewards,
         collections,
         dailySnapshots,
         redemptionRecords,
         collectionRecords,
+        archivedBottles,
+        bottleActionRecords,
+        sealPreview,
         availableStars,
         totalEarnedStars,
         totalRedeemedStars,
@@ -559,12 +679,9 @@ export const AchievementProvider: React.FC<{ children: ReactNode }> = ({ childre
         updateReward,
         deleteReward,
         redeemReward,
-        createCollection,
-        updateCollection,
-        deleteCollection,
-        redeemCollection,
-        deleteRedemptionRecord,
-        deleteCollectionRecord
+        sealBottle,
+        shatterBottle,
+        deleteRedemptionRecord
       }}
     >
       {children}

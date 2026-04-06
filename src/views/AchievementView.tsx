@@ -5,7 +5,7 @@
  * @pos View (Achievement Overlay)
  * @description Achievement bottle full-screen page opened from Timeline. The collapsed state emphasizes the bottle, while the expanded state turns the screen into a full ledger workspace.
  *
- * @updated 2026-03-29: Daily record detail now supports recomputing a single day's snapshot from the current rules.
+ * @updated 2026-04-06: Collections tab now drives fixed-range sealing, archived bottle browsing, and shatter actions.
  */
 import React, { useEffect, useMemo, useState } from 'react';
 import { Archive, ChevronDown, Gift, ScrollText, SlidersHorizontal } from 'lucide-react';
@@ -41,7 +41,8 @@ export const AchievementView: React.FC = () => {
     collections,
     dailySnapshots,
     redemptionRecords,
-    collectionRecords,
+    archivedBottles,
+    sealPreview,
     availableStars,
     ensureRecentSnapshots,
     recomputeSnapshotForDate,
@@ -52,11 +53,9 @@ export const AchievementView: React.FC = () => {
     updateReward,
     deleteReward,
     redeemReward,
-    updateCollection,
-    deleteCollection,
-    redeemCollection,
-    deleteRedemptionRecord,
-    deleteCollectionRecord
+    sealBottle,
+    shatterBottle,
+    deleteRedemptionRecord
   } = useAchievement();
   const { categories, scopes } = useCategoryScope();
   const { todoCategories } = useData();
@@ -121,9 +120,7 @@ export const AchievementView: React.FC = () => {
         <AchievementRecordsTab
           snapshots={dailySnapshots}
           redemptionRecords={redemptionRecords}
-          collectionRecords={collectionRecords}
           onDeleteRedemptionRecord={deleteRedemptionRecord}
-          onDeleteCollectionRecord={deleteCollectionRecord}
           onRecomputeSnapshot={recomputeSnapshotForDate}
         />
       );
@@ -161,36 +158,35 @@ export const AchievementView: React.FC = () => {
       <AchievementCollectionsTab
         availableStars={availableStars}
         collections={collections}
-        collectionRecords={collectionRecords}
-        onUpdateCollection={updateCollection}
-        onDeleteCollection={deleteCollection}
-        onRedeemCollection={redeemCollection}
+        archivedBottles={archivedBottles}
+        sealPreview={sealPreview}
+        onSealBottle={sealBottle}
+        onShatterBottle={shatterBottle}
       />
     );
   }, [
     activeTab,
     availableStars,
+    archivedBottles,
     categories,
     checkTemplates,
-    collectionRecords,
     collections,
     createReward,
     createRule,
     dailySnapshots,
-    deleteCollection,
-    deleteCollectionRecord,
     deleteRedemptionRecord,
     deleteReward,
     deleteRule,
     recomputeSnapshotForDate,
-    redeemCollection,
     redeemReward,
     redemptionRecords,
     rewards,
     rules,
+    sealBottle,
+    sealPreview,
+    shatterBottle,
     scopes,
     todoCategories,
-    updateCollection,
     updateReward,
     updateRule
   ]);

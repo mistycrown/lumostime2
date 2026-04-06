@@ -5,11 +5,15 @@
  * @pos Utility (Achievement)
  * @description 成就系统计算工具 - 负责每日快照计算、日期枚举和账本汇总。
  *
- * @updated 2026-03-28: Added decimal-safe star helpers and support for combining reward plus collection spending records.
+ * @updated 2026-04-06: Added fixed-range seal preview helpers and active-bottle balance support for shattered bottle returns.
  */
 import {
+  AchievementArchivedBottle,
+  AchievementBottleActionRecord,
   AchievementDailySnapshot,
   AchievementDailyRuleBreakdown,
+  AchievementRedemptionRecord,
+  AchievementSealPreview,
   AchievementRule,
   DailyReview,
   Log,
@@ -25,9 +29,25 @@ interface AchievementSpendRecordLike {
   cost: number;
 }
 
+interface AchievementActionRecordLike {
+  actionType: AchievementBottleActionRecord['actionType'];
+  amount: number;
+}
+
 const createDateAtNoon = (dateStr: string): Date => {
   const [year, month, day] = dateStr.split('-').map(Number);
   return new Date(year, (month || 1) - 1, day || 1, 12, 0, 0, 0);
+};
+
+const shiftAchievementDate = (dateStr: string, deltaDays: number): string => {
+  const nextDate = createDateAtNoon(dateStr);
+  nextDate.setDate(nextDate.getDate() + deltaDays);
+  nextDate.setHours(12, 0, 0, 0);
+  return getLocalDateStr(nextDate);
+};
+
+const isAchievementDateInRange = (date: string, startDate: string, endDate: string): boolean => {
+  return date >= startDate && date <= endDate;
 };
 
 const normalizeUnitAmount = (rule: AchievementRule | (AchievementRule & { unitMinutes?: number })): number => {
@@ -184,13 +204,35 @@ export const sortAchievementSnapshots = (snapshots: AchievementDailySnapshot[]):
   return [...snapshots].sort((first, second) => first.date.localeCompare(second.date));
 };
 
+export const calculateAchievementSnapshotFlows = (snapshots: AchievementDailySnapshot[]) => {
+  const earnedStars = normalizeAchievementStarValue(
+    snapshots.reduce((sum, item) => sum + Math.max(0, item.netDelta), 0)
+  );
+  const spentStars = normalizeAchievementStarValue(
+    snapshots.reduce((sum, item) => sum + Math.abs(Math.min(0, item.netDelta)), 0)
+  );
+  const netStars = normalizeAchievementStarValue(
+    snapshots.reduce((sum, item) => sum + item.netDelta, 0)
+  );
+
+  return {
+    earnedStars,
+    spentStars,
+    netStars
+  };
+};
+
 export const calculateAchievementAvailableStars = (
   snapshots: AchievementDailySnapshot[],
-  spendRecords: AchievementSpendRecordLike[]
+  spendRecords: AchievementSpendRecordLike[],
+  actionRecords: AchievementActionRecordLike[] = []
 ): number => {
   const earned = snapshots.reduce((sum, item) => sum + item.netDelta, 0);
   const spent = spendRecords.reduce((sum, item) => sum + item.cost, 0);
-  return normalizeAchievementStarValue(earned - spent);
+  const returned = actionRecords.reduce((sum, item) => (
+    item.actionType === 'shatter' ? sum + item.amount : sum
+  ), 0);
+  return normalizeAchievementStarValue(earned - spent + returned);
 };
 
 export const calculateAchievementTotalEarned = (snapshots: AchievementDailySnapshot[]): number => {
@@ -199,4 +241,78 @@ export const calculateAchievementTotalEarned = (snapshots: AchievementDailySnaps
 
 export const calculateAchievementTotalRedeemed = (spendRecords: AchievementSpendRecordLike[]): number => {
   return normalizeAchievementStarValue(spendRecords.reduce((sum, item) => sum + item.cost, 0));
+};
+
+export const getAchievementSealPreview = ({
+  achievementStartDate,
+  archivedBottles,
+  dailySnapshots,
+  redemptionRecords,
+  today = new Date()
+}: {
+  achievementStartDate: string | null;
+  archivedBottles: AchievementArchivedBottle[];
+  dailySnapshots: AchievementDailySnapshot[];
+  redemptionRecords: AchievementRedemptionRecord[];
+  today?: Date;
+}): AchievementSealPreview | null => {
+  if (!achievementStartDate) {
+    return null;
+  }
+
+  const lastArchivedEndDate = archivedBottles.reduce<string | null>((latest, bottle) => {
+    if (!latest || bottle.periodEndDate > latest) {
+      return bottle.periodEndDate;
+    }
+    return latest;
+  }, null);
+  const startDate = lastArchivedEndDate ? shiftAchievementDate(lastArchivedEndDate, 1) : achievementStartDate;
+  const endDate = getAchievementYesterday(today);
+
+  if (!startDate || startDate > endDate) {
+    return null;
+  }
+
+  const snapshotsInRange = dailySnapshots.filter((snapshot) => (
+    isAchievementDateInRange(snapshot.date, startDate, endDate)
+  ));
+  const redemptionsInRange = redemptionRecords.filter((record) => {
+    const recordDate = getLocalDateStr(new Date(record.redeemedAt));
+    return isAchievementDateInRange(recordDate, startDate, endDate);
+  });
+  const snapshotFlows = calculateAchievementSnapshotFlows(snapshotsInRange);
+  const rewardSpentStars = normalizeAchievementStarValue(
+    redemptionsInRange.reduce((sum, record) => sum + record.cost, 0)
+  );
+  const rewardSpentFromLiveStars = normalizeAchievementStarValue(
+    redemptionsInRange.reduce((sum, record) => sum + (record.cost - (record.paidFromCarryover || 0)), 0)
+  );
+
+  return {
+    startDate,
+    endDate,
+    earnedStars: snapshotFlows.earnedStars,
+    spentStars: normalizeAchievementStarValue(snapshotFlows.spentStars + rewardSpentStars),
+    sealableStars: normalizeAchievementStarValue(snapshotFlows.netStars - rewardSpentFromLiveStars),
+    snapshotIds: snapshotsInRange.map((snapshot) => snapshot.id),
+    redemptionRecordIds: redemptionsInRange.map((record) => record.id)
+  };
+};
+
+export const getAchievementActiveStartDate = (
+  achievementStartDate: string | null,
+  archivedBottles: AchievementArchivedBottle[]
+): string | null => {
+  if (!achievementStartDate) {
+    return null;
+  }
+
+  const lastArchivedEndDate = archivedBottles.reduce<string | null>((latest, bottle) => {
+    if (!latest || bottle.periodEndDate > latest) {
+      return bottle.periodEndDate;
+    }
+    return latest;
+  }, null);
+
+  return lastArchivedEndDate ? shiftAchievementDate(lastArchivedEndDate, 1) : achievementStartDate;
 };
