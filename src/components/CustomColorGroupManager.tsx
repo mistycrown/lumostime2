@@ -5,6 +5,7 @@
  * @pos Component (Theme & Customization)
  * @description 自定义色组管理组件，支持色值输入预览、回车提交、重复校验、上下移动与自动保存。
  *
+ * @updated 2026-04-06: Extracted the draft preview style so valid HEX input immediately replaces the checkerboard placeholder with a solid swatch.
  * Once I am updated, be sure to update my header comment and the folder's md.
  */
 
@@ -21,6 +22,18 @@ import { ToastType } from './Toast';
 interface CustomColorGroupManagerProps {
   onToast: (type: ToastType, message: string) => void;
 }
+
+export const getDraftPreviewStyle = (
+  normalizedDraft: string | null
+): React.CSSProperties | undefined => {
+  if (!normalizedDraft) {
+    return undefined;
+  }
+
+  return {
+    background: normalizedDraft,
+  };
+};
 
 export const CustomColorGroupManager: React.FC<CustomColorGroupManagerProps> = ({
   onToast,
@@ -105,7 +118,7 @@ export const CustomColorGroupManager: React.FC<CustomColorGroupManagerProps> = (
         <div className="flex items-center gap-2 min-w-0">
           <div
             className="w-11 h-11 rounded-xl border border-stone-200 shrink-0 overflow-hidden bg-[linear-gradient(135deg,#fafaf9_25%,#f5f5f4_25%,#f5f5f4_50%,#fafaf9_50%,#fafaf9_75%,#f5f5f4_75%,#f5f5f4_100%)] bg-[length:12px_12px]"
-            style={normalizedDraft ? { backgroundColor: normalizedDraft } : undefined}
+            style={getDraftPreviewStyle(normalizedDraft)}
             aria-hidden="true"
           />
 
