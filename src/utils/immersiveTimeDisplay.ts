@@ -3,9 +3,10 @@
  * @input Display source, display format, elapsed seconds, and current time
  * @output Immersive timer display parts and adaptive digit-slot width helpers
  * @pos Utility
- * @description Centralizes immersive timer display parsing so source and format switches can be tested without coupling to the React component tree.
+ * @description Centralizes immersive timer display parsing and persistence so source and format switches can be tested without coupling to the React component tree.
  */
 
+import { SETTINGS_KEYS } from '../constants/storageKeys';
 import {
   IMMERSIVE_TIMER_DIGIT_SLOT_WIDTH,
   IMMERSIVE_TIMER_DIGIT_SLOT_WIDTH_PER_CHARACTER,
@@ -13,6 +14,14 @@ import {
 
 export type ImmersiveDisplaySource = 'elapsed' | 'current';
 export type ImmersiveDisplayFormat = 'hoursMinutes' | 'minutesSeconds' | 'hoursMinutesSeconds';
+
+export const DEFAULT_IMMERSIVE_DISPLAY_SOURCE: ImmersiveDisplaySource = 'elapsed';
+export const DEFAULT_IMMERSIVE_DISPLAY_FORMAT: ImmersiveDisplayFormat = 'hoursMinutesSeconds';
+
+export const IMMERSIVE_DISPLAY_STORAGE_KEYS = {
+  source: SETTINGS_KEYS.IMMERSIVE_TIMER_DISPLAY_SOURCE,
+  format: SETTINGS_KEYS.IMMERSIVE_TIMER_DISPLAY_FORMAT,
+} as const;
 
 export interface ImmersiveDisplayPart {
   kind: 'value' | 'separator';
@@ -70,6 +79,37 @@ export const getDefaultImmersiveDisplayFormatForSource = (
 
   return format;
 };
+
+export const normalizeImmersiveDisplaySource = (
+  value: string | null | undefined
+): ImmersiveDisplaySource => (
+  value === 'current' || value === 'elapsed'
+    ? value
+    : DEFAULT_IMMERSIVE_DISPLAY_SOURCE
+);
+
+export const normalizeImmersiveDisplayFormat = (
+  value: string | null | undefined,
+  source: ImmersiveDisplaySource
+): ImmersiveDisplayFormat => {
+  const normalized = value === 'hoursMinutes'
+    || value === 'minutesSeconds'
+    || value === 'hoursMinutesSeconds'
+    ? value
+    : DEFAULT_IMMERSIVE_DISPLAY_FORMAT;
+
+  return getDefaultImmersiveDisplayFormatForSource(source, normalized);
+};
+
+export const readStoredImmersiveDisplaySource = (
+  storage: Pick<Storage, 'getItem'>
+): ImmersiveDisplaySource => normalizeImmersiveDisplaySource(storage.getItem(IMMERSIVE_DISPLAY_STORAGE_KEYS.source));
+
+export const readStoredImmersiveDisplayFormat = (
+  storage: Pick<Storage, 'getItem'>,
+  source: ImmersiveDisplaySource
+): ImmersiveDisplayFormat =>
+  normalizeImmersiveDisplayFormat(storage.getItem(IMMERSIVE_DISPLAY_STORAGE_KEYS.format), source);
 
 export const getImmersiveDisplayFormatSegmentCount = (
   format: ImmersiveDisplayFormat
