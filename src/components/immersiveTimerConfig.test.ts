@@ -4,14 +4,19 @@ import {
   IMMERSIVE_TIMER_CONTROL_IDS,
   IMMERSIVE_TIMER_FONT_FAMILY,
   IMMERSIVE_TIMER_FONT_WEIGHT,
+  IMMERSIVE_TIMER_DIGIT_SLOT_WIDTH,
+  IMMERSIVE_TIMER_DIGIT_SLOT_WIDTH_PER_CHARACTER,
+  IMMERSIVE_TIMER_HORIZONTAL_PADDING,
   IMMERSIVE_TIMER_LANDSCAPE_SIZE,
+  IMMERSIVE_TIMER_LANDSCAPE_VIEWPORT,
   IMMERSIVE_TIMER_PORTRAIT_DIGIT_SIZE,
+  IMMERSIVE_TIMER_SEPARATOR_SLOT_WIDTH,
   IMMERSIVE_TIMER_TOP_INSET,
 } from './immersiveTimerConfig';
 
 describe('immersiveTimerConfig', () => {
-  test('locks immersive timer controls to back submit and white-noise only', () => {
-    expect(IMMERSIVE_TIMER_CONTROL_IDS).toEqual(['back', 'submit', 'noise']);
+  test('locks immersive timer controls to the fixed black theme plus display toggles', () => {
+    expect(IMMERSIVE_TIMER_CONTROL_IDS).toEqual(['back', 'submit', 'orientation', 'format', 'source', 'noise']);
   });
 
   test('locks immersive timer visuals to black background and white text', () => {
@@ -31,11 +36,20 @@ describe('immersiveTimerConfig', () => {
     expect(IMMERSIVE_TIMER_FONT_FAMILY).toContain('Lahlit Font');
     expect(IMMERSIVE_TIMER_FONT_WEIGHT).toBe(800);
     expect(IMMERSIVE_TIMER_TOP_INSET).toContain('--status-bar-height');
+    expect(IMMERSIVE_TIMER_DIGIT_SLOT_WIDTH).toBe('2.45ch');
+    expect(IMMERSIVE_TIMER_DIGIT_SLOT_WIDTH_PER_CHARACTER).toBe(1.12);
+    expect(IMMERSIVE_TIMER_SEPARATOR_SLOT_WIDTH).toBe('0.2ch');
+    expect(IMMERSIVE_TIMER_HORIZONTAL_PADDING).toBe('0.25rem');
     expect(IMMERSIVE_TIMER_PORTRAIT_DIGIT_SIZE).toBe('min(36vw, 22vh)');
     expect(IMMERSIVE_TIMER_LANDSCAPE_SIZE).toEqual({
-      widthRatio: 0.24,
-      heightRatio: 0.5,
+      widthRatio: 0.3,
+      heightRatio: 0.58,
       finalScale: 1,
+    });
+    expect(IMMERSIVE_TIMER_LANDSCAPE_VIEWPORT).toEqual({
+      width: 0.985,
+      height: 0.88,
+      maxWidth: '98vw',
     });
   });
 });

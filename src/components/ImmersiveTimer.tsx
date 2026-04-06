@@ -3,10 +3,10 @@
  * @input elapsed time, onExit callback, onSubmit callback
  * @output Immersive fullscreen timer display and session submit trigger
  * @pos Component (View)
- * @description A fixed black-and-white immersive timer with large sans-serif digits, white-noise controls, orientation locking, and Android immersive fullscreen handling that temporarily removes WebView insets.
+ * @description A fixed black-and-white immersive timer with large numeric digits, session-only orientation toggles, display-source and display-format toggles, white-noise controls, and Android immersive fullscreen handling that temporarily removes WebView insets.
  */
 import React, { useEffect, useRef, useState } from 'react';
-import { Check, Volume2, VolumeX, X } from 'lucide-react';
+import { Check, Clock3, MonitorSmartphone, TimerReset, Volume2, VolumeX, X } from 'lucide-react';
 import { Capacitor } from '@capacitor/core';
 import { StatusBar, Style } from '@capacitor/status-bar';
 import { OrientationType, ScreenOrientation } from '@capawesome/capacitor-screen-orientation';
@@ -16,10 +16,13 @@ import {
   IMMERSIVE_TIMER_CONTROL_SURFACE,
   IMMERSIVE_TIMER_FONT_FAMILY,
   IMMERSIVE_TIMER_FONT_WEIGHT,
+  IMMERSIVE_TIMER_HORIZONTAL_PADDING,
   IMMERSIVE_TIMER_LANDSCAPE_SIZE,
+  IMMERSIVE_TIMER_LANDSCAPE_VIEWPORT,
   IMMERSIVE_TIMER_LETTER_SPACING,
   IMMERSIVE_TIMER_MODAL_THEME,
   IMMERSIVE_TIMER_PORTRAIT_DIGIT_SIZE,
+  IMMERSIVE_TIMER_SEPARATOR_SLOT_WIDTH,
   IMMERSIVE_TIMER_TOP_INSET,
 } from './immersiveTimerConfig';
 import { useSettings } from '../contexts/SettingsContext';
@@ -30,7 +33,21 @@ import {
   applyAndroidEdgeToEdgeBackgroundColor,
   getImmersiveStatusBarTransition,
   } from '../utils/statusBarTransitions';
-import { getScreenOrientationLockValue } from '../utils/immersiveOrientation';
+import {
+  getScreenOrientationLockValue,
+  resolveImmersiveTimerOrientation,
+  toggleImmersiveTimerOrientation,
+  type ImmersiveTimerOrientation,
+} from '../utils/immersiveOrientation';
+import {
+  buildImmersiveDisplayParts,
+  getDefaultImmersiveDisplayFormatForSource,
+  getImmersiveDigitSlotWidth,
+  ImmersiveDisplayFormat,
+  ImmersiveDisplaySource,
+  toggleImmersiveDisplayFormat,
+  toggleImmersiveDisplaySource,
+} from '../utils/immersiveTimeDisplay';
 
 let EdgeToEdge: {
   disable?: () => Promise<void>;
@@ -68,6 +85,9 @@ export const ImmersiveTimer: React.FC<ImmersiveTimerProps> = ({ elapsed, onExit,
   const { immersiveTimerDefaultOrientation } = useSettings();
   const [showControls, setShowControls] = useState(false);
   const [showNoiseModal, setShowNoiseModal] = useState(false);
+  const [sessionOrientationOverride, setSessionOrientationOverride] = useState<ImmersiveTimerOrientation | null>(null);
+  const [displaySource, setDisplaySource] = useState<ImmersiveDisplaySource>('elapsed');
+  const [displayFormat, setDisplayFormat] = useState<ImmersiveDisplayFormat>('hoursMinutesSeconds');
   const [isWhiteNoiseOn, setIsWhiteNoiseOn] = useState(false);
   const [audioElement, setAudioElement] = useState<HTMLAudioElement | null>(null);
   const [audioContext, setAudioContext] = useState<AudioContext | null>(null);
@@ -83,11 +103,29 @@ export const ImmersiveTimer: React.FC<ImmersiveTimerProps> = ({ elapsed, onExit,
     typeof window !== 'undefined' ? window.innerWidth > window.innerHeight : true
   );
   const timerRef = useRef<HTMLDivElement>(null);
+  const effectiveOrientation = resolveImmersiveTimerOrientation(
+    immersiveTimerDefaultOrientation,
+    sessionOrientationOverride
+  );
+  const displayParts = buildImmersiveDisplayParts({
+    source: displaySource,
+    format: displayFormat,
+    elapsedSeconds: elapsed,
+    now: new Date(),
+  });
+  const valueParts = displayParts.filter((part) => part.kind === 'value');
+  const digitSlotWidth = getImmersiveDigitSlotWidth(valueParts.map((part) => part.value));
+  const displaySignature = `${displaySource}-${displayFormat}-${displayParts.map((part) => part.value).join('')}`;
+  const formatLabel = displayFormat === 'hoursMinutes'
+    ? '时分'
+    : displayFormat === 'minutesSeconds'
+      ? '分秒'
+      : '时分秒';
 
   useEffect(() => {
-    const applyPreferredOrientation = async () => {
+    const applyEffectiveOrientation = async () => {
       try {
-        const preferredLock = getScreenOrientationLockValue(immersiveTimerDefaultOrientation);
+        const preferredLock = getScreenOrientationLockValue(effectiveOrientation);
         const type = preferredLock === 'portrait-primary'
           ? OrientationType.PORTRAIT_PRIMARY
           : OrientationType.LANDSCAPE_PRIMARY;
@@ -98,14 +136,14 @@ export const ImmersiveTimer: React.FC<ImmersiveTimerProps> = ({ elapsed, onExit,
       }
     };
 
-    void applyPreferredOrientation();
+    void applyEffectiveOrientation();
 
     return () => {
       ScreenOrientation.unlock().catch((error) => {
         console.error('Failed to unlock immersive timer orientation:', error);
       });
     };
-  }, [immersiveTimerDefaultOrientation]);
+  }, [effectiveOrientation]);
 
   useEffect(() => {
     const platform = Capacitor.getPlatform();
@@ -186,7 +224,7 @@ export const ImmersiveTimer: React.FC<ImmersiveTimerProps> = ({ elapsed, onExit,
   }, []);
 
   useEffect(() => {
-    if (!isLandscape || !timerRef.current) {
+    if (effectiveOrientation !== 'landscape' || !timerRef.current) {
       return;
     }
 
@@ -196,8 +234,8 @@ export const ImmersiveTimer: React.FC<ImmersiveTimerProps> = ({ elapsed, onExit,
         return;
       }
 
-      const containerWidth = window.innerWidth * 0.94;
-      const containerHeight = window.innerHeight * 0.8;
+      const containerWidth = window.innerWidth * IMMERSIVE_TIMER_LANDSCAPE_VIEWPORT.width;
+      const containerHeight = window.innerHeight * IMMERSIVE_TIMER_LANDSCAPE_VIEWPORT.height;
       let fontSize = Math.min(
         containerWidth * IMMERSIVE_TIMER_LANDSCAPE_SIZE.widthRatio,
         containerHeight * IMMERSIVE_TIMER_LANDSCAPE_SIZE.heightRatio
@@ -221,7 +259,7 @@ export const ImmersiveTimer: React.FC<ImmersiveTimerProps> = ({ elapsed, onExit,
     return () => {
       window.removeEventListener('resize', adjustFontSize);
     };
-  }, [elapsed, isLandscape]);
+  }, [displaySignature, effectiveOrientation, isLandscape]);
 
   useEffect(() => {
     if (selectedNoise === 'none') {
@@ -284,25 +322,6 @@ export const ImmersiveTimer: React.FC<ImmersiveTimerProps> = ({ elapsed, onExit,
       }
     };
   }, [audioContext, audioElement, whiteNoiseNode]);
-
-  const formatTime = (seconds: number): string => {
-    const hours = Math.floor(seconds / 3600);
-    const minutes = Math.floor((seconds % 3600) / 60);
-    const secs = seconds % 60;
-    return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-  };
-
-  const formatTimeParts = (seconds: number) => {
-    const hours = Math.floor(seconds / 3600);
-    const minutes = Math.floor((seconds % 3600) / 60);
-    const secs = seconds % 60;
-
-    return {
-      hours: hours.toString().padStart(2, '0'),
-      minutes: minutes.toString().padStart(2, '0'),
-      seconds: secs.toString().padStart(2, '0'),
-    };
-  };
 
   const stopWhiteNoise = () => {
     if (audioElement) {
@@ -458,8 +477,6 @@ export const ImmersiveTimer: React.FC<ImmersiveTimerProps> = ({ elapsed, onExit,
     onExit();
   };
 
-  const time = formatTimeParts(elapsed);
-
   return (
     <div
       className="fixed inset-0 z-[200] flex items-center justify-center overflow-hidden"
@@ -470,10 +487,10 @@ export const ImmersiveTimer: React.FC<ImmersiveTimerProps> = ({ elapsed, onExit,
         touchAction: 'manipulation',
       }}
     >
-      {isLandscape ? (
+      {effectiveOrientation === 'landscape' ? (
         <div
           ref={timerRef}
-          className="relative z-10 select-none px-4 text-center whitespace-nowrap"
+          className="relative z-10 inline-flex select-none items-center justify-center whitespace-nowrap"
           style={{
             fontSize: landscapeFontSize,
             fontFamily: IMMERSIVE_TIMER_FONT_FAMILY,
@@ -482,77 +499,55 @@ export const ImmersiveTimer: React.FC<ImmersiveTimerProps> = ({ elapsed, onExit,
             color: IMMERSIVE_TIMER_COLORS.foreground,
             fontVariantNumeric: 'lining-nums tabular-nums',
             fontFeatureSettings: '"tnum" 1',
-            maxWidth: '94vw',
+            paddingInline: IMMERSIVE_TIMER_HORIZONTAL_PADDING,
+            maxWidth: IMMERSIVE_TIMER_LANDSCAPE_VIEWPORT.maxWidth,
             overflow: 'hidden',
           }}
         >
-          {formatTime(elapsed)}
+          {displayParts.map((part, index) => (
+            <span
+              key={`${part.kind}-${part.value}-${index}`}
+              style={{
+                width: part.kind === 'separator' ? IMMERSIVE_TIMER_SEPARATOR_SLOT_WIDTH : digitSlotWidth,
+                textAlign: 'center',
+                flexShrink: 0,
+              }}
+            >
+              {part.value}
+            </span>
+          ))}
         </div>
       ) : (
         <div className="flex flex-col items-center gap-3">
-          <div className="flex flex-col items-center gap-1">
-            <div
-              className="relative z-10 select-none"
-              style={{
-                fontSize: IMMERSIVE_TIMER_PORTRAIT_DIGIT_SIZE,
-                fontFamily: IMMERSIVE_TIMER_FONT_FAMILY,
-                fontWeight: IMMERSIVE_TIMER_FONT_WEIGHT,
-                letterSpacing: IMMERSIVE_TIMER_LETTER_SPACING,
-                color: IMMERSIVE_TIMER_COLORS.foreground,
-                fontVariantNumeric: 'lining-nums tabular-nums',
-                fontFeatureSettings: '"tnum" 1',
-              }}
-            >
-              {time.hours}
-            </div>
-            <div className="text-xs font-medium tracking-[0.28em]" style={{ color: IMMERSIVE_TIMER_COLORS.secondaryText }}>
-              小时
-            </div>
-          </div>
+          {valueParts.map((part, index) => (
+            <React.Fragment key={`${part.label}-${part.value}-${index}`}>
+              <div className="flex flex-col items-center gap-1">
+                <div
+                  className="relative z-10 select-none"
+                  style={{
+                    fontSize: IMMERSIVE_TIMER_PORTRAIT_DIGIT_SIZE,
+                    fontFamily: IMMERSIVE_TIMER_FONT_FAMILY,
+                    fontWeight: IMMERSIVE_TIMER_FONT_WEIGHT,
+                    letterSpacing: IMMERSIVE_TIMER_LETTER_SPACING,
+                    color: IMMERSIVE_TIMER_COLORS.foreground,
+                    fontVariantNumeric: 'lining-nums tabular-nums',
+                    fontFeatureSettings: '"tnum" 1',
+                    width: digitSlotWidth,
+                    textAlign: 'center',
+                  }}
+                >
+                  {part.value}
+                </div>
+                <div className="text-xs font-medium tracking-[0.28em]" style={{ color: IMMERSIVE_TIMER_COLORS.secondaryText }}>
+                  {part.label}
+                </div>
+              </div>
 
-          <div className="w-12 h-px" style={{ backgroundColor: IMMERSIVE_TIMER_COLORS.divider }} />
-
-          <div className="flex flex-col items-center gap-1">
-            <div
-              className="relative z-10 select-none"
-              style={{
-                fontSize: IMMERSIVE_TIMER_PORTRAIT_DIGIT_SIZE,
-                fontFamily: IMMERSIVE_TIMER_FONT_FAMILY,
-                fontWeight: IMMERSIVE_TIMER_FONT_WEIGHT,
-                letterSpacing: IMMERSIVE_TIMER_LETTER_SPACING,
-                color: IMMERSIVE_TIMER_COLORS.foreground,
-                fontVariantNumeric: 'lining-nums tabular-nums',
-                fontFeatureSettings: '"tnum" 1',
-              }}
-            >
-              {time.minutes}
-            </div>
-            <div className="text-xs font-medium tracking-[0.28em]" style={{ color: IMMERSIVE_TIMER_COLORS.secondaryText }}>
-              分钟
-            </div>
-          </div>
-
-          <div className="w-12 h-px" style={{ backgroundColor: IMMERSIVE_TIMER_COLORS.divider }} />
-
-          <div className="flex flex-col items-center gap-1">
-            <div
-              className="relative z-10 select-none"
-              style={{
-                fontSize: IMMERSIVE_TIMER_PORTRAIT_DIGIT_SIZE,
-                fontFamily: IMMERSIVE_TIMER_FONT_FAMILY,
-                fontWeight: IMMERSIVE_TIMER_FONT_WEIGHT,
-                letterSpacing: IMMERSIVE_TIMER_LETTER_SPACING,
-                color: IMMERSIVE_TIMER_COLORS.foreground,
-                fontVariantNumeric: 'lining-nums tabular-nums',
-                fontFeatureSettings: '"tnum" 1',
-              }}
-            >
-              {time.seconds}
-            </div>
-            <div className="text-xs font-medium tracking-[0.28em]" style={{ color: IMMERSIVE_TIMER_COLORS.secondaryText }}>
-              秒
-            </div>
-          </div>
+              {index < valueParts.length - 1 && (
+                <div className="w-12 h-px" style={{ backgroundColor: IMMERSIVE_TIMER_COLORS.divider }} />
+              )}
+            </React.Fragment>
+          ))}
         </div>
       )}
 
@@ -610,39 +605,129 @@ export const ImmersiveTimer: React.FC<ImmersiveTimerProps> = ({ elapsed, onExit,
             <Check size={24} strokeWidth={2.5} />
           </button>
 
-          <button
-            onClick={(event) => {
-              event.stopPropagation();
-              setShowNoiseModal(true);
-            }}
-            title="选择白噪音"
-            className="pointer-events-auto absolute right-4 w-12 h-12 rounded-full backdrop-blur-md flex items-center justify-center active:scale-95 transition-all shadow-lg"
+          <div
+            className="pointer-events-none absolute flex items-center gap-2"
             style={{
               top: `calc(0.5rem + ${IMMERSIVE_TIMER_TOP_INSET})`,
               right: 'calc(1rem + env(safe-area-inset-right, 0px))',
-              backgroundColor: isWhiteNoiseOn
-                ? IMMERSIVE_TIMER_COLORS.activeButtonBackground
-                : IMMERSIVE_TIMER_CONTROL_SURFACE.backgroundColor,
-              borderWidth: '1.5px',
-              borderStyle: 'solid',
-              borderColor: isWhiteNoiseOn
-                ? IMMERSIVE_TIMER_COLORS.activeButtonBorder
-                : IMMERSIVE_TIMER_CONTROL_SURFACE.borderColor,
-              color: IMMERSIVE_TIMER_CONTROL_SURFACE.color,
-            }}
-            onMouseEnter={(event) => {
-              if (!isWhiteNoiseOn) {
-                event.currentTarget.style.backgroundColor = IMMERSIVE_TIMER_COLORS.buttonHover;
-              }
-            }}
-            onMouseLeave={(event) => {
-              event.currentTarget.style.backgroundColor = isWhiteNoiseOn
-                ? IMMERSIVE_TIMER_COLORS.activeButtonBackground
-                : IMMERSIVE_TIMER_CONTROL_SURFACE.backgroundColor;
             }}
           >
-            {isWhiteNoiseOn ? <Volume2 size={24} strokeWidth={2} /> : <VolumeX size={24} strokeWidth={2} />}
-          </button>
+            <button
+              onClick={(event) => {
+                event.stopPropagation();
+                setDisplayFormat((current) => toggleImmersiveDisplayFormat(current, displaySource));
+              }}
+              title="切换显示格式"
+              className="pointer-events-auto h-12 rounded-full backdrop-blur-md flex items-center justify-center active:scale-95 transition-all shadow-lg px-4 text-sm font-semibold tracking-[0.18em]"
+              style={{
+                backgroundColor: IMMERSIVE_TIMER_CONTROL_SURFACE.backgroundColor,
+                borderWidth: '1.5px',
+                borderStyle: 'solid',
+                borderColor: IMMERSIVE_TIMER_CONTROL_SURFACE.borderColor,
+                color: IMMERSIVE_TIMER_CONTROL_SURFACE.color,
+              }}
+              onMouseEnter={(event) => {
+                event.currentTarget.style.backgroundColor = IMMERSIVE_TIMER_COLORS.buttonHover;
+              }}
+              onMouseLeave={(event) => {
+                event.currentTarget.style.backgroundColor = IMMERSIVE_TIMER_CONTROL_SURFACE.backgroundColor;
+              }}
+            >
+              {formatLabel}
+            </button>
+
+            <button
+              onClick={(event) => {
+                event.stopPropagation();
+                setDisplaySource((current) => {
+                  const nextSource = toggleImmersiveDisplaySource(current);
+                  setDisplayFormat((currentFormat) => getDefaultImmersiveDisplayFormatForSource(nextSource, currentFormat));
+                  return nextSource;
+                });
+              }}
+              title={displaySource === 'elapsed' ? '切换为当前时间' : '切换为计时时间'}
+              className="pointer-events-auto w-12 h-12 rounded-full backdrop-blur-md flex items-center justify-center active:scale-95 transition-all shadow-lg"
+              style={{
+                backgroundColor: IMMERSIVE_TIMER_CONTROL_SURFACE.backgroundColor,
+                borderWidth: '1.5px',
+                borderStyle: 'solid',
+                borderColor: IMMERSIVE_TIMER_CONTROL_SURFACE.borderColor,
+                color: IMMERSIVE_TIMER_CONTROL_SURFACE.color,
+              }}
+              onMouseEnter={(event) => {
+                event.currentTarget.style.backgroundColor = IMMERSIVE_TIMER_COLORS.buttonHover;
+              }}
+              onMouseLeave={(event) => {
+                event.currentTarget.style.backgroundColor = IMMERSIVE_TIMER_CONTROL_SURFACE.backgroundColor;
+              }}
+            >
+              {displaySource === 'elapsed'
+                ? <TimerReset size={18} strokeWidth={2} />
+                : <Clock3 size={18} strokeWidth={2} />}
+            </button>
+
+            <button
+              onClick={(event) => {
+                event.stopPropagation();
+                setSessionOrientationOverride((current) => toggleImmersiveTimerOrientation(
+                  resolveImmersiveTimerOrientation(immersiveTimerDefaultOrientation, current)
+                ));
+              }}
+              title="切换横竖屏样式"
+              className="pointer-events-auto w-12 h-12 rounded-full backdrop-blur-md flex items-center justify-center active:scale-95 transition-all shadow-lg"
+              style={{
+                backgroundColor: IMMERSIVE_TIMER_CONTROL_SURFACE.backgroundColor,
+                borderWidth: '1.5px',
+                borderStyle: 'solid',
+                borderColor: IMMERSIVE_TIMER_CONTROL_SURFACE.borderColor,
+                color: IMMERSIVE_TIMER_CONTROL_SURFACE.color,
+              }}
+              onMouseEnter={(event) => {
+                event.currentTarget.style.backgroundColor = IMMERSIVE_TIMER_COLORS.buttonHover;
+              }}
+              onMouseLeave={(event) => {
+                event.currentTarget.style.backgroundColor = IMMERSIVE_TIMER_CONTROL_SURFACE.backgroundColor;
+              }}
+            >
+              <MonitorSmartphone
+                size={18}
+                strokeWidth={2}
+                style={{ transform: effectiveOrientation === 'landscape' ? 'rotate(90deg)' : 'none' }}
+              />
+            </button>
+
+            <button
+              onClick={(event) => {
+                event.stopPropagation();
+                setShowNoiseModal(true);
+              }}
+              title="选择白噪音"
+              className="pointer-events-auto w-12 h-12 rounded-full backdrop-blur-md flex items-center justify-center active:scale-95 transition-all shadow-lg"
+              style={{
+                backgroundColor: isWhiteNoiseOn
+                  ? IMMERSIVE_TIMER_COLORS.activeButtonBackground
+                  : IMMERSIVE_TIMER_CONTROL_SURFACE.backgroundColor,
+                borderWidth: '1.5px',
+                borderStyle: 'solid',
+                borderColor: isWhiteNoiseOn
+                  ? IMMERSIVE_TIMER_COLORS.activeButtonBorder
+                  : IMMERSIVE_TIMER_CONTROL_SURFACE.borderColor,
+                color: IMMERSIVE_TIMER_CONTROL_SURFACE.color,
+              }}
+              onMouseEnter={(event) => {
+                if (!isWhiteNoiseOn) {
+                  event.currentTarget.style.backgroundColor = IMMERSIVE_TIMER_COLORS.buttonHover;
+                }
+              }}
+              onMouseLeave={(event) => {
+                event.currentTarget.style.backgroundColor = isWhiteNoiseOn
+                  ? IMMERSIVE_TIMER_COLORS.activeButtonBackground
+                  : IMMERSIVE_TIMER_CONTROL_SURFACE.backgroundColor;
+              }}
+            >
+              {isWhiteNoiseOn ? <Volume2 size={24} strokeWidth={2} /> : <VolumeX size={24} strokeWidth={2} />}
+            </button>
+          </div>
         </div>
       )}
 
