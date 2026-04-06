@@ -1,4 +1,4 @@
-/**
+﻿/**
  * @file statusBarTransitions.ts
  * @input Platform names, immersive phase, Android EdgeToEdge plugin handles
  * @output Testable status bar transition decisions and Android background application
@@ -10,6 +10,11 @@ export interface ImmersiveStatusBarTransition {
   hide: boolean;
   show: boolean;
   restoreManagedStatusBar: boolean;
+  backgroundColor?: string;
+  hideSystemBars?: boolean;
+  restoreSystemBars?: boolean;
+  disableEdgeToEdgeInsets?: boolean;
+  enableEdgeToEdgeInsets?: boolean;
 }
 
 interface EdgeToEdgeBackgroundPlugin {
@@ -27,14 +32,23 @@ export function getImmersiveStatusBarTransition(
       hide: false,
       show: false,
       restoreManagedStatusBar: false,
+      hideSystemBars: false,
+      restoreSystemBars: false,
+      disableEdgeToEdgeInsets: false,
+      enableEdgeToEdgeInsets: false,
     };
   }
 
   if (phase === 'enter') {
     return {
-      hide: true,
-      show: false,
+      hide: false,
+      show: true,
       restoreManagedStatusBar: false,
+      backgroundColor: '#000000',
+      hideSystemBars: true,
+      restoreSystemBars: false,
+      disableEdgeToEdgeInsets: true,
+      enableEdgeToEdgeInsets: false,
     };
   }
 
@@ -42,6 +56,10 @@ export function getImmersiveStatusBarTransition(
     hide: false,
     show: true,
     restoreManagedStatusBar: true,
+    hideSystemBars: false,
+    restoreSystemBars: true,
+    disableEdgeToEdgeInsets: false,
+    enableEdgeToEdgeInsets: true,
   };
 }
 

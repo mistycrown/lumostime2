@@ -322,6 +322,7 @@ export const FocusDetailView: React.FC<FocusDetailViewProps> = ({ session, todos
                 />
             )}
             
+            {!isImmersiveMode && (
             <div className="fixed inset-0 z-[100] bg-white flex flex-col animate-in slide-in-from-bottom-[100%] duration-500 ease-out pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">
 
                 {/* Header */}
@@ -631,7 +632,8 @@ export const FocusDetailView: React.FC<FocusDetailViewProps> = ({ session, todos
 
             </div>
 
-        </div>
+            </div>
+            )}
         </>
     );
 };
