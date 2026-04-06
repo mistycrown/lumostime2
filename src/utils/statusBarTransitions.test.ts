@@ -1,21 +1,31 @@
-import { describe, expect, test, vi } from 'vitest';
+﻿import { describe, expect, test, vi } from 'vitest';
 import {
   applyAndroidEdgeToEdgeBackgroundColor,
   getImmersiveStatusBarTransition,
 } from './statusBarTransitions';
 
 describe('getImmersiveStatusBarTransition', () => {
-  test('hides the status bar when immersive mode starts on mobile', () => {
+  test('keeps the status bar visible with a black background when immersive mode starts on mobile', () => {
     expect(getImmersiveStatusBarTransition('android', 'enter')).toEqual({
-      hide: true,
-      show: false,
+      hide: false,
+      show: true,
       restoreManagedStatusBar: false,
+      backgroundColor: '#000000',
+      hideSystemBars: true,
+      restoreSystemBars: false,
+      disableEdgeToEdgeInsets: true,
+      enableEdgeToEdgeInsets: false,
     });
 
     expect(getImmersiveStatusBarTransition('ios', 'enter')).toEqual({
-      hide: true,
-      show: false,
+      hide: false,
+      show: true,
       restoreManagedStatusBar: false,
+      backgroundColor: '#000000',
+      hideSystemBars: true,
+      restoreSystemBars: false,
+      disableEdgeToEdgeInsets: true,
+      enableEdgeToEdgeInsets: false,
     });
   });
 
@@ -24,6 +34,10 @@ describe('getImmersiveStatusBarTransition', () => {
       hide: false,
       show: true,
       restoreManagedStatusBar: true,
+      hideSystemBars: false,
+      restoreSystemBars: true,
+      disableEdgeToEdgeInsets: false,
+      enableEdgeToEdgeInsets: true,
     });
   });
 
@@ -32,6 +46,10 @@ describe('getImmersiveStatusBarTransition', () => {
       hide: false,
       show: false,
       restoreManagedStatusBar: false,
+      hideSystemBars: false,
+      restoreSystemBars: false,
+      disableEdgeToEdgeInsets: false,
+      enableEdgeToEdgeInsets: false,
     });
   });
 });

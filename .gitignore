@@ -33,6 +33,7 @@ dist-ssr
 # Android Signing Keys (重要：不要提交到 Git)
 *.jks
 *.keystore
+android/.gradle-user-home/
 
 # ========================================
 # 🎨 美术资源 - 不上传到 GitHub
@@ -95,3 +96,5 @@ SourceCode_For_Copyright.txt
 # - test-obfuscation.html: 包含解密逻辑示例
 # - CODE_OBFUSCATION_GUIDE.md: 包含破解方法说明
 # ========================================
+static/样机.pptx
+static/~$样机.pptx
