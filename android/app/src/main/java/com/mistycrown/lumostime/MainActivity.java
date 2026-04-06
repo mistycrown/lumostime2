@@ -7,6 +7,7 @@
  */
 package com.mistycrown.lumostime;
 
+import android.content.res.Configuration;
 import android.graphics.Color;
 import android.graphics.drawable.ColorDrawable;
 import android.os.Build;
@@ -161,9 +162,11 @@ public class MainActivity extends BridgeActivity {
 
         Insets systemBarInsets = windowInsets.getInsetsIgnoringVisibility(WindowInsetsCompat.Type.systemBars());
         Insets displayCutoutInsets = windowInsets.getInsetsIgnoringVisibility(WindowInsetsCompat.Type.displayCutout());
+        boolean isLandscape = getResources().getConfiguration().orientation == Configuration.ORIENTATION_LANDSCAPE;
         ImmersiveProtectionInsets protectionInsets = ImmersiveProtectionInsets.resolve(
             systemBarInsets,
-            displayCutoutInsets
+            displayCutoutInsets,
+            isLandscape
         );
 
         updateProtectionEdgeLayout(immersiveProtectionTopView, FrameLayout.LayoutParams.MATCH_PARENT, protectionInsets.top, Gravity.TOP);

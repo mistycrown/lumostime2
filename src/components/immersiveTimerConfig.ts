@@ -8,7 +8,16 @@
 
 export const IMMERSIVE_TIMER_CONTROL_IDS = ['back', 'submit', 'noise'] as const;
 
-export const IMMERSIVE_TIMER_FONT_FAMILY = '"Noto Sans SC", "Microsoft YaHei", "PingFang SC", sans-serif';
+export const IMMERSIVE_TIMER_FONT_FAMILY = '"Lahlit Font", "Noto Sans SC", "Microsoft YaHei", "PingFang SC", sans-serif';
+export const IMMERSIVE_TIMER_FONT_WEIGHT = 800;
+export const IMMERSIVE_TIMER_LETTER_SPACING = '0.02em';
+export const IMMERSIVE_TIMER_TOP_INSET = 'max(env(safe-area-inset-top, 0px), var(--status-bar-height, 0px))';
+export const IMMERSIVE_TIMER_LANDSCAPE_SIZE = {
+  widthRatio: 0.24,
+  heightRatio: 0.5,
+  finalScale: 1,
+} as const;
+export const IMMERSIVE_TIMER_PORTRAIT_DIGIT_SIZE = 'min(36vw, 22vh)';
 
 export const IMMERSIVE_TIMER_COLORS = {
   background: '#000000',
