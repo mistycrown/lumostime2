@@ -30,3 +30,16 @@ export function getScreenOrientationLockValue(
 ): 'landscape-primary' | 'portrait-primary' {
   return orientation === 'portrait' ? 'portrait-primary' : 'landscape-primary';
 }
+
+export function shouldManageImmersiveOrientationLock(platform: string): boolean {
+  return platform === 'android' || platform === 'ios';
+}
+
+export function shouldSilenceImmersiveOrientationError(error: unknown): boolean {
+  if (!error || typeof error !== 'object') {
+    return false;
+  }
+
+  const name = 'name' in error ? String((error as { name?: unknown }).name ?? '') : '';
+  return name === 'AbortError' || name === 'NotSupportedError';
+}

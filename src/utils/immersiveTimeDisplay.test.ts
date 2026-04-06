@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'vitest';
 import {
   buildImmersiveDisplayParts,
+  getImmersiveDisplayFormatSegmentCount,
   getImmersiveDigitSlotWidth,
   toggleImmersiveDisplayFormat,
   toggleImmersiveDisplaySource,
@@ -120,5 +121,11 @@ describe('immersiveTimeDisplay', () => {
   test('skips minutes-seconds when the source is current time', () => {
     expect(toggleImmersiveDisplayFormat('hoursMinutes', 'current')).toBe('hoursMinutesSeconds');
     expect(toggleImmersiveDisplayFormat('hoursMinutesSeconds', 'current')).toBe('hoursMinutes');
+  });
+
+  test('maps display formats to compact icon segment counts', () => {
+    expect(getImmersiveDisplayFormatSegmentCount('hoursMinutes')).toBe(2);
+    expect(getImmersiveDisplayFormatSegmentCount('minutesSeconds')).toBe(2);
+    expect(getImmersiveDisplayFormatSegmentCount('hoursMinutesSeconds')).toBe(3);
   });
 });

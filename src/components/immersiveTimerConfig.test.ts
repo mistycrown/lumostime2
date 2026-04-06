@@ -7,6 +7,7 @@ import {
   IMMERSIVE_TIMER_DIGIT_SLOT_WIDTH,
   IMMERSIVE_TIMER_DIGIT_SLOT_WIDTH_PER_CHARACTER,
   IMMERSIVE_TIMER_HORIZONTAL_PADDING,
+  IMMERSIVE_TIMER_LANDSCAPE_DIGIT_WIDTH_SCALE,
   IMMERSIVE_TIMER_LANDSCAPE_SIZE,
   IMMERSIVE_TIMER_LANDSCAPE_VIEWPORT,
   IMMERSIVE_TIMER_MODAL_THEME,
@@ -48,18 +49,19 @@ describe('immersiveTimerConfig', () => {
     expect(IMMERSIVE_TIMER_TOP_INSET).toContain('--status-bar-height');
     expect(IMMERSIVE_TIMER_DIGIT_SLOT_WIDTH).toBe('2.45ch');
     expect(IMMERSIVE_TIMER_DIGIT_SLOT_WIDTH_PER_CHARACTER).toBe(1.12);
-    expect(IMMERSIVE_TIMER_SEPARATOR_SLOT_WIDTH).toBe('0.2ch');
-    expect(IMMERSIVE_TIMER_HORIZONTAL_PADDING).toBe('0.25rem');
-    expect(IMMERSIVE_TIMER_PORTRAIT_DIGIT_SIZE).toBe('min(36vw, 22vh)');
+    expect(IMMERSIVE_TIMER_SEPARATOR_SLOT_WIDTH).toBe('0.01ch');
+    expect(IMMERSIVE_TIMER_LANDSCAPE_DIGIT_WIDTH_SCALE).toBe(0.84);
+    expect(IMMERSIVE_TIMER_HORIZONTAL_PADDING).toBe('0.1rem');
+    expect(IMMERSIVE_TIMER_PORTRAIT_DIGIT_SIZE).toBe('min(46vw, 30vh)');
     expect(IMMERSIVE_TIMER_LANDSCAPE_SIZE).toEqual({
-      widthRatio: 0.3,
-      heightRatio: 0.58,
+      widthRatio: 0.34,
+      heightRatio: 0.68,
       finalScale: 1,
     });
     expect(IMMERSIVE_TIMER_LANDSCAPE_VIEWPORT).toEqual({
-      width: 0.985,
-      height: 0.88,
-      maxWidth: '98vw',
+      width: 0.995,
+      height: 0.94,
+      maxWidth: '99vw',
     });
     expect(IMMERSIVE_TIMER_MODAL_THEME.modalBg).toBe('rgba(12,12,12,0.96)');
     expect(IMMERSIVE_TIMER_CONTROL_SURFACE.backgroundColor).toBe('rgba(255,255,255,0.08)');

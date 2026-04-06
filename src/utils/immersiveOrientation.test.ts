@@ -1,6 +1,8 @@
 import { describe, expect, test } from 'vitest';
 import {
   getScreenOrientationLockValue,
+  shouldManageImmersiveOrientationLock,
+  shouldSilenceImmersiveOrientationError,
   normalizeImmersiveTimerOrientation,
   resolveImmersiveTimerOrientation,
   toggleImmersiveTimerOrientation
@@ -35,5 +37,18 @@ describe('immersiveOrientation', () => {
   test('maps preferences to the correct screen-orientation lock values', () => {
     expect(getScreenOrientationLockValue('landscape')).toBe('landscape-primary');
     expect(getScreenOrientationLockValue('portrait')).toBe('portrait-primary');
+  });
+
+  test('only manages system orientation lock on native platforms', () => {
+    expect(shouldManageImmersiveOrientationLock('android')).toBe(true);
+    expect(shouldManageImmersiveOrientationLock('ios')).toBe(true);
+    expect(shouldManageImmersiveOrientationLock('web')).toBe(false);
+  });
+
+  test('silences abort and unsupported orientation lock errors', () => {
+    expect(shouldSilenceImmersiveOrientationError({ name: 'AbortError' })).toBe(true);
+    expect(shouldSilenceImmersiveOrientationError({ name: 'NotSupportedError' })).toBe(true);
+    expect(shouldSilenceImmersiveOrientationError({ name: 'SecurityError' })).toBe(false);
+    expect(shouldSilenceImmersiveOrientationError(new Error('boom'))).toBe(false);
   });
 });

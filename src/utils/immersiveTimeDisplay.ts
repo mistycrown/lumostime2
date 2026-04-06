@@ -71,6 +71,10 @@ export const getDefaultImmersiveDisplayFormatForSource = (
   return format;
 };
 
+export const getImmersiveDisplayFormatSegmentCount = (
+  format: ImmersiveDisplayFormat
+): 2 | 3 => (format === 'hoursMinutesSeconds' ? 3 : 2);
+
 export const buildImmersiveDisplayParts = ({
   source,
   format,
