@@ -9,14 +9,24 @@ import {
   IMMERSIVE_TIMER_HORIZONTAL_PADDING,
   IMMERSIVE_TIMER_LANDSCAPE_SIZE,
   IMMERSIVE_TIMER_LANDSCAPE_VIEWPORT,
+  IMMERSIVE_TIMER_MODAL_THEME,
   IMMERSIVE_TIMER_PORTRAIT_DIGIT_SIZE,
   IMMERSIVE_TIMER_SEPARATOR_SLOT_WIDTH,
   IMMERSIVE_TIMER_TOP_INSET,
+  IMMERSIVE_TIMER_CONTROL_SURFACE,
 } from './immersiveTimerConfig';
 
 describe('immersiveTimerConfig', () => {
   test('locks immersive timer controls to the fixed black theme plus display toggles', () => {
-    expect(IMMERSIVE_TIMER_CONTROL_IDS).toEqual(['back', 'submit', 'orientation', 'format', 'source', 'noise']);
+    expect(IMMERSIVE_TIMER_CONTROL_IDS).toEqual([
+      'back',
+      'submit',
+      'orientation',
+      'format',
+      'source',
+      'noise',
+      'visual',
+    ]);
   });
 
   test('locks immersive timer visuals to black background and white text', () => {
@@ -51,5 +61,7 @@ describe('immersiveTimerConfig', () => {
       height: 0.88,
       maxWidth: '98vw',
     });
+    expect(IMMERSIVE_TIMER_MODAL_THEME.modalBg).toBe('rgba(12,12,12,0.96)');
+    expect(IMMERSIVE_TIMER_CONTROL_SURFACE.backgroundColor).toBe('rgba(255,255,255,0.08)');
   });
 });

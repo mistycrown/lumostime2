@@ -3,14 +3,16 @@
  * @input elapsed time, onExit callback, onSubmit callback
  * @output Immersive fullscreen timer display and session submit trigger
  * @pos Component (View)
- * @description A fixed black-and-white immersive timer with large numeric digits, session-only orientation toggles, display-source and display-format toggles, white-noise controls, and Android immersive fullscreen handling that temporarily removes WebView insets.
+ * @description A fixed black-and-white immersive timer with large numeric digits, static masked art visuals, session-only orientation toggles, display-source and display-format toggles, white-noise controls, and Android immersive fullscreen handling that temporarily removes WebView insets.
  */
 import React, { useEffect, useRef, useState } from 'react';
-import { Check, Clock3, MonitorSmartphone, TimerReset, Volume2, VolumeX, X } from 'lucide-react';
+import { Check, Clock3, Image as ImageIcon, MonitorSmartphone, TimerReset, Volume2, VolumeX, X } from 'lucide-react';
 import { Capacitor } from '@capacitor/core';
 import { StatusBar, Style } from '@capacitor/status-bar';
 import { OrientationType, ScreenOrientation } from '@capawesome/capacitor-screen-orientation';
+import { ImmersiveMaskedDigits } from './ImmersiveMaskedDigits';
 import { ImmersiveSelectorModal } from './ImmersiveSelectorModal';
+import { ImmersiveVisualSelectorModal } from './ImmersiveVisualSelectorModal';
 import {
   IMMERSIVE_TIMER_COLORS,
   IMMERSIVE_TIMER_CONTROL_SURFACE,
@@ -48,6 +50,18 @@ import {
   toggleImmersiveDisplayFormat,
   toggleImmersiveDisplaySource,
 } from '../utils/immersiveTimeDisplay';
+import {
+  DEFAULT_IMMERSIVE_ART_ID,
+  DEFAULT_IMMERSIVE_MOTION_STYLE,
+  getImmersiveArtOptionById,
+  IMMERSIVE_ART_OPTIONS,
+  IMMERSIVE_MOTION_OPTIONS,
+  IMMERSIVE_VISUAL_STORAGE_KEYS,
+  ImmersiveArtId,
+  ImmersiveMotionStyle,
+  readStoredImmersiveArtId,
+  readStoredImmersiveMotionStyle,
+} from '../utils/immersiveVisuals';
 
 let EdgeToEdge: {
   disable?: () => Promise<void>;
@@ -85,6 +99,7 @@ export const ImmersiveTimer: React.FC<ImmersiveTimerProps> = ({ elapsed, onExit,
   const { immersiveTimerDefaultOrientation } = useSettings();
   const [showControls, setShowControls] = useState(false);
   const [showNoiseModal, setShowNoiseModal] = useState(false);
+  const [showVisualModal, setShowVisualModal] = useState(false);
   const [sessionOrientationOverride, setSessionOrientationOverride] = useState<ImmersiveTimerOrientation | null>(null);
   const [displaySource, setDisplaySource] = useState<ImmersiveDisplaySource>('elapsed');
   const [displayFormat, setDisplayFormat] = useState<ImmersiveDisplayFormat>('hoursMinutesSeconds');
@@ -98,6 +113,20 @@ export const ImmersiveTimer: React.FC<ImmersiveTimerProps> = ({ elapsed, onExit,
       return localStorage.getItem('immersiveTimerNoise') || 'none';
     }
     return 'none';
+  });
+  const [selectedArtId, setSelectedArtId] = useState<ImmersiveArtId>(() => {
+    if (typeof window === 'undefined') {
+      return DEFAULT_IMMERSIVE_ART_ID;
+    }
+
+    return readStoredImmersiveArtId(window.localStorage);
+  });
+  const [selectedMotionStyle, setSelectedMotionStyle] = useState<ImmersiveMotionStyle>(() => {
+    if (typeof window === 'undefined') {
+      return DEFAULT_IMMERSIVE_MOTION_STYLE;
+    }
+
+    return readStoredImmersiveMotionStyle(window.localStorage);
   });
   const [isLandscape, setIsLandscape] = useState(
     typeof window !== 'undefined' ? window.innerWidth > window.innerHeight : true
@@ -116,6 +145,7 @@ export const ImmersiveTimer: React.FC<ImmersiveTimerProps> = ({ elapsed, onExit,
   const valueParts = displayParts.filter((part) => part.kind === 'value');
   const digitSlotWidth = getImmersiveDigitSlotWidth(valueParts.map((part) => part.value));
   const displaySignature = `${displaySource}-${displayFormat}-${displayParts.map((part) => part.value).join('')}`;
+  const selectedArt = getImmersiveArtOptionById(selectedArtId);
   const formatLabel = displayFormat === 'hoursMinutes'
     ? '时分'
     : displayFormat === 'minutesSeconds'
@@ -208,6 +238,18 @@ export const ImmersiveTimer: React.FC<ImmersiveTimerProps> = ({ elapsed, onExit,
       localStorage.setItem('immersiveTimerNoise', selectedNoise);
     }
   }, [selectedNoise]);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem(IMMERSIVE_VISUAL_STORAGE_KEYS.art, selectedArtId);
+    }
+  }, [selectedArtId]);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem(IMMERSIVE_VISUAL_STORAGE_KEYS.motionStyle, selectedMotionStyle);
+    }
+  }, [selectedMotionStyle]);
 
   useEffect(() => {
     const handleResize = () => {
@@ -504,50 +546,35 @@ export const ImmersiveTimer: React.FC<ImmersiveTimerProps> = ({ elapsed, onExit,
             overflow: 'hidden',
           }}
         >
-          {displayParts.map((part, index) => (
-            <span
-              key={`${part.kind}-${part.value}-${index}`}
-              style={{
-                width: part.kind === 'separator' ? IMMERSIVE_TIMER_SEPARATOR_SLOT_WIDTH : digitSlotWidth,
-                textAlign: 'center',
-                flexShrink: 0,
-              }}
-            >
-              {part.value}
-            </span>
-          ))}
+          <ImmersiveMaskedDigits
+            orientation="landscape"
+            displayParts={displayParts}
+            digitSlotWidth={digitSlotWidth}
+            artSrc={selectedArt.src}
+            motionStyle={selectedMotionStyle}
+          />
         </div>
       ) : (
-        <div className="flex flex-col items-center gap-3">
-          {valueParts.map((part, index) => (
-            <React.Fragment key={`${part.label}-${part.value}-${index}`}>
-              <div className="flex flex-col items-center gap-1">
-                <div
-                  className="relative z-10 select-none"
-                  style={{
-                    fontSize: IMMERSIVE_TIMER_PORTRAIT_DIGIT_SIZE,
-                    fontFamily: IMMERSIVE_TIMER_FONT_FAMILY,
-                    fontWeight: IMMERSIVE_TIMER_FONT_WEIGHT,
-                    letterSpacing: IMMERSIVE_TIMER_LETTER_SPACING,
-                    color: IMMERSIVE_TIMER_COLORS.foreground,
-                    fontVariantNumeric: 'lining-nums tabular-nums',
-                    fontFeatureSettings: '"tnum" 1',
-                    width: digitSlotWidth,
-                    textAlign: 'center',
-                  }}
-                >
-                  {part.value}
-                </div>
-                <div className="text-xs font-medium tracking-[0.28em]" style={{ color: IMMERSIVE_TIMER_COLORS.secondaryText }}>
-                  {part.label}
-                </div>
-              </div>
-
-              {index < valueParts.length - 1 && (
-                <div className="w-12 h-px" style={{ backgroundColor: IMMERSIVE_TIMER_COLORS.divider }} />
-              )}
-            </React.Fragment>
-          ))}
+        <div
+          className="relative z-10 select-none"
+          style={{
+            fontSize: IMMERSIVE_TIMER_PORTRAIT_DIGIT_SIZE,
+            fontFamily: IMMERSIVE_TIMER_FONT_FAMILY,
+            fontWeight: IMMERSIVE_TIMER_FONT_WEIGHT,
+            letterSpacing: IMMERSIVE_TIMER_LETTER_SPACING,
+            color: IMMERSIVE_TIMER_COLORS.foreground,
+            fontVariantNumeric: 'lining-nums tabular-nums',
+            fontFeatureSettings: '"tnum" 1',
+            textAlign: 'center',
+          }}
+        >
+          <ImmersiveMaskedDigits
+            orientation="portrait"
+            displayParts={displayParts}
+            digitSlotWidth={digitSlotWidth}
+            artSrc={selectedArt.src}
+            motionStyle={selectedMotionStyle}
+          />
         </div>
       )}
 
@@ -727,6 +754,38 @@ export const ImmersiveTimer: React.FC<ImmersiveTimerProps> = ({ elapsed, onExit,
             >
               {isWhiteNoiseOn ? <Volume2 size={24} strokeWidth={2} /> : <VolumeX size={24} strokeWidth={2} />}
             </button>
+
+            <button
+              onClick={(event) => {
+                event.stopPropagation();
+                setShowVisualModal(true);
+              }}
+              title="选择画面样式"
+              className="pointer-events-auto w-12 h-12 rounded-full backdrop-blur-md flex items-center justify-center active:scale-95 transition-all shadow-lg"
+              style={{
+                backgroundColor: showVisualModal
+                  ? IMMERSIVE_TIMER_COLORS.activeButtonBackground
+                  : IMMERSIVE_TIMER_CONTROL_SURFACE.backgroundColor,
+                borderWidth: '1.5px',
+                borderStyle: 'solid',
+                borderColor: showVisualModal
+                  ? IMMERSIVE_TIMER_COLORS.activeButtonBorder
+                  : IMMERSIVE_TIMER_CONTROL_SURFACE.borderColor,
+                color: IMMERSIVE_TIMER_CONTROL_SURFACE.color,
+              }}
+              onMouseEnter={(event) => {
+                if (!showVisualModal) {
+                  event.currentTarget.style.backgroundColor = IMMERSIVE_TIMER_COLORS.buttonHover;
+                }
+              }}
+              onMouseLeave={(event) => {
+                event.currentTarget.style.backgroundColor = showVisualModal
+                  ? IMMERSIVE_TIMER_COLORS.activeButtonBackground
+                  : IMMERSIVE_TIMER_CONTROL_SURFACE.backgroundColor;
+              }}
+            >
+              <ImageIcon size={20} strokeWidth={2} />
+            </button>
           </div>
         </div>
       )}
@@ -738,6 +797,17 @@ export const ImmersiveTimer: React.FC<ImmersiveTimerProps> = ({ elapsed, onExit,
         options={WHITE_NOISES as unknown as Array<{ id: string; name: string; icon?: string; description?: string }>}
         selectedId={selectedNoise}
         onSelect={handleNoiseSelect}
+        theme={IMMERSIVE_TIMER_MODAL_THEME}
+      />
+      <ImmersiveVisualSelectorModal
+        isOpen={showVisualModal}
+        onClose={() => setShowVisualModal(false)}
+        selectedArtId={selectedArtId}
+        selectedMotionStyle={selectedMotionStyle}
+        onSelectArt={setSelectedArtId}
+        onSelectMotionStyle={setSelectedMotionStyle}
+        artOptions={IMMERSIVE_ART_OPTIONS}
+        motionOptions={IMMERSIVE_MOTION_OPTIONS}
         theme={IMMERSIVE_TIMER_MODAL_THEME}
       />
     </div>
