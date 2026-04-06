@@ -15,7 +15,12 @@ import {
   IMMERSIVE_TIMER_COLORS,
   IMMERSIVE_TIMER_CONTROL_SURFACE,
   IMMERSIVE_TIMER_FONT_FAMILY,
+  IMMERSIVE_TIMER_FONT_WEIGHT,
+  IMMERSIVE_TIMER_LANDSCAPE_SIZE,
+  IMMERSIVE_TIMER_LETTER_SPACING,
   IMMERSIVE_TIMER_MODAL_THEME,
+  IMMERSIVE_TIMER_PORTRAIT_DIGIT_SIZE,
+  IMMERSIVE_TIMER_TOP_INSET,
 } from './immersiveTimerConfig';
 import { useSettings } from '../contexts/SettingsContext';
 import ImmersiveMode from '../plugins/ImmersiveModePlugin';
@@ -67,7 +72,7 @@ export const ImmersiveTimer: React.FC<ImmersiveTimerProps> = ({ elapsed, onExit,
   const [audioElement, setAudioElement] = useState<HTMLAudioElement | null>(null);
   const [audioContext, setAudioContext] = useState<AudioContext | null>(null);
   const [whiteNoiseNode, setWhiteNoiseNode] = useState<AudioBufferSourceNode | null>(null);
-  const [landscapeFontSize, setLandscapeFontSize] = useState('min(24vw, 34vh)');
+  const [landscapeFontSize, setLandscapeFontSize] = useState('min(28vw, 42vh)');
   const [selectedNoise, setSelectedNoise] = useState(() => {
     if (typeof window !== 'undefined') {
       return localStorage.getItem('immersiveTimerNoise') || 'none';
@@ -192,8 +197,11 @@ export const ImmersiveTimer: React.FC<ImmersiveTimerProps> = ({ elapsed, onExit,
       }
 
       const containerWidth = window.innerWidth * 0.94;
-      const containerHeight = window.innerHeight * 0.78;
-      let fontSize = Math.min(containerWidth * 0.2, containerHeight * 0.42);
+      const containerHeight = window.innerHeight * 0.8;
+      let fontSize = Math.min(
+        containerWidth * IMMERSIVE_TIMER_LANDSCAPE_SIZE.widthRatio,
+        containerHeight * IMMERSIVE_TIMER_LANDSCAPE_SIZE.heightRatio
+      );
 
       container.style.fontSize = `${fontSize}px`;
 
@@ -204,7 +212,7 @@ export const ImmersiveTimer: React.FC<ImmersiveTimerProps> = ({ elapsed, onExit,
         iterations += 1;
       }
 
-      setLandscapeFontSize(`${fontSize * 0.98}px`);
+      setLandscapeFontSize(`${fontSize * IMMERSIVE_TIMER_LANDSCAPE_SIZE.finalScale}px`);
     };
 
     adjustFontSize();
@@ -469,8 +477,8 @@ export const ImmersiveTimer: React.FC<ImmersiveTimerProps> = ({ elapsed, onExit,
           style={{
             fontSize: landscapeFontSize,
             fontFamily: IMMERSIVE_TIMER_FONT_FAMILY,
-            fontWeight: 700,
-            letterSpacing: '0.06em',
+            fontWeight: IMMERSIVE_TIMER_FONT_WEIGHT,
+            letterSpacing: IMMERSIVE_TIMER_LETTER_SPACING,
             color: IMMERSIVE_TIMER_COLORS.foreground,
             fontVariantNumeric: 'lining-nums tabular-nums',
             fontFeatureSettings: '"tnum" 1',
@@ -486,10 +494,10 @@ export const ImmersiveTimer: React.FC<ImmersiveTimerProps> = ({ elapsed, onExit,
             <div
               className="relative z-10 select-none"
               style={{
-                fontSize: 'min(32vw, 20vh)',
+                fontSize: IMMERSIVE_TIMER_PORTRAIT_DIGIT_SIZE,
                 fontFamily: IMMERSIVE_TIMER_FONT_FAMILY,
-                fontWeight: 700,
-                letterSpacing: '0.06em',
+                fontWeight: IMMERSIVE_TIMER_FONT_WEIGHT,
+                letterSpacing: IMMERSIVE_TIMER_LETTER_SPACING,
                 color: IMMERSIVE_TIMER_COLORS.foreground,
                 fontVariantNumeric: 'lining-nums tabular-nums',
                 fontFeatureSettings: '"tnum" 1',
@@ -508,10 +516,10 @@ export const ImmersiveTimer: React.FC<ImmersiveTimerProps> = ({ elapsed, onExit,
             <div
               className="relative z-10 select-none"
               style={{
-                fontSize: 'min(32vw, 20vh)',
+                fontSize: IMMERSIVE_TIMER_PORTRAIT_DIGIT_SIZE,
                 fontFamily: IMMERSIVE_TIMER_FONT_FAMILY,
-                fontWeight: 700,
-                letterSpacing: '0.06em',
+                fontWeight: IMMERSIVE_TIMER_FONT_WEIGHT,
+                letterSpacing: IMMERSIVE_TIMER_LETTER_SPACING,
                 color: IMMERSIVE_TIMER_COLORS.foreground,
                 fontVariantNumeric: 'lining-nums tabular-nums',
                 fontFeatureSettings: '"tnum" 1',
@@ -530,10 +538,10 @@ export const ImmersiveTimer: React.FC<ImmersiveTimerProps> = ({ elapsed, onExit,
             <div
               className="relative z-10 select-none"
               style={{
-                fontSize: 'min(32vw, 20vh)',
+                fontSize: IMMERSIVE_TIMER_PORTRAIT_DIGIT_SIZE,
                 fontFamily: IMMERSIVE_TIMER_FONT_FAMILY,
-                fontWeight: 700,
-                letterSpacing: '0.06em',
+                fontWeight: IMMERSIVE_TIMER_FONT_WEIGHT,
+                letterSpacing: IMMERSIVE_TIMER_LETTER_SPACING,
                 color: IMMERSIVE_TIMER_COLORS.foreground,
                 fontVariantNumeric: 'lining-nums tabular-nums',
                 fontFeatureSettings: '"tnum" 1',
@@ -558,7 +566,7 @@ export const ImmersiveTimer: React.FC<ImmersiveTimerProps> = ({ elapsed, onExit,
             title="返回"
             className="pointer-events-auto absolute left-4 w-12 h-12 rounded-full backdrop-blur-md flex items-center justify-center active:scale-95 transition-all shadow-lg"
             style={{
-              top: 'calc(0.5rem + env(safe-area-inset-top, 0px))',
+              top: `calc(0.5rem + ${IMMERSIVE_TIMER_TOP_INSET})`,
               left: 'calc(1rem + env(safe-area-inset-left, 0px))',
               backgroundColor: IMMERSIVE_TIMER_CONTROL_SURFACE.backgroundColor,
               borderWidth: '1.5px',
@@ -584,7 +592,7 @@ export const ImmersiveTimer: React.FC<ImmersiveTimerProps> = ({ elapsed, onExit,
             title="提交并保存"
             className="pointer-events-auto absolute left-[72px] w-12 h-12 rounded-full backdrop-blur-md flex items-center justify-center active:scale-95 transition-all shadow-lg"
             style={{
-              top: 'calc(0.5rem + env(safe-area-inset-top, 0px))',
+              top: `calc(0.5rem + ${IMMERSIVE_TIMER_TOP_INSET})`,
               left: 'calc(4.5rem + env(safe-area-inset-left, 0px))',
               backgroundColor: IMMERSIVE_TIMER_CONTROL_SURFACE.backgroundColor,
               borderWidth: '1.5px',
@@ -610,7 +618,7 @@ export const ImmersiveTimer: React.FC<ImmersiveTimerProps> = ({ elapsed, onExit,
             title="选择白噪音"
             className="pointer-events-auto absolute right-4 w-12 h-12 rounded-full backdrop-blur-md flex items-center justify-center active:scale-95 transition-all shadow-lg"
             style={{
-              top: 'calc(0.5rem + env(safe-area-inset-top, 0px))',
+              top: `calc(0.5rem + ${IMMERSIVE_TIMER_TOP_INSET})`,
               right: 'calc(1rem + env(safe-area-inset-right, 0px))',
               backgroundColor: isWhiteNoiseOn
                 ? IMMERSIVE_TIMER_COLORS.activeButtonBackground

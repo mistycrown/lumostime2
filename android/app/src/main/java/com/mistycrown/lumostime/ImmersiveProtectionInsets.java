@@ -22,7 +22,20 @@ final class ImmersiveProtectionInsets {
         this.bottom = bottom;
     }
 
-    static ImmersiveProtectionInsets resolve(Insets systemBarInsets, Insets displayCutoutInsets) {
+    static ImmersiveProtectionInsets resolve(
+        Insets systemBarInsets,
+        Insets displayCutoutInsets,
+        boolean isLandscape
+    ) {
+        if (isLandscape) {
+            return new ImmersiveProtectionInsets(
+                Math.max(systemBarInsets.left, displayCutoutInsets.left),
+                0,
+                Math.max(systemBarInsets.right, displayCutoutInsets.right),
+                0
+            );
+        }
+
         return new ImmersiveProtectionInsets(
             Math.max(systemBarInsets.left, displayCutoutInsets.left),
             Math.max(systemBarInsets.top, displayCutoutInsets.top),
