@@ -99,6 +99,8 @@ export const SETTINGS_KEYS = {
     IMMERSIVE_TIMER_ART: 'immersiveTimerArt',
     /** 沉浸式计时动画样式 */
     IMMERSIVE_TIMER_MOTION_STYLE: 'immersiveTimerMotionStyle',
+    /** 沉浸式计时字体 */
+    IMMERSIVE_TIMER_FONT: 'immersiveTimerFont',
     /** 沉浸式计时显示来源 */
     IMMERSIVE_TIMER_DISPLAY_SOURCE: 'immersiveTimerDisplaySource',
     /** 沉浸式计时显示格式 */

@@ -23,7 +23,7 @@ describe('ImmersiveMaskedDigits', () => {
 
     expect(markup).toContain('data-motion-style="orbit"');
     expect(markup).toContain('data-art-layer="true"');
-    expect(markup).toContain('font-family="&quot;Lahlit Font&quot;');
+    expect(markup).toContain('font-family="&quot;Kode Mono&quot;');
     expect(markup).toContain('font-variant-numeric:lining-nums tabular-nums');
     expect(markup).toContain('font-feature-settings:&quot;tnum&quot; 1');
     expect(markup).toContain('>08<');
@@ -60,6 +60,27 @@ describe('ImmersiveMaskedDigits', () => {
     expect(markup).toContain('>35<');
     expect(markup).toContain('font-variant-numeric:lining-nums tabular-nums');
     expect(markup).toContain('width:5.73ch');
+  });
+
+  test('supports font-specific separator spacing without changing the digit slot width', () => {
+    const markup = renderToStaticMarkup(
+      <ImmersiveMaskedDigits
+        orientation="landscape"
+        displayParts={[
+          { kind: 'value', value: '08' },
+          { kind: 'separator', value: ':' },
+          { kind: 'value', value: '46' },
+          { kind: 'separator', value: ':' },
+          { kind: 'value', value: '35' },
+        ]}
+        digitSlotWidth="2.45ch"
+        separatorSlotWidth="0.12ch"
+        artSrc="/timer_bak/Van_Gogh_-_Starry_Night_-_Google_Art_Project.jpg.webp"
+        motionStyle="sweep"
+      />
+    );
+
+    expect(markup).toContain('width:5.97ch');
   });
 
   test('renders a two-segment portrait stack with the same tighter spacing treatment', () => {

@@ -45,8 +45,8 @@ describe('immersiveTimerConfig', () => {
       divider: 'rgba(255,255,255,0.24)',
       secondaryText: 'rgba(255,255,255,0.6)',
     });
-    expect(IMMERSIVE_TIMER_FONT_FAMILY).toContain('Lahlit Font');
-    expect(IMMERSIVE_TIMER_FONT_WEIGHT).toBe(800);
+    expect(IMMERSIVE_TIMER_FONT_FAMILY).toContain('Kode Mono');
+    expect(IMMERSIVE_TIMER_FONT_WEIGHT).toBe(700);
     expect(IMMERSIVE_TIMER_TOP_INSET).toContain('--status-bar-height');
     expect(IMMERSIVE_TIMER_DIGIT_SLOT_WIDTH).toBe('2.45ch');
     expect(IMMERSIVE_TIMER_DIGIT_SLOT_WIDTH_PER_CHARACTER).toBe(1.12);

@@ -7,7 +7,7 @@
  */
 
 import React from 'react';
-import { Check, Clock3, Image as ImageIcon, Sparkles, TimerReset, X } from 'lucide-react';
+import { Check, Clock3, Image as ImageIcon, Sparkles, TimerReset, Type, X } from 'lucide-react';
 import {
   getImmersiveDisplayFormatSegmentCount,
   ImmersiveDisplayFormat,
@@ -19,6 +19,10 @@ import {
   ImmersiveMotionOption,
   ImmersiveMotionStyle,
 } from '../utils/immersiveVisuals';
+import {
+  ImmersiveTimerFontId,
+  ImmersiveTimerFontOption,
+} from '../utils/immersiveFonts';
 
 interface ImmersiveVisualSelectorModalProps {
   isOpen: boolean;
@@ -27,12 +31,15 @@ interface ImmersiveVisualSelectorModalProps {
   selectedDisplayFormat: ImmersiveDisplayFormat;
   selectedArtId: ImmersiveArtId;
   selectedMotionStyle: ImmersiveMotionStyle;
+  selectedFontId: ImmersiveTimerFontId;
   onSelectDisplaySource: (source: ImmersiveDisplaySource) => void;
   onSelectDisplayFormat: (format: ImmersiveDisplayFormat) => void;
   onSelectArt: (id: ImmersiveArtId) => void;
   onSelectMotionStyle: (id: ImmersiveMotionStyle) => void;
+  onSelectFont: (id: ImmersiveTimerFontId) => void;
   artOptions: ImmersiveArtOption[];
   motionOptions: ImmersiveMotionOption[];
+  fontOptions: ImmersiveTimerFontOption[];
   theme: {
     modalBg: string;
     modalBorder: string;
@@ -130,12 +137,15 @@ export const ImmersiveVisualSelectorModal: React.FC<ImmersiveVisualSelectorModal
   selectedDisplayFormat,
   selectedArtId,
   selectedMotionStyle,
+  selectedFontId,
   onSelectDisplaySource,
   onSelectDisplayFormat,
   onSelectArt,
   onSelectMotionStyle,
+  onSelectFont,
   artOptions,
   motionOptions,
+  fontOptions,
   theme,
 }) => {
   if (!isOpen) {
@@ -312,6 +322,40 @@ export const ImmersiveVisualSelectorModal: React.FC<ImmersiveVisualSelectorModal
                     <span
                       className="text-lg font-semibold tracking-[0.08em]"
                       style={{ color: theme.buttonText }}
+                    >
+                      {option.name}
+                    </span>
+                  </ChoiceCard>
+                );
+              })}
+            </div>
+          </section>
+
+          <section className="mt-6 border-t pt-6" style={{ borderColor: theme.modalBorder }}>
+            <div className="mb-3 flex items-center gap-2">
+              <Type size={16} style={{ color: theme.buttonText }} />
+              <h4 className="text-sm font-semibold tracking-[0.16em]" style={{ color: theme.buttonText }}>
+                选择字体
+              </h4>
+            </div>
+            <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+              {fontOptions.map((option) => {
+                const isSelected = option.id === selectedFontId;
+
+                return (
+                  <ChoiceCard
+                    key={option.id}
+                    isSelected={isSelected}
+                    onClick={() => onSelectFont(option.id)}
+                    theme={theme}
+                  >
+                    <span
+                      className="text-base"
+                      style={{
+                        color: theme.buttonText,
+                        fontFamily: option.fontFamily,
+                        fontWeight: option.fontWeight,
+                      }}
                     >
                       {option.name}
                     </span>
