@@ -95,6 +95,10 @@ export const SETTINGS_KEYS = {
     AUTO_GENERATE_WEEKLY_REVIEW: 'lumostime_auto_generate_weekly_review',
     /** 自动生成每月回顾 */
     AUTO_GENERATE_MONTHLY_REVIEW: 'lumostime_auto_generate_monthly_review',
+    /** 沉浸式计时画作选择 */
+    IMMERSIVE_TIMER_ART: 'immersiveTimerArt',
+    /** 沉浸式计时动画样式 */
+    IMMERSIVE_TIMER_MOTION_STYLE: 'immersiveTimerMotionStyle',
 } as const;
 
 /**

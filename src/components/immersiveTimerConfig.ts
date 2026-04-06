@@ -6,7 +6,7 @@
  * @description Centralizes the fixed immersive timer visual contract so the component and tests share the same source of truth.
  */
 
-export const IMMERSIVE_TIMER_CONTROL_IDS = ['back', 'submit', 'orientation', 'format', 'source', 'noise'] as const;
+export const IMMERSIVE_TIMER_CONTROL_IDS = ['back', 'submit', 'orientation', 'format', 'source', 'noise', 'visual'] as const;
 
 export const IMMERSIVE_TIMER_FONT_FAMILY = '"Lahlit Font", "Noto Sans SC", "Microsoft YaHei", "PingFang SC", sans-serif';
 export const IMMERSIVE_TIMER_FONT_WEIGHT = 800;
