@@ -68,6 +68,14 @@ import {
   readStoredImmersiveArtId,
   readStoredImmersiveMotionStyle,
 } from '../utils/immersiveVisuals';
+import {
+  DEFAULT_IMMERSIVE_TIMER_FONT_ID,
+  getImmersiveTimerFontOptionById,
+  IMMERSIVE_TIMER_FONT_OPTIONS,
+  IMMERSIVE_TIMER_FONT_STORAGE_KEY,
+  ImmersiveTimerFontId,
+  readStoredImmersiveTimerFontId,
+} from '../utils/immersiveFonts';
 
 let EdgeToEdge: {
   disable?: () => Promise<void>;
@@ -147,6 +155,13 @@ export const ImmersiveTimer: React.FC<ImmersiveTimerProps> = ({ elapsed, onExit,
 
     return readStoredImmersiveMotionStyle(window.localStorage);
   });
+  const [selectedFontId, setSelectedFontId] = useState<ImmersiveTimerFontId>(() => {
+    if (typeof window === 'undefined') {
+      return DEFAULT_IMMERSIVE_TIMER_FONT_ID;
+    }
+
+    return readStoredImmersiveTimerFontId(window.localStorage);
+  });
   const [isLandscape, setIsLandscape] = useState(
     typeof window !== 'undefined' ? window.innerWidth > window.innerHeight : true
   );
@@ -166,8 +181,9 @@ export const ImmersiveTimer: React.FC<ImmersiveTimerProps> = ({ elapsed, onExit,
     ? IMMERSIVE_TIMER_PORTRAIT_TWO_SEGMENT_DIGIT_SIZE
     : IMMERSIVE_TIMER_PORTRAIT_DIGIT_SIZE;
   const digitSlotWidth = getImmersiveDigitSlotWidth(valueParts.map((part) => part.value));
-  const displaySignature = `${displaySource}-${displayFormat}-${displayParts.map((part) => part.value).join('')}`;
+  const displaySignature = `${displaySource}-${displayFormat}-${selectedFontId}-${displayParts.map((part) => part.value).join('')}`;
   const selectedArt = getImmersiveArtOptionById(selectedArtId);
+  const selectedFont = getImmersiveTimerFontOptionById(selectedFontId);
 
   useEffect(() => {
     const platform = Capacitor.getPlatform();
@@ -292,6 +308,12 @@ export const ImmersiveTimer: React.FC<ImmersiveTimerProps> = ({ elapsed, onExit,
       localStorage.setItem(IMMERSIVE_VISUAL_STORAGE_KEYS.motionStyle, selectedMotionStyle);
     }
   }, [selectedMotionStyle]);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem(IMMERSIVE_TIMER_FONT_STORAGE_KEY, selectedFontId);
+    }
+  }, [selectedFontId]);
 
   useEffect(() => {
     const handleResize = () => {
@@ -577,8 +599,8 @@ export const ImmersiveTimer: React.FC<ImmersiveTimerProps> = ({ elapsed, onExit,
           className="relative z-10 inline-flex select-none items-center justify-center whitespace-nowrap"
           style={{
             fontSize: landscapeFontSize,
-            fontFamily: IMMERSIVE_TIMER_FONT_FAMILY,
-            fontWeight: IMMERSIVE_TIMER_FONT_WEIGHT,
+            fontFamily: selectedFont.fontFamily,
+            fontWeight: selectedFont.fontWeight,
             letterSpacing: IMMERSIVE_TIMER_LETTER_SPACING,
             color: IMMERSIVE_TIMER_COLORS.foreground,
             fontVariantNumeric: 'lining-nums tabular-nums',
@@ -592,6 +614,9 @@ export const ImmersiveTimer: React.FC<ImmersiveTimerProps> = ({ elapsed, onExit,
             orientation="landscape"
             displayParts={displayParts}
             digitSlotWidth={digitSlotWidth}
+            separatorSlotWidth={selectedFont.separatorSlotWidth}
+            fontFamily={selectedFont.fontFamily}
+            fontWeight={selectedFont.fontWeight}
             artSrc={selectedArt.src}
             motionStyle={selectedMotionStyle}
           />
@@ -601,8 +626,8 @@ export const ImmersiveTimer: React.FC<ImmersiveTimerProps> = ({ elapsed, onExit,
           className="relative z-10 select-none"
           style={{
             fontSize: portraitDigitSize,
-            fontFamily: IMMERSIVE_TIMER_FONT_FAMILY,
-            fontWeight: IMMERSIVE_TIMER_FONT_WEIGHT,
+            fontFamily: selectedFont.fontFamily,
+            fontWeight: selectedFont.fontWeight,
             letterSpacing: IMMERSIVE_TIMER_LETTER_SPACING,
             color: IMMERSIVE_TIMER_COLORS.foreground,
             fontVariantNumeric: 'lining-nums tabular-nums',
@@ -614,6 +639,9 @@ export const ImmersiveTimer: React.FC<ImmersiveTimerProps> = ({ elapsed, onExit,
             orientation="portrait"
             displayParts={displayParts}
             digitSlotWidth={digitSlotWidth}
+            separatorSlotWidth={selectedFont.separatorSlotWidth}
+            fontFamily={selectedFont.fontFamily}
+            fontWeight={selectedFont.fontWeight}
             artSrc={selectedArt.src}
             motionStyle={selectedMotionStyle}
           />
@@ -794,6 +822,7 @@ export const ImmersiveTimer: React.FC<ImmersiveTimerProps> = ({ elapsed, onExit,
         selectedDisplayFormat={displayFormat}
         selectedArtId={selectedArtId}
         selectedMotionStyle={selectedMotionStyle}
+        selectedFontId={selectedFontId}
         onSelectDisplaySource={(nextSource) => {
           setDisplaySource(nextSource);
           setDisplayFormat((currentFormat) => getDefaultImmersiveDisplayFormatForSource(nextSource, currentFormat));
@@ -801,8 +830,10 @@ export const ImmersiveTimer: React.FC<ImmersiveTimerProps> = ({ elapsed, onExit,
         onSelectDisplayFormat={setDisplayFormat}
         onSelectArt={setSelectedArtId}
         onSelectMotionStyle={setSelectedMotionStyle}
+        onSelectFont={setSelectedFontId}
         artOptions={IMMERSIVE_ART_OPTIONS}
         motionOptions={IMMERSIVE_MOTION_OPTIONS}
+        fontOptions={IMMERSIVE_TIMER_FONT_OPTIONS}
         theme={IMMERSIVE_TIMER_MODAL_THEME}
       />
     </div>

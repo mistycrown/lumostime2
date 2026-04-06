@@ -21,6 +21,7 @@ interface ImmersiveMaskedDigitsProps {
   orientation: 'landscape' | 'portrait';
   displayParts: ImmersiveDisplayPart[];
   digitSlotWidth: string;
+  separatorSlotWidth?: string;
   fontFamily?: string;
   fontWeight?: number;
   artSrc: string;
@@ -60,11 +61,12 @@ const formatChWidth = (value: number): string =>
 const buildSvgLayout = (
   displayParts: ImmersiveDisplayPart[],
   digitSlotWidth: string,
-  orientation: 'landscape' | 'portrait'
+  orientation: 'landscape' | 'portrait',
+  separatorSlotWidth: string
 ): SvgLayout => {
   const digitWidth = parseCh(digitSlotWidth)
     * (orientation === 'landscape' ? IMMERSIVE_TIMER_LANDSCAPE_DIGIT_WIDTH_SCALE : 1);
-  const separatorWidth = parseCh(IMMERSIVE_TIMER_SEPARATOR_SLOT_WIDTH);
+  const separatorWidth = parseCh(separatorSlotWidth);
   const widths = displayParts.map((part) => (part.kind === 'value' ? digitWidth : separatorWidth));
   const widthInCh = widths.reduce((sum, width) => sum + width, 0);
 
@@ -317,6 +319,7 @@ export const ImmersiveMaskedDigits: React.FC<ImmersiveMaskedDigitsProps> = ({
   orientation,
   displayParts,
   digitSlotWidth,
+  separatorSlotWidth = IMMERSIVE_TIMER_SEPARATOR_SLOT_WIDTH,
   fontFamily = IMMERSIVE_TIMER_FONT_FAMILY,
   fontWeight = IMMERSIVE_TIMER_FONT_WEIGHT,
   artSrc,
@@ -331,7 +334,7 @@ export const ImmersiveMaskedDigits: React.FC<ImmersiveMaskedDigitsProps> = ({
         <style>{immersiveMaskStyles}</style>
         <div className="immersive-mask__portrait-stack" data-motion-style={motionStyle}>
           {valueParts.map((part, index) => {
-            const layout = buildSvgLayout([part], digitSlotWidth, orientation);
+            const layout = buildSvgLayout([part], digitSlotWidth, orientation, separatorSlotWidth);
 
             return (
               <div
@@ -355,7 +358,7 @@ export const ImmersiveMaskedDigits: React.FC<ImmersiveMaskedDigitsProps> = ({
     );
   }
 
-  const layout = buildSvgLayout(displayParts, digitSlotWidth, orientation);
+  const layout = buildSvgLayout(displayParts, digitSlotWidth, orientation, separatorSlotWidth);
 
   return (
     <>
