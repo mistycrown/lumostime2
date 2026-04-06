@@ -420,7 +420,7 @@ export const PreferencesSettingsView: React.FC<PreferencesSettingsViewProps> = (
                         <div className="flex items-center justify-between p-4 border-b border-stone-100 hover:bg-stone-50 transition-colors">
                             <div>
                                 <h4 className="font-bold text-stone-700">沉浸式计时默认方向</h4>
-                                <p className="text-xs text-stone-400 mt-1">控制进入沉浸式计时时默认使用横屏还是竖屏布局</p>
+                                <p className="text-xs text-stone-400 mt-1">控制进入沉浸式计时的默认布局方向</p>
                             </div>
                             <div className="flex items-center gap-1 bg-stone-100 p-1 rounded-lg">
                                 <button

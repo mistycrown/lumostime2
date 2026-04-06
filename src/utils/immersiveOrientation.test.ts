@@ -20,6 +20,7 @@ describe('immersiveOrientation', () => {
     expect(resolveImmersiveTimerOrientation('portrait', null)).toBe('portrait');
     expect(resolveImmersiveTimerOrientation('landscape', 'portrait')).toBe('portrait');
     expect(resolveImmersiveTimerOrientation('portrait', 'landscape')).toBe('landscape');
+    expect(resolveImmersiveTimerOrientation('portrait', null)).toBe('portrait');
   });
 
   test('toggles between landscape and portrait', () => {
