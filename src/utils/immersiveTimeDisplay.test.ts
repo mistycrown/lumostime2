@@ -1,8 +1,15 @@
 import { describe, expect, test } from 'vitest';
 import {
   buildImmersiveDisplayParts,
+  DEFAULT_IMMERSIVE_DISPLAY_FORMAT,
+  DEFAULT_IMMERSIVE_DISPLAY_SOURCE,
   getImmersiveDisplayFormatSegmentCount,
+  IMMERSIVE_DISPLAY_STORAGE_KEYS,
   getImmersiveDigitSlotWidth,
+  normalizeImmersiveDisplayFormat,
+  normalizeImmersiveDisplaySource,
+  readStoredImmersiveDisplayFormat,
+  readStoredImmersiveDisplaySource,
   toggleImmersiveDisplayFormat,
   toggleImmersiveDisplaySource,
 } from './immersiveTimeDisplay';
@@ -127,5 +134,30 @@ describe('immersiveTimeDisplay', () => {
     expect(getImmersiveDisplayFormatSegmentCount('hoursMinutes')).toBe(2);
     expect(getImmersiveDisplayFormatSegmentCount('minutesSeconds')).toBe(2);
     expect(getImmersiveDisplayFormatSegmentCount('hoursMinutesSeconds')).toBe(3);
+  });
+
+  test('falls back to immersive display defaults when persisted values are invalid', () => {
+    expect(normalizeImmersiveDisplaySource('bad-source')).toBe(DEFAULT_IMMERSIVE_DISPLAY_SOURCE);
+    expect(normalizeImmersiveDisplayFormat('bad-format', 'elapsed')).toBe(DEFAULT_IMMERSIVE_DISPLAY_FORMAT);
+    expect(normalizeImmersiveDisplayFormat('minutesSeconds', 'current')).toBe('hoursMinutes');
+  });
+
+  test('hydrates persisted display source and format for the immersive timer', () => {
+    const storage = {
+      getItem: (key: string) => {
+        if (key === IMMERSIVE_DISPLAY_STORAGE_KEYS.source) {
+          return 'current';
+        }
+
+        if (key === IMMERSIVE_DISPLAY_STORAGE_KEYS.format) {
+          return 'hoursMinutesSeconds';
+        }
+
+        return null;
+      },
+    } as Pick<Storage, 'getItem'>;
+
+    expect(readStoredImmersiveDisplaySource(storage)).toBe('current');
+    expect(readStoredImmersiveDisplayFormat(storage, 'current')).toBe('hoursMinutesSeconds');
   });
 });

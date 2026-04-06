@@ -46,10 +46,15 @@ import {
 } from '../utils/immersiveOrientation';
 import {
   buildImmersiveDisplayParts,
+  DEFAULT_IMMERSIVE_DISPLAY_FORMAT,
+  DEFAULT_IMMERSIVE_DISPLAY_SOURCE,
   getDefaultImmersiveDisplayFormatForSource,
   getImmersiveDigitSlotWidth,
+  IMMERSIVE_DISPLAY_STORAGE_KEYS,
   ImmersiveDisplayFormat,
   ImmersiveDisplaySource,
+  readStoredImmersiveDisplayFormat,
+  readStoredImmersiveDisplaySource,
 } from '../utils/immersiveTimeDisplay';
 import {
   DEFAULT_IMMERSIVE_ART_ID,
@@ -102,8 +107,21 @@ export const ImmersiveTimer: React.FC<ImmersiveTimerProps> = ({ elapsed, onExit,
   const [showNoiseModal, setShowNoiseModal] = useState(false);
   const [showVisualModal, setShowVisualModal] = useState(false);
   const [sessionOrientationOverride, setSessionOrientationOverride] = useState<ImmersiveTimerOrientation | null>(null);
-  const [displaySource, setDisplaySource] = useState<ImmersiveDisplaySource>('elapsed');
-  const [displayFormat, setDisplayFormat] = useState<ImmersiveDisplayFormat>('hoursMinutesSeconds');
+  const [displaySource, setDisplaySource] = useState<ImmersiveDisplaySource>(() => {
+    if (typeof window === 'undefined') {
+      return DEFAULT_IMMERSIVE_DISPLAY_SOURCE;
+    }
+
+    return readStoredImmersiveDisplaySource(window.localStorage);
+  });
+  const [displayFormat, setDisplayFormat] = useState<ImmersiveDisplayFormat>(() => {
+    if (typeof window === 'undefined') {
+      return DEFAULT_IMMERSIVE_DISPLAY_FORMAT;
+    }
+
+    const storedSource = readStoredImmersiveDisplaySource(window.localStorage);
+    return readStoredImmersiveDisplayFormat(window.localStorage, storedSource);
+  });
   const [isWhiteNoiseOn, setIsWhiteNoiseOn] = useState(false);
   const [audioElement, setAudioElement] = useState<HTMLAudioElement | null>(null);
   const [audioContext, setAudioContext] = useState<AudioContext | null>(null);
@@ -250,6 +268,18 @@ export const ImmersiveTimer: React.FC<ImmersiveTimerProps> = ({ elapsed, onExit,
       localStorage.setItem('immersiveTimerNoise', selectedNoise);
     }
   }, [selectedNoise]);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem(IMMERSIVE_DISPLAY_STORAGE_KEYS.source, displaySource);
+    }
+  }, [displaySource]);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem(IMMERSIVE_DISPLAY_STORAGE_KEYS.format, displayFormat);
+    }
+  }, [displayFormat]);
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
