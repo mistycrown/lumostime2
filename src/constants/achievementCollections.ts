@@ -5,7 +5,7 @@
  * @pos Constant (Achievement Collections)
  * @description Provides the default collectible bottle catalog for the achievement ledger collection tab.
  *
- * @updated 2026-03-29: Replaced placeholder bottle names with curated names and descriptions for all 16 bundled collectibles.
+ * @updated 2026-04-06: Renamed the bundled 16 bottle presets to match the refreshed bottle artwork set.
  */
 import { AchievementCollection } from '../types';
 
@@ -20,83 +20,83 @@ interface DefaultAchievementCollectionDefinition {
 const DEFAULT_ACHIEVEMENT_COLLECTION_DEFINITIONS: DefaultAchievementCollectionDefinition[] = [
   {
     assetId: '01',
-    name: '缤纷彩糖瓶',
-    description: '装满彩色包装糖果和水果硬糖的圆肚小瓶。'
+    name: '小熊糖果罐',
+    description: '装着彩色小熊软糖的高罐，像把童年的甜味整齐封进了玻璃里。'
   },
   {
     assetId: '02',
-    name: '岁月留香瓶',
-    description: '装着干枯玫瑰和花瓣的复古带塞小瓶，带有手工香丸般的古典气息。'
+    name: '蓝珠标本瓶',
+    description: '三颗蓝色玻璃珠静静叠放，像被封存起来的清凉海潮。'
   },
   {
     assetId: '03',
-    name: '摘星许愿瓶',
-    description: '散发着温暖光芒，装满小星星的方形玻璃瓶，带着占星与祈愿的氛围。'
+    name: '金砂许愿瓶',
+    description: '细闪金砂落在小小玻璃瓶里，像一枚可以握住的微光愿望。'
   },
   {
     assetId: '04',
-    name: '魔法微光瓶',
-    description: '装满细碎闪烁珠光色彩的小颗粒，像把柔和魔法收进了细长瓶身。'
+    name: '柑橘切片瓶',
+    description: '糖渍橘片和果香被层层叠进瓶里，带着明亮又温暖的夏日气味。'
   },
   {
     assetId: '05',
-    name: '小熊软糖罐',
-    description: '装着五颜六色经典小熊软糖的广口密封罐。'
+    name: '金花花瓣瓶',
+    description: '蓬松的金色花瓣被收进圆腹瓶中，像一束不会褪色的小太阳。'
   },
   {
     assetId: '06',
-    name: '微观多肉瓶',
-    description: '层层叠叠种着多肉植物的细长生态柱。'
+    name: '彩糖圆球瓶',
+    description: '饱满的彩色糖球把圆瓶塞得满满当当，看起来像一整瓶开心。'
   },
   {
     assetId: '07',
-    name: '夏日星砂瓶',
-    description: '装着彩虹色分层沙子和海贝壳的软木塞瓶。'
+    name: '星光锥瓶',
+    description: '亮亮的小星星漂浮在锥形瓶里，像被收拢的一捧夜空。'
   },
   {
     assetId: '08',
-    name: '星月夜明瓶',
-    description: '装着发光弯月和群星的心形瓶，像收藏了一段宁静夜色。'
+    name: '樱花花瓣罐',
+    description: '粉色花瓣轻轻叠放在方形玻璃罐里，像把一小段春天的樱色留了下来。'
   },
   {
     assetId: '09',
-    name: '彩虹豆豆瓶',
-    description: '装满彩色巧克力豆的矮胖玻璃瓶。'
+    name: '薰衣草瓶',
+    description: '细长瓶里插着一束安静的薰衣草，像把傍晚的香气也一起留住。'
   },
   {
     assetId: '10',
-    name: '萤火之森瓶',
-    description: '装着飞舞萤火虫的钟形瓶，暗夜里透出温柔微光。'
+    name: '青柠切片瓶',
+    description: '一片片青柠整齐排开，瓶子里像装着清爽的薄荷汽水。'
   },
   {
     assetId: '11',
-    name: '复古纽扣瓶',
-    description: '装满各种颜色四孔小纽扣的瓶子，带着手作与编织的温度。'
+    name: '黄玫瑰花瓣瓶',
+    description: '浅金黄色的花瓣安静盛在透明方杯里，像一束被封存下来的黄玫瑰余香。'
   },
   {
     assetId: '12',
-    name: '时光信笺瓶',
-    description: '装满彩色卷轴、信纸和笑脸小纸条的瓶子，像收纳被记录下来的灵感。'
+    name: '心愿漂流瓶',
+    description: '心形糖片和柔软粉色被收进吊环玻璃瓶，像一封没有寄出的心事。'
   },
   {
     assetId: '13',
-    name: '幸运四叶草瓶',
-    description: '瓶口系着质朴麻绳，里面装满了绿色四叶草。'
+    name: '星月玻璃杯',
+    description: '把手杯里浮着月亮和星星，像深夜里一杯微微发光的牛奶。'
   },
   {
     assetId: '14',
-    name: '绒绒毛球瓶',
-    description: '装着马卡龙色系毛茸茸小球的多边形玻璃瓶。'
+    name: '纸卷细瓶',
+    description: '窄长的小瓶里收着卷起的纸条，像一支等待展开的秘密注脚。'
   },
   {
     assetId: '15',
-    name: '绿意微景罐',
-    description: '装着多肉、迷你绿植和造景小石头的圆形生态瓶。'
+    name: '紫瓣香氛罐',
+    description: '紫色花瓣堆在小圆罐里，像把轻柔香气和黄昏一起拧上了盖子。'
   },
   {
     assetId: '16',
-    name: '水果方糖罐',
-    description: '装着五颜六色方形软糖或水果块的广口罐。'
+    name: '珍珠泡泡瓶',
+    description: '圆腹瓶里堆着粉蓝白的珠球，像一整瓶柔软又轻快的泡泡。'
   }
 ];
 

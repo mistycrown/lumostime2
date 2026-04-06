@@ -5,7 +5,7 @@
  * @pos Repository (Application Data)
  * @description Loads and persists large core datasets through a single async repository and migrates legacy localStorage payloads into IndexedDB on first run.
  *
- * @updated 2026-03-29: Migrates bundled achievement bottle names, descriptions, and collection record labels away from placeholder defaults.
+ * @updated 2026-04-06: Persists archived achievement bottles and bottle action records for the seal-and-shatter flow.
  */
 import {
   DEFAULT_ACHIEVEMENT_COLLECTION_COST,
@@ -15,6 +15,8 @@ import {
 import { CATEGORIES, INITIAL_DAILY_REVIEWS, INITIAL_GOALS, INITIAL_LOGS, INITIAL_TODOS, MOCK_TODO_CATEGORIES, SCOPES } from '../constants';
 import { REVIEW_KEYS, StorageKey, USER_DATA_KEYS, storage } from '../constants/storageKeys';
 import {
+  AchievementArchivedBottle,
+  AchievementBottleActionRecord,
   AchievementCollection,
   AchievementCollectionRecord,
   AchievementDailySnapshot,
@@ -57,7 +59,9 @@ export const REPOSITORY_KEYS = {
   ACHIEVEMENT_COLLECTIONS: 'achievementCollections',
   ACHIEVEMENT_DAILY_SNAPSHOTS: 'achievementDailySnapshots',
   ACHIEVEMENT_REDEMPTION_RECORDS: 'achievementRedemptionRecords',
-  ACHIEVEMENT_COLLECTION_RECORDS: 'achievementCollectionRecords'
+  ACHIEVEMENT_COLLECTION_RECORDS: 'achievementCollectionRecords',
+  ACHIEVEMENT_ARCHIVED_BOTTLES: 'achievementArchivedBottles',
+  ACHIEVEMENT_BOTTLE_ACTION_RECORDS: 'achievementBottleActionRecords'
 } as const;
 
 type CoreRepositoryKey = typeof REPOSITORY_KEYS[keyof typeof REPOSITORY_KEYS];
@@ -113,6 +117,8 @@ export interface AchievementSnapshot {
   dailySnapshots: AchievementDailySnapshot[];
   redemptionRecords: AchievementRedemptionRecord[];
   collectionRecords: AchievementCollectionRecord[];
+  archivedBottles: AchievementArchivedBottle[];
+  bottleActionRecords: AchievementBottleActionRecord[];
 }
 
 const LEGACY_DEFAULT_BOTTLE_NAME_PATTERN = /^(?:收藏瓶|玻璃瓶)\s*\d{2}$/;
@@ -262,7 +268,8 @@ export class DataRepository {
 
     const meta =
       (await this.repository.getData<AchievementMeta>(REPOSITORY_KEYS.ACHIEVEMENT_META)) ?? {
-        achievementStartDate: null
+        achievementStartDate: null,
+        activeBottleCarryoverStars: 0
       };
     const rules =
       (await this.repository.getData<AchievementRule[]>(REPOSITORY_KEYS.ACHIEVEMENT_RULES)) ?? [];
@@ -278,15 +285,24 @@ export class DataRepository {
     const collectionRecords =
       ((await this.repository.getData<AchievementCollectionRecord[]>(REPOSITORY_KEYS.ACHIEVEMENT_COLLECTION_RECORDS)) ?? [])
         .map(migrateDefaultAchievementCollectionRecord);
+    const archivedBottles =
+      (await this.repository.getData<AchievementArchivedBottle[]>(REPOSITORY_KEYS.ACHIEVEMENT_ARCHIVED_BOTTLES)) ?? [];
+    const bottleActionRecords =
+      (await this.repository.getData<AchievementBottleActionRecord[]>(REPOSITORY_KEYS.ACHIEVEMENT_BOTTLE_ACTION_RECORDS)) ?? [];
 
     return {
-      meta,
+      meta: {
+        achievementStartDate: meta.achievementStartDate ?? null,
+        activeBottleCarryoverStars: meta.activeBottleCarryoverStars ?? 0
+      },
       rules,
       rewards,
       collections: migratedCollections,
       dailySnapshots,
       redemptionRecords,
-      collectionRecords
+      collectionRecords,
+      archivedBottles,
+      bottleActionRecords
     };
   }
 
@@ -393,6 +409,16 @@ export class DataRepository {
   async saveAchievementCollectionRecords(collectionRecords: AchievementCollectionRecord[]): Promise<void> {
     await this.initialize();
     await this.repository.setData(REPOSITORY_KEYS.ACHIEVEMENT_COLLECTION_RECORDS, collectionRecords);
+  }
+
+  async saveAchievementArchivedBottles(archivedBottles: AchievementArchivedBottle[]): Promise<void> {
+    await this.initialize();
+    await this.repository.setData(REPOSITORY_KEYS.ACHIEVEMENT_ARCHIVED_BOTTLES, archivedBottles);
+  }
+
+  async saveAchievementBottleActionRecords(bottleActionRecords: AchievementBottleActionRecord[]): Promise<void> {
+    await this.initialize();
+    await this.repository.setData(REPOSITORY_KEYS.ACHIEVEMENT_BOTTLE_ACTION_RECORDS, bottleActionRecords);
   }
 
   private buildDefaultTodos(logs: Log[]): TodoItem[] {

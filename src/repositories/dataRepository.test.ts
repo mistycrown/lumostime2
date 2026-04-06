@@ -159,6 +159,75 @@ describe('DataRepository', () => {
     expect(values.has(USER_DATA_KEYS.MAJOR_GOALS)).toBe(false);
   });
 
+  it('hydrates archived achievement bottles and carryover meta for the seal-and-shatter flow', async () => {
+    const repository = new InMemoryStorageRepository();
+
+    repository.data.set(REPOSITORY_KEYS.ACHIEVEMENT_META, {
+      achievementStartDate: '2026-04-01',
+      activeBottleCarryoverStars: 3
+    });
+    repository.data.set(REPOSITORY_KEYS.ACHIEVEMENT_ARCHIVED_BOTTLES, [
+      {
+        id: 'archive-1',
+        collectionId: 'default-bottle-02',
+        collectionName: '花瓶',
+        imagePath: '/bottle/02.png',
+        periodStartDate: '2026-04-01',
+        periodEndDate: '2026-04-05',
+        earnedStars: 10,
+        spentStars: 2,
+        sealedAmount: 8,
+        status: 'sealed',
+        sealedAt: 1,
+        dailySnapshots: [],
+        redemptionRecords: []
+      }
+    ]);
+    repository.data.set(REPOSITORY_KEYS.ACHIEVEMENT_BOTTLE_ACTION_RECORDS, [
+      {
+        id: 'action-1',
+        bottleId: 'archive-1',
+        actionType: 'seal',
+        amount: 8,
+        occurredAt: 1
+      }
+    ]);
+
+    const dataRepository = new DataRepository(repository, createLegacyStorageAdapter(new Map()).adapter);
+    const snapshot = await dataRepository.loadAchievementSnapshot();
+
+    expect(snapshot.meta).toEqual({
+      achievementStartDate: '2026-04-01',
+      activeBottleCarryoverStars: 3
+    });
+    expect(snapshot.archivedBottles).toEqual([
+      {
+        id: 'archive-1',
+        collectionId: 'default-bottle-02',
+        collectionName: '花瓶',
+        imagePath: '/bottle/02.png',
+        periodStartDate: '2026-04-01',
+        periodEndDate: '2026-04-05',
+        earnedStars: 10,
+        spentStars: 2,
+        sealedAmount: 8,
+        status: 'sealed',
+        sealedAt: 1,
+        dailySnapshots: [],
+        redemptionRecords: []
+      }
+    ]);
+    expect(snapshot.bottleActionRecords).toEqual([
+      {
+        id: 'action-1',
+        bottleId: 'archive-1',
+        actionType: 'seal',
+        amount: 8,
+        occurredAt: 1
+      }
+    ]);
+  });
+
   it('migrates legacy default achievement bottle names in collections and records', async () => {
     const repository = new InMemoryStorageRepository();
 
@@ -210,10 +279,10 @@ describe('DataRepository', () => {
     expect(snapshot.collections).toEqual([
       {
         id: 'default-bottle-03',
-        name: '摘星许愿瓶',
+        name: '金砂许愿瓶',
         cost: DEFAULT_ACHIEVEMENT_COLLECTION_COST,
         imagePath: '/bottle/03.png',
-        description: '散发着温暖光芒，装满小星星的方形玻璃瓶，带着占星与祈愿的氛围。',
+        description: '细闪金砂落在小小玻璃瓶里，像一枚可以握住的微光愿望。',
         enabled: true,
         createdAt: 1,
         updatedAt: 1
@@ -234,7 +303,7 @@ describe('DataRepository', () => {
       {
         id: 'record-1',
         collectionId: 'default-bottle-03',
-        collectionName: '摘星许愿瓶',
+        collectionName: '金砂许愿瓶',
         cost: 200,
         imagePath: '/bottle/03.png',
         redeemedAt: 10

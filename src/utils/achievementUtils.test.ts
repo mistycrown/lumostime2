@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
   calculateAchievementAvailableStars,
+  getAchievementActiveStartDate,
+  getAchievementSealPreview,
   computeAchievementDailySnapshot,
   formatAchievementSignedStars,
   formatAchievementStars,
@@ -72,5 +74,166 @@ describe('achievementUtils decimal stars', () => {
     });
 
     expect(legacyRule.deltaPerUnit).toBe(0.3);
+  });
+
+  it('adds shattered bottle returns back into the active bottle while ignoring seal actions', () => {
+    expect(calculateAchievementAvailableStars(
+      [
+        {
+          id: 'snapshot-1',
+          date: '2026-04-01',
+          netDelta: 3,
+          ruleBreakdown: [],
+          computedAt: 1
+        },
+        {
+          id: 'snapshot-2',
+          date: '2026-04-02',
+          netDelta: 2,
+          ruleBreakdown: [],
+          computedAt: 2
+        }
+      ],
+      [
+        {
+          id: 'redeem-1',
+          rewardId: 'reward-1',
+          rewardName: 'Movie',
+          cost: 1,
+          redeemedAt: 3
+        }
+      ],
+      [
+        {
+          id: 'action-1',
+          bottleId: 'bottle-1',
+          actionType: 'seal',
+          amount: 4,
+          occurredAt: 4
+        },
+        {
+          id: 'action-2',
+          bottleId: 'bottle-1',
+          actionType: 'shatter',
+          amount: 2.5,
+          occurredAt: 5
+        }
+      ]
+    )).toBe(6.5);
+  });
+
+  it('builds the fixed seal preview from the day after the last sealed bottle through yesterday', () => {
+    const preview = getAchievementSealPreview({
+      achievementStartDate: '2026-04-01',
+      archivedBottles: [
+        {
+          id: 'archive-1',
+          collectionId: 'default-bottle-01',
+          collectionName: '旧瓶',
+          sealedAmount: 5,
+          earnedStars: 6,
+          spentStars: 1,
+          periodStartDate: '2026-04-01',
+          periodEndDate: '2026-04-02',
+          status: 'sealed',
+          sealedAt: 10,
+          dailySnapshots: [],
+          redemptionRecords: []
+        }
+      ],
+      dailySnapshots: [
+        {
+          id: 'snapshot-3',
+          date: '2026-04-03',
+          netDelta: 5,
+          ruleBreakdown: [],
+          computedAt: 11
+        },
+        {
+          id: 'snapshot-4',
+          date: '2026-04-04',
+          netDelta: -1,
+          ruleBreakdown: [],
+          computedAt: 12
+        },
+        {
+          id: 'snapshot-5',
+          date: '2026-04-05',
+          netDelta: 2,
+          ruleBreakdown: [],
+          computedAt: 13
+        },
+        {
+          id: 'snapshot-6',
+          date: '2026-04-06',
+          netDelta: 9,
+          ruleBreakdown: [],
+          computedAt: 14
+        }
+      ],
+      redemptionRecords: [
+        {
+          id: 'redeem-2',
+          rewardId: 'reward-2',
+          rewardName: 'Tea',
+          cost: 2,
+          redeemedAt: new Date('2026-04-04T12:00:00+08:00').getTime()
+        },
+        {
+          id: 'redeem-3',
+          rewardId: 'reward-3',
+          rewardName: 'Snack',
+          cost: 1,
+          redeemedAt: new Date('2026-04-06T12:00:00+08:00').getTime()
+        }
+      ],
+      today: new Date('2026-04-06T22:00:00+08:00')
+    });
+
+    expect(preview).toEqual({
+      startDate: '2026-04-03',
+      endDate: '2026-04-05',
+      earnedStars: 7,
+      spentStars: 3,
+      sealableStars: 4,
+      snapshotIds: ['snapshot-3', 'snapshot-4', 'snapshot-5'],
+      redemptionRecordIds: ['redeem-2']
+    });
+  });
+
+  it('moves the live snapshot start date to the day after the latest archived bottle', () => {
+    expect(getAchievementActiveStartDate(
+      '2026-04-01',
+      [
+        {
+          id: 'archive-1',
+          collectionId: 'default-bottle-01',
+          collectionName: '旧瓶',
+          sealedAmount: 5,
+          earnedStars: 6,
+          spentStars: 1,
+          periodStartDate: '2026-04-01',
+          periodEndDate: '2026-04-02',
+          status: 'sealed',
+          sealedAt: 10,
+          dailySnapshots: [],
+          redemptionRecords: []
+        },
+        {
+          id: 'archive-2',
+          collectionId: 'default-bottle-02',
+          collectionName: '新瓶',
+          sealedAmount: 4,
+          earnedStars: 5,
+          spentStars: 1,
+          periodStartDate: '2026-04-03',
+          periodEndDate: '2026-04-05',
+          status: 'shattered',
+          sealedAt: 20,
+          dailySnapshots: [],
+          redemptionRecords: []
+        }
+      ]
+    )).toBe('2026-04-06');
   });
 });

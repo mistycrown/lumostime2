@@ -4,7 +4,8 @@
  * @output TypeScript Interfaces & Types
  * @pos Type Definitions (Shared contract)
  * @description Defines the core data structures (Log, TodoItem, Category, Activity, Filter order metadata, etc.) used throughout the application.
- * 
+ * @updated 2026-04-06: Added archived achievement bottle, seal preview, and bottle action contracts for seal/shatter history.
+ *
  * 鈿狅笍 Once I am updated, be sure to update my header comment and the folder's md.
  */
 export interface Activity {
@@ -272,6 +273,7 @@ export interface AchievementRedemptionRecord {
   rewardName: string;
   cost: number;
   redeemedAt: number;
+  paidFromCarryover?: number;
   note?: string;
 }
 
@@ -285,8 +287,44 @@ export interface AchievementCollectionRecord {
   note?: string;
 }
 
+export interface AchievementArchivedBottle {
+  id: string;
+  collectionId: string;
+  collectionName: string;
+  imagePath?: string;
+  periodStartDate: string;
+  periodEndDate: string;
+  earnedStars: number;
+  spentStars: number;
+  sealedAmount: number;
+  status: 'sealed' | 'shattered';
+  sealedAt: number;
+  shatteredAt?: number;
+  dailySnapshots: AchievementDailySnapshot[];
+  redemptionRecords: AchievementRedemptionRecord[];
+}
+
+export interface AchievementBottleActionRecord {
+  id: string;
+  bottleId: string;
+  actionType: 'seal' | 'shatter';
+  amount: number;
+  occurredAt: number;
+}
+
+export interface AchievementSealPreview {
+  startDate: string;
+  endDate: string;
+  earnedStars: number;
+  spentStars: number;
+  sealableStars: number;
+  snapshotIds: string[];
+  redemptionRecordIds: string[];
+}
+
 export interface AchievementMeta {
   achievementStartDate: string | null;
+  activeBottleCarryoverStars: number;
 }
 
 export enum AppView {
