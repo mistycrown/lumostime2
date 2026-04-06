@@ -6,7 +6,7 @@
  * @description A fixed black-and-white immersive timer with large numeric digits, static masked art visuals, session-only orientation toggles, display-source and display-format toggles, white-noise controls, and Android immersive fullscreen handling that temporarily removes WebView insets.
  */
 import React, { useEffect, useRef, useState } from 'react';
-import { Check, Clock3, Image as ImageIcon, MonitorSmartphone, TimerReset, Volume2, VolumeX, X } from 'lucide-react';
+import { Check, Image as ImageIcon, MonitorSmartphone, Volume2, VolumeX, X } from 'lucide-react';
 import { Capacitor } from '@capacitor/core';
 import { StatusBar, Style } from '@capacitor/status-bar';
 import { OrientationType, ScreenOrientation } from '@capawesome/capacitor-screen-orientation';
@@ -38,6 +38,8 @@ import {
 import {
   getScreenOrientationLockValue,
   resolveImmersiveTimerOrientation,
+  shouldManageImmersiveOrientationLock,
+  shouldSilenceImmersiveOrientationError,
   toggleImmersiveTimerOrientation,
   type ImmersiveTimerOrientation,
 } from '../utils/immersiveOrientation';
@@ -47,8 +49,6 @@ import {
   getImmersiveDigitSlotWidth,
   ImmersiveDisplayFormat,
   ImmersiveDisplaySource,
-  toggleImmersiveDisplayFormat,
-  toggleImmersiveDisplaySource,
 } from '../utils/immersiveTimeDisplay';
 import {
   DEFAULT_IMMERSIVE_ART_ID,
@@ -146,13 +146,16 @@ export const ImmersiveTimer: React.FC<ImmersiveTimerProps> = ({ elapsed, onExit,
   const digitSlotWidth = getImmersiveDigitSlotWidth(valueParts.map((part) => part.value));
   const displaySignature = `${displaySource}-${displayFormat}-${displayParts.map((part) => part.value).join('')}`;
   const selectedArt = getImmersiveArtOptionById(selectedArtId);
-  const formatLabel = displayFormat === 'hoursMinutes'
-    ? '时分'
-    : displayFormat === 'minutesSeconds'
-      ? '分秒'
-      : '时分秒';
 
   useEffect(() => {
+    const platform = Capacitor.getPlatform();
+
+    if (!shouldManageImmersiveOrientationLock(platform)) {
+      return;
+    }
+
+    let isCancelled = false;
+
     const applyEffectiveOrientation = async () => {
       try {
         const preferredLock = getScreenOrientationLockValue(effectiveOrientation);
@@ -162,15 +165,20 @@ export const ImmersiveTimer: React.FC<ImmersiveTimerProps> = ({ elapsed, onExit,
 
         await ScreenOrientation.lock({ type });
       } catch (error) {
-        console.error('Failed to lock immersive timer orientation:', error);
+        if (!isCancelled && !shouldSilenceImmersiveOrientationError(error)) {
+          console.error('Failed to lock immersive timer orientation:', error);
+        }
       }
     };
 
     void applyEffectiveOrientation();
 
     return () => {
+      isCancelled = true;
       ScreenOrientation.unlock().catch((error) => {
-        console.error('Failed to unlock immersive timer orientation:', error);
+        if (!shouldSilenceImmersiveOrientationError(error)) {
+          console.error('Failed to unlock immersive timer orientation:', error);
+        }
       });
     };
   }, [effectiveOrientation]);
@@ -642,60 +650,6 @@ export const ImmersiveTimer: React.FC<ImmersiveTimerProps> = ({ elapsed, onExit,
             <button
               onClick={(event) => {
                 event.stopPropagation();
-                setDisplayFormat((current) => toggleImmersiveDisplayFormat(current, displaySource));
-              }}
-              title="切换显示格式"
-              className="pointer-events-auto h-12 rounded-full backdrop-blur-md flex items-center justify-center active:scale-95 transition-all shadow-lg px-4 text-sm font-semibold tracking-[0.18em]"
-              style={{
-                backgroundColor: IMMERSIVE_TIMER_CONTROL_SURFACE.backgroundColor,
-                borderWidth: '1.5px',
-                borderStyle: 'solid',
-                borderColor: IMMERSIVE_TIMER_CONTROL_SURFACE.borderColor,
-                color: IMMERSIVE_TIMER_CONTROL_SURFACE.color,
-              }}
-              onMouseEnter={(event) => {
-                event.currentTarget.style.backgroundColor = IMMERSIVE_TIMER_COLORS.buttonHover;
-              }}
-              onMouseLeave={(event) => {
-                event.currentTarget.style.backgroundColor = IMMERSIVE_TIMER_CONTROL_SURFACE.backgroundColor;
-              }}
-            >
-              {formatLabel}
-            </button>
-
-            <button
-              onClick={(event) => {
-                event.stopPropagation();
-                setDisplaySource((current) => {
-                  const nextSource = toggleImmersiveDisplaySource(current);
-                  setDisplayFormat((currentFormat) => getDefaultImmersiveDisplayFormatForSource(nextSource, currentFormat));
-                  return nextSource;
-                });
-              }}
-              title={displaySource === 'elapsed' ? '切换为当前时间' : '切换为计时时间'}
-              className="pointer-events-auto w-12 h-12 rounded-full backdrop-blur-md flex items-center justify-center active:scale-95 transition-all shadow-lg"
-              style={{
-                backgroundColor: IMMERSIVE_TIMER_CONTROL_SURFACE.backgroundColor,
-                borderWidth: '1.5px',
-                borderStyle: 'solid',
-                borderColor: IMMERSIVE_TIMER_CONTROL_SURFACE.borderColor,
-                color: IMMERSIVE_TIMER_CONTROL_SURFACE.color,
-              }}
-              onMouseEnter={(event) => {
-                event.currentTarget.style.backgroundColor = IMMERSIVE_TIMER_COLORS.buttonHover;
-              }}
-              onMouseLeave={(event) => {
-                event.currentTarget.style.backgroundColor = IMMERSIVE_TIMER_CONTROL_SURFACE.backgroundColor;
-              }}
-            >
-              {displaySource === 'elapsed'
-                ? <TimerReset size={18} strokeWidth={2} />
-                : <Clock3 size={18} strokeWidth={2} />}
-            </button>
-
-            <button
-              onClick={(event) => {
-                event.stopPropagation();
                 setSessionOrientationOverride((current) => toggleImmersiveTimerOrientation(
                   resolveImmersiveTimerOrientation(immersiveTimerDefaultOrientation, current)
                 ));
@@ -760,7 +714,7 @@ export const ImmersiveTimer: React.FC<ImmersiveTimerProps> = ({ elapsed, onExit,
                 event.stopPropagation();
                 setShowVisualModal(true);
               }}
-              title="选择画面样式"
+              title="时钟样式"
               className="pointer-events-auto w-12 h-12 rounded-full backdrop-blur-md flex items-center justify-center active:scale-95 transition-all shadow-lg"
               style={{
                 backgroundColor: showVisualModal
@@ -802,8 +756,15 @@ export const ImmersiveTimer: React.FC<ImmersiveTimerProps> = ({ elapsed, onExit,
       <ImmersiveVisualSelectorModal
         isOpen={showVisualModal}
         onClose={() => setShowVisualModal(false)}
+        selectedDisplaySource={displaySource}
+        selectedDisplayFormat={displayFormat}
         selectedArtId={selectedArtId}
         selectedMotionStyle={selectedMotionStyle}
+        onSelectDisplaySource={(nextSource) => {
+          setDisplaySource(nextSource);
+          setDisplayFormat((currentFormat) => getDefaultImmersiveDisplayFormatForSource(nextSource, currentFormat));
+        }}
+        onSelectDisplayFormat={setDisplayFormat}
         onSelectArt={setSelectedArtId}
         onSelectMotionStyle={setSelectedMotionStyle}
         artOptions={IMMERSIVE_ART_OPTIONS}

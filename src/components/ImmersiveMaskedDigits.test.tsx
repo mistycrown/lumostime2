@@ -4,7 +4,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { ImmersiveMaskedDigits } from './ImmersiveMaskedDigits';
 
 describe('ImmersiveMaskedDigits', () => {
-  test('renders static digits with a separate animated art layer in portrait mode', () => {
+  test('renders static digits with a separate animated art layer in portrait mode without labels', () => {
     const markup = renderToStaticMarkup(
       <ImmersiveMaskedDigits
         orientation="portrait"
@@ -23,12 +23,18 @@ describe('ImmersiveMaskedDigits', () => {
 
     expect(markup).toContain('data-motion-style="orbit"');
     expect(markup).toContain('data-art-layer="true"');
-    expect(markup).toContain('小时');
-    expect(markup).toContain('分钟');
-    expect(markup).toContain('秒');
+    expect(markup).toContain('font-family="&quot;Lahlit Font&quot;');
+    expect(markup).toContain('font-variant-numeric:lining-nums tabular-nums');
+    expect(markup).toContain('font-feature-settings:&quot;tnum&quot; 1');
+    expect(markup).toContain('>08<');
+    expect(markup).toContain('>46<');
+    expect(markup).toContain('>35<');
+    expect(markup).not.toContain('小时');
+    expect(markup).not.toContain('分钟');
+    expect(markup).not.toContain('秒');
   });
 
-  test('renders a single masked landscape art layer', () => {
+  test('renders a single masked landscape art layer with tighter separator spacing', () => {
     const markup = renderToStaticMarkup(
       <ImmersiveMaskedDigits
         orientation="landscape"
@@ -47,6 +53,10 @@ describe('ImmersiveMaskedDigits', () => {
 
     expect(markup).toContain('immersive-mask--landscape');
     expect(markup).toContain('data-motion-style="sweep"');
-    expect(markup).toContain('width:7.75ch');
+    expect(markup).toContain('>08<');
+    expect(markup).toContain('>46<');
+    expect(markup).toContain('>35<');
+    expect(markup).toContain('font-variant-numeric:lining-nums tabular-nums');
+    expect(markup).toContain('width:6.19ch');
   });
 });
