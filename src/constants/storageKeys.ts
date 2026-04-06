@@ -14,6 +14,7 @@ export const TIMEPAL_KEYS = {
     TYPE: 'lumostime_timepal_type',
     /** 自定义时光小友列表 */
     CUSTOM_ITEMS: 'lumostime_timepal_custom_items',
+    STAGE_THRESHOLDS: 'lumostime_timepal_stage_thresholds',
     CLICK_SWITCH_ENABLED: 'lumostime_timepal_click_switch_enabled',
     /** 是否启用标签筛选 */
     FILTER_ENABLED: 'lumostime_timepal_filter_enabled',

@@ -5,7 +5,7 @@
  * @output 时光小友设置界面，包含选择、筛选、自定义名言和点击切换开关
  * @pos Component
  */
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Check, Plus, X } from 'lucide-react';
 import { Category } from '../types';
 import { TIMEPAL_OPTIONS, getTimePalEmoji, isCustomTimePalType } from '../constants/timePalConfig';
@@ -16,13 +16,59 @@ import { imageService } from '../services/imageService';
 import { CustomTimePalItem, timePalCustomService, TIMEPAL_CUSTOM_CHANGED_EVENT } from '../services/timePalCustomService';
 import { CustomTimePalModal } from './CustomTimePalModal';
 import { ConfirmModal } from './ConfirmModal';
+import {
+    DEFAULT_TIMEPAL_STAGE_THRESHOLDS,
+    TIMEPAL_STAGE_THRESHOLDS_CHANGED_EVENT,
+    TimePalStageThresholds,
+    getTimePalStageRanges,
+    readStoredTimePalStageThresholds
+} from '../utils/timePalStageThresholds';
 
 const TIMEPAL_CLICK_SWITCH_CHANGED_EVENT = 'timepal-click-switch-changed';
+type StageThresholdInputState = [string, string, string, string];
 
 interface TimePalSettingsProps {
     categories: Category[];
     onToast?: (type: ToastType, message: string) => void;
 }
+
+const buildStageThresholdInputs = (thresholds: TimePalStageThresholds): StageThresholdInputState => {
+    return thresholds.map(value => String(value)) as StageThresholdInputState;
+};
+
+const validateStageThresholdInputs = (inputs: StageThresholdInputState): {
+    error: string | null;
+    thresholds: TimePalStageThresholds | null;
+} => {
+    if (inputs.some(value => value.trim() === '')) {
+        return {
+            error: '请填写 4 个阶段的累计分钟阈值',
+            thresholds: null
+        };
+    }
+
+    const parsed = inputs.map(value => Number(value));
+    if (parsed.some(value => !Number.isInteger(value) || value < 0)) {
+        return {
+            error: '阶段时间只能填写非负整数分钟',
+            thresholds: null
+        };
+    }
+
+    for (let i = 1; i < parsed.length; i += 1) {
+        if (parsed[i] <= parsed[i - 1]) {
+            return {
+                error: `进入阶段 ${i + 2} 的分钟数必须大于阶段 ${i + 1}`,
+                thresholds: null
+            };
+        }
+    }
+
+    return {
+        error: null,
+        thresholds: parsed as TimePalStageThresholds
+    };
+};
 
 export const TimePalSettings: React.FC<TimePalSettingsProps> = ({ categories, onToast }) => {
     const [selectedType, setSelectedType] = useState<string>(() => {
@@ -48,7 +94,19 @@ export const TimePalSettings: React.FC<TimePalSettingsProps> = ({ categories, on
     const [clickSwitchEnabled, setClickSwitchEnabled] = useState<boolean>(() => {
         return storage.getBoolean(TIMEPAL_KEYS.CLICK_SWITCH_ENABLED, true);
     });
+    const [savedStageThresholds, setSavedStageThresholds] = useState<TimePalStageThresholds>(() => {
+        return readStoredTimePalStageThresholds();
+    });
+    const [stageThresholdInputs, setStageThresholdInputs] = useState<StageThresholdInputState>(() => {
+        return buildStageThresholdInputs(readStoredTimePalStageThresholds());
+    });
     const previewUrlsRef = useRef<Record<string, string>>({});
+    const stageThresholdValidation = useMemo(() => {
+        return validateStageThresholdInputs(stageThresholdInputs);
+    }, [stageThresholdInputs]);
+    const stageRanges = useMemo(() => {
+        return getTimePalStageRanges(stageThresholdValidation.thresholds ?? savedStageThresholds);
+    }, [savedStageThresholds, stageThresholdValidation.thresholds]);
 
     const revokeBlobUrls = (urlMap: Record<string, string>) => {
         Object.values(urlMap).forEach(url => {
@@ -146,6 +204,29 @@ export const TimePalSettings: React.FC<TimePalSettingsProps> = ({ categories, on
             .map(q => q.trim())
             .filter(q => q.length > 0);
         storage.setJSON(TIMEPAL_KEYS.CUSTOM_QUOTES, quotesArray);
+    };
+
+    const persistStageThresholds = (thresholds: TimePalStageThresholds) => {
+        setSavedStageThresholds(thresholds);
+        storage.setJSON(TIMEPAL_KEYS.STAGE_THRESHOLDS, thresholds);
+        window.dispatchEvent(new Event(TIMEPAL_STAGE_THRESHOLDS_CHANGED_EVENT));
+    };
+
+    const handleStageThresholdChange = (index: number, rawValue: string) => {
+        const nextInputs = [...stageThresholdInputs] as StageThresholdInputState;
+        nextInputs[index] = rawValue.replace(/[^\d]/g, '');
+        setStageThresholdInputs(nextInputs);
+
+        const validation = validateStageThresholdInputs(nextInputs);
+        if (validation.thresholds) {
+            persistStageThresholds(validation.thresholds);
+        }
+    };
+
+    const handleResetStageThresholds = () => {
+        const nextInputs = buildStageThresholdInputs(DEFAULT_TIMEPAL_STAGE_THRESHOLDS);
+        setStageThresholdInputs(nextInputs);
+        persistStageThresholds(DEFAULT_TIMEPAL_STAGE_THRESHOLDS);
     };
 
     const handleCustomCreated = (item: CustomTimePalItem) => {
@@ -342,6 +423,69 @@ export const TimePalSettings: React.FC<TimePalSettingsProps> = ({ categories, on
                 <p className="text-xs text-stone-500">
                     开启后，可在脉络页顶部卡片中点击小友图片切换类型。
                 </p>
+            </div>
+
+            <div className="pt-4 border-t border-stone-200 bg-white rounded-lg p-4 shadow-sm">
+                <div className="flex items-center justify-between gap-3 mb-3">
+                    <div>
+                        <label className="text-xs font-medium text-stone-400 uppercase tracking-wider">
+                            阶段时间
+                        </label>
+                        <p className="text-xs text-stone-500 mt-1">
+                            用累计分钟设置进入阶段 2-5 的时间阈值。
+                        </p>
+                    </div>
+                    <button
+                        type="button"
+                        onClick={handleResetStageThresholds}
+                        className="shrink-0 px-3 py-1 rounded-full text-[10px] font-bold bg-stone-100 text-stone-600 hover:bg-stone-200 transition-colors"
+                    >
+                        恢复默认
+                    </button>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                    {stageThresholdInputs.map((value, index) => (
+                        <label key={index} className="block">
+                            <div className="text-[11px] font-medium text-stone-500 mb-1">
+                                进入阶段 {index + 2}
+                            </div>
+                            <div className="relative">
+                                <input
+                                    type="text"
+                                    inputMode="numeric"
+                                    value={value}
+                                    onChange={(event) => handleStageThresholdChange(index, event.target.value)}
+                                    className="w-full bg-stone-50 border border-stone-200 rounded-lg px-3 py-2 pr-10 text-sm outline-none focus:border-stone-400 focus:ring-1 focus:ring-stone-300 transition-all"
+                                    placeholder={String(DEFAULT_TIMEPAL_STAGE_THRESHOLDS[index])}
+                                />
+                                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[11px] text-stone-400">
+                                    分
+                                </span>
+                            </div>
+                        </label>
+                    ))}
+                </div>
+
+                {stageThresholdValidation.error && (
+                    <div className="mt-3 text-xs text-rose-500">
+                        {stageThresholdValidation.error}
+                    </div>
+                )}
+
+                <div className="mt-4 rounded-xl border border-stone-200 bg-stone-50/80 p-3">
+                    <div className="text-[11px] font-medium text-stone-500 mb-2">
+                        当前阶段范围
+                    </div>
+                    <div className="grid gap-2">
+                        {stageRanges.map(range => (
+                            <div key={range.level} className="flex items-center justify-between gap-3 text-xs">
+                                <span className="font-medium text-stone-600">阶段 {range.level}</span>
+                                <span className="text-stone-500">{range.label}</span>
+                            </div>
+                        ))}
+                    </div>
+                </div>
             </div>
 
             <div className="pt-4 border-t border-stone-200 bg-white rounded-lg p-4 shadow-sm">

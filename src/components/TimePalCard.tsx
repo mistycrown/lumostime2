@@ -14,6 +14,12 @@ import { getAllTimePalTypes, isCustomTimePalType } from '../constants/timePalCon
 import { useTimePalImage } from '../hooks/useTimePalImage';
 import { TIMEPAL_KEYS, storage } from '../constants/storageKeys';
 import { timePalCustomService, TIMEPAL_CUSTOM_CHANGED_EVENT } from '../services/timePalCustomService';
+import {
+    TIMEPAL_STAGE_THRESHOLDS_CHANGED_EVENT,
+    TimePalStageThresholds,
+    calculateTimePalStageLevel,
+    readStoredTimePalStageThresholds
+} from '../utils/timePalStageThresholds';
 
 const TIMEPAL_CLICK_SWITCH_CHANGED_EVENT = 'timepal-click-switch-changed';
 
@@ -23,14 +29,6 @@ interface TimePalCardProps {
     categories: Category[];
     activeSessions?: ActiveSession[];
 }
-
-const calculateFormLevel = (focusHours: number): number => {
-    if (focusHours < 2) return 1;
-    if (focusHours < 4) return 2;
-    if (focusHours < 6) return 3;
-    if (focusHours < 8) return 4;
-    return 5;
-};
 
 const formatDuration = (seconds: number): string => {
     const h = Math.floor(seconds / 3600);
@@ -63,8 +61,10 @@ export const TimePalCard: React.FC<TimePalCardProps> = ({ logs, currentDate, cat
     });
     const [currentTime, setCurrentTime] = useState(Date.now());
     const [debugMode, setDebugMode] = useState(false);
-    const [debugFocusSeconds, setDebugFocusSeconds] = useState(0);
-    const [debugLevel, setDebugLevel] = useState(1);
+    const [debugFocusMinutes, setDebugFocusMinutes] = useState(0);
+    const [stageThresholds, setStageThresholds] = useState<TimePalStageThresholds>(() => {
+        return readStoredTimePalStageThresholds();
+    });
 
     useEffect(() => {
         if (activeSessions.length > 0) {
@@ -119,10 +119,14 @@ export const TimePalCard: React.FC<TimePalCardProps> = ({ logs, currentDate, cat
         const syncClickSwitchEnabled = () => {
             setIsClickSwitchEnabled(storage.getBoolean(TIMEPAL_KEYS.CLICK_SWITCH_ENABLED, true));
         };
+        const syncStageThresholds = () => {
+            setStageThresholds(readStoredTimePalStageThresholds());
+        };
 
         const handleStorageChange = () => {
             syncTimePalType();
             syncClickSwitchEnabled();
+            syncStageThresholds();
         };
         const handleTypeChange = () => {
             syncTimePalType();
@@ -130,25 +134,29 @@ export const TimePalCard: React.FC<TimePalCardProps> = ({ logs, currentDate, cat
         const handleClickSwitchChange = () => {
             syncClickSwitchEnabled();
         };
+        const handleStageThresholdsChange = () => {
+            syncStageThresholds();
+        };
         const handleDebugMode = (event: CustomEvent) => {
-            const { enabled, type, level, focusHours } = event.detail;
+            const { enabled, type, focusMinutes } = event.detail;
             setDebugMode(enabled);
             if (enabled) {
                 setTimePalType(type);
-                setDebugLevel(level);
-                setDebugFocusSeconds(focusHours * 3600);
+                setDebugFocusMinutes(focusMinutes);
             }
         };
 
         window.addEventListener('storage', handleStorageChange);
         window.addEventListener('timepal-type-changed', handleTypeChange);
         window.addEventListener(TIMEPAL_CLICK_SWITCH_CHANGED_EVENT, handleClickSwitchChange);
+        window.addEventListener(TIMEPAL_STAGE_THRESHOLDS_CHANGED_EVENT, handleStageThresholdsChange);
         window.addEventListener('timepal-debug-mode', handleDebugMode as EventListener);
 
         return () => {
             window.removeEventListener('storage', handleStorageChange);
             window.removeEventListener('timepal-type-changed', handleTypeChange);
             window.removeEventListener(TIMEPAL_CLICK_SWITCH_CHANGED_EVENT, handleClickSwitchChange);
+            window.removeEventListener(TIMEPAL_STAGE_THRESHOLDS_CHANGED_EVENT, handleStageThresholdsChange);
             window.removeEventListener('timepal-debug-mode', handleDebugMode as EventListener);
         };
     }, []);
@@ -177,8 +185,8 @@ export const TimePalCard: React.FC<TimePalCardProps> = ({ logs, currentDate, cat
     const { totalFocusSeconds, formLevel } = useMemo(() => {
         if (debugMode) {
             return {
-                totalFocusSeconds: debugFocusSeconds,
-                formLevel: debugLevel
+                totalFocusSeconds: debugFocusMinutes * 60,
+                formLevel: calculateTimePalStageLevel(debugFocusMinutes, stageThresholds)
             };
         }
 
@@ -223,14 +231,13 @@ export const TimePalCard: React.FC<TimePalCardProps> = ({ logs, currentDate, cat
             });
         }
 
-        const focusHours = totalSeconds / 3600;
-        const level = calculateFormLevel(focusHours);
+        const level = calculateTimePalStageLevel(totalSeconds / 60, stageThresholds);
 
         return {
             totalFocusSeconds: totalSeconds,
             formLevel: level
         };
-    }, [logs, currentDate, categories, activeSessions, currentTime, debugMode, debugFocusSeconds, debugLevel]);
+    }, [logs, currentDate, categories, activeSessions, currentTime, debugMode, debugFocusMinutes, stageThresholds]);
 
     const { imageUrl, hasError: imageError, emoji, handleImageError } = useTimePalImage(effectiveTimePalType, formLevel);
     const imageFitClass = isCustomTimePalType(effectiveTimePalType) ? 'object-fill' : 'object-cover';
