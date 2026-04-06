@@ -2,7 +2,7 @@
  * @file achievementBottleIconPackService.ts
  * @description Shared achievement bottle icon-pack metadata used by settings persistence, sponsorship controls, and bottle rendering.
  *
- * @updated 2026-03-28: Auto-discovers bundled icon packs from public/stars and uses the standardized 01.webp cover image for fallback previews.
+ * @updated 2026-04-06: Replaced invalid public asset imports with generated public URL paths shared by settings and bottle rendering.
  */
 
 export type AchievementBottleIconPack = string;
@@ -15,6 +15,18 @@ export interface AchievementBottleIconPackOption {
 }
 
 export const DEFAULT_ACHIEVEMENT_BOTTLE_ICON_PACK: AchievementBottleIconPack = 'star1';
+const ICON_PACK_FRAME_COUNTS: Record<AchievementBottleIconPack, number> = {
+  candy: 16,
+  coin: 13,
+  flower1: 22,
+  leaf: 16,
+  paper: 16,
+  planet: 19,
+  sea: 16,
+  star1: 18,
+  stone: 16
+};
+
 const FALLBACK_ICON_PACKS: AchievementBottleIconPack[] = [
   'star1',
   'flower1',
@@ -27,19 +39,15 @@ const FALLBACK_ICON_PACKS: AchievementBottleIconPack[] = [
   'stone'
 ];
 
-const ICON_PACK_PREVIEW_PATHS = FALLBACK_ICON_PACKS.reduce<Record<string, string>>((result, packName) => {
-  result[packName] = `/stars/${packName}/01.webp`;
-  return result;
-}, {});
+const getAchievementBottleIconPackFrameFileName = (frameNumber: number): string => {
+  return `${String(frameNumber).padStart(2, '0')}.webp`;
+};
 
-const ICON_PACK_FILE_PATHS = Object.keys(import.meta.glob('../../../public/stars/*/*.{png,jpg,jpeg,webp,svg}'));
-
-const toPublicAssetPath = (filePath: string): string => {
-  const normalizedPath = filePath.replace(/\\/g, '/');
-  const publicPathIndex = normalizedPath.indexOf('/public/');
-  return publicPathIndex >= 0
-    ? normalizedPath.slice(publicPathIndex + '/public'.length)
-    : normalizedPath.replace(/^\.\.\/\.\.\/\.\.\/public/, '');
+const getAchievementBottleIconPackFrameUrl = (
+  packName: AchievementBottleIconPack,
+  frameNumber: number
+): string => {
+  return `/stars/${packName}/${getAchievementBottleIconPackFrameFileName(frameNumber)}`;
 };
 
 const ICON_PACK_META: Record<string, Omit<AchievementBottleIconPackOption, 'value'>> = {
@@ -90,36 +98,35 @@ const toTitleCase = (value: string): string => {
     .replace(/\b\w/g, (char) => char.toUpperCase());
 };
 
-const discoveredIconPacks = Array.from(new Set(
-  ICON_PACK_FILE_PATHS
-    .map((filePath) => filePath.split('/').at(-2))
-    .filter((packName): packName is string => Boolean(packName))
-))
+const availableIconPacks = Array.from(new Set([
+  ...FALLBACK_ICON_PACKS,
+  ...Object.keys(ICON_PACK_META),
+  ...Object.keys(ICON_PACK_FRAME_COUNTS)
+]))
   .sort((first, second) => {
     if (first === DEFAULT_ACHIEVEMENT_BOTTLE_ICON_PACK) return -1;
     if (second === DEFAULT_ACHIEVEMENT_BOTTLE_ICON_PACK) return 1;
     return first.localeCompare(second, undefined, { numeric: true });
   });
 
-const availableIconPacks = discoveredIconPacks.length > 0 ? discoveredIconPacks : FALLBACK_ICON_PACKS;
+export const getAchievementBottleIconPackFramePaths = (
+  packName: AchievementBottleIconPack
+): string[] => {
+  const frameCount = ICON_PACK_FRAME_COUNTS[packName];
 
-const iconPackPreviewMap = ICON_PACK_FILE_PATHS.reduce<Record<string, string[]>>((accumulator, filePath) => {
-  const normalizedPath = filePath.replace(/\\/g, '/');
-  const packName = normalizedPath.split('/').at(-2);
-  if (!packName) return accumulator;
-
-  if (!accumulator[packName]) {
-    accumulator[packName] = [];
+  if (!frameCount || frameCount < 1) {
+    return [];
   }
 
-  accumulator[packName].push(toPublicAssetPath(normalizedPath));
-  accumulator[packName].sort((first, second) => first.localeCompare(second, undefined, { numeric: true }));
-  return accumulator;
-}, {});
+  return Array.from({ length: frameCount }, (_, index) => {
+    return getAchievementBottleIconPackFrameUrl(packName, index + 1);
+  });
+};
 
 export const ACHIEVEMENT_BOTTLE_ICON_PACK_OPTIONS: AchievementBottleIconPackOption[] = availableIconPacks.map((packName) => {
   const meta = ICON_PACK_META[packName];
-  const previewImageSrc = iconPackPreviewMap[packName]?.[0] || ICON_PACK_PREVIEW_PATHS[packName];
+  const previewImageSrc = getAchievementBottleIconPackFramePaths(packName)[0]
+    || getAchievementBottleIconPackFrameUrl(packName, 1);
 
   return {
     value: packName,
@@ -144,7 +151,7 @@ export const getAchievementBottleIconPackOption = (
       value: DEFAULT_ACHIEVEMENT_BOTTLE_ICON_PACK,
       label: 'Star',
       description: 'Default star sprite pack.',
-      previewImageSrc: iconPackPreviewMap[DEFAULT_ACHIEVEMENT_BOTTLE_ICON_PACK]?.[0]
-        || ICON_PACK_PREVIEW_PATHS[DEFAULT_ACHIEVEMENT_BOTTLE_ICON_PACK]
+      previewImageSrc: getAchievementBottleIconPackFramePaths(DEFAULT_ACHIEVEMENT_BOTTLE_ICON_PACK)[0]
+        || getAchievementBottleIconPackFrameUrl(DEFAULT_ACHIEVEMENT_BOTTLE_ICON_PACK, 1)
     };
 };

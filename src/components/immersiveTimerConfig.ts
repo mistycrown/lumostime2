@@ -14,12 +14,12 @@ export const IMMERSIVE_TIMER_LETTER_SPACING = '0.01em';
 export const IMMERSIVE_TIMER_TOP_INSET = 'max(env(safe-area-inset-top, 0px), var(--status-bar-height, 0px))';
 export const IMMERSIVE_TIMER_DIGIT_SLOT_WIDTH = '2.45ch';
 export const IMMERSIVE_TIMER_DIGIT_SLOT_WIDTH_PER_CHARACTER = 1.12;
-export const IMMERSIVE_TIMER_SEPARATOR_SLOT_WIDTH = '0.01ch';
-export const IMMERSIVE_TIMER_LANDSCAPE_DIGIT_WIDTH_SCALE = 0.84;
-export const IMMERSIVE_TIMER_HORIZONTAL_PADDING = '0.1rem';
+export const IMMERSIVE_TIMER_SEPARATOR_SLOT_WIDTH = '0';
+export const IMMERSIVE_TIMER_LANDSCAPE_DIGIT_WIDTH_SCALE = 0.78;
+export const IMMERSIVE_TIMER_HORIZONTAL_PADDING = '0';
 export const IMMERSIVE_TIMER_LANDSCAPE_SIZE = {
-  widthRatio: 0.34,
-  heightRatio: 0.68,
+  widthRatio: 0.38,
+  heightRatio: 0.74,
   finalScale: 1,
 } as const;
 export const IMMERSIVE_TIMER_LANDSCAPE_VIEWPORT = {
@@ -27,7 +27,8 @@ export const IMMERSIVE_TIMER_LANDSCAPE_VIEWPORT = {
   height: 0.94,
   maxWidth: '99vw',
 } as const;
-export const IMMERSIVE_TIMER_PORTRAIT_DIGIT_SIZE = 'min(46vw, 30vh)';
+export const IMMERSIVE_TIMER_PORTRAIT_DIGIT_SIZE = 'min(50vw, 33vh)';
+export const IMMERSIVE_TIMER_PORTRAIT_TWO_SEGMENT_DIGIT_SIZE = 'min(58vw, 40vh)';
 
 export const IMMERSIVE_TIMER_COLORS = {
   background: '#000000',
