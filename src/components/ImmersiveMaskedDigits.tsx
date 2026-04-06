@@ -113,12 +113,12 @@ const immersiveMaskStyles = `
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 0.28rem;
+  gap: 0.18rem;
 }
 
 .immersive-mask__portrait-value {
   position: relative;
-  height: 1em;
+  height: 1.02em;
 }
 
 .immersive-mask__motion,

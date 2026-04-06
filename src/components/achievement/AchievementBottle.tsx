@@ -2,7 +2,7 @@
  * @file AchievementBottle.tsx
  * @description Physics-driven achievement bottle visualization with switchable bottle skins for the achievement page and sponsorship previews.
  *
- * @updated 2026-03-29: Added layered glass collision sound playback for bottle-wall impacts and occasional star-to-star accents during shake interactions.
+ * @updated 2026-04-06: Switched achievement icon pack image lookup to generated public URLs instead of invalid public-directory imports.
  */
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Capacitor } from '@capacitor/core';
@@ -14,6 +14,7 @@ import {
 } from '../../services/achievementBottleStyleService';
 import {
   DEFAULT_ACHIEVEMENT_BOTTLE_ICON_PACK,
+  getAchievementBottleIconPackFramePaths,
   type AchievementBottleIconPack
 } from '../../services/achievementBottleIconPackService';
 import {
@@ -109,32 +110,7 @@ const SCATTER_INTENSITY_THRESHOLD = 2.1;
 const SCATTER_INTENSITY_CAP = 5.2;
 const BOUNDARY_LABEL_PREFIX = 'achievement-boundary-';
 const STAR_BODY_LABEL = 'achievement-star';
-const STAR_IMAGE_PATH_ENTRIES = Object.entries(
-  import.meta.glob<string>(
-    '../../../public/stars/*/*.{png,jpg,jpeg,webp,svg}',
-    {
-      eager: true,
-      import: 'default'
-    }
-  )
-)
-  .sort(([firstPath], [secondPath]) => firstPath.localeCompare(secondPath, undefined, { numeric: true }));
-
-const STAR_IMAGE_PATHS_BY_PACK = STAR_IMAGE_PATH_ENTRIES.reduce<Record<string, string[]>>((result, [filePath, assetUrl]) => {
-  const segments = filePath.split('/');
-  const packName = segments[segments.length - 2];
-
-  if (!packName) {
-    return result;
-  }
-
-  if (!result[packName]) {
-    result[packName] = [];
-  }
-
-  result[packName].push(assetUrl);
-  return result;
-}, {});
+const STAR_IMAGE_PATHS_BY_PACK: Record<string, string[]> = {};
 
 const PREVIEW_STAR_LAYOUTS: PreviewStarSpec[] = [
   { left: '16%', top: '78%', rotate: -12, scale: 0.96, opacity: 0.74 },
@@ -341,15 +317,19 @@ const getStableStarImagePath = (
   styleVariant: AchievementBottleStyle,
   iconPack: AchievementBottleIconPack
 ): string | null => {
-  const imagePaths = STAR_IMAGE_PATHS_BY_PACK[iconPack] || STAR_IMAGE_PATHS_BY_PACK[DEFAULT_ACHIEVEMENT_BOTTLE_ICON_PACK] || [];
+  const imagePaths = STAR_IMAGE_PATHS_BY_PACK[iconPack]
+    || (STAR_IMAGE_PATHS_BY_PACK[iconPack] = getAchievementBottleIconPackFramePaths(iconPack));
+  const fallbackImagePaths = STAR_IMAGE_PATHS_BY_PACK[DEFAULT_ACHIEVEMENT_BOTTLE_ICON_PACK]
+    || (STAR_IMAGE_PATHS_BY_PACK[DEFAULT_ACHIEVEMENT_BOTTLE_ICON_PACK] = getAchievementBottleIconPackFramePaths(DEFAULT_ACHIEVEMENT_BOTTLE_ICON_PACK));
+  const stableImagePaths = imagePaths.length > 0 ? imagePaths : fallbackImagePaths;
 
-  if (imagePaths.length === 0) {
+  if (stableImagePaths.length === 0) {
     return null;
   }
 
   const hash = getStableStarHash(`${styleVariant}:${iconPack}:${index}:image`);
 
-  return imagePaths[hash % imagePaths.length] || null;
+  return stableImagePaths[hash % stableImagePaths.length] || null;
 };
 
 const getStableStarScale = (index: number, styleVariant: AchievementBottleStyle): number => {

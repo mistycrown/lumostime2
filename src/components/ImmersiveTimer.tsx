@@ -24,6 +24,7 @@ import {
   IMMERSIVE_TIMER_LETTER_SPACING,
   IMMERSIVE_TIMER_MODAL_THEME,
   IMMERSIVE_TIMER_PORTRAIT_DIGIT_SIZE,
+  IMMERSIVE_TIMER_PORTRAIT_TWO_SEGMENT_DIGIT_SIZE,
   IMMERSIVE_TIMER_SEPARATOR_SLOT_WIDTH,
   IMMERSIVE_TIMER_TOP_INSET,
 } from './immersiveTimerConfig';
@@ -143,6 +144,9 @@ export const ImmersiveTimer: React.FC<ImmersiveTimerProps> = ({ elapsed, onExit,
     now: new Date(),
   });
   const valueParts = displayParts.filter((part) => part.kind === 'value');
+  const portraitDigitSize = valueParts.length <= 2
+    ? IMMERSIVE_TIMER_PORTRAIT_TWO_SEGMENT_DIGIT_SIZE
+    : IMMERSIVE_TIMER_PORTRAIT_DIGIT_SIZE;
   const digitSlotWidth = getImmersiveDigitSlotWidth(valueParts.map((part) => part.value));
   const displaySignature = `${displaySource}-${displayFormat}-${displayParts.map((part) => part.value).join('')}`;
   const selectedArt = getImmersiveArtOptionById(selectedArtId);
@@ -566,7 +570,7 @@ export const ImmersiveTimer: React.FC<ImmersiveTimerProps> = ({ elapsed, onExit,
         <div
           className="relative z-10 select-none"
           style={{
-            fontSize: IMMERSIVE_TIMER_PORTRAIT_DIGIT_SIZE,
+            fontSize: portraitDigitSize,
             fontFamily: IMMERSIVE_TIMER_FONT_FAMILY,
             fontWeight: IMMERSIVE_TIMER_FONT_WEIGHT,
             letterSpacing: IMMERSIVE_TIMER_LETTER_SPACING,

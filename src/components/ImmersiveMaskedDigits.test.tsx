@@ -32,6 +32,8 @@ describe('ImmersiveMaskedDigits', () => {
     expect(markup).not.toContain('小时');
     expect(markup).not.toContain('分钟');
     expect(markup).not.toContain('秒');
+    expect(markup).toContain('gap: 0.18rem;');
+    expect(markup).toContain('height: 1.02em;');
   });
 
   test('renders a single masked landscape art layer with tighter separator spacing', () => {
@@ -57,6 +59,27 @@ describe('ImmersiveMaskedDigits', () => {
     expect(markup).toContain('>46<');
     expect(markup).toContain('>35<');
     expect(markup).toContain('font-variant-numeric:lining-nums tabular-nums');
-    expect(markup).toContain('width:6.19ch');
+    expect(markup).toContain('width:5.73ch');
+  });
+
+  test('renders a two-segment portrait stack with the same tighter spacing treatment', () => {
+    const markup = renderToStaticMarkup(
+      <ImmersiveMaskedDigits
+        orientation="portrait"
+        displayParts={[
+          { kind: 'value', value: '00', label: '分钟' },
+          { kind: 'separator', value: ':' },
+          { kind: 'value', value: '40', label: '秒' },
+        ]}
+        digitSlotWidth="2.45ch"
+        artSrc="/timer_bak/Van_Gogh_-_Starry_Night_-_Google_Art_Project.jpg.webp"
+        motionStyle="sweep"
+      />
+    );
+
+    expect(markup).toContain('>00<');
+    expect(markup).toContain('>40<');
+    expect(markup).toContain('gap: 0.18rem;');
+    expect(markup).toContain('height: 1.02em;');
   });
 });
