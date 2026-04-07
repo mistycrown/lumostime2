@@ -133,6 +133,32 @@ export class S3Service {
         this.disconnect();
     }
 
+    private buildFreshJsonDownloadParams(filename: string) {
+        return {
+            Bucket: this.config!.bucketName,
+            Region: this.config!.region,
+            Key: filename,
+            DataType: 'text' as const,
+            Query: {
+                _: Date.now().toString()
+            },
+            ResponseCacheControl: 'no-cache, no-store, must-revalidate',
+            ResponseContentType: 'application/json'
+        };
+    }
+
+    private async normalizeJsonBody(body: string | Blob | ArrayBuffer): Promise<string> {
+        if (typeof body === 'string') {
+            return body;
+        }
+
+        if (body instanceof Blob) {
+            return await body.text();
+        }
+
+        return new TextDecoder('utf-8').decode(new Uint8Array(body));
+    }
+
     /**
      * Test COS connection by attempting to access the bucket
      */
@@ -235,6 +261,7 @@ export class S3Service {
                 Region: this.config!.region,
                 Key: filename,
                 Body: contentBlob,
+                CacheControl: 'no-cache, no-store, must-revalidate',
                 Headers: {
                     'Content-Length': String(contentBlob.size),
                     'Content-Type': 'application/json'
@@ -261,17 +288,13 @@ export class S3Service {
             // console.log(`[COS] Downloading data: ${filename}`);
 
 
-            this.client.getObject({
-                Bucket: this.config!.bucketName,
-                Region: this.config!.region,
-                Key: filename
-            }, (err: any, data: any) => {
+            this.client.getObject(this.buildFreshJsonDownloadParams(filename), async (err: any, data: any) => {
                 if (err) {
                     console.error(`[COS] Download failed: ${filename}`, err);
                     reject(err);
                 } else {
                     try {
-                        const content = data.Body;
+                        const content = await this.normalizeJsonBody(data.Body);
                         // console.log(`[COS] ✓ Download completed: ${filename}, size: ${content.length} bytes`);
                         const parsedData = JSON.parse(content);
                         resolve(parsedData);
@@ -484,6 +507,7 @@ export class S3Service {
                 Region: this.config!.region,
                 Key: filename,
                 Body: bodyBlob,
+                CacheControl: 'no-cache, no-store, must-revalidate',
                 Headers: {
                     'Content-Length': String(bodyBlob.size),
                     'Content-Type': 'application/json'
@@ -511,11 +535,7 @@ export class S3Service {
         return new Promise((resolve, reject) => {
             // console.log(`[COS] Downloading image list: ${filename}`);
 
-            this.client.getObject({
-                Bucket: this.config!.bucketName,
-                Region: this.config!.region,
-                Key: filename
-            }, (err: any, data: any) => {
+            this.client.getObject(this.buildFreshJsonDownloadParams(filename), async (err: any, data: any) => {
                 if (err) {
                     if (err.code === 'NoSuchKey') {
                         // console.log('[COS] Image list file not found');
@@ -526,7 +546,7 @@ export class S3Service {
                     }
                 } else {
                     try {
-                        const content = data.Body;
+                        const content = await this.normalizeJsonBody(data.Body);
                         const parsedData = JSON.parse(content);
 
                         // console.log(`[COS] ✓ Image list downloaded: ${parsedData.images?.length || 0} images`);

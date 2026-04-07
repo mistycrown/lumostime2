@@ -10,6 +10,7 @@
 
 import React, { useState } from 'react';
 import { ICON_OPTIONS } from '../services/iconService';
+import { resolveAssetPath } from '../utils/assetPath';
 
 interface IconPreviewProps {
     iconId: string;
@@ -43,7 +44,7 @@ export const IconPreview: React.FC<IconPreviewProps> = ({
 
     // 从iconService获取正确的图标路径
     const iconOption = ICON_OPTIONS.find(option => option.id === iconId);
-    const iconPath = iconOption?.desktopIcon || '/icon.ico';
+    const iconPath = resolveAssetPath(iconOption?.desktopIcon || '/icon.ico');
     const fallbackEmoji = iconOption?.preview || '⏰';
 
     // 如果图片加载失败，显示 emoji

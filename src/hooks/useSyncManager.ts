@@ -73,6 +73,14 @@ export const useSyncManager = () => {
 
         try {
             const hasField = (key: string) => Object.prototype.hasOwnProperty.call(data, key);
+            console.log('[Sync] handleSyncDataUpdate incoming summary:', {
+                incomingTimestamp: data?.timestamp,
+                currentLogsCount: logs.length,
+                incomingLogsCount: Array.isArray(data?.logs) ? data.logs.length : 'unchanged',
+                currentTodosCount: todos.length,
+                incomingTodosCount: Array.isArray(data?.todos) ? data.todos.length : 'unchanged',
+                currentView
+            });
 
             if (hasField('logs')) setLogs(data.logs);
             if (hasField('categories')) setCategories(data.categories);
@@ -112,6 +120,7 @@ export const useSyncManager = () => {
             }
 
             await new Promise(resolve => setTimeout(resolve, 10));
+            console.log('[Sync] handleSyncDataUpdate applied restore payload');
 
             // console.log('[App] 同步数据更新完成');
             if (currentView === AppView.TIMELINE) {

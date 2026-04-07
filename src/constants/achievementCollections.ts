@@ -85,8 +85,8 @@ const DEFAULT_ACHIEVEMENT_COLLECTION_DEFINITIONS: DefaultAchievementCollectionDe
   },
   {
     assetId: '14',
-    name: '纸卷细瓶',
-    description: '窄长的小瓶里收着卷起的纸条，像一支等待展开的秘密注脚。'
+    name: '尤加利标本瓶',
+    description: '透明细瓶里留着一枝淡绿色叶片，像把安静生长的一点清新封存在光里。'
   },
   {
     assetId: '15',

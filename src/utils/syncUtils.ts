@@ -152,6 +152,13 @@ export async function downloadDataFromCloud(
   try {
     onProgress?.(`正在从${displayName}下载数据...`);
     const rawData = await service.downloadData();
+    console.log('[syncUtils] Raw cloud payload summary:', {
+      service: displayName,
+      timestamp: rawData?.timestamp,
+      logsCount: Array.isArray(rawData?.logs) ? rawData.logs.length : 'not-array',
+      todosCount: Array.isArray(rawData?.todos) ? rawData.todos.length : 'not-array',
+      categoriesCount: Array.isArray(rawData?.categories) ? rawData.categories.length : 'not-array'
+    });
 
     if (!rawData) {
       return {
@@ -161,6 +168,15 @@ export async function downloadDataFromCloud(
     }
 
     const { data, result } = validateAndFixData(rawData);
+    console.log('[syncUtils] Validated restore payload summary:', {
+      service: displayName,
+      timestamp: data?.timestamp,
+      logsCount: Array.isArray(data?.logs) ? data.logs.length : 'not-array',
+      todosCount: Array.isArray(data?.todos) ? data.todos.length : 'not-array',
+      categoriesCount: Array.isArray(data?.categories) ? data.categories.length : 'not-array',
+      validationErrors: result.errors,
+      validationWarnings: result.warnings
+    });
     if (!result.isValid) {
       console.error('[syncUtils] Invalid restore payload:', result.errors, rawData);
       return {
