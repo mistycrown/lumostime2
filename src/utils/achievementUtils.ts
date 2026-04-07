@@ -5,7 +5,7 @@
  * @pos Utility (Achievement)
  * @description 成就系统计算工具 - 负责每日快照计算、日期枚举和账本汇总。
  *
- * @updated 2026-04-06: Added fixed-range seal preview helpers and active-bottle balance support for shattered bottle returns.
+ * @updated 2026-04-07: Separates live-period spending from remaining carryover so archived carryover-funded redemptions do not inflate the active balance.
  */
 import {
   AchievementArchivedBottle,
@@ -27,11 +27,23 @@ const ACHIEVEMENT_STAR_FACTOR = 10 ** ACHIEVEMENT_STAR_DECIMALS;
 
 interface AchievementSpendRecordLike {
   cost: number;
+  paidFromCarryover?: number;
+  paidFromLiveStars?: number;
 }
 
 interface AchievementActionRecordLike {
   actionType: AchievementBottleActionRecord['actionType'];
   amount: number;
+}
+
+interface AchievementFundingLike {
+  cost: number;
+  paidFromCarryover?: number;
+  paidFromLiveStars?: number;
+}
+
+interface AchievementSealRedemptionFragment extends AchievementRedemptionRecord {
+  sourceRecordId: string;
 }
 
 const createDateAtNoon = (dateStr: string): Date => {
@@ -58,6 +70,32 @@ export const normalizeAchievementStarValue = (value: number): number => {
   const safeValue = Number.isFinite(value) ? value : 0;
   const rounded = Math.round((safeValue + Number.EPSILON) * ACHIEVEMENT_STAR_FACTOR) / ACHIEVEMENT_STAR_FACTOR;
   return Object.is(rounded, -0) ? 0 : rounded;
+};
+
+export const normalizeAchievementRedemptionRecordFunding = <T extends AchievementFundingLike>(record: T) => {
+  const normalizedCost = Math.max(0, normalizeAchievementStarValue(record.cost || 0));
+  const normalizedCarryover = Math.max(
+    0,
+    Math.min(normalizedCost, normalizeAchievementStarValue(record.paidFromCarryover || 0))
+  );
+  const normalizedLive = Math.max(
+    0,
+    Math.min(
+      normalizeAchievementStarValue(
+        record.paidFromLiveStars === undefined
+          ? normalizedCost - normalizedCarryover
+          : record.paidFromLiveStars || 0
+      ),
+      normalizeAchievementStarValue(normalizedCost - normalizedCarryover)
+    )
+  );
+
+  return {
+    ...record,
+    cost: normalizedCost,
+    paidFromCarryover: normalizedCarryover,
+    paidFromLiveStars: normalizedLive
+  };
 };
 
 export const formatAchievementStars = (value: number): string => {
@@ -225,14 +263,26 @@ export const calculateAchievementSnapshotFlows = (snapshots: AchievementDailySna
 export const calculateAchievementAvailableStars = (
   snapshots: AchievementDailySnapshot[],
   spendRecords: AchievementSpendRecordLike[],
-  actionRecords: AchievementActionRecordLike[] = []
+  actionRecords: AchievementActionRecordLike[] = [],
+  activeBottleCarryoverStars?: number
 ): number => {
   const earned = snapshots.reduce((sum, item) => sum + item.netDelta, 0);
-  const spent = spendRecords.reduce((sum, item) => sum + item.cost, 0);
   const returned = actionRecords.reduce((sum, item) => (
     item.actionType === 'shatter' ? sum + item.amount : sum
   ), 0);
-  return normalizeAchievementStarValue(earned - spent + returned);
+  const spentFromCarryover = spendRecords.reduce((sum, item) => {
+    const normalized = normalizeAchievementRedemptionRecordFunding(item);
+    return sum + normalized.paidFromCarryover;
+  }, 0);
+  const spentFromLiveStars = spendRecords.reduce((sum, item) => {
+    const normalized = normalizeAchievementRedemptionRecordFunding(item);
+    return sum + normalized.paidFromLiveStars;
+  }, 0);
+  const remainingCarryoverStars = activeBottleCarryoverStars === undefined
+    ? normalizeAchievementStarValue(returned - spentFromCarryover)
+    : normalizeAchievementStarValue(activeBottleCarryoverStars);
+
+  return normalizeAchievementStarValue(earned - spentFromLiveStars + remainingCarryoverStars);
 };
 
 export const calculateAchievementTotalEarned = (snapshots: AchievementDailySnapshot[]): number => {
@@ -285,7 +335,10 @@ export const getAchievementSealPreview = ({
     redemptionsInRange.reduce((sum, record) => sum + record.cost, 0)
   );
   const rewardSpentFromLiveStars = normalizeAchievementStarValue(
-    redemptionsInRange.reduce((sum, record) => sum + (record.cost - (record.paidFromCarryover || 0)), 0)
+    redemptionsInRange.reduce((sum, record) => {
+      const normalized = normalizeAchievementRedemptionRecordFunding(record);
+      return sum + normalized.paidFromLiveStars;
+    }, 0)
   );
 
   return {
@@ -296,6 +349,58 @@ export const getAchievementSealPreview = ({
     sealableStars: normalizeAchievementStarValue(snapshotFlows.netStars - rewardSpentFromLiveStars),
     snapshotIds: snapshotsInRange.map((snapshot) => snapshot.id),
     redemptionRecordIds: redemptionsInRange.map((record) => record.id)
+  };
+};
+
+export const partitionAchievementRedemptionsForSeal = ({
+  startDate,
+  endDate,
+  redemptionRecords
+}: {
+  startDate: string;
+  endDate: string;
+  redemptionRecords: AchievementRedemptionRecord[];
+}) => {
+  const archivedRecords: AchievementSealRedemptionFragment[] = [];
+  const remainingActiveRecords: AchievementSealRedemptionFragment[] = [];
+
+  redemptionRecords.forEach((record) => {
+    const normalized = normalizeAchievementRedemptionRecordFunding(record);
+    const recordDate = getLocalDateStr(new Date(record.redeemedAt));
+    const inRange = isAchievementDateInRange(recordDate, startDate, endDate);
+
+    if (!inRange) {
+      remainingActiveRecords.push({
+        ...normalized,
+        sourceRecordId: record.id
+      });
+      return;
+    }
+
+    if (normalized.paidFromLiveStars > 0) {
+      archivedRecords.push({
+        ...normalized,
+        cost: normalized.paidFromLiveStars,
+        paidFromCarryover: 0,
+        paidFromLiveStars: normalized.paidFromLiveStars,
+        sourceRecordId: record.id
+      });
+    }
+
+    if (normalized.paidFromCarryover > 0) {
+      remainingActiveRecords.push({
+        ...normalized,
+        cost: normalized.paidFromCarryover,
+        paidFromCarryover: normalized.paidFromCarryover,
+        paidFromLiveStars: 0,
+        sourceRecordId: record.id
+      });
+    }
+  });
+
+  return {
+    archivedRecords,
+    remainingActiveRecords
   };
 };
 

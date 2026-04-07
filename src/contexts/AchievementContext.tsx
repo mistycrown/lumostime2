@@ -1,7 +1,7 @@
 ﻿/**
  * @file AchievementContext.tsx
  * @description Manages achievement bottle data, live snapshots, archived bottles, and reward redemption records with repository hydration and selective recent-day recomputation.
- * @updated 2026-04-06: Replaced collectible bottle purchases with sealable archived bottles and shatter return logic.
+ * @updated 2026-04-07: Separates live and carryover redemption funding so sealing only archives live-period spending.
  */
 import React, { createContext, ReactNode, useContext, useEffect, useRef, useState } from 'react';
 import { dataRepository } from '../repositories/dataRepository';
@@ -26,9 +26,11 @@ import {
   getAchievementActiveStartDate,
   getAchievementSealPreview,
   getAchievementYesterday,
+  normalizeAchievementRedemptionRecordFunding,
   normalizeAchievementStarValue,
   normalizeAchievementRule,
   normalizeAchievementSnapshot,
+  partitionAchievementRedemptionsForSeal,
   sortAchievementSnapshots
 } from '../utils/achievementUtils';
 import { getLocalDateStr } from '../utils/dateUtils';
@@ -110,12 +112,19 @@ const normalizeCollection = (collection: AchievementCollection): AchievementColl
   description: collection.description?.trim() || undefined
 });
 
-const normalizeRedemptionRecord = (record: AchievementRedemptionRecord): AchievementRedemptionRecord => ({
-  ...record,
-  cost: Math.max(0.1, normalizeAchievementStarValue(record.cost || 0.1)),
-  paidFromCarryover: Math.max(0, normalizeAchievementStarValue(record.paidFromCarryover || 0)),
-  note: record.note?.trim() || undefined
-});
+const normalizeRedemptionRecord = (record: AchievementRedemptionRecord): AchievementRedemptionRecord => {
+  const normalizedFunding = normalizeAchievementRedemptionRecordFunding({
+    ...record,
+    cost: Math.max(0.1, normalizeAchievementStarValue(record.cost || 0.1))
+  });
+
+  return {
+    ...normalizedFunding,
+    paidFromCarryover: normalizedFunding.paidFromCarryover || undefined,
+    paidFromLiveStars: normalizedFunding.paidFromLiveStars || undefined,
+    note: record.note?.trim() || undefined
+  };
+};
 
 const normalizeCollectionRecord = (record: AchievementCollectionRecord): AchievementCollectionRecord => ({
   ...record,
@@ -388,7 +397,8 @@ export const AchievementProvider: React.FC<{ children: ReactNode }> = ({ childre
     const currentAvailableStars = calculateAchievementAvailableStars(
       dailySnapshots,
       [...redemptionRecords, ...collectionRecords],
-      bottleActionRecords
+      bottleActionRecords,
+      meta.activeBottleCarryoverStars
     );
     const normalizedRewardCost = Math.max(0.1, normalizeAchievementStarValue(reward.cost || 0.1));
 
@@ -400,6 +410,7 @@ export const AchievementProvider: React.FC<{ children: ReactNode }> = ({ childre
     }
 
     const paidFromCarryover = Math.min(meta.activeBottleCarryoverStars, normalizedRewardCost);
+    const paidFromLiveStars = normalizeAchievementStarValue(normalizedRewardCost - paidFromCarryover);
     const nextRecord: AchievementRedemptionRecord = {
       id: crypto.randomUUID(),
       rewardId: reward.id,
@@ -407,6 +418,7 @@ export const AchievementProvider: React.FC<{ children: ReactNode }> = ({ childre
       cost: normalizedRewardCost,
       redeemedAt: Date.now(),
       paidFromCarryover: paidFromCarryover || undefined,
+      paidFromLiveStars: paidFromLiveStars || undefined,
       note: note?.trim() || undefined
     };
 
@@ -449,9 +461,37 @@ export const AchievementProvider: React.FC<{ children: ReactNode }> = ({ childre
     }
 
     const snapshotMap = new Set(sealPreview.snapshotIds);
-    const redemptionMap = new Set(sealPreview.redemptionRecordIds);
     const snapshotsToArchive = dailySnapshots.filter((snapshot) => snapshotMap.has(snapshot.id));
-    const redemptionsToArchive = redemptionRecords.filter((record) => redemptionMap.has(record.id));
+    const { archivedRecords, remainingActiveRecords } = partitionAchievementRedemptionsForSeal({
+      startDate: sealPreview.startDate,
+      endDate: sealPreview.endDate,
+      redemptionRecords
+    });
+    const redemptionsToArchive = archivedRecords.map((record) => {
+      const originalRecord = redemptionRecords.find((item) => item.id === record.sourceRecordId);
+      const normalizedOriginal = originalRecord
+        ? normalizeAchievementRedemptionRecordFunding(originalRecord)
+        : null;
+      const shouldReuseOriginalId = Boolean(
+        normalizedOriginal
+        && normalizedOriginal.cost === record.cost
+        && normalizedOriginal.paidFromCarryover === record.paidFromCarryover
+        && normalizedOriginal.paidFromLiveStars === record.paidFromLiveStars
+      );
+      const { sourceRecordId, ...restRecord } = record;
+
+      return {
+        ...restRecord,
+        id: shouldReuseOriginalId ? sourceRecordId : crypto.randomUUID()
+      };
+    });
+    const nextActiveRedemptions = remainingActiveRecords.map((record) => {
+      const { sourceRecordId, ...restRecord } = record;
+      return {
+        ...restRecord,
+        id: sourceRecordId
+      };
+    });
 
     if (!snapshotsToArchive.length && !redemptionsToArchive.length) {
       return {
@@ -494,7 +534,7 @@ export const AchievementProvider: React.FC<{ children: ReactNode }> = ({ childre
     setArchivedBottles((previous) => [...previous, nextArchivedBottle]);
     setBottleActionRecords((previous) => [nextActionRecord, ...previous]);
     setDailySnapshots((previous) => previous.filter((snapshot) => !snapshotMap.has(snapshot.id)));
-    setRedemptionRecords((previous) => previous.filter((record) => !redemptionMap.has(record.id)));
+    setRedemptionRecords(nextActiveRedemptions);
 
     return {
       ok: true,
@@ -546,7 +586,12 @@ export const AchievementProvider: React.FC<{ children: ReactNode }> = ({ childre
   };
 
   const spendRecords = [...redemptionRecords, ...collectionRecords];
-  const availableStars = calculateAchievementAvailableStars(dailySnapshots, spendRecords, bottleActionRecords);
+  const availableStars = calculateAchievementAvailableStars(
+    dailySnapshots,
+    spendRecords,
+    bottleActionRecords,
+    meta.activeBottleCarryoverStars
+  );
   const totalEarnedStars = calculateAchievementTotalEarned(dailySnapshots);
   const totalRedeemedStars = calculateAchievementTotalRedeemed(spendRecords);
 

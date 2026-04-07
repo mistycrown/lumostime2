@@ -5,7 +5,7 @@
  * @pos Repository (Application Data)
  * @description Loads and persists large core datasets through a single async repository and migrates legacy localStorage payloads into IndexedDB on first run.
  *
- * @updated 2026-04-06: Persists archived achievement bottles and bottle action records for the seal-and-shatter flow.
+ * @updated 2026-04-07: Keeps default achievement bottle metadata synced with the latest preset names, descriptions, and archive labels.
  */
 import {
   DEFAULT_ACHIEVEMENT_COLLECTION_COST,
@@ -121,13 +121,6 @@ export interface AchievementSnapshot {
   bottleActionRecords: AchievementBottleActionRecord[];
 }
 
-const LEGACY_DEFAULT_BOTTLE_NAME_PATTERN = /^(?:收藏瓶|玻璃瓶)\s*\d{2}$/;
-
-const shouldReplaceLegacyBottleName = (value?: string) => {
-  const normalizedValue = value?.trim();
-  return !normalizedValue || LEGACY_DEFAULT_BOTTLE_NAME_PATTERN.test(normalizedValue);
-};
-
 const migrateDefaultAchievementCollection = (collection: AchievementCollection): AchievementCollection => {
   if (!collection.id.startsWith('default-bottle-')) {
     return collection;
@@ -140,10 +133,10 @@ const migrateDefaultAchievementCollection = (collection: AchievementCollection):
 
   return {
     ...collection,
-    name: shouldReplaceLegacyBottleName(collection.name) ? preset.name : collection.name,
+    name: preset.name,
     cost: DEFAULT_ACHIEVEMENT_COLLECTION_COST,
     imagePath: preset.imagePath,
-    description: collection.description?.trim() ? collection.description : preset.description
+    description: preset.description
   };
 };
 
@@ -157,7 +150,22 @@ const migrateDefaultAchievementCollectionRecord = (
 
   return {
     ...record,
-    collectionName: shouldReplaceLegacyBottleName(record.collectionName) ? preset.name : record.collectionName,
+    collectionName: preset.name,
+    imagePath: preset.imagePath
+  };
+};
+
+const migrateDefaultAchievementArchivedBottle = (
+  bottle: AchievementArchivedBottle
+): AchievementArchivedBottle => {
+  const preset = getDefaultAchievementCollectionPreset(bottle.collectionId);
+  if (!preset) {
+    return bottle;
+  }
+
+  return {
+    ...bottle,
+    collectionName: preset.name,
     imagePath: preset.imagePath
   };
 };
@@ -286,7 +294,8 @@ export class DataRepository {
       ((await this.repository.getData<AchievementCollectionRecord[]>(REPOSITORY_KEYS.ACHIEVEMENT_COLLECTION_RECORDS)) ?? [])
         .map(migrateDefaultAchievementCollectionRecord);
     const archivedBottles =
-      (await this.repository.getData<AchievementArchivedBottle[]>(REPOSITORY_KEYS.ACHIEVEMENT_ARCHIVED_BOTTLES)) ?? [];
+      ((await this.repository.getData<AchievementArchivedBottle[]>(REPOSITORY_KEYS.ACHIEVEMENT_ARCHIVED_BOTTLES)) ?? [])
+        .map(migrateDefaultAchievementArchivedBottle);
     const bottleActionRecords =
       (await this.repository.getData<AchievementBottleActionRecord[]>(REPOSITORY_KEYS.ACHIEVEMENT_BOTTLE_ACTION_RECORDS)) ?? [];
 

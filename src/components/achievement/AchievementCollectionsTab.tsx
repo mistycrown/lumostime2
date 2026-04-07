@@ -14,6 +14,7 @@ import {
   AchievementCollection,
   AchievementSealPreview
 } from '../../types';
+import { resolveAchievementCollectionImagePath } from '../../constants/achievementCollections';
 import { useToast } from '../../contexts/ToastContext';
 import { getLocalDateTimeStr } from '../../utils/dateUtils';
 import { formatAchievementSignedStars, formatAchievementStars } from '../../utils/achievementUtils';
@@ -58,6 +59,9 @@ const BottlePreview: React.FC<{
   shattered?: boolean;
   transparent?: boolean;
 }> = ({ imagePath, alt, size = 'sm', shattered = false, transparent = false }) => {
+  const resolvedImagePath = imagePath
+    ? resolveAchievementCollectionImagePath(imagePath)
+    : imagePath;
   const wrapperClassName = size === 'lg'
     ? transparent
       ? 'relative flex h-24 items-end justify-center px-2 pb-0 pt-4'
@@ -72,9 +76,9 @@ const BottlePreview: React.FC<{
 
   return (
     <div className={wrapperClassName}>
-      {imagePath ? (
+      {resolvedImagePath ? (
         <img
-          src={imagePath}
+          src={resolvedImagePath}
           alt={alt}
           className={`${imageClassName} ${shattered ? 'opacity-70 grayscale-[0.35]' : ''}`}
         />

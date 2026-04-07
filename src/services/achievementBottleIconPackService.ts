@@ -5,6 +5,8 @@
  * @updated 2026-04-06: Replaced invalid public asset imports with generated public URL paths shared by settings and bottle rendering.
  */
 
+import { resolveAssetPath } from '../utils/assetPath';
+
 export type AchievementBottleIconPack = string;
 
 export interface AchievementBottleIconPackOption {
@@ -43,11 +45,12 @@ const getAchievementBottleIconPackFrameFileName = (frameNumber: number): string 
   return `${String(frameNumber).padStart(2, '0')}.webp`;
 };
 
-const getAchievementBottleIconPackFrameUrl = (
+export const getAchievementBottleIconPackFramePath = (
   packName: AchievementBottleIconPack,
-  frameNumber: number
+  frameNumber: number,
+  baseUri?: string
 ): string => {
-  return `/stars/${packName}/${getAchievementBottleIconPackFrameFileName(frameNumber)}`;
+  return resolveAssetPath(`/stars/${packName}/${getAchievementBottleIconPackFrameFileName(frameNumber)}`, baseUri);
 };
 
 const ICON_PACK_META: Record<string, Omit<AchievementBottleIconPackOption, 'value'>> = {
@@ -110,7 +113,8 @@ const availableIconPacks = Array.from(new Set([
   });
 
 export const getAchievementBottleIconPackFramePaths = (
-  packName: AchievementBottleIconPack
+  packName: AchievementBottleIconPack,
+  baseUri?: string
 ): string[] => {
   const frameCount = ICON_PACK_FRAME_COUNTS[packName];
 
@@ -119,14 +123,14 @@ export const getAchievementBottleIconPackFramePaths = (
   }
 
   return Array.from({ length: frameCount }, (_, index) => {
-    return getAchievementBottleIconPackFrameUrl(packName, index + 1);
+    return getAchievementBottleIconPackFramePath(packName, index + 1, baseUri);
   });
 };
 
 export const ACHIEVEMENT_BOTTLE_ICON_PACK_OPTIONS: AchievementBottleIconPackOption[] = availableIconPacks.map((packName) => {
   const meta = ICON_PACK_META[packName];
   const previewImageSrc = getAchievementBottleIconPackFramePaths(packName)[0]
-    || getAchievementBottleIconPackFrameUrl(packName, 1);
+    || getAchievementBottleIconPackFramePath(packName, 1);
 
   return {
     value: packName,
@@ -152,6 +156,6 @@ export const getAchievementBottleIconPackOption = (
       label: 'Star',
       description: 'Default star sprite pack.',
       previewImageSrc: getAchievementBottleIconPackFramePaths(DEFAULT_ACHIEVEMENT_BOTTLE_ICON_PACK)[0]
-        || getAchievementBottleIconPackFrameUrl(DEFAULT_ACHIEVEMENT_BOTTLE_ICON_PACK, 1)
+        || getAchievementBottleIconPackFramePath(DEFAULT_ACHIEVEMENT_BOTTLE_ICON_PACK, 1)
     };
 };

@@ -12,6 +12,9 @@ dist/
 dist-electron/
 release/
 build/
+!build/
+build/*
+!build/installer-overwrite-hooks.nsh
 dist
 dist-ssr
 *.local
