@@ -1,5 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
-import { DEFAULT_ACHIEVEMENT_COLLECTION_COST } from '../constants/achievementCollections';
+import {
+  DEFAULT_ACHIEVEMENT_COLLECTION_COST,
+  getDefaultAchievementCollectionPreset
+} from '../constants/achievementCollections';
 import { REVIEW_KEYS, USER_DATA_KEYS } from '../constants/storageKeys';
 import { DataRepository, REPOSITORY_KEYS } from './dataRepository';
 
@@ -42,6 +45,10 @@ const createLegacyStorageAdapter = (initialValues: Map<string, unknown>) => {
 };
 
 describe('DataRepository', () => {
+  const preset02 = getDefaultAchievementCollectionPreset('default-bottle-02');
+  const preset03 = getDefaultAchievementCollectionPreset('default-bottle-03');
+  const preset08 = getDefaultAchievementCollectionPreset('default-bottle-08');
+
   it('migrates legacy heavy data once into the repository and clears old keys', async () => {
     const repository = new InMemoryStorageRepository();
     const logs = [
@@ -204,7 +211,7 @@ describe('DataRepository', () => {
       {
         id: 'archive-1',
         collectionId: 'default-bottle-02',
-        collectionName: '花瓶',
+        collectionName: preset02?.name,
         imagePath: '/bottle/02.png',
         periodStartDate: '2026-04-01',
         periodEndDate: '2026-04-05',
@@ -228,7 +235,7 @@ describe('DataRepository', () => {
     ]);
   });
 
-  it('migrates legacy default achievement bottle names in collections and records', async () => {
+  it('syncs default achievement bottle metadata from presets across collections, records, and archived bottles', async () => {
     const repository = new InMemoryStorageRepository();
 
     repository.data.set(REPOSITORY_KEYS.ACHIEVEMENT_COLLECTIONS, [
@@ -244,10 +251,10 @@ describe('DataRepository', () => {
       },
       {
         id: 'default-bottle-08',
-        name: '自定义星瓶',
+        name: '纸月旧藏瓶',
         cost: 333,
         imagePath: '/bottle/08.png',
-        description: '我的备注',
+        description: '一段已经过时的旧描述',
         enabled: true,
         createdAt: 2,
         updatedAt: 2
@@ -266,10 +273,28 @@ describe('DataRepository', () => {
       {
         id: 'record-2',
         collectionId: 'default-bottle-08',
-        collectionName: '我的夜空瓶',
+        collectionName: '纸月旧藏瓶',
         cost: 200,
         imagePath: '',
         redeemedAt: 20
+      }
+    ]);
+
+    repository.data.set(REPOSITORY_KEYS.ACHIEVEMENT_ARCHIVED_BOTTLES, [
+      {
+        id: 'archive-1',
+        collectionId: 'default-bottle-08',
+        collectionName: '纸月旧藏瓶',
+        imagePath: '',
+        periodStartDate: '2026-04-01',
+        periodEndDate: '2026-04-05',
+        earnedStars: 10,
+        spentStars: 2,
+        sealedAmount: 8,
+        status: 'sealed',
+        sealedAt: 30,
+        dailySnapshots: [],
+        redemptionRecords: []
       }
     ]);
 
@@ -279,20 +304,20 @@ describe('DataRepository', () => {
     expect(snapshot.collections).toEqual([
       {
         id: 'default-bottle-03',
-        name: '金砂许愿瓶',
+        name: preset03?.name,
         cost: DEFAULT_ACHIEVEMENT_COLLECTION_COST,
         imagePath: '/bottle/03.png',
-        description: '细闪金砂落在小小玻璃瓶里，像一枚可以握住的微光愿望。',
+        description: preset03?.description,
         enabled: true,
         createdAt: 1,
         updatedAt: 1
       },
       {
         id: 'default-bottle-08',
-        name: '自定义星瓶',
+        name: preset08?.name,
         cost: DEFAULT_ACHIEVEMENT_COLLECTION_COST,
         imagePath: '/bottle/08.png',
-        description: '我的备注',
+        description: preset08?.description,
         enabled: true,
         createdAt: 2,
         updatedAt: 2
@@ -303,7 +328,7 @@ describe('DataRepository', () => {
       {
         id: 'record-1',
         collectionId: 'default-bottle-03',
-        collectionName: '金砂许愿瓶',
+        collectionName: preset03?.name,
         cost: 200,
         imagePath: '/bottle/03.png',
         redeemedAt: 10
@@ -311,10 +336,28 @@ describe('DataRepository', () => {
       {
         id: 'record-2',
         collectionId: 'default-bottle-08',
-        collectionName: '我的夜空瓶',
+        collectionName: preset08?.name,
         cost: 200,
         imagePath: '/bottle/08.png',
         redeemedAt: 20
+      }
+    ]);
+
+    expect(snapshot.archivedBottles).toEqual([
+      {
+        id: 'archive-1',
+        collectionId: 'default-bottle-08',
+        collectionName: preset08?.name,
+        imagePath: '/bottle/08.png',
+        periodStartDate: '2026-04-01',
+        periodEndDate: '2026-04-05',
+        earnedStars: 10,
+        spentStars: 2,
+        sealedAmount: 8,
+        status: 'sealed',
+        sealedAt: 30,
+        dailySnapshots: [],
+        redemptionRecords: []
       }
     ]);
   });

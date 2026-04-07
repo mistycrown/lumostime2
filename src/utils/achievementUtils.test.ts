@@ -7,8 +7,10 @@ import {
   formatAchievementSignedStars,
   formatAchievementStars,
   getAchievementRenderableStarCount,
+  normalizeAchievementRedemptionRecordFunding,
   normalizeAchievementRule,
-  normalizeAchievementStarValue
+  normalizeAchievementStarValue,
+  partitionAchievementRedemptionsForSeal
 } from './achievementUtils';
 import type { AchievementRule, DailyReview, Log, TodoItem } from '../types';
 
@@ -76,6 +78,21 @@ describe('achievementUtils decimal stars', () => {
     expect(legacyRule.deltaPerUnit).toBe(0.3);
   });
 
+  it('normalizes legacy redemption records into explicit carryover and live funding', () => {
+    expect(normalizeAchievementRedemptionRecordFunding({
+      id: 'redeem-1',
+      rewardId: 'reward-1',
+      rewardName: 'Tea',
+      cost: 10,
+      redeemedAt: 1,
+      paidFromCarryover: 3
+    })).toMatchObject({
+      cost: 10,
+      paidFromCarryover: 3,
+      paidFromLiveStars: 7
+    });
+  });
+
   it('adds shattered bottle returns back into the active bottle while ignoring seal actions', () => {
     expect(calculateAchievementAvailableStars(
       [
@@ -120,6 +137,118 @@ describe('achievementUtils decimal stars', () => {
         }
       ]
     )).toBe(6.5);
+  });
+
+  it('preserves the remaining carryover balance after carryover-funded redemptions are archived out of the live ledger', () => {
+    expect(calculateAchievementAvailableStars(
+      [],
+      [],
+      [
+        {
+          id: 'action-1',
+          bottleId: 'bottle-1',
+          actionType: 'shatter',
+          amount: 3000,
+          occurredAt: 1
+        }
+      ],
+      1000
+    )).toBe(1000);
+  });
+
+  it('excludes carryover-funded redemption cost from the sealable live balance', () => {
+    const preview = getAchievementSealPreview({
+      achievementStartDate: '2026-04-01',
+      archivedBottles: [],
+      dailySnapshots: [
+        {
+          id: 'snapshot-1',
+          date: '2026-04-01',
+          netDelta: 1000,
+          ruleBreakdown: [],
+          computedAt: 1
+        }
+      ],
+      redemptionRecords: [
+        {
+          id: 'redeem-1',
+          rewardId: 'reward-1',
+          rewardName: 'Tea',
+          cost: 700,
+          redeemedAt: new Date('2026-04-01T12:00:00+08:00').getTime(),
+          paidFromCarryover: 300,
+          paidFromLiveStars: 400
+        }
+      ],
+      today: new Date('2026-04-02T12:00:00+08:00')
+    });
+
+    expect(preview?.sealableStars).toBe(600);
+    expect(preview?.spentStars).toBe(700);
+  });
+
+  it('archives only the live-funded portion of mixed redemptions during sealing', () => {
+    const result = partitionAchievementRedemptionsForSeal({
+      startDate: '2026-04-01',
+      endDate: '2026-04-02',
+      redemptionRecords: [
+        {
+          id: 'redeem-1',
+          rewardId: 'reward-1',
+          rewardName: 'Tea',
+          cost: 1000,
+          redeemedAt: new Date('2026-04-01T12:00:00+08:00').getTime(),
+          paidFromCarryover: 300,
+          paidFromLiveStars: 700
+        }
+      ]
+    });
+
+    expect(result.archivedRecords).toEqual([
+      expect.objectContaining({
+        sourceRecordId: 'redeem-1',
+        cost: 700,
+        paidFromCarryover: 0,
+        paidFromLiveStars: 700
+      })
+    ]);
+
+    expect(result.remainingActiveRecords).toEqual([
+      expect.objectContaining({
+        sourceRecordId: 'redeem-1',
+        cost: 300,
+        paidFromCarryover: 300,
+        paidFromLiveStars: 0
+      })
+    ]);
+  });
+
+  it('keeps pure carryover redemptions active when sealing a period', () => {
+    const result = partitionAchievementRedemptionsForSeal({
+      startDate: '2026-04-01',
+      endDate: '2026-04-02',
+      redemptionRecords: [
+        {
+          id: 'redeem-1',
+          rewardId: 'reward-1',
+          rewardName: 'Tea',
+          cost: 2000,
+          redeemedAt: new Date('2026-04-01T12:00:00+08:00').getTime(),
+          paidFromCarryover: 2000,
+          paidFromLiveStars: 0
+        }
+      ]
+    });
+
+    expect(result.archivedRecords).toEqual([]);
+    expect(result.remainingActiveRecords).toEqual([
+      expect.objectContaining({
+        sourceRecordId: 'redeem-1',
+        cost: 2000,
+        paidFromCarryover: 2000,
+        paidFromLiveStars: 0
+      })
+    ]);
   });
 
   it('builds the fixed seal preview from the day after the last sealed bottle through yesterday', () => {

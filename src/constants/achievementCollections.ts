@@ -5,11 +5,16 @@
  * @pos Constant (Achievement Collections)
  * @description Provides the default collectible bottle catalog for the achievement ledger collection tab.
  *
- * @updated 2026-04-06: Renamed the bundled 16 bottle presets to match the refreshed bottle artwork set.
+ * @updated 2026-04-07: Resolve bottle image paths through the shared asset-path helper so Electron desktop builds can load bundled bottle images.
  */
 import { AchievementCollection } from '../types';
+import { resolveAssetPath } from '../utils/assetPath';
 
 export const DEFAULT_ACHIEVEMENT_COLLECTION_COST = 200;
+
+export const resolveAchievementCollectionImagePath = (imagePath: string, baseUri?: string): string => {
+  return resolveAssetPath(imagePath, baseUri);
+};
 
 interface DefaultAchievementCollectionDefinition {
   assetId: string;
@@ -21,27 +26,27 @@ const DEFAULT_ACHIEVEMENT_COLLECTION_DEFINITIONS: DefaultAchievementCollectionDe
   {
     assetId: '01',
     name: '小熊糖果罐',
-    description: '装着彩色小熊软糖的高罐，像把童年的甜味整齐封进了玻璃里。'
+    description: '装着彩色小熊软糖的高罐子，像把童年的甜味整齐地封进了玻璃里。'
   },
   {
     assetId: '02',
     name: '蓝珠标本瓶',
-    description: '三颗蓝色玻璃珠静静叠放，像被封存起来的清凉海潮。'
+    description: '三颗蓝色玻璃珠安静叠放，像被封存起来的清凉海潮。'
   },
   {
     assetId: '03',
-    name: '金砂许愿瓶',
+    name: '金沙许愿瓶',
     description: '细闪金砂落在小小玻璃瓶里，像一枚可以握住的微光愿望。'
   },
   {
     assetId: '04',
     name: '柑橘切片瓶',
-    description: '糖渍橘片和果香被层层叠进瓶里，带着明亮又温暖的夏日气味。'
+    description: '糖渍橙片和果香被层层叠进瓶里，带着明亮又温暖的夏日气味。'
   },
   {
     assetId: '05',
     name: '金花花瓣瓶',
-    description: '蓬松的金色花瓣被收进圆腹瓶中，像一束不会褪色的小太阳。'
+    description: '蓬松的金色花瓣被收进圆肚玻璃瓶中，像一束不会褪色的小太阳。'
   },
   {
     assetId: '06',
@@ -50,8 +55,8 @@ const DEFAULT_ACHIEVEMENT_COLLECTION_DEFINITIONS: DefaultAchievementCollectionDe
   },
   {
     assetId: '07',
-    name: '星光锥瓶',
-    description: '亮亮的小星星漂浮在锥形瓶里，像被收拢的一捧夜空。'
+    name: '星光钥匙瓶',
+    description: '亮晶晶的小星星漂浮在钥匙形瓶里，像被收藏的一捧夜空。'
   },
   {
     assetId: '08',
@@ -91,17 +96,17 @@ const DEFAULT_ACHIEVEMENT_COLLECTION_DEFINITIONS: DefaultAchievementCollectionDe
   {
     assetId: '15',
     name: '紫瓣香氛罐',
-    description: '紫色花瓣堆在小圆罐里，像把轻柔香气和黄昏一起拧上了盖子。'
+    description: '紫色花瓣堆在小圆罐里，像把轻柔香气和黄昏一起拢上了盖子。'
   },
   {
     assetId: '16',
     name: '珍珠泡泡瓶',
-    description: '圆腹瓶里堆着粉蓝白的珠球，像一整瓶柔软又轻快的泡泡。'
+    description: '圆肚瓶里堆着粉蓝白的珠球，像一整瓶柔软又轻快的泡泡。'
   }
 ];
 
 export const DEFAULT_ACHIEVEMENT_COLLECTION_IMAGE_PATHS = DEFAULT_ACHIEVEMENT_COLLECTION_DEFINITIONS.map(({ assetId }) => (
-  `/bottle/${assetId}.png`
+  resolveAchievementCollectionImagePath(`/bottle/${assetId}.png`)
 ));
 
 const DEFAULT_ACHIEVEMENT_COLLECTION_PRESET_BY_ID = DEFAULT_ACHIEVEMENT_COLLECTION_DEFINITIONS.reduce<Record<string, DefaultAchievementCollectionDefinition>>((accumulator, definition) => {
@@ -117,7 +122,7 @@ export const getDefaultAchievementCollectionPreset = (collectionId: string) => {
 
   return {
     ...preset,
-    imagePath: `/bottle/${preset.assetId}.png`
+    imagePath: resolveAchievementCollectionImagePath(`/bottle/${preset.assetId}.png`)
   };
 };
 
@@ -130,7 +135,7 @@ export const DEFAULT_ACHIEVEMENT_COLLECTIONS: AchievementCollection[] = DEFAULT_
     id: `default-bottle-${definition.assetId}`,
     name: definition.name,
     cost: DEFAULT_ACHIEVEMENT_COLLECTION_COST,
-    imagePath: `/bottle/${definition.assetId}.png`,
+    imagePath: resolveAchievementCollectionImagePath(`/bottle/${definition.assetId}.png`),
     description: definition.description,
     enabled: true,
     createdAt: timestamp,

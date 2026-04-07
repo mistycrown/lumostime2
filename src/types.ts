@@ -274,6 +274,7 @@ export interface AchievementRedemptionRecord {
   cost: number;
   redeemedAt: number;
   paidFromCarryover?: number;
+  paidFromLiveStars?: number;
   note?: string;
 }
 

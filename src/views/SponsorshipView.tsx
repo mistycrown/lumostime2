@@ -35,6 +35,7 @@ import { userStatsService, UserStats } from '../services/userStatsService';
 import { stickerService } from '../services/stickerService';
 import { IconRenderer } from '../components/IconRenderer';
 import { resolveAssetPath } from '../utils/assetPath';
+import { getTimePalPreviewPath } from '../constants/timePalConfig';
 
 interface SponsorshipViewProps {
     onBack: () => void;
@@ -833,12 +834,12 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
                                                             ) : (
                                                                 <div className="shrink-0 w-10 h-10 rounded-md overflow-hidden bg-white border border-stone-200">
                                                                     <img 
-                                                                        src={`/time_pal_origin/${preset.timePal}/1.webp`}
+                                                                        src={getTimePalPreviewPath(preset.timePal as any)}
                                                                         alt="时间小友"
                                                                         className="w-full h-full object-cover"
                                                                         onError={(e) => {
                                                                             // 尝试 PNG 格式
-                                                                            const pngSrc = `/time_pal_origin/${preset.timePal}/1.png`;
+                                                                            const pngSrc = resolveAssetPath(`/time_pal_origin/${preset.timePal}/1.png`);
                                                                             if (e.currentTarget.src.indexOf('.png') === -1) {
                                                                                 e.currentTarget.src = pngSrc;
                                                                             } else {
