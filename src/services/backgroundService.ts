@@ -18,6 +18,7 @@
 import { Capacitor } from '@capacitor/core';
 import { Directory, Filesystem } from '@capacitor/filesystem';
 import { statusBarService } from './statusBarService';
+import { resolveAssetPath } from '../utils/assetPath';
 
 export interface BackgroundOption {
     id: string;
@@ -188,7 +189,7 @@ const PRESET_BACKGROUNDS: BackgroundOption[] = [
  * 获取背景图片的降级路径（PNG → WebP）
  */
 export const getBackgroundFallbackUrl = (url: string): string => {
-    return url.replace('.png', '.webp');
+    return resolveAssetPath(url.replace('.png', '.webp'));
 };
 
 const STORAGE_KEY = 'lumos_custom_backgrounds';
@@ -368,14 +369,18 @@ class BackgroundService {
      */
     getAllBackgrounds(): BackgroundOption[] {
         const customBackgrounds = this.getCustomBackgrounds();
-        return [...PRESET_BACKGROUNDS, ...customBackgrounds];
+        return [...this.getPresetBackgrounds(), ...customBackgrounds];
     }
 
     /**
      * 获取预设背景
      */
     getPresetBackgrounds(): BackgroundOption[] {
-        return PRESET_BACKGROUNDS;
+        return PRESET_BACKGROUNDS.map(background => ({
+            ...background,
+            url: background.url.startsWith('linear-gradient') ? background.url : resolveAssetPath(background.url),
+            thumbnail: background.thumbnail ? resolveAssetPath(background.thumbnail) : background.thumbnail
+        }));
     }
 
     /**

@@ -1,7 +1,7 @@
 {
-    "version": "1.1.9",
-    "versionCode": 119,
+    "version": "1.6.0",
+    "versionCode": 160,
     "updateUrl": "https://github.com/mistycrown/lumostime2/releases/latest",
-    "releaseNotes": "v1.1.9\n• 更改自定义背景图存储路径\n• 修复s3下载json无法正常导入的问题\n• 新增检查本地云端图片一致性的功能\n• 增加图片导出分块功能\n• 脉络页新增搜索/自定义筛选器快捷入口\n• 增加设置页滚动位置记忆\n• 修改计时悬浮窗收缩逻辑\n• 使用IndexedDB重构数据存储\n• 增加时间线全部视图的快速导航栏\n• 增加on this day功能\n• 脉络页/统计页切换日期加一点动画\n• 修复nfc部分异常\n\n提醒：本次更新涉及数据存储结构更新，请务必在更新前备份数据。",
+    "releaseNotes": "v1.6.0\n• 增加成就瓶功能\n• 将脉络页记录排序功能移动到偏好设置中\n• 删除nfc结束活动手动确认弹窗\n• 增加 on this day - 笺注的删除功能\n• 增加关联待办进度实时更新\n• 新增目标类型“记录条数”\n• 增加上传自定义导航栏的功能\n• 增加添加记录时直接拍照的功能\n• 修复跨月矩阵统计标题错误\n• 重构沉浸式计时功能\n• 增加时间小友时间自定义设置",
     "forceUpdate": false
 }

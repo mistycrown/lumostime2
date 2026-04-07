@@ -17,6 +17,7 @@ import { Check } from 'lucide-react';
 import { ToastType } from './Toast';
 import { timePalCustomService, CustomTimePalItem, TIMEPAL_CUSTOM_CHANGED_EVENT } from '../services/timePalCustomService';
 import { imageService } from '../services/imageService';
+import { resolveAssetPath } from '../utils/assetPath';
 
 interface PresetEditModalProps {
     isOpen: boolean;
@@ -226,11 +227,11 @@ export const PresetEditModal: React.FC<PresetEditModalProps> = ({
                                                     {[1, 2, 3, 4].map((num) => (
                                                         <div key={num} className="bg-stone-50 rounded flex items-center justify-center">
                                                             <img
-                                                                src={`/uiicon/${option.id}/${String(num).padStart(2, '0')}.webp`}
+                                                                src={resolveAssetPath(`/uiicon/${option.id}/${String(num).padStart(2, '0')}.webp`)}
                                                                 alt={`icon-${num}`}
                                                                 className="w-full h-full object-contain p-0.5"
                                                                 onError={(e) => {
-                                                                    e.currentTarget.src = `/uiicon/${option.id}/${String(num).padStart(2, '0')}.png`;
+                                                                    e.currentTarget.src = resolveAssetPath(`/uiicon/${option.id}/${String(num).padStart(2, '0')}.png`);
                                                                 }}
                                                             />
                                                         </div>

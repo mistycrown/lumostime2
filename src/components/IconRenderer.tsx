@@ -12,6 +12,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import twemoji from 'twemoji';
 import { uiIconService, UIIconType } from '../services/uiIconService';
 import { getDisplayIcon } from '../utils/iconUtils';
+import { resolveAssetPath } from '../utils/assetPath';
 import { useSettings } from '../contexts/SettingsContext';
 
 interface IconRendererProps {
@@ -75,6 +76,7 @@ export const IconRenderer: React.FC<IconRendererProps> = ({
     if (customImagePath && !customImagePath.match(/\.(png|webp|jpg|jpeg|gif|svg)$/i)) {
         customImagePath = `${customImagePath}.webp`;
     }
+    const resolvedCustomImagePath = customImagePath ? resolveAssetPath(customImagePath) : null;
     
     // 4. 渲染 Emoji（原生、Twemoji 或 OpenMoji）
     // 显示 Emoji（如果开启 Twemoji 或 OpenMoji，useEffect 会自动转换）
@@ -231,7 +233,7 @@ export const IconRenderer: React.FC<IconRendererProps> = ({
     };
     
     // 1. 判断是否使用自定义图片
-    if (isCustomImage && customImagePath && !imageError) {
+    if (isCustomImage && resolvedCustomImagePath && !imageError) {
         const imageSize = getImageSize();
         const sizeStyle = { 
             width: imageSize, 
@@ -241,7 +243,7 @@ export const IconRenderer: React.FC<IconRendererProps> = ({
 
         return (
             <img
-                src={customImagePath}
+                src={resolvedCustomImagePath}
                 alt={alt || 'Custom icon'}
                 className={`inline-block ${className}`}
                 style={sizeStyle}
@@ -252,13 +254,13 @@ export const IconRenderer: React.FC<IconRendererProps> = ({
                     
                     // 如果是 .webp 加载失败，尝试 .png
                     if (currentPath.endsWith('.webp') && !hasFallbackAttempted) {
-                        const pngPath = customImagePath!.replace(/\.webp$/i, '.png');
+                        const pngPath = resolveAssetPath(customImagePath!.replace(/\.webp$/i, '.png'));
                         setHasFallbackAttempted(true);
                         e.currentTarget.src = pngPath;
                     } 
                     // 如果是 .png 加载失败，尝试 .webp
                     else if (currentPath.endsWith('.png') && !hasFallbackAttempted) {
-                        const webpPath = customImagePath!.replace(/\.png$/i, '.webp');
+                        const webpPath = resolveAssetPath(customImagePath!.replace(/\.png$/i, '.webp'));
                         setHasFallbackAttempted(true);
                         e.currentTarget.src = webpPath;
                     }

@@ -40,6 +40,7 @@
  */
 
 import React from 'react';
+import { resolveAssetPath } from '../utils/assetPath';
 
 // UI 图标类型定义
 export type UIIconType =
@@ -456,7 +457,7 @@ class UIIconService {
         }
 
         const iconNumber = ICON_NUMBER_MAP[iconType];
-        return `/uiicon/${this.currentTheme}/${iconNumber}.${format}`;
+        return resolveAssetPath(`/uiicon/${this.currentTheme}/${iconNumber}.${format}`);
     }
 
     /**
@@ -472,8 +473,8 @@ class UIIconService {
 
         const iconNumber = ICON_NUMBER_MAP[iconType];
         return {
-            primary: `/uiicon/${this.currentTheme}/${iconNumber}.webp`,
-            fallback: `/uiicon/${this.currentTheme}/${iconNumber}.png`
+            primary: resolveAssetPath(`/uiicon/${this.currentTheme}/${iconNumber}.webp`),
+            fallback: resolveAssetPath(`/uiicon/${this.currentTheme}/${iconNumber}.png`)
         };
     }
 

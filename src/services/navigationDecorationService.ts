@@ -17,6 +17,7 @@
 
 import { Capacitor } from '@capacitor/core';
 import { Directory, Filesystem } from '@capacitor/filesystem';
+import { resolveAssetPath } from '../utils/assetPath';
 
 export interface NavigationDecorationOption {
     id: string;
@@ -187,7 +188,14 @@ class NavigationDecorationService {
     }
 
     getAllDecorations(): NavigationDecorationOption[] {
-        return [...this.decorations, ...this.getCustomDecorations()];
+        return [
+            ...this.decorations.map(decoration => ({
+                ...decoration,
+                url: decoration.url ? resolveAssetPath(decoration.url) : decoration.url,
+                thumbnail: decoration.thumbnail ? resolveAssetPath(decoration.thumbnail) : decoration.thumbnail
+            })),
+            ...this.getCustomDecorations()
+        ];
     }
 
     async addCustomDecoration(file: File): Promise<NavigationDecorationOption> {
@@ -320,5 +328,5 @@ export const navigationDecorationService = new NavigationDecorationService();
  * 获取导航装饰图片的降级路径（PNG → WebP）
  */
 export const getNavigationDecorationFallbackUrl = (url: string): string => {
-    return url.replace('.png', '.webp');
+    return resolveAssetPath(url.replace('.png', '.webp'));
 };

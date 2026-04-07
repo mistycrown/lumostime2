@@ -34,6 +34,7 @@ import { FontSelector } from '../components/FontSelector';
 import { userStatsService, UserStats } from '../services/userStatsService';
 import { stickerService } from '../services/stickerService';
 import { IconRenderer } from '../components/IconRenderer';
+import { resolveAssetPath } from '../utils/assetPath';
 
 interface SponsorshipViewProps {
     onBack: () => void;
@@ -229,10 +230,10 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
         
         // 特殊处理：morning3 文件名前面有空格
         if (timeOfDay === 'morning' && randomNum === 3) {
-            return `/banner/ morning3.webp`;
+            return resolveAssetPath('/banner/ morning3.webp');
         }
         
-        return `/banner/${timeOfDay}${randomNum}.webp`;
+        return resolveAssetPath(`/banner/${timeOfDay}${randomNum}.webp`);
     });
     
     // 根据时间段生成问候语
@@ -778,7 +779,7 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
                                                                 /* 自定义主题显示图片 - 使用 01.webp */
                                                                 <div className="shrink-0 w-10 h-10 rounded-md overflow-hidden bg-white border border-stone-200 flex items-center justify-center">
                                                                     <img 
-                                                                        src={`/uiicon/${preset.uiTheme}/01.webp`}
+                                                                        src={resolveAssetPath(`/uiicon/${preset.uiTheme}/01.webp`)}
                                                                         alt="UI"
                                                                         className="w-6 h-6 object-contain"
                                                                         onError={(e) => {
@@ -796,7 +797,7 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
                                                             ) : (
                                                                 <div className="shrink-0 w-10 h-10 rounded-md overflow-hidden bg-white border border-stone-200">
                                                                     <img 
-                                                                        src={`/background/${preset.background}.webp`}
+                                                                        src={resolveAssetPath(`/background/${preset.background}.webp`)}
                                                                         alt="背景"
                                                                         className="w-full h-full object-cover"
                                                                         onError={(e) => {
@@ -814,7 +815,7 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
                                                             ) : (
                                                                 <div className="shrink-0 w-10 h-10 rounded-md overflow-hidden bg-white border border-stone-200">
                                                                     <img 
-                                                                        src={`/dchh/${preset.navigation}.webp`}
+                                                                        src={resolveAssetPath(`/dchh/${preset.navigation}.webp`)}
                                                                         alt="导航"
                                                                         className="w-full h-full object-cover"
                                                                         onError={(e) => {
@@ -1176,7 +1177,7 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
                             <div className="flex justify-center">
                                 <div className="bg-stone-50 p-4 rounded-2xl">
                                     <img
-                                        src="/sponsorship_qr.jpg"
+                                        src={resolveAssetPath('/sponsorship_qr.jpg')}
                                         alt="投喂码"
                                         className="w-64 h-64 object-contain rounded-xl"
                                     />

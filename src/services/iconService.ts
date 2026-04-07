@@ -9,12 +9,14 @@
  * - 预设图标选项管理
  * - 平台检测（桌面端/移动端）
  * - 图标切换和应用
+ * - Electron file:// 场景下的图标路径兼容
  * - 图标预览
  * 
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
 
 import { Capacitor } from '@capacitor/core';
+import { resolveAssetPath } from '../utils/assetPath';
 
 export interface IconOption {
     id: string;
@@ -360,6 +362,7 @@ class IconService {
         }
 
         console.log('[iconService] 准备更新favicon:', iconOption.desktopIcon);
+        const resolvedDesktopIcon = resolveAssetPath(iconOption.desktopIcon);
 
         // 更新favicon（浏览器支持 PNG）
         const favicon = document.querySelector('link[rel="icon"]') as HTMLLinkElement;
@@ -367,7 +370,7 @@ class IconService {
         
         if (favicon) {
             const oldHref = favicon.href;
-            favicon.href = iconOption.desktopIcon;
+            favicon.href = resolvedDesktopIcon;
             console.log('[iconService] ✓ favicon已更新');
             console.log('[iconService]   旧路径:', oldHref);
             console.log('[iconService]   新路径:', favicon.href);
@@ -376,7 +379,7 @@ class IconService {
             console.log('[iconService] 创建新的favicon元素');
             const newFavicon = document.createElement('link');
             newFavicon.rel = 'icon';
-            newFavicon.href = iconOption.desktopIcon;
+            newFavicon.href = resolvedDesktopIcon;
             document.head.appendChild(newFavicon);
             console.log('[iconService] ✓ 新favicon已创建并添加');
         }
@@ -384,7 +387,7 @@ class IconService {
         // 更新其他相关的图标链接
         const appleTouchIcon = document.querySelector('link[rel="apple-touch-icon"]') as HTMLLinkElement;
         if (appleTouchIcon) {
-            appleTouchIcon.href = iconOption.desktopIcon;
+            appleTouchIcon.href = resolvedDesktopIcon;
             console.log('[iconService] ✓ apple-touch-icon已更新');
         }
 
