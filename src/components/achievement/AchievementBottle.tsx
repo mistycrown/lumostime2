@@ -2,7 +2,7 @@
  * @file AchievementBottle.tsx
  * @description Physics-driven achievement bottle visualization with switchable bottle skins for the achievement page and sponsorship previews.
  *
- * @updated 2026-04-06: Switched achievement icon pack image lookup to generated public URLs instead of invalid public-directory imports.
+ * @updated 2026-04-07: Clamp live-mode spawn points so low-count bottle items always start inside the visible chamber.
  */
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Capacitor } from '@capacitor/core';
@@ -22,6 +22,7 @@ import {
   getAchievementRenderableStarCount,
   normalizeAchievementStarValue
 } from '../../utils/achievementUtils';
+import { getAchievementBottleSpawnPoint } from '../../utils/achievementBottleLayout';
 
 interface AchievementBottleProps {
   starCount: number;
@@ -721,17 +722,16 @@ export const AchievementBottle: React.FC<AchievementBottleProps> = ({
       const starScale = getStableStarScale(index, styleVariant);
       const effectiveStarSize = (iconPack === 'coin' || iconPack === 'planet') ? STAR_SIZE : STAR_SIZE * 0.85;
       const starRadius = (effectiveStarSize * starScale) / 2;
-      const innerMinX = BOTTLE_PADDING + starRadius - 2;
-      const innerMaxX = width - BOTTLE_PADDING - starRadius + 2;
-      const spreadWidth = Math.max(0, innerMaxX - innerMinX);
-      const normalizedX = visibleCount <= 1 ? 0.5 : (index / (visibleCount - 1));
-      const baseX = innerMinX + (spreadWidth * normalizedX);
-      const jitterLimit = Math.min(22, spreadWidth / Math.max(3, visibleCount * 1.35));
-      const spawnX = Math.max(innerMinX, Math.min(innerMaxX, baseX + ((Math.random() - 0.5) * jitterLimit * 2)));
-      // 在整个瓶子高度范围内均匀分层生成，确保200个元素能填满整个空间
-      const innerHeight = height - BOTTLE_PADDING * 2;
-      const spawnY = BOTTLE_PADDING + (index / Math.max(1, visibleCount - 1)) * innerHeight * 0.95 + (Math.random() - 0.5) * (innerHeight / visibleCount) * 2;
-
+      const { x: spawnX, y: spawnY } = getAchievementBottleSpawnPoint({
+        index,
+        visibleCount,
+        width,
+        height,
+        starRadius,
+        padding: BOTTLE_PADDING,
+        randomX: Math.random(),
+        randomY: Math.random()
+      });
       const star = Bodies.circle(spawnX, spawnY, starRadius, {
         label: STAR_BODY_LABEL,
         restitution: 0.48,
