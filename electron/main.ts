@@ -4,6 +4,7 @@
  * @output Window Management
  * @pos Electron Main
  * @description Entry point for the Electron application. Handles window creation, lifecycle events, and inter-process communication (IPC).
+ * @updated 2026-04-09: Added Obsidian image attachment export IPC handler for desktop builds.
  * 
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
@@ -170,6 +171,37 @@ ipcMain.handle('write-obsidian-file', async (_, { filePath, content }) => {
     } catch (error: any) {
         console.error('❌ 写入 Obsidian 文件失败:', error)
         throw new Error(`文件写入失败: ${error.message}`)
+    }
+})
+
+ipcMain.handle('write-obsidian-images', async (_, { rootPath, imageFolderName, files }) => {
+    try {
+        if (!rootPath || !imageFolderName || !Array.isArray(files)) {
+            throw new Error('Invalid parameters for image export');
+        }
+
+        const safeRoot = path.resolve(rootPath);
+        const targetDir = path.resolve(safeRoot, imageFolderName);
+        const relativeDir = path.relative(safeRoot, targetDir);
+        if (relativeDir.startsWith('..') || path.isAbsolute(relativeDir)) {
+            throw new Error('Image folder must stay within the configured root path');
+        }
+
+        await fs.mkdir(targetDir, { recursive: true });
+
+        let saved = 0;
+        for (const file of files) {
+            if (!file?.filename || !file?.base64Data) continue;
+            const buffer = Buffer.from(file.base64Data, 'base64');
+            const destPath = path.join(targetDir, file.filename);
+            await fs.writeFile(destPath, buffer);
+            saved += 1;
+        }
+
+        return { success: true, saved };
+    } catch (error: any) {
+        console.error('Failed to write Obsidian images:', error);
+        throw new Error(`Image file write failed: ${error.message}`);
     }
 })
 

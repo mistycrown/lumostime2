@@ -4,12 +4,13 @@
  * @output 导出操作, 配置更新
  * @pos View (Obsidian导出设置)
  * @description Obsidian 导出配置界面,允许用户设置笔记库路径和格式,并执行导出操作
+ * @updated 2026-04-09: Added image folder configuration and attachment export handling.
  * 
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
 
 import React, { useState, useEffect } from 'react';
-import { ChevronLeft, FolderOpen, FileText, Download, CheckCircle2, AlertCircle } from 'lucide-react';
+import { ChevronLeft, FolderOpen, FileText, Download, CheckCircle2, AlertCircle, Image as ImageIcon } from 'lucide-react';
 import obsidianExportService, { ObsidianExportConfig, ObsidianExportOptions } from '../services/obsidianExportService';
 
 import { Log, Category, TodoItem, Scope, DailyReview, WeeklyReview, MonthlyReview } from '../types';
@@ -49,6 +50,7 @@ export const ObsidianExportView: React.FC<ObsidianExportViewProps> = ({
     const [pathTemplate, setPathTemplate] = useState('{YYYY}/{MM}/{YYYY}-{MM}-{DD}.md');
     const [weeklyPathTemplate, setWeeklyPathTemplate] = useState('{YYYY}/{YYYY}-W{WW}.md');
     const [monthlyPathTemplate, setMonthlyPathTemplate] = useState('{YYYY}/{YYYY}-{MM}.md');
+    const [imageFolderName, setImageFolderName] = useState('attachments');
 
     // 导出选项
     const [exportOptions, setExportOptions] = useState<ObsidianExportOptions>({
@@ -99,6 +101,17 @@ export const ObsidianExportView: React.FC<ObsidianExportViewProps> = ({
         return date;
     };
 
+    const getLogsForDate = (sourceLogs: Log[], targetDate: Date): Log[] => {
+        const dayStart = new Date(targetDate);
+        dayStart.setHours(0, 0, 0, 0);
+        const dayEnd = new Date(targetDate);
+        dayEnd.setHours(23, 59, 59, 999);
+
+        return sourceLogs.filter(log =>
+            log.startTime >= dayStart.getTime() && log.endTime <= dayEnd.getTime()
+        );
+    };
+
     // 加载保存的配置
     useEffect(() => {
         const config = obsidianExportService.getConfig();
@@ -110,6 +123,9 @@ export const ObsidianExportView: React.FC<ObsidianExportViewProps> = ({
             }
             if (config.monthlyPathTemplate) {
                 setMonthlyPathTemplate(config.monthlyPathTemplate);
+            }
+            if (config.imageFolderName) {
+                setImageFolderName(config.imageFolderName);
             }
         }
         // 初始化日期输入框
@@ -124,7 +140,7 @@ export const ObsidianExportView: React.FC<ObsidianExportViewProps> = ({
     const previewPath = () => {
         if (!rootPath || !pathTemplate) return '';
         try {
-            const config: ObsidianExportConfig = { rootPath, pathTemplate };
+            const config: ObsidianExportConfig = { rootPath, pathTemplate, imageFolderName: imageFolderName || 'attachments' };
             return obsidianExportService.generateFilePath(config, currentDate);
         } catch (error) {
             return '路径格式错误';
@@ -137,12 +153,17 @@ export const ObsidianExportView: React.FC<ObsidianExportViewProps> = ({
             onToast('error', '请填写根目录路径和路径模板');
             return;
         }
+        if (!imageFolderName.trim()) {
+            onToast('error', '请填写图片文件夹名称');
+            return;
+        }
 
         const config: ObsidianExportConfig = {
             rootPath,
             pathTemplate,
             weeklyPathTemplate: weeklyPathTemplate || undefined,
-            monthlyPathTemplate: monthlyPathTemplate || undefined
+            monthlyPathTemplate: monthlyPathTemplate || undefined,
+            imageFolderName: imageFolderName.trim()
         };
 
         obsidianExportService.saveConfig(config);
@@ -233,6 +254,10 @@ export const ObsidianExportView: React.FC<ObsidianExportViewProps> = ({
             onToast('error', '请先配置路径格式模板');
             return;
         }
+        if (!imageFolderName.trim()) {
+            onToast('error', '请填写图片文件夹名称');
+            return;
+        }
 
         setIsExporting(true);
 
@@ -241,12 +266,15 @@ export const ObsidianExportView: React.FC<ObsidianExportViewProps> = ({
                 rootPath: rootPath.trim(),
                 pathTemplate: pathTemplate.trim(),
                 weeklyPathTemplate: weeklyPathTemplate || undefined,
-                monthlyPathTemplate: monthlyPathTemplate || undefined
-            };
+                monthlyPathTemplate: monthlyPathTemplate || undefined,
+                imageFolderName: imageFolderName.trim()
+        };
 
             if (dateRangeMode === 'single') {
                 // 单日导出
                 const filePath = obsidianExportService.generateFilePath(config, startDate);
+                const singleDayLogs = getLogsForDate(logs, startDate);
+                const dayImages = obsidianExportService.collectLogImages(singleDayLogs);
 
                 // 获取当天的 dailyReview
                 const dateStr = formatDateKey(startDate);
@@ -260,10 +288,14 @@ export const ObsidianExportView: React.FC<ObsidianExportViewProps> = ({
                     startDate,
                     startDate.toDateString() === currentDate.toDateString() ? dailyReview : undefined,
                     exportOptions,
-                    todoCategories
+                    todoCategories,
+                    dayImages
                 );
 
                 await obsidianExportService.exportToFile(filePath, content);
+                if (dayImages.length > 0) {
+                    await obsidianExportService.exportImagesToFolder(dayImages, config);
+                }
                 onToast('success', `导出成功: ${filePath}`);
             } else {
                 // 范围导出 - 每天生成一个文件
@@ -274,14 +306,9 @@ export const ObsidianExportView: React.FC<ObsidianExportViewProps> = ({
                     const filePath = obsidianExportService.generateFilePath(config, current);
 
                     // 筛选当天的logs (这里简化处理，实际应该从props获取所有日期的数据)
-                    const dayStart = new Date(current);
-                    dayStart.setHours(0, 0, 0, 0);
-                    const dayEnd = new Date(current);
-                    dayEnd.setHours(23, 59, 59, 999);
+                    const dayLogs = getLogsForDate(logs, current);
+                    const dayImages = obsidianExportService.collectLogImages(dayLogs);
 
-                    const dayLogs = logs.filter(log =>
-                        log.startTime >= dayStart.getTime() && log.endTime <= dayEnd.getTime()
-                    );
 
                     if (dayLogs.length > 0) {
                         // 查找当天的dailyReview
@@ -297,10 +324,14 @@ export const ObsidianExportView: React.FC<ObsidianExportViewProps> = ({
                             current,
                             dayReview,  // 传递当天的review
                             exportOptions,
-                            todoCategories
+                            todoCategories,
+                            dayImages
                         );
 
                         await obsidianExportService.exportToFile(filePath, content);
+                        if (dayImages.length > 0) {
+                            await obsidianExportService.exportImagesToFolder(dayImages, config);
+                        }
                         exportedCount++;
                     }
 
@@ -514,6 +545,25 @@ export const ObsidianExportView: React.FC<ObsidianExportViewProps> = ({
                     </div>
 
                     {/* 路径预览 */}
+                    <div>
+                        <label className="text-xs font-bold text-stone-400 uppercase ml-1">
+                            图片文件夹 (IMAGE FOLDER)
+                        </label>
+                        <div className="flex items-center gap-2 bg-stone-50 px-3 py-2 rounded-xl mt-1 focus-within:ring-2 focus-within:ring-stone-200 transition-all">
+                            <ImageIcon size={18} className="text-stone-400" />
+                            <input
+                                type="text"
+                                placeholder="attachments"
+                                className="flex-1 bg-transparent border-none outline-none text-stone-700 placeholder:text-stone-300 text-sm"
+                                value={imageFolderName}
+                                onChange={e => setImageFolderName(e.target.value)}
+                            />
+                        </div>
+                        <p className="text-xs text-stone-400 mt-1 ml-1">
+                            例如: attachments 或 Obsidian/Assets/Images
+                        </p>
+                    </div>
+
                     {rootPath && pathTemplate && (
                         <div className="p-3 bg-stone-50 rounded-xl border border-stone-100">
                             <p className="text-xs font-bold text-stone-400 mb-1">路径预览</p>

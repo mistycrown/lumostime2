@@ -12,3 +12,4 @@ The `electron/` directory contains the main process and preload scripts for runn
 *   **Window Management**: Configures the main application window (dimensions, icon, frame).
 *   **Security**: Disables Web Security (`webSecurity: false`) to allow WebDAV access across origins (critical for the Sync feature).
 *   **IPC**: Sets up handlers for inter-process communication if needed.
+*   **Obsidian Export Helpers**: Writes Markdown files and copies referenced log images into the user-selected Obsidian attachments folder on desktop builds.

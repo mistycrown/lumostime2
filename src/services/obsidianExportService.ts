@@ -4,11 +4,13 @@
  * @output Markdown文件路径和内容
  * @pos Service (导出服务)
  * @description 处理导出数据到 Obsidian 笔记的逻辑,包括路径生成、Markdown内容生成和文件写入
+ * @updated 2026-04-09: PC ???????????????????????????????????????, ??????????????????????
  * 
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
 
-import { Log, Category, TodoItem, Scope, DailyReview } from '../types';
+import { Log, Category, TodoItem, Scope, DailyReview } from '../types';
+import { imageService } from './imageService';
 
 /**
  * 导出选项
@@ -30,6 +32,7 @@ export interface ObsidianExportConfig {
     pathTemplate: string;    // 路径模板,如: "{YYYY}/{MM}/{YYYY}-{MM}-{DD}.md"
     weeklyPathTemplate?: string;  // 周报路径模板,如: "{YYYY}/{YYYY}-W{WW}.md"
     monthlyPathTemplate?: string; // 月报路径模板,如: "{YYYY}/{YYYY}-{MM}.md"
+    imageFolderName: string; // Image output folder relative to root path
 }
 
 /**
@@ -276,6 +279,43 @@ class ObsidianExportService {
     }
 
     /**
+     * 鐢熸垚鍥剧墖瀵煎嚭鐨勪綅鎴?
+     */
+    generateImagesSection(imageFilenames: string[]): string {
+        if (!imageFilenames || imageFilenames.length === 0) {
+            return '';
+        }
+
+        let text = '## 🖼️ 图片\n\n';
+        imageFilenames.forEach(filename => {
+            text += `![[${filename}]]\n\n`;
+        });
+
+        return text.trimEnd();
+    }
+
+    /**
+     * 鎷兼帴鏃ュ織涓寮曡鍚嶇殑鍥剧墖(淇濈暀棣栨鍑虹幇椤甸潰)
+     */
+    collectLogImages(logs: Log[]): string[] {
+        const seen = new Set<string>();
+        const ordered: string[] = [];
+
+        logs.forEach(log => {
+            if (Array.isArray(log.images)) {
+                log.images.forEach(filename => {
+                    if (filename && !seen.has(filename)) {
+                        seen.add(filename);
+                        ordered.push(filename);
+                    }
+                });
+            }
+        });
+
+        return ordered;
+    }
+
+    /**
      * 生成引导提问内容
      */
     generateQuestionsMarkdown(dailyReview: DailyReview | undefined, date: Date): string {
@@ -396,7 +436,8 @@ class ObsidianExportService {
         date: Date,
         dailyReview?: DailyReview,
         options: ObsidianExportOptions = this.defaultOptions,
-        todoCategories?: any[]
+        todoCategories?: any[],
+        imageFilenames?: string[]
     ): string {
         const sections: string[] = [];
 
@@ -414,6 +455,10 @@ class ObsidianExportService {
 
         if (options.includeNarrative) {
             sections.push(this.generateNarrativeMarkdown(dailyReview?.narrative));
+        }
+
+        if (imageFilenames && imageFilenames.length > 0) {
+            sections.push(this.generateImagesSection(imageFilenames));
         }
 
         return sections.join('\n\n');
@@ -582,6 +627,125 @@ class ObsidianExportService {
     }
 
     /**
+     * PC 绔墽琛屼笂浼犲浘鐗囩殑IPC鎺ユ敹
+     */
+    async exportImagesToFolder(imageFilenames: string[], config: ObsidianExportConfig): Promise<void> {
+        if (!imageFilenames || imageFilenames.length === 0) {
+            return;
+        }
+
+        if (!this.isElectronEnvironment()) {
+            console.warn('[ObsidianExportService] Image export is only supported in Electron.');
+            return;
+        }
+
+        const folderName = this.sanitizeImageFolderName(config.imageFolderName);
+        if (!folderName) {
+            console.warn('[ObsidianExportService] Missing image folder configuration, skip image export.');
+            return;
+        }
+
+        const uniqueNames = Array.from(new Set(imageFilenames));
+        const filesPayload: { filename: string; base64Data: string }[] = [];
+
+        for (const filename of uniqueNames) {
+            try {
+                const rawData = await imageService.readImage(filename);
+                const base64Data = await this.ensureBase64Payload(rawData);
+                if (base64Data) {
+                    filesPayload.push({ filename, base64Data });
+                } else {
+                    console.warn(`[ObsidianExportService] Empty image payload, skip ${filename}`);
+                }
+            } catch (error) {
+                console.error(`[ObsidianExportService] Failed to read image ${filename}`, error);
+            }
+        }
+
+        if (filesPayload.length === 0) {
+            return;
+        }
+
+        try {
+            await (window as any).ipcRenderer.invoke('write-obsidian-images', {
+                rootPath: config.rootPath,
+                imageFolderName: folderName,
+                files: filesPayload
+            });
+        } catch (error: any) {
+            throw new Error(`鍥剧墖瀵煎嚭澶辫触: ${error.message}`);
+        }
+    }
+
+    private sanitizeImageFolderName(folderName?: string): string | null {
+        if (!folderName) {
+            return null;
+        }
+        const normalized = folderName.trim().replace(/^[\\/]+|[\\/]+$/g, '').replace(/\\/g, '/');
+        if (!normalized || normalized.includes('..')) {
+            return null;
+        }
+        return normalized;
+    }
+
+    private async ensureBase64Payload(data: ArrayBuffer | string | Blob): Promise<string | null> {
+        if (typeof data === 'string') {
+            return this.stripDataUrlPrefix(data);
+        }
+
+        if (data instanceof Blob) {
+            const buffer = await data.arrayBuffer();
+            return this.arrayBufferToBase64(buffer);
+        }
+
+        if (data instanceof ArrayBuffer) {
+            return this.arrayBufferToBase64(data);
+        }
+
+        return null;
+    }
+
+    private arrayBufferToBase64(buffer: ArrayBuffer): string {
+        let binary = '';
+        const bytes = new Uint8Array(buffer);
+        const chunkSize = 0x8000;
+        for (let i = 0; i < bytes.length; i += chunkSize) {
+            const chunk = bytes.subarray(i, Math.min(i + chunkSize, bytes.length));
+            binary += String.fromCharCode(...chunk);
+        }
+
+        const btoaFn =
+            typeof btoa === 'function'
+                ? btoa
+                : typeof globalThis !== 'undefined' && typeof (globalThis as any).btoa === 'function'
+                    ? (globalThis as any).btoa
+                    : null;
+
+        if (btoaFn) {
+            return btoaFn(binary);
+        }
+
+        if (typeof globalThis !== 'undefined' && (globalThis as any).Buffer) {
+            return (globalThis as any).Buffer.from(buffer).toString('base64');
+        }
+
+        throw new Error('Base64 conversion is not supported in this environment');
+    }
+
+    private stripDataUrlPrefix(value: string): string {
+        if (!value) {
+            return '';
+        }
+
+        if (value.startsWith('data:')) {
+            const commaIndex = value.indexOf(',');
+            return commaIndex >= 0 ? value.substring(commaIndex + 1) : '';
+        }
+
+        return value;
+    }
+
+    /**
      * 导出到文件 (通过 Electron IPC)
      */
     async exportToFile(filePath: string, content: string): Promise<void> {
@@ -624,7 +788,20 @@ class ObsidianExportService {
      */
     getConfig(): ObsidianExportConfig | null {
         const stored = localStorage.getItem(STORAGE_KEY);
-        return stored ? JSON.parse(stored) : null;
+        if (!stored) {
+            return null;
+        }
+
+        try {
+            const parsed = JSON.parse(stored) as Partial<ObsidianExportConfig>;
+            if (!parsed.imageFolderName) {
+                parsed.imageFolderName = 'attachments';
+            }
+            return parsed as ObsidianExportConfig;
+        } catch (error) {
+            console.error('[ObsidianExportService] Failed to parse stored config', error);
+            return null;
+        }
     }
 }
 
