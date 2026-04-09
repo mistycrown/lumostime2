@@ -2,6 +2,8 @@
 
 Contains business logic and external integrations.
 
+Update 2026-04-09: `obsidianExportService.ts` now supports copying referenced log images into a user-defined Obsidian attachment folder during desktop exports.
+
 Update 2026-03-12: timeline styling for normal timeline records is managed by `timelineStyleService.ts`.
 
 ## Files
