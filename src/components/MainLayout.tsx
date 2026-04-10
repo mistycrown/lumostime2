@@ -95,15 +95,15 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
         if (isMonthlyReviewOpen) return 'Monthly Review';
         if (isAchievementOpen) return '成就瓶';
         if (currentView === AppView.TAGS) {
-            if (selectedTagId) return 'Tag Details';
-            if (selectedCategoryId) return 'Category Details';
+            if (selectedTagId) return '标签详情';
+            if (selectedCategoryId) return '分类详情';
             return 'Tags';
         }
         if (currentView === AppView.REVIEW) {
             return isJournalMode ? 'Memoir' : 'Chronicle';
         }
         if (currentView === AppView.SCOPE) {
-            if (selectedScopeId) return 'Scope Details';
+            if (selectedScopeId) return '领域详情';
             return 'Scopes';
         }
         if (currentView === AppView.STATS) {

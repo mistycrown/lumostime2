@@ -308,10 +308,10 @@ export const TagDetailView: React.FC<TagDetailViewProps> = ({ tagId, logs, todos
             return (
                <div className="space-y-6">
                   <div className="bg-white rounded-2xl p-6 border border-stone-100 shadow-sm">
-                     <h3 className="text-sm font-bold text-stone-400 uppercase tracking-widest mb-4">Basic Info</h3>
+                     <h3 className="text-sm font-bold text-stone-400 uppercase tracking-widest mb-4">基本信息</h3>
                      <div className="space-y-4">
                         <div>
-                           <label className="text-xs text-stone-400 font-medium mb-1.5 block">Name (First char is icon)</label>
+                           <label className="text-xs text-stone-400 font-medium mb-1.5 block">名称（首字符作为图标）</label>
                            <input
                               type="text"
                               value={`${activity.icon}${activity.name} `}
@@ -360,12 +360,12 @@ export const TagDetailView: React.FC<TagDetailViewProps> = ({ tagId, logs, todos
 
                         {/* Focus Score Setting */}
                         <div>
-                           <label className="text-xs text-stone-400 font-medium mb-1.5 block">Focus Score</label>
+                           <label className="text-xs text-stone-400 font-medium mb-1.5 block">专注评分</label>
                            <div className="flex bg-stone-100 p-1 rounded-xl">
                               {[
-                                 { value: 'inherit', label: 'Inherit' },
-                                 { value: 'true', label: 'On' },
-                                 { value: 'false', label: 'Off' }
+                                 { value: 'inherit', label: '继承' },
+                                 { value: 'true', label: '开启' },
+                                 { value: 'false', label: '关闭' }
                               ].map((option) => {
                                  const currentValue = activity.enableFocusScore === undefined ? 'inherit' : activity.enableFocusScore.toString();
                                  const isSelected = currentValue === option.value;
@@ -374,9 +374,9 @@ export const TagDetailView: React.FC<TagDetailViewProps> = ({ tagId, logs, todos
                                  if (option.value === 'inherit') {
                                     labelNode = (
                                        <div className="flex flex-col items-center leading-none">
-                                          <span className="text-xs font-bold">Inherit</span>
+                                          <span className="text-xs font-bold">继承</span>
                                           <span className="text-[9px] opacity-60 mt-0.5">
-                                             (Cat: {category?.enableFocusScore ? 'On' : 'Off'})
+                                             （分类：{category?.enableFocusScore ? '开启' : '关闭'}）
                                           </span>
                                        </div>
                                     );
@@ -398,7 +398,7 @@ export const TagDetailView: React.FC<TagDetailViewProps> = ({ tagId, logs, todos
                                              : 'text-stone-400 hover:text-stone-600 hover:bg-stone-200/50'
                                           }
 `}
-                                       title={option.value === 'inherit' ? `Inherit from Category(${category?.enableFocusScore ? 'Enabled' : 'Disabled'})` : ''}
+                                       title={option.value === 'inherit' ? `继承分类设置（当前：${category?.enableFocusScore ? '开启' : '关闭'}）` : ''}
                                     >
                                        {labelNode}
                                     </button>
@@ -409,12 +409,12 @@ export const TagDetailView: React.FC<TagDetailViewProps> = ({ tagId, logs, todos
 
                         {/* Mood Score Setting */}
                         <div>
-                           <label className="text-xs text-stone-400 font-medium mb-1.5 block">Mood Score</label>
+                           <label className="text-xs text-stone-400 font-medium mb-1.5 block">情绪评分</label>
                            <div className="flex bg-stone-100 p-1 rounded-xl">
                               {[
-                                 { value: 'inherit', label: 'Inherit' },
-                                 { value: 'true', label: 'On' },
-                                 { value: 'false', label: 'Off' }
+                                 { value: 'inherit', label: '继承' },
+                                 { value: 'true', label: '开启' },
+                                 { value: 'false', label: '关闭' }
                               ].map((option) => {
                                  const currentValue = activity.enableMoodScore === undefined ? 'inherit' : activity.enableMoodScore.toString();
                                  const isSelected = currentValue === option.value;
@@ -423,9 +423,9 @@ export const TagDetailView: React.FC<TagDetailViewProps> = ({ tagId, logs, todos
                                  if (option.value === 'inherit') {
                                     labelNode = (
                                        <div className="flex flex-col items-center leading-none">
-                                          <span className="text-xs font-bold">Inherit</span>
+                                          <span className="text-xs font-bold">继承</span>
                                           <span className="text-[9px] opacity-60 mt-0.5">
-                                             (Cat: {category?.enableMoodScore ? 'On' : 'Off'})
+                                             （分类：{category?.enableMoodScore ? '开启' : '关闭'}）
                                           </span>
                                        </div>
                                     );
@@ -447,7 +447,7 @@ export const TagDetailView: React.FC<TagDetailViewProps> = ({ tagId, logs, todos
                                              : 'text-stone-400 hover:text-stone-600 hover:bg-stone-200/50'
                                           }
 `}
-                                       title={option.value === 'inherit' ? `Inherit from Category(${category?.enableMoodScore ? 'Enabled' : 'Disabled'})` : ''}
+                                       title={option.value === 'inherit' ? `继承分类设置（当前：${category?.enableMoodScore ? '开启' : '关闭'}）` : ''}
                                     >
                                        {labelNode}
                                     </button>
@@ -458,27 +458,27 @@ export const TagDetailView: React.FC<TagDetailViewProps> = ({ tagId, logs, todos
 
                         {/* Heatmap Scale */}
                         <div>
-                           <label className="text-xs text-stone-400 font-medium mb-1.5 block">Heatmap Scale (Minutes)</label>
+                           <label className="text-xs text-stone-400 font-medium mb-1.5 block">热力图范围（分钟）</label>
                            <div className="flex gap-4">
                               <div className="flex-1">
-                                 <label className="text-xs text-stone-400 font-medium mb-1.5 block">Min (Lightest)</label>
+                                 <label className="text-xs text-stone-400 font-medium mb-1.5 block">最小值（最浅）</label>
                                  <input
                                     type="number"
                                     min={0}
                                     value={activity.heatmapMin ?? ''}
                                     onChange={(e) => setActivity({ ...activity, heatmapMin: parseInt(e.target.value) || undefined })}
-                                    placeholder="Default: 0"
+                                    placeholder="默认：0"
                                     className="w-full bg-stone-50 border border-stone-200 rounded-xl px-4 py-3 text-stone-800 font-bold outline-none focus:border-stone-400 transition-colors"
                                  />
                               </div>
                               <div className="flex-1">
-                                 <label className="text-xs text-stone-400 font-medium mb-1.5 block">Max (Darkest)</label>
+                                 <label className="text-xs text-stone-400 font-medium mb-1.5 block">最大值（最深）</label>
                                  <input
                                     type="number"
                                     min={0}
                                     value={activity.heatmapMax ?? ''}
                                     onChange={(e) => setActivity({ ...activity, heatmapMax: parseInt(e.target.value) || undefined })}
-                                    placeholder="Default: 240"
+                                    placeholder="默认：240"
                                     className="w-full bg-stone-50 border border-stone-200 rounded-xl px-4 py-3 text-stone-800 font-bold outline-none focus:border-stone-400 transition-colors"
                                  />
                               </div>
@@ -506,10 +506,10 @@ export const TagDetailView: React.FC<TagDetailViewProps> = ({ tagId, logs, todos
                   </div>
 
                   <div className="bg-white rounded-2xl p-6 border border-stone-100 shadow-sm">
-                     <h3 className="text-sm font-bold text-stone-400 uppercase tracking-widest mb-4">Appearance</h3>
+                     <h3 className="text-sm font-bold text-stone-400 uppercase tracking-widest mb-4">外观</h3>
                      <div className="space-y-4">
                         <div>
-                           <label className="text-xs text-stone-400 font-medium mb-1.5 block">Background Color</label>
+                           <label className="text-xs text-stone-400 font-medium mb-1.5 block">背景颜色</label>
                            <div className="flex gap-2 flex-wrap">
                               {COLOR_OPTIONS.map(opt => (
                                  <button
@@ -539,7 +539,7 @@ export const TagDetailView: React.FC<TagDetailViewProps> = ({ tagId, logs, todos
 
                   {/* Keywords Section */}
                   <div className="bg-white rounded-2xl p-6 border border-stone-100 shadow-sm">
-                     <h3 className="text-sm font-bold text-stone-400 uppercase tracking-widest mb-4">Keywords</h3>
+                     <h3 className="text-sm font-bold text-stone-400 uppercase tracking-widest mb-4">关键字</h3>
                      <div className="space-y-4">
                         <div className="flex flex-wrap gap-2">
                            {(activity.keywords || []).map(keyword => (
@@ -556,7 +556,7 @@ export const TagDetailView: React.FC<TagDetailViewProps> = ({ tagId, logs, todos
                               </button>
                            ))}
                            {(activity.keywords || []).length === 0 && (
-                              <span className="text-xs text-stone-300 italic">No keywords added yet.</span>
+                              <span className="text-xs text-stone-300 italic">还没有添加关键字。</span>
                            )}
                         </div>
                         <div className="flex items-center gap-2 min-w-0">
@@ -570,7 +570,7 @@ export const TagDetailView: React.FC<TagDetailViewProps> = ({ tagId, logs, todos
                                     handleAddKeyword();
                                  }
                               }}
-                              placeholder="Add a keyword..."
+                              placeholder="添加关键字..."
                               className="flex-1 min-w-0 bg-stone-50 border border-stone-200 rounded-xl px-4 py-2.5 text-sm font-bold text-stone-700 outline-none focus:border-stone-400 focus:bg-white transition-colors placeholder:font-normal"
                            />
                            <button

@@ -292,7 +292,7 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({ initialTodo, c
         <button onClick={onClose} className="absolute left-4 p-2 text-stone-400 hover:text-stone-600 rounded-full">
           <ChevronLeft size={24} />
         </button>
-        <span className="font-bold text-stone-800 text-lg font-serif">Task Details</span>
+        <span className="font-bold text-stone-800 text-lg font-serif">待办详情</span>
       </div>
 
       {/* Scrollable Content */}
@@ -302,7 +302,7 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({ initialTodo, c
         <div className="mb-6">
           <div className="flex items-center gap-3 mb-1">
             <span className="text-2xl font-bold text-stone-300">@</span>
-            <span className="text-2xl font-bold text-stone-900 break-all line-clamp-2">{title || 'New Task'}</span>
+            <span className="text-2xl font-bold text-stone-900 break-all line-clamp-2">{title || '新待办'}</span>
           </div>
           <div className="flex items-center gap-2">
             <span className="text-stone-500 text-sm font-medium bg-stone-100 px-3 py-1 rounded-full flex items-center gap-2">
@@ -312,7 +312,7 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({ initialTodo, c
             {isProgress && (
               <span className="btn-template-filled text-xs font-bold px-2 py-1 rounded-md flex items-center gap-1">
                 <TrendingUp size={12} />
-                Tracking
+                进度追踪
               </span>
             )}
           </div>
@@ -337,17 +337,17 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({ initialTodo, c
             {/* Edit Form */}
             <div className="bg-white rounded-2xl p-6 border border-stone-100 shadow-sm space-y-4">
               <div className="flex items-center justify-between mb-4">
-                <h3 className="text-sm font-bold text-stone-400 uppercase tracking-widest">Basic Info</h3>
+                <h3 className="text-sm font-bold text-stone-400 uppercase tracking-widest">基本信息</h3>
                 <button
                   onClick={() => setIsCompleted(!isCompleted)}
                   className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-2 ${isCompleted ? 'bg-stone-900 text-white shadow-md' : 'bg-stone-100 text-stone-500 hover:bg-stone-200'}`}
                 >
                   {isCompleted ? <CheckCircle2 size={14} /> : <Circle size={14} />}
-                  {isCompleted ? 'Completed' : 'Mark Complete'}
+                  {isCompleted ? '已完成' : '标记完成'}
                 </button>
               </div>
               <div>
-                <label className="text-xs text-stone-400 font-medium mb-1.5 block">Category</label>
+                <label className="text-xs text-stone-400 font-medium mb-1.5 block">分类</label>
                 <div className="grid grid-cols-4 gap-2">
                   {todoCategories?.map(cat => (
                     <button
@@ -367,7 +367,7 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({ initialTodo, c
                 </div>
               </div>
               <div>
-                <label className="text-xs text-stone-400 font-medium mb-1.5 block">Task Name</label>
+                <label className="text-xs text-stone-400 font-medium mb-1.5 block">待办名称</label>
                 <input
                   ref={taskNameInputRef}
                   type="text"
@@ -377,19 +377,19 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({ initialTodo, c
                 />
               </div>
               <div>
-                <label className="text-xs text-stone-400 font-medium mb-1.5 block">Notes</label>
+                <label className="text-xs text-stone-400 font-medium mb-1.5 block">备注</label>
                 <textarea
                   value={note}
                   onChange={e => setNote(e.target.value)}
                   className="w-full bg-stone-50 border border-stone-200 rounded-xl px-4 py-3 text-stone-700 text-sm outline-none focus:border-stone-400 transition-colors min-h-[100px] resize-none"
-                  placeholder="Add notes..."
+                  placeholder="添加备注..."
                 />
               </div>
               
               {/* Cover Image */}
               <div>
                 <div className="flex items-center justify-between mb-1.5">
-                  <label className="text-xs text-stone-400 font-medium">Cover Image</label>
+                  <label className="text-xs text-stone-400 font-medium">封面图片</label>
                   {coverImage && (
                     <button
                       type="button"
@@ -440,14 +440,14 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({ initialTodo, c
               {/* Progress Tracking */}
               <div>
                 <div className="flex items-center justify-between mb-1.5">
-                  <label className="text-xs text-stone-400 font-medium">Progress Tracking</label>
+                  <label className="text-xs text-stone-400 font-medium">进度追踪</label>
                   <div className="flex items-center gap-2">
                     <button
                       type="button"
                       onClick={handleRecalculateProgressFromLogs}
                       disabled={!isProgress}
                       className={`text-[10px] px-2 py-1 rounded-md border transition-colors flex items-center gap-1 ${isProgress ? 'text-stone-600 border-stone-200 hover:bg-stone-50' : 'text-stone-300 border-stone-100 cursor-not-allowed'}`}
-                      title={isProgress ? '按关联日志重算进度' : '请先开启 Progress Tracking'}
+                      title={isProgress ? '按关联日志重算进度' : '请先开启进度追踪'}
                     >
                       <RotateCcw size={10} />
                       重算
@@ -465,11 +465,11 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({ initialTodo, c
                 {isProgress && (
                   <div className="pt-2 grid grid-cols-2 gap-4 animate-in slide-in-from-top-2 fade-in">
                     <div>
-                      <label className="text-xs text-stone-400 font-medium mb-1.5 block">Total Amount</label>
+                      <label className="text-xs text-stone-400 font-medium mb-1.5 block">总量</label>
                       <input type="number" value={totalAmount} onChange={e => setTotalAmount(parseInt(e.target.value) || 0)} className="w-full bg-stone-50 border border-stone-200 rounded-xl px-4 py-3 text-stone-800 font-bold outline-none focus:border-stone-400 transition-colors" />
                     </div>
                     <div>
-                      <label className="text-xs text-stone-400 font-medium mb-1.5 block">Unit Size</label>
+                      <label className="text-xs text-stone-400 font-medium mb-1.5 block">单位大小</label>
                       <input type="number" value={unitAmount} onChange={e => setUnitAmount(parseInt(e.target.value) || 0)} className="w-full bg-stone-50 border border-stone-200 rounded-xl px-4 py-3 text-stone-800 font-bold outline-none focus:border-stone-400 transition-colors" />
                     </div>
                   </div>
@@ -478,27 +478,27 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({ initialTodo, c
 
               {/* Heatmap Scale */}
               <div>
-                <label className="text-xs text-stone-400 font-medium mb-1.5 block">Heatmap Scale (Minutes)</label>
+                <label className="text-xs text-stone-400 font-medium mb-1.5 block">热力图范围（分钟）</label>
                 <div className="flex gap-4">
                   <div className="flex-1">
-                    <label className="text-xs text-stone-400 font-medium mb-1.5 block">Min (Lightest)</label>
+                    <label className="text-xs text-stone-400 font-medium mb-1.5 block">最小值（最浅）</label>
                     <input
                       type="number"
                       min={0}
                       value={heatmapMin ?? ''}
                       onChange={(e) => setHeatmapMin(parseInt(e.target.value) || undefined)}
-                      placeholder="Default: 0"
+                      placeholder="默认：0"
                       className="w-full bg-stone-50 border border-stone-200 rounded-xl px-4 py-3 text-stone-800 font-bold outline-none focus:border-stone-400 transition-colors"
                     />
                   </div>
                   <div className="flex-1">
-                    <label className="text-xs text-stone-400 font-medium mb-1.5 block">Max (Darkest)</label>
+                    <label className="text-xs text-stone-400 font-medium mb-1.5 block">最大值（最深）</label>
                     <input
                       type="number"
                       min={0}
                       value={heatmapMax ?? ''}
                       onChange={(e) => setHeatmapMax(parseInt(e.target.value) || undefined)}
-                      placeholder="Default: 240"
+                      placeholder="默认：240"
                       className="w-full bg-stone-50 border border-stone-200 rounded-xl px-4 py-3 text-stone-800 font-bold outline-none focus:border-stone-400 transition-colors"
                     />
                   </div>
@@ -509,7 +509,7 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({ initialTodo, c
             {/* Link Activity */}
             <div className="bg-white rounded-2xl p-6 border border-stone-100 shadow-sm">
               <div className="flex items-center justify-between mb-4">
-                <span className="text-xs font-bold text-stone-400 uppercase tracking-widest">Associated Tag</span>
+                <span className="text-xs font-bold text-stone-400 uppercase tracking-widest">关联标签</span>
                 {(linkedCategoryId || linkedActivityId) && (
                   <button
                     onClick={() => { 
@@ -518,7 +518,7 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({ initialTodo, c
                     }}
                     className="text-[10px] text-stone-400 hover:text-red-400 transition-colors"
                   >
-                    Clear
+                    清除
                   </button>
                 )}
               </div>
@@ -543,7 +543,7 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({ initialTodo, c
 
             {initialTodo && onDelete && (
               <button onClick={handleDelete} className="w-full py-4 text-red-500 font-bold text-sm hover:bg-red-50 rounded-xl transition-colors">
-                Delete Task
+                删除待办
               </button>
             )}
           </div>

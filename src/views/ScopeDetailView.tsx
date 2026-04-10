@@ -352,12 +352,12 @@ export const ScopeDetailView: React.FC<ScopeDetailViewProps> = ({
                     <div className="space-y-6 max-w-2xl">
                         {/* Basic Info */}
                         <div className="bg-white rounded-2xl p-6 border border-stone-100 shadow-sm">
-                            <h3 className="text-sm font-bold text-stone-400 uppercase tracking-widest mb-4">Basic Info</h3>
+                            <h3 className="text-sm font-bold text-stone-400 uppercase tracking-widest mb-4">基本信息</h3>
 
                             <div className="space-y-4">
                                 {/* Name (Combined Icon + Name) */}
                                 <div>
-                                    <label className="text-xs text-stone-400 font-medium mb-1.5 block">Name (First char is icon)</label>
+                                    <label className="text-xs text-stone-400 font-medium mb-1.5 block">名称（首字符作为图标）</label>
                                     <input
                                         type="text"
                                         value={`${scope.icon || ''}${scope.name}`}
@@ -368,7 +368,7 @@ export const ScopeDetailView: React.FC<ScopeDetailViewProps> = ({
 
                                 {/* Description */}
                                 <div>
-                                    <label className="text-xs text-stone-400 font-medium mb-1.5 block">Description</label>
+                                    <label className="text-xs text-stone-400 font-medium mb-1.5 block">描述</label>
                                     <textarea
                                         value={scope.description || ''}
                                         onChange={(e) => setScope(prev => ({ ...prev, description: e.target.value }))}
@@ -380,10 +380,10 @@ export const ScopeDetailView: React.FC<ScopeDetailViewProps> = ({
 
                                 {/* Focus Score Setting */}
                                 <div>
-                                    <label className="text-xs text-stone-400 font-medium mb-1.5 block">Focus Score</label>
+                                    <label className="text-xs text-stone-400 font-medium mb-1.5 block">专注评分</label>
                                     <div className="flex items-center justify-between">
                                         <div>
-                                            <p className="text-xs text-stone-400 mt-1">If enabled, activities in this scope will track focus levels (1-5) by default.</p>
+                                            <p className="text-xs text-stone-400 mt-1">开启后，此领域下的活动默认记录专注评分（1-5）。</p>
                                         </div>
                                         <button
                                             onClick={() => setScope(prev => ({ ...prev, enableFocusScore: !prev.enableFocusScore }))}
@@ -402,10 +402,10 @@ export const ScopeDetailView: React.FC<ScopeDetailViewProps> = ({
 
                                 {/* Mood Score Setting */}
                                 <div>
-                                    <label className="text-xs text-stone-400 font-medium mb-1.5 block">Mood Score</label>
+                                    <label className="text-xs text-stone-400 font-medium mb-1.5 block">情绪评分</label>
                                     <div className="flex items-center justify-between">
                                         <div>
-                                            <p className="text-xs text-stone-400 mt-1">If enabled, activities in this scope will track mood levels (1-5) by default.</p>
+                                            <p className="text-xs text-stone-400 mt-1">开启后，此领域下的活动默认记录情绪评分（1-5）。</p>
                                         </div>
                                         <button
                                             onClick={() => setScope(prev => ({ ...prev, enableMoodScore: !prev.enableMoodScore }))}
@@ -444,7 +444,7 @@ export const ScopeDetailView: React.FC<ScopeDetailViewProps> = ({
 
                         {/* Keywords Section */}
                         <div className="bg-white rounded-2xl p-6 border border-stone-100 shadow-sm">
-                            <h3 className="text-sm font-bold text-stone-400 uppercase tracking-widest mb-4">Keywords</h3>
+                            <h3 className="text-sm font-bold text-stone-400 uppercase tracking-widest mb-4">关键字</h3>
                             <div className="space-y-4">
                                 <div className="flex flex-wrap gap-2">
                                     {(scope.keywords || []).map(keyword => (
@@ -467,7 +467,7 @@ export const ScopeDetailView: React.FC<ScopeDetailViewProps> = ({
                                         </button>
                                     ))}
                                     {(scope.keywords || []).length === 0 && (
-                                        <span className="text-xs text-stone-300 italic">No keywords added yet.</span>
+                                        <span className="text-xs text-stone-300 italic">还没有添加关键字。</span>
                                     )}
                                 </div>
                                 <div className="flex items-center gap-2 min-w-0">
@@ -490,7 +490,7 @@ export const ScopeDetailView: React.FC<ScopeDetailViewProps> = ({
                                                 }
                                             }
                                         }}
-                                        placeholder="Add a keyword..."
+                                        placeholder="添加关键字..."
                                         className="flex-1 min-w-0 bg-stone-50 border border-stone-200 rounded-xl px-4 py-2.5 text-sm font-bold text-stone-700 outline-none focus:border-stone-400 focus:bg-white transition-colors placeholder:font-normal"
                                     />
                                     <button
@@ -517,10 +517,10 @@ export const ScopeDetailView: React.FC<ScopeDetailViewProps> = ({
 
                         {/* Appearance */}
                         <div className="bg-white rounded-2xl p-6 border border-stone-100 shadow-sm">
-                            <h3 className="text-sm font-bold text-stone-400 uppercase tracking-widest mb-4">Appearance</h3>
+                            <h3 className="text-sm font-bold text-stone-400 uppercase tracking-widest mb-4">外观</h3>
                             <div className="space-y-4">
                                 <div>
-                                    <label className="text-xs text-stone-400 font-medium mb-1.5 block">Theme Color</label>
+                                    <label className="text-xs text-stone-400 font-medium mb-1.5 block">主题颜色</label>
                                     <div className="flex gap-2 flex-wrap">
                                         {COLOR_OPTIONS.map(opt => (
                                             <button
