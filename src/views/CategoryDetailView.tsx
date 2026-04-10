@@ -267,10 +267,10 @@ export const CategoryDetailView: React.FC<CategoryDetailViewProps> = ({ category
                 return (
                     <div className="space-y-6">
                         <div className="bg-white rounded-2xl p-6 border border-stone-100 shadow-sm">
-                            <h3 className="text-sm font-bold text-stone-400 uppercase tracking-widest mb-4">Basic Info</h3>
+                            <h3 className="text-sm font-bold text-stone-400 uppercase tracking-widest mb-4">基本信息</h3>
                             <div className="space-y-4">
                                 <div>
-                                    <label className="text-xs text-stone-400 font-medium mb-1.5 block">Name (First char is icon)</label>
+                                    <label className="text-xs text-stone-400 font-medium mb-1.5 block">名称（首字符作为图标）</label>
                                     <input
                                         type="text"
                                         value={`${category.icon}${category.name}`}
@@ -281,7 +281,7 @@ export const CategoryDetailView: React.FC<CategoryDetailViewProps> = ({ category
                                 
                                 {/* Theme Color */}
                                 <div>
-                                    <label className="text-xs text-stone-400 font-medium mb-1.5 block">Theme Color</label>
+                                    <label className="text-xs text-stone-400 font-medium mb-1.5 block">主题颜色</label>
                                     <div className="flex gap-2 flex-wrap">
                                         {COLOR_OPTIONS.map(opt => (
                                             <button
@@ -309,7 +309,7 @@ export const CategoryDetailView: React.FC<CategoryDetailViewProps> = ({ category
 
                                 {/* Heatmap Scale */}
                                 <div>
-                                    <label className="text-xs text-stone-400 font-medium mb-1.5 block">Heatmap Scale (Minutes)</label>
+                                    <label className="text-xs text-stone-400 font-medium mb-1.5 block">热力图范围（分钟）</label>
                                     <div className="flex gap-4">
                                         <div className="flex-1">
                                             <input
@@ -317,7 +317,7 @@ export const CategoryDetailView: React.FC<CategoryDetailViewProps> = ({ category
                                                 min={0}
                                                 value={category.heatmapMin ?? ''}
                                                 onChange={(e) => setCategory({ ...category, heatmapMin: parseInt(e.target.value) || undefined })}
-                                                placeholder="Min: 0"
+                                                placeholder="最小值：0"
                                                 className="w-full bg-stone-50 border border-stone-200 rounded-xl px-4 py-3 text-stone-800 font-bold outline-none focus:border-stone-400 transition-colors"
                                             />
                                         </div>
@@ -327,7 +327,7 @@ export const CategoryDetailView: React.FC<CategoryDetailViewProps> = ({ category
                                                 min={0}
                                                 value={category.heatmapMax ?? ''}
                                                 onChange={(e) => setCategory({ ...category, heatmapMax: parseInt(e.target.value) || undefined })}
-                                                placeholder="Max: 240"
+                                                placeholder="最大值：240"
                                                 className="w-full bg-stone-50 border border-stone-200 rounded-xl px-4 py-3 text-stone-800 font-bold outline-none focus:border-stone-400 transition-colors"
                                             />
                                         </div>
@@ -337,7 +337,7 @@ export const CategoryDetailView: React.FC<CategoryDetailViewProps> = ({ category
                                 {/* Focus Score */}
                                 <div>
                                     <div className="flex items-center justify-between">
-                                        <label className="text-xs text-stone-400 font-medium">Enable Focus Score</label>
+                                        <label className="text-xs text-stone-400 font-medium">启用专注评分</label>
                                         <button
                                             onClick={() => setCategory({ ...category, enableFocusScore: !category.enableFocusScore })}
                                             className={`w-12 h-6 rounded-full p-1 transition-colors ${category.enableFocusScore ? 'bg-stone-900' : 'bg-stone-200'}`}
@@ -346,14 +346,14 @@ export const CategoryDetailView: React.FC<CategoryDetailViewProps> = ({ category
                                         </button>
                                     </div>
                                     <p className="text-xs text-stone-400 mt-1.5">
-                                        If enabled, activities in this category will track focus levels (1-5) by default.
+                                        开启后，此分类下的活动默认记录专注评分（1-5）。
                                     </p>
                                 </div>
 
                                 {/* Mood Score */}
                                 <div>
                                     <div className="flex items-center justify-between">
-                                        <label className="text-xs text-stone-400 font-medium">Enable Mood Score</label>
+                                        <label className="text-xs text-stone-400 font-medium">启用情绪评分</label>
                                         <button
                                             onClick={() => setCategory({ ...category, enableMoodScore: !category.enableMoodScore })}
                                             className={`w-12 h-6 rounded-full p-1 transition-colors ${category.enableMoodScore ? 'bg-stone-900' : 'bg-stone-200'}`}
@@ -362,7 +362,7 @@ export const CategoryDetailView: React.FC<CategoryDetailViewProps> = ({ category
                                         </button>
                                     </div>
                                     <p className="text-xs text-stone-400 mt-1.5">
-                                        If enabled, activities in this category will track mood levels (1-5) by default.
+                                        开启后，此分类下的活动默认记录情绪评分（1-5）。
                                     </p>
                                 </div>
                                 
@@ -387,7 +387,7 @@ export const CategoryDetailView: React.FC<CategoryDetailViewProps> = ({ category
                         </div>
 
                         <div className="bg-white rounded-2xl p-6 border border-stone-100 shadow-sm">
-                            <h3 className="text-sm font-bold text-stone-400 uppercase tracking-widest mb-4">Activities</h3>
+                            <h3 className="text-sm font-bold text-stone-400 uppercase tracking-widest mb-4">活动</h3>
                             <div className="space-y-2">
                                 {category.activities.map(act => (
                                     <div key={act.id} className="flex items-center gap-3 p-3 bg-stone-50 rounded-xl">
@@ -485,7 +485,7 @@ export const CategoryDetailView: React.FC<CategoryDetailViewProps> = ({ category
                     />}
                     {category.name}
                 </h1>
-                <span className="text-stone-400 text-sm font-medium ml-1 mt-1 block">Category</span>
+                <span className="text-stone-400 text-sm font-medium ml-1 mt-1 block">分类</span>
             </div>
 
             {/* Tabs */}

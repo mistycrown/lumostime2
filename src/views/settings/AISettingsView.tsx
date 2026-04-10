@@ -21,7 +21,7 @@ const AI_PRESETS = {
         config: { provider: 'openai', baseUrl: 'https://api.siliconflow.cn/v1', modelName: 'deepseek-ai/deepseek-v3' }
     },
     openai: {
-        name: 'OpenAI (兼容)',
+        name: 'OpenAI（兼容）',
         config: { provider: 'openai', baseUrl: 'https://api.openai.com/v1', modelName: 'gpt-4o-mini' }
     }
 };
@@ -65,7 +65,7 @@ export const AISettingsView: React.FC<AISettingsViewProps> = ({ onBack, onToast 
 
     const handleSaveAIConfig = async () => {
         if (!aiConfigForm.apiKey) {
-            onToast('error', 'API Key is required');
+            onToast('error', '请填写 API 密钥');
             return;
         }
 
@@ -90,14 +90,14 @@ export const AISettingsView: React.FC<AISettingsViewProps> = ({ onBack, onToast 
                 <button onClick={onBack} className="text-stone-400 hover:text-stone-600 p-1">
                     <ChevronLeft size={24} />
                 </button>
-                <span className="text-stone-800 font-bold text-lg">AI API</span>
+                <span className="text-stone-800 font-bold text-lg">AI 接口</span>
             </div>
 
             <div className="p-4 space-y-4 overflow-y-auto pb-40">
                 <div className="bg-white rounded-2xl p-6 shadow-sm space-y-4">
                     <div className="flex items-center gap-3 text-stone-600 mb-2">
                         <Bot size={24} />
-                        <h3 className="font-bold text-lg">AI Provider</h3>
+                        <h3 className="font-bold text-lg">AI 服务商</h3>
                     </div>
 
                     <div className="grid grid-cols-2 gap-2">
@@ -117,10 +117,10 @@ export const AISettingsView: React.FC<AISettingsViewProps> = ({ onBack, onToast 
 
                     <div className="space-y-3 pt-4">
                         <div>
-                            <label className="text-xs font-bold text-stone-400 uppercase ml-1">API Key</label>
+                            <label className="text-xs font-bold text-stone-400 uppercase ml-1">API 密钥</label>
                             <input
                                 type="password"
-                                placeholder="Enter your API key"
+                                placeholder="请输入 API 密钥"
                                 className="w-full bg-stone-50 border border-stone-200 rounded-xl px-4 py-3 text-sm text-stone-700 outline-none focus:border-stone-400 mt-1"
                                 value={aiConfigForm.apiKey}
                                 onChange={e => setAiConfigForm(prev => ({ ...prev, apiKey: e.target.value }))}
@@ -128,10 +128,10 @@ export const AISettingsView: React.FC<AISettingsViewProps> = ({ onBack, onToast 
                         </div>
 
                         <div>
-                            <label className="text-xs font-bold text-stone-400 uppercase ml-1">Base URL</label>
+                            <label className="text-xs font-bold text-stone-400 uppercase ml-1">接口地址</label>
                             <input
                                 type="text"
-                                placeholder="API endpoint"
+                                placeholder="请输入 API 地址"
                                 className="w-full bg-stone-50 border border-stone-200 rounded-xl px-4 py-3 text-sm text-stone-700 outline-none focus:border-stone-400 mt-1"
                                 value={aiConfigForm.baseUrl}
                                 onChange={e => setAiConfigForm(prev => ({ ...prev, baseUrl: e.target.value }))}
@@ -139,10 +139,10 @@ export const AISettingsView: React.FC<AISettingsViewProps> = ({ onBack, onToast 
                         </div>
 
                         <div>
-                            <label className="text-xs font-bold text-stone-400 uppercase ml-1">Model Name</label>
+                            <label className="text-xs font-bold text-stone-400 uppercase ml-1">模型名称</label>
                             <input
                                 type="text"
-                                placeholder="Model identifier"
+                                placeholder="请输入模型标识"
                                 className="w-full bg-stone-50 border border-stone-200 rounded-xl px-4 py-3 text-sm text-stone-700 outline-none focus:border-stone-400 mt-1"
                                 value={aiConfigForm.modelName}
                                 onChange={e => setAiConfigForm(prev => ({ ...prev, modelName: e.target.value }))}
@@ -166,13 +166,13 @@ export const AISettingsView: React.FC<AISettingsViewProps> = ({ onBack, onToast 
                             {aiTestStatus === 'error' && <AlertCircle size={18} />}
                             {aiTestStatus === 'idle' && <Save size={18} />}
 
-                            {aiTestStatus === 'testing' && "测试中..."}
-                            {aiTestStatus === 'success' && "连接成功"}
-                            {aiTestStatus === 'error' && "连接失败 - 请检查配置"}
-                            {aiTestStatus === 'idle' && "保存并测试连接"}
+                            {aiTestStatus === 'testing' && '测试中...'}
+                            {aiTestStatus === 'success' && '连接成功'}
+                            {aiTestStatus === 'error' && '连接失败，请检查配置'}
+                            {aiTestStatus === 'idle' && '保存并测试连接'}
                         </button>
                         <p className="text-[10px] text-center text-stone-400 mt-3">
-                            隐私说明：您的输入和标签将发送至配置的 AI 服务商，本地服务器不存储任何数据。
+                            隐私说明：您的输入和标签将发送至所配置的 AI 服务商，本地服务器不会存储任何数据。
                         </p>
                     </div>
                 </div>
