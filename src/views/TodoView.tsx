@@ -4,7 +4,8 @@
  * @output Todo Status Updates, Edit Triggers, Focus Timer Start
  * @pos View (Main Tab)
  * @description The main To-Do list interface. Displays tasks grouped by category, supports swipe actions (complete/duplicate), and filtering.
- * 
+ * @updated 2026-04-12: Matched the expanded sidebar action button spacing with RecordView so the density toggle and collapse control keep the same right-side gutter.
+ *
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
 import React, { useState, useEffect } from 'react';
@@ -489,7 +490,7 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, categories, activityC
         {/* View Mode Toggle Button */}
         <button
           onClick={() => setViewMode(prev => prev === 'loose' ? 'compact' : 'loose')}
-          className={`mt-2 p-2 rounded-full text-stone-600 hover:bg-white hover:text-stone-800 transition-all active:scale-95 mb-2 ${isSidebarOpen ? 'ml-auto mr-0' : 'mx-auto'}`}
+          className={`mt-2 mb-2 p-2 rounded-full text-stone-600 hover:bg-white hover:text-stone-800 transition-all active:scale-95 ${isSidebarOpen ? 'self-end mr-4' : 'mx-auto'}`}
           title={viewMode === 'loose' ? "Switch to Compact View" : "Switch to Loose View"}
         >
           {viewMode === 'loose' ? <Rows size={20} /> : <LayoutList size={20} />}
@@ -498,7 +499,7 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, categories, activityC
         {/* Sidebar Toggle Button */}
         <button
           onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-          className={`mt-1 p-2 rounded-full text-stone-600 hover:bg-white hover:text-stone-800 transition-all active:scale-95 ${isSidebarOpen ? 'ml-auto mr-0' : 'mx-auto'}`}
+          className={`mt-1 p-2 rounded-full text-stone-600 hover:bg-white hover:text-stone-800 transition-all active:scale-95 ${isSidebarOpen ? 'self-end mr-4' : 'mx-auto'}`}
         >
           {isSidebarOpen ? <ChevronLeft size={20} /> : <ChevronRight size={20} />}
         </button>

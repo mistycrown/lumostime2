@@ -29,6 +29,7 @@ The views are designed as "dumb" or "presentational" components where possible, 
 > ⚠️ **Note**: When modifying views, ensure that new state requirements are coordinated with `App.tsx` if they affect global data (Logs, Categories, Todos).
 
 > Last updated: 2026-04-12
+- `TodoView.tsx`: Matched the expanded left-sidebar button spacing with `RecordView` so the density toggle and collapse control keep the same right-side gutter.
 - `OnThisDayView.tsx`: Switched historical review answers to a quote-style layout and preserved newline formatting for review and note content in the On This Day archive.
 - `ObsidianExportView.tsx`: Added image folder configuration, image-section rendering, and attachment export flow for the desktop Obsidian export tool.
 - `StatsView.tsx`: Reused the shared week range helper so matrix weeks no longer overflow when a week spans two months.
