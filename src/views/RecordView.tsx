@@ -4,7 +4,8 @@
  * @output Measurement Start Event
  * @pos View (Main Tab)
  * @description The primary interface for starting new time blocks. Features a category sidebar and a grid of activity buttons with larger start-card icons.
- * 
+ * @updated 2026-04-12: Softened the sidebar toggle button styling to reduce visual weight and keep it aligned with TodoView controls.
+ *
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
 import React, { useState, useEffect } from 'react';
@@ -150,7 +151,7 @@ export const RecordView: React.FC<RecordViewProps> = ({ onStartActivity, categor
         <button
           onClick={() => setIsSidebarOpen(!isSidebarOpen)}
           className={`
-            mt-4 mx-auto p-2 rounded-full text-stone-600 hover:bg-white hover:text-stone-800 transition-all active:scale-95
+            mt-4 mx-auto p-2 rounded-full text-stone-400 hover:bg-white/50 hover:text-stone-500 transition-all active:scale-95
             ${!isSidebarOpen ? 'bg-transparent' : 'self-end mr-4'}
           `}
         >
