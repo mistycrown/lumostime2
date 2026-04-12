@@ -27,7 +27,8 @@ export type SettingsSubmenu =
     | 'sponsorship_preview'
     | 'scene'
     | 'emoji'
-    | 'principle';
+    | 'principle'
+    | 'widget_timer';
 
 interface NavigationContextType {
     // 主视图

@@ -112,7 +112,8 @@ import {
     ReviewTemplateManageViewLazy as ReviewTemplateManageView,
     S3SyncSettingsViewLazy as S3SyncSettingsView,
     SponsorshipViewLazy as SponsorshipView,
-    UserGuideViewLazy as UserGuideView
+    UserGuideViewLazy as UserGuideView,
+    WidgetSettingsViewLazy as WidgetSettingsView
 } from '../utils/lazyViews';
 
 import { NARRATIVE_TEMPLATES } from '../constants';
@@ -1122,6 +1123,17 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
         return <SceneSettingsView onBack={handleBackToMain} />;
     }
 
+    if (activeSubmenu === 'widget_timer') {
+        return renderLazySettingsSubview(
+            <WidgetSettingsView
+                onBack={handleBackToMain}
+                onToast={onToast}
+                categories={categoriesData || []}
+            />,
+            'Loading widget timer...'
+        );
+    }
+
     return (
         <div className="fixed inset-0 z-50 bg-[#fdfbf7] flex flex-col font-serif animate-in slide-in-from-right duration-300 pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">
             {/* Header */}
@@ -1222,6 +1234,11 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
                             icon={<Smartphone size={18} className="text-indigo-500" />}
                             label="应用关联标签规则"
                             onClick={() => openSettingsSubmenu('auto_record')}
+                        />
+                        <MenuItem
+                            icon={<LayoutGrid size={18} className="text-sky-500" />}
+                            label="Widget Timer"
+                            onClick={() => openSettingsSubmenu('widget_timer')}
                         />
                         <ToggleItem
                             icon={<SquareActivity size={18} className="text-teal-500" />}

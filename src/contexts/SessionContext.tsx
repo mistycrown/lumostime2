@@ -88,7 +88,8 @@ export const SessionProvider: React.FC<SessionProviderProps> = ({ children, spli
             startTime: Date.now(),
             linkedTodoId: todoId,
             scopeIds: appliedScopeIds,
-            note: note
+            note: note,
+            source: 'app'
         };
 
         setActiveSessions(prev => [...prev, newSession]);

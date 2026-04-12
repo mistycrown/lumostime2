@@ -40,6 +40,7 @@ public class MainActivity extends BridgeActivity {
         registerPlugin(IconPlugin.class);
         registerPlugin(AppLauncherPlugin.class);
         registerPlugin(ImmersiveModePlugin.class);
+        registerPlugin(WidgetBridgePlugin.class);
         super.onCreate(savedInstanceState);
 
         configureWindowForEdgeToEdge();

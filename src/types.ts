@@ -141,6 +141,7 @@ export interface ActiveSession {
   focusScore?: number; // 1-5
   moodScore?: number; // 1-5 mood rating
   reactions?: string[]; // Emoji reactions
+  source?: 'app' | 'widget';
 }
 
 // 璇勮鎺ュ彛
