@@ -45,6 +45,7 @@ import { useFloatingWindow } from './hooks/useFloatingWindow';
 import { useAppDetection } from './hooks/useAppDetection';
 import { useHardwareBackButton } from './hooks/useHardwareBackButton';
 import { useAppLifecycle } from './hooks/useAppLifecycle';
+import { useWidgetBridgeSync } from './hooks/useWidgetBridgeSync';
 import { splitLogByDays } from './utils/logUtils';
 import { buildSceneGroupStateFromLegacySlots, getActiveSceneGroup, loadSceneGroupStateFromStorage, saveSceneGroupStateToStorage } from './utils/sceneGroupStorage';
 import { getLocalDataTimestamp, setLocalDataTimestampValue } from './utils/localDataTimestamp';
@@ -393,6 +394,7 @@ const AppContent: React.FC = () => {
   );
   useFloatingWindow(handleStopActivityWrapper);
   useAppDetection(handleStartActivityWrapper);
+  useWidgetBridgeSync();
 
   React.useEffect(() => {
     const cleanup = startLazyViewPreload();
