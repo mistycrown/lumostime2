@@ -1,5 +1,7 @@
 /**
  * @file AchievementRedeemTab.tsx
+ * @input Achievement rewards, current available stars, and reward mutation callbacks for the redeem tab
+ * @output Reward list plus create, edit, and redeem dialogs with tolerant numeric cost editing
  * @description Simplified reward catalog and redemption record manager used inside the achievement ledger.
  *
  * @updated 2026-03-28: Support one-decimal reward costs and star balance display while keeping redemption checks precise.
@@ -31,6 +33,21 @@ const createEmptyRewardDraft = (): RewardDraft => ({
   cost: 10
 });
 
+const formatRewardCostInput = (value: number) => String(value);
+
+const parseRewardCostInput = (value: string): number | null => {
+  if (!value.trim()) {
+    return null;
+  }
+
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) {
+    return null;
+  }
+
+  return Math.max(0.1, normalizeAchievementStarValue(parsed));
+};
+
 const isSameRewardDraft = (left: RewardDraft, right: RewardDraft) => (
   left.name === right.name &&
   left.cost === right.cost
@@ -47,6 +64,7 @@ export const AchievementRedeemTab: React.FC<AchievementRedeemTabProps> = ({
   const [dialogMode, setDialogMode] = useState<DialogMode>(null);
   const [selectedRewardId, setSelectedRewardId] = useState<string | null>(null);
   const [draft, setDraft] = useState<RewardDraft>(createEmptyRewardDraft);
+  const [costInput, setCostInput] = useState<string>(() => formatRewardCostInput(createEmptyRewardDraft().cost));
   const [redeemError, setRedeemError] = useState<string | null>(null);
 
   const orderedRewards = useMemo(() => {
@@ -61,12 +79,14 @@ export const AchievementRedeemTab: React.FC<AchievementRedeemTabProps> = ({
         name: selectedReward.name,
         cost: selectedReward.cost
       };
+      setCostInput(formatRewardCostInput(nextDraft.cost));
       setDraft((previous) => (isSameRewardDraft(previous, nextDraft) ? previous : nextDraft));
       return;
     }
 
     if (dialogMode === 'create') {
       const nextDraft = createEmptyRewardDraft();
+      setCostInput(formatRewardCostInput(nextDraft.cost));
       setDraft((previous) => (isSameRewardDraft(previous, nextDraft) ? previous : nextDraft));
     }
   }, [dialogMode, selectedReward]);
@@ -75,7 +95,19 @@ export const AchievementRedeemTab: React.FC<AchievementRedeemTabProps> = ({
     setDialogMode(null);
     setSelectedRewardId(null);
     setDraft(createEmptyRewardDraft());
+    setCostInput(formatRewardCostInput(createEmptyRewardDraft().cost));
     setRedeemError(null);
+  };
+
+  const commitCostInput = () => {
+    const nextValue = parseRewardCostInput(costInput) ?? Math.max(0.1, normalizeAchievementStarValue(draft.cost));
+    setCostInput(formatRewardCostInput(nextValue));
+    setDraft((previous) => (
+      previous.cost === nextValue
+        ? previous
+        : { ...previous, cost: nextValue }
+    ));
+    return nextValue;
   };
 
   const handleRewardSave = () => {
@@ -83,7 +115,7 @@ export const AchievementRedeemTab: React.FC<AchievementRedeemTabProps> = ({
       return;
     }
 
-    const sanitizedCost = Math.max(0.1, normalizeAchievementStarValue(Number(draft.cost) || 0.1));
+    const sanitizedCost = commitCostInput();
 
     if (dialogMode === 'create') {
       onCreateReward({
@@ -264,8 +296,16 @@ export const AchievementRedeemTab: React.FC<AchievementRedeemTabProps> = ({
               type="number"
               min={0.1}
               step={0.1}
-              value={draft.cost}
-              onChange={(event) => setDraft((previous) => ({ ...previous, cost: Number(event.target.value) }))}
+              value={costInput}
+              onBlur={commitCostInput}
+              onChange={(event) => {
+                const nextValue = event.target.value;
+                setCostInput(nextValue);
+                const parsedValue = parseRewardCostInput(nextValue);
+                if (parsedValue !== null) {
+                  setDraft((previous) => ({ ...previous, cost: parsedValue }));
+                }
+              }}
               className="mt-2 w-full border-b border-stone-300 bg-transparent px-0 py-2 text-[1rem] text-stone-900 outline-none focus:border-stone-900"
             />
             <div className="mt-2 text-xs text-stone-400">Current: {formatAchievementStars(draft.cost)} 光点</div>

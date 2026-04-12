@@ -1,5 +1,7 @@
 /**
  * @file AchievementRulesTab.tsx
+ * @input Achievement rules plus category, scope, todo, and daily-check metadata for editing targets
+ * @output Rule list rows and a modal editor that can safely edit temporary empty numeric input states
  * @description Achievement rule list and modal editor, reusing the shared multi-tag selector for target activity picking and decimal-safe star deltas.
  */
 import React, { useEffect, useMemo, useState } from 'react';
@@ -48,6 +50,34 @@ const createEmptyDraft = (): RuleDraft => ({
   deltaPerUnit: 1,
   note: ''
 });
+
+const formatRuleNumberInput = (value: number) => String(value);
+
+const parseRuleUnitAmountInput = (value: string): number | null => {
+  if (!value.trim()) {
+    return null;
+  }
+
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) {
+    return null;
+  }
+
+  return Math.max(1, Math.round(parsed));
+};
+
+const parseRuleDeltaInput = (value: string): number | null => {
+  if (!value.trim()) {
+    return null;
+  }
+
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) {
+    return null;
+  }
+
+  return Math.max(0.1, parsed);
+};
 
 const isSameRuleDraft = (left: RuleDraft, right: RuleDraft) => (
   left.name === right.name &&
@@ -156,6 +186,8 @@ export const AchievementRulesTab: React.FC<AchievementRulesTabProps> = ({
   const [dialogMode, setDialogMode] = useState<'create' | 'edit' | null>(null);
   const [selectedRuleId, setSelectedRuleId] = useState<string | null>(null);
   const [draft, setDraft] = useState<RuleDraft>(createEmptyDraft);
+  const [unitAmountInput, setUnitAmountInput] = useState<string>(() => formatRuleNumberInput(createEmptyDraft().unitAmount));
+  const [deltaPerUnitInput, setDeltaPerUnitInput] = useState<string>(() => formatRuleNumberInput(createEmptyDraft().deltaPerUnit));
 
   const selectedRule = rules.find((rule) => rule.id === selectedRuleId) || null;
   const isDialogOpen = dialogMode !== null;
@@ -171,12 +203,16 @@ export const AchievementRulesTab: React.FC<AchievementRulesTabProps> = ({
         deltaPerUnit: selectedRule.deltaPerUnit,
         note: selectedRule.note || ''
       };
+      setUnitAmountInput(formatRuleNumberInput(nextDraft.unitAmount));
+      setDeltaPerUnitInput(formatRuleNumberInput(nextDraft.deltaPerUnit));
       setDraft((previous) => (isSameRuleDraft(previous, nextDraft) ? previous : nextDraft));
       return;
     }
 
     if (dialogMode === 'create') {
       const nextDraft = createEmptyDraft();
+      setUnitAmountInput(formatRuleNumberInput(nextDraft.unitAmount));
+      setDeltaPerUnitInput(formatRuleNumberInput(nextDraft.deltaPerUnit));
       setDraft((previous) => (isSameRuleDraft(previous, nextDraft) ? previous : nextDraft));
     }
   }, [dialogMode, selectedRule]);
@@ -241,10 +277,35 @@ export const AchievementRulesTab: React.FC<AchievementRulesTabProps> = ({
     setSelectedRuleId(null);
   };
 
+  const commitUnitAmountInput = () => {
+    const nextValue = parseRuleUnitAmountInput(unitAmountInput) ?? Math.max(1, Math.round(draft.unitAmount));
+    setUnitAmountInput(formatRuleNumberInput(nextValue));
+    setDraft((previous) => (
+      previous.unitAmount === nextValue
+        ? previous
+        : { ...previous, unitAmount: nextValue }
+    ));
+    return nextValue;
+  };
+
+  const commitDeltaPerUnitInput = () => {
+    const nextValue = parseRuleDeltaInput(deltaPerUnitInput) ?? Math.max(0.1, draft.deltaPerUnit);
+    setDeltaPerUnitInput(formatRuleNumberInput(nextValue));
+    setDraft((previous) => (
+      previous.deltaPerUnit === nextValue
+        ? previous
+        : { ...previous, deltaPerUnit: nextValue }
+    ));
+    return nextValue;
+  };
+
   const handleSave = () => {
     if (!draft.name.trim() || draft.targetIds.length === 0) {
       return;
     }
+
+    const normalizedUnitAmount = commitUnitAmountInput();
+    const normalizedDeltaPerUnit = commitDeltaPerUnitInput();
 
     if (dialogMode === 'create') {
       onCreateRule({
@@ -252,8 +313,8 @@ export const AchievementRulesTab: React.FC<AchievementRulesTabProps> = ({
         effectType: draft.effectType,
         targetType: draft.targetType,
         targetIds: draft.targetIds,
-        unitAmount: draft.unitAmount,
-        deltaPerUnit: draft.deltaPerUnit,
+        unitAmount: normalizedUnitAmount,
+        deltaPerUnit: normalizedDeltaPerUnit,
         note: draft.note.trim() || undefined
       });
       closeDialog();
@@ -267,8 +328,8 @@ export const AchievementRulesTab: React.FC<AchievementRulesTabProps> = ({
         effectType: draft.effectType,
         targetType: draft.targetType,
         targetIds: draft.targetIds,
-        unitAmount: draft.unitAmount,
-        deltaPerUnit: draft.deltaPerUnit,
+        unitAmount: normalizedUnitAmount,
+        deltaPerUnit: normalizedDeltaPerUnit,
         note: draft.note.trim() || undefined
       });
       closeDialog();
@@ -446,12 +507,16 @@ export const AchievementRulesTab: React.FC<AchievementRulesTabProps> = ({
                   <button
                     key={option.id}
                     type="button"
-                    onClick={() => setDraft((previous) => ({
-                      ...previous,
-                      targetType: option.id as AchievementRule['targetType'],
-                      targetIds: [],
-                      unitAmount: option.id === 'activity' || option.id === 'scope' ? 30 : 1
-                    }))}
+                    onClick={() => {
+                      const nextUnitAmount = option.id === 'activity' || option.id === 'scope' ? 30 : 1;
+                      setUnitAmountInput(formatRuleNumberInput(nextUnitAmount));
+                      setDraft((previous) => ({
+                        ...previous,
+                        targetType: option.id as AchievementRule['targetType'],
+                        targetIds: [],
+                        unitAmount: nextUnitAmount
+                      }));
+                    }}
                     className={`rounded-2xl border px-4 py-3 text-sm transition-colors ${
                       draft.targetType === option.id
                         ? 'bg-white text-stone-900'
@@ -470,8 +535,16 @@ export const AchievementRulesTab: React.FC<AchievementRulesTabProps> = ({
                 <input
                   type="number"
                   min={1}
-                  value={draft.unitAmount}
-                  onChange={(event) => setDraft((previous) => ({ ...previous, unitAmount: Number(event.target.value) || 1 }))}
+                  value={unitAmountInput}
+                  onBlur={commitUnitAmountInput}
+                  onChange={(event) => {
+                    const nextValue = event.target.value;
+                    setUnitAmountInput(nextValue);
+                    const parsedValue = parseRuleUnitAmountInput(nextValue);
+                    if (parsedValue !== null) {
+                      setDraft((previous) => ({ ...previous, unitAmount: parsedValue }));
+                    }
+                  }}
                   className="mt-2 w-full border-b border-stone-300 bg-transparent px-0 py-2 text-[1rem] text-stone-900 outline-none focus:border-stone-900"
                 />
               </label>
@@ -482,8 +555,16 @@ export const AchievementRulesTab: React.FC<AchievementRulesTabProps> = ({
                 type="number"
                 min={0.1}
                 step={0.1}
-                value={draft.deltaPerUnit}
-                onChange={(event) => setDraft((previous) => ({ ...previous, deltaPerUnit: Number(event.target.value) || 1 }))}
+                value={deltaPerUnitInput}
+                onBlur={commitDeltaPerUnitInput}
+                onChange={(event) => {
+                  const nextValue = event.target.value;
+                  setDeltaPerUnitInput(nextValue);
+                  const parsedValue = parseRuleDeltaInput(nextValue);
+                  if (parsedValue !== null) {
+                    setDraft((previous) => ({ ...previous, deltaPerUnit: parsedValue }));
+                  }
+                }}
                 className="mt-2 w-full border-b border-stone-300 bg-transparent px-0 py-2 text-[1rem] text-stone-900 outline-none focus:border-stone-900"
               />
               <div className="mt-2 text-xs text-stone-400">Current: {formatAchievementStars(draft.deltaPerUnit)} 光点</div>
