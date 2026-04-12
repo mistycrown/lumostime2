@@ -254,7 +254,7 @@ export const AchievementView: React.FC = () => {
                   key={tab.id}
                   type="button"
                   onClick={() => openDetailPanel(tab.id)}
-                  className={`flex min-w-0 flex-1 items-center justify-center gap-2 rounded-[1.1rem] px-3 py-2.5 text-[14px] font-medium transition-all ${
+                  className={`flex min-w-0 flex-1 items-center justify-center gap-1 rounded-[1.1rem] px-2 py-2.5 text-[13px] font-medium leading-none transition-all min-[360px]:gap-1.5 min-[360px]:px-2.5 min-[360px]:text-[13px] min-[390px]:gap-2 min-[390px]:px-3 min-[390px]:text-[14px] ${
                     activeTab === tab.id
                       ? 'text-stone-900'
                       : 'text-stone-900 hover:text-stone-900'
@@ -265,7 +265,7 @@ export const AchievementView: React.FC = () => {
                   } : undefined}
                 >
                   {tab.icon}
-                  <span>{tab.label}</span>
+                  <span className="whitespace-nowrap text-center">{tab.label}</span>
                 </button>
               ))}
             </div>
