@@ -4,7 +4,7 @@
  * @output Cross-year same-day review UI with DailyReview-style tabs and detail-timeline-style rows
  * @pos View (Review System)
  * @description Renders a read-only archive page for the same month-day across years, with timeline, schedule, review, and persistent notes, while keeping the default timeline rail aligned with the main timeline/detail views.
- * @updated 2026-03-30: Added deletion functionality for notes (笺注) with a ConfirmModal.
+ * @updated 2026-04-12: Switched historical review answers to a quote-style layout and preserved multiline formatting for review and note content.
  *
  * Once I am updated, be sure to update my header comment and the folder's md.
  */
@@ -34,6 +34,7 @@ interface OnThisDayViewProps {
   todos: TodoItem[];
   onThisDayEntries: OnThisDayEntry[];
   onUpdateOnThisDayEntries: React.Dispatch<React.SetStateAction<OnThisDayEntry[]>>;
+  initialTab?: TabType;
 }
 
 interface OnThisDayYearBucket {
@@ -90,6 +91,8 @@ const extractReviewContent = (review?: DailyReview) => {
   return { summary: '', narrativeTitle: '', narrativeBody: '' };
 };
 
+const multilineTextClassName = 'text-[15px] leading-7 text-stone-700 whitespace-pre-wrap';
+
 const YearSidebar: React.FC<{
   years: number[];
   activeYear: number | null;
@@ -137,13 +140,14 @@ export const OnThisDayView: React.FC<OnThisDayViewProps> = ({
   scopes,
   todos,
   onThisDayEntries,
-  onUpdateOnThisDayEntries
+  onUpdateOnThisDayEntries,
+  initialTab = 'timeline'
 }) => {
   const { scheduleStyle, timelineStyleTheme, timelineStyleConfigs } = useSettings();
   const { addToast } = useToast();
   const { isPrivacyMode } = usePrivacy();
   const activeTimelineConfig = timelineStyleConfigs[timelineStyleTheme];
-  const [activeTab, setActiveTab] = useState<TabType>('timeline');
+  const [activeTab, setActiveTab] = useState<TabType>(initialTab);
   const [noteDraft, setNoteDraft] = useState('');
   const [activeYear, setActiveYear] = useState<number | null>(null);
   const [showYearSidebar, setShowYearSidebar] = useState(false);
@@ -617,7 +621,7 @@ export const OnThisDayView: React.FC<OnThisDayViewProps> = ({
               {reviewContent.summary && (
                 <div className="mb-5">
                   <div className="mb-2 text-[11px] uppercase tracking-[0.18em] text-stone-400">一句话总结</div>
-                  <p className="text-[15px] leading-7 text-stone-700">{reviewContent.summary}</p>
+                  <p className={multilineTextClassName}>{reviewContent.summary}</p>
                 </div>
               )}
 
@@ -627,7 +631,7 @@ export const OnThisDayView: React.FC<OnThisDayViewProps> = ({
                   {reviewContent.narrativeTitle && (
                     <h3 className="mb-2 text-base font-bold text-stone-900">{reviewContent.narrativeTitle}</h3>
                   )}
-                  <p className="text-[15px] leading-7 text-stone-700">{reviewContent.narrativeBody}</p>
+                  <p className={multilineTextClassName}>{reviewContent.narrativeBody}</p>
                 </div>
               )}
 
@@ -636,7 +640,7 @@ export const OnThisDayView: React.FC<OnThisDayViewProps> = ({
                   {review.answers.map((answer) => (
                     <div key={`${review.id}-${answer.questionId}`} className="space-y-2">
                       <div className="text-[11px] uppercase tracking-[0.18em] text-stone-400">{answer.question}</div>
-                      <div className="rounded-2xl bg-stone-50/80 px-4 py-3 text-[15px] leading-7 text-stone-700">
+                      <div className={`border-l-2 border-stone-200 pl-4 ${multilineTextClassName}`}>
                         {answer.answer || '未填写'}
                       </div>
                     </div>
@@ -679,7 +683,7 @@ export const OnThisDayView: React.FC<OnThisDayViewProps> = ({
           <div className="space-y-4">
             {notes.map((note) => (
               <article key={note.id} className="rounded-2xl border border-stone-200 bg-white/80 p-5 shadow-sm">
-                <p className="text-[15px] leading-7 text-stone-700">{note.content}</p>
+                <p className={multilineTextClassName}>{note.content}</p>
                 <div className="mt-4 flex items-center justify-between text-xs text-stone-400">
                   <span>
                     {new Date(note.createdAt).toLocaleString('zh-CN', {
