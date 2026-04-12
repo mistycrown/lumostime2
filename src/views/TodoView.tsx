@@ -4,7 +4,7 @@
  * @output Todo Status Updates, Edit Triggers, Focus Timer Start
  * @pos View (Main Tab)
  * @description The main To-Do list interface. Displays tasks grouped by category, supports swipe actions (complete/duplicate), and filtering.
- * @updated 2026-04-12: Matched the expanded sidebar action button spacing with RecordView so the density toggle and collapse control keep the same right-side gutter.
+ * @updated 2026-04-12: Matched the expanded sidebar action button spacing with RecordView, added a persisted toggle for showing completed todos, and softened the shared sidebar control styling.
  *
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
@@ -12,7 +12,7 @@ import React, { useState, useEffect } from 'react';
 import { MOCK_TODO_CATEGORIES } from '../constants';
 import { Scope } from '../types';
 import { TodoItem, TodoCategory, Category, AutoLinkRule } from '../types';
-import { PlayCircle, CheckCircle2, Circle, Plus, MoreHorizontal, Settings2, ChevronLeft, ChevronRight, LayoutList, Rows, Sparkles } from 'lucide-react';
+import { PlayCircle, CheckCircle2, Circle, Plus, MoreHorizontal, Settings2, ChevronLeft, ChevronRight, LayoutList, Rows, Sparkles, Eye, EyeOff } from 'lucide-react';
 import { AITodoInputModal } from '../components/AITodoInputModal';
 import { AITodoConfirmModal, ParsedTask } from '../components/AITodoConfirmModal';
 import { aiService, AIParsedTodo } from '../services/aiService';
@@ -390,11 +390,19 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, categories, activityC
     const saved = localStorage.getItem('todoViewMode');
     return (saved === 'compact' || saved === 'loose') ? saved : 'loose';
   });
+  const [showCompletedTodos, setShowCompletedTodos] = useState<boolean>(() => {
+    const saved = localStorage.getItem('todoShowCompleted');
+    return saved !== 'false';
+  });
 
   // 当 viewMode 改变时，保存到 localStorage
   React.useEffect(() => {
     localStorage.setItem('todoViewMode', viewMode);
   }, [viewMode]);
+
+  React.useEffect(() => {
+    localStorage.setItem('todoShowCompleted', showCompletedTodos ? 'true' : 'false');
+  }, [showCompletedTodos]);
 
   // 初始化选中的分类：如果没有选中任何分类，默认选中第一个
   React.useEffect(() => {
@@ -422,6 +430,7 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, categories, activityC
 
   const filteredTodos = todos
     .filter(t => t.categoryId === selectedCategoryId)
+    .filter(t => showCompletedTodos || !t.isCompleted)
     .sort((a, b) => Number(a.isCompleted) - Number(b.isCompleted));
 
   return (
@@ -487,10 +496,18 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, categories, activityC
           })}
         </div>
 
+        <button
+          onClick={() => setShowCompletedTodos(prev => !prev)}
+          className={`mt-2 mb-2 p-2 rounded-full text-stone-400 hover:bg-white/50 hover:text-stone-500 transition-all active:scale-95 ${isSidebarOpen ? 'self-end mr-4' : 'mx-auto'}`}
+          title={showCompletedTodos ? 'Hide Completed Todos' : 'Show Completed Todos'}
+        >
+          {showCompletedTodos ? <EyeOff size={20} /> : <Eye size={20} />}
+        </button>
+
         {/* View Mode Toggle Button */}
         <button
           onClick={() => setViewMode(prev => prev === 'loose' ? 'compact' : 'loose')}
-          className={`mt-2 mb-2 p-2 rounded-full text-stone-600 hover:bg-white hover:text-stone-800 transition-all active:scale-95 ${isSidebarOpen ? 'self-end mr-4' : 'mx-auto'}`}
+          className={`mb-2 p-2 rounded-full text-stone-400 hover:bg-white/50 hover:text-stone-500 transition-all active:scale-95 ${isSidebarOpen ? 'self-end mr-4' : 'mx-auto'}`}
           title={viewMode === 'loose' ? "Switch to Compact View" : "Switch to Loose View"}
         >
           {viewMode === 'loose' ? <Rows size={20} /> : <LayoutList size={20} />}
@@ -499,7 +516,7 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, categories, activityC
         {/* Sidebar Toggle Button */}
         <button
           onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-          className={`mt-1 p-2 rounded-full text-stone-600 hover:bg-white hover:text-stone-800 transition-all active:scale-95 ${isSidebarOpen ? 'self-end mr-4' : 'mx-auto'}`}
+          className={`mt-1 p-2 rounded-full text-stone-400 hover:bg-white/50 hover:text-stone-500 transition-all active:scale-95 ${isSidebarOpen ? 'self-end mr-4' : 'mx-auto'}`}
         >
           {isSidebarOpen ? <ChevronLeft size={20} /> : <ChevronRight size={20} />}
         </button>
