@@ -34,6 +34,8 @@ object WidgetStores {
                     activityId = item.optString("activityId").ifBlank { null },
                     categoryId = item.optString("categoryId").ifBlank { null },
                     icon = item.optString("icon", "\u2022"),
+                    uiIconAssetPath = item.optString("uiIconAssetPath").ifBlank { null },
+                    uiIconFallbackAssetPath = item.optString("uiIconFallbackAssetPath").ifBlank { null },
                     label = item.optString("label").ifBlank { null },
                     color = item.optString("color").ifBlank { null }
                 )
@@ -53,6 +55,8 @@ object WidgetStores {
                 put("activityId", slot.activityId ?: JSONObject.NULL)
                 put("categoryId", slot.categoryId ?: JSONObject.NULL)
                 put("icon", slot.icon ?: JSONObject.NULL)
+                put("uiIconAssetPath", slot.uiIconAssetPath ?: JSONObject.NULL)
+                put("uiIconFallbackAssetPath", slot.uiIconFallbackAssetPath ?: JSONObject.NULL)
                 put("label", slot.label ?: JSONObject.NULL)
                 put("color", slot.color ?: JSONObject.NULL)
             })

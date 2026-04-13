@@ -33,6 +33,8 @@ class WidgetBridgePlugin : Plugin() {
                 activityId = item.optString("activityId").ifBlank { null },
                 categoryId = item.optString("categoryId").ifBlank { null },
                 icon = item.optString("icon").ifBlank { null },
+                uiIconAssetPath = item.optString("uiIconAssetPath").ifBlank { null },
+                uiIconFallbackAssetPath = item.optString("uiIconFallbackAssetPath").ifBlank { null },
                 label = item.optString("label").ifBlank { null },
                 color = item.optString("color").ifBlank { null }
             )
@@ -118,6 +120,8 @@ class WidgetBridgePlugin : Plugin() {
             put("activityId", slot.activityId)
             put("categoryId", slot.categoryId)
             put("icon", slot.icon)
+            put("uiIconAssetPath", slot.uiIconAssetPath)
+            put("uiIconFallbackAssetPath", slot.uiIconFallbackAssetPath)
             put("label", slot.label)
             put("color", slot.color)
         }

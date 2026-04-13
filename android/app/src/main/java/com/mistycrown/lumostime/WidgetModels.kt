@@ -9,6 +9,8 @@ data class WidgetTimerSlotConfig(
     val activityId: String? = null,
     val categoryId: String? = null,
     val icon: String? = null,
+    val uiIconAssetPath: String? = null,
+    val uiIconFallbackAssetPath: String? = null,
     val label: String? = null,
     val color: String? = null
 ) {
@@ -46,6 +48,8 @@ data class WidgetSnapshotSlot(
     val activityId: String?,
     val categoryId: String?,
     val icon: String,
+    val uiIconAssetPath: String?,
+    val uiIconFallbackAssetPath: String?,
     val label: String,
     val color: String,
     val isActive: Boolean

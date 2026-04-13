@@ -12,6 +12,8 @@ export interface WidgetBridgeSlot {
   activityId: string | null;
   categoryId: string | null;
   icon: string | null;
+  uiIconAssetPath?: string | null;
+  uiIconFallbackAssetPath?: string | null;
   label: string | null;
   color: string | null;
 }

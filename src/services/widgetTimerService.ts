@@ -14,6 +14,7 @@ import type {
   WidgetBridgeSlot
 } from '../plugins/WidgetBridgePlugin';
 import { getColorHexForCharts } from '../utils/colorAdapterUtils';
+import { getUIIconAssetPathWithFallback, type UIIconType, type UIIconTheme } from './uiIconService';
 
 export const WIDGET_TIMER_SLOT_COUNT = 4;
 const WIDGET_TIMER_STORAGE_KEY = 'lumostime_widget_timer_slots_v1';
@@ -27,6 +28,8 @@ export const createEmptyWidgetTimerSlots = (): WidgetTimerSlotConfig[] =>
     activityId: null,
     categoryId: null,
     icon: null,
+    uiIconAssetPath: null,
+    uiIconFallbackAssetPath: null,
     label: null,
     color: null
   }));
@@ -40,10 +43,36 @@ export const normalizeWidgetTimerSlots = (slots: WidgetTimerSlotConfig[]): Widge
       activityId: slot?.activityId ?? null,
       categoryId: slot?.categoryId ?? null,
       icon: slot?.icon ?? null,
+      uiIconAssetPath: slot?.uiIconAssetPath ?? null,
+      uiIconFallbackAssetPath: slot?.uiIconFallbackAssetPath ?? null,
       label: slot?.label ?? null,
       color: slot?.color ?? null
     };
   });
+};
+
+const resolveWidgetUiIconAssets = (uiIcon?: string | null) => {
+  if (!uiIcon?.startsWith('ui:')) {
+    return {
+      uiIconAssetPath: null,
+      uiIconFallbackAssetPath: null
+    };
+  }
+
+  const theme = (localStorage.getItem('lumostime_ui_icon_theme') || 'default') as UIIconTheme;
+  if (!theme || theme === 'default') {
+    return {
+      uiIconAssetPath: null,
+      uiIconFallbackAssetPath: null
+    };
+  }
+
+  const iconType = uiIcon.slice(3) as UIIconType;
+  const paths = getUIIconAssetPathWithFallback(iconType, theme);
+  return {
+    uiIconAssetPath: paths.primary,
+    uiIconFallbackAssetPath: paths.fallback
+  };
 };
 
 export const loadWidgetTimerSlotsFromStorage = (): WidgetTimerSlotConfig[] => {
@@ -76,6 +105,7 @@ export const buildWidgetTimerSlotConfig = (
   activityId: activity.id,
   categoryId: category.id,
   icon: activity.icon || category.icon,
+  ...resolveWidgetUiIconAssets(activity.uiIcon),
   label: activity.name,
   color: getColorHexForCharts(activity.color || category.themeColor || '')
 });
