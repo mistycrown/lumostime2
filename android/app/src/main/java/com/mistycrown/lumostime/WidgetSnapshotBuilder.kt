@@ -1,19 +1,19 @@
 package com.mistycrown.lumostime
 
 /**
- * Builds the lightweight widget UI snapshot from config and native runtime state.
+ * Builds the lightweight widget UI snapshot from template bindings and native runtime state.
  */
 object WidgetSnapshotBuilder {
-    fun build(context: android.content.Context): WidgetSnapshot {
+    fun build(context: android.content.Context, appWidgetId: Int): WidgetSnapshot {
         val runtimeState = WidgetStores.loadRuntimeState(context)
-        val slots = WidgetStores.loadConfig(context).map { slot ->
+        val binding = WidgetStores.ensureBinding(context, appWidgetId)
+        val template = WidgetStores.loadTemplate(context, binding?.templateId)
+
+        val slots = (template?.slots ?: emptySlots()).map { slot ->
             val matchesRuntime = runtimeState?.let { runtime ->
-                if (runtime.slotIndex != null) {
-                    runtime.slotIndex == slot.slotIndex
-                } else {
-                    runtime.activityId == slot.activityId &&
-                        runtime.categoryId == slot.categoryId
-                }
+                runtime.activityId == slot.activityId &&
+                    runtime.categoryId == slot.categoryId &&
+                    slot.isConfigured()
             } ?: false
 
             WidgetSnapshotSlot(
@@ -29,6 +29,15 @@ object WidgetSnapshotBuilder {
             )
         }
 
-        return WidgetSnapshot(slots = slots)
+        return WidgetSnapshot(
+            appWidgetId = appWidgetId,
+            templateId = template?.id,
+            templateName = template?.name ?: "暂无模板",
+            slots = slots
+        )
+    }
+
+    private fun emptySlots(): List<WidgetTimerSlotConfig> {
+        return (0 until WidgetStores.SLOT_COUNT).map { WidgetTimerSlotConfig(slotIndex = it) }
     }
 }
