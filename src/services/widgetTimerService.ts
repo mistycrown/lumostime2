@@ -14,7 +14,6 @@ import type {
   WidgetBridgeSlot
 } from '../plugins/WidgetBridgePlugin';
 import { getColorHexForCharts } from '../utils/colorAdapterUtils';
-import { getUIIconAssetPathWithFallback, type UIIconType, type UIIconTheme } from './uiIconService';
 
 export const WIDGET_TIMER_SLOT_COUNT = 4;
 const WIDGET_TIMER_STORAGE_KEY = 'lumostime_widget_timer_slots_v1';
@@ -22,17 +21,19 @@ const FALLBACK_WIDGET_ICON = '\u2022';
 
 export type WidgetTimerSlotConfig = WidgetBridgeSlot;
 
+export const createEmptyWidgetTimerSlot = (slotIndex: number): WidgetTimerSlotConfig => ({
+  slotIndex,
+  activityId: null,
+  categoryId: null,
+  icon: null,
+  uiIconAssetPath: null,
+  uiIconFallbackAssetPath: null,
+  label: null,
+  color: null
+});
+
 export const createEmptyWidgetTimerSlots = (): WidgetTimerSlotConfig[] =>
-  Array.from({ length: WIDGET_TIMER_SLOT_COUNT }, (_, slotIndex) => ({
-    slotIndex,
-    activityId: null,
-    categoryId: null,
-    icon: null,
-    uiIconAssetPath: null,
-    uiIconFallbackAssetPath: null,
-    label: null,
-    color: null
-  }));
+  Array.from({ length: WIDGET_TIMER_SLOT_COUNT }, (_, slotIndex) => createEmptyWidgetTimerSlot(slotIndex));
 
 export const normalizeWidgetTimerSlots = (slots: WidgetTimerSlotConfig[]): WidgetTimerSlotConfig[] => {
   const slotMap = new Map(slots.map((slot) => [slot.slotIndex, slot]));
@@ -49,30 +50,6 @@ export const normalizeWidgetTimerSlots = (slots: WidgetTimerSlotConfig[]): Widge
       color: slot?.color ?? null
     };
   });
-};
-
-const resolveWidgetUiIconAssets = (uiIcon?: string | null) => {
-  if (!uiIcon?.startsWith('ui:')) {
-    return {
-      uiIconAssetPath: null,
-      uiIconFallbackAssetPath: null
-    };
-  }
-
-  const theme = (localStorage.getItem('lumostime_ui_icon_theme') || 'default') as UIIconTheme;
-  if (!theme || theme === 'default') {
-    return {
-      uiIconAssetPath: null,
-      uiIconFallbackAssetPath: null
-    };
-  }
-
-  const iconType = uiIcon.slice(3) as UIIconType;
-  const paths = getUIIconAssetPathWithFallback(iconType, theme);
-  return {
-    uiIconAssetPath: paths.primary,
-    uiIconFallbackAssetPath: paths.fallback
-  };
 };
 
 export const loadWidgetTimerSlotsFromStorage = (): WidgetTimerSlotConfig[] => {
@@ -105,7 +82,8 @@ export const buildWidgetTimerSlotConfig = (
   activityId: activity.id,
   categoryId: category.id,
   icon: activity.icon || category.icon,
-  ...resolveWidgetUiIconAssets(activity.uiIcon),
+  uiIconAssetPath: null,
+  uiIconFallbackAssetPath: null,
   label: activity.name,
   color: getColorHexForCharts(activity.color || category.themeColor || '')
 });
@@ -114,6 +92,22 @@ export const findWidgetActivity = (categories: Category[], categoryId: string, a
   const category = categories.find((item) => item.id === categoryId);
   const activity = category?.activities.find((item) => item.id === activityId);
   return { category, activity };
+};
+
+export const rebuildWidgetTimerSlotConfig = (
+  slot: WidgetTimerSlotConfig,
+  categories: Category[]
+): WidgetTimerSlotConfig => {
+  if (!slot.activityId || !slot.categoryId) {
+    return createEmptyWidgetTimerSlot(slot.slotIndex);
+  }
+
+  const { category, activity } = findWidgetActivity(categories, slot.categoryId, slot.activityId);
+  if (!category || !activity) {
+    return createEmptyWidgetTimerSlot(slot.slotIndex);
+  }
+
+  return buildWidgetTimerSlotConfig(category, activity, slot.slotIndex);
 };
 
 export const buildWidgetRuntimeStateFromSession = (

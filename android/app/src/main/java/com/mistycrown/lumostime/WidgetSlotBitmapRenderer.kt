@@ -2,7 +2,6 @@ package com.mistycrown.lumostime
 
 import android.content.Context
 import android.graphics.Bitmap
-import android.graphics.BitmapFactory
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
@@ -11,14 +10,14 @@ import android.text.TextPaint
 
 /**
  * Renders widget slot visuals as bitmaps so RemoteViews can show
- * dynamic activity colors and packaged uiIcon image assets.
+ * dynamic activity colors and emoji icons.
  */
 object WidgetSlotBitmapRenderer {
-    private const val SLOT_SIZE_DP = 42f
-    private const val ICON_SIZE_DP = 20f
-    private const val STOP_SIZE_DP = 12f
+    private const val SLOT_SIZE_DP = 72f
+    private const val CIRCLE_INSET_DP = 4f
+    private const val STOP_SIZE_DP = 22f
     private const val STOP_RADIUS_DP = 3f
-    private const val EMOJI_TEXT_SIZE_DP = 16f
+    private const val EMOJI_TEXT_SIZE_DP = 28f
 
     fun render(context: Context, slot: WidgetSnapshotSlot): Bitmap {
         val sizePx = dpToPx(context, SLOT_SIZE_DP)
@@ -36,16 +35,12 @@ object WidgetSlotBitmapRenderer {
             color = fillColor
             style = Paint.Style.FILL
         }
-        canvas.drawCircle(sizePx / 2f, sizePx / 2f, sizePx / 2f, circlePaint)
+        val circleInsetPx = dpToPx(context, CIRCLE_INSET_DP).toFloat()
+        val circleRadius = ((sizePx / 2f) - circleInsetPx).coerceAtLeast(0f)
+        canvas.drawCircle(sizePx / 2f, sizePx / 2f, circleRadius, circlePaint)
 
         if (slot.isActive) {
             drawStop(canvas, context, sizePx)
-            return bitmap
-        }
-
-        val iconBitmap = loadSlotIconBitmap(context, slot)
-        if (iconBitmap != null) {
-            drawCenteredBitmap(canvas, iconBitmap, context, sizePx)
             return bitmap
         }
 
@@ -66,14 +61,6 @@ object WidgetSlotBitmapRenderer {
         canvas.drawRoundRect(rect, radius, radius, stopPaint)
     }
 
-    private fun drawCenteredBitmap(canvas: Canvas, iconBitmap: Bitmap, context: Context, sizePx: Int) {
-        val iconSize = dpToPx(context, ICON_SIZE_DP)
-        val scaled = Bitmap.createScaledBitmap(iconBitmap, iconSize, iconSize, true)
-        val left = (sizePx - iconSize) / 2f
-        val top = (sizePx - iconSize) / 2f
-        canvas.drawBitmap(scaled, left, top, null)
-    }
-
     private fun drawEmoji(canvas: Canvas, context: Context, sizePx: Int, icon: String) {
         val textPaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
             color = Color.parseColor("#1F2937")
@@ -82,24 +69,6 @@ object WidgetSlotBitmapRenderer {
         }
         val baseline = (sizePx / 2f) - ((textPaint.descent() + textPaint.ascent()) / 2f)
         canvas.drawText(icon.ifBlank { "\u2022" }, sizePx / 2f, baseline, textPaint)
-    }
-
-    private fun loadSlotIconBitmap(context: Context, slot: WidgetSnapshotSlot): Bitmap? {
-        val primary = slot.uiIconAssetPath?.takeIf { it.isNotBlank() }
-        val fallback = slot.uiIconFallbackAssetPath?.takeIf { it.isNotBlank() }
-        return loadAssetBitmap(context, primary) ?: loadAssetBitmap(context, fallback)
-    }
-
-    private fun loadAssetBitmap(context: Context, assetPath: String?): Bitmap? {
-        if (assetPath.isNullOrBlank()) {
-            return null
-        }
-
-        return runCatching {
-            context.assets.open("public/$assetPath").use { input ->
-                BitmapFactory.decodeStream(input)
-            }
-        }.getOrNull()
     }
 
     private fun parseColor(raw: String): Int {
