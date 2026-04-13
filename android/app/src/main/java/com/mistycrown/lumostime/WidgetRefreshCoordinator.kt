@@ -14,11 +14,8 @@ object WidgetRefreshCoordinator {
 
     fun refreshAll(context: Context) {
         QuickLogWidget.refreshAllAsync(context)
-        QuickLogWidget1x2.refreshAllAsync(context)
         QuickLogWidget2x1.refreshAllAsync(context)
-        QuickLogWidget1x4.refreshAllAsync(context)
         QuickLogWidget4x1.refreshAllAsync(context)
-        QuickLogWidget2x4.refreshAllAsync(context)
         QuickLogWidget4x2.refreshAllAsync(context)
     }
 
@@ -32,16 +29,10 @@ object WidgetRefreshCoordinator {
         when (providerClassName) {
             ComponentName(context, QuickLogWidget::class.java).className ->
                 QuickLogWidget.refreshWidget(context, appWidgetId)
-            ComponentName(context, QuickLogWidget1x2::class.java).className ->
-                QuickLogWidget1x2.refreshWidget(context, appWidgetId)
             ComponentName(context, QuickLogWidget2x1::class.java).className ->
                 QuickLogWidget2x1.refreshWidget(context, appWidgetId)
-            ComponentName(context, QuickLogWidget1x4::class.java).className ->
-                QuickLogWidget1x4.refreshWidget(context, appWidgetId)
             ComponentName(context, QuickLogWidget4x1::class.java).className ->
                 QuickLogWidget4x1.refreshWidget(context, appWidgetId)
-            ComponentName(context, QuickLogWidget2x4::class.java).className ->
-                QuickLogWidget2x4.refreshWidget(context, appWidgetId)
             ComponentName(context, QuickLogWidget4x2::class.java).className ->
                 QuickLogWidget4x2.refreshWidget(context, appWidgetId)
             else -> refreshAll(context)
