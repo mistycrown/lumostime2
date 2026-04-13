@@ -4,7 +4,7 @@
  * @output Widget template persistence helpers and app/native conversion utilities
  * @pos Service
  * @description Centralizes the shared types and conversions used by the Android timer widget feature.
- * @updated 2026-04-13: Added multi-size widget template support with size-scoped slot normalization.
+ * @updated 2026-04-13: Removed unsupported vertical widget sizes and kept only shipped horizontal/square sizes.
  */
 import { Capacitor } from '@capacitor/core';
 import { ActiveSession, Category, Log } from '../types';
@@ -23,7 +23,7 @@ const FALLBACK_WIDGET_ICON = '\u2022';
 
 export const DEFAULT_WIDGET_TEMPLATE_NAME = '我的小组件';
 export const DEFAULT_WIDGET_SIZE = '2x2';
-export const WIDGET_SIZE_OPTIONS = ['1x2', '2x1', '2x2', '1x4', '4x1', '2x4', '4x2'] as const;
+export const WIDGET_SIZE_OPTIONS = ['2x1', '2x2', '4x1', '4x2'] as const;
 
 export type WidgetSize = (typeof WIDGET_SIZE_OPTIONS)[number];
 export type WidgetTemplateSlotConfig = WidgetBridgeSlot;
@@ -31,22 +31,16 @@ export type WidgetTemplate = WidgetBridgeTemplate;
 export type WidgetInstanceBinding = WidgetBridgeInstanceBinding;
 
 const WIDGET_SIZE_SLOT_COUNT: Record<WidgetSize, number> = {
-  '1x2': 2,
   '2x1': 2,
   '2x2': 4,
-  '1x4': 4,
   '4x1': 4,
-  '2x4': 8,
   '4x2': 8
 };
 
 const WIDGET_SIZE_GRID: Record<WidgetSize, { columns: number; rows: number }> = {
-  '1x2': { columns: 1, rows: 2 },
   '2x1': { columns: 2, rows: 1 },
   '2x2': { columns: 2, rows: 2 },
-  '1x4': { columns: 1, rows: 4 },
   '4x1': { columns: 4, rows: 1 },
-  '2x4': { columns: 2, rows: 4 },
   '4x2': { columns: 4, rows: 2 }
 };
 

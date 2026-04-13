@@ -587,18 +587,6 @@
         </receiver>
 
         <receiver
-            android:name=".QuickLogWidget1x2"
-            android:exported="true"
-            android:label="@string/widget_label_1x2">
-            <intent-filter>
-                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
-            </intent-filter>
-            <meta-data
-                android:name="android.appwidget.provider"
-                android:resource="@xml/widget_info_1x2" />
-        </receiver>
-
-        <receiver
             android:name=".QuickLogWidget2x1"
             android:exported="true"
             android:label="@string/widget_label_2x1">
@@ -611,18 +599,6 @@
         </receiver>
 
         <receiver
-            android:name=".QuickLogWidget1x4"
-            android:exported="true"
-            android:label="@string/widget_label_1x4">
-            <intent-filter>
-                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
-            </intent-filter>
-            <meta-data
-                android:name="android.appwidget.provider"
-                android:resource="@xml/widget_info_1x4" />
-        </receiver>
-
-        <receiver
             android:name=".QuickLogWidget4x1"
             android:exported="true"
             android:label="@string/widget_label_4x1">
@@ -632,18 +608,6 @@
             <meta-data
                 android:name="android.appwidget.provider"
                 android:resource="@xml/widget_info_4x1" />
-        </receiver>
-
-        <receiver
-            android:name=".QuickLogWidget2x4"
-            android:exported="true"
-            android:label="@string/widget_label_2x4">
-            <intent-filter>
-                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
-            </intent-filter>
-            <meta-data
-                android:name="android.appwidget.provider"
-                android:resource="@xml/widget_info_2x4" />
         </receiver>
 
         <receiver
