@@ -223,6 +223,17 @@ public class FloatingWindowService extends Service {
         }
     }
 
+    public static void syncFocusStateIfRunning(String icon, boolean focusing, long startTime) {
+        if (instance == null) {
+            Log.d(TAG, "Floating window service is not running, skip widget sync");
+            return;
+        }
+
+        new android.os.Handler(android.os.Looper.getMainLooper()).post(() -> {
+            instance.updateContent(icon, focusing, startTime);
+        });
+    }
+
     private void showTempTextInternal(String text) {
         Log.d(TAG, "🔤 showTempTextInternal: " + text);
         if (timeView != null) {

@@ -26,6 +26,7 @@ object WidgetTimerController {
             finishRuntime(context, currentRuntime, now)
             WidgetStores.saveRuntimeState(context, null)
             WidgetStores.saveLastWidgetStopAt(context, now)
+            FloatingWindowService.syncFocusStateIfRunning(currentRuntime.icon, false, 0L)
             return
         }
 
@@ -33,23 +34,26 @@ object WidgetTimerController {
             finishRuntime(context, currentRuntime, now)
         }
 
+        val nextRuntime = WidgetTimerRuntimeState(
+            id = UUID.randomUUID().toString(),
+            activityId = slot.activityId.orEmpty(),
+            categoryId = slot.categoryId.orEmpty(),
+            icon = slot.icon?.ifBlank { null } ?: "\u2022",
+            label = slot.label?.ifBlank { null } ?: "",
+            color = slot.color?.ifBlank { null } ?: "#E7E5E4",
+            startedAt = now,
+            source = "widget",
+            slotIndex = slotIndex,
+            templateId = template.id,
+            appWidgetId = appWidgetId
+        )
+
         WidgetStores.saveRuntimeState(
             context,
-            WidgetTimerRuntimeState(
-                id = UUID.randomUUID().toString(),
-                activityId = slot.activityId.orEmpty(),
-                categoryId = slot.categoryId.orEmpty(),
-                icon = slot.icon?.ifBlank { null } ?: "\u2022",
-                label = slot.label?.ifBlank { null } ?: "",
-                color = slot.color?.ifBlank { null } ?: "#E7E5E4",
-                startedAt = now,
-                source = "widget",
-                slotIndex = slotIndex,
-                templateId = template.id,
-                appWidgetId = appWidgetId
-            )
+            nextRuntime
         )
         WidgetStores.saveLastWidgetStopAt(context, null)
+        FloatingWindowService.syncFocusStateIfRunning(nextRuntime.icon, true, nextRuntime.startedAt)
     }
 
     private fun finishRuntime(context: Context, runtimeState: WidgetTimerRuntimeState, endedAt: Long) {
