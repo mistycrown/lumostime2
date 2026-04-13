@@ -3,8 +3,8 @@
  * @input Native widget bridge calls
  * @output Typed Capacitor widget bridge methods
  * @pos Plugin
- * @description Exposes the Android widget template, instance binding, and runtime bridge to the React application.
- * @updated 2026-04-13: Replaced single shared widget config methods with template and instance binding APIs.
+ * @description Exposes the Android widget template, instance binding state, and runtime bridge to the React application.
+ * @updated 2026-04-13: Removed the unused manual widget-instance binding API and kept automatic binding support only.
  */
 import { registerPlugin } from '@capacitor/core';
 
@@ -65,7 +65,6 @@ export interface WidgetBridgePlugin {
   getTemplates(): Promise<{ templates: WidgetBridgeTemplate[] }>;
   saveTemplates(options: { templates: WidgetBridgeTemplate[] }): Promise<void>;
   getInstanceBindings(): Promise<{ bindings: WidgetBridgeInstanceBinding[] }>;
-  bindWidgetInstance(options: { appWidgetId: number; templateId: string | null }): Promise<void>;
   getPendingActions(): Promise<{ actions: WidgetBridgePendingAction[] }>;
   clearPendingActions(options: { ids: string[] }): Promise<void>;
   getRuntimeState(): Promise<{ runtimeState: WidgetBridgeRuntimeState | null }>;

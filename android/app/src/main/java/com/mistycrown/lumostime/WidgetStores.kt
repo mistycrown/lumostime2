@@ -1,5 +1,6 @@
 package com.mistycrown.lumostime
 
+import android.appwidget.AppWidgetManager
 import android.content.Context
 import org.json.JSONArray
 import org.json.JSONObject
@@ -98,7 +99,7 @@ object WidgetStores {
             return emptyList()
         }
 
-        return runCatching {
+        val parsedBindings = runCatching {
             val array = JSONArray(raw)
             buildList {
                 for (index in 0 until array.length()) {
@@ -116,6 +117,12 @@ object WidgetStores {
         }.getOrElse {
             emptyList()
         }
+
+        val prunedBindings = pruneStaleBindings(context, parsedBindings)
+        if (prunedBindings.size != parsedBindings.size) {
+            saveBindings(context, prunedBindings)
+        }
+        return prunedBindings
     }
 
     fun loadBinding(context: Context, appWidgetId: Int): WidgetInstanceBinding? {
@@ -379,6 +386,20 @@ object WidgetStores {
         }
 
         prefs(context).edit().putString(KEY_PENDING_ACTIONS, array.toString()).commit()
+    }
+
+    private fun pruneStaleBindings(
+        context: Context,
+        bindings: List<WidgetInstanceBinding>
+    ): List<WidgetInstanceBinding> {
+        if (bindings.isEmpty()) {
+            return bindings
+        }
+
+        val appWidgetManager = AppWidgetManager.getInstance(context)
+        return bindings.filter { binding ->
+            appWidgetManager.getAppWidgetInfo(binding.appWidgetId) != null
+        }
     }
 
     private fun normalizeSlots(

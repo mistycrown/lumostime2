@@ -4,7 +4,7 @@
  * @output No-op widget bridge implementation for browser environments
  * @pos Plugin
  * @description Prevents widget bridge calls from failing when the app runs outside native Android.
- * @updated 2026-04-13: Added no-op template and instance binding bridge methods for browser environments.
+ * @updated 2026-04-13: Removed the unused manual binding bridge stub while keeping browser-safe widget APIs.
  */
 import { WebPlugin } from '@capacitor/core';
 import type {
@@ -25,8 +25,6 @@ export class WidgetBridgeWeb extends WebPlugin implements WidgetBridgePlugin {
   async getInstanceBindings(): Promise<{ bindings: WidgetBridgeInstanceBinding[] }> {
     return { bindings: [] };
   }
-
-  async bindWidgetInstance(): Promise<void> {}
 
   async getPendingActions(): Promise<{ actions: WidgetBridgePendingAction[] }> {
     return { actions: [] };

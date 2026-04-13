@@ -19,8 +19,14 @@ object WidgetTimerController {
 
         val now = System.currentTimeMillis()
         val currentRuntime = WidgetStores.loadRuntimeState(context)
-        val isSameSlotActive = currentRuntime?.activityId == slot.activityId &&
-            currentRuntime?.categoryId == slot.categoryId
+        val isSameSlotActive = currentRuntime?.let { runtime ->
+            if (runtime.source == "widget" && runtime.templateId == template.id) {
+                runtime.slotIndex == slotIndex
+            } else {
+                runtime.activityId == slot.activityId &&
+                    runtime.categoryId == slot.categoryId
+            }
+        } ?: false
 
         if (isSameSlotActive && currentRuntime != null) {
             finishRuntime(context, currentRuntime, now)

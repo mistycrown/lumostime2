@@ -4,7 +4,7 @@
  * @output A template-based widget configuration page with multi-size editing
  * @pos View
  * @description Lets the user create, name, resize, edit, and manage multiple Android timer widget templates, while desktop widget instances only bind to templates.
- * @updated 2026-04-13: Added list summaries, moved create button below the title bar, and expanded size support to 4x2.
+ * @updated 2026-04-13: Removed redundant native refreshes and keep local template state aligned with native save results.
  */
 import React, { useEffect, useMemo, useState } from 'react';
 import { ChevronLeft, Plus, Save, Trash2 } from 'lucide-react';
@@ -106,20 +106,22 @@ export const WidgetSettingsView: React.FC<WidgetSettingsViewProps> = ({
         WidgetBridge.getTemplates(),
         WidgetBridge.getInstanceBindings()
       ]);
+      let effectiveBindings = bindings;
 
       const nextTemplates =
         nativeTemplates.length > 0 ? normalizeWidgetTemplates(nativeTemplates) : localTemplates;
 
       if (nativeTemplates.length === 0 && localTemplates.length > 0) {
         await WidgetBridge.saveTemplates({ templates: localTemplates });
-        await WidgetBridge.refreshWidget();
+        const { bindings: refreshedBindings } = await WidgetBridge.getInstanceBindings();
+        effectiveBindings = refreshedBindings;
       }
 
       setTemplates(nextTemplates);
       saveWidgetTemplatesToStorage(nextTemplates);
 
       const counts = nextTemplates.reduce<Record<string, number>>((accumulator, template) => {
-        accumulator[template.id] = countTemplateBoundInstances(bindings, template.id);
+        accumulator[template.id] = countTemplateBoundInstances(effectiveBindings, template.id);
         return accumulator;
       }, {});
       setBindingCounts(counts);
@@ -137,26 +139,37 @@ export const WidgetSettingsView: React.FC<WidgetSettingsViewProps> = ({
 
   const persistTemplates = async (nextTemplates: WidgetTemplate[], successMessage: string) => {
     const normalizedTemplates = normalizeWidgetTemplates(nextTemplates);
-    setTemplates(normalizedTemplates);
-    saveWidgetTemplatesToStorage(normalizedTemplates);
+    const previousTemplates = templates;
+    const previousBindingCounts = bindingCounts;
     setIsSaving(true);
 
     try {
       if (isNativeAndroidWidgetSupported()) {
         await WidgetBridge.saveTemplates({ templates: normalizedTemplates });
-        await WidgetBridge.refreshWidget();
-        const { bindings } = await WidgetBridge.getInstanceBindings();
-        const counts = normalizedTemplates.reduce<Record<string, number>>((accumulator, template) => {
-          accumulator[template.id] = countTemplateBoundInstances(bindings, template.id);
-          return accumulator;
-        }, {});
-        setBindingCounts(counts);
+        try {
+          const { bindings } = await WidgetBridge.getInstanceBindings();
+          const counts = normalizedTemplates.reduce<Record<string, number>>((accumulator, template) => {
+            accumulator[template.id] = countTemplateBoundInstances(bindings, template.id);
+            return accumulator;
+          }, {});
+          setBindingCounts(counts);
+        } catch (error) {
+          console.error('[WidgetSettingsView] Failed to refresh widget binding counts', error);
+          setBindingCounts(previousBindingCounts);
+        }
+      } else {
+        setBindingCounts({});
       }
 
+      setTemplates(normalizedTemplates);
+      saveWidgetTemplatesToStorage(normalizedTemplates);
       onToast('success', successMessage);
       return true;
     } catch (error) {
       console.error('[WidgetSettingsView] Failed to persist widget templates', error);
+      setTemplates(previousTemplates);
+      saveWidgetTemplatesToStorage(previousTemplates);
+      setBindingCounts(previousBindingCounts);
       onToast('error', '保存小组件模板失败');
       return false;
     } finally {
