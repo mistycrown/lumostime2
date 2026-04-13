@@ -2,7 +2,7 @@ package com.mistycrown.lumostime
 
 /**
  * Lightweight native models used by the Android timer widget.
- * First version keeps a shared 4-slot config for all widget instances.
+ * Templates are edited in-app; desktop widget instances only bind to templates.
  */
 data class WidgetTimerSlotConfig(
     val slotIndex: Int,
@@ -19,6 +19,21 @@ data class WidgetTimerSlotConfig(
     }
 }
 
+data class WidgetTemplate(
+    val id: String,
+    val name: String,
+    val slots: List<WidgetTimerSlotConfig>,
+    val createdAt: Long,
+    val updatedAt: Long
+)
+
+data class WidgetInstanceBinding(
+    val appWidgetId: Int,
+    val templateId: String? = null,
+    val createdAt: Long,
+    val updatedAt: Long
+)
+
 data class WidgetTimerRuntimeState(
     val id: String,
     val activityId: String,
@@ -28,7 +43,9 @@ data class WidgetTimerRuntimeState(
     val color: String,
     val startedAt: Long,
     val source: String,
-    val slotIndex: Int? = null
+    val slotIndex: Int? = null,
+    val templateId: String? = null,
+    val appWidgetId: Int? = null
 )
 
 data class WidgetPendingAction(
@@ -56,5 +73,8 @@ data class WidgetSnapshotSlot(
 )
 
 data class WidgetSnapshot(
+    val appWidgetId: Int,
+    val templateId: String?,
+    val templateName: String,
     val slots: List<WidgetSnapshotSlot>
 )

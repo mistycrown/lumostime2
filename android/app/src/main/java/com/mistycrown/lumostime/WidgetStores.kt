@@ -5,64 +5,209 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 /**
- * SharedPreferences-backed storage for widget config, runtime state, and pending imports.
+ * SharedPreferences-backed storage for widget templates, instance bindings, runtime state, and pending imports.
  */
 object WidgetStores {
     private const val PREFS_NAME = "lumostime_widget_timer"
-    private const val KEY_CONFIG = "shared_slots_v1"
+    private const val KEY_TEMPLATES = "templates_v1"
+    private const val KEY_INSTANCE_BINDINGS = "instance_bindings_v1"
     private const val KEY_RUNTIME = "runtime_v1"
     private const val KEY_PENDING_ACTIONS = "pending_actions_v1"
     private const val KEY_LAST_WIDGET_STOP_AT = "last_widget_stop_at_v1"
+    private const val KEY_LEGACY_CONFIG = "shared_slots_v1"
+    private const val KEY_LEGACY_AUTO_BIND_PENDING = "legacy_auto_bind_pending_v1"
     const val SLOT_COUNT = 4
+    const val LEGACY_TEMPLATE_ID = "widget-template-legacy-default"
+    const val DEFAULT_TEMPLATE_NAME = "我的小组件"
 
     private fun prefs(context: Context) =
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
 
-    fun loadConfig(context: Context): List<WidgetTimerSlotConfig> {
-        val raw = prefs(context).getString(KEY_CONFIG, null)
+    fun loadTemplates(context: Context): List<WidgetTemplate> {
+        migrateLegacyConfigIfNeeded(context)
+
+        val raw = prefs(context).getString(KEY_TEMPLATES, null)
         if (raw.isNullOrBlank()) {
-            return defaultConfig()
+            return emptyList()
         }
 
         return runCatching {
             val array = JSONArray(raw)
-            val slots = mutableListOf<WidgetTimerSlotConfig>()
-            for (index in 0 until array.length()) {
-                val item = array.optJSONObject(index) ?: continue
-                slots += WidgetTimerSlotConfig(
-                    slotIndex = item.optInt("slotIndex", index),
-                    activityId = item.optString("activityId").ifBlank { null },
-                    categoryId = item.optString("categoryId").ifBlank { null },
-                    icon = item.optString("icon", "\u2022"),
-                    uiIconAssetPath = item.optString("uiIconAssetPath").ifBlank { null },
-                    uiIconFallbackAssetPath = item.optString("uiIconFallbackAssetPath").ifBlank { null },
-                    label = item.optString("label").ifBlank { null },
-                    color = item.optString("color").ifBlank { null }
-                )
+            buildList {
+                for (index in 0 until array.length()) {
+                    val item = array.optJSONObject(index) ?: continue
+                    add(
+                        WidgetTemplate(
+                            id = item.optString("id").ifBlank { "widget-template-$index" },
+                            name = item.optString("name").ifBlank { DEFAULT_TEMPLATE_NAME },
+                            slots = parseSlots(item.optJSONArray("slots")),
+                            createdAt = item.optLong("createdAt", System.currentTimeMillis()),
+                            updatedAt = item.optLong("updatedAt", System.currentTimeMillis())
+                        )
+                    )
+                }
             }
-            normalizeSlots(slots)
         }.getOrElse {
-            defaultConfig()
-        }
+            emptyList()
+        }.map(::normalizeTemplate)
     }
 
-    fun saveConfig(context: Context, slots: List<WidgetTimerSlotConfig>) {
-        val normalized = normalizeSlots(slots)
+    fun saveTemplates(context: Context, templates: List<WidgetTemplate>) {
+        val normalized = templates.map(::normalizeTemplate)
         val array = JSONArray()
-        normalized.forEach { slot ->
+        normalized.forEach { template ->
             array.put(JSONObject().apply {
-                put("slotIndex", slot.slotIndex)
-                put("activityId", slot.activityId ?: JSONObject.NULL)
-                put("categoryId", slot.categoryId ?: JSONObject.NULL)
-                put("icon", slot.icon ?: JSONObject.NULL)
-                put("uiIconAssetPath", slot.uiIconAssetPath ?: JSONObject.NULL)
-                put("uiIconFallbackAssetPath", slot.uiIconFallbackAssetPath ?: JSONObject.NULL)
-                put("label", slot.label ?: JSONObject.NULL)
-                put("color", slot.color ?: JSONObject.NULL)
+                put("id", template.id)
+                put("name", template.name)
+                put("createdAt", template.createdAt)
+                put("updatedAt", template.updatedAt)
+                put("slots", slotsToJson(template.slots))
             })
         }
 
-        prefs(context).edit().putString(KEY_CONFIG, array.toString()).commit()
+        prefs(context)
+            .edit()
+            .putString(KEY_TEMPLATES, array.toString())
+            .commit()
+    }
+
+    fun loadTemplate(context: Context, templateId: String?): WidgetTemplate? {
+        if (templateId.isNullOrBlank()) {
+            return null
+        }
+        return loadTemplates(context).firstOrNull { it.id == templateId }
+    }
+
+    fun loadInstanceBindings(context: Context): List<WidgetInstanceBinding> {
+        val raw = prefs(context).getString(KEY_INSTANCE_BINDINGS, null)
+        if (raw.isNullOrBlank()) {
+            return emptyList()
+        }
+
+        return runCatching {
+            val array = JSONArray(raw)
+            buildList {
+                for (index in 0 until array.length()) {
+                    val item = array.optJSONObject(index) ?: continue
+                    add(
+                        WidgetInstanceBinding(
+                            appWidgetId = item.optInt("appWidgetId", -1),
+                            templateId = item.optString("templateId").ifBlank { null },
+                            createdAt = item.optLong("createdAt", System.currentTimeMillis()),
+                            updatedAt = item.optLong("updatedAt", System.currentTimeMillis())
+                        )
+                    )
+                }
+            }.filter { it.appWidgetId > 0 }
+        }.getOrElse {
+            emptyList()
+        }
+    }
+
+    fun loadBinding(context: Context, appWidgetId: Int): WidgetInstanceBinding? {
+        return loadInstanceBindings(context).firstOrNull { it.appWidgetId == appWidgetId }
+    }
+
+    fun ensureBinding(context: Context, appWidgetId: Int): WidgetInstanceBinding? {
+        if (appWidgetId <= 0) {
+            return null
+        }
+
+        val templates = loadTemplates(context)
+        if (templates.isEmpty()) {
+            return null
+        }
+
+        val currentBinding = loadBinding(context, appWidgetId)
+        val currentTemplateId = currentBinding?.templateId
+        val hasValidTemplate = templates.any { it.id == currentTemplateId }
+        if (currentBinding != null && hasValidTemplate) {
+            return currentBinding
+        }
+
+        val defaultTemplate = templates.first()
+        saveBinding(context, appWidgetId, defaultTemplate.id)
+        return loadBinding(context, appWidgetId)
+    }
+
+    fun cycleBindingToNextTemplate(context: Context, appWidgetId: Int): WidgetInstanceBinding? {
+        if (appWidgetId <= 0) {
+            return null
+        }
+
+        val templates = loadTemplates(context)
+        if (templates.isEmpty()) {
+            return null
+        }
+
+        val currentBinding = ensureBinding(context, appWidgetId)
+        val currentIndex = templates.indexOfFirst { it.id == currentBinding?.templateId }
+        val nextTemplate = if (currentIndex < 0) {
+            templates.first()
+        } else {
+            templates[(currentIndex + 1) % templates.size]
+        }
+
+        saveBinding(context, appWidgetId, nextTemplate.id)
+        return loadBinding(context, appWidgetId)
+    }
+
+    fun saveBinding(context: Context, appWidgetId: Int, templateId: String?) {
+        if (appWidgetId <= 0) {
+            return
+        }
+
+        val now = System.currentTimeMillis()
+        val existing = loadBinding(context, appWidgetId)
+        val nextBinding = WidgetInstanceBinding(
+            appWidgetId = appWidgetId,
+            templateId = templateId,
+            createdAt = existing?.createdAt ?: now,
+            updatedAt = now
+        )
+
+        val bindings = loadInstanceBindings(context)
+            .filterNot { it.appWidgetId == appWidgetId }
+            .toMutableList()
+        bindings.add(nextBinding)
+        saveBindings(context, bindings)
+    }
+
+    fun removeBinding(context: Context, appWidgetId: Int) {
+        if (appWidgetId <= 0) {
+            return
+        }
+
+        val nextBindings = loadInstanceBindings(context).filterNot { it.appWidgetId == appWidgetId }
+        saveBindings(context, nextBindings)
+    }
+
+    fun maybeAutoBindLegacyWidgets(context: Context, appWidgetIds: IntArray) {
+        if (!prefs(context).getBoolean(KEY_LEGACY_AUTO_BIND_PENDING, false)) {
+            return
+        }
+
+        val templates = loadTemplates(context)
+        val defaultTemplate = templates.firstOrNull { it.id == LEGACY_TEMPLATE_ID } ?: templates.firstOrNull()
+        if (defaultTemplate == null) {
+            prefs(context).edit().putBoolean(KEY_LEGACY_AUTO_BIND_PENDING, false).commit()
+            return
+        }
+
+        appWidgetIds.forEach { appWidgetId ->
+            val binding = loadBinding(context, appWidgetId)
+            if (binding == null) {
+                saveBinding(context, appWidgetId, defaultTemplate.id)
+            }
+        }
+
+        prefs(context).edit().putBoolean(KEY_LEGACY_AUTO_BIND_PENDING, false).commit()
+    }
+
+    fun ensureBindings(context: Context, appWidgetIds: IntArray) {
+        appWidgetIds.forEach { appWidgetId ->
+            ensureBinding(context, appWidgetId)
+        }
     }
 
     fun loadRuntimeState(context: Context): WidgetTimerRuntimeState? {
@@ -82,7 +227,9 @@ object WidgetStores {
                 color = json.optString("color", "#E7E5E4"),
                 startedAt = json.getLong("startedAt"),
                 source = json.optString("source", "widget"),
-                slotIndex = if (json.has("slotIndex")) json.optInt("slotIndex") else null
+                slotIndex = if (json.has("slotIndex")) json.optInt("slotIndex") else null,
+                templateId = json.optString("templateId").ifBlank { null },
+                appWidgetId = if (json.has("appWidgetId")) json.optInt("appWidgetId") else null
             )
         }.getOrNull()
     }
@@ -105,6 +252,12 @@ object WidgetStores {
             put("source", runtimeState.source)
             if (runtimeState.slotIndex != null) {
                 put("slotIndex", runtimeState.slotIndex)
+            }
+            if (!runtimeState.templateId.isNullOrBlank()) {
+                put("templateId", runtimeState.templateId)
+            }
+            if (runtimeState.appWidgetId != null) {
+                put("appWidgetId", runtimeState.appWidgetId)
             }
         }
         editor.putString(KEY_RUNTIME, json.toString()).commit()
@@ -170,6 +323,23 @@ object WidgetStores {
         savePendingActions(context, remaining)
     }
 
+    private fun saveBindings(context: Context, bindings: List<WidgetInstanceBinding>) {
+        val array = JSONArray()
+        bindings
+            .filter { it.appWidgetId > 0 }
+            .sortedBy { it.appWidgetId }
+            .forEach { binding ->
+                array.put(JSONObject().apply {
+                    put("appWidgetId", binding.appWidgetId)
+                    put("templateId", binding.templateId ?: JSONObject.NULL)
+                    put("createdAt", binding.createdAt)
+                    put("updatedAt", binding.updatedAt)
+                })
+            }
+
+        prefs(context).edit().putString(KEY_INSTANCE_BINDINGS, array.toString()).commit()
+    }
+
     private fun savePendingActions(context: Context, actions: List<WidgetPendingAction>) {
         val array = JSONArray()
         actions.forEach { action ->
@@ -196,7 +366,87 @@ object WidgetStores {
         }
     }
 
-    private fun defaultConfig(): List<WidgetTimerSlotConfig> {
-        return (0 until SLOT_COUNT).map { WidgetTimerSlotConfig(slotIndex = it) }
+    private fun normalizeTemplate(template: WidgetTemplate): WidgetTemplate {
+        return WidgetTemplate(
+            id = template.id,
+            name = template.name.ifBlank { DEFAULT_TEMPLATE_NAME },
+            slots = normalizeSlots(template.slots),
+            createdAt = template.createdAt,
+            updatedAt = template.updatedAt
+        )
+    }
+
+    private fun parseSlots(array: JSONArray?): List<WidgetTimerSlotConfig> {
+        if (array == null) {
+            return normalizeSlots(emptyList())
+        }
+
+        val slots = mutableListOf<WidgetTimerSlotConfig>()
+        for (index in 0 until array.length()) {
+            val item = array.optJSONObject(index) ?: continue
+            slots += WidgetTimerSlotConfig(
+                slotIndex = item.optInt("slotIndex", index),
+                activityId = item.optString("activityId").ifBlank { null },
+                categoryId = item.optString("categoryId").ifBlank { null },
+                icon = item.optString("icon").ifBlank { null },
+                uiIconAssetPath = item.optString("uiIconAssetPath").ifBlank { null },
+                uiIconFallbackAssetPath = item.optString("uiIconFallbackAssetPath").ifBlank { null },
+                label = item.optString("label").ifBlank { null },
+                color = item.optString("color").ifBlank { null }
+            )
+        }
+        return normalizeSlots(slots)
+    }
+
+    private fun slotsToJson(slots: List<WidgetTimerSlotConfig>): JSONArray {
+        val array = JSONArray()
+        normalizeSlots(slots).forEach { slot ->
+            array.put(JSONObject().apply {
+                put("slotIndex", slot.slotIndex)
+                put("activityId", slot.activityId ?: JSONObject.NULL)
+                put("categoryId", slot.categoryId ?: JSONObject.NULL)
+                put("icon", slot.icon ?: JSONObject.NULL)
+                put("uiIconAssetPath", slot.uiIconAssetPath ?: JSONObject.NULL)
+                put("uiIconFallbackAssetPath", slot.uiIconFallbackAssetPath ?: JSONObject.NULL)
+                put("label", slot.label ?: JSONObject.NULL)
+                put("color", slot.color ?: JSONObject.NULL)
+            })
+        }
+        return array
+    }
+
+    private fun migrateLegacyConfigIfNeeded(context: Context) {
+        val prefs = prefs(context)
+        val currentTemplates = prefs.getString(KEY_TEMPLATES, null)
+        if (!currentTemplates.isNullOrBlank()) {
+            return
+        }
+
+        val legacyRaw = prefs.getString(KEY_LEGACY_CONFIG, null)
+        if (legacyRaw.isNullOrBlank()) {
+            return
+        }
+
+        val legacySlots = runCatching {
+            parseSlots(JSONArray(legacyRaw))
+        }.getOrElse {
+            normalizeSlots(emptyList())
+        }
+
+        if (!legacySlots.any { it.isConfigured() }) {
+            return
+        }
+
+        val now = System.currentTimeMillis()
+        val migratedTemplate = WidgetTemplate(
+            id = LEGACY_TEMPLATE_ID,
+            name = DEFAULT_TEMPLATE_NAME,
+            slots = legacySlots,
+            createdAt = now,
+            updatedAt = now
+        )
+
+        saveTemplates(context, listOf(migratedTemplate))
+        prefs.edit().putBoolean(KEY_LEGACY_AUTO_BIND_PENDING, true).commit()
     }
 }
