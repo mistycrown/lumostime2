@@ -9,7 +9,7 @@ import com.getcapacitor.annotation.CapacitorPlugin
 import org.json.JSONArray
 
 /**
- * Capacitor bridge for widget templates, instance bindings, runtime synchronization, and pending action import.
+ * Capacitor bridge for widget templates, instance binding state, runtime synchronization, and pending action import.
  */
 @CapacitorPlugin(name = "WidgetBridge")
 class WidgetBridgePlugin : Plugin() {
@@ -52,21 +52,6 @@ class WidgetBridgePlugin : Plugin() {
         WidgetStores.loadInstanceBindings(context).forEach { payload.put(bindingToJs(it)) }
         result.put("bindings", payload)
         call.resolve(result)
-    }
-
-    @PluginMethod
-    fun bindWidgetInstance(call: PluginCall) {
-        val appWidgetId = call.getInt("appWidgetId") ?: -1
-        val templateId = call.getString("templateId")
-
-        if (appWidgetId <= 0) {
-            call.reject("Invalid appWidgetId")
-            return
-        }
-
-        WidgetStores.saveBinding(context, appWidgetId, templateId)
-        WidgetRefreshCoordinator.refreshWidget(context, appWidgetId)
-        call.resolve()
     }
 
     @PluginMethod
@@ -138,8 +123,15 @@ class WidgetBridgePlugin : Plugin() {
     @PluginMethod
     fun refreshWidget(call: PluginCall) {
         val appWidgetId = call.getInt("appWidgetId") ?: -1
+        val templateId = call.getString("templateId")?.ifBlank { null }
         if (appWidgetId > 0) {
             WidgetRefreshCoordinator.refreshWidget(context, appWidgetId)
+        } else if (templateId != null) {
+            WidgetStores.loadInstanceBindings(context)
+                .filter { it.templateId == templateId }
+                .forEach { binding ->
+                    WidgetRefreshCoordinator.refreshWidget(context, binding.appWidgetId)
+                }
         } else {
             WidgetRefreshCoordinator.refreshAllAsync(context)
         }

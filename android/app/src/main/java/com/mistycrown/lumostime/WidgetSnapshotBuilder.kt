@@ -11,11 +11,7 @@ object WidgetSnapshotBuilder {
         val template = WidgetStores.loadTemplateForSize(context, binding?.templateId, normalizedSize)
 
         val slots = (template?.slots ?: emptySlots(normalizedSize)).map { slot ->
-            val matchesRuntime = runtimeState?.let { runtime ->
-                runtime.activityId == slot.activityId &&
-                    runtime.categoryId == slot.categoryId &&
-                    slot.isConfigured()
-            } ?: false
+            val matchesRuntime = matchesRuntime(template, slot, runtimeState)
 
             WidgetSnapshotSlot(
                 slotIndex = slot.slotIndex,
@@ -37,6 +33,24 @@ object WidgetSnapshotBuilder {
             templateName = template?.name ?: "暂无模板",
             slots = slots
         )
+    }
+
+    private fun matchesRuntime(
+        template: WidgetTemplate?,
+        slot: WidgetTimerSlotConfig,
+        runtimeState: WidgetTimerRuntimeState?
+    ): Boolean {
+        if (!slot.isConfigured() || runtimeState == null) {
+            return false
+        }
+
+        return if (runtimeState.source == "widget" && template != null) {
+            runtimeState.templateId == template.id &&
+                runtimeState.slotIndex == slot.slotIndex
+        } else {
+            runtimeState.activityId == slot.activityId &&
+                runtimeState.categoryId == slot.categoryId
+        }
     }
 
     private fun emptySlots(widgetSize: String): List<WidgetTimerSlotConfig> {

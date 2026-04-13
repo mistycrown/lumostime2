@@ -4,7 +4,7 @@
  * @output Runtime reconciliation between the Android widget and app state
  * @pos Hook
  * @description Imports completed widget actions into logs and mirrors active runtime state between native Android and the React app.
- * @updated 2026-04-13: Avoid clearing widget-native runtime state when app has no active session.
+ * @updated 2026-04-13: Dedupe native/runtime reconciliation and clear completed app sessions finished from the widget.
  */
 import { App as CapacitorApp } from '@capacitor/app';
 import { useEffect, useMemo, useState } from 'react';
@@ -65,12 +65,35 @@ export const useWidgetBridgeSync = () => {
         }
 
         setActiveSessions((prevSessions) => {
-          const withoutWidgetSessions = prevSessions.filter((session) => session.source !== 'widget');
+          const completedActionIds = new Set(actions.map((action) => action.id));
+          const withoutCompletedSessions = prevSessions.filter(
+            (session) => !completedActionIds.has(session.id)
+          );
+
           if (!runtimeState) {
-            return withoutWidgetSessions;
+            return withoutCompletedSessions.filter((session) => session.source !== 'widget');
           }
 
-          return [...withoutWidgetSessions, buildWidgetSessionFromRuntimeState(runtimeState, categories)];
+          const nextNativeSession = buildWidgetSessionFromRuntimeState(runtimeState, categories);
+          const existingSameSession = withoutCompletedSessions.find(
+            (session) => session.id === nextNativeSession.id
+          );
+          const reconciledSession = existingSameSession
+            ? {
+                ...existingSameSession,
+                ...nextNativeSession,
+                source: existingSameSession.source || nextNativeSession.source
+              }
+            : nextNativeSession;
+
+          const withoutDuplicateSessions = withoutCompletedSessions.filter((session) => {
+            if (session.id === reconciledSession.id) {
+              return false;
+            }
+            return session.source !== 'widget';
+          });
+
+          return [...withoutDuplicateSessions, reconciledSession];
         });
 
         setHasHydratedNativeState(true);
