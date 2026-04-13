@@ -4,6 +4,8 @@
  * @output A minimal 4-slot widget configuration page
  * @pos View
  * @description Lets the user choose the four activities shown in the Android timer widget and push that config to native immediately.
+ * @updated 2026-04-13: Localized widget settings UI text to Chinese.
+ * @updated 2026-04-13: Align preview slot background opacity with record view.
  */
 import React, { useMemo, useState } from 'react';
 import { ChevronLeft, LayoutGrid, RefreshCw, Save } from 'lucide-react';
@@ -18,6 +20,7 @@ import {
   normalizeWidgetTimerSlots,
   saveWidgetTimerSlotsToStorage
 } from '../../services/widgetTimerService';
+import { getSoftColorCircleStyle } from '../../utils/colorAdapterUtils';
 import { Category } from '../../types';
 
 interface WidgetSettingsViewProps {
@@ -35,7 +38,7 @@ export const WidgetSettingsView: React.FC<WidgetSettingsViewProps> = ({
   const [isSaving, setIsSaving] = useState(false);
 
   const activityOptions = useMemo(() => {
-    const options = [{ value: '', label: 'Not configured' }];
+    const options = [{ value: '', label: '未配置' }];
     categories.forEach((category) => {
       category.activities.forEach((activity) => {
         options.push({
@@ -83,13 +86,13 @@ export const WidgetSettingsView: React.FC<WidgetSettingsViewProps> = ({
       if (isNativeAndroidWidgetSupported()) {
         await WidgetBridge.saveConfig({ slots: normalizedSlots });
         await WidgetBridge.refreshWidget();
-        onToast('success', 'Widget config saved');
+        onToast('success', '小组件配置已保存');
       } else {
-        onToast('info', 'Saved locally. Refresh requires native Android.');
+        onToast('info', '已保存到本地，刷新需在 Android 原生环境中进行。');
       }
     } catch (error) {
       console.error('[WidgetSettingsView] Failed to save widget config', error);
-      onToast('error', 'Failed to save widget config');
+      onToast('error', '保存小组件配置失败');
     } finally {
       setIsSaving(false);
     }
@@ -97,7 +100,7 @@ export const WidgetSettingsView: React.FC<WidgetSettingsViewProps> = ({
 
   const handleReloadLocalConfig = () => {
     setSlots(loadWidgetTimerSlotsFromStorage());
-    onToast('success', 'Reloaded local widget config');
+    onToast('success', '已重新加载本地小组件配置');
   };
 
   return (
@@ -106,7 +109,7 @@ export const WidgetSettingsView: React.FC<WidgetSettingsViewProps> = ({
         <button onClick={onBack} className="text-stone-400 hover:text-stone-600 p-1">
           <ChevronLeft size={24} />
         </button>
-        <span className="text-stone-800 font-bold text-lg">Widget Timer</span>
+        <span className="text-stone-800 font-bold text-lg">小组件计时器</span>
       </div>
 
       <div className="flex-1 overflow-y-auto px-5 py-6 pb-40 space-y-6">
@@ -116,9 +119,9 @@ export const WidgetSettingsView: React.FC<WidgetSettingsViewProps> = ({
               <LayoutGrid size={20} />
             </div>
             <div>
-              <h3 className="font-bold text-stone-800">4-slot timer widget</h3>
+              <h3 className="font-bold text-stone-800">4 槽位计时小组件</h3>
               <p className="text-xs text-stone-400">
-                White card, four circles, tap to start, tap again to stop, and tap another one to auto-switch.
+                白色卡片，四个圆点，点一下开始，再点停止，点另一个自动切换。
               </p>
             </div>
           </div>
@@ -129,7 +132,7 @@ export const WidgetSettingsView: React.FC<WidgetSettingsViewProps> = ({
                 <div
                   key={slot.slotIndex}
                   className="aspect-square rounded-full flex items-center justify-center text-2xl border border-stone-100"
-                  style={{ backgroundColor: slot.color || '#EEF2F7' }}
+                  style={getSoftColorCircleStyle(slot.color || '#EEF2F7', 0.15)}
                 >
                   <span>{slot.icon || '\u2022'}</span>
                 </div>
@@ -140,23 +143,23 @@ export const WidgetSettingsView: React.FC<WidgetSettingsViewProps> = ({
 
         <div className="bg-white rounded-2xl p-5 shadow-sm border border-stone-100 space-y-4">
           <div>
-            <h3 className="font-bold text-stone-800">Slots</h3>
+            <h3 className="font-bold text-stone-800">槽位</h3>
             <p className="text-xs text-stone-400 mt-1">
-              First version uses one shared 4-slot config for all home-screen widget instances.
+              当前版本所有桌面小组件共用一套 4 槽位配置。
             </p>
           </div>
 
           {slots.map((slot, index) => (
             <div key={slot.slotIndex} className="space-y-2">
               <div className="flex items-center justify-between">
-                <span className="text-sm font-bold text-stone-700">Slot {index + 1}</span>
-                <span className="text-xs text-stone-400">{slot.label || 'Not configured'}</span>
+                <span className="text-sm font-bold text-stone-700">槽位 {index + 1}</span>
+                <span className="text-xs text-stone-400">{slot.label || '未配置'}</span>
               </div>
               <CustomSelect
                 value={slot.activityId && slot.categoryId ? `${slot.categoryId}::${slot.activityId}` : ''}
                 options={activityOptions}
                 onChange={(value) => updateSlot(slot.slotIndex, value)}
-                placeholder="Select an activity"
+                placeholder="选择一个活动"
               />
             </div>
           ))}
@@ -164,11 +167,11 @@ export const WidgetSettingsView: React.FC<WidgetSettingsViewProps> = ({
 
         <div className="bg-white rounded-2xl p-5 shadow-sm border border-stone-100 space-y-4">
           <div>
-            <h3 className="font-bold text-stone-800">Status</h3>
+            <h3 className="font-bold text-stone-800">状态</h3>
             <p className="text-xs text-stone-400 mt-1">
               {isNativeAndroidWidgetSupported()
-                ? 'Native Android widget support is active. Saving refreshes the widget immediately.'
-                : 'Not running in native Android. Saving only updates the local config.'}
+                ? '已检测到原生 Android 小组件支持，保存后会立即刷新。'
+                : '当前不是原生 Android 环境，保存仅更新本地配置。'}
             </p>
           </div>
 
@@ -178,7 +181,7 @@ export const WidgetSettingsView: React.FC<WidgetSettingsViewProps> = ({
               className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl bg-stone-100 text-stone-700 font-bold active:scale-[0.98] transition-all"
             >
               <RefreshCw size={16} />
-              Reload
+              重新加载
             </button>
             <button
               onClick={() => void handleSave()}
@@ -186,7 +189,7 @@ export const WidgetSettingsView: React.FC<WidgetSettingsViewProps> = ({
               className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl bg-stone-800 text-white font-bold shadow-lg shadow-stone-200 active:scale-[0.98] transition-all disabled:opacity-60"
             >
               <Save size={16} />
-              {isSaving ? 'Saving...' : 'Save & Refresh'}
+              {isSaving ? '保存中...' : '保存并刷新'}
             </button>
           </div>
         </div>

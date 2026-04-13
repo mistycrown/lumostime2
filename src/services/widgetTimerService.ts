@@ -4,6 +4,7 @@
  * @output Widget config persistence helpers and app/native conversion utilities
  * @pos Service
  * @description Centralizes the shared types and conversions used by the Android timer widget feature.
+ * @updated 2026-04-13: Localized widget fallback label to Chinese.
  */
 import { Capacitor } from '@capacitor/core';
 import { ActiveSession, Category, Log } from '../types';
@@ -111,7 +112,7 @@ export const buildWidgetSessionFromRuntimeState = (
     id: runtimeState.id,
     activityId: runtimeState.activityId,
     categoryId: runtimeState.categoryId,
-    activityName: activity?.name || runtimeState.label || 'Widget Timer',
+    activityName: activity?.name || runtimeState.label || '小组件计时器',
     activityIcon: activity?.icon || runtimeState.icon || FALLBACK_WIDGET_ICON,
     activityUiIcon: activity?.uiIcon,
     startTime: runtimeState.startedAt,

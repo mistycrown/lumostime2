@@ -24,7 +24,7 @@ object WidgetTimerController {
         if (isSameSlotActive && currentRuntime != null) {
             finishRuntime(context, currentRuntime, now)
             WidgetStores.saveRuntimeState(context, null)
-            LumosTimerWidgetUpdater.refreshAllAsync(context)
+            WidgetStores.saveLastWidgetStopAt(context, now)
             return
         }
 
@@ -42,11 +42,11 @@ object WidgetTimerController {
                 label = slot.label?.ifBlank { null } ?: "",
                 color = slot.color?.ifBlank { null } ?: "#E7E5E4",
                 startedAt = now,
-                source = "widget"
+                source = "widget",
+                slotIndex = slotIndex
             )
         )
-
-        LumosTimerWidgetUpdater.refreshAllAsync(context)
+        WidgetStores.saveLastWidgetStopAt(context, null)
     }
 
     private fun finishRuntime(context: Context, runtimeState: WidgetTimerRuntimeState, endedAt: Long) {

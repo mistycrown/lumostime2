@@ -4,6 +4,7 @@
  * @output Runtime reconciliation between the Android widget and app state
  * @pos Hook
  * @description Imports completed widget actions into logs and mirrors active runtime state between native Android and the React app.
+ * @updated 2026-04-13: Avoid clearing widget-native runtime state when app has no active session.
  */
 import { App as CapacitorApp } from '@capacitor/app';
 import { useEffect, useMemo, useState } from 'react';
@@ -113,12 +114,27 @@ export const useWidgetBridgeSync = () => {
       return;
     }
 
-    const runtimeState = latestSession
-      ? buildWidgetRuntimeStateFromSession(latestSession, categories)
-      : null;
+    const syncRuntimeState = async () => {
+      if (!latestSession) {
+        try {
+          const { runtimeState: nativeRuntime } = await WidgetBridge.getRuntimeState();
+          if (nativeRuntime?.source === 'widget') {
+            return;
+          }
+        } catch (error) {
+          console.error('[useWidgetBridgeSync] Failed to read native runtime state', error);
+        }
+      }
 
-    WidgetBridge.syncRuntimeState({ runtimeState }).catch((error) => {
-      console.error('[useWidgetBridgeSync] Failed to sync runtime state to native widget', error);
-    });
+      const runtimeState = latestSession
+        ? buildWidgetRuntimeStateFromSession(latestSession, categories)
+        : null;
+
+      WidgetBridge.syncRuntimeState({ runtimeState }).catch((error) => {
+        console.error('[useWidgetBridgeSync] Failed to sync runtime state to native widget', error);
+      });
+    };
+
+    void syncRuntimeState();
   }, [categories, hasHydratedNativeState, latestSession]);
 };

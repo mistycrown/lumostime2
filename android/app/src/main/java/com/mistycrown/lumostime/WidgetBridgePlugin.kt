@@ -39,7 +39,7 @@ class WidgetBridgePlugin : Plugin() {
         }
 
         WidgetStores.saveConfig(context, slots)
-        LumosTimerWidgetUpdater.refreshAllAsync(context)
+        QuickLogWidget.refreshAllAsync(context)
         call.resolve()
     }
 
@@ -91,14 +91,24 @@ class WidgetBridgePlugin : Plugin() {
             )
         }
 
+        val lastWidgetStopAt = WidgetStores.loadLastWidgetStopAt(context)
+        if (runtimeState != null &&
+            runtimeState.source == "app" &&
+            lastWidgetStopAt != null &&
+            System.currentTimeMillis() - lastWidgetStopAt < 2000L
+        ) {
+            call.resolve()
+            return
+        }
+
         WidgetStores.saveRuntimeState(context, runtimeState)
-        LumosTimerWidgetUpdater.refreshAllAsync(context)
+        QuickLogWidget.refreshAllAsync(context)
         call.resolve()
     }
 
     @PluginMethod
     fun refreshWidget(call: PluginCall) {
-        LumosTimerWidgetUpdater.refreshAllAsync(context)
+        QuickLogWidget.refreshAllAsync(context)
         call.resolve()
     }
 

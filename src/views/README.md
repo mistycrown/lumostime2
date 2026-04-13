@@ -28,7 +28,8 @@ The views are designed as "dumb" or "presentational" components where possible, 
 
 > ⚠️ **Note**: When modifying views, ensure that new state requirements are coordinated with `App.tsx` if they affect global data (Logs, Categories, Todos).
 
-> Last updated: 2026-04-12
+> Last updated: 2026-04-13
+- `SettingsView.tsx`, `WidgetSettingsView.tsx`: Localized widget settings entry, loading label, and widget settings UI text to Chinese.
 - `RecordView.tsx`, `TodoView.tsx`: Softened the shared sidebar utility buttons so the bottom controls feel lighter in both record and todo pages.
 - `TodoView.tsx`: Added a persisted sidebar toggle for showing or hiding completed todos, while keeping the sidebar control spacing aligned with `RecordView`.
 - `TodoView.tsx`: Matched the expanded left-sidebar button spacing with `RecordView` so the density toggle and collapse control keep the same right-side gutter.
