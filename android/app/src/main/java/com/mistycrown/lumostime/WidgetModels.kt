@@ -25,7 +25,8 @@ data class WidgetTimerRuntimeState(
     val label: String,
     val color: String,
     val startedAt: Long,
-    val source: String
+    val source: String,
+    val slotIndex: Int? = null
 )
 
 data class WidgetPendingAction(
@@ -47,11 +48,9 @@ data class WidgetSnapshotSlot(
     val icon: String,
     val label: String,
     val color: String,
-    val isConfigured: Boolean,
     val isActive: Boolean
 )
 
 data class WidgetSnapshot(
-    val slots: List<WidgetSnapshotSlot>,
-    val runtimeState: WidgetTimerRuntimeState?
+    val slots: List<WidgetSnapshotSlot>
 )

@@ -8,6 +8,7 @@
  * 修改历史:
  * - 2026-03-23: 接入云端图片一致性检查与按本地状态修复入口，补齐数据管理页中的图片清理入口。
  * - 2026-03-19: 恢复场景设置为直接加载，排查并修复子页面白屏无法打开的问题。
+ * - 2026-04-13: Localized widget settings entry and loading label to Chinese.
  * 
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
@@ -1130,7 +1131,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
                 onToast={onToast}
                 categories={categoriesData || []}
             />,
-            'Loading widget timer...'
+            '正在加载小组件计时器...'
         );
     }
 
@@ -1237,7 +1238,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
                         />
                         <MenuItem
                             icon={<LayoutGrid size={18} className="text-sky-500" />}
-                            label="Widget Timer"
+                            label="小组件计时器"
                             onClick={() => openSettingsSubmenu('widget_timer')}
                         />
                         <ToggleItem

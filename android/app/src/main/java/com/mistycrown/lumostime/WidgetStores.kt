@@ -12,6 +12,7 @@ object WidgetStores {
     private const val KEY_CONFIG = "shared_slots_v1"
     private const val KEY_RUNTIME = "runtime_v1"
     private const val KEY_PENDING_ACTIONS = "pending_actions_v1"
+    private const val KEY_LAST_WIDGET_STOP_AT = "last_widget_stop_at_v1"
     const val SLOT_COUNT = 4
 
     private fun prefs(context: Context) =
@@ -32,7 +33,7 @@ object WidgetStores {
                     slotIndex = item.optInt("slotIndex", index),
                     activityId = item.optString("activityId").ifBlank { null },
                     categoryId = item.optString("categoryId").ifBlank { null },
-                    icon = item.optString("icon").ifBlank { null },
+                    icon = item.optString("icon", "\u2022"),
                     label = item.optString("label").ifBlank { null },
                     color = item.optString("color").ifBlank { null }
                 )
@@ -57,7 +58,7 @@ object WidgetStores {
             })
         }
 
-        prefs(context).edit().putString(KEY_CONFIG, array.toString()).apply()
+        prefs(context).edit().putString(KEY_CONFIG, array.toString()).commit()
     }
 
     fun loadRuntimeState(context: Context): WidgetTimerRuntimeState? {
@@ -72,11 +73,12 @@ object WidgetStores {
                 id = json.getString("id"),
                 activityId = json.getString("activityId"),
                 categoryId = json.getString("categoryId"),
-                icon = json.optString("icon", "•"),
+                icon = json.optString("icon", "\u2022"),
                 label = json.optString("label", ""),
                 color = json.optString("color", "#E7E5E4"),
                 startedAt = json.getLong("startedAt"),
-                source = json.optString("source", "widget")
+                source = json.optString("source", "widget"),
+                slotIndex = if (json.has("slotIndex")) json.optInt("slotIndex") else null
             )
         }.getOrNull()
     }
@@ -84,7 +86,7 @@ object WidgetStores {
     fun saveRuntimeState(context: Context, runtimeState: WidgetTimerRuntimeState?) {
         val editor = prefs(context).edit()
         if (runtimeState == null) {
-            editor.remove(KEY_RUNTIME).apply()
+            editor.remove(KEY_RUNTIME).commit()
             return
         }
 
@@ -97,8 +99,25 @@ object WidgetStores {
             put("color", runtimeState.color)
             put("startedAt", runtimeState.startedAt)
             put("source", runtimeState.source)
+            if (runtimeState.slotIndex != null) {
+                put("slotIndex", runtimeState.slotIndex)
+            }
         }
-        editor.putString(KEY_RUNTIME, json.toString()).apply()
+        editor.putString(KEY_RUNTIME, json.toString()).commit()
+    }
+
+    fun loadLastWidgetStopAt(context: Context): Long? {
+        val raw = prefs(context).getLong(KEY_LAST_WIDGET_STOP_AT, -1L)
+        return if (raw > 0L) raw else null
+    }
+
+    fun saveLastWidgetStopAt(context: Context, stoppedAt: Long?) {
+        val editor = prefs(context).edit()
+        if (stoppedAt == null) {
+            editor.remove(KEY_LAST_WIDGET_STOP_AT).commit()
+            return
+        }
+        editor.putLong(KEY_LAST_WIDGET_STOP_AT, stoppedAt).commit()
     }
 
     fun loadPendingActions(context: Context): List<WidgetPendingAction> {
@@ -117,7 +136,7 @@ object WidgetStores {
                             id = item.getString("id"),
                             activityId = item.getString("activityId"),
                             categoryId = item.getString("categoryId"),
-                            icon = item.optString("icon", "•"),
+                            icon = item.optString("icon", "\u2022"),
                             label = item.optString("label", ""),
                             color = item.optString("color", "#E7E5E4"),
                             startedAt = item.getLong("startedAt"),
@@ -163,7 +182,7 @@ object WidgetStores {
             })
         }
 
-        prefs(context).edit().putString(KEY_PENDING_ACTIONS, array.toString()).apply()
+        prefs(context).edit().putString(KEY_PENDING_ACTIONS, array.toString()).commit()
     }
 
     private fun normalizeSlots(slots: List<WidgetTimerSlotConfig>): List<WidgetTimerSlotConfig> {
