@@ -6,24 +6,28 @@ import android.content.Context;
 import android.content.Intent;
 
 /**
- * 2x2 timer widget provider.
+ * 4x2 timer widget provider.
  */
-public class QuickLogWidget extends AppWidgetProvider {
-    public static final String WIDGET_SIZE = WidgetSizes.SIZE_2X2;
+public class QuickLogWidget4x2 extends AppWidgetProvider {
+    public static final String WIDGET_SIZE = WidgetSizes.SIZE_4X2;
 
     private static final int[] SLOT_VIEW_IDS = new int[] {
             R.id.widget_slot_0,
             R.id.widget_slot_1,
             R.id.widget_slot_2,
-            R.id.widget_slot_3
+            R.id.widget_slot_3,
+            R.id.widget_slot_4,
+            R.id.widget_slot_5,
+            R.id.widget_slot_6,
+            R.id.widget_slot_7
     };
 
     public static void refreshAllAsync(Context context) {
         WidgetProviderSupport.refreshAll(
                 context,
-                QuickLogWidget.class,
+                QuickLogWidget4x2.class,
                 WIDGET_SIZE,
-                R.layout.widget_layout,
+                R.layout.widget_layout_4x2,
                 SLOT_VIEW_IDS
         );
     }
@@ -32,9 +36,9 @@ public class QuickLogWidget extends AppWidgetProvider {
         WidgetProviderSupport.refreshWidget(
                 context,
                 appWidgetId,
-                QuickLogWidget.class,
+                QuickLogWidget4x2.class,
                 WIDGET_SIZE,
-                R.layout.widget_layout,
+                R.layout.widget_layout_4x2,
                 SLOT_VIEW_IDS
         );
     }
@@ -45,9 +49,9 @@ public class QuickLogWidget extends AppWidgetProvider {
                 context,
                 appWidgetManager,
                 appWidgetIds,
-                QuickLogWidget.class,
+                QuickLogWidget4x2.class,
                 WIDGET_SIZE,
-                R.layout.widget_layout,
+                R.layout.widget_layout_4x2,
                 SLOT_VIEW_IDS
         );
     }
@@ -64,9 +68,9 @@ public class QuickLogWidget extends AppWidgetProvider {
         WidgetProviderSupport.onReceive(
                 context,
                 intent,
-                QuickLogWidget.class,
+                QuickLogWidget4x2.class,
                 WIDGET_SIZE,
-                R.layout.widget_layout,
+                R.layout.widget_layout_4x2,
                 SLOT_VIEW_IDS
         );
     }

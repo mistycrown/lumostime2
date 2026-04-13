@@ -4,7 +4,7 @@
  * @output Widget template persistence helpers and app/native conversion utilities
  * @pos Service
  * @description Centralizes the shared types and conversions used by the Android timer widget feature.
- * @updated 2026-04-13: Refactored widget config from single shared slots to template library storage with legacy migration.
+ * @updated 2026-04-13: Added multi-size widget template support with size-scoped slot normalization.
  */
 import { Capacitor } from '@capacitor/core';
 import { ActiveSession, Category, Log } from '../types';
@@ -17,18 +17,53 @@ import type {
 } from '../plugins/WidgetBridgePlugin';
 import { getColorHexForCharts } from '../utils/colorAdapterUtils';
 
-export const WIDGET_TIMER_SLOT_COUNT = 4;
 const LEGACY_WIDGET_TIMER_STORAGE_KEY = 'lumostime_widget_timer_slots_v1';
 const WIDGET_TEMPLATE_STORAGE_KEY = 'lumostime_widget_templates_v1';
 const FALLBACK_WIDGET_ICON = '\u2022';
-export const DEFAULT_WIDGET_TEMPLATE_NAME = '我的小组件';
 
+export const DEFAULT_WIDGET_TEMPLATE_NAME = '我的小组件';
+export const DEFAULT_WIDGET_SIZE = '2x2';
+export const WIDGET_SIZE_OPTIONS = ['1x2', '2x1', '2x2', '1x4', '4x1', '2x4', '4x2'] as const;
+
+export type WidgetSize = (typeof WIDGET_SIZE_OPTIONS)[number];
 export type WidgetTemplateSlotConfig = WidgetBridgeSlot;
 export type WidgetTemplate = WidgetBridgeTemplate;
 export type WidgetInstanceBinding = WidgetBridgeInstanceBinding;
 
+const WIDGET_SIZE_SLOT_COUNT: Record<WidgetSize, number> = {
+  '1x2': 2,
+  '2x1': 2,
+  '2x2': 4,
+  '1x4': 4,
+  '4x1': 4,
+  '2x4': 8,
+  '4x2': 8
+};
+
+const WIDGET_SIZE_GRID: Record<WidgetSize, { columns: number; rows: number }> = {
+  '1x2': { columns: 1, rows: 2 },
+  '2x1': { columns: 2, rows: 1 },
+  '2x2': { columns: 2, rows: 2 },
+  '1x4': { columns: 1, rows: 4 },
+  '4x1': { columns: 4, rows: 1 },
+  '2x4': { columns: 2, rows: 4 },
+  '4x2': { columns: 4, rows: 2 }
+};
+
 const createWidgetTemplateId = () =>
   `widget-template-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+
+export const normalizeWidgetSize = (size?: string | null): WidgetSize =>
+  WIDGET_SIZE_OPTIONS.includes((size || '') as WidgetSize)
+    ? (size as WidgetSize)
+    : DEFAULT_WIDGET_SIZE;
+
+export const getWidgetSlotCountBySize = (size: WidgetSize): number => WIDGET_SIZE_SLOT_COUNT[size];
+
+export const getWidgetGridBySize = (size: WidgetSize): { columns: number; rows: number } =>
+  WIDGET_SIZE_GRID[size];
+
+export const getWidgetSizeLabel = (size: WidgetSize): string => size;
 
 export const createEmptyWidgetTemplateSlot = (slotIndex: number): WidgetTemplateSlotConfig => ({
   slotIndex,
@@ -41,14 +76,20 @@ export const createEmptyWidgetTemplateSlot = (slotIndex: number): WidgetTemplate
   color: null
 });
 
-export const createEmptyWidgetTemplateSlots = (): WidgetTemplateSlotConfig[] =>
-  Array.from({ length: WIDGET_TIMER_SLOT_COUNT }, (_, slotIndex) => createEmptyWidgetTemplateSlot(slotIndex));
+export const createEmptyWidgetTemplateSlots = (
+  size: WidgetSize = DEFAULT_WIDGET_SIZE
+): WidgetTemplateSlotConfig[] =>
+  Array.from({ length: getWidgetSlotCountBySize(size) }, (_, slotIndex) =>
+    createEmptyWidgetTemplateSlot(slotIndex)
+  );
 
 export const normalizeWidgetTemplateSlots = (
-  slots: WidgetTemplateSlotConfig[]
+  slots: WidgetTemplateSlotConfig[],
+  size: WidgetSize = DEFAULT_WIDGET_SIZE
 ): WidgetTemplateSlotConfig[] => {
+  const slotCount = getWidgetSlotCountBySize(size);
   const slotMap = new Map(slots.map((slot) => [slot.slotIndex, slot]));
-  return Array.from({ length: WIDGET_TIMER_SLOT_COUNT }, (_, slotIndex) => {
+  return Array.from({ length: slotCount }, (_, slotIndex) => {
     const slot = slotMap.get(slotIndex);
     return {
       slotIndex,
@@ -63,32 +104,47 @@ export const normalizeWidgetTemplateSlots = (
   });
 };
 
+export const resizeWidgetTemplateSlots = (
+  slots: WidgetTemplateSlotConfig[],
+  size: WidgetSize
+): WidgetTemplateSlotConfig[] => normalizeWidgetTemplateSlots(slots, size);
+
 export const isWidgetTemplateConfigured = (template: WidgetTemplate): boolean =>
   template.slots.some((slot) => Boolean(slot.activityId && slot.categoryId));
 
-export const createWidgetTemplate = (name?: string): WidgetTemplate => {
+export const createWidgetTemplate = (
+  name?: string,
+  size: WidgetSize = DEFAULT_WIDGET_SIZE
+): WidgetTemplate => {
   const now = Date.now();
   return {
     id: createWidgetTemplateId(),
     name: name?.trim() || DEFAULT_WIDGET_TEMPLATE_NAME,
-    slots: createEmptyWidgetTemplateSlots(),
+    size,
+    slots: createEmptyWidgetTemplateSlots(size),
     createdAt: now,
     updatedAt: now
   };
 };
 
-export const normalizeWidgetTemplate = (template: WidgetTemplate): WidgetTemplate => ({
-  id: template.id,
-  name: template.name?.trim() || DEFAULT_WIDGET_TEMPLATE_NAME,
-  slots: normalizeWidgetTemplateSlots(template.slots || []),
-  createdAt: Number.isFinite(template.createdAt) ? template.createdAt : Date.now(),
-  updatedAt: Number.isFinite(template.updatedAt) ? template.updatedAt : Date.now()
-});
+export const normalizeWidgetTemplate = (
+  template: Partial<WidgetTemplate> & Pick<WidgetTemplate, 'id'>
+): WidgetTemplate => {
+  const size = normalizeWidgetSize(template.size);
+  return {
+    id: template.id,
+    name: template.name?.trim() || DEFAULT_WIDGET_TEMPLATE_NAME,
+    size,
+    slots: normalizeWidgetTemplateSlots(template.slots || [], size),
+    createdAt: Number.isFinite(template.createdAt) ? Number(template.createdAt) : Date.now(),
+    updatedAt: Number.isFinite(template.updatedAt) ? Number(template.updatedAt) : Date.now()
+  };
+};
 
 export const normalizeWidgetTemplates = (templates: WidgetTemplate[]): WidgetTemplate[] => {
   const seen = new Set<string>();
   return templates
-    .map(normalizeWidgetTemplate)
+    .map((template) => normalizeWidgetTemplate(template))
     .filter((template) => {
       if (!template.id || seen.has(template.id)) {
         return false;
@@ -142,21 +198,25 @@ export const rebuildWidgetTemplate = (
   ...template,
   updatedAt: Date.now(),
   slots: normalizeWidgetTemplateSlots(
-    template.slots.map((slot) => rebuildWidgetTimerSlotConfig(slot, categories))
+    template.slots.map((slot) => rebuildWidgetTimerSlotConfig(slot, categories)),
+    template.size
   )
 });
 
 const loadLegacyWidgetTimerSlotsFromStorage = (): WidgetTemplateSlotConfig[] => {
   const raw = localStorage.getItem(LEGACY_WIDGET_TIMER_STORAGE_KEY);
   if (!raw) {
-    return createEmptyWidgetTemplateSlots();
+    return createEmptyWidgetTemplateSlots(DEFAULT_WIDGET_SIZE);
   }
 
   try {
-    return normalizeWidgetTemplateSlots(JSON.parse(raw) as WidgetTemplateSlotConfig[]);
+    return normalizeWidgetTemplateSlots(
+      JSON.parse(raw) as WidgetTemplateSlotConfig[],
+      DEFAULT_WIDGET_SIZE
+    );
   } catch (error) {
     console.error('[widgetTimerService] Failed to parse legacy widget config from localStorage', error);
-    return createEmptyWidgetTemplateSlots();
+    return createEmptyWidgetTemplateSlots(DEFAULT_WIDGET_SIZE);
   }
 };
 
@@ -175,6 +235,7 @@ const migrateLegacySlotsToTemplates = (): WidgetTemplate[] => {
   const migratedTemplate: WidgetTemplate = {
     id: 'widget-template-legacy-default',
     name: DEFAULT_WIDGET_TEMPLATE_NAME,
+    size: DEFAULT_WIDGET_SIZE,
     slots: legacySlots,
     createdAt: now,
     updatedAt: now
@@ -203,9 +264,13 @@ export const saveWidgetTemplatesToStorage = (templates: WidgetTemplate[]) => {
   localStorage.setItem(WIDGET_TEMPLATE_STORAGE_KEY, JSON.stringify(normalizeWidgetTemplates(templates)));
 };
 
-export const renameWidgetTemplate = (template: WidgetTemplate, name: string): WidgetTemplate => ({
+export const updateWidgetTemplateSize = (
+  template: WidgetTemplate,
+  size: WidgetSize
+): WidgetTemplate => ({
   ...template,
-  name: name.trim() || DEFAULT_WIDGET_TEMPLATE_NAME,
+  size,
+  slots: resizeWidgetTemplateSlots(template.slots, size),
   updatedAt: Date.now()
 });
 
@@ -214,7 +279,7 @@ export const updateWidgetTemplateSlots = (
   slots: WidgetTemplateSlotConfig[]
 ): WidgetTemplate => ({
   ...template,
-  slots: normalizeWidgetTemplateSlots(slots),
+  slots: normalizeWidgetTemplateSlots(slots, template.size),
   updatedAt: Date.now()
 });
 

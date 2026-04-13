@@ -16,7 +16,6 @@ object WidgetStores {
     private const val KEY_LAST_WIDGET_STOP_AT = "last_widget_stop_at_v1"
     private const val KEY_LEGACY_CONFIG = "shared_slots_v1"
     private const val KEY_LEGACY_AUTO_BIND_PENDING = "legacy_auto_bind_pending_v1"
-    const val SLOT_COUNT = 4
     const val LEGACY_TEMPLATE_ID = "widget-template-legacy-default"
     const val DEFAULT_TEMPLATE_NAME = "我的小组件"
 
@@ -36,11 +35,13 @@ object WidgetStores {
             buildList {
                 for (index in 0 until array.length()) {
                     val item = array.optJSONObject(index) ?: continue
+                    val size = WidgetSizes.normalize(item.optString("size"))
                     add(
                         WidgetTemplate(
                             id = item.optString("id").ifBlank { "widget-template-$index" },
                             name = item.optString("name").ifBlank { DEFAULT_TEMPLATE_NAME },
-                            slots = parseSlots(item.optJSONArray("slots")),
+                            size = size,
+                            slots = parseSlots(item.optJSONArray("slots"), size),
                             createdAt = item.optLong("createdAt", System.currentTimeMillis()),
                             updatedAt = item.optLong("updatedAt", System.currentTimeMillis())
                         )
@@ -52,6 +53,11 @@ object WidgetStores {
         }.map(::normalizeTemplate)
     }
 
+    fun loadTemplatesBySize(context: Context, widgetSize: String): List<WidgetTemplate> {
+        val normalizedSize = WidgetSizes.normalize(widgetSize)
+        return loadTemplates(context).filter { it.size == normalizedSize }
+    }
+
     fun saveTemplates(context: Context, templates: List<WidgetTemplate>) {
         val normalized = templates.map(::normalizeTemplate)
         val array = JSONArray()
@@ -59,9 +65,10 @@ object WidgetStores {
             array.put(JSONObject().apply {
                 put("id", template.id)
                 put("name", template.name)
+                put("size", template.size)
                 put("createdAt", template.createdAt)
                 put("updatedAt", template.updatedAt)
-                put("slots", slotsToJson(template.slots))
+                put("slots", slotsToJson(template.slots, template.size))
             })
         }
 
@@ -76,6 +83,13 @@ object WidgetStores {
             return null
         }
         return loadTemplates(context).firstOrNull { it.id == templateId }
+    }
+
+    fun loadTemplateForSize(context: Context, templateId: String?, widgetSize: String): WidgetTemplate? {
+        val normalizedSize = WidgetSizes.normalize(widgetSize)
+        val templates = loadTemplatesBySize(context, normalizedSize)
+        val boundTemplate = templates.firstOrNull { it.id == templateId }
+        return boundTemplate ?: templates.firstOrNull()
     }
 
     fun loadInstanceBindings(context: Context): List<WidgetInstanceBinding> {
@@ -108,12 +122,12 @@ object WidgetStores {
         return loadInstanceBindings(context).firstOrNull { it.appWidgetId == appWidgetId }
     }
 
-    fun ensureBinding(context: Context, appWidgetId: Int): WidgetInstanceBinding? {
+    fun ensureBinding(context: Context, appWidgetId: Int, widgetSize: String): WidgetInstanceBinding? {
         if (appWidgetId <= 0) {
             return null
         }
 
-        val templates = loadTemplates(context)
+        val templates = loadTemplatesBySize(context, widgetSize)
         if (templates.isEmpty()) {
             return null
         }
@@ -130,17 +144,21 @@ object WidgetStores {
         return loadBinding(context, appWidgetId)
     }
 
-    fun cycleBindingToNextTemplate(context: Context, appWidgetId: Int): WidgetInstanceBinding? {
+    fun cycleBindingToNextTemplate(
+        context: Context,
+        appWidgetId: Int,
+        widgetSize: String
+    ): WidgetInstanceBinding? {
         if (appWidgetId <= 0) {
             return null
         }
 
-        val templates = loadTemplates(context)
+        val templates = loadTemplatesBySize(context, widgetSize)
         if (templates.isEmpty()) {
             return null
         }
 
-        val currentBinding = ensureBinding(context, appWidgetId)
+        val currentBinding = ensureBinding(context, appWidgetId, widgetSize)
         val currentIndex = templates.indexOfFirst { it.id == currentBinding?.templateId }
         val nextTemplate = if (currentIndex < 0) {
             templates.first()
@@ -182,12 +200,16 @@ object WidgetStores {
         saveBindings(context, nextBindings)
     }
 
-    fun maybeAutoBindLegacyWidgets(context: Context, appWidgetIds: IntArray) {
+    fun maybeAutoBindLegacyWidgets(context: Context, appWidgetIds: IntArray, widgetSize: String) {
+        if (WidgetSizes.normalize(widgetSize) != WidgetSizes.DEFAULT) {
+            return
+        }
+
         if (!prefs(context).getBoolean(KEY_LEGACY_AUTO_BIND_PENDING, false)) {
             return
         }
 
-        val templates = loadTemplates(context)
+        val templates = loadTemplatesBySize(context, WidgetSizes.DEFAULT)
         val defaultTemplate = templates.firstOrNull { it.id == LEGACY_TEMPLATE_ID } ?: templates.firstOrNull()
         if (defaultTemplate == null) {
             prefs(context).edit().putBoolean(KEY_LEGACY_AUTO_BIND_PENDING, false).commit()
@@ -204,9 +226,9 @@ object WidgetStores {
         prefs(context).edit().putBoolean(KEY_LEGACY_AUTO_BIND_PENDING, false).commit()
     }
 
-    fun ensureBindings(context: Context, appWidgetIds: IntArray) {
+    fun ensureBindings(context: Context, appWidgetIds: IntArray, widgetSize: String) {
         appWidgetIds.forEach { appWidgetId ->
-            ensureBinding(context, appWidgetId)
+            ensureBinding(context, appWidgetId, widgetSize)
         }
     }
 
@@ -359,26 +381,32 @@ object WidgetStores {
         prefs(context).edit().putString(KEY_PENDING_ACTIONS, array.toString()).commit()
     }
 
-    private fun normalizeSlots(slots: List<WidgetTimerSlotConfig>): List<WidgetTimerSlotConfig> {
+    private fun normalizeSlots(
+        slots: List<WidgetTimerSlotConfig>,
+        widgetSize: String
+    ): List<WidgetTimerSlotConfig> {
+        val slotCount = WidgetSizes.slotCount(widgetSize)
         val slotMap = slots.associateBy { it.slotIndex }
-        return (0 until SLOT_COUNT).map { index ->
+        return (0 until slotCount).map { index ->
             slotMap[index] ?: WidgetTimerSlotConfig(slotIndex = index)
         }
     }
 
     private fun normalizeTemplate(template: WidgetTemplate): WidgetTemplate {
+        val size = WidgetSizes.normalize(template.size)
         return WidgetTemplate(
             id = template.id,
             name = template.name.ifBlank { DEFAULT_TEMPLATE_NAME },
-            slots = normalizeSlots(template.slots),
+            size = size,
+            slots = normalizeSlots(template.slots, size),
             createdAt = template.createdAt,
             updatedAt = template.updatedAt
         )
     }
 
-    private fun parseSlots(array: JSONArray?): List<WidgetTimerSlotConfig> {
+    private fun parseSlots(array: JSONArray?, widgetSize: String): List<WidgetTimerSlotConfig> {
         if (array == null) {
-            return normalizeSlots(emptyList())
+            return normalizeSlots(emptyList(), widgetSize)
         }
 
         val slots = mutableListOf<WidgetTimerSlotConfig>()
@@ -395,12 +423,12 @@ object WidgetStores {
                 color = item.optString("color").ifBlank { null }
             )
         }
-        return normalizeSlots(slots)
+        return normalizeSlots(slots, widgetSize)
     }
 
-    private fun slotsToJson(slots: List<WidgetTimerSlotConfig>): JSONArray {
+    private fun slotsToJson(slots: List<WidgetTimerSlotConfig>, widgetSize: String): JSONArray {
         val array = JSONArray()
-        normalizeSlots(slots).forEach { slot ->
+        normalizeSlots(slots, widgetSize).forEach { slot ->
             array.put(JSONObject().apply {
                 put("slotIndex", slot.slotIndex)
                 put("activityId", slot.activityId ?: JSONObject.NULL)
@@ -428,9 +456,9 @@ object WidgetStores {
         }
 
         val legacySlots = runCatching {
-            parseSlots(JSONArray(legacyRaw))
+            parseSlots(JSONArray(legacyRaw), WidgetSizes.DEFAULT)
         }.getOrElse {
-            normalizeSlots(emptyList())
+            normalizeSlots(emptyList(), WidgetSizes.DEFAULT)
         }
 
         if (!legacySlots.any { it.isConfigured() }) {
@@ -441,6 +469,7 @@ object WidgetStores {
         val migratedTemplate = WidgetTemplate(
             id = LEGACY_TEMPLATE_ID,
             name = DEFAULT_TEMPLATE_NAME,
+            size = WidgetSizes.DEFAULT,
             slots = legacySlots,
             createdAt = now,
             updatedAt = now

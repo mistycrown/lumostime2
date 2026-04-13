@@ -6,10 +6,10 @@ import android.content.Context;
 import android.content.Intent;
 
 /**
- * 2x2 timer widget provider.
+ * 1x4 timer widget provider.
  */
-public class QuickLogWidget extends AppWidgetProvider {
-    public static final String WIDGET_SIZE = WidgetSizes.SIZE_2X2;
+public class QuickLogWidget1x4 extends AppWidgetProvider {
+    public static final String WIDGET_SIZE = WidgetSizes.SIZE_1X4;
 
     private static final int[] SLOT_VIEW_IDS = new int[] {
             R.id.widget_slot_0,
@@ -21,9 +21,9 @@ public class QuickLogWidget extends AppWidgetProvider {
     public static void refreshAllAsync(Context context) {
         WidgetProviderSupport.refreshAll(
                 context,
-                QuickLogWidget.class,
+                QuickLogWidget1x4.class,
                 WIDGET_SIZE,
-                R.layout.widget_layout,
+                R.layout.widget_layout_1x4,
                 SLOT_VIEW_IDS
         );
     }
@@ -32,9 +32,9 @@ public class QuickLogWidget extends AppWidgetProvider {
         WidgetProviderSupport.refreshWidget(
                 context,
                 appWidgetId,
-                QuickLogWidget.class,
+                QuickLogWidget1x4.class,
                 WIDGET_SIZE,
-                R.layout.widget_layout,
+                R.layout.widget_layout_1x4,
                 SLOT_VIEW_IDS
         );
     }
@@ -45,9 +45,9 @@ public class QuickLogWidget extends AppWidgetProvider {
                 context,
                 appWidgetManager,
                 appWidgetIds,
-                QuickLogWidget.class,
+                QuickLogWidget1x4.class,
                 WIDGET_SIZE,
-                R.layout.widget_layout,
+                R.layout.widget_layout_1x4,
                 SLOT_VIEW_IDS
         );
     }
@@ -64,9 +64,9 @@ public class QuickLogWidget extends AppWidgetProvider {
         WidgetProviderSupport.onReceive(
                 context,
                 intent,
-                QuickLogWidget.class,
+                QuickLogWidget1x4.class,
                 WIDGET_SIZE,
-                R.layout.widget_layout,
+                R.layout.widget_layout_1x4,
                 SLOT_VIEW_IDS
         );
     }

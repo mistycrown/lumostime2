@@ -22,6 +22,7 @@ export interface WidgetBridgeSlot {
 export interface WidgetBridgeTemplate {
   id: string;
   name: string;
+  size: '1x2' | '2x1' | '2x2' | '1x4' | '4x1' | '2x4' | '4x2';
   slots: WidgetBridgeSlot[];
   createdAt: number;
   updatedAt: number;
