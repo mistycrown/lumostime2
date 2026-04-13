@@ -29,17 +29,19 @@ class WidgetBridgePlugin : Plugin() {
 
         for (index in 0 until templatesArray.length()) {
             val item = templatesArray.optJSONObject(index) ?: continue
+            val size = WidgetSizes.normalize(item.optString("size"))
             templates += WidgetTemplate(
                 id = item.optString("id").ifBlank { "widget-template-$index" },
                 name = item.optString("name").ifBlank { WidgetStores.DEFAULT_TEMPLATE_NAME },
-                slots = parseSlots(item.optJSONArray("slots")),
+                size = size,
+                slots = parseSlots(item.optJSONArray("slots"), size),
                 createdAt = item.optLong("createdAt", System.currentTimeMillis()),
                 updatedAt = item.optLong("updatedAt", System.currentTimeMillis())
             )
         }
 
         WidgetStores.saveTemplates(context, templates)
-        QuickLogWidget.refreshAllAsync(context)
+        WidgetRefreshCoordinator.refreshAllAsync(context)
         call.resolve()
     }
 
@@ -63,7 +65,7 @@ class WidgetBridgePlugin : Plugin() {
         }
 
         WidgetStores.saveBinding(context, appWidgetId, templateId)
-        QuickLogWidget.refreshWidget(context, appWidgetId)
+        WidgetRefreshCoordinator.refreshWidget(context, appWidgetId)
         call.resolve()
     }
 
@@ -129,7 +131,7 @@ class WidgetBridgePlugin : Plugin() {
         }
 
         WidgetStores.saveRuntimeState(context, runtimeState)
-        QuickLogWidget.refreshAllAsync(context)
+        WidgetRefreshCoordinator.refreshAllAsync(context)
         call.resolve()
     }
 
@@ -137,16 +139,16 @@ class WidgetBridgePlugin : Plugin() {
     fun refreshWidget(call: PluginCall) {
         val appWidgetId = call.getInt("appWidgetId") ?: -1
         if (appWidgetId > 0) {
-            QuickLogWidget.refreshWidget(context, appWidgetId)
+            WidgetRefreshCoordinator.refreshWidget(context, appWidgetId)
         } else {
-            QuickLogWidget.refreshAllAsync(context)
+            WidgetRefreshCoordinator.refreshAllAsync(context)
         }
         call.resolve()
     }
 
-    private fun parseSlots(slotsArray: JSONArray?): List<WidgetTimerSlotConfig> {
+    private fun parseSlots(slotsArray: JSONArray?, widgetSize: String): List<WidgetTimerSlotConfig> {
         if (slotsArray == null) {
-            return (0 until WidgetStores.SLOT_COUNT).map { WidgetTimerSlotConfig(slotIndex = it) }
+            return (0 until WidgetSizes.slotCount(widgetSize)).map { WidgetTimerSlotConfig(slotIndex = it) }
         }
 
         val slots = mutableListOf<WidgetTimerSlotConfig>()
@@ -170,6 +172,7 @@ class WidgetBridgePlugin : Plugin() {
         return JSObject().apply {
             put("id", template.id)
             put("name", template.name)
+            put("size", template.size)
             put("createdAt", template.createdAt)
             put("updatedAt", template.updatedAt)
             put("slots", JSArray().apply {

@@ -7,9 +7,10 @@ import java.util.UUID
  * Native start/stop/switch controller for the Android timer widget.
  */
 object WidgetTimerController {
-    fun handleSlotTap(context: Context, appWidgetId: Int, slotIndex: Int) {
-        val binding = WidgetStores.ensureBinding(context, appWidgetId) ?: return
-        val template = WidgetStores.loadTemplate(context, binding.templateId) ?: return
+    fun handleSlotTap(context: Context, appWidgetId: Int, widgetSize: String, slotIndex: Int) {
+        val normalizedSize = WidgetSizes.normalize(widgetSize)
+        val binding = WidgetStores.ensureBinding(context, appWidgetId, normalizedSize) ?: return
+        val template = WidgetStores.loadTemplateForSize(context, binding.templateId, normalizedSize) ?: return
         val slot = template.slots.firstOrNull { it.slotIndex == slotIndex } ?: return
 
         if (!slot.isConfigured()) {

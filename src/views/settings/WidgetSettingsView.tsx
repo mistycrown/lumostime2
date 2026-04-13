@@ -1,10 +1,10 @@
 /**
  * @file WidgetSettingsView.tsx
  * @input Widget templates, categories, Android bridge availability
- * @output A template-based widget configuration page with editor modal
+ * @output A template-based widget configuration page with multi-size editing
  * @pos View
- * @description Lets the user create, name, edit, and manage multiple Android timer widget templates, while desktop widget instances only bind to templates.
- * @updated 2026-04-13: Simplified template list interactions and moved name editing into the detail page.
+ * @description Lets the user create, name, resize, edit, and manage multiple Android timer widget templates, while desktop widget instances only bind to templates.
+ * @updated 2026-04-13: Added list summaries, moved create button below the title bar, and expanded size support to 4x2.
  */
 import React, { useEffect, useMemo, useState } from 'react';
 import { ChevronLeft, Plus, Save, Trash2 } from 'lucide-react';
@@ -13,20 +13,26 @@ import { ConfirmModal } from '../../components/ConfirmModal';
 import { ToastType } from '../../components/Toast';
 import WidgetBridge from '../../plugins/WidgetBridgePlugin';
 import {
+  DEFAULT_WIDGET_SIZE,
   WidgetTemplate,
-  WidgetTemplateSlotConfig,
   buildWidgetTimerSlotConfig,
   countTemplateBoundInstances,
   createEmptyWidgetTemplateSlot,
   createWidgetTemplate,
+  getWidgetGridBySize,
+  getWidgetSizeLabel,
+  getWidgetSlotCountBySize,
   isNativeAndroidWidgetSupported,
   loadWidgetTemplatesFromStorage,
+  normalizeWidgetSize,
   normalizeWidgetTemplateSlots,
   normalizeWidgetTemplates,
   rebuildWidgetTemplate,
   rebuildWidgetTimerSlotConfig,
   saveWidgetTemplatesToStorage,
-  updateWidgetTemplateSlots
+  updateWidgetTemplateSize,
+  updateWidgetTemplateSlots,
+  WIDGET_SIZE_OPTIONS
 } from '../../services/widgetTimerService';
 import { getSoftColorCircleStyle } from '../../utils/colorAdapterUtils';
 import { Category } from '../../types';
@@ -36,6 +42,20 @@ interface WidgetSettingsViewProps {
   onToast: (type: ToastType, message: string) => void;
   categories: Category[];
 }
+
+const getTemplateSlotSummary = (template: WidgetTemplate): string => {
+  const configuredLabels = template.slots
+    .map((slot) => slot.label?.trim())
+    .filter((label): label is string => Boolean(label));
+
+  if (configuredLabels.length === 0) {
+    return '未配置任何活动';
+  }
+
+  const previewLabels = configuredLabels.slice(0, 4).join('、');
+  const restCount = configuredLabels.length - 4;
+  return restCount > 0 ? `${previewLabels} 等 ${configuredLabels.length} 个活动` : previewLabels;
+};
 
 export const WidgetSettingsView: React.FC<WidgetSettingsViewProps> = ({
   onBack,
@@ -61,6 +81,15 @@ export const WidgetSettingsView: React.FC<WidgetSettingsViewProps> = ({
     });
     return options;
   }, [categories]);
+
+  const sizeOptions = useMemo(
+    () =>
+      WIDGET_SIZE_OPTIONS.map((size) => ({
+        value: size,
+        label: `${getWidgetSizeLabel(size)} · ${getWidgetSlotCountBySize(size)} 个槽位`
+      })),
+    []
+  );
 
   const loadTemplates = async () => {
     const localTemplates = normalizeWidgetTemplates(loadWidgetTemplatesFromStorage());
@@ -123,6 +152,7 @@ export const WidgetSettingsView: React.FC<WidgetSettingsViewProps> = ({
         }, {});
         setBindingCounts(counts);
       }
+
       onToast('success', successMessage);
       return true;
     } catch (error) {
@@ -135,7 +165,7 @@ export const WidgetSettingsView: React.FC<WidgetSettingsViewProps> = ({
   };
 
   const handleCreateTemplate = async () => {
-    const nextTemplate = createWidgetTemplate(`小组件 ${templates.length + 1}`);
+    const nextTemplate = createWidgetTemplate(`小组件 ${templates.length + 1}`, DEFAULT_WIDGET_SIZE);
     const didSave = await persistTemplates([...templates, nextTemplate], '已创建小组件模板');
     if (didSave) {
       setEditingTemplateDraft(nextTemplate);
@@ -160,13 +190,23 @@ export const WidgetSettingsView: React.FC<WidgetSettingsViewProps> = ({
     });
   };
 
+  const updateDraftSize = (sizeValue: string) => {
+    const nextSize = normalizeWidgetSize(sizeValue);
+    setEditingTemplateDraft((previousDraft) => {
+      if (!previousDraft) {
+        return previousDraft;
+      }
+      return updateWidgetTemplateSize(previousDraft, nextSize);
+    });
+  };
+
   const updateDraftSlot = (slotIndex: number, value: string) => {
     setEditingTemplateDraft((previousDraft) => {
       if (!previousDraft) {
         return previousDraft;
       }
 
-      const nextSlots = [...previousDraft.slots];
+      const nextSlots = normalizeWidgetTemplateSlots(previousDraft.slots, previousDraft.size);
       if (!value) {
         nextSlots[slotIndex] = createEmptyWidgetTemplateSlot(slotIndex);
       } else {
@@ -179,7 +219,7 @@ export const WidgetSettingsView: React.FC<WidgetSettingsViewProps> = ({
         nextSlots[slotIndex] = buildWidgetTimerSlotConfig(category, activity, slotIndex);
       }
 
-      return updateWidgetTemplateSlots(previousDraft, normalizeWidgetTemplateSlots(nextSlots));
+      return updateWidgetTemplateSlots(previousDraft, nextSlots);
     });
   };
 
@@ -225,14 +265,25 @@ export const WidgetSettingsView: React.FC<WidgetSettingsViewProps> = ({
       return [];
     }
 
-    return normalizeWidgetTemplateSlots(editingTemplateDraft.slots).map((slot) =>
+    return normalizeWidgetTemplateSlots(editingTemplateDraft.slots, editingTemplateDraft.size).map((slot) =>
       rebuildWidgetTimerSlotConfig(slot, categories)
     );
   }, [categories, editingTemplateDraft]);
 
+  const previewGrid = useMemo(() => {
+    if (!editingTemplateDraft) {
+      return getWidgetGridBySize(DEFAULT_WIDGET_SIZE);
+    }
+    return getWidgetGridBySize(editingTemplateDraft.size);
+  }, [editingTemplateDraft]);
+
+  const draftSlotCount = editingTemplateDraft
+    ? getWidgetSlotCountBySize(editingTemplateDraft.size)
+    : 0;
+
   return (
-    <div className="fixed inset-0 z-50 bg-[#fdfbf7] flex flex-col font-serif animate-in slide-in-from-right duration-300 pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">
-      <div className="flex items-center justify-between px-4 h-14 border-b border-stone-100 bg-[#fdfbf7]/80 backdrop-blur-md sticky top-0 z-10">
+    <div className="fixed inset-0 z-50 flex flex-col bg-[#fdfbf7] pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] font-serif animate-in slide-in-from-right duration-300">
+      <div className="sticky top-0 z-10 flex h-14 items-center justify-between border-b border-stone-100 bg-[#fdfbf7]/80 px-4 backdrop-blur-md">
         <div className="flex items-center gap-3">
           <button
             onClick={() => {
@@ -242,35 +293,24 @@ export const WidgetSettingsView: React.FC<WidgetSettingsViewProps> = ({
               }
               onBack();
             }}
-            className="text-stone-400 hover:text-stone-600 p-1"
+            className="p-1 text-stone-400 hover:text-stone-600"
           >
             <ChevronLeft size={24} />
           </button>
-          <span className="text-stone-800 font-bold text-lg">
+          <span className="text-lg font-bold text-stone-800">
             {editingTemplateDraft ? '小组件详情' : '小组件计时器'}
           </span>
         </div>
-        {!editingTemplateDraft && (
-          <button
-            type="button"
-            onClick={() => void handleCreateTemplate()}
-            className="flex items-center gap-1 text-sm font-medium text-stone-600 bg-white border border-stone-200 shadow-sm px-3 py-1.5 rounded-lg hover:bg-stone-50 transition-colors"
-            disabled={isSaving}
-          >
-            <Plus size={16} />
-            <span>新建</span>
-          </button>
-        )}
       </div>
 
-      <div className="flex-1 overflow-y-auto px-5 py-6 pb-40 space-y-6">
+      <div className="flex-1 space-y-6 overflow-y-auto px-5 py-6 pb-40">
         {editingTemplateDraft ? (
           <>
-            <div className="bg-white rounded-[28px] p-6 shadow-sm border border-stone-100 space-y-4">
+            <div className="space-y-4 rounded-[28px] border border-stone-100 bg-white p-6 shadow-sm">
               <div>
                 <h3 className="font-bold text-stone-800">名称</h3>
-                <p className="text-xs text-stone-400 mt-1">
-                  这里设置的小组件名称，会实时显示在桌面标题区。
+                <p className="mt-1 text-xs text-stone-400">
+                  这里设置的小组件名称，会实时显示在桌面标题区域。
                 </p>
               </div>
 
@@ -282,36 +322,69 @@ export const WidgetSettingsView: React.FC<WidgetSettingsViewProps> = ({
               />
             </div>
 
-            <div className="bg-white rounded-[28px] p-6 shadow-sm border border-stone-100">
-              <div className="mb-4">
-                <div>
-                  <h3 className="font-bold text-stone-800">模板预览</h3>
-                  <p className="text-xs text-stone-400 mt-1">
-                    桌面绑定这个模板的小组件都会显示成下面这组活动。
-                  </p>
-                </div>
+            <div className="space-y-4 rounded-[28px] border border-stone-100 bg-white p-6 shadow-sm">
+              <div>
+                <h3 className="font-bold text-stone-800">小组件尺寸</h3>
+                <p className="mt-1 text-xs text-stone-400">
+                  切换尺寸时会自动保留前面的活动，超出的槽位会裁掉，不足的槽位会补空。
+                </p>
               </div>
 
-              <div className="rounded-[28px] bg-white border border-stone-100 shadow-[0_12px_30px_rgba(15,23,42,0.06)] p-5">
-                <div className="grid grid-cols-2 gap-3">
-                  {draftPreviewSlots.map((slot) => (
-                    <div
-                      key={slot.slotIndex}
-                      className="aspect-square rounded-full flex items-center justify-center border border-stone-100 text-[30px] leading-none"
-                      style={getSoftColorCircleStyle(slot.color || '#EEF2F7', 0.15)}
-                    >
-                      <span>{slot.icon || '\u2022'}</span>
-                    </div>
-                  ))}
+              <CustomSelect
+                value={editingTemplateDraft.size}
+                options={sizeOptions}
+                onChange={updateDraftSize}
+                placeholder="选择一个尺寸"
+              />
+
+              <div className="rounded-2xl bg-stone-50 px-4 py-3 text-xs text-stone-500">
+                当前尺寸：{getWidgetSizeLabel(editingTemplateDraft.size)}，共 {draftSlotCount} 个活动槽位。
+              </div>
+            </div>
+
+            <div className="space-y-4 rounded-[28px] border border-stone-100 bg-white p-6 shadow-sm">
+              <div>
+                <h3 className="font-bold text-stone-800">模板预览</h3>
+                <p className="mt-1 text-xs text-stone-400">
+                  桌面上同尺寸并绑定这个模板的小组件，会显示成下面的布局。
+                </p>
+              </div>
+
+              <div className="mx-auto w-full max-w-[320px]">
+                <div
+                  className="rounded-[28px] border border-stone-100 bg-white p-4 shadow-[0_12px_30px_rgba(15,23,42,0.06)]"
+                  style={{ aspectRatio: `${previewGrid.columns} / ${previewGrid.rows + 0.45}` }}
+                >
+                  <div className="mb-3 truncate text-center text-[11px] text-stone-400">
+                    {editingTemplateDraft.name.trim() || '标题占位'}
+                  </div>
+                  <div
+                    className="grid h-[calc(100%-24px)] gap-2.5"
+                    style={{
+                      gridTemplateColumns: `repeat(${previewGrid.columns}, minmax(0, 1fr))`,
+                      gridTemplateRows: `repeat(${previewGrid.rows}, minmax(0, 1fr))`
+                    }}
+                  >
+                    {draftPreviewSlots.map((slot) => (
+                      <div key={slot.slotIndex} className="flex items-center justify-center">
+                        <div
+                          className="flex aspect-square h-full w-full max-h-[72px] max-w-[72px] items-center justify-center rounded-full border border-stone-100 text-[28px] leading-none"
+                          style={getSoftColorCircleStyle(slot.color || '#EEF2F7', 0.15)}
+                        >
+                          <span>{slot.icon || '\u2022'}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               </div>
             </div>
 
-            <div className="bg-white rounded-2xl p-5 shadow-sm border border-stone-100 space-y-4">
+            <div className="space-y-4 rounded-2xl border border-stone-100 bg-white p-5 shadow-sm">
               <div>
                 <h3 className="font-bold text-stone-800">活动槽位</h3>
-                <p className="text-xs text-stone-400 mt-1">
-                  编辑模板里的 4 个活动后，所有绑定它的桌面实例都会一起更新。
+                <p className="mt-1 text-xs text-stone-400">
+                  编辑模板里的活动后，所有绑定这个模板且尺寸一致的桌面实例都会一起更新。
                 </p>
               </div>
 
@@ -326,16 +399,17 @@ export const WidgetSettingsView: React.FC<WidgetSettingsViewProps> = ({
                     options={activityOptions}
                     onChange={(value) => updateDraftSlot(slot.slotIndex, value)}
                     placeholder="选择一个活动"
+                    dropdownPosition="top"
                   />
                 </div>
               ))}
             </div>
 
-            <div className="bg-white rounded-2xl p-5 shadow-sm border border-stone-100 space-y-4">
+            <div className="space-y-4 rounded-2xl border border-stone-100 bg-white p-5 shadow-sm">
               <div>
                 <h3 className="font-bold text-stone-800">保存说明</h3>
-                <p className="text-xs text-stone-400 mt-1 leading-6">
-                  保存后，绑定这个模板的桌面小组件会一起刷新。桌面实例本身不会再保存单独配置。
+                <p className="mt-1 text-xs leading-6 text-stone-400">
+                  保存后，绑定这个模板的桌面小组件会一起刷新。桌面实例本身不会单独保存活动配置。
                 </p>
               </div>
 
@@ -343,7 +417,7 @@ export const WidgetSettingsView: React.FC<WidgetSettingsViewProps> = ({
                 type="button"
                 onClick={() => void handleSaveDraft()}
                 disabled={isSaving}
-                className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-stone-800 text-white font-bold shadow-lg shadow-stone-200 active:scale-[0.98] transition-all disabled:opacity-60"
+                className="flex w-full items-center justify-center gap-2 rounded-xl bg-stone-800 py-3 font-bold text-white shadow-lg shadow-stone-200 transition-all active:scale-[0.98] disabled:opacity-60"
               >
                 <Save size={16} />
                 {isSaving ? '保存中...' : '保存模板并刷新'}
@@ -355,41 +429,67 @@ export const WidgetSettingsView: React.FC<WidgetSettingsViewProps> = ({
             正在加载小组件模板...
           </div>
         ) : templates.length === 0 ? (
-          <div className="rounded-2xl border border-dashed border-stone-200 bg-stone-50 px-4 py-10 text-center space-y-3">
-            <p className="text-sm font-bold text-stone-700">还没有小组件模板</p>
-            <p className="text-xs text-stone-400 leading-6">
-              点击右上角“新建”创建第一个小组件模板。
-            </p>
-          </div>
+          <>
+            <button
+              type="button"
+              onClick={() => void handleCreateTemplate()}
+              className="flex w-full items-center justify-center gap-2 rounded-2xl border border-stone-200 bg-white px-4 py-3 text-sm font-medium text-stone-700 shadow-sm transition-colors hover:bg-stone-50"
+              disabled={isSaving}
+            >
+              <Plus size={16} />
+              <span>新建小组件模板</span>
+            </button>
+
+            <div className="space-y-3 rounded-2xl border border-dashed border-stone-200 bg-stone-50 px-4 py-10 text-center">
+              <p className="text-sm font-bold text-stone-700">还没有小组件模板</p>
+              <p className="text-xs leading-6 text-stone-400">
+                点击上面的“新建小组件模板”创建第一个模板。
+              </p>
+            </div>
+          </>
         ) : (
-          <div className="space-y-3">
-            {templates.map((template) => {
-              return (
+          <>
+            <button
+              type="button"
+              onClick={() => void handleCreateTemplate()}
+              className="flex w-full items-center justify-center gap-2 rounded-2xl border border-stone-200 bg-white px-4 py-3 text-sm font-medium text-stone-700 shadow-sm transition-colors hover:bg-stone-50"
+              disabled={isSaving}
+            >
+              <Plus size={16} />
+              <span>新建小组件模板</span>
+            </button>
+
+            <div className="space-y-3">
+              {templates.map((template) => (
                 <div
                   key={template.id}
-                  className="flex items-center justify-between p-4 bg-white border border-stone-100 shadow-[0_2px_8px_rgba(0,0,0,0.02)] rounded-2xl hover:bg-stone-50 transition-colors group"
+                  className="group flex items-start justify-between rounded-2xl border border-stone-100 bg-white p-4 shadow-[0_2px_8px_rgba(0,0,0,0.02)] transition-colors hover:bg-stone-50"
                 >
                   <button
                     type="button"
                     onClick={() => openEditor(template)}
-                    className="flex items-center gap-4 flex-1 text-left min-w-0"
+                    className="min-w-0 flex-1 text-left"
                   >
-                    <div className="flex-1 min-w-0">
-                      <h4 className="font-bold text-stone-800 text-[15px] truncate">{template.name}</h4>
-                    </div>
+                    <h4 className="truncate text-[15px] font-bold text-stone-800">{template.name}</h4>
+                    <p className="mt-1 text-xs text-stone-500">
+                      尺寸：{getWidgetSizeLabel(template.size)} · {getWidgetSlotCountBySize(template.size)} 个槽位
+                    </p>
+                    <p className="mt-1 line-clamp-2 text-xs leading-5 text-stone-400">
+                      标签：{getTemplateSlotSummary(template)}
+                    </p>
                   </button>
 
                   <button
                     type="button"
                     onClick={() => setDeleteTarget(template)}
-                    className="p-2 text-stone-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                    className="rounded-lg p-2 text-stone-400 transition-colors hover:bg-red-50 hover:text-red-500"
                   >
                     <Trash2 size={18} />
                   </button>
                 </div>
-              );
-            })}
-          </div>
+              ))}
+            </div>
+          </>
         )}
       </div>
 

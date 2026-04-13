@@ -7,7 +7,7 @@
     android:minHeight="110dp"
     android:resizeMode="none"
     android:updatePeriodMillis="86400000"
-    android:description="@string/app_name"
+    android:description="@string/widget_label_2x2"
     android:widgetCategory="home_screen"
     android:targetCellWidth="2"
     android:targetCellHeight="2" />
