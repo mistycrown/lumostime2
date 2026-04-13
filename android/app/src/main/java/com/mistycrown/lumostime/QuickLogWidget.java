@@ -71,14 +71,7 @@ public class QuickLogWidget extends AppWidgetProvider {
         for (int index = 0; index < SLOT_VIEW_IDS.length; index++) {
             int viewId = SLOT_VIEW_IDS[index];
             WidgetSnapshotSlot slot = snapshot.getSlots().get(index);
-            views.setTextViewText(viewId, slot.isActive() ? "\u25A0" : slot.getIcon());
-            views.setTextColor(viewId, slot.isActive() ? 0xFFFFFFFF : 0xFF1F2937);
-            views.setInt(
-                    viewId,
-                    "setBackgroundResource",
-                    slot.isActive() ? R.drawable.widget_placeholder_circle_active : R.drawable.widget_placeholder_circle
-            );
-
+            views.setImageViewBitmap(viewId, WidgetSlotBitmapRenderer.INSTANCE.render(context, slot));
             views.setOnClickPendingIntent(viewId, buildSlotPendingIntent(context, appWidgetId, slot.getSlotIndex()));
         }
     }

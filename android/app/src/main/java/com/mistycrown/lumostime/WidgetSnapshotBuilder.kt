@@ -21,6 +21,8 @@ object WidgetSnapshotBuilder {
                 activityId = slot.activityId,
                 categoryId = slot.categoryId,
                 icon = slot.icon?.ifBlank { null } ?: "\u2022",
+                uiIconAssetPath = slot.uiIconAssetPath,
+                uiIconFallbackAssetPath = slot.uiIconFallbackAssetPath,
                 label = slot.label?.ifBlank { null } ?: "Slot ${slot.slotIndex + 1}",
                 color = slot.color?.ifBlank { null } ?: "#E7E5E4",
                 isActive = matchesRuntime

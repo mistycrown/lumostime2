@@ -598,6 +598,17 @@ class UIIconService {
 // 导出单例
 export const uiIconService = new UIIconService();
 
+export const getUIIconAssetPathWithFallback = (
+    iconType: UIIconType,
+    theme: UIIconTheme
+): { primary: string; fallback: string } => {
+    const iconNumber = ICON_NUMBER_MAP[iconType];
+    return {
+        primary: `uiicon/${theme}/${iconNumber}.webp`,
+        fallback: `uiicon/${theme}/${iconNumber}.png`
+    };
+};
+
 /**
  * React Hook - 获取 UI 图标路径
  */

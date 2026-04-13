@@ -59,6 +59,8 @@ export const WidgetSettingsView: React.FC<WidgetSettingsViewProps> = ({
           activityId: null,
           categoryId: null,
           icon: null,
+          uiIconAssetPath: null,
+          uiIconFallbackAssetPath: null,
           label: null,
           color: null
         };
