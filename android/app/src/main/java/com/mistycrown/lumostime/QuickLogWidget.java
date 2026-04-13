@@ -68,6 +68,7 @@ public class QuickLogWidget extends AppWidgetProvider {
     }
 
     private static void bindSlots(Context context, RemoteViews views, WidgetSnapshot snapshot, int appWidgetId) {
+        views.setTextViewText(R.id.widget_title, "标题占位");
         for (int index = 0; index < SLOT_VIEW_IDS.length; index++) {
             int viewId = SLOT_VIEW_IDS[index];
             WidgetSnapshotSlot slot = snapshot.getSlots().get(index);

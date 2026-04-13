@@ -15,9 +15,11 @@ import WidgetBridge from '../../plugins/WidgetBridgePlugin';
 import {
   WidgetTimerSlotConfig,
   buildWidgetTimerSlotConfig,
+  createEmptyWidgetTimerSlot,
   isNativeAndroidWidgetSupported,
   loadWidgetTimerSlotsFromStorage,
   normalizeWidgetTimerSlots,
+  rebuildWidgetTimerSlotConfig,
   saveWidgetTimerSlotsToStorage
 } from '../../services/widgetTimerService';
 import { getSoftColorCircleStyle } from '../../utils/colorAdapterUtils';
@@ -50,20 +52,15 @@ export const WidgetSettingsView: React.FC<WidgetSettingsViewProps> = ({
     return options;
   }, [categories]);
 
+  const previewSlots = useMemo(() => {
+    return normalizeWidgetTimerSlots(slots).map((slot) => rebuildWidgetTimerSlotConfig(slot, categories));
+  }, [categories, slots]);
+
   const updateSlot = (slotIndex: number, value: string) => {
     setSlots((prevSlots) => {
       const nextSlots = [...prevSlots];
       if (!value) {
-        nextSlots[slotIndex] = {
-          slotIndex,
-          activityId: null,
-          categoryId: null,
-          icon: null,
-          uiIconAssetPath: null,
-          uiIconFallbackAssetPath: null,
-          label: null,
-          color: null
-        };
+        nextSlots[slotIndex] = createEmptyWidgetTimerSlot(slotIndex);
         return normalizeWidgetTimerSlots(nextSlots);
       }
 
@@ -80,8 +77,11 @@ export const WidgetSettingsView: React.FC<WidgetSettingsViewProps> = ({
   };
 
   const handleSave = async () => {
-    const normalizedSlots = normalizeWidgetTimerSlots(slots);
+    const normalizedSlots = normalizeWidgetTimerSlots(
+      slots.map((slot) => rebuildWidgetTimerSlotConfig(slot, categories))
+    );
     setIsSaving(true);
+    setSlots(normalizedSlots);
     saveWidgetTimerSlotsToStorage(normalizedSlots);
 
     try {
@@ -129,11 +129,11 @@ export const WidgetSettingsView: React.FC<WidgetSettingsViewProps> = ({
           </div>
 
           <div className="rounded-[28px] bg-white border border-stone-100 shadow-[0_12px_30px_rgba(15,23,42,0.06)] p-5">
-            <div className="grid grid-cols-2 gap-4">
-              {slots.map((slot) => (
+            <div className="grid grid-cols-2 gap-3">
+              {previewSlots.map((slot) => (
                 <div
                   key={slot.slotIndex}
-                  className="aspect-square rounded-full flex items-center justify-center text-2xl border border-stone-100"
+                  className="aspect-square rounded-full flex items-center justify-center border border-stone-100 text-[30px] leading-none"
                   style={getSoftColorCircleStyle(slot.color || '#EEF2F7', 0.15)}
                 >
                   <span>{slot.icon || '\u2022'}</span>
