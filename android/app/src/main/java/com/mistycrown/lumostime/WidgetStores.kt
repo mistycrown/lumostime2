@@ -20,6 +20,11 @@ object WidgetStores {
     const val LEGACY_TEMPLATE_ID = "widget-template-legacy-default"
     const val DEFAULT_TEMPLATE_NAME = "我的小组件"
 
+    private fun parseNullableString(value: String?): String? {
+        val trimmed = value?.trim() ?: return null
+        return if (trimmed.isEmpty() || trimmed.equals("null", ignoreCase = true)) null else trimmed
+    }
+
     private fun prefs(context: Context) =
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
 
@@ -80,16 +85,18 @@ object WidgetStores {
     }
 
     fun loadTemplate(context: Context, templateId: String?): WidgetTemplate? {
-        if (templateId.isNullOrBlank()) {
+        val normalizedTemplateId = parseNullableString(templateId)
+        if (normalizedTemplateId == null) {
             return null
         }
-        return loadTemplates(context).firstOrNull { it.id == templateId }
+        return loadTemplates(context).firstOrNull { it.id == normalizedTemplateId }
     }
 
     fun loadTemplateForSize(context: Context, templateId: String?, widgetSize: String): WidgetTemplate? {
         val normalizedSize = WidgetSizes.normalize(widgetSize)
         val templates = loadTemplatesBySize(context, normalizedSize)
-        val boundTemplate = templates.firstOrNull { it.id == templateId }
+        val normalizedTemplateId = parseNullableString(templateId)
+        val boundTemplate = templates.firstOrNull { it.id == normalizedTemplateId }
         return boundTemplate ?: templates.firstOrNull()
     }
 
@@ -107,7 +114,7 @@ object WidgetStores {
                     add(
                         WidgetInstanceBinding(
                             appWidgetId = item.optInt("appWidgetId", -1),
-                            templateId = item.optString("templateId").ifBlank { null },
+                            templateId = parseNullableString(item.optString("templateId")),
                             createdAt = item.optLong("createdAt", System.currentTimeMillis()),
                             updatedAt = item.optLong("updatedAt", System.currentTimeMillis())
                         )
@@ -186,7 +193,7 @@ object WidgetStores {
         val existing = loadBinding(context, appWidgetId)
         val nextBinding = WidgetInstanceBinding(
             appWidgetId = appWidgetId,
-            templateId = templateId,
+            templateId = parseNullableString(templateId),
             createdAt = existing?.createdAt ?: now,
             updatedAt = now
         )
@@ -256,8 +263,10 @@ object WidgetStores {
                 color = json.optString("color", "#E7E5E4"),
                 startedAt = json.getLong("startedAt"),
                 source = json.optString("source", "widget"),
+                linkedTodoId = parseNullableString(json.optString("linkedTodoId")),
+                scopeIds = json.optJSONArray("scopeIds").toStringList(),
                 slotIndex = if (json.has("slotIndex")) json.optInt("slotIndex") else null,
-                templateId = json.optString("templateId").ifBlank { null },
+                templateId = parseNullableString(json.optString("templateId")),
                 appWidgetId = if (json.has("appWidgetId")) json.optInt("appWidgetId") else null
             )
         }.getOrNull()
@@ -279,6 +288,12 @@ object WidgetStores {
             put("color", runtimeState.color)
             put("startedAt", runtimeState.startedAt)
             put("source", runtimeState.source)
+            if (!runtimeState.linkedTodoId.isNullOrBlank()) {
+                put("linkedTodoId", runtimeState.linkedTodoId)
+            }
+            if (runtimeState.scopeIds.isNotEmpty()) {
+                put("scopeIds", runtimeState.scopeIds.toJsonArray())
+            }
             if (runtimeState.slotIndex != null) {
                 put("slotIndex", runtimeState.slotIndex)
             }
@@ -327,7 +342,9 @@ object WidgetStores {
                             color = item.optString("color", "#E7E5E4"),
                             startedAt = item.getLong("startedAt"),
                             endedAt = item.getLong("endedAt"),
-                            createdAt = item.getLong("createdAt")
+                            createdAt = item.getLong("createdAt"),
+                            linkedTodoId = parseNullableString(item.optString("linkedTodoId")),
+                            scopeIds = item.optJSONArray("scopeIds").toStringList()
                         )
                     )
                 }
@@ -382,6 +399,12 @@ object WidgetStores {
                 put("startedAt", action.startedAt)
                 put("endedAt", action.endedAt)
                 put("createdAt", action.createdAt)
+                if (!action.linkedTodoId.isNullOrBlank()) {
+                    put("linkedTodoId", action.linkedTodoId)
+                }
+                if (action.scopeIds.isNotEmpty()) {
+                    put("scopeIds", action.scopeIds.toJsonArray())
+                }
             })
         }
 
@@ -435,13 +458,16 @@ object WidgetStores {
             val item = array.optJSONObject(index) ?: continue
             slots += WidgetTimerSlotConfig(
                 slotIndex = item.optInt("slotIndex", index),
-                activityId = item.optString("activityId").ifBlank { null },
-                categoryId = item.optString("categoryId").ifBlank { null },
-                icon = item.optString("icon").ifBlank { null },
-                uiIconAssetPath = item.optString("uiIconAssetPath").ifBlank { null },
-                uiIconFallbackAssetPath = item.optString("uiIconFallbackAssetPath").ifBlank { null },
-                label = item.optString("label").ifBlank { null },
-                color = item.optString("color").ifBlank { null }
+                activityId = parseNullableString(item.optString("activityId")),
+                categoryId = parseNullableString(item.optString("categoryId")),
+                icon = parseNullableString(item.optString("icon")),
+                customIcon = parseNullableString(item.optString("customIcon")),
+                uiIconAssetPath = parseNullableString(item.optString("uiIconAssetPath")),
+                uiIconFallbackAssetPath = parseNullableString(item.optString("uiIconFallbackAssetPath")),
+                label = parseNullableString(item.optString("label")),
+                color = parseNullableString(item.optString("color")),
+                linkedTodoId = parseNullableString(item.optString("linkedTodoId")),
+                scopeIds = item.optJSONArray("scopeIds").toStringList()
             )
         }
         return normalizeSlots(slots, widgetSize)
@@ -455,11 +481,37 @@ object WidgetStores {
                 put("activityId", slot.activityId ?: JSONObject.NULL)
                 put("categoryId", slot.categoryId ?: JSONObject.NULL)
                 put("icon", slot.icon ?: JSONObject.NULL)
+                put("customIcon", slot.customIcon ?: JSONObject.NULL)
                 put("uiIconAssetPath", slot.uiIconAssetPath ?: JSONObject.NULL)
                 put("uiIconFallbackAssetPath", slot.uiIconFallbackAssetPath ?: JSONObject.NULL)
                 put("label", slot.label ?: JSONObject.NULL)
                 put("color", slot.color ?: JSONObject.NULL)
+                put("linkedTodoId", slot.linkedTodoId ?: JSONObject.NULL)
+                put("scopeIds", slot.scopeIds.toJsonArray())
             })
+        }
+        return array
+    }
+
+    private fun JSONArray?.toStringList(): List<String> {
+        if (this == null) {
+            return emptyList()
+        }
+
+        return buildList {
+            for (index in 0 until length()) {
+                val value = parseNullableString(optString(index)) ?: continue
+                add(value)
+            }
+        }
+    }
+
+    private fun List<String>.toJsonArray(): JSONArray {
+        val array = JSONArray()
+        forEach { value ->
+            if (value.isNotBlank()) {
+                array.put(value)
+            }
         }
         return array
     }

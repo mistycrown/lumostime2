@@ -24,7 +24,9 @@ object WidgetTimerController {
                 runtime.slotIndex == slotIndex
             } else {
                 runtime.activityId == slot.activityId &&
-                    runtime.categoryId == slot.categoryId
+                    runtime.categoryId == slot.categoryId &&
+                    runtime.linkedTodoId == slot.linkedTodoId &&
+                    runtime.scopeIds.toSet() == slot.scopeIds.toSet()
             }
         } ?: false
 
@@ -49,6 +51,8 @@ object WidgetTimerController {
             color = slot.color?.ifBlank { null } ?: "#E7E5E4",
             startedAt = now,
             source = "widget",
+            linkedTodoId = slot.linkedTodoId,
+            scopeIds = slot.scopeIds,
             slotIndex = slotIndex,
             templateId = template.id,
             appWidgetId = appWidgetId
@@ -78,7 +82,9 @@ object WidgetTimerController {
                 color = runtimeState.color,
                 startedAt = runtimeState.startedAt,
                 endedAt = endedAt,
-                createdAt = endedAt
+                createdAt = endedAt,
+                linkedTodoId = runtimeState.linkedTodoId,
+                scopeIds = runtimeState.scopeIds
             )
         )
     }

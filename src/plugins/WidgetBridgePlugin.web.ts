@@ -4,7 +4,7 @@
  * @output No-op widget bridge implementation for browser environments
  * @pos Plugin
  * @description Prevents widget bridge calls from failing when the app runs outside native Android.
- * @updated 2026-04-13: Removed the unused manual binding bridge stub while keeping browser-safe widget APIs.
+ * @updated 2026-04-13: Kept the browser-safe bridge aligned with richer widget association payloads.
  */
 import { WebPlugin } from '@capacitor/core';
 import type {
