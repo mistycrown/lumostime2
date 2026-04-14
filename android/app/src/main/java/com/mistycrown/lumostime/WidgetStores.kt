@@ -96,8 +96,10 @@ object WidgetStores {
         val normalizedSize = WidgetSizes.normalize(widgetSize)
         val templates = loadTemplatesBySize(context, normalizedSize)
         val normalizedTemplateId = parseNullableString(templateId)
-        val boundTemplate = templates.firstOrNull { it.id == normalizedTemplateId }
-        return boundTemplate ?: templates.firstOrNull()
+        if (normalizedTemplateId == null) {
+            return null
+        }
+        return templates.firstOrNull { it.id == normalizedTemplateId }
     }
 
     fun loadInstanceBindings(context: Context): List<WidgetInstanceBinding> {
@@ -141,16 +143,14 @@ object WidgetStores {
             return null
         }
 
+        val currentBinding = loadBinding(context, appWidgetId)
+        if (currentBinding != null) {
+            return currentBinding
+        }
+
         val templates = loadTemplatesBySize(context, widgetSize)
         if (templates.isEmpty()) {
             return null
-        }
-
-        val currentBinding = loadBinding(context, appWidgetId)
-        val currentTemplateId = currentBinding?.templateId
-        val hasValidTemplate = templates.any { it.id == currentTemplateId }
-        if (currentBinding != null && hasValidTemplate) {
-            return currentBinding
         }
 
         val defaultTemplate = templates.first()

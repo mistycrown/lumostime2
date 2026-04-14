@@ -4,7 +4,7 @@
  * @output A template-based widget configuration page with per-slot modal editing
  * @pos View
  * @description Lets the user create, name, resize, edit, and manage Android timer widget templates while configuring each slot directly from the template preview.
- * @updated 2026-04-14: Switched template editing to auto-save, enlarged preview icons, and updated the widget preview to scale proportionally by layout.
+ * @updated 2026-04-14: Switched template editing to auto-save, updated the preview sizing, and allowed deleting templates even when widgets still reference them.
  */
 import React, { useEffect, useMemo, useState } from 'react';
 import { ChevronLeft, Plus, Trash2 } from 'lucide-react';
@@ -309,13 +309,6 @@ export const WidgetSettingsView: React.FC<WidgetSettingsViewProps> = ({
       return;
     }
 
-    const bindingCount = bindingCounts[deleteTarget.id] || 0;
-    if (bindingCount > 0) {
-      onToast('info', '该模板仍被桌面小组件使用，请先移除对应实例');
-      setDeleteTarget(null);
-      return;
-    }
-
     const nextTemplates = templates.filter((template) => template.id !== deleteTarget.id);
     const didSave = await persistTemplates(nextTemplates, '已删除小组件模板');
     if (didSave) {
@@ -585,7 +578,7 @@ export const WidgetSettingsView: React.FC<WidgetSettingsViewProps> = ({
         title="删除小组件模板"
         description={
           deleteTarget
-            ? `确认删除“${deleteTarget.name}”吗？删除后，这个模板本身会消失；仍被桌面实例使用的模板不能直接删除。`
+            ? `确认删除“${deleteTarget.name}”吗？删除后，仍绑定这个模板的桌面小组件会先显示为空槽位。`
             : ''
         }
         confirmText="删除"
