@@ -70,6 +70,7 @@ export const USER_DATA_KEYS = {
     GOALS: 'lumostime_goals',
     /** 澶х洰鏍囨暟鎹 */
     MAJOR_GOALS: 'lumostime_majorGoals',
+    ACTIVE_SESSIONS: 'lumostime_activeSessions',
     /** 本地修改时间戳 */
     LOCAL_TIMESTAMP: 'lumostime_local_timestamp',
 } as const;
