@@ -9,6 +9,7 @@ object WidgetSnapshotBuilder {
         val runtimeState = WidgetStores.loadRuntimeState(context)
         val binding = WidgetStores.ensureBinding(context, appWidgetId, normalizedSize)
         val template = WidgetStores.loadTemplateForSize(context, binding?.templateId, normalizedSize)
+        val hasTemplate = template != null
 
         val slots = (template?.slots ?: emptySlots(normalizedSize)).map { slot ->
             val matchesRuntime = matchesRuntime(template, slot, runtimeState)
@@ -20,7 +21,11 @@ object WidgetSnapshotBuilder {
                 icon = slot.icon?.ifBlank { null } ?: "\u2022",
                 uiIconAssetPath = slot.uiIconAssetPath,
                 uiIconFallbackAssetPath = slot.uiIconFallbackAssetPath,
-                label = slot.label?.ifBlank { null } ?: "Slot ${slot.slotIndex + 1}",
+                label = if (hasTemplate) {
+                    slot.label?.ifBlank { null } ?: "Slot ${slot.slotIndex + 1}"
+                } else {
+                    ""
+                },
                 color = slot.color?.ifBlank { null } ?: "#E7E5E4",
                 isActive = matchesRuntime
             )
@@ -30,7 +35,7 @@ object WidgetSnapshotBuilder {
             appWidgetId = appWidgetId,
             widgetSize = normalizedSize,
             templateId = template?.id,
-            templateName = template?.name ?: "暂无模板",
+            templateName = template?.name ?: "",
             slots = slots
         )
     }
