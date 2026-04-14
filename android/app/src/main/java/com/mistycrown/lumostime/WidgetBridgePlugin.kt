@@ -13,6 +13,11 @@ import org.json.JSONArray
  */
 @CapacitorPlugin(name = "WidgetBridge")
 class WidgetBridgePlugin : Plugin() {
+    private fun parseNullableString(value: String?): String? {
+        val trimmed = value?.trim() ?: return null
+        return if (trimmed.isEmpty() || trimmed.equals("null", ignoreCase = true)) null else trimmed
+    }
+
     @PluginMethod
     fun getTemplates(call: PluginCall) {
         val result = JSObject()
@@ -99,8 +104,10 @@ class WidgetBridgePlugin : Plugin() {
                 color = it.optString("color", "#E7E5E4"),
                 startedAt = it.getLong("startedAt"),
                 source = it.optString("source", "app"),
+                linkedTodoId = parseNullableString(it.optString("linkedTodoId")),
+                scopeIds = it.optJSONArray("scopeIds").toStringList(),
                 slotIndex = if (it.has("slotIndex")) it.optInt("slotIndex") else null,
-                templateId = it.optString("templateId").ifBlank { null },
+                templateId = parseNullableString(it.optString("templateId")),
                 appWidgetId = if (it.has("appWidgetId")) it.optInt("appWidgetId") else null
             )
         }
@@ -123,7 +130,7 @@ class WidgetBridgePlugin : Plugin() {
     @PluginMethod
     fun refreshWidget(call: PluginCall) {
         val appWidgetId = call.getInt("appWidgetId") ?: -1
-        val templateId = call.getString("templateId")?.ifBlank { null }
+        val templateId = parseNullableString(call.getString("templateId"))
         if (appWidgetId > 0) {
             WidgetRefreshCoordinator.refreshWidget(context, appWidgetId)
         } else if (templateId != null) {
@@ -148,13 +155,16 @@ class WidgetBridgePlugin : Plugin() {
             val item = slotsArray.optJSONObject(index) ?: continue
             slots += WidgetTimerSlotConfig(
                 slotIndex = item.optInt("slotIndex", index),
-                activityId = item.optString("activityId").ifBlank { null },
-                categoryId = item.optString("categoryId").ifBlank { null },
-                icon = item.optString("icon").ifBlank { null },
-                uiIconAssetPath = item.optString("uiIconAssetPath").ifBlank { null },
-                uiIconFallbackAssetPath = item.optString("uiIconFallbackAssetPath").ifBlank { null },
-                label = item.optString("label").ifBlank { null },
-                color = item.optString("color").ifBlank { null }
+                activityId = parseNullableString(item.optString("activityId")),
+                categoryId = parseNullableString(item.optString("categoryId")),
+                icon = parseNullableString(item.optString("icon")),
+                customIcon = parseNullableString(item.optString("customIcon")),
+                uiIconAssetPath = parseNullableString(item.optString("uiIconAssetPath")),
+                uiIconFallbackAssetPath = parseNullableString(item.optString("uiIconFallbackAssetPath")),
+                label = parseNullableString(item.optString("label")),
+                color = parseNullableString(item.optString("color")),
+                linkedTodoId = parseNullableString(item.optString("linkedTodoId")),
+                scopeIds = item.optJSONArray("scopeIds").toStringList()
             )
         }
         return slots
@@ -188,10 +198,13 @@ class WidgetBridgePlugin : Plugin() {
             put("activityId", slot.activityId)
             put("categoryId", slot.categoryId)
             put("icon", slot.icon)
+            put("customIcon", slot.customIcon)
             put("uiIconAssetPath", slot.uiIconAssetPath)
             put("uiIconFallbackAssetPath", slot.uiIconFallbackAssetPath)
             put("label", slot.label)
             put("color", slot.color)
+            put("linkedTodoId", slot.linkedTodoId)
+            put("scopeIds", slot.scopeIds.toJsonArray())
         }
     }
 
@@ -206,6 +219,8 @@ class WidgetBridgePlugin : Plugin() {
             put("startedAt", action.startedAt)
             put("endedAt", action.endedAt)
             put("createdAt", action.createdAt)
+            put("linkedTodoId", action.linkedTodoId)
+            put("scopeIds", action.scopeIds.toJsonArray())
         }
     }
 
@@ -219,9 +234,34 @@ class WidgetBridgePlugin : Plugin() {
             put("color", runtimeState.color)
             put("startedAt", runtimeState.startedAt)
             put("source", runtimeState.source)
+            put("linkedTodoId", runtimeState.linkedTodoId)
+            put("scopeIds", runtimeState.scopeIds.toJsonArray())
             put("slotIndex", runtimeState.slotIndex)
             put("templateId", runtimeState.templateId)
             put("appWidgetId", runtimeState.appWidgetId)
         }
+    }
+
+    private fun JSONArray?.toStringList(): List<String> {
+        if (this == null) {
+            return emptyList()
+        }
+
+        val values = mutableListOf<String>()
+        for (index in 0 until length()) {
+            val value = parseNullableString(optString(index)) ?: continue
+            values.add(value)
+        }
+        return values
+    }
+
+    private fun List<String>.toJsonArray(): JSArray {
+        val array = JSArray()
+        forEach { value ->
+            if (value.isNotBlank()) {
+                array.put(value)
+            }
+        }
+        return array
     }
 }

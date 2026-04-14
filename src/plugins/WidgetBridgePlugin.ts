@@ -4,7 +4,7 @@
  * @output Typed Capacitor widget bridge methods
  * @pos Plugin
  * @description Exposes the Android widget template, instance binding state, and runtime bridge to the React application.
- * @updated 2026-04-13: Removed the unused manual widget-instance binding API and kept automatic binding support only.
+ * @updated 2026-04-13: Added slot-level todo and scope association fields plus custom emoji overrides.
  */
 import { registerPlugin } from '@capacitor/core';
 
@@ -13,16 +13,19 @@ export interface WidgetBridgeSlot {
   activityId: string | null;
   categoryId: string | null;
   icon: string | null;
+  customIcon?: string | null;
   uiIconAssetPath?: string | null;
   uiIconFallbackAssetPath?: string | null;
   label: string | null;
   color: string | null;
+  linkedTodoId?: string | null;
+  scopeIds?: string[] | null;
 }
 
 export interface WidgetBridgeTemplate {
   id: string;
   name: string;
-  size: '2x1' | '2x2' | '4x1' | '4x2';
+  size: '2x1' | '2x2' | '3x2' | '4x1' | '4x2';
   slots: WidgetBridgeSlot[];
   createdAt: number;
   updatedAt: number;
@@ -45,6 +48,8 @@ export interface WidgetBridgePendingAction {
   startedAt: number;
   endedAt: number;
   createdAt: number;
+  linkedTodoId?: string | null;
+  scopeIds?: string[] | null;
 }
 
 export interface WidgetBridgeRuntimeState {
@@ -56,6 +61,8 @@ export interface WidgetBridgeRuntimeState {
   color: string;
   startedAt: number;
   source: 'app' | 'widget';
+  linkedTodoId?: string | null;
+  scopeIds?: string[] | null;
   slotIndex?: number | null;
   templateId?: string | null;
   appWidgetId?: number | null;

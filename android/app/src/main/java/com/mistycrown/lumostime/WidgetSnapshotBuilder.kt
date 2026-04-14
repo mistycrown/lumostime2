@@ -49,7 +49,9 @@ object WidgetSnapshotBuilder {
                 runtimeState.slotIndex == slot.slotIndex
         } else {
             runtimeState.activityId == slot.activityId &&
-                runtimeState.categoryId == slot.categoryId
+                runtimeState.categoryId == slot.categoryId &&
+                runtimeState.linkedTodoId == slot.linkedTodoId &&
+                runtimeState.scopeIds.toSet() == slot.scopeIds.toSet()
         }
     }
 

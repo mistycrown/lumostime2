@@ -4,7 +4,7 @@
  * @output TypeScript Interfaces & Types
  * @pos Type Definitions (Shared contract)
  * @description Defines the core data structures (Log, TodoItem, Category, Activity, Filter order metadata, etc.) used throughout the application.
- * @updated 2026-04-06: Added archived achievement bottle, seal preview, and bottle action contracts for seal/shatter history.
+ * @updated 2026-04-13: Added widget session slot metadata so Android widget sessions can retain richer slot associations during sync.
  *
  * 鈿狅笍 Once I am updated, be sure to update my header comment and the folder's md.
  */
@@ -142,6 +142,9 @@ export interface ActiveSession {
   moodScore?: number; // 1-5 mood rating
   reactions?: string[]; // Emoji reactions
   source?: 'app' | 'widget';
+  slotIndex?: number;
+  templateId?: string;
+  appWidgetId?: number;
 }
 
 // 璇勮鎺ュ彛

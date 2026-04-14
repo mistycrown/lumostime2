@@ -1,23 +1,28 @@
 /**
  * @file WidgetSettingsView.tsx
- * @input Widget templates, categories, Android bridge availability
- * @output A template-based widget configuration page with multi-size editing
+ * @input Widget templates, categories, todos, scopes, Android bridge availability
+ * @output A template-based widget configuration page with per-slot modal editing
  * @pos View
- * @description Lets the user create, name, resize, edit, and manage multiple Android timer widget templates, while desktop widget instances only bind to templates.
- * @updated 2026-04-13: Removed redundant native refreshes and keep local template state aligned with native save results.
+ * @description Lets the user create, name, resize, edit, and manage Android timer widget templates while configuring each slot directly from the template preview.
+ * @updated 2026-04-14: Switched template editing to auto-save, enlarged preview icons, and updated the widget preview to scale proportionally by layout.
  */
 import React, { useEffect, useMemo, useState } from 'react';
-import { ChevronLeft, Plus, Save, Trash2 } from 'lucide-react';
-import { CustomSelect } from '../../components/CustomSelect';
+import { ChevronLeft, Plus, Trash2 } from 'lucide-react';
 import { ConfirmModal } from '../../components/ConfirmModal';
+import { CustomSelect } from '../../components/CustomSelect';
+import { IconRenderer } from '../../components/IconRenderer';
+import {
+  WidgetSlotConfigDraft,
+  WidgetSlotConfigModal
+} from '../../components/WidgetSlotConfigModal';
 import { ToastType } from '../../components/Toast';
 import WidgetBridge from '../../plugins/WidgetBridgePlugin';
 import {
   DEFAULT_WIDGET_SIZE,
   WidgetTemplate,
+  WidgetTemplateSlotConfig,
   buildWidgetTimerSlotConfig,
   countTemplateBoundInstances,
-  createEmptyWidgetTemplateSlot,
   createWidgetTemplate,
   getWidgetGridBySize,
   getWidgetSizeLabel,
@@ -35,13 +40,21 @@ import {
   WIDGET_SIZE_OPTIONS
 } from '../../services/widgetTimerService';
 import { getSoftColorCircleStyle } from '../../utils/colorAdapterUtils';
-import { Category } from '../../types';
+import { Category, Scope, TodoCategory, TodoItem } from '../../types';
 
 interface WidgetSettingsViewProps {
   onBack: () => void;
   onToast: (type: ToastType, message: string) => void;
   categories: Category[];
+  todos: TodoItem[];
+  todoCategories: TodoCategory[];
+  scopes: Scope[];
 }
+
+const AUTO_SAVE_DELAY_MS = 350;
+const PREVIEW_MAX_COLUMNS = 4;
+const PREVIEW_MAX_ROWS = 2;
+const PREVIEW_TITLE_ROW_RATIO = 0.6;
 
 const getTemplateSlotSummary = (template: WidgetTemplate): string => {
   const configuredLabels = template.slots
@@ -49,7 +62,7 @@ const getTemplateSlotSummary = (template: WidgetTemplate): string => {
     .filter((label): label is string => Boolean(label));
 
   if (configuredLabels.length === 0) {
-    return '未配置任何活动';
+    return '还没有配置任何槽位';
   }
 
   const previewLabels = configuredLabels.slice(0, 4).join('、');
@@ -57,30 +70,31 @@ const getTemplateSlotSummary = (template: WidgetTemplate): string => {
   return restCount > 0 ? `${previewLabels} 等 ${configuredLabels.length} 个活动` : previewLabels;
 };
 
+const toSlotDraft = (slot: WidgetTemplateSlotConfig): WidgetSlotConfigDraft => ({
+  slotIndex: slot.slotIndex,
+  categoryId: slot.categoryId ?? null,
+  activityId: slot.activityId ?? null,
+  linkedTodoId: slot.linkedTodoId ?? null,
+  scopeIds: slot.scopeIds ?? null,
+  customIcon: slot.customIcon ?? null
+});
+
 export const WidgetSettingsView: React.FC<WidgetSettingsViewProps> = ({
   onBack,
   onToast,
-  categories
+  categories,
+  todos,
+  todoCategories,
+  scopes
 }) => {
   const [templates, setTemplates] = useState<WidgetTemplate[]>([]);
   const [bindingCounts, setBindingCounts] = useState<Record<string, number>>({});
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [editingTemplateDraft, setEditingTemplateDraft] = useState<WidgetTemplate | null>(null);
+  const [editingSlotIndex, setEditingSlotIndex] = useState<number | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<WidgetTemplate | null>(null);
-
-  const activityOptions = useMemo(() => {
-    const options = [{ value: '', label: '未配置' }];
-    categories.forEach((category) => {
-      category.activities.forEach((activity) => {
-        options.push({
-          value: `${category.id}::${activity.id}`,
-          label: `${category.icon} ${category.name} / ${activity.icon} ${activity.name}`
-        });
-      });
-    });
-    return options;
-  }, [categories]);
+  const [isDraftDirty, setIsDraftDirty] = useState(false);
 
   const sizeOptions = useMemo(
     () =>
@@ -137,7 +151,18 @@ export const WidgetSettingsView: React.FC<WidgetSettingsViewProps> = ({
     void loadTemplates();
   }, []);
 
-  const persistTemplates = async (nextTemplates: WidgetTemplate[], successMessage: string) => {
+  useEffect(() => {
+    if (!editingTemplateDraft || editingSlotIndex === null) {
+      return;
+    }
+
+    const slotCount = getWidgetSlotCountBySize(editingTemplateDraft.size);
+    if (editingSlotIndex >= slotCount) {
+      setEditingSlotIndex(null);
+    }
+  }, [editingSlotIndex, editingTemplateDraft]);
+
+  const persistTemplates = async (nextTemplates: WidgetTemplate[], successMessage?: string) => {
     const normalizedTemplates = normalizeWidgetTemplates(nextTemplates);
     const previousTemplates = templates;
     const previousBindingCounts = bindingCounts;
@@ -163,7 +188,9 @@ export const WidgetSettingsView: React.FC<WidgetSettingsViewProps> = ({
 
       setTemplates(normalizedTemplates);
       saveWidgetTemplatesToStorage(normalizedTemplates);
-      onToast('success', successMessage);
+      if (successMessage) {
+        onToast('success', successMessage);
+      }
       return true;
     } catch (error) {
       console.error('[WidgetSettingsView] Failed to persist widget templates', error);
@@ -177,16 +204,53 @@ export const WidgetSettingsView: React.FC<WidgetSettingsViewProps> = ({
     }
   };
 
+  const persistDraftNow = async (draft: WidgetTemplate) => {
+    const rebuiltDraft = rebuildWidgetTemplate(draft, categories);
+    const nextTemplates = templates.map((template) =>
+      template.id === rebuiltDraft.id ? rebuiltDraft : template
+    );
+    const didSave = await persistTemplates(nextTemplates);
+    if (didSave) {
+      setIsDraftDirty(false);
+    }
+    return didSave;
+  };
+
+  useEffect(() => {
+    if (!editingTemplateDraft || !isDraftDirty) {
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      void persistDraftNow(editingTemplateDraft);
+    }, AUTO_SAVE_DELAY_MS);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [categories, editingTemplateDraft, isDraftDirty, templates]);
+
   const handleCreateTemplate = async () => {
     const nextTemplate = createWidgetTemplate(`小组件 ${templates.length + 1}`, DEFAULT_WIDGET_SIZE);
     const didSave = await persistTemplates([...templates, nextTemplate], '已创建小组件模板');
     if (didSave) {
       setEditingTemplateDraft(nextTemplate);
+      setEditingSlotIndex(null);
+      setIsDraftDirty(false);
     }
   };
 
   const openEditor = (template: WidgetTemplate) => {
     setEditingTemplateDraft(rebuildWidgetTemplate(template, categories));
+    setEditingSlotIndex(null);
+    setIsDraftDirty(false);
+  };
+
+  const closeEditor = async () => {
+    if (editingTemplateDraft && isDraftDirty) {
+      await persistDraftNow(editingTemplateDraft);
+    }
+    setEditingTemplateDraft(null);
+    setEditingSlotIndex(null);
+    setIsDraftDirty(false);
   };
 
   const updateDraftName = (name: string) => {
@@ -201,6 +265,7 @@ export const WidgetSettingsView: React.FC<WidgetSettingsViewProps> = ({
         updatedAt: Date.now()
       };
     });
+    setIsDraftDirty(true);
   };
 
   const updateDraftSize = (sizeValue: string) => {
@@ -211,44 +276,32 @@ export const WidgetSettingsView: React.FC<WidgetSettingsViewProps> = ({
       }
       return updateWidgetTemplateSize(previousDraft, nextSize);
     });
+    setIsDraftDirty(true);
   };
 
-  const updateDraftSlot = (slotIndex: number, value: string) => {
+  const updateDraftSlot = (draft: WidgetSlotConfigDraft) => {
     setEditingTemplateDraft((previousDraft) => {
-      if (!previousDraft) {
+      if (!previousDraft || !draft.categoryId || !draft.activityId) {
+        return previousDraft;
+      }
+
+      const category = categories.find((item) => item.id === draft.categoryId);
+      const activity = category?.activities.find((item) => item.id === draft.activityId);
+      if (!category || !activity) {
         return previousDraft;
       }
 
       const nextSlots = normalizeWidgetTemplateSlots(previousDraft.slots, previousDraft.size);
-      if (!value) {
-        nextSlots[slotIndex] = createEmptyWidgetTemplateSlot(slotIndex);
-      } else {
-        const [categoryId, activityId] = value.split('::');
-        const category = categories.find((item) => item.id === categoryId);
-        const activity = category?.activities.find((item) => item.id === activityId);
-        if (!category || !activity) {
-          return previousDraft;
-        }
-        nextSlots[slotIndex] = buildWidgetTimerSlotConfig(category, activity, slotIndex);
-      }
+      nextSlots[draft.slotIndex] = buildWidgetTimerSlotConfig(category, activity, draft.slotIndex, {
+        linkedTodoId: draft.linkedTodoId,
+        scopeIds: draft.scopeIds,
+        customIcon: draft.customIcon
+      });
 
       return updateWidgetTemplateSlots(previousDraft, nextSlots);
     });
-  };
-
-  const handleSaveDraft = async () => {
-    if (!editingTemplateDraft) {
-      return;
-    }
-
-    const rebuiltDraft = rebuildWidgetTemplate(editingTemplateDraft, categories);
-    const nextTemplates = templates.map((template) =>
-      template.id === rebuiltDraft.id ? rebuiltDraft : template
-    );
-    const didSave = await persistTemplates(nextTemplates, '小组件模板已保存');
-    if (didSave) {
-      setEditingTemplateDraft(null);
-    }
+    setEditingSlotIndex(null);
+    setIsDraftDirty(true);
   };
 
   const handleDeleteTemplate = async () => {
@@ -268,6 +321,8 @@ export const WidgetSettingsView: React.FC<WidgetSettingsViewProps> = ({
     if (didSave) {
       if (editingTemplateDraft?.id === deleteTarget.id) {
         setEditingTemplateDraft(null);
+        setEditingSlotIndex(null);
+        setIsDraftDirty(false);
       }
       setDeleteTarget(null);
     }
@@ -290,9 +345,33 @@ export const WidgetSettingsView: React.FC<WidgetSettingsViewProps> = ({
     return getWidgetGridBySize(editingTemplateDraft.size);
   }, [editingTemplateDraft]);
 
-  const draftSlotCount = editingTemplateDraft
-    ? getWidgetSlotCountBySize(editingTemplateDraft.size)
-    : 0;
+  const previewFrameStyle = useMemo<React.CSSProperties>(() => {
+    const maxPreviewHeightUnits = PREVIEW_MAX_ROWS + PREVIEW_TITLE_ROW_RATIO;
+    return {
+      width: `${(previewGrid.columns / PREVIEW_MAX_COLUMNS) * 100}%`,
+      height: `${((previewGrid.rows + PREVIEW_TITLE_ROW_RATIO) / maxPreviewHeightUnits) * 100}%`
+    };
+  }, [previewGrid]);
+
+  const currentEditingSlot = useMemo(() => {
+    if (!editingTemplateDraft || editingSlotIndex === null) {
+      return null;
+    }
+
+    const normalizedSlots = normalizeWidgetTemplateSlots(editingTemplateDraft.slots, editingTemplateDraft.size);
+    return normalizedSlots.find((slot) => slot.slotIndex === editingSlotIndex) || null;
+  }, [editingSlotIndex, editingTemplateDraft]);
+
+  const renderHomeGuide = (
+    <div className="rounded-2xl border border-dashed border-stone-200 bg-stone-50 px-4 py-5 text-sm text-stone-600">
+      <div className="font-bold text-stone-800">使用说明</div>
+      <div className="mt-3 space-y-2 text-xs leading-6 text-stone-500">
+        <div>第一步：新建小组件模板。</div>
+        <div>第二步：在桌面插入对应尺寸的小组件。</div>
+        <div>第三步：如果相同尺寸有多个，点击标题切换。</div>
+      </div>
+    </div>
+  );
 
   return (
     <div className="fixed inset-0 z-50 flex flex-col bg-[#fdfbf7] pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] font-serif animate-in slide-in-from-right duration-300">
@@ -301,7 +380,7 @@ export const WidgetSettingsView: React.FC<WidgetSettingsViewProps> = ({
           <button
             onClick={() => {
               if (editingTemplateDraft) {
-                setEditingTemplateDraft(null);
+                void closeEditor();
                 return;
               }
               onBack();
@@ -310,9 +389,16 @@ export const WidgetSettingsView: React.FC<WidgetSettingsViewProps> = ({
           >
             <ChevronLeft size={24} />
           </button>
-          <span className="text-lg font-bold text-stone-800">
-            {editingTemplateDraft ? '小组件详情' : '小组件计时器'}
-          </span>
+          <div className="flex items-center gap-3">
+            <span className="text-lg font-bold text-stone-800">
+              {editingTemplateDraft ? '小组件详情' : '小组件计时器'}
+            </span>
+            {editingTemplateDraft && (
+              <span className="text-[11px] text-stone-400">
+                {isSaving ? '自动保存中...' : isDraftDirty ? '等待保存...' : '已自动保存'}
+              </span>
+            )}
+          </div>
         </div>
       </div>
 
@@ -323,7 +409,7 @@ export const WidgetSettingsView: React.FC<WidgetSettingsViewProps> = ({
               <div>
                 <h3 className="font-bold text-stone-800">名称</h3>
                 <p className="mt-1 text-xs text-stone-400">
-                  这里设置的小组件名称，会实时显示在桌面标题区域。
+                  模板名称会显示在桌面小组件的标题区域，方便区分不同模板。
                 </p>
               </div>
 
@@ -339,7 +425,7 @@ export const WidgetSettingsView: React.FC<WidgetSettingsViewProps> = ({
               <div>
                 <h3 className="font-bold text-stone-800">小组件尺寸</h3>
                 <p className="mt-1 text-xs text-stone-400">
-                  切换尺寸时会自动保留前面的活动，超出的槽位会裁掉，不足的槽位会补空。
+                  切换尺寸时会保留前面的槽位配置，多出来的槽位会裁掉，不足的槽位会自动补空。
                 </p>
               </div>
 
@@ -351,7 +437,7 @@ export const WidgetSettingsView: React.FC<WidgetSettingsViewProps> = ({
               />
 
               <div className="rounded-2xl bg-stone-50 px-4 py-3 text-xs text-stone-500">
-                当前尺寸：{getWidgetSizeLabel(editingTemplateDraft.size)}，共 {draftSlotCount} 个活动槽位。
+                当前尺寸：{getWidgetSizeLabel(editingTemplateDraft.size)}，共 {getWidgetSlotCountBySize(editingTemplateDraft.size)} 个槽位。
               </div>
             </div>
 
@@ -359,82 +445,53 @@ export const WidgetSettingsView: React.FC<WidgetSettingsViewProps> = ({
               <div>
                 <h3 className="font-bold text-stone-800">模板预览</h3>
                 <p className="mt-1 text-xs text-stone-400">
-                  桌面上同尺寸并绑定这个模板的小组件，会显示成下面的布局。
+                  直接点击下面任意一个槽位，就能设置它的图标、标签、待办和领域。
                 </p>
               </div>
 
-              <div className="mx-auto w-full max-w-[320px]">
-                <div
-                  className="rounded-[28px] border border-stone-100 bg-white p-4 shadow-[0_12px_30px_rgba(15,23,42,0.06)]"
-                  style={{ aspectRatio: `${previewGrid.columns} / ${previewGrid.rows + 0.45}` }}
-                >
-                  <div className="mb-3 truncate text-center text-[11px] text-stone-400">
-                    {editingTemplateDraft.name.trim() || '标题占位'}
-                  </div>
+              <div className="mx-auto w-full max-w-[420px]">
+                <div className="relative aspect-[20/13] w-full">
                   <div
-                    className="grid h-[calc(100%-24px)] gap-2.5"
-                    style={{
-                      gridTemplateColumns: `repeat(${previewGrid.columns}, minmax(0, 1fr))`,
-                      gridTemplateRows: `repeat(${previewGrid.rows}, minmax(0, 1fr))`
-                    }}
+                    className="absolute left-1/2 top-1/2 flex -translate-x-1/2 -translate-y-1/2 flex-col rounded-[28px] bg-stone-50 px-[4.5%] py-[4%] shadow-[0_10px_24px_rgba(120,113,108,0.08)]"
+                    style={previewFrameStyle}
                   >
-                    {draftPreviewSlots.map((slot) => (
-                      <div key={slot.slotIndex} className="flex items-center justify-center">
-                        <div
-                          className="flex aspect-square h-full w-full max-h-[72px] max-w-[72px] items-center justify-center rounded-full border border-stone-100 text-[28px] leading-none"
-                          style={getSoftColorCircleStyle(slot.color || '#EEF2F7', 0.15)}
+                    <div className="mb-[6%] truncate text-center text-[11px] text-stone-400">
+                      {editingTemplateDraft.name.trim() || '标题占位'}
+                    </div>
+                    <div
+                      className="grid min-h-0 flex-1 gap-[7%]"
+                      style={{
+                        gridTemplateColumns: `repeat(${previewGrid.columns}, minmax(0, 1fr))`,
+                        gridTemplateRows: `repeat(${previewGrid.rows}, minmax(0, 1fr))`
+                      }}
+                    >
+                      {draftPreviewSlots.map((slot) => {
+                        const isConfigured = Boolean(slot.activityId && slot.categoryId);
+                        return (
+                        <button
+                          key={slot.slotIndex}
+                          type="button"
+                          onClick={() => setEditingSlotIndex(slot.slotIndex)}
+                          className="flex h-full w-full min-h-0 items-center justify-center rounded-full p-[6%] text-center transition-all hover:-translate-y-0.5"
+                          style={{ containerType: 'size' }}
                         >
-                          <span>{slot.icon || '\u2022'}</span>
-                        </div>
-                      </div>
-                    ))}
+                          <div
+                            className="flex min-h-0 min-w-0 items-center justify-center rounded-full leading-none"
+                            style={{
+                              ...getSoftColorCircleStyle(slot.color || '#EEF2F7', isConfigured ? 0.18 : 0.1),
+                              width: '74cqmin',
+                              height: '74cqmin'
+                            } as React.CSSProperties}
+                          >
+                            <IconRenderer icon={slot.icon || '\u2022'} size="42cqmin" />
+                          </div>
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
-              </div>
-            </div>
-
-            <div className="space-y-4 rounded-2xl border border-stone-100 bg-white p-5 shadow-sm">
-              <div>
-                <h3 className="font-bold text-stone-800">活动槽位</h3>
-                <p className="mt-1 text-xs text-stone-400">
-                  编辑模板里的活动后，所有绑定这个模板且尺寸一致的桌面实例都会一起更新。
-                </p>
-              </div>
-
-              {editingTemplateDraft.slots.map((slot, index) => (
-                <div key={slot.slotIndex} className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-bold text-stone-700">槽位 {index + 1}</span>
-                    <span className="text-xs text-stone-400">{slot.label || '未配置'}</span>
-                  </div>
-                  <CustomSelect
-                    value={slot.activityId && slot.categoryId ? `${slot.categoryId}::${slot.activityId}` : ''}
-                    options={activityOptions}
-                    onChange={(value) => updateDraftSlot(slot.slotIndex, value)}
-                    placeholder="选择一个活动"
-                    dropdownPosition="top"
-                  />
                 </div>
-              ))}
-            </div>
-
-            <div className="space-y-4 rounded-2xl border border-stone-100 bg-white p-5 shadow-sm">
-              <div>
-                <h3 className="font-bold text-stone-800">保存说明</h3>
-                <p className="mt-1 text-xs leading-6 text-stone-400">
-                  保存后，绑定这个模板的桌面小组件会一起刷新。桌面实例本身不会单独保存活动配置。
-                </p>
               </div>
-
-              <button
-                type="button"
-                onClick={() => void handleSaveDraft()}
-                disabled={isSaving}
-                className="flex w-full items-center justify-center gap-2 rounded-xl bg-stone-800 py-3 font-bold text-white shadow-lg shadow-stone-200 transition-all active:scale-[0.98] disabled:opacity-60"
-              >
-                <Save size={16} />
-                {isSaving ? '保存中...' : '保存模板并刷新'}
-              </button>
             </div>
           </>
         ) : isLoading ? (
@@ -456,9 +513,11 @@ export const WidgetSettingsView: React.FC<WidgetSettingsViewProps> = ({
             <div className="space-y-3 rounded-2xl border border-dashed border-stone-200 bg-stone-50 px-4 py-10 text-center">
               <p className="text-sm font-bold text-stone-700">还没有小组件模板</p>
               <p className="text-xs leading-6 text-stone-400">
-                点击上面的“新建小组件模板”创建第一个模板。
+                点击上面的“新建小组件模板”，就可以开始配置桌面记时槽位。
               </p>
             </div>
+
+            {renderHomeGuide}
           </>
         ) : (
           <>
@@ -488,7 +547,7 @@ export const WidgetSettingsView: React.FC<WidgetSettingsViewProps> = ({
                       尺寸：{getWidgetSizeLabel(template.size)} · {getWidgetSlotCountBySize(template.size)} 个槽位
                     </p>
                     <p className="mt-1 line-clamp-2 text-xs leading-5 text-stone-400">
-                      标签：{getTemplateSlotSummary(template)}
+                      {getTemplateSlotSummary(template)}
                     </p>
                   </button>
 
@@ -502,9 +561,22 @@ export const WidgetSettingsView: React.FC<WidgetSettingsViewProps> = ({
                 </div>
               ))}
             </div>
+
+            {renderHomeGuide}
           </>
         )}
       </div>
+
+      <WidgetSlotConfigModal
+        isOpen={Boolean(editingTemplateDraft && currentEditingSlot)}
+        draft={currentEditingSlot ? toSlotDraft(currentEditingSlot) : null}
+        categories={categories}
+        todos={todos}
+        todoCategories={todoCategories}
+        scopes={scopes}
+        onClose={() => setEditingSlotIndex(null)}
+        onSave={updateDraftSlot}
+      />
 
       <ConfirmModal
         isOpen={Boolean(deleteTarget)}
@@ -513,7 +585,7 @@ export const WidgetSettingsView: React.FC<WidgetSettingsViewProps> = ({
         title="删除小组件模板"
         description={
           deleteTarget
-            ? `确认删除“${deleteTarget.name}”吗？删除后，该模板本身会消失。仍被桌面实例使用的模板不能直接删除。`
+            ? `确认删除“${deleteTarget.name}”吗？删除后，这个模板本身会消失；仍被桌面实例使用的模板不能直接删除。`
             : ''
         }
         confirmText="删除"

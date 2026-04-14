@@ -4,7 +4,7 @@
  * @output Widget template persistence helpers and app/native conversion utilities
  * @pos Service
  * @description Centralizes the shared types and conversions used by the Android timer widget feature.
- * @updated 2026-04-13: Removed unsupported vertical widget sizes and kept only shipped horizontal/square sizes.
+ * @updated 2026-04-13: Added slot-level todo/scope associations and custom emoji overrides for widget templates.
  */
 import { Capacitor } from '@capacitor/core';
 import { ActiveSession, Category, Log } from '../types';
@@ -21,9 +21,18 @@ const LEGACY_WIDGET_TIMER_STORAGE_KEY = 'lumostime_widget_timer_slots_v1';
 const WIDGET_TEMPLATE_STORAGE_KEY = 'lumostime_widget_templates_v1';
 const FALLBACK_WIDGET_ICON = '\u2022';
 
+const normalizeNullableString = (value?: string | null): string | null => {
+  if (typeof value !== 'string') {
+    return null;
+  }
+
+  const trimmed = value.trim();
+  return trimmed && trimmed.toLowerCase() !== 'null' ? trimmed : null;
+};
+
 export const DEFAULT_WIDGET_TEMPLATE_NAME = '我的小组件';
 export const DEFAULT_WIDGET_SIZE = '2x2';
-export const WIDGET_SIZE_OPTIONS = ['2x1', '2x2', '4x1', '4x2'] as const;
+export const WIDGET_SIZE_OPTIONS = ['2x1', '2x2', '3x2', '4x1', '4x2'] as const;
 
 export type WidgetSize = (typeof WIDGET_SIZE_OPTIONS)[number];
 export type WidgetTemplateSlotConfig = WidgetBridgeSlot;
@@ -33,6 +42,7 @@ export type WidgetInstanceBinding = WidgetBridgeInstanceBinding;
 const WIDGET_SIZE_SLOT_COUNT: Record<WidgetSize, number> = {
   '2x1': 2,
   '2x2': 4,
+  '3x2': 6,
   '4x1': 4,
   '4x2': 8
 };
@@ -40,6 +50,7 @@ const WIDGET_SIZE_SLOT_COUNT: Record<WidgetSize, number> = {
 const WIDGET_SIZE_GRID: Record<WidgetSize, { columns: number; rows: number }> = {
   '2x1': { columns: 2, rows: 1 },
   '2x2': { columns: 2, rows: 2 },
+  '3x2': { columns: 3, rows: 2 },
   '4x1': { columns: 4, rows: 1 },
   '4x2': { columns: 4, rows: 2 }
 };
@@ -64,10 +75,13 @@ export const createEmptyWidgetTemplateSlot = (slotIndex: number): WidgetTemplate
   activityId: null,
   categoryId: null,
   icon: null,
+  customIcon: null,
   uiIconAssetPath: null,
   uiIconFallbackAssetPath: null,
   label: null,
-  color: null
+  color: null,
+  linkedTodoId: null,
+  scopeIds: null
 });
 
 export const createEmptyWidgetTemplateSlots = (
@@ -87,13 +101,16 @@ export const normalizeWidgetTemplateSlots = (
     const slot = slotMap.get(slotIndex);
     return {
       slotIndex,
-      activityId: slot?.activityId ?? null,
-      categoryId: slot?.categoryId ?? null,
-      icon: slot?.icon ?? null,
-      uiIconAssetPath: slot?.uiIconAssetPath ?? null,
-      uiIconFallbackAssetPath: slot?.uiIconFallbackAssetPath ?? null,
-      label: slot?.label ?? null,
-      color: slot?.color ?? null
+      activityId: normalizeNullableString(slot?.activityId),
+      categoryId: normalizeNullableString(slot?.categoryId),
+      icon: normalizeNullableString(slot?.icon),
+      customIcon: normalizeNullableString(slot?.customIcon),
+      uiIconAssetPath: normalizeNullableString(slot?.uiIconAssetPath),
+      uiIconFallbackAssetPath: normalizeNullableString(slot?.uiIconFallbackAssetPath),
+      label: normalizeNullableString(slot?.label),
+      color: normalizeNullableString(slot?.color),
+      linkedTodoId: normalizeNullableString(slot?.linkedTodoId),
+      scopeIds: slot?.scopeIds?.filter(Boolean) ?? null
     };
   });
 };
@@ -151,16 +168,24 @@ export const normalizeWidgetTemplates = (templates: WidgetTemplate[]): WidgetTem
 export const buildWidgetTimerSlotConfig = (
   category: Category,
   activity: Category['activities'][number],
-  slotIndex: number
+  slotIndex: number,
+  overrides?: {
+    linkedTodoId?: string | null;
+    scopeIds?: string[] | null;
+    customIcon?: string | null;
+  }
 ): WidgetTemplateSlotConfig => ({
   slotIndex,
   activityId: activity.id,
   categoryId: category.id,
-  icon: activity.icon || category.icon,
+  icon: normalizeNullableString(overrides?.customIcon) || activity.icon || category.icon,
+  customIcon: normalizeNullableString(overrides?.customIcon),
   uiIconAssetPath: null,
   uiIconFallbackAssetPath: null,
   label: activity.name,
-  color: getColorHexForCharts(activity.color || category.themeColor || '')
+  color: getColorHexForCharts(activity.color || category.themeColor || ''),
+  linkedTodoId: normalizeNullableString(overrides?.linkedTodoId),
+  scopeIds: overrides?.scopeIds?.filter(Boolean) ?? null
 });
 
 export const findWidgetActivity = (categories: Category[], categoryId: string, activityId: string) => {
@@ -182,7 +207,11 @@ export const rebuildWidgetTimerSlotConfig = (
     return createEmptyWidgetTemplateSlot(slot.slotIndex);
   }
 
-  return buildWidgetTimerSlotConfig(category, activity, slot.slotIndex);
+  return buildWidgetTimerSlotConfig(category, activity, slot.slotIndex, {
+    linkedTodoId: slot.linkedTodoId ?? null,
+    scopeIds: slot.scopeIds ?? null,
+    customIcon: slot.customIcon ?? null
+  });
 };
 
 export const rebuildWidgetTemplate = (
@@ -298,7 +327,12 @@ export const buildWidgetRuntimeStateFromSession = (
     label: activity?.name || session.activityName || '',
     color: getColorHexForCharts(activity?.color || category?.themeColor || ''),
     startedAt: session.startTime,
-    source: session.source || 'app'
+    source: session.source || 'app',
+    linkedTodoId: session.linkedTodoId || null,
+    scopeIds: session.scopeIds ?? null,
+    slotIndex: session.slotIndex ?? null,
+    templateId: session.templateId ?? null,
+    appWidgetId: session.appWidgetId ?? null
   };
 };
 
@@ -315,7 +349,12 @@ export const buildWidgetSessionFromRuntimeState = (
     activityIcon: activity?.icon || runtimeState.icon || FALLBACK_WIDGET_ICON,
     activityUiIcon: activity?.uiIcon,
     startTime: runtimeState.startedAt,
-    source: runtimeState.source || 'widget'
+    linkedTodoId: runtimeState.linkedTodoId || undefined,
+    scopeIds: runtimeState.scopeIds ?? undefined,
+    source: runtimeState.source || 'widget',
+    slotIndex: runtimeState.slotIndex ?? undefined,
+    templateId: runtimeState.templateId ?? undefined,
+    appWidgetId: runtimeState.appWidgetId ?? undefined
   };
 };
 
@@ -327,5 +366,7 @@ export const buildLogFromWidgetPendingAction = (action: WidgetBridgePendingActio
   endTime: action.endedAt,
   duration: Math.max(0, (action.endedAt - action.startedAt) / 1000),
   note: '',
-  title: action.label || undefined
+  title: action.label || undefined,
+  linkedTodoId: action.linkedTodoId || undefined,
+  scopeIds: action.scopeIds ?? undefined
 });

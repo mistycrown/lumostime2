@@ -599,6 +599,18 @@
         </receiver>
 
         <receiver
+            android:name=".QuickLogWidget3x2"
+            android:exported="true"
+            android:label="@string/widget_label_3x2">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_3x2" />
+        </receiver>
+
+        <receiver
             android:name=".QuickLogWidget4x1"
             android:exported="true"
             android:label="@string/widget_label_4x1">

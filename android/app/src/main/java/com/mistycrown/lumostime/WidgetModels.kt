@@ -7,6 +7,7 @@ package com.mistycrown.lumostime
 object WidgetSizes {
     const val SIZE_2X1 = "2x1"
     const val SIZE_2X2 = "2x2"
+    const val SIZE_3X2 = "3x2"
     const val SIZE_4X1 = "4x1"
     const val SIZE_4X2 = "4x2"
     const val DEFAULT = SIZE_2X2
@@ -16,6 +17,7 @@ object WidgetSizes {
         return when (size) {
             SIZE_2X1,
             SIZE_2X2,
+            SIZE_3X2,
             SIZE_4X1,
             SIZE_4X2 -> size
             else -> DEFAULT
@@ -27,6 +29,7 @@ object WidgetSizes {
         return when (normalize(size)) {
             SIZE_2X1 -> 2
             SIZE_2X2,
+            SIZE_3X2 -> 6
             SIZE_4X1 -> 4
             SIZE_4X2 -> 8
             else -> 4
@@ -39,10 +42,13 @@ data class WidgetTimerSlotConfig(
     val activityId: String? = null,
     val categoryId: String? = null,
     val icon: String? = null,
+    val customIcon: String? = null,
     val uiIconAssetPath: String? = null,
     val uiIconFallbackAssetPath: String? = null,
     val label: String? = null,
-    val color: String? = null
+    val color: String? = null,
+    val linkedTodoId: String? = null,
+    val scopeIds: List<String> = emptyList()
 ) {
     fun isConfigured(): Boolean {
         return !activityId.isNullOrBlank() && !categoryId.isNullOrBlank()
@@ -74,6 +80,8 @@ data class WidgetTimerRuntimeState(
     val color: String,
     val startedAt: Long,
     val source: String,
+    val linkedTodoId: String? = null,
+    val scopeIds: List<String> = emptyList(),
     val slotIndex: Int? = null,
     val templateId: String? = null,
     val appWidgetId: Int? = null
@@ -88,7 +96,9 @@ data class WidgetPendingAction(
     val color: String,
     val startedAt: Long,
     val endedAt: Long,
-    val createdAt: Long
+    val createdAt: Long,
+    val linkedTodoId: String? = null,
+    val scopeIds: List<String> = emptyList()
 )
 
 data class WidgetSnapshotSlot(
