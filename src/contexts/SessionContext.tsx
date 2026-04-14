@@ -2,10 +2,15 @@
  * @file SessionContext.tsx
  * @description 管理活动计时会话的状态和逻辑
  */
-import React, { createContext, useContext, useState, ReactNode } from 'react';
+import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { ActiveSession, Activity, AutoLinkRule } from '../types';
 import { Capacitor } from '@capacitor/core';
 import FocusNotification from '../plugins/FocusNotificationPlugin';
+import {
+    clearPersistedActiveSessions,
+    loadPersistedActiveSessions,
+    savePersistedActiveSessions
+} from '../utils/sessionPersistence';
 
 interface SessionContextType {
     // 会话状态
@@ -51,8 +56,17 @@ interface SessionProviderProps {
 }
 
 export const SessionProvider: React.FC<SessionProviderProps> = ({ children, splitLogByDays }) => {
-    const [activeSessions, setActiveSessions] = useState<ActiveSession[]>([]);
+    const [activeSessions, setActiveSessions] = useState<ActiveSession[]>(() => loadPersistedActiveSessions());
     const [focusDetailSessionId, setFocusDetailSessionId] = useState<string | null>(null);
+
+    useEffect(() => {
+        if (activeSessions.length === 0) {
+            clearPersistedActiveSessions();
+            return;
+        }
+
+        savePersistedActiveSessions(activeSessions);
+    }, [activeSessions]);
 
     const startActivity = (
         activity: Activity,
