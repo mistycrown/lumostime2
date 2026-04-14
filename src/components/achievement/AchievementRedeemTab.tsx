@@ -5,11 +5,13 @@
  * @description Simplified reward catalog and redemption record manager used inside the achievement ledger.
  *
  * @updated 2026-03-28: Support one-decimal reward costs and star balance display while keeping redemption checks precise.
+ * @updated 2026-04-14: Trigger the shared fireworks burst when reward redemption succeeds from the confirm button.
  */
 import React, { useEffect, useMemo, useState } from 'react';
 import { Gift, Pencil, Plus } from 'lucide-react';
 import { AchievementReward } from '../../types';
 import { AchievementDialog } from './AchievementDialog';
+import { launchFireworkBurstFromRect } from '../../utils/confettiEffects';
 import { formatAchievementStars, normalizeAchievementStarValue } from '../../utils/achievementUtils';
 
 interface AchievementRedeemTabProps {
@@ -139,7 +141,7 @@ export const AchievementRedeemTab: React.FC<AchievementRedeemTabProps> = ({
     }
   };
 
-  const handleRedeem = () => {
+  const handleRedeem = (event: React.MouseEvent<HTMLButtonElement>) => {
     if (!selectedReward) {
       return;
     }
@@ -150,6 +152,7 @@ export const AchievementRedeemTab: React.FC<AchievementRedeemTabProps> = ({
       return;
     }
 
+    launchFireworkBurstFromRect(event.currentTarget.getBoundingClientRect());
     closeDialog();
   };
 

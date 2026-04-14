@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Smile, Plus } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { IconRenderer } from './IconRenderer';
+import { launchFireworkBurstFromRect } from '../utils/confettiEffects';
 
 // Default emoji list with effects
 export const DEFAULT_REACTIONS = ['🎉', '❤️', '🔥', '❄️', '✨', '🌸'];
@@ -114,22 +115,7 @@ export const ReactionPicker: React.FC<ReactionPickerProps> = ({ onSelect, curren
 
         switch (emoji) {
             case '🎉': // Realistic Look (Mixed bursts)
-                const count = 100; // Reduced from 200
-                const defaults = { origin, zIndex: 9999 };
-
-                const fire = (particleRatio: number, opts: any) => {
-                    confetti({
-                        ...defaults,
-                        ...opts,
-                        particleCount: Math.floor(count * particleRatio)
-                    });
-                };
-
-                fire(0.25, { spread: 26, startVelocity: 55 });
-                fire(0.2, { spread: 60 });
-                fire(0.35, { spread: 100, decay: 0.91, scalar: 0.8 });
-                fire(0.1, { spread: 120, startVelocity: 25, decay: 0.92, scalar: 1.2 });
-                fire(0.1, { spread: 120, startVelocity: 45 });
+                launchFireworkBurstFromRect(rect);
                 break;
 
             case '❤️': // Hearts (Custom Shape for Coloring)
