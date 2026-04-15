@@ -5,6 +5,7 @@
  * @pos Type Definitions (Shared contract)
  * @description Defines the core data structures (Log, TodoItem, Category, Activity, Filter order metadata, etc.) used throughout the application.
  * @updated 2026-04-13: Added widget session slot metadata so Android widget sessions can retain richer slot associations during sync.
+ * @updated 2026-04-15: Added nightLatestStart auto-check comparison type for cross-midnight sleep rules.
  *
  * 鈿狅笍 Once I am updated, be sure to update my header comment and the folder's md.
  */
@@ -585,7 +586,7 @@ export interface CheckTemplateItem {
 // 鑷姩鏃ヨ閰嶇疆
 export interface AutoCheckConfig {
   filterExpression: string; // 绛涢€夎〃杈惧紡锛堝 "#瀛︿範 %涓撲笟杈撳叆"锛?
-  comparisonType: 'duration' | 'earliestStart' | 'latestStart' | 'earliestEnd' | 'latestEnd' | 'count'; // 鍒ゆ柇绫诲瀷
+  comparisonType: 'duration' | 'earliestStart' | 'latestStart' | 'nightLatestStart' | 'earliestEnd' | 'latestEnd' | 'count'; // 鍒ゆ柇绫诲瀷
   operator: '>=' | '<=' | '>' | '<' | '='; // 姣旇緝杩愮畻绗?
   targetValue: number; // 鐩爣鍊硷紙鍒嗛挓鏁帮紝鏃跺埢鐢ㄥ垎閽熻〃绀哄 480=8:00锛屾鏁板氨鏄暟瀛楋級
 }
