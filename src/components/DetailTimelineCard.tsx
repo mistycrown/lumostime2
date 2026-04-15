@@ -1,9 +1,10 @@
 /**
  * @file DetailTimelineCard.tsx
  * @input Filtered logs, display date, entity info
- * @output Timeline UI with calendar, stats, history, and shared custom timeline styling with per-day rail termination plus month-based quick navigation in all-record mode
+ * @output Timeline UI with calendar, stats, history, and shared custom timeline styling with per-day rail termination, Chinese day-total duration labels, plus month-based quick navigation in all-record mode
  * @pos Component (Shared Detail View UI)
- * @description 详情页面共享的时间线卡片组件，包括月历热图、统计信息、历史记录列表，以及与主时间线同步且在每个分组末端及时收线的自定义轨道样式
+ * @description 详情页面共享的时间线卡片组件，包括月历热图、统计信息、历史记录列表，以及与主时间线同步且在每个分组末端及时收线的自定义轨道样式；每日总时长支持按中文显示为“X小时Y分钟”
+ * @updated 2026-04-15: 每日时间线总和超过 60 分钟时改为显示“X小时Y分钟”，整小时仅显示“X小时”
  * 
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
@@ -19,6 +20,22 @@ import { TimelineStyleRail } from './TimelineStyleRail';
 
 const CALENDAR_WEEK_DAYS_MONDAY_FIRST = ['周一', '周二', '周三', '周四', '周五', '周六', '周日'];
 const WEEK_DAYS_SUNDAY_FIRST = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
+
+const formatDayTotalDuration = (totalSeconds: number): string => {
+    const totalMinutes = Math.floor(totalSeconds / 60);
+    const hours = Math.floor(totalMinutes / 60);
+    const minutes = totalMinutes % 60;
+
+    if (hours === 0) {
+        return `${totalMinutes}分钟`;
+    }
+
+    if (minutes === 0) {
+        return `${hours}小时`;
+    }
+
+    return `${hours}小时${minutes}分钟`;
+};
 
 interface DetailTimelineCardProps {
     // 数据
@@ -1070,7 +1087,7 @@ export const DetailTimelineCard: React.FC<DetailTimelineCardProps> = ({
                                         <span className="text-xs font-medium text-stone-400">{weekDay}</span>
                                     </div>
                                     <div className="flex items-center gap-2">
-                                        <span className="font-bold text-stone-900 font-mono">{Math.floor(daySeconds / 60)}m</span>
+                                        <span className="font-bold text-stone-900 font-mono">{formatDayTotalDuration(daySeconds)}</span>
                                     </div>
                                 </div>
 

@@ -8,6 +8,7 @@
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
 import { WebPlugin } from '@capacitor/core';
+import type { PluginListenerHandle } from '@capacitor/core';
 import type { FocusNotificationPlugin } from './FocusNotificationPlugin';
 
 /**
@@ -20,8 +21,18 @@ export class FocusNotificationWeb extends WebPlugin implements FocusNotification
         return { granted: true }; // Mock granted on web
     }
 
+    async checkNotificationPermission(): Promise<{ granted: boolean }> {
+        console.log('FocusNotification.checkNotificationPermission (Web - No-op)');
+        return { granted: true };
+    }
+
     async requestFloatingPermission(): Promise<void> {
         console.log('FocusNotification.requestFloatingPermission (Web - No-op)');
+    }
+
+    async requestNotificationPermission(): Promise<{ granted: boolean }> {
+        console.log('FocusNotification.requestNotificationPermission (Web - No-op)');
+        return { granted: true };
     }
 
     async startFloatingWindow(options?: { icon?: string, isFocusing?: boolean, startTime?: string }): Promise<void> {
@@ -34,5 +45,12 @@ export class FocusNotificationWeb extends WebPlugin implements FocusNotification
 
     async stopFloatingWindow(): Promise<void> {
         console.log('FocusNotification.stopFloatingWindow (Web - No-op)');
+    }
+
+    addListener(
+        eventName: string,
+        listenerFunc: (data: any) => void
+    ): Promise<PluginListenerHandle> & PluginListenerHandle {
+        return super.addListener(eventName, listenerFunc) as Promise<PluginListenerHandle> & PluginListenerHandle;
     }
 }

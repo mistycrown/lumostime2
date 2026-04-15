@@ -18,10 +18,14 @@ export interface FocusNotificationPlugin {
      */
     checkFloatingPermission(): Promise<{ granted: boolean }>;
 
+    checkNotificationPermission(): Promise<{ granted: boolean }>;
+
     /**
      * 请求悬浮窗权限
      */
     requestFloatingPermission(): Promise<void>;
+
+    requestNotificationPermission(): Promise<{ granted: boolean }>;
 
     /**
      * 启动悬浮窗服务
