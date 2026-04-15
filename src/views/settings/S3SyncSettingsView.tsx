@@ -176,7 +176,7 @@ export const S3SyncSettingsView: React.FC<S3SyncSettingsViewProps> = ({
                                 <button
                                     onClick={() => {
                                         if (confirm('确定要完全清理S3配置吗？这将删除所有保存的配置信息，下次需要重新输入。')) {
-                                            s3Service.clearConfig();
+                                            s3Service.disconnect();
                                             setS3Config(null);
                                             setS3ConfigForm({ bucketName: '', region: '', secretId: '', secretKey: '', endpoint: '' });
                                             localStorage.removeItem('lumos_s3_draft_bucket');

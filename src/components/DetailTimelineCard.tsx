@@ -17,6 +17,12 @@ import { IconRenderer } from './IconRenderer';
 import { usePrivacy } from '../contexts/PrivacyContext';
 import { useSettings } from '../contexts/SettingsContext';
 import { TimelineStyleRail } from './TimelineStyleRail';
+type ScoreBarColor = {
+    bg: string;
+    bgStyle?: React.CSSProperties;
+    text: string;
+    useInlineStyle: boolean;
+};
 
 const CALENDAR_WEEK_DAYS_MONDAY_FIRST = ['周一', '周二', '周三', '周四', '周五', '周六', '周日'];
 const WEEK_DAYS_SUNDAY_FIRST = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
@@ -111,7 +117,7 @@ export const DetailTimelineCard: React.FC<DetailTimelineCardProps> = ({
     // 日期悬浮条相关状态
     const [showDateSidebar, setShowDateSidebar] = React.useState(false);
     const [activeSidebarKey, setActiveSidebarKey] = React.useState<string | null>(null);
-    const scrollContainerRef = React.useRef<HTMLDivElement | null>(null);
+    const scrollContainerRef = React.useRef<HTMLElement | null>(null);
 
     const displayMonth = displayDate.getMonth();
     const displayYear = displayDate.getFullYear();
@@ -667,7 +673,7 @@ export const DetailTimelineCard: React.FC<DetailTimelineCardProps> = ({
                                     .getPropertyValue('--accent-color').trim() !== '#1c1917';
                                 
                                 // 获取专注度对应的颜色
-                                const getFocusColor = (score: number) => {
+                                const getFocusColor = (score: number): ScoreBarColor => {
                                     if (useThemeColor) {
                                         // 使用主题色的不同透明度
                                         const opacities = {
@@ -678,6 +684,7 @@ export const DetailTimelineCard: React.FC<DetailTimelineCardProps> = ({
                                             5: 1.0
                                         };
                                         return {
+                                            bg: '',
                                             bgStyle: {
                                                 backgroundColor: 'var(--progress-bar-fill)',
                                                 opacity: opacities[score as keyof typeof opacities]
@@ -772,7 +779,7 @@ export const DetailTimelineCard: React.FC<DetailTimelineCardProps> = ({
                                     .getPropertyValue('--accent-color').trim() !== '#1c1917';
                                 
                                 // 获取情绪对应的颜色
-                                const getMoodColor = (score: number) => {
+                                const getMoodColor = (score: number): ScoreBarColor => {
                                     if (useThemeColor) {
                                         // 使用主题色的不同透明度
                                         const opacities = {
@@ -783,6 +790,7 @@ export const DetailTimelineCard: React.FC<DetailTimelineCardProps> = ({
                                             5: 1.0
                                         };
                                         return {
+                                            bg: '',
                                             bgStyle: {
                                                 backgroundColor: 'var(--progress-bar-fill)',
                                                 opacity: opacities[score as keyof typeof opacities]

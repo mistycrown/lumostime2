@@ -14,7 +14,7 @@ import { ParsedData } from '../components/ChronoPrint/types';
 import { PrintCard, PrintBarChart, PrintDonutChart, PrintStyle } from '../components/ChronoPrint/PrintComponents';
 import { getFontEmbedCSS, toPng } from 'html-to-image';
 import { fontService } from '../services/fontService';
-import { ToastType } from '../types';
+import type { ToastType } from '../components/Toast';
 
 const FONT_URL = 'https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;800;900&family=Merriweather:ital,wght@0,300;0,400;0,700;0,900;1,300;1,400&family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&family=Space+Mono:ital,wght@0,400;0,700;1,400&family=DM+Serif+Display:ital@0;1&display=swap';
 const FONT_READY_TIMEOUT = 3000;

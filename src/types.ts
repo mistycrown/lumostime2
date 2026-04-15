@@ -657,7 +657,8 @@ export interface NarrativeTemplate {
   id: string;
   title: string;
   description: string; // 绠€鐭弿杩帮紝鐢ㄤ簬UI灞曠ず
-  prompt: string; // 鎻愮ず璇嶅唴瀹?  isCustom?: boolean; // Whether created by user
+  prompt: string; // 鎻愮ず璇嶅唴瀹? 
+  isCustom?: boolean; // Whether created by user
   icon?: string;
   isDaily?: boolean;    // 鏄惁鐢ㄤ簬鏃ュ洖椤?
   isWeekly?: boolean;   // 鏄惁鐢ㄤ簬鍛ㄥ洖椤?

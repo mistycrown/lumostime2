@@ -7,7 +7,8 @@ import { ChevronLeft, Download, Palette, Layout } from 'lucide-react';
 import { toPng } from 'html-to-image';
 import { Capacitor } from '@capacitor/core';
 import { Filesystem, Directory } from '@capacitor/filesystem';
-import { Log, ToastType } from '../types';
+import { Log, Scope } from '../types';
+import type { ToastType } from '../components/Toast';
 import { SHARE_THEMES, SHARE_TEMPLATES } from '../components/ShareCard/constants';
 import { ShareCardContent } from '../components/ShareCard/types';
 import { TemplateRenderer } from '../components/ShareCard/TemplateRenderer';
@@ -16,6 +17,7 @@ import { imageService } from '../services/imageService';
 
 interface ShareViewProps {
   log: Log;
+  scopes?: Scope[];
   onBack: () => void;
   onToast?: (type: ToastType, message: string) => void;
 }
@@ -103,21 +105,21 @@ export const ShareView: React.FC<ShareViewProps> = ({ log, onBack, onToast }) =>
       const images = previewRef.current.querySelectorAll('img');
       const imagePromises = Array.from(images).map(img => {
         if (img.complete) return Promise.resolve();
-        return new Promise((resolve, reject) => {
-          img.onload = resolve;
+        return new Promise<void>((resolve) => {
+          img.onload = () => resolve();
           img.onerror = () => {
             console.warn('Image failed to load:', img.src);
             resolve(); // 即使失败也继续
           };
           // 超时保护
-          setTimeout(resolve, 3000);
+          setTimeout(() => resolve(), 3000);
         });
       });
       
       await Promise.all(imagePromises);
       
       // 额外延迟确保渲染完成
-      await new Promise(r => setTimeout(r, 200));
+      await new Promise<void>((resolve) => setTimeout(resolve, 200));
 
       const options = { 
         cacheBust: true, 

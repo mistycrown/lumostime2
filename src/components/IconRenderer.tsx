@@ -135,19 +135,12 @@ export const IconRenderer: React.FC<IconRendererProps> = ({
                     img.style.width = sizeValue;
                     img.style.height = sizeValue;
                     // 对于 OpenMoji，使用 transform scale 来放大
-                    if (scaleFactor !== 1) {
-                        img.style.transform = `scale(${scaleFactor})`;
-                    }
+                    img.style.transform = `scale(${scaleFactor})`;
                 }
             } else {
                 // 默认使用 1em，这样会跟随字体大小
-                if (scaleFactor !== 1) {
-                    img.style.width = `${scaleFactor}em`;
-                    img.style.height = `${scaleFactor}em`;
-                } else {
-                    img.style.width = '1em';
-                    img.style.height = '1em';
-                }
+                img.style.width = `${scaleFactor}em`;
+                img.style.height = `${scaleFactor}em`;
             }
             img.style.verticalAlign = 'middle';
             img.style.display = 'inline-block';
