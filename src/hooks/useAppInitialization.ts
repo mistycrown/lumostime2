@@ -4,6 +4,7 @@
  * @output App Initialization (data repair, dual icon migration, app rules loading, update check, background service init)
  * @pos Hook (System Integration)
  * @description 应用初始化 Hook - 处理应用启动时的数据修复、迁移、规则加载、更新检查等初始化任务
+ * @updated 2026-04-15: Unified Android floating-window startup so the overlay can still recover when notifications are disabled.
  * 
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
@@ -20,8 +21,8 @@ import { useData } from '../contexts/DataContext';
 import { dataRepairService } from '../services/dataRepairService';
 import { dualIconMigrationService } from '../services/dualIconMigrationService';
 import { initResetDataTool } from '../utils/resetDataTool';
-import FocusNotification from '../plugins/FocusNotificationPlugin';
 import { DEFAULT_PRINCIPLE_PRESETS } from '../constants/principlePresets';
+import { startFloatingWindowWithGuards } from '../utils/floatingWindowStartup';
 
 // Edge-to-Edge 支持（仅在 Android 上可用）
 let EdgeToEdge: any = null;
@@ -193,12 +194,14 @@ export const useAppInitialization = () => {
                     console.log('🎈 检测到悬浮球已启用，尝试启动...');
                     
                     // 检查权限
-                    const { granted } = await FocusNotification.checkFloatingPermission();
+                    const result = await startFloatingWindowWithGuards();
                     
-                    if (granted) {
+                    if (result.started) {
                         // 启动悬浮球服务
-                        await FocusNotification.startFloatingWindow();
                         console.log('✅ 悬浮球已自动启动');
+                        if (!result.notificationPermissionGranted) {
+                            console.warn('[AppInitialization] Floating window started without notification permission; stability may be reduced.');
+                        }
                     } else {
                         console.log('⚠️ 悬浮球权限未授予，无法自动启动');
                     }

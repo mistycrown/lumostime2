@@ -169,13 +169,14 @@ public class FloatingWindowService extends Service {
             Log.d(TAG, "📥 Service onStartCommand: focus=" + focusing + ", start=" + start + ", icon=" + icon);
             updateContent(icon, focusing, start);
         }
-        return START_NOT_STICKY;
+        return START_STICKY;
     }
 
     @Override
     public void onDestroy() {
         super.onDestroy();
         instance = null;
+        stopForeground(true);
         Log.d(TAG, "🔴 悬浮窗服务销毁, instance已清空");
         if (floatingView != null) {
             try {
@@ -201,6 +202,9 @@ public class FloatingWindowService extends Service {
         super.onCreate();
         instance = this;
         Log.d(TAG, "🟢 悬浮窗服务 onCreate");
+
+        createNotificationChannel();
+        startForeground(NOTIFICATION_ID, createNotification("悬浮球已开启，点击可返回 LumosTime"));
 
         windowManager = (WindowManager) getSystemService(WINDOW_SERVICE);
         initView();
@@ -486,6 +490,7 @@ public class FloatingWindowService extends Service {
 
             handler.removeCallbacks(updateRunnable);
             handler.post(updateRunnable);
+            updateNotification("悬浮球计时中，点击可结束当前专注");
         } else {
             // Stop Focusing Mode -> Show App Icon
             handler.removeCallbacks(updateRunnable);
@@ -500,6 +505,48 @@ public class FloatingWindowService extends Service {
 
             iconView.setScaleY(1f);
             iconView.setVisibility(View.VISIBLE);
+            updateNotification("悬浮球已开启，点击可返回 LumosTime");
+        }
+    }
+
+    private void createNotificationChannel() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            NotificationChannel channel = new NotificationChannel(
+                    CHANNEL_ID,
+                    "悬浮球服务",
+                    NotificationManager.IMPORTANCE_LOW);
+            channel.setDescription("保持 LumosTime 悬浮球在后台持续运行");
+            NotificationManager manager = getSystemService(NotificationManager.class);
+            if (manager != null) {
+                manager.createNotificationChannel(channel);
+            }
+        }
+    }
+
+    private Notification createNotification(String contentText) {
+        Intent notificationIntent = new Intent(this, MainActivity.class);
+        notificationIntent.addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+        PendingIntent pendingIntent = PendingIntent.getActivity(
+                this,
+                0,
+                notificationIntent,
+                PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+
+        return new androidx.core.app.NotificationCompat.Builder(this, CHANNEL_ID)
+                .setContentTitle("LumosTime 悬浮球运行中")
+                .setContentText(contentText)
+                .setSmallIcon(android.R.drawable.ic_dialog_info)
+                .setContentIntent(pendingIntent)
+                .setOngoing(true)
+                .setSilent(true)
+                .setPriority(androidx.core.app.NotificationCompat.PRIORITY_LOW)
+                .build();
+    }
+
+    private void updateNotification(String contentText) {
+        NotificationManager manager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
+        if (manager != null) {
+            manager.notify(NOTIFICATION_ID, createNotification(contentText));
         }
     }
 

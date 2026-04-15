@@ -14,6 +14,7 @@
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
 import React, { useState, useRef, useEffect } from 'react';
+import { App as CapacitorApp } from '@capacitor/app';
 import {
     ChevronRight,
     User,
@@ -95,6 +96,7 @@ import { cloudImageConsistencyService } from '../services/cloudImageConsistencyS
 import { usePrivacy } from '../contexts/PrivacyContext';
 import { RedemptionService } from '../services/redemptionService';
 import { SceneSettingsView } from './SceneSettingsView';
+import { startFloatingWindowWithGuards, type FloatingWindowStartupResult } from '../utils/floatingWindowStartup';
 import {
     AISettingsViewLazy as AISettingsView,
     AutoLinkViewLazy as AutoLinkView,
@@ -226,6 +228,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
     const [s3Config, setS3Config] = useState<S3Config | null>(null);
     // Floating Window State
     const [floatingWindowEnabled, setFloatingWindowEnabled] = useState(false);
+    const pendingFloatingWindowResumeCheckRef = useRef(false);
 
     // UI State
     const [isDefaultViewDropdownOpen, setIsDefaultViewDropdownOpen] = useState(false);
@@ -299,6 +302,75 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
         checkFloatingStatus();
     }, []);
 
+    const handleFloatingWindowStartFeedback = (
+        result: FloatingWindowStartupResult,
+        source: 'toggle' | 'resume'
+    ) => {
+        if (result.started) {
+            if (!result.notificationPermissionGranted) {
+                onToast('info', '悬浮球已开启，但通知栏常驻不可用，稳定性会变差。请在系统设置中允许通知。');
+                return;
+            }
+
+            onToast('success', source === 'resume' ? '悬浮球已自动恢复' : '悬浮球已开启');
+            return;
+        }
+
+        if (!result.floatingPermissionGranted) {
+            onToast(
+                'info',
+                source === 'resume'
+                    ? '悬浮窗权限尚未授予，暂未恢复悬浮球。'
+                    : '请在系统设置中授予悬浮窗权限，返回后会自动尝试启动。'
+            );
+            return;
+        }
+
+        onToast('error', source === 'resume' ? '自动恢复悬浮球失败' : '开启悬浮球失败');
+    };
+
+    useEffect(() => {
+        if (Capacitor.getPlatform() !== 'android') {
+            return;
+        }
+
+        let listener: { remove: () => void } | null = null;
+        let cancelled = false;
+
+        const setupListener = async () => {
+            listener = await CapacitorApp.addListener('appStateChange', async ({ isActive }) => {
+                if (!isActive || !pendingFloatingWindowResumeCheckRef.current) {
+                    return;
+                }
+
+                pendingFloatingWindowResumeCheckRef.current = false;
+
+                if (localStorage.getItem('floating_window_enabled') !== 'true') {
+                    return;
+                }
+
+                try {
+                    const result = await startFloatingWindowWithGuards();
+                    handleFloatingWindowStartFeedback(result, 'resume');
+                } catch (error) {
+                    console.error('Restore floating window on resume failed:', error);
+                    onToast('error', '自动恢复悬浮球失败');
+                }
+            });
+
+            if (cancelled && listener) {
+                listener.remove();
+            }
+        };
+
+        setupListener();
+
+        return () => {
+            cancelled = true;
+            listener?.remove();
+        };
+    }, [onToast]);
+
     const handleToggleFloatingWindow = async () => {
         if (!Capacitor.isNativePlatform()) {
             onToast('error', '悬浮球仅支持 Android 设备');
@@ -311,18 +383,24 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
 
         try {
             if (newState) {
-                const { granted } = await FocusNotification.checkFloatingPermission();
-                if (granted) {
-                    await FocusNotification.startFloatingWindow();
+                const result = await startFloatingWindowWithGuards({
+                    requestFloatingPermission: true,
+                    requestNotificationPermission: true
+                });
+                pendingFloatingWindowResumeCheckRef.current =
+                    (!result.floatingPermissionGranted && result.requestedFloatingPermission) ||
+                    (result.started && !result.notificationPermissionGranted && result.requestedNotificationPermission);
+
+                handleFloatingWindowStartFeedback(result, 'toggle');
+                return;
+                /*
+
                     onToast('success', '悬浮球已开启');
-                } else {
-                    await FocusNotification.requestFloatingPermission();
-                    // Permission result handling requires app resume usually, 
-                    // but for simplicity we rely on user manually granting and retrying or plugin handling it.
-                    // The plugin requestFloatingPermission typically opens settings.
                     onToast('info', '请在设置中授予悬浮窗权限');
                 }
+                */
             } else {
+                pendingFloatingWindowResumeCheckRef.current = false;
                 await FocusNotification.stopFloatingWindow();
                 onToast('success', '悬浮球已关闭');
             }
