@@ -1,17 +1,22 @@
 /**
  * @file FloatingWindowService.java
  * @input Intent Commands (Start/Stop/Update)
- * @output Floating UI Overlay
+ * @output Floating UI Overlay and Foreground Notification
  * @pos Native Service
- * @description Background service managing the "LumosTime Island" floating window. Handles UI rendering, touch events, and state updates (Time/Icon/Emoji).
+ * @description Foreground Android service managing the "LumosTime Island" floating window, including overlay rendering, touch interaction, runtime state updates, and a persistent notification that helps reduce background kills.
+ * @updated 2026-04-15: Added foreground-notification support for the floating window service.
  */
 package com.mistycrown.lumostime;
 
+import android.app.Notification;
+import android.app.NotificationChannel;
+import android.app.NotificationManager;
+import android.app.PendingIntent;
 import android.app.Service;
-import android.content.Intent;
-import android.content.IntentFilter;
 import android.content.BroadcastReceiver;
 import android.content.Context;
+import android.content.Intent;
+import android.content.IntentFilter;
 import android.content.pm.PackageManager;
 import android.graphics.Color;
 import android.graphics.PixelFormat;
@@ -19,12 +24,12 @@ import android.graphics.drawable.Drawable;
 import android.os.Build;
 import android.os.IBinder;
 import android.util.Log;
+import android.util.TypedValue;
 import android.view.Gravity;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.WindowManager;
 import android.widget.TextView;
-import android.util.TypedValue;
 
 /**
  * 悬浮窗服务
@@ -32,6 +37,8 @@ import android.util.TypedValue;
  */
 public class FloatingWindowService extends Service {
     private static final String TAG = "FloatingWindowService";
+    private static final String CHANNEL_ID = "floating_window_channel";
+    private static final int NOTIFICATION_ID = 2101;
     private static FloatingWindowService instance = null;
 
     private WindowManager windowManager;
