@@ -4,7 +4,8 @@
  * @output Auto-check completion status
  * @pos Utility (Auto Check)
  * @description 自动日课判断逻辑 - 根据筛选条件和统计规则自动判断日课完成状态
- * 
+ * @updated 2026-04-15: Added nightLatestStart support for cross-midnight sleep auto checks.
+ *
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
 
@@ -18,6 +19,7 @@ interface LogStats {
   totalDuration: number; // 总时长（分钟）
   earliestStart: number | null; // 最早开始时间（分钟，从 0:00 开始）
   latestStart: number | null; // 最晚开始时间（分钟）
+  nightLatestStart: number | null; // 夜间最晚开始时间（18:00-次日04:00，跨零点按延长时刻比较）
   earliestEnd: number | null; // 最早结束时间（分钟）
   latestEnd: number | null; // 最晚结束时间（分钟）
   count: number; // 匹配记录的次数
@@ -29,6 +31,11 @@ interface LogStats {
 function timestampToMinutes(timestamp: number): number {
   const date = new Date(timestamp);
   return date.getHours() * 60 + date.getMinutes();
+}
+
+function timestampToNightMinutes(timestamp: number): number {
+  const minutes = timestampToMinutes(timestamp);
+  return minutes < 4 * 60 ? minutes + 24 * 60 : minutes;
 }
 
 /**
@@ -44,6 +51,7 @@ function calculateLogStats(
     totalDuration: 0,
     earliestStart: null,
     latestStart: null,
+    nightLatestStart: null,
     earliestEnd: null,
     latestEnd: null,
     count: 0
@@ -60,6 +68,11 @@ function calculateLogStats(
   dayStart.setHours(0, 0, 0, 0);
   const dayEnd = new Date(targetDate);
   dayEnd.setHours(23, 59, 59, 999);
+  const nightWindowStart = new Date(targetDate);
+  nightWindowStart.setHours(18, 0, 0, 0);
+  const nightWindowEnd = new Date(targetDate);
+  nightWindowEnd.setDate(nightWindowEnd.getDate() + 1);
+  nightWindowEnd.setHours(4, 0, 0, 0);
 
   const filteredLogs = logs.filter(log => {
     const logStartTime = log.startTime;
@@ -67,6 +80,14 @@ function calculateLogStats(
     const matchesCondition = matchesFilter(log, condition, context);
     
     return isInDateRange && matchesCondition;
+  });
+
+  const nightFilteredLogs = logs.filter(log => {
+    const logStartTime = log.startTime;
+    const isInNightWindow = logStartTime >= nightWindowStart.getTime() && logStartTime < nightWindowEnd.getTime();
+    const matchesCondition = matchesFilter(log, condition, context);
+
+    return isInNightWindow && matchesCondition;
   });
 
   // 计算统计信息
@@ -92,6 +113,14 @@ function calculateLogStats(
     }
     if (stats.latestEnd === null || endMinutes > stats.latestEnd) {
       stats.latestEnd = endMinutes;
+    }
+  });
+
+  nightFilteredLogs.forEach(log => {
+    const startMinutes = timestampToNightMinutes(log.startTime);
+
+    if (stats.nightLatestStart === null || startMinutes > stats.nightLatestStart) {
+      stats.nightLatestStart = startMinutes;
     }
   });
 
@@ -126,6 +155,9 @@ export function evaluateAutoCheck(
       break;
     case 'latestStart':
       actualValue = stats.latestStart;
+      break;
+    case 'nightLatestStart':
+      actualValue = stats.nightLatestStart;
       break;
     case 'earliestEnd':
       actualValue = stats.earliestEnd;
@@ -186,6 +218,13 @@ export function updateAutoCheckItems(
  * @returns 格式化的时间字符串，如 "08:30"
  */
 export function formatTimeValue(minutes: number): string {
+  if (minutes >= 24 * 60) {
+    const adjustedMinutes = minutes - 24 * 60;
+    const hours = Math.floor(adjustedMinutes / 60);
+    const mins = adjustedMinutes % 60;
+    return `次日 ${hours.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}`;
+  }
+
   const hours = Math.floor(minutes / 60);
   const mins = minutes % 60;
   return `${hours.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}`;

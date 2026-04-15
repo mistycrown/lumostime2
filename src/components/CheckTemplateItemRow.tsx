@@ -4,6 +4,7 @@
  * @output UI for editing check template item
  * @pos Component (Check Template)
  * @description 日课模板项编辑行 - 支持手动和自动类型
+ * @updated 2026-04-15: Added nightLatestStart summary rendering for auto rules.
  */
 
 import React, { useEffect, useState } from 'react';
@@ -242,6 +243,7 @@ export const CheckTemplateItemRow: React.FC<CheckTemplateItemRowProps> = ({
                 {item.autoConfig.comparisonType === 'duration' && '时长'}
                 {item.autoConfig.comparisonType === 'earliestStart' && '最早开始'}
                 {item.autoConfig.comparisonType === 'latestStart' && '最晚开始'}
+                {item.autoConfig.comparisonType === 'nightLatestStart' && '夜间最晚开始'}
                 {item.autoConfig.comparisonType === 'earliestEnd' && '最早结束'}
                 {item.autoConfig.comparisonType === 'latestEnd' && '最晚结束'}
                 {item.autoConfig.comparisonType === 'count' && '次数'}
@@ -252,7 +254,7 @@ export const CheckTemplateItemRow: React.FC<CheckTemplateItemRowProps> = ({
                   ? `${item.autoConfig.targetValue}分钟`
                   : item.autoConfig.comparisonType === 'count'
                     ? `${item.autoConfig.targetValue}次`
-                    : `${Math.floor(item.autoConfig.targetValue / 60).toString().padStart(2, '0')}:${(item.autoConfig.targetValue % 60).toString().padStart(2, '0')}`
+                    : `${item.autoConfig.comparisonType === 'nightLatestStart' && item.autoConfig.targetValue >= 24 * 60 ? '次日 ' : ''}${Math.floor(((item.autoConfig.comparisonType === 'nightLatestStart' && item.autoConfig.targetValue >= 24 * 60) ? item.autoConfig.targetValue - 24 * 60 : item.autoConfig.targetValue) / 60).toString().padStart(2, '0')}:${(((item.autoConfig.comparisonType === 'nightLatestStart' && item.autoConfig.targetValue >= 24 * 60) ? item.autoConfig.targetValue - 24 * 60 : item.autoConfig.targetValue) % 60).toString().padStart(2, '0')}`
                 }
               </span>
             ) : (

@@ -4,7 +4,8 @@
  * @output Static Data (Colors, Categories, Initial States, Templates)
  * @pos Global Configuration & Static Data
  * @description Defines application-wide constants, configuration options, and initial mock data.
- * 
+ * @updated 2026-04-15: Switched the default early-sleep auto check to nightLatestStart.
+ *
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
 import { Category, Log, AppView, TodoCategory, TodoItem, Scope, Goal, ReviewTemplate, DailyReview, NarrativeTemplate, CheckTemplate } from './types';
@@ -782,7 +783,7 @@ export const DEFAULT_CHECK_TEMPLATES: CheckTemplate[] = [
         type: 'auto',
         autoConfig: {
           filterExpression: '#睡觉',
-          comparisonType: 'latestStart',
+          comparisonType: 'nightLatestStart',
           operator: '<',
           targetValue: 1380 // 23:00，晚于判断（时刻类型）
         }
