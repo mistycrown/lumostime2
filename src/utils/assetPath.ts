@@ -7,6 +7,11 @@
  */
 
 const ABSOLUTE_URL_PATTERN = /^(?:[a-zA-Z][a-zA-Z\d+\-.]*:|\/\/)/;
+const importMetaEnv = (import.meta as ImportMeta & {
+  env?: {
+    BASE_URL?: string;
+  };
+}).env;
 
 export const resolveAssetPath = (assetPath: string, baseUri?: string): string => {
   if (!assetPath) {
@@ -24,7 +29,7 @@ export const resolveAssetPath = (assetPath: string, baseUri?: string): string =>
     return new URL(normalizedPath, runtimeBaseUri).toString();
   }
 
-  const fallbackBasePath = import.meta.env.BASE_URL || '/';
+  const fallbackBasePath = importMetaEnv?.BASE_URL || '/';
   const normalizedBasePath = fallbackBasePath.endsWith('/') ? fallbackBasePath : `${fallbackBasePath}/`;
   return `${normalizedBasePath}${normalizedPath}`;
 };

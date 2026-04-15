@@ -90,10 +90,16 @@ export enum LogLevel {
     ERROR = 3,
 }
 
+const importMetaEnv = (import.meta as ImportMeta & {
+    env?: {
+        DEV?: boolean;
+    };
+}).env;
+
 /**
  * 当前日志级别
  * 
  * 开发环境：DEBUG（显示所有日志）
  * 生产环境：INFO（只显示重要日志）
  */
-export const CURRENT_LOG_LEVEL = import.meta.env.DEV ? LogLevel.DEBUG : LogLevel.INFO;
+export const CURRENT_LOG_LEVEL = importMetaEnv?.DEV ? LogLevel.DEBUG : LogLevel.INFO;

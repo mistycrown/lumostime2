@@ -108,7 +108,6 @@ interface SettingsContextType {
 
     // 日程图样式
     scheduleStyle: ScheduleStyle;
-    scheduleStyle: ScheduleStyle;
     setScheduleStyle: React.Dispatch<React.SetStateAction<ScheduleStyle>>;
     achievementBottleStyle: AchievementBottleStyle;
     setAchievementBottleStyle: React.Dispatch<React.SetStateAction<AchievementBottleStyle>>;

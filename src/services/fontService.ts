@@ -168,7 +168,7 @@ class FontService {
     const arrayBuffer = await record.blob.arrayBuffer();
     const fontFace = new FontFace(record.familyName, arrayBuffer);
     await fontFace.load();
-    document.fonts.add(fontFace);
+    (document.fonts as FontFaceSet & { add: (font: FontFace) => void }).add(fontFace);
     this.registeredCustomFontIds.add(record.id);
   }
 

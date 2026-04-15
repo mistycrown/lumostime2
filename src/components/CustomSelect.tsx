@@ -12,20 +12,24 @@ interface Option {
 }
 
 interface CustomSelectProps {
+  label?: string;
   value: string;
   options: Option[];
   onChange: (value: string) => void;
   placeholder?: string;
   className?: string;
+  disabled?: boolean;
   dropdownPosition?: 'auto' | 'top' | 'bottom'; // 新增：下拉框位置
 }
 
 export const CustomSelect: React.FC<CustomSelectProps> = ({
+  label,
   value,
   options,
   onChange,
   placeholder = '请选择',
   className = '',
+  disabled = false,
   dropdownPosition = 'auto'
 }) => {
   const [isOpen, setIsOpen] = useState(false);
@@ -75,15 +79,22 @@ export const CustomSelect: React.FC<CustomSelectProps> = ({
 
   return (
     <div ref={containerRef} className={`relative ${className}`}>
+      {label && <label className="mb-2 block text-sm font-medium text-stone-700">{label}</label>}
       <button
         type="button"
         onClick={(e) => {
           e.stopPropagation();
+          if (disabled) return;
           setIsOpen(!isOpen);
         }}
-        className="w-full bg-stone-50 border border-stone-200 rounded-xl px-4 py-2 text-sm outline-none hover:border-stone-300 transition-all flex items-center justify-between text-left"
+        disabled={disabled}
+        className={`w-full rounded-xl border px-4 py-2 text-sm outline-none transition-all flex items-center justify-between text-left ${
+          disabled
+            ? 'cursor-not-allowed border-stone-200 bg-stone-100 text-stone-400'
+            : 'bg-stone-50 border-stone-200 hover:border-stone-300'
+        }`}
       >
-        <span className={selectedOption ? 'text-stone-900' : 'text-stone-400'}>
+        <span className={selectedOption && !disabled ? 'text-stone-900' : 'text-stone-400'}>
           {selectedOption ? selectedOption.label : placeholder}
         </span>
         <ChevronDown 
@@ -92,7 +103,7 @@ export const CustomSelect: React.FC<CustomSelectProps> = ({
         />
       </button>
 
-      {isOpen && (
+      {isOpen && !disabled && (
         <div 
           className={`absolute z-50 w-full bg-white border border-stone-200 rounded-xl shadow-lg overflow-hidden animate-in fade-in duration-200 ${
             shouldOpenUpward 

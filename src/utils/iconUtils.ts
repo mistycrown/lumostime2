@@ -96,7 +96,7 @@ export function hasUiIcon(uiIcon: string | undefined): boolean {
  * 初始化 uiIcon 字段（用于数据迁移）
  * 如果对象没有 uiIcon 字段，则添加为 undefined
  */
-export function ensureUiIconField<T extends { icon: string; uiIcon?: string }>(
+export function ensureUiIconField<T extends { icon?: string; uiIcon?: string }>(
   item: T
 ): T {
   if (!('uiIcon' in item)) {

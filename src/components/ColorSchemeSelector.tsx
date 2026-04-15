@@ -51,6 +51,7 @@ export type ColorScheme =
 interface ColorSchemeSelectorProps {
     currentScheme: ColorScheme;
     onSchemeChange: (scheme: ColorScheme) => void;
+    title?: string;
 }
 
 // 配色方案配置
@@ -337,13 +338,15 @@ const COLOR_SCHEMES: SchemeConfig[] = [
  */
 export const ColorSchemeSelector: React.FC<ColorSchemeSelectorProps> = ({
     currentScheme,
-    onSchemeChange
+    onSchemeChange,
+    title
 }) => {
     // 按分类分组
     const categories = ['经典', '莫兰迪', '风格', '传统'];
     
     return (
         <div className="space-y-6">
+            {title && <h3 className="text-sm font-semibold text-stone-700">{title}</h3>}
             {categories.map(category => {
                 const schemes = COLOR_SCHEMES.filter(s => s.category === category);
                 if (schemes.length === 0) return null;

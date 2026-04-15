@@ -37,6 +37,8 @@ export const TimelineStyleRail: React.FC<TimelineStyleRailProps> = ({
     nodeColorOverride,
     maxTimelineWidth
 }) => {
+    const isLegacyClassicTheme = (theme as string) === 'classic';
+
     const renderLine = () => {
         const { lineWidth, timelineWidth, lineColor, lineOpacity, railOffsetX } = config;
         const opacity = lineOpacity / 100;
@@ -49,7 +51,7 @@ export const TimelineStyleRail: React.FC<TimelineStyleRailProps> = ({
             return null;
         }
 
-        if (theme === 'classic') {
+        if (isLegacyClassicTheme) {
             return (
                 <div
                     className="absolute top-3 bottom-[-2.5rem] left-0 -translate-x-1/2 transition-all duration-500"
@@ -177,7 +179,7 @@ export const TimelineStyleRail: React.FC<TimelineStyleRailProps> = ({
             );
         }
 
-        if (theme === 'classic') {
+        if (isLegacyClassicTheme) {
             const dotSize = Math.max(6, iconSize - 6);
 
             return (

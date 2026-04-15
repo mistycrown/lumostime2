@@ -66,7 +66,7 @@ const validateStageThresholdInputs = (inputs: StageThresholdInputState): {
 
     return {
         error: null,
-        thresholds: parsed as TimePalStageThresholds
+        thresholds: parsed as unknown as TimePalStageThresholds
     };
 };
 
