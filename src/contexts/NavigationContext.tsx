@@ -28,7 +28,7 @@ export type SettingsSubmenu =
     | 'scene'
     | 'emoji'
     | 'principle'
-    | 'widget_timer';
+    | 'widget';
 
 interface NavigationContextType {
     // 主视图

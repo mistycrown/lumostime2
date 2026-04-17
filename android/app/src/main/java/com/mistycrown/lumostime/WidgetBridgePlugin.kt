@@ -34,12 +34,14 @@ class WidgetBridgePlugin : Plugin() {
 
         for (index in 0 until templatesArray.length()) {
             val item = templatesArray.optJSONObject(index) ?: continue
+            val widgetType = WidgetTypes.normalize(item.optString("widgetType"))
             val size = WidgetSizes.normalize(item.optString("size"))
             templates += WidgetTemplate(
                 id = item.optString("id").ifBlank { "widget-template-$index" },
+                widgetType = widgetType,
                 name = item.optString("name").ifBlank { WidgetStores.DEFAULT_TEMPLATE_NAME },
                 size = size,
-                slots = parseSlots(item.optJSONArray("slots"), size),
+                slots = parseSlots(item.optJSONArray("slots"), size, widgetType),
                 createdAt = item.optLong("createdAt", System.currentTimeMillis()),
                 updatedAt = item.optLong("updatedAt", System.currentTimeMillis())
             )
@@ -85,6 +87,31 @@ class WidgetBridgePlugin : Plugin() {
     }
 
     @PluginMethod
+    fun getPendingDailyActions(call: PluginCall) {
+        val result = JSObject()
+        val actions = JSArray()
+        WidgetStores.loadPendingDailyActions(context).forEach { actions.put(dailyActionToJs(it)) }
+        result.put("actions", actions)
+        call.resolve(result)
+    }
+
+    @PluginMethod
+    fun clearPendingDailyActions(call: PluginCall) {
+        val idsArray = call.getArray("ids") ?: JSArray()
+        val ids = mutableSetOf<String>()
+
+        for (index in 0 until idsArray.length()) {
+            val id = idsArray.optString(index)
+            if (!id.isNullOrBlank()) {
+                ids.add(id)
+            }
+        }
+
+        WidgetStores.clearPendingDailyActions(context, ids)
+        call.resolve()
+    }
+
+    @PluginMethod
     fun getRuntimeState(call: PluginCall) {
         val result = JSObject()
         result.put("runtimeState", WidgetStores.loadRuntimeState(context)?.let(::runtimeToJs))
@@ -95,8 +122,9 @@ class WidgetBridgePlugin : Plugin() {
     fun syncRuntimeState(call: PluginCall) {
         val runtimeJson = call.getObject("runtimeState")
         val runtimeState = runtimeJson?.let {
-            WidgetTimerRuntimeState(
+            WidgetRuntimeState(
                 id = it.getString("id") ?: "",
+                widgetType = WidgetTypes.normalize(it.optString("widgetType")),
                 activityId = it.getString("activityId") ?: "",
                 categoryId = it.getString("categoryId") ?: "",
                 icon = it.optString("icon", "\u2022"),
@@ -128,6 +156,23 @@ class WidgetBridgePlugin : Plugin() {
     }
 
     @PluginMethod
+    fun syncDailyWidgetData(call: PluginCall) {
+        val payloadJson = call.getObject("payload")
+        val payload = payloadJson?.let {
+            WidgetDailySyncPayload(
+                date = it.optString("date"),
+                items = it.optJSONArray("items").toDailyMetaList(),
+                progress = it.optJSONArray("progress").toDailyProgressList(),
+                syncedAt = it.optLong("syncedAt", System.currentTimeMillis())
+            )
+        }
+
+        WidgetStores.saveDailySyncPayload(context, payload)
+        WidgetRefreshCoordinator.refreshAllAsync(context)
+        call.resolve()
+    }
+
+    @PluginMethod
     fun refreshWidget(call: PluginCall) {
         val appWidgetId = call.getInt("appWidgetId") ?: -1
         val templateId = parseNullableString(call.getString("templateId"))
@@ -145,16 +190,23 @@ class WidgetBridgePlugin : Plugin() {
         call.resolve()
     }
 
-    private fun parseSlots(slotsArray: JSONArray?, widgetSize: String): List<WidgetTimerSlotConfig> {
+    private fun parseSlots(
+        slotsArray: JSONArray?,
+        widgetSize: String,
+        widgetType: String
+    ): List<WidgetSlotConfig> {
         if (slotsArray == null) {
-            return (0 until WidgetSizes.slotCount(widgetSize)).map { WidgetTimerSlotConfig(slotIndex = it) }
+            return (0 until WidgetSizes.slotCount(widgetSize)).map {
+                WidgetSlotConfig(slotIndex = it, widgetType = WidgetTypes.normalize(widgetType))
+            }
         }
 
-        val slots = mutableListOf<WidgetTimerSlotConfig>()
+        val slots = mutableListOf<WidgetSlotConfig>()
         for (index in 0 until slotsArray.length()) {
             val item = slotsArray.optJSONObject(index) ?: continue
-            slots += WidgetTimerSlotConfig(
+            slots += WidgetSlotConfig(
                 slotIndex = item.optInt("slotIndex", index),
+                widgetType = WidgetTypes.normalize(item.optString("widgetType", widgetType)),
                 activityId = parseNullableString(item.optString("activityId")),
                 categoryId = parseNullableString(item.optString("categoryId")),
                 icon = parseNullableString(item.optString("icon")),
@@ -164,7 +216,11 @@ class WidgetBridgePlugin : Plugin() {
                 label = parseNullableString(item.optString("label")),
                 color = parseNullableString(item.optString("color")),
                 linkedTodoId = parseNullableString(item.optString("linkedTodoId")),
-                scopeIds = item.optJSONArray("scopeIds").toStringList()
+                scopeIds = item.optJSONArray("scopeIds").toStringList(),
+                checkTemplateId = parseNullableString(item.optString("checkTemplateId")),
+                checkItemId = parseNullableString(item.optString("checkItemId")),
+                checkManualMode = parseNullableString(item.optString("checkManualMode")),
+                checkTargetCount = if (item.has("checkTargetCount")) item.optInt("checkTargetCount") else null
             )
         }
         return slots
@@ -173,6 +229,7 @@ class WidgetBridgePlugin : Plugin() {
     private fun templateToJs(template: WidgetTemplate): JSObject {
         return JSObject().apply {
             put("id", template.id)
+            put("widgetType", WidgetTypes.normalize(template.widgetType))
             put("name", template.name)
             put("size", template.size)
             put("createdAt", template.createdAt)
@@ -186,15 +243,17 @@ class WidgetBridgePlugin : Plugin() {
     private fun bindingToJs(binding: WidgetInstanceBinding): JSObject {
         return JSObject().apply {
             put("appWidgetId", binding.appWidgetId)
+            put("widgetType", WidgetTypes.normalize(binding.widgetType))
             put("templateId", binding.templateId)
             put("createdAt", binding.createdAt)
             put("updatedAt", binding.updatedAt)
         }
     }
 
-    private fun slotToJs(slot: WidgetTimerSlotConfig): JSObject {
+    private fun slotToJs(slot: WidgetSlotConfig): JSObject {
         return JSObject().apply {
             put("slotIndex", slot.slotIndex)
+            put("widgetType", WidgetTypes.normalize(slot.widgetType))
             put("activityId", slot.activityId)
             put("categoryId", slot.categoryId)
             put("icon", slot.icon)
@@ -205,12 +264,17 @@ class WidgetBridgePlugin : Plugin() {
             put("color", slot.color)
             put("linkedTodoId", slot.linkedTodoId)
             put("scopeIds", slot.scopeIds.toJsonArray())
+            put("checkTemplateId", slot.checkTemplateId)
+            put("checkItemId", slot.checkItemId)
+            put("checkManualMode", slot.checkManualMode)
+            put("checkTargetCount", slot.checkTargetCount)
         }
     }
 
     private fun actionToJs(action: WidgetPendingAction): JSObject {
         return JSObject().apply {
             put("id", action.id)
+            put("widgetType", WidgetTypes.normalize(action.widgetType))
             put("activityId", action.activityId)
             put("categoryId", action.categoryId)
             put("icon", action.icon)
@@ -224,9 +288,24 @@ class WidgetBridgePlugin : Plugin() {
         }
     }
 
-    private fun runtimeToJs(runtimeState: WidgetTimerRuntimeState): JSObject {
+    private fun dailyActionToJs(action: WidgetPendingDailyAction): JSObject {
+        return JSObject().apply {
+            put("id", action.id)
+            put("widgetType", WidgetTypes.normalize(action.widgetType))
+            put("date", action.date)
+            put("checkTemplateId", action.checkTemplateId)
+            put("checkItemId", action.checkItemId)
+            put("actionMode", action.actionMode)
+            put("createdAt", action.createdAt)
+            put("appWidgetId", action.appWidgetId)
+            put("slotIndex", action.slotIndex)
+        }
+    }
+
+    private fun runtimeToJs(runtimeState: WidgetRuntimeState): JSObject {
         return JSObject().apply {
             put("id", runtimeState.id)
+            put("widgetType", WidgetTypes.normalize(runtimeState.widgetType))
             put("activityId", runtimeState.activityId)
             put("categoryId", runtimeState.categoryId)
             put("icon", runtimeState.icon)
@@ -251,6 +330,56 @@ class WidgetBridgePlugin : Plugin() {
         for (index in 0 until length()) {
             val value = parseNullableString(optString(index)) ?: continue
             values.add(value)
+        }
+        return values
+    }
+
+    private fun JSONArray?.toDailyMetaList(): List<WidgetDailyCheckMeta> {
+        if (this == null) {
+            return emptyList()
+        }
+
+        val values = mutableListOf<WidgetDailyCheckMeta>()
+        for (index in 0 until length()) {
+            val item = optJSONObject(index) ?: continue
+            val checkTemplateId = parseNullableString(item.optString("checkTemplateId")) ?: continue
+            val checkItemId = parseNullableString(item.optString("checkItemId")) ?: continue
+            values.add(
+                WidgetDailyCheckMeta(
+                    checkTemplateId = checkTemplateId,
+                    checkItemId = checkItemId,
+                    content = item.optString("content"),
+                    category = item.optString("category"),
+                    manualMode = WidgetDailyModes.normalize(item.optString("manualMode")),
+                    targetCount = item.optInt("targetCount", 1).coerceAtLeast(1),
+                    icon = parseNullableString(item.optString("icon")),
+                    uiIcon = parseNullableString(item.optString("uiIcon"))
+                )
+            )
+        }
+        return values
+    }
+
+    private fun JSONArray?.toDailyProgressList(): List<WidgetDailyProgress> {
+        if (this == null) {
+            return emptyList()
+        }
+
+        val values = mutableListOf<WidgetDailyProgress>()
+        for (index in 0 until length()) {
+            val item = optJSONObject(index) ?: continue
+            val checkItemId = parseNullableString(item.optString("checkItemId")) ?: continue
+            values.add(
+                WidgetDailyProgress(
+                    checkItemId = checkItemId,
+                    date = item.optString("date"),
+                    manualMode = WidgetDailyModes.normalize(item.optString("manualMode")),
+                    currentCount = item.optInt("currentCount", 0).coerceAtLeast(0),
+                    targetCount = item.optInt("targetCount", 1).coerceAtLeast(1),
+                    isCompleted = item.optBoolean("isCompleted", false),
+                    updatedAt = item.optLong("updatedAt", System.currentTimeMillis())
+                )
+            )
         }
         return values
     }

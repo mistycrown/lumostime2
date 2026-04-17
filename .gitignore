@@ -19,6 +19,8 @@ dist
 dist-ssr
 *.local
 
+
+android/.gradle-user/
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

@@ -10,7 +10,7 @@ import android.text.TextPaint
 
 /**
  * Renders widget slot visuals as bitmaps so RemoteViews can show
- * dynamic activity colors and emoji icons.
+ * dynamic timer states and daily-check progress states.
  */
 object WidgetSlotBitmapRenderer {
     private const val SLOT_SIZE_DP = 72f
@@ -18,6 +18,9 @@ object WidgetSlotBitmapRenderer {
     private const val STOP_SIZE_DP = 22f
     private const val STOP_RADIUS_DP = 3f
     private const val EMOJI_TEXT_SIZE_DP = 28f
+    private const val DAILY_CHECK_TEXT_SIZE_DP = 26f
+    private const val DAILY_COUNT_EMOJI_SIZE_DP = 20f
+    private const val DAILY_COUNT_TEXT_SIZE_DP = 15f
 
     fun render(context: Context, slot: WidgetSnapshotSlot): Bitmap {
         val sizePx = dpToPx(context, SLOT_SIZE_DP)
@@ -25,10 +28,10 @@ object WidgetSlotBitmapRenderer {
         val canvas = Canvas(bitmap)
 
         val baseColor = parseColor(slot.color)
-        val fillColor = if (slot.isActive) {
-            baseColor
-        } else {
-            blendWithWhite(baseColor, 0.82f)
+        val fillColor = when {
+            slot.widgetType == WidgetTypes.TIMER && slot.isActive -> baseColor
+            slot.widgetType == WidgetTypes.DAILY && slot.isCompleted -> baseColor
+            else -> blendWithWhite(baseColor, 0.82f)
         }
 
         val circlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -39,12 +42,26 @@ object WidgetSlotBitmapRenderer {
         val circleRadius = ((sizePx / 2f) - circleInsetPx).coerceAtLeast(0f)
         canvas.drawCircle(sizePx / 2f, sizePx / 2f, circleRadius, circlePaint)
 
-        if (slot.isActive) {
-            drawStop(canvas, context, sizePx)
+        if (slot.widgetType == WidgetTypes.TIMER) {
+            if (slot.isActive) {
+                drawStop(canvas, context, sizePx)
+            } else {
+                drawCenteredText(canvas, context, sizePx, slot.icon, EMOJI_TEXT_SIZE_DP, Color.parseColor("#1F2937"))
+            }
             return bitmap
         }
 
-        drawEmoji(canvas, context, sizePx, slot.icon)
+        if (slot.isCompleted) {
+            drawCenteredText(canvas, context, sizePx, "✓", DAILY_CHECK_TEXT_SIZE_DP, Color.parseColor("#111827"))
+            return bitmap
+        }
+
+        if (WidgetDailyModes.normalize(slot.manualMode) == WidgetDailyModes.COUNT && slot.currentCount > 0) {
+            drawCountLayout(canvas, context, sizePx, slot.icon, slot.currentCount)
+            return bitmap
+        }
+
+        drawCenteredText(canvas, context, sizePx, slot.icon, EMOJI_TEXT_SIZE_DP, Color.parseColor("#1F2937"))
         return bitmap
     }
 
@@ -61,14 +78,47 @@ object WidgetSlotBitmapRenderer {
         canvas.drawRoundRect(rect, radius, radius, stopPaint)
     }
 
-    private fun drawEmoji(canvas: Canvas, context: Context, sizePx: Int, icon: String) {
-        val textPaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
+    private fun drawCountLayout(
+        canvas: Canvas,
+        context: Context,
+        sizePx: Int,
+        icon: String,
+        currentCount: Int
+    ) {
+        val emojiPaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
             color = Color.parseColor("#1F2937")
             textAlign = Paint.Align.CENTER
-            textSize = dpToPx(context, EMOJI_TEXT_SIZE_DP).toFloat()
+            textSize = dpToPx(context, DAILY_COUNT_EMOJI_SIZE_DP).toFloat()
+        }
+        val countPaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.parseColor("#111827")
+            textAlign = Paint.Align.CENTER
+            textSize = dpToPx(context, DAILY_COUNT_TEXT_SIZE_DP).toFloat()
+            isFakeBoldText = true
+        }
+
+        val iconY = sizePx * 0.42f - ((emojiPaint.descent() + emojiPaint.ascent()) / 2f)
+        val countY = sizePx * 0.68f - ((countPaint.descent() + countPaint.ascent()) / 2f)
+        canvas.drawText(icon.ifBlank { "\u2022" }, sizePx / 2f, iconY, emojiPaint)
+        canvas.drawText(currentCount.toString(), sizePx / 2f, countY, countPaint)
+    }
+
+    private fun drawCenteredText(
+        canvas: Canvas,
+        context: Context,
+        sizePx: Int,
+        text: String,
+        textSizeDp: Float,
+        textColor: Int
+    ) {
+        val textPaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = textColor
+            textAlign = Paint.Align.CENTER
+            textSize = dpToPx(context, textSizeDp).toFloat()
+            isFakeBoldText = text == "✓"
         }
         val baseline = (sizePx / 2f) - ((textPaint.descent() + textPaint.ascent()) / 2f)
-        canvas.drawText(icon.ifBlank { "\u2022" }, sizePx / 2f, baseline, textPaint)
+        canvas.drawText(text.ifBlank { "\u2022" }, sizePx / 2f, baseline, textPaint)
     }
 
     private fun parseColor(raw: String): Int {

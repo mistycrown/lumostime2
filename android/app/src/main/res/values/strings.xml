@@ -5,9 +5,10 @@
     <string name="package_name">com.mistycrown.lumostime</string>
     <string name="custom_url_scheme">lumostime</string>
     <string name="accessibility_service_description">LumosTime 使用无障碍服务检测应用切换，实现自动时间记录功能。本服务不会收集或上传任何个人信息。</string>
-    <string name="widget_label_2x2">LumosTime 小组件 2x2</string>
-    <string name="widget_label_2x1">LumosTime 小组件 2x1</string>
-    <string name="widget_label_3x2">LumosTime 小组件 3x2</string>
-    <string name="widget_label_4x1">LumosTime 小组件 4x1</string>
-    <string name="widget_label_4x2">LumosTime 小组件 4x2</string>
+    <string name="widget_label_2x2">计时器 2x2</string>
+    <string name="widget_label_2x1">计时器 2x1</string>
+    <string name="widget_label_3x2">计时器 3x2</string>
+    <string name="widget_label_4x1">计时器 4x1</string>
+    <string name="widget_label_4x2">计时器 4x2</string>
+    <string name="widget_label_daily_2x2">日课 2x2</string>
 </resources>
