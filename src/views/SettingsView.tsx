@@ -1197,12 +1197,13 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
         return <SceneSettingsView onBack={handleBackToMain} />;
     }
 
-    if (activeSubmenu === 'widget_timer') {
+    if (activeSubmenu === 'widget') {
         return renderLazySettingsSubview(
             <WidgetSettingsView
                 onBack={handleBackToMain}
                 onToast={onToast}
                 categories={categoriesData || []}
+                checkTemplates={checkTemplates || []}
                 todos={todos || []}
                 todoCategories={todoCategories || []}
                 scopes={scopes || []}
@@ -1314,8 +1315,8 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
                         />
                         <MenuItem
                             icon={<LayoutGrid size={18} className="text-sky-500" />}
-                            label="小组件计时器"
-                            onClick={() => openSettingsSubmenu('widget_timer')}
+                            label="小组件"
+                            onClick={() => openSettingsSubmenu('widget')}
                         />
                         <ToggleItem
                             icon={<SquareActivity size={18} className="text-teal-500" />}

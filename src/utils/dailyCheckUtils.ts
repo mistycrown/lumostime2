@@ -21,6 +21,7 @@ export type DailyCheckActionStatus =
   | 'unsupported_type';
 
 export interface DailyCheckTemplateMeta {
+  checkTemplateId: string;
   checkItemId: string;
   content: string;
   category: string;
@@ -184,6 +185,7 @@ export const getDailyCheckTemplateMeta = (
       : 1;
 
     return {
+      checkTemplateId: template.id,
       checkItemId,
       content: item.content,
       category: template.title,
@@ -512,6 +514,7 @@ export const getEligibleNfcDailyCheckItems = (checkTemplates: CheckTemplate[]): 
 
       const manualMode: 'binary' | 'count' = item.manualMode === 'count' ? 'count' : 'binary';
       items.push({
+        checkTemplateId: template.id,
         checkItemId: getCheckTemplateItemKey(template, item, index),
         content: item.content,
         category: template.title,

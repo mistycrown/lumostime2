@@ -21,6 +21,7 @@ public final class WidgetProviderSupport {
     public static void refreshAll(
             Context context,
             Class<? extends AppWidgetProvider> providerClass,
+            String widgetType,
             String widgetSize,
             int layoutResId,
             int[] slotViewIds
@@ -31,15 +32,25 @@ public final class WidgetProviderSupport {
         if (appWidgetIds == null || appWidgetIds.length == 0) {
             return;
         }
-        WidgetStores.INSTANCE.maybeAutoBindLegacyWidgets(context, appWidgetIds, widgetSize);
-        WidgetStores.INSTANCE.ensureBindings(context, appWidgetIds, widgetSize);
-        updateWidgets(context, appWidgetManager, appWidgetIds, providerClass, widgetSize, layoutResId, slotViewIds);
+        WidgetStores.INSTANCE.maybeAutoBindLegacyWidgets(context, appWidgetIds, widgetType, widgetSize);
+        WidgetStores.INSTANCE.ensureBindings(context, appWidgetIds, widgetType, widgetSize);
+        updateWidgets(
+                context,
+                appWidgetManager,
+                appWidgetIds,
+                providerClass,
+                widgetType,
+                widgetSize,
+                layoutResId,
+                slotViewIds
+        );
     }
 
     public static void refreshWidget(
             Context context,
             int appWidgetId,
             Class<? extends AppWidgetProvider> providerClass,
+            String widgetType,
             String widgetSize,
             int layoutResId,
             int[] slotViewIds
@@ -54,6 +65,7 @@ public final class WidgetProviderSupport {
                 appWidgetManager,
                 new int[] { appWidgetId },
                 providerClass,
+                widgetType,
                 widgetSize,
                 layoutResId,
                 slotViewIds
@@ -65,13 +77,23 @@ public final class WidgetProviderSupport {
             AppWidgetManager appWidgetManager,
             int[] appWidgetIds,
             Class<? extends AppWidgetProvider> providerClass,
+            String widgetType,
             String widgetSize,
             int layoutResId,
             int[] slotViewIds
     ) {
-        WidgetStores.INSTANCE.maybeAutoBindLegacyWidgets(context, appWidgetIds, widgetSize);
-        WidgetStores.INSTANCE.ensureBindings(context, appWidgetIds, widgetSize);
-        updateWidgets(context, appWidgetManager, appWidgetIds, providerClass, widgetSize, layoutResId, slotViewIds);
+        WidgetStores.INSTANCE.maybeAutoBindLegacyWidgets(context, appWidgetIds, widgetType, widgetSize);
+        WidgetStores.INSTANCE.ensureBindings(context, appWidgetIds, widgetType, widgetSize);
+        updateWidgets(
+                context,
+                appWidgetManager,
+                appWidgetIds,
+                providerClass,
+                widgetType,
+                widgetSize,
+                layoutResId,
+                slotViewIds
+        );
     }
 
     public static void onDeleted(Context context, int[] appWidgetIds) {
@@ -88,6 +110,7 @@ public final class WidgetProviderSupport {
             Context context,
             Intent intent,
             Class<? extends AppWidgetProvider> providerClass,
+            String widgetType,
             String widgetSize,
             int layoutResId,
             int[] slotViewIds
@@ -103,7 +126,13 @@ public final class WidgetProviderSupport {
                     AppWidgetManager.INVALID_APPWIDGET_ID
             );
             if (slotIndex >= 0 && appWidgetId != AppWidgetManager.INVALID_APPWIDGET_ID) {
-                WidgetTimerController.INSTANCE.handleSlotTap(context, appWidgetId, widgetSize, slotIndex);
+                WidgetTimerController.INSTANCE.handleSlotTap(
+                        context,
+                        appWidgetId,
+                        widgetType,
+                        widgetSize,
+                        slotIndex
+                );
                 WidgetRefreshCoordinator.INSTANCE.refreshAllAsync(context);
             }
             return;
@@ -115,8 +144,16 @@ public final class WidgetProviderSupport {
                     AppWidgetManager.INVALID_APPWIDGET_ID
             );
             if (appWidgetId != AppWidgetManager.INVALID_APPWIDGET_ID) {
-                WidgetStores.INSTANCE.cycleBindingToNextTemplate(context, appWidgetId, widgetSize);
-                refreshWidget(context, appWidgetId, providerClass, widgetSize, layoutResId, slotViewIds);
+                WidgetStores.INSTANCE.cycleBindingToNextTemplate(context, appWidgetId, widgetType, widgetSize);
+                refreshWidget(
+                        context,
+                        appWidgetId,
+                        providerClass,
+                        widgetType,
+                        widgetSize,
+                        layoutResId,
+                        slotViewIds
+                );
             }
         }
     }
@@ -126,6 +163,7 @@ public final class WidgetProviderSupport {
             AppWidgetManager appWidgetManager,
             int[] appWidgetIds,
             Class<? extends AppWidgetProvider> providerClass,
+            String widgetType,
             String widgetSize,
             int layoutResId,
             int[] slotViewIds
@@ -136,7 +174,12 @@ public final class WidgetProviderSupport {
 
         for (int appWidgetId : appWidgetIds) {
             RemoteViews views = new RemoteViews(context.getPackageName(), layoutResId);
-            WidgetSnapshot snapshot = WidgetSnapshotBuilder.INSTANCE.build(context, appWidgetId, widgetSize);
+            WidgetSnapshot snapshot = WidgetSnapshotBuilder.INSTANCE.build(
+                    context,
+                    appWidgetId,
+                    widgetType,
+                    widgetSize
+            );
             views.setTextViewText(R.id.widget_title, snapshot.getTemplateName());
             views.setOnClickPendingIntent(
                     R.id.widget_title,

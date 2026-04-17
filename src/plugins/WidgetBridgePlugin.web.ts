@@ -8,8 +8,10 @@
  */
 import { WebPlugin } from '@capacitor/core';
 import type {
+  WidgetBridgeDailySyncPayload,
   WidgetBridgeInstanceBinding,
   WidgetBridgePendingAction,
+  WidgetBridgePendingDailyAction,
   WidgetBridgePlugin,
   WidgetBridgeRuntimeState,
   WidgetBridgeTemplate
@@ -37,6 +39,14 @@ export class WidgetBridgeWeb extends WebPlugin implements WidgetBridgePlugin {
   }
 
   async syncRuntimeState(): Promise<void> {}
+
+  async getPendingDailyActions(): Promise<{ actions: WidgetBridgePendingDailyAction[] }> {
+    return { actions: [] };
+  }
+
+  async clearPendingDailyActions(): Promise<void> {}
+
+  async syncDailyWidgetData(_options?: { payload: WidgetBridgeDailySyncPayload | null }): Promise<void> {}
 
   async refreshWidget(): Promise<void> {}
 }

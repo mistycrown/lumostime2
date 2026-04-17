@@ -6,10 +6,10 @@ import android.content.Context;
 import android.content.Intent;
 
 /**
- * 2x2 timer widget provider.
+ * 2x2 daily widget provider.
  */
-public class QuickLogWidget extends AppWidgetProvider {
-    public static final String WIDGET_TYPE = WidgetTypes.TIMER;
+public class DailyCheckWidget2x2 extends AppWidgetProvider {
+    public static final String WIDGET_TYPE = WidgetTypes.DAILY;
     public static final String WIDGET_SIZE = WidgetSizes.SIZE_2X2;
 
     private static final int[] SLOT_VIEW_IDS = new int[] {
@@ -22,7 +22,7 @@ public class QuickLogWidget extends AppWidgetProvider {
     public static void refreshAllAsync(Context context) {
         WidgetProviderSupport.refreshAll(
                 context,
-                QuickLogWidget.class,
+                DailyCheckWidget2x2.class,
                 WIDGET_TYPE,
                 WIDGET_SIZE,
                 R.layout.widget_layout,
@@ -34,7 +34,7 @@ public class QuickLogWidget extends AppWidgetProvider {
         WidgetProviderSupport.refreshWidget(
                 context,
                 appWidgetId,
-                QuickLogWidget.class,
+                DailyCheckWidget2x2.class,
                 WIDGET_TYPE,
                 WIDGET_SIZE,
                 R.layout.widget_layout,
@@ -48,7 +48,7 @@ public class QuickLogWidget extends AppWidgetProvider {
                 context,
                 appWidgetManager,
                 appWidgetIds,
-                QuickLogWidget.class,
+                DailyCheckWidget2x2.class,
                 WIDGET_TYPE,
                 WIDGET_SIZE,
                 R.layout.widget_layout,
@@ -68,7 +68,7 @@ public class QuickLogWidget extends AppWidgetProvider {
         WidgetProviderSupport.onReceive(
                 context,
                 intent,
-                QuickLogWidget.class,
+                DailyCheckWidget2x2.class,
                 WIDGET_TYPE,
                 WIDGET_SIZE,
                 R.layout.widget_layout,

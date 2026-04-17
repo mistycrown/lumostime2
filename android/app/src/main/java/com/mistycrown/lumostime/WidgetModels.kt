@@ -1,9 +1,40 @@
 package com.mistycrown.lumostime
 
 /**
- * Lightweight native models used by the Android timer widget.
- * Templates are edited in-app; desktop widget instances only bind to templates.
+ * Lightweight native models used by the Android widget system.
+ * Timer widgets remain the first widget family, while daily widgets reuse the same
+ * template and binding layer with their own mirrored progress snapshot.
  */
+object WidgetTypes {
+    const val TIMER = "timer"
+    const val DAILY = "daily"
+    const val DEFAULT = TIMER
+
+    @JvmStatic
+    fun normalize(widgetType: String?): String {
+        return when (widgetType) {
+            TIMER,
+            DAILY -> widgetType
+            else -> DEFAULT
+        }
+    }
+}
+
+object WidgetDailyModes {
+    const val BINARY = "binary"
+    const val COUNT = "count"
+    const val DEFAULT = BINARY
+
+    @JvmStatic
+    fun normalize(manualMode: String?): String {
+        return when (manualMode) {
+            COUNT -> COUNT
+            BINARY -> BINARY
+            else -> DEFAULT
+        }
+    }
+}
+
 object WidgetSizes {
     const val SIZE_2X1 = "2x1"
     const val SIZE_2X2 = "2x2"
@@ -28,7 +59,7 @@ object WidgetSizes {
     fun slotCount(size: String?): Int {
         return when (normalize(size)) {
             SIZE_2X1 -> 2
-            SIZE_2X2,
+            SIZE_2X2 -> 4
             SIZE_3X2 -> 6
             SIZE_4X1 -> 4
             SIZE_4X2 -> 8
@@ -37,8 +68,9 @@ object WidgetSizes {
     }
 }
 
-data class WidgetTimerSlotConfig(
+data class WidgetSlotConfig(
     val slotIndex: Int,
+    val widgetType: String = WidgetTypes.DEFAULT,
     val activityId: String? = null,
     val categoryId: String? = null,
     val icon: String? = null,
@@ -48,31 +80,41 @@ data class WidgetTimerSlotConfig(
     val label: String? = null,
     val color: String? = null,
     val linkedTodoId: String? = null,
-    val scopeIds: List<String> = emptyList()
+    val scopeIds: List<String> = emptyList(),
+    val checkTemplateId: String? = null,
+    val checkItemId: String? = null,
+    val checkManualMode: String? = null,
+    val checkTargetCount: Int? = null
 ) {
     fun isConfigured(): Boolean {
-        return !activityId.isNullOrBlank() && !categoryId.isNullOrBlank()
+        return when (WidgetTypes.normalize(widgetType)) {
+            WidgetTypes.DAILY -> !checkItemId.isNullOrBlank()
+            else -> !activityId.isNullOrBlank() && !categoryId.isNullOrBlank()
+        }
     }
 }
 
 data class WidgetTemplate(
     val id: String,
+    val widgetType: String = WidgetTypes.DEFAULT,
     val name: String,
     val size: String = WidgetSizes.DEFAULT,
-    val slots: List<WidgetTimerSlotConfig>,
+    val slots: List<WidgetSlotConfig>,
     val createdAt: Long,
     val updatedAt: Long
 )
 
 data class WidgetInstanceBinding(
     val appWidgetId: Int,
+    val widgetType: String = WidgetTypes.DEFAULT,
     val templateId: String? = null,
     val createdAt: Long,
     val updatedAt: Long
 )
 
-data class WidgetTimerRuntimeState(
+data class WidgetRuntimeState(
     val id: String,
+    val widgetType: String = WidgetTypes.DEFAULT,
     val activityId: String,
     val categoryId: String,
     val icon: String,
@@ -89,6 +131,7 @@ data class WidgetTimerRuntimeState(
 
 data class WidgetPendingAction(
     val id: String,
+    val widgetType: String = WidgetTypes.DEFAULT,
     val activityId: String,
     val categoryId: String,
     val icon: String,
@@ -101,20 +144,67 @@ data class WidgetPendingAction(
     val scopeIds: List<String> = emptyList()
 )
 
+data class WidgetDailyCheckMeta(
+    val checkTemplateId: String,
+    val checkItemId: String,
+    val content: String,
+    val category: String,
+    val manualMode: String = WidgetDailyModes.DEFAULT,
+    val targetCount: Int = 1,
+    val icon: String? = null,
+    val uiIcon: String? = null
+)
+
+data class WidgetDailyProgress(
+    val checkItemId: String,
+    val date: String,
+    val manualMode: String = WidgetDailyModes.DEFAULT,
+    val currentCount: Int = 0,
+    val targetCount: Int = 1,
+    val isCompleted: Boolean = false,
+    val updatedAt: Long
+)
+
+data class WidgetDailySyncPayload(
+    val date: String,
+    val items: List<WidgetDailyCheckMeta>,
+    val progress: List<WidgetDailyProgress>,
+    val syncedAt: Long
+)
+
+data class WidgetPendingDailyAction(
+    val id: String,
+    val widgetType: String = WidgetTypes.DAILY,
+    val date: String,
+    val checkTemplateId: String? = null,
+    val checkItemId: String,
+    val actionMode: String = "complete_once",
+    val createdAt: Long,
+    val appWidgetId: Int? = null,
+    val slotIndex: Int? = null
+)
+
 data class WidgetSnapshotSlot(
     val slotIndex: Int,
+    val widgetType: String = WidgetTypes.DEFAULT,
     val activityId: String?,
     val categoryId: String?,
+    val checkItemId: String? = null,
     val icon: String,
     val uiIconAssetPath: String?,
     val uiIconFallbackAssetPath: String?,
     val label: String,
     val color: String,
-    val isActive: Boolean
+    val isActive: Boolean,
+    val manualMode: String? = null,
+    val currentCount: Int = 0,
+    val targetCount: Int = 1,
+    val isCompleted: Boolean = false
 )
 
 data class WidgetSnapshot(
     val appWidgetId: Int,
+    val widgetType: String = WidgetTypes.DEFAULT,
     val widgetSize: String,
     val templateId: String?,
     val templateName: String,

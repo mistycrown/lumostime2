@@ -1,15 +1,19 @@
 /**
  * @file WidgetSettingsView.tsx
- * @input Widget templates, categories, todos, scopes, Android bridge availability
+ * @input Widget templates, categories, daily check templates, todos, scopes, Android bridge availability
  * @output A template-based widget configuration page with per-slot modal editing
  * @pos View
- * @description Lets the user create, name, resize, edit, and manage Android timer widget templates while configuring each slot directly from the template preview.
- * @updated 2026-04-14: Switched template editing to auto-save, updated the preview sizing, and allowed deleting templates even when widgets still reference them.
+ * @description Lets the user create, rename, resize, edit, and manage Android widget templates while configuring timer and daily widgets from a shared entry.
+ * @updated 2026-04-16: Added daily 2x2 widget editing alongside the existing timer widget template flow.
  */
 import React, { useEffect, useMemo, useState } from 'react';
 import { ChevronLeft, Plus, Trash2 } from 'lucide-react';
 import { ConfirmModal } from '../../components/ConfirmModal';
 import { CustomSelect } from '../../components/CustomSelect';
+import {
+  DailyWidgetSlotConfigDraft,
+  DailyWidgetSlotConfigModal
+} from '../../components/DailyWidgetSlotConfigModal';
 import { IconRenderer } from '../../components/IconRenderer';
 import {
   WidgetSlotConfigDraft,
@@ -19,33 +23,38 @@ import { ToastType } from '../../components/Toast';
 import WidgetBridge from '../../plugins/WidgetBridgePlugin';
 import {
   DEFAULT_WIDGET_SIZE,
+  DEFAULT_DAILY_WIDGET_COLOR,
   WidgetTemplate,
   WidgetTemplateSlotConfig,
-  buildWidgetTimerSlotConfig,
+  buildDailyWidgetSlotConfig,
+  buildTimerWidgetSlotConfig,
   countTemplateBoundInstances,
   createWidgetTemplate,
+  findDailyWidgetBinding,
   getWidgetGridBySize,
   getWidgetSizeLabel,
+  getWidgetSizeOptionsByType,
   getWidgetSlotCountBySize,
   isNativeAndroidWidgetSupported,
   loadWidgetTemplatesFromStorage,
   normalizeWidgetSize,
   normalizeWidgetTemplateSlots,
   normalizeWidgetTemplates,
+  rebuildDailyWidgetSlotConfig,
+  rebuildTimerWidgetSlotConfig,
   rebuildWidgetTemplate,
-  rebuildWidgetTimerSlotConfig,
   saveWidgetTemplatesToStorage,
   updateWidgetTemplateSize,
-  updateWidgetTemplateSlots,
-  WIDGET_SIZE_OPTIONS
-} from '../../services/widgetTimerService';
+  updateWidgetTemplateSlots
+} from '../../services/widgetService';
 import { getSoftColorCircleStyle } from '../../utils/colorAdapterUtils';
-import { Category, Scope, TodoCategory, TodoItem } from '../../types';
+import { Category, CheckTemplate, Scope, TodoCategory, TodoItem } from '../../types';
 
 interface WidgetSettingsViewProps {
   onBack: () => void;
   onToast: (type: ToastType, message: string) => void;
   categories: Category[];
+  checkTemplates: CheckTemplate[];
   todos: TodoItem[];
   todoCategories: TodoCategory[];
   scopes: Scope[];
@@ -55,6 +64,12 @@ const AUTO_SAVE_DELAY_MS = 350;
 const PREVIEW_MAX_COLUMNS = 4;
 const PREVIEW_MAX_ROWS = 2;
 const PREVIEW_TITLE_ROW_RATIO = 0.6;
+const WIDGET_TYPE_TABS = [
+  { value: 'timer', label: '计时器' },
+  { value: 'daily', label: '日课' }
+] as const;
+
+type WidgetSettingsTab = (typeof WIDGET_TYPE_TABS)[number]['value'];
 
 const getTemplateSlotSummary = (template: WidgetTemplate): string => {
   const configuredLabels = template.slots
@@ -66,11 +81,10 @@ const getTemplateSlotSummary = (template: WidgetTemplate): string => {
   }
 
   const previewLabels = configuredLabels.slice(0, 4).join('、');
-  const restCount = configuredLabels.length - 4;
-  return restCount > 0 ? `${previewLabels} 等 ${configuredLabels.length} 个活动` : previewLabels;
+  return configuredLabels.length > 4 ? `${previewLabels} 等 ${configuredLabels.length} 项` : previewLabels;
 };
 
-const toSlotDraft = (slot: WidgetTemplateSlotConfig): WidgetSlotConfigDraft => ({
+const toTimerSlotDraft = (slot: WidgetTemplateSlotConfig): WidgetSlotConfigDraft => ({
   slotIndex: slot.slotIndex,
   categoryId: slot.categoryId ?? null,
   activityId: slot.activityId ?? null,
@@ -79,10 +93,19 @@ const toSlotDraft = (slot: WidgetTemplateSlotConfig): WidgetSlotConfigDraft => (
   customIcon: slot.customIcon ?? null
 });
 
+const toDailySlotDraft = (slot: WidgetTemplateSlotConfig): DailyWidgetSlotConfigDraft => ({
+  slotIndex: slot.slotIndex,
+  checkTemplateId: slot.checkTemplateId ?? null,
+  checkItemId: slot.checkItemId ?? null,
+  customIcon: slot.customIcon ?? null,
+  backgroundColor: slot.color ?? DEFAULT_DAILY_WIDGET_COLOR
+});
+
 export const WidgetSettingsView: React.FC<WidgetSettingsViewProps> = ({
   onBack,
   onToast,
   categories,
+  checkTemplates,
   todos,
   todoCategories,
   scopes
@@ -91,19 +114,28 @@ export const WidgetSettingsView: React.FC<WidgetSettingsViewProps> = ({
   const [bindingCounts, setBindingCounts] = useState<Record<string, number>>({});
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [selectedWidgetTab, setSelectedWidgetTab] = useState<WidgetSettingsTab>('timer');
   const [editingTemplateDraft, setEditingTemplateDraft] = useState<WidgetTemplate | null>(null);
   const [editingSlotIndex, setEditingSlotIndex] = useState<number | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<WidgetTemplate | null>(null);
   const [isDraftDirty, setIsDraftDirty] = useState(false);
 
-  const sizeOptions = useMemo(
-    () =>
-      WIDGET_SIZE_OPTIONS.map((size) => ({
-        value: size,
-        label: `${getWidgetSizeLabel(size)} · ${getWidgetSlotCountBySize(size)} 个槽位`
-      })),
-    []
+  const timerTemplates = useMemo(
+    () => templates.filter((template) => template.widgetType === 'timer'),
+    [templates]
   );
+  const dailyTemplates = useMemo(
+    () => templates.filter((template) => template.widgetType === 'daily'),
+    [templates]
+  );
+
+  const sizeOptions = useMemo(() => {
+    const activeWidgetType = editingTemplateDraft?.widgetType || selectedWidgetTab;
+    return getWidgetSizeOptionsByType(activeWidgetType).map((size) => ({
+      value: size,
+      label: `${getWidgetSizeLabel(size)} · ${getWidgetSlotCountBySize(size)} 个槽位`
+    }));
+  }, [editingTemplateDraft?.widgetType, selectedWidgetTab]);
 
   const loadTemplates = async () => {
     const localTemplates = normalizeWidgetTemplates(loadWidgetTemplatesFromStorage());
@@ -120,8 +152,8 @@ export const WidgetSettingsView: React.FC<WidgetSettingsViewProps> = ({
         WidgetBridge.getTemplates(),
         WidgetBridge.getInstanceBindings()
       ]);
-      let effectiveBindings = bindings;
 
+      let effectiveBindings = bindings;
       const nextTemplates =
         nativeTemplates.length > 0 ? normalizeWidgetTemplates(nativeTemplates) : localTemplates;
 
@@ -156,8 +188,7 @@ export const WidgetSettingsView: React.FC<WidgetSettingsViewProps> = ({
       return;
     }
 
-    const slotCount = getWidgetSlotCountBySize(editingTemplateDraft.size);
-    if (editingSlotIndex >= slotCount) {
+    if (editingSlotIndex >= getWidgetSlotCountBySize(editingTemplateDraft.size)) {
       setEditingSlotIndex(null);
     }
   }, [editingSlotIndex, editingTemplateDraft]);
@@ -205,13 +236,14 @@ export const WidgetSettingsView: React.FC<WidgetSettingsViewProps> = ({
   };
 
   const persistDraftNow = async (draft: WidgetTemplate) => {
-    const rebuiltDraft = rebuildWidgetTemplate(draft, categories);
+    const rebuiltDraft = rebuildWidgetTemplate(draft, categories, checkTemplates);
     const nextTemplates = templates.map((template) =>
       template.id === rebuiltDraft.id ? rebuiltDraft : template
     );
     const didSave = await persistTemplates(nextTemplates);
     if (didSave) {
       setIsDraftDirty(false);
+      setEditingTemplateDraft(rebuiltDraft);
     }
     return didSave;
   };
@@ -226,10 +258,17 @@ export const WidgetSettingsView: React.FC<WidgetSettingsViewProps> = ({
     }, AUTO_SAVE_DELAY_MS);
 
     return () => window.clearTimeout(timeoutId);
-  }, [categories, editingTemplateDraft, isDraftDirty, templates]);
+  }, [categories, checkTemplates, editingTemplateDraft, isDraftDirty, templates]);
 
   const handleCreateTemplate = async () => {
-    const nextTemplate = createWidgetTemplate(`小组件 ${templates.length + 1}`, DEFAULT_WIDGET_SIZE);
+    const widgetType = selectedWidgetTab;
+    const defaultSize = getWidgetSizeOptionsByType(widgetType)[0] || DEFAULT_WIDGET_SIZE;
+    const typeIndex = templates.filter((template) => template.widgetType === widgetType).length + 1;
+    const nextTemplate = createWidgetTemplate(
+      widgetType === 'daily' ? `日课小组件 ${typeIndex}` : `小组件 ${typeIndex}`,
+      defaultSize,
+      widgetType
+    );
     const didSave = await persistTemplates([...templates, nextTemplate], '已创建小组件模板');
     if (didSave) {
       setEditingTemplateDraft(nextTemplate);
@@ -239,7 +278,7 @@ export const WidgetSettingsView: React.FC<WidgetSettingsViewProps> = ({
   };
 
   const openEditor = (template: WidgetTemplate) => {
-    setEditingTemplateDraft(rebuildWidgetTemplate(template, categories));
+    setEditingTemplateDraft(rebuildWidgetTemplate(template, categories, checkTemplates));
     setEditingSlotIndex(null);
     setIsDraftDirty(false);
   };
@@ -274,14 +313,20 @@ export const WidgetSettingsView: React.FC<WidgetSettingsViewProps> = ({
       if (!previousDraft) {
         return previousDraft;
       }
+
       return updateWidgetTemplateSize(previousDraft, nextSize);
     });
     setIsDraftDirty(true);
   };
 
-  const updateDraftSlot = (draft: WidgetSlotConfigDraft) => {
+  const updateTimerDraftSlot = (draft: WidgetSlotConfigDraft) => {
     setEditingTemplateDraft((previousDraft) => {
-      if (!previousDraft || !draft.categoryId || !draft.activityId) {
+      if (
+        !previousDraft ||
+        previousDraft.widgetType !== 'timer' ||
+        !draft.categoryId ||
+        !draft.activityId
+      ) {
         return previousDraft;
       }
 
@@ -291,15 +336,50 @@ export const WidgetSettingsView: React.FC<WidgetSettingsViewProps> = ({
         return previousDraft;
       }
 
-      const nextSlots = normalizeWidgetTemplateSlots(previousDraft.slots, previousDraft.size);
-      nextSlots[draft.slotIndex] = buildWidgetTimerSlotConfig(category, activity, draft.slotIndex, {
+      const nextSlots = normalizeWidgetTemplateSlots(
+        previousDraft.slots,
+        previousDraft.size,
+        previousDraft.widgetType
+      );
+      nextSlots[draft.slotIndex] = buildTimerWidgetSlotConfig(category, activity, draft.slotIndex, {
         linkedTodoId: draft.linkedTodoId,
         scopeIds: draft.scopeIds,
-        customIcon: draft.customIcon
+        customIcon: draft.customIcon,
+        widgetType: previousDraft.widgetType
       });
 
       return updateWidgetTemplateSlots(previousDraft, nextSlots);
     });
+
+    setEditingSlotIndex(null);
+    setIsDraftDirty(true);
+  };
+
+  const updateDailyDraftSlot = (draft: DailyWidgetSlotConfigDraft) => {
+    setEditingTemplateDraft((previousDraft) => {
+      if (!previousDraft || previousDraft.widgetType !== 'daily' || !draft.checkItemId) {
+        return previousDraft;
+      }
+
+      const binding = findDailyWidgetBinding(checkTemplates, draft.checkItemId);
+      if (!binding) {
+        return previousDraft;
+      }
+
+      const nextSlots = normalizeWidgetTemplateSlots(
+        previousDraft.slots,
+        previousDraft.size,
+        previousDraft.widgetType
+      );
+      nextSlots[draft.slotIndex] = buildDailyWidgetSlotConfig(binding, draft.slotIndex, {
+        customIcon: draft.customIcon,
+        backgroundColor: draft.backgroundColor,
+        widgetType: previousDraft.widgetType
+      });
+
+      return updateWidgetTemplateSlots(previousDraft, nextSlots);
+    });
+
     setEditingSlotIndex(null);
     setIsDraftDirty(true);
   };
@@ -326,10 +406,16 @@ export const WidgetSettingsView: React.FC<WidgetSettingsViewProps> = ({
       return [];
     }
 
-    return normalizeWidgetTemplateSlots(editingTemplateDraft.slots, editingTemplateDraft.size).map((slot) =>
-      rebuildWidgetTimerSlotConfig(slot, categories)
+    return normalizeWidgetTemplateSlots(
+      editingTemplateDraft.slots,
+      editingTemplateDraft.size,
+      editingTemplateDraft.widgetType
+    ).map((slot) =>
+      editingTemplateDraft.widgetType === 'daily'
+        ? rebuildDailyWidgetSlotConfig(slot, checkTemplates)
+        : rebuildTimerWidgetSlotConfig(slot, categories)
     );
-  }, [categories, editingTemplateDraft]);
+  }, [categories, checkTemplates, editingTemplateDraft]);
 
   const previewGrid = useMemo(() => {
     if (!editingTemplateDraft) {
@@ -351,7 +437,11 @@ export const WidgetSettingsView: React.FC<WidgetSettingsViewProps> = ({
       return null;
     }
 
-    const normalizedSlots = normalizeWidgetTemplateSlots(editingTemplateDraft.slots, editingTemplateDraft.size);
+    const normalizedSlots = normalizeWidgetTemplateSlots(
+      editingTemplateDraft.slots,
+      editingTemplateDraft.size,
+      editingTemplateDraft.widgetType
+    );
     return normalizedSlots.find((slot) => slot.slotIndex === editingSlotIndex) || null;
   }, [editingSlotIndex, editingTemplateDraft]);
 
@@ -360,11 +450,44 @@ export const WidgetSettingsView: React.FC<WidgetSettingsViewProps> = ({
       <div className="font-bold text-stone-800">使用说明</div>
       <div className="mt-3 space-y-2 text-xs leading-6 text-stone-500">
         <div>第一步：新建小组件模板。</div>
-        <div>第二步：在桌面插入对应尺寸的小组件。</div>
-        <div>第三步：如果相同尺寸有多个，点击标题切换。</div>
+        <div>第二步：在系统桌面添加对应尺寸的小组件。</div>
+        <div>第三步：如果同尺寸模板有多个，点击小组件标题可以轮换模板。</div>
       </div>
     </div>
   );
+
+  const renderWidgetTypeSelector = !editingTemplateDraft ? (
+    <div className="space-y-3 rounded-[28px] border border-stone-100 bg-white p-4 shadow-sm">
+      <div>
+        <h3 className="font-bold text-stone-800">小组件类型</h3>
+        <p className="mt-1 text-xs text-stone-400">
+          先选要配置的小组件类型。计时器和日课共用一套模板管理，但各自槽位的绑定规则不同。
+        </p>
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        {WIDGET_TYPE_TABS.map((tab) => {
+          const isActive = selectedWidgetTab === tab.value;
+          return (
+            <button
+              key={tab.value}
+              type="button"
+              onClick={() => setSelectedWidgetTab(tab.value)}
+              className={`rounded-2xl border px-4 py-3 text-sm font-medium transition-all ${
+                isActive
+                  ? 'border-stone-800 bg-stone-800 text-white shadow-sm'
+                  : 'border-stone-200 bg-stone-50 text-stone-600 hover:border-stone-300 hover:bg-white'
+              }`}
+            >
+              {tab.label}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  ) : null;
+
+  const visibleTemplates = selectedWidgetTab === 'daily' ? dailyTemplates : timerTemplates;
+  const isEditingDaily = editingTemplateDraft?.widgetType === 'daily';
 
   return (
     <div className="fixed inset-0 z-50 flex flex-col bg-[#fdfbf7] pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] font-serif animate-in slide-in-from-right duration-300">
@@ -384,7 +507,9 @@ export const WidgetSettingsView: React.FC<WidgetSettingsViewProps> = ({
           </button>
           <div className="flex items-center gap-3">
             <span className="text-lg font-bold text-stone-800">
-              {editingTemplateDraft ? '小组件详情' : '小组件计时器'}
+              {editingTemplateDraft
+                ? `${editingTemplateDraft.widgetType === 'daily' ? '日课' : '计时器'}小组件详情`
+                : '小组件'}
             </span>
             {editingTemplateDraft && (
               <span className="text-[11px] text-stone-400">
@@ -396,6 +521,8 @@ export const WidgetSettingsView: React.FC<WidgetSettingsViewProps> = ({
       </div>
 
       <div className="flex-1 space-y-6 overflow-y-auto px-5 py-6 pb-40">
+        {renderWidgetTypeSelector}
+
         {editingTemplateDraft ? (
           <>
             <div className="space-y-4 rounded-[28px] border border-stone-100 bg-white p-6 shadow-sm">
@@ -418,7 +545,9 @@ export const WidgetSettingsView: React.FC<WidgetSettingsViewProps> = ({
               <div>
                 <h3 className="font-bold text-stone-800">小组件尺寸</h3>
                 <p className="mt-1 text-xs text-stone-400">
-                  切换尺寸时会保留前面的槽位配置，多出来的槽位会裁掉，不足的槽位会自动补空。
+                  {isEditingDaily
+                    ? '日课小组件目前先开放 2x2，等这一版逻辑跑通后再扩展其他尺寸。'
+                    : '切换尺寸时会保留前面的槽位配置，多出来的槽位会被裁掉，不足的槽位会自动补空。'}
                 </p>
               </div>
 
@@ -438,7 +567,9 @@ export const WidgetSettingsView: React.FC<WidgetSettingsViewProps> = ({
               <div>
                 <h3 className="font-bold text-stone-800">模板预览</h3>
                 <p className="mt-1 text-xs text-stone-400">
-                  直接点击下面任意一个槽位，就能设置它的图标、标签、待办和领域。
+                  {isEditingDaily
+                    ? '直接点击下面任意一个槽位，就能绑定手动日课，并设置图标覆盖和背景颜色。'
+                    : '直接点击下面任意一个槽位，就能设置它的图标、标签、待办和领域。'}
                 </p>
               </div>
 
@@ -459,30 +590,33 @@ export const WidgetSettingsView: React.FC<WidgetSettingsViewProps> = ({
                       }}
                     >
                       {draftPreviewSlots.map((slot) => {
-                        const isConfigured = Boolean(slot.activityId && slot.categoryId);
+                        const isConfigured = isEditingDaily
+                          ? Boolean(slot.checkItemId)
+                          : Boolean(slot.activityId && slot.categoryId);
+
                         return (
-                        <button
-                          key={slot.slotIndex}
-                          type="button"
-                          onClick={() => setEditingSlotIndex(slot.slotIndex)}
-                          className="flex h-full w-full min-h-0 items-center justify-center rounded-full p-[6%] text-center transition-all hover:-translate-y-0.5"
-                          style={{ containerType: 'size' }}
-                        >
-                          <div
-                            className="flex min-h-0 min-w-0 items-center justify-center rounded-full leading-none"
-                            style={{
-                              ...getSoftColorCircleStyle(slot.color || '#EEF2F7', isConfigured ? 0.18 : 0.1),
-                              width: '74cqmin',
-                              height: '74cqmin'
-                            } as React.CSSProperties}
+                          <button
+                            key={slot.slotIndex}
+                            type="button"
+                            onClick={() => setEditingSlotIndex(slot.slotIndex)}
+                            className="flex h-full w-full min-h-0 items-center justify-center rounded-full p-[6%] text-center transition-all hover:-translate-y-0.5"
+                            style={{ containerType: 'size' }}
                           >
-                            <IconRenderer icon={slot.icon || '\u2022'} size="42cqmin" />
-                          </div>
-                        </button>
-                      );
-                    })}
+                            <div
+                              className="flex min-h-0 min-w-0 items-center justify-center rounded-full leading-none"
+                              style={{
+                                ...getSoftColorCircleStyle(slot.color || '#EEF2F7', isConfigured ? 0.18 : 0.1),
+                                width: '74cqmin',
+                                height: '74cqmin'
+                              } as React.CSSProperties}
+                            >
+                              <IconRenderer icon={slot.icon || '\u2022'} size="42cqmin" />
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
                   </div>
-                </div>
                 </div>
               </div>
             </div>
@@ -491,7 +625,7 @@ export const WidgetSettingsView: React.FC<WidgetSettingsViewProps> = ({
           <div className="rounded-2xl border border-dashed border-stone-200 bg-stone-50 px-4 py-10 text-center text-sm text-stone-400">
             正在加载小组件模板...
           </div>
-        ) : templates.length === 0 ? (
+        ) : visibleTemplates.length === 0 ? (
           <>
             <button
               type="button"
@@ -504,9 +638,13 @@ export const WidgetSettingsView: React.FC<WidgetSettingsViewProps> = ({
             </button>
 
             <div className="space-y-3 rounded-2xl border border-dashed border-stone-200 bg-stone-50 px-4 py-10 text-center">
-              <p className="text-sm font-bold text-stone-700">还没有小组件模板</p>
+              <p className="text-sm font-bold text-stone-700">
+                {selectedWidgetTab === 'daily' ? '还没有日课小组件模板' : '还没有小组件模板'}
+              </p>
               <p className="text-xs leading-6 text-stone-400">
-                点击上面的“新建小组件模板”，就可以开始配置桌面记时槽位。
+                {selectedWidgetTab === 'daily'
+                  ? '点击上面的“新建小组件模板”，就可以开始配置 2x2 的桌面日课槽位。'
+                  : '点击上面的“新建小组件模板”，就可以开始配置桌面计时槽位。'}
               </p>
             </div>
 
@@ -525,7 +663,7 @@ export const WidgetSettingsView: React.FC<WidgetSettingsViewProps> = ({
             </button>
 
             <div className="space-y-3">
-              {templates.map((template) => (
+              {visibleTemplates.map((template) => (
                 <div
                   key={template.id}
                   className="group flex items-start justify-between rounded-2xl border border-stone-100 bg-white p-4 shadow-[0_2px_8px_rgba(0,0,0,0.02)] transition-colors hover:bg-stone-50"
@@ -542,6 +680,11 @@ export const WidgetSettingsView: React.FC<WidgetSettingsViewProps> = ({
                     <p className="mt-1 line-clamp-2 text-xs leading-5 text-stone-400">
                       {getTemplateSlotSummary(template)}
                     </p>
+                    {bindingCounts[template.id] > 0 && (
+                      <p className="mt-1 text-[11px] text-stone-400">
+                        已绑定 {bindingCounts[template.id]} 个桌面实例
+                      </p>
+                    )}
                   </button>
 
                   <button
@@ -561,14 +704,22 @@ export const WidgetSettingsView: React.FC<WidgetSettingsViewProps> = ({
       </div>
 
       <WidgetSlotConfigModal
-        isOpen={Boolean(editingTemplateDraft && currentEditingSlot)}
-        draft={currentEditingSlot ? toSlotDraft(currentEditingSlot) : null}
+        isOpen={Boolean(editingTemplateDraft && currentEditingSlot && editingTemplateDraft.widgetType === 'timer')}
+        draft={currentEditingSlot ? toTimerSlotDraft(currentEditingSlot) : null}
         categories={categories}
         todos={todos}
         todoCategories={todoCategories}
         scopes={scopes}
         onClose={() => setEditingSlotIndex(null)}
-        onSave={updateDraftSlot}
+        onSave={updateTimerDraftSlot}
+      />
+
+      <DailyWidgetSlotConfigModal
+        isOpen={Boolean(editingTemplateDraft && currentEditingSlot && editingTemplateDraft.widgetType === 'daily')}
+        draft={currentEditingSlot ? toDailySlotDraft(currentEditingSlot) : null}
+        checkTemplates={checkTemplates}
+        onClose={() => setEditingSlotIndex(null)}
+        onSave={updateDailyDraftSlot}
       />
 
       <ConfirmModal
