@@ -28,6 +28,7 @@ object WidgetSlotBitmapRenderer {
         val canvas = Canvas(bitmap)
 
         val baseColor = parseColor(slot.color)
+        val dailyAccentColor = darkenColor(baseColor, 0.34f)
         val fillColor = when {
             slot.widgetType == WidgetTypes.TIMER && slot.isActive -> baseColor
             slot.widgetType == WidgetTypes.DAILY && slot.isCompleted -> baseColor
@@ -52,12 +53,12 @@ object WidgetSlotBitmapRenderer {
         }
 
         if (slot.isCompleted) {
-            drawCenteredText(canvas, context, sizePx, "✓", DAILY_CHECK_TEXT_SIZE_DP, Color.parseColor("#111827"))
+            drawCenteredText(canvas, context, sizePx, "✓", DAILY_CHECK_TEXT_SIZE_DP, dailyAccentColor)
             return bitmap
         }
 
         if (WidgetDailyModes.normalize(slot.manualMode) == WidgetDailyModes.COUNT && slot.currentCount > 0) {
-            drawCountLayout(canvas, context, sizePx, slot.icon, slot.currentCount)
+            drawCountLayout(canvas, context, sizePx, slot.icon, slot.currentCount, dailyAccentColor)
             return bitmap
         }
 
@@ -83,15 +84,16 @@ object WidgetSlotBitmapRenderer {
         context: Context,
         sizePx: Int,
         icon: String,
-        currentCount: Int
+        currentCount: Int,
+        accentColor: Int
     ) {
         val emojiPaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.parseColor("#1F2937")
+            color = accentColor
             textAlign = Paint.Align.CENTER
             textSize = dpToPx(context, DAILY_COUNT_EMOJI_SIZE_DP).toFloat()
         }
         val countPaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.parseColor("#111827")
+            color = accentColor
             textAlign = Paint.Align.CENTER
             textSize = dpToPx(context, DAILY_COUNT_TEXT_SIZE_DP).toFloat()
             isFakeBoldText = true
@@ -139,6 +141,14 @@ object WidgetSlotBitmapRenderer {
         val mixedGreen = green + ((255 - green) * clamped).toInt()
         val mixedBlue = blue + ((255 - blue) * clamped).toInt()
         return Color.rgb(mixedRed, mixedGreen, mixedBlue)
+    }
+
+    private fun darkenColor(colorInt: Int, ratio: Float): Int {
+        val clamped = ratio.coerceIn(0f, 1f)
+        val red = (Color.red(colorInt) * (1f - clamped)).toInt()
+        val green = (Color.green(colorInt) * (1f - clamped)).toInt()
+        val blue = (Color.blue(colorInt) * (1f - clamped)).toInt()
+        return Color.rgb(red, green, blue)
     }
 
     private fun dpToPx(context: Context, dp: Float): Int {

@@ -4,7 +4,7 @@
  * @output Slot configuration modal for widget timer templates
  * @pos Component
  * @description Lets the user configure a widget timer slot by choosing its activity tag, associated todo, scopes, and optional emoji override.
- * @updated 2026-04-14: Removed nested card styling while keeping explicit save so the slot editor stays close to AddLogModal.
+ * @updated 2026-04-17: Improved slot preview icon scaling on larger screens so tablet modals stay proportional.
  */
 import React, { useEffect, useMemo, useState } from 'react';
 import { X } from 'lucide-react';
@@ -121,8 +121,11 @@ export const WidgetSlotConfigModal: React.FC<WidgetSlotConfigModalProps> = ({
 
         <div className="flex-1 space-y-6 overflow-y-auto px-5 py-5">
           <div className="flex items-center gap-4 px-1">
-            <div className="flex h-24 w-24 items-center justify-center rounded-full border border-stone-200 bg-white/80 text-5xl leading-none shadow-[0_10px_24px_rgba(15,23,42,0.08)]">
-              <IconRenderer icon={effectiveIcon} className="text-5xl" />
+            <div
+              className="flex h-24 w-24 items-center justify-center rounded-full border border-stone-200 bg-white/80 leading-none shadow-[0_10px_24px_rgba(15,23,42,0.08)] sm:h-28 sm:w-28 md:h-32 md:w-32"
+              style={{ containerType: 'size' } as React.CSSProperties}
+            >
+              <IconRenderer icon={effectiveIcon} size="58cqmin" />
             </div>
             <div className="min-w-0 flex-1">
               <div className="text-xs font-bold uppercase tracking-widest text-stone-400">Preview</div>

@@ -4,7 +4,7 @@
  * @output Slot configuration modal for daily widgets
  * @pos Component
  * @description Lets the user bind one daily widget slot to a manual daily check item, optionally override its icon, and choose a background color.
- * @updated 2026-04-16: Added the first dedicated editor for daily 2x2 widget slots.
+ * @updated 2026-04-17: Switched daily binding to a dropdown selector and improved tablet preview scaling.
  */
 import React, { useEffect, useMemo, useState } from 'react';
 import { X } from 'lucide-react';
@@ -15,6 +15,7 @@ import { normalizeCustomColorHex } from '../services/customColorGroupService';
 import { DEFAULT_DAILY_WIDGET_COLOR } from '../services/widgetService';
 import { getEligibleNfcDailyCheckItems } from '../utils/dailyCheckUtils';
 import { normalizeHexColor } from '../utils/colorUtils';
+import { CustomSelect } from './CustomSelect';
 import { IconRenderer } from './IconRenderer';
 
 export interface DailyWidgetSlotConfigDraft {
@@ -56,24 +57,17 @@ export const DailyWidgetSlotConfigModal: React.FC<DailyWidgetSlotConfigModalProp
 
   const manualItems = useMemo(() => getEligibleNfcDailyCheckItems(checkTemplates), [checkTemplates]);
 
-  const itemGroups = useMemo(() => {
-    const grouped = new Map<string, { title: string; items: typeof manualItems }>();
-
-    manualItems.forEach((item) => {
-      const current = grouped.get(item.checkTemplateId);
-      if (current) {
-        current.items.push(item);
-        return;
-      }
-
-      grouped.set(item.checkTemplateId, {
-        title: item.category,
-        items: [item]
-      });
-    });
-
-    return Array.from(grouped.values());
-  }, [manualItems]);
+  const bindingOptions = useMemo(
+    () =>
+      manualItems.map((item) => ({
+        value: item.checkItemId,
+        label:
+          item.manualMode === 'count'
+            ? `${item.category} / ${item.content}（目标 ${item.targetCount} 次）`
+            : `${item.category} / ${item.content}`
+      })),
+    [manualItems]
+  );
 
   const selectedItem = useMemo(
     () => manualItems.find((item) => item.checkItemId === localDraft?.checkItemId) ?? null,
@@ -125,6 +119,25 @@ export const DailyWidgetSlotConfigModal: React.FC<DailyWidgetSlotConfigModalProp
     });
   };
 
+  const handleSelectBinding = (checkItemId: string) => {
+    const nextItem = manualItems.find((item) => item.checkItemId === checkItemId);
+    if (!nextItem) {
+      return;
+    }
+
+    setLocalDraft((previousDraft) => {
+      if (!previousDraft) {
+        return previousDraft;
+      }
+
+      return {
+        ...previousDraft,
+        checkTemplateId: nextItem.checkTemplateId,
+        checkItemId: nextItem.checkItemId
+      };
+    });
+  };
+
   const handleSave = () => {
     if (!localDraft || !selectedItem) {
       return;
@@ -158,10 +171,10 @@ export const DailyWidgetSlotConfigModal: React.FC<DailyWidgetSlotConfigModalProp
         <div className="flex-1 space-y-6 overflow-y-auto px-5 py-5">
           <div className="flex items-center gap-4 px-1">
             <div
-              className="flex h-24 w-24 items-center justify-center rounded-full border border-stone-200 text-5xl leading-none shadow-[0_10px_24px_rgba(15,23,42,0.08)]"
-              style={{ backgroundColor: effectiveColor }}
+              className="flex h-24 w-24 items-center justify-center rounded-full border border-stone-200 leading-none shadow-[0_10px_24px_rgba(15,23,42,0.08)] sm:h-28 sm:w-28 md:h-32 md:w-32"
+              style={{ backgroundColor: effectiveColor, containerType: 'size' } as React.CSSProperties}
             >
-              <IconRenderer icon={effectiveIcon} className="text-5xl" />
+              <IconRenderer icon={effectiveIcon} size="58cqmin" />
             </div>
             <div className="min-w-0 flex-1">
               <div className="text-xs font-bold uppercase tracking-widest text-stone-400">Preview</div>
@@ -169,7 +182,7 @@ export const DailyWidgetSlotConfigModal: React.FC<DailyWidgetSlotConfigModalProp
                 {selectedItem?.content || '未绑定日课'}
               </div>
               <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-stone-500">
-                <span>{selectedItem?.category || '请先选择一个日课项'}</span>
+                <span>{selectedItem?.category || '请先选择一个日课项目'}</span>
                 {selectedItem && (
                   <span className="rounded-full bg-stone-100 px-2 py-0.5 text-[11px] text-stone-500">
                     {selectedItem.manualMode === 'count'
@@ -179,6 +192,28 @@ export const DailyWidgetSlotConfigModal: React.FC<DailyWidgetSlotConfigModalProp
                 )}
               </div>
             </div>
+          </div>
+
+          <div>
+            <div className="mb-4 px-1">
+              <h3 className="text-sm font-bold text-stone-800">绑定手动日课</h3>
+              <p className="mt-1 text-xs text-stone-400">
+                这里只显示手动日课，自动日课暂时不能加入到小组件里。
+              </p>
+            </div>
+
+            {bindingOptions.length === 0 ? (
+              <div className="rounded-2xl border border-dashed border-stone-200 bg-white px-4 py-8 text-center text-sm text-stone-400">
+                还没有可绑定的手动日课
+              </div>
+            ) : (
+              <CustomSelect
+                value={localDraft.checkItemId || ''}
+                options={bindingOptions}
+                onChange={handleSelectBinding}
+                placeholder="请选择一个手动日课"
+              />
+            )}
           </div>
 
           <div>
@@ -195,7 +230,7 @@ export const DailyWidgetSlotConfigModal: React.FC<DailyWidgetSlotConfigModalProp
             <input
               value={localDraft.customIcon || ''}
               onChange={(event) => setDraftField('customIcon', event.target.value)}
-              placeholder={selectedItem?.icon || '✳️'}
+              placeholder={selectedItem?.icon || '✅'}
               maxLength={EMOJI_INPUT_MAX_LENGTH}
               className="w-full rounded-3xl border border-stone-200 bg-white px-4 py-4 text-center text-3xl outline-none transition-colors focus:border-stone-400"
             />
@@ -240,65 +275,6 @@ export const DailyWidgetSlotConfigModal: React.FC<DailyWidgetSlotConfigModalProp
                 自定
               </label>
             </div>
-          </div>
-
-          <div>
-            <div className="mb-4 px-1">
-              <h3 className="text-sm font-bold text-stone-800">绑定日课</h3>
-              <p className="mt-1 text-xs text-stone-400">
-                这里只展示手动日课。自动日课暂时不能加到小组件里。
-              </p>
-            </div>
-
-            {itemGroups.length === 0 ? (
-              <div className="rounded-2xl border border-dashed border-stone-200 bg-white px-4 py-8 text-center text-sm text-stone-400">
-                还没有可绑定的手动日课
-              </div>
-            ) : (
-              <div className="space-y-4">
-                {itemGroups.map((group) => (
-                  <div key={group.title}>
-                    <div className="mb-2 px-1 text-[10px] font-bold uppercase tracking-wider text-stone-500">
-                      {group.title}
-                    </div>
-                    <div className="space-y-2">
-                      {group.items.map((item) => {
-                        const isSelected = item.checkItemId === localDraft.checkItemId;
-                        return (
-                          <button
-                            key={item.checkItemId}
-                            type="button"
-                            onClick={() => {
-                              setDraftField('checkTemplateId', item.checkTemplateId);
-                              setDraftField('checkItemId', item.checkItemId);
-                            }}
-                            className={`w-full rounded-2xl border px-4 py-3 text-left transition-colors ${
-                              isSelected
-                                ? 'border-stone-800 bg-stone-900 text-white'
-                                : 'border-stone-200 bg-white text-stone-700 hover:bg-stone-50'
-                            }`}
-                          >
-                            <div className="flex items-center gap-3">
-                              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-white/70 text-xl">
-                                <IconRenderer icon={item.icon || '\u2022'} uiIcon={item.uiIcon} />
-                              </div>
-                              <div className="min-w-0 flex-1">
-                                <div className="truncate text-sm font-bold">{item.content}</div>
-                                <div className={`mt-1 text-xs ${isSelected ? 'text-white/75' : 'text-stone-400'}`}>
-                                  {item.manualMode === 'count'
-                                    ? `手动计数 · 目标 ${item.targetCount} 次`
-                                    : '手动布尔 · 点一次完成'}
-                                </div>
-                              </div>
-                            </div>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
           </div>
         </div>
 
