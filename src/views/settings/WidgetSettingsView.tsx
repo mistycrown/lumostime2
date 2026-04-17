@@ -4,7 +4,7 @@
  * @output A template-based widget configuration page with per-slot modal editing
  * @pos View
  * @description Lets the user create, rename, resize, edit, and manage Android widget templates while configuring timer and daily widgets from a shared entry.
- * @updated 2026-04-16: Added daily 2x2 widget editing alongside the existing timer widget template flow.
+ * @updated 2026-04-17: Expanded daily widgets to the full timer size matrix and refreshed slot editor guidance.
  */
 import React, { useEffect, useMemo, useState } from 'react';
 import { ChevronLeft, Plus, Trash2 } from 'lucide-react';
@@ -546,7 +546,7 @@ export const WidgetSettingsView: React.FC<WidgetSettingsViewProps> = ({
                 <h3 className="font-bold text-stone-800">小组件尺寸</h3>
                 <p className="mt-1 text-xs text-stone-400">
                   {isEditingDaily
-                    ? '日课小组件目前先开放 2x2，等这一版逻辑跑通后再扩展其他尺寸。'
+                    ? '日课小组件现在支持和计时器一致的尺寸；切换尺寸时会保留前面的槽位配置，多出来的槽位会被裁掉，不足的槽位会自动补空。'
                     : '切换尺寸时会保留前面的槽位配置，多出来的槽位会被裁掉，不足的槽位会自动补空。'}
                 </p>
               </div>
@@ -643,7 +643,7 @@ export const WidgetSettingsView: React.FC<WidgetSettingsViewProps> = ({
               </p>
               <p className="text-xs leading-6 text-stone-400">
                 {selectedWidgetTab === 'daily'
-                  ? '点击上面的“新建小组件模板”，就可以开始配置 2x2 的桌面日课槽位。'
+                  ? '点击上面的“新建小组件模板”，就可以开始配置不同尺寸的桌面日课槽位。'
                   : '点击上面的“新建小组件模板”，就可以开始配置桌面计时槽位。'}
               </p>
             </div>

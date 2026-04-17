@@ -35,7 +35,7 @@ const FALLBACK_WIDGET_ICON = '\u2022';
 
 export const DEFAULT_WIDGET_TYPE: WidgetType = 'timer';
 export const WIDGET_TYPE_OPTIONS: WidgetType[] = ['timer', 'daily'];
-export const DAILY_WIDGET_SIZE_OPTIONS = ['2x2'] as const;
+export const DAILY_WIDGET_SIZE_OPTIONS = ['2x1', '2x2', '3x2', '4x1', '4x2'] as const;
 export const DEFAULT_DAILY_WIDGET_COLOR = '#E7E5E4';
 export const DEFAULT_WIDGET_TEMPLATE_NAME = '我的小组件';
 export const DEFAULT_WIDGET_SIZE = '2x2';

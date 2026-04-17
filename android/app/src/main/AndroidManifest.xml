@@ -640,6 +640,18 @@
         </receiver>
 
         <receiver
+            android:name=".DailyCheckWidget2x1"
+            android:exported="true"
+            android:label="@string/widget_label_daily_2x1">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_daily_2x1" />
+        </receiver>
+
+        <receiver
             android:name=".DailyCheckWidget2x2"
             android:exported="true"
             android:label="@string/widget_label_daily_2x2">
@@ -649,6 +661,42 @@
             <meta-data
                 android:name="android.appwidget.provider"
                 android:resource="@xml/widget_info_daily_2x2" />
+        </receiver>
+
+        <receiver
+            android:name=".DailyCheckWidget3x2"
+            android:exported="true"
+            android:label="@string/widget_label_daily_3x2">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_daily_3x2" />
+        </receiver>
+
+        <receiver
+            android:name=".DailyCheckWidget4x1"
+            android:exported="true"
+            android:label="@string/widget_label_daily_4x1">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_daily_4x1" />
+        </receiver>
+
+        <receiver
+            android:name=".DailyCheckWidget4x2"
+            android:exported="true"
+            android:label="@string/widget_label_daily_4x2">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_daily_4x2" />
         </receiver>
     </application>
 
