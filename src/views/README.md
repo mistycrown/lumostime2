@@ -28,7 +28,8 @@ The views are designed as "dumb" or "presentational" components where possible, 
 
 > ⚠️ **Note**: When modifying views, ensure that new state requirements are coordinated with `App.tsx` if they affect global data (Logs, Categories, Todos).
 
-> Last updated: 2026-04-13
+> Last updated: 2026-04-17
+- `ReviewHubView.tsx`: Replaced Chronicle card `color-mix` shadows and blur-only surfaces with Android-safe fallbacks so HarmonyOS no longer renders abnormal themed gradients behind archive cards.
 - `SettingsView.tsx`, `WidgetSettingsView.tsx`: Localized widget settings entry, loading label, and widget settings UI text to Chinese.
 - `SettingsView.tsx`: Added notification-aware floating-window startup, warning toasts when persistent notifications are unavailable, and automatic retry after returning from Android permission pages.
 - `RecordView.tsx`, `TodoView.tsx`: Softened the shared sidebar utility buttons so the bottom controls feel lighter in both record and todo pages.
