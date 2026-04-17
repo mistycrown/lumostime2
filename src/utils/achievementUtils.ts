@@ -5,6 +5,7 @@
  * @pos Utility (Achievement)
  * @description 成就系统计算工具 - 负责每日快照计算、日期枚举和账本汇总。
  *
+ * @updated 2026-04-17: Added filter-expression duration rules that reuse the shared custom-filter matching logic.
  * @updated 2026-04-07: Separates live-period spending from remaining carryover so archived carryover-funded redemptions do not inflate the active balance.
  */
 import {
@@ -20,6 +21,7 @@ import {
   TodoItem
 } from '../types';
 import { getLocalDateStr } from './dateUtils';
+import { FilterContext, matchesFilter, parseFilterExpression } from './filterUtils';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const ACHIEVEMENT_STAR_DECIMALS = 1;
@@ -64,6 +66,11 @@ const isAchievementDateInRange = (date: string, startDate: string, endDate: stri
 
 const normalizeUnitAmount = (rule: AchievementRule | (AchievementRule & { unitMinutes?: number })): number => {
   return Math.max(1, Math.floor(rule.unitAmount ?? rule.unitMinutes ?? 1));
+};
+
+const getDurationMinutesFromLogs = (logs: Log[]): number => {
+  const matchedSeconds = logs.reduce((sum, log) => sum + Math.max(0, log.duration || 0), 0);
+  return Math.floor(matchedSeconds / 60);
 };
 
 export const normalizeAchievementStarValue = (value: number): number => {
@@ -116,6 +123,7 @@ export const normalizeAchievementRule = (
 ): AchievementRule => ({
   ...rule,
   targetType: rule.targetType ?? 'activity',
+  filterExpression: rule.filterExpression?.trim() || undefined,
   unitAmount: normalizeUnitAmount(rule),
   deltaPerUnit: Math.max(0.1, normalizeAchievementStarValue(rule.deltaPerUnit || 1)),
   targetIds: Array.isArray(rule.targetIds) ? rule.targetIds : []
@@ -135,6 +143,7 @@ export const normalizeAchievementSnapshot = (
   ruleBreakdown: (snapshot.ruleBreakdown || []).map((item) => ({
     ...item,
     targetType: item.targetType ?? 'activity',
+    filterExpression: item.filterExpression?.trim() || undefined,
     matchedValue: Math.max(0, Math.floor(item.matchedValue ?? item.matchedMinutes ?? 0)),
     unitAmount: Math.max(1, Math.floor(item.unitAmount ?? item.unitMinutes ?? 1)),
     deltaPerUnit: Math.max(0.1, normalizeAchievementStarValue(item.deltaPerUnit || 1)),
@@ -171,11 +180,26 @@ export const computeAchievementDailySnapshot = (
   logs: Log[],
   todos: TodoItem[],
   dailyReviews: DailyReview[],
-  rules: AchievementRule[]
+  rules: AchievementRule[],
+  filterContext?: FilterContext
 ): AchievementDailySnapshot => {
+  const effectiveFilterContext: FilterContext = filterContext ?? {
+    categories: [],
+    scopes: [],
+    todos,
+    todoCategories: []
+  };
   const activeRules = rules
     .map(normalizeAchievementRule)
-    .filter((rule) => rule.enabled && rule.targetIds.length > 0 && rule.unitAmount > 0 && rule.deltaPerUnit > 0);
+    .filter((rule) => (
+      rule.enabled
+      && rule.unitAmount > 0
+      && rule.deltaPerUnit > 0
+      && (
+        (rule.targetType === 'filterDuration' && Boolean(rule.filterExpression?.trim()))
+        || rule.targetIds.length > 0
+      )
+    ));
   const dayLogs = logs.filter((log) => getLocalDateStr(new Date(log.startTime)) === date);
   const completedTodos = todos.filter((todo) => (
     todo.isCompleted
@@ -188,20 +212,25 @@ export const computeAchievementDailySnapshot = (
   const ruleBreakdown: AchievementDailyRuleBreakdown[] = activeRules.map((rule) => {
     const matchedValue = (() => {
       if (rule.targetType === 'activity') {
-        const matchedSeconds = dayLogs
-          .filter((log) => rule.targetIds.includes(log.activityId))
-          .reduce((sum, log) => sum + Math.max(0, log.duration || 0), 0);
-        return Math.floor(matchedSeconds / 60);
+        return getDurationMinutesFromLogs(
+          dayLogs.filter((log) => rule.targetIds.includes(log.activityId))
+        );
       }
 
       if (rule.targetType === 'scope') {
-        const matchedSeconds = dayLogs
-          .filter((log) => (
+        return getDurationMinutesFromLogs(
+          dayLogs.filter((log) => (
             Array.isArray(log.scopeIds)
             && log.scopeIds.some((scopeId) => rule.targetIds.includes(scopeId))
           ))
-          .reduce((sum, log) => sum + Math.max(0, log.duration || 0), 0);
-        return Math.floor(matchedSeconds / 60);
+        );
+      }
+
+      if (rule.targetType === 'filterDuration') {
+        const condition = parseFilterExpression(rule.filterExpression || '');
+        return getDurationMinutesFromLogs(
+          dayLogs.filter((log) => matchesFilter(log, condition, effectiveFilterContext))
+        );
       }
 
       if (rule.targetType === 'todoCategory') {
@@ -221,6 +250,7 @@ export const computeAchievementDailySnapshot = (
       effectType: rule.effectType,
       targetType: rule.targetType,
       matchedValue,
+      filterExpression: rule.filterExpression,
       unitAmount: rule.unitAmount,
       deltaPerUnit: rule.deltaPerUnit,
       appliedUnits,

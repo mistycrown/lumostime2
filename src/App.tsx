@@ -913,17 +913,17 @@ const App: React.FC = () => {
         <SettingsProvider>
           <ReviewProvider>
             <SessionProvider splitLogByDays={splitLogByDays}>
-              <AchievementProviderWithData>
-                <NavigationProvider>
-                  <CategoryScopeProviderWithData>
+              <CategoryScopeProviderWithData>
+                <AchievementProviderWithData>
+                  <NavigationProvider>
                     <PrivacyProvider>
                       <AppBootstrapGate>
                         <AppContent />
                       </AppBootstrapGate>
                     </PrivacyProvider>
-                  </CategoryScopeProviderWithData>
-                </NavigationProvider>
-              </AchievementProviderWithData>
+                  </NavigationProvider>
+                </AchievementProviderWithData>
+              </CategoryScopeProviderWithData>
             </SessionProvider>
           </ReviewProvider>
         </SettingsProvider>
