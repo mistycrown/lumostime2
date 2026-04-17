@@ -1,6 +1,7 @@
 ﻿/**
  * @file AchievementContext.tsx
  * @description Manages achievement bottle data, live snapshots, archived bottles, and reward redemption records with repository hydration and selective recent-day recomputation.
+ * @updated 2026-04-17: Added filter-duration achievement rules that reuse the shared custom filter expression logic.
  * @updated 2026-04-07: Separates live and carryover redemption funding so sealing only archives live-period spending.
  */
 import React, { createContext, ReactNode, useContext, useEffect, useRef, useState } from 'react';
@@ -39,6 +40,7 @@ import {
   updateLocalDataTimestamp
 } from '../utils/localDataTimestamp';
 import { useData } from './DataContext';
+import { useCategoryScope } from './CategoryScopeContext';
 import { useReview } from './ReviewContext';
 
 interface CreateAchievementRuleInput {
@@ -46,6 +48,7 @@ interface CreateAchievementRuleInput {
   effectType: 'earn' | 'spend';
   targetType: AchievementRule['targetType'];
   targetIds: string[];
+  filterExpression?: string;
   unitAmount: number;
   deltaPerUnit: number;
   note?: string;
@@ -162,7 +165,8 @@ export const useAchievement = () => {
 };
 
 export const AchievementProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const { logs, todos } = useData();
+  const { logs, todos, todoCategories } = useData();
+  const { categories, scopes } = useCategoryScope();
   const { dailyReviews } = useReview();
   const [isReady, setIsReady] = useState(false);
   const [canPersist, setCanPersist] = useState(false);
@@ -243,7 +247,12 @@ export const AchievementProvider: React.FC<{ children: ReactNode }> = ({ childre
         return normalizeAchievementSnapshot(existing);
       }
 
-      const computed = computeAchievementDailySnapshot(date, logs, todos, dailyReviews, rulesSource);
+      const computed = computeAchievementDailySnapshot(date, logs, todos, dailyReviews, rulesSource, {
+        categories,
+        scopes,
+        todos,
+        todoCategories
+      });
       if (existing) {
         computed.id = existing.id;
       }
@@ -284,7 +293,13 @@ export const AchievementProvider: React.FC<{ children: ReactNode }> = ({ childre
         logs,
         todos,
         dailyReviews,
-        rules
+        rules,
+        {
+          categories,
+          scopes,
+          todos,
+          todoCategories
+        }
       );
 
       if (existingSnapshot) {
@@ -309,7 +324,8 @@ export const AchievementProvider: React.FC<{ children: ReactNode }> = ({ childre
       enabled: true,
       effectType: input.effectType,
       targetType: input.targetType,
-      targetIds: input.targetIds,
+      targetIds: input.targetType === 'filterDuration' ? [] : input.targetIds,
+      filterExpression: input.filterExpression?.trim() || undefined,
       unitAmount: Math.max(1, Math.floor(input.unitAmount)),
       deltaPerUnit: Math.max(0.1, normalizeAchievementStarValue(input.deltaPerUnit || 0.1)),
       roundingMode: 'floor',
@@ -333,6 +349,8 @@ export const AchievementProvider: React.FC<{ children: ReactNode }> = ({ childre
         ? {
           ...rule,
           name: rule.name.trim() || '未命名规则',
+          targetIds: rule.targetType === 'filterDuration' ? [] : rule.targetIds,
+          filterExpression: rule.filterExpression?.trim() || undefined,
           unitAmount: Math.max(1, Math.floor(rule.unitAmount)),
           deltaPerUnit: Math.max(0.1, normalizeAchievementStarValue(rule.deltaPerUnit || 0.1)),
           updatedAt: Date.now()

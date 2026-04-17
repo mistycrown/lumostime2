@@ -2,7 +2,8 @@
  * @file AchievementRulesTab.tsx
  * @input Achievement rules plus category, scope, todo, and daily-check metadata for editing targets
  * @output Rule list rows and a modal editor that can safely edit temporary empty numeric input states
- * @description Achievement rule list and modal editor, reusing the shared multi-tag selector for target activity picking and decimal-safe star deltas.
+ * @description Achievement rule list and modal editor, reusing the shared selectors plus inline filter expressions for duration-based custom matching.
+ * @updated 2026-04-17: Added filter-duration rules backed by inline custom filter expressions.
  */
 import React, { useEffect, useMemo, useState } from 'react';
 import { ChevronRight, Plus } from 'lucide-react';
@@ -10,7 +11,7 @@ import { AchievementRule, Category, CheckTemplate, Scope, TodoCategory } from '.
 import { AchievementDialog } from './AchievementDialog';
 import { TagMultipleAssociation } from '../TagMultipleAssociation';
 import { IconRenderer } from '../IconRenderer';
-import { formatAchievementStars, formatAchievementSignedStars } from '../../utils/achievementUtils';
+import { formatAchievementSignedStars, formatAchievementStars } from '../../utils/achievementUtils';
 
 interface AchievementRulesTabProps {
   categories: Category[];
@@ -23,6 +24,7 @@ interface AchievementRulesTabProps {
     effectType: 'earn' | 'spend';
     targetType: AchievementRule['targetType'];
     targetIds: string[];
+    filterExpression?: string;
     unitAmount: number;
     deltaPerUnit: number;
     note?: string;
@@ -36,16 +38,33 @@ interface RuleDraft {
   effectType: 'earn' | 'spend';
   targetType: AchievementRule['targetType'];
   targetIds: string[];
+  filterExpression: string;
   unitAmount: number;
   deltaPerUnit: number;
   note: string;
 }
+
+interface TargetOption {
+  id: string;
+  name: string;
+  icon?: string;
+  uiIcon?: string;
+}
+
+const RULE_TYPE_OPTIONS: Array<{ id: AchievementRule['targetType']; label: string }> = [
+  { id: 'activity', label: '标签时长' },
+  { id: 'scope', label: '领域时长' },
+  { id: 'filterDuration', label: '筛选器时长' },
+  { id: 'todoCategory', label: '待办完成' },
+  { id: 'checkCategory', label: '日课完成' }
+];
 
 const createEmptyDraft = (): RuleDraft => ({
   name: '',
   effectType: 'earn',
   targetType: 'activity',
   targetIds: [],
+  filterExpression: '',
   unitAmount: 30,
   deltaPerUnit: 1,
   note: ''
@@ -85,23 +104,48 @@ const isSameRuleDraft = (left: RuleDraft, right: RuleDraft) => (
   left.targetType === right.targetType &&
   left.unitAmount === right.unitAmount &&
   left.deltaPerUnit === right.deltaPerUnit &&
+  left.filterExpression === right.filterExpression &&
   left.note === right.note &&
   left.targetIds.length === right.targetIds.length &&
   left.targetIds.every((targetId, index) => targetId === right.targetIds[index])
 );
-
-interface TargetOption {
-  id: string;
-  name: string;
-  icon?: string;
-  uiIcon?: string;
-}
 
 const getSelectedOutlineStyle = () => ({
   borderColor: '#d6d3d1',
   backgroundColor: '#f5f5f4',
   color: 'rgb(28 25 23)'
 });
+
+const getRuleUnitAmountDefault = (targetType: AchievementRule['targetType']) => (
+  targetType === 'activity' || targetType === 'scope' || targetType === 'filterDuration'
+    ? 30
+    : 1
+);
+
+const getRuleNamePlaceholder = (targetType: AchievementRule['targetType']) => {
+  if (targetType === 'activity') {
+    return '例如：阅读标签半小时一点光';
+  }
+  if (targetType === 'scope') {
+    return '例如：学习领域半小时一点光';
+  }
+  if (targetType === 'filterDuration') {
+    return '例如：阅读筛选半小时一点光';
+  }
+  if (targetType === 'todoCategory') {
+    return '例如：完成待办得光点';
+  }
+  return '例如：完成晨间日课得光点';
+};
+
+const collectActivityOptions = (categories: Category[]) => categories.flatMap((category) => (
+  category.activities.map((activity) => ({
+    categoryId: category.id,
+    categoryName: category.name,
+    activityId: activity.id,
+    activityName: activity.name
+  }))
+));
 
 const TargetMultiSelector: React.FC<{
   label: string;
@@ -164,15 +208,6 @@ const TargetMultiSelector: React.FC<{
   );
 };
 
-const collectActivityOptions = (categories: Category[]) => categories.flatMap((category) => (
-  category.activities.map((activity) => ({
-    categoryId: category.id,
-    categoryName: category.name,
-    activityId: activity.id,
-    activityName: activity.name
-  }))
-));
-
 export const AchievementRulesTab: React.FC<AchievementRulesTabProps> = ({
   categories,
   scopes,
@@ -191,14 +226,19 @@ export const AchievementRulesTab: React.FC<AchievementRulesTabProps> = ({
 
   const selectedRule = rules.find((rule) => rule.id === selectedRuleId) || null;
   const isDialogOpen = dialogMode !== null;
+  const isDraftSavable = Boolean(
+    (draft.targetType === 'filterDuration' && draft.filterExpression.trim())
+    || (draft.targetType !== 'filterDuration' && draft.targetIds.length > 0)
+  );
 
   useEffect(() => {
     if (dialogMode === 'edit' && selectedRule) {
-      const nextDraft = {
+      const nextDraft: RuleDraft = {
         name: selectedRule.name,
         effectType: selectedRule.effectType,
         targetType: selectedRule.targetType,
         targetIds: selectedRule.targetIds,
+        filterExpression: selectedRule.filterExpression || '',
         unitAmount: selectedRule.unitAmount,
         deltaPerUnit: selectedRule.deltaPerUnit,
         note: selectedRule.note || ''
@@ -218,21 +258,22 @@ export const AchievementRulesTab: React.FC<AchievementRulesTabProps> = ({
   }, [dialogMode, selectedRule]);
 
   const activityNameMap = useMemo(() => {
-    const entries = collectActivityOptions(categories).map((option) => [option.activityId, option.activityName]);
+    const entries = collectActivityOptions(categories).map((option) => [option.activityId, option.activityName] as const);
     return new Map(entries);
   }, [categories]);
 
-  const todoCategoryNameMap = useMemo(() => {
-    return new Map(todoCategories.map((category) => [category.id, category.name]));
-  }, [todoCategories]);
-
-  const scopeNameMap = useMemo(() => {
-    return new Map(scopes.map((scope) => [scope.id, scope.name]));
-  }, [scopes]);
-
-  const checkTemplateNameMap = useMemo(() => {
-    return new Map(checkTemplates.map((template) => [template.title, template.title]));
-  }, [checkTemplates]);
+  const todoCategoryNameMap = useMemo(
+    () => new Map(todoCategories.map((category) => [category.id, category.name] as const)),
+    [todoCategories]
+  );
+  const scopeNameMap = useMemo(
+    () => new Map(scopes.map((scope) => [scope.id, scope.name] as const)),
+    [scopes]
+  );
+  const checkTemplateNameMap = useMemo(
+    () => new Map(checkTemplates.map((template) => [template.title, template.title] as const)),
+    [checkTemplates]
+  );
 
   const scopeTargetOptions = useMemo<TargetOption[]>(() => (
     scopes
@@ -263,12 +304,14 @@ export const AchievementRulesTab: React.FC<AchievementRulesTabProps> = ({
         icon: template.icon,
         uiIcon: template.uiIcon
       }));
+
     const existingIds = new Set(baseOptions.map((option) => option.id));
     draft.targetIds.forEach((targetId) => {
       if (!existingIds.has(targetId)) {
         baseOptions.push({ id: targetId, name: targetId });
       }
     });
+
     return baseOptions;
   }, [checkTemplates, draft.targetIds]);
 
@@ -299,20 +342,34 @@ export const AchievementRulesTab: React.FC<AchievementRulesTabProps> = ({
     return nextValue;
   };
 
+  const handleRuleTypeChange = (targetType: AchievementRule['targetType']) => {
+    const nextUnitAmount = getRuleUnitAmountDefault(targetType);
+    setUnitAmountInput(formatRuleNumberInput(nextUnitAmount));
+    setDraft((previous) => ({
+      ...previous,
+      targetType,
+      targetIds: targetType === 'filterDuration' ? previous.targetIds : [],
+      unitAmount: nextUnitAmount
+    }));
+  };
+
   const handleSave = () => {
-    if (!draft.name.trim() || draft.targetIds.length === 0) {
+    if (!isDraftSavable) {
       return;
     }
 
     const normalizedUnitAmount = commitUnitAmountInput();
     const normalizedDeltaPerUnit = commitDeltaPerUnitInput();
+    const normalizedTargetIds = draft.targetType === 'filterDuration' ? [] : draft.targetIds;
+    const normalizedFilterExpression = draft.filterExpression.trim() || undefined;
 
     if (dialogMode === 'create') {
       onCreateRule({
         name: draft.name.trim(),
         effectType: draft.effectType,
         targetType: draft.targetType,
-        targetIds: draft.targetIds,
+        targetIds: normalizedTargetIds,
+        filterExpression: normalizedFilterExpression,
         unitAmount: normalizedUnitAmount,
         deltaPerUnit: normalizedDeltaPerUnit,
         note: draft.note.trim() || undefined
@@ -327,7 +384,8 @@ export const AchievementRulesTab: React.FC<AchievementRulesTabProps> = ({
         name: draft.name.trim(),
         effectType: draft.effectType,
         targetType: draft.targetType,
-        targetIds: draft.targetIds,
+        targetIds: normalizedTargetIds,
+        filterExpression: normalizedFilterExpression,
         unitAmount: normalizedUnitAmount,
         deltaPerUnit: normalizedDeltaPerUnit,
         note: draft.note.trim() || undefined
@@ -352,35 +410,34 @@ export const AchievementRulesTab: React.FC<AchievementRulesTabProps> = ({
 
       {rules.length === 0 ? (
         <div className="mt-[14px] rounded-2xl border border-dashed border-stone-300 bg-white/50 px-5 py-6 text-sm leading-7 text-stone-500">
-          还没有规则。先新增一条类似“阅读 30 分钟 +1 光点”的规则，成就页才会开始生成每日快照。
+          还没有规则。先新增一条类似“阅读 30 分钟 +1 光点”或“#阅读 %学习 30 分钟 +1 光点”的规则，成就页才会开始生成每日快照。
         </div>
       ) : (
         <div className="mt-[14px] divide-y divide-stone-200">
           {rules.map((rule) => {
-            const targetPreview = rule.targetIds
-              .map((targetId) => {
-                if (rule.targetType === 'activity') {
-                  return activityNameMap.get(targetId) || '未命名活动';
-                }
-                if (rule.targetType === 'scope') {
-                  return scopeNameMap.get(targetId) || '未命名领域';
-                }
-                if (rule.targetType === 'todoCategory') {
-                  return todoCategoryNameMap.get(targetId) || '未命名待办分类';
-                }
-                return checkTemplateNameMap.get(targetId) || '未命名日课组';
-              })
-              .slice(0, 3)
-              .join(' / ');
+            const targetPreview = rule.targetType === 'filterDuration'
+              ? (rule.filterExpression || '')
+              : rule.targetIds
+                .map((targetId) => {
+                  if (rule.targetType === 'activity') {
+                    return activityNameMap.get(targetId) || '未命名标签';
+                  }
+                  if (rule.targetType === 'scope') {
+                    return scopeNameMap.get(targetId) || '未命名领域';
+                  }
+                  if (rule.targetType === 'todoCategory') {
+                    return todoCategoryNameMap.get(targetId) || '未命名待办分类';
+                  }
+                  return checkTemplateNameMap.get(targetId) || '未命名日课组';
+                })
+                .slice(0, 3)
+                .join(' / ');
 
             const summaryText = (() => {
-              if (rule.targetType === 'activity' || rule.targetType === 'scope') {
+              if (rule.targetType === 'activity' || rule.targetType === 'scope' || rule.targetType === 'filterDuration') {
                 return `每 ${rule.unitAmount} 分钟 ${formatAchievementSignedStars(rule.effectType === 'earn' ? rule.deltaPerUnit : -rule.deltaPerUnit)} 光点`;
               }
-              if (rule.targetType === 'todoCategory') {
-                return `每完成 1 项 ${formatAchievementSignedStars(rule.effectType === 'earn' ? rule.deltaPerUnit : -rule.deltaPerUnit)} 光点`;
-              }
-              return `每完成 1 项 ${formatAchievementSignedStars(rule.effectType === 'earn' ? rule.deltaPerUnit : -rule.deltaPerUnit)} 光点`;
+              return `每完成 ${rule.unitAmount} 项 ${formatAchievementSignedStars(rule.effectType === 'earn' ? rule.deltaPerUnit : -rule.deltaPerUnit)} 光点`;
             })();
 
             return (
@@ -438,7 +495,7 @@ export const AchievementRulesTab: React.FC<AchievementRulesTabProps> = ({
               <button
                 type="button"
                 onClick={handleSave}
-                disabled={!draft.name.trim() || draft.targetIds.length === 0}
+                disabled={!isDraftSavable}
                 className="rounded-full bg-stone-900 px-4 py-2 text-sm text-white transition-colors disabled:bg-stone-300"
               >
                 保存
@@ -455,17 +512,10 @@ export const AchievementRulesTab: React.FC<AchievementRulesTabProps> = ({
                 value={draft.name}
                 onChange={(event) => setDraft((previous) => ({ ...previous, name: event.target.value }))}
                 className="mt-2 w-full border-b border-stone-300 bg-transparent px-0 py-2 text-[1rem] text-stone-900 outline-none focus:border-stone-900"
-                placeholder={
-                  draft.targetType === 'activity'
-                    ? '例如：阅读标签半小时一点光'
-                    : draft.targetType === 'scope'
-                      ? '例如：专业输入半小时一点光'
-                    : draft.targetType === 'todoCategory'
-                      ? '例如：完成待办得光点'
-                      : '例如：完成晨间日课得光点'
-                }
+                placeholder={getRuleNamePlaceholder(draft.targetType)}
               />
             </label>
+
             <div className="block">
               <span className="text-[11px] uppercase tracking-[0.14em] text-stone-400">方向</span>
               <div className="mt-3 grid grid-cols-2 gap-2">
@@ -495,28 +545,15 @@ export const AchievementRulesTab: React.FC<AchievementRulesTabProps> = ({
                 </button>
               </div>
             </div>
+
             <div className="block sm:col-span-2">
               <span className="text-[11px] uppercase tracking-[0.14em] text-stone-400">规则类型</span>
               <div className="mt-3 grid grid-cols-2 gap-2">
-                {[
-                  { id: 'activity', label: '标签时长' },
-                  { id: 'scope', label: '领域时长' },
-                  { id: 'todoCategory', label: '待办完成' },
-                  { id: 'checkCategory', label: '日课完成' }
-                ].map((option) => (
+                {RULE_TYPE_OPTIONS.map((option) => (
                   <button
                     key={option.id}
                     type="button"
-                    onClick={() => {
-                      const nextUnitAmount = option.id === 'activity' || option.id === 'scope' ? 30 : 1;
-                      setUnitAmountInput(formatRuleNumberInput(nextUnitAmount));
-                      setDraft((previous) => ({
-                        ...previous,
-                        targetType: option.id as AchievementRule['targetType'],
-                        targetIds: [],
-                        unitAmount: nextUnitAmount
-                      }));
-                    }}
+                    onClick={() => handleRuleTypeChange(option.id)}
                     className={`rounded-2xl border px-4 py-3 text-sm transition-colors ${
                       draft.targetType === option.id
                         ? 'bg-white text-stone-900'
@@ -529,7 +566,8 @@ export const AchievementRulesTab: React.FC<AchievementRulesTabProps> = ({
                 ))}
               </div>
             </div>
-            {(draft.targetType === 'activity' || draft.targetType === 'scope') && (
+
+            {(draft.targetType === 'activity' || draft.targetType === 'scope' || draft.targetType === 'filterDuration') && (
               <label className="block">
                 <span className="text-[11px] uppercase tracking-[0.14em] text-stone-400">触发分钟</span>
                 <input
@@ -549,6 +587,7 @@ export const AchievementRulesTab: React.FC<AchievementRulesTabProps> = ({
                 />
               </label>
             )}
+
             <label className="block">
               <span className="text-[11px] uppercase tracking-[0.14em] text-stone-400">每次变化</span>
               <input
@@ -586,15 +625,31 @@ export const AchievementRulesTab: React.FC<AchievementRulesTabProps> = ({
           ) : draft.targetType === 'scope' ? (
             <TargetMultiSelector
               label="领域"
-              description="选择要统计的领域。当天命中这些领域的记录时长会累计结算光点，同一条记录不会因为命中多个已选领域而重复计时。"
+              description="选择要统计的领域。当日命中这些领域的记录时长会累计结算光点，同一条记录不会因为命中多个已选领域而重复计时。"
               options={scopeTargetOptions}
               selectedIds={draft.targetIds}
               onChange={(targetIds) => setDraft((previous) => ({ ...previous, targetIds }))}
             />
+          ) : draft.targetType === 'filterDuration' ? (
+            <label className="block">
+              <span className="text-[11px] uppercase tracking-[0.14em] text-stone-400">筛选表达式</span>
+              <p className="mt-2 text-xs leading-6 text-stone-500">
+                直接输入自定义筛选器语法，例如 `#阅读 %学习`、`@晨间计划`、`冥想 OR 呼吸`。系统会用这条表达式去匹配当天记录并累计时长。
+              </p>
+              <textarea
+                value={draft.filterExpression}
+                onChange={(event) => setDraft((previous) => ({ ...previous, filterExpression: event.target.value }))}
+                className="mt-3 min-h-[7.5rem] w-full rounded-3xl border border-stone-200 bg-white px-4 py-3 text-sm leading-6 text-stone-900 outline-none transition-colors focus:border-stone-400"
+                placeholder="例如：#阅读 %学习"
+              />
+              <p className="mt-2 text-xs leading-6 text-stone-400">
+                支持 `#标签`、`%领域`、`@待办`、`^Reaction`、备注关键词，以及 `OR` 连接同类条件。
+              </p>
+            </label>
           ) : draft.targetType === 'todoCategory' ? (
             <TargetMultiSelector
               label="待办分类"
-              description="选择要统计的待办分类。当天完成该分类下的待办后，就会按条目数结算光点。"
+              description="选择要统计的待办分类。当日完成该分类下的待办后，就会按条目数结算光点。"
               options={todoTargetOptions}
               selectedIds={draft.targetIds}
               onChange={(targetIds) => setDraft((previous) => ({ ...previous, targetIds }))}

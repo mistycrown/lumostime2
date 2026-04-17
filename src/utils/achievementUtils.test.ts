@@ -78,6 +78,100 @@ describe('achievementUtils decimal stars', () => {
     expect(legacyRule.deltaPerUnit).toBe(0.3);
   });
 
+  it('matches filter-duration rules via the shared filter expression logic', () => {
+    const rules: AchievementRule[] = [
+      {
+        id: 'rule-filter-1',
+        name: '阅读学习筛选',
+        enabled: true,
+        effectType: 'earn',
+        targetType: 'filterDuration',
+        targetIds: [],
+        filterExpression: '#阅读 %学习',
+        unitAmount: 30,
+        deltaPerUnit: 1,
+        roundingMode: 'floor',
+        createdAt: 0,
+        updatedAt: 0
+      }
+    ];
+    const logs: Log[] = [
+      {
+        id: 'log-filter-1',
+        activityId: 'activity-read',
+        categoryId: 'category-read',
+        startTime: new Date('2026-03-28T09:00:00+08:00').getTime(),
+        endTime: new Date('2026-03-28T09:50:00+08:00').getTime(),
+        duration: 50 * 60,
+        scopeIds: ['scope-study']
+      },
+      {
+        id: 'log-filter-2',
+        activityId: 'activity-read',
+        categoryId: 'category-read',
+        startTime: new Date('2026-03-28T10:00:00+08:00').getTime(),
+        endTime: new Date('2026-03-28T10:20:00+08:00').getTime(),
+        duration: 20 * 60,
+        scopeIds: ['scope-life']
+      }
+    ];
+
+    const snapshot = computeAchievementDailySnapshot(
+      '2026-03-28',
+      logs,
+      [],
+      [],
+      rules,
+      {
+        categories: [
+          {
+            id: 'category-read',
+            name: '阅读',
+            icon: 'Book',
+            color: 'bg-stone-100 text-stone-700',
+            themeColor: '#a8a29e',
+            activities: [
+              {
+                id: 'activity-read',
+                name: '读书',
+                icon: 'Book',
+                color: 'bg-stone-100 text-stone-700'
+              }
+            ]
+          }
+        ],
+        scopes: [
+          {
+            id: 'scope-study',
+            name: '学习',
+            icon: 'Brain',
+            isArchived: false,
+            order: 0,
+            themeColor: '#e7e5e4'
+          },
+          {
+            id: 'scope-life',
+            name: '生活',
+            icon: 'Home',
+            isArchived: false,
+            order: 1,
+            themeColor: '#d6d3d1'
+          }
+        ],
+        todos: [],
+        todoCategories: []
+      }
+    );
+
+    expect(snapshot.netDelta).toBe(1.7);
+    expect(snapshot.ruleBreakdown[0]).toMatchObject({
+      targetType: 'filterDuration',
+      matchedValue: 50,
+      appliedUnits: 1.7,
+      filterExpression: '#阅读 %学习'
+    });
+  });
+
   it('normalizes legacy redemption records into explicit carryover and live funding', () => {
     expect(normalizeAchievementRedemptionRecordFunding({
       id: 'redeem-1',

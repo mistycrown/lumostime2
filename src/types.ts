@@ -4,6 +4,7 @@
  * @output TypeScript Interfaces & Types
  * @pos Type Definitions (Shared contract)
  * @description Defines the core data structures (Log, TodoItem, Category, Activity, Filter order metadata, etc.) used throughout the application.
+ * @updated 2026-04-17: Added achievement filter-duration rules with inline filter expressions.
  * @updated 2026-04-16: Added widgetType metadata so shared widget flows can distinguish timer and daily widget families.
  * @updated 2026-04-15: Added nightLatestStart auto-check comparison type for cross-midnight sleep rules.
  *
@@ -215,13 +216,16 @@ export interface ParsedTimeEntry {
   scopeIds?: string[];
 }
 
+export type AchievementRuleTargetType = 'activity' | 'scope' | 'todoCategory' | 'checkCategory' | 'filterDuration';
+
 export interface AchievementRule {
   id: string;
   name: string;
   enabled: boolean;
   effectType: 'earn' | 'spend';
-  targetType: 'activity' | 'scope' | 'todoCategory' | 'checkCategory';
+  targetType: AchievementRuleTargetType;
   targetIds: string[];
+  filterExpression?: string;
   unitAmount: number;
   deltaPerUnit: number;
   roundingMode: 'floor';
@@ -234,8 +238,9 @@ export interface AchievementDailyRuleBreakdown {
   ruleId: string;
   ruleName: string;
   effectType: 'earn' | 'spend';
-  targetType: 'activity' | 'scope' | 'todoCategory' | 'checkCategory';
+  targetType: AchievementRuleTargetType;
   matchedValue: number;
+  filterExpression?: string;
   unitAmount: number;
   deltaPerUnit: number;
   appliedUnits: number;

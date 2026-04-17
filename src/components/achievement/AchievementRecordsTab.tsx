@@ -2,6 +2,7 @@
  * @file AchievementRecordsTab.tsx
  * @description Minimal ledger-style daily snapshot list with modal-based detail view and one-decimal achievement star values.
  *
+ * @updated 2026-04-17: Added filter-expression detail text for filter-duration rules.
  * @updated 2026-04-06: Removed archived bottle exchange records so the tab only shows the current active bottle ledger.
  */
 import React, { useMemo, useState } from 'react';
@@ -197,10 +198,15 @@ export const AchievementRecordsTab: React.FC<AchievementRecordsTabProps> = ({
                   </div>
                 </div>
                 <div className="mt-2 text-sm leading-7 text-stone-500">
-                  {item.targetType === 'activity' || item.targetType === 'scope'
+                  {item.targetType === 'activity' || item.targetType === 'scope' || item.targetType === 'filterDuration'
                     ? `${item.matchedValue} 分钟，按每 ${item.unitAmount} 分钟 ${formatAchievementSignedStars(item.effectType === 'earn' ? item.deltaPerUnit : -item.deltaPerUnit)} 光点，折算 ${formatAchievementStars(item.appliedUnits)} 单位。`
                     : `${item.matchedValue} 项，按每 ${item.unitAmount} 项 ${formatAchievementSignedStars(item.effectType === 'earn' ? item.deltaPerUnit : -item.deltaPerUnit)} 光点，折算 ${formatAchievementStars(item.appliedUnits)} 单位。`}
                 </div>
+                {item.targetType === 'filterDuration' && item.filterExpression && (
+                  <div className="mt-1 text-xs leading-6 text-stone-400">
+                    表达式：{item.filterExpression}
+                  </div>
+                )}
               </div>
             ))}
           </div>
