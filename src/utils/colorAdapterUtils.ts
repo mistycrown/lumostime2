@@ -91,6 +91,35 @@ export const getSoftColorCircleStyle = (
   };
 };
 
+const blendHexWithWhite = (hexColor: string, ratio: number): string => {
+  const normalizedHex = normalizeHexColor(hexColor);
+  if (!normalizedHex) {
+    return '#e7e5e4';
+  }
+
+  const clampedRatio = Math.min(1, Math.max(0, ratio));
+  const hex = normalizedHex.replace('#', '');
+  const red = parseInt(hex.slice(0, 2), 16);
+  const green = parseInt(hex.slice(2, 4), 16);
+  const blue = parseInt(hex.slice(4, 6), 16);
+
+  const nextRed = red + Math.round((255 - red) * clampedRatio);
+  const nextGreen = green + Math.round((255 - green) * clampedRatio);
+  const nextBlue = blue + Math.round((255 - blue) * clampedRatio);
+
+  return `#${[nextRed, nextGreen, nextBlue]
+    .map((value) => value.toString(16).padStart(2, '0'))
+    .join('')}`;
+};
+
+export const getWidgetSlotFillColor = (
+  colorValue: string = '',
+  isEmphasized: boolean = false
+): string => {
+  const baseColor = normalizeHexColor(toCssColor(colorValue, 'fill', 1)) || '#e7e5e4';
+  return isEmphasized ? baseColor : blendHexWithWhite(baseColor, 0.82);
+};
+
 export const getTagCirclePresentation = (
   colorValue: string = '',
   alpha: number = 0.2

@@ -19,6 +19,8 @@ object WidgetSnapshotBuilder {
         val normalizedSize = WidgetSizes.normalize(widgetSize)
         val runtimeState = WidgetStores.loadRuntimeState(context)
         val dailyPayload = WidgetStores.loadDailySyncPayload(context)
+        val tapAnimationState = WidgetStores.loadTapAnimationState(context)
+        val now = System.currentTimeMillis()
         val todayDate = getCurrentDateString()
         val dailyMetaMap = dailyPayload?.items?.associateBy { it.checkItemId } ?: emptyMap()
         val dailyProgressMap =
@@ -73,7 +75,25 @@ object WidgetSnapshotBuilder {
                     manualMode = manualMode,
                     currentCount = currentCount,
                     targetCount = targetCount,
-                    isCompleted = isCompleted
+                    isCompleted = isCompleted,
+                    tapAnimationMode = tapAnimationState
+                        ?.takeIf {
+                            it.appWidgetId == appWidgetId &&
+                                WidgetTypes.normalize(it.widgetType) == normalizedWidgetType &&
+                                it.slotIndex == slot.slotIndex
+                        }
+                        ?.animationMode,
+                    tapAnimationProgress = tapAnimationState
+                        ?.takeIf {
+                            it.appWidgetId == appWidgetId &&
+                                WidgetTypes.normalize(it.widgetType) == normalizedWidgetType &&
+                                it.slotIndex == slot.slotIndex
+                        }
+                        ?.let { animation ->
+                            ((now - animation.startedAt).toFloat() /
+                                (animation.expiresAt - animation.startedAt).coerceAtLeast(1L).toFloat())
+                                .coerceIn(0f, 1f)
+                        }
                 )
             } else {
                 val matchesRuntime = matchesRuntime(template, slot, runtimeState)
@@ -91,7 +111,25 @@ object WidgetSnapshotBuilder {
                         ""
                     },
                     color = slot.color?.ifBlank { null } ?: "#E7E5E4",
-                    isActive = matchesRuntime
+                    isActive = matchesRuntime,
+                    tapAnimationMode = tapAnimationState
+                        ?.takeIf {
+                            it.appWidgetId == appWidgetId &&
+                                WidgetTypes.normalize(it.widgetType) == normalizedWidgetType &&
+                                it.slotIndex == slot.slotIndex
+                        }
+                        ?.animationMode,
+                    tapAnimationProgress = tapAnimationState
+                        ?.takeIf {
+                            it.appWidgetId == appWidgetId &&
+                                WidgetTypes.normalize(it.widgetType) == normalizedWidgetType &&
+                                it.slotIndex == slot.slotIndex
+                        }
+                        ?.let { animation ->
+                            ((now - animation.startedAt).toFloat() /
+                                (animation.expiresAt - animation.startedAt).coerceAtLeast(1L).toFloat())
+                                .coerceIn(0f, 1f)
+                        }
                 )
             }
         }

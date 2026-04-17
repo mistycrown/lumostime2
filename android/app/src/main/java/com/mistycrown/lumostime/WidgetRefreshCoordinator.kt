@@ -3,13 +3,28 @@ package com.mistycrown.lumostime
 import android.appwidget.AppWidgetManager
 import android.content.ComponentName
 import android.content.Context
+import android.os.Handler
+import android.os.Looper
 
 /**
  * Refreshes every registered widget provider so runtime state stays in sync across sizes.
  */
 object WidgetRefreshCoordinator {
+    private val mainHandler = Handler(Looper.getMainLooper())
+    private val tapFeedbackFrameDelays = longArrayOf(0L, 48L, 108L, 176L, 244L)
+
     fun refreshAllAsync(context: Context) {
         refreshAll(context)
+    }
+
+    fun refreshWidgetWithTapFeedback(context: Context, appWidgetId: Int) {
+        val appContext = context.applicationContext
+        tapFeedbackFrameDelays.forEach { delayMs ->
+            mainHandler.postDelayed(
+                { refreshWidget(appContext, appWidgetId) },
+                delayMs
+            )
+        }
     }
 
     fun refreshAll(context: Context) {

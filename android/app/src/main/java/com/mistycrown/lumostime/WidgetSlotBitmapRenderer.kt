@@ -21,11 +21,14 @@ object WidgetSlotBitmapRenderer {
     private const val DAILY_CHECK_TEXT_SIZE_DP = 26f
     private const val DAILY_COUNT_EMOJI_SIZE_DP = 20f
     private const val DAILY_COUNT_TEXT_SIZE_DP = 15f
+    private const val CHECK_MARK = "\u2713"
 
     fun render(context: Context, slot: WidgetSnapshotSlot): Bitmap {
         val sizePx = dpToPx(context, SLOT_SIZE_DP)
         val bitmap = Bitmap.createBitmap(sizePx, sizePx, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(bitmap)
+        val tapScale = getTapScale(slot.tapAnimationProgress)
+        val isTapAnimated = tapScale != 1f
 
         val baseColor = parseColor(slot.color)
         val dailyAccentColor = darkenColor(baseColor, 0.34f)
@@ -41,33 +44,67 @@ object WidgetSlotBitmapRenderer {
         }
         val circleInsetPx = dpToPx(context, CIRCLE_INSET_DP).toFloat()
         val circleRadius = ((sizePx / 2f) - circleInsetPx).coerceAtLeast(0f)
-        canvas.drawCircle(sizePx / 2f, sizePx / 2f, circleRadius, circlePaint)
+        val animatedCircleRadius = (circleRadius * getTapCircleScale(slot.tapAnimationProgress))
+            .coerceAtMost((sizePx / 2f) - 1f)
+        canvas.drawCircle(sizePx / 2f, sizePx / 2f, animatedCircleRadius, circlePaint)
 
         if (slot.widgetType == WidgetTypes.TIMER) {
             if (slot.isActive) {
-                drawStop(canvas, context, sizePx)
+                drawStop(canvas, context, sizePx, tapScale)
             } else {
-                drawCenteredText(canvas, context, sizePx, slot.icon, EMOJI_TEXT_SIZE_DP, Color.parseColor("#1F2937"))
+                drawCenteredText(
+                    canvas,
+                    context,
+                    sizePx,
+                    slot.icon,
+                    EMOJI_TEXT_SIZE_DP,
+                    Color.parseColor("#1F2937"),
+                    tapScale
+                )
             }
             return bitmap
         }
 
         if (slot.isCompleted) {
-            drawCenteredText(canvas, context, sizePx, "✓", DAILY_CHECK_TEXT_SIZE_DP, dailyAccentColor)
+            drawCenteredText(
+                canvas,
+                context,
+                sizePx,
+                CHECK_MARK,
+                DAILY_CHECK_TEXT_SIZE_DP,
+                dailyAccentColor,
+                tapScale
+            )
             return bitmap
         }
 
         if (WidgetDailyModes.normalize(slot.manualMode) == WidgetDailyModes.COUNT && slot.currentCount > 0) {
-            drawCountLayout(canvas, context, sizePx, slot.icon, slot.currentCount, dailyAccentColor)
+            drawCountLayout(
+                canvas,
+                context,
+                sizePx,
+                slot.icon,
+                slot.currentCount,
+                dailyAccentColor,
+                tapScale
+            )
             return bitmap
         }
 
-        drawCenteredText(canvas, context, sizePx, slot.icon, EMOJI_TEXT_SIZE_DP, Color.parseColor("#1F2937"))
+        drawCenteredText(
+            canvas,
+            context,
+            sizePx,
+            slot.icon,
+            EMOJI_TEXT_SIZE_DP,
+            Color.parseColor("#1F2937"),
+            tapScale
+        )
         return bitmap
     }
 
-    private fun drawStop(canvas: Canvas, context: Context, sizePx: Int) {
-        val stopSize = dpToPx(context, STOP_SIZE_DP).toFloat()
+    private fun drawStop(canvas: Canvas, context: Context, sizePx: Int, tapScale: Float) {
+        val stopSize = dpToPx(context, STOP_SIZE_DP).toFloat() * tapScale
         val radius = dpToPx(context, STOP_RADIUS_DP).toFloat()
         val left = (sizePx - stopSize) / 2f
         val top = (sizePx - stopSize) / 2f
@@ -85,17 +122,18 @@ object WidgetSlotBitmapRenderer {
         sizePx: Int,
         icon: String,
         currentCount: Int,
-        accentColor: Int
+        accentColor: Int,
+        tapScale: Float
     ) {
         val emojiPaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
             color = accentColor
             textAlign = Paint.Align.CENTER
-            textSize = dpToPx(context, DAILY_COUNT_EMOJI_SIZE_DP).toFloat()
+            textSize = dpToPx(context, DAILY_COUNT_EMOJI_SIZE_DP).toFloat() * tapScale
         }
         val countPaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
             color = accentColor
             textAlign = Paint.Align.CENTER
-            textSize = dpToPx(context, DAILY_COUNT_TEXT_SIZE_DP).toFloat()
+            textSize = dpToPx(context, DAILY_COUNT_TEXT_SIZE_DP).toFloat() * tapScale
             isFakeBoldText = true
         }
 
@@ -111,16 +149,41 @@ object WidgetSlotBitmapRenderer {
         sizePx: Int,
         text: String,
         textSizeDp: Float,
-        textColor: Int
+        textColor: Int,
+        tapScale: Float = 1f
     ) {
         val textPaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
             color = textColor
             textAlign = Paint.Align.CENTER
-            textSize = dpToPx(context, textSizeDp).toFloat()
-            isFakeBoldText = text == "✓"
+            textSize = dpToPx(context, textSizeDp).toFloat() * tapScale
+            isFakeBoldText = text == CHECK_MARK
         }
         val baseline = (sizePx / 2f) - ((textPaint.descent() + textPaint.ascent()) / 2f)
         canvas.drawText(text.ifBlank { "\u2022" }, sizePx / 2f, baseline, textPaint)
+    }
+
+    private fun getTapScale(progress: Float?): Float {
+        val safeProgress = progress ?: return 1f
+        return when {
+            safeProgress < 0.2f -> lerp(0.94f, 0.985f, safeProgress / 0.2f)
+            safeProgress < 0.52f -> lerp(0.985f, 1.11f, (safeProgress - 0.2f) / 0.32f)
+            safeProgress < 0.78f -> lerp(1.11f, 1.02f, (safeProgress - 0.52f) / 0.26f)
+            else -> lerp(1.02f, 1f, (safeProgress - 0.78f) / 0.22f)
+        }
+    }
+
+    private fun getTapCircleScale(progress: Float?): Float {
+        val safeProgress = progress ?: return 1f
+        return when {
+            safeProgress < 0.2f -> lerp(0.985f, 1.015f, safeProgress / 0.2f)
+            safeProgress < 0.52f -> lerp(1.015f, 1.05f, (safeProgress - 0.2f) / 0.32f)
+            safeProgress < 0.78f -> lerp(1.05f, 1.018f, (safeProgress - 0.52f) / 0.26f)
+            else -> lerp(1.018f, 1f, (safeProgress - 0.78f) / 0.22f)
+        }
+    }
+
+    private fun lerp(start: Float, end: Float, progress: Float): Float {
+        return start + (end - start) * progress.coerceIn(0f, 1f)
     }
 
     private fun parseColor(raw: String): Int {
