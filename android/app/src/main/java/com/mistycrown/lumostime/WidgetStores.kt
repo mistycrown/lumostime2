@@ -17,6 +17,7 @@ object WidgetStores {
     private const val KEY_PENDING_ACTIONS = "pending_actions_v1"
     private const val KEY_PENDING_DAILY_ACTIONS = "pending_daily_actions_v1"
     private const val KEY_DAILY_SYNC = "daily_sync_v1"
+    private const val KEY_TAP_ANIMATION = "tap_animation_v1"
     private const val KEY_LAST_WIDGET_STOP_AT = "last_widget_stop_at_v1"
     private const val KEY_LEGACY_CONFIG = "shared_slots_v1"
     private const val KEY_LEGACY_AUTO_BIND_PENDING = "legacy_auto_bind_pending_v1"
@@ -485,6 +486,60 @@ object WidgetStores {
             put("syncedAt", payload.syncedAt)
         }
         editor.putString(KEY_DAILY_SYNC, json.toString()).commit()
+    }
+
+    fun loadTapAnimationState(context: Context): WidgetTapAnimationState? {
+        val raw = prefs(context).getString(KEY_TAP_ANIMATION, null)
+        if (raw.isNullOrBlank()) {
+            return null
+        }
+
+        val state = runCatching {
+            val json = JSONObject(raw)
+            WidgetTapAnimationState(
+                appWidgetId = json.optInt("appWidgetId", -1),
+                widgetType = WidgetTypes.normalize(json.optString("widgetType")),
+                slotIndex = json.optInt("slotIndex", -1),
+                animationMode = json.optString("animationMode"),
+                startedAt = json.optLong("startedAt", 0L),
+                expiresAt = json.optLong("expiresAt", 0L)
+            )
+        }.getOrNull()
+
+        if (
+            state == null ||
+            state.appWidgetId <= 0 ||
+            state.slotIndex < 0 ||
+            state.animationMode.isBlank() ||
+            state.expiresAt <= System.currentTimeMillis()
+        ) {
+            clearTapAnimationState(context)
+            return null
+        }
+
+        return state
+    }
+
+    fun saveTapAnimationState(context: Context, state: WidgetTapAnimationState?) {
+        val editor = prefs(context).edit()
+        if (state == null) {
+            editor.remove(KEY_TAP_ANIMATION).commit()
+            return
+        }
+
+        val json = JSONObject().apply {
+            put("appWidgetId", state.appWidgetId)
+            put("widgetType", WidgetTypes.normalize(state.widgetType))
+            put("slotIndex", state.slotIndex)
+            put("animationMode", state.animationMode)
+            put("startedAt", state.startedAt)
+            put("expiresAt", state.expiresAt)
+        }
+        editor.putString(KEY_TAP_ANIMATION, json.toString()).commit()
+    }
+
+    fun clearTapAnimationState(context: Context) {
+        prefs(context).edit().remove(KEY_TAP_ANIMATION).commit()
     }
 
     fun upsertDailyProgress(context: Context, progress: WidgetDailyProgress) {

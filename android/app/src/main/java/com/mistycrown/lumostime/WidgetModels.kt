@@ -35,6 +35,13 @@ object WidgetDailyModes {
     }
 }
 
+object WidgetTapAnimationModes {
+    const val TIMER_START = "timer_start"
+    const val TIMER_STOP = "timer_stop"
+    const val DAILY_COMPLETE = "daily_complete"
+    const val DAILY_COUNT = "daily_count"
+}
+
 object WidgetSizes {
     const val SIZE_2X1 = "2x1"
     const val SIZE_2X2 = "2x2"
@@ -184,6 +191,15 @@ data class WidgetPendingDailyAction(
     val slotIndex: Int? = null
 )
 
+data class WidgetTapAnimationState(
+    val appWidgetId: Int,
+    val widgetType: String = WidgetTypes.DEFAULT,
+    val slotIndex: Int,
+    val animationMode: String,
+    val startedAt: Long,
+    val expiresAt: Long
+)
+
 data class WidgetSnapshotSlot(
     val slotIndex: Int,
     val widgetType: String = WidgetTypes.DEFAULT,
@@ -199,7 +215,9 @@ data class WidgetSnapshotSlot(
     val manualMode: String? = null,
     val currentCount: Int = 0,
     val targetCount: Int = 1,
-    val isCompleted: Boolean = false
+    val isCompleted: Boolean = false,
+    val tapAnimationMode: String? = null,
+    val tapAnimationProgress: Float? = null
 )
 
 data class WidgetSnapshot(

@@ -126,14 +126,18 @@ public final class WidgetProviderSupport {
                     AppWidgetManager.INVALID_APPWIDGET_ID
             );
             if (slotIndex >= 0 && appWidgetId != AppWidgetManager.INVALID_APPWIDGET_ID) {
-                WidgetTimerController.INSTANCE.handleSlotTap(
+                boolean didChange = WidgetTimerController.INSTANCE.handleSlotTap(
                         context,
                         appWidgetId,
                         widgetType,
                         widgetSize,
                         slotIndex
                 );
-                WidgetRefreshCoordinator.INSTANCE.refreshAllAsync(context);
+                if (didChange) {
+                    WidgetRefreshCoordinator.INSTANCE.refreshWidgetWithTapFeedback(context, appWidgetId);
+                } else {
+                    WidgetRefreshCoordinator.INSTANCE.refreshAllAsync(context);
+                }
             }
             return;
         }

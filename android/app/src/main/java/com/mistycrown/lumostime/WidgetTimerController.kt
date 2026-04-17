@@ -10,14 +10,16 @@ import java.util.UUID
  * Native widget action controller for timer and daily widgets.
  */
 object WidgetTimerController {
+    private const val TAP_FEEDBACK_DURATION_MS = 260L
+
     fun handleSlotTap(
         context: Context,
         appWidgetId: Int,
         widgetType: String,
         widgetSize: String,
         slotIndex: Int
-    ) {
-        when (WidgetTypes.normalize(widgetType)) {
+    ): Boolean {
+        return when (WidgetTypes.normalize(widgetType)) {
             WidgetTypes.DAILY -> handleDailySlotTap(context, appWidgetId, widgetType, widgetSize, slotIndex)
             else -> handleTimerSlotTap(context, appWidgetId, widgetType, widgetSize, slotIndex)
         }
@@ -29,20 +31,20 @@ object WidgetTimerController {
         widgetType: String,
         widgetSize: String,
         slotIndex: Int
-    ) {
+    ): Boolean {
         val normalizedWidgetType = WidgetTypes.normalize(widgetType)
         val normalizedSize = WidgetSizes.normalize(widgetSize)
-        val binding = WidgetStores.ensureBinding(context, appWidgetId, normalizedWidgetType, normalizedSize) ?: return
+        val binding = WidgetStores.ensureBinding(context, appWidgetId, normalizedWidgetType, normalizedSize) ?: return false
         val template = WidgetStores.loadTemplateForTypeAndSize(
             context,
             binding.templateId,
             normalizedWidgetType,
             normalizedSize
-        ) ?: return
-        val slot = template.slots.firstOrNull { it.slotIndex == slotIndex } ?: return
+        ) ?: return false
+        val slot = template.slots.firstOrNull { it.slotIndex == slotIndex } ?: return false
 
         if (!slot.isConfigured()) {
-            return
+            return false
         }
 
         val now = System.currentTimeMillis()
@@ -62,8 +64,16 @@ object WidgetTimerController {
             finishRuntime(context, currentRuntime, now)
             WidgetStores.saveRuntimeState(context, null)
             WidgetStores.saveLastWidgetStopAt(context, now)
+            saveTapAnimation(
+                context,
+                appWidgetId = appWidgetId,
+                widgetType = normalizedWidgetType,
+                slotIndex = slotIndex,
+                animationMode = WidgetTapAnimationModes.TIMER_STOP,
+                startedAt = now
+            )
             FloatingWindowService.syncFocusStateIfRunning(currentRuntime.icon, false, 0L)
-            return
+            return true
         }
 
         if (currentRuntime != null) {
@@ -89,7 +99,16 @@ object WidgetTimerController {
 
         WidgetStores.saveRuntimeState(context, nextRuntime)
         WidgetStores.saveLastWidgetStopAt(context, null)
+        saveTapAnimation(
+            context,
+            appWidgetId = appWidgetId,
+            widgetType = normalizedWidgetType,
+            slotIndex = slotIndex,
+            animationMode = WidgetTapAnimationModes.TIMER_START,
+            startedAt = now
+        )
         FloatingWindowService.syncFocusStateIfRunning(nextRuntime.icon, true, nextRuntime.startedAt)
+        return true
     }
 
     private fun handleDailySlotTap(
@@ -98,18 +117,18 @@ object WidgetTimerController {
         widgetType: String,
         widgetSize: String,
         slotIndex: Int
-    ) {
+    ): Boolean {
         val normalizedWidgetType = WidgetTypes.normalize(widgetType)
         val normalizedSize = WidgetSizes.normalize(widgetSize)
-        val binding = WidgetStores.ensureBinding(context, appWidgetId, normalizedWidgetType, normalizedSize) ?: return
+        val binding = WidgetStores.ensureBinding(context, appWidgetId, normalizedWidgetType, normalizedSize) ?: return false
         val template = WidgetStores.loadTemplateForTypeAndSize(
             context,
             binding.templateId,
             normalizedWidgetType,
             normalizedSize
-        ) ?: return
-        val slot = template.slots.firstOrNull { it.slotIndex == slotIndex } ?: return
-        val checkItemId = slot.checkItemId ?: return
+        ) ?: return false
+        val slot = template.slots.firstOrNull { it.slotIndex == slotIndex } ?: return false
+        val checkItemId = slot.checkItemId ?: return false
 
         val payload = WidgetStores.loadDailySyncPayload(context)
         val todayDate = getCurrentDateString()
@@ -124,7 +143,7 @@ object WidgetTimerController {
 
         if (manualMode == WidgetDailyModes.BINARY) {
             if (isCompleted) {
-                return
+                return false
             }
 
             WidgetStores.upsertDailyProgress(
@@ -141,7 +160,7 @@ object WidgetTimerController {
             )
         } else {
             if (currentCount >= targetCount) {
-                return
+                return false
             }
 
             val nextCount = (currentCount + 1).coerceAtMost(targetCount)
@@ -171,6 +190,41 @@ object WidgetTimerController {
                 createdAt = System.currentTimeMillis(),
                 appWidgetId = appWidgetId,
                 slotIndex = slotIndex
+            )
+        )
+
+        saveTapAnimation(
+            context,
+            appWidgetId = appWidgetId,
+            widgetType = normalizedWidgetType,
+            slotIndex = slotIndex,
+            animationMode = if (manualMode == WidgetDailyModes.COUNT && currentCount + 1 < targetCount) {
+                WidgetTapAnimationModes.DAILY_COUNT
+            } else {
+                WidgetTapAnimationModes.DAILY_COMPLETE
+            },
+            startedAt = System.currentTimeMillis()
+        )
+        return true
+    }
+
+    private fun saveTapAnimation(
+        context: Context,
+        appWidgetId: Int,
+        widgetType: String,
+        slotIndex: Int,
+        animationMode: String,
+        startedAt: Long
+    ) {
+        WidgetStores.saveTapAnimationState(
+            context,
+            WidgetTapAnimationState(
+                appWidgetId = appWidgetId,
+                widgetType = widgetType,
+                slotIndex = slotIndex,
+                animationMode = animationMode,
+                startedAt = startedAt,
+                expiresAt = startedAt + TAP_FEEDBACK_DURATION_MS
             )
         )
     }

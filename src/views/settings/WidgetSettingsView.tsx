@@ -47,7 +47,7 @@ import {
   updateWidgetTemplateSize,
   updateWidgetTemplateSlots
 } from '../../services/widgetService';
-import { getSoftColorCircleStyle } from '../../utils/colorAdapterUtils';
+import { getWidgetSlotFillColor } from '../../utils/colorAdapterUtils';
 import { Category, CheckTemplate, Scope, TodoCategory, TodoItem } from '../../types';
 
 interface WidgetSettingsViewProps {
@@ -590,10 +590,6 @@ export const WidgetSettingsView: React.FC<WidgetSettingsViewProps> = ({
                       }}
                     >
                       {draftPreviewSlots.map((slot) => {
-                        const isConfigured = isEditingDaily
-                          ? Boolean(slot.checkItemId)
-                          : Boolean(slot.activityId && slot.categoryId);
-
                         return (
                           <button
                             key={slot.slotIndex}
@@ -605,7 +601,7 @@ export const WidgetSettingsView: React.FC<WidgetSettingsViewProps> = ({
                             <div
                               className="flex min-h-0 min-w-0 items-center justify-center rounded-full leading-none"
                               style={{
-                                ...getSoftColorCircleStyle(slot.color || '#EEF2F7', isConfigured ? 0.18 : 0.1),
+                                backgroundColor: getWidgetSlotFillColor(slot.color || '#EEF2F7', false),
                                 width: '74cqmin',
                                 height: '74cqmin'
                               } as React.CSSProperties}
