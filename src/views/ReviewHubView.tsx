@@ -4,7 +4,7 @@
  * @output Navigation to Specific Review
  * @pos View (Main Tab)
  * @description The central dashboard for accessing past reviews. Displays summaries and entry points for Daily, Weekly, and Monthly reviews, often using carousels or lists, with Android-compatible card rendering fallbacks for archive themes.
- * @updated 2026-04-17: Replaced Chronicle card color-mix shadows and blur-only surfaces with Android-safe fallbacks to avoid HarmonyOS gradient artifacts behind archive cards.
+ * @updated 2026-04-17: Replaced Chronicle card color-mix shadows and blur-only surfaces with Android-safe fallbacks to avoid HarmonyOS gradient artifacts behind archive cards, then softened the archive card shadows for a lighter page feel.
  *
  * 鈿狅笍 Once I am updated, be sure to update my header comment and the folder's md.
  */
@@ -100,19 +100,19 @@ export const ReviewHubView: React.FC<ReviewHubViewProps> = ({
     const isDefaultTheme = accentColor === '#1c1917' || accentColor === 'rgb(28, 25, 23)';
 
     if (isDefaultTheme) {
-      return '0 2px 8px -1px rgba(0, 0, 0, 0.08), 0 4px 16px -2px rgba(0, 0, 0, 0.05)';
+      return '0 1px 6px -1px rgba(0, 0, 0, 0.06), 0 3px 12px -3px rgba(0, 0, 0, 0.04)';
     }
 
     if (!prefersCompatibleArchiveCards && supportsColorMix) {
-      return '0 4px 16px -2px color-mix(in srgb, var(--progress-bar-fill) 12%, transparent), 0 12px 32px -4px color-mix(in srgb, var(--progress-bar-fill) 8%, transparent)';
+      return '0 3px 12px -3px color-mix(in srgb, var(--progress-bar-fill) 8%, transparent), 0 8px 24px -8px color-mix(in srgb, var(--progress-bar-fill) 5%, transparent)';
     }
 
     const parsedColor = parseCssColor(progressBarFill) || parseCssColor(accentColor);
     if (!parsedColor) {
-      return '0 4px 16px -2px rgba(28, 25, 23, 0.10), 0 12px 32px -4px rgba(28, 25, 23, 0.08)';
+      return '0 3px 12px -3px rgba(28, 25, 23, 0.08), 0 8px 24px -8px rgba(28, 25, 23, 0.05)';
     }
 
-    return `0 4px 16px -2px rgba(${parsedColor.r}, ${parsedColor.g}, ${parsedColor.b}, 0.16), 0 12px 32px -4px rgba(${parsedColor.r}, ${parsedColor.g}, ${parsedColor.b}, 0.11)`;
+    return `0 3px 12px -3px rgba(${parsedColor.r}, ${parsedColor.g}, ${parsedColor.b}, 0.10), 0 8px 24px -8px rgba(${parsedColor.r}, ${parsedColor.g}, ${parsedColor.b}, 0.06)`;
   };
 
   const getCardSurfaceStyle = (): React.CSSProperties => {
