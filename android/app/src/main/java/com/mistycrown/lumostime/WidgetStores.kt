@@ -147,7 +147,6 @@ object WidgetStores {
     fun ensureBinding(
         context: Context,
         appWidgetId: Int,
-        widgetType: String,
         widgetSize: String
     ): WidgetInstanceBinding? {
         if (appWidgetId <= 0) {
@@ -176,7 +175,6 @@ object WidgetStores {
     fun cycleBindingToNextTemplate(
         context: Context,
         appWidgetId: Int,
-        widgetType: String,
         widgetSize: String
     ): WidgetInstanceBinding? {
         if (appWidgetId <= 0) {
@@ -189,7 +187,7 @@ object WidgetStores {
             return null
         }
 
-        val currentBinding = ensureBinding(context, appWidgetId, widgetType, normalizedSize)
+        val currentBinding = ensureBinding(context, appWidgetId, normalizedSize)
         val currentIndex = templates.indexOfFirst { it.id == currentBinding?.templateId }
         val nextTemplate = if (currentIndex < 0) templates.first() else templates[(currentIndex + 1) % templates.size]
 
@@ -230,13 +228,8 @@ object WidgetStores {
     fun maybeAutoBindLegacyWidgets(
         context: Context,
         appWidgetIds: IntArray,
-        widgetType: String,
         widgetSize: String
     ) {
-        if (WidgetTypes.normalize(widgetType) != WidgetTypes.TIMER) {
-            return
-        }
-
         if (WidgetSizes.normalize(widgetSize) != WidgetSizes.DEFAULT) {
             return
         }
@@ -265,11 +258,10 @@ object WidgetStores {
     fun ensureBindings(
         context: Context,
         appWidgetIds: IntArray,
-        widgetType: String,
         widgetSize: String
     ) {
         appWidgetIds.forEach { appWidgetId ->
-            ensureBinding(context, appWidgetId, widgetType, widgetSize)
+            ensureBinding(context, appWidgetId, widgetSize)
         }
     }
 

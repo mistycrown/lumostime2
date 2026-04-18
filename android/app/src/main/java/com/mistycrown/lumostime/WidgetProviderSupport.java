@@ -21,7 +21,6 @@ public final class WidgetProviderSupport {
     public static void refreshAll(
             Context context,
             Class<? extends AppWidgetProvider> providerClass,
-            String widgetType,
             String widgetSize,
             int layoutResId,
             int[] slotViewIds
@@ -32,14 +31,13 @@ public final class WidgetProviderSupport {
         if (appWidgetIds == null || appWidgetIds.length == 0) {
             return;
         }
-        WidgetStores.INSTANCE.maybeAutoBindLegacyWidgets(context, appWidgetIds, widgetType, widgetSize);
-        WidgetStores.INSTANCE.ensureBindings(context, appWidgetIds, widgetType, widgetSize);
+        WidgetStores.INSTANCE.maybeAutoBindLegacyWidgets(context, appWidgetIds, widgetSize);
+        WidgetStores.INSTANCE.ensureBindings(context, appWidgetIds, widgetSize);
         updateWidgets(
                 context,
                 appWidgetManager,
                 appWidgetIds,
                 providerClass,
-                widgetType,
                 widgetSize,
                 layoutResId,
                 slotViewIds
@@ -50,7 +48,6 @@ public final class WidgetProviderSupport {
             Context context,
             int appWidgetId,
             Class<? extends AppWidgetProvider> providerClass,
-            String widgetType,
             String widgetSize,
             int layoutResId,
             int[] slotViewIds
@@ -65,7 +62,6 @@ public final class WidgetProviderSupport {
                 appWidgetManager,
                 new int[] { appWidgetId },
                 providerClass,
-                widgetType,
                 widgetSize,
                 layoutResId,
                 slotViewIds
@@ -77,19 +73,17 @@ public final class WidgetProviderSupport {
             AppWidgetManager appWidgetManager,
             int[] appWidgetIds,
             Class<? extends AppWidgetProvider> providerClass,
-            String widgetType,
             String widgetSize,
             int layoutResId,
             int[] slotViewIds
     ) {
-        WidgetStores.INSTANCE.maybeAutoBindLegacyWidgets(context, appWidgetIds, widgetType, widgetSize);
-        WidgetStores.INSTANCE.ensureBindings(context, appWidgetIds, widgetType, widgetSize);
+        WidgetStores.INSTANCE.maybeAutoBindLegacyWidgets(context, appWidgetIds, widgetSize);
+        WidgetStores.INSTANCE.ensureBindings(context, appWidgetIds, widgetSize);
         updateWidgets(
                 context,
                 appWidgetManager,
                 appWidgetIds,
                 providerClass,
-                widgetType,
                 widgetSize,
                 layoutResId,
                 slotViewIds
@@ -110,7 +104,6 @@ public final class WidgetProviderSupport {
             Context context,
             Intent intent,
             Class<? extends AppWidgetProvider> providerClass,
-            String widgetType,
             String widgetSize,
             int layoutResId,
             int[] slotViewIds
@@ -129,7 +122,6 @@ public final class WidgetProviderSupport {
                 boolean didChange = WidgetTimerController.INSTANCE.handleSlotTap(
                         context,
                         appWidgetId,
-                        widgetType,
                         widgetSize,
                         slotIndex
                 );
@@ -148,12 +140,11 @@ public final class WidgetProviderSupport {
                     AppWidgetManager.INVALID_APPWIDGET_ID
             );
             if (appWidgetId != AppWidgetManager.INVALID_APPWIDGET_ID) {
-                WidgetStores.INSTANCE.cycleBindingToNextTemplate(context, appWidgetId, widgetType, widgetSize);
+                WidgetStores.INSTANCE.cycleBindingToNextTemplate(context, appWidgetId, widgetSize);
                 refreshWidget(
                         context,
                         appWidgetId,
                         providerClass,
-                        widgetType,
                         widgetSize,
                         layoutResId,
                         slotViewIds
@@ -167,7 +158,6 @@ public final class WidgetProviderSupport {
             AppWidgetManager appWidgetManager,
             int[] appWidgetIds,
             Class<? extends AppWidgetProvider> providerClass,
-            String widgetType,
             String widgetSize,
             int layoutResId,
             int[] slotViewIds
@@ -181,7 +171,6 @@ public final class WidgetProviderSupport {
             WidgetSnapshot snapshot = WidgetSnapshotBuilder.INSTANCE.build(
                     context,
                     appWidgetId,
-                    widgetType,
                     widgetSize
             );
             PendingIntent cycleTemplateIntent = buildCycleTemplatePendingIntent(context, providerClass, appWidgetId);
