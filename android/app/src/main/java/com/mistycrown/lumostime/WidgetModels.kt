@@ -1,9 +1,8 @@
 package com.mistycrown.lumostime
 
 /**
- * Lightweight native models used by the Android widget system.
- * Timer widgets remain the first widget family, while daily widgets reuse the same
- * template and binding layer with their own mirrored progress snapshot.
+ * Lightweight native models used by the unified Android widget system.
+ * Templates are size-based, while each slot carries its own timer, daily, or shortcut type.
  */
 object WidgetTypes {
     const val TIMER = "timer"

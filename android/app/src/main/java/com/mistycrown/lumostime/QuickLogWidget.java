@@ -6,10 +6,9 @@ import android.content.Context;
 import android.content.Intent;
 
 /**
- * 2x2 timer widget provider.
+ * 2x2 unified widget provider.
  */
 public class QuickLogWidget extends AppWidgetProvider {
-    public static final String WIDGET_TYPE = WidgetTypes.TIMER;
     public static final String WIDGET_SIZE = WidgetSizes.SIZE_2X2;
 
     private static final int[] SLOT_VIEW_IDS = new int[] {
@@ -23,7 +22,6 @@ public class QuickLogWidget extends AppWidgetProvider {
         WidgetProviderSupport.refreshAll(
                 context,
                 QuickLogWidget.class,
-                WIDGET_TYPE,
                 WIDGET_SIZE,
                 R.layout.widget_layout,
                 SLOT_VIEW_IDS
@@ -35,7 +33,6 @@ public class QuickLogWidget extends AppWidgetProvider {
                 context,
                 appWidgetId,
                 QuickLogWidget.class,
-                WIDGET_TYPE,
                 WIDGET_SIZE,
                 R.layout.widget_layout,
                 SLOT_VIEW_IDS
@@ -49,7 +46,6 @@ public class QuickLogWidget extends AppWidgetProvider {
                 appWidgetManager,
                 appWidgetIds,
                 QuickLogWidget.class,
-                WIDGET_TYPE,
                 WIDGET_SIZE,
                 R.layout.widget_layout,
                 SLOT_VIEW_IDS
@@ -69,7 +65,6 @@ public class QuickLogWidget extends AppWidgetProvider {
                 context,
                 intent,
                 QuickLogWidget.class,
-                WIDGET_TYPE,
                 WIDGET_SIZE,
                 R.layout.widget_layout,
                 SLOT_VIEW_IDS

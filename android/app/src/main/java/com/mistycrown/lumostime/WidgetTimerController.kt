@@ -17,14 +17,12 @@ object WidgetTimerController {
     fun handleSlotTap(
         context: Context,
         appWidgetId: Int,
-        widgetType: String,
         widgetSize: String,
         slotIndex: Int
     ): Boolean {
-        val normalizedWidgetType = WidgetTypes.normalize(widgetType)
         val normalizedSize = WidgetSizes.normalize(widgetSize)
         val binding =
-            WidgetStores.ensureBinding(context, appWidgetId, normalizedWidgetType, normalizedSize) ?: return false
+            WidgetStores.ensureBinding(context, appWidgetId, normalizedSize) ?: return false
         val template = WidgetStores.loadTemplateForSize(context, binding.templateId, normalizedSize) ?: return false
         val slot = template.slots.firstOrNull { it.slotIndex == slotIndex } ?: return false
 

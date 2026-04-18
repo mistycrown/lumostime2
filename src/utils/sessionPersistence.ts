@@ -4,7 +4,7 @@
  * @output Sanitized active sessions for SessionContext hydration and persistence helpers
  * @pos Utility
  * @description Keeps timer session persistence small and defensive so running timers survive background restarts without restoring malformed session data.
- * @updated 2026-04-16: Allowed widgetType metadata so restored widget-backed sessions keep their originating widget family.
+ * @updated 2026-04-18: Keep restored widget-backed sessions aligned with slot-based widget types, including shortcuts.
  */
 import { USER_DATA_KEYS, storage } from '../constants/storageKeys';
 import { ActiveSession } from '../types';
@@ -25,7 +25,7 @@ const isOptionalSource = (value: unknown): value is ActiveSession['source'] =>
   value === undefined || value === 'app' || value === 'widget';
 
 const isOptionalWidgetType = (value: unknown): value is ActiveSession['widgetType'] =>
-  value === undefined || value === 'timer' || value === 'daily';
+  value === undefined || value === 'timer' || value === 'daily' || value === 'shortcut';
 
 const isActiveSession = (value: unknown): value is ActiveSession => {
   if (!value || typeof value !== 'object') {

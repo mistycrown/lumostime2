@@ -12,10 +12,8 @@ object WidgetSnapshotBuilder {
     fun build(
         context: android.content.Context,
         appWidgetId: Int,
-        widgetType: String,
         widgetSize: String
     ): WidgetSnapshot {
-        val normalizedWidgetType = WidgetTypes.normalize(widgetType)
         val normalizedSize = WidgetSizes.normalize(widgetSize)
         val runtimeState = WidgetStores.loadRuntimeState(context)
         val dailyPayload = WidgetStores.loadDailySyncPayload(context)
@@ -30,7 +28,7 @@ object WidgetSnapshotBuilder {
                 emptyMap()
             }
 
-        val binding = WidgetStores.ensureBinding(context, appWidgetId, normalizedWidgetType, normalizedSize)
+        val binding = WidgetStores.ensureBinding(context, appWidgetId, normalizedSize)
         val template = WidgetStores.loadTemplateForSize(context, binding?.templateId, normalizedSize)
         val hasTemplate = template != null
 

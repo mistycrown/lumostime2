@@ -5,7 +5,7 @@
  * @pos Type Definitions (Shared contract)
  * @description Defines the core data structures (Log, TodoItem, Category, Activity, Filter order metadata, etc.) used throughout the application.
  * @updated 2026-04-17: Added achievement filter-duration rules with inline filter expressions.
- * @updated 2026-04-16: Added widgetType metadata so shared widget flows can distinguish timer and daily widget families.
+ * @updated 2026-04-18: Expanded widget session metadata to match the slot-based widget model, including shortcut slots.
  * @updated 2026-04-15: Added nightLatestStart auto-check comparison type for cross-midnight sleep rules.
  *
  * 鈿狅笍 Once I am updated, be sure to update my header comment and the folder's md.
@@ -144,7 +144,7 @@ export interface ActiveSession {
   moodScore?: number; // 1-5 mood rating
   reactions?: string[]; // Emoji reactions
   source?: 'app' | 'widget';
-  widgetType?: 'timer' | 'daily';
+  widgetType?: 'timer' | 'daily' | 'shortcut';
   slotIndex?: number;
   templateId?: string;
   appWidgetId?: number;
