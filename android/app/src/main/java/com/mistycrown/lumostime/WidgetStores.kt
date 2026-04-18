@@ -82,6 +82,14 @@ object WidgetStores {
         }
     }
 
+    fun loadTemplatesBySize(
+        context: Context,
+        widgetSize: String
+    ): List<WidgetTemplate> {
+        val normalizedSize = WidgetSizes.normalize(widgetSize)
+        return loadTemplates(context).filter { it.size == normalizedSize }
+    }
+
     fun saveTemplates(context: Context, templates: List<WidgetTemplate>) {
         val normalized = templates.map(::normalizeTemplate)
         val array = JSONArray()
@@ -112,6 +120,16 @@ object WidgetStores {
         widgetSize: String
     ): WidgetTemplate? {
         val templates = loadTemplatesByTypeAndSize(context, widgetType, widgetSize)
+        val normalizedTemplateId = parseNullableString(templateId) ?: return null
+        return templates.firstOrNull { it.id == normalizedTemplateId }
+    }
+
+    fun loadTemplateForSize(
+        context: Context,
+        templateId: String?,
+        widgetSize: String
+    ): WidgetTemplate? {
+        val templates = loadTemplatesBySize(context, widgetSize)
         val normalizedTemplateId = parseNullableString(templateId) ?: return null
         return templates.firstOrNull { it.id == normalizedTemplateId }
     }
@@ -166,8 +184,20 @@ object WidgetStores {
         val normalizedWidgetType = WidgetTypes.normalize(widgetType)
         val normalizedSize = WidgetSizes.normalize(widgetSize)
         val currentBinding = loadBinding(context, appWidgetId)
-        if (currentBinding != null && currentBinding.widgetType == normalizedWidgetType) {
-            return currentBinding
+        if (currentBinding != null) {
+            val boundTemplate = loadTemplateForTypeAndSize(
+                context,
+                currentBinding.templateId,
+                normalizedWidgetType,
+                normalizedSize
+            )
+            if (boundTemplate != null) {
+                if (currentBinding.widgetType != boundTemplate.widgetType) {
+                    saveBinding(context, appWidgetId, boundTemplate.widgetType, boundTemplate.id)
+                    return loadBinding(context, appWidgetId)
+                }
+                return currentBinding
+            }
         }
 
         val templates = loadTemplatesByTypeAndSize(context, normalizedWidgetType, normalizedSize)
@@ -176,7 +206,7 @@ object WidgetStores {
         }
 
         val defaultTemplate = templates.first()
-        saveBinding(context, appWidgetId, normalizedWidgetType, defaultTemplate.id)
+        saveBinding(context, appWidgetId, defaultTemplate.widgetType, defaultTemplate.id)
         return loadBinding(context, appWidgetId)
     }
 
@@ -201,7 +231,7 @@ object WidgetStores {
         val currentIndex = templates.indexOfFirst { it.id == currentBinding?.templateId }
         val nextTemplate = if (currentIndex < 0) templates.first() else templates[(currentIndex + 1) % templates.size]
 
-        saveBinding(context, appWidgetId, normalizedWidgetType, nextTemplate.id)
+        saveBinding(context, appWidgetId, nextTemplate.widgetType, nextTemplate.id)
         return loadBinding(context, appWidgetId)
     }
 
@@ -662,7 +692,8 @@ object WidgetStores {
                 slot.copy(
                     widgetType = WidgetTypes.normalize(slot.widgetType),
                     checkManualMode = if (slot.checkManualMode == null) null else WidgetDailyModes.normalize(slot.checkManualMode),
-                    checkTargetCount = slot.checkTargetCount?.coerceAtLeast(1)
+                    checkTargetCount = slot.checkTargetCount?.coerceAtLeast(1),
+                    shortcutAction = parseNullableString(slot.shortcutAction)
                 )
             }
         }
@@ -710,7 +741,8 @@ object WidgetStores {
                 checkTemplateId = parseNullableString(item.optString("checkTemplateId")),
                 checkItemId = parseNullableString(item.optString("checkItemId")),
                 checkManualMode = parseNullableString(item.optString("checkManualMode")),
-                checkTargetCount = if (item.has("checkTargetCount")) item.optInt("checkTargetCount") else null
+                checkTargetCount = if (item.has("checkTargetCount")) item.optInt("checkTargetCount") else null,
+                shortcutAction = parseNullableString(item.optString("shortcutAction"))
             )
         }
 
@@ -741,6 +773,7 @@ object WidgetStores {
                 put("checkItemId", slot.checkItemId ?: JSONObject.NULL)
                 put("checkManualMode", slot.checkManualMode ?: JSONObject.NULL)
                 put("checkTargetCount", slot.checkTargetCount ?: JSONObject.NULL)
+                put("shortcutAction", slot.shortcutAction ?: JSONObject.NULL)
             })
         }
         return array

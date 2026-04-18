@@ -47,6 +47,7 @@ import { useHardwareBackButton } from './hooks/useHardwareBackButton';
 import { useAppLifecycle } from './hooks/useAppLifecycle';
 import { useWidgetBridgeSync } from './hooks/useWidgetBridgeSync';
 import { useFloatingWindowSync } from './hooks/useFloatingWindowSync';
+import { ShortcutWidgetAction } from './services/widgetShortcutService';
 import { splitLogByDays } from './utils/logUtils';
 import { buildSceneGroupStateFromLegacySlots, getActiveSceneGroup, loadSceneGroupStateFromStorage, saveSceneGroupStateToStorage } from './utils/sceneGroupStorage';
 import { getLocalDataTimestamp, setLocalDataTimestampValue } from './utils/localDataTimestamp';
@@ -180,7 +181,8 @@ const AppContent: React.FC = () => {
     currentView, setCurrentView,
     initialLogTimes,
     setReturnToSearch,
-    setIsSearchOpenedFromSettings
+    setIsSearchOpenedFromSettings,
+    setIsGalleryViewOpen
   } = useNavigation();
   const { categories, scopes, goals, majorGoals, setCategories, setScopes, setGoals, setMajorGoals } = useCategoryScope();
   const { startActivity, stopActivity, cancelSession, activeSessions, setActiveSessions } = useSession();
@@ -387,11 +389,60 @@ const AppContent: React.FC = () => {
     setIsFiltersOpen(false);
   };
 
+  const handleWidgetShortcutAction = React.useCallback((action: ShortcutWidgetAction) => {
+    closeFiltersOverlay();
+    setIsSettingsOpen(false);
+    setIsAutoLinkOpen(false);
+    setIsSearchOpenedFromSettings(false);
+
+    switch (action) {
+      case 'open_supplement_log':
+        setCurrentView(AppView.TIMELINE);
+        setIsSearchOpen(false);
+        setIsGalleryViewOpen(false);
+        logManager.openAddModal();
+        break;
+      case 'quick_punch':
+        setCurrentView(AppView.TIMELINE);
+        setIsSearchOpen(false);
+        setIsGalleryViewOpen(false);
+        logManager.handleQuickPunch();
+        break;
+      case 'open_today_review':
+        setCurrentView(AppView.TIMELINE);
+        setIsSearchOpen(false);
+        setIsGalleryViewOpen(false);
+        reviewManager.handleOpenDailyReview(new Date());
+        break;
+      case 'open_search':
+        setCurrentView(AppView.TIMELINE);
+        setIsGalleryViewOpen(false);
+        setIsSearchOpen(true);
+        break;
+      case 'open_gallery':
+        setCurrentView(AppView.TIMELINE);
+        setIsSearchOpen(false);
+        setIsGalleryViewOpen(true);
+        break;
+    }
+  }, [
+    closeFiltersOverlay,
+    logManager,
+    reviewManager,
+    setCurrentView,
+    setIsAutoLinkOpen,
+    setIsGalleryViewOpen,
+    setIsSearchOpen,
+    setIsSearchOpenedFromSettings,
+    setIsSettingsOpen
+  ]);
+
   useDeepLink(
     logManager.handleQuickPunch,
     handleStartActivityWrapper,
     handleStopActivityWrapper,
-    handleRequestStopActivityWrapper
+    handleRequestStopActivityWrapper,
+    handleWidgetShortcutAction
   );
   useFloatingWindow(handleStopActivityWrapper);
   useAppDetection(handleStartActivityWrapper);

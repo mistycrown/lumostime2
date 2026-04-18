@@ -38,9 +38,10 @@ object WidgetSnapshotBuilder {
             normalizedSize
         )
         val hasTemplate = template != null
+        val effectiveWidgetType = template?.widgetType ?: normalizedWidgetType
 
-        val slots = (template?.slots ?: emptySlots(normalizedWidgetType, normalizedSize)).map { slot ->
-            if (normalizedWidgetType == WidgetTypes.DAILY) {
+        val slots = (template?.slots ?: emptySlots(effectiveWidgetType, normalizedSize)).map { slot ->
+            if (effectiveWidgetType == WidgetTypes.DAILY) {
                 val meta = slot.checkItemId?.let(dailyMetaMap::get)
                 val progress = slot.checkItemId?.let(dailyProgressMap::get)
                 val manualMode = WidgetDailyModes.normalize(
@@ -53,7 +54,7 @@ object WidgetSnapshotBuilder {
 
                 WidgetSnapshotSlot(
                     slotIndex = slot.slotIndex,
-                    widgetType = normalizedWidgetType,
+                    widgetType = effectiveWidgetType,
                     activityId = null,
                     categoryId = null,
                     checkItemId = slot.checkItemId,
@@ -79,14 +80,56 @@ object WidgetSnapshotBuilder {
                     tapAnimationMode = tapAnimationState
                         ?.takeIf {
                             it.appWidgetId == appWidgetId &&
-                                WidgetTypes.normalize(it.widgetType) == normalizedWidgetType &&
+                                WidgetTypes.normalize(it.widgetType) == effectiveWidgetType &&
                                 it.slotIndex == slot.slotIndex
                         }
                         ?.animationMode,
                     tapAnimationProgress = tapAnimationState
                         ?.takeIf {
                             it.appWidgetId == appWidgetId &&
-                                WidgetTypes.normalize(it.widgetType) == normalizedWidgetType &&
+                                WidgetTypes.normalize(it.widgetType) == effectiveWidgetType &&
+                                it.slotIndex == slot.slotIndex
+                        }
+                        ?.let { animation ->
+                            ((now - animation.startedAt).toFloat() /
+                                (animation.expiresAt - animation.startedAt).coerceAtLeast(1L).toFloat())
+                                .coerceIn(0f, 1f)
+                        }
+                )
+            } else if (effectiveWidgetType == WidgetTypes.SHORTCUT) {
+                WidgetSnapshotSlot(
+                    slotIndex = slot.slotIndex,
+                    widgetType = effectiveWidgetType,
+                    activityId = null,
+                    categoryId = null,
+                    icon = slot.customIcon?.ifBlank { null }
+                        ?: slot.icon?.ifBlank { null }
+                        ?: shortcutEmojiForAction(slot.shortcutAction)
+                        ?: "\u2022",
+                    uiIconAssetPath = null,
+                    uiIconFallbackAssetPath = null,
+                    label = if (hasTemplate) {
+                        slot.label?.ifBlank { null }
+                            ?: shortcutLabelForAction(slot.shortcutAction)
+                            ?: "快捷入口 ${slot.slotIndex + 1}"
+                    } else {
+                        ""
+                    },
+                    color = slot.color?.ifBlank { null }
+                        ?: shortcutColorForAction(slot.shortcutAction)
+                        ?: "#E7E5E4",
+                    isActive = false,
+                    tapAnimationMode = tapAnimationState
+                        ?.takeIf {
+                            it.appWidgetId == appWidgetId &&
+                                WidgetTypes.normalize(it.widgetType) == effectiveWidgetType &&
+                                it.slotIndex == slot.slotIndex
+                        }
+                        ?.animationMode,
+                    tapAnimationProgress = tapAnimationState
+                        ?.takeIf {
+                            it.appWidgetId == appWidgetId &&
+                                WidgetTypes.normalize(it.widgetType) == effectiveWidgetType &&
                                 it.slotIndex == slot.slotIndex
                         }
                         ?.let { animation ->
@@ -99,7 +142,7 @@ object WidgetSnapshotBuilder {
                 val matchesRuntime = matchesRuntime(template, slot, runtimeState)
                 WidgetSnapshotSlot(
                     slotIndex = slot.slotIndex,
-                    widgetType = normalizedWidgetType,
+                    widgetType = effectiveWidgetType,
                     activityId = slot.activityId,
                     categoryId = slot.categoryId,
                     icon = slot.icon?.ifBlank { null } ?: "\u2022",
@@ -115,14 +158,14 @@ object WidgetSnapshotBuilder {
                     tapAnimationMode = tapAnimationState
                         ?.takeIf {
                             it.appWidgetId == appWidgetId &&
-                                WidgetTypes.normalize(it.widgetType) == normalizedWidgetType &&
+                                WidgetTypes.normalize(it.widgetType) == effectiveWidgetType &&
                                 it.slotIndex == slot.slotIndex
                         }
                         ?.animationMode,
                     tapAnimationProgress = tapAnimationState
                         ?.takeIf {
                             it.appWidgetId == appWidgetId &&
-                                WidgetTypes.normalize(it.widgetType) == normalizedWidgetType &&
+                                WidgetTypes.normalize(it.widgetType) == effectiveWidgetType &&
                                 it.slotIndex == slot.slotIndex
                         }
                         ?.let { animation ->
@@ -136,7 +179,7 @@ object WidgetSnapshotBuilder {
 
         return WidgetSnapshot(
             appWidgetId = appWidgetId,
-            widgetType = normalizedWidgetType,
+            widgetType = effectiveWidgetType,
             widgetSize = normalizedSize,
             templateId = template?.id,
             templateName = template?.name ?: "",
@@ -176,5 +219,38 @@ object WidgetSnapshotBuilder {
 
     private fun getCurrentDateString(): String {
         return SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
+    }
+
+    private fun shortcutLabelForAction(action: String?): String? {
+        return when (action) {
+            "open_supplement_log" -> "补记"
+            "quick_punch" -> "打点"
+            "open_today_review" -> "Review"
+            "open_search" -> "搜索"
+            "open_gallery" -> "画廊"
+            else -> null
+        }
+    }
+
+    private fun shortcutEmojiForAction(action: String?): String? {
+        return when (action) {
+            "open_supplement_log" -> "\u270D\uFE0F"
+            "quick_punch" -> "\u26A1"
+            "open_today_review" -> "\uD83D\uDCD3"
+            "open_search" -> "\uD83D\uDD0D"
+            "open_gallery" -> "\uD83D\uDDBC\uFE0F"
+            else -> null
+        }
+    }
+
+    private fun shortcutColorForAction(action: String?): String? {
+        return when (action) {
+            "open_supplement_log" -> "#F5E6D3"
+            "quick_punch" -> "#FEF3C7"
+            "open_today_review" -> "#DBEAFE"
+            "open_search" -> "#E0E7FF"
+            "open_gallery" -> "#DCFCE7"
+            else -> null
+        }
     }
 }

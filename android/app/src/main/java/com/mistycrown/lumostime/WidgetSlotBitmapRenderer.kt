@@ -15,6 +15,8 @@ import android.text.TextPaint
 object WidgetSlotBitmapRenderer {
     private const val SLOT_SIZE_DP = 72f
     private const val CIRCLE_INSET_DP = 4f
+    private const val SHORTCUT_CIRCLE_INSET_DP = 3f
+    private const val SHORTCUT_EMOJI_TEXT_SIZE_DP = 34f
     private const val STOP_SIZE_DP = 22f
     private const val STOP_RADIUS_DP = 3f
     private const val EMOJI_TEXT_SIZE_DP = 28f
@@ -32,6 +34,11 @@ object WidgetSlotBitmapRenderer {
 
         val baseColor = parseColor(slot.color)
         val dailyAccentColor = darkenColor(baseColor, 0.34f)
+        if (slot.widgetType == WidgetTypes.SHORTCUT) {
+            drawShortcutSlot(canvas, context, sizePx, slot, tapScale)
+            return bitmap
+        }
+
         val fillColor = when {
             slot.widgetType == WidgetTypes.TIMER && slot.isActive -> baseColor
             slot.widgetType == WidgetTypes.DAILY && slot.isCompleted -> baseColor
@@ -101,6 +108,41 @@ object WidgetSlotBitmapRenderer {
             tapScale
         )
         return bitmap
+    }
+
+    private fun drawShortcutSlot(
+        canvas: Canvas,
+        context: Context,
+        sizePx: Int,
+        slot: WidgetSnapshotSlot,
+        tapScale: Float
+    ) {
+        val baseColor = parseColor(slot.color)
+        val fillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = blendWithWhite(baseColor, 0.18f)
+            style = Paint.Style.FILL
+        }
+        val circleInsetPx = dpToPx(context, SHORTCUT_CIRCLE_INSET_DP).toFloat()
+        val circleRadius = ((sizePx / 2f) - circleInsetPx).coerceAtLeast(0f)
+        val animatedCircleRadius = (circleRadius * getTapCircleScale(slot.tapAnimationProgress))
+            .coerceAtMost((sizePx / 2f) - 1f)
+        canvas.drawCircle(sizePx / 2f, sizePx / 2f, animatedCircleRadius, fillPaint)
+
+        val strokePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = blendWithWhite(darkenColor(baseColor, 0.18f), 0.36f)
+            style = Paint.Style.STROKE
+            strokeWidth = dpToPx(context, 1.1f).toFloat()
+        }
+        canvas.drawCircle(sizePx / 2f, sizePx / 2f, animatedCircleRadius, strokePaint)
+        drawCenteredText(
+            canvas,
+            context,
+            sizePx,
+            slot.icon,
+            SHORTCUT_EMOJI_TEXT_SIZE_DP,
+            Color.parseColor("#1F2937"),
+            tapScale
+        )
     }
 
     private fun drawStop(canvas: Canvas, context: Context, sizePx: Int, tapScale: Float) {

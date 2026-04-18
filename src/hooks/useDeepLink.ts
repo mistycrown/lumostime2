@@ -21,6 +21,7 @@ import { useReview } from '../contexts/ReviewContext';
 import { useToast } from '../contexts/ToastContext';
 import { getLocalDateStr } from '../utils/dateUtils';
 import { applyDailyCheckActionForDate } from '../utils/dailyCheckUtils';
+import { ShortcutWidgetAction, normalizeShortcutWidgetAction } from '../services/widgetShortcutService';
 
 type DeepLinkStateSnapshot = {
   categories: ReturnType<typeof useCategoryScope>['categories'];
@@ -40,7 +41,8 @@ export const useDeepLink = (
   handleQuickPunch: () => void,
   handleStartActivity: (activity: any, categoryId: string, todoId?: string, scopeIdOrIds?: string | string[], note?: string) => void,
   handleStopActivity: (sessionId: string) => void,
-  handleRequestStopActivity: (sessionId: string) => void
+  handleRequestStopActivity: (sessionId: string) => void,
+  handleWidgetShortcutAction?: (action: ShortcutWidgetAction) => void
 ) => {
   const { categories } = useCategoryScope();
   const { activeSessions } = useSession();
@@ -58,6 +60,7 @@ export const useDeepLink = (
   const startActivityRef = useRef(handleStartActivity);
   const stopActivityRef = useRef(handleStopActivity);
   const requestStopActivityRef = useRef(handleRequestStopActivity);
+  const widgetShortcutActionRef = useRef(handleWidgetShortcutAction);
   const addToastRef = useRef(addToast);
   const setDailyReviewsRef = useRef(setDailyReviews);
   const lastHandledUrlRef = useRef<{ key: string; timestamp: number } | null>(null);
@@ -88,6 +91,10 @@ export const useDeepLink = (
   useEffect(() => {
     requestStopActivityRef.current = handleRequestStopActivity;
   }, [handleRequestStopActivity]);
+
+  useEffect(() => {
+    widgetShortcutActionRef.current = handleWidgetShortcutAction;
+  }, [handleWidgetShortcutAction]);
 
   useEffect(() => {
     addToastRef.current = addToast;
@@ -223,6 +230,21 @@ export const useDeepLink = (
       return false;
     };
 
+    const handleWidgetUrl = (urlObj: URL) => {
+      if (urlObj.protocol !== 'lumostime:' || urlObj.host !== 'widget') {
+        return false;
+      }
+
+      const action = normalizeShortcutWidgetAction(urlObj.searchParams.get('action'));
+      if (!action) {
+        addToastRef.current('error', '快捷方式动作无效');
+        return true;
+      }
+
+      widgetShortcutActionRef.current?.(action);
+      return true;
+    };
+
     const processUrl = (urlString: string, toggleExistingActivity: boolean, source: 'scan' | 'deeplink') => {
       const now = Date.now();
 
@@ -244,7 +266,7 @@ export const useDeepLink = (
 
       try {
         const urlObj = new URL(urlString);
-        const handled = handleRecordUrl(urlObj, toggleExistingActivity);
+        const handled = handleRecordUrl(urlObj, toggleExistingActivity) || handleWidgetUrl(urlObj);
         if (handled) {
           lastHandledUrlRef.current = { key: dedupeKey, timestamp: now };
         }

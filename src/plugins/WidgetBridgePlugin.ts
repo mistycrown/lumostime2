@@ -7,8 +7,9 @@
  * @updated 2026-04-16: Added daily widget sync payloads and expanded widgetType metadata so timer and daily widgets can share one bridge contract.
  */
 import { registerPlugin } from '@capacitor/core';
+import { ShortcutWidgetAction } from '../services/widgetShortcutService';
 
-export type WidgetType = 'timer' | 'daily';
+export type WidgetType = 'timer' | 'daily' | 'shortcut';
 export type DailyWidgetManualMode = 'binary' | 'count';
 
 export interface WidgetBridgeSlot {
@@ -28,6 +29,7 @@ export interface WidgetBridgeSlot {
   checkItemId?: string | null;
   checkManualMode?: DailyWidgetManualMode | null;
   checkTargetCount?: number | null;
+  shortcutAction?: ShortcutWidgetAction | null;
 }
 
 export interface WidgetBridgeTemplate {

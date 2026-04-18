@@ -8,13 +8,15 @@ package com.mistycrown.lumostime
 object WidgetTypes {
     const val TIMER = "timer"
     const val DAILY = "daily"
+    const val SHORTCUT = "shortcut"
     const val DEFAULT = TIMER
 
     @JvmStatic
     fun normalize(widgetType: String?): String {
         return when (widgetType) {
             TIMER,
-            DAILY -> widgetType
+            DAILY,
+            SHORTCUT -> widgetType
             else -> DEFAULT
         }
     }
@@ -91,11 +93,13 @@ data class WidgetSlotConfig(
     val checkTemplateId: String? = null,
     val checkItemId: String? = null,
     val checkManualMode: String? = null,
-    val checkTargetCount: Int? = null
+    val checkTargetCount: Int? = null,
+    val shortcutAction: String? = null
 ) {
     fun isConfigured(): Boolean {
         return when (WidgetTypes.normalize(widgetType)) {
             WidgetTypes.DAILY -> !checkItemId.isNullOrBlank()
+            WidgetTypes.SHORTCUT -> !shortcutAction.isNullOrBlank()
             else -> !activityId.isNullOrBlank() && !categoryId.isNullOrBlank()
         }
     }

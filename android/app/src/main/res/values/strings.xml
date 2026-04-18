@@ -10,6 +10,9 @@
     <string name="widget_label_3x2">计时器 3x2</string>
     <string name="widget_label_4x1">计时器 4x1</string>
     <string name="widget_label_4x2">计时器 4x2</string>
+    <string name="widget_label_shortcut_2x1">&#x5FEB;&#x6377;&#x65B9;&#x5F0F;&#x680F; 2x1</string>
+    <string name="widget_label_shortcut_2x2">&#x5FEB;&#x6377;&#x65B9;&#x5F0F;&#x680F; 2x2</string>
+    <string name="widget_label_shortcut_4x1">&#x5FEB;&#x6377;&#x65B9;&#x5F0F;&#x680F; 4x1</string>
     <string name="widget_label_daily_2x1">日课 2x1</string>
     <string name="widget_label_daily_2x2">日课 2x2</string>
     <string name="widget_label_daily_3x2">日课 3x2</string>

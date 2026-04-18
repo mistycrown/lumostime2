@@ -1,13 +1,15 @@
 package com.mistycrown.lumostime
 
 import android.content.Context
+import android.content.Intent
+import android.net.Uri
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import java.util.UUID
 
 /**
- * Native widget action controller for timer and daily widgets.
+ * Native widget action controller for timer, daily, and shortcut widgets.
  */
 object WidgetTimerController {
     private const val TAP_FEEDBACK_DURATION_MS = 260L
@@ -19,29 +21,28 @@ object WidgetTimerController {
         widgetSize: String,
         slotIndex: Int
     ): Boolean {
-        return when (WidgetTypes.normalize(widgetType)) {
-            WidgetTypes.DAILY -> handleDailySlotTap(context, appWidgetId, widgetType, widgetSize, slotIndex)
-            else -> handleTimerSlotTap(context, appWidgetId, widgetType, widgetSize, slotIndex)
+        val normalizedWidgetType = WidgetTypes.normalize(widgetType)
+        val normalizedSize = WidgetSizes.normalize(widgetSize)
+        val binding =
+            WidgetStores.ensureBinding(context, appWidgetId, normalizedWidgetType, normalizedSize) ?: return false
+        val template = WidgetStores.loadTemplateForSize(context, binding.templateId, normalizedSize) ?: return false
+        val slot = template.slots.firstOrNull { it.slotIndex == slotIndex } ?: return false
+
+        return when (template.widgetType) {
+            WidgetTypes.DAILY -> handleDailySlotTap(context, appWidgetId, template, slot)
+            WidgetTypes.SHORTCUT -> handleShortcutSlotTap(context, appWidgetId, template, slot)
+            else -> handleTimerSlotTap(context, appWidgetId, template, slot)
         }
     }
 
     private fun handleTimerSlotTap(
         context: Context,
         appWidgetId: Int,
-        widgetType: String,
-        widgetSize: String,
-        slotIndex: Int
+        template: WidgetTemplate,
+        slot: WidgetSlotConfig
     ): Boolean {
-        val normalizedWidgetType = WidgetTypes.normalize(widgetType)
-        val normalizedSize = WidgetSizes.normalize(widgetSize)
-        val binding = WidgetStores.ensureBinding(context, appWidgetId, normalizedWidgetType, normalizedSize) ?: return false
-        val template = WidgetStores.loadTemplateForTypeAndSize(
-            context,
-            binding.templateId,
-            normalizedWidgetType,
-            normalizedSize
-        ) ?: return false
-        val slot = template.slots.firstOrNull { it.slotIndex == slotIndex } ?: return false
+        val normalizedWidgetType = WidgetTypes.normalize(template.widgetType)
+        val slotIndex = slot.slotIndex
 
         if (!slot.isConfigured()) {
             return false
@@ -114,20 +115,11 @@ object WidgetTimerController {
     private fun handleDailySlotTap(
         context: Context,
         appWidgetId: Int,
-        widgetType: String,
-        widgetSize: String,
-        slotIndex: Int
+        template: WidgetTemplate,
+        slot: WidgetSlotConfig
     ): Boolean {
-        val normalizedWidgetType = WidgetTypes.normalize(widgetType)
-        val normalizedSize = WidgetSizes.normalize(widgetSize)
-        val binding = WidgetStores.ensureBinding(context, appWidgetId, normalizedWidgetType, normalizedSize) ?: return false
-        val template = WidgetStores.loadTemplateForTypeAndSize(
-            context,
-            binding.templateId,
-            normalizedWidgetType,
-            normalizedSize
-        ) ?: return false
-        val slot = template.slots.firstOrNull { it.slotIndex == slotIndex } ?: return false
+        val normalizedWidgetType = WidgetTypes.normalize(template.widgetType)
+        val slotIndex = slot.slotIndex
         val checkItemId = slot.checkItemId ?: return false
 
         val payload = WidgetStores.loadDailySyncPayload(context)
@@ -205,6 +197,36 @@ object WidgetTimerController {
             },
             startedAt = System.currentTimeMillis()
         )
+        return true
+    }
+
+    private fun handleShortcutSlotTap(
+        context: Context,
+        appWidgetId: Int,
+        template: WidgetTemplate,
+        slot: WidgetSlotConfig
+    ): Boolean {
+        val action = slot.shortcutAction ?: return false
+        val normalizedWidgetType = WidgetTypes.normalize(template.widgetType)
+        val startedAt = System.currentTimeMillis()
+
+        saveTapAnimation(
+            context,
+            appWidgetId = appWidgetId,
+            widgetType = normalizedWidgetType,
+            slotIndex = slot.slotIndex,
+            animationMode = WidgetTapAnimationModes.TIMER_START,
+            startedAt = startedAt
+        )
+
+        val intent = Intent(
+            Intent.ACTION_VIEW,
+            Uri.parse("lumostime://widget?action=$action")
+        ).apply {
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+            `package` = context.packageName
+        }
+        context.startActivity(intent)
         return true
     }
 
