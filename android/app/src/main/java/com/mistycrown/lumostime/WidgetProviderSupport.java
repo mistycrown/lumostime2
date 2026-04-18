@@ -184,11 +184,9 @@ public final class WidgetProviderSupport {
                     widgetType,
                     widgetSize
             );
+            PendingIntent cycleTemplateIntent = buildCycleTemplatePendingIntent(context, providerClass, appWidgetId);
             views.setTextViewText(R.id.widget_title, snapshot.getTemplateName());
-            views.setOnClickPendingIntent(
-                    R.id.widget_title,
-                    buildCycleTemplatePendingIntent(context, providerClass, appWidgetId)
-            );
+            views.setOnClickPendingIntent(R.id.widget_title, cycleTemplateIntent);
             bindSlots(context, views, snapshot, appWidgetId, providerClass, slotViewIds);
             appWidgetManager.updateAppWidget(appWidgetId, views);
         }

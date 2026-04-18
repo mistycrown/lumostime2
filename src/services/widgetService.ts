@@ -3,8 +3,8 @@
  * @input Category/activity data, daily template data, ActiveSession state, widget bridge payloads
  * @output Widget template persistence helpers and app/native conversion utilities
  * @pos Service
- * @description Centralizes the shared types and conversions used by the Android widget system while keeping timer widgets and daily widgets on one contract.
- * @updated 2026-04-16: Added daily widget slot helpers and native daily-sync payload builders so timer and daily widgets can share one service layer.
+ * @description Centralizes the shared types and conversions used by the Android widget system while keeping timer, daily, and shortcut widgets on one contract.
+ * @updated 2026-04-18: Added shortcut widget templates, slot helpers, and metadata so the shortcut widget family can share the same template layer.
  */
 import { Capacitor } from '@capacitor/core';
 import { ActiveSession, Category, CheckTemplate, DailyReview, Log } from '../types';
@@ -20,6 +20,13 @@ import type {
   WidgetBridgeTemplate,
   WidgetType
 } from '../plugins/WidgetBridgePlugin';
+import {
+  ShortcutWidgetAction,
+  getShortcutWidgetActionColor,
+  getShortcutWidgetActionEmoji,
+  getShortcutWidgetActionLabel,
+  normalizeShortcutWidgetAction
+} from './widgetShortcutService';
 import { getColorHexForCharts } from '../utils/colorAdapterUtils';
 import {
   DailyCheckTemplateMeta,
@@ -34,10 +41,11 @@ const WIDGET_TEMPLATE_STORAGE_KEY = 'lumostime_widget_templates_v1';
 const FALLBACK_WIDGET_ICON = '\u2022';
 
 export const DEFAULT_WIDGET_TYPE: WidgetType = 'timer';
-export const WIDGET_TYPE_OPTIONS: WidgetType[] = ['timer', 'daily'];
+export const WIDGET_TYPE_OPTIONS: WidgetType[] = ['timer', 'daily', 'shortcut'];
 export const DAILY_WIDGET_SIZE_OPTIONS = ['2x1', '2x2', '3x2', '4x1', '4x2'] as const;
+export const SHORTCUT_WIDGET_SIZE_OPTIONS = ['2x1', '2x2', '4x1'] as const;
 export const DEFAULT_DAILY_WIDGET_COLOR = '#E7E5E4';
-export const DEFAULT_WIDGET_TEMPLATE_NAME = '我的小组件';
+export const DEFAULT_WIDGET_TEMPLATE_NAME = '\u6211\u7684\u5c0f\u7ec4\u4ef6';
 export const DEFAULT_WIDGET_SIZE = '2x2';
 export const WIDGET_SIZE_OPTIONS = ['2x1', '2x2', '3x2', '4x1', '4x2'] as const;
 
@@ -84,7 +92,9 @@ const createWidgetTemplateId = () =>
   `widget-template-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
 
 export const normalizeWidgetType = (widgetType?: string | null): WidgetType =>
-  widgetType === 'daily' || widgetType === 'timer' ? widgetType : DEFAULT_WIDGET_TYPE;
+  widgetType === 'daily' || widgetType === 'timer' || widgetType === 'shortcut'
+    ? widgetType
+    : DEFAULT_WIDGET_TYPE;
 
 export const normalizeDailyWidgetManualMode = (
   manualMode?: string | null
@@ -113,7 +123,11 @@ export const getWidgetGridBySize = (size: WidgetSize): { columns: number; rows: 
 export const getWidgetSizeLabel = (size: WidgetSize): string => size;
 
 export const getWidgetSizeOptionsByType = (widgetType: WidgetType): WidgetSize[] =>
-  widgetType === 'daily' ? [...DAILY_WIDGET_SIZE_OPTIONS] : [...WIDGET_SIZE_OPTIONS];
+  widgetType === 'daily'
+    ? [...DAILY_WIDGET_SIZE_OPTIONS]
+    : widgetType === 'shortcut'
+      ? [...SHORTCUT_WIDGET_SIZE_OPTIONS]
+      : [...WIDGET_SIZE_OPTIONS];
 
 export const createEmptyWidgetTemplateSlot = (
   slotIndex: number,
@@ -134,7 +148,8 @@ export const createEmptyWidgetTemplateSlot = (
   checkTemplateId: null,
   checkItemId: null,
   checkManualMode: null,
-  checkTargetCount: null
+  checkTargetCount: null,
+  shortcutAction: null
 });
 
 export const createEmptyWidgetTemplateSlots = (
@@ -172,7 +187,8 @@ export const normalizeWidgetTemplateSlots = (
       checkTemplateId: normalizeNullableString(slot?.checkTemplateId),
       checkItemId: normalizeNullableString(slot?.checkItemId),
       checkManualMode: normalizeDailyWidgetManualMode(slot?.checkManualMode),
-      checkTargetCount: normalizePositiveInt(slot?.checkTargetCount, null)
+      checkTargetCount: normalizePositiveInt(slot?.checkTargetCount, null),
+      shortcutAction: normalizeShortcutWidgetAction(slot?.shortcutAction)
     };
   });
 };
@@ -186,6 +202,8 @@ export const resizeWidgetTemplateSlots = (
 export const isWidgetTemplateConfigured = (template: WidgetTemplate): boolean =>
   template.widgetType === 'daily'
     ? template.slots.some((slot) => Boolean(slot.checkItemId))
+    : template.widgetType === 'shortcut'
+      ? template.slots.some((slot) => Boolean(slot.shortcutAction))
     : template.slots.some((slot) => Boolean(slot.activityId && slot.categoryId));
 
 export const createWidgetTemplate = (
@@ -291,6 +309,35 @@ export const buildDailyWidgetSlotConfig = (
   checkTargetCount: binding.targetCount
 });
 
+export const buildShortcutWidgetSlotConfig = (
+  shortcutAction: ShortcutWidgetAction,
+  slotIndex: number,
+  overrides?: {
+    label?: string | null;
+    customIcon?: string | null;
+    backgroundColor?: string | null;
+    widgetType?: WidgetType;
+  }
+): WidgetTemplateSlotConfig => ({
+  slotIndex,
+  widgetType: normalizeWidgetType(overrides?.widgetType || 'shortcut'),
+  activityId: null,
+  categoryId: null,
+  icon: normalizeNullableString(overrides?.customIcon) || getShortcutWidgetActionEmoji(shortcutAction),
+  customIcon: normalizeNullableString(overrides?.customIcon),
+  uiIconAssetPath: null,
+  uiIconFallbackAssetPath: null,
+  label: normalizeNullableString(overrides?.label) || getShortcutWidgetActionLabel(shortcutAction),
+  color: normalizeNullableString(overrides?.backgroundColor) || getShortcutWidgetActionColor(shortcutAction),
+  linkedTodoId: null,
+  scopeIds: null,
+  checkTemplateId: null,
+  checkItemId: null,
+  checkManualMode: null,
+  checkTargetCount: null,
+  shortcutAction
+});
+
 export const findDailyWidgetBinding = (
   checkTemplates: CheckTemplate[],
   checkItemId: string
@@ -343,6 +390,21 @@ export const rebuildDailyWidgetSlotConfig = (
   });
 };
 
+export const rebuildShortcutWidgetSlotConfig = (
+  slot: WidgetTemplateSlotConfig
+): WidgetTemplateSlotConfig => {
+  if (!slot.shortcutAction) {
+    return createEmptyWidgetTemplateSlot(slot.slotIndex, normalizeWidgetType(slot.widgetType));
+  }
+
+  return buildShortcutWidgetSlotConfig(slot.shortcutAction, slot.slotIndex, {
+    label: slot.label ?? undefined,
+    customIcon: slot.customIcon ?? null,
+    backgroundColor: slot.color ?? null,
+    widgetType: slot.widgetType
+  });
+};
+
 export const rebuildWidgetTemplate = (
   template: WidgetTemplate,
   categories: Category[],
@@ -355,6 +417,8 @@ export const rebuildWidgetTemplate = (
     template.slots.map((slot) =>
       template.widgetType === 'daily'
         ? rebuildDailyWidgetSlotConfig(slot, checkTemplates)
+        : template.widgetType === 'shortcut'
+          ? rebuildShortcutWidgetSlotConfig(slot)
         : rebuildTimerWidgetSlotConfig(slot, categories)
     ),
     template.size,

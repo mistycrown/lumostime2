@@ -3,8 +3,8 @@
  * @input Widget templates, categories, daily check templates, todos, scopes, Android bridge availability
  * @output A template-based widget configuration page with per-slot modal editing
  * @pos View
- * @description Lets the user create, rename, resize, edit, and manage Android widget templates while configuring timer and daily widgets from a shared entry.
- * @updated 2026-04-17: Expanded daily widgets to the full timer size matrix and refreshed slot editor guidance.
+ * @description Lets the user create, rename, resize, edit, and manage Android widget templates while configuring timer, daily, and shortcut widgets from a shared entry.
+ * @updated 2026-04-18: Added the new 4x1 shortcut widget family with its own slot editor and preview style.
  */
 import React, { useEffect, useMemo, useState } from 'react';
 import { ChevronLeft, Plus, Trash2 } from 'lucide-react';
@@ -15,6 +15,10 @@ import {
   DailyWidgetSlotConfigModal
 } from '../../components/DailyWidgetSlotConfigModal';
 import { IconRenderer } from '../../components/IconRenderer';
+import {
+  ShortcutWidgetSlotConfigDraft,
+  ShortcutWidgetSlotConfigModal
+} from '../../components/ShortcutWidgetSlotConfigModal';
 import {
   WidgetSlotConfigDraft,
   WidgetSlotConfigModal
@@ -27,6 +31,7 @@ import {
   WidgetTemplate,
   WidgetTemplateSlotConfig,
   buildDailyWidgetSlotConfig,
+  buildShortcutWidgetSlotConfig,
   buildTimerWidgetSlotConfig,
   countTemplateBoundInstances,
   createWidgetTemplate,
@@ -41,12 +46,16 @@ import {
   normalizeWidgetTemplateSlots,
   normalizeWidgetTemplates,
   rebuildDailyWidgetSlotConfig,
+  rebuildShortcutWidgetSlotConfig,
   rebuildTimerWidgetSlotConfig,
   rebuildWidgetTemplate,
   saveWidgetTemplatesToStorage,
   updateWidgetTemplateSize,
   updateWidgetTemplateSlots
 } from '../../services/widgetService';
+import {
+  ShortcutWidgetAction,
+} from '../../services/widgetShortcutService';
 import { getWidgetSlotFillColor } from '../../utils/colorAdapterUtils';
 import { Category, CheckTemplate, Scope, TodoCategory, TodoItem } from '../../types';
 
@@ -66,7 +75,8 @@ const PREVIEW_MAX_ROWS = 2;
 const PREVIEW_TITLE_ROW_RATIO = 0.6;
 const WIDGET_TYPE_TABS = [
   { value: 'timer', label: '计时器' },
-  { value: 'daily', label: '日课' }
+  { value: 'daily', label: '日课' },
+  { value: 'shortcut', label: '快捷方式栏' }
 ] as const;
 
 type WidgetSettingsTab = (typeof WIDGET_TYPE_TABS)[number]['value'];
@@ -101,6 +111,14 @@ const toDailySlotDraft = (slot: WidgetTemplateSlotConfig): DailyWidgetSlotConfig
   backgroundColor: slot.color ?? DEFAULT_DAILY_WIDGET_COLOR
 });
 
+const toShortcutSlotDraft = (slot: WidgetTemplateSlotConfig): ShortcutWidgetSlotConfigDraft => ({
+  slotIndex: slot.slotIndex,
+  shortcutAction: (slot.shortcutAction as ShortcutWidgetAction | null) ?? null,
+  label: slot.label ?? null,
+  customIcon: slot.customIcon ?? null,
+  backgroundColor: slot.color ?? null
+});
+
 export const WidgetSettingsView: React.FC<WidgetSettingsViewProps> = ({
   onBack,
   onToast,
@@ -126,6 +144,10 @@ export const WidgetSettingsView: React.FC<WidgetSettingsViewProps> = ({
   );
   const dailyTemplates = useMemo(
     () => templates.filter((template) => template.widgetType === 'daily'),
+    [templates]
+  );
+  const shortcutTemplates = useMemo(
+    () => templates.filter((template) => template.widgetType === 'shortcut'),
     [templates]
   );
 
@@ -264,11 +286,13 @@ export const WidgetSettingsView: React.FC<WidgetSettingsViewProps> = ({
     const widgetType = selectedWidgetTab;
     const defaultSize = getWidgetSizeOptionsByType(widgetType)[0] || DEFAULT_WIDGET_SIZE;
     const typeIndex = templates.filter((template) => template.widgetType === widgetType).length + 1;
-    const nextTemplate = createWidgetTemplate(
-      widgetType === 'daily' ? `日课小组件 ${typeIndex}` : `小组件 ${typeIndex}`,
-      defaultSize,
-      widgetType
-    );
+    const defaultTemplateName =
+      widgetType === 'daily'
+        ? `日课小组件 ${typeIndex}`
+        : widgetType === 'shortcut'
+          ? `快捷方式栏 ${typeIndex}`
+          : `计时器小组件 ${typeIndex}`;
+    const nextTemplate = createWidgetTemplate(defaultTemplateName, defaultSize, widgetType);
     const didSave = await persistTemplates([...templates, nextTemplate], '已创建小组件模板');
     if (didSave) {
       setEditingTemplateDraft(nextTemplate);
@@ -384,6 +408,31 @@ export const WidgetSettingsView: React.FC<WidgetSettingsViewProps> = ({
     setIsDraftDirty(true);
   };
 
+  const updateShortcutDraftSlot = (draft: ShortcutWidgetSlotConfigDraft) => {
+    setEditingTemplateDraft((previousDraft) => {
+      if (!previousDraft || previousDraft.widgetType !== 'shortcut' || !draft.shortcutAction) {
+        return previousDraft;
+      }
+
+      const nextSlots = normalizeWidgetTemplateSlots(
+        previousDraft.slots,
+        previousDraft.size,
+        previousDraft.widgetType
+      );
+      nextSlots[draft.slotIndex] = buildShortcutWidgetSlotConfig(draft.shortcutAction, draft.slotIndex, {
+        label: draft.label,
+        customIcon: draft.customIcon,
+        backgroundColor: draft.backgroundColor,
+        widgetType: previousDraft.widgetType
+      });
+
+      return updateWidgetTemplateSlots(previousDraft, nextSlots);
+    });
+
+    setEditingSlotIndex(null);
+    setIsDraftDirty(true);
+  };
+
   const handleDeleteTemplate = async () => {
     if (!deleteTarget) {
       return;
@@ -413,6 +462,8 @@ export const WidgetSettingsView: React.FC<WidgetSettingsViewProps> = ({
     ).map((slot) =>
       editingTemplateDraft.widgetType === 'daily'
         ? rebuildDailyWidgetSlotConfig(slot, checkTemplates)
+        : editingTemplateDraft.widgetType === 'shortcut'
+          ? rebuildShortcutWidgetSlotConfig(slot)
         : rebuildTimerWidgetSlotConfig(slot, categories)
     );
   }, [categories, checkTemplates, editingTemplateDraft]);
@@ -464,7 +515,7 @@ export const WidgetSettingsView: React.FC<WidgetSettingsViewProps> = ({
           先选要配置的小组件类型。计时器和日课共用一套模板管理，但各自槽位的绑定规则不同。
         </p>
       </div>
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-3 gap-3">
         {WIDGET_TYPE_TABS.map((tab) => {
           const isActive = selectedWidgetTab === tab.value;
           return (
@@ -486,9 +537,13 @@ export const WidgetSettingsView: React.FC<WidgetSettingsViewProps> = ({
     </div>
   ) : null;
 
-  const visibleTemplates = selectedWidgetTab === 'daily' ? dailyTemplates : timerTemplates;
+  const visibleTemplates =
+    selectedWidgetTab === 'daily'
+      ? dailyTemplates
+      : selectedWidgetTab === 'shortcut'
+        ? shortcutTemplates
+        : timerTemplates;
   const isEditingDaily = editingTemplateDraft?.widgetType === 'daily';
-
   return (
     <div className="fixed inset-0 z-50 flex flex-col bg-[#fdfbf7] pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] font-serif animate-in slide-in-from-right duration-300">
       <div className="sticky top-0 z-10 flex h-14 items-center justify-between border-b border-stone-100 bg-[#fdfbf7]/80 px-4 backdrop-blur-md">
@@ -590,6 +645,7 @@ export const WidgetSettingsView: React.FC<WidgetSettingsViewProps> = ({
                       }}
                     >
                       {draftPreviewSlots.map((slot) => {
+                        const isShortcutSlot = editingTemplateDraft.widgetType === 'shortcut';
                         return (
                           <button
                             key={slot.slotIndex}
@@ -598,16 +654,31 @@ export const WidgetSettingsView: React.FC<WidgetSettingsViewProps> = ({
                             className="flex h-full w-full min-h-0 items-center justify-center rounded-full p-[6%] text-center transition-all hover:-translate-y-0.5"
                             style={{ containerType: 'size' }}
                           >
-                            <div
-                              className="flex min-h-0 min-w-0 items-center justify-center rounded-full leading-none"
-                              style={{
-                                backgroundColor: getWidgetSlotFillColor(slot.color || '#EEF2F7', false),
-                                width: '74cqmin',
-                                height: '74cqmin'
-                              } as React.CSSProperties}
-                            >
-                              <IconRenderer icon={slot.icon || '\u2022'} size="42cqmin" />
-                            </div>
+                            {isShortcutSlot ? (
+                              <div className="flex min-h-0 min-w-0 items-center justify-center">
+                                <div
+                                  className="flex items-center justify-center rounded-full leading-none shadow-[inset_0_1px_0_rgba(255,255,255,0.72)]"
+                                  style={{
+                                    backgroundColor: getWidgetSlotFillColor(slot.color || '#E7E5E4', false),
+                                    width: '74cqmin',
+                                    height: '74cqmin'
+                                  } as React.CSSProperties}
+                                >
+                                  <IconRenderer icon={slot.icon || '\u2022'} size="42cqmin" />
+                                </div>
+                              </div>
+                            ) : (
+                              <div
+                                className="flex min-h-0 min-w-0 items-center justify-center rounded-full leading-none"
+                                style={{
+                                  backgroundColor: getWidgetSlotFillColor(slot.color || '#EEF2F7', false),
+                                  width: '74cqmin',
+                                  height: '74cqmin'
+                                } as React.CSSProperties}
+                              >
+                                <IconRenderer icon={slot.icon || '\u2022'} size="42cqmin" />
+                              </div>
+                            )}
                           </button>
                         );
                       })}
@@ -716,6 +787,13 @@ export const WidgetSettingsView: React.FC<WidgetSettingsViewProps> = ({
         checkTemplates={checkTemplates}
         onClose={() => setEditingSlotIndex(null)}
         onSave={updateDailyDraftSlot}
+      />
+
+      <ShortcutWidgetSlotConfigModal
+        isOpen={Boolean(editingTemplateDraft && currentEditingSlot && editingTemplateDraft.widgetType === 'shortcut')}
+        draft={currentEditingSlot ? toShortcutSlotDraft(currentEditingSlot) : null}
+        onClose={() => setEditingSlotIndex(null)}
+        onSave={updateShortcutDraftSlot}
       />
 
       <ConfirmModal

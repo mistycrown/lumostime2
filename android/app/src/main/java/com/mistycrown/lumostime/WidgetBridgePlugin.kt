@@ -220,7 +220,8 @@ class WidgetBridgePlugin : Plugin() {
                 checkTemplateId = parseNullableString(item.optString("checkTemplateId")),
                 checkItemId = parseNullableString(item.optString("checkItemId")),
                 checkManualMode = parseNullableString(item.optString("checkManualMode")),
-                checkTargetCount = if (item.has("checkTargetCount")) item.optInt("checkTargetCount") else null
+                checkTargetCount = if (item.has("checkTargetCount")) item.optInt("checkTargetCount") else null,
+                shortcutAction = parseNullableString(item.optString("shortcutAction"))
             )
         }
         return slots
@@ -268,6 +269,7 @@ class WidgetBridgePlugin : Plugin() {
             put("checkItemId", slot.checkItemId)
             put("checkManualMode", slot.checkManualMode)
             put("checkTargetCount", slot.checkTargetCount)
+            put("shortcutAction", slot.shortcutAction)
         }
     }
 
