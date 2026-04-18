@@ -116,6 +116,11 @@ export const getWidgetSlotFillColor = (
   colorValue: string = '',
   isEmphasized: boolean = false
 ): string => {
+  const normalizedHex = normalizeHexColor(colorValue);
+  if (normalizedHex) {
+    return isEmphasized ? normalizedHex : hexToRgba(normalizedHex, 0.2);
+  }
+
   const baseColor = normalizeHexColor(toCssColor(colorValue, 'fill', 1)) || '#e7e5e4';
   return isEmphasized ? baseColor : blendHexWithWhite(baseColor, 0.82);
 };

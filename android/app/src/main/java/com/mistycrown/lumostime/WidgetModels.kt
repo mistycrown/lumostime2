@@ -79,7 +79,7 @@ object WidgetSizes {
 
 data class WidgetSlotConfig(
     val slotIndex: Int,
-    val widgetType: String = WidgetTypes.DEFAULT,
+    val slotType: String? = null,
     val activityId: String? = null,
     val categoryId: String? = null,
     val icon: String? = null,
@@ -97,7 +97,7 @@ data class WidgetSlotConfig(
     val shortcutAction: String? = null
 ) {
     fun isConfigured(): Boolean {
-        return when (WidgetTypes.normalize(widgetType)) {
+        return when (WidgetTypes.normalize(slotType)) {
             WidgetTypes.DAILY -> !checkItemId.isNullOrBlank()
             WidgetTypes.SHORTCUT -> !shortcutAction.isNullOrBlank()
             else -> !activityId.isNullOrBlank() && !categoryId.isNullOrBlank()
@@ -107,7 +107,6 @@ data class WidgetSlotConfig(
 
 data class WidgetTemplate(
     val id: String,
-    val widgetType: String = WidgetTypes.DEFAULT,
     val name: String,
     val size: String = WidgetSizes.DEFAULT,
     val slots: List<WidgetSlotConfig>,
@@ -117,7 +116,6 @@ data class WidgetTemplate(
 
 data class WidgetInstanceBinding(
     val appWidgetId: Int,
-    val widgetType: String = WidgetTypes.DEFAULT,
     val templateId: String? = null,
     val createdAt: Long,
     val updatedAt: Long
@@ -206,7 +204,7 @@ data class WidgetTapAnimationState(
 
 data class WidgetSnapshotSlot(
     val slotIndex: Int,
-    val widgetType: String = WidgetTypes.DEFAULT,
+    val slotType: String? = null,
     val activityId: String?,
     val categoryId: String?,
     val checkItemId: String? = null,
@@ -226,7 +224,6 @@ data class WidgetSnapshotSlot(
 
 data class WidgetSnapshot(
     val appWidgetId: Int,
-    val widgetType: String = WidgetTypes.DEFAULT,
     val widgetSize: String,
     val templateId: String?,
     val templateName: String,

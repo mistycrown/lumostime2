@@ -50,15 +50,13 @@ object WidgetStores {
             buildList {
                 for (index in 0 until array.length()) {
                     val item = array.optJSONObject(index) ?: continue
-                    val widgetType = WidgetTypes.normalize(item.optString("widgetType"))
                     val size = WidgetSizes.normalize(item.optString("size"))
                     add(
                         WidgetTemplate(
                             id = item.optString("id").ifBlank { "widget-template-$index" },
-                            widgetType = widgetType,
                             name = item.optString("name").ifBlank { DEFAULT_TEMPLATE_NAME },
                             size = size,
-                            slots = parseSlots(item.optJSONArray("slots"), size, widgetType),
+                            slots = parseSlots(item.optJSONArray("slots"), size),
                             createdAt = item.optLong("createdAt", System.currentTimeMillis()),
                             updatedAt = item.optLong("updatedAt", System.currentTimeMillis())
                         )
@@ -68,18 +66,6 @@ object WidgetStores {
         }.getOrElse {
             emptyList()
         }.map(::normalizeTemplate)
-    }
-
-    fun loadTemplatesByTypeAndSize(
-        context: Context,
-        widgetType: String,
-        widgetSize: String
-    ): List<WidgetTemplate> {
-        val normalizedWidgetType = WidgetTypes.normalize(widgetType)
-        val normalizedSize = WidgetSizes.normalize(widgetSize)
-        return loadTemplates(context).filter {
-            it.widgetType == normalizedWidgetType && it.size == normalizedSize
-        }
     }
 
     fun loadTemplatesBySize(
@@ -96,12 +82,11 @@ object WidgetStores {
         normalized.forEach { template ->
             array.put(JSONObject().apply {
                 put("id", template.id)
-                put("widgetType", template.widgetType)
                 put("name", template.name)
                 put("size", template.size)
                 put("createdAt", template.createdAt)
                 put("updatedAt", template.updatedAt)
-                put("slots", slotsToJson(template.slots, template.size, template.widgetType))
+                put("slots", slotsToJson(template.slots, template.size))
             })
         }
 
@@ -111,17 +96,6 @@ object WidgetStores {
     fun loadTemplate(context: Context, templateId: String?): WidgetTemplate? {
         val normalizedTemplateId = parseNullableString(templateId) ?: return null
         return loadTemplates(context).firstOrNull { it.id == normalizedTemplateId }
-    }
-
-    fun loadTemplateForTypeAndSize(
-        context: Context,
-        templateId: String?,
-        widgetType: String,
-        widgetSize: String
-    ): WidgetTemplate? {
-        val templates = loadTemplatesByTypeAndSize(context, widgetType, widgetSize)
-        val normalizedTemplateId = parseNullableString(templateId) ?: return null
-        return templates.firstOrNull { it.id == normalizedTemplateId }
     }
 
     fun loadTemplateForSize(
@@ -148,7 +122,6 @@ object WidgetStores {
                     add(
                         WidgetInstanceBinding(
                             appWidgetId = item.optInt("appWidgetId", -1),
-                            widgetType = WidgetTypes.normalize(item.optString("widgetType")),
                             templateId = parseNullableString(item.optString("templateId")),
                             createdAt = item.optLong("createdAt", System.currentTimeMillis()),
                             updatedAt = item.optLong("updatedAt", System.currentTimeMillis())
@@ -181,32 +154,22 @@ object WidgetStores {
             return null
         }
 
-        val normalizedWidgetType = WidgetTypes.normalize(widgetType)
         val normalizedSize = WidgetSizes.normalize(widgetSize)
         val currentBinding = loadBinding(context, appWidgetId)
         if (currentBinding != null) {
-            val boundTemplate = loadTemplateForTypeAndSize(
-                context,
-                currentBinding.templateId,
-                normalizedWidgetType,
-                normalizedSize
-            )
+            val boundTemplate = loadTemplateForSize(context, currentBinding.templateId, normalizedSize)
             if (boundTemplate != null) {
-                if (currentBinding.widgetType != boundTemplate.widgetType) {
-                    saveBinding(context, appWidgetId, boundTemplate.widgetType, boundTemplate.id)
-                    return loadBinding(context, appWidgetId)
-                }
                 return currentBinding
             }
         }
 
-        val templates = loadTemplatesByTypeAndSize(context, normalizedWidgetType, normalizedSize)
+        val templates = loadTemplatesBySize(context, normalizedSize)
         if (templates.isEmpty()) {
             return null
         }
 
         val defaultTemplate = templates.first()
-        saveBinding(context, appWidgetId, defaultTemplate.widgetType, defaultTemplate.id)
+        saveBinding(context, appWidgetId, defaultTemplate.id)
         return loadBinding(context, appWidgetId)
     }
 
@@ -220,32 +183,29 @@ object WidgetStores {
             return null
         }
 
-        val normalizedWidgetType = WidgetTypes.normalize(widgetType)
         val normalizedSize = WidgetSizes.normalize(widgetSize)
-        val templates = loadTemplatesByTypeAndSize(context, normalizedWidgetType, normalizedSize)
+        val templates = loadTemplatesBySize(context, normalizedSize)
         if (templates.isEmpty()) {
             return null
         }
 
-        val currentBinding = ensureBinding(context, appWidgetId, normalizedWidgetType, normalizedSize)
+        val currentBinding = ensureBinding(context, appWidgetId, widgetType, normalizedSize)
         val currentIndex = templates.indexOfFirst { it.id == currentBinding?.templateId }
         val nextTemplate = if (currentIndex < 0) templates.first() else templates[(currentIndex + 1) % templates.size]
 
-        saveBinding(context, appWidgetId, nextTemplate.widgetType, nextTemplate.id)
+        saveBinding(context, appWidgetId, nextTemplate.id)
         return loadBinding(context, appWidgetId)
     }
 
-    fun saveBinding(context: Context, appWidgetId: Int, widgetType: String, templateId: String?) {
+    fun saveBinding(context: Context, appWidgetId: Int, templateId: String?) {
         if (appWidgetId <= 0) {
             return
         }
 
-        val normalizedWidgetType = WidgetTypes.normalize(widgetType)
         val now = System.currentTimeMillis()
         val existing = loadBinding(context, appWidgetId)
         val nextBinding = WidgetInstanceBinding(
             appWidgetId = appWidgetId,
-            widgetType = normalizedWidgetType,
             templateId = parseNullableString(templateId),
             createdAt = existing?.createdAt ?: now,
             updatedAt = now
@@ -285,7 +245,7 @@ object WidgetStores {
             return
         }
 
-        val templates = loadTemplatesByTypeAndSize(context, WidgetTypes.TIMER, WidgetSizes.DEFAULT)
+        val templates = loadTemplatesBySize(context, WidgetSizes.DEFAULT)
         val defaultTemplate = templates.firstOrNull { it.id == LEGACY_TEMPLATE_ID } ?: templates.firstOrNull()
         if (defaultTemplate == null) {
             prefs(context).edit().putBoolean(KEY_LEGACY_AUTO_BIND_PENDING, false).commit()
@@ -295,7 +255,7 @@ object WidgetStores {
         appWidgetIds.forEach { appWidgetId ->
             val binding = loadBinding(context, appWidgetId)
             if (binding == null) {
-                saveBinding(context, appWidgetId, WidgetTypes.TIMER, defaultTemplate.id)
+                saveBinding(context, appWidgetId, defaultTemplate.id)
             }
         }
 
@@ -603,7 +563,6 @@ object WidgetStores {
             .forEach { binding ->
                 array.put(JSONObject().apply {
                     put("appWidgetId", binding.appWidgetId)
-                    put("widgetType", WidgetTypes.normalize(binding.widgetType))
                     put("templateId", binding.templateId ?: JSONObject.NULL)
                     put("createdAt", binding.createdAt)
                     put("updatedAt", binding.updatedAt)
@@ -678,19 +637,17 @@ object WidgetStores {
 
     private fun normalizeSlots(
         slots: List<WidgetSlotConfig>,
-        widgetSize: String,
-        widgetType: String
+        widgetSize: String
     ): List<WidgetSlotConfig> {
-        val normalizedWidgetType = WidgetTypes.normalize(widgetType)
         val slotCount = WidgetSizes.slotCount(widgetSize)
         val slotMap = slots.associateBy { it.slotIndex }
         return (0 until slotCount).map { index ->
             val slot = slotMap[index]
             if (slot == null) {
-                WidgetSlotConfig(slotIndex = index, widgetType = normalizedWidgetType)
+                WidgetSlotConfig(slotIndex = index, slotType = null)
             } else {
                 slot.copy(
-                    widgetType = WidgetTypes.normalize(slot.widgetType),
+                    slotType = slot.slotType?.let(WidgetTypes::normalize),
                     checkManualMode = if (slot.checkManualMode == null) null else WidgetDailyModes.normalize(slot.checkManualMode),
                     checkTargetCount = slot.checkTargetCount?.coerceAtLeast(1),
                     shortcutAction = parseNullableString(slot.shortcutAction)
@@ -700,14 +657,12 @@ object WidgetStores {
     }
 
     private fun normalizeTemplate(template: WidgetTemplate): WidgetTemplate {
-        val widgetType = WidgetTypes.normalize(template.widgetType)
         val size = WidgetSizes.normalize(template.size)
         return WidgetTemplate(
             id = template.id,
-            widgetType = widgetType,
             name = template.name.ifBlank { DEFAULT_TEMPLATE_NAME },
             size = size,
-            slots = normalizeSlots(template.slots, size, widgetType),
+            slots = normalizeSlots(template.slots, size),
             createdAt = template.createdAt,
             updatedAt = template.updatedAt
         )
@@ -715,11 +670,10 @@ object WidgetStores {
 
     private fun parseSlots(
         array: JSONArray?,
-        widgetSize: String,
-        widgetType: String
+        widgetSize: String
     ): List<WidgetSlotConfig> {
         if (array == null) {
-            return normalizeSlots(emptyList(), widgetSize, widgetType)
+            return normalizeSlots(emptyList(), widgetSize)
         }
 
         val slots = mutableListOf<WidgetSlotConfig>()
@@ -727,7 +681,7 @@ object WidgetStores {
             val item = array.optJSONObject(index) ?: continue
             slots += WidgetSlotConfig(
                 slotIndex = item.optInt("slotIndex", index),
-                widgetType = WidgetTypes.normalize(item.optString("widgetType", widgetType)),
+                slotType = parseNullableString(item.optString("slotType"))?.let(WidgetTypes::normalize),
                 activityId = parseNullableString(item.optString("activityId")),
                 categoryId = parseNullableString(item.optString("categoryId")),
                 icon = parseNullableString(item.optString("icon")),
@@ -746,19 +700,18 @@ object WidgetStores {
             )
         }
 
-        return normalizeSlots(slots, widgetSize, widgetType)
+        return normalizeSlots(slots, widgetSize)
     }
 
     private fun slotsToJson(
         slots: List<WidgetSlotConfig>,
-        widgetSize: String,
-        widgetType: String
+        widgetSize: String
     ): JSONArray {
         val array = JSONArray()
-        normalizeSlots(slots, widgetSize, widgetType).forEach { slot ->
+        normalizeSlots(slots, widgetSize).forEach { slot ->
             array.put(JSONObject().apply {
                 put("slotIndex", slot.slotIndex)
-                put("widgetType", WidgetTypes.normalize(slot.widgetType))
+                put("slotType", slot.slotType?.let(WidgetTypes::normalize) ?: JSONObject.NULL)
                 put("activityId", slot.activityId ?: JSONObject.NULL)
                 put("categoryId", slot.categoryId ?: JSONObject.NULL)
                 put("icon", slot.icon ?: JSONObject.NULL)
@@ -902,9 +855,9 @@ object WidgetStores {
         }
 
         val legacySlots = runCatching {
-            parseSlots(JSONArray(legacyRaw), WidgetSizes.DEFAULT, WidgetTypes.TIMER)
+            parseSlots(JSONArray(legacyRaw), WidgetSizes.DEFAULT)
         }.getOrElse {
-            normalizeSlots(emptyList(), WidgetSizes.DEFAULT, WidgetTypes.TIMER)
+            normalizeSlots(emptyList(), WidgetSizes.DEFAULT)
         }
 
         if (!legacySlots.any { it.isConfigured() }) {
@@ -914,10 +867,11 @@ object WidgetStores {
         val now = System.currentTimeMillis()
         val migratedTemplate = WidgetTemplate(
             id = LEGACY_TEMPLATE_ID,
-            widgetType = WidgetTypes.TIMER,
             name = DEFAULT_TEMPLATE_NAME,
             size = WidgetSizes.DEFAULT,
-            slots = legacySlots,
+            slots = legacySlots.map {
+                it.copy(slotType = if (!it.activityId.isNullOrBlank() && !it.categoryId.isNullOrBlank()) WidgetTypes.TIMER else null)
+            },
             createdAt = now,
             updatedAt = now
         )

@@ -34,14 +34,12 @@ class WidgetBridgePlugin : Plugin() {
 
         for (index in 0 until templatesArray.length()) {
             val item = templatesArray.optJSONObject(index) ?: continue
-            val widgetType = WidgetTypes.normalize(item.optString("widgetType"))
             val size = WidgetSizes.normalize(item.optString("size"))
             templates += WidgetTemplate(
                 id = item.optString("id").ifBlank { "widget-template-$index" },
-                widgetType = widgetType,
                 name = item.optString("name").ifBlank { WidgetStores.DEFAULT_TEMPLATE_NAME },
                 size = size,
-                slots = parseSlots(item.optJSONArray("slots"), size, widgetType),
+                slots = parseSlots(item.optJSONArray("slots"), size),
                 createdAt = item.optLong("createdAt", System.currentTimeMillis()),
                 updatedAt = item.optLong("updatedAt", System.currentTimeMillis())
             )
@@ -192,12 +190,11 @@ class WidgetBridgePlugin : Plugin() {
 
     private fun parseSlots(
         slotsArray: JSONArray?,
-        widgetSize: String,
-        widgetType: String
+        widgetSize: String
     ): List<WidgetSlotConfig> {
         if (slotsArray == null) {
             return (0 until WidgetSizes.slotCount(widgetSize)).map {
-                WidgetSlotConfig(slotIndex = it, widgetType = WidgetTypes.normalize(widgetType))
+                WidgetSlotConfig(slotIndex = it, slotType = null)
             }
         }
 
@@ -206,7 +203,7 @@ class WidgetBridgePlugin : Plugin() {
             val item = slotsArray.optJSONObject(index) ?: continue
             slots += WidgetSlotConfig(
                 slotIndex = item.optInt("slotIndex", index),
-                widgetType = WidgetTypes.normalize(item.optString("widgetType", widgetType)),
+                slotType = parseNullableString(item.optString("slotType"))?.let(WidgetTypes::normalize),
                 activityId = parseNullableString(item.optString("activityId")),
                 categoryId = parseNullableString(item.optString("categoryId")),
                 icon = parseNullableString(item.optString("icon")),
@@ -230,7 +227,6 @@ class WidgetBridgePlugin : Plugin() {
     private fun templateToJs(template: WidgetTemplate): JSObject {
         return JSObject().apply {
             put("id", template.id)
-            put("widgetType", WidgetTypes.normalize(template.widgetType))
             put("name", template.name)
             put("size", template.size)
             put("createdAt", template.createdAt)
@@ -244,7 +240,6 @@ class WidgetBridgePlugin : Plugin() {
     private fun bindingToJs(binding: WidgetInstanceBinding): JSObject {
         return JSObject().apply {
             put("appWidgetId", binding.appWidgetId)
-            put("widgetType", WidgetTypes.normalize(binding.widgetType))
             put("templateId", binding.templateId)
             put("createdAt", binding.createdAt)
             put("updatedAt", binding.updatedAt)
@@ -254,7 +249,7 @@ class WidgetBridgePlugin : Plugin() {
     private fun slotToJs(slot: WidgetSlotConfig): JSObject {
         return JSObject().apply {
             put("slotIndex", slot.slotIndex)
-            put("widgetType", WidgetTypes.normalize(slot.widgetType))
+            put("slotType", slot.slotType?.let(WidgetTypes::normalize))
             put("activityId", slot.activityId)
             put("categoryId", slot.categoryId)
             put("icon", slot.icon)
