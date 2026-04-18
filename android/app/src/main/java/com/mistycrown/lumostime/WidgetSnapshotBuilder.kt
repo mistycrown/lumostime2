@@ -31,17 +31,12 @@ object WidgetSnapshotBuilder {
             }
 
         val binding = WidgetStores.ensureBinding(context, appWidgetId, normalizedWidgetType, normalizedSize)
-        val template = WidgetStores.loadTemplateForTypeAndSize(
-            context,
-            binding?.templateId,
-            normalizedWidgetType,
-            normalizedSize
-        )
+        val template = WidgetStores.loadTemplateForSize(context, binding?.templateId, normalizedSize)
         val hasTemplate = template != null
-        val effectiveWidgetType = template?.widgetType ?: normalizedWidgetType
 
-        val slots = (template?.slots ?: emptySlots(effectiveWidgetType, normalizedSize)).map { slot ->
-            if (effectiveWidgetType == WidgetTypes.DAILY) {
+        val slots = (template?.slots ?: emptySlots(normalizedSize)).map { slot ->
+            val slotType = WidgetTypes.normalize(slot.slotType)
+            if (slotType == WidgetTypes.DAILY) {
                 val meta = slot.checkItemId?.let(dailyMetaMap::get)
                 val progress = slot.checkItemId?.let(dailyProgressMap::get)
                 val manualMode = WidgetDailyModes.normalize(
@@ -54,7 +49,7 @@ object WidgetSnapshotBuilder {
 
                 WidgetSnapshotSlot(
                     slotIndex = slot.slotIndex,
-                    widgetType = effectiveWidgetType,
+                    slotType = slotType,
                     activityId = null,
                     categoryId = null,
                     checkItemId = slot.checkItemId,
@@ -80,14 +75,14 @@ object WidgetSnapshotBuilder {
                     tapAnimationMode = tapAnimationState
                         ?.takeIf {
                             it.appWidgetId == appWidgetId &&
-                                WidgetTypes.normalize(it.widgetType) == effectiveWidgetType &&
+                                WidgetTypes.normalize(it.widgetType) == slotType &&
                                 it.slotIndex == slot.slotIndex
                         }
                         ?.animationMode,
                     tapAnimationProgress = tapAnimationState
                         ?.takeIf {
                             it.appWidgetId == appWidgetId &&
-                                WidgetTypes.normalize(it.widgetType) == effectiveWidgetType &&
+                                WidgetTypes.normalize(it.widgetType) == slotType &&
                                 it.slotIndex == slot.slotIndex
                         }
                         ?.let { animation ->
@@ -96,10 +91,10 @@ object WidgetSnapshotBuilder {
                                 .coerceIn(0f, 1f)
                         }
                 )
-            } else if (effectiveWidgetType == WidgetTypes.SHORTCUT) {
+            } else if (slotType == WidgetTypes.SHORTCUT) {
                 WidgetSnapshotSlot(
                     slotIndex = slot.slotIndex,
-                    widgetType = effectiveWidgetType,
+                    slotType = slotType,
                     activityId = null,
                     categoryId = null,
                     icon = slot.customIcon?.ifBlank { null }
@@ -122,14 +117,14 @@ object WidgetSnapshotBuilder {
                     tapAnimationMode = tapAnimationState
                         ?.takeIf {
                             it.appWidgetId == appWidgetId &&
-                                WidgetTypes.normalize(it.widgetType) == effectiveWidgetType &&
+                                WidgetTypes.normalize(it.widgetType) == slotType &&
                                 it.slotIndex == slot.slotIndex
                         }
                         ?.animationMode,
                     tapAnimationProgress = tapAnimationState
                         ?.takeIf {
                             it.appWidgetId == appWidgetId &&
-                                WidgetTypes.normalize(it.widgetType) == effectiveWidgetType &&
+                                WidgetTypes.normalize(it.widgetType) == slotType &&
                                 it.slotIndex == slot.slotIndex
                         }
                         ?.let { animation ->
@@ -142,7 +137,7 @@ object WidgetSnapshotBuilder {
                 val matchesRuntime = matchesRuntime(template, slot, runtimeState)
                 WidgetSnapshotSlot(
                     slotIndex = slot.slotIndex,
-                    widgetType = effectiveWidgetType,
+                    slotType = slot.slotType,
                     activityId = slot.activityId,
                     categoryId = slot.categoryId,
                     icon = slot.icon?.ifBlank { null } ?: "\u2022",
@@ -158,14 +153,14 @@ object WidgetSnapshotBuilder {
                     tapAnimationMode = tapAnimationState
                         ?.takeIf {
                             it.appWidgetId == appWidgetId &&
-                                WidgetTypes.normalize(it.widgetType) == effectiveWidgetType &&
+                                WidgetTypes.normalize(it.widgetType) == slotType &&
                                 it.slotIndex == slot.slotIndex
                         }
                         ?.animationMode,
                     tapAnimationProgress = tapAnimationState
                         ?.takeIf {
                             it.appWidgetId == appWidgetId &&
-                                WidgetTypes.normalize(it.widgetType) == effectiveWidgetType &&
+                                WidgetTypes.normalize(it.widgetType) == slotType &&
                                 it.slotIndex == slot.slotIndex
                         }
                         ?.let { animation ->
@@ -179,7 +174,6 @@ object WidgetSnapshotBuilder {
 
         return WidgetSnapshot(
             appWidgetId = appWidgetId,
-            widgetType = effectiveWidgetType,
             widgetSize = normalizedSize,
             templateId = template?.id,
             templateName = template?.name ?: "",
@@ -196,7 +190,7 @@ object WidgetSnapshotBuilder {
             return false
         }
 
-        if (WidgetTypes.normalize(runtimeState.widgetType) != WidgetTypes.normalize(slot.widgetType)) {
+        if (WidgetTypes.normalize(runtimeState.widgetType) != WidgetTypes.normalize(slot.slotType)) {
             return false
         }
 
@@ -210,10 +204,9 @@ object WidgetSnapshotBuilder {
         }
     }
 
-    private fun emptySlots(widgetType: String, widgetSize: String): List<WidgetSlotConfig> {
-        val normalizedWidgetType = WidgetTypes.normalize(widgetType)
+    private fun emptySlots(widgetSize: String): List<WidgetSlotConfig> {
         return (0 until WidgetSizes.slotCount(widgetSize)).map {
-            WidgetSlotConfig(slotIndex = it, widgetType = normalizedWidgetType)
+            WidgetSlotConfig(slotIndex = it, slotType = null)
         }
     }
 

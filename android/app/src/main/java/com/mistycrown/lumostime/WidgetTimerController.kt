@@ -28,7 +28,7 @@ object WidgetTimerController {
         val template = WidgetStores.loadTemplateForSize(context, binding.templateId, normalizedSize) ?: return false
         val slot = template.slots.firstOrNull { it.slotIndex == slotIndex } ?: return false
 
-        return when (template.widgetType) {
+        return when (WidgetTypes.normalize(slot.slotType)) {
             WidgetTypes.DAILY -> handleDailySlotTap(context, appWidgetId, template, slot)
             WidgetTypes.SHORTCUT -> handleShortcutSlotTap(context, appWidgetId, template, slot)
             else -> handleTimerSlotTap(context, appWidgetId, template, slot)
@@ -41,7 +41,7 @@ object WidgetTimerController {
         template: WidgetTemplate,
         slot: WidgetSlotConfig
     ): Boolean {
-        val normalizedWidgetType = WidgetTypes.normalize(template.widgetType)
+        val normalizedWidgetType = WidgetTypes.normalize(slot.slotType)
         val slotIndex = slot.slotIndex
 
         if (!slot.isConfigured()) {
@@ -118,7 +118,7 @@ object WidgetTimerController {
         template: WidgetTemplate,
         slot: WidgetSlotConfig
     ): Boolean {
-        val normalizedWidgetType = WidgetTypes.normalize(template.widgetType)
+        val normalizedWidgetType = WidgetTypes.normalize(slot.slotType)
         val slotIndex = slot.slotIndex
         val checkItemId = slot.checkItemId ?: return false
 
@@ -207,7 +207,7 @@ object WidgetTimerController {
         slot: WidgetSlotConfig
     ): Boolean {
         val action = slot.shortcutAction ?: return false
-        val normalizedWidgetType = WidgetTypes.normalize(template.widgetType)
+        val normalizedWidgetType = WidgetTypes.normalize(slot.slotType)
         val startedAt = System.currentTimeMillis()
 
         saveTapAnimation(

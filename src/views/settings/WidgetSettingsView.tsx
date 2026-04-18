@@ -1,44 +1,36 @@
 /**
  * @file WidgetSettingsView.tsx
  * @input Widget templates, categories, daily check templates, todos, scopes, Android bridge availability
- * @output A template-based widget configuration page with per-slot modal editing
+ * @output A template-based widget configuration page with per-slot mixed-type editing
  * @pos View
- * @description Lets the user create, rename, resize, edit, and manage Android widget templates while configuring timer, daily, and shortcut widgets from a shared entry.
- * @updated 2026-04-18: Added the new 4x1 shortcut widget family with its own slot editor and preview style.
+ * @description Lets the user create, rename, resize, edit, and manage Android widget templates while configuring each slot as a timer, daily check, or shortcut.
+ * @updated 2026-04-18: Removed template-level widget categories and switched to slot-type-first editing.
  */
 import React, { useEffect, useMemo, useState } from 'react';
 import { ChevronLeft, Plus, Trash2 } from 'lucide-react';
 import { ConfirmModal } from '../../components/ConfirmModal';
 import { CustomSelect } from '../../components/CustomSelect';
-import {
-  DailyWidgetSlotConfigDraft,
-  DailyWidgetSlotConfigModal
-} from '../../components/DailyWidgetSlotConfigModal';
 import { IconRenderer } from '../../components/IconRenderer';
 import {
-  ShortcutWidgetSlotConfigDraft,
-  ShortcutWidgetSlotConfigModal
-} from '../../components/ShortcutWidgetSlotConfigModal';
-import {
-  WidgetSlotConfigDraft,
-  WidgetSlotConfigModal
-} from '../../components/WidgetSlotConfigModal';
+  WidgetSlotEditorDraft,
+  WidgetSlotEditorModal
+} from '../../components/WidgetSlotEditorModal';
 import { ToastType } from '../../components/Toast';
 import WidgetBridge from '../../plugins/WidgetBridgePlugin';
 import {
   DEFAULT_WIDGET_SIZE,
-  DEFAULT_DAILY_WIDGET_COLOR,
   WidgetTemplate,
   WidgetTemplateSlotConfig,
   buildDailyWidgetSlotConfig,
   buildShortcutWidgetSlotConfig,
   buildTimerWidgetSlotConfig,
   countTemplateBoundInstances,
+  createEmptyWidgetTemplateSlot,
   createWidgetTemplate,
   findDailyWidgetBinding,
   getWidgetGridBySize,
   getWidgetSizeLabel,
-  getWidgetSizeOptionsByType,
+  getWidgetSizeOptions,
   getWidgetSlotCountBySize,
   isNativeAndroidWidgetSupported,
   loadWidgetTemplatesFromStorage,
@@ -53,9 +45,6 @@ import {
   updateWidgetTemplateSize,
   updateWidgetTemplateSlots
 } from '../../services/widgetService';
-import {
-  ShortcutWidgetAction,
-} from '../../services/widgetShortcutService';
 import { getWidgetSlotFillColor } from '../../utils/colorAdapterUtils';
 import { Category, CheckTemplate, Scope, TodoCategory, TodoItem } from '../../types';
 
@@ -73,17 +62,25 @@ const AUTO_SAVE_DELAY_MS = 350;
 const PREVIEW_MAX_COLUMNS = 4;
 const PREVIEW_MAX_ROWS = 2;
 const PREVIEW_TITLE_ROW_RATIO = 0.6;
-const WIDGET_TYPE_TABS = [
-  { value: 'timer', label: '计时器' },
-  { value: 'daily', label: '日课' },
-  { value: 'shortcut', label: '快捷方式栏' }
-] as const;
-
-type WidgetSettingsTab = (typeof WIDGET_TYPE_TABS)[number]['value'];
 
 const getTemplateSlotSummary = (template: WidgetTemplate): string => {
   const configuredLabels = template.slots
-    .map((slot) => slot.label?.trim())
+    .map((slot) => {
+      const label = slot.label?.trim();
+      if (label) {
+        return label;
+      }
+      if (slot.slotType === 'timer') {
+        return '计时器';
+      }
+      if (slot.slotType === 'daily') {
+        return '日课';
+      }
+      if (slot.slotType === 'shortcut') {
+        return '快捷方式';
+      }
+      return null;
+    })
     .filter((label): label is string => Boolean(label));
 
   if (configuredLabels.length === 0) {
@@ -94,30 +91,39 @@ const getTemplateSlotSummary = (template: WidgetTemplate): string => {
   return configuredLabels.length > 4 ? `${previewLabels} 等 ${configuredLabels.length} 项` : previewLabels;
 };
 
-const toTimerSlotDraft = (slot: WidgetTemplateSlotConfig): WidgetSlotConfigDraft => ({
+const toSlotEditorDraft = (slot: WidgetTemplateSlotConfig): WidgetSlotEditorDraft => ({
   slotIndex: slot.slotIndex,
+  slotType: slot.slotType ?? null,
   categoryId: slot.categoryId ?? null,
   activityId: slot.activityId ?? null,
   linkedTodoId: slot.linkedTodoId ?? null,
   scopeIds: slot.scopeIds ?? null,
-  customIcon: slot.customIcon ?? null
-});
-
-const toDailySlotDraft = (slot: WidgetTemplateSlotConfig): DailyWidgetSlotConfigDraft => ({
-  slotIndex: slot.slotIndex,
   checkTemplateId: slot.checkTemplateId ?? null,
   checkItemId: slot.checkItemId ?? null,
-  customIcon: slot.customIcon ?? null,
-  backgroundColor: slot.color ?? DEFAULT_DAILY_WIDGET_COLOR
-});
-
-const toShortcutSlotDraft = (slot: WidgetTemplateSlotConfig): ShortcutWidgetSlotConfigDraft => ({
-  slotIndex: slot.slotIndex,
-  shortcutAction: (slot.shortcutAction as ShortcutWidgetAction | null) ?? null,
+  shortcutAction: slot.shortcutAction ?? null,
   label: slot.label ?? null,
   customIcon: slot.customIcon ?? null,
   backgroundColor: slot.color ?? null
 });
+
+const getSlotPreviewShape = (slot: WidgetTemplateSlotConfig) => {
+  if (slot.slotType === 'shortcut') {
+    return 'rounded-[26%]';
+  }
+  return 'rounded-full';
+};
+
+const getSlotPreviewColor = (slot: WidgetTemplateSlotConfig) => {
+  if (slot.slotType === 'timer') {
+    return getWidgetSlotFillColor(slot.color || '#EEF2F7', false);
+  }
+  if (slot.slotType === 'daily' || slot.slotType === 'shortcut') {
+    return getWidgetSlotFillColor(slot.color || '#E7E5E4', false);
+  }
+  return '#F5F5F4';
+};
+
+const getSlotPreviewIcon = (slot: WidgetTemplateSlotConfig) => slot.icon || '\u2022';
 
 export const WidgetSettingsView: React.FC<WidgetSettingsViewProps> = ({
   onBack,
@@ -132,32 +138,19 @@ export const WidgetSettingsView: React.FC<WidgetSettingsViewProps> = ({
   const [bindingCounts, setBindingCounts] = useState<Record<string, number>>({});
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
-  const [selectedWidgetTab, setSelectedWidgetTab] = useState<WidgetSettingsTab>('timer');
   const [editingTemplateDraft, setEditingTemplateDraft] = useState<WidgetTemplate | null>(null);
   const [editingSlotIndex, setEditingSlotIndex] = useState<number | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<WidgetTemplate | null>(null);
   const [isDraftDirty, setIsDraftDirty] = useState(false);
 
-  const timerTemplates = useMemo(
-    () => templates.filter((template) => template.widgetType === 'timer'),
-    [templates]
+  const sizeOptions = useMemo(
+    () =>
+      getWidgetSizeOptions().map((size) => ({
+        value: size,
+        label: `${getWidgetSizeLabel(size)} · ${getWidgetSlotCountBySize(size)} 个槽位`
+      })),
+    []
   );
-  const dailyTemplates = useMemo(
-    () => templates.filter((template) => template.widgetType === 'daily'),
-    [templates]
-  );
-  const shortcutTemplates = useMemo(
-    () => templates.filter((template) => template.widgetType === 'shortcut'),
-    [templates]
-  );
-
-  const sizeOptions = useMemo(() => {
-    const activeWidgetType = editingTemplateDraft?.widgetType || selectedWidgetTab;
-    return getWidgetSizeOptionsByType(activeWidgetType).map((size) => ({
-      value: size,
-      label: `${getWidgetSizeLabel(size)} · ${getWidgetSlotCountBySize(size)} 个槽位`
-    }));
-  }, [editingTemplateDraft?.widgetType, selectedWidgetTab]);
 
   const loadTemplates = async () => {
     const localTemplates = normalizeWidgetTemplates(loadWidgetTemplatesFromStorage());
@@ -283,16 +276,8 @@ export const WidgetSettingsView: React.FC<WidgetSettingsViewProps> = ({
   }, [categories, checkTemplates, editingTemplateDraft, isDraftDirty, templates]);
 
   const handleCreateTemplate = async () => {
-    const widgetType = selectedWidgetTab;
-    const defaultSize = getWidgetSizeOptionsByType(widgetType)[0] || DEFAULT_WIDGET_SIZE;
-    const typeIndex = templates.filter((template) => template.widgetType === widgetType).length + 1;
-    const defaultTemplateName =
-      widgetType === 'daily'
-        ? `日课小组件 ${typeIndex}`
-        : widgetType === 'shortcut'
-          ? `快捷方式栏 ${typeIndex}`
-          : `计时器小组件 ${typeIndex}`;
-    const nextTemplate = createWidgetTemplate(defaultTemplateName, defaultSize, widgetType);
+    const templateIndex = templates.length + 1;
+    const nextTemplate = createWidgetTemplate(`小组件 ${templateIndex}`, DEFAULT_WIDGET_SIZE);
     const didSave = await persistTemplates([...templates, nextTemplate], '已创建小组件模板');
     if (didSave) {
       setEditingTemplateDraft(nextTemplate);
@@ -321,7 +306,6 @@ export const WidgetSettingsView: React.FC<WidgetSettingsViewProps> = ({
       if (!previousDraft) {
         return previousDraft;
       }
-
       return {
         ...previousDraft,
         name,
@@ -337,94 +321,56 @@ export const WidgetSettingsView: React.FC<WidgetSettingsViewProps> = ({
       if (!previousDraft) {
         return previousDraft;
       }
-
       return updateWidgetTemplateSize(previousDraft, nextSize);
     });
     setIsDraftDirty(true);
   };
 
-  const updateTimerDraftSlot = (draft: WidgetSlotConfigDraft) => {
+  const updateSlotDraft = (draft: WidgetSlotEditorDraft) => {
     setEditingTemplateDraft((previousDraft) => {
-      if (
-        !previousDraft ||
-        previousDraft.widgetType !== 'timer' ||
-        !draft.categoryId ||
-        !draft.activityId
-      ) {
+      if (!previousDraft || !draft.slotType) {
         return previousDraft;
       }
 
-      const category = categories.find((item) => item.id === draft.categoryId);
-      const activity = category?.activities.find((item) => item.id === draft.activityId);
-      if (!category || !activity) {
-        return previousDraft;
+      const nextSlots = normalizeWidgetTemplateSlots(previousDraft.slots, previousDraft.size);
+
+      if (draft.slotType === 'timer') {
+        if (!draft.categoryId || !draft.activityId) {
+          return previousDraft;
+        }
+        const category = categories.find((item) => item.id === draft.categoryId);
+        const activity = category?.activities.find((item) => item.id === draft.activityId);
+        if (!category || !activity) {
+          return previousDraft;
+        }
+
+        nextSlots[draft.slotIndex] = buildTimerWidgetSlotConfig(category, activity, draft.slotIndex, {
+          linkedTodoId: draft.linkedTodoId,
+          scopeIds: draft.scopeIds,
+          customIcon: draft.customIcon
+        });
+      } else if (draft.slotType === 'daily') {
+        if (!draft.checkItemId) {
+          return previousDraft;
+        }
+        const binding = findDailyWidgetBinding(checkTemplates, draft.checkItemId);
+        if (!binding) {
+          return previousDraft;
+        }
+        nextSlots[draft.slotIndex] = buildDailyWidgetSlotConfig(binding, draft.slotIndex, {
+          customIcon: draft.customIcon,
+          backgroundColor: draft.backgroundColor
+        });
+      } else if (draft.slotType === 'shortcut') {
+        if (!draft.shortcutAction) {
+          return previousDraft;
+        }
+        nextSlots[draft.slotIndex] = buildShortcutWidgetSlotConfig(draft.shortcutAction, draft.slotIndex, {
+          label: draft.label,
+          customIcon: draft.customIcon,
+          backgroundColor: draft.backgroundColor
+        });
       }
-
-      const nextSlots = normalizeWidgetTemplateSlots(
-        previousDraft.slots,
-        previousDraft.size,
-        previousDraft.widgetType
-      );
-      nextSlots[draft.slotIndex] = buildTimerWidgetSlotConfig(category, activity, draft.slotIndex, {
-        linkedTodoId: draft.linkedTodoId,
-        scopeIds: draft.scopeIds,
-        customIcon: draft.customIcon,
-        widgetType: previousDraft.widgetType
-      });
-
-      return updateWidgetTemplateSlots(previousDraft, nextSlots);
-    });
-
-    setEditingSlotIndex(null);
-    setIsDraftDirty(true);
-  };
-
-  const updateDailyDraftSlot = (draft: DailyWidgetSlotConfigDraft) => {
-    setEditingTemplateDraft((previousDraft) => {
-      if (!previousDraft || previousDraft.widgetType !== 'daily' || !draft.checkItemId) {
-        return previousDraft;
-      }
-
-      const binding = findDailyWidgetBinding(checkTemplates, draft.checkItemId);
-      if (!binding) {
-        return previousDraft;
-      }
-
-      const nextSlots = normalizeWidgetTemplateSlots(
-        previousDraft.slots,
-        previousDraft.size,
-        previousDraft.widgetType
-      );
-      nextSlots[draft.slotIndex] = buildDailyWidgetSlotConfig(binding, draft.slotIndex, {
-        customIcon: draft.customIcon,
-        backgroundColor: draft.backgroundColor,
-        widgetType: previousDraft.widgetType
-      });
-
-      return updateWidgetTemplateSlots(previousDraft, nextSlots);
-    });
-
-    setEditingSlotIndex(null);
-    setIsDraftDirty(true);
-  };
-
-  const updateShortcutDraftSlot = (draft: ShortcutWidgetSlotConfigDraft) => {
-    setEditingTemplateDraft((previousDraft) => {
-      if (!previousDraft || previousDraft.widgetType !== 'shortcut' || !draft.shortcutAction) {
-        return previousDraft;
-      }
-
-      const nextSlots = normalizeWidgetTemplateSlots(
-        previousDraft.slots,
-        previousDraft.size,
-        previousDraft.widgetType
-      );
-      nextSlots[draft.slotIndex] = buildShortcutWidgetSlotConfig(draft.shortcutAction, draft.slotIndex, {
-        label: draft.label,
-        customIcon: draft.customIcon,
-        backgroundColor: draft.backgroundColor,
-        widgetType: previousDraft.widgetType
-      });
 
       return updateWidgetTemplateSlots(previousDraft, nextSlots);
     });
@@ -455,16 +401,14 @@ export const WidgetSettingsView: React.FC<WidgetSettingsViewProps> = ({
       return [];
     }
 
-    return normalizeWidgetTemplateSlots(
-      editingTemplateDraft.slots,
-      editingTemplateDraft.size,
-      editingTemplateDraft.widgetType
-    ).map((slot) =>
-      editingTemplateDraft.widgetType === 'daily'
+    return normalizeWidgetTemplateSlots(editingTemplateDraft.slots, editingTemplateDraft.size).map((slot) =>
+      slot.slotType === 'daily'
         ? rebuildDailyWidgetSlotConfig(slot, checkTemplates)
-        : editingTemplateDraft.widgetType === 'shortcut'
+        : slot.slotType === 'shortcut'
           ? rebuildShortcutWidgetSlotConfig(slot)
-        : rebuildTimerWidgetSlotConfig(slot, categories)
+          : slot.slotType === 'timer'
+            ? rebuildTimerWidgetSlotConfig(slot, categories)
+            : createEmptyWidgetTemplateSlot(slot.slotIndex)
     );
   }, [categories, checkTemplates, editingTemplateDraft]);
 
@@ -488,11 +432,7 @@ export const WidgetSettingsView: React.FC<WidgetSettingsViewProps> = ({
       return null;
     }
 
-    const normalizedSlots = normalizeWidgetTemplateSlots(
-      editingTemplateDraft.slots,
-      editingTemplateDraft.size,
-      editingTemplateDraft.widgetType
-    );
+    const normalizedSlots = normalizeWidgetTemplateSlots(editingTemplateDraft.slots, editingTemplateDraft.size);
     return normalizedSlots.find((slot) => slot.slotIndex === editingSlotIndex) || null;
   }, [editingSlotIndex, editingTemplateDraft]);
 
@@ -500,50 +440,13 @@ export const WidgetSettingsView: React.FC<WidgetSettingsViewProps> = ({
     <div className="rounded-2xl border border-dashed border-stone-200 bg-stone-50 px-4 py-5 text-sm text-stone-600">
       <div className="font-bold text-stone-800">使用说明</div>
       <div className="mt-3 space-y-2 text-xs leading-6 text-stone-500">
-        <div>第一步：新建小组件模板。</div>
-        <div>第二步：在系统桌面添加对应尺寸的小组件。</div>
-        <div>第三步：如果同尺寸模板有多个，点击小组件标题可以轮换模板。</div>
+        <div>第一步：新建一个小组件模板。</div>
+        <div>第二步：进入模板后，点击任意槽位，先选择槽位类型。</div>
+        <div>第三步：在系统桌面添加对应尺寸的小组件，点击标题即可轮换同尺寸模板。</div>
       </div>
     </div>
   );
 
-  const renderWidgetTypeSelector = !editingTemplateDraft ? (
-    <div className="space-y-3 rounded-[28px] border border-stone-100 bg-white p-4 shadow-sm">
-      <div>
-        <h3 className="font-bold text-stone-800">小组件类型</h3>
-        <p className="mt-1 text-xs text-stone-400">
-          先选要配置的小组件类型。计时器和日课共用一套模板管理，但各自槽位的绑定规则不同。
-        </p>
-      </div>
-      <div className="grid grid-cols-3 gap-3">
-        {WIDGET_TYPE_TABS.map((tab) => {
-          const isActive = selectedWidgetTab === tab.value;
-          return (
-            <button
-              key={tab.value}
-              type="button"
-              onClick={() => setSelectedWidgetTab(tab.value)}
-              className={`rounded-2xl border px-4 py-3 text-sm font-medium transition-all ${
-                isActive
-                  ? 'border-stone-800 bg-stone-800 text-white shadow-sm'
-                  : 'border-stone-200 bg-stone-50 text-stone-600 hover:border-stone-300 hover:bg-white'
-              }`}
-            >
-              {tab.label}
-            </button>
-          );
-        })}
-      </div>
-    </div>
-  ) : null;
-
-  const visibleTemplates =
-    selectedWidgetTab === 'daily'
-      ? dailyTemplates
-      : selectedWidgetTab === 'shortcut'
-        ? shortcutTemplates
-        : timerTemplates;
-  const isEditingDaily = editingTemplateDraft?.widgetType === 'daily';
   return (
     <div className="fixed inset-0 z-50 flex flex-col bg-[#fdfbf7] pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] font-serif animate-in slide-in-from-right duration-300">
       <div className="sticky top-0 z-10 flex h-14 items-center justify-between border-b border-stone-100 bg-[#fdfbf7]/80 px-4 backdrop-blur-md">
@@ -562,9 +465,7 @@ export const WidgetSettingsView: React.FC<WidgetSettingsViewProps> = ({
           </button>
           <div className="flex items-center gap-3">
             <span className="text-lg font-bold text-stone-800">
-              {editingTemplateDraft
-                ? `${editingTemplateDraft.widgetType === 'daily' ? '日课' : '计时器'}小组件详情`
-                : '小组件'}
+              {editingTemplateDraft ? '小组件详情' : '小组件'}
             </span>
             {editingTemplateDraft && (
               <span className="text-[11px] text-stone-400">
@@ -576,8 +477,6 @@ export const WidgetSettingsView: React.FC<WidgetSettingsViewProps> = ({
       </div>
 
       <div className="flex-1 space-y-6 overflow-y-auto px-5 py-6 pb-40">
-        {renderWidgetTypeSelector}
-
         {editingTemplateDraft ? (
           <>
             <div className="space-y-4 rounded-[28px] border border-stone-100 bg-white p-6 shadow-sm">
@@ -600,9 +499,7 @@ export const WidgetSettingsView: React.FC<WidgetSettingsViewProps> = ({
               <div>
                 <h3 className="font-bold text-stone-800">小组件尺寸</h3>
                 <p className="mt-1 text-xs text-stone-400">
-                  {isEditingDaily
-                    ? '日课小组件现在支持和计时器一致的尺寸；切换尺寸时会保留前面的槽位配置，多出来的槽位会被裁掉，不足的槽位会自动补空。'
-                    : '切换尺寸时会保留前面的槽位配置，多出来的槽位会被裁掉，不足的槽位会自动补空。'}
+                  切换尺寸时会保留前面的槽位配置，超出的槽位会被裁掉，不足的槽位会自动补空。
                 </p>
               </div>
 
@@ -622,9 +519,7 @@ export const WidgetSettingsView: React.FC<WidgetSettingsViewProps> = ({
               <div>
                 <h3 className="font-bold text-stone-800">模板预览</h3>
                 <p className="mt-1 text-xs text-stone-400">
-                  {isEditingDaily
-                    ? '直接点击下面任意一个槽位，就能绑定手动日课，并设置图标覆盖和背景颜色。'
-                    : '直接点击下面任意一个槽位，就能设置它的图标、标签、待办和领域。'}
+                  点击下面任意一个槽位，先设置它的类型，再配置对应内容。
                 </p>
               </div>
 
@@ -644,44 +539,28 @@ export const WidgetSettingsView: React.FC<WidgetSettingsViewProps> = ({
                         gridTemplateRows: `repeat(${previewGrid.rows}, minmax(0, 1fr))`
                       }}
                     >
-                      {draftPreviewSlots.map((slot) => {
-                        const isShortcutSlot = editingTemplateDraft.widgetType === 'shortcut';
-                        return (
-                          <button
-                            key={slot.slotIndex}
-                            type="button"
-                            onClick={() => setEditingSlotIndex(slot.slotIndex)}
-                            className="flex h-full w-full min-h-0 items-center justify-center rounded-full p-[6%] text-center transition-all hover:-translate-y-0.5"
-                            style={{ containerType: 'size' }}
-                          >
-                            {isShortcutSlot ? (
-                              <div className="flex min-h-0 min-w-0 items-center justify-center">
-                                <div
-                                  className="flex items-center justify-center rounded-full leading-none shadow-[inset_0_1px_0_rgba(255,255,255,0.72)]"
-                                  style={{
-                                    backgroundColor: getWidgetSlotFillColor(slot.color || '#E7E5E4', false),
-                                    width: '74cqmin',
-                                    height: '74cqmin'
-                                  } as React.CSSProperties}
-                                >
-                                  <IconRenderer icon={slot.icon || '\u2022'} size="42cqmin" />
-                                </div>
-                              </div>
-                            ) : (
-                              <div
-                                className="flex min-h-0 min-w-0 items-center justify-center rounded-full leading-none"
-                                style={{
-                                  backgroundColor: getWidgetSlotFillColor(slot.color || '#EEF2F7', false),
-                                  width: '74cqmin',
-                                  height: '74cqmin'
-                                } as React.CSSProperties}
-                              >
-                                <IconRenderer icon={slot.icon || '\u2022'} size="42cqmin" />
-                              </div>
-                            )}
-                          </button>
-                        );
-                      })}
+                      {draftPreviewSlots.map((slot) => (
+                        <button
+                          key={slot.slotIndex}
+                          type="button"
+                          onClick={() => setEditingSlotIndex(slot.slotIndex)}
+                          className="flex h-full w-full min-h-0 items-center justify-center p-[6%] text-center transition-all hover:-translate-y-0.5"
+                          style={{ containerType: 'size' }}
+                        >
+                          <div className="flex min-h-0 min-w-0 items-center justify-center">
+                            <div
+                              className={`flex items-center justify-center leading-none ${getSlotPreviewShape(slot)}`}
+                              style={{
+                                backgroundColor: getSlotPreviewColor(slot),
+                                width: '74cqmin',
+                                height: '74cqmin'
+                              } as React.CSSProperties}
+                            >
+                              <IconRenderer icon={getSlotPreviewIcon(slot)} size="42cqmin" />
+                            </div>
+                          </div>
+                        </button>
+                      ))}
                     </div>
                   </div>
                 </div>
@@ -692,7 +571,7 @@ export const WidgetSettingsView: React.FC<WidgetSettingsViewProps> = ({
           <div className="rounded-2xl border border-dashed border-stone-200 bg-stone-50 px-4 py-10 text-center text-sm text-stone-400">
             正在加载小组件模板...
           </div>
-        ) : visibleTemplates.length === 0 ? (
+        ) : templates.length === 0 ? (
           <>
             <button
               type="button"
@@ -705,13 +584,9 @@ export const WidgetSettingsView: React.FC<WidgetSettingsViewProps> = ({
             </button>
 
             <div className="space-y-3 rounded-2xl border border-dashed border-stone-200 bg-stone-50 px-4 py-10 text-center">
-              <p className="text-sm font-bold text-stone-700">
-                {selectedWidgetTab === 'daily' ? '还没有日课小组件模板' : '还没有小组件模板'}
-              </p>
+              <p className="text-sm font-bold text-stone-700">还没有小组件模板</p>
               <p className="text-xs leading-6 text-stone-400">
-                {selectedWidgetTab === 'daily'
-                  ? '点击上面的“新建小组件模板”，就可以开始配置不同尺寸的桌面日课槽位。'
-                  : '点击上面的“新建小组件模板”，就可以开始配置桌面计时槽位。'}
+                点击上面的“新建小组件模板”，就可以开始配置混合类型的桌面槽位。
               </p>
             </div>
 
@@ -730,7 +605,7 @@ export const WidgetSettingsView: React.FC<WidgetSettingsViewProps> = ({
             </button>
 
             <div className="space-y-3">
-              {visibleTemplates.map((template) => (
+              {templates.map((template) => (
                 <div
                   key={template.id}
                   className="group flex items-start justify-between rounded-2xl border border-stone-100 bg-white p-4 shadow-[0_2px_8px_rgba(0,0,0,0.02)] transition-colors hover:bg-stone-50"
@@ -770,30 +645,16 @@ export const WidgetSettingsView: React.FC<WidgetSettingsViewProps> = ({
         )}
       </div>
 
-      <WidgetSlotConfigModal
-        isOpen={Boolean(editingTemplateDraft && currentEditingSlot && editingTemplateDraft.widgetType === 'timer')}
-        draft={currentEditingSlot ? toTimerSlotDraft(currentEditingSlot) : null}
+      <WidgetSlotEditorModal
+        isOpen={Boolean(editingTemplateDraft && currentEditingSlot)}
+        draft={currentEditingSlot ? toSlotEditorDraft(currentEditingSlot) : null}
         categories={categories}
+        checkTemplates={checkTemplates}
         todos={todos}
         todoCategories={todoCategories}
         scopes={scopes}
         onClose={() => setEditingSlotIndex(null)}
-        onSave={updateTimerDraftSlot}
-      />
-
-      <DailyWidgetSlotConfigModal
-        isOpen={Boolean(editingTemplateDraft && currentEditingSlot && editingTemplateDraft.widgetType === 'daily')}
-        draft={currentEditingSlot ? toDailySlotDraft(currentEditingSlot) : null}
-        checkTemplates={checkTemplates}
-        onClose={() => setEditingSlotIndex(null)}
-        onSave={updateDailyDraftSlot}
-      />
-
-      <ShortcutWidgetSlotConfigModal
-        isOpen={Boolean(editingTemplateDraft && currentEditingSlot && editingTemplateDraft.widgetType === 'shortcut')}
-        draft={currentEditingSlot ? toShortcutSlotDraft(currentEditingSlot) : null}
-        onClose={() => setEditingSlotIndex(null)}
-        onSave={updateShortcutDraftSlot}
+        onSave={updateSlotDraft}
       />
 
       <ConfirmModal

@@ -34,14 +34,15 @@ object WidgetSlotBitmapRenderer {
 
         val baseColor = parseColor(slot.color)
         val dailyAccentColor = darkenColor(baseColor, 0.34f)
-        if (slot.widgetType == WidgetTypes.SHORTCUT) {
+        val slotType = WidgetTypes.normalize(slot.slotType)
+        if (slotType == WidgetTypes.SHORTCUT) {
             drawShortcutSlot(canvas, context, sizePx, slot, tapScale)
             return bitmap
         }
 
         val fillColor = when {
-            slot.widgetType == WidgetTypes.TIMER && slot.isActive -> baseColor
-            slot.widgetType == WidgetTypes.DAILY && slot.isCompleted -> baseColor
+            slotType == WidgetTypes.TIMER && slot.isActive -> baseColor
+            slotType == WidgetTypes.DAILY && slot.isCompleted -> baseColor
             else -> blendWithWhite(baseColor, 0.82f)
         }
 
@@ -55,7 +56,7 @@ object WidgetSlotBitmapRenderer {
             .coerceAtMost((sizePx / 2f) - 1f)
         canvas.drawCircle(sizePx / 2f, sizePx / 2f, animatedCircleRadius, circlePaint)
 
-        if (slot.widgetType == WidgetTypes.TIMER) {
+        if (slotType == WidgetTypes.TIMER) {
             if (slot.isActive) {
                 drawStop(canvas, context, sizePx, tapScale)
             } else {
@@ -119,7 +120,7 @@ object WidgetSlotBitmapRenderer {
     ) {
         val baseColor = parseColor(slot.color)
         val fillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = blendWithWhite(baseColor, 0.18f)
+            color = blendWithWhite(baseColor, 0.76f)
             style = Paint.Style.FILL
         }
         val circleInsetPx = dpToPx(context, SHORTCUT_CIRCLE_INSET_DP).toFloat()
@@ -127,13 +128,6 @@ object WidgetSlotBitmapRenderer {
         val animatedCircleRadius = (circleRadius * getTapCircleScale(slot.tapAnimationProgress))
             .coerceAtMost((sizePx / 2f) - 1f)
         canvas.drawCircle(sizePx / 2f, sizePx / 2f, animatedCircleRadius, fillPaint)
-
-        val strokePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = blendWithWhite(darkenColor(baseColor, 0.18f), 0.36f)
-            style = Paint.Style.STROKE
-            strokeWidth = dpToPx(context, 1.1f).toFloat()
-        }
-        canvas.drawCircle(sizePx / 2f, sizePx / 2f, animatedCircleRadius, strokePaint)
         drawCenteredText(
             canvas,
             context,

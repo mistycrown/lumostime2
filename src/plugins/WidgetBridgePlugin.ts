@@ -4,7 +4,7 @@
  * @output Typed Capacitor widget bridge methods
  * @pos Plugin
  * @description Exposes the Android widget template, instance binding state, and runtime bridge to the React application.
- * @updated 2026-04-16: Added daily widget sync payloads and expanded widgetType metadata so timer and daily widgets can share one bridge contract.
+ * @updated 2026-04-18: Moved widget type selection from template level to slot level so mixed-type templates can share one contract.
  */
 import { registerPlugin } from '@capacitor/core';
 import { ShortcutWidgetAction } from '../services/widgetShortcutService';
@@ -14,7 +14,7 @@ export type DailyWidgetManualMode = 'binary' | 'count';
 
 export interface WidgetBridgeSlot {
   slotIndex: number;
-  widgetType: WidgetType;
+  slotType: WidgetType | null;
   activityId: string | null;
   categoryId: string | null;
   icon: string | null;
@@ -34,7 +34,6 @@ export interface WidgetBridgeSlot {
 
 export interface WidgetBridgeTemplate {
   id: string;
-  widgetType: WidgetType;
   name: string;
   size: '2x1' | '2x2' | '3x2' | '4x1' | '4x2';
   slots: WidgetBridgeSlot[];
@@ -44,7 +43,6 @@ export interface WidgetBridgeTemplate {
 
 export interface WidgetBridgeInstanceBinding {
   appWidgetId: number;
-  widgetType: WidgetType;
   templateId: string | null;
   createdAt: number;
   updatedAt: number;

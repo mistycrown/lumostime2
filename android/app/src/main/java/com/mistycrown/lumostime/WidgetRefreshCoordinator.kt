@@ -33,14 +33,6 @@ object WidgetRefreshCoordinator {
         QuickLogWidget3x2.refreshAllAsync(context)
         QuickLogWidget4x1.refreshAllAsync(context)
         QuickLogWidget4x2.refreshAllAsync(context)
-        ShortcutWidget2x1.refreshAllAsync(context)
-        ShortcutWidget2x2.refreshAllAsync(context)
-        ShortcutWidget4x1.refreshAllAsync(context)
-        DailyCheckWidget2x1.refreshAllAsync(context)
-        DailyCheckWidget2x2.refreshAllAsync(context)
-        DailyCheckWidget3x2.refreshAllAsync(context)
-        DailyCheckWidget4x1.refreshAllAsync(context)
-        DailyCheckWidget4x2.refreshAllAsync(context)
     }
 
     fun refreshWidget(context: Context, appWidgetId: Int) {
@@ -61,22 +53,6 @@ object WidgetRefreshCoordinator {
                 QuickLogWidget4x1.refreshWidget(context, appWidgetId)
             ComponentName(context, QuickLogWidget4x2::class.java).className ->
                 QuickLogWidget4x2.refreshWidget(context, appWidgetId)
-            ComponentName(context, ShortcutWidget2x1::class.java).className ->
-                ShortcutWidget2x1.refreshWidget(context, appWidgetId)
-            ComponentName(context, ShortcutWidget2x2::class.java).className ->
-                ShortcutWidget2x2.refreshWidget(context, appWidgetId)
-            ComponentName(context, ShortcutWidget4x1::class.java).className ->
-                ShortcutWidget4x1.refreshWidget(context, appWidgetId)
-            ComponentName(context, DailyCheckWidget2x1::class.java).className ->
-                DailyCheckWidget2x1.refreshWidget(context, appWidgetId)
-            ComponentName(context, DailyCheckWidget2x2::class.java).className ->
-                DailyCheckWidget2x2.refreshWidget(context, appWidgetId)
-            ComponentName(context, DailyCheckWidget3x2::class.java).className ->
-                DailyCheckWidget3x2.refreshWidget(context, appWidgetId)
-            ComponentName(context, DailyCheckWidget4x1::class.java).className ->
-                DailyCheckWidget4x1.refreshWidget(context, appWidgetId)
-            ComponentName(context, DailyCheckWidget4x2::class.java).className ->
-                DailyCheckWidget4x2.refreshWidget(context, appWidgetId)
             else -> refreshAll(context)
         }
     }
