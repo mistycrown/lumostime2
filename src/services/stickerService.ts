@@ -3,6 +3,8 @@
  * @description 贴纸服务 - 管理自定义心情贴纸集合
  */
 
+import { buildCustomStickerViewSets, getStoredCustomStickerState } from './customStickerAssetService';
+
 export interface Sticker {
     path: string;      // 图片路径（不含扩展名），如 "/sticker/water/01"，渲染时会自动尝试 .webp 和 .png
     label?: string;    // 显示标签（可选），如 "Cat"
@@ -149,15 +151,8 @@ class StickerService {
      * 获取自定义贴纸集
      */
     getCustomStickerSets(): StickerSet[] {
-        const stored = localStorage.getItem('lumostime_custom_sticker_sets');
-        if (!stored) return [];
-        
-        try {
-            return JSON.parse(stored);
-        } catch (e) {
-            console.error('Failed to parse custom sticker sets:', e);
-            return [];
-        }
+        const { customStickerSets, customStickers } = getStoredCustomStickerState();
+        return buildCustomStickerViewSets(customStickerSets, customStickers);
     }
 
     /**

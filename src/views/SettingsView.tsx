@@ -1022,6 +1022,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
                 onCheckCloudImageConsistency={handleCheckCloudImageConsistency}
                 onCleanupCloudImages={handleCleanupCloudImages}
                 logs={logs}
+                dailyReviews={dailyReviews}
                 categories={categoriesData || []}
                 todos={todos}
                 todoCategories={todoCategories}

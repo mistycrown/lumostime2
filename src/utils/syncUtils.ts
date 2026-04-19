@@ -34,7 +34,13 @@ function getServiceDisplayName(service: CloudService): string {
 }
 
 function buildReferencedImageList(data: any): string[] {
-  return imageService.buildReferencedImagesList(data?.logs || [], data?.todos || []);
+  return imageService.buildReferencedImagesList(
+    data?.logs || [],
+    data?.todos || [],
+    data?.dailyReviews || [],
+    data?.customStickerSets || [],
+    data?.customStickers || []
+  );
 }
 
 function buildUploadMessage(

@@ -14,6 +14,7 @@ import { uiIconService, UIIconType } from '../services/uiIconService';
 import { getDisplayIcon } from '../utils/iconUtils';
 import { resolveAssetPath } from '../utils/assetPath';
 import { useSettings } from '../contexts/SettingsContext';
+import { imageService } from '../services/imageService';
 
 interface IconRendererProps {
     icon: string;                    // Emoji 图标（用于默认主题）
@@ -51,6 +52,7 @@ export const IconRenderer: React.FC<IconRendererProps> = ({
     // ===== 所有 Hooks 必须在最前面，不能在条件语句中 =====
     const [imageError, setImageError] = useState(false);
     const [hasFallbackAttempted, setHasFallbackAttempted] = useState(false);
+    const [resolvedManagedImageSrc, setResolvedManagedImageSrc] = useState<string | null>(null);
     const emojiRef = useRef<HTMLSpanElement>(null);
     const { emojiStyle } = useSettings();
     
@@ -71,13 +73,42 @@ export const IconRenderer: React.FC<IconRendererProps> = ({
     // 检查是否是自定义图片（格式：image:/path/to/image）
     const isCustomImage = displayIcon.startsWith('image:');
     let customImagePath = isCustomImage ? displayIcon.substring(6) : null; // 移除 "image:" 前缀
+    const isManagedImage = !!customImagePath && !customImagePath.startsWith('/');
     
     // 如果路径没有扩展名，优先尝试 .webp
     if (customImagePath && !customImagePath.match(/\.(png|webp|jpg|jpeg|gif|svg)$/i)) {
         customImagePath = `${customImagePath}.webp`;
     }
-    const resolvedCustomImagePath = customImagePath ? resolveAssetPath(customImagePath) : null;
+    const resolvedCustomImagePath = customImagePath && !isManagedImage ? resolveAssetPath(customImagePath) : null;
     
+    useEffect(() => {
+        let disposed = false;
+
+        if (!isCustomImage || !customImagePath || !isManagedImage) {
+            setResolvedManagedImageSrc(null);
+            return () => {
+                disposed = true;
+            };
+        }
+
+        imageService.getImageUrl(customImagePath, 'thumbnail')
+            .then((src) => {
+                if (!disposed) {
+                    setResolvedManagedImageSrc(src || null);
+                }
+            })
+            .catch((error) => {
+                console.error('[IconRenderer] Failed to load managed image icon', error);
+                if (!disposed) {
+                    setResolvedManagedImageSrc(null);
+                }
+            });
+
+        return () => {
+            disposed = true;
+        };
+    }, [customImagePath, isCustomImage, isManagedImage]);
+
     // 4. 渲染 Emoji（原生、Twemoji 或 OpenMoji）
     // 显示 Emoji（如果开启 Twemoji 或 OpenMoji，useEffect 会自动转换）
     const displayEmoji = imageError ? (fallbackEmoji || icon || value) : value;
@@ -225,8 +256,18 @@ export const IconRenderer: React.FC<IconRendererProps> = ({
         return '11px';
     };
     
+    if (isCustomImage && isManagedImage && !imageError && !resolvedManagedImageSrc) {
+        const imageSize = getImageSize();
+        return (
+            <span
+                className={`inline-block rounded-md bg-stone-100 ${className}`}
+                style={{ width: imageSize, height: imageSize }}
+            />
+        );
+    }
+
     // 1. 判断是否使用自定义图片
-    if (isCustomImage && resolvedCustomImagePath && !imageError) {
+    if (isCustomImage && !imageError && ((isManagedImage && resolvedManagedImageSrc) || resolvedCustomImagePath)) {
         const imageSize = getImageSize();
         const sizeStyle = { 
             width: imageSize, 
@@ -236,11 +277,15 @@ export const IconRenderer: React.FC<IconRendererProps> = ({
 
         return (
             <img
-                src={resolvedCustomImagePath}
+                src={isManagedImage ? resolvedManagedImageSrc || '' : resolvedCustomImagePath || ''}
                 alt={alt || 'Custom icon'}
                 className={`inline-block ${className}`}
                 style={sizeStyle}
                 onError={(e) => {
+                    if (isManagedImage) {
+                        setImageError(true);
+                        return;
+                    }
                     // 获取当前尝试的路径
                     const currentSrc = e.currentTarget.src;
                     const currentPath = new URL(currentSrc).pathname;

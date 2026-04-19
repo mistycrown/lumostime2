@@ -4,11 +4,12 @@
  * @output Navigation (onBack), Toast Messages (onToast), Theme Changes (localStorage, service calls)
  * @pos View
  * @description 投喂功能页面 - 包含兑换码验证、专属徽章、应用图标、背景图片、导航栏样式等功能
+ * @updated 2026-04-19: Switched custom sticker set management to a centered modal editor with fixed 16-slot uploads, small-square tiles, and direct delete confirmations.
  * 
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
 import React, { useState, useEffect } from 'react';
-import { ChevronLeft, Fish, Check, X } from 'lucide-react';
+import { ChevronLeft, Fish, Check, X, Plus } from 'lucide-react';
 import { Capacitor } from '@capacitor/core';
 import { ToastType } from '../components/Toast';
 import { RedemptionService } from '../services/redemptionService';
@@ -24,8 +25,10 @@ import { AchievementBottleStyleSelector } from '../components/achievement/Achiev
 import { iconService, ICON_OPTIONS } from '../services/iconService';
 import { Category } from '../types';
 import { useSettings } from '../contexts/SettingsContext';
+import { useReview } from '../contexts/ReviewContext';
 import { InputModal } from '../components/InputModal';
 import { PresetEditModal } from '../components/PresetEditModal';
+import { ConfirmModal } from '../components/ConfirmModal';
 import { useCustomPresets, ThemePreset, getValidationErrorMessage } from '../hooks/useCustomPresets';
 import { TimePalSettings } from '../components/TimePalSettings';
 import { ThemePresetService } from '../services/themePresetService';
@@ -34,6 +37,9 @@ import { FontSelector } from '../components/FontSelector';
 import { userStatsService, UserStats } from '../services/userStatsService';
 import { stickerService } from '../services/stickerService';
 import { IconRenderer } from '../components/IconRenderer';
+import { StickerSetEditModal } from '../components/StickerSetEditModal';
+import { imageService } from '../services/imageService';
+import { buildCustomStickerViewSets } from '../services/customStickerAssetService';
 import { resolveAssetPath } from '../utils/assetPath';
 import { getTimePalPreviewPath } from '../constants/timePalConfig';
 
@@ -42,6 +48,22 @@ interface SponsorshipViewProps {
     onToast: (type: ToastType, message: string) => void;
     categories: Category[];
 }
+
+type StickerDeleteTarget =
+    | {
+        kind: 'sticker';
+        stickerId: string;
+        stickerName: string;
+        referenceCount: number;
+    }
+    | {
+        kind: 'set';
+        setId: string;
+        setName: string;
+        stickerCount: number;
+        referenceCount: number;
+    }
+    | null;
 
 // 主题方案数据
 const THEME_PRESETS: ThemePreset[] = [
@@ -193,6 +215,7 @@ const THEME_PRESETS: ThemePreset[] = [
 
 // UI 主题列表
 const UI_THEMES = ['purple', 'color', 'prince', 'cat', 'forest', 'plant', 'water', 'knit', 'paper', 'pencil', 'old'];
+const MAX_CUSTOM_STICKERS_PER_SET = 16;
 
 export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToast, categories }) => {
     const [redemptionCode, setRedemptionCode] = useState('');
@@ -205,13 +228,20 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
     const redemptionService = React.useMemo(() => new RedemptionService(), []);
     const [showDonationModal, setShowDonationModal] = useState(false);
     const {
+        defaultSelectorPage,
+        setDefaultSelectorPage,
         uiIconTheme,
         setUiIconTheme,
         colorScheme,
         setColorScheme,
         setAchievementBottleStyle,
-        setAchievementBottleIconPack
+        setAchievementBottleIconPack,
+        customStickerSets,
+        setCustomStickerSets,
+        customStickers,
+        setCustomStickers
     } = useSettings();
+    const { dailyReviews } = useReview();
     
     // 根据时间段随机选择背景图片
     const [bannerImage] = useState(() => {
@@ -281,6 +311,10 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
     // Tab 页状态
     type TabType = 'preset' | 'icon' | 'colorScheme' | 'background' | 'navigation' | 'timepal' | 'font' | 'style';
     const [activeTab, setActiveTab] = useState<TabType>('preset');
+    const [isEditingStickerSet, setIsEditingStickerSet] = useState(false);
+    const [editingStickerSetId, setEditingStickerSetId] = useState<string | null>(null);
+    const [stickerSetName, setStickerSetName] = useState('');
+    const [deleteConfirmTarget, setDeleteConfirmTarget] = useState<StickerDeleteTarget>(null);
 
     // 用户统计数据
     const [userStats, setUserStats] = useState<UserStats | null>(null);
@@ -300,6 +334,33 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
         if (!editingPresetId) return null;
         return customPresets.find(p => p.id === editingPresetId) || null;
     }, [editingPresetId, customPresets]);
+    const customStickerViewSets = buildCustomStickerViewSets(customStickerSets, customStickers, { includeEmptySets: true });
+    const editingStickerSet = React.useMemo(() => {
+        if (!editingStickerSetId) {
+            return null;
+        }
+
+        return customStickerViewSets.find((set) => set.id === editingStickerSetId) || null;
+    }, [customStickerViewSets, editingStickerSetId]);
+    const presetStickerSets = React.useMemo(
+        () => stickerService.getAllStickerSets().filter((set) => !set.isCustom),
+        [customStickerSets, customStickers]
+    );
+    const stickerReferenceCounts = React.useMemo(() => {
+        const counts = new Map<string, number>();
+
+        dailyReviews.forEach((review) => {
+            const moodValue = typeof review?.moodEmoji === 'string' ? review.moodEmoji : '';
+            if (!moodValue.startsWith('image:')) {
+                return;
+            }
+
+            const filename = moodValue.slice(6);
+            counts.set(filename, (counts.get(filename) || 0) + 1);
+        });
+
+        return counts;
+    }, [dailyReviews]);
 
     // Handle save current settings as preset
     const handleSaveCurrentSettings = (name: string) => {
@@ -407,7 +468,6 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
     // 处理 UI 图标主题切换，并触发图标迁移
     const handleUiIconThemeChange = async (newTheme: string) => {
         const oldTheme = uiIconTheme;
-        console.log('[SponsorshipView] UI主题切换:', { from: oldTheme, to: newTheme });
         
         setUiIconTheme(newTheme);
         
@@ -418,13 +478,10 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
                 
                 // 检查是否已经生成过 uiIcon
                 if (!iconMigrationService.isUiIconGenerated()) {
-                    console.log('[SponsorshipView] 首次切换到自定义主题，生成 uiIcon...');
-                    
                     // 执行一次性生成
                     const result = await iconMigrationService.generateAllUiIcons();
                     
                     if (result.success) {
-                        console.log('[SponsorshipView] uiIcon 生成成功:', result);
                         onToast('success', `${result.message}，正在刷新...`);
                         
                         // 刷新页面以应用新数据
@@ -436,7 +493,6 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
                         onToast('error', result.message);
                     }
                 } else {
-                    console.log('[SponsorshipView] uiIcon 已存在，直接切换主题');
                     onToast('success', 'UI 主题已切换');
                 }
             } catch (error) {
@@ -445,11 +501,9 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
             }
         } else if (oldTheme !== 'default' && newTheme === 'default') {
             // 从自定义主题切换回 default，不做数据迁移
-            console.log('[SponsorshipView] 从自定义主题切换回默认主题，不做数据迁移');
             onToast('success', 'UI 主题已切换');
         } else {
             // 在自定义主题之间切换，不做数据迁移
-            console.log('[SponsorshipView] 在主题之间切换，不做数据迁移');
             onToast('success', 'UI 主题已切换');
         }
     };
@@ -457,16 +511,12 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
     useEffect(() => {
         const checkVerification = async () => {
             const result = await redemptionService.isVerified();
-            console.log('[SponsorshipView] 验证状态检查:', result);
             if (result.isVerified && result.userId) {
                 setIsRedeemed(true);
                 setSupporterId(result.userId);
-                console.log('[SponsorshipView] ✓ 用户已验证，ID:', result.userId);
                 
                 // 加载用户统计数据
                 loadUserStats();
-            } else {
-                console.log('[SponsorshipView] ❌ 用户未验证');
             }
         };
         checkVerification();
@@ -476,24 +526,11 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
             try {
                 const currentIcon = iconService.getCurrentIcon();
                 setSelectedIcon(currentIcon);
-                console.log('[SponsorshipView] 当前图标:', currentIcon);
             } catch (error) {
-                console.error('加载当前图标失败:', error);
+                console.error('[SponsorshipView] 加载当前图标失败:', error);
             }
         };
         loadCurrentIcon();
-
-        // 添加全局调试函数
-        (window as any).debugIconSwitch = () => {
-            console.log('========== 图标切换调试信息 ==========');
-            console.log('isRedeemed:', isRedeemed);
-            console.log('isChangingIcon:', isChangingIcon);
-            console.log('selectedIcon:', selectedIcon);
-            console.log('supporterId:', supporterId);
-            console.log('redemptionCode:', redemptionCode);
-            console.log('=====================================');
-        };
-        console.log('[SponsorshipView] 调试命令已注册: window.debugIconSwitch()');
     }, []);
 
     // 加载用户统计数据
@@ -501,7 +538,6 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
         try {
             const stats = await userStatsService.getUserStats();
             setUserStats(stats);
-            console.log('[SponsorshipView] 用户统计数据:', stats);
         } catch (error) {
             console.error('[SponsorshipView] 加载统计数据失败:', error);
         }
@@ -539,43 +575,314 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
         onToast('success', '已重置');
     };
 
+    const resetStickerSetForm = () => {
+        setIsEditingStickerSet(false);
+        setEditingStickerSetId(null);
+        setStickerSetName('');
+    };
+
+    const countStickerReferences = (imageFilename: string) => stickerReferenceCounts.get(imageFilename) || 0;
+
+    const handleSaveStickerSet = () => {
+        const trimmedName = stickerSetName.trim();
+
+        if (!trimmedName) {
+            return;
+        }
+
+        const now = Date.now();
+        if (editingStickerSetId) {
+            setCustomStickerSets((prev) => prev.map((set) => (
+                set.id === editingStickerSetId
+                    ? {
+                        ...set,
+                        name: trimmedName,
+                        description: undefined,
+                        updatedAt: now
+                    }
+                    : set
+            )));
+            setStickerSetName(trimmedName);
+            onToast('success', '贴纸组已更新');
+        } else {
+            const newSetId = crypto.randomUUID();
+            setCustomStickerSets((prev) => [
+                ...prev,
+                {
+                    id: newSetId,
+                    name: trimmedName,
+                    description: undefined,
+                    stickerIds: [],
+                    status: 'active',
+                    createdAt: now,
+                    updatedAt: now
+                }
+            ]);
+            setEditingStickerSetId(newSetId);
+            setStickerSetName(trimmedName);
+            onToast('success', '贴纸组已创建');
+        }
+    };
+
+    const handleEditStickerSet = (setId: string) => {
+        const currentSet = customStickerSets.find((item) => item.id === setId);
+        if (!currentSet) {
+            return;
+        }
+
+        setIsEditingStickerSet(true);
+        setEditingStickerSetId(setId);
+        setStickerSetName(currentSet.name);
+    };
+
+    const handleUploadStickerToSlot = async (targetSetId: string, slotIndex: number, file: File) => {
+        if (!targetSetId || !file) {
+            return;
+        }
+
+        const targetSet = customStickerSets.find((set) => set.id === targetSetId);
+        if (!targetSet || targetSet.status !== 'active') {
+            return;
+        }
+
+        const activeStickers = customStickers.filter((sticker) => (
+            sticker.setId === targetSetId && sticker.status === 'active'
+        ));
+        const occupiedSlots = new Set(activeStickers.map((sticker) => sticker.sortOrder));
+        if (
+            slotIndex < 0 ||
+            slotIndex >= MAX_CUSTOM_STICKERS_PER_SET ||
+            occupiedSlots.has(slotIndex)
+        ) {
+            onToast('error', '这个槽位暂时不可用，请换一个空槽位');
+            return;
+        }
+
+        try {
+            const filename = await imageService.saveImage(file);
+            const now = Date.now();
+            const stickerId = crypto.randomUUID();
+            const createdStickerRecord = {
+                id: stickerId,
+                setId: targetSetId,
+                imageFilename: filename,
+                thumbnailFilename: `thumb_${filename}`,
+                label: file.name.replace(/\.[^.]+$/, ''),
+                sortOrder: slotIndex,
+                status: 'active' as const,
+                createdAt: now,
+                updatedAt: now
+            };
+
+            setCustomStickers((prev) => [...prev, createdStickerRecord]);
+            setCustomStickerSets((prev) => prev.map((set) => (
+                set.id === targetSetId
+                    ? {
+                        ...set,
+                        stickerIds: [...set.stickerIds, stickerId],
+                        updatedAt: now
+                    }
+                    : set
+            )));
+            onToast('success', '已上传 1 张贴纸');
+        } catch (error) {
+            console.error('[SponsorshipView] 上传自定义贴纸失败:', error);
+            onToast('error', '贴纸上传失败，请重试');
+        }
+    };
+
+    const deleteStickerNow = async (stickerId: string) => {
+        const targetSticker = customStickers.find((item) => item.id === stickerId);
+        if (!targetSticker) {
+            return;
+        }
+
+        try {
+            await imageService.deleteImage(targetSticker.imageFilename);
+            const now = Date.now();
+
+            setCustomStickers((prev) => prev.filter((sticker) => sticker.id !== stickerId));
+            setCustomStickerSets((prev) => prev.map((set) => (
+                set.id === targetSticker.setId
+                    ? {
+                        ...set,
+                        stickerIds: set.stickerIds.filter((id) => id !== stickerId),
+                        updatedAt: now
+                    }
+                    : set
+            )));
+            onToast('success', '贴纸已删除');
+        } catch (error) {
+            console.error('[SponsorshipView] 删除贴纸失败:', error);
+            onToast('error', '删除贴纸失败，请重试');
+        }
+    };
+
+    const deleteStickerSetNow = async (setId: string) => {
+        const stickersInSet = customStickers.filter((sticker) => sticker.setId === setId);
+        if (stickersInSet.length === 0) {
+            setCustomStickerSets((prev) => prev.filter((set) => set.id !== setId));
+
+            if (defaultSelectorPage === setId) {
+                setDefaultSelectorPage('emoji');
+            }
+
+            if (editingStickerSetId === setId) {
+                resetStickerSetForm();
+            }
+
+            onToast('success', '贴纸组已删除');
+            return;
+        }
+
+        try {
+            const deleteResults = await Promise.allSettled(
+                stickersInSet.map(async (sticker) => {
+                    await imageService.deleteImage(sticker.imageFilename);
+                    return sticker.id;
+                })
+            );
+            const deletedStickerIds = deleteResults
+                .filter((result): result is PromiseFulfilledResult<string> => result.status === 'fulfilled')
+                .map((result) => result.value);
+            const failedCount = deleteResults.length - deletedStickerIds.length;
+
+            if (deletedStickerIds.length > 0) {
+                const now = Date.now();
+                setCustomStickers((prev) => prev.filter((sticker) => !deletedStickerIds.includes(sticker.id)));
+                setCustomStickerSets((prev) => (
+                    failedCount === 0
+                        ? prev.filter((set) => set.id !== setId)
+                        : prev.map((set) => (
+                            set.id === setId
+                                ? {
+                                    ...set,
+                                    stickerIds: set.stickerIds.filter((id) => !deletedStickerIds.includes(id)),
+                                    updatedAt: now
+                                }
+                                : set
+                        ))
+                ));
+            }
+
+            if (failedCount === 0) {
+                if (defaultSelectorPage === setId) {
+                    setDefaultSelectorPage('emoji');
+                }
+
+                if (editingStickerSetId === setId) {
+                    resetStickerSetForm();
+                }
+
+                onToast('success', `贴纸组已删除，已移除 ${stickersInSet.length} 张贴纸`);
+                return;
+            }
+
+            if (deletedStickerIds.length > 0) {
+                onToast('error', `已删除 ${deletedStickerIds.length} 张贴纸，另有 ${failedCount} 张删除失败，请重试`);
+                return;
+            }
+
+            onToast('error', '删除贴纸组失败，请重试');
+        } catch (error) {
+            console.error('[SponsorshipView] 删除贴纸组失败:', error);
+            onToast('error', '删除贴纸组失败，请重试');
+        }
+    };
+
+    const handleRequestDeleteSticker = (stickerId: string) => {
+        const targetSticker = customStickers.find((item) => item.id === stickerId);
+        if (!targetSticker) {
+            return;
+        }
+
+        setDeleteConfirmTarget({
+            kind: 'sticker',
+            stickerId,
+            stickerName: targetSticker.label || '这张贴纸',
+            referenceCount: countStickerReferences(targetSticker.imageFilename)
+        });
+    };
+
+    const handleRequestDeleteStickerSet = (setId: string) => {
+        const targetSet = customStickerSets.find((set) => set.id === setId);
+        if (!targetSet) {
+            return;
+        }
+
+        const stickersInSet = customStickers.filter((sticker) => sticker.setId === setId);
+        const referenceCount = stickersInSet.reduce((total, sticker) => (
+            total + countStickerReferences(sticker.imageFilename)
+        ), 0);
+
+        setDeleteConfirmTarget({
+            kind: 'set',
+            setId,
+            setName: targetSet.name,
+            stickerCount: stickersInSet.length,
+            referenceCount
+        });
+    };
+
+    const handleConfirmDelete = async () => {
+        const target = deleteConfirmTarget;
+        setDeleteConfirmTarget(null);
+
+        if (!target) {
+            return;
+        }
+
+        if (target.kind === 'sticker') {
+            await deleteStickerNow(target.stickerId);
+            return;
+        }
+
+        await deleteStickerSetNow(target.setId);
+    };
+
     const handleIconChange = async (iconId: string) => {
-        console.log('[SponsorshipView] ========== 图标切换开始 ==========');
-        console.log('[SponsorshipView] 点击的图标ID:', iconId);
-        console.log('[SponsorshipView] isRedeemed状态:', isRedeemed);
-        console.log('[SponsorshipView] isChangingIcon状态:', isChangingIcon);
-        console.log('[SponsorshipView] 当前选中图标:', selectedIcon);
-        
         if (!isRedeemed) {
-            console.log('[SponsorshipView] ❌ 未验证投喂码，操作被阻止');
             onToast('error', '请先验证投喂码');
             return;
         }
 
         setIsChangingIcon(true);
         try {
-            console.log('[SponsorshipView] ✓ iconService已加载');
-            console.log('[SponsorshipView] 开始调用setIcon:', iconId);
-            
             const result = await iconService.setIcon(iconId);
-            console.log('[SponsorshipView] setIcon返回结果:', result);
 
             if (result.success) {
-                console.log('[SponsorshipView] ✓ 图标切换成功');
                 setSelectedIcon(iconId);
                 onToast('success', result.message);
             } else {
-                console.log('[SponsorshipView] ❌ 图标切换失败:', result.message);
                 onToast('error', result.message);
             }
         } catch (error: any) {
-            console.error('[SponsorshipView] ❌ 切换图标异常:', error);
+            console.error('[SponsorshipView] 切换图标异常:', error);
             onToast('error', error.message || '切换图标失败');
         } finally {
             setIsChangingIcon(false);
-            console.log('[SponsorshipView] ========== 图标切换结束 ==========');
         }
     };
+
+    const deleteConfirmTitle = deleteConfirmTarget?.kind === 'set' ? '删除贴纸组' : '删除贴纸';
+    const deleteConfirmDescription = React.useMemo(() => {
+        if (!deleteConfirmTarget) {
+            return '';
+        }
+
+        if (deleteConfirmTarget.kind === 'set') {
+            const referenceNotice = deleteConfirmTarget.referenceCount > 0
+                ? `\n\n检测到 ${deleteConfirmTarget.referenceCount} 个历史引用。确定后仍会直接删除。`
+                : '';
+            return `确定要删除贴纸组“${deleteConfirmTarget.setName}”吗？这会直接删除组内 ${deleteConfirmTarget.stickerCount} 张贴纸。${referenceNotice}`;
+        }
+
+        if (deleteConfirmTarget.referenceCount > 0) {
+            return `确定要删除“${deleteConfirmTarget.stickerName}”吗？\n\n检测到 ${deleteConfirmTarget.referenceCount} 个历史引用。确定后仍会直接删除。`;
+        }
+
+        return `确定要删除“${deleteConfirmTarget.stickerName}”吗？\n\n此操作无法撤销。`;
+    }, [deleteConfirmTarget]);
 
     const iconOptions = ICON_OPTIONS;
 
@@ -944,12 +1251,7 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
                                             {iconOptions.map((option) => (
                                                 <button
                                                     key={option.id}
-                                                    onClick={(e) => {
-                                                        console.log('[Button] 按钮被点击:', option.id);
-                                                        console.log('[Button] 事件对象:', e);
-                                                        console.log('[Button] disabled状态:', isChangingIcon || !isRedeemed);
-                                                        handleIconChange(option.id);
-                                                    }}
+                                                    onClick={() => handleIconChange(option.id)}
                                                     disabled={isChangingIcon || !isRedeemed}
                                                     className={`relative aspect-square rounded-xl transition-all hover:bg-white/50 ${!isRedeemed ? 'opacity-50 cursor-not-allowed' : ''
                                                         } ${isChangingIcon ? 'opacity-70' : ''
@@ -1025,11 +1327,68 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
                                     {/* Sticker 集部分 */}
                                     <div className="space-y-4">
                                         <h4 className="text-sm font-medium text-stone-600">Sticker 集</h4>
-                                        <p className="text-xs text-stone-500 mb-3">在已开启 Emoji 和 Sticker 的选择器中查看</p>
+                                        <p className="text-xs text-stone-500 mb-3">在已开启 Emoji 和 Sticker 的选择器中查看。点击带加号的小方块新建，点击自定义贴纸组可编辑。</p>
                                         
                                         {/* Sticker 集预览网格 */}
                                         <div className="grid gap-2" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(64px, 1fr))', maxWidth: '600px' }}>
-                                            {stickerService.getAllStickerSets().map((stickerSet) => (
+                                            <button
+                                                onClick={() => {
+                                                    setIsEditingStickerSet(true);
+                                                    setEditingStickerSetId(null);
+                                                    setStickerSetName('');
+                                                }}
+                                                className="relative rounded-lg border-2 border-dashed border-stone-200 overflow-hidden bg-white transition-all hover:border-stone-300"
+                                                style={{ aspectRatio: '1/1' }}
+                                                aria-label="新建贴纸组"
+                                            >
+                                                <div className="w-full h-full flex flex-col items-center justify-center gap-1 text-stone-400">
+                                                    <Plus size={22} />
+                                                    <span className="text-[10px] font-medium text-stone-500">新建</span>
+                                                </div>
+                                            </button>
+
+                                            {customStickerViewSets.map((setView) => (
+                                                <button
+                                                    key={setView.id}
+                                                    onClick={() => handleEditStickerSet(setView.id)}
+                                                    className="relative rounded-lg border-2 border-stone-200 overflow-hidden bg-white transition-all hover:border-stone-300"
+                                                    style={{ aspectRatio: '1/1' }}
+                                                    aria-label={`编辑贴纸组 ${setView.name}`}
+                                                >
+                                                    <div className="w-full h-full bg-white p-1.5">
+                                                        <div className="grid grid-cols-2 grid-rows-2 gap-1 h-full">
+                                                            {Array.from({ length: 4 }, (_, index) => {
+                                                                const sticker = setView.stickers[index];
+
+                                                                if (!sticker) {
+                                                                    return (
+                                                                        <div
+                                                                            key={`empty-preview-${setView.id}-${index}`}
+                                                                            className="h-full w-full rounded-md border border-dashed border-stone-200 bg-stone-50/70"
+                                                                        />
+                                                                    );
+                                                                }
+
+                                                                return (
+                                                                    <div
+                                                                        key={`${setView.id}-${sticker.id}-${index}`}
+                                                                        className="h-full w-full rounded-md bg-stone-50 overflow-hidden"
+                                                                    >
+                                                                        <div className="w-full h-full p-1 flex items-center justify-center">
+                                                                            <IconRenderer
+                                                                                icon={`image:${sticker.path}`}
+                                                                                size="100%"
+                                                                            />
+                                                                        </div>
+                                                                    </div>
+                                                                );
+                                                            })}
+                                                        </div>
+                                                    </div>
+                                                </button>
+                                            ))}
+
+                                            {presetStickerSets.map((stickerSet) => (
                                                 <div
                                                     key={stickerSet.id}
                                                     className="relative rounded-lg border-2 border-stone-200 overflow-hidden"
@@ -1054,6 +1413,29 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
                                                 </div>
                                             ))}
                                         </div>
+
+                                        <StickerSetEditModal
+                                            isOpen={isEditingStickerSet}
+                                            setId={editingStickerSetId}
+                                            initialName={stickerSetName}
+                                            stickers={editingStickerSet?.stickers || []}
+                                            onClose={resetStickerSetForm}
+                                            onSaveName={handleSaveStickerSet}
+                                            onUploadToSlot={handleUploadStickerToSlot}
+                                            onRemoveSticker={handleRequestDeleteSticker}
+                                            onDeleteSet={handleRequestDeleteStickerSet}
+                                        />
+
+                                        <ConfirmModal
+                                            isOpen={deleteConfirmTarget !== null}
+                                            onClose={() => setDeleteConfirmTarget(null)}
+                                            onConfirm={handleConfirmDelete}
+                                            title={deleteConfirmTitle}
+                                            description={deleteConfirmDescription}
+                                            confirmText="确定删除"
+                                            cancelText="取消"
+                                            type="danger"
+                                        />
                                     </div>
                                 </div>
                             )}

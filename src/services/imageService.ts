@@ -10,7 +10,8 @@
  */
 import { Filesystem, Directory } from '@capacitor/filesystem';
 import { Capacitor } from '@capacitor/core';
-import { Log, TodoItem } from '../types';
+import { CustomStickerRecord, CustomStickerSetRecord, DailyReview, Log, TodoItem } from '../types';
+import { collectCustomStickerReferencedImages } from './customStickerAssetService';
 
 // DB Configuration for Web Fallback
 const DB_NAME = 'LumosTimeImagesDB';
@@ -825,7 +826,13 @@ class ImageService {
     /**
      * 根据logs重建引用列表（用于修复/同步）
      */
-    private collectReferencedImages(logs: Log[] = [], todos: TodoItem[] = []): Set<string> {
+    private collectReferencedImages(
+        logs: Log[] = [],
+        todos: TodoItem[] = [],
+        dailyReviews: DailyReview[] = [],
+        customStickerSets: CustomStickerSetRecord[] = [],
+        customStickers: CustomStickerRecord[] = []
+    ): Set<string> {
         const referencedSet = new Set<string>();
         logs.forEach(log => {
             if (log.images && Array.isArray(log.images)) {
@@ -846,15 +853,30 @@ class ImageService {
                 referencedSet.add(`thumb_${todo.coverImage}`);
             }
         });
+        collectCustomStickerReferencedImages(dailyReviews, customStickerSets, customStickers).forEach((filename) => {
+            referencedSet.add(filename);
+        });
         return referencedSet;
     }
 
-    buildReferencedImagesList(logs: Log[], todos: TodoItem[] = []): string[] {
-        return Array.from(this.collectReferencedImages(logs, todos));
+    buildReferencedImagesList(
+        logs: Log[],
+        todos: TodoItem[] = [],
+        dailyReviews: DailyReview[] = [],
+        customStickerSets: CustomStickerSetRecord[] = [],
+        customStickers: CustomStickerRecord[] = []
+    ): string[] {
+        return Array.from(this.collectReferencedImages(logs, todos, dailyReviews, customStickerSets, customStickers));
     }
 
-    async rebuildReferencedListFromLogs(logs: Log[], todos: TodoItem[] = []): Promise<string[]> {
-        const referencedImages = this.buildReferencedImagesList(logs, todos);
+    async rebuildReferencedListFromLogs(
+        logs: Log[],
+        todos: TodoItem[] = [],
+        dailyReviews: DailyReview[] = [],
+        customStickerSets: CustomStickerSetRecord[] = [],
+        customStickers: CustomStickerRecord[] = []
+    ): Promise<string[]> {
+        const referencedImages = this.buildReferencedImagesList(logs, todos, dailyReviews, customStickerSets, customStickers);
         const localFiles = new Set(await this.listImages());
         const list = referencedImages.filter((filename) => localFiles.has(filename));
         this.updateReferencedImagesList(list);
@@ -873,11 +895,17 @@ class ImageService {
     /**
      * 清理未引用的图片（从列表和文件系统中删除）
      */
-    async cleanupUnreferencedImages(logs: Log[], todos: TodoItem[] = []): Promise<{ cleaned: number, kept: number }> {
+    async cleanupUnreferencedImages(
+        logs: Log[],
+        todos: TodoItem[] = [],
+        dailyReviews: DailyReview[] = [],
+        customStickerSets: CustomStickerSetRecord[] = [],
+        customStickers: CustomStickerRecord[] = []
+    ): Promise<{ cleaned: number, kept: number }> {
         console.log('[ImageService] ========== 开始清理未引用的图片 ==========');
 
         // 1. 从logs重建正确的引用列表
-        const referencedImages = this.collectReferencedImages(logs, todos);
+        const referencedImages = this.collectReferencedImages(logs, todos, dailyReviews, customStickerSets, customStickers);
 
         // console.log(`[ImageService] Logs中引用的图片: ${referencedImages.size} 个`);
 

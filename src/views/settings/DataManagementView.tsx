@@ -7,7 +7,8 @@ import React, { useState, useRef } from 'react';
 import { ChevronLeft, Database, Download, Upload, Trash2, Cloud, FileSpreadsheet, ImageIcon, Search, RefreshCw, Package } from 'lucide-react';
 import { Capacitor } from '@capacitor/core';
 import { ToastType } from '../../components/Toast';
-import { Log, Category, TodoItem, TodoCategory, Scope } from '../../types';
+import { Log, Category, DailyReview, TodoItem, TodoCategory, Scope } from '../../types';
+import { getStoredCustomStickerState } from '../../services/customStickerAssetService';
 import excelExportService from '../../services/excelExportService';
 import { imageService } from '../../services/imageService';
 import { imageCleanupService } from '../../services/imageCleanupService';
@@ -27,6 +28,7 @@ interface DataManagementViewProps {
     onClearData: () => void;
     onToast: (type: ToastType, message: string) => void;
     logs: Log[];
+    dailyReviews: DailyReview[];
     categories: Category[];
     todos: TodoItem[];
     todoCategories: TodoCategory[];
@@ -44,6 +46,7 @@ export const DataManagementView: React.FC<DataManagementViewProps> = ({
     onClearData,
     onToast,
     logs,
+    dailyReviews,
     categories,
     todos,
     todoCategories,
@@ -262,7 +265,8 @@ export const DataManagementView: React.FC<DataManagementViewProps> = ({
 
         setIsCheckingImages(true);
         try {
-            const list = await imageService.rebuildReferencedListFromLogs(logs, todos);
+            const { customStickerSets, customStickers } = getStoredCustomStickerState();
+            const list = await imageService.rebuildReferencedListFromLogs(logs, todos, dailyReviews, customStickerSets, customStickers);
             onToast('success', `图片列表重建完成，当前有效图片引用 ${list.length} 个`);
         } catch (error: any) {
             console.error('修复图片列表失败:', error);
@@ -276,7 +280,8 @@ export const DataManagementView: React.FC<DataManagementViewProps> = ({
         setIsCheckingImages(true);
         setImageCleanupReport('');
         try {
-            const report = await imageCleanupService.generateCleanupReport(logs, todos);
+            const { customStickerSets, customStickers } = getStoredCustomStickerState();
+            const report = await imageCleanupService.generateCleanupReport(logs, todos, dailyReviews, customStickerSets, customStickers);
             setImageCleanupReport(report);
             onToast('success', '检查完成');
         } catch (error: any) {
@@ -291,10 +296,11 @@ export const DataManagementView: React.FC<DataManagementViewProps> = ({
         setIsImageCleanupConfirmOpen(false);
         setIsCleaningImages(true);
         try {
+            const { customStickerSets, customStickers } = getStoredCustomStickerState();
             const result = await imageCleanupService.cleanupUnreferencedImages(logs, {
                 deleteLocal: true,
                 deleteRemote: true
-            }, todos);
+            }, todos, dailyReviews, customStickerSets, customStickers);
 
             let message = `清理完成: 本地-${result.deletedLocal}, 远程-${result.deletedRemote}`;
             if (result.errors.length > 0) {
