@@ -10,10 +10,11 @@
 
 import { Capacitor } from '@capacitor/core';
 import { Directory, Filesystem } from '@capacitor/filesystem';
-import { Log, TodoItem } from '../types';
+import { CustomStickerRecord, CustomStickerSetRecord, DailyReview, Log, TodoItem } from '../types';
 import { imageService } from './imageService';
 import { getSettingsReferencedImages } from './settingsImageReferenceService';
 import { webdavService } from './webdavService';
+import { collectCustomStickerReferencedImages } from './customStickerAssetService';
 
 export interface CleanupResult {
     totalImages: number;
@@ -31,7 +32,13 @@ export class ImageCleanupService {
     /**
      * 获取所有 logs 中引用的图片文件名（包括对应的缩略图）
      */
-    private getReferencedImages(logs: Log[], todos: TodoItem[] = []): Set<string> {
+    private getReferencedImages(
+        logs: Log[],
+        todos: TodoItem[] = [],
+        dailyReviews: DailyReview[] = [],
+        customStickerSets: CustomStickerSetRecord[] = [],
+        customStickers: CustomStickerRecord[] = []
+    ): Set<string> {
         const referencedImages = new Set<string>();
         
         logs.forEach(log => {
@@ -58,6 +65,10 @@ export class ImageCleanupService {
         });
 
         getSettingsReferencedImages().forEach((imageName) => {
+            referencedImages.add(imageName);
+        });
+
+        collectCustomStickerReferencedImages(dailyReviews, customStickerSets, customStickers).forEach((imageName) => {
             referencedImages.add(imageName);
         });
         
@@ -124,7 +135,13 @@ export class ImageCleanupService {
     /**
      * 检查未引用的图片
      */
-    async checkUnreferencedImages(logs: Log[], todos: TodoItem[] = []): Promise<{
+    async checkUnreferencedImages(
+        logs: Log[],
+        todos: TodoItem[] = [],
+        dailyReviews: DailyReview[] = [],
+        customStickerSets: CustomStickerSetRecord[] = [],
+        customStickers: CustomStickerRecord[] = []
+    ): Promise<{
         totalImages: number;
         referencedImages: number;
         unreferencedImages: string[];
@@ -139,7 +156,7 @@ export class ImageCleanupService {
             const { originalImages, thumbnailImages, pairedImages } = this.groupImagesByPairs(allImageFiles);
             
             // 获取所有被引用的图片（包括对应的缩略图）
-            const referencedImages = this.getReferencedImages(logs, todos);
+            const referencedImages = this.getReferencedImages(logs, todos, dailyReviews, customStickerSets, customStickers);
             
             // 找出未被引用的原图（只检查原图，缩略图会自动跟随）
             const unreferencedOriginals = originalImages.filter(imageName => 
@@ -213,7 +230,10 @@ export class ImageCleanupService {
             deleteRemote?: boolean;
             dryRun?: boolean;
         } = {},
-        todos: TodoItem[] = []
+        todos: TodoItem[] = [],
+        dailyReviews: DailyReview[] = [],
+        customStickerSets: CustomStickerSetRecord[] = [],
+        customStickers: CustomStickerRecord[] = []
     ): Promise<CleanupResult> {
         const { deleteLocal = true, deleteRemote = true, dryRun = false } = options;
         
@@ -227,7 +247,7 @@ export class ImageCleanupService {
                     deleteLocal, 
                     deleteRemote: false, 
                     dryRun 
-                }, todos);
+                }, todos, dailyReviews, customStickerSets, customStickers);
             }
         }
         
@@ -242,7 +262,7 @@ export class ImageCleanupService {
         
         try {
             // 检查未引用的图片
-            const checkResult = await this.checkUnreferencedImages(logs, todos);
+            const checkResult = await this.checkUnreferencedImages(logs, todos, dailyReviews, customStickerSets, customStickers);
             result.totalImages = checkResult.totalImages;
             result.referencedImages = checkResult.referencedImages;
             result.unreferencedImages = checkResult.unreferencedImages;
@@ -391,7 +411,13 @@ export class ImageCleanupService {
     /**
      * 获取图片使用统计
      */
-    async getImageUsageStats(logs: Log[], todos: TodoItem[] = []): Promise<{
+    async getImageUsageStats(
+        logs: Log[],
+        todos: TodoItem[] = [],
+        dailyReviews: DailyReview[] = [],
+        customStickerSets: CustomStickerSetRecord[] = [],
+        customStickers: CustomStickerRecord[] = []
+    ): Promise<{
         imageUsage: Map<string, number>;
         totalReferences: number;
         uniqueImages: number;
@@ -421,6 +447,11 @@ export class ImageCleanupService {
             imageUsage.set(imageName, (imageUsage.get(imageName) || 0) + 1);
             totalReferences++;
         });
+
+        collectCustomStickerReferencedImages(dailyReviews, customStickerSets, customStickers).forEach((imageName) => {
+            imageUsage.set(imageName, (imageUsage.get(imageName) || 0) + 1);
+            totalReferences++;
+        });
         
         return {
             imageUsage,
@@ -432,10 +463,16 @@ export class ImageCleanupService {
     /**
      * 生成清理报告
      */
-    async generateCleanupReport(logs: Log[], todos: TodoItem[] = []): Promise<string> {
+    async generateCleanupReport(
+        logs: Log[],
+        todos: TodoItem[] = [],
+        dailyReviews: DailyReview[] = [],
+        customStickerSets: CustomStickerSetRecord[] = [],
+        customStickers: CustomStickerRecord[] = []
+    ): Promise<string> {
         try {
-            const checkResult = await this.checkUnreferencedImages(logs, todos);
-            const usageStats = await this.getImageUsageStats(logs, todos);
+            const checkResult = await this.checkUnreferencedImages(logs, todos, dailyReviews, customStickerSets, customStickers);
+            const usageStats = await this.getImageUsageStats(logs, todos, dailyReviews, customStickerSets, customStickers);
             
             let report = `# 图片清理报告\n\n`;
             report += `## 📊 总体统计\n`;

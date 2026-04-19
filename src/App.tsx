@@ -104,6 +104,8 @@ const AppContent: React.FC = () => {
     defaultRecordView, setDefaultRecordView,
     customNarrativeTemplates, setCustomNarrativeTemplates,
     userPersonalInfo, setUserPersonalInfo,
+    customStickerSets, setCustomStickerSets,
+    customStickers, setCustomStickers,
     filters, setFilters,
     autoFocusNote, setAutoFocusNote,
     autoOpenFocusDetail, setAutoOpenFocusDetail,
@@ -212,7 +214,7 @@ const AppContent: React.FC = () => {
     const data = {
       logs, todos, categories, todoCategories, scopes, goals, majorGoals,
       autoLinkRules, reviewTemplates, checkTemplates, dailyReviews, weeklyReviews,
-      monthlyReviews, onThisDayEntries, customNarrativeTemplates, userPersonalInfo, filters,
+      monthlyReviews, onThisDayEntries, customNarrativeTemplates, userPersonalInfo, customStickerSets, customStickers, filters,
       sceneGroupState, // 新版：场景组状态
       sceneTimeSlots, // 添加场景设置
       principles, // 添加原则库
@@ -782,6 +784,8 @@ const AppContent: React.FC = () => {
               setAutoLinkRules([]);
               setCustomNarrativeTemplates([]);
               setUserPersonalInfo('');
+              setCustomStickerSets([]);
+              setCustomStickers([]);
               setFilters([]);
               resetPrinciplesToDefaults();
               resetSceneGroupsToDefaults();
@@ -803,6 +807,8 @@ const AppContent: React.FC = () => {
               setAutoLinkRules([]);
               setCustomNarrativeTemplates([]);
               setUserPersonalInfo('');
+              setCustomStickerSets([]);
+              setCustomStickers([]);
               setFilters([]);
               clearPrinciples();
               resetSceneGroupsToDefaults();
@@ -841,6 +847,8 @@ const AppContent: React.FC = () => {
               monthlyReviews,
               customNarrativeTemplates,
               userPersonalInfo,
+              customStickerSets,
+              customStickers,
               filters
             }}
 

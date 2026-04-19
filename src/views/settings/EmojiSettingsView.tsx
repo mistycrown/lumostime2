@@ -1,4 +1,4 @@
-/**
+﻿/**
  * @file EmojiSettingsView.tsx
  * @description Emoji 和 Sticker 设置页面 - 管理心情日历的 emoji 组、emoji 渲染风格和 Selector 默认页
  */

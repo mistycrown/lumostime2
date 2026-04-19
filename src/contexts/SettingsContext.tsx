@@ -3,7 +3,15 @@
  * @description 管理应用设置和用户偏好（不包括 Review 系统，Review 由 ReviewContext 管理），并兼容自定义筛选器排序。
  */
 import React, { createContext, useContext, useState, useEffect, ReactNode, useRef } from 'react';
-import { AppView, AutoLinkRule, Filter, NarrativeTemplate, MemoirFilterConfig } from '../types';
+import {
+    AppView,
+    AutoLinkRule,
+    CustomStickerRecord,
+    CustomStickerSetRecord,
+    Filter,
+    MemoirFilterConfig,
+    NarrativeTemplate
+} from '../types';
 import { DEFAULT_USER_PERSONAL_INFO } from '../constants';
 import { THEME_KEYS } from '../constants/storageKeys';
 import { uiIconService } from '../services/uiIconService';
@@ -32,6 +40,7 @@ import {
     isLocalDataTimestampUpdateLocked,
     updateLocalDataTimestamp
 } from '../utils/localDataTimestamp';
+import { normalizeCustomStickerState } from '../services/customStickerAssetService';
 import {
     normalizeImmersiveTimerOrientation,
     type ImmersiveTimerOrientation
@@ -141,6 +150,10 @@ interface SettingsContextType {
     setUserPersonalInfo: React.Dispatch<React.SetStateAction<string>>;
 
     // 筛选器
+    customStickerSets: CustomStickerSetRecord[];
+    setCustomStickerSets: React.Dispatch<React.SetStateAction<CustomStickerSetRecord[]>>;
+    customStickers: CustomStickerRecord[];
+    setCustomStickers: React.Dispatch<React.SetStateAction<CustomStickerRecord[]>>;
     filters: Filter[];
     setFilters: React.Dispatch<React.SetStateAction<Filter[]>>;
 
@@ -170,6 +183,27 @@ interface SettingsContextType {
 }
 
 const SettingsContext = createContext<SettingsContextType | undefined>(undefined);
+
+const buildInitialCustomStickerState = (): {
+    customStickerSets: CustomStickerSetRecord[];
+    customStickers: CustomStickerRecord[];
+} => {
+    try {
+        const storedSets = localStorage.getItem('lumostime_custom_sticker_sets_v2');
+        const storedStickers = localStorage.getItem('lumostime_custom_stickers_v2');
+
+        return normalizeCustomStickerState(
+            storedSets ? JSON.parse(storedSets) : [],
+            storedStickers ? JSON.parse(storedStickers) : []
+        );
+    } catch (error) {
+        console.error('[SettingsContext] Failed to parse stored custom sticker state', error);
+        return {
+            customStickerSets: [],
+            customStickers: []
+        };
+    }
+};
 
 export const useSettings = () => {
     const context = useContext(SettingsContext);
@@ -257,6 +291,14 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
     });
 
     // 筛选器
+    const [customStickerSets, setCustomStickerSets] = useState<CustomStickerSetRecord[]>(() => {
+        return buildInitialCustomStickerState().customStickerSets;
+    });
+
+    const [customStickers, setCustomStickers] = useState<CustomStickerRecord[]>(() => {
+        return buildInitialCustomStickerState().customStickers;
+    });
+
     const [filters, setFilters] = useState<Filter[]>(() => {
         const stored = localStorage.getItem('lumostime_filters');
         return stored ? normalizeFiltersOrder(JSON.parse(stored)) : [];
@@ -523,6 +565,17 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
     }, [userPersonalInfo]);
 
     useEffect(() => {
+        localStorage.setItem('lumostime_custom_sticker_sets_v2', JSON.stringify(customStickerSets));
+        localStorage.setItem('lumostime_custom_sticker_sets', JSON.stringify(customStickerSets));
+        window.dispatchEvent(new CustomEvent('stickerSetsChanged'));
+    }, [customStickerSets]);
+
+    useEffect(() => {
+        localStorage.setItem('lumostime_custom_stickers_v2', JSON.stringify(customStickers));
+        window.dispatchEvent(new CustomEvent('stickerSetsChanged'));
+    }, [customStickers]);
+
+    useEffect(() => {
         const normalizedFilters = normalizeFiltersOrder(filters);
         if (JSON.stringify(filters) !== JSON.stringify(normalizedFilters)) {
             setFilters(normalizedFilters);
@@ -548,7 +601,7 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
         console.log(
             `[SettingsContext] Sync-relevant settings changed, updated local timestamp: ${previous} -> ${now} (${new Date(now).toLocaleTimeString()})`
         );
-    }, [autoLinkRules, customNarrativeTemplates, filters, userPersonalInfo]);
+    }, [autoLinkRules, customNarrativeTemplates, customStickerSets, customStickers, filters, userPersonalInfo]);
 
     useEffect(() => {
         localStorage.setItem('lumostime_memoir_filter_config', JSON.stringify(memoirFilterConfig));
@@ -624,6 +677,10 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
             setCustomNarrativeTemplates,
             userPersonalInfo,
             setUserPersonalInfo,
+            customStickerSets,
+            setCustomStickerSets,
+            customStickers,
+            setCustomStickers,
             filters,
             setFilters,
             memoirFilterConfig,

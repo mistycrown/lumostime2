@@ -4,6 +4,7 @@
  * @output TypeScript Interfaces & Types
  * @pos Type Definitions (Shared contract)
  * @description Defines the core data structures (Log, TodoItem, Category, Activity, Filter order metadata, etc.) used throughout the application.
+ * @updated 2026-04-18: Added custom sticker set and sticker record types for synced mood sticker uploads.
  * @updated 2026-04-17: Added achievement filter-duration rules with inline filter expressions.
  * @updated 2026-04-18: Expanded widget session metadata to match the slot-based widget model, including shortcut slots.
  * @updated 2026-04-15: Added nightLatestStart auto-check comparison type for cross-midnight sleep rules.
@@ -717,6 +718,30 @@ export interface MemoirFilterConfig {
   showWeeklyReviews?: boolean; // 鏂板锛氭樉绀烘瘡鍛ㄥ洖椤?
 }
 
+
+export type CustomStickerStatus = 'active' | 'archived';
+
+export interface CustomStickerRecord {
+  id: string;
+  setId: string;
+  imageFilename: string;
+  thumbnailFilename?: string;
+  label?: string;
+  sortOrder: number;
+  status: CustomStickerStatus;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface CustomStickerSetRecord {
+  id: string;
+  name: string;
+  description?: string;
+  stickerIds: string[];
+  status: CustomStickerStatus;
+  createdAt: number;
+  updatedAt: number;
+}
 
 export type SearchType = 'record' | 'category' | 'activity' | 'todo' | 'scope' | 'review';
 

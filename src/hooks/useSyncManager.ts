@@ -44,6 +44,8 @@ export const useSyncManager = () => {
         autoLinkRules, setAutoLinkRules,
         customNarrativeTemplates, setCustomNarrativeTemplates,
         userPersonalInfo, setUserPersonalInfo,
+        customStickerSets, setCustomStickerSets,
+        customStickers, setCustomStickers,
         filters, setFilters,
         lastSyncTime, updateLastSyncTime,
         isRestoring,
@@ -98,6 +100,8 @@ export const useSyncManager = () => {
             if (hasField('onThisDayEntries')) setOnThisDayEntries(data.onThisDayEntries);
             if (hasField('customNarrativeTemplates')) setCustomNarrativeTemplates(data.customNarrativeTemplates);
             if (hasField('userPersonalInfo')) setUserPersonalInfo(data.userPersonalInfo ?? '');
+            if (hasField('customStickerSets')) setCustomStickerSets(data.customStickerSets ?? []);
+            if (hasField('customStickers')) setCustomStickers(data.customStickers ?? []);
             if (hasField('filters')) setFilters(normalizeFiltersOrder(data.filters));
             
             // 恢复场景设置到 localStorage（优先新版 sceneGroupState，兼容旧版 sceneTimeSlots）
@@ -147,7 +151,7 @@ export const useSyncManager = () => {
         const localData = {
             logs, todos, categories, todoCategories, scopes, goals, majorGoals,
             autoLinkRules, reviewTemplates, checkTemplates, dailyReviews, weeklyReviews,
-            monthlyReviews, onThisDayEntries, customNarrativeTemplates, userPersonalInfo, filters,
+            monthlyReviews, onThisDayEntries, customNarrativeTemplates, userPersonalInfo, customStickerSets, customStickers, filters,
             sceneGroupState, // 新版：场景组状态
             sceneTimeSlots, // 添加场景设置
             principles, // 添加原则库
@@ -698,7 +702,7 @@ export const useSyncManager = () => {
             clearTimeout(timer);
             // Don't clear the pending flag here, only clear it when sync completes or is skipped
         };
-    }, [logs, todos, categories, todoCategories, scopes, goals, autoLinkRules, reviewTemplates, checkTemplates, dailyReviews, weeklyReviews, monthlyReviews, onThisDayEntries, customNarrativeTemplates, userPersonalInfo, filters, manualSyncMode]); // 添加 manualSyncMode 依赖
+    }, [logs, todos, categories, todoCategories, scopes, goals, autoLinkRules, reviewTemplates, checkTemplates, dailyReviews, weeklyReviews, monthlyReviews, onThisDayEntries, customNarrativeTemplates, userPersonalInfo, customStickerSets, customStickers, filters, manualSyncMode]); // 添加 manualSyncMode 依赖
 
     // 2b. Image List Auto Sync (监听图片列表 JSON 的变化)
     useEffect(() => {
