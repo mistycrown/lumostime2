@@ -583,8 +583,8 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
 
     const countStickerReferences = (imageFilename: string) => stickerReferenceCounts.get(imageFilename) || 0;
 
-    const handleSaveStickerSet = () => {
-        const trimmedName = stickerSetName.trim();
+    const handleSaveStickerSet = (nextName: string) => {
+        const trimmedName = nextName.trim();
 
         if (!trimmedName) {
             return;

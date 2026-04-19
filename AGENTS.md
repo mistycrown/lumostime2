@@ -19,6 +19,7 @@
 - `npm run optimize-images` converts/optimizes PNG assets to WebP (with backups).
 - `npm run convert-uiicon` converts `public/uiicon` PNG icons to WebP.
 - `npx cap sync android` syncs web assets/config into the Android project when mobile changes are made.
+- Do not attempt to compile the Android app from this repository workspace. Android compilation is handled manually by the user.
 
 ## Coding Style & Naming Conventions
 - Use UTF-8 encoding for all files.
