@@ -3,7 +3,7 @@
  * @input Scope Data, Logs, Associated Todos/Goals/MajorGoals
  * @output Updated Scope, Managed Goals/MajorGoals/Keywords
  * @pos View (Detail Page)
- * @description A comprehensive detail view for a specific Scope (Domain). Features a heatmap, keyword analysis, matrix chart (Tags vs Time), and management of associated Goals, Major Goals, and Todos. The Goals tab displays both major goals (with their phase goals) and independent goals.
+ * @description A comprehensive detail view for a specific Scope (Domain). Features a heatmap, keyword analysis, note template management, matrix chart (Tags vs Time), and management of associated Goals, Major Goals, and Todos. The Goals tab displays both major goals (with their phase goals) and independent goals.
  * 
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
@@ -29,6 +29,7 @@ import { useCustomColors } from '../hooks/useCustomColors';
 import { isStoredColorSelected } from '../utils/colorUtils';
 import { getColorHexForCharts } from '../utils/colorAdapterUtils';
 import { getNormalizedScopeIds } from '../utils/scopeStatsUtils';
+import { NoteTemplateManager } from '../components/NoteTemplateManager';
 
 interface ScopeDetailViewProps {
     scope: Scope;
@@ -103,7 +104,8 @@ export const ScopeDetailView: React.FC<ScopeDetailViewProps> = ({
                 scope.themeColor !== initialScope.themeColor ||
                 scope.enableFocusScore !== initialScope.enableFocusScore ||
                 scope.enableMoodScore !== initialScope.enableMoodScore ||
-                JSON.stringify(scope.keywords) !== JSON.stringify(initialScope.keywords);
+                JSON.stringify(scope.keywords) !== JSON.stringify(initialScope.keywords) ||
+                JSON.stringify(scope.noteTemplates || []) !== JSON.stringify(initialScope.noteTemplates || []);
             
             if (hasChanges) {
                 onUpdate(scope);
@@ -441,6 +443,11 @@ export const ScopeDetailView: React.FC<ScopeDetailViewProps> = ({
                                 )}
                             </div>
                         </div>
+
+                        <NoteTemplateManager
+                            templates={scope.noteTemplates}
+                            onChange={(noteTemplates) => setScope(prev => ({ ...prev, noteTemplates }))}
+                        />
 
                         {/* Keywords Section */}
                         <div className="bg-white rounded-2xl p-6 border border-stone-100 shadow-sm">

@@ -3,7 +3,7 @@
  * @input Category ID, Logs, Associated Todos/Scopes
  * @output Detailed Category Analysis
  * @pos View (Detail Page)
- * @description Displays comprehensive analytics for a specific category, including a heatmap, history log, focus trends, and cross-analysis with scopes. Also allows editing category properties.
+ * @description Displays comprehensive analytics for a specific category, including a heatmap, history log, focus trends, cross-analysis with scopes, and inline-managed note templates.
  * 
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
@@ -23,6 +23,7 @@ import { useCustomColors } from '../hooks/useCustomColors';
 import { isStoredColorSelected } from '../utils/colorUtils';
 import { getColorHexForCharts } from '../utils/colorAdapterUtils';
 import { getNormalizedScopeIds } from '../utils/scopeStatsUtils';
+import { NoteTemplateManager } from '../components/NoteTemplateManager';
 
 interface CategoryDetailViewProps {
     categoryId: string;
@@ -62,7 +63,8 @@ export const CategoryDetailView: React.FC<CategoryDetailViewProps> = ({ category
                 category.heatmapMin !== initialCategory.heatmapMin ||
                 category.heatmapMax !== initialCategory.heatmapMax ||
                 category.enableFocusScore !== initialCategory.enableFocusScore ||
-                category.enableMoodScore !== initialCategory.enableMoodScore;
+                category.enableMoodScore !== initialCategory.enableMoodScore ||
+                JSON.stringify(category.noteTemplates || []) !== JSON.stringify(initialCategory.noteTemplates || []);
             
             if (hasChanges) {
                 onUpdateCategory(category);
@@ -385,6 +387,11 @@ export const CategoryDetailView: React.FC<CategoryDetailViewProps> = ({ category
                                 )}
                             </div>
                         </div>
+
+                        <NoteTemplateManager
+                            templates={category.noteTemplates}
+                            onChange={(noteTemplates) => setCategory({ ...category, noteTemplates })}
+                        />
 
                         <div className="bg-white rounded-2xl p-6 border border-stone-100 shadow-sm">
                             <h3 className="text-sm font-bold text-stone-400 uppercase tracking-widest mb-4">活动</h3>

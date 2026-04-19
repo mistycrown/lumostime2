@@ -3,11 +3,11 @@
  * @input Active Session Data, Todos, Categories, Scopes
  * @output Session Updates (Note, Association), Completion Event
  * @pos View (Active Focus Overlay)
- * @description The main interface displayed during an active focus session. Shows the timer, allows associating the session with a Todo or Scope, editing the note, and completing the session.
+ * @description The main interface displayed during an active focus session. Shows the timer, allows associating the session with a Todo or Scope, editing the note, completing the session, and applying inline note templates.
  * 
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { ActiveSession, TodoItem, Category, Activity, TodoCategory, Scope, AutoLinkRule } from '../types';
 import { X, Check, ChevronDown, TrendingUp, Plus, Minus, Lightbulb, CheckCircle2, Maximize2 } from 'lucide-react';
 import { TodoAssociation } from '../components/TodoAssociation';
@@ -17,6 +17,8 @@ import { MoodScoreSelector } from '../components/MoodScoreSelector';
 import { ImmersiveTimer } from '../components/ImmersiveTimer';
 import { IconRenderer } from '../components/IconRenderer';
 import { ReactionPicker, ReactionList } from '../components/ReactionComponents';
+import { RecommendedNoteTemplates } from '../components/RecommendedNoteTemplates';
+import { appendTemplateToNote, getRecommendedNoteTemplates, RecommendedNoteTemplate } from '../utils/noteTemplateUtils';
 
 interface FocusDetailViewProps {
     session: ActiveSession;
@@ -231,6 +233,31 @@ export const FocusDetailView: React.FC<FocusDetailViewProps> = ({ session, todos
     };
 
     const hasSuggestions = suggestions.activity || suggestions.scopes.length > 0;
+    const recommendedNoteTemplates = useMemo(() => getRecommendedNoteTemplates({
+        categories,
+        scopes,
+        todos,
+        selectedCategoryId: session.categoryId,
+        selectedActivityId: session.activityId,
+        selectedScopeIds: session.scopeIds,
+        linkedTodoId: session.linkedTodoId
+    }), [
+        categories,
+        scopes,
+        todos,
+        session.categoryId,
+        session.activityId,
+        session.scopeIds,
+        session.linkedTodoId
+    ]);
+
+    const handleApplyNoteTemplate = (template: RecommendedNoteTemplate) => {
+        setNote((current) => appendTemplateToNote(current, template.content));
+        window.setTimeout(() => {
+            noteRef.current?.focus();
+            noteRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }, 0);
+    };
 
     // 计时器
     useEffect(() => {
@@ -596,6 +623,12 @@ export const FocusDetailView: React.FC<FocusDetailViewProps> = ({ session, todos
                         onChange={e => setNote(e.target.value)}
                         placeholder="Add a note..."
                         className="w-full bg-white border border-stone-200 rounded-2xl p-4 text-stone-800 text-sm min-h-[100px] shadow-sm focus:outline-none focus:ring-1 focus:ring-stone-900 focus:border-stone-900 transition-all resize-none placeholder:text-stone-300 font-serif"
+                    />
+
+                    <RecommendedNoteTemplates
+                        templates={recommendedNoteTemplates}
+                        onApply={handleApplyNoteTemplate}
+                        className="mt-3"
                     />
                 </div>
 

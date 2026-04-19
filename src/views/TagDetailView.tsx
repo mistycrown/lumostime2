@@ -3,7 +3,7 @@
  * @input Activity ID, Logs, Associated Todos, Categories
  * @output Activity Updates (Name, Color), Todo Toggles
  * @pos View (Detail Page)
- * @description Detailed analytics and settings for a specific Activity (Tag). Features an activity heatmap, history timeline, keyword management, and associated To-Do tracking.
+ * @description Detailed analytics and settings for a specific Activity (Tag). Features an activity heatmap, history timeline, keyword management, note template editing, and associated To-Do tracking.
  * 
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
@@ -24,6 +24,7 @@ import { useCustomColors } from '../hooks/useCustomColors';
 import { isStoredColorSelected } from '../utils/colorUtils';
 import { getColorHexForCharts } from '../utils/colorAdapterUtils';
 import { getNormalizedScopeIds } from '../utils/scopeStatsUtils';
+import { NoteTemplateManager } from '../components/NoteTemplateManager';
 
 
 interface TagDetailViewProps {
@@ -83,7 +84,8 @@ export const TagDetailView: React.FC<TagDetailViewProps> = ({ tagId, logs, todos
             activity.heatmapMax !== initialActivity.heatmapMax ||
             activity.enableFocusScore !== initialActivity.enableFocusScore ||
             activity.enableMoodScore !== initialActivity.enableMoodScore ||
-            JSON.stringify(activity.keywords) !== JSON.stringify(initialActivity.keywords);
+            JSON.stringify(activity.keywords) !== JSON.stringify(initialActivity.keywords) ||
+            JSON.stringify(activity.noteTemplates || []) !== JSON.stringify(initialActivity.noteTemplates || []);
          
          if (hasChanges) {
             onUpdateActivity(activity);
@@ -536,6 +538,11 @@ export const TagDetailView: React.FC<TagDetailViewProps> = ({ tagId, logs, todos
                         </div>
                      </div>
                   </div>
+
+                  <NoteTemplateManager
+                     templates={activity.noteTemplates}
+                     onChange={(noteTemplates) => setActivity({ ...activity, noteTemplates })}
+                  />
 
                   {/* Keywords Section */}
                   <div className="bg-white rounded-2xl p-6 border border-stone-100 shadow-sm">

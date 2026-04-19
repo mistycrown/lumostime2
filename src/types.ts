@@ -4,6 +4,7 @@
  * @output TypeScript Interfaces & Types
  * @pos Type Definitions (Shared contract)
  * @description Defines the core data structures (Log, TodoItem, Category, Activity, Filter order metadata, etc.) used throughout the application.
+ * @updated 2026-04-19: Added reusable note template definitions for detail-page editing and inline note recommendations.
  * @updated 2026-04-18: Added custom sticker set and sticker record types for synced mood sticker uploads.
  * @updated 2026-04-17: Added achievement filter-duration rules with inline filter expressions.
  * @updated 2026-04-18: Expanded widget session metadata to match the slot-based widget model, including shortcut slots.
@@ -11,6 +12,13 @@
  *
  * 鈿狅笍 Once I am updated, be sure to update my header comment and the folder's md.
  */
+export interface NoteTemplate {
+  id: string;
+  name: string;
+  content: string;
+  order?: number;
+}
+
 export interface Activity {
   id: string;
   name: string;
@@ -22,6 +30,7 @@ export interface Activity {
   enableFocusScore?: boolean; // Override parent setting
   enableMoodScore?: boolean; // Override parent setting for mood tracking
   keywords?: string[]; // (NEW) Keywords for finer classification
+  noteTemplates?: NoteTemplate[];
 }
 
 export interface Category {
@@ -35,6 +44,7 @@ export interface Category {
   enableMoodScore?: boolean; // Default for all activities in category for mood tracking
   heatmapMin?: number; // Custom heatmap scale (Minutes)
   heatmapMax?: number;
+  noteTemplates?: NoteTemplate[];
 }
 
 // Scope (棰嗗煙) - orthogonal to Tags
@@ -49,6 +59,7 @@ export interface Scope {
   enableFocusScore?: boolean; // Whether to track focus in this scope
   enableMoodScore?: boolean; // Whether to track mood in this scope
   themeColor: string; // Hex color or Tailwind class name
+  noteTemplates?: NoteTemplate[];
   keywords?: string[]; // 鍏抽敭瀛楀垪琛紝鐢ㄤ簬蹇€熷尮閰嶅拰缁熻
 }
 

@@ -42,12 +42,15 @@ Specialized input controls.
 - `ScopeAssociation.tsx`: Tag selection grid.
 - `TodoAssociation.tsx`: Todo linking selector.
 - `CommentSection.tsx`: Comment system for focus logs.
+- `RecommendedNoteTemplates.tsx`: Inline recommendation strip that lets note fields insert context-aware templates without opening a selector modal.
 
 ## Display Items
 Small, atomic display components.
 
 - `ActivityItem.tsx`: Circular activity icon.
 - `GoalCard.tsx`: Goal progress summary card.
+- `NoteTemplateManager.tsx`: Capsule-based note template manager shared by category, scope, and activity detail views.
+- `NoteTemplateEditorModal.tsx`: Shared add/edit modal for note template names and contents.
 - `achievement/AchievementEntryCard.tsx`: Timeline 顶部的成就入口卡片，展示当前可用光点并进入成就页。
 - `achievement/AchievementBottle.tsx`: 成就页光点瓶主容器，使用物理引擎驱动光点碰撞效果。
 - `achievement/AchievementRecordsTab.tsx`: 每日快照记录列表，支持展开查看规则命中明细。

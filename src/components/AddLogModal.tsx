@@ -3,13 +3,13 @@
  * @input props: initialLog, time ranges, categories, todos, etc.
  * @output Modal Interaction (Save/Delete Log)
  * @pos Component (Modal)
- * @description A complex modal for creating or editing time logs. Handles duration calculation, activity selection, todo association, focus scoring, and segmented time entry.
+ * @description A complex modal for creating or editing time logs. Handles duration calculation, activity selection, todo association, focus scoring, segmented time entry, and inline note template recommendations.
  * @lastModified 2026-03-30
  * @change Auto-advance across hour/minute inputs and continue from start time to end time after segmented time entry. Added direct camera capture functionality using Capacitor Camera plugin and native camera-path persistence fallback for Android photo attachments.
  * 
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Category, Log, TodoItem, TodoCategory, Scope, AutoLinkRule, Comment } from '../types';
 import { X, Trash2, TrendingUp, Plus, Minus, Lightbulb, Check, CheckCircle2, Clock, Camera, Image as ImageIcon, Maximize2, Minimize2, Share2 } from 'lucide-react';
 import { Camera as CapCamera, CameraResultType, CameraSource } from '@capacitor/camera';
@@ -23,10 +23,12 @@ import { CommentSection } from '../components/CommentSection';
 import { ImagePreviewModal } from './ImagePreviewModal';
 import { ReactionPicker, ReactionList } from './ReactionComponents';
 import { IconRenderer } from './IconRenderer';
+import { RecommendedNoteTemplates } from './RecommendedNoteTemplates';
 import { useLogForm, useTimeCalculation, useImageManager, useSuggestions, LogFormState } from '../hooks';
 import { useNavigation } from '../contexts/NavigationContext';
 import { useToast } from '../contexts/ToastContext';
 import { imageService } from '../services/imageService';
+import { appendTemplateToNote, getRecommendedNoteTemplates, RecommendedNoteTemplate } from '../utils/noteTemplateUtils';
 
 interface AddLogModalProps {
   initialLog?: Log | null;
@@ -542,9 +544,33 @@ export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialSta
   }, [isDraggingStart, isDraggingEnd, formState.currentStartTime, formState.currentEndTime, formState.trackStartTime, formState.trackEndTime]);
 
   // Derived values
-  const selectedCategory = categories.find(c => c.id === formState.selectedCategoryId) || categories[0];
-  const linkedTodo = todos.find(t => t.id === formState.linkedTodoId);
+  const recommendedNoteTemplates = useMemo(() => getRecommendedNoteTemplates({
+    categories,
+    scopes,
+    todos,
+    selectedCategoryId: formState.selectedCategoryId,
+    selectedActivityId: formState.selectedActivityId,
+    selectedScopeIds: formState.scopeIds,
+    linkedTodoId: formState.linkedTodoId
+  }), [
+    categories,
+    scopes,
+    todos,
+    formState.selectedCategoryId,
+    formState.selectedActivityId,
+    formState.scopeIds,
+    formState.linkedTodoId
+  ]);
   const hasSuggestions = suggestions.activity || suggestions.scopes.length > 0;
+
+  const handleApplyNoteTemplate = (template: RecommendedNoteTemplate) => {
+    updateField('note', appendTemplateToNote(formState.note, template.content));
+    window.setTimeout(() => {
+      noteRef.current?.focus();
+      noteRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }, 0);
+  };
+
   return (
     <div
       className="fixed inset-0 z-[100] flex items-end md:items-center justify-center bg-stone-900/40 backdrop-blur-sm animate-fadeIn pb-[env(safe-area-inset-bottom)]"
@@ -958,6 +984,12 @@ export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialSta
                 '--tw-ring-color': 'var(--accent-color)'
               } as React.CSSProperties}
               placeholder="Add a note..."
+            />
+
+            <RecommendedNoteTemplates
+              templates={recommendedNoteTemplates}
+              onApply={handleApplyNoteTemplate}
+              className="mt-3"
             />
           </div>
 
