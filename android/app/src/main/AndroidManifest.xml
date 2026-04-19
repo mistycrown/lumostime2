@@ -639,6 +639,17 @@
                 android:resource="@xml/widget_info_4x2" />
         </receiver>
 
+        <receiver
+            android:name=".WidgetDateChangeReceiver"
+            android:enabled="true"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.DATE_CHANGED" />
+                <action android:name="android.intent.action.TIME_SET" />
+                <action android:name="android.intent.action.TIMEZONE_CHANGED" />
+            </intent-filter>
+        </receiver>
+
     </application>
 
     <!-- Permissions -->
