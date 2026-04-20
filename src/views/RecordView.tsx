@@ -5,15 +5,16 @@
  * @pos View (Main Tab)
  * @description The primary interface for starting new time blocks. Features a category sidebar and a grid of activity buttons with larger start-card icons.
  * @updated 2026-04-12: Softened the sidebar toggle button styling to reduce visual weight and keep it aligned with TodoView controls.
+ * @updated 2026-04-20: Switched custom background rendering to the shared preloaded display hook and reduced mobile blur cost.
  *
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
 import React, { useState, useEffect } from 'react';
 import { Category, Activity } from '../types';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
-import { backgroundService } from '../services/backgroundService';
 import { IconRenderer } from '../components/IconRenderer';
 import { getSoftColorCircleStyle } from '../utils/colorAdapterUtils';
+import { useBackgroundDisplay } from '../hooks/useBackgroundDisplay';
 
 
 interface RecordViewProps {
@@ -24,8 +25,7 @@ interface RecordViewProps {
 export const RecordView: React.FC<RecordViewProps> = ({ onStartActivity, categories }) => {
   const [selectedCategoryId, setSelectedCategoryId] = useState<string>('');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const [backgroundUrl, setBackgroundUrl] = useState<string>('');
-  const [backgroundOpacity, setBackgroundOpacity] = useState<number>(0.1);
+  const { backgroundUrl, hasBackground, panelOverlayOpacity, useReducedEffects } = useBackgroundDisplay();
 
   // 初始化时从 localStorage 恢复用户上次选择的分组
   useEffect(() => {
@@ -47,32 +47,6 @@ export const RecordView: React.FC<RecordViewProps> = ({ onStartActivity, categor
     }
   }, [selectedCategoryId]);
 
-  useEffect(() => {
-    const updateBackground = () => {
-      const bg = backgroundService.getCurrentBackgroundOption();
-      const opacity = backgroundService.getBackgroundOpacity();
-      setBackgroundUrl(bg?.url || '');
-      setBackgroundOpacity(opacity);
-    };
-    
-    updateBackground();
-    
-    // 监听localStorage变化
-    const handleStorageChange = () => {
-      updateBackground();
-    };
-    
-    window.addEventListener('storage', handleStorageChange);
-    
-    // 定期检查背景变化
-    const interval = setInterval(updateBackground, 500);
-    
-    return () => {
-      window.removeEventListener('storage', handleStorageChange);
-      clearInterval(interval);
-    };
-  }, []);
-
   // Fallback to first category if selected one is not found (e.g. was deleted)
   // Or if 'recent' is not implemented yet, just default to first.
   // Note: 'recent' logic was not fully implemented in previous code, it just defaulted to CATEGORIES[0] if not found.
@@ -86,24 +60,25 @@ export const RecordView: React.FC<RecordViewProps> = ({ onStartActivity, categor
     <div 
       className="flex h-full relative"
       style={{
-        backgroundColor: backgroundUrl && backgroundUrl !== '' ? 'transparent' : '#faf9f6'
+        backgroundColor: hasBackground ? 'transparent' : '#faf9f6'
       }}
     >
       {/* 背景图片层 */}
-      {backgroundUrl && backgroundUrl !== '' && (
+      {hasBackground && (
         <div 
           className="absolute inset-0 -z-20"
           style={{
             backgroundImage: `url(${backgroundUrl})`,
             backgroundSize: 'cover',
             backgroundPosition: 'center',
-            backgroundRepeat: 'no-repeat'
+            backgroundRepeat: 'no-repeat',
+            transform: 'translateZ(0)'
           }}
         />
       )}
       
       {/* 全局半透明遮罩层 - 覆盖整个下半部分 */}
-      <div className="absolute inset-0 bg-[#faf9f6]/50 backdrop-blur-md -z-10"></div>
+      <div className="absolute inset-0 -z-10" style={{ backgroundColor: 'rgba(250, 249, 246, 0.5)' }}></div>
       
       {/* Left Sidebar - Categories */}
       {/* w-auto allows it to grow with text, max-w to prevent taking over too much space on tablets */}
@@ -164,23 +139,11 @@ export const RecordView: React.FC<RecordViewProps> = ({ onStartActivity, categor
         className="flex-1 overflow-hidden flex flex-col p-5 md:p-10 rounded-tl-[2rem] shadow-[-5px_0_20px_rgba(0,0,0,0.08)] z-10 ml-[-10px] relative"
         id="record-content"
       >
-        {/* 主体部分的背景图片层 */}
-        {backgroundUrl && backgroundUrl !== '' && (
-          <div 
-            className="absolute inset-0 -z-20 rounded-tl-[2rem]"
-            style={{
-              backgroundImage: `url(${backgroundUrl})`,
-              backgroundSize: 'cover',
-              backgroundPosition: 'center',
-              backgroundRepeat: 'no-repeat'
-            }}
-          />
-        )}
         {/* 半透明白色遮罩层 - 透明度根据用户设置动态调整 */}
         <div 
-          className="absolute inset-0 -z-10 backdrop-blur-sm rounded-tl-[2rem]"
+          className={`absolute inset-0 -z-10 rounded-tl-[2rem] ${useReducedEffects ? '' : 'backdrop-blur-sm'}`}
           style={{
-            backgroundColor: `rgba(255, 255, 255, ${1 - backgroundOpacity})`
+            backgroundColor: `rgba(255, 255, 255, ${panelOverlayOpacity})`
           }}
         />
 

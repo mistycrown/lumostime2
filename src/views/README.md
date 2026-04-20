@@ -28,7 +28,8 @@ The views are designed as "dumb" or "presentational" components where possible, 
 
 > ⚠️ **Note**: When modifying views, ensure that new state requirements are coordinated with `App.tsx` if they affect global data (Logs, Categories, Todos).
 
-> Last updated: 2026-04-17
+> Last updated: 2026-04-20
+- `SceneView.tsx`, `RecordView.tsx`, `TodoView.tsx`: Moved custom background rendering onto a shared preloaded display hook, removed per-view 500ms background polling, dropped duplicate inner background layers, and reduced heavy blur on lower-end mobile devices to smooth scrolling and background switches.
 - `CategoryDetailView.tsx`, `ScopeDetailView.tsx`, `TagDetailView.tsx`: Added inline note template management in detail pages so template editing lives beside the related category/scope/tag instead of in settings.
 - `FocusDetailView.tsx`: Added note template recommendations directly below the note input to keep active-session note capture one-tap.
 - `ReviewHubView.tsx`: Replaced Chronicle card `color-mix` shadows and blur-only surfaces with Android-safe fallbacks so HarmonyOS no longer renders abnormal themed gradients behind archive cards.
