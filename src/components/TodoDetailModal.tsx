@@ -23,6 +23,7 @@ import { TodoDatePickerModal } from './TodoDatePickerModal';
 
 interface TodoDetailModalProps {
   initialTodo?: TodoItem | null;
+  initialDraft?: Partial<TodoItem> | null;
   currentCategory: TodoCategory;
   displayMode?: 'overlay' | 'page';
   onClose: () => void;
@@ -59,10 +60,28 @@ const formatDateFieldValue = (value?: string): string => {
   return `${parsed.getFullYear()}.${month}.${day}`;
 };
 
-export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({ initialTodo, currentCategory, displayMode = 'overlay', onClose, onSave, onDelete, logs, onLogUpdate, onEditLog, todoCategories, categories, scopes }) => {
+export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({ initialTodo, initialDraft, currentCategory, displayMode = 'overlay', onClose, onSave, onDelete, logs, onLogUpdate, onEditLog, todoCategories, categories, scopes }) => {
   const { addToast } = useToast();
   const [isEntering, setIsEntering] = useState(true);
   const [activeTab, setActiveTab] = useState<Tab>(initialTodo ? '時間線' : '细节');
+
+  const initialCategoryId = initialTodo?.categoryId || initialDraft?.categoryId || currentCategory.id;
+  const initialTitle = initialTodo?.title || initialDraft?.title || '';
+  const initialNote = initialTodo?.note || initialDraft?.note || '';
+  const initialIsCompleted = initialTodo?.isCompleted || initialDraft?.isCompleted || false;
+  const initialLinkedCategoryId = initialTodo?.linkedCategoryId || initialDraft?.linkedCategoryId || '';
+  const initialLinkedActivityId = initialTodo?.linkedActivityId || initialDraft?.linkedActivityId || '';
+  const initialDefaultScopeIds = initialTodo?.defaultScopeIds || initialDraft?.defaultScopeIds;
+  const initialIsProgress = initialTodo?.isProgress || initialDraft?.isProgress || false;
+  const initialTotalAmount = initialTodo?.totalAmount || initialDraft?.totalAmount || 100;
+  const initialUnitAmount = initialTodo?.unitAmount || initialDraft?.unitAmount || 1;
+  const initialCompletedUnits = initialTodo?.completedUnits || initialDraft?.completedUnits || 0;
+  const initialHeatmapMin = initialTodo?.heatmapMin ?? initialDraft?.heatmapMin;
+  const initialHeatmapMax = initialTodo?.heatmapMax ?? initialDraft?.heatmapMax;
+  const initialCoverImage = initialTodo?.coverImage || initialDraft?.coverImage;
+  const initialScheduledDate = initialTodo?.scheduledDate || initialDraft?.scheduledDate || '';
+  const initialDeadlineDate = initialTodo?.deadlineDate || initialDraft?.deadlineDate || '';
+  const initialRecurrenceRule = initialTodo?.recurrenceRule || initialDraft?.recurrenceRule;
 
   // Stable ID for the session
   const [todoId] = useState(initialTodo?.id || crypto.randomUUID());
@@ -71,44 +90,44 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({ initialTodo, c
   const taskNameInputRef = useRef<HTMLInputElement>(null);
 
   // --- Detail State ---
-  const [selectedCategoryId, setSelectedCategoryId] = useState(initialTodo?.categoryId || currentCategory.id);
-  const [title, setTitle] = useState(initialTodo?.title || '');
+  const [selectedCategoryId, setSelectedCategoryId] = useState(initialCategoryId);
+  const [title, setTitle] = useState(initialTitle);
 
-  const [note, setNote] = useState(initialTodo?.note || '');
-  const [isCompleted, setIsCompleted] = useState(initialTodo?.isCompleted || false);
+  const [note, setNote] = useState(initialNote);
+  const [isCompleted, setIsCompleted] = useState(initialIsCompleted);
 
   // Link to Record Activity
-  const [linkedCategoryId, setLinkedCategoryId] = useState<string>(initialTodo?.linkedCategoryId || '');
-  const [linkedActivityId, setLinkedActivityId] = useState<string>(initialTodo?.linkedActivityId || '');
-  const [defaultScopeIds, setDefaultScopeIds] = useState<string[] | undefined>(initialTodo?.defaultScopeIds);
+  const [linkedCategoryId, setLinkedCategoryId] = useState<string>(initialLinkedCategoryId);
+  const [linkedActivityId, setLinkedActivityId] = useState<string>(initialLinkedActivityId);
+  const [defaultScopeIds, setDefaultScopeIds] = useState<string[] | undefined>(initialDefaultScopeIds);
 
   // Progress State
-  const [isProgress, setIsProgress] = useState(initialTodo?.isProgress || false);
-  const [totalAmount, setTotalAmount] = useState(initialTodo?.totalAmount || 100);
-  const [unitAmount, setUnitAmount] = useState(initialTodo?.unitAmount || 1);
-  const [completedUnits, setCompletedUnits] = useState(initialTodo?.completedUnits || 0);
+  const [isProgress, setIsProgress] = useState(initialIsProgress);
+  const [totalAmount, setTotalAmount] = useState(initialTotalAmount);
+  const [unitAmount, setUnitAmount] = useState(initialUnitAmount);
+  const [completedUnits, setCompletedUnits] = useState(initialCompletedUnits);
 
   // Heatmap State
-  const [heatmapMin, setHeatmapMin] = useState<number | undefined>(initialTodo?.heatmapMin);
-  const [heatmapMax, setHeatmapMax] = useState<number | undefined>(initialTodo?.heatmapMax);
+  const [heatmapMin, setHeatmapMin] = useState<number | undefined>(initialHeatmapMin);
+  const [heatmapMax, setHeatmapMax] = useState<number | undefined>(initialHeatmapMax);
 
   // Cover Image State
-  const [coverImage, setCoverImage] = useState<string | undefined>(initialTodo?.coverImage);
+  const [coverImage, setCoverImage] = useState<string | undefined>(initialCoverImage);
   const [isUploadingImage, setIsUploadingImage] = useState(false);
 
   // Schedule State
-  const [scheduledDate, setScheduledDate] = useState(initialTodo?.scheduledDate || '');
-  const [deadlineDate, setDeadlineDate] = useState(initialTodo?.deadlineDate || '');
-  const [recurrenceFrequency, setRecurrenceFrequency] = useState<RecurrenceFrequencyMode>(initialTodo?.recurrenceRule?.frequency || 'none');
+  const [scheduledDate, setScheduledDate] = useState(initialScheduledDate);
+  const [deadlineDate, setDeadlineDate] = useState(initialDeadlineDate);
+  const [recurrenceFrequency, setRecurrenceFrequency] = useState<RecurrenceFrequencyMode>(initialRecurrenceRule?.frequency || 'none');
   const [recurrenceStartDate, setRecurrenceStartDate] = useState(
-    initialTodo?.recurrenceRule?.startDate || initialTodo?.scheduledDate || getTodayDateKey()
+    initialRecurrenceRule?.startDate || initialScheduledDate || getTodayDateKey()
   );
-  const [recurrenceEndDate, setRecurrenceEndDate] = useState(initialTodo?.recurrenceRule?.endDate || '');
-  const [recurrenceInterval, setRecurrenceInterval] = useState(initialTodo?.recurrenceRule?.interval || 1);
-  const [recurrenceWeekdays, setRecurrenceWeekdays] = useState<number[]>(initialTodo?.recurrenceRule?.weekdays || []);
+  const [recurrenceEndDate, setRecurrenceEndDate] = useState(initialRecurrenceRule?.endDate || '');
+  const [recurrenceInterval, setRecurrenceInterval] = useState(initialRecurrenceRule?.interval || 1);
+  const [recurrenceWeekdays, setRecurrenceWeekdays] = useState<number[]>(initialRecurrenceRule?.weekdays || []);
   const [recurrenceMonthDay, setRecurrenceMonthDay] = useState(
-    initialTodo?.recurrenceRule?.monthDays?.[0] ||
-    parseDateKey(initialTodo?.recurrenceRule?.startDate)?.getDate() ||
+    initialRecurrenceRule?.monthDays?.[0] ||
+    parseDateKey(initialRecurrenceRule?.startDate)?.getDate() ||
     new Date().getDate()
   );
   const [activeDatePicker, setActiveDatePicker] = useState<DatePickerField>(null);

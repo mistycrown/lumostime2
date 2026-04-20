@@ -25,6 +25,7 @@ export const useTodoManager = () => {
         setEditingTodo,
         todoCategoryToAdd, // 读取待添加的分类 ID
         setTodoCategoryToAdd,
+        setNewTodoDraft,
         setIsTodoManaging
     } = useNavigation();
     const { addToast } = useToast();
@@ -63,21 +64,24 @@ export const useTodoManager = () => {
         openEditTodoModal(todo);
     };
 
-    const openAddTodoModal = (categoryId: string) => {
+    const openAddTodoModal = (categoryId: string, draft?: Partial<TodoItem>) => {
         setEditingTodo(null);
         setTodoCategoryToAdd(categoryId);
+        setNewTodoDraft(draft ?? null);
         setIsTodoModalOpen(true);
     };
 
     const openEditTodoModal = (todo: TodoItem) => {
         setEditingTodo(todo);
         setTodoCategoryToAdd(todo.categoryId);
+        setNewTodoDraft(null);
         setIsTodoModalOpen(true);
     };
 
     const closeTodoModal = () => {
         setIsTodoModalOpen(false);
         setEditingTodo(null);
+        setNewTodoDraft(null);
     };
 
     const handleSaveTodo = (todo: TodoItem) => {

@@ -135,6 +135,8 @@ interface NavigationContextType {
     setStatsRange: (range: 'day' | 'week' | 'month' | 'year' | null) => void;
     todoCategoryToAdd: string;
     setTodoCategoryToAdd: (id: string) => void;
+    newTodoDraft: Partial<TodoItem> | null;
+    setNewTodoDraft: (draft: Partial<TodoItem> | null) => void;
     goalScopeId: string;
     setGoalScopeId: (id: string) => void;
     initialLogTimes: { start?: number; end?: number; prefilledData?: { categoryId?: string; activityId?: string; linkedTodoId?: string } } | null;
@@ -281,6 +283,7 @@ export const NavigationProvider: React.FC<NavigationProviderProps> = ({
     const [todoCategoryToAdd, setTodoCategoryToAdd] = useState<string>(
         initialTodoCategory || 'work'
     );
+    const [newTodoDraft, setNewTodoDraft] = useState<Partial<TodoItem> | null>(null);
     const [goalScopeId, setGoalScopeId] = useState<string>('');
     const [initialLogTimes, setInitialLogTimes] = useState<{ start?: number; end?: number; prefilledData?: { categoryId?: string; activityId?: string; linkedTodoId?: string } } | null>(null);
 
@@ -384,6 +387,8 @@ export const NavigationProvider: React.FC<NavigationProviderProps> = ({
             setStatsRange,
             todoCategoryToAdd,
             setTodoCategoryToAdd,
+            newTodoDraft,
+            setNewTodoDraft,
             goalScopeId,
             setGoalScopeId,
             initialLogTimes,
