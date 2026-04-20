@@ -29,6 +29,10 @@ The views are designed as "dumb" or "presentational" components where possible, 
 > ⚠️ **Note**: When modifying views, ensure that new state requirements are coordinated with `App.tsx` if they affect global data (Logs, Categories, Todos).
 
 > Last updated: 2026-04-20
+- `TodoView.tsx`: Tightened week-view overdue warning icons so Arrange/Due only show the alert when the date has passed and no completion date exists.
+- `TodoView.tsx`: Added extra bottom padding to the week-planning scroll content so the floating action button no longer blocks the last scheduled rows.
+- `TodoView.tsx`: Hid empty quick-action Arrange/Due/Completed metadata rows in the week-view badge editor so unset dates no longer render `None`.
+- `TodoView.tsx`: Added a quick duplicate-edit modal before creating todo copies, with default date cleanup plus optional tag and scope clearing.
 - `SceneView.tsx`, `RecordView.tsx`, `TodoView.tsx`: Moved custom background rendering onto a shared preloaded display hook, removed per-view 500ms background polling, dropped duplicate inner background layers, and reduced heavy blur on lower-end mobile devices to smooth scrolling and background switches.
 - `TodoView.tsx`: Added a first-pass week planning mode with a floating list/week switcher, seven horizontal day rows, and separate badges for assigned, deadline, recurring, completed, and in-progress todo states.
 - `CategoryDetailView.tsx`, `ScopeDetailView.tsx`, `TagDetailView.tsx`: Added inline note template management in detail pages so template editing lives beside the related category/scope/tag instead of in settings.

@@ -539,6 +539,7 @@ const AppContent: React.FC = () => {
         handleStartTodoFocus={handleStartTodoFocusWrapper}
         handleBatchAddTodos={todoManager.handleBatchAddTodos}
         handleDuplicateTodo={todoManager.handleDuplicateTodo}
+        handleSaveTodo={todoManager.handleSaveTodo}
         handleUpdateTodoData={todoManager.handleUpdateTodoData}
 
         // 大目标处理

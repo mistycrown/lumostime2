@@ -1,28 +1,38 @@
-/**
+﻿/**
  * @file TodoView.tsx
  * @input Todos, Categories, Scopes
  * @output Todo Status Updates, Edit Triggers, Focus Timer Start
  * @pos View (Main Tab)
  * @description The main To-Do list interface. Displays tasks grouped by category, supports swipe actions, and now includes a week planning view with schedule and history badges.
+ * @updated 2026-04-20 18:07: Limited week-view overdue alerts to items that are past due and still have no completion date.
+ * @updated 2026-04-20 18:03: Added extra bottom padding to the week planning scroll area so the floating action button no longer covers the last rows.
+ * @updated 2026-04-20 17:59: Hid empty quick-action schedule metadata rows instead of rendering None placeholders.
+ * @updated 2026-04-20: Added a quick duplicate-edit modal before creating copied todos.
  * @updated 2026-04-20: Added list/week switching, seven-row week planning layout, and first-pass schedule/history badge rendering.
  * @updated 2026-04-12: Matched the expanded sidebar action button spacing with RecordView, added a persisted toggle for showing completed todos, and softened the shared sidebar control styling.
  * @updated 2026-04-20: Switched custom background rendering to the shared preloaded display hook and reduced mobile blur cost.
+ * @updated 2026-04-20: Moved week-view touch dragging to non-passive native listeners so mobile drag no longer logs passive preventDefault warnings.
+ * @updated 2026-04-20: Simplified week Arrange icons, added quick-clear actions, and refined schedule picker ordering.
  *
- * 閳跨媴绗?Once I am updated, be sure to update my header comment and the folder's md.
+ * 闁宠法濯寸粭?Once I am updated, be sure to update my header comment and the folder's md.
  */
-import React, { useState, useEffect, useMemo } from 'react';
-import { Scope, TodoItem, TodoCategory, Category, AutoLinkRule, Log } from '../types';
-import { PlayCircle, CheckCircle2, Plus, MoreHorizontal, ChevronLeft, ChevronRight, LayoutList, Rows, Sparkles, Eye, EyeOff, CalendarDays, Flag, Repeat2, TrendingUp, ListTodo } from 'lucide-react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { Scope, TodoItem, TodoCategory, Category, AutoLinkRule, Log, TodoDuplicateOptions } from '../types';
+import { PlayCircle, CheckCircle2, Plus, MoreHorizontal, ChevronLeft, ChevronRight, LayoutList, Rows, Sparkles, Eye, EyeOff, CalendarDays, Flag, Repeat2, TrendingUp, ListTodo, CircleAlert, ArrowRightCircle, PanelRightOpen, Check, X } from 'lucide-react';
 import { AITodoInputModal } from '../components/AITodoInputModal';
 import { AITodoConfirmModal, ParsedTask } from '../components/AITodoConfirmModal';
 import { aiService } from '../services/aiService';
 import { usePrivacy } from '../contexts/PrivacyContext';
+import { useToast } from '../contexts/ToastContext';
 import { IconRenderer } from '../components/IconRenderer';
 import { useBackgroundDisplay } from '../hooks/useBackgroundDisplay';
 import { FloatingButton } from '../components/FloatingButton';
 import { UIIcon } from '../components/UIIcon';
 import { uiIconService } from '../services/uiIconService';
 import { WeekTodoEntry, buildWeekTodoBuckets, formatDateKey, getTodayDateKey, getWeekDates, parseDateKey } from '../utils/todoScheduleUtils';
+import { TodoScheduleAssignModal } from '../components/TodoScheduleAssignModal';
+import { TodoDatePickerModal } from '../components/TodoDatePickerModal';
+import { TodoDuplicateModal } from '../components/TodoDuplicateModal';
 
 
 interface TodoViewProps {
@@ -35,7 +45,8 @@ interface TodoViewProps {
   onEditTodo: (todo: TodoItem) => void;
   onAddTodo: (categoryId: string) => void;
   onStartFocus: (todo: TodoItem) => void;
-  onDuplicateTodo: (todo: TodoItem) => void;
+  onDuplicateTodo: (todo: TodoItem, options: TodoDuplicateOptions) => void;
+  onSaveTodo: (todo: TodoItem) => void;
   onBatchAddTodos?: (todos: Partial<TodoItem>[]) => void;
   autoLinkRules?: AutoLinkRule[];
 }
@@ -127,7 +138,7 @@ const SwipeableTodoItem: React.FC<{
 
   const { isPrivacyMode } = usePrivacy();
 
-  // 鐠侊紕鐣婚崷鍡氼潡閺嶅嘲绱?
+  // 閻犱緤绱曢悾濠氬捶閸℃凹娼￠柡宥呭槻缁?
   const getRoundedClass = () => {
     if (viewMode !== 'compact') return 'rounded-2xl';
     if (isFirst && isLast) return 'rounded-xl';
@@ -293,14 +304,207 @@ const SwipeableTodoItem: React.FC<{
 
 const WEEKDAY_ROW_LABELS = ['周一', '周二', '周三', '周四', '周五', '周六', '周日'];
 
+type WeekBadgeKey = 'deadline' | 'scheduled' | 'recurring' | 'completed' | 'inProgress';
+
+interface WeekBadgeDescriptor {
+  key: WeekBadgeKey;
+  label: string;
+  color: string;
+  overdue?: boolean;
+}
+
+const TodoScheduleQuickActionsModal: React.FC<{
+  isOpen: boolean;
+  todo: TodoItem | null;
+  badgeType: 'scheduled' | 'deadline' | null;
+  currentDateLabel?: string;
+  onMoveDate: (type: 'scheduled' | 'deadline', mode: 'today' | 'nextWeek') => void;
+  onClearDate: (type: 'scheduled' | 'deadline') => void;
+  onOpenDetail: () => void;
+  onComplete: () => void;
+  onClose: () => void;
+}> = ({
+  isOpen,
+  todo,
+  badgeType,
+  onMoveDate,
+  onClearDate,
+  onOpenDetail,
+  onComplete,
+  onClose
+}) => {
+  if (!isOpen || !todo || !badgeType) return null;
+
+  const formatQuickActionDate = (dateKey?: string) => {
+    if (!dateKey) return null;
+    const date = parseDateKey(dateKey);
+    if (!date) return dateKey;
+    return `${date.getMonth() + 1}/${date.getDate()}`;
+  };
+
+  const formatQuickActionDateTime = (dateValue?: string) => {
+    if (!dateValue) return null;
+    const date = new Date(dateValue);
+    if (Number.isNaN(date.getTime())) return dateValue;
+    return `${date.getMonth() + 1}/${date.getDate()} ${date.toLocaleTimeString('en-US', {
+      hour: 'numeric',
+      minute: '2-digit'
+    })}`;
+  };
+
+  const quickActionDateRows = [
+    { label: 'Arrange', value: formatQuickActionDate(todo.scheduledDate) },
+    { label: 'Due', value: formatQuickActionDate(todo.deadlineDate) },
+    { label: 'Completed', value: formatQuickActionDateTime(todo.completedAt) }
+  ].filter((item): item is { label: string; value: string } => Boolean(item.value));
+
+  return (
+    <div
+      className="fixed inset-0 z-[130] flex items-end justify-center bg-[rgba(15,23,42,0.12)] px-4 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-12 backdrop-blur-sm md:items-center md:pb-4"
+      onClick={onClose}
+    >
+      <div
+        className="w-full max-w-[26rem] overflow-hidden rounded-[2rem] border border-stone-200 bg-[#faf9f6] shadow-[0_26px_70px_rgba(15,23,42,0.14)]"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <div className="relative border-b border-stone-200 px-5 py-4 pr-24">
+              <div className="text-[11px] uppercase tracking-[0.22em] text-stone-400">Quick Actions</div>
+              <div className="mt-1 text-lg font-medium text-stone-800">{todo.title}</div>
+              {quickActionDateRows.length > 0 && (
+                <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-stone-400">
+                  {quickActionDateRows.map((item) => (
+                    <span key={item.label} className="inline-flex min-w-0 items-center gap-1.5">
+                      <span className="shrink-0 uppercase tracking-[0.18em] text-stone-400">{item.label}</span>
+                      <span className="text-stone-500">{item.value}</span>
+                    </span>
+                  ))}
+                </div>
+              )}
+              <div className="absolute right-5 top-4 flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={onOpenDetail}
+                  className="rounded-full p-2 text-stone-400 transition-colors hover:bg-white hover:text-stone-600"
+                  title="打开详情"
+                >
+                  <PanelRightOpen size={16} />
+                </button>
+                {!todo.isCompleted && (
+                  <button
+                    type="button"
+                    onClick={onComplete}
+                    className="rounded-full p-2 text-stone-400 transition-colors hover:bg-white hover:text-stone-600"
+                    title="标记完成"
+                  >
+                    <Check size={16} />
+                  </button>
+                )}
+              </div>
+        </div>
+
+        <div className="px-4 py-4">
+          <div className="space-y-2">
+            <div className="grid grid-cols-2 gap-2">
+              <div className="overflow-hidden rounded-2xl border border-stone-200 bg-white/80">
+                <div className="flex items-center gap-1.5 border-b border-stone-100 px-4 py-2 text-[10px] uppercase tracking-[0.18em] text-stone-400">
+                  <CalendarDays size={12} className="text-stone-400" />
+                  <span>安排到</span>
+                </div>
+                <div className="grid grid-cols-2">
+                  <button
+                    type="button"
+                    onClick={() => onMoveDate('scheduled', 'today')}
+                    className="flex items-center justify-center px-4 py-3 text-center text-sm text-stone-700 transition-colors hover:bg-white"
+                  >
+                    <span>今天</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onMoveDate('scheduled', 'nextWeek')}
+                    className="flex items-center justify-center border-l border-stone-100 px-4 py-3 text-center text-sm text-stone-700 transition-colors hover:bg-white"
+                  >
+                    <span>下周</span>
+                  </button>
+                </div>
+              </div>
+
+              <div className="overflow-hidden rounded-2xl border border-stone-200 bg-white/80">
+                <div className="flex items-center gap-1.5 border-b border-stone-100 px-4 py-2 text-[10px] uppercase tracking-[0.18em] text-stone-400">
+                  <Flag size={12} className="text-stone-400" />
+                  <span>截止到</span>
+                </div>
+                <div className="grid grid-cols-2">
+                  <button
+                    type="button"
+                    onClick={() => onMoveDate('deadline', 'today')}
+                    className="flex items-center justify-center px-4 py-3 text-center text-sm text-stone-700 transition-colors hover:bg-white"
+                  >
+                    今天
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onMoveDate('deadline', 'nextWeek')}
+                    className="flex items-center justify-center border-l border-stone-100 px-4 py-3 text-center text-sm text-stone-700 transition-colors hover:bg-white"
+                  >
+                    下周
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => onClearDate('scheduled')}
+                className="flex items-center gap-2 rounded-2xl border border-stone-200 bg-white/80 px-4 py-3 text-left text-sm text-stone-700 transition-colors hover:border-stone-300 hover:bg-white"
+              >
+                <X size={16} className="text-stone-400" />
+                <span>清除安排日期</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => onClearDate('deadline')}
+                className="flex items-center gap-2 rounded-2xl border border-stone-200 bg-white/80 px-4 py-3 text-left text-sm text-stone-700 transition-colors hover:border-stone-300 hover:bg-white"
+              >
+                <X size={16} className="text-stone-400" />
+                <span>清除截止日期</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const WeekTodoLineItem: React.FC<{
   entry: WeekTodoEntry;
-}> = ({ entry }) => {
+  isDragging: boolean;
+  onDragStart: (entry: WeekTodoEntry, event: React.DragEvent<HTMLDivElement>) => void;
+  onDragEnd: () => void;
+  onTouchDragStart: (entry: WeekTodoEntry, event: React.TouchEvent<HTMLDivElement>) => void;
+  onBadgeClick: (entry: WeekTodoEntry, badgeKey: 'scheduled' | 'deadline') => void;
+}> = ({ entry, isDragging, onDragStart, onDragEnd, onTouchDragStart, onBadgeClick }) => {
   const { todo, badges } = entry;
   const isHistoricalOnly = !badges.scheduled && !badges.deadline && !badges.recurring && (badges.completed || badges.inProgress);
   const iconClassName = isHistoricalOnly ? 'text-stone-300' : 'text-stone-400';
   const titleClassName = isHistoricalOnly ? 'text-stone-400' : 'text-stone-700';
   const noteClassName = isHistoricalOnly ? 'text-stone-300' : 'text-stone-400';
+  const todayDateKey = getTodayDateKey();
+  const completedDateKey = todo.completedAt ? formatDateKey(new Date(todo.completedAt)) : null;
+  const isScheduledOverdue = Boolean(
+    badges.scheduled &&
+    todo.scheduledDate &&
+    todo.scheduledDate < todayDateKey &&
+    !completedDateKey
+  );
+  const isDeadlineOverdue = Boolean(
+    badges.deadline &&
+    todo.deadlineDate &&
+    todo.deadlineDate < todayDateKey &&
+    !completedDateKey
+  );
 
   const leadingIcon = badges.completed
     ? <CheckCircle2 size={12} className={iconClassName} />
@@ -310,47 +514,84 @@ const WeekTodoLineItem: React.FC<{
         ? <Flag size={12} className={iconClassName} />
         : badges.recurring
           ? <Repeat2 size={12} className={iconClassName} />
-          : <CalendarDays size={12} className={iconClassName} />;
+          : <ChevronRight size={12} className={iconClassName} />;
 
   const orderedBadges = [
-    badges.deadline ? { key: 'deadline', label: 'Due', color: '#8f6f6b' } : null,
-    badges.scheduled ? { key: 'scheduled', label: 'Arrange', color: '#7c8b97' } : null,
+    badges.deadline ? { key: 'deadline', label: 'Due', color: '#8f6f6b', overdue: isDeadlineOverdue } : null,
+    badges.scheduled ? { key: 'scheduled', label: 'Arrange', color: '#7c8b97', overdue: isScheduledOverdue } : null,
     badges.recurring ? { key: 'recurring', label: 'Repeat', color: '#8b8f79' } : null,
     badges.completed ? { key: 'completed', label: 'Done', color: '#7f8c84' } : null,
     badges.inProgress ? { key: 'inProgress', label: 'Trace', color: '#8b8096' } : null
-  ].filter(Boolean) as Array<{ key: string; label: string; color: string }>;
+  ].filter(Boolean) as WeekBadgeDescriptor[];
+  const dragBadgeKey: 'scheduled' | 'deadline' | null = badges.deadline ? 'deadline' : badges.scheduled ? 'scheduled' : null;
 
   return (
-    <div className="flex w-full items-center gap-2 py-1 text-left">
-      <span className="shrink-0 self-center">
+    <div
+      className={`flex w-full items-center gap-2 py-1 text-left ${isDragging ? 'opacity-40' : ''}`}
+    >
+      <span className="shrink-0 self-center flex h-4 w-4 items-center justify-center">
         {leadingIcon}
       </span>
-      <div className="min-w-0 flex-1">
+      <div
+        draggable={dragBadgeKey !== null}
+        onDragStart={(event) => dragBadgeKey && onDragStart(entry, event)}
+        onDragEnd={onDragEnd}
+        onTouchStart={(event) => dragBadgeKey && onTouchDragStart(entry, event)}
+        className={`min-w-0 flex-1 ${dragBadgeKey ? 'cursor-grab active:cursor-grabbing' : ''}`}
+      >
         <div className={`truncate text-[14px] font-medium leading-5 ${titleClassName}`}>
           {todo.title}
         </div>
       </div>
-      <div className="shrink-0 flex items-center gap-1.5 text-[9px] tracking-[0.16em] uppercase">
+      <div className="shrink-0 flex w-[5.75rem] items-center justify-end text-[9px] tracking-[0.16em] uppercase">
         {orderedBadges.map((badge) => (
-          <span key={badge.key} style={{ color: badge.color }}>
-            {badge.label}
-          </span>
+          badge.key === 'scheduled' || badge.key === 'deadline' ? (
+            <span
+              key={badge.key}
+              onClick={() => onBadgeClick(entry, badge.key)}
+              className="inline-flex w-full cursor-pointer items-center justify-end gap-1 rounded-full py-0.5 text-right transition-colors hover:bg-stone-100/70"
+              style={{ color: badge.color }}
+            >
+              {badge.overdue && <CircleAlert size={10} className="text-red-500" />}
+              <span>{badge.label}</span>
+            </span>
+          ) : (
+            <span key={badge.key} className="inline-flex w-full items-center justify-end gap-1 text-right" style={{ color: badge.color }}>
+              {badge.overdue && <CircleAlert size={10} className="text-red-500" />}
+              <span>{badge.label}</span>
+            </span>
+          )
         ))}
       </div>
     </div>
   );
 };
 
-export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, activityCategories, scopes, onToggleTodo, onEditTodo, onAddTodo, onStartFocus, onDuplicateTodo, onBatchAddTodos, autoLinkRules = [] }) => {
+export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, activityCategories, scopes, onToggleTodo, onEditTodo, onAddTodo, onStartFocus, onDuplicateTodo, onSaveTodo, onBatchAddTodos, autoLinkRules = [] }) => {
   const [selectedCategoryId, setSelectedCategoryId] = useState<string>('');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const { backgroundUrl, hasBackground, panelOverlayOpacity, useReducedEffects } = useBackgroundDisplay();
+  const { addToast } = useToast();
   const [screenMode, setScreenMode] = useState<'list' | 'week'>(() => {
     const saved = localStorage.getItem('todoScreenMode');
     return saved === 'week' ? 'week' : 'list';
   });
   const [weekReferenceDate, setWeekReferenceDate] = useState<Date>(new Date());
   const [hasCustomIconTheme, setHasCustomIconTheme] = useState(() => uiIconService.isCustomTheme());
+  const [draggingWeekTodoId, setDraggingWeekTodoId] = useState<string | null>(null);
+  const [draggingWeekEntry, setDraggingWeekEntry] = useState<WeekTodoEntry | null>(null);
+  const [dragTargetDate, setDragTargetDate] = useState<string | null>(null);
+  const [touchDragPreview, setTouchDragPreview] = useState<{ x: number; y: number; title: string } | null>(null);
+  const [isTouchWeekDragging, setIsTouchWeekDragging] = useState(false);
+  const [assignModalDate, setAssignModalDate] = useState<string | null>(null);
+  const [assignModalType, setAssignModalType] = useState<'scheduled' | 'deadline'>('scheduled');
+  const [quickActionEntry, setQuickActionEntry] = useState<WeekTodoEntry | null>(null);
+  const [quickActionType, setQuickActionType] = useState<'scheduled' | 'deadline' | null>(null);
+  const [isWeekJumpPickerOpen, setIsWeekJumpPickerOpen] = useState(false);
+  const [duplicatingTodo, setDuplicatingTodo] = useState<TodoItem | null>(null);
+  const touchDragActivatedRef = useRef(false);
+  const touchDraggingWeekEntryRef = useRef<WeekTodoEntry | null>(null);
+  const touchDragTargetDateRef = useRef<string | null>(null);
 
   // AI States
   const [isAIInputOpen, setIsAIInputOpen] = useState(false);
@@ -425,7 +666,7 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
     setIsAIConfirmOpen(false);
   };
 
-  // 娴?localStorage 鐠囪褰囬悽銊﹀煕娑撳﹥顐奸柅澶嬪閻ㄥ嫯顫嬮崶鐐佸?
+  // 濞?localStorage 閻犲洩顕цぐ鍥偨閵婏箑鐓曞☉鎾筹攻椤愬ジ鏌呮径瀣仴闁汇劌瀚～瀣炊閻愵儫浣割嚕?
   const [viewMode, setViewMode] = useState<'loose' | 'compact'>(() => {
     const saved = localStorage.getItem('todoViewMode');
     return (saved === 'compact' || saved === 'loose') ? saved : 'loose';
@@ -435,7 +676,7 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
     return saved !== 'false';
   });
 
-  // 瑜?viewMode 閺€鐟板綁閺冭绱濇穱婵嗙摠閸?localStorage
+  // 鐟?viewMode 闁衡偓閻熸澘缍侀柡鍐啇缁辨繃绌卞┑鍡欐憼闁?localStorage
   React.useEffect(() => {
     localStorage.setItem('todoViewMode', viewMode);
   }, [viewMode]);
@@ -467,7 +708,7 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
     };
   }, []);
 
-  // 閸掓繂顫愰崠鏍偓澶夎厬閻ㄥ嫬鍨庣猾浼欑窗婵″倹鐏夊▽鈩冩箒闁鑵戞禒璁崇秿閸掑棛琚敍宀勭帛鐠併倝鈧鑵戠粭顑跨娑?
+  // 闁告帗绻傞～鎰板礌閺嶎厸鍋撴径澶庡幀闁汇劌瀚崹搴ｇ尵娴兼瑧绐楀┑鈥冲€归悘澶娾柦閳╁啯绠掗梺顐㈩槷閼垫垶绂掔拋宕囩Э闁告帒妫涚悮顐︽晬瀹€鍕笡閻犱降鍊濋埀顒€顦懙鎴犵箔椤戣法顏卞☉?
   React.useEffect(() => {
     if (!selectedCategoryId && categories.length > 0) {
       setSelectedCategoryId(categories[0].id);
@@ -476,7 +717,7 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
 
   const selectedCategory = categories.find(c => c.id === selectedCategoryId) || categories[0];
 
-  // 婵″倹鐏夊▽鈩冩箒閸掑棛琚敍灞炬▔缁€铏光敄閻樿埖鈧浇鈧奔绗夐弰顖氱┛濠?
+  // 濠碘€冲€归悘澶娾柦閳╁啯绠掗柛鎺戞鐞氼偊鏁嶇仦鐐枖缂佲偓閾忓厜鏁勯柣妯垮煐閳ь兛娴囬埀顒€濂旂粭澶愬及椤栨氨鈹涙繝?
   if (!selectedCategory) {
     return (
       <div className="flex h-full items-center justify-center bg-[#faf9f6] flex-col gap-4">
@@ -518,6 +759,313 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
       ? `${startMonth}.${start.getDate()} - ${end.getDate()}`
       : `${startMonth}.${start.getDate()} - ${endMonth}.${end.getDate()}`;
   }, [weekDates]);
+  const weekJumpDateValue = formatDateKey(weekReferenceDate);
+
+  const handleOpenDuplicateModal = (todo: TodoItem) => {
+    setDuplicatingTodo(todo);
+  };
+
+  const handleCloseDuplicateModal = () => {
+    setDuplicatingTodo(null);
+  };
+
+  const handleConfirmDuplicate = (options: TodoDuplicateOptions) => {
+    if (!duplicatingTodo) return;
+    onDuplicateTodo(duplicatingTodo, options);
+    setDuplicatingTodo(null);
+  };
+
+  const createDragEntryForWeekItem = (entry: WeekTodoEntry): WeekTodoEntry | null => {
+    if (entry.badges.deadline) {
+      return {
+        ...entry,
+        badges: {
+          scheduled: false,
+          deadline: true,
+          recurring: false,
+          completed: false,
+          inProgress: false
+        }
+      };
+    }
+
+    if (entry.badges.scheduled) {
+      return {
+        ...entry,
+        badges: {
+          scheduled: true,
+          deadline: false,
+          recurring: false,
+          completed: false,
+          inProgress: false
+        }
+      };
+    }
+
+    return null;
+  };
+
+  const handleWeekItemDragStart = (entry: WeekTodoEntry, event: React.DragEvent<HTMLDivElement>) => {
+    const dragEntry = createDragEntryForWeekItem(entry);
+    if (!dragEntry) return;
+    event.dataTransfer.effectAllowed = 'move';
+    event.dataTransfer.setData('text/plain', entry.todo.id);
+    setDraggingWeekTodoId(entry.todo.id);
+    setDraggingWeekEntry(dragEntry);
+  };
+
+  const handleWeekItemDragEnd = () => {
+    setDraggingWeekTodoId(null);
+    setDraggingWeekEntry(null);
+    setDragTargetDate(null);
+    setTouchDragPreview(null);
+    setIsTouchWeekDragging(false);
+    touchDragActivatedRef.current = false;
+    touchDraggingWeekEntryRef.current = null;
+    touchDragTargetDateRef.current = null;
+  };
+
+  const commitWeekDrop = (entryDate: string, entry: WeekTodoEntry | null) => {
+    if (!entry) return;
+    const targetTodo = weekTodos.find((todo) => todo.id === entry.todo.id);
+
+    if (!targetTodo) {
+      handleWeekItemDragEnd();
+      return;
+    }
+
+    const shouldMoveDeadline = entry.badges.deadline;
+    const shouldMoveScheduled = entry.badges.scheduled;
+    const nextTodo: TodoItem = {
+      ...targetTodo,
+      deadlineDate: shouldMoveDeadline ? entryDate : targetTodo.deadlineDate,
+      scheduledDate: shouldMoveScheduled ? entryDate : targetTodo.scheduledDate
+    };
+
+    onSaveTodo(nextTodo);
+    handleWeekItemDragEnd();
+  };
+
+  const handleWeekDrop = (entryDate: string) => {
+    if (!draggingWeekEntry) return;
+    commitWeekDrop(entryDate, draggingWeekEntry);
+  };
+
+  const resolveDropDateFromPoint = (clientX: number, clientY: number): string | null => {
+    const targetElement = document.elementFromPoint(clientX, clientY) as HTMLElement | null;
+    const dropContainer = targetElement?.closest('[data-week-drop-date]') as HTMLElement | null;
+    return dropContainer?.dataset.weekDropDate || null;
+  };
+
+  const handleTouchWeekItemDragStart = (entry: WeekTodoEntry, event: React.TouchEvent<HTMLDivElement>) => {
+    const dragEntry = createDragEntryForWeekItem(entry);
+    if (!dragEntry) return;
+    const touch = event.touches[0];
+    if (!touch) return;
+
+    setDraggingWeekTodoId(entry.todo.id);
+    setDraggingWeekEntry(dragEntry);
+    setTouchDragPreview({
+      x: touch.clientX,
+      y: touch.clientY,
+      title: entry.todo.title
+    });
+    setIsTouchWeekDragging(true);
+    touchDragActivatedRef.current = true;
+    touchDraggingWeekEntryRef.current = dragEntry;
+    touchDragTargetDateRef.current = null;
+  };
+
+  React.useEffect(() => {
+    if (!isTouchWeekDragging) return;
+
+    const handleWindowTouchMove = (event: TouchEvent) => {
+      if (!touchDragActivatedRef.current) return;
+
+      const touch = event.touches[0];
+      const activeEntry = touchDraggingWeekEntryRef.current;
+      if (!touch || !activeEntry) return;
+
+      event.preventDefault();
+
+      const nextDate = resolveDropDateFromPoint(touch.clientX, touch.clientY);
+      touchDragTargetDateRef.current = nextDate;
+      setDragTargetDate(nextDate);
+      setTouchDragPreview({
+        x: touch.clientX,
+        y: touch.clientY,
+        title: activeEntry.todo.title
+      });
+    };
+
+    const handleWindowTouchEnd = () => {
+      if (!touchDragActivatedRef.current) return;
+
+      const activeEntry = touchDraggingWeekEntryRef.current;
+      const targetDate = touchDragTargetDateRef.current;
+      if (targetDate && activeEntry) {
+        commitWeekDrop(targetDate, activeEntry);
+        return;
+      }
+
+      handleWeekItemDragEnd();
+    };
+
+    window.addEventListener('touchmove', handleWindowTouchMove, { passive: false });
+    window.addEventListener('touchend', handleWindowTouchEnd);
+    window.addEventListener('touchcancel', handleWindowTouchEnd);
+
+    return () => {
+      window.removeEventListener('touchmove', handleWindowTouchMove);
+      window.removeEventListener('touchend', handleWindowTouchEnd);
+      window.removeEventListener('touchcancel', handleWindowTouchEnd);
+    };
+  }, [isTouchWeekDragging, weekTodos, onSaveTodo]);
+
+  const handleWeekBadgeClick = (entry: WeekTodoEntry, badgeKey: 'scheduled' | 'deadline') => {
+    if (touchDragActivatedRef.current) return;
+    setQuickActionEntry(entry);
+    setQuickActionType(badgeKey);
+  };
+
+  const handleQuickActionMove = (type: 'scheduled' | 'deadline', mode: 'today' | 'nextWeek') => {
+    if (!quickActionEntry) return;
+
+    const baseDateKey = type === 'scheduled'
+      ? quickActionEntry.todo.scheduledDate
+      : quickActionEntry.todo.deadlineDate;
+    const baseDate = parseDateKey(baseDateKey) || new Date();
+    const targetDate = new Date(baseDate);
+    if (mode === 'today') {
+      const today = new Date();
+      targetDate.setFullYear(today.getFullYear(), today.getMonth(), today.getDate());
+    } else {
+      targetDate.setDate(targetDate.getDate() + 7);
+    }
+
+    const dateKey = formatDateKey(targetDate);
+    const nextTodo: TodoItem = {
+      ...quickActionEntry.todo,
+      scheduledDate: type === 'scheduled' ? dateKey : quickActionEntry.todo.scheduledDate,
+      deadlineDate: type === 'deadline' ? dateKey : quickActionEntry.todo.deadlineDate
+    };
+
+    onSaveTodo(nextTodo);
+    setQuickActionEntry(null);
+    setQuickActionType(null);
+  };
+
+  const handleQuickActionOpenDetail = () => {
+    if (!quickActionEntry) return;
+    onEditTodo(quickActionEntry.todo);
+    setQuickActionEntry(null);
+    setQuickActionType(null);
+  };
+
+  const handleQuickActionComplete = () => {
+    if (!quickActionEntry) return;
+    onSaveTodo({
+      ...quickActionEntry.todo,
+      isCompleted: true,
+      completedAt: new Date().toISOString()
+    });
+    setQuickActionEntry(null);
+    setQuickActionType(null);
+  };
+
+  const handleQuickActionClearDate = (type: 'scheduled' | 'deadline') => {
+    if (!quickActionEntry) return;
+
+    onSaveTodo({
+      ...quickActionEntry.todo,
+      scheduledDate: type === 'scheduled' ? undefined : quickActionEntry.todo.scheduledDate,
+      deadlineDate: type === 'deadline' ? undefined : quickActionEntry.todo.deadlineDate
+    });
+    setQuickActionEntry(null);
+    setQuickActionType(null);
+  };
+
+  const quickActionDateLabel = useMemo(() => {
+    if (!quickActionEntry || !quickActionType) return '';
+    const dateKey = quickActionType === 'scheduled'
+      ? quickActionEntry.todo.scheduledDate
+      : quickActionEntry.todo.deadlineDate;
+    const date = parseDateKey(dateKey);
+    if (!date) return '';
+    return `${date.getMonth() + 1}/${date.getDate()}`;
+  }, [quickActionEntry, quickActionType]);
+
+  const assignModalDateLabel = useMemo(() => {
+    if (!assignModalDate) return '';
+    const date = parseDateKey(assignModalDate);
+    if (!date) return assignModalDate;
+    return `${date.getMonth() + 1}月${date.getDate()}日 ${WEEKDAY_ROW_LABELS[date.getDay() === 0 ? 6 : date.getDay() - 1]}`;
+  }, [assignModalDate]);
+
+  const assignableTodos = useMemo(() => {
+    if (!assignModalDate) return [];
+
+    return todos.filter((todo) => {
+      if (todo.isCompleted) return false;
+      if (todo.recurrenceRule) return false;
+      return true;
+    });
+  }, [assignModalDate, assignModalType, todos]);
+
+  const handleAssignTodoToDate = (todo: TodoItem) => {
+    if (!assignModalDate) return;
+    const parsedDate = parseDateKey(assignModalDate);
+    const readableDate = parsedDate
+      ? `${parsedDate.getMonth() + 1}月${parsedDate.getDate()}日`
+      : assignModalDate;
+
+    const nextTodo: TodoItem = {
+      ...todo,
+      scheduledDate: assignModalType === 'scheduled' ? assignModalDate : todo.scheduledDate,
+      deadlineDate: assignModalType === 'deadline' ? assignModalDate : todo.deadlineDate
+    };
+
+    if (assignModalType === 'scheduled' && nextTodo.recurrenceRule) {
+      nextTodo.recurrenceRule = undefined;
+    }
+
+    onSaveTodo(nextTodo);
+    addToast('success', `《${todo.title}》已添加到 ${readableDate}`);
+  };
+
+  const handleCreateTodoForDate = (draft: Partial<TodoItem>) => {
+    if (!assignModalDate || !draft.title || !draft.categoryId) return;
+    const parsedDate = parseDateKey(assignModalDate);
+    const readableDate = parsedDate
+      ? `${parsedDate.getMonth() + 1}月${parsedDate.getDate()}日`
+      : assignModalDate;
+
+    const newTodo: TodoItem = {
+      id: crypto.randomUUID(),
+      categoryId: draft.categoryId,
+      title: draft.title,
+      isCompleted: false,
+      linkedCategoryId: draft.linkedCategoryId,
+      linkedActivityId: draft.linkedActivityId,
+      defaultScopeIds: draft.defaultScopeIds,
+      note: draft.note,
+      completedUnits: 0,
+      scheduledDate: assignModalType === 'scheduled' ? assignModalDate : undefined,
+      deadlineDate: assignModalType === 'deadline' ? assignModalDate : undefined
+    };
+
+    onSaveTodo(newTodo);
+    addToast('success', `《${newTodo.title}》已添加到 ${readableDate}`);
+  };
+
+  const duplicateModalNode = (
+    <TodoDuplicateModal
+      isOpen={duplicatingTodo !== null}
+      todo={duplicatingTodo}
+      onClose={handleCloseDuplicateModal}
+      onConfirm={handleConfirmDuplicate}
+    />
+  );
 
   if (screenMode === 'week') {
     return (
@@ -558,7 +1106,13 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
                 >
                   <ChevronLeft size={15} />
                 </button>
-                <div className="text-[13px] tracking-[0.16em] text-slate-500">{currentWeekLabel}</div>
+                <button
+                  type="button"
+                  onClick={() => setIsWeekJumpPickerOpen(true)}
+                  className="rounded-full px-2 py-1 text-[13px] tracking-[0.16em] text-slate-500 transition-colors hover:bg-white/60 hover:text-slate-700"
+                >
+                  {currentWeekLabel}
+                </button>
                 <button
                   type="button"
                   onClick={() => setWeekReferenceDate((prev) => {
@@ -587,7 +1141,7 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
           </div>
 
           <div className="min-h-0 flex-1 overflow-y-auto no-scrollbar">
-            <div className="border-t border-stone-300/70">
+            <div className="border-t border-stone-300/70 pb-[calc(6.5rem+env(safe-area-inset-bottom))]">
               {weekBuckets.map((bucket, index) => {
                 const bucketDate = parseDateKey(bucket.date);
                 const isToday = bucket.date === getTodayDateKey();
@@ -595,9 +1149,33 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
                 return (
                   <section
                     key={bucket.date}
+                    data-week-drop-date={bucket.date}
                     className="grid min-h-[5.5rem] grid-cols-[4.25rem_minmax(0,1fr)] border-b border-stone-300/70 md:grid-cols-[4.75rem_minmax(0,1fr)]"
+                    onDragOver={(event) => {
+                      if (!draggingWeekTodoId) return;
+                      event.preventDefault();
+                      if (dragTargetDate !== bucket.date) {
+                        setDragTargetDate(bucket.date);
+                      }
+                    }}
+                    onDragLeave={() => {
+                      if (dragTargetDate === bucket.date) {
+                        setDragTargetDate(null);
+                      }
+                    }}
+                    onDrop={(event) => {
+                      event.preventDefault();
+                      handleWeekDrop(bucket.date);
+                    }}
                   >
-                    <div className="flex flex-col justify-center border-r border-stone-300/70 px-2 py-3 text-center md:px-3">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setAssignModalDate(bucket.date);
+                        setAssignModalType('scheduled');
+                      }}
+                      className="flex flex-col justify-center border-r border-stone-300/70 px-2 py-3 text-center transition-colors hover:bg-white/40 md:px-3"
+                    >
                       <div className={`text-[12px] tracking-[0.02em] ${isToday ? 'text-slate-600' : 'text-slate-400'}`}>
                         {WEEKDAY_ROW_LABELS[index]}
                       </div>
@@ -607,9 +1185,9 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
                       <div className="mt-1 text-[10px] tracking-[0.02em] text-slate-400">
                         {bucketDate ? `${bucketDate.getMonth() + 1}月` : ''}
                       </div>
-                    </div>
+                    </button>
 
-                    <div className="flex min-w-0 items-stretch px-4 py-3 md:px-5">
+                    <div className={`flex min-w-0 items-stretch px-4 py-3 md:px-5 ${dragTargetDate === bucket.date ? 'bg-stone-100/30' : ''}`}>
                       <div className="flex min-h-full w-full items-center">
                         {bucket.items.length > 0 ? (
                           <div className="w-full space-y-0.5">
@@ -617,12 +1195,17 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
                               <WeekTodoLineItem
                                 key={`${bucket.date}-${entry.todo.id}`}
                                 entry={entry}
+                                isDragging={draggingWeekTodoId === entry.todo.id}
+                                onDragStart={handleWeekItemDragStart}
+                                onDragEnd={handleWeekItemDragEnd}
+                                onTouchDragStart={handleTouchWeekItemDragStart}
+                                onBadgeClick={handleWeekBadgeClick}
                               />
                             ))}
                           </div>
                         ) : (
-                          <div className="w-full py-2 text-[14px] italic text-slate-300">
-                            Silence is part of the schedule.
+                          <div className="w-full py-2 text-[18px] italic tracking-[0.2em] text-slate-300">
+                            ...
                           </div>
                         )}
                       </div>
@@ -641,7 +1224,7 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
           disableThemeStyle={!hasCustomIconTheme}
           className="text-white shadow-[0_14px_34px_rgba(15,23,42,0.16)]"
         >
-          <UIIcon type="tags" fallbackIcon={ListTodo} size={24} className="text-white" style={{ color: '#ffffff' }} />
+          <UIIcon type="email" fallbackIcon={ListTodo} size={24} className="text-white" style={{ color: '#ffffff' }} />
         </FloatingButton>
 
         {isAIInputOpen && (
@@ -663,6 +1246,59 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
             autoLinkRules={autoLinkRules}
           />
         )}
+
+        <TodoScheduleAssignModal
+          isOpen={assignModalDate !== null}
+          dateLabel={assignModalDateLabel}
+          assignType={assignModalType}
+          onAssignTypeChange={setAssignModalType}
+          todos={assignableTodos}
+          todoCategories={categories}
+          activityCategories={activityCategories}
+          onAssign={handleAssignTodoToDate}
+          onCreate={handleCreateTodoForDate}
+          onClose={() => setAssignModalDate(null)}
+        />
+
+        <TodoDatePickerModal
+          isOpen={isWeekJumpPickerOpen}
+          title="跳到某一天"
+          value={weekJumpDateValue}
+          initialMonthValue={weekJumpDateValue}
+          onSelect={(value) => {
+            const nextDate = parseDateKey(value);
+            if (nextDate) {
+              setWeekReferenceDate(nextDate);
+            }
+          }}
+          onClose={() => setIsWeekJumpPickerOpen(false)}
+        />
+
+        <TodoScheduleQuickActionsModal
+          isOpen={quickActionEntry !== null && quickActionType !== null}
+          todo={quickActionEntry?.todo || null}
+          badgeType={quickActionType}
+          currentDateLabel={quickActionDateLabel}
+          onMoveDate={handleQuickActionMove}
+          onClearDate={handleQuickActionClearDate}
+          onOpenDetail={handleQuickActionOpenDetail}
+          onComplete={handleQuickActionComplete}
+          onClose={() => {
+            setQuickActionEntry(null);
+            setQuickActionType(null);
+          }}
+        />
+
+        {duplicateModalNode}
+
+        {touchDragPreview && (
+          <div
+            className="pointer-events-none fixed z-[140] -translate-x-1/2 -translate-y-1/2 rounded-xl border border-stone-200 bg-white/92 px-3 py-2 text-sm text-stone-700 shadow-[0_18px_40px_rgba(15,23,42,0.12)]"
+            style={{ left: touchDragPreview.x, top: touchDragPreview.y }}
+          >
+            <div className="max-w-[12rem] truncate">{touchDragPreview.title}</div>
+          </div>
+        )}
       </div>
     );
   }
@@ -674,7 +1310,7 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
         backgroundColor: hasBackground ? 'transparent' : '#faf9f6'
       }}
     >
-      {/* 閼冲本娅欓崶鍓у鐏?*/}
+      {/* 闁煎啿鏈▍娆撳炊閸撗冾暬閻?*/}
       {hasBackground && (
         <div 
           className="absolute inset-0 -z-20"
@@ -688,7 +1324,7 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
         />
       )}
       
-      {/* 閸忋劌鐪崡濠団偓蹇旀闁喚鍍电仦?- 鐟曞棛娲婇弫缈犻嚋娑撳宕愰柈銊ュ瀻 */}
+      {/* 闁稿繈鍔岄惇顒勫础婵犲洠鍋撹箛鏃€顫栭梺顒夊枤閸嶇數浠?- 閻熸洖妫涘ú濠囧极缂堢娀鍤嬪☉鎾愁儏瀹曟劙鏌堥妸銉ョ€?*/}
       <div className="absolute inset-0 -z-10" style={{ backgroundColor: 'rgba(250, 249, 246, 0.5)' }}></div>
       
       {/* Left Sidebar - Todo Categories */}
@@ -762,7 +1398,7 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
         className="flex-1 overflow-hidden flex flex-col p-5 md:p-10 rounded-tl-[2rem] shadow-[-5px_0_20px_rgba(0,0,0,0.08)] z-10 ml-[-10px] relative"
         id="todo-content"
       >
-        {/* 閸楀﹪鈧繑妲戦惂鍊熷闁喚鍍电仦?- 闁繑妲戞惔锔界壌閹诡喚鏁ら幋鐤啎缂冾喖濮╅幀浣界殶閺?*/}
+        {/* 闁告锕埀顒€绻戝Σ鎴︽儌閸婄喎顥忛梺顒夊枤閸嶇數浠?- 闂侇偄绻戝Σ鎴炴償閿旂晫澹岄柟璇″枤閺併倝骞嬮悿顖ｅ晭缂傚喚鍠栨慨鈺呭箑娴ｇ晫娈堕柡?*/}
         <div 
           className={`absolute inset-0 -z-10 rounded-tl-[2rem] ${useReducedEffects ? '' : 'backdrop-blur-sm'}`}
           style={{
@@ -806,7 +1442,7 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
               onToggle={onToggleTodo}
               onEdit={onEditTodo}
               onStartFocus={onStartFocus}
-              onDuplicate={onDuplicateTodo}
+              onDuplicate={handleOpenDuplicateModal}
               viewMode={viewMode}
               isFirst={index === 0}
               isLast={index === filteredTodos.length - 1}
@@ -827,11 +1463,12 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
         title={screenMode === 'list' ? '切换到周视图' : '切换回列表'}
         ariaLabel={screenMode === 'list' ? '切换到周视图' : '切换回列表'}
         disableThemeStyle={!hasCustomIconTheme}
+        className="text-white"
       >
         {screenMode === 'list' ? (
-          <UIIcon type="calendar" fallbackIcon={CalendarDays} size={24} className={hasCustomIconTheme ? 'text-white' : 'text-stone-600'} />
+          <UIIcon type="manage" fallbackIcon={CalendarDays} size={24} className="text-white" style={{ color: '#ffffff' }} />
         ) : (
-          <UIIcon type="tags" fallbackIcon={ListTodo} size={24} className={hasCustomIconTheme ? 'text-white' : 'text-stone-600'} />
+          <UIIcon type="email" fallbackIcon={ListTodo} size={24} className="text-white" style={{ color: '#ffffff' }} />
         )}
       </FloatingButton>
 
@@ -854,6 +1491,10 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
           autoLinkRules={autoLinkRules}
         />
       )}
+
+      {duplicateModalNode}
     </div>
   );
 };
+
+

@@ -4,11 +4,12 @@
  * @output Todo CRUD Operations (handleSaveTodo, handleDeleteTodo, handleToggleTodo, handleDuplicateTodo, handleBatchAddTodos), Modal Control (openAddTodoModal, openEditTodoModal, closeTodoModal), Focus Management (handleStartTodoFocus), Progress Update (updateTodoProgress)
  * @pos Hook (Data Manager)
  * @description 待办事项数据管理 Hook - 处理待办的增删改查、完成状态切换、专注模式启动、批量操作等。时间戳由 DataContext 自动管理。
+ * @updated 2026-04-20: Added configurable duplicate-copy cleanup for dates, tags, and scopes.
  * 
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
 import { useState } from 'react';
-import { TodoItem, TodoCategory } from '../types';
+import { TodoItem, TodoCategory, TodoDuplicateOptions } from '../types';
 import { useData } from '../contexts/DataContext';
 import { useNavigation } from '../contexts/NavigationContext';
 import { useCategoryScope } from '../contexts/CategoryScopeContext';
@@ -127,17 +128,29 @@ export const useTodoManager = () => {
         // Timestamp automatically updated by DataContext
     };
 
-    const handleDuplicateTodo = (todo: TodoItem) => {
+    const handleDuplicateTodo = (todo: TodoItem, options?: TodoDuplicateOptions) => {
+        const title = options?.title?.trim() || `${todo.title} 副本`;
+        const clearDates = options?.clearDates ?? true;
+        const clearTags = options?.clearTags ?? false;
+        const clearScopes = options?.clearScopes ?? false;
         const newTodo: TodoItem = {
             ...todo,
             id: crypto.randomUUID(),
             title: `${todo.title} 副本`,
             isCompleted: false,
+            completedAt: undefined,
             completedUnits: 0,
+            scheduledDate: clearDates ? undefined : todo.scheduledDate,
+            deadlineDate: clearDates ? undefined : todo.deadlineDate,
+            recurrenceRule: clearDates ? undefined : todo.recurrenceRule,
+            linkedActivityId: clearTags ? undefined : todo.linkedActivityId,
+            linkedCategoryId: clearTags ? undefined : todo.linkedCategoryId,
+            defaultScopeIds: clearScopes ? undefined : todo.defaultScopeIds,
         };
+        newTodo.title = title;
         setTodos(prev => [newTodo, ...prev]);
         // Timestamp automatically updated by DataContext
-        addToast('success', 'Task duplicated');
+        addToast('success', '已创建待办副本');
     };
 
     const handleBatchAddTodos = (newTodosData: Partial<TodoItem>[]) => {

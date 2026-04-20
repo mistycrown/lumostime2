@@ -4,6 +4,7 @@
  * @output TypeScript Interfaces & Types
  * @pos Type Definitions (Shared contract)
  * @description Defines the core data structures (Log, TodoItem, Category, Activity, Filter order metadata, etc.) used throughout the application.
+ * @updated 2026-04-20: Added configurable todo duplication options for quick-copy editing.
  * @updated 2026-04-20: Added todo schedule and recurrence rule types for week-view planning.
  * @updated 2026-04-19: Added reusable note template definitions for detail-page editing and inline note recommendations.
  * @updated 2026-04-18: Added custom sticker set and sticker record types for synced mood sticker uploads.
@@ -206,6 +207,13 @@ export interface TodoRecurrenceRule {
   interval?: number;
   weekdays?: number[]; // weekly: 0-6
   monthDays?: number[]; // monthly: 1-31
+}
+
+export interface TodoDuplicateOptions {
+  title: string;
+  clearDates?: boolean;
+  clearTags?: boolean;
+  clearScopes?: boolean;
 }
 
 export interface TodoItem {

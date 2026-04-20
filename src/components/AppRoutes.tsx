@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { AppView, Category, DailyReview, WeeklyReview, MonthlyReview, Log, TodoItem, TodoCategory } from '../types';
+import { AppView, Category, DailyReview, WeeklyReview, MonthlyReview, Log, TodoItem, TodoCategory, TodoDuplicateOptions } from '../types';
 import { useNavigation } from '../contexts/NavigationContext';
 import { useData } from '../contexts/DataContext';
 import { useCategoryScope } from '../contexts/CategoryScopeContext';
@@ -70,7 +70,8 @@ interface AppRoutesProps {
     handleToggleTodo: (id: string) => void;
     handleStartTodoFocus: (todo: TodoItem, autoEnterFocus?: boolean) => void;
     handleBatchAddTodos: (todos: Partial<TodoItem>[]) => void;
-    handleDuplicateTodo: (todo: TodoItem) => void;
+    handleDuplicateTodo: (todo: TodoItem, options: TodoDuplicateOptions) => void;
+    handleSaveTodo: (todo: TodoItem) => void;
     handleUpdateTodoData: (cats: TodoCategory[], todos: TodoItem[]) => void;
 
     // 大目标处理函数
@@ -82,7 +83,7 @@ interface AppRoutesProps {
 export const AppRoutes: React.FC<AppRoutesProps> = ({
     handleStartActivity,
     openAddModal, openEditModal, handleBatchAddLogs, handleQuickPunch,
-    openEditTodoModal, openAddTodoModal, handleToggleTodo, handleStartTodoFocus, handleBatchAddTodos, handleDuplicateTodo, handleUpdateTodoData,
+    openEditTodoModal, openAddTodoModal, handleToggleTodo, handleStartTodoFocus, handleBatchAddTodos, handleDuplicateTodo, handleSaveTodo, handleUpdateTodoData,
     refreshKey, isSyncing, handleQuickSync,
     setStatsTitle,
     onOpenMajorGoalEditor
@@ -483,6 +484,7 @@ export const AppRoutes: React.FC<AppRoutesProps> = ({
                     onStartFocus={handleStartTodoFocus}
                     onBatchAddTodos={handleBatchAddTodos}
                     onDuplicateTodo={handleDuplicateTodo}
+                    onSaveTodo={handleSaveTodo}
                     autoLinkRules={autoLinkRules}
                 />
             );
