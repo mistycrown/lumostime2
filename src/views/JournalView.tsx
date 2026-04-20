@@ -6,15 +6,16 @@
  * @description A journal-style view for daily entries, providing an alternative perspective to the ReviewHubView and reusing shared timeline styling behavior for archive rendering.
  * 
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
- * @updated 2026-04-20: Switched the journal screen to the shared lightweight custom-background pipeline.
+ * @updated 2026-04-20: Replaced the top-left Memoir month dropdown with the shared centered month picker modal used by todo scheduling.
  */
 import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import { DailyReview, Log, WeeklyReview, MonthlyReview } from '../types';
 import { DiaryEntry, MOCK_ENTRIES, MONTHS, Comment } from './journalTypes';
 import { TimelineStyleAdjuster } from '../components/TimelineStyleAdjuster';
 import TimelineItem from '../components/TimelineItem';
-import { Search, Menu, PenLine, ChevronDown, ChevronLeft, ChevronRight, Image as ImageIcon, AlignLeft, X, FilterX, AudioWaveform } from 'lucide-react';
+import { PenLine } from 'lucide-react';
 import { MoodCalendar } from '../components/MoodCalendar';
+import { TodoDatePickerModal } from '../components/TodoDatePickerModal';
 
 import { useSettings } from '../contexts/SettingsContext';
 import { useCategoryScope } from '../contexts/CategoryScopeContext';
@@ -137,29 +138,7 @@ export const JournalView: React.FC<JournalViewProps> = ({
     const [selectedDate, setSelectedDate] = useState(new Date());
     const [isMonthPickerOpen, setIsMonthPickerOpen] = useState(false);
     const [isScrolled, setIsScrolled] = useState(false); // 滚动状�?
-
-
-
-    const monthPickerRef = useRef<HTMLDivElement>(null);
-    const monthPickerDropdownRef = useRef<HTMLDivElement>(null); // 新增：下拉菜单的 ref
     const scrollContainerRef = useRef<HTMLDivElement>(null); // 滚动容器ref
-
-    // Close popups when clicking outside
-    useEffect(() => {
-        const handleClickOutside = (event: MouseEvent) => {
-            // 检查点击是否在触发按钮或下拉菜单内
-            if (
-                monthPickerRef.current && 
-                !monthPickerRef.current.contains(event.target as Node) &&
-                monthPickerDropdownRef.current &&
-                !monthPickerDropdownRef.current.contains(event.target as Node)
-            ) {
-                setIsMonthPickerOpen(false);
-            }
-        };
-        document.addEventListener('mousedown', handleClickOutside);
-        return () => document.removeEventListener('mousedown', handleClickOutside);
-    }, []);
 
     // 滚动监听:标题栏缩小效�?& Date Sidebar Active State
     const [activeDay, setActiveDay] = useState<string | null>(null);
@@ -588,18 +567,16 @@ export const JournalView: React.FC<JournalViewProps> = ({
         }));
     }, [setLogs]);
 
-    const handleMonthSelect = (monthIndex: number) => {
+    const handleMonthSelect = (value: string) => {
+        const [yearText, monthText] = value.split('-');
+        const nextYear = Number(yearText);
+        const nextMonth = Number(monthText);
+        if (Number.isNaN(nextYear) || Number.isNaN(nextMonth)) return;
+
         const newDate = new Date(selectedDate);
-        newDate.setMonth(monthIndex);
+        newDate.setFullYear(nextYear, nextMonth - 1, 1);
         setSelectedDate(newDate);
         setIsMonthPickerOpen(false);
-        setDisplayCount(30); // 重置显示数量
-    };
-
-    const changeYear = (offset: number) => {
-        const newDate = new Date(selectedDate);
-        newDate.setFullYear(newDate.getFullYear() + offset);
-        setSelectedDate(newDate);
         setDisplayCount(30); // 重置显示数量
     };
 
@@ -707,44 +684,6 @@ export const JournalView: React.FC<JournalViewProps> = ({
                 className="absolute inset-0 -z-10"
                 style={{ backgroundColor: `rgba(250, 249, 246, ${panelOverlayOpacity})` }}
             />
-            {/* Month Picker Dropdown - Portal to avoid stacking context issues */}
-            {isMonthPickerOpen && (
-                <div 
-                    ref={monthPickerDropdownRef}
-                    className="fixed mt-4 bg-white shadow-xl border border-gray-100 rounded-xl p-4 z-[9999] w-72 animate-in fade-in zoom-in-95 duration-200 cursor-default" 
-                    style={{
-                        top: monthPickerRef.current ? `${monthPickerRef.current.getBoundingClientRect().bottom + 16}px` : '0',
-                        left: monthPickerRef.current ? `${monthPickerRef.current.getBoundingClientRect().left}px` : '0'
-                    }}
-                    onClick={(e) => e.stopPropagation()}
-                >
-                    {/* Year Switcher */}
-                    <div className="flex items-center justify-between mb-4 border-b border-gray-100 pb-2">
-                        <button onClick={() => changeYear(-1)} className="p-1 hover:bg-gray-100 rounded-full text-gray-500">
-                            <ChevronLeft className="w-5 h-5" />
-                        </button>
-                        <span className="font-serif text-lg font-bold text-gray-900">{selectedDate.getFullYear()}</span>
-                        <button onClick={() => changeYear(1)} className="p-1 hover:bg-gray-100 rounded-full text-gray-500">
-                            <ChevronRight className="w-5 h-5" />
-                        </button>
-                    </div>
-                    {/* Month Grid */}
-                    <div className="grid grid-cols-3 gap-2">
-                        {MONTHS.map((m, idx) => (
-                            <button
-                                key={m}
-                                onClick={() => handleMonthSelect(idx)}
-                                className={`text-sm py-2 px-1 rounded-md transition-colors ${selectedDate.getMonth() === idx
-                                    ? 'bg-gray-900 text-white font-bold'
-                                    : 'text-gray-600 hover:bg-gray-100'
-                                    }`}
-                            >
-                                {m.slice(0, 3)}
-                            </button>
-                        ))}
-                    </div>
-                </div>
-            )}
 
             {/* Sticky Header - 标题栏随滚动缩小 */}
             <header className={`sticky top-0 z-40 transition-all duration-300 pt-[env(safe-area-inset-top)] ${isScrolled
@@ -771,24 +710,21 @@ export const JournalView: React.FC<JournalViewProps> = ({
 
                     {/* Intro / Stats Area / Month Selector */}
                     <div className="mb-12 pl-2 pr-0 relative">
-                        {/* New Month Picker UI */}
+                        {/* Memoir month picker trigger */}
                         <div className="flex items-end gap-4 mb-6 pt-0 px-1 select-none">
-                            <div className="flex flex-col relative group cursor-pointer" ref={monthPickerRef}>
-                                <div
-                                    onClick={() => setIsMonthPickerOpen(!isMonthPickerOpen)}
-                                    className="flex flex-col"
-                                >
-                                    <div className="flex items-center gap-2">
-                                        <span className="text-[10px] font-bold text-stone-400 font-sans tracking-wide">{selectedDate.getFullYear()}年</span>
-                                    </div>
-                                    <div className="flex items-center gap-1">
-                                        <h2 className="text-2xl font-serif font-bold text-stone-800 group-hover:text-stone-600 transition-colors">
-                                            {selectedDate.getMonth() + 1}月
-                                        </h2>
-                                        <ChevronDown className={`w-4 h-4 text-stone-300 group-hover:text-stone-500 transition-colors mt-1.5 ${isMonthPickerOpen ? 'rotate-180' : ''}`} />
-                                    </div>
-                                </div>
-                            </div>
+                            <button
+                                type="button"
+                                onClick={() => setIsMonthPickerOpen(true)}
+                                className="group flex flex-col text-left"
+                                title="选择月份"
+                            >
+                                <span className="text-[10px] font-bold text-stone-400 font-sans tracking-wide">
+                                    {selectedDate.getFullYear()}年
+                                </span>
+                                <span className="text-2xl font-serif font-bold text-stone-800 transition-colors group-hover:text-stone-600">
+                                    {selectedDate.getMonth() + 1}月
+                                </span>
+                            </button>
                             <div className="h-px bg-stone-200 flex-1 mb-3"></div>
 
                             <div className="flex items-center gap-1 mb-1 shrink-0 bg-stone-100/60 p-1 rounded-lg border border-stone-100">
@@ -984,6 +920,15 @@ export const JournalView: React.FC<JournalViewProps> = ({
                 <TimelineStyleAdjuster onClose={() => setTimelineStyleAdjusterOpen(false)} />
             )}
 
+            <TodoDatePickerModal
+                isOpen={isMonthPickerOpen}
+                title="选择月份"
+                mode="month"
+                value={`${selectedDate.getFullYear()}-${String(selectedDate.getMonth() + 1).padStart(2, '0')}`}
+                onSelect={handleMonthSelect}
+                onClose={() => setIsMonthPickerOpen(false)}
+            />
+
             {/* Right Edge Line */}
             <div className="fixed top-0 right-0 bottom-0 w-[1px] bg-stone-200/50 z-40 pointer-events-none" />
 
@@ -991,3 +936,4 @@ export const JournalView: React.FC<JournalViewProps> = ({
         </div >
     );
 };
+

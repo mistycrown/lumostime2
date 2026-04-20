@@ -26,7 +26,7 @@ export const AITodoInputModal: React.FC<AITodoInputModalProps> = ({ onClose, onG
                 <div className="flex items-center justify-between px-6 py-4 border-b border-stone-100 bg-white">
                     <div className="flex items-center gap-2 text-stone-800">
                         <Sparkles size={18} className="text-stone-800" />
-                        <h2 className="text-lg font-bold">AI Integration</h2>
+                        <h2 className="text-lg font-bold">AI 添加待办</h2>
                     </div>
                     <button
                         onClick={onClose}
@@ -42,7 +42,7 @@ export const AITodoInputModal: React.FC<AITodoInputModalProps> = ({ onClose, onG
                         <textarea
                             value={text}
                             onChange={(e) => setText(e.target.value)}
-                            placeholder="Describe your activity..."
+                            placeholder="描述一下你想添加的待办..."
                             className="flex-1 w-full resize-none border-none outline-none bg-transparent text-stone-700 placeholder:text-stone-300 text-base leading-relaxed font-serif"
                             autoFocus
                         />
@@ -64,12 +64,12 @@ export const AITodoInputModal: React.FC<AITodoInputModalProps> = ({ onClose, onG
                         {isLoading ? (
                             <>
                                 <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                                <span>Analyzing...</span>
+                                <span>解析中...</span>
                             </>
                         ) : (
                             <>
                                 <Sparkles size={20} />
-                                <span>Generate</span>
+                                <span>生成待办</span>
                             </>
                         )}
                     </button>

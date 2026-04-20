@@ -23,12 +23,18 @@ The views are designed as "dumb" or "presentational" components where possible, 
 *   **StatsView**: Comprehensive analytics with multiple visualization modes (Pie, Matrix, Line, Schedule, Check, Emoji), including a subtle top-level fade transition for swipe and header date navigation. Weekly ranges should reuse the shared stats date-range helper so cross-month matrix weeks stay capped at 7 days.
 *   **SettingsView**: Central configuration hub for Sync, AI, and App preferences, including notification-aware floating-window startup and Android permission-return recovery.
 *   **ReviewHubView**: Archive dashboard displaying monthly, weekly, and daily reviews.
-*   **JournalView**: Journal-style view for daily entries, providing an alternative perspective to ReviewHubView, with shared timeline styling and per-style archive offset support.
+*   **JournalView**: Journal-style view for daily entries, providing an alternative perspective to ReviewHubView, with shared timeline styling, per-style archive offset support, and a centered shared month picker modal for Memoir navigation.
 *   **OnThisDayView**: Same-day-across-years archive view with shared timeline styling, schedule comparison, review content, and deletable persistent notes for a month-day.
 
 > ⚠️ **Note**: When modifying views, ensure that new state requirements are coordinated with `App.tsx` if they affect global data (Logs, Categories, Todos).
 
 > Last updated: 2026-04-20
+- `TodoView.tsx`: Moved arranged/due date markers into the detailed card's right action rail as stacked icon-plus-date rows, removed their outlines, and clamped loose-mode titles to two lines.
+- `TodoView.tsx`: Shortened the quick-action move labels to `今 / 明 / 下周` and widened the `下周` action column so the sheet no longer wraps the week shortcut.
+- `TodoView.tsx`: Added a `明天` shortcut beside `今天` and `下周` in the week-view quick-actions sheet for both Arrange and Due date moves.
+- `TodoView.tsx`: Added an undo-complete action to the week-view quick-actions sheet so completed todos can be restored without opening the full detail editor.
+- `TodoView.tsx`: Added a top-pinned virtual `排期` sidebar category that opens by default, with in-panel `今天 / 明天 / 本周` filters and lightweight schedule badges that reuse the existing Arrange / Due / Repeat semantics.
+- `TodoView.tsx`: Added touch edge auto-scroll for mobile week-view dragging and let the week rows use normalized badge combinations so redundant Arrange/Trace labels are suppressed when Due/Done are present.
 - `TodoView.tsx`: Tightened week-view overdue warning icons so Arrange/Due only show the alert when the date has passed and no completion date exists.
 - `TodoView.tsx`: Added extra bottom padding to the week-planning scroll content so the floating action button no longer blocks the last scheduled rows.
 - `TodoView.tsx`: Hid empty quick-action Arrange/Due/Completed metadata rows in the week-view badge editor so unset dates no longer render `None`.

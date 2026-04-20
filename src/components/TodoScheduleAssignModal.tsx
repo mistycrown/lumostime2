@@ -4,11 +4,12 @@
  * @output Lightweight modal for assigning or quickly creating todos for a specific week-view day
  * @pos Component (Modal)
  * @description Lets users assign unfinished todos to a selected day as either Arrange or Due, or create a linked todo, without leaving the week schedule view.
+ * @updated 2026-04-20 18:21: Fixed the schedule assign modal to a stable three-quarter viewport height and kept the inner content scrollable.
  * @updated 2026-04-20: Sorted assignable todos so items without a current date appear first and dated items follow in chronological order.
  *
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
-import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { X, CalendarDays, Flag } from 'lucide-react';
 import { Category, TodoCategory, TodoItem } from '../types';
 import { IconRenderer } from './IconRenderer';
@@ -58,8 +59,6 @@ export const TodoScheduleAssignModal: React.FC<TodoScheduleAssignModalProps> = (
   onClose
 }) => {
   const [selectedCategoryId, setSelectedCategoryId] = useState<string>('all');
-  const [lockedHeight, setLockedHeight] = useState<number | null>(null);
-  const panelRef = useRef<HTMLDivElement | null>(null);
   const [activeTab, setActiveTab] = useState<'scheduled' | 'deadline' | 'new'>(assignType);
   const [newTitle, setNewTitle] = useState('');
   const [newTodoCategoryId, setNewTodoCategoryId] = useState<string>(todoCategories[0]?.id || '');
@@ -69,7 +68,6 @@ export const TodoScheduleAssignModal: React.FC<TodoScheduleAssignModalProps> = (
   useEffect(() => {
     if (isOpen) {
       setSelectedCategoryId('all');
-      setLockedHeight(null);
       setActiveTab(assignType);
       setNewTitle('');
       setNewTodoCategoryId(todoCategories[0]?.id || '');
@@ -108,16 +106,6 @@ export const TodoScheduleAssignModal: React.FC<TodoScheduleAssignModalProps> = (
     return nextTodos;
   }, [activeTab, assignType, selectedCategoryId, todos]);
 
-  useLayoutEffect(() => {
-    if (!isOpen || lockedHeight !== null) return;
-    if (!panelRef.current) return;
-
-    const nextHeight = panelRef.current.getBoundingClientRect().height;
-    if (nextHeight > 0) {
-      setLockedHeight(nextHeight);
-    }
-  }, [isOpen, lockedHeight, filteredTodos.length]);
-
   if (!isOpen) return null;
 
   return (
@@ -126,9 +114,7 @@ export const TodoScheduleAssignModal: React.FC<TodoScheduleAssignModalProps> = (
       onClick={onClose}
       >
       <div
-        ref={panelRef}
-        className="flex max-h-[75vh] w-full max-w-[28rem] flex-col overflow-hidden rounded-[2rem] border border-stone-200 bg-[#faf9f6] shadow-[0_26px_70px_rgba(15,23,42,0.14)]"
-        style={lockedHeight ? { height: `${lockedHeight}px`, maxHeight: '75vh' } : { maxHeight: '75vh' }}
+        className="flex h-[75vh] max-h-[75vh] w-full max-w-[28rem] flex-col overflow-hidden rounded-[2rem] border border-stone-200 bg-[#faf9f6] shadow-[0_26px_70px_rgba(15,23,42,0.14)]"
         onClick={(event) => event.stopPropagation()}
       >
         <div className="border-b border-stone-200 px-5 py-4">

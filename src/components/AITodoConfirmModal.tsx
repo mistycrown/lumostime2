@@ -127,7 +127,7 @@ export const AITodoConfirmModal: React.FC<AITodoConfirmModalProps> = ({
                         <div className="w-8 h-8 rounded-full bg-stone-100 flex items-center justify-center text-stone-600">
                             <Sparkles size={16} />
                         </div>
-                        <h2 className="font-bold text-stone-800 text-lg">AI Integration</h2>
+                        <h2 className="font-bold text-stone-800 text-lg">AI 添加待办</h2>
                     </div>
                     <button
                         onClick={onClose}
@@ -141,12 +141,12 @@ export const AITodoConfirmModal: React.FC<AITodoConfirmModalProps> = ({
                 <div className="flex-1 overflow-y-auto custom-scrollbar p-6 bg-[#faf9f6]">
                     <div className="space-y-6 animate-in slide-in-from-right-4 duration-300 pb-20">
                         <div className="flex items-center justify-between px-1">
-                            <h3 className="text-xs font-bold text-stone-400 uppercase tracking-widest">Review ({tasks.length})</h3>
+                            <h3 className="text-xs font-bold text-stone-400 uppercase tracking-widest">检查结果（{tasks.length}）</h3>
                             <button
                                 onClick={addTask}
                                 className="text-stone-600 text-xs font-bold flex items-center gap-1 hover:bg-stone-100 px-3 py-1.5 rounded-full transition-colors bg-white border border-stone-100"
                             >
-                                <Plus size={14} /> Add
+                                <Plus size={14} /> 新增
                             </button>
                         </div>
 
@@ -162,18 +162,18 @@ export const AITodoConfirmModal: React.FC<AITodoConfirmModalProps> = ({
                                             {/* Top Row: Task Name & Delete */}
                                             <div>
                                                 <div className="flex items-center justify-between mb-1">
-                                                    <label className="text-[10px] font-bold text-stone-300 uppercase tracking-wider block">Task Name</label>
+                                                    <label className="text-[10px] font-bold text-stone-300 uppercase tracking-wider block">待办名称</label>
                                                     <button
                                                         onClick={() => removeTask(index)}
                                                         className="text-stone-300 hover:text-red-500 p-1 -mr-1 rounded-full hover:bg-red-50 transition-colors"
-                                                        title="Delete Entry"
+                                                        title="删除待办"
                                                     >
                                                         <Trash2 size={16} />
                                                     </button>
                                                 </div>
                                                 <input
                                                     className="w-full bg-transparent border-b border-stone-200 px-0 py-2 text-base font-medium text-stone-800 placeholder:text-stone-300 outline-none focus:border-stone-400 transition-all"
-                                                    placeholder="Describe task..."
+                                                    placeholder="填写待办内容..."
                                                     type="text"
                                                     value={task.title}
                                                     onChange={(e) => updateTask(index, { title: e.target.value })}
@@ -182,7 +182,7 @@ export const AITodoConfirmModal: React.FC<AITodoConfirmModalProps> = ({
 
                                             {/* List Selection */}
                                             <div>
-                                                <label className="text-[10px] font-bold text-stone-300 uppercase tracking-wider mb-2 block">List</label>
+                                                <label className="text-[10px] font-bold text-stone-300 uppercase tracking-wider mb-2 block">清单</label>
                                                 <div className="flex flex-wrap gap-2">
                                                     {todoCategories.map(cat => (
                                                         <button
@@ -204,7 +204,7 @@ export const AITodoConfirmModal: React.FC<AITodoConfirmModalProps> = ({
 
                                             {/* Activity Selection */}
                                             <div className="pt-2">
-                                                <label className="text-[10px] font-bold text-stone-300 uppercase tracking-wider mb-2 block">ASSOCIATED TAG</label>
+                                                <label className="text-[10px] font-bold text-stone-300 uppercase tracking-wider mb-2 block">关联标签</label>
 
                                                 {/* Category Tabs */}
                                                 <div className="grid grid-cols-4 gap-2 mb-3">
@@ -255,7 +255,7 @@ export const AITodoConfirmModal: React.FC<AITodoConfirmModalProps> = ({
 
                                             {/* Scope Selection */}
                                             <div className="pt-2">
-                                                <label className="text-[10px] font-bold text-stone-300 uppercase tracking-wider mb-2 block">ASSOCIATED SCOPE</label>
+                                                <label className="text-[10px] font-bold text-stone-300 uppercase tracking-wider mb-2 block">关联领域</label>
                                                 <div className="flex flex-wrap gap-2">
                                                     {scopes.map(scope => {
                                                         const isSelected = task.defaultScopeIds.includes(scope.id);
@@ -299,7 +299,7 @@ export const AITodoConfirmModal: React.FC<AITodoConfirmModalProps> = ({
                             onClick={onClose}
                             className="px-6 py-4 bg-white border border-stone-200 text-stone-600 rounded-2xl font-bold hover:bg-stone-50 transition-colors"
                         >
-                            Back
+                            返回
                         </button>
                         <button
                             onClick={handleSave}
@@ -307,7 +307,7 @@ export const AITodoConfirmModal: React.FC<AITodoConfirmModalProps> = ({
                             className="flex-1 py-4 bg-stone-900 disabled:bg-stone-300 disabled:cursor-not-allowed text-white rounded-2xl font-bold flex items-center justify-center gap-2 hover:bg-black transition-colors shadow-xl shadow-stone-200 active:scale-[0.98]"
                         >
                             <Check size={20} />
-                            <span>Save All ({tasks.filter(t => t.title.trim()).length})</span>
+                            <span>全部保存（{tasks.filter(t => t.title.trim()).length}）</span>
                         </button>
                     </div>
                 </div>

@@ -174,6 +174,7 @@ const AppContent: React.FC = () => {
     setIsGoalBatchManaging,
     editingLog,
     editingTodo,
+    newTodoDraft,
     editingGoal,
     goalScopeId,
     focusDetailSessionId, setFocusDetailSessionId,
@@ -482,6 +483,7 @@ const AppContent: React.FC = () => {
   const todoDetailModalNode = isTodoModalOpen ? (
     <TodoDetailModal
       initialTodo={editingTodo}
+      initialDraft={editingTodo ? null : newTodoDraft}
       currentCategory={todoCategories.find(c => c.id === todoManager.todoCategoryToAdd) || todoCategories[0]}
       displayMode={showTodoDetailPage ? 'page' : 'overlay'}
       onClose={todoManager.closeTodoModal}

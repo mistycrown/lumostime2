@@ -4,6 +4,7 @@
  * @output AI-generated schedule entries
  * @pos Component (AI Integration)
  * @description A modal interface for AI-powered batch schedule generation. Handles natural language input parsing and manual review of generated entries.
+ * @updated 2026-04-20: Localized the AI backfill modal so add-log input, review labels, and action buttons use Chinese copy.
  * 
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
@@ -125,11 +126,11 @@ const ReviewCard: React.FC<ReviewCardProps> = ({ entry, onUpdate, onDelete, cate
                 {/* Date Input */}
                 <div>
                     <div className="flex items-center justify-between mb-1">
-                        <label className="text-[10px] font-bold text-stone-300 uppercase tracking-wider block">Date</label>
+                        <label className="text-[10px] font-bold text-stone-300 uppercase tracking-wider block">日期</label>
                         <button
                             onClick={onDelete}
                             className="text-stone-300 hover:text-red-500 p-1 -mr-1 rounded-full hover:bg-red-50 transition-colors"
-                            title="Delete Entry"
+                            title="删除记录"
                         >
                             <Trash2 size={16} />
                         </button>
@@ -148,7 +149,7 @@ const ReviewCard: React.FC<ReviewCardProps> = ({ entry, onUpdate, onDelete, cate
                 {/* Time Inputs */}
                 <div className="grid grid-cols-2 gap-3">
                     <div>
-                        <label className="text-[10px] font-bold text-stone-300 uppercase tracking-wider mb-1 block">Start</label>
+                        <label className="text-[10px] font-bold text-stone-300 uppercase tracking-wider mb-1 block">开始</label>
                         <input
                             type="text"
                             maxLength={4}
@@ -160,7 +161,7 @@ const ReviewCard: React.FC<ReviewCardProps> = ({ entry, onUpdate, onDelete, cate
                         />
                     </div>
                     <div>
-                        <label className="text-[10px] font-bold text-stone-300 uppercase tracking-wider mb-1 block">End</label>
+                        <label className="text-[10px] font-bold text-stone-300 uppercase tracking-wider mb-1 block">结束</label>
                         <input
                             type="text"
                             maxLength={4}
@@ -175,19 +176,19 @@ const ReviewCard: React.FC<ReviewCardProps> = ({ entry, onUpdate, onDelete, cate
 
                 {/* Note */}
                 <div>
-                    <label className="text-[10px] font-bold text-stone-300 uppercase tracking-wider mb-1 block">Note</label>
+                    <label className="text-[10px] font-bold text-stone-300 uppercase tracking-wider mb-1 block">内容</label>
                     <input
                         type="text"
                         value={entry.description}
                         onChange={(e) => onUpdate('description', e.target.value)}
                         className="w-full bg-transparent border-b border-stone-200 px-0 py-2 text-lg font-bold text-stone-900 placeholder:text-stone-300 outline-none focus:border-stone-400 transition-all font-serif"
-                        placeholder="Activity description..."
+                        placeholder="填写这段补记的内容..."
                     />
                 </div>
 
                 {/* Link Tag Section (Inline) */}
                 <div className="pt-2">
-                    <label className="text-[10px] font-bold text-stone-300 uppercase tracking-wider mb-2 block">ASSOCIATED TAG</label>
+                    <label className="text-[10px] font-bold text-stone-300 uppercase tracking-wider mb-2 block">关联标签</label>
                     {/* Categories */}
                     <div className="grid grid-cols-4 gap-2 mb-3">
                         {categories.map(cat => (
@@ -227,7 +228,7 @@ const ReviewCard: React.FC<ReviewCardProps> = ({ entry, onUpdate, onDelete, cate
 
                 {/* Scope Selection */}
                 <div className="pt-2">
-                    <label className="text-[10px] font-bold text-stone-300 uppercase tracking-wider mb-2 block">ASSOCIATED SCOPE</label>
+                    <label className="text-[10px] font-bold text-stone-300 uppercase tracking-wider mb-2 block">关联领域</label>
                     <div className="flex flex-wrap gap-2">
                         {scopes?.map(scope => {
                             const isSelected = entry.scopeIds?.includes(scope.id);
@@ -352,8 +353,8 @@ export const AIBatchModal: React.FC<AIBatchModalProps> = ({ onClose, onSave, cat
         setParsedEntries([...parsedEntries, {
             startTime: new Date().toISOString(),
             endTime: new Date(Date.now() + 3600000).toISOString(),
-            description: 'New Activity',
-            categoryName: categories[0]?.name || 'Uncategorized',
+            description: '新的补记',
+            categoryName: categories[0]?.name || '未分类',
             activityName: '',
             _uiId: crypto.randomUUID()
         }]);
@@ -379,7 +380,7 @@ export const AIBatchModal: React.FC<AIBatchModalProps> = ({ onClose, onSave, cat
                         <div className="w-8 h-8 rounded-full bg-stone-100 flex items-center justify-center text-stone-600">
                             <Sparkles size={16} />
                         </div>
-                        <h2 className="font-bold text-stone-800 text-lg">AI Integration</h2>
+                        <h2 className="font-bold text-stone-800 text-lg">AI 添加补记</h2>
                     </div>
                     <button onClick={onClose} className="p-2 hover:bg-stone-100 rounded-full text-stone-400 transition-colors">
                         <X size={20} />
@@ -393,7 +394,7 @@ export const AIBatchModal: React.FC<AIBatchModalProps> = ({ onClose, onSave, cat
                             <div className="bg-white p-5 rounded-2xl border border-stone-100 shadow-sm">
                                 <textarea
                                     className="w-full min-h-[160px] text-base text-stone-700 placeholder:text-stone-300 outline-none resize-none font-medium leading-relaxed bg-transparent"
-                                    placeholder="Describe your activity..."
+                                    placeholder="描述一下这段时间做了什么..."
                                     value={inputText}
                                     onChange={(e) => setInputText(e.target.value)}
                                     autoFocus
@@ -423,9 +424,9 @@ export const AIBatchModal: React.FC<AIBatchModalProps> = ({ onClose, onSave, cat
                     ) : (
                         <div className="space-y-6 animate-in slide-in-from-right-4 duration-300 pb-20">
                             <div className="flex items-center justify-between px-1">
-                                <h3 className="text-xs font-bold text-stone-400 uppercase tracking-widest">Review ({parsedEntries.length})</h3>
+                                <h3 className="text-xs font-bold text-stone-400 uppercase tracking-widest">检查结果（{parsedEntries.length}）</h3>
                                 <button onClick={handleAddEntry} className="text-stone-600 text-xs font-bold flex items-center gap-1 hover:bg-stone-100 px-3 py-1.5 rounded-full transition-colors bg-white border border-stone-100">
-                                    <Plus size={14} /> Add
+                                    <Plus size={14} /> 新增
                                 </button>
                             </div>
 
@@ -456,12 +457,12 @@ export const AIBatchModal: React.FC<AIBatchModalProps> = ({ onClose, onSave, cat
                             {isLoading ? (
                                 <>
                                     <Wand2 size={20} className="animate-spin" />
-                                    <span>Processing...</span>
+                                    <span>解析中...</span>
                                 </>
                             ) : (
                                 <>
                                     <Sparkles size={20} className="text-purple-300" />
-                                    <span>Generate</span>
+                                    <span>生成补记</span>
                                 </>
                             )}
                         </button>
@@ -471,14 +472,14 @@ export const AIBatchModal: React.FC<AIBatchModalProps> = ({ onClose, onSave, cat
                                 onClick={() => setStep('input')}
                                 className="px-6 py-4 bg-white border border-stone-200 text-stone-600 rounded-2xl font-bold hover:bg-stone-50 transition-colors"
                             >
-                                Back
+                                返回
                             </button>
                             <button
                                 onClick={handleConfirm}
                                 className="flex-1 py-4 bg-stone-900 text-white rounded-2xl font-bold flex items-center justify-center gap-2 hover:bg-black transition-colors shadow-xl shadow-stone-200"
                             >
                                 <CheckCircle2 size={20} />
-                                <span>Save All ({parsedEntries.length})</span>
+                                <span>全部保存（{parsedEntries.length}）</span>
                             </button>
                         </div>
                     )}

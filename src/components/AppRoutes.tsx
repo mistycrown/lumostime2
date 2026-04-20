@@ -66,7 +66,7 @@ interface AppRoutesProps {
     handleQuickPunch: () => void;
 
     openEditTodoModal: (todo: TodoItem) => void;
-    openAddTodoModal: (catId: string) => void;
+    openAddTodoModal: (catId: string, draft?: Partial<TodoItem>) => void;
     handleToggleTodo: (id: string) => void;
     handleStartTodoFocus: (todo: TodoItem, autoEnterFocus?: boolean) => void;
     handleBatchAddTodos: (todos: Partial<TodoItem>[]) => void;

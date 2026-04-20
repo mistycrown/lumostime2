@@ -4,6 +4,14 @@
  * @output Todo Status Updates, Edit Triggers, Focus Timer Start
  * @pos View (Main Tab)
  * @description The main To-Do list interface. Displays tasks grouped by category, supports swipe actions, and now includes a week planning view with schedule and history badges.
+ * @updated 2026-04-20 19:50: Moved detailed-list arranged/due markers into the right action rail as stacked text-only rows and clamped loose titles to two lines.
+ * @updated 2026-04-20 19:39: Moved detailed-list arranged/due markers onto the title row and reduced them to icon-only capsules.
+ * @updated 2026-04-20 19:32: Added detailed-list date markers for arranged and due todos while keeping compact rows unchanged.
+ * @updated 2026-04-20 18:46: Shortened quick-action move labels to single-character `今 / 明` and widened the `下周` column to prevent wrapping.
+ * @updated 2026-04-20 18:43: Added a tomorrow shortcut to the week-view quick-actions sheet for both Arrange and Due date moves.
+ * @updated 2026-04-20 19:08: Added a top-pinned virtual schedule category with today, tomorrow, and this-week list filters.
+ * @updated 2026-04-20 18:38: Added an undo-complete quick action for completed items in the week-view badge editor.
+ * @updated 2026-04-20 18:12: Added touch edge auto-scroll for week-view dragging and reduced redundant badge combinations in the rendered week rows.
  * @updated 2026-04-20 18:07: Limited week-view overdue alerts to items that are past due and still have no completion date.
  * @updated 2026-04-20 18:03: Added extra bottom padding to the week planning scroll area so the floating action button no longer covers the last rows.
  * @updated 2026-04-20 17:59: Hid empty quick-action schedule metadata rows instead of rendering None placeholders.
@@ -16,9 +24,9 @@
  *
  * 闁宠法濯寸粭?Once I am updated, be sure to update my header comment and the folder's md.
  */
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
 import { Scope, TodoItem, TodoCategory, Category, AutoLinkRule, Log, TodoDuplicateOptions } from '../types';
-import { PlayCircle, CheckCircle2, Plus, MoreHorizontal, ChevronLeft, ChevronRight, LayoutList, Rows, Sparkles, Eye, EyeOff, CalendarDays, Flag, Repeat2, TrendingUp, ListTodo, CircleAlert, ArrowRightCircle, PanelRightOpen, Check, X } from 'lucide-react';
+import { PlayCircle, CheckCircle2, Plus, MoreHorizontal, ChevronLeft, ChevronRight, LayoutList, Rows, Sparkles, Eye, EyeOff, CalendarDays, Flag, Repeat2, TrendingUp, ListTodo, CircleAlert, PanelRightOpen, Check, X } from 'lucide-react';
 import { AITodoInputModal } from '../components/AITodoInputModal';
 import { AITodoConfirmModal, ParsedTask } from '../components/AITodoConfirmModal';
 import { aiService } from '../services/aiService';
@@ -29,7 +37,17 @@ import { useBackgroundDisplay } from '../hooks/useBackgroundDisplay';
 import { FloatingButton } from '../components/FloatingButton';
 import { UIIcon } from '../components/UIIcon';
 import { uiIconService } from '../services/uiIconService';
-import { WeekTodoEntry, buildWeekTodoBuckets, formatDateKey, getTodayDateKey, getWeekDates, parseDateKey } from '../utils/todoScheduleUtils';
+import {
+  TodoScheduleMatch,
+  TodoScheduleRange,
+  WeekTodoEntry,
+  buildWeekTodoBuckets,
+  formatDateKey,
+  getTodayDateKey,
+  getTodoScheduleMatches,
+  getWeekDates,
+  parseDateKey
+} from '../utils/todoScheduleUtils';
 import { TodoScheduleAssignModal } from '../components/TodoScheduleAssignModal';
 import { TodoDatePickerModal } from '../components/TodoDatePickerModal';
 import { TodoDuplicateModal } from '../components/TodoDuplicateModal';
@@ -43,7 +61,7 @@ interface TodoViewProps {
   scopes: Scope[];
   onToggleTodo: (id: string) => void;
   onEditTodo: (todo: TodoItem) => void;
-  onAddTodo: (categoryId: string) => void;
+  onAddTodo: (categoryId: string, draft?: Partial<TodoItem>) => void;
   onStartFocus: (todo: TodoItem) => void;
   onDuplicateTodo: (todo: TodoItem, options: TodoDuplicateOptions) => void;
   onSaveTodo: (todo: TodoItem) => void;
@@ -62,12 +80,18 @@ const SwipeableTodoItem: React.FC<{
   onStartFocus: (todo: TodoItem) => void;
   onDuplicate: (todo: TodoItem) => void;
   viewMode: 'loose' | 'compact';
+  scheduleMatchLabels?: string[];
   isFirst?: boolean;
   isLast?: boolean;
-}> = ({ todo, categories, activityCategories, scopes, onToggle, onEdit, onStartFocus, onDuplicate, viewMode, isFirst = false, isLast = false }) => {
+}> = ({ todo, categories, activityCategories, scopes, onToggle, onEdit, onStartFocus, onDuplicate, viewMode, scheduleMatchLabels = [], isFirst = false, isLast = false }) => {
   const [touchStart, setTouchStart] = useState<number | null>(null);
   const [translateX, setTranslateX] = useState(0);
   const canQuickToggle = !todo.recurrenceRule;
+  const visibleScheduleMatchLabels = scheduleMatchLabels.slice(0, VIRTUAL_SCHEDULE_MATCH_LIMIT);
+  const hiddenScheduleMatchCount = Math.max(0, scheduleMatchLabels.length - visibleScheduleMatchLabels.length);
+  const scheduledDateLabel = formatTodoInlineDate(todo.scheduledDate);
+  const deadlineDateLabel = formatTodoInlineDate(todo.deadlineDate);
+  const hasLooseDateMarkers = viewMode === 'loose' && Boolean(scheduledDateLabel || deadlineDateLabel);
 
   // Constants
   const minSwipeDistance = 100;
@@ -189,8 +213,8 @@ const SwipeableTodoItem: React.FC<{
       >
         {/* Content (Click to Edit) */}
         <div className={`flex-1 cursor-pointer ${todo.isCompleted ? 'opacity-60' : ''} ${viewMode === 'compact' ? 'flex items-center gap-2 min-w-0' : 'py-0.5'}`} onClick={() => onEdit(todo)}>
-          <div className="flex items-center gap-2 flex-1 min-w-0">
-            <div className={`font-bold leading-tight ${todo.isCompleted ? 'text-stone-400 line-through' : 'text-stone-800'} ${viewMode === 'compact' ? 'text-sm truncate' : 'text-base'} transition-all duration-500`}>
+          <div className={`flex gap-2 flex-1 min-w-0 ${viewMode === 'compact' ? 'items-center' : 'items-start'}`}>
+            <div className={`min-w-0 flex-1 font-bold ${todo.isCompleted ? 'text-stone-400 line-through' : 'text-stone-800'} ${viewMode === 'compact' ? 'text-sm truncate leading-tight' : 'text-base leading-snug line-clamp-2'} transition-all duration-500`}>
               {todo.title}
             </div>
 
@@ -232,6 +256,22 @@ const SwipeableTodoItem: React.FC<{
 
           {/* Linked Tags/Scopes */}
           <div className={`flex items-center gap-1.5 flex-wrap flex-shrink-0 ${viewMode === 'compact' ? 'mt-0' : 'mt-1.5'}`}>
+            {visibleScheduleMatchLabels.map((label) => (
+              <span
+                key={label}
+                className={`text-[11px] text-stone-500 font-medium flex items-center gap-1 ${viewMode === 'compact' ? 'px-0 border-0 bg-transparent' : 'px-1.5 py-0.5 rounded-md border border-stone-200 bg-white/50'}`}
+              >
+                <span className="h-1.5 w-1.5 rounded-full bg-stone-300"></span>
+                <span>{label}</span>
+              </span>
+            ))}
+            {hiddenScheduleMatchCount > 0 && (
+              <span
+                className={`text-[10px] uppercase tracking-[0.16em] text-stone-400 ${viewMode === 'compact' ? 'px-1.5 py-0.5 rounded-full border border-stone-200/80 bg-white/80' : 'px-2 py-1 rounded-full border border-stone-200 bg-white/80'}`}
+              >
+                +{hiddenScheduleMatchCount}
+              </span>
+            )}
             {linkedDetails && (
               <span className={`text-[11px] text-stone-500 font-medium flex items-center gap-1 ${viewMode === 'compact' ? 'px-0 border-0 bg-transparent' : 'px-1.5 py-0.5 rounded-md border border-stone-200 bg-white/50'}`}>
                 <span className="text-stone-300 font-sans">#</span>
@@ -284,8 +324,26 @@ const SwipeableTodoItem: React.FC<{
 
         {/* Right Actions Column */}
         <div className={`flex items-end pl-2 ${viewMode === 'compact' ? 'items-center' : 'flex-col justify-between self-stretch'}`}>
-          {/* Spacer only for Loose mode */}
-          {viewMode === 'loose' && <div className="flex-1"></div>}
+          {viewMode === 'loose' && (
+            hasLooseDateMarkers ? (
+              <div className="flex w-full flex-col items-end gap-0.5 pt-0.5 text-[11px] font-medium text-stone-400">
+                {scheduledDateLabel && (
+                  <span className="inline-flex items-center gap-1 leading-none">
+                    <CalendarDays size={11} className="text-stone-350" />
+                    <span>{scheduledDateLabel}</span>
+                  </span>
+                )}
+                {deadlineDateLabel && (
+                  <span className="inline-flex items-center gap-1 leading-none">
+                    <Flag size={11} className="text-stone-350" />
+                    <span>{deadlineDateLabel}</span>
+                  </span>
+                )}
+              </div>
+            ) : (
+              <div className="flex-1"></div>
+            )
+          )}
 
           {/* Bottom Right: Start Focus */}
           {!todo.isCompleted && (
@@ -303,6 +361,81 @@ const SwipeableTodoItem: React.FC<{
 };
 
 const WEEKDAY_ROW_LABELS = ['周一', '周二', '周三', '周四', '周五', '周六', '周日'];
+const VIRTUAL_SCHEDULE_CATEGORY_ID = '__virtual_schedule__';
+const VIRTUAL_SCHEDULE_CATEGORY_NAME = '排期';
+const VIRTUAL_SCHEDULE_MATCH_LIMIT = 4;
+
+const formatTodoInlineDate = (dateKey?: string): string | null => {
+  if (!dateKey) return null;
+  const date = parseDateKey(dateKey);
+  if (!date) return dateKey;
+  const month = `${date.getMonth() + 1}`.padStart(2, '0');
+  const day = `${date.getDate()}`.padStart(2, '0');
+  return `${month}.${day}`;
+};
+
+const VIRTUAL_SCHEDULE_FILTERS: Array<{ id: TodoScheduleRange; label: string }> = [
+  { id: 'today', label: '今天' },
+  { id: 'tomorrow', label: '明天' },
+  { id: 'thisWeek', label: '本周' }
+];
+
+const TODO_SCHEDULE_MATCH_LABELS: Record<TodoScheduleMatch['kind'], string> = {
+  deadline: 'Due',
+  scheduled: 'Arrange',
+  recurring: 'Repeat'
+};
+
+const TODO_SCHEDULE_MATCH_PRIORITY: Record<TodoScheduleMatch['kind'], number> = {
+  deadline: 0,
+  scheduled: 1,
+  recurring: 2
+};
+
+interface TodoListEntry {
+  todo: TodoItem;
+  scheduleMatchLabels: string[];
+  scheduleMatches: TodoScheduleMatch[];
+}
+
+interface TodoListSection {
+  dateKey: string;
+  label: string;
+  entries: TodoListEntry[];
+}
+
+const buildScheduleMatchLabels = (matches: TodoScheduleMatch[]): string[] => {
+  const labels: string[] = [];
+  const seenKinds = new Set<TodoScheduleMatch['kind']>();
+
+  matches.forEach((match) => {
+    if (seenKinds.has(match.kind)) {
+      return;
+    }
+
+    seenKinds.add(match.kind);
+    labels.push(TODO_SCHEDULE_MATCH_LABELS[match.kind]);
+  });
+
+  return labels;
+};
+
+const formatScheduleSectionLabel = (dateKey: string, todayDateKey: string, tomorrowDateKey: string): string => {
+  const date = parseDateKey(dateKey);
+  if (!date) return dateKey;
+
+  const weekdayLabel = WEEKDAY_ROW_LABELS[date.getDay() === 0 ? 6 : date.getDay() - 1];
+
+  if (dateKey === todayDateKey) {
+    return `今天 · ${date.getMonth() + 1}.${date.getDate()}`;
+  }
+
+  if (dateKey === tomorrowDateKey) {
+    return `明天 · ${date.getMonth() + 1}.${date.getDate()}`;
+  }
+
+  return `${weekdayLabel} · ${date.getMonth() + 1}.${date.getDate()}`;
+};
 
 type WeekBadgeKey = 'deadline' | 'scheduled' | 'recurring' | 'completed' | 'inProgress';
 
@@ -318,10 +451,11 @@ const TodoScheduleQuickActionsModal: React.FC<{
   todo: TodoItem | null;
   badgeType: 'scheduled' | 'deadline' | null;
   currentDateLabel?: string;
-  onMoveDate: (type: 'scheduled' | 'deadline', mode: 'today' | 'nextWeek') => void;
+  onMoveDate: (type: 'scheduled' | 'deadline', mode: 'today' | 'tomorrow' | 'nextWeek') => void;
   onClearDate: (type: 'scheduled' | 'deadline') => void;
   onOpenDetail: () => void;
   onComplete: () => void;
+  onUndoComplete: () => void;
   onClose: () => void;
 }> = ({
   isOpen,
@@ -331,6 +465,7 @@ const TodoScheduleQuickActionsModal: React.FC<{
   onClearDate,
   onOpenDetail,
   onComplete,
+  onUndoComplete,
   onClose
 }) => {
   if (!isOpen || !todo || !badgeType) return null;
@@ -410,18 +545,25 @@ const TodoScheduleQuickActionsModal: React.FC<{
                   <CalendarDays size={12} className="text-stone-400" />
                   <span>安排到</span>
                 </div>
-                <div className="grid grid-cols-2">
+                <div className="grid grid-cols-[0.8fr_0.8fr_1.1fr]">
                   <button
                     type="button"
                     onClick={() => onMoveDate('scheduled', 'today')}
-                    className="flex items-center justify-center px-4 py-3 text-center text-sm text-stone-700 transition-colors hover:bg-white"
+                    className="flex items-center justify-center whitespace-nowrap px-4 py-3 text-center text-sm text-stone-700 transition-colors hover:bg-white"
                   >
-                    <span>今天</span>
+                    <span>今</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onMoveDate('scheduled', 'tomorrow')}
+                    className="flex items-center justify-center whitespace-nowrap border-l border-stone-100 px-4 py-3 text-center text-sm text-stone-700 transition-colors hover:bg-white"
+                  >
+                    <span>明</span>
                   </button>
                   <button
                     type="button"
                     onClick={() => onMoveDate('scheduled', 'nextWeek')}
-                    className="flex items-center justify-center border-l border-stone-100 px-4 py-3 text-center text-sm text-stone-700 transition-colors hover:bg-white"
+                    className="flex items-center justify-center whitespace-nowrap border-l border-stone-100 px-4 py-3 text-center text-sm text-stone-700 transition-colors hover:bg-white"
                   >
                     <span>下周</span>
                   </button>
@@ -433,18 +575,25 @@ const TodoScheduleQuickActionsModal: React.FC<{
                   <Flag size={12} className="text-stone-400" />
                   <span>截止到</span>
                 </div>
-                <div className="grid grid-cols-2">
+                <div className="grid grid-cols-[0.8fr_0.8fr_1.1fr]">
                   <button
                     type="button"
                     onClick={() => onMoveDate('deadline', 'today')}
-                    className="flex items-center justify-center px-4 py-3 text-center text-sm text-stone-700 transition-colors hover:bg-white"
+                    className="flex items-center justify-center whitespace-nowrap px-4 py-3 text-center text-sm text-stone-700 transition-colors hover:bg-white"
                   >
-                    今天
+                    今
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onMoveDate('deadline', 'tomorrow')}
+                    className="flex items-center justify-center whitespace-nowrap border-l border-stone-100 px-4 py-3 text-center text-sm text-stone-700 transition-colors hover:bg-white"
+                  >
+                    明
                   </button>
                   <button
                     type="button"
                     onClick={() => onMoveDate('deadline', 'nextWeek')}
-                    className="flex items-center justify-center border-l border-stone-100 px-4 py-3 text-center text-sm text-stone-700 transition-colors hover:bg-white"
+                    className="flex items-center justify-center whitespace-nowrap border-l border-stone-100 px-4 py-3 text-center text-sm text-stone-700 transition-colors hover:bg-white"
                   >
                     下周
                   </button>
@@ -471,6 +620,17 @@ const TodoScheduleQuickActionsModal: React.FC<{
                 <span>清除截止日期</span>
               </button>
             </div>
+
+            {todo.isCompleted && (
+              <button
+                type="button"
+                onClick={onUndoComplete}
+                className="flex w-full items-center gap-2 rounded-2xl border border-stone-200 bg-white/80 px-4 py-3 text-left text-sm text-stone-700 transition-colors hover:border-stone-300 hover:bg-white"
+              >
+                <CheckCircle2 size={16} className="text-stone-400" />
+                <span>取消完成</span>
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -568,7 +728,8 @@ const WeekTodoLineItem: React.FC<{
 };
 
 export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, activityCategories, scopes, onToggleTodo, onEditTodo, onAddTodo, onStartFocus, onDuplicateTodo, onSaveTodo, onBatchAddTodos, autoLinkRules = [] }) => {
-  const [selectedCategoryId, setSelectedCategoryId] = useState<string>('');
+  const [selectedCategoryId, setSelectedCategoryId] = useState<string>(VIRTUAL_SCHEDULE_CATEGORY_ID);
+  const [selectedScheduleFilter, setSelectedScheduleFilter] = useState<TodoScheduleRange>('today');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const { backgroundUrl, hasBackground, panelOverlayOpacity, useReducedEffects } = useBackgroundDisplay();
   const { addToast } = useToast();
@@ -589,9 +750,14 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
   const [quickActionType, setQuickActionType] = useState<'scheduled' | 'deadline' | null>(null);
   const [isWeekJumpPickerOpen, setIsWeekJumpPickerOpen] = useState(false);
   const [duplicatingTodo, setDuplicatingTodo] = useState<TodoItem | null>(null);
+  const weekScrollContainerRef = useRef<HTMLDivElement | null>(null);
   const touchDragActivatedRef = useRef(false);
   const touchDraggingWeekEntryRef = useRef<WeekTodoEntry | null>(null);
   const touchDragTargetDateRef = useRef<string | null>(null);
+  const touchDragPointRef = useRef<{ x: number; y: number; title: string } | null>(null);
+  const touchDragFrameRef = useRef<number | null>(null);
+  const touchAutoScrollFrameRef = useRef<number | null>(null);
+  const touchAutoScrollSpeedRef = useRef(0);
 
   // AI States
   const [isAIInputOpen, setIsAIInputOpen] = useState(false);
@@ -613,7 +779,7 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
       const tasksWithId: ParsedTask[] = parsedTodos.map((t, idx) => ({
         id: Date.now().toString() + idx,
         title: t.title,
-        categoryId: t.categoryId || selectedCategoryId, // Use AI's or fallback to current
+        categoryId: t.categoryId || categories[0]?.id || selectedCategoryId, // Use AI's or fallback to current
         linkedActivityId: t.linkedActivityId,
         linkedCategoryId: undefined, // Let Modal auto-derive
         defaultScopeIds: t.defaultScopeIds || [],
@@ -635,7 +801,7 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
       setIsAIConfirmOpen(true); // Open confirm
     } catch (error) {
       console.error("AI Generation Failed", error);
-      alert("AI Analysis Failed. Please check your network or API Key settings in Settings -> AI Integration.");
+      alert('AI 解析失败，请检查网络连接或前往“设置 -> AI 集成”确认 API Key 配置。');
       // Ideally use toast, but alert is safer if toast prop is missing/optional
     } finally {
       setIsAIGenerating(false);
@@ -710,15 +876,26 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
 
   // 闁告帗绻傞～鎰板礌閺嶎厸鍋撴径澶庡幀闁汇劌瀚崹搴ｇ尵娴兼瑧绐楀┑鈥冲€归悘澶娾柦閳╁啯绠掗梺顐㈩槷閼垫垶绂掔拋宕囩Э闁告帒妫涚悮顐︽晬瀹€鍕笡閻犱降鍊濋埀顒€顦懙鎴犵箔椤戣法顏卞☉?
   React.useEffect(() => {
-    if (!selectedCategoryId && categories.length > 0) {
-      setSelectedCategoryId(categories[0].id);
+    if (selectedCategoryId === VIRTUAL_SCHEDULE_CATEGORY_ID) {
+      return;
+    }
+
+    if (!categories.some((category) => category.id === selectedCategoryId)) {
+      setSelectedCategoryId(VIRTUAL_SCHEDULE_CATEGORY_ID);
     }
   }, [categories, selectedCategoryId]);
 
-  const selectedCategory = categories.find(c => c.id === selectedCategoryId) || categories[0];
+  const isVirtualScheduleCategory = selectedCategoryId === VIRTUAL_SCHEDULE_CATEGORY_ID;
+  const selectedCategory = categories.find((category) => category.id === selectedCategoryId) || null;
+  const primaryCategoryId = categories[0]?.id || '';
+  const todayDateKey = getTodayDateKey();
+  const todayDate = parseDateKey(todayDateKey) || new Date();
+  const tomorrowDate = new Date(todayDate);
+  tomorrowDate.setDate(todayDate.getDate() + 1);
+  const tomorrowDateKey = formatDateKey(tomorrowDate);
 
   // 濠碘€冲€归悘澶娾柦閳╁啯绠掗柛鎺戞鐞氼偊鏁嶇仦鐐枖缂佲偓閾忓厜鏁勯柣妯垮煐閳ь兛娴囬埀顒€濂旂粭澶愬及椤栨氨鈹涙繝?
-  if (!selectedCategory) {
+  if (categories.length === 0) {
     return (
       <div className="flex h-full items-center justify-center bg-[#faf9f6] flex-col gap-4">
         <div className="w-16 h-16 rounded-full bg-stone-100 flex items-center justify-center text-stone-300">
@@ -732,10 +909,114 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
     );
   }
 
-  const filteredTodos = todos
-    .filter(t => t.categoryId === selectedCategoryId)
-    .filter(t => showCompletedTodos || !t.isCompleted)
-    .sort((a, b) => Number(a.isCompleted) - Number(b.isCompleted));
+  const scheduleEntriesByFilter = useMemo<Record<TodoScheduleRange, TodoListEntry[]>>(() => {
+    const referenceDate = parseDateKey(todayDateKey) || new Date();
+
+    const buildEntries = (range: TodoScheduleRange): TodoListEntry[] => (
+      todos
+        .filter((todo) => showCompletedTodos || !todo.isCompleted)
+        .map((todo) => {
+          const scheduleMatches = getTodoScheduleMatches(todo, range, referenceDate);
+
+          return {
+            todo,
+            scheduleMatches,
+            scheduleMatchLabels: buildScheduleMatchLabels(scheduleMatches)
+          };
+        })
+        .filter((entry) => entry.scheduleMatches.length > 0)
+        .sort((left, right) => {
+          if (left.todo.isCompleted !== right.todo.isCompleted) {
+            return Number(left.todo.isCompleted) - Number(right.todo.isCompleted);
+          }
+
+          const leftFirstMatch = left.scheduleMatches[0];
+          const rightFirstMatch = right.scheduleMatches[0];
+
+          if (leftFirstMatch && rightFirstMatch) {
+            const dateDiff = leftFirstMatch.dateKey.localeCompare(rightFirstMatch.dateKey);
+            if (dateDiff !== 0) return dateDiff;
+
+            const priorityDiff = TODO_SCHEDULE_MATCH_PRIORITY[leftFirstMatch.kind] - TODO_SCHEDULE_MATCH_PRIORITY[rightFirstMatch.kind];
+            if (priorityDiff !== 0) return priorityDiff;
+          }
+
+          return left.todo.title.localeCompare(right.todo.title, 'zh-CN');
+        })
+    );
+
+    return {
+      today: buildEntries('today'),
+      tomorrow: buildEntries('tomorrow'),
+      thisWeek: buildEntries('thisWeek')
+    };
+  }, [todos, showCompletedTodos, todayDateKey, tomorrowDateKey]);
+
+  const selectedTodoEntries: TodoListEntry[] = isVirtualScheduleCategory
+    ? scheduleEntriesByFilter[selectedScheduleFilter]
+    : todos
+        .filter((todo) => todo.categoryId === selectedCategoryId)
+        .filter((todo) => showCompletedTodos || !todo.isCompleted)
+        .sort((left, right) => Number(left.isCompleted) - Number(right.isCompleted))
+        .map((todo) => ({
+          todo,
+          scheduleMatches: [],
+          scheduleMatchLabels: []
+        }));
+
+  const selectedCategoryName = isVirtualScheduleCategory
+    ? VIRTUAL_SCHEDULE_CATEGORY_NAME
+    : (selectedCategory?.name || categories[0].name);
+  const selectedScheduleFilterMeta = VIRTUAL_SCHEDULE_FILTERS.find((filter) => filter.id === selectedScheduleFilter) || VIRTUAL_SCHEDULE_FILTERS[0];
+  const selectedTodoSections = useMemo<TodoListSection[]>(() => {
+    if (!isVirtualScheduleCategory || selectedScheduleFilter !== 'thisWeek') {
+      return [];
+    }
+
+    const sectionMap = new Map<string, TodoListSection>();
+
+    selectedTodoEntries.forEach((entry) => {
+      const firstMatch = entry.scheduleMatches[0];
+      if (!firstMatch) {
+        return;
+      }
+
+      const existingSection = sectionMap.get(firstMatch.dateKey);
+      if (existingSection) {
+        existingSection.entries.push(entry);
+        return;
+      }
+
+      sectionMap.set(firstMatch.dateKey, {
+        dateKey: firstMatch.dateKey,
+        label: formatScheduleSectionLabel(firstMatch.dateKey, todayDateKey, tomorrowDateKey),
+        entries: [entry]
+      });
+    });
+
+    return Array.from(sectionMap.values()).sort((left, right) => left.dateKey.localeCompare(right.dateKey));
+  }, [isVirtualScheduleCategory, selectedScheduleFilter, selectedTodoEntries, todayDateKey, tomorrowDateKey]);
+
+  const handleAddTodoClick = () => {
+    const targetCategoryId = isVirtualScheduleCategory ? primaryCategoryId : selectedCategoryId;
+    if (!targetCategoryId) {
+      return;
+    }
+
+    if (isVirtualScheduleCategory) {
+      if (selectedScheduleFilter === 'today') {
+        onAddTodo(targetCategoryId, { scheduledDate: todayDateKey });
+        return;
+      }
+
+      if (selectedScheduleFilter === 'tomorrow') {
+        onAddTodo(targetCategoryId, { scheduledDate: tomorrowDateKey });
+        return;
+      }
+    }
+
+    onAddTodo(targetCategoryId);
+  };
 
   const weekTodos = useMemo(() => todos, [todos]);
 
@@ -823,6 +1104,16 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
     touchDragActivatedRef.current = false;
     touchDraggingWeekEntryRef.current = null;
     touchDragTargetDateRef.current = null;
+    touchDragPointRef.current = null;
+    touchAutoScrollSpeedRef.current = 0;
+    if (touchAutoScrollFrameRef.current !== null) {
+      window.cancelAnimationFrame(touchAutoScrollFrameRef.current);
+      touchAutoScrollFrameRef.current = null;
+    }
+    if (touchDragFrameRef.current !== null) {
+      window.cancelAnimationFrame(touchDragFrameRef.current);
+      touchDragFrameRef.current = null;
+    }
   };
 
   const commitWeekDrop = (entryDate: string, entry: WeekTodoEntry | null) => {
@@ -857,6 +1148,91 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
     return dropContainer?.dataset.weekDropDate || null;
   };
 
+  const flushTouchDragPreview = () => {
+    const point = touchDragPointRef.current;
+    if (!point) {
+      touchDragFrameRef.current = null;
+      return;
+    }
+
+    const nextDate = resolveDropDateFromPoint(point.x, point.y);
+    touchDragTargetDateRef.current = nextDate;
+    setDragTargetDate((current) => current === nextDate ? current : nextDate);
+    setTouchDragPreview((current) => (
+      current
+      && current.x === point.x
+      && current.y === point.y
+      && current.title === point.title
+    )
+      ? current
+      : { ...point });
+    touchDragFrameRef.current = null;
+  };
+
+  const queueTouchDragPreviewUpdate = (point: { x: number; y: number; title: string }) => {
+    touchDragPointRef.current = point;
+    if (touchDragFrameRef.current === null) {
+      touchDragFrameRef.current = window.requestAnimationFrame(flushTouchDragPreview);
+    }
+  };
+
+  const stopTouchAutoScroll = () => {
+    touchAutoScrollSpeedRef.current = 0;
+    if (touchAutoScrollFrameRef.current !== null) {
+      window.cancelAnimationFrame(touchAutoScrollFrameRef.current);
+      touchAutoScrollFrameRef.current = null;
+    }
+  };
+
+  const stepTouchAutoScroll = () => {
+    const container = weekScrollContainerRef.current;
+    const point = touchDragPointRef.current;
+    const speed = touchAutoScrollSpeedRef.current;
+
+    if (!container || !point || speed === 0) {
+      touchAutoScrollFrameRef.current = null;
+      return;
+    }
+
+    const previousScrollTop = container.scrollTop;
+    container.scrollTop += speed;
+    queueTouchDragPreviewUpdate(point);
+
+    if (container.scrollTop === previousScrollTop) {
+      stopTouchAutoScroll();
+      return;
+    }
+
+    touchAutoScrollFrameRef.current = window.requestAnimationFrame(stepTouchAutoScroll);
+  };
+
+  const updateTouchAutoScroll = (clientY: number) => {
+    const container = weekScrollContainerRef.current;
+    if (!container) return;
+
+    const rect = container.getBoundingClientRect();
+    const threshold = Math.min(96, Math.max(56, rect.height * 0.16));
+    let nextSpeed = 0;
+
+    if (clientY < rect.top + threshold) {
+      const intensity = (rect.top + threshold - clientY) / threshold;
+      nextSpeed = -Math.max(6, intensity * 20);
+    } else if (clientY > rect.bottom - threshold) {
+      const intensity = (clientY - (rect.bottom - threshold)) / threshold;
+      nextSpeed = Math.max(6, intensity * 20);
+    }
+
+    if (nextSpeed === 0) {
+      stopTouchAutoScroll();
+      return;
+    }
+
+    touchAutoScrollSpeedRef.current = nextSpeed;
+    if (touchAutoScrollFrameRef.current === null) {
+      touchAutoScrollFrameRef.current = window.requestAnimationFrame(stepTouchAutoScroll);
+    }
+  };
+
   const handleTouchWeekItemDragStart = (entry: WeekTodoEntry, event: React.TouchEvent<HTMLDivElement>) => {
     const dragEntry = createDragEntryForWeekItem(entry);
     if (!dragEntry) return;
@@ -870,6 +1246,11 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
       y: touch.clientY,
       title: entry.todo.title
     });
+    touchDragPointRef.current = {
+      x: touch.clientX,
+      y: touch.clientY,
+      title: entry.todo.title
+    };
     setIsTouchWeekDragging(true);
     touchDragActivatedRef.current = true;
     touchDraggingWeekEntryRef.current = dragEntry;
@@ -888,14 +1269,12 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
 
       event.preventDefault();
 
-      const nextDate = resolveDropDateFromPoint(touch.clientX, touch.clientY);
-      touchDragTargetDateRef.current = nextDate;
-      setDragTargetDate(nextDate);
-      setTouchDragPreview({
+      queueTouchDragPreviewUpdate({
         x: touch.clientX,
         y: touch.clientY,
         title: activeEntry.todo.title
       });
+      updateTouchAutoScroll(touch.clientY);
     };
 
     const handleWindowTouchEnd = () => {
@@ -916,6 +1295,11 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
     window.addEventListener('touchcancel', handleWindowTouchEnd);
 
     return () => {
+      stopTouchAutoScroll();
+      if (touchDragFrameRef.current !== null) {
+        window.cancelAnimationFrame(touchDragFrameRef.current);
+        touchDragFrameRef.current = null;
+      }
       window.removeEventListener('touchmove', handleWindowTouchMove);
       window.removeEventListener('touchend', handleWindowTouchEnd);
       window.removeEventListener('touchcancel', handleWindowTouchEnd);
@@ -928,7 +1312,7 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
     setQuickActionType(badgeKey);
   };
 
-  const handleQuickActionMove = (type: 'scheduled' | 'deadline', mode: 'today' | 'nextWeek') => {
+  const handleQuickActionMove = (type: 'scheduled' | 'deadline', mode: 'today' | 'tomorrow' | 'nextWeek') => {
     if (!quickActionEntry) return;
 
     const baseDateKey = type === 'scheduled'
@@ -939,6 +1323,10 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
     if (mode === 'today') {
       const today = new Date();
       targetDate.setFullYear(today.getFullYear(), today.getMonth(), today.getDate());
+    } else if (mode === 'tomorrow') {
+      const tomorrow = new Date();
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      targetDate.setFullYear(tomorrow.getFullYear(), tomorrow.getMonth(), tomorrow.getDate());
     } else {
       targetDate.setDate(targetDate.getDate() + 7);
     }
@@ -968,6 +1356,17 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
       ...quickActionEntry.todo,
       isCompleted: true,
       completedAt: new Date().toISOString()
+    });
+    setQuickActionEntry(null);
+    setQuickActionType(null);
+  };
+
+  const handleQuickActionUndoComplete = () => {
+    if (!quickActionEntry) return;
+    onSaveTodo({
+      ...quickActionEntry.todo,
+      isCompleted: false,
+      completedAt: undefined
     });
     setQuickActionEntry(null);
     setQuickActionType(null);
@@ -1140,7 +1539,7 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
             </div>
           </div>
 
-          <div className="min-h-0 flex-1 overflow-y-auto no-scrollbar">
+          <div ref={weekScrollContainerRef} className="min-h-0 flex-1 overflow-y-auto no-scrollbar">
             <div className="border-t border-stone-300/70 pb-[calc(6.5rem+env(safe-area-inset-bottom))]">
               {weekBuckets.map((bucket, index) => {
                 const bucketDate = parseDateKey(bucket.date);
@@ -1283,6 +1682,7 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
           onClearDate={handleQuickActionClearDate}
           onOpenDetail={handleQuickActionOpenDetail}
           onComplete={handleQuickActionComplete}
+          onUndoComplete={handleQuickActionUndoComplete}
           onClose={() => {
             setQuickActionEntry(null);
             setQuickActionType(null);
@@ -1332,6 +1732,34 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
         className={`flex-shrink-0 flex flex-col overflow-y-auto pt-6 pb-20 pl-0 pr-2 no-scrollbar z-0 transition-all duration-300 relative ${isSidebarOpen ? 'w-auto md:min-w-[12rem]' : 'w-16 items-center'}`}
       >
         <div className="flex-1 w-full">
+          <button
+            onClick={() => {
+              setSelectedCategoryId(VIRTUAL_SCHEDULE_CATEGORY_ID);
+              setSelectedScheduleFilter('today');
+            }}
+            className={`
+              flex items-center gap-2 mb-1 transition-all duration-200 text-left relative rounded-r-2xl group
+              ${isVirtualScheduleCategory
+                ? 'text-stone-900 font-bold bg-white shadow-[2px_2px_10px_rgba(0,0,0,0.02)] z-10'
+                : 'text-stone-600 hover:text-stone-800'
+              }
+              ${!isSidebarOpen ? 'justify-center w-12 h-12 md:w-14 md:h-14' : 'w-full min-h-[3.5rem] px-4 py-3'}
+            `}
+            title={!isSidebarOpen ? VIRTUAL_SCHEDULE_CATEGORY_NAME : undefined}
+          >
+            {isVirtualScheduleCategory && (
+              <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-5 rounded-r-full" style={{ backgroundColor: 'var(--accent-color)' }}></div>
+            )}
+            <IconRenderer icon="📅" uiIcon="ui:calendar" size={20} className="flex-shrink-0" />
+            {isSidebarOpen && (
+              <div className={`min-w-0 text-sm md:text-base whitespace-nowrap transition-all ${isVirtualScheduleCategory ? 'font-bold' : 'font-medium'}`}>
+                {VIRTUAL_SCHEDULE_CATEGORY_NAME}
+              </div>
+            )}
+          </button>
+
+          <div className={`${isSidebarOpen ? 'mx-4 my-3' : 'mx-auto my-3 w-8'} border-t border-stone-200/80`}></div>
+
           {categories.map((category) => {
             const isSelected = selectedCategoryId === category.id;
             return (
@@ -1410,9 +1838,35 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
         <div className="mb-6 flex items-center justify-between mt-2 md:mt-0">
           <div className="min-w-0">
             <h1 className="text-2xl font-bold text-stone-900 tracking-tight flex items-center gap-3">
-              {selectedCategory.name}
+              {selectedCategoryName}
               <span className="text-stone-300 text-lg font-normal">Tasks</span>
             </h1>
+            {isVirtualScheduleCategory && (
+              <div className="mt-3 flex flex-wrap items-center gap-1.5">
+                {VIRTUAL_SCHEDULE_FILTERS.map((filter) => {
+                  const isActive = selectedScheduleFilter === filter.id;
+                  const visibleCount = scheduleEntriesByFilter[filter.id].length;
+
+                  return (
+                    <button
+                      key={filter.id}
+                      type="button"
+                      onClick={() => setSelectedScheduleFilter(filter.id)}
+                      className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[10px] tracking-[0.12em] transition-all ${
+                        isActive
+                          ? 'border-stone-300 bg-white text-stone-800 shadow-sm'
+                          : 'border-stone-200 bg-white/55 text-stone-500 hover:border-stone-300 hover:bg-white/80'
+                      }`}
+                    >
+                      <span>{filter.label}</span>
+                      <span className={`rounded-full px-1.5 py-0.5 text-[9px] tracking-[0.08em] ${isActive ? 'bg-stone-100 text-stone-600' : 'bg-stone-100/70 text-stone-400'}`}>
+                        {visibleCount}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
           </div>
           <div className="flex items-center gap-3">
             <button
@@ -1423,7 +1877,7 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
               <Sparkles size={16} />
             </button>
             <button
-              onClick={() => onAddTodo(selectedCategoryId)}
+              onClick={handleAddTodoClick}
               className="floating-button w-10 h-10 rounded-full flex items-center justify-center shadow-lg active:scale-90 transition-transform"
             >
               <Plus size={20} />
@@ -1432,27 +1886,60 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
         </div>
 
         <div className="flex-1 overflow-y-auto pb-24 no-scrollbar">
-          {filteredTodos.map((todo, index) => (
-            <SwipeableTodoItem
-              key={todo.id}
-              todo={todo}
-              categories={categories}
-              activityCategories={activityCategories}
-              scopes={scopes}
-              onToggle={onToggleTodo}
-              onEdit={onEditTodo}
-              onStartFocus={onStartFocus}
-              onDuplicate={handleOpenDuplicateModal}
-              viewMode={viewMode}
-              isFirst={index === 0}
-              isLast={index === filteredTodos.length - 1}
-            />
-          ))}
+          {isVirtualScheduleCategory && selectedScheduleFilter === 'thisWeek'
+            ? selectedTodoSections.map((section) => (
+              <section key={section.dateKey} className="mb-6">
+                <div className="mb-2 flex items-center gap-3 px-1">
+                  <div className="text-[11px] uppercase tracking-[0.18em] text-stone-400">
+                    {section.label}
+                  </div>
+                  <div className="h-px flex-1 bg-stone-200/80"></div>
+                </div>
+                {section.entries.map((entry, index) => (
+                  <SwipeableTodoItem
+                    key={entry.todo.id}
+                    todo={entry.todo}
+                    categories={categories}
+                    activityCategories={activityCategories}
+                    scopes={scopes}
+                    onToggle={onToggleTodo}
+                    onEdit={onEditTodo}
+                    onStartFocus={onStartFocus}
+                    onDuplicate={handleOpenDuplicateModal}
+                    viewMode={viewMode}
+                    scheduleMatchLabels={entry.scheduleMatchLabels}
+                    isFirst={index === 0}
+                    isLast={index === section.entries.length - 1}
+                  />
+                ))}
+              </section>
+            ))
+            : selectedTodoEntries.map((entry, index) => (
+              <SwipeableTodoItem
+                key={entry.todo.id}
+                todo={entry.todo}
+                categories={categories}
+                activityCategories={activityCategories}
+                scopes={scopes}
+                onToggle={onToggleTodo}
+                onEdit={onEditTodo}
+                onStartFocus={onStartFocus}
+                onDuplicate={handleOpenDuplicateModal}
+                viewMode={viewMode}
+                scheduleMatchLabels={entry.scheduleMatchLabels}
+                isFirst={index === 0}
+                isLast={index === selectedTodoEntries.length - 1}
+              />
+            ))}
 
-          {filteredTodos.length === 0 && (
+          {selectedTodoEntries.length === 0 && (
             <div className="flex flex-col items-center justify-center py-20 text-stone-300">
               <MoreHorizontal size={40} className="mb-4 opacity-50" />
-              <p className="text-sm font-serif italic">No tasks yet.</p>
+              <p className="text-sm font-serif italic">
+                {isVirtualScheduleCategory
+                  ? `${selectedScheduleFilterMeta.label}没有排期任务。`
+                  : 'No tasks yet.'}
+              </p>
             </div>
           )}
         </div>

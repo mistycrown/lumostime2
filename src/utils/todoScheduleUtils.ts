@@ -4,6 +4,8 @@
  * @output Week buckets and schedule badge metadata for the todo week view
  * @pos Utility (Todo planning)
  * @description Shared helpers for deriving scheduled, deadline, and recurring todo visibility without creating standalone occurrence records.
+ * @updated 2026-04-20 19:08: Added reusable today/tomorrow/this-week schedule match helpers for the todo list virtual category.
+ * @updated 2026-04-20 18:12: Normalized week-view badge combinations so Due hides Arrange and Done hides Trace for the same day.
  *
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
@@ -28,7 +30,20 @@ export interface WeekDayBucket {
   items: WeekTodoEntry[];
 }
 
+export type TodoScheduleMatchKind = 'deadline' | 'scheduled' | 'recurring';
+export type TodoScheduleRange = 'today' | 'tomorrow' | 'thisWeek';
+
+export interface TodoScheduleMatch {
+  dateKey: string;
+  kind: TodoScheduleMatchKind;
+}
+
 const ONE_DAY_MS = 24 * 60 * 60 * 1000;
+const TODO_SCHEDULE_MATCH_PRIORITY: Record<TodoScheduleMatchKind, number> = {
+  deadline: 0,
+  scheduled: 1,
+  recurring: 2
+};
 
 const normalizeDate = (date: Date): Date => new Date(date.getFullYear(), date.getMonth(), date.getDate());
 
@@ -74,6 +89,25 @@ export const getWeekDates = (referenceDate: Date): Date[] => {
 };
 
 export const getTodayDateKey = (): string => formatDateKey(new Date());
+
+export const getTodoScheduleRangeDateKeys = (
+  range: TodoScheduleRange,
+  referenceDate: Date = new Date()
+): string[] => {
+  const normalizedReference = normalizeDate(referenceDate);
+
+  if (range === 'today') {
+    return [formatDateKey(normalizedReference)];
+  }
+
+  if (range === 'tomorrow') {
+    const tomorrow = new Date(normalizedReference);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    return [formatDateKey(tomorrow)];
+  }
+
+  return getWeekDates(normalizedReference).map((date) => formatDateKey(date));
+};
 
 const getDayDiff = (start: Date, end: Date): number =>
   Math.floor((normalizeDate(end).getTime() - normalizeDate(start).getTime()) / ONE_DAY_MS);
@@ -141,17 +175,64 @@ const buildInProgressLookup = (logs: Log[]): Map<string, Set<string>> => {
   return lookup;
 };
 
+const normalizeTodoDateBadges = (badges: TodoDateBadges): TodoDateBadges => {
+  const normalized = { ...badges };
+
+  if (normalized.deadline) {
+    normalized.scheduled = false;
+  }
+
+  if (normalized.completed) {
+    normalized.inProgress = false;
+  }
+
+  return normalized;
+};
+
 export const getTodoDateBadges = (
   todo: TodoItem,
   targetDateKey: string,
   inProgressLookup?: Map<string, Set<string>>
-): TodoDateBadges => ({
+): TodoDateBadges => normalizeTodoDateBadges({
   scheduled: todo.scheduledDate === targetDateKey,
   deadline: todo.deadlineDate === targetDateKey,
   recurring: matchesRecurrenceRule(todo.recurrenceRule, targetDateKey),
   completed: todo.completedAt ? formatDateKey(new Date(todo.completedAt)) === targetDateKey : false,
   inProgress: inProgressLookup?.get(todo.id)?.has(targetDateKey) || false
 });
+
+export const getTodoScheduleMatches = (
+  todo: TodoItem,
+  range: TodoScheduleRange,
+  referenceDate: Date = new Date()
+): TodoScheduleMatch[] => {
+  const dateKeys = getTodoScheduleRangeDateKeys(range, referenceDate);
+
+  return dateKeys.flatMap((dateKey) => {
+    const badges = getTodoDateBadges(todo, dateKey);
+    const matches: TodoScheduleMatch[] = [];
+
+    if (badges.deadline) {
+      matches.push({ dateKey, kind: 'deadline' });
+    }
+
+    if (badges.scheduled) {
+      matches.push({ dateKey, kind: 'scheduled' });
+    }
+
+    if (badges.recurring) {
+      matches.push({ dateKey, kind: 'recurring' });
+    }
+
+    return matches;
+  }).sort((left, right) => {
+    if (left.dateKey !== right.dateKey) {
+      return left.dateKey.localeCompare(right.dateKey);
+    }
+
+    return TODO_SCHEDULE_MATCH_PRIORITY[left.kind] - TODO_SCHEDULE_MATCH_PRIORITY[right.kind];
+  });
+};
 
 const getWeekEntryPriority = (badges: TodoDateBadges): number => {
   if (badges.deadline) return 0;
