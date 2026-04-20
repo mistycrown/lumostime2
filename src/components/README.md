@@ -13,7 +13,9 @@ Components that form the structural or global UI elements.
 Overlay components for complex interactions.
 
 - `AddLogModal.tsx`: Main modal for logging time, including segmented start/end time inputs that auto-advance from hour to minute after two digits.
+- `TodoDatePickerModal.tsx`: Lightweight planning date picker with day selection plus a quick year/month jump panel from the header month label.
 - `TodoDetailModal.tsx`: Detailed view and editing for Todos, including planning fields for assigned date, deadline date, and lightweight recurrence rules.
+- `TodoDuplicateModal.tsx`: Lightweight pre-copy modal for renaming duplicated todos and clearing dates, tags, or scopes before creation.
 - `GoalEditor.tsx`: Goal creation and editing.
 - `AIBatchModal.tsx`: AI-powered schedule generation.
 - `AddActivityModal.tsx`: Creating new activities.
@@ -88,7 +90,8 @@ Components for theme and appearance customization.
 - `ScheduleStyleSelector.tsx`: 日程图样式卡片选择器，提供默认、经典、极简、实色四种轻量预览。
 - `achievement/AchievementBottleIconPackSelector.tsx`: 已改为成就瓶图标包卡片选择器，支持更紧凑的预览式切换。
 - `achievement/AchievementBottleStyleSelector.tsx`: 已改为成就瓶样式卡片选择器，使用玻璃瓶身小预览区分不同气质。
-> Last updated: 2026-03-30
+> Last updated: 2026-04-20
+- `TodoDuplicateModal.tsx`: Added a quick-copy editing modal so todo duplication can stay lightweight without leaving an extra temporary item in the list.
 - `AddLogModal.tsx`: Added direct camera capture functionality, now preferring native camera file-path persistence before falling back to `webPath`.
 - `TodoAssociation.tsx`: Updated progress display logic in associated parent modals/views (`AddLogModal`, `FocusDetailView`) to reflect active progress increments in real time with a distinct color.
 - `NavigationDecorationSelector.tsx`: Added support for uploading and managing custom navigation decorations using Capacitor Filesystem.

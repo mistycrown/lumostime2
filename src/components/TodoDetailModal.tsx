@@ -174,8 +174,13 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({ initialTodo, c
   const handleRecurrenceFrequencyChange = (nextFrequency: RecurrenceFrequencyMode) => {
     setRecurrenceFrequency(nextFrequency);
 
-    if (nextFrequency !== 'none' && scheduledDate) {
-      setScheduledDate('');
+    if (nextFrequency !== 'none') {
+      if (scheduledDate) {
+        setScheduledDate('');
+      }
+      if (deadlineDate) {
+        setDeadlineDate('');
+      }
     }
 
     if (!recurrenceStartDate) {
@@ -239,6 +244,9 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({ initialTodo, c
         break;
       case 'deadlineDate':
         setDeadlineDate(value);
+        if (recurrenceFrequency !== 'none') {
+          clearRecurrence();
+        }
         break;
       case 'recurrenceStartDate':
         setRecurrenceStartDate(value);
@@ -793,6 +801,9 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({ initialTodo, c
                   >
                     {formatDateFieldValue(deadlineDate)}
                   </button>
+                  {recurrenceFrequency !== 'none' && (
+                    <p className="text-[11px] text-stone-400">设置截止日期后会自动关闭循环规则。</p>
+                  )}
                 </div>
 
                 <div className="space-y-3">
@@ -841,7 +852,7 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({ initialTodo, c
                       );
                     })}
                   </div>
-                  <p className="text-[11px] text-stone-400">循环规则与分配日期互斥。开启循环后会自动清空分配日期。</p>
+                  <p className="text-[11px] text-stone-400">循环规则与分配日期、截止日期互斥。开启循环后会自动清空这两个日期。</p>
 
                   {recurrenceFrequency !== 'none' && (
                     <div className="space-y-3 rounded-2xl border border-dashed border-stone-200 bg-stone-50/70 p-4 animate-in slide-in-from-top-2 fade-in">
