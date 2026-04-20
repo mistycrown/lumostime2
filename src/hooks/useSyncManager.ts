@@ -18,6 +18,7 @@ import { useNavigation } from '../contexts/NavigationContext';
 import { useToast } from '../contexts/ToastContext';
 import { webdavService } from '../services/webdavService';
 import { s3Service } from '../services/s3Service';
+import { compatibleS3Service } from '../services/compatibleS3Service';
 import { imageService } from '../services/imageService';
 import { syncService } from '../services/syncService';
 import { uploadDataToCloud, downloadWithBackup, CloudService } from '../utils/syncUtils';
@@ -183,22 +184,30 @@ export const useSyncManager = () => {
     const getActiveCloudService = () => {
         const webdavConfig = webdavService.getConfig();
         const s3Config = s3Service.getConfig();
+        const compatibleS3Config = compatibleS3Service.getConfig();
         
         // 检查手动断开标志
         const webdavManualDisconnect = localStorage.getItem('lumos_webdav_manual_disconnect') === 'true';
         const s3ManualDisconnect = localStorage.getItem('lumos_s3_manual_disconnect') === 'true';
+        const compatibleS3ManualDisconnect = localStorage.getItem('lumos_compatible_s3_manual_disconnect') === 'true';
 
         // 过滤掉已手动断开的服务
         const hasWebdav = webdavConfig && !webdavManualDisconnect;
         const hasS3 = s3Config && !s3ManualDisconnect;
+        const hasCompatibleS3 = compatibleS3Config && !compatibleS3ManualDisconnect;
+        const activeCount = [hasWebdav, hasS3, hasCompatibleS3].filter(Boolean).length;
 
-        if (!hasWebdav && !hasS3) {
+        if (activeCount === 0) {
             return { service: null, error: 'no_service' as const };
         }
 
         // 如果两个都连接了，提示用户只能选择一个
-        if (hasWebdav && hasS3) {
+        if (activeCount > 1) {
             return { service: null, error: 'multiple_services' as const };
+        }
+
+        if (hasCompatibleS3) {
+            return { service: compatibleS3Service, error: null };
         }
 
         return { service: hasS3 ? s3Service : webdavService, error: null };
@@ -235,7 +244,7 @@ export const useSyncManager = () => {
             
             if (serviceError === 'multiple_services') {
                 if (mode === 'manual') {
-                    addToast('error', '检测到同时连接了 WebDAV 和 S3，请在设置中断开其中一个');
+                    addToast('error', '检测到同时连接了多个云端服务，请在设置中断开其余连接后再同步');
                     setIsSettingsOpen(true);
                 }
                 return;
@@ -506,7 +515,7 @@ export const useSyncManager = () => {
             }
             
             if (serviceError === 'multiple_services') {
-                addToast('error', '检测到同时连接了 WebDAV 和 S3，请在设置中断开其中一个');
+                addToast('error', '检测到同时连接了多个云端服务，请在设置中断开其余连接后再同步');
                 setIsSettingsOpen(true);
                 return;
             }
@@ -584,7 +593,7 @@ export const useSyncManager = () => {
             }
             
             if (serviceError === 'multiple_services') {
-                addToast('error', '检测到同时连接了 WebDAV 和 S3，请在设置中断开其中一个');
+                addToast('error', '检测到同时连接了多个云端服务，请在设置中断开其余连接后再同步');
                 setIsSettingsOpen(true);
                 return;
             }

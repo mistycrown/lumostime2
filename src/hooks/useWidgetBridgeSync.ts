@@ -4,7 +4,7 @@
  * @output Runtime reconciliation between the Android widget layer and the React app
  * @pos Hook
  * @description Imports completed timer widget actions into logs, mirrors timer runtime state, syncs daily widget progress to native, and replays queued daily taps back into review state.
- * @updated 2026-04-16: Added daily widget reconciliation so native daily taps and app-side review edits stay in sync.
+ * @updated 2026-04-20: Force-resyncs today's daily widget payload whenever the app becomes visible so cross-day state resets without requiring a widget tap.
  */
 import { App as CapacitorApp } from '@capacitor/app';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -57,6 +57,7 @@ export const useWidgetBridgeSync = () => {
 
     const reconcileFromNative = async () => {
       try {
+        let reconciledDailyState = latestDailyStateRef.current;
         const [{ actions }, { runtimeState }, { actions: dailyActions }] = await Promise.all([
           WidgetBridge.getPendingActions(),
           WidgetBridge.getRuntimeState(),
@@ -103,15 +104,24 @@ export const useWidgetBridgeSync = () => {
           });
 
           if (nextDailyReviews !== currentState.dailyReviews) {
-            latestDailyStateRef.current = {
+            reconciledDailyState = {
               ...currentState,
               dailyReviews: nextDailyReviews
             };
+            latestDailyStateRef.current = reconciledDailyState;
             setDailyReviews(nextDailyReviews);
+          } else {
+            reconciledDailyState = currentState;
           }
 
           await WidgetBridge.clearPendingDailyActions({ ids: dailyActions.map((action) => action.id) });
         }
+
+        const payload = buildDailyWidgetSyncPayload({
+          dailyReviews: reconciledDailyState.dailyReviews,
+          checkTemplates: reconciledDailyState.checkTemplates
+        });
+        await WidgetBridge.syncDailyWidgetData({ payload });
 
         setActiveSessions((prevSessions) => {
           const completedActionIds = new Set(actions.map((action) => action.id));
