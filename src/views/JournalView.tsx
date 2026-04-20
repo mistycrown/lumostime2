@@ -7,6 +7,7 @@
  * 
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  * @updated 2026-04-20: Replaced the top-left Memoir month dropdown with the shared centered month picker modal used by todo scheduling.
+ * @updated 2026-04-20: Enabled the mood calendar modal date title to jump directly into that day's daily review.
  */
 import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import { DailyReview, Log, WeeklyReview, MonthlyReview } from '../types';
@@ -789,6 +790,7 @@ export const JournalView: React.FC<JournalViewProps> = ({
                                             }
                                         }
                                     }}
+                                    onOpenDailyReview={onOpenDailyReview}
                                 />
 
                                 {/* Quote Text - Click to Open Monthly Review */}

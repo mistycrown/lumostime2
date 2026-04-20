@@ -29,6 +29,16 @@ The views are designed as "dumb" or "presentational" components where possible, 
 > ⚠️ **Note**: When modifying views, ensure that new state requirements are coordinated with `App.tsx` if they affect global data (Logs, Categories, Todos).
 
 > Last updated: 2026-04-20
+- `TodoView.tsx`: Added conservative left/right week-switch swipes inside the week planning scroll area, with stronger horizontal thresholds and explicit opt-outs for row drag handles, badge taps, and date buttons to reduce accidental switches.
+- `TodoView.tsx`: Moved the week-view `本周` action into the header's top-right corner so it reads as a separate jump-to-current-week control.
+- `TodoView.tsx`: Split the right-swipe background styling so the light detail-open state and deeper duplicate state now use clearly different colors.
+- `TodoView.tsx`: Lowered completed progress-fill opacity so finished progress-tracking cards read more softly in both loose and compact views.
+- `TodoView.tsx`: Mounted the shared todo quick-actions sheet above both list and week layouts so list-row taps now show the sheet in the active screen instead of the hidden week branch.
+- `TodoView.tsx`: Extracted the todo quick-actions sheet into shared component and hook files, and moved list-row touch handling onto a unified pointer gesture flow.
+- `TodoView.tsx`: Let loose-mode progress bars span the full card width so top-right arranged/due markers no longer compress them.
+- `TodoView.tsx`: Prevented touch ghost-clicks from immediately dismissing the todo quick-actions sheet after a mobile tap-open.
+- `TodoView.tsx`: Fixed mobile todo-row taps so they reliably open quick actions, and split right-swipe into a light open-detail gesture plus a deeper duplicate gesture.
+- `TodoView.tsx`: Changed todo-row primary taps to open the shared quick-actions sheet first, while keeping full detail editing available from the sheet header button.
 - `TodoView.tsx`: Moved arranged/due date markers into the detailed card's right action rail as stacked icon-plus-date rows, removed their outlines, and clamped loose-mode titles to two lines.
 - `TodoView.tsx`: Shortened the quick-action move labels to `今 / 明 / 下周` and widened the `下周` action column so the sheet no longer wraps the week shortcut.
 - `TodoView.tsx`: Added a `明天` shortcut beside `今天` and `下周` in the week-view quick-actions sheet for both Arrange and Due date moves.

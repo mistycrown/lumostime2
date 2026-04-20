@@ -62,6 +62,7 @@ interface MoodPickerModalProps {
     onSelect: (emoji: string) => void;
     onClear?: () => void;
     onSummaryChange?: (summary: string) => void; // 一句话总结变化回调
+    onOpenDailyReview?: (date: Date) => void;
     onClose: () => void;
 }
 
@@ -73,6 +74,7 @@ export const MoodPickerModal: React.FC<MoodPickerModalProps> = ({
     onSelect,
     onClear,
     onSummaryChange,
+    onOpenDailyReview,
     onClose
 }) => {
     const { defaultSelectorPage } = useSettings();
@@ -266,6 +268,16 @@ export const MoodPickerModal: React.FC<MoodPickerModalProps> = ({
         return `${year}/${month}/${day}`;
     };
 
+    const handleOpenDailyReview = () => {
+        if (!onOpenDailyReview) return;
+
+        const [year, month, day] = date.split('-').map(Number);
+        if (!year || !month || !day) return;
+
+        onClose();
+        onOpenDailyReview(new Date(year, month - 1, day));
+    };
+
     const modalContent = (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/20 backdrop-blur-sm animate-in fade-in duration-200">
             <div 
@@ -285,7 +297,20 @@ export const MoodPickerModal: React.FC<MoodPickerModalProps> = ({
 
                 {/* 标题 */}
                 <h2 className="text-2xl font-bold text-stone-900 text-center mb-2">
-                    How was {formatDate(date)}?
+                    <span>How was </span>
+                    {onOpenDailyReview ? (
+                        <button
+                            type="button"
+                            onClick={handleOpenDailyReview}
+                            className="inline-flex items-center border-b border-dashed border-stone-300 pb-0.5 text-stone-800 transition-colors hover:border-stone-500 hover:text-stone-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-stone-300 focus-visible:ring-offset-2"
+                            aria-label={`Open daily review for ${formatDate(date)}`}
+                        >
+                            {formatDate(date)}
+                        </button>
+                    ) : (
+                        <span>{formatDate(date)}</span>
+                    )}
+                    <span>?</span>
                 </h2>
 
                 {/* 副标题 */}

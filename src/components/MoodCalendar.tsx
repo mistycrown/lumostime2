@@ -15,6 +15,7 @@ interface MoodCalendarProps {
     onUpdateMood: (date: string, emoji: string) => void;
     onClearMood: (date: string) => void;
     onUpdateSummary?: (date: string, summary: string) => void; // 新增：更新一句话总结
+    onOpenDailyReview?: (date: Date) => void;
 }
 
 const WEEK_DAYS = ['M', 'T', 'W', 'T', 'F', 'S', 'S']; // 周一到周日
@@ -25,7 +26,8 @@ export const MoodCalendar: React.FC<MoodCalendarProps> = ({
     dailyReviews,
     onUpdateMood,
     onClearMood,
-    onUpdateSummary
+    onUpdateSummary,
+    onOpenDailyReview
 }) => {
     const [selectedDate, setSelectedDate] = useState<string | null>(null);
     const [isMoodModalOpen, setIsMoodModalOpen] = useState(false);
@@ -199,6 +201,7 @@ export const MoodCalendar: React.FC<MoodCalendarProps> = ({
                         onUpdateSummary(selectedDate, summary);
                     }
                 } : undefined}
+                onOpenDailyReview={onOpenDailyReview}
                 onClose={() => {
                     setIsMoodModalOpen(false);
                     setSelectedDate(null);

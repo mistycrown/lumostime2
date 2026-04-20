@@ -7,6 +7,7 @@
 > `useScopeStats.ts` now follows the shared scope aggregation rule: one log linked to multiple scopes contributes its full duration to each linked scope.
 > `useAppInitialization.ts` now uses the shared floating-window startup guard so Android can still restore the overlay when notification permission is disabled, while logging that notification-based stability is reduced.
 > `useTodoManager.ts` now supports configurable todo duplication so copy flows can rename the duplicate first and optionally clear dates, tags, or scopes before saving.
+> `useTodoQuickActions.ts` now centralizes lightweight todo quick-actions state so todo-list taps and week-plan badges open the same scheduling/completion sheet behavior.
 
 > `useTodoStats.ts` 优先使用 `TodoCategory.color` 作为待办环形图颜色；旧分类没有保存颜色时，继续回退到历史默认调色板。
 
