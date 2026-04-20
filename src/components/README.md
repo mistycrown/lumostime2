@@ -13,7 +13,7 @@ Components that form the structural or global UI elements.
 Overlay components for complex interactions.
 
 - `AddLogModal.tsx`: Main modal for logging time, including segmented start/end time inputs that auto-advance from hour to minute after two digits.
-- `TodoDetailModal.tsx`: Detailed view and editing for Todos.
+- `TodoDetailModal.tsx`: Detailed view and editing for Todos, including planning fields for assigned date, deadline date, and lightweight recurrence rules.
 - `GoalEditor.tsx`: Goal creation and editing.
 - `AIBatchModal.tsx`: AI-powered schedule generation.
 - `AddActivityModal.tsx`: Creating new activities.

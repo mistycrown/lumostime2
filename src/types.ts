@@ -4,6 +4,7 @@
  * @output TypeScript Interfaces & Types
  * @pos Type Definitions (Shared contract)
  * @description Defines the core data structures (Log, TodoItem, Category, Activity, Filter order metadata, etc.) used throughout the application.
+ * @updated 2026-04-20: Added todo schedule and recurrence rule types for week-view planning.
  * @updated 2026-04-19: Added reusable note template definitions for detail-page editing and inline note recommendations.
  * @updated 2026-04-18: Added custom sticker set and sticker record types for synced mood sticker uploads.
  * @updated 2026-04-17: Added achievement filter-duration rules with inline filter expressions.
@@ -196,6 +197,17 @@ export interface TodoCategory {
   color?: string; // Stored category color for todo stats (Tailwind token or HEX)
 }
 
+export type TodoRecurrenceFrequency = 'daily' | 'weekly' | 'monthly';
+
+export interface TodoRecurrenceRule {
+  frequency: TodoRecurrenceFrequency;
+  startDate: string; // YYYY-MM-DD
+  endDate?: string; // YYYY-MM-DD
+  interval?: number;
+  weekdays?: number[]; // weekly: 0-6
+  monthDays?: number[]; // monthly: 1-31
+}
+
 export interface TodoItem {
   id: string;
   categoryId: string; // Belongs to a TodoCategory
@@ -217,6 +229,11 @@ export interface TodoItem {
   // Heatmap Customization (in Minutes)
   heatmapMin?: number;
   heatmapMax?: number;
+
+  // Schedule / Planning
+  scheduledDate?: string; // YYYY-MM-DD
+  deadlineDate?: string; // YYYY-MM-DD
+  recurrenceRule?: TodoRecurrenceRule;
 }
 
 export interface ParsedTimeEntry {

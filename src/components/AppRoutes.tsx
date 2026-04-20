@@ -473,6 +473,7 @@ export const AppRoutes: React.FC<AppRoutesProps> = ({
             return (
                 <TodoView
                     todos={todos}
+                    logs={logs}
                     categories={todoCategories}
                     activityCategories={categories}
                     scopes={scopes}
