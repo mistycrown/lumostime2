@@ -13,6 +13,7 @@ import * as LucideIcons from 'lucide-react';
 import { Capacitor } from '@capacitor/core';
 import { DailyReview, WeeklyReview, MonthlyReview, Log } from '../types';
 import { parseNarrative } from '../utils/narrativeUtils';
+import { useBackgroundDisplay } from '../hooks/useBackgroundDisplay';
 
 interface ReviewHubViewProps {
   dailyReviews: DailyReview[];
@@ -35,6 +36,7 @@ export const ReviewHubView: React.FC<ReviewHubViewProps> = ({
 }) => {
   const [isScrolled, setIsScrolled] = React.useState(false);
   const scrollContainerRef = React.useRef<HTMLDivElement>(null);
+  const { backgroundUrl, hasBackground, panelOverlayOpacity, useReducedEffects } = useBackgroundDisplay();
 
   const prefersCompatibleArchiveCards = useMemo(() => {
     if (typeof window === 'undefined') {
@@ -235,12 +237,31 @@ export const ReviewHubView: React.FC<ReviewHubViewProps> = ({
   void logs;
 
   return (
-    <div className="flex flex-col h-full bg-[#faf9f6] relative">
+    <div
+      className="flex flex-col h-full relative"
+      style={{ backgroundColor: hasBackground ? 'transparent' : '#faf9f6' }}
+    >
+      {hasBackground && (
+        <div
+          className="absolute inset-0 -z-20"
+          style={{
+            backgroundImage: `url(${backgroundUrl})`,
+            backgroundSize: 'cover',
+            backgroundPosition: 'center',
+            backgroundRepeat: 'no-repeat',
+            transform: 'translateZ(0)'
+          }}
+        />
+      )}
+      <div
+        className="absolute inset-0 -z-10"
+        style={{ backgroundColor: `rgba(250, 249, 246, ${panelOverlayOpacity})` }}
+      />
       <header
         className={`sticky top-0 z-40 transition-all duration-300 pt-[env(safe-area-inset-top)] ${
           isScrolled
-            ? 'bg-[#faf9f6]/90 backdrop-blur-md shadow-sm h-[calc(3rem+env(safe-area-inset-top))]'
-            : 'bg-[#faf9f6]/80 backdrop-blur-sm h-[calc(3.5rem+env(safe-area-inset-top))]'
+            ? `bg-[#faf9f6]/90 ${useReducedEffects ? '' : 'backdrop-blur-md'} shadow-sm h-[calc(3rem+env(safe-area-inset-top))]`
+            : `bg-[#faf9f6]/80 ${useReducedEffects ? '' : 'backdrop-blur-sm'} h-[calc(3.5rem+env(safe-area-inset-top))]`
         }`}
       >
         <div className="max-w-xl mx-auto px-6 h-full flex items-center justify-center">

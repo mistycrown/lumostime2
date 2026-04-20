@@ -9,6 +9,7 @@
  * - 使用 EdgeToEdge 设置状态栏背景为透明
  * - 分析背景图片顶部区域的亮度
  * - 根据背景亮度自动调整状态栏图标颜色
+ * @updated 2026-04-20: Cached per-image analysis results so background opacity tweaks no longer trigger redundant mobile image sampling.
  */
 
 import { Capacitor } from '@capacitor/core';
@@ -34,6 +35,7 @@ interface ColorAnalysis {
 class StatusBarService {
     private currentStyle: Style = Style.Light;
     private isInitialized = false;
+    private imageAnalysisCache = new Map<string, ColorAnalysis>();
 
     /**
      * 初始化状态栏服务 - 设置为透明背景
@@ -76,6 +78,11 @@ class StatusBarService {
      * 分析图片顶部区域的亮度
      */
     private async analyzeImage(imageUrl: string): Promise<ColorAnalysis> {
+        const cachedAnalysis = this.imageAnalysisCache.get(imageUrl);
+        if (cachedAnalysis) {
+            return cachedAnalysis;
+        }
+
         return new Promise((resolve, reject) => {
             const img = new Image();
             img.crossOrigin = 'Anonymous';
@@ -124,11 +131,13 @@ class StatusBarService {
                     
                     const dominantColor = `rgb(${r}, ${g}, ${b})`;
                     
-                    resolve({
+                    const analysis = {
                         isDark,
                         dominantColor,
                         brightness
-                    });
+                    };
+                    this.imageAnalysisCache.set(imageUrl, analysis);
+                    resolve(analysis);
                 } catch (error) {
                     reject(error);
                 }

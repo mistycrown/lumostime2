@@ -5,8 +5,9 @@
  * @pos View (Main Tab)
  * @description The main To-Do list interface. Displays tasks grouped by category, supports swipe actions (complete/duplicate), and filtering.
  * @updated 2026-04-12: Matched the expanded sidebar action button spacing with RecordView, added a persisted toggle for showing completed todos, and softened the shared sidebar control styling.
+ * @updated 2026-04-20: Switched custom background rendering to the shared preloaded display hook and reduced mobile blur cost.
  *
- * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
+ * 閳跨媴绗?Once I am updated, be sure to update my header comment and the folder's md.
  */
 import React, { useState, useEffect } from 'react';
 import { MOCK_TODO_CATEGORIES } from '../constants';
@@ -17,8 +18,8 @@ import { AITodoInputModal } from '../components/AITodoInputModal';
 import { AITodoConfirmModal, ParsedTask } from '../components/AITodoConfirmModal';
 import { aiService, AIParsedTodo } from '../services/aiService';
 import { usePrivacy } from '../contexts/PrivacyContext';
-import { backgroundService } from '../services/backgroundService';
 import { IconRenderer } from '../components/IconRenderer';
+import { useBackgroundDisplay } from '../hooks/useBackgroundDisplay';
 
 
 interface TodoViewProps {
@@ -116,7 +117,7 @@ const SwipeableTodoItem: React.FC<{
 
   const { isPrivacyMode } = usePrivacy();
 
-  // 计算圆角样式
+  // 鐠侊紕鐣婚崷鍡氼潡閺嶅嘲绱?
   const getRoundedClass = () => {
     if (viewMode !== 'compact') return 'rounded-2xl';
     if (isFirst && isLast) return 'rounded-xl';
@@ -283,34 +284,7 @@ const SwipeableTodoItem: React.FC<{
 export const TodoView: React.FC<TodoViewProps> = ({ todos, categories, activityCategories, scopes, onToggleTodo, onEditTodo, onAddTodo, onStartFocus, onDuplicateTodo, onBatchAddTodos, autoLinkRules = [] }) => {
   const [selectedCategoryId, setSelectedCategoryId] = useState<string>('');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const [backgroundUrl, setBackgroundUrl] = useState<string>('');
-  const [backgroundOpacity, setBackgroundOpacity] = useState<number>(0.1);
-
-  useEffect(() => {
-    const updateBackground = () => {
-      const bg = backgroundService.getCurrentBackgroundOption();
-      const opacity = backgroundService.getBackgroundOpacity();
-      setBackgroundUrl(bg?.url || '');
-      setBackgroundOpacity(opacity);
-    };
-    
-    updateBackground();
-    
-    // 监听localStorage变化
-    const handleStorageChange = () => {
-      updateBackground();
-    };
-    
-    window.addEventListener('storage', handleStorageChange);
-    
-    // 定期检查背景变化
-    const interval = setInterval(updateBackground, 500);
-    
-    return () => {
-      window.removeEventListener('storage', handleStorageChange);
-      clearInterval(interval);
-    };
-  }, []);
+  const { backgroundUrl, hasBackground, panelOverlayOpacity, useReducedEffects } = useBackgroundDisplay();
 
   // AI States
   const [isAIInputOpen, setIsAIInputOpen] = useState(false);
@@ -385,7 +359,7 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, categories, activityC
     setIsAIConfirmOpen(false);
   };
 
-  // 从 localStorage 读取用户上次选择的视图模式
+  // 娴?localStorage 鐠囪褰囬悽銊﹀煕娑撳﹥顐奸柅澶嬪閻ㄥ嫯顫嬮崶鐐佸?
   const [viewMode, setViewMode] = useState<'loose' | 'compact'>(() => {
     const saved = localStorage.getItem('todoViewMode');
     return (saved === 'compact' || saved === 'loose') ? saved : 'loose';
@@ -395,7 +369,7 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, categories, activityC
     return saved !== 'false';
   });
 
-  // 当 viewMode 改变时，保存到 localStorage
+  // 瑜?viewMode 閺€鐟板綁閺冭绱濇穱婵嗙摠閸?localStorage
   React.useEffect(() => {
     localStorage.setItem('todoViewMode', viewMode);
   }, [viewMode]);
@@ -404,7 +378,7 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, categories, activityC
     localStorage.setItem('todoShowCompleted', showCompletedTodos ? 'true' : 'false');
   }, [showCompletedTodos]);
 
-  // 初始化选中的分类：如果没有选中任何分类，默认选中第一个
+  // 閸掓繂顫愰崠鏍偓澶夎厬閻ㄥ嫬鍨庣猾浼欑窗婵″倹鐏夊▽鈩冩箒闁鑵戞禒璁崇秿閸掑棛琚敍宀勭帛鐠併倝鈧鑵戠粭顑跨娑?
   React.useEffect(() => {
     if (!selectedCategoryId && categories.length > 0) {
       setSelectedCategoryId(categories[0].id);
@@ -413,7 +387,7 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, categories, activityC
 
   const selectedCategory = categories.find(c => c.id === selectedCategoryId) || categories[0];
 
-  // 如果没有分类，显示空状态而不是崩溃
+  // 婵″倹鐏夊▽鈩冩箒閸掑棛琚敍灞炬▔缁€铏光敄閻樿埖鈧浇鈧奔绗夐弰顖氱┛濠?
   if (!selectedCategory) {
     return (
       <div className="flex h-full items-center justify-center bg-[#faf9f6] flex-col gap-4">
@@ -421,8 +395,8 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, categories, activityC
           <LayoutList size={32} />
         </div>
         <div className="text-center">
-          <p className="text-stone-500 font-bold mb-1">暂无待办分类</p>
-          <p className="text-xs text-stone-400">请先创建分类以添加待办事项</p>
+          <p className="text-stone-500 font-bold mb-1">No todo categories yet.</p>
+          <p className="text-xs text-stone-400">Create a category first to start adding tasks.</p>
         </div>
       </div>
     );
@@ -437,24 +411,25 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, categories, activityC
     <div 
       className="flex h-full relative"
       style={{
-        backgroundColor: backgroundUrl && backgroundUrl !== '' ? 'transparent' : '#faf9f6'
+        backgroundColor: hasBackground ? 'transparent' : '#faf9f6'
       }}
     >
-      {/* 背景图片层 */}
-      {backgroundUrl && backgroundUrl !== '' && (
+      {/* 閼冲本娅欓崶鍓у鐏?*/}
+      {hasBackground && (
         <div 
           className="absolute inset-0 -z-20"
           style={{
             backgroundImage: `url(${backgroundUrl})`,
             backgroundSize: 'cover',
             backgroundPosition: 'center',
-            backgroundRepeat: 'no-repeat'
+            backgroundRepeat: 'no-repeat',
+            transform: 'translateZ(0)'
           }}
         />
       )}
       
-      {/* 全局半透明遮罩层 - 覆盖整个下半部分 */}
-      <div className="absolute inset-0 bg-[#faf9f6]/50 backdrop-blur-md -z-10"></div>
+      {/* 閸忋劌鐪崡濠団偓蹇旀闁喚鍍电仦?- 鐟曞棛娲婇弫缈犻嚋娑撳宕愰柈銊ュ瀻 */}
+      <div className="absolute inset-0 -z-10" style={{ backgroundColor: 'rgba(250, 249, 246, 0.5)' }}></div>
       
       {/* Left Sidebar - Todo Categories */}
       <div
@@ -527,23 +502,11 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, categories, activityC
         className="flex-1 overflow-hidden flex flex-col p-5 md:p-10 rounded-tl-[2rem] shadow-[-5px_0_20px_rgba(0,0,0,0.08)] z-10 ml-[-10px] relative"
         id="todo-content"
       >
-        {/* 主体部分的背景图片层 */}
-        {backgroundUrl && backgroundUrl !== '' && (
-          <div 
-            className="absolute inset-0 -z-20 rounded-tl-[2rem]"
-            style={{
-              backgroundImage: `url(${backgroundUrl})`,
-              backgroundSize: 'cover',
-              backgroundPosition: 'center',
-              backgroundRepeat: 'no-repeat'
-            }}
-          />
-        )}
-        {/* 半透明白色遮罩层 - 透明度根据用户设置动态调整 */}
+        {/* 閸楀﹪鈧繑妲戦惂鍊熷闁喚鍍电仦?- 闁繑妲戞惔锔界壌閹诡喚鏁ら幋鐤啎缂冾喖濮╅幀浣界殶閺?*/}
         <div 
-          className="absolute inset-0 -z-10 backdrop-blur-sm rounded-tl-[2rem]"
+          className={`absolute inset-0 -z-10 rounded-tl-[2rem] ${useReducedEffects ? '' : 'backdrop-blur-sm'}`}
           style={{
-            backgroundColor: `rgba(255, 255, 255, ${1 - backgroundOpacity})`
+            backgroundColor: `rgba(255, 255, 255, ${panelOverlayOpacity})`
           }}
         />
 

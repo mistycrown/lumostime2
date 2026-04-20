@@ -6,6 +6,7 @@
  * @description A journal-style view for daily entries, providing an alternative perspective to the ReviewHubView and reusing shared timeline styling behavior for archive rendering.
  * 
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
+ * @updated 2026-04-20: Switched the journal screen to the shared lightweight custom-background pipeline.
  */
 import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import { DailyReview, Log, WeeklyReview, MonthlyReview } from '../types';
@@ -21,6 +22,7 @@ import { useData } from '../contexts/DataContext';
 import { Comment as GlobalComment, Scope } from '../types';
 import { getDisplayIcon } from '../utils/iconUtils';
 import { parseNarrative } from '../utils/narrativeUtils';
+import { useBackgroundDisplay } from '../hooks/useBackgroundDisplay';
 
 
 interface JournalViewProps {
@@ -122,6 +124,7 @@ export const JournalView: React.FC<JournalViewProps> = ({
 }) => {
     const { categories } = useCategoryScope();
     const { setLogs } = useData();
+    const { backgroundUrl, hasBackground, panelOverlayOpacity, useReducedEffects } = useBackgroundDisplay();
     const {
         memoirFilterConfig,
         uiTheme,
@@ -682,11 +685,28 @@ export const JournalView: React.FC<JournalViewProps> = ({
 
     return (
         <div 
-            className="flex flex-col h-full bg-[#faf9f6] relative"
+            className="flex flex-col h-full relative"
+            style={{ backgroundColor: hasBackground ? 'transparent' : '#faf9f6' }}
             onTouchStart={onTouchStart}
             onTouchMove={onTouchMove}
             onTouchEnd={onTouchEnd}
         >
+            {hasBackground && (
+                <div
+                    className="absolute inset-0 -z-20"
+                    style={{
+                        backgroundImage: `url(${backgroundUrl})`,
+                        backgroundSize: 'cover',
+                        backgroundPosition: 'center',
+                        backgroundRepeat: 'no-repeat',
+                        transform: 'translateZ(0)'
+                    }}
+                />
+            )}
+            <div
+                className="absolute inset-0 -z-10"
+                style={{ backgroundColor: `rgba(250, 249, 246, ${panelOverlayOpacity})` }}
+            />
             {/* Month Picker Dropdown - Portal to avoid stacking context issues */}
             {isMonthPickerOpen && (
                 <div 
@@ -728,8 +748,8 @@ export const JournalView: React.FC<JournalViewProps> = ({
 
             {/* Sticky Header - 标题栏随滚动缩小 */}
             <header className={`sticky top-0 z-40 transition-all duration-300 pt-[env(safe-area-inset-top)] ${isScrolled
-                ? 'bg-[#faf9f6]/90 backdrop-blur-md shadow-sm h-[calc(3rem+env(safe-area-inset-top))]'
-                : 'bg-[#faf9f6]/80 backdrop-blur-sm h-[calc(3.5rem+env(safe-area-inset-top))]'
+                ? `bg-[#faf9f6]/90 ${useReducedEffects ? '' : 'backdrop-blur-md'} shadow-sm h-[calc(3rem+env(safe-area-inset-top))]`
+                : `bg-[#faf9f6]/80 ${useReducedEffects ? '' : 'backdrop-blur-sm'} h-[calc(3.5rem+env(safe-area-inset-top))]`
                 }`}>
                 <div className="max-w-xl mx-auto px-6 h-full flex items-center justify-center relative">
                     <h1 className={`font-serif text-stone-800 font-bold transition-all duration-300 ${isScrolled ? 'text-[16px]' : 'text-[18px]'
