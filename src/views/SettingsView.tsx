@@ -10,6 +10,7 @@
  * - 2026-03-19: 恢复场景设置为直接加载，排查并修复子页面白屏无法打开的问题。
  * - 2026-04-13: Localized widget settings entry and loading label to Chinese.
  * - 2026-04-13: Passed todo and scope sources into widget settings so slot preview modals can reuse the existing selectors.
+ * - 2026-04-19: Added a separate compatible S3 sync path alongside the existing Tencent Cloud COS flow.
  * 
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
@@ -70,6 +71,7 @@ import {
 import { Capacitor } from '@capacitor/core';
 import { webdavService, WebDAVConfig } from '../services/webdavService';
 import { s3Service, S3Config } from '../services/s3Service';
+import { compatibleS3Service, CompatibleS3Config } from '../services/compatibleS3Service';
 import { imageService } from '../services/imageService';
 import { syncService } from '../services/syncService';
 import { NfcService } from '../services/NfcService';
@@ -226,6 +228,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
     const previousSubmenuRef = useRef<SettingsSubmenu>(activeSubmenu);
     const [webdavConfig, setWebdavConfig] = useState<WebDAVConfig | null>(null);
     const [s3Config, setS3Config] = useState<S3Config | null>(null);
+    const [compatibleS3Config, setCompatibleS3Config] = useState<CompatibleS3Config | null>(null);
     // Floating Window State
     const [floatingWindowEnabled, setFloatingWindowEnabled] = useState(false);
     const pendingFloatingWindowResumeCheckRef = useRef(false);
@@ -455,10 +458,23 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
         };
 
         // 立即尝试加载
+        const loadCompatibleS3Config = () => {
+            const nextCompatibleS3Config = compatibleS3Service.getConfig();
+            const manualCompatibleS3Disconnect = localStorage.getItem('lumos_compatible_s3_manual_disconnect');
+
+            if (nextCompatibleS3Config && manualCompatibleS3Disconnect !== 'true') {
+                setCompatibleS3Config(nextCompatibleS3Config);
+            }
+        };
+
         loadS3Config();
+        loadCompatibleS3Config();
 
         // 如果第一次加载失败，延迟再试一次
-        const timer = setTimeout(loadS3Config, 100);
+        const timer = setTimeout(() => {
+            loadS3Config();
+            loadCompatibleS3Config();
+        }, 100);
 
         return () => clearTimeout(timer);
     }, []);
@@ -583,6 +599,40 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
         }
     };
 
+    const handleCompatibleS3SyncUpload = async () => {
+        if (!compatibleS3Config) return;
+        setIsSyncing(true);
+        
+        try {
+            const localData = getFullLocalData();
+            const uploadCheck = canSafelyUpload(localData);
+            if (!uploadCheck.canUpload) {
+                alert(`错误: ${uploadCheck.reason}`);
+                setIsSyncing(false);
+                return;
+            }
+
+            const result = await uploadDataToCloud(
+                compatibleS3Service,
+                localData,
+                (message) => console.log('[Compatible S3 Upload]', message)
+            );
+
+            if (result.success) {
+                const now = Date.now();
+                setLocalDataTimestampValue(now);
+                onToast(result.imageStats?.errors.length ? 'warning' : 'success', result.message);
+            } else {
+                onToast('error', result.message);
+            }
+        } catch (error: any) {
+            console.error('Compatible S3 Upload Error:', error);
+            onToast('error', `上传数据到兼容 S3 失败: ${error.message || '未知错误'}`);
+        } finally {
+            setIsSyncing(false);
+        }
+    };
+
     const getFullLocalData = () => {
         // 从 localStorage 读取场景组设置（兼容旧版 sceneTimeSlots）
         const sceneGroupState = loadSceneGroupStateFromStorage();
@@ -657,6 +707,41 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
         } catch (error) {
             console.error(error);
             onToast('error', '从 COS 下载数据失败');
+        } finally {
+            setIsSyncing(false);
+        }
+    };
+
+    const handleCompatibleS3SyncDownload = async () => {
+        if (!compatibleS3Config) return;
+        if (!window.confirm("这将使用兼容 S3 版本覆盖当前本地数据。首先会将当前本地数据的备份上传到云端的 'backups/' 目录。确定吗？")) return;
+
+        setIsSyncing(true);
+        
+        try {
+            const localData = getFullLocalData();
+            const result = await downloadWithBackup(
+                compatibleS3Service,
+                localData,
+                (message) => onToast('info', message),
+                async (message) => window.confirm(message)
+            );
+
+            if (result.success && result.data) {
+                await onSyncUpdate(result.data);
+                const now = Date.now();
+                setLocalDataTimestampValue(now);
+                onToast(result.imageStats?.errors.length ? 'warning' : 'success', result.message);
+                
+                setTimeout(() => {
+                    onClose();
+                }, 1000);
+            } else {
+                onToast('error', result.message);
+            }
+        } catch (error) {
+            console.error(error);
+            onToast('error', '从兼容 S3 下载数据失败');
         } finally {
             setIsSyncing(false);
         }
@@ -755,10 +840,12 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
     const handleCleanupCloudBackups = async () => {
         const webdavConfig = webdavService.getConfig();
         const s3Config = s3Service.getConfig();
-        const activeService = s3Config ? s3Service : (webdavConfig ? webdavService : null);
+        const activeService = compatibleS3Config
+            ? compatibleS3Service
+            : (s3Config ? s3Service : (webdavConfig ? webdavService : null));
 
         if (!activeService) {
-            onToast('error', '未连接云端服务 (WebDAV 或 S3)');
+            onToast('error', '未连接云端服务 (WebDAV、COS 或兼容 S3)');
             return;
         }
 
@@ -964,8 +1051,12 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
                 onToast={onToast}
                 s3Config={s3Config}
                 setS3Config={setS3Config}
+                compatibleS3Config={compatibleS3Config}
+                setCompatibleS3Config={setCompatibleS3Config}
                 onS3SyncUpload={handleS3SyncUpload}
                 onS3SyncDownload={handleS3SyncDownload}
+                onCompatibleS3SyncUpload={handleCompatibleS3SyncUpload}
+                onCompatibleS3SyncDownload={handleCompatibleS3SyncDownload}
             />,
             '正在加载 S3 同步设置...'
         );

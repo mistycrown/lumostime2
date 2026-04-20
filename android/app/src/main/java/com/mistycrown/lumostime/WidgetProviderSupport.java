@@ -112,6 +112,17 @@ public final class WidgetProviderSupport {
             return;
         }
 
+        if (isWidgetDateRefreshAction(intent.getAction())) {
+            refreshAll(
+                    context,
+                    providerClass,
+                    widgetSize,
+                    layoutResId,
+                    slotViewIds
+            );
+            return;
+        }
+
         if (ACTION_TOGGLE_SLOT.equals(intent.getAction())) {
             int slotIndex = intent.getIntExtra(EXTRA_SLOT_INDEX, -1);
             int appWidgetId = intent.getIntExtra(
@@ -151,6 +162,12 @@ public final class WidgetProviderSupport {
                 );
             }
         }
+    }
+
+    private static boolean isWidgetDateRefreshAction(String action) {
+        return Intent.ACTION_DATE_CHANGED.equals(action)
+                || Intent.ACTION_TIME_CHANGED.equals(action)
+                || Intent.ACTION_TIMEZONE_CHANGED.equals(action);
     }
 
     private static void updateWidgets(

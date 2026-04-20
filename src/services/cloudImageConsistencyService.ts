@@ -11,10 +11,11 @@ import { Capacitor } from '@capacitor/core';
 import { Log, TodoItem } from '../types';
 import { imageService } from './imageService';
 import { s3Service } from './s3Service';
+import { compatibleS3Service } from './compatibleS3Service';
 import { webdavService } from './webdavService';
 
-type ActiveCloudKind = 's3' | 'webdav';
-type ActiveCloudService = typeof s3Service | typeof webdavService;
+type ActiveCloudKind = 's3' | 'compatible-s3' | 'webdav';
+type ActiveCloudService = typeof s3Service | typeof compatibleS3Service | typeof webdavService;
 
 interface ActiveCloudContext {
     kind: ActiveCloudKind;
@@ -51,10 +52,19 @@ export interface CloudImageRepairResult {
 class CloudImageConsistencyService {
     private getActiveCloudContext(): ActiveCloudContext | null {
         const hasS3 = !!s3Service.getConfig() && localStorage.getItem('lumos_s3_manual_disconnect') !== 'true';
+        const hasCompatibleS3 = !!compatibleS3Service.getConfig() && localStorage.getItem('lumos_compatible_s3_manual_disconnect') !== 'true';
         const hasWebDAV = !!webdavService.getConfig() && localStorage.getItem('lumos_webdav_manual_disconnect') !== 'true';
 
-        if (hasS3 && hasWebDAV) {
-            throw new Error('同时连接了 WebDAV 和 S3，请先断开其中一个后再执行一致性检查');
+        if ([hasS3, hasCompatibleS3, hasWebDAV].filter(Boolean).length > 1) {
+            throw new Error('同时连接了多个云端服务，请先断开其中一个后再执行一致性检查');
+        }
+
+        if (hasCompatibleS3) {
+            return {
+                kind: 'compatible-s3',
+                label: '兼容 S3',
+                service: compatibleS3Service
+            };
         }
 
         if (hasS3) {
@@ -81,11 +91,11 @@ class CloudImageConsistencyService {
             throw new Error('当前平台下 WebDAV 不支持读取远程 images 目录，暂时无法检查一致性');
         }
 
-        const directoryPath = context.kind === 's3' ? 'images' : '/images';
+        const directoryPath = context.kind === 'webdav' ? '/images' : 'images';
         const contents = await context.service.getDirectoryContents?.(directoryPath);
         const items = Array.isArray(contents) ? contents : [];
 
-        if (context.kind === 's3') {
+        if (context.kind !== 'webdav') {
             return items
                 .filter((item: any) => item?.Key && !String(item.Key).endsWith('/'))
                 .map((item: any) => String(item.Key).split('/').pop() || '')

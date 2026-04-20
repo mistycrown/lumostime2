@@ -21,6 +21,8 @@ const config: CapacitorConfig = {
       'https://*.myqcloud.com',
       'https://*.tencentcos.cn',
       'https://*.cos.ap-*.myqcloud.com',
+      'https://*.qiniucs.com',
+      'https://*.cloudflarestorage.com',
       'https://dav.jianguoyun.com',
       'https://*.jianguoyun.com'
     ]

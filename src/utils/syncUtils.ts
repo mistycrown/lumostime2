@@ -1,17 +1,18 @@
 /**
  * @file syncUtils.ts
- * @description Unified cloud sync helpers for WebDAV and S3/COS.
- * @updated 2026-03-23: Keep daily sync simple, restore JSON independently from image warnings, and move cloud image repair into an explicit maintenance flow.
+ * @description Unified cloud sync helpers for WebDAV, COS, and compatible S3.
+ * @updated 2026-04-20: Cleaned user-facing messages and kept compatible S3 fully aligned with the shared upload/restore flow.
  */
 
 import { webdavService } from '../services/webdavService';
 import { s3Service } from '../services/s3Service';
+import { compatibleS3Service } from '../services/compatibleS3Service';
 import { imageService } from '../services/imageService';
 import { syncService } from '../services/syncService';
 import { validateAndFixData, validateLocalData } from './dataValidation';
 
-export type CloudService = typeof webdavService | typeof s3Service;
-export type CloudServiceName = 'webdav' | 's3';
+export type CloudService = typeof webdavService | typeof s3Service | typeof compatibleS3Service;
+export type CloudServiceName = 'webdav' | 's3' | 'compatible-s3';
 export type ProgressCallback = (message: string) => void;
 
 export interface SyncResult {
@@ -30,7 +31,15 @@ function isValidSyncPayload(data: any): boolean {
 }
 
 function getServiceDisplayName(service: CloudService): string {
-  return service === s3Service ? 'COS' : '云端';
+  if (service === s3Service) {
+    return 'COS';
+  }
+
+  if (service === compatibleS3Service) {
+    return '兼容 S3';
+  }
+
+  return '云端';
 }
 
 function buildReferencedImageList(data: any): string[] {
@@ -43,24 +52,50 @@ function buildReferencedImageList(data: any): string[] {
   );
 }
 
+async function listCloudImageFiles(service: CloudService): Promise<string[] | null> {
+  try {
+    const directoryPath = service === webdavService ? '/images' : 'images';
+    const contents = await service.getDirectoryContents?.(directoryPath);
+
+    if (!Array.isArray(contents)) {
+      return null;
+    }
+
+    if (service === webdavService) {
+      return contents
+        .filter((item: any) => item?.type === 'file')
+        .map((item: any) => item.basename || String(item.filename || '').split('/').pop() || '')
+        .filter(Boolean);
+    }
+
+    return contents
+      .filter((item: any) => item?.Key && !String(item.Key).endsWith('/'))
+      .map((item: any) => String(item.Key).split('/').pop() || '')
+      .filter(Boolean);
+  } catch (error) {
+    console.warn('[syncUtils] Failed to list actual cloud image files, fallback to manifest.', error);
+    return null;
+  }
+}
+
 function buildUploadMessage(
   displayName: string,
   localImageList: string[],
   imageStats?: { uploaded?: number; errors: string[] }
 ): string {
   if (localImageList.length === 0) {
-    return `数据已成功上传至${displayName}`;
+    return `数据已成功上传到${displayName}`;
   }
 
   if (imageStats?.errors.length) {
-    return `数据已上传至${displayName}，图片上传成功 ${imageStats.uploaded || 0} 张，失败 ${imageStats.errors.length} 张`;
+    return `数据已上传到${displayName}，图片上传成功 ${imageStats.uploaded || 0} 张，失败 ${imageStats.errors.length} 张`;
   }
 
   if ((imageStats?.uploaded || 0) > 0) {
-    return `数据和 ${imageStats?.uploaded || 0} 张图片已成功上传至${displayName}`;
+    return `数据和 ${imageStats.uploaded || 0} 张图片已成功上传到${displayName}`;
   }
 
-  return `数据已成功上传至${displayName}，图片无需更新`;
+  return `数据已上传到${displayName}，图片无需更新`;
 }
 
 function buildDownloadMessage(
@@ -84,7 +119,15 @@ function buildDownloadMessage(
 }
 
 export function getServiceName(service: CloudService): CloudServiceName {
-  return service === s3Service ? 's3' : 'webdav';
+  if (service === s3Service) {
+    return 's3';
+  }
+
+  if (service === compatibleS3Service) {
+    return 'compatible-s3';
+  }
+
+  return 'webdav';
 }
 
 export async function uploadDataToCloud(
@@ -126,13 +169,20 @@ export async function uploadDataToCloud(
       console.warn('[syncUtils] Failed to read cloud image manifest before upload, treat as empty.', error);
     }
 
-    await service.uploadImageList(localImageList);
+    const actualCloudImageList = await listCloudImageFiles(service);
+    const knownCloudImageList = actualCloudImageList ?? oldCloudImageList;
 
     let imageResult: Awaited<ReturnType<typeof syncService.uploadImages>> | undefined;
     if (localImageList.length > 0) {
       onProgress?.('正在上传图片...');
-      imageResult = await syncService.uploadImages(onProgress, localImageList, oldCloudImageList);
+      imageResult = await syncService.uploadImages(service, onProgress, localImageList, knownCloudImageList);
     }
+
+    const existingCloudSet = new Set(knownCloudImageList);
+    const uploadedSet = new Set(imageResult?.uploadedFiles || []);
+    const finalManifest = localImageList.filter((filename) => existingCloudSet.has(filename) || uploadedSet.has(filename));
+
+    await service.uploadImageList(finalManifest);
 
     return {
       success: true,
@@ -183,11 +233,12 @@ export async function downloadDataFromCloud(
       validationErrors: result.errors,
       validationWarnings: result.warnings
     });
+
     if (!result.isValid) {
       console.error('[syncUtils] Invalid restore payload:', result.errors, rawData);
       return {
         success: false,
-        message: `从${displayName}下载的数据格式无效: ${result.errors.join('；')}`
+        message: `从${displayName}下载的数据格式无效：${result.errors.join('；')}`
       };
     }
 
@@ -212,7 +263,7 @@ export async function downloadDataFromCloud(
     let imageResult: Awaited<ReturnType<typeof syncService.downloadImages>> | undefined;
     if (requestedImageList.length > 0) {
       onProgress?.('正在下载图片...');
-      imageResult = await syncService.downloadImages(onProgress, requestedImageList);
+      imageResult = await syncService.downloadImages(service, onProgress, requestedImageList);
 
       if (imageResult.failedFiles.length > 0) {
         console.warn('[syncUtils] Image download failures during restore:', imageResult.failedFiles);
@@ -258,7 +309,7 @@ export async function backupLocalDataToCloud(
 
     return {
       success: true,
-      message: '本地数据备份成功'
+      message: `本地数据已备份到${displayName}`
     };
   } catch (error: any) {
     console.error(`[syncUtils] ${displayName} backup error:`, error);
