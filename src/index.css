@@ -2,6 +2,14 @@
 @tailwind components;
 @tailwind utilities;
 
+@font-face {
+  font-family: 'Lahlit Calendar';
+  src: url('/fonts/LahlitFont-OTF.otf') format('opentype');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
 /* 自定义基础样式 */
 @layer base {
   :root {
@@ -24,6 +32,10 @@
 @layer utilities {
   .font-serif {
     font-family: var(--font-family) !important;
+  }
+
+  .font-calendar {
+    font-family: 'Lahlit Calendar', 'Noto Serif SC', 'Source Han Serif SC', 'Songti SC', serif !important;
   }
 }
 

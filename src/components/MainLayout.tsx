@@ -52,6 +52,7 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
     handleCloseMonthlyReview,
     statsTitle
 }) => {
+    const [isTodoScheduleMode, setIsTodoScheduleMode] = useState<boolean>(() => localStorage.getItem('todoScreenMode') === 'week');
     const {
         currentView, setCurrentView,
         isSettingsOpen, setIsSettingsOpen,
@@ -88,6 +89,18 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
     } = useSettings();
     const { addToast } = useToast();
 
+    useEffect(() => {
+        const handleTodoScheduleModeChange = (event: Event) => {
+            const customEvent = event as CustomEvent<{ isWeekMode?: boolean }>;
+            setIsTodoScheduleMode(Boolean(customEvent.detail?.isWeekMode));
+        };
+
+        window.addEventListener('todo-schedule-mode-changed', handleTodoScheduleModeChange as EventListener);
+        return () => {
+            window.removeEventListener('todo-schedule-mode-changed', handleTodoScheduleModeChange as EventListener);
+        };
+    }, []);
+
     const getHeaderTitle = () => {
         if (isDailyReviewOpen) return 'Daily Review';
         if (isOnThisDayOpen) return 'On This Day';
@@ -119,6 +132,7 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
             {!isSettingsOpen && (currentView !== AppView.TIMELINE || isDailyReviewOpen || isOnThisDayOpen || isWeeklyReviewOpen || isMonthlyReviewOpen || isAchievementOpen) && !isStatsFullScreen &&
                 !isTodoModalOpen &&
                 !(currentView === AppView.TODO && isTodoManaging) &&
+                !(currentView === AppView.TODO && isTodoScheduleMode) &&
                 !(currentView === AppView.TAGS && isTagsManaging) &&
                 !(currentView === AppView.SCOPE && isScopeManaging) &&
                 !(currentView === AppView.SCOPE && isGoalBatchManaging) &&

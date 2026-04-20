@@ -3,27 +3,31 @@
  * @input Todos, Categories, Scopes
  * @output Todo Status Updates, Edit Triggers, Focus Timer Start
  * @pos View (Main Tab)
- * @description The main To-Do list interface. Displays tasks grouped by category, supports swipe actions (complete/duplicate), and filtering.
+ * @description The main To-Do list interface. Displays tasks grouped by category, supports swipe actions, and now includes a week planning view with schedule and history badges.
+ * @updated 2026-04-20: Added list/week switching, seven-row week planning layout, and first-pass schedule/history badge rendering.
  * @updated 2026-04-12: Matched the expanded sidebar action button spacing with RecordView, added a persisted toggle for showing completed todos, and softened the shared sidebar control styling.
  * @updated 2026-04-20: Switched custom background rendering to the shared preloaded display hook and reduced mobile blur cost.
  *
  * 閳跨媴绗?Once I am updated, be sure to update my header comment and the folder's md.
  */
-import React, { useState, useEffect } from 'react';
-import { MOCK_TODO_CATEGORIES } from '../constants';
-import { Scope } from '../types';
-import { TodoItem, TodoCategory, Category, AutoLinkRule } from '../types';
-import { PlayCircle, CheckCircle2, Circle, Plus, MoreHorizontal, Settings2, ChevronLeft, ChevronRight, LayoutList, Rows, Sparkles, Eye, EyeOff } from 'lucide-react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { Scope, TodoItem, TodoCategory, Category, AutoLinkRule, Log } from '../types';
+import { PlayCircle, CheckCircle2, Plus, MoreHorizontal, ChevronLeft, ChevronRight, LayoutList, Rows, Sparkles, Eye, EyeOff, CalendarDays, Flag, Repeat2, TrendingUp, ListTodo } from 'lucide-react';
 import { AITodoInputModal } from '../components/AITodoInputModal';
 import { AITodoConfirmModal, ParsedTask } from '../components/AITodoConfirmModal';
-import { aiService, AIParsedTodo } from '../services/aiService';
+import { aiService } from '../services/aiService';
 import { usePrivacy } from '../contexts/PrivacyContext';
 import { IconRenderer } from '../components/IconRenderer';
 import { useBackgroundDisplay } from '../hooks/useBackgroundDisplay';
+import { FloatingButton } from '../components/FloatingButton';
+import { UIIcon } from '../components/UIIcon';
+import { uiIconService } from '../services/uiIconService';
+import { WeekTodoEntry, buildWeekTodoBuckets, formatDateKey, getTodayDateKey, getWeekDates, parseDateKey } from '../utils/todoScheduleUtils';
 
 
 interface TodoViewProps {
   todos: TodoItem[];
+  logs: Log[];
   categories: TodoCategory[];
   activityCategories: Category[];
   scopes: Scope[];
@@ -52,6 +56,7 @@ const SwipeableTodoItem: React.FC<{
 }> = ({ todo, categories, activityCategories, scopes, onToggle, onEdit, onStartFocus, onDuplicate, viewMode, isFirst = false, isLast = false }) => {
   const [touchStart, setTouchStart] = useState<number | null>(null);
   const [translateX, setTranslateX] = useState(0);
+  const canQuickToggle = !todo.recurrenceRule;
 
   // Constants
   const minSwipeDistance = 100;
@@ -65,6 +70,11 @@ const SwipeableTodoItem: React.FC<{
     if (touchStart === null) return;
     const currentTouch = e.targetTouches[0].clientX;
     const diff = currentTouch - touchStart;
+
+    if (diff < 0 && !canQuickToggle) {
+      setTranslateX(0);
+      return;
+    }
 
     // Allow swipe in both directions but clamp
     if (Math.abs(diff) < maxSwipeDistance) {
@@ -87,7 +97,7 @@ const SwipeableTodoItem: React.FC<{
     if (diff > minSwipeDistance) {
       // Right Swipe -> Duplicate
       onDuplicate(todo);
-    } else if (diff < -minSwipeDistance) {
+    } else if (canQuickToggle && diff < -minSwipeDistance) {
       // Left Swipe -> Toggle Complete
       onToggle(todo.id);
     }
@@ -141,7 +151,7 @@ const SwipeableTodoItem: React.FC<{
       {/* Background Actions (Left Swipe -> Complete/Uncomplete) */}
       <div
         className={`absolute inset-0 flex items-center justify-end pr-6 text-white font-bold tracking-wider z-0 transition-opacity duration-200 ${todo.isCompleted ? 'bg-stone-400' : 'bg-green-500'} ${viewMode === 'compact' ? getRoundedClass() : 'rounded-2xl'}`}
-        style={{ opacity: translateX < 0 ? 1 : 0 }}
+        style={{ opacity: canQuickToggle && translateX < 0 ? 1 : 0 }}
       >
         <span className="flex items-center gap-2">
           {todo.isCompleted ? 'UNDO' : 'COMPLETE'} <CheckCircle2 size={20} />
@@ -281,10 +291,66 @@ const SwipeableTodoItem: React.FC<{
   );
 };
 
-export const TodoView: React.FC<TodoViewProps> = ({ todos, categories, activityCategories, scopes, onToggleTodo, onEditTodo, onAddTodo, onStartFocus, onDuplicateTodo, onBatchAddTodos, autoLinkRules = [] }) => {
+const WEEKDAY_ROW_LABELS = ['周一', '周二', '周三', '周四', '周五', '周六', '周日'];
+
+const WeekTodoLineItem: React.FC<{
+  entry: WeekTodoEntry;
+}> = ({ entry }) => {
+  const { todo, badges } = entry;
+  const isHistoricalOnly = !badges.scheduled && !badges.deadline && !badges.recurring && (badges.completed || badges.inProgress);
+  const iconClassName = isHistoricalOnly ? 'text-stone-300' : 'text-stone-400';
+  const titleClassName = isHistoricalOnly ? 'text-stone-400' : 'text-stone-700';
+  const noteClassName = isHistoricalOnly ? 'text-stone-300' : 'text-stone-400';
+
+  const leadingIcon = badges.completed
+    ? <CheckCircle2 size={12} className={iconClassName} />
+    : badges.inProgress
+      ? <TrendingUp size={12} className={iconClassName} />
+      : badges.deadline
+        ? <Flag size={12} className={iconClassName} />
+        : badges.recurring
+          ? <Repeat2 size={12} className={iconClassName} />
+          : <CalendarDays size={12} className={iconClassName} />;
+
+  const orderedBadges = [
+    badges.deadline ? { key: 'deadline', label: 'Due', color: '#8f6f6b' } : null,
+    badges.scheduled ? { key: 'scheduled', label: 'Arrange', color: '#7c8b97' } : null,
+    badges.recurring ? { key: 'recurring', label: 'Repeat', color: '#8b8f79' } : null,
+    badges.completed ? { key: 'completed', label: 'Done', color: '#7f8c84' } : null,
+    badges.inProgress ? { key: 'inProgress', label: 'Trace', color: '#8b8096' } : null
+  ].filter(Boolean) as Array<{ key: string; label: string; color: string }>;
+
+  return (
+    <div className="flex w-full items-center gap-2 py-1 text-left">
+      <span className="shrink-0 self-center">
+        {leadingIcon}
+      </span>
+      <div className="min-w-0 flex-1">
+        <div className={`truncate text-[14px] font-medium leading-5 ${titleClassName}`}>
+          {todo.title}
+        </div>
+      </div>
+      <div className="shrink-0 flex items-center gap-1.5 text-[9px] tracking-[0.16em] uppercase">
+        {orderedBadges.map((badge) => (
+          <span key={badge.key} style={{ color: badge.color }}>
+            {badge.label}
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, activityCategories, scopes, onToggleTodo, onEditTodo, onAddTodo, onStartFocus, onDuplicateTodo, onBatchAddTodos, autoLinkRules = [] }) => {
   const [selectedCategoryId, setSelectedCategoryId] = useState<string>('');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const { backgroundUrl, hasBackground, panelOverlayOpacity, useReducedEffects } = useBackgroundDisplay();
+  const [screenMode, setScreenMode] = useState<'list' | 'week'>(() => {
+    const saved = localStorage.getItem('todoScreenMode');
+    return saved === 'week' ? 'week' : 'list';
+  });
+  const [weekReferenceDate, setWeekReferenceDate] = useState<Date>(new Date());
+  const [hasCustomIconTheme, setHasCustomIconTheme] = useState(() => uiIconService.isCustomTheme());
 
   // AI States
   const [isAIInputOpen, setIsAIInputOpen] = useState(false);
@@ -378,6 +444,29 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, categories, activityC
     localStorage.setItem('todoShowCompleted', showCompletedTodos ? 'true' : 'false');
   }, [showCompletedTodos]);
 
+  React.useEffect(() => {
+    localStorage.setItem('todoScreenMode', screenMode);
+    window.dispatchEvent(new CustomEvent('todo-schedule-mode-changed', {
+      detail: { isWeekMode: screenMode === 'week' }
+    }));
+    return () => {
+      window.dispatchEvent(new CustomEvent('todo-schedule-mode-changed', {
+        detail: { isWeekMode: false }
+      }));
+    };
+  }, [screenMode]);
+
+  React.useEffect(() => {
+    const handleThemeChange = () => {
+      setHasCustomIconTheme(uiIconService.isCustomTheme());
+    };
+
+    window.addEventListener('ui-icon-theme-changed', handleThemeChange);
+    return () => {
+      window.removeEventListener('ui-icon-theme-changed', handleThemeChange);
+    };
+  }, []);
+
   // 閸掓繂顫愰崠鏍偓澶夎厬閻ㄥ嫬鍨庣猾浼欑窗婵″倹鐏夊▽鈩冩箒闁鑵戞禒璁崇秿閸掑棛琚敍宀勭帛鐠併倝鈧鑵戠粭顑跨娑?
   React.useEffect(() => {
     if (!selectedCategoryId && categories.length > 0) {
@@ -406,6 +495,177 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, categories, activityC
     .filter(t => t.categoryId === selectedCategoryId)
     .filter(t => showCompletedTodos || !t.isCompleted)
     .sort((a, b) => Number(a.isCompleted) - Number(b.isCompleted));
+
+  const weekTodos = useMemo(() => todos, [todos]);
+
+  const weekBuckets = useMemo(
+    () => buildWeekTodoBuckets(weekTodos, logs, weekReferenceDate),
+    [weekReferenceDate, weekTodos, logs]
+  );
+
+  const weekDates = useMemo(() => getWeekDates(weekReferenceDate), [weekReferenceDate]);
+  const isCurrentWeek = useMemo(
+    () => weekDates.some((date) => getTodayDateKey() === formatDateKey(date)),
+    [weekDates]
+  );
+  const currentWeekLabel = useMemo(() => {
+    const start = weekDates[0];
+    const end = weekDates[6];
+    if (!start || !end) return '';
+    const startMonth = start.getMonth() + 1;
+    const endMonth = end.getMonth() + 1;
+    return startMonth === endMonth
+      ? `${startMonth}.${start.getDate()} - ${end.getDate()}`
+      : `${startMonth}.${start.getDate()} - ${endMonth}.${end.getDate()}`;
+  }, [weekDates]);
+
+  if (screenMode === 'week') {
+    return (
+      <div
+        className="relative h-full overflow-hidden"
+        style={{
+          backgroundColor: hasBackground ? 'transparent' : 'rgb(250, 249, 246)'
+        }}
+      >
+        {hasBackground && (
+          <div
+            className="absolute inset-0 -z-20"
+            style={{
+              backgroundImage: `url(${backgroundUrl})`,
+              backgroundSize: 'cover',
+              backgroundPosition: 'center',
+              backgroundRepeat: 'no-repeat',
+              transform: 'translateZ(0)'
+            }}
+          />
+        )}
+
+        <div className="absolute inset-0 -z-10" style={{ backgroundColor: 'rgba(250, 249, 246, 0.92)' }}></div>
+
+        <div className={`relative z-10 flex h-full flex-col px-4 pb-[calc(3rem+env(safe-area-inset-bottom))] pt-[env(safe-area-inset-top)] md:px-8 ${useReducedEffects ? '' : 'backdrop-blur-[2px]'}`}>
+          <div className="shrink-0 border-b border-stone-300/70">
+            <div className="flex h-14 items-center">
+              <div className="flex items-center gap-2 text-slate-500">
+                <button
+                  type="button"
+                  onClick={() => setWeekReferenceDate((prev) => {
+                    const next = new Date(prev);
+                    next.setDate(prev.getDate() - 7);
+                    return next;
+                  })}
+                  className="rounded-full p-1.5 transition-colors hover:bg-white/60 hover:text-slate-700"
+                  title="上一周"
+                >
+                  <ChevronLeft size={15} />
+                </button>
+                <div className="text-[13px] tracking-[0.16em] text-slate-500">{currentWeekLabel}</div>
+                <button
+                  type="button"
+                  onClick={() => setWeekReferenceDate((prev) => {
+                    const next = new Date(prev);
+                    next.setDate(prev.getDate() + 7);
+                    return next;
+                  })}
+                  className="rounded-full p-1.5 transition-colors hover:bg-white/60 hover:text-slate-700"
+                  title="下一周"
+                >
+                  <ChevronRight size={15} />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setWeekReferenceDate(new Date())}
+                  className={`ml-1 rounded-full px-2.5 py-1 text-[10px] tracking-[0.14em] transition-colors ${
+                    isCurrentWeek
+                      ? 'bg-stone-100 text-slate-600'
+                      : 'text-slate-400 hover:bg-white/50 hover:text-slate-600'
+                  }`}
+                >
+                  本周
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div className="min-h-0 flex-1 overflow-y-auto no-scrollbar">
+            <div className="border-t border-stone-300/70">
+              {weekBuckets.map((bucket, index) => {
+                const bucketDate = parseDateKey(bucket.date);
+                const isToday = bucket.date === getTodayDateKey();
+
+                return (
+                  <section
+                    key={bucket.date}
+                    className="grid min-h-[5.5rem] grid-cols-[4.25rem_minmax(0,1fr)] border-b border-stone-300/70 md:grid-cols-[4.75rem_minmax(0,1fr)]"
+                  >
+                    <div className="flex flex-col justify-center border-r border-stone-300/70 px-2 py-3 text-center md:px-3">
+                      <div className={`text-[12px] tracking-[0.02em] ${isToday ? 'text-slate-600' : 'text-slate-400'}`}>
+                        {WEEKDAY_ROW_LABELS[index]}
+                      </div>
+                      <div className={`mt-1 text-[19px] leading-none md:text-[22px] font-calendar ${isToday ? 'font-semibold text-slate-800' : 'font-medium text-slate-700'}`}>
+                        {bucketDate?.getDate() || '--'}
+                      </div>
+                      <div className="mt-1 text-[10px] tracking-[0.02em] text-slate-400">
+                        {bucketDate ? `${bucketDate.getMonth() + 1}月` : ''}
+                      </div>
+                    </div>
+
+                    <div className="flex min-w-0 items-stretch px-4 py-3 md:px-5">
+                      <div className="flex min-h-full w-full items-center">
+                        {bucket.items.length > 0 ? (
+                          <div className="w-full space-y-0.5">
+                            {bucket.items.map((entry) => (
+                              <WeekTodoLineItem
+                                key={`${bucket.date}-${entry.todo.id}`}
+                                entry={entry}
+                              />
+                            ))}
+                          </div>
+                        ) : (
+                          <div className="w-full py-2 text-[14px] italic text-slate-300">
+                            Silence is part of the schedule.
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </section>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+
+        <FloatingButton
+          onClick={() => setScreenMode('list')}
+          title="切换回列表"
+          ariaLabel="切换回列表"
+          disableThemeStyle={!hasCustomIconTheme}
+          className="text-white shadow-[0_14px_34px_rgba(15,23,42,0.16)]"
+        >
+          <UIIcon type="tags" fallbackIcon={ListTodo} size={24} className="text-white" style={{ color: '#ffffff' }} />
+        </FloatingButton>
+
+        {isAIInputOpen && (
+          <AITodoInputModal
+            onClose={() => setIsAIInputOpen(false)}
+            onGenerate={handleAIGenerate}
+            isLoading={isAIGenerating}
+          />
+        )}
+
+        {isAIConfirmOpen && (
+          <AITodoConfirmModal
+            onClose={() => setIsAIConfirmOpen(false)}
+            onSave={handleAISave}
+            initialTasks={aiParsedTasks}
+            todoCategories={categories}
+            activityCategories={activityCategories}
+            scopes={scopes}
+            autoLinkRules={autoLinkRules}
+          />
+        )}
+      </div>
+    );
+  }
 
   return (
     <div 
@@ -512,10 +772,12 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, categories, activityC
 
         {/* Header */}
         <div className="mb-6 flex items-center justify-between mt-2 md:mt-0">
-          <h1 className="text-2xl font-bold text-stone-900 tracking-tight flex items-center gap-3">
-            {selectedCategory.name}
-            <span className="text-stone-300 text-lg font-normal">Tasks</span>
-          </h1>
+          <div className="min-w-0">
+            <h1 className="text-2xl font-bold text-stone-900 tracking-tight flex items-center gap-3">
+              {selectedCategory.name}
+              <span className="text-stone-300 text-lg font-normal">Tasks</span>
+            </h1>
+          </div>
           <div className="flex items-center gap-3">
             <button
               onClick={() => setIsAIInputOpen(true)}
@@ -533,7 +795,6 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, categories, activityC
           </div>
         </div>
 
-        {/* Task List */}
         <div className="flex-1 overflow-y-auto pb-24 no-scrollbar">
           {filteredTodos.map((todo, index) => (
             <SwipeableTodoItem
@@ -560,6 +821,19 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, categories, activityC
           )}
         </div>
       </div>
+
+      <FloatingButton
+        onClick={() => setScreenMode((prev) => prev === 'list' ? 'week' : 'list')}
+        title={screenMode === 'list' ? '切换到周视图' : '切换回列表'}
+        ariaLabel={screenMode === 'list' ? '切换到周视图' : '切换回列表'}
+        disableThemeStyle={!hasCustomIconTheme}
+      >
+        {screenMode === 'list' ? (
+          <UIIcon type="calendar" fallbackIcon={CalendarDays} size={24} className={hasCustomIconTheme ? 'text-white' : 'text-stone-600'} />
+        ) : (
+          <UIIcon type="tags" fallbackIcon={ListTodo} size={24} className={hasCustomIconTheme ? 'text-white' : 'text-stone-600'} />
+        )}
+      </FloatingButton>
 
       {isAIInputOpen && (
         <AITodoInputModal
