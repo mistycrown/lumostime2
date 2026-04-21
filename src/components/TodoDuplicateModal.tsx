@@ -3,8 +3,9 @@
  * @input open state, source todo, duplicate cleanup options, confirm/close callbacks
  * @output Lightweight quick-edit modal for creating a copied todo
  * @pos Component (Modal)
- * @description Opens before duplication is committed so the user can rename the copy and optionally clear dates, tags, or scopes.
+ * @description Opens before duplication is committed so the user can rename the copy and optionally clear dates, tags, or scopes with a more concise layout.
  * @updated 2026-04-20: Added quick-copy editing flow for todo duplication.
+ * @updated 2026-04-21: Simplified helper copy in the duplicate modal so the sheet feels lighter.
  *
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
@@ -78,9 +79,6 @@ export const TodoDuplicateModal: React.FC<TodoDuplicateModalProps> = ({
             <div>
               <div className="text-[11px] uppercase tracking-[0.24em] text-stone-400">Quick Copy</div>
               <div className="mt-1 text-xl font-semibold tracking-tight text-stone-800">复制待办</div>
-              <p className="mt-2 text-sm leading-6 text-stone-500">
-                先调整副本标题和清理项，再创建新的待办副本。
-              </p>
             </div>
             <button
               type="button"
@@ -119,28 +117,21 @@ export const TodoDuplicateModal: React.FC<TodoDuplicateModalProps> = ({
             <OptionRow
               icon={<CalendarDays size={16} className="text-stone-400" />}
               title="清除日期信息"
-              description="清空安排日期、截止日期和重复规则。"
               checked={clearDates}
               onChange={setClearDates}
             />
             <OptionRow
               icon={<Tag size={16} className="text-stone-400" />}
               title="清除标签信息"
-              description="清空关联分类和活动标签。"
               checked={clearTags}
               onChange={setClearTags}
             />
             <OptionRow
               icon={<Layers3 size={16} className="text-stone-400" />}
               title="清除领域信息"
-              description="清空默认关联领域。"
               checked={clearScopes}
               onChange={setClearScopes}
             />
-          </div>
-
-          <div className="rounded-2xl border border-stone-200 bg-white/70 px-4 py-3 text-xs leading-6 text-stone-500">
-            完成状态会自动重置，副本默认回到未完成状态。
           </div>
         </div>
 
@@ -170,19 +161,15 @@ export const TodoDuplicateModal: React.FC<TodoDuplicateModalProps> = ({
 const OptionRow: React.FC<{
   icon: React.ReactNode;
   title: string;
-  description: string;
   checked: boolean;
   onChange: (next: boolean) => void;
-}> = ({ icon, title, description, checked, onChange }) => (
+}> = ({ icon, title, checked, onChange }) => (
   <label className="flex items-center justify-between gap-4 rounded-2xl border border-stone-200 bg-white/80 px-4 py-3 cursor-pointer transition-colors hover:border-stone-300 hover:bg-white">
-    <div className="flex min-w-0 items-start gap-3">
+    <div className="flex min-w-0 items-center gap-3">
       <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-stone-100">
         {icon}
       </div>
-      <div className="min-w-0">
-        <div className="text-sm font-medium text-stone-700">{title}</div>
-        <div className="mt-1 text-xs leading-5 text-stone-500">{description}</div>
-      </div>
+      <div className="min-w-0 text-sm font-medium text-stone-700">{title}</div>
     </div>
 
     <span className="relative inline-flex items-center">

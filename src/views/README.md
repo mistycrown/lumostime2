@@ -28,7 +28,20 @@ The views are designed as "dumb" or "presentational" components where possible, 
 
 > ⚠️ **Note**: When modifying views, ensure that new state requirements are coordinated with `App.tsx` if they affect global data (Logs, Categories, Todos).
 
-> Last updated: 2026-04-20
+> Last updated: 2026-04-21
+- `TodoView.tsx`: Category-specific todo lists now also pin pinned todos to the top and render the pin chip as icon-only in compact mode versus icon plus `Pin` in loose mode.
+- `TodoView.tsx`: The `排期 -> 今` page now includes pin-only todos in a top `Pin` section, while deduplicating todos that are both pinned and already arranged/due today.
+- `TodoView.tsx`: Added a boolean `pin` flag to todo scheduling so `排期 -> 今` now lifts pinned items to the top and shows a matching `Pin` label in the same lightweight badge style as `Arrange` / `Due`.
+- `TodoView.tsx`: Let the week-view `Trace` and `Done` badges open the shared quick-actions sheet, matching the existing `Arrange` and `Due` badge behavior.
+- `TodoView.tsx`: Kept week-view multi-badge abbreviations on a single compact line so `Arr / Tra / Rep` no longer wrap into stacked rows.
+- `TodoView.tsx`: Tightened the week-view multi-badge right rail so abbreviated labels no longer leave wide trailing blanks, and split the virtual `今` schedule list into `今天` plus `过期未完成` sections.
+- `TodoView.tsx`: Shortened week-view right-rail status labels to three-letter abbreviations whenever a row shows multiple badges, while keeping `Due` and `Done` fully spelled out.
+- `TodoView.tsx`: Switched the week-view left date numerals to `Bilbo Swash Caps` using the bundled `/public/fonts/BilboSwashCaps-Regular.ttf` asset.
+- `TimerFloating.tsx`: Narrowed Todo-view floating timers to the same avoidance scale used by the Record page so the bottom-right list/week floating button no longer overlaps the timer pill.
+- `TodoView.tsx`: Excluded the inline start-focus button from row-level quick-action tap handling so the play button still launches focus on mobile instead of opening the quick-actions sheet.
+- `TodoView.tsx`, `TodoQuickActionsModal.tsx`: Stopped todo-row open clicks from bubbling and switched quick-actions backdrop dismissal to pointer-down handling so desktop taps no longer flash the sheet open and closed.
+- `TodoView.tsx`: Shortened the virtual `排期` filter chips under the header from `今天 / 明天 / 本周` to `今 / 明 / 周` for a tighter mobile layout.
+- `TodoView.tsx`: Unified todo-row tap targets across the full foreground card and only suppresses follow-up clicks after real touch gestures, fixing mobile quick-actions taps that were intermittently swallowed on active items.
 - `TodoView.tsx`: Added conservative left/right week-switch swipes inside the week planning scroll area, with stronger horizontal thresholds and explicit opt-outs for row drag handles, badge taps, and date buttons to reduce accidental switches.
 - `TodoView.tsx`: Moved the week-view `本周` action into the header's top-right corner so it reads as a separate jump-to-current-week control.
 - `TodoView.tsx`: Split the right-swipe background styling so the light detail-open state and deeper duplicate state now use clearly different colors.

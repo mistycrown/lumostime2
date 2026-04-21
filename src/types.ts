@@ -4,6 +4,7 @@
  * @output TypeScript Interfaces & Types
  * @pos Type Definitions (Shared contract)
  * @description Defines the core data structures (Log, TodoItem, Category, Activity, Filter order metadata, etc.) used throughout the application.
+ * @updated 2026-04-21: Added an optional boolean `pin` flag for prioritizing todos in the today schedule list.
  * @updated 2026-04-20: Added configurable todo duplication options for quick-copy editing.
  * @updated 2026-04-20: Added todo schedule and recurrence rule types for week-view planning.
  * @updated 2026-04-19: Added reusable note template definitions for detail-page editing and inline note recommendations.
@@ -239,6 +240,7 @@ export interface TodoItem {
   heatmapMax?: number;
 
   // Schedule / Planning
+  pin?: boolean; // Defaults to false; lifts the todo to the top of today's schedule tab
   scheduledDate?: string; // YYYY-MM-DD
   deadlineDate?: string; // YYYY-MM-DD
   recurrenceRule?: TodoRecurrenceRule;

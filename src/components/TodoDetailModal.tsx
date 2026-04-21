@@ -4,6 +4,7 @@
  * @output Modal Interaction (Edit Todo, View History)
  * @pos Component (Modal)
  * @description Displays detailed information for a specific Todo item, including its progress, planning fields, associated history logs, and focus stats.
+ * @updated 2026-04-21: Added a detail-level pin toggle so todos can be promoted to the top of today's schedule tab.
  * @updated 2026-04-20: Added schedule date, deadline date, and lightweight recurrence-rule editing for the first todo week-view release.
  * 
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
@@ -12,7 +13,7 @@ import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { TodoItem, TodoCategory, Log, Category, Scope, TodoRecurrenceFrequency, TodoRecurrenceRule } from '../types';
 import { ScopeAssociation } from './ScopeAssociation';
 import { TagAssociation } from './TagAssociation';
-import { Trash2, CheckCircle2, TrendingUp, ChevronLeft, Circle, Image as ImageIcon, RotateCcw, CalendarDays, Flag, Repeat2 } from 'lucide-react';
+import { Trash2, CheckCircle2, TrendingUp, ChevronLeft, Circle, Image as ImageIcon, Pin, RotateCcw, CalendarDays, Flag, Repeat2 } from 'lucide-react';
 import { DetailTimelineCard } from './DetailTimelineCard';
 import { TimelineImage } from './TimelineImage';
 import { imageService } from '../services/imageService';
@@ -79,6 +80,7 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({ initialTodo, i
   const initialHeatmapMin = initialTodo?.heatmapMin ?? initialDraft?.heatmapMin;
   const initialHeatmapMax = initialTodo?.heatmapMax ?? initialDraft?.heatmapMax;
   const initialCoverImage = initialTodo?.coverImage || initialDraft?.coverImage;
+  const initialPin = initialTodo?.pin || initialDraft?.pin || false;
   const initialScheduledDate = initialTodo?.scheduledDate || initialDraft?.scheduledDate || '';
   const initialDeadlineDate = initialTodo?.deadlineDate || initialDraft?.deadlineDate || '';
   const initialRecurrenceRule = initialTodo?.recurrenceRule || initialDraft?.recurrenceRule;
@@ -114,6 +116,7 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({ initialTodo, i
   // Cover Image State
   const [coverImage, setCoverImage] = useState<string | undefined>(initialCoverImage);
   const [isUploadingImage, setIsUploadingImage] = useState(false);
+  const [pin, setPin] = useState(initialPin);
 
   // Schedule State
   const [scheduledDate, setScheduledDate] = useState(initialScheduledDate);
@@ -317,6 +320,7 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({ initialTodo, i
         completedUnits !== initialTodo.completedUnits ||
         heatmapMin !== initialTodo.heatmapMin ||
         heatmapMax !== initialTodo.heatmapMax ||
+        pin !== Boolean(initialTodo.pin) ||
         coverImage !== initialTodo.coverImage ||
         scheduledDate !== (initialTodo.scheduledDate || '') ||
         deadlineDate !== (initialTodo.deadlineDate || '') ||
@@ -341,6 +345,7 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({ initialTodo, i
       totalAmount: isProgress ? totalAmount : undefined,
       unitAmount: isProgress ? unitAmount : undefined,
       completedUnits: isProgress ? completedUnits : undefined,
+      pin,
       heatmapMin,
       heatmapMax,
       coverImage,
@@ -352,6 +357,38 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({ initialTodo, i
   }, [selectedCategoryId, title, note, isCompleted, linkedCategoryId, linkedActivityId, defaultScopeIds, isProgress, totalAmount, unitAmount, completedUnits, heatmapMin, heatmapMax, coverImage, scheduledDate, deadlineDate, recurrenceRule]); // 监听所有状态变化
 
   const selectedCategory = todoCategories?.find(c => c.id === selectedCategoryId) || currentCategory;
+
+  const handleTogglePin = () => {
+    const nextPin = !pin;
+    setPin(nextPin);
+
+    if (!title.trim()) return;
+
+    onSave({
+      id: todoId,
+      categoryId: selectedCategoryId,
+      title: title.trim(),
+      isCompleted,
+      completedAt: isCompleted
+        ? (initialTodo?.isCompleted ? initialTodo.completedAt : new Date().toISOString())
+        : undefined,
+      note: note.trim(),
+      linkedCategoryId: linkedCategoryId || undefined,
+      linkedActivityId: linkedActivityId || undefined,
+      defaultScopeIds,
+      isProgress,
+      totalAmount: isProgress ? totalAmount : undefined,
+      unitAmount: isProgress ? unitAmount : undefined,
+      completedUnits: isProgress ? completedUnits : undefined,
+      pin: nextPin,
+      heatmapMin,
+      heatmapMax,
+      coverImage,
+      scheduledDate: scheduledDate || undefined,
+      deadlineDate: deadlineDate || undefined,
+      recurrenceRule,
+    });
+  };
 
   const handleDelete = () => {
     if (initialTodo && onDelete) {
@@ -524,6 +561,12 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({ initialTodo, i
                 进度追踪
               </span>
             )}
+            {pin && (
+              <span className="px-2 py-1 rounded-md border border-stone-200 bg-white text-xs font-bold text-stone-500 flex items-center gap-1">
+                <Pin size={10} className="rotate-[28deg]" />
+                Pin
+              </span>
+            )}
           </div>
         </div>
 
@@ -593,6 +636,27 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({ initialTodo, i
                   className="w-full bg-stone-50 border border-stone-200 rounded-xl px-4 py-3 text-stone-700 text-sm outline-none focus:border-stone-400 transition-colors min-h-[100px] resize-none"
                   placeholder="添加备注..."
                 />
+              </div>
+
+              <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="text-xs text-stone-400 font-medium flex items-center gap-1.5">
+                    <Pin size={10} className="rotate-[28deg]" />
+                    Pin 置顶
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] text-stone-400">{pin ? '已开启' : '关闭'}</span>
+                    <button
+                      type="button"
+                      onClick={handleTogglePin}
+                      className={`w-12 h-6 rounded-full relative transition-colors ${pin ? '' : 'bg-stone-200'}`}
+                      style={pin ? { backgroundColor: 'var(--accent-color)' } : undefined}
+                    >
+                      <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all shadow-sm ${pin ? 'left-7' : 'left-1'}`}></div>
+                    </button>
+                  </div>
+                </div>
+                <p className="text-[11px] text-stone-400">开启后会在「排期 &gt; 今」里置顶显示，并带有 Pin 标签。</p>
               </div>
 
               {/* Cover Image */}

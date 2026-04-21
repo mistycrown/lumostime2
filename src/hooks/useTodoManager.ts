@@ -4,6 +4,7 @@
  * @output Todo CRUD Operations (handleSaveTodo, handleDeleteTodo, handleToggleTodo, handleDuplicateTodo, handleBatchAddTodos), Modal Control (openAddTodoModal, openEditTodoModal, closeTodoModal), Focus Management (handleStartTodoFocus), Progress Update (updateTodoProgress)
  * @pos Hook (Data Manager)
  * @description 待办事项数据管理 Hook - 处理待办的增删改查、完成状态切换、专注模式启动、批量操作等。时间戳由 DataContext 自动管理。
+ * @updated 2026-04-21: Reset duplicated and newly created todos to `pin: false` unless explicitly toggled later.
  * @updated 2026-04-20: Added configurable duplicate-copy cleanup for dates, tags, and scopes.
  * 
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
@@ -142,6 +143,7 @@ export const useTodoManager = () => {
             id: crypto.randomUUID(),
             title: `${todo.title} 副本`,
             isCompleted: false,
+            pin: false,
             completedAt: undefined,
             completedUnits: 0,
             scheduledDate: clearDates ? undefined : todo.scheduledDate,
@@ -163,6 +165,7 @@ export const useTodoManager = () => {
             categoryId: data.categoryId || todoCategories[0].id,
             title: data.title || 'New Task',
             isCompleted: false,
+            pin: false,
             completedUnits: 0,
             linkedActivityId: data.linkedActivityId,
             linkedCategoryId: data.linkedCategoryId,

@@ -4,6 +4,17 @@
  * @output Todo Status Updates, Edit Triggers, Focus Timer Start
  * @pos View (Main Tab)
  * @description The main To-Do list interface. Displays tasks grouped by category, supports swipe actions, and now includes a week planning view with schedule and history badges.
+ * @updated 2026-04-21 11:46: Pinned todos now rise to the top of category lists, with icon-only compact chips and icon-plus-text loose chips.
+ * @updated 2026-04-21 11:25: Added todo pin support so the today schedule tab can pin items to the top and show a matching `Pin` label.
+ * @updated 2026-04-21 10:29: Let week-view `Trace` and `Done` badges open the shared quick-actions sheet just like `Arrange` and `Due`.
+ * @updated 2026-04-21 10:16: Forced multi-badge week-view status labels onto a compact single line so abbreviated badges no longer wrap.
+ * @updated 2026-04-21 10:02: Tightened multi-badge week-view status spacing and split the virtual `今` schedule list into today and overdue unfinished sections.
+ * @updated 2026-04-21 09:11: Shortened multi-badge week-view status labels to three-letter abbreviations for non-`Due` and non-`Done` states.
+ * @updated 2026-04-21 00:56: Applied the `Bilbo Swash Caps` font to the week-view left date numerals for a more decorative calendar column.
+ * @updated 2026-04-21 00:43: Excluded the inline start-focus button from the row's quick-action gesture handling so mobile taps can launch focus without opening the shared sheet.
+ * @updated 2026-04-21 00:34: Stopped todo-row click bubbling when opening quick actions so desktop clicks no longer reopen and immediately dismiss the shared action sheet.
+ * @updated 2026-04-21 00:18: Shortened the virtual schedule filter chips under `排期` from `今天 / 明天 / 本周` to `今 / 明 / 周`.
+ * @updated 2026-04-21 00:10: Unified todo-row tap targets across the whole card and tightened touch gesture suppression so mobile taps no longer get swallowed on active items.
  * @updated 2026-04-20 22:22: Added conservative left/right week-switch swipes inside the week planning scroll area, while ignoring row drag handles and date controls to reduce accidental triggers.
  * @updated 2026-04-20 22:05: Moved the week-view `本周` action into the header's top-right corner so it reads as a separate jump-to-current-week control.
  * @updated 2026-04-20 21:58: Split the right-swipe background styling so detail and duplicate states use clearly different colors while keeping the same gesture thresholds.
@@ -36,7 +47,7 @@
  */
 import React, { useState, useMemo, useRef } from 'react';
 import { Scope, TodoItem, TodoCategory, Category, AutoLinkRule, Log, TodoDuplicateOptions } from '../types';
-import { PlayCircle, CheckCircle2, Plus, MoreHorizontal, ChevronLeft, ChevronRight, LayoutList, Rows, Sparkles, Eye, EyeOff, CalendarDays, Flag, Repeat2, TrendingUp, ListTodo, CircleAlert, PanelRightOpen } from 'lucide-react';
+import { PlayCircle, CheckCircle2, Plus, MoreHorizontal, ChevronLeft, ChevronRight, LayoutList, Rows, Sparkles, Eye, EyeOff, CalendarDays, Flag, Repeat2, TrendingUp, ListTodo, CircleAlert, PanelRightOpen, Pin } from 'lucide-react';
 import { AITodoInputModal } from '../components/AITodoInputModal';
 import { AITodoConfirmModal, ParsedTask } from '../components/AITodoConfirmModal';
 import { aiService } from '../services/aiService';
@@ -94,9 +105,10 @@ const SwipeableTodoItem: React.FC<{
   onDuplicate: (todo: TodoItem) => void;
   viewMode: 'loose' | 'compact';
   scheduleMatchLabels?: string[];
+  scheduleLabelStyle?: 'default' | 'schedule';
   isFirst?: boolean;
   isLast?: boolean;
-}> = ({ todo, categories, activityCategories, scopes, onToggle, onOpenDetail, onOpenQuickActions, onStartFocus, onDuplicate, viewMode, scheduleMatchLabels = [], isFirst = false, isLast = false }) => {
+}> = ({ todo, categories, activityCategories, scopes, onToggle, onOpenDetail, onOpenQuickActions, onStartFocus, onDuplicate, viewMode, scheduleMatchLabels = [], scheduleLabelStyle = 'default', isFirst = false, isLast = false }) => {
   const [translateX, setTranslateX] = useState(0);
   const canQuickToggle = !todo.recurrenceRule;
   const visibleScheduleMatchLabels = scheduleMatchLabels.slice(0, VIRTUAL_SCHEDULE_MATCH_LIMIT);
@@ -117,69 +129,91 @@ const SwipeableTodoItem: React.FC<{
   const minSwipeDistance = 100;
   const maxSwipeDistance = 150; // Limit drag visual
   const shouldSuppressClickRef = useRef(false);
-  const pointerStartXRef = useRef<number | null>(null);
+  const pointerStartPointRef = useRef<{ x: number; y: number } | null>(null);
   const activePointerIdRef = useRef<number | null>(null);
 
   const resetPointerGesture = () => {
-    pointerStartXRef.current = null;
+    pointerStartPointRef.current = null;
     activePointerIdRef.current = null;
     setTranslateX(0);
   };
 
   const onPointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
     if (event.pointerType !== 'touch') return;
+    if (shouldIgnoreTodoPrimaryInteraction(event.target)) {
+      resetPointerGesture();
+      shouldSuppressClickRef.current = false;
+      return;
+    }
     shouldSuppressClickRef.current = false;
-    pointerStartXRef.current = event.clientX;
+    pointerStartPointRef.current = { x: event.clientX, y: event.clientY };
     activePointerIdRef.current = event.pointerId;
   };
 
   const onPointerMove = (event: React.PointerEvent<HTMLDivElement>) => {
     if (event.pointerType !== 'touch') return;
-    if (activePointerIdRef.current !== event.pointerId || pointerStartXRef.current === null) return;
-    const diff = event.clientX - pointerStartXRef.current;
+    if (activePointerIdRef.current !== event.pointerId || pointerStartPointRef.current === null) return;
+    const diffX = event.clientX - pointerStartPointRef.current.x;
+    const diffY = event.clientY - pointerStartPointRef.current.y;
 
-    if (diff < 0 && !canQuickToggle) {
+    // Let mostly-vertical movements behave like scrolls instead of half-starting swipe actions.
+    if (Math.abs(diffY) > Math.abs(diffX) && Math.abs(diffY) > tapActionThreshold) {
+      setTranslateX(0);
+      return;
+    }
+
+    if (diffX < 0 && !canQuickToggle) {
       setTranslateX(0);
       return;
     }
 
     // Allow swipe in both directions but clamp
-    if (Math.abs(diff) < maxSwipeDistance) {
-      setTranslateX(diff);
+    if (Math.abs(diffX) < maxSwipeDistance) {
+      setTranslateX(diffX);
     } else {
       // Clamp to max distance, keeping sign
-      setTranslateX(diff > 0 ? maxSwipeDistance : -maxSwipeDistance);
+      setTranslateX(diffX > 0 ? maxSwipeDistance : -maxSwipeDistance);
     }
   };
 
   const onPointerUp = (event: React.PointerEvent<HTMLDivElement>) => {
     if (event.pointerType !== 'touch') return;
-    if (activePointerIdRef.current !== event.pointerId || pointerStartXRef.current === null) {
+    if (shouldIgnoreTodoPrimaryInteraction(event.target)) {
+      resetPointerGesture();
+      shouldSuppressClickRef.current = false;
+      return;
+    }
+    if (activePointerIdRef.current !== event.pointerId || pointerStartPointRef.current === null) {
       resetPointerGesture();
       return;
     }
 
-    const diff = event.clientX - pointerStartXRef.current;
+    const diffX = event.clientX - pointerStartPointRef.current.x;
+    const diffY = event.clientY - pointerStartPointRef.current.y;
+    const travelDistance = Math.hypot(diffX, diffY);
     let handledGesture = false;
+    const isHorizontalGesture = Math.abs(diffX) > Math.abs(diffY);
 
-    shouldSuppressClickRef.current = true;
-
-    if (Math.abs(diff) <= tapActionThreshold) {
+    if (travelDistance <= tapActionThreshold) {
       handledGesture = true;
       onOpenQuickActions(todo);
-    } else if (diff > duplicateSwipeDistance) {
-      // Deep right swipe -> Duplicate
-      handledGesture = true;
-      onDuplicate(todo);
-    } else if (diff > detailSwipeDistance) {
-      // Light right swipe -> Open detail page
-      handledGesture = true;
-      onOpenDetail(todo);
-    } else if (canQuickToggle && diff < -minSwipeDistance) {
-      // Left Swipe -> Toggle Complete
-      handledGesture = true;
-      onToggle(todo.id);
+    } else if (isHorizontalGesture) {
+      if (diffX > duplicateSwipeDistance) {
+        // Deep right swipe -> Duplicate
+        handledGesture = true;
+        onDuplicate(todo);
+      } else if (diffX > detailSwipeDistance) {
+        // Light right swipe -> Open detail page
+        handledGesture = true;
+        onOpenDetail(todo);
+      } else if (canQuickToggle && diffX < -minSwipeDistance) {
+        // Left Swipe -> Toggle Complete
+        handledGesture = true;
+        onToggle(todo.id);
+      }
     }
+
+    shouldSuppressClickRef.current = handledGesture;
 
     if (handledGesture) {
       event.preventDefault();
@@ -222,7 +256,13 @@ const SwipeableTodoItem: React.FC<{
     return '';
   };
 
-  const handlePrimaryClick = () => {
+  const handlePrimaryClick = (event: React.MouseEvent<HTMLDivElement>) => {
+    event.stopPropagation();
+
+    if (shouldIgnoreTodoPrimaryInteraction(event.target)) {
+      return;
+    }
+
     if (shouldSuppressClickRef.current) {
       shouldSuppressClickRef.current = false;
       return;
@@ -280,9 +320,10 @@ const SwipeableTodoItem: React.FC<{
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
         onPointerCancel={onPointerCancel}
+        onClick={handlePrimaryClick}
       >
         {/* Content (Click to Open Quick Actions) */}
-        <div className={`flex-1 cursor-pointer ${todo.isCompleted ? 'opacity-60' : ''} ${viewMode === 'compact' ? 'flex items-center gap-2 min-w-0' : 'py-0.5'}`} onClick={handlePrimaryClick}>
+        <div className={`flex-1 cursor-pointer ${todo.isCompleted ? 'opacity-60' : ''} ${viewMode === 'compact' ? 'flex items-center gap-2 min-w-0' : 'py-0.5'}`}>
           <div className={`flex gap-2 flex-1 min-w-0 ${viewMode === 'compact' ? 'items-center' : 'items-start'}`}>
             <div className={`min-w-0 flex-1 font-bold ${todo.isCompleted ? 'text-stone-400 line-through' : 'text-stone-800'} ${viewMode === 'compact' ? 'text-sm truncate leading-tight' : 'text-base leading-snug line-clamp-2'} transition-all duration-500`}>
               {todo.title}
@@ -328,13 +369,31 @@ const SwipeableTodoItem: React.FC<{
           {/* Linked Tags/Scopes */}
           <div className={`flex items-center gap-1.5 flex-wrap flex-shrink-0 ${viewMode === 'compact' ? 'mt-0' : 'mt-1.5'}`}>
             {visibleScheduleMatchLabels.map((label) => (
-              <span
-                key={label}
-                className={`text-[11px] text-stone-500 font-medium flex items-center gap-1 ${viewMode === 'compact' ? 'px-0 border-0 bg-transparent' : 'px-1.5 py-0.5 rounded-md border border-stone-200 bg-white/50'}`}
-              >
-                <span className="h-1.5 w-1.5 rounded-full bg-stone-300"></span>
-                <span>{label}</span>
-              </span>
+              scheduleLabelStyle === 'schedule' ? (
+                <span
+                  key={label}
+                  className={`text-[11px] text-stone-500 font-medium flex items-center gap-1 ${viewMode === 'compact' ? 'px-0 border-0 bg-transparent' : 'px-1.5 py-0.5 rounded-md border border-stone-200 bg-white/50'}`}
+                >
+                  <span className="text-stone-300 font-sans">{'⁎'}</span>
+                  <span>{label}</span>
+                </span>
+              ) : label === PIN_SCHEDULE_MATCH_LABEL ? (
+                <span
+                  key={label}
+                  className={`text-[11px] text-stone-500 font-medium flex items-center gap-1 ${viewMode === 'compact' ? 'px-0 border-0 bg-transparent' : 'px-1.5 py-0.5 rounded-md border border-stone-200 bg-white/50'}`}
+                >
+                  <Pin size={10} className="rotate-[28deg] text-stone-400" />
+                  {viewMode === 'loose' && <span>Pin</span>}
+                </span>
+              ) : (
+                <span
+                  key={label}
+                  className={`text-[11px] text-stone-500 font-medium flex items-center gap-1 ${viewMode === 'compact' ? 'px-0 border-0 bg-transparent' : 'px-1.5 py-0.5 rounded-md border border-stone-200 bg-white/50'}`}
+                >
+                  <span className="h-1.5 w-1.5 rounded-full bg-stone-300"></span>
+                  <span>{label}</span>
+                </span>
+              )
             ))}
             {hiddenScheduleMatchCount > 0 && (
               <span
@@ -402,6 +461,7 @@ const SwipeableTodoItem: React.FC<{
             {/* Bottom Right: Start Focus */}
             {!todo.isCompleted && (
               <button
+                data-todo-primary-ignore="true"
                 onClick={(e) => { e.stopPropagation(); onStartFocus(todo); }}
                 className={`text-stone-300 hover:text-orange-500 transition-colors opacity-100 md:opacity-0 md:group-hover:opacity-100 ${viewMode === 'compact' ? '' : 'pt-2'}`}
               >
@@ -434,6 +494,16 @@ const SwipeableTodoItem: React.FC<{
   );
 };
 
+const shouldIgnoreTodoPrimaryInteraction = (target: EventTarget | null): boolean => {
+  if (!(target instanceof Element)) {
+    return false;
+  }
+
+  return Boolean(
+    target.closest('[data-todo-primary-ignore="true"], button, a, input, textarea, select, [role="button"]')
+  );
+};
+
 const WEEKDAY_ROW_LABELS = ['周一', '周二', '周三', '周四', '周五', '周六', '周日'];
 const VIRTUAL_SCHEDULE_CATEGORY_ID = '__virtual_schedule__';
 const VIRTUAL_SCHEDULE_CATEGORY_NAME = '排期';
@@ -449,10 +519,12 @@ const formatTodoInlineDate = (dateKey?: string): string | null => {
 };
 
 const VIRTUAL_SCHEDULE_FILTERS: Array<{ id: TodoScheduleRange; label: string }> = [
-  { id: 'today', label: '今天' },
-  { id: 'tomorrow', label: '明天' },
-  { id: 'thisWeek', label: '本周' }
+  { id: 'today', label: '今' },
+  { id: 'tomorrow', label: '明' },
+  { id: 'thisWeek', label: '周' }
 ];
+
+const PIN_SCHEDULE_MATCH_LABEL = 'Pin';
 
 const TODO_SCHEDULE_MATCH_LABELS: Record<TodoScheduleMatch['kind'], string> = {
   deadline: 'Due',
@@ -478,6 +550,9 @@ interface TodoListSection {
   entries: TodoListEntry[];
 }
 
+const filterVisibleTodos = (todos: TodoItem[], showCompletedTodos: boolean): TodoItem[] =>
+  todos.filter((todo) => showCompletedTodos || !todo.isCompleted);
+
 const buildScheduleMatchLabels = (matches: TodoScheduleMatch[]): string[] => {
   const labels: string[] = [];
   const seenKinds = new Set<TodoScheduleMatch['kind']>();
@@ -492,6 +567,78 @@ const buildScheduleMatchLabels = (matches: TodoScheduleMatch[]): string[] => {
   });
 
   return labels;
+};
+
+const buildTodoListEntry = (
+  todo: TodoItem,
+  scheduleMatches: TodoScheduleMatch[],
+  options?: { includePinLabel?: boolean }
+): TodoListEntry => ({
+  todo,
+  scheduleMatches,
+  scheduleMatchLabels: [
+    ...(options?.includePinLabel && todo.pin ? [PIN_SCHEDULE_MATCH_LABEL] : []),
+    ...buildScheduleMatchLabels(scheduleMatches)
+  ]
+});
+
+const sortTodoListEntries = (
+  left: TodoListEntry,
+  right: TodoListEntry,
+  options?: { pinFirst?: boolean }
+): number => {
+  if (options?.pinFirst && Boolean(left.todo.pin) !== Boolean(right.todo.pin)) {
+    return Number(Boolean(right.todo.pin)) - Number(Boolean(left.todo.pin));
+  }
+
+  if (left.todo.isCompleted !== right.todo.isCompleted) {
+    return Number(left.todo.isCompleted) - Number(right.todo.isCompleted);
+  }
+
+  const leftFirstMatch = left.scheduleMatches[0];
+  const rightFirstMatch = right.scheduleMatches[0];
+
+  if (leftFirstMatch && rightFirstMatch) {
+    const dateDiff = leftFirstMatch.dateKey.localeCompare(rightFirstMatch.dateKey);
+    if (dateDiff !== 0) return dateDiff;
+
+    const priorityDiff = TODO_SCHEDULE_MATCH_PRIORITY[leftFirstMatch.kind] - TODO_SCHEDULE_MATCH_PRIORITY[rightFirstMatch.kind];
+    if (priorityDiff !== 0) return priorityDiff;
+  }
+
+  return left.todo.title.localeCompare(right.todo.title, 'zh-CN');
+};
+
+const sortCategoryTodoEntries = (left: TodoListEntry, right: TodoListEntry): number => {
+  if (Boolean(left.todo.pin) !== Boolean(right.todo.pin)) {
+    return Number(Boolean(right.todo.pin)) - Number(Boolean(left.todo.pin));
+  }
+
+  if (left.todo.isCompleted !== right.todo.isCompleted) {
+    return Number(left.todo.isCompleted) - Number(right.todo.isCompleted);
+  }
+
+  return left.todo.title.localeCompare(right.todo.title, 'zh-CN');
+};
+
+const buildOverdueScheduleMatches = (todo: TodoItem, todayDateKey: string): TodoScheduleMatch[] => {
+  const matches: TodoScheduleMatch[] = [];
+
+  if (todo.deadlineDate && todo.deadlineDate < todayDateKey) {
+    matches.push({ dateKey: todo.deadlineDate, kind: 'deadline' });
+  }
+
+  if (todo.scheduledDate && todo.scheduledDate < todayDateKey) {
+    matches.push({ dateKey: todo.scheduledDate, kind: 'scheduled' });
+  }
+
+  return matches.sort((left, right) => {
+    if (left.dateKey !== right.dateKey) {
+      return left.dateKey.localeCompare(right.dateKey);
+    }
+
+    return TODO_SCHEDULE_MATCH_PRIORITY[left.kind] - TODO_SCHEDULE_MATCH_PRIORITY[right.kind];
+  });
 };
 
 const formatScheduleSectionLabel = (dateKey: string, todayDateKey: string, tomorrowDateKey: string): string => {
@@ -512,6 +659,7 @@ const formatScheduleSectionLabel = (dateKey: string, todayDateKey: string, tomor
 };
 
 type WeekBadgeKey = 'deadline' | 'scheduled' | 'recurring' | 'completed' | 'inProgress';
+type WeekQuickActionBadgeKey = 'deadline' | 'scheduled' | 'completed' | 'inProgress';
 
 interface WeekBadgeDescriptor {
   key: WeekBadgeKey;
@@ -520,13 +668,25 @@ interface WeekBadgeDescriptor {
   overdue?: boolean;
 }
 
+const getWeekBadgeDisplayLabel = (badge: WeekBadgeDescriptor, badgeCount: number): string => {
+  if (badgeCount <= 1) {
+    return badge.label;
+  }
+
+  if (badge.key === 'deadline' || badge.key === 'completed') {
+    return badge.label;
+  }
+
+  return badge.label.slice(0, 3);
+};
+
 const WeekTodoLineItem: React.FC<{
   entry: WeekTodoEntry;
   isDragging: boolean;
   onDragStart: (entry: WeekTodoEntry, event: React.DragEvent<HTMLDivElement>) => void;
   onDragEnd: () => void;
   onTouchDragStart: (entry: WeekTodoEntry, event: React.TouchEvent<HTMLDivElement>) => void;
-  onBadgeClick: (entry: WeekTodoEntry, badgeKey: 'scheduled' | 'deadline') => void;
+  onBadgeClick: (entry: WeekTodoEntry, badgeKey: WeekQuickActionBadgeKey) => void;
 }> = ({ entry, isDragging, onDragStart, onDragEnd, onTouchDragStart, onBadgeClick }) => {
   const { todo, badges } = entry;
   const isHistoricalOnly = !badges.scheduled && !badges.deadline && !badges.recurring && (badges.completed || badges.inProgress);
@@ -565,6 +725,7 @@ const WeekTodoLineItem: React.FC<{
     badges.completed ? { key: 'completed', label: 'Done', color: '#7f8c84' } : null,
     badges.inProgress ? { key: 'inProgress', label: 'Trace', color: '#8b8096' } : null
   ].filter(Boolean) as WeekBadgeDescriptor[];
+  const hasMultipleBadges = orderedBadges.length > 1;
   const dragBadgeKey: 'scheduled' | 'deadline' | null = badges.deadline ? 'deadline' : badges.scheduled ? 'scheduled' : null;
 
   return (
@@ -588,24 +749,24 @@ const WeekTodoLineItem: React.FC<{
           {todo.title}
         </div>
       </div>
-      <div className="shrink-0 flex w-[5.75rem] items-center justify-end text-[9px] tracking-[0.16em] uppercase">
+      <div className={`shrink-0 flex items-center justify-end gap-1 whitespace-nowrap text-[9px] uppercase leading-none ${hasMultipleBadges ? 'tracking-[0.08em]' : 'tracking-[0.16em]'}`}>
         {orderedBadges.map((badge) => (
-          badge.key === 'scheduled' || badge.key === 'deadline' ? (
+          badge.key === 'scheduled' || badge.key === 'deadline' || badge.key === 'completed' || badge.key === 'inProgress' ? (
             <span
               key={badge.key}
               data-week-badge-trigger="true"
               data-week-swipe-ignore="true"
               onClick={() => onBadgeClick(entry, badge.key)}
-              className="inline-flex w-full cursor-pointer items-center justify-end gap-1 rounded-full py-0.5 text-right transition-colors hover:bg-stone-100/70"
+              className="inline-flex cursor-pointer items-center justify-end gap-1 whitespace-nowrap rounded-full px-1 py-0.5 text-right transition-colors hover:bg-stone-100/70"
               style={{ color: badge.color }}
             >
               {badge.overdue && <CircleAlert size={10} className="text-red-500" />}
-              <span>{badge.label}</span>
+              <span>{getWeekBadgeDisplayLabel(badge, hasMultipleBadges ? orderedBadges.length : 1)}</span>
             </span>
           ) : (
-            <span key={badge.key} className="inline-flex w-full items-center justify-end gap-1 text-right" style={{ color: badge.color }}>
+            <span key={badge.key} className="inline-flex items-center justify-end gap-1 whitespace-nowrap text-right" style={{ color: badge.color }}>
               {badge.overdue && <CircleAlert size={10} className="text-red-500" />}
-              <span>{badge.label}</span>
+              <span>{getWeekBadgeDisplayLabel(badge, hasMultipleBadges ? orderedBadges.length : 1)}</span>
             </span>
           )
         ))}
@@ -654,7 +815,8 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
     handleQuickActionOpenDetail,
     handleQuickActionComplete,
     handleQuickActionUndoComplete,
-    handleQuickActionClearDate
+    handleQuickActionClearDate,
+    handleQuickActionTogglePin
   } = useTodoQuickActions({ onSaveTodo, onEditTodo });
 
   // AI States
@@ -811,36 +973,16 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
     const referenceDate = parseDateKey(todayDateKey) || new Date();
 
     const buildEntries = (range: TodoScheduleRange): TodoListEntry[] => (
-      todos
-        .filter((todo) => showCompletedTodos || !todo.isCompleted)
+      filterVisibleTodos(todos, showCompletedTodos)
         .map((todo) => {
           const scheduleMatches = getTodoScheduleMatches(todo, range, referenceDate);
 
-          return {
-            todo,
-            scheduleMatches,
-            scheduleMatchLabels: buildScheduleMatchLabels(scheduleMatches)
-          };
+          return buildTodoListEntry(todo, scheduleMatches, {
+            includePinLabel: range === 'today'
+          });
         })
         .filter((entry) => entry.scheduleMatches.length > 0)
-        .sort((left, right) => {
-          if (left.todo.isCompleted !== right.todo.isCompleted) {
-            return Number(left.todo.isCompleted) - Number(right.todo.isCompleted);
-          }
-
-          const leftFirstMatch = left.scheduleMatches[0];
-          const rightFirstMatch = right.scheduleMatches[0];
-
-          if (leftFirstMatch && rightFirstMatch) {
-            const dateDiff = leftFirstMatch.dateKey.localeCompare(rightFirstMatch.dateKey);
-            if (dateDiff !== 0) return dateDiff;
-
-            const priorityDiff = TODO_SCHEDULE_MATCH_PRIORITY[leftFirstMatch.kind] - TODO_SCHEDULE_MATCH_PRIORITY[rightFirstMatch.kind];
-            if (priorityDiff !== 0) return priorityDiff;
-          }
-
-          return left.todo.title.localeCompare(right.todo.title, 'zh-CN');
-        })
+        .sort((left, right) => sortTodoListEntries(left, right, { pinFirst: range === 'today' }))
     );
 
     return {
@@ -850,24 +992,102 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
     };
   }, [todos, showCompletedTodos, todayDateKey, tomorrowDateKey]);
 
+  const pinnedTodayEntries = useMemo<TodoListEntry[]>(() => {
+    const referenceDate = parseDateKey(todayDateKey) || new Date();
+
+    return filterVisibleTodos(todos, showCompletedTodos)
+      .filter((todo) => todo.pin)
+      .map((todo) => {
+        const todayMatches = getTodoScheduleMatches(todo, 'today', referenceDate);
+        const overdueMatches = buildOverdueScheduleMatches(todo, todayDateKey);
+        const combinedMatches = todayMatches.length > 0 ? todayMatches : overdueMatches;
+
+        return buildTodoListEntry(todo, combinedMatches, {
+          includePinLabel: true
+        });
+      })
+      .sort((left, right) => sortTodoListEntries(left, right, { pinFirst: true }));
+  }, [todos, showCompletedTodos, todayDateKey]);
+
+  const nonPinnedTodayEntries = useMemo<TodoListEntry[]>(
+    () => scheduleEntriesByFilter.today.filter((entry) => !entry.todo.pin),
+    [scheduleEntriesByFilter]
+  );
+
+  const overdueTodayEntries = useMemo<TodoListEntry[]>(() => {
+    const visibleTodayEntryIds = new Set([
+      ...nonPinnedTodayEntries.map((entry) => entry.todo.id),
+      ...pinnedTodayEntries.map((entry) => entry.todo.id)
+    ]);
+
+    return todos
+      .filter((todo) => !todo.isCompleted)
+      .filter((todo) => !visibleTodayEntryIds.has(todo.id))
+      .map((todo) => {
+        const scheduleMatches = buildOverdueScheduleMatches(todo, todayDateKey);
+
+        return buildTodoListEntry(todo, scheduleMatches, {
+          includePinLabel: true
+        });
+      })
+      .filter((entry) => entry.scheduleMatches.length > 0)
+      .sort((left, right) => sortTodoListEntries(left, right, { pinFirst: true }));
+  }, [todos, nonPinnedTodayEntries, pinnedTodayEntries, todayDateKey]);
+
+  const virtualScheduleVisibleCounts = useMemo<Record<TodoScheduleRange, number>>(() => ({
+    today: pinnedTodayEntries.length + nonPinnedTodayEntries.length + overdueTodayEntries.length,
+    tomorrow: scheduleEntriesByFilter.tomorrow.length,
+    thisWeek: scheduleEntriesByFilter.thisWeek.length
+  }), [scheduleEntriesByFilter, nonPinnedTodayEntries.length, pinnedTodayEntries.length, overdueTodayEntries.length]);
+
   const selectedTodoEntries: TodoListEntry[] = isVirtualScheduleCategory
     ? scheduleEntriesByFilter[selectedScheduleFilter]
     : todos
         .filter((todo) => todo.categoryId === selectedCategoryId)
         .filter((todo) => showCompletedTodos || !todo.isCompleted)
-        .sort((left, right) => Number(left.isCompleted) - Number(right.isCompleted))
-        .map((todo) => ({
-          todo,
-          scheduleMatches: [],
-          scheduleMatchLabels: []
-        }));
+        .map((todo) => buildTodoListEntry(todo, [], { includePinLabel: true }))
+        .sort(sortCategoryTodoEntries);
 
   const selectedCategoryName = isVirtualScheduleCategory
     ? VIRTUAL_SCHEDULE_CATEGORY_NAME
     : (selectedCategory?.name || categories[0].name);
   const selectedScheduleFilterMeta = VIRTUAL_SCHEDULE_FILTERS.find((filter) => filter.id === selectedScheduleFilter) || VIRTUAL_SCHEDULE_FILTERS[0];
   const selectedTodoSections = useMemo<TodoListSection[]>(() => {
-    if (!isVirtualScheduleCategory || selectedScheduleFilter !== 'thisWeek') {
+    if (!isVirtualScheduleCategory) {
+      return [];
+    }
+
+    if (selectedScheduleFilter === 'today') {
+      const sections: TodoListSection[] = [];
+
+      if (pinnedTodayEntries.length > 0) {
+        sections.push({
+          dateKey: '__pin__',
+          label: 'Pin',
+          entries: pinnedTodayEntries
+        });
+      }
+
+      if (nonPinnedTodayEntries.length > 0) {
+        sections.push({
+          dateKey: todayDateKey,
+          label: formatScheduleSectionLabel(todayDateKey, todayDateKey, tomorrowDateKey),
+          entries: nonPinnedTodayEntries
+        });
+      }
+
+      if (overdueTodayEntries.length > 0) {
+        sections.push({
+          dateKey: '__overdue__',
+          label: '过期未完成',
+          entries: overdueTodayEntries
+        });
+      }
+
+      return sections;
+    }
+
+    if (selectedScheduleFilter !== 'thisWeek') {
       return [];
     }
 
@@ -893,7 +1113,9 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
     });
 
     return Array.from(sectionMap.values()).sort((left, right) => left.dateKey.localeCompare(right.dateKey));
-  }, [isVirtualScheduleCategory, selectedScheduleFilter, selectedTodoEntries, todayDateKey, tomorrowDateKey]);
+  }, [isVirtualScheduleCategory, selectedScheduleFilter, selectedTodoEntries, pinnedTodayEntries, nonPinnedTodayEntries, overdueTodayEntries, todayDateKey, tomorrowDateKey]);
+  const hasSectionedTodoEntries = selectedTodoSections.some((section) => section.entries.length > 0);
+  const hasVisibleTodoEntries = hasSectionedTodoEntries || selectedTodoEntries.length > 0;
 
   const handleAddTodoClick = () => {
     const targetCategoryId = isVirtualScheduleCategory ? primaryCategoryId : selectedCategoryId;
@@ -1323,7 +1545,7 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
     };
   }, [isTouchWeekDragging, weekTodos, onSaveTodo]);
 
-  const handleWeekBadgeClick = (entry: WeekTodoEntry, _badgeKey: 'scheduled' | 'deadline') => {
+  const handleWeekBadgeClick = (entry: WeekTodoEntry, _badgeKey: WeekQuickActionBadgeKey) => {
     if (touchDragActivatedRef.current) return;
     openQuickActions(entry.todo);
   };
@@ -1378,6 +1600,7 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
       categoryId: draft.categoryId,
       title: draft.title,
       isCompleted: false,
+      pin: false,
       linkedCategoryId: draft.linkedCategoryId,
       linkedActivityId: draft.linkedActivityId,
       defaultScopeIds: draft.defaultScopeIds,
@@ -1409,6 +1632,7 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
       onOpenDetail={handleQuickActionOpenDetail}
       onComplete={handleQuickActionComplete}
       onUndoComplete={handleQuickActionUndoComplete}
+      onTogglePin={handleQuickActionTogglePin}
       onClose={closeQuickActions}
     />
   );
@@ -1526,7 +1750,10 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
                       <div className={`text-[12px] tracking-[0.02em] ${isToday ? 'text-slate-600' : 'text-slate-400'}`}>
                         {WEEKDAY_ROW_LABELS[index]}
                       </div>
-                      <div className={`mt-1 text-[19px] leading-none md:text-[22px] font-calendar ${isToday ? 'font-semibold text-slate-800' : 'font-medium text-slate-700'}`}>
+                      <div
+                        className={`mt-1 text-[19px] leading-none md:text-[22px] ${isToday ? 'font-semibold text-slate-800' : 'font-medium text-slate-700'}`}
+                        style={{ fontFamily: "'Bilbo Swash Caps', 'Georgia', 'Times New Roman', cursive, serif" }}
+                      >
                         {bucketDate?.getDate() || '--'}
                       </div>
                       <div className="mt-1 text-[10px] tracking-[0.02em] text-slate-400">
@@ -1779,7 +2006,7 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
               <div className="mt-3 flex flex-wrap items-center gap-1.5">
                 {VIRTUAL_SCHEDULE_FILTERS.map((filter) => {
                   const isActive = selectedScheduleFilter === filter.id;
-                  const visibleCount = scheduleEntriesByFilter[filter.id].length;
+                  const visibleCount = virtualScheduleVisibleCounts[filter.id];
 
                   return (
                     <button
@@ -1820,7 +2047,7 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
         </div>
 
         <div className="flex-1 overflow-y-auto pb-24 no-scrollbar">
-          {isVirtualScheduleCategory && selectedScheduleFilter === 'thisWeek'
+          {isVirtualScheduleCategory && (selectedScheduleFilter === 'thisWeek' || selectedScheduleFilter === 'today')
             ? selectedTodoSections.map((section) => (
               <section key={section.dateKey} className="mb-6">
                 <div className="mb-2 flex items-center gap-3 px-1">
@@ -1843,6 +2070,7 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
                     onDuplicate={handleOpenDuplicateModal}
                     viewMode={viewMode}
                     scheduleMatchLabels={entry.scheduleMatchLabels}
+                    scheduleLabelStyle="schedule"
                     isFirst={index === 0}
                     isLast={index === section.entries.length - 1}
                   />
@@ -1863,12 +2091,13 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
                 onDuplicate={handleOpenDuplicateModal}
                 viewMode={viewMode}
                 scheduleMatchLabels={entry.scheduleMatchLabels}
+                scheduleLabelStyle={isVirtualScheduleCategory ? 'schedule' : 'default'}
                 isFirst={index === 0}
                 isLast={index === selectedTodoEntries.length - 1}
               />
             ))}
 
-          {selectedTodoEntries.length === 0 && (
+          {!hasVisibleTodoEntries && (
             <div className="flex flex-col items-center justify-center py-20 text-stone-300">
               <MoreHorizontal size={40} className="mb-4 opacity-50" />
               <p className="text-sm font-serif italic">

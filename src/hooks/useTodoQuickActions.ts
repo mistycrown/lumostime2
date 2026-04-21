@@ -4,6 +4,7 @@
  * @output Shared quick-actions state and handlers for todo list rows and week-view badges
  * @pos Hook
  * @description Centralizes todo quick-actions sheet state so multiple entry points can open the same modal without duplicating move/complete/detail logic inside the view.
+ * @updated 2026-04-21: Added a shared pin/unpin quick action so schedule-list rows and week badges can toggle the today-top flag consistently.
  * @updated 2026-04-20: Extracted from TodoView to unify quick-actions behavior across todo-row taps and week badge actions.
  */
 import { useRef, useState } from 'react';
@@ -99,6 +100,15 @@ export const useTodoQuickActions = ({ onSaveTodo, onEditTodo }: UseTodoQuickActi
     closeQuickActions(true);
   };
 
+  const handleQuickActionTogglePin = () => {
+    if (!quickActionTodo) return;
+    onSaveTodo({
+      ...quickActionTodo,
+      pin: !quickActionTodo.pin
+    });
+    closeQuickActions(true);
+  };
+
   return {
     quickActionTodo,
     openQuickActions,
@@ -107,6 +117,7 @@ export const useTodoQuickActions = ({ onSaveTodo, onEditTodo }: UseTodoQuickActi
     handleQuickActionOpenDetail,
     handleQuickActionComplete,
     handleQuickActionUndoComplete,
-    handleQuickActionClearDate
+    handleQuickActionClearDate,
+    handleQuickActionTogglePin
   };
 };
