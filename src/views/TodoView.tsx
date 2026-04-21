@@ -760,12 +760,12 @@ const WeekTodoLineItem: React.FC<{
               className="inline-flex cursor-pointer items-center justify-end gap-1 whitespace-nowrap rounded-full px-1 py-0.5 text-right transition-colors hover:bg-stone-100/70"
               style={{ color: badge.color }}
             >
-              {badge.overdue && <CircleAlert size={10} className="text-red-500" />}
+              {badge.overdue && <CircleAlert size={10} className="-translate-y-px shrink-0 text-red-500" />}
               <span>{getWeekBadgeDisplayLabel(badge, hasMultipleBadges ? orderedBadges.length : 1)}</span>
             </span>
           ) : (
             <span key={badge.key} className="inline-flex items-center justify-end gap-1 whitespace-nowrap text-right" style={{ color: badge.color }}>
-              {badge.overdue && <CircleAlert size={10} className="text-red-500" />}
+              {badge.overdue && <CircleAlert size={10} className="-translate-y-px shrink-0 text-red-500" />}
               <span>{getWeekBadgeDisplayLabel(badge, hasMultipleBadges ? orderedBadges.length : 1)}</span>
             </span>
           )
@@ -1747,16 +1747,16 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
                       }}
                       className="flex flex-col justify-center border-r border-stone-300/70 px-2 py-3 text-center transition-colors hover:bg-white/40 md:px-3"
                     >
-                      <div className={`text-[12px] tracking-[0.02em] ${isToday ? 'text-slate-600' : 'text-slate-400'}`}>
+                      <div className={`text-[12px] tracking-[0.02em] ${isToday ? 'text-stone-600' : 'text-stone-500'}`}>
                         {WEEKDAY_ROW_LABELS[index]}
                       </div>
                       <div
-                        className={`mt-1 text-[19px] leading-none md:text-[22px] ${isToday ? 'font-semibold text-slate-800' : 'font-medium text-slate-700'}`}
+                        className={`mt-1 text-[19px] leading-none md:text-[22px] ${isToday ? 'font-semibold text-stone-800' : 'font-medium text-stone-700'}`}
                         style={{ fontFamily: "'Bilbo Swash Caps', 'Georgia', 'Times New Roman', cursive, serif" }}
                       >
                         {bucketDate?.getDate() || '--'}
                       </div>
-                      <div className="mt-1 text-[10px] tracking-[0.02em] text-slate-400">
+                      <div className="mt-1 text-[10px] tracking-[0.02em] text-stone-400">
                         {bucketDate ? `${bucketDate.getMonth() + 1}月` : ''}
                       </div>
                     </button>
