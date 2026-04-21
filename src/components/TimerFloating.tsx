@@ -4,6 +4,7 @@
  * @output Floating UI Elements
  * @pos Component (Global UI)
  * @description Renders floating timer bubbles for active sessions, with responsive action visibility that keeps the confirm button aligned on narrow layouts.
+ * @updated 2026-04-21: Narrowed Todo-view floating timers to the same avoidance scale used by Record-style layouts so they no longer collide with the bottom-right floating action button.
  * @updated 2026-03-24
  */
 import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
@@ -91,9 +92,10 @@ const SingleTimer: React.FC<{
     currentView === AppView.TAGS;
   const isGroupTwo = currentView === AppView.TIMELINE;
   const isGroupThree = currentView === AppView.TODO;
+  const shouldUseResponsiveVisibility = isGroupOne || isGroupThree;
 
   const updateResponsiveVisibility = useCallback(() => {
-    if (!isGroupOne || isCollapsed) {
+    if (!shouldUseResponsiveVisibility || isCollapsed) {
       setResponsiveVisibility(prev =>
         prev.hideCancelButton || prev.hideTodoTag
           ? { hideCancelButton: false, hideTodoTag: false }
@@ -143,14 +145,14 @@ const SingleTimer: React.FC<{
         hideTodoTag: nextHideTodoTag
       };
     });
-  }, [isCollapsed, isGroupOne]);
+  }, [isCollapsed, shouldUseResponsiveVisibility]);
 
   useLayoutEffect(() => {
     updateResponsiveVisibility();
   }, [updateResponsiveVisibility, session.activityName, todo?.title]);
 
   useEffect(() => {
-    if (!isGroupOne || isCollapsed) {
+    if (!shouldUseResponsiveVisibility || isCollapsed) {
       return;
     }
 
@@ -174,7 +176,7 @@ const SingleTimer: React.FC<{
       resizeObserver?.disconnect();
       window.removeEventListener('resize', updateResponsiveVisibility);
     };
-  }, [isCollapsed, isGroupOne, updateResponsiveVisibility]);
+  }, [isCollapsed, shouldUseResponsiveVisibility, updateResponsiveVisibility]);
 
   const formatTime = (seconds: number) => {
     const h = Math.floor(seconds / 3600);
@@ -224,8 +226,8 @@ const SingleTimer: React.FC<{
     };
   };
 
-  const shouldHideCancelButton = isGroupOne && responsiveVisibility.hideCancelButton;
-  const shouldHideTodoTag = isGroupOne && responsiveVisibility.hideTodoTag;
+  const shouldHideCancelButton = shouldUseResponsiveVisibility && responsiveVisibility.hideCancelButton;
+  const shouldHideTodoTag = shouldUseResponsiveVisibility && responsiveVisibility.hideTodoTag;
 
   return (
     <div
@@ -238,7 +240,7 @@ const SingleTimer: React.FC<{
             } ${isBorderAnimating ? 'duration-300' : ''}`
           : `transition-all duration-500 ease-out rounded-full h-14 ${
               isGroupThree
-                ? 'px-4 py-3 justify-between w-full'
+                ? 'px-4 py-3 justify-between w-[75%]'
                 : isGroupTwo
                   ? 'pl-3 pr-3 py-3 w-[50%]'
                   : 'pl-3 pr-2 py-3 justify-between w-[75%]'

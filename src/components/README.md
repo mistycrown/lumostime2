@@ -91,10 +91,14 @@ Components for theme and appearance customization.
 - `ScheduleStyleSelector.tsx`: 日程图样式卡片选择器，提供默认、经典、极简、实色四种轻量预览。
 - `achievement/AchievementBottleIconPackSelector.tsx`: 已改为成就瓶图标包卡片选择器，支持更紧凑的预览式切换。
 - `achievement/AchievementBottleStyleSelector.tsx`: 已改为成就瓶样式卡片选择器，使用玻璃瓶身小预览区分不同气质。
-> Last updated: 2026-04-20
+> Last updated: 2026-04-21
+- `TodoDetailModal.tsx`: Added a detail-level `Pin` toggle so todos can be marked for top placement in the `排期 -> 今` list without leaving the detail screen.
+- `TodoQuickActionsModal.tsx`: Added a lightweight `Pin / 取消 Pin` row and pinned-state metadata so quick actions can toggle the today-schedule priority flag directly.
+- `TimerFloating.tsx`: Matched Todo-view floating timers to the narrower Record-style avoidance width and responsive control hiding so they leave clear space for the bottom-right floating action button.
+- `TodoQuickActionsModal.tsx`: Switched backdrop dismissal to pointer-down handling and stops panel pointer events from bubbling so desktop row clicks no longer open and instantly dismiss the shared quick-actions sheet.
 - `TodoQuickActionsModal.tsx`: Extracted the todo quick-actions sheet from `TodoView` so list rows and week badges now share the same lightweight action panel.
 - `TodoScheduleAssignModal.tsx`: Fixed the week-planning schedule modal to a stable three-quarter viewport height so the panel no longer grows or shrinks with its content.
-- `TodoDuplicateModal.tsx`: Added a quick-copy editing modal so todo duplication can stay lightweight without leaving an extra temporary item in the list.
+- `TodoDuplicateModal.tsx`: Trimmed the duplicate modal helper copy so the quick-copy flow stays lightweight without extra explanatory text.
 - `AddLogModal.tsx`: Added direct camera capture functionality, now preferring native camera file-path persistence before falling back to `webPath`.
 - `TodoAssociation.tsx`: Updated progress display logic in associated parent modals/views (`AddLogModal`, `FocusDetailView`) to reflect active progress increments in real time with a distinct color.
 - `NavigationDecorationSelector.tsx`: Added support for uploading and managing custom navigation decorations using Capacitor Filesystem.

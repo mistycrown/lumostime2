@@ -4,10 +4,12 @@
  * @output Shared todo quick-actions sheet UI for list rows and week-view badges
  * @pos Component
  * @description A reusable bottom sheet that exposes lightweight todo planning and completion actions without opening the full todo detail editor first.
+ * @updated 2026-04-21: Added pin/unpin quick action support plus pinned-state metadata for today-schedule prioritization.
+ * @updated 2026-04-21: Switched backdrop dismissal to pointer-down handling so opening clicks no longer immediately close the shared sheet on desktop.
  * @updated 2026-04-20: Extracted from TodoView so todo-list taps and week badges can share one quick-actions sheet implementation.
  */
 import React from 'react';
-import { CalendarDays, Flag, PanelRightOpen, Check, CheckCircle2, X } from 'lucide-react';
+import { CalendarDays, Flag, PanelRightOpen, Check, CheckCircle2, Pin, X } from 'lucide-react';
 import { TodoItem } from '../types';
 import { parseDateKey } from '../utils/todoScheduleUtils';
 
@@ -19,6 +21,7 @@ interface TodoQuickActionsModalProps {
   onOpenDetail: () => void;
   onComplete: () => void;
   onUndoComplete: () => void;
+  onTogglePin: () => void;
   onClose: () => void;
 }
 
@@ -30,6 +33,7 @@ export const TodoQuickActionsModal: React.FC<TodoQuickActionsModalProps> = ({
   onOpenDetail,
   onComplete,
   onUndoComplete,
+  onTogglePin,
   onClose
 }) => {
   if (!isOpen || !todo) return null;
@@ -52,6 +56,7 @@ export const TodoQuickActionsModal: React.FC<TodoQuickActionsModalProps> = ({
   };
 
   const quickActionDateRows = [
+    { label: 'Pin', value: todo.pin ? 'On' : null },
     { label: 'Arrange', value: formatQuickActionDate(todo.scheduledDate) },
     { label: 'Due', value: formatQuickActionDate(todo.deadlineDate) },
     { label: 'Completed', value: formatQuickActionDateTime(todo.completedAt) }
@@ -60,10 +65,15 @@ export const TodoQuickActionsModal: React.FC<TodoQuickActionsModalProps> = ({
   return (
     <div
       className="fixed inset-0 z-[130] flex items-end justify-center bg-[rgba(15,23,42,0.12)] px-4 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-12 backdrop-blur-sm md:items-center md:pb-4"
-      onClick={onClose}
+      onPointerDown={(event) => {
+        if (event.target === event.currentTarget) {
+          onClose();
+        }
+      }}
     >
       <div
         className="w-full max-w-[26rem] overflow-hidden rounded-[2rem] border border-stone-200 bg-[#faf9f6] shadow-[0_26px_70px_rgba(15,23,42,0.14)]"
+        onPointerDown={(event) => event.stopPropagation()}
         onClick={(event) => event.stopPropagation()}
       >
         <div className="relative border-b border-stone-200 px-5 py-4 pr-24">
@@ -184,6 +194,15 @@ export const TodoQuickActionsModal: React.FC<TodoQuickActionsModalProps> = ({
                 <span>清除截止日期</span>
               </button>
             </div>
+
+            <button
+              type="button"
+              onClick={onTogglePin}
+              className="flex w-full items-center gap-2 rounded-2xl border border-stone-200 bg-white/80 px-4 py-3 text-left text-sm text-stone-700 transition-colors hover:border-stone-300 hover:bg-white"
+            >
+              <Pin size={13} className={`${todo.pin ? 'text-stone-600' : 'text-stone-400'} rotate-[28deg]`} />
+              <span>{todo.pin ? '取消 Pin' : 'Pin'}</span>
+            </button>
 
             {todo.isCompleted && (
               <button
