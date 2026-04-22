@@ -3,7 +3,7 @@
  * @input CategoryScopeContext (categories), SessionContext (activeSessions), ReviewContext (daily reviews and templates), ToastContext (addToast), callbacks for quick punch and activity control
  * @output Deep Link Listener (appUrlOpen event handler), NFC Listener (nfcTagScanned event handler)
  * @pos Hook (System Integration)
- * @description Handles app deep links and NFC scans with stable listeners, launch-url fallback, retained NFC error handling, NFC read-test interception, and stop-confirm routing for repeated activity tags.
+ * @description Handles app deep links and NFC scans with stable listeners, launch-url fallback, shared LumosTime URI compatibility parsing, retained NFC error handling, NFC read-test interception, and stop-confirm routing for repeated activity tags.
  */
 import { useEffect, useRef } from 'react';
 import { App as CapacitorApp } from '@capacitor/app';
@@ -21,6 +21,7 @@ import { useReview } from '../contexts/ReviewContext';
 import { useToast } from '../contexts/ToastContext';
 import { getLocalDateStr } from '../utils/dateUtils';
 import { applyDailyCheckActionForDate } from '../utils/dailyCheckUtils';
+import { parseLumosTimeUrl } from '../utils/lumosTimeUrlParser';
 import { ShortcutWidgetAction, normalizeShortcutWidgetAction } from '../services/widgetShortcutService';
 
 type DeepLinkStateSnapshot = {
@@ -195,20 +196,19 @@ export const useDeepLink = (
       addToastRef.current('success', `已开始：${activity.name}`);
     };
 
-    const handleRecordUrl = (urlObj: URL, toggleExistingActivity: boolean) => {
-      if (urlObj.protocol !== 'lumostime:' || urlObj.host !== 'record') {
+    const handleParsedUrl = (urlString: string, toggleExistingActivity: boolean) => {
+      const parsedUrl = parseLumosTimeUrl(urlString);
+      if (!parsedUrl) {
         return false;
       }
 
-      const action = urlObj.searchParams.get('action');
-      if (action === 'quick_punch' || action === 'quick_log') {
+      if (parsedUrl.type === 'record' && parsedUrl.action === 'quick_punch') {
         quickPunchRef.current();
         return true;
       }
 
-      if (action === 'start') {
-        const catId = urlObj.searchParams.get('cat_id');
-        const actId = urlObj.searchParams.get('act_id');
+      if (parsedUrl.type === 'record' && parsedUrl.action === 'start') {
+        const { catId, actId } = parsedUrl;
         if (catId && actId) {
           handleStartAction(catId, actId, toggleExistingActivity);
         } else {
@@ -217,8 +217,8 @@ export const useDeepLink = (
         return true;
       }
 
-      if (action === 'daily_check') {
-        const checkItemId = urlObj.searchParams.get('check_item_id');
+      if (parsedUrl.type === 'record' && parsedUrl.action === 'daily_check') {
+        const { checkItemId } = parsedUrl;
         if (checkItemId) {
           handleDailyCheck(checkItemId);
         } else {
@@ -227,22 +227,18 @@ export const useDeepLink = (
         return true;
       }
 
-      return false;
-    };
+      if (parsedUrl.type === 'widget') {
+        const action = normalizeShortcutWidgetAction(parsedUrl.action);
+        if (!action) {
+          addToastRef.current('error', '快捷方式动作无效');
+          return true;
+        }
 
-    const handleWidgetUrl = (urlObj: URL) => {
-      if (urlObj.protocol !== 'lumostime:' || urlObj.host !== 'widget') {
-        return false;
-      }
-
-      const action = normalizeShortcutWidgetAction(urlObj.searchParams.get('action'));
-      if (!action) {
-        addToastRef.current('error', '快捷方式动作无效');
+        widgetShortcutActionRef.current?.(action);
         return true;
       }
 
-      widgetShortcutActionRef.current?.(action);
-      return true;
+      return false;
     };
 
     const processUrl = (urlString: string, toggleExistingActivity: boolean, source: 'scan' | 'deeplink') => {
@@ -264,17 +260,11 @@ export const useDeepLink = (
         return true;
       }
 
-      try {
-        const urlObj = new URL(urlString);
-        const handled = handleRecordUrl(urlObj, toggleExistingActivity) || handleWidgetUrl(urlObj);
-        if (handled) {
-          lastHandledUrlRef.current = { key: dedupeKey, timestamp: now };
-        }
-        return handled;
-      } catch (error) {
-        console.error('Deep link processing error', error);
-        return false;
+      const handled = handleParsedUrl(urlString, toggleExistingActivity);
+      if (handled) {
+        lastHandledUrlRef.current = { key: dedupeKey, timestamp: now };
       }
+      return handled;
     };
 
     const handleLaunchUrl = async () => {

@@ -93,7 +93,7 @@ Components for theme and appearance customization.
 - `achievement/AchievementBottleIconPackSelector.tsx`: 已改为成就瓶图标包卡片选择器，支持更紧凑的预览式切换。
 - `achievement/AchievementBottleStyleSelector.tsx`: 已改为成就瓶样式卡片选择器，使用玻璃瓶身小预览区分不同气质。
 > Last updated: 2026-04-22
-- `AIBackfillChatModal.tsx`: Added the new first-step AI backfill full-screen chat view, which keeps per-day conversation history in local storage, supports `/debug` toggling, and lets users inspect each AI call's request and response payloads.
+- `AIBackfillChatModal.tsx`: Added the new AI backfill full-screen chat view, which keeps per-day conversation history in local storage, supports `/debug` toggling, applies AI-planned logs directly, and now preserves interrupted requests as local retryable states with stop/resend controls.
 - `TodoDetailModal.tsx`: Styled the inherited parent-task jump target with a dashed underline so the subtask detail page makes that link state more obvious.
 - `TodoDetailModal.tsx`: Parent todo timeline tabs now aggregate direct child-task logs into the same history list and duration stats while keeping manual progress recalculation scoped to the current todo's own logs.
 - `TodoDetailModal.tsx`: Parent todo timeline entries now add an `@子任务标题` badge whenever a record comes from a direct child task, so merged history stays attributable.

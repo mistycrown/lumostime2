@@ -10,6 +10,7 @@ import {
 } from '../../services/NfcService';
 import { CustomSelect } from '../../components/CustomSelect';
 import { getEligibleNfcDailyCheckItems } from '../../utils/dailyCheckUtils';
+import { parseLumosTimeUrl } from '../../utils/lumosTimeUrlParser';
 
 interface NFCSettingsViewProps {
   onBack: () => void;
@@ -89,39 +90,44 @@ const parseReadTestResult = (result: NfcReadTestResultPayload | null): ParsedRea
     { label: '标签内容', value: result.value }
   ];
 
-  try {
-    const url = new URL(result.value);
-    if (url.protocol !== 'lumostime:' || url.host !== 'record') {
-      return {
-        title: '普通 URI 标签',
-        subtitle: '这不是 LumosTime 专用标签，当前仅展示内容，不会执行任何动作。',
-        details
+  const parsed = parseLumosTimeUrl(result.value);
+  if (parsed) {
+    if (parsed.type === 'record') {
+      const actionLabelMap: Record<string, string> = {
+        quick_punch: '快速打点',
+        start: '开始活动',
+        daily_check: '日课打点',
+        unknown: parsed.rawAction || 'unknown'
       };
-    }
 
-    const action = url.searchParams.get('action') || 'unknown';
-    const actionLabelMap: Record<string, string> = {
-      quick_punch: '快速打点',
-      quick_log: '快速打点',
-      start: '开始活动',
-      daily_check: '日课打点'
-    };
+      details.push({ label: '识别结果', value: 'LumosTime 标签' });
+      details.push({ label: '动作类型', value: actionLabelMap[parsed.action] || parsed.action });
 
-    details.push({ label: '识别结果', value: 'LumosTime 标签' });
-    details.push({ label: '动作类型', value: actionLabelMap[action] || action });
+      if (parsed.action === 'start') {
+        details.push({ label: '分类 ID', value: parsed.catId || '-' });
+        details.push({ label: '活动 ID', value: parsed.actId || '-' });
+      }
 
-    if (action === 'start') {
-      details.push({ label: '分类 ID', value: url.searchParams.get('cat_id') || '-' });
-      details.push({ label: '活动 ID', value: url.searchParams.get('act_id') || '-' });
-    }
-
-    if (action === 'daily_check') {
-      details.push({ label: '日课项目 ID', value: url.searchParams.get('check_item_id') || '-' });
+      if (parsed.action === 'daily_check') {
+        details.push({ label: '日课项目 ID', value: parsed.checkItemId || '-' });
+      }
+    } else {
+      details.push({ label: '识别结果', value: 'LumosTime 标签' });
+      details.push({ label: '动作类型', value: parsed.action || 'widget' });
     }
 
     return {
       title: 'LumosTime 标签',
       subtitle: '已识别标签内容，但测试模式下不会自动执行任何动作。',
+      details
+    };
+  }
+
+  try {
+    new URL(result.value);
+    return {
+      title: '普通 URI 标签',
+      subtitle: '这不是 LumosTime 专用标签，当前仅展示内容，不会执行任何动作。',
       details
     };
   } catch {
