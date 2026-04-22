@@ -6,6 +6,7 @@
  * @description The primary daily view. Visualizes time usage on a timeline, supports adding/editing logs, gap detection, gesture and lightweight calendar date-switch animation, quick search and custom filter entry points, and integrates Daily/Weekly/Monthly review plus achievement bottle entry points.
  * 
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
+ * @updated 2026-04-22: The floating AI button now opens the app-level shared AI window so closing the modal does not interrupt an in-flight request.
  * @updated 2026-04-22: Replaced the old AI backfill entry with a local-history chat modal for the first-step conversational AI flow.
  * @updated 2026-04-20: Switched the timeline screen to the shared lightweight custom-background pipeline.
  */
@@ -16,7 +17,6 @@ import { CATEGORIES } from '../constants';
 import * as LucideIcons from 'lucide-react';
 import { Plus, MoreHorizontal, BarChart2, FlaskConical, Sparkles, Zap, Heart, Share, Timer, Clock, Search, Filter, Image as ImageIcon } from 'lucide-react';
 import { CalendarWidget } from '../components/CalendarWidget';
-import { AIBackfillChatModal } from '../components/AIBackfillChatModal';
 import { ParsedTimeEntry } from '../services/aiService';
 import { ToastType } from '../components/Toast';
 import { imageService } from '../services/imageService';
@@ -26,6 +26,7 @@ import { ReactionPicker, ReactionList } from '../components/ReactionComponents';
 import { TimePalCard } from '../components/TimePalCard';
 import { TimePalDebugger } from '../components/TimePalDebugger';
 import { FloatingButton } from '../components/FloatingButton';
+import { useAIChatWindow } from '../contexts/AIChatWindowContext';
 import { UIIcon } from '../components/UIIcon';
 import { IconRenderer } from '../components/IconRenderer';
 import { usePrivacy } from '../contexts/PrivacyContext';
@@ -231,7 +232,7 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ logs, todos, scopes,
         };
     }, []);
 
-    const [isAIModalOpen, setIsAIModalOpen] = useState(false);
+    const { openAIChat } = useAIChatWindow();
 
     // 计算时间线样式偏移量
     const currentStyleConfig = timelineStyleConfigs[timelineStyleTheme];
@@ -1903,7 +1904,7 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ logs, todos, scopes,
 
             {/* Floating AI Button (Above Add) */}
             <FloatingButton
-                onClick={() => setIsAIModalOpen(true)}
+                onClick={() => openAIChat({ targetDate: currentDate })}
                 position="custom"
                 className="fixed bottom-[calc(8.5rem+env(safe-area-inset-bottom))] right-6"
                 size="sm"
@@ -1934,14 +1935,6 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ logs, todos, scopes,
             >
                 <UIIcon type="add-record" fallbackIcon={Plus} size={24} />
             </FloatingButton>
-            {
-                isAIModalOpen && (
-                    <AIBackfillChatModal
-                        onClose={() => setIsAIModalOpen(false)}
-                        targetDate={currentDate}
-                    />
-                )
-            }
             <ImagePreviewModal
                 imageUrl={previewImage}
                 onClose={() => setPreviewImage(null)}

@@ -4,6 +4,7 @@
  * @output Main UI Render, State Management, Data Persistence (JSON in localStorage)
  * @pos Root Component, Application Entry Point (Logic Hub)
  * @description The main component that holds the global state (logs, todos, active sessions) and handles routing between views and overlays, including preserving standalone return paths for search and custom filters while keeping export/import, NFC stop confirmation, and reset flows aligned with repository-backed data.
+ * @updated 2026-04-22: Mounted the shared AI chat window at the app level so it can keep running in the background after the modal UI is closed.
  *
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
@@ -22,6 +23,7 @@ import { NavigationProvider, useNavigation } from './contexts/NavigationContext'
 import { CategoryScopeProvider, useCategoryScope } from './contexts/CategoryScopeContext';
 import { AchievementProvider, useAchievement } from './contexts/AchievementContext';
 import { PrivacyProvider } from './contexts/PrivacyContext';
+import { AIChatWindowProvider } from './contexts/AIChatWindowContext';
 
 import { MainLayout } from './components/MainLayout';
 import { AppRoutes } from './components/AppRoutes';
@@ -984,11 +986,13 @@ const App: React.FC = () => {
               <CategoryScopeProviderWithData>
                 <AchievementProviderWithData>
                   <NavigationProvider>
-                    <PrivacyProvider>
-                      <AppBootstrapGate>
-                        <AppContent />
-                      </AppBootstrapGate>
-                    </PrivacyProvider>
+                    <AIChatWindowProvider>
+                      <PrivacyProvider>
+                        <AppBootstrapGate>
+                          <AppContent />
+                        </AppBootstrapGate>
+                      </PrivacyProvider>
+                    </AIChatWindowProvider>
                   </NavigationProvider>
                 </AchievementProviderWithData>
               </CategoryScopeProviderWithData>

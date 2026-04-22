@@ -482,7 +482,6 @@ export const AppRoutes: React.FC<AppRoutesProps> = ({
                     onEditTodo={openEditTodoModal}
                     onAddTodo={openAddTodoModal}
                     onStartFocus={handleStartTodoFocus}
-                    onBatchAddTodos={handleBatchAddTodos}
                     onDuplicateTodo={handleDuplicateTodo}
                     onSaveTodo={handleSaveTodo}
                     autoLinkRules={autoLinkRules}

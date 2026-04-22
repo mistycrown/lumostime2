@@ -4,6 +4,8 @@
  * @output Todo Status Updates, Edit Triggers, Focus Timer Start
  * @pos View (Main Tab)
  * @description The main To-Do list interface. Displays tasks grouped by category, supports swipe actions, and now includes a week planning view with schedule and history badges.
+ * @updated 2026-04-22: The todo-page AI magic button now opens the app-level shared AI window so closing the modal does not interrupt an in-flight request.
+ * @updated 2026-04-22: Routed the todo-page AI magic button into the shared AI chat workspace and removed the old standalone AI todo parse/confirm flow.
  * @updated 2026-04-22: Narrowed the `今` filter count to only standalone todos whose own arranged or due date is today, excluding pin-only and overdue entries.
  * @updated 2026-04-22: Made expanded subtask rows in the virtual schedule view respect the sidebar's hide-completed toggle, so completed child rows disappear together with other completed todos.
  * @updated 2026-04-22: Hid redundant linked-activity and scope badges for child rows rendered directly beneath their parent so nested subtasks no longer repeat inherited metadata.
@@ -64,9 +66,6 @@
 import React, { useState, useMemo, useRef } from 'react';
 import { Scope, TodoItem, TodoCategory, Category, AutoLinkRule, Log, TodoDuplicateOptions } from '../types';
 import { PlayCircle, CheckCircle2, Plus, MoreHorizontal, ChevronLeft, ChevronRight, LayoutList, Rows, Sparkles, Eye, EyeOff, CalendarDays, Flag, Repeat2, TrendingUp, ListTodo, CircleAlert, PanelRightOpen, Pin } from 'lucide-react';
-import { AITodoInputModal } from '../components/AITodoInputModal';
-import { AITodoConfirmModal, ParsedTask } from '../components/AITodoConfirmModal';
-import { aiService } from '../services/aiService';
 import { usePrivacy } from '../contexts/PrivacyContext';
 import { useToast } from '../contexts/ToastContext';
 import { IconRenderer } from '../components/IconRenderer';
@@ -91,6 +90,7 @@ import { TodoDuplicateModal } from '../components/TodoDuplicateModal';
 import { TodoQuickActionsModal } from '../components/TodoQuickActionsModal';
 import { useTodoQuickActions } from '../hooks/useTodoQuickActions';
 import { buildTodoTreeItems, getCompletedDirectChildCount, getDirectChildCount, getDirectChildTodosForDisplay, getParentTodo } from '../utils/todoHierarchyUtils';
+import { useAIChatWindow } from '../contexts/AIChatWindowContext';
 
 
 interface TodoViewProps {
@@ -105,7 +105,6 @@ interface TodoViewProps {
   onStartFocus: (todo: TodoItem) => void;
   onDuplicateTodo: (todo: TodoItem, options: TodoDuplicateOptions) => void;
   onSaveTodo: (todo: TodoItem) => void;
-  onBatchAddTodos?: (todos: Partial<TodoItem>[]) => void;
   autoLinkRules?: AutoLinkRule[];
 }
 
@@ -933,7 +932,7 @@ const WeekTodoLineItem: React.FC<{
   );
 };
 
-export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, activityCategories, scopes, onToggleTodo, onEditTodo, onAddTodo, onStartFocus, onDuplicateTodo, onSaveTodo, onBatchAddTodos, autoLinkRules = [] }) => {
+export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, activityCategories, scopes, onToggleTodo, onEditTodo, onAddTodo, onStartFocus, onDuplicateTodo, onSaveTodo, autoLinkRules = [] }) => {
   const [selectedCategoryId, setSelectedCategoryId] = useState<string>(VIRTUAL_SCHEDULE_CATEGORY_ID);
   const [selectedScheduleFilter, setSelectedScheduleFilter] = useState<TodoScheduleRange>('today');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -978,79 +977,6 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
     handleQuickActionTogglePin
   } = useTodoQuickActions({ onSaveTodo, onEditTodo });
 
-  // AI States
-  const [isAIInputOpen, setIsAIInputOpen] = useState(false);
-  const [isAIConfirmOpen, setIsAIConfirmOpen] = useState(false);
-  const [isAIGenerating, setIsAIGenerating] = useState(false); // Loading state
-  const [aiParsedTasks, setAiParsedTasks] = useState<ParsedTask[]>([]);
-
-  const handleAIGenerate = async (text: string) => {
-    setIsAIGenerating(true);
-    try {
-      // Call AI Service
-      const parsedTodos = await aiService.parseTodoText(text, {
-        todoCategories: categories,
-        activityCategories: activityCategories,
-        scopes: scopes
-      });
-
-      // Map to Modal Data Structure
-      const tasksWithId: ParsedTask[] = parsedTodos.map((t, idx) => ({
-        id: Date.now().toString() + idx,
-        title: t.title,
-        categoryId: t.categoryId || categories[0]?.id || selectedCategoryId, // Use AI's or fallback to current
-        linkedActivityId: t.linkedActivityId,
-        linkedCategoryId: undefined, // Let Modal auto-derive
-        defaultScopeIds: t.defaultScopeIds || [],
-      }));
-
-      // Apply Auto-Link Rules (Rule > AI)
-      const tasksWithRules = tasksWithId.map(task => {
-        if (task.linkedActivityId) {
-          const rule = autoLinkRules.find(r => r.activityId === task.linkedActivityId);
-          if (rule) {
-            return { ...task, defaultScopeIds: [rule.scopeId] };
-          }
-        }
-        return task;
-      });
-
-      setAiParsedTasks(tasksWithRules);
-      setIsAIInputOpen(false); // Close input ONLY on success
-      setIsAIConfirmOpen(true); // Open confirm
-    } catch (error) {
-      console.error("AI Generation Failed", error);
-      alert('AI 解析失败，请检查网络连接或前往“设置 -> AI 集成”确认 API Key 配置。');
-      // Ideally use toast, but alert is safer if toast prop is missing/optional
-    } finally {
-      setIsAIGenerating(false);
-    }
-  };
-
-  const handleAISave = (tasks: ParsedTask[]) => {
-    const newTodos: Partial<TodoItem>[] = tasks.map(t => {
-      // Auto-infer linkedCategoryId if missing but linkedActivityId exists
-      let finalLinkedCategoryId = t.linkedCategoryId;
-      if (t.linkedActivityId && !finalLinkedCategoryId) {
-        const foundCat = activityCategories.find(c => c.activities.some(a => a.id === t.linkedActivityId));
-        if (foundCat) {
-          finalLinkedCategoryId = foundCat.id;
-        }
-      }
-
-      return {
-        title: t.title,
-        categoryId: t.categoryId,
-        linkedActivityId: t.linkedActivityId,
-        linkedCategoryId: finalLinkedCategoryId,
-        defaultScopeIds: t.defaultScopeIds,
-        isCompleted: false
-      };
-    });
-    onBatchAddTodos?.(newTodos);
-    setIsAIConfirmOpen(false);
-  };
-
   // 濞?localStorage 閻犲洩顕цぐ鍥偨閵婏箑鐓曞☉鎾筹攻椤愬ジ鏌呮径瀣仴闁汇劌瀚～瀣炊閻愵儫浣割嚕?
   const [viewMode, setViewMode] = useState<'loose' | 'compact'>(() => {
     const saved = localStorage.getItem('todoViewMode');
@@ -1060,6 +986,7 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
     const saved = localStorage.getItem('todoShowCompleted');
     return saved !== 'false';
   });
+  const { openAIChat } = useAIChatWindow();
 
   // 鐟?viewMode 闁衡偓閻熸澘缍侀柡鍐啇缁辨繃绌卞┑鍡欐憼闁?localStorage
   React.useEffect(() => {
@@ -2086,26 +2013,6 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
           <UIIcon type="email" fallbackIcon={ListTodo} size={24} className="text-white" style={{ color: '#ffffff' }} />
         </FloatingButton>
 
-        {isAIInputOpen && (
-          <AITodoInputModal
-            onClose={() => setIsAIInputOpen(false)}
-            onGenerate={handleAIGenerate}
-            isLoading={isAIGenerating}
-          />
-        )}
-
-        {isAIConfirmOpen && (
-          <AITodoConfirmModal
-            onClose={() => setIsAIConfirmOpen(false)}
-            onSave={handleAISave}
-            initialTasks={aiParsedTasks}
-            todoCategories={categories}
-            activityCategories={activityCategories}
-            scopes={scopes}
-            autoLinkRules={autoLinkRules}
-          />
-        )}
-
         <TodoScheduleAssignModal
           isOpen={assignModalDate !== null}
           dateLabel={assignModalDateLabel}
@@ -2316,9 +2223,9 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
           </div>
           <div className="flex items-center gap-3">
             <button
-              onClick={() => setIsAIInputOpen(true)}
+              onClick={() => openAIChat({ targetDate: todayDate })}
               className="theme-icon-button"
-              title="AI Add Task"
+              title="AI 助理"
             >
               <Sparkles size={16} />
             </button>
@@ -2556,27 +2463,7 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
         )}
       </FloatingButton>
 
-      {isAIInputOpen && (
-        <AITodoInputModal
-          onClose={() => setIsAIInputOpen(false)}
-          onGenerate={handleAIGenerate}
-          isLoading={isAIGenerating}
-        />
-      )}
-
       {todoQuickActionsModalNode}
-
-      {isAIConfirmOpen && (
-        <AITodoConfirmModal
-          onClose={() => setIsAIConfirmOpen(false)}
-          onSave={handleAISave}
-          initialTasks={aiParsedTasks}
-          todoCategories={categories}
-          activityCategories={activityCategories}
-          scopes={scopes}
-          autoLinkRules={autoLinkRules}
-        />
-      )}
 
       {duplicateModalNode}
     </div>

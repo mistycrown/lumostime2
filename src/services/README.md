@@ -2,7 +2,9 @@
 
 Contains business logic and external integrations.
 
-Update 2026-04-22: `aiService.ts` now exposes single-turn backfill tool planning, debug-oriented request/response capture, abort-signal plumbing, and per-tool-call date planning with latest-log/todo-hierarchy context for the AI backfill dialog.
+Update 2026-04-22: `aiService.ts` now exposes lightweight AI intent classification plus debug-aware chat reply, add-log planning, and add-todo planning so the unified AI dialog can route each turn with only the needed context.
+Update 2026-04-22: `aiService.ts` now also exposes single-turn backfill tool planning, debug-oriented request/response capture, abort-signal plumbing, and per-tool-call date planning with latest-log/todo-hierarchy context for the AI backfill dialog.
+Update 2026-04-22: `aiService.ts` now accepts persona guidance and optional cached conversation history for unified AI sessions, and aligns OpenAI/Gemini request construction so quick-context and persona settings affect chat, add-log, and add-todo flows consistently.
 
 Update 2026-04-20: `backgroundService.ts` now emits background snapshot events, preloads image switches, and avoids the old 500ms fallback polling loop; `statusBarService.ts` now caches per-image brightness analysis results.
 
@@ -11,7 +13,7 @@ Update 2026-04-09: `obsidianExportService.ts` now supports copying referenced lo
 Update 2026-03-12: timeline styling for normal timeline records is managed by `timelineStyleService.ts`.
 
 ## Files
-- `aiService.ts`: [Active] - Handles AI integration (OpenAI/Gemini) for text parsing, dated AI-planned backfill tool calls, debug capture of request/response payloads, abort-aware chat requests, and narrative generation.
+- `aiService.ts`: [Active] - Handles AI integration (OpenAI/Gemini) for text parsing, lightweight intent classification, persona-aware chat replies, cached-conversation context injection, dated AI-planned backfill tool calls, direct todo tool planning, abort-aware chat requests, and narrative generation.
 - `excelExportService.ts`: [Active] - Exports time logs to Excel format.
 - `geminiService.ts`: [Placeholder] - Simple Gemini test service (likely deprecated/experimental).
 - `imageCleanupService.ts`: [Active] - Checks unreferenced images, protects referenced business/settings images, and executes cleanup/report generation.
@@ -37,4 +39,4 @@ Update 2026-03-12: timeline styling for normal timeline records is managed by `t
 - `navigationDecorationService.ts`: 支持自定义导航栏装饰上传和存储
 
 > ⚠️ Once the folder I belong to changes, please update me.
-> ⚠️ 本文档最后更新：2026-03-30
+> ⚠️ 本文档最后更新：2026-04-22
