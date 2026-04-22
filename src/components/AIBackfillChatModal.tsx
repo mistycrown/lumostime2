@@ -1,6 +1,6 @@
 /**
  * @file AIBackfillChatModal.tsx
- * @input Target date, locally persisted chat history, user backfill questions
+ * @input Local-only AI backfill conversation history plus user backfill questions
  * @output Local-only full-screen AI backfill chat view with direct tool application, edit/undo controls, and optional request debugging
  * @pos Component (AI Integration)
  * @description Replaces the old AI backfill parse-first flow with a chat-first full-screen conversation view that can let AI plan create-log tool calls, apply them immediately, and keep visible local history with per-call edit/undo affordances.
@@ -8,6 +8,7 @@
  * @updated 2026-04-22: Added command-based debug mode with per-call request/response inspection for AI backfill chat.
  * @updated 2026-04-22: Added local pending-request recovery plus stop/retry controls so interrupted AI requests can be resent safely.
  * @updated 2026-04-22: Switched the AI backfill chat UI to a full-screen conversation layout with app-style header, scroll area, and composer.
+ * @updated 2026-04-22: AI backfill now defaults to today, shows dates in applied results, and supports explicit past-day or cross-midnight tool calls.
  *
  * Once I am updated, be sure to update my header comment and the folder's md.
  */
@@ -24,6 +25,7 @@ import { useCategoryScope } from '../contexts/CategoryScopeContext';
 import { useNavigation } from '../contexts/NavigationContext';
 import { useToast } from '../contexts/ToastContext';
 import type { Log } from '../types';
+import { formatDateKey, normalizeAIBackfillToolCalls, parseTimeOnDateKey } from '../utils/aiBackfillUtils';
 import { getTodoProgressTrackingMode } from '../utils/todoProgressUtils';
 
 type BackfillChatRole = 'user' | 'assistant';
@@ -87,13 +89,6 @@ interface AIBackfillChatModalProps {
 const STORAGE_KEY_PREFIX = 'lumostime_ai_backfill_chat_v1_';
 const DEBUG_MODE_KEY = 'lumostime_ai_backfill_debug_mode_v1';
 
-const formatStorageDate = (date: Date) => {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
-};
-
 const formatDateLabel = (date: Date) => (
   new Intl.DateTimeFormat('zh-CN', {
     month: 'long',
@@ -110,6 +105,14 @@ const formatTimeRange = (startTime: number, endTime: number) => {
   });
   return `${formatter.format(startTime)} - ${formatter.format(endTime)}`;
 };
+
+const formatDateTimeRange = (startTime: number, endTime: number) => (
+  `${new Intl.DateTimeFormat('zh-CN', {
+    month: 'numeric',
+    day: 'numeric',
+    weekday: 'short'
+  }).format(startTime)} · ${formatTimeRange(startTime, endTime)}`
+);
 
 const isDebugExchange = (value: unknown): value is AIDebugExchange => {
   if (!value || typeof value !== 'object') return false;
@@ -225,19 +228,6 @@ const stringifyDebugSection = (value: unknown): string => {
   }
 };
 
-const parseTimeOnDate = (targetDate: Date, hhmm: string): number | null => {
-  const match = /^(\d{2}):(\d{2})$/.exec(hhmm.trim());
-  if (!match) return null;
-
-  const hour = Number(match[1]);
-  const minute = Number(match[2]);
-  if (hour > 23 || minute > 59) return null;
-
-  const next = new Date(targetDate);
-  next.setHours(hour, minute, 0, 0);
-  return next.getTime();
-};
-
 const formatLocalDateTimeContext = (date: Date): string => {
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, '0');
@@ -255,11 +245,11 @@ const formatLocalDateTimeContext = (date: Date): string => {
 
 export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
   onClose,
-  targetDate
+  targetDate: _targetDate
 }) => {
-  const resolvedTargetDate = targetDate || new Date();
-  const dateKey = useMemo(() => formatStorageDate(resolvedTargetDate), [resolvedTargetDate]);
-  const storageKey = `${STORAGE_KEY_PREFIX}${dateKey}`;
+  const defaultConversationDate = useMemo(() => new Date(), []);
+  const defaultDateKey = useMemo(() => formatDateKey(defaultConversationDate), [defaultConversationDate]);
+  const storageKey = `${STORAGE_KEY_PREFIX}${defaultDateKey}`;
   const [messages, setMessages] = useState<BackfillChatMessage[]>(() => loadMessages(storageKey));
   const [inputText, setInputText] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -273,6 +263,67 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
   const { categories, scopes } = useCategoryScope();
   const { setEditingLog, setInitialLogTimes, setIsAddModalOpen } = useNavigation();
   const { addToast } = useToast();
+  const latestLog = useMemo(() => (
+    logs.length > 0
+      ? [...logs].sort((left, right) => right.endTime - left.endTime)[0]
+      : null
+  ), [logs]);
+
+  const getTodoDisplayTitle = (
+    todo?: typeof todos[number] | null,
+    sourceTodos: typeof todos = todos
+  ): string => {
+    if (!todo) {
+      return '';
+    }
+
+    const parentTodo = todo.parentTodoId
+      ? sourceTodos.find((candidate) => candidate.id === todo.parentTodoId)
+      : undefined;
+
+    return parentTodo ? `${parentTodo.title} / ${todo.title}` : todo.title;
+  };
+
+  const latestLogContext = useMemo(() => {
+    if (!latestLog) {
+      return null;
+    }
+
+    return {
+      endDateTime: formatLocalDateTimeContext(new Date(latestLog.endTime)),
+      date: formatDateKey(new Date(latestLog.endTime)),
+      endTime: new Intl.DateTimeFormat('zh-CN', {
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false
+      }).format(latestLog.endTime),
+      title: latestLog.title || '',
+      note: latestLog.note || ''
+    };
+  }, [latestLog]);
+
+  const todoPlanningContext = useMemo(() => (
+    todos.map((todo) => {
+      const displayTitle = getTodoDisplayTitle(todo);
+      const progressTrackingMode = getTodoProgressTrackingMode(todo, todos);
+      const parentTodo = todo.parentTodoId
+        ? todos.find((candidate) => candidate.id === todo.parentTodoId)
+        : undefined;
+
+      return {
+        id: todo.id,
+        title: todo.title,
+        path: displayTitle,
+        isProgress: todo.isProgress,
+        progressTrackingMode,
+        totalAmount: todo.totalAmount,
+        unitAmount: todo.unitAmount,
+        completedUnits: todo.completedUnits,
+        parentTodoId: todo.parentTodoId,
+        parentTodoTitle: parentTodo?.title
+      };
+    })
+  ), [todos]);
 
   useEffect(() => {
     activeRequestRef.current?.controller?.abort();
@@ -388,11 +439,13 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     const createdLogs: Log[] = [];
     const actions: AppliedToolAction[] = [];
     const nextTodos = [...todos];
+    const normalizedToolCalls = normalizeAIBackfillToolCalls(toolCalls, defaultDateKey);
 
-    for (const toolCall of toolCalls) {
+    for (const toolCall of normalizedToolCalls) {
       const { args } = toolCall;
-      const startTime = parseTimeOnDate(resolvedTargetDate, args.startTime);
-      const endTime = parseTimeOnDate(resolvedTargetDate, args.endTime);
+      const actionDate = args.date || defaultDateKey;
+      const startTime = parseTimeOnDateKey(actionDate, args.startTime);
+      const endTime = parseTimeOnDateKey(actionDate, args.endTime);
 
       const category = categories.find((item) => item.id === args.categoryId);
       const activity = category?.activities.find((item) => item.id === args.activityId)
@@ -480,7 +533,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
           activityName: activity.name,
           scopeIds: validScopes.map((scope) => scope.id),
           scopeNames: validScopes.map((scope) => scope.name),
-          ...(linkedTodo ? { linkedTodoId: linkedTodo.id, linkedTodoTitle: linkedTodo.title } : {}),
+          ...(linkedTodo ? { linkedTodoId: linkedTodo.id, linkedTodoTitle: getTodoDisplayTitle(linkedTodo, nextTodos) } : {}),
           ...(progressIncrement ? { progressIncrement } : {})
         }
       });
@@ -518,18 +571,11 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     try {
       const planningResult = await aiService.planBackfillToolCallsWithDebug(trimmedText, {
         currentDateTime: formatLocalDateTimeContext(new Date()),
-        targetDate: dateKey,
+        defaultDate: defaultDateKey,
         categories,
         scopes,
-        todos: todos.map((todo) => ({
-          id: todo.id,
-          title: todo.title,
-          isProgress: todo.isProgress,
-          progressTrackingMode: todo.progressTrackingMode,
-          totalAmount: todo.totalAmount,
-          completedUnits: todo.completedUnits,
-          parentTodoId: todo.parentTodoId
-        }))
+        latestLog: latestLogContext,
+        todos: todoPlanningContext
       });
 
       const appliedActions = applyPlannedToolCalls(planningResult.plan.toolCalls);
@@ -610,18 +656,11 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     try {
       const planningResult = await aiService.planBackfillToolCallsWithDebug(trimmedText, {
         currentDateTime: formatLocalDateTimeContext(new Date()),
-        targetDate: dateKey,
+        defaultDate: defaultDateKey,
         categories,
         scopes,
-        todos: todos.map((todo) => ({
-          id: todo.id,
-          title: todo.title,
-          isProgress: todo.isProgress,
-          progressTrackingMode: todo.progressTrackingMode,
-          totalAmount: todo.totalAmount,
-          completedUnits: todo.completedUnits,
-          parentTodoId: todo.parentTodoId
-        }))
+        latestLog: latestLogContext,
+        todos: todoPlanningContext
       }, {
         signal: controller?.signal
       });
@@ -779,8 +818,11 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     const scopeData = (liveLog?.scopeIds || action.snapshot.scopeIds)
       .map((scopeId) => scopes.find((scope) => scope.id === scopeId))
       .filter((scope): scope is NonNullable<typeof scope> => Boolean(scope));
-    const linkedTodoTitle = liveLog?.linkedTodoId
-      ? todos.find((todo) => todo.id === liveLog.linkedTodoId)?.title
+    const liveLinkedTodo = liveLog?.linkedTodoId
+      ? todos.find((todo) => todo.id === liveLog.linkedTodoId)
+      : undefined;
+    const linkedTodoTitle = liveLinkedTodo
+      ? getTodoDisplayTitle(liveLinkedTodo)
       : action.snapshot.linkedTodoTitle;
     const progressIncrement = liveLog?.progressIncrement || action.snapshot.progressIncrement;
 
@@ -799,7 +841,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
           <div className="min-w-0">
             <div className="flex items-center gap-1.5 text-sm font-bold text-stone-700">
               <Clock3 size={13} />
-              <span>{formatTimeRange(startTime, endTime)}</span>
+              <span>{formatDateTimeRange(startTime, endTime)}</span>
             </div>
             <p className="mt-1 text-[15px] font-medium leading-5 text-stone-800">{activityName}</p>
             {note && (
@@ -988,6 +1030,15 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
 
             {debugMode && message.debugData && (
               <div className="pl-1">
+                {false && isLoading && activeRequestRef.current && (
+                  <button
+                    onClick={() => handleStopRequest(activeRequestRef.current!.messageId, activeRequestRef.current!.requestId)}
+                    className="ml-auto inline-flex items-center gap-2 rounded-full border border-stone-200 bg-white px-4 py-2 text-sm font-bold text-stone-600 transition-all hover:border-stone-300 hover:text-stone-800"
+                  >
+                    <Square size={14} />
+                    <span>停止</span>
+                  </button>
+                )}
                 <button
                   onClick={() => setSelectedDebug(message.debugData || null)}
                   className="inline-flex items-center gap-1 rounded-full border border-stone-200 bg-white px-3 py-1 text-xs font-medium text-stone-500 transition-colors hover:border-stone-300 hover:text-stone-700"
@@ -1027,7 +1078,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
                 )}
               </div>
               <p className="text-xs text-stone-400">
-                {formatDateLabel(resolvedTargetDate)} · 单轮调用 · 本地保留对话记录
+                默认补记今天 {formatDateLabel(defaultConversationDate)} · 单轮调用 · 本地保留对话记录
               </p>
             </div>
           </div>
@@ -1105,14 +1156,25 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
                 autoFocus
               />
 
-              <div className="mt-2 flex items-center justify-between gap-3">
+              <div className="mt-2 flex items-center gap-3">
                 <p className="text-xs text-stone-400">Enter 发送，Shift+Enter 换行</p>
                 <button
-                  onClick={handleSend}
-                  disabled={isLoading || !inputText.trim()}
-                  className="inline-flex items-center gap-2 rounded-full bg-stone-900 px-4 py-2 text-sm font-bold text-white transition-all hover:bg-black disabled:cursor-not-allowed disabled:bg-stone-300"
+                  onClick={() => {
+                    if (isLoading && activeRequestRef.current) {
+                      handleStopRequest(activeRequestRef.current.messageId, activeRequestRef.current.requestId);
+                      return;
+                    }
+                    handleSend();
+                  }}
+                  disabled={!isLoading && !inputText.trim()}
+                  className={`ml-auto inline-flex items-center gap-2 rounded-full px-4 py-2 text-[0px] font-bold transition-all ${
+                    isLoading
+                      ? 'border border-stone-200 bg-white text-stone-600 hover:border-stone-300 hover:text-stone-800'
+                      : 'bg-stone-900 text-white hover:bg-black disabled:cursor-not-allowed disabled:bg-stone-300'
+                  }`}
                 >
-                  {isLoading ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
+                  {isLoading ? <Square size={16} /> : <Send size={16} />}
+                  <span className="text-sm">{isLoading ? '停止' : '发送'}</span>
                   <span>发送</span>
                 </button>
               </div>

@@ -1,9 +1,10 @@
 /**
  * @file aiService.ts
  * @input AI Configuration (OpenAI/Gemini keys), User Natural Language Input, Context Data (categories, scopes, todos)
- * @output Parsed Time Entries (ParsedTimeEntry[]), Parsed Todos (AIParsedTodo[]), Backfill Chat Replies (string), Generated Narratives (string), Connection Status (boolean)
+ * @output Parsed Time Entries (ParsedTimeEntry[]), Parsed Todos (AIParsedTodo[]), Dated AI Backfill Tool Plans, Backfill Chat Replies (string), Generated Narratives (string), Connection Status (boolean)
  * @pos Service (AI Integration Layer)
  * @description AI 服务 - 处理与 AI 提供商（OpenAI/Gemini）的所有交互，包括配置管理、连接测试和提示执行
+ * @updated 2026-04-22: AI backfill planning now supports per-call dates, latest-log context, todo hierarchy hints, and local cross-midnight normalization.
  * 
  * 核心功能：
  * - 自然语言解析为时间记录
@@ -15,6 +16,7 @@
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
 import { TodoCategory, Category, Scope } from '../types';
+import { normalizeAIBackfillToolCalls } from '../utils/aiBackfillUtils';
 export interface AIConfig {
     provider: 'openai' | 'gemini';
     apiKey: string;
@@ -72,6 +74,7 @@ export interface AIBackfillChatResult {
 }
 
 export interface AIBackfillCreateLogArgs {
+    date: string; // YYYY-MM-DD
     startTime: string; // HH:mm
     endTime: string; // HH:mm
     description: string;
@@ -620,17 +623,27 @@ ${text}
         text: string,
         context: {
             currentDateTime: string;
-            targetDate: string;
+            defaultDate: string;
             categories: Category[];
             scopes: Scope[];
+            latestLog?: {
+                endDateTime: string;
+                date: string;
+                endTime: string;
+                title?: string;
+                note?: string;
+            } | null;
             todos: Array<{
                 id: string;
                 title: string;
                 isProgress?: boolean;
                 progressTrackingMode?: string;
                 totalAmount?: number;
+                unitAmount?: number;
                 completedUnits?: number;
                 parentTodoId?: string;
+                parentTodoTitle?: string;
+                path?: string;
             }>;
         },
         options: AIRequestOptions = {}
@@ -659,9 +672,12 @@ ${text}
         const todoContext = context.todos.map((todo) => ({
             id: todo.id,
             title: todo.title,
+            path: todo.path || todo.title,
+            parentTodoTitle: todo.parentTodoTitle || null,
             isProgress: Boolean(todo.isProgress),
             progressTrackingMode: todo.progressTrackingMode || 'none',
             totalAmount: todo.totalAmount || 0,
+            unitAmount: todo.unitAmount || 1,
             completedUnits: todo.completedUnits || 0,
             parentTodoId: todo.parentTodoId || null
         }));
@@ -672,7 +688,8 @@ Task: Read the user's message, decide whether one or more backfill records shoul
 
 Context:
 - Current DateTime: ${context.currentDateTime}
-- Selected Backfill Date: ${context.targetDate}
+- Default Backfill Date: ${context.defaultDate} (today unless the user explicitly says another date)
+- Latest Existing Log: ${JSON.stringify(context.latestLog || null)}
 - Available Categories and Activities: ${JSON.stringify(categoryContext)}
 - Available Scopes: ${JSON.stringify(scopeContext)}
 - Available Todos: ${JSON.stringify(todoContext)}
@@ -681,6 +698,7 @@ Available Tool:
 1. create_log
 Arguments schema:
 {
+  "date": "YYYY-MM-DD",
   "startTime": "HH:mm",
   "endTime": "HH:mm",
   "description": "string",
@@ -705,18 +723,24 @@ Requirements:
 }
 3. assistantReply is what the user will read in the chat.
 4. toolCalls is what the app will apply directly.
-5. If the time, category, or activity is too uncertain, keep toolCalls empty and ask a concise follow-up question in assistantReply.
-6. If the user describes multiple time ranges, emit multiple toolCalls.
-7. All times must stay within the selected date and must use 24-hour HH:mm format.
-8. categoryId, activityId, scopeIds, and linkedTodoId must come from the provided context exactly. Do not invent IDs.
-9. If no scope or todo is clearly relevant, omit them.
-10. Only include progressIncrement when a linked todo clearly matches and the user explicitly provides progress.
-11. Preserve important user details in description instead of over-summarizing.
-12. Never output duplicate toolCalls. If two toolCalls would be identical, keep only one.
+5. If the user does not mention a date, use the default backfill date ${context.defaultDate}.
+6. If the user explicitly mentions another day such as yesterday, the day before yesterday, or a calendar date, set each affected tool call's date accordingly and mention that date clearly in assistantReply.
+7. If the time, category, or activity is too uncertain, keep toolCalls empty and ask a concise follow-up question in assistantReply.
+8. If the user describes multiple time ranges, emit multiple toolCalls.
+9. All times must use 24-hour HH:mm format.
+10. Never create a single cross-day record. If an activity crosses midnight, split it into multiple create_log tool calls, one per date segment.
+11. For words like "刚刚", "现在", "到现在", or "刚才", when the user is talking about today, use Current DateTime and Latest Existing Log to infer the most likely contiguous range.
+12. If the user describes a sequence without exact times, prefer splitting the available gap into contiguous, reasonable segments that fully cover the described period instead of leaving unexplained holes.
+13. categoryId, activityId, scopeIds, and linkedTodoId must come from the provided context exactly. Do not invent IDs.
+14. Prefer a specific subtask when the todo context clearly matches a child task path or child title better than its parent.
+15. Only include progressIncrement when a linked todo clearly matches, uses manual progress, and the user explicitly provides measurable progress such as pages, units, chapters, or counts.
+16. Do not include progressIncrement for todo items whose progressTrackingMode is "subtasks".
+17. Preserve important user details in description instead of over-summarizing.
+18. Never output duplicate toolCalls. If two toolCalls would be identical, keep only one.
 `;
 
         const userPrompt = `
-Selected Backfill Date: ${context.targetDate}
+Default Backfill Date: ${context.defaultDate}
 Current DateTime: ${context.currentDateTime}
 User Message:
 ${text}
@@ -727,32 +751,12 @@ ${text}
                 ? rawPlan.toolCalls.filter((call: any) => call?.toolName === 'create_log' && call?.args)
                 : [];
 
-            const dedupedToolCalls = toolCalls.filter((call: any, index: number, list: any[]) => {
-                const buildKey = (candidate: any) => JSON.stringify({
-                    toolName: 'create_log',
-                    startTime: String(candidate.args.startTime || ''),
-                    endTime: String(candidate.args.endTime || ''),
-                    description: String(candidate.args.description || '').trim(),
-                    categoryId: String(candidate.args.categoryId || ''),
-                    activityId: String(candidate.args.activityId || ''),
-                    scopeIds: Array.isArray(candidate.args.scopeIds)
-                        ? candidate.args.scopeIds.map((id: any) => String(id)).sort()
-                        : [],
-                    linkedTodoId: candidate.args.linkedTodoId ? String(candidate.args.linkedTodoId) : '',
-                    progressIncrement: typeof candidate.args.progressIncrement === 'number'
-                        ? candidate.args.progressIncrement
-                        : null
-                });
-
-                const currentKey = buildKey(call);
-                return index === list.findIndex((candidate: any) => buildKey(candidate) === currentKey);
-            });
-
             return {
                 assistantReply: typeof rawPlan?.assistantReply === 'string' ? rawPlan.assistantReply : '',
-                toolCalls: dedupedToolCalls.map((call: any) => ({
+                toolCalls: normalizeAIBackfillToolCalls(toolCalls.map((call: any) => ({
                     toolName: 'create_log',
                     args: {
+                        date: String(call.args.date || context.defaultDate || ''),
                         startTime: String(call.args.startTime || ''),
                         endTime: String(call.args.endTime || ''),
                         description: String(call.args.description || ''),
@@ -764,7 +768,7 @@ ${text}
                             ? { progressIncrement: call.args.progressIncrement }
                             : {})
                     }
-                }))
+                })), context.defaultDate)
             };
         };
 
