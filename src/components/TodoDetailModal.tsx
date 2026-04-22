@@ -4,6 +4,8 @@
  * @output Modal Interaction (Edit Todo, View History)
  * @pos Component (Modal)
  * @description Displays detailed information for a specific Todo item, including its progress, planning fields, associated history logs, and focus stats.
+ * @updated 2026-04-22: Parent todo timeline tabs now aggregate direct child-task logs for shared history and duration stats while keeping manual progress recalculation scoped to the current todo's own logs.
+ * @updated 2026-04-22: Parent todo timelines now show an `@subtask` badge on entries contributed by direct child tasks.
  * @updated 2026-04-22: Styled the inherited parent-task link with a dashed underline so clickable parent navigation reads like a link.
  * @updated 2026-04-22: Renamed inherited scope copy to inherited domain wording inside subtask detail pages for clearer terminology.
  * @updated 2026-04-22: Fixed parent-task navigation from subtask detail pages so opening a parent todo no longer crashes the detail view.
@@ -648,7 +650,16 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({
     : '未关联领域';
 
   // Linked Logs
-  const linkedLogs = useMemo(() => logs.filter(l => l.linkedTodoId === todoId), [logs, todoId]);
+  const ownLinkedLogs = useMemo(() => logs.filter((log) => log.linkedTodoId === todoId), [logs, todoId]);
+  const timelineLinkedTodoIds = useMemo(
+    () => (isSubtask ? [todoId] : [todoId, ...childTodos.map((todo) => todo.id)]),
+    [childTodos, isSubtask, todoId]
+  );
+  const timelineLinkedLogs = useMemo(() => {
+    const linkedTodoIdSet = new Set(timelineLinkedTodoIds);
+    return logs.filter((log) => log.linkedTodoId && linkedTodoIdSet.has(log.linkedTodoId));
+  }, [logs, timelineLinkedTodoIds]);
+  const timelineTodos = isSubtask ? [buildTodoPayload()] : [buildTodoPayload(), ...childTodos];
 
   const handleOpenLinkedTodo = (todo?: TodoItem | null) => {
     if (!todo || !onOpenTodo) {
@@ -660,13 +671,13 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({
 
   const handleRecalculateProgressFromLogs = () => {
     if (!isManualProgress) return;
-    const recalculated = linkedLogs.reduce((sum, log) => sum + (log.progressIncrement || 0), 0);
+    const recalculated = ownLinkedLogs.reduce((sum, log) => sum + (log.progressIncrement || 0), 0);
     setCompletedUnits(Math.max(0, recalculated));
     addToast('success', `已按日志重算进度：${Math.max(0, recalculated)}`);
   };
 
   // Stats
-  const totalSeconds = linkedLogs.reduce((acc, curr) => acc + curr.duration, 0);
+  const totalSeconds = timelineLinkedLogs.reduce((acc, curr) => acc + curr.duration, 0);
   const totalHours = Math.floor(totalSeconds / 3600);
   const totalMins = Math.floor((totalSeconds % 3600) / 60);
 
@@ -682,13 +693,13 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({
   // 1. 首先检查日志中是否有专注打分数据（最直接的判断）
   // 2. 如果有关联活动，也检查活动的设置
   // 3. 如果日志中有任何一个活动启用了专注打分，就显示
-  const hasLogFocusData = linkedLogs.some(log => log.focusScore !== undefined && log.focusScore > 0);
+  const hasLogFocusData = timelineLinkedLogs.some(log => log.focusScore !== undefined && log.focusScore > 0);
   const linkedActivityFocusEnabled = linkedActivity 
     ? (linkedActivity.enableFocusScore ?? linkedActivityCategory?.enableFocusScore ?? false)
     : false;
   
   // 检查日志所属的活动是否有启用专注打分的
-  const logActivitiesFocusEnabled = linkedLogs.some(log => {
+  const logActivitiesFocusEnabled = timelineLinkedLogs.some(log => {
     const logCategory = categories?.find(c => c.id === log.categoryId);
     const logActivity = logCategory?.activities.find(a => a.id === log.activityId);
     return logActivity && (logActivity.enableFocusScore ?? logCategory?.enableFocusScore ?? false);
@@ -697,12 +708,12 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({
   const enableFocusScore = hasLogFocusData || linkedActivityFocusEnabled || logActivitiesFocusEnabled;
 
   // 检查是否应该显示情绪评分
-  const hasLogMoodData = linkedLogs.some(log => log.moodScore !== undefined && log.moodScore > 0);
+  const hasLogMoodData = timelineLinkedLogs.some(log => log.moodScore !== undefined && log.moodScore > 0);
   const linkedActivityMoodEnabled = linkedActivity 
     ? (linkedActivity.enableMoodScore ?? linkedActivityCategory?.enableMoodScore ?? false)
     : false;
   
-  const logActivitiesMoodEnabled = linkedLogs.some(log => {
+  const logActivitiesMoodEnabled = timelineLinkedLogs.some(log => {
     const logCategory = categories?.find(c => c.id === log.categoryId);
     const logActivity = logCategory?.activities.find(a => a.id === log.activityId);
     return logActivity && (logActivity.enableMoodScore ?? logCategory?.enableMoodScore ?? false);
@@ -1401,7 +1412,7 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({
 
         {activeTab === '时间线' && (
           <DetailTimelineCard
-            filteredLogs={linkedLogs}
+            filteredLogs={timelineLinkedLogs}
               displayDate={displayDate}
               onDateChange={setDisplayDate}
               customScale={
@@ -1416,30 +1427,7 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({
               }}
             onEditLog={onEditLog}
             categories={categories}
-            todos={[{
-              id: todoId,
-              categoryId: selectedCategoryId,
-              title: title.trim(),
-              isCompleted: isCompleted,
-              completedAt: isCompleted
-                ? (initialTodo?.isCompleted ? initialTodo.completedAt : new Date().toISOString())
-                : undefined,
-              note: note.trim(),
-              linkedCategoryId: linkedCategoryId || undefined,
-              linkedActivityId: linkedActivityId || undefined,
-              defaultScopeIds,
-              isProgress,
-              progressTrackingMode: resolvedProgressTrackingMode,
-              totalAmount: progressSnapshot.totalAmount || undefined,
-              unitAmount: progressSnapshot.unitAmount || undefined,
-              completedUnits: progressSnapshot.completedUnits || undefined,
-              heatmapMin,
-              heatmapMax,
-              coverImage,
-              scheduledDate: scheduledDate || undefined,
-              deadlineDate: deadlineDate || undefined,
-              recurrenceRule: isSubtask ? undefined : recurrenceRule,
-            }]}
+            todos={timelineTodos}
             enableFocusScore={enableFocusScore}
             enableMoodScore={enableMoodScore}
             progressTracking={isProgress ? {
@@ -1451,6 +1439,8 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({
             renderLogMetadata={(log) => {
               const category = categories?.find(c => c.id === log.categoryId);
               const activity = category?.activities.find(a => a.id === log.activityId);
+              const linkedTodo = timelineTodos.find((todo) => todo.id === log.linkedTodoId);
+              const isDirectChildLog = Boolean(linkedTodo?.parentTodoId === todoId);
 
               return (
                 <div className="flex flex-wrap items-center gap-2 mt-1">
@@ -1465,6 +1455,12 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({
                       <span className="text-stone-500">{activity?.name}</span>
                     </span>
                   </span>
+
+                  {isDirectChildLog && linkedTodo?.title && (
+                    <span className="text-[10px] font-medium text-stone-500 border border-stone-200 px-2 py-0.5 rounded bg-stone-50/30">
+                      @{linkedTodo.title}
+                    </span>
+                  )}
 
                   {/* Scope Tags */}
                   {log.scopeIds && log.scopeIds.length > 0 && log.scopeIds.map(scopeId => {

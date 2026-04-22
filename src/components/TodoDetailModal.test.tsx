@@ -4,12 +4,15 @@
  * @output Regression coverage for parent-task detail rendering from subtask navigation
  * @pos Test
  * @description Ensures parent todo detail pages render safely so subtask inheritance links can open their parent without crashing.
+ * @updated 2026-04-22: Added regression coverage for parent timeline subtask badges and direct child-task log aggregation.
  */
 
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, test, vi } from 'vitest';
 import { TodoDetailModal } from './TodoDetailModal';
+
+let detailTimelineCardProps: any = null;
 
 vi.mock('../contexts/ToastContext', () => ({
   useToast: () => ({
@@ -26,7 +29,10 @@ vi.mock('./TagAssociation', () => ({
 }));
 
 vi.mock('./DetailTimelineCard', () => ({
-  DetailTimelineCard: () => <div data-testid="detail-timeline-card" />
+  DetailTimelineCard: (props: any) => {
+    detailTimelineCardProps = props;
+    return <div data-testid="detail-timeline-card" />;
+  }
 }));
 
 vi.mock('./TimelineImage', () => ({
@@ -73,7 +79,94 @@ const activityCategories = [
 ] as any;
 
 describe('TodoDetailModal parent navigation regression', () => {
+  test('aggregates direct child logs into the parent timeline tab', () => {
+    detailTimelineCardProps = null;
+
+    const parentTodo = {
+      id: 'parent-1',
+      categoryId: 'cat-1',
+      title: 'Parent task',
+      isCompleted: false,
+      linkedCategoryId: 'activity-category-1',
+      linkedActivityId: 'activity-1'
+    } as any;
+
+    const childTodo = {
+      id: 'child-1',
+      categoryId: 'cat-1',
+      parentTodoId: 'parent-1',
+      title: 'Child task',
+      isCompleted: false
+    } as any;
+
+    const unrelatedTodo = {
+      id: 'other-1',
+      categoryId: 'cat-1',
+      title: 'Other task',
+      isCompleted: false
+    } as any;
+
+    const logs = [
+      {
+        id: 'log-parent',
+        categoryId: 'activity-category-1',
+        activityId: 'activity-1',
+        startTime: 10,
+        endTime: 20,
+        duration: 10,
+        linkedTodoId: 'parent-1'
+      },
+      {
+        id: 'log-child',
+        categoryId: 'activity-category-1',
+        activityId: 'activity-1',
+        startTime: 30,
+        endTime: 50,
+        duration: 20,
+        linkedTodoId: 'child-1'
+      },
+      {
+        id: 'log-other',
+        categoryId: 'activity-category-1',
+        activityId: 'activity-1',
+        startTime: 60,
+        endTime: 90,
+        duration: 30,
+        linkedTodoId: 'other-1'
+      }
+    ] as any;
+
+    renderToStaticMarkup(
+      <TodoDetailModal
+        initialTodo={parentTodo}
+        currentCategory={todoCategories[0]}
+        displayMode="page"
+        onClose={() => {}}
+        onSave={() => {}}
+        onOpenTodo={() => {}}
+        logs={logs}
+        todoCategories={todoCategories}
+        categories={activityCategories}
+        scopes={[]}
+        todos={[parentTodo, childTodo, unrelatedTodo]}
+      />
+    );
+
+    expect(detailTimelineCardProps).not.toBeNull();
+    expect(detailTimelineCardProps.filteredLogs.map((log: any) => log.id)).toEqual(['log-parent', 'log-child']);
+    expect(detailTimelineCardProps.todos.map((todo: any) => todo.id)).toEqual(['parent-1', 'child-1']);
+
+    const parentMetadataHtml = renderToStaticMarkup(detailTimelineCardProps.renderLogMetadata(logs[0]));
+    const childMetadataHtml = renderToStaticMarkup(detailTimelineCardProps.renderLogMetadata(logs[1]));
+
+    expect(parentMetadataHtml).not.toContain('@Parent task');
+    expect(parentMetadataHtml).not.toContain('@Child task');
+    expect(childMetadataHtml).toContain('@Child task');
+  });
+
   test('renders a parent todo detail page without crashing when recurrence is absent', () => {
+    detailTimelineCardProps = null;
+
     const parentTodo = {
       id: 'parent-1',
       categoryId: 'cat-1',

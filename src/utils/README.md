@@ -11,7 +11,8 @@ Contains pure utility functions for data processing and business logic calculati
 - `noteTemplateUtils.ts`: [Active] - Sorts note templates, builds context-aware note template recommendations, and appends template text into notes consistently.
 - `scopeStatsUtils.ts`: [Active] - Centralizes scope duration aggregation and counts full duration for every linked scope on a log.
 - `floatingWindowStartup.ts`: [Active] - Guards Android floating-window startup, keeps the overlay launchable when notifications are disabled, and reports whether permission-return recovery is needed.
-- `todoScheduleUtils.ts`: [Active] - Derives week-view todo badges plus today/tomorrow/this-week virtual-category matches for assigned, deadline, recurring, completed, and in-progress states without storing standalone occurrences, while normalizing overlapping labels so Due hides Arrange and Done hides Trace on the same day.
-- `todoHierarchyUtils.ts`: [Active] - Centralizes one-level parent/subtask helpers for inheritance syncing, cascade deletion, sibling ordering, and collapsed tree rendering in todo lists.
+- `todoScheduleUtils.ts`: [Active] - Derives week-view todo badges plus today/tomorrow/this-week virtual-category matches, and now also provides shared todo-picker helpers for the `pin or arranged today` virtual category without storing standalone occurrences.
+- `todoHierarchyUtils.ts`: [Active] - Centralizes one-level parent/subtask helpers for inheritance syncing, cascade deletion, sibling ordering, collapsed tree rendering, and expanded-subtask display ordering with unfinished items first.
+- `todoAssociationUtils.ts`: [Active] - Builds collapsed parent/subtask row models for todo pickers and auto-expands the selected child's parent when hierarchy mode is enabled.
 
 > ⚠️ Once the folder I belong to changes, please update me.

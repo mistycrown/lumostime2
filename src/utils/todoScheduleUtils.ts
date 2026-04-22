@@ -4,6 +4,7 @@
  * @output Week buckets and schedule badge metadata for the todo week view
  * @pos Utility (Todo planning)
  * @description Shared helpers for deriving scheduled, deadline, and recurring todo visibility without creating standalone occurrence records.
+ * @updated 2026-04-22: Added shared today-selector helpers so todo pickers can reuse the same `pin or arranged today` virtual category.
  * @updated 2026-04-20 19:08: Added reusable today/tomorrow/this-week schedule match helpers for the todo list virtual category.
  * @updated 2026-04-20 18:12: Normalized week-view badge combinations so Due hides Arrange and Done hides Trace for the same day.
  *
@@ -37,6 +38,8 @@ export interface TodoScheduleMatch {
   dateKey: string;
   kind: TodoScheduleMatchKind;
 }
+
+export const TODO_ASSOCIATION_TODAY_CATEGORY_ID = '__todo_association_today__';
 
 const ONE_DAY_MS = 24 * 60 * 60 * 1000;
 const TODO_SCHEDULE_MATCH_PRIORITY: Record<TodoScheduleMatchKind, number> = {
@@ -89,6 +92,29 @@ export const getWeekDates = (referenceDate: Date): Date[] => {
 };
 
 export const getTodayDateKey = (): string => formatDateKey(new Date());
+
+export const isTodoInAssociationTodayCategory = (
+  todo: TodoItem,
+  referenceDate: Date = new Date()
+): boolean => {
+  const todayDateKey = formatDateKey(referenceDate);
+  return Boolean(todo.pin) || todo.scheduledDate === todayDateKey;
+};
+
+export const getTodoAssociationTodayTodos = (
+  todos: TodoItem[],
+  referenceDate: Date = new Date(),
+  options?: { includeCompleted?: boolean }
+): TodoItem[] => todos
+  .filter((todo) => options?.includeCompleted || !todo.isCompleted)
+  .filter((todo) => isTodoInAssociationTodayCategory(todo, referenceDate))
+  .sort((left, right) => {
+    if (Boolean(left.pin) !== Boolean(right.pin)) {
+      return Number(Boolean(right.pin)) - Number(Boolean(left.pin));
+    }
+
+    return left.title.localeCompare(right.title, 'zh-CN');
+  });
 
 export const getTodoScheduleRangeDateKeys = (
   range: TodoScheduleRange,

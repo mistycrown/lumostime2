@@ -19,6 +19,7 @@ Overlay components for complex interactions.
 - `TodoQuickActionsModal.tsx`: Shared quick-actions bottom sheet for lightweight todo scheduling, completion, and detail-entry flows reused by list-row taps and week-plan badges.
 - `GoalEditor.tsx`: Goal creation and editing.
 - `AIBatchModal.tsx`: AI 补记弹窗，支持中文自然语言输入、解析复核与批量保存。
+- `AIBackfillChatModal.tsx`: AI 补记对话弹窗，采用单轮调用 + 本地对话记录展示的第一步聊天体验。
 - `AddActivityModal.tsx`: Creating new activities.
 - `ConfirmModal.tsx`: specialized confirmation dialogs.
 - `NarrativeStyleSelectionModal.tsx`: AI narrative style picker.
@@ -43,7 +44,7 @@ Specialized input controls.
 - `TagAssociation.tsx`: Single tag selector with custom HEX soft-color support.
 - `TagMultipleAssociation.tsx`: Multi-tag selector with custom HEX soft-color support.
 - `ScopeAssociation.tsx`: Tag selection grid.
-- `TodoAssociation.tsx`: Todo linking selector.
+- `TodoAssociation.tsx`: Todo linking selector with a virtual today category for pinned and today-arranged tasks.
 - `CommentSection.tsx`: Comment system for focus logs.
 - `RecommendedNoteTemplates.tsx`: Inline recommendation strip that lets note fields insert context-aware templates without opening a selector modal.
 
@@ -92,7 +93,10 @@ Components for theme and appearance customization.
 - `achievement/AchievementBottleIconPackSelector.tsx`: 已改为成就瓶图标包卡片选择器，支持更紧凑的预览式切换。
 - `achievement/AchievementBottleStyleSelector.tsx`: 已改为成就瓶样式卡片选择器，使用玻璃瓶身小预览区分不同气质。
 > Last updated: 2026-04-22
+- `AIBackfillChatModal.tsx`: Added the new first-step AI backfill chat dialog, which keeps per-day conversation history in local storage while sending each user message as an independent AI request.
 - `TodoDetailModal.tsx`: Styled the inherited parent-task jump target with a dashed underline so the subtask detail page makes that link state more obvious.
+- `TodoDetailModal.tsx`: Parent todo timeline tabs now aggregate direct child-task logs into the same history list and duration stats while keeping manual progress recalculation scoped to the current todo's own logs.
+- `TodoDetailModal.tsx`: Parent todo timeline entries now add an `@子任务标题` badge whenever a record comes from a direct child task, so merged history stays attributable.
 - `TodoDetailModal.tsx`: Fixed the subtask-to-parent navigation regression so tapping a parent task from inherited info opens the parent detail page without crashing.
 - `TodoDetailModal.tsx`: Renamed subtask inherited-field copy from `范围` to `领域` so the detail page matches the actual association concept.
 - `TodoDetailModal.tsx`: Recurring todos now hide the `子任务` tab entirely, so only non-recurring parent todos can manage or create child tasks.
@@ -105,5 +109,7 @@ Components for theme and appearance customization.
 - `TodoScheduleAssignModal.tsx`: Fixed the week-planning schedule modal to a stable three-quarter viewport height so the panel no longer grows or shrinks with its content.
 - `TodoDuplicateModal.tsx`: Trimmed the duplicate modal helper copy so the quick-copy flow stays lightweight without extra explanatory text.
 - `AddLogModal.tsx`: Added direct camera capture functionality, now preferring native camera file-path persistence before falling back to `webPath`.
+- `TodoAssociation.tsx`: Added an optional collapsed parent/subtask tree mode so Add Log and active focus todo pickers can expand child tasks beneath selectable parent rows.
+- `TodoAssociation.tsx`: Added a first-position virtual `今天` category so shared todo pickers can surface pinned tasks plus todos arranged for today without switching into each source category.
 - `TodoAssociation.tsx`: Updated progress display logic in associated parent modals/views (`AddLogModal`, `FocusDetailView`) to reflect active progress increments in real time with a distinct color.
 - `NavigationDecorationSelector.tsx`: Added support for uploading and managing custom navigation decorations using Capacitor Filesystem.
