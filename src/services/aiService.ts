@@ -71,6 +71,36 @@ export interface AIBackfillChatResult {
     debug: AIDebugExchange;
 }
 
+export interface AIBackfillCreateLogArgs {
+    startTime: string; // HH:mm
+    endTime: string; // HH:mm
+    description: string;
+    categoryId: string;
+    activityId: string;
+    scopeIds?: string[];
+    linkedTodoId?: string;
+    progressIncrement?: number;
+}
+
+export interface AIBackfillToolCall {
+    toolName: 'create_log';
+    args: AIBackfillCreateLogArgs;
+}
+
+export interface AIBackfillToolPlan {
+    assistantReply: string;
+    toolCalls: AIBackfillToolCall[];
+}
+
+export interface AIBackfillToolPlanningResult {
+    plan: AIBackfillToolPlan;
+    debug: AIDebugExchange;
+}
+
+export interface AIRequestOptions {
+    signal?: AbortSignal;
+}
+
 const AI_CONFIG_KEY = 'lumostime_ai_config';
 const AI_PROFILES_KEY = 'lumostime_ai_profiles';
 
@@ -586,6 +616,326 @@ ${text}
         throw new Error('AI provider not supported');
     },
 
+    planBackfillToolCallsWithDebug: async (
+        text: string,
+        context: {
+            currentDateTime: string;
+            targetDate: string;
+            categories: Category[];
+            scopes: Scope[];
+            todos: Array<{
+                id: string;
+                title: string;
+                isProgress?: boolean;
+                progressTrackingMode?: string;
+                totalAmount?: number;
+                completedUnits?: number;
+                parentTodoId?: string;
+            }>;
+        },
+        options: AIRequestOptions = {}
+    ): Promise<AIBackfillToolPlanningResult> => {
+        const config = aiService.getConfig();
+        const fetchFn = Capacitor.isNativePlatform() ? nativeFetch : fetch;
+
+        if (!config.apiKey?.trim()) {
+            throw new Error('请先在设置中完成 AI 配置。');
+        }
+
+        const categoryContext = context.categories.map((category) => ({
+            id: category.id,
+            name: category.name,
+            activities: category.activities.map((activity) => ({
+                id: activity.id,
+                name: activity.name
+            }))
+        }));
+
+        const scopeContext = context.scopes.map((scope) => ({
+            id: scope.id,
+            name: scope.name
+        }));
+
+        const todoContext = context.todos.map((todo) => ({
+            id: todo.id,
+            title: todo.title,
+            isProgress: Boolean(todo.isProgress),
+            progressTrackingMode: todo.progressTrackingMode || 'none',
+            totalAmount: todo.totalAmount || 0,
+            completedUnits: todo.completedUnits || 0,
+            parentTodoId: todo.parentTodoId || null
+        }));
+
+        const systemPrompt = `
+Role: You are LumosTime's AI backfill assistant with tool planning ability.
+Task: Read the user's message, decide whether one or more backfill records should be created, and separate your natural-language reply from the tool calls.
+
+Context:
+- Current DateTime: ${context.currentDateTime}
+- Selected Backfill Date: ${context.targetDate}
+- Available Categories and Activities: ${JSON.stringify(categoryContext)}
+- Available Scopes: ${JSON.stringify(scopeContext)}
+- Available Todos: ${JSON.stringify(todoContext)}
+
+Available Tool:
+1. create_log
+Arguments schema:
+{
+  "startTime": "HH:mm",
+  "endTime": "HH:mm",
+  "description": "string",
+  "categoryId": "category id",
+  "activityId": "activity id",
+  "scopeIds": ["scope id"],
+  "linkedTodoId": "todo id",
+  "progressIncrement": 1
+}
+
+Requirements:
+1. Output ONLY a valid JSON object.
+2. JSON schema:
+{
+  "assistantReply": "string",
+  "toolCalls": [
+    {
+      "toolName": "create_log",
+      "args": { ... }
+    }
+  ]
+}
+3. assistantReply is what the user will read in the chat.
+4. toolCalls is what the app will apply directly.
+5. If the time, category, or activity is too uncertain, keep toolCalls empty and ask a concise follow-up question in assistantReply.
+6. If the user describes multiple time ranges, emit multiple toolCalls.
+7. All times must stay within the selected date and must use 24-hour HH:mm format.
+8. categoryId, activityId, scopeIds, and linkedTodoId must come from the provided context exactly. Do not invent IDs.
+9. If no scope or todo is clearly relevant, omit them.
+10. Only include progressIncrement when a linked todo clearly matches and the user explicitly provides progress.
+11. Preserve important user details in description instead of over-summarizing.
+12. Never output duplicate toolCalls. If two toolCalls would be identical, keep only one.
+`;
+
+        const userPrompt = `
+Selected Backfill Date: ${context.targetDate}
+Current DateTime: ${context.currentDateTime}
+User Message:
+${text}
+`;
+
+        const normalizePlan = (rawPlan: any): AIBackfillToolPlan => {
+            const toolCalls = Array.isArray(rawPlan?.toolCalls)
+                ? rawPlan.toolCalls.filter((call: any) => call?.toolName === 'create_log' && call?.args)
+                : [];
+
+            const dedupedToolCalls = toolCalls.filter((call: any, index: number, list: any[]) => {
+                const buildKey = (candidate: any) => JSON.stringify({
+                    toolName: 'create_log',
+                    startTime: String(candidate.args.startTime || ''),
+                    endTime: String(candidate.args.endTime || ''),
+                    description: String(candidate.args.description || '').trim(),
+                    categoryId: String(candidate.args.categoryId || ''),
+                    activityId: String(candidate.args.activityId || ''),
+                    scopeIds: Array.isArray(candidate.args.scopeIds)
+                        ? candidate.args.scopeIds.map((id: any) => String(id)).sort()
+                        : [],
+                    linkedTodoId: candidate.args.linkedTodoId ? String(candidate.args.linkedTodoId) : '',
+                    progressIncrement: typeof candidate.args.progressIncrement === 'number'
+                        ? candidate.args.progressIncrement
+                        : null
+                });
+
+                const currentKey = buildKey(call);
+                return index === list.findIndex((candidate: any) => buildKey(candidate) === currentKey);
+            });
+
+            return {
+                assistantReply: typeof rawPlan?.assistantReply === 'string' ? rawPlan.assistantReply : '',
+                toolCalls: dedupedToolCalls.map((call: any) => ({
+                    toolName: 'create_log',
+                    args: {
+                        startTime: String(call.args.startTime || ''),
+                        endTime: String(call.args.endTime || ''),
+                        description: String(call.args.description || ''),
+                        categoryId: String(call.args.categoryId || ''),
+                        activityId: String(call.args.activityId || ''),
+                        ...(Array.isArray(call.args.scopeIds) ? { scopeIds: call.args.scopeIds.map((id: any) => String(id)) } : {}),
+                        ...(call.args.linkedTodoId ? { linkedTodoId: String(call.args.linkedTodoId) } : {}),
+                        ...(typeof call.args.progressIncrement === 'number'
+                            ? { progressIncrement: call.args.progressIncrement }
+                            : {})
+                    }
+                }))
+            };
+        };
+
+        if (config.provider === 'openai') {
+            const url = `${config.baseUrl}/chat/completions`;
+            const headers = {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${config.apiKey}`
+            };
+            const body = {
+                model: config.modelName,
+                messages: [
+                    { role: 'system', content: systemPrompt.trim() },
+                    { role: 'user', content: userPrompt.trim() }
+                ],
+                response_format: { type: 'json_object' }
+            };
+            const requestedAt = new Date().toISOString();
+            let responseStatus = 0;
+            let responseOk = false;
+            let responseBody: unknown = null;
+
+            try {
+                const response = await fetchFn(url, {
+                    method: 'POST',
+                    headers,
+                    body: JSON.stringify(body),
+                    ...(options.signal ? { signal: options.signal } : {})
+                });
+                responseStatus = response.status || 0;
+                responseOk = Boolean(response.ok);
+                responseBody = await response.json();
+
+                const debug: AIDebugExchange = {
+                    provider: 'openai',
+                    requestedAt,
+                    completedAt: new Date().toISOString(),
+                    request: {
+                        url: sanitizeDebugUrl(url),
+                        method: 'POST',
+                        headers: sanitizeDebugHeaders(headers),
+                        body
+                    },
+                    response: {
+                        status: responseStatus,
+                        ok: responseOk,
+                        body: responseBody
+                    }
+                };
+
+                if ((responseBody as any)?.error) {
+                    const error = new Error((responseBody as any).error.message || 'AI 请求失败');
+                    (error as Error & { debug?: AIDebugExchange }).debug = debug;
+                    throw error;
+                }
+
+                const rawContent = (responseBody as any)?.choices?.[0]?.message?.content || '{}';
+                const plan = normalizePlan(aiService.cleanAndParseJSONObject(rawContent));
+
+                return { plan, debug };
+            } catch (error) {
+                const debug: AIDebugExchange = {
+                    provider: 'openai',
+                    requestedAt,
+                    completedAt: new Date().toISOString(),
+                    request: {
+                        url: sanitizeDebugUrl(url),
+                        method: 'POST',
+                        headers: sanitizeDebugHeaders(headers),
+                        body
+                    },
+                    response: {
+                        status: responseStatus,
+                        ok: responseOk,
+                        body: responseBody || {
+                            transportError: error instanceof Error ? error.message : String(error)
+                        }
+                    }
+                };
+
+                const finalError = error instanceof Error ? error : new Error(String(error));
+                (finalError as Error & { debug?: AIDebugExchange }).debug = debug;
+                throw finalError;
+            }
+        }
+
+        if (config.provider === 'gemini') {
+            const baseUrl = config.baseUrl || 'https://generativelanguage.googleapis.com/v1beta/models';
+            const url = `${baseUrl}/${config.modelName}:generateContent?key=${config.apiKey}`;
+            const headers = {
+                'Content-Type': 'application/json'
+            };
+            const body = {
+                contents: [{ parts: [{ text: userPrompt.trim() }] }],
+                system_instruction: { parts: [{ text: systemPrompt.trim() }] },
+                generationConfig: {
+                    response_mime_type: 'application/json'
+                }
+            };
+            const requestedAt = new Date().toISOString();
+            let responseStatus = 0;
+            let responseOk = false;
+            let responseBody: unknown = null;
+
+            try {
+                const response = await fetchFn(url, {
+                    method: 'POST',
+                    headers,
+                    body: JSON.stringify(body),
+                    ...(options.signal ? { signal: options.signal } : {})
+                });
+                responseStatus = response.status || 0;
+                responseOk = Boolean(response.ok);
+                responseBody = await response.json();
+
+                const debug: AIDebugExchange = {
+                    provider: 'gemini',
+                    requestedAt,
+                    completedAt: new Date().toISOString(),
+                    request: {
+                        url: sanitizeDebugUrl(url),
+                        method: 'POST',
+                        headers: sanitizeDebugHeaders(headers),
+                        body
+                    },
+                    response: {
+                        status: responseStatus,
+                        ok: responseOk,
+                        body: responseBody
+                    }
+                };
+
+                if ((responseBody as any)?.error) {
+                    const error = new Error((responseBody as any).error.message || 'AI 请求失败');
+                    (error as Error & { debug?: AIDebugExchange }).debug = debug;
+                    throw error;
+                }
+
+                const rawContent = (((responseBody as any)?.candidates?.[0]?.content?.parts?.[0]?.text) || '{}');
+                const plan = normalizePlan(aiService.cleanAndParseJSONObject(rawContent));
+
+                return { plan, debug };
+            } catch (error) {
+                const debug: AIDebugExchange = {
+                    provider: 'gemini',
+                    requestedAt,
+                    completedAt: new Date().toISOString(),
+                    request: {
+                        url: sanitizeDebugUrl(url),
+                        method: 'POST',
+                        headers: sanitizeDebugHeaders(headers),
+                        body
+                    },
+                    response: {
+                        status: responseStatus,
+                        ok: responseOk,
+                        body: responseBody || {
+                            transportError: error instanceof Error ? error.message : String(error)
+                        }
+                    }
+                };
+
+                const finalError = error instanceof Error ? error : new Error(String(error));
+                (finalError as Error & { debug?: AIDebugExchange }).debug = debug;
+                throw finalError;
+            }
+        }
+
+        throw new Error('AI provider not supported');
+    },
+
     parseTodoText: async (
         text: string,
         context: {
@@ -798,6 +1148,27 @@ JSON Output Schema:
         } catch (e) {
             console.error('JSON Parse Error', e);
             return [];
+        }
+    },
+
+    cleanAndParseJSONObject: (content: string): any => {
+        if (content.includes('```json')) {
+            content = content.replace(/```json\n?|\n?```/g, '');
+        } else if (content.includes('```')) {
+            content = content.replace(/```\n?|\n?```/g, '');
+        }
+
+        const objectStart = content.indexOf('{');
+        const objectEnd = content.lastIndexOf('}') + 1;
+        if (objectStart >= 0 && objectEnd > objectStart) {
+            content = content.substring(objectStart, objectEnd);
+        }
+
+        try {
+            return JSON.parse(content);
+        } catch (e) {
+            console.error('JSON Object Parse Error', e);
+            return {};
         }
     }
 };
