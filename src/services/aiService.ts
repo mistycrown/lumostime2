@@ -49,6 +49,28 @@ export interface AIParsedTodo {
     defaultScopeIds?: string[];
 }
 
+export interface AIDebugExchange {
+    provider: 'openai' | 'gemini';
+    requestedAt: string;
+    completedAt: string;
+    request: {
+        url: string;
+        method: string;
+        headers: Record<string, string>;
+        body: unknown;
+    };
+    response: {
+        status: number;
+        ok: boolean;
+        body: unknown;
+    };
+}
+
+export interface AIBackfillChatResult {
+    reply: string;
+    debug: AIDebugExchange;
+}
+
 const AI_CONFIG_KEY = 'lumostime_ai_config';
 const AI_PROFILES_KEY = 'lumostime_ai_profiles';
 
@@ -102,6 +124,21 @@ const nativeFetch = async (url: string, options: any) => {
         throw error;
     }
 };
+
+const sanitizeDebugHeaders = (headers: Record<string, string>): Record<string, string> => (
+    Object.fromEntries(
+        Object.entries(headers).map(([key, value]) => {
+            if (key.toLowerCase() === 'authorization') {
+                return [key, 'Bearer [REDACTED]'];
+            }
+            return [key, value];
+        })
+    )
+);
+
+const sanitizeDebugUrl = (url: string): string => (
+    url.replace(/([?&]key=)[^&]+/gi, '$1[REDACTED]')
+);
 
 export const aiService = {
     getConfig: (): AIConfig => {
@@ -349,10 +386,210 @@ ${text}
         return aiService.generateNarrative(userPrompt.trim(), systemPrompt.trim());
     },
 
+    sendBackfillChatMessageWithDebug: async (
+        text: string,
+        context: {
+            currentDateTime: string;
+            targetDate: string;
+        }
+    ): Promise<AIBackfillChatResult> => {
+        const config = aiService.getConfig();
+        const fetchFn = Capacitor.isNativePlatform() ? nativeFetch : fetch;
+
+        if (!config.apiKey?.trim()) {
+            throw new Error('请先在设置中完成 AI 配置。');
+        }
+
+        const systemPrompt = `
+Role: You are LumosTime's AI backfill assistant.
+Task: Help the user talk through what they were doing so the app can later turn it into a backfill record.
+
+Context:
+- Current DateTime: ${context.currentDateTime}
+- Selected Backfill Date: ${context.targetDate}
+
+Requirements:
+1. Reply in natural Chinese.
+2. Treat each request as a single independent turn.
+3. Help the user clarify what they were doing, when they did it, and which details may still be missing.
+4. If the time range is ambiguous, ask concise follow-up questions instead of inventing details.
+5. Do not output JSON, code blocks, or tool-call syntax in this step.
+6. Keep the answer practical and reasonably concise.
+`;
+
+        const userPrompt = `
+Selected Backfill Date: ${context.targetDate}
+Current DateTime: ${context.currentDateTime}
+User Message:
+${text}
+`;
+
+        if (config.provider === 'openai') {
+            const url = `${config.baseUrl}/chat/completions`;
+            const headers = {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${config.apiKey}`
+            };
+            const body = {
+                model: config.modelName,
+                messages: [
+                    { role: 'system', content: systemPrompt.trim() },
+                    { role: 'user', content: userPrompt.trim() }
+                ]
+            };
+            const requestedAt = new Date().toISOString();
+            let responseStatus = 0;
+            let responseOk = false;
+            let responseBody: unknown = null;
+
+            try {
+                const response = await fetchFn(url, {
+                    method: 'POST',
+                    headers,
+                    body: JSON.stringify(body)
+                });
+                responseStatus = response.status || 0;
+                responseOk = Boolean(response.ok);
+                responseBody = await response.json();
+
+                const debug: AIDebugExchange = {
+                    provider: 'openai',
+                    requestedAt,
+                    completedAt: new Date().toISOString(),
+                    request: {
+                        url: sanitizeDebugUrl(url),
+                        method: 'POST',
+                        headers: sanitizeDebugHeaders(headers),
+                        body
+                    },
+                    response: {
+                        status: responseStatus,
+                        ok: responseOk,
+                        body: responseBody
+                    }
+                };
+
+                if ((responseBody as any)?.error) {
+                    const error = new Error((responseBody as any).error.message || 'AI 请求失败');
+                    (error as Error & { debug?: AIDebugExchange }).debug = debug;
+                    throw error;
+                }
+
+                return {
+                    reply: ((responseBody as any)?.choices?.[0]?.message?.content || '').trim(),
+                    debug
+                };
+            } catch (error) {
+                const debug: AIDebugExchange = {
+                    provider: 'openai',
+                    requestedAt,
+                    completedAt: new Date().toISOString(),
+                    request: {
+                        url: sanitizeDebugUrl(url),
+                        method: 'POST',
+                        headers: sanitizeDebugHeaders(headers),
+                        body
+                    },
+                    response: {
+                        status: responseStatus,
+                        ok: responseOk,
+                        body: responseBody || {
+                            transportError: error instanceof Error ? error.message : String(error)
+                        }
+                    }
+                };
+
+                const finalError = error instanceof Error ? error : new Error(String(error));
+                (finalError as Error & { debug?: AIDebugExchange }).debug = debug;
+                throw finalError;
+            }
+        }
+
+        if (config.provider === 'gemini') {
+            const baseUrl = config.baseUrl || 'https://generativelanguage.googleapis.com/v1beta/models';
+            const url = `${baseUrl}/${config.modelName}:generateContent?key=${config.apiKey}`;
+            const headers = {
+                'Content-Type': 'application/json'
+            };
+            const body = {
+                contents: [{ parts: [{ text: userPrompt.trim() }] }],
+                system_instruction: { parts: [{ text: systemPrompt.trim() }] }
+            };
+            const requestedAt = new Date().toISOString();
+            let responseStatus = 0;
+            let responseOk = false;
+            let responseBody: unknown = null;
+
+            try {
+                const response = await fetchFn(url, {
+                    method: 'POST',
+                    headers,
+                    body: JSON.stringify(body)
+                });
+                responseStatus = response.status || 0;
+                responseOk = Boolean(response.ok);
+                responseBody = await response.json();
+
+                const debug: AIDebugExchange = {
+                    provider: 'gemini',
+                    requestedAt,
+                    completedAt: new Date().toISOString(),
+                    request: {
+                        url: sanitizeDebugUrl(url),
+                        method: 'POST',
+                        headers: sanitizeDebugHeaders(headers),
+                        body
+                    },
+                    response: {
+                        status: responseStatus,
+                        ok: responseOk,
+                        body: responseBody
+                    }
+                };
+
+                if ((responseBody as any)?.error) {
+                    const error = new Error((responseBody as any).error.message || 'AI 请求失败');
+                    (error as Error & { debug?: AIDebugExchange }).debug = debug;
+                    throw error;
+                }
+
+                return {
+                    reply: (((responseBody as any)?.candidates?.[0]?.content?.parts?.[0]?.text) || '').trim(),
+                    debug
+                };
+            } catch (error) {
+                const debug: AIDebugExchange = {
+                    provider: 'gemini',
+                    requestedAt,
+                    completedAt: new Date().toISOString(),
+                    request: {
+                        url: sanitizeDebugUrl(url),
+                        method: 'POST',
+                        headers: sanitizeDebugHeaders(headers),
+                        body
+                    },
+                    response: {
+                        status: responseStatus,
+                        ok: responseOk,
+                        body: responseBody || {
+                            transportError: error instanceof Error ? error.message : String(error)
+                        }
+                    }
+                };
+
+                const finalError = error instanceof Error ? error : new Error(String(error));
+                (finalError as Error & { debug?: AIDebugExchange }).debug = debug;
+                throw finalError;
+            }
+        }
+
+        throw new Error('AI provider not supported');
+    },
+
     parseTodoText: async (
         text: string,
         context: {
-            todoCategories: TodoCategory[];
+            todoCategories: TodoCategory[]; 
             activityCategories: Category[];
             scopes: Scope[];
         }
