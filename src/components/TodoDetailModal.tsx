@@ -4,16 +4,24 @@
  * @output Modal Interaction (Edit Todo, View History)
  * @pos Component (Modal)
  * @description Displays detailed information for a specific Todo item, including its progress, planning fields, associated history logs, and focus stats.
+ * @updated 2026-04-22: Styled the inherited parent-task link with a dashed underline so clickable parent navigation reads like a link.
+ * @updated 2026-04-22: Renamed inherited scope copy to inherited domain wording inside subtask detail pages for clearer terminology.
+ * @updated 2026-04-22: Fixed parent-task navigation from subtask detail pages so opening a parent todo no longer crashes the detail view.
+ * @updated 2026-04-21: Hid the subtask tab whenever a todo has a recurrence rule so recurring todos can no longer add child tasks.
+ * @updated 2026-04-21: Rendered subtask inherited fields as plain strings inside the basic-info card and hid non-editable recurrence UI on child todo pages.
+ * @updated 2026-04-21: Moved parent-link context into the detail tab footer and hid subtask hierarchy chips/tabs on child todo pages.
+ * @updated 2026-04-21: Added inline subtask composing in the parent detail page for continuous child creation without navigation.
+ * @updated 2026-04-21: Added one-level subtask display, parent navigation, and inherited-field restrictions for child todos.
  * @updated 2026-04-21: Added a detail-level pin toggle so todos can be promoted to the top of today's schedule tab.
  * @updated 2026-04-20: Added schedule date, deadline date, and lightweight recurrence-rule editing for the first todo week-view release.
  * 
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
 import React, { useState, useMemo, useRef, useEffect } from 'react';
-import { TodoItem, TodoCategory, Log, Category, Scope, TodoRecurrenceFrequency, TodoRecurrenceRule } from '../types';
+import { TodoItem, TodoCategory, Log, Category, Scope, TodoProgressTrackingMode, TodoRecurrenceFrequency, TodoRecurrenceRule } from '../types';
 import { ScopeAssociation } from './ScopeAssociation';
 import { TagAssociation } from './TagAssociation';
-import { Trash2, CheckCircle2, TrendingUp, ChevronLeft, Circle, Image as ImageIcon, Pin, RotateCcw, CalendarDays, Flag, Repeat2 } from 'lucide-react';
+import { Trash2, CheckCircle2, TrendingUp, ChevronLeft, ChevronRight, Circle, Image as ImageIcon, Pin, RotateCcw, CalendarDays, Flag, Repeat2, Plus } from 'lucide-react';
 import { DetailTimelineCard } from './DetailTimelineCard';
 import { TimelineImage } from './TimelineImage';
 import { imageService } from '../services/imageService';
@@ -21,6 +29,14 @@ import { IconRenderer } from './IconRenderer';
 import { useToast } from '../contexts/ToastContext';
 import { getTodayDateKey, parseDateKey } from '../utils/todoScheduleUtils';
 import { TodoDatePickerModal } from './TodoDatePickerModal';
+import {
+  getCompletedDirectChildCount,
+  getDirectChildCount,
+  getDirectChildTodos,
+  getNextChildOrder,
+  isSubtask as isSubtaskTodo
+} from '../utils/todoHierarchyUtils';
+import { canTodoUseSubtaskProgress, getTodoProgressSnapshot, getTodoProgressTrackingMode } from '../utils/todoProgressUtils';
 
 interface TodoDetailModalProps {
   initialTodo?: TodoItem | null;
@@ -30,15 +46,18 @@ interface TodoDetailModalProps {
   onClose: () => void;
   onSave: (todo: TodoItem) => void;
   onDelete?: (id: string) => void;
+  onOpenTodo?: (todo: TodoItem) => void;
+  onAddSubtask?: (parentTodo: TodoItem) => void;
   logs: Log[];
   onLogUpdate?: (log: Log) => void;
   onEditLog?: (log: Log) => void;
   todoCategories: TodoCategory[];
   categories: Category[];
   scopes: Scope[];
+  todos?: TodoItem[];
 }
 
-type Tab = '细节' | '時間線';
+type Tab = '细节' | '子任务' | '时间线';
 type RecurrenceFrequencyMode = TodoRecurrenceFrequency | 'none';
 type DatePickerField = 'scheduledDate' | 'deadlineDate' | 'recurrenceStartDate' | 'recurrenceEndDate' | null;
 
@@ -61,10 +80,27 @@ const formatDateFieldValue = (value?: string): string => {
   return `${parsed.getFullYear()}.${month}.${day}`;
 };
 
-export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({ initialTodo, initialDraft, currentCategory, displayMode = 'overlay', onClose, onSave, onDelete, logs, onLogUpdate, onEditLog, todoCategories, categories, scopes }) => {
+export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({
+  initialTodo,
+  initialDraft,
+  currentCategory,
+  displayMode = 'overlay',
+  onClose,
+  onSave,
+  onDelete,
+  onOpenTodo,
+  onAddSubtask,
+  logs,
+  onLogUpdate,
+  onEditLog,
+  todoCategories,
+  categories,
+  scopes,
+  todos = []
+}) => {
   const { addToast } = useToast();
   const [isEntering, setIsEntering] = useState(true);
-  const [activeTab, setActiveTab] = useState<Tab>(initialTodo ? '時間線' : '细节');
+  const [activeTab, setActiveTab] = useState<Tab>(initialTodo ? '时间线' : '细节');
 
   const initialCategoryId = initialTodo?.categoryId || initialDraft?.categoryId || currentCategory.id;
   const initialTitle = initialTodo?.title || initialDraft?.title || '';
@@ -73,7 +109,6 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({ initialTodo, i
   const initialLinkedCategoryId = initialTodo?.linkedCategoryId || initialDraft?.linkedCategoryId || '';
   const initialLinkedActivityId = initialTodo?.linkedActivityId || initialDraft?.linkedActivityId || '';
   const initialDefaultScopeIds = initialTodo?.defaultScopeIds || initialDraft?.defaultScopeIds;
-  const initialIsProgress = initialTodo?.isProgress || initialDraft?.isProgress || false;
   const initialTotalAmount = initialTodo?.totalAmount || initialDraft?.totalAmount || 100;
   const initialUnitAmount = initialTodo?.unitAmount || initialDraft?.unitAmount || 1;
   const initialCompletedUnits = initialTodo?.completedUnits || initialDraft?.completedUnits || 0;
@@ -84,12 +119,15 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({ initialTodo, i
   const initialScheduledDate = initialTodo?.scheduledDate || initialDraft?.scheduledDate || '';
   const initialDeadlineDate = initialTodo?.deadlineDate || initialDraft?.deadlineDate || '';
   const initialRecurrenceRule = initialTodo?.recurrenceRule || initialDraft?.recurrenceRule;
+  const initialParentTodoId = initialTodo?.parentTodoId || initialDraft?.parentTodoId;
+  const initialChildOrder = initialTodo?.childOrder ?? initialDraft?.childOrder;
 
   // Stable ID for the session
   const [todoId] = useState(initialTodo?.id || crypto.randomUUID());
 
   // Ref for Task Name input
   const taskNameInputRef = useRef<HTMLInputElement>(null);
+  const inlineSubtaskTitleInputRef = useRef<HTMLInputElement>(null);
 
   // --- Detail State ---
   const [selectedCategoryId, setSelectedCategoryId] = useState(initialCategoryId);
@@ -104,7 +142,14 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({ initialTodo, i
   const [defaultScopeIds, setDefaultScopeIds] = useState<string[] | undefined>(initialDefaultScopeIds);
 
   // Progress State
-  const [isProgress, setIsProgress] = useState(initialIsProgress);
+  const [progressTrackingMode, setProgressTrackingMode] = useState<TodoProgressTrackingMode>(() => (
+    getTodoProgressTrackingMode({
+      id: initialTodo?.id || '',
+      parentTodoId: initialParentTodoId,
+      isProgress: initialTodo?.isProgress ?? initialDraft?.isProgress,
+      progressTrackingMode: initialTodo?.progressTrackingMode ?? initialDraft?.progressTrackingMode
+    }, todos)
+  ));
   const [totalAmount, setTotalAmount] = useState(initialTotalAmount);
   const [unitAmount, setUnitAmount] = useState(initialUnitAmount);
   const [completedUnits, setCompletedUnits] = useState(initialCompletedUnits);
@@ -117,11 +162,15 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({ initialTodo, i
   const [coverImage, setCoverImage] = useState<string | undefined>(initialCoverImage);
   const [isUploadingImage, setIsUploadingImage] = useState(false);
   const [pin, setPin] = useState(initialPin);
+  const [parentTodoId] = useState<string | undefined>(initialParentTodoId);
+  const [childOrder] = useState<number | undefined>(initialChildOrder);
 
   // Schedule State
   const [scheduledDate, setScheduledDate] = useState(initialScheduledDate);
   const [deadlineDate, setDeadlineDate] = useState(initialDeadlineDate);
-  const [recurrenceFrequency, setRecurrenceFrequency] = useState<RecurrenceFrequencyMode>(initialRecurrenceRule?.frequency || 'none');
+  const [recurrenceFrequency, setRecurrenceFrequency] = useState<RecurrenceFrequencyMode>(
+    initialParentTodoId ? 'none' : (initialRecurrenceRule?.frequency || 'none')
+  );
   const [recurrenceStartDate, setRecurrenceStartDate] = useState(
     initialRecurrenceRule?.startDate || initialScheduledDate || getTodayDateKey()
   );
@@ -137,6 +186,52 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({ initialTodo, i
 
   // Timeline / Calendar State
   const [displayDate, setDisplayDate] = useState(new Date());
+  const isSubtask = isSubtaskTodo({ parentTodoId });
+  const parentTodo = useMemo(
+    () => (parentTodoId ? todos.find((todo) => todo.id === parentTodoId) || null : null),
+    [parentTodoId, todos]
+  );
+  const childTodos = useMemo(
+    () => getDirectChildTodos(todos, todoId),
+    [todoId, todos]
+  );
+  const childTodoCount = useMemo(
+    () => getDirectChildCount(todos, todoId),
+    [todoId, todos]
+  );
+  const completedChildTodoCount = useMemo(
+    () => getCompletedDirectChildCount(todos, todoId),
+    [todoId, todos]
+  );
+  const [isInlineSubtaskComposerOpen, setIsInlineSubtaskComposerOpen] = useState(false);
+  const [inlineSubtaskTitle, setInlineSubtaskTitle] = useState('');
+  const canUseSubtaskProgress = useMemo(
+    () => canTodoUseSubtaskProgress({ id: todoId, parentTodoId }, todos),
+    [parentTodoId, todoId, todos]
+  );
+  const resolvedProgressTrackingMode = progressTrackingMode === 'subtasks' && !canUseSubtaskProgress
+    ? 'none'
+    : progressTrackingMode;
+  const isProgress = resolvedProgressTrackingMode !== 'none';
+  const isManualProgress = resolvedProgressTrackingMode === 'manual';
+  const isSubtaskAutoProgress = resolvedProgressTrackingMode === 'subtasks';
+  const progressSnapshot = useMemo(
+    () => getTodoProgressSnapshot({
+      id: todoId,
+      parentTodoId,
+      isProgress,
+      progressTrackingMode: resolvedProgressTrackingMode,
+      totalAmount,
+      unitAmount,
+      completedUnits
+    }, todos),
+    [completedUnits, isProgress, parentTodoId, resolvedProgressTrackingMode, todoId, todos, totalAmount, unitAmount]
+  );
+  const hasActiveRecurrence = !isSubtask && recurrenceFrequency !== 'none' && Boolean(recurrenceStartDate);
+  const showSubtaskTab = Boolean(initialTodo) && !isSubtask && !hasActiveRecurrence;
+  const tabItems: Tab[] = showSubtaskTab
+    ? ['\u7EC6\u8282', '\u5B50\u4EFB\u52A1', '\u65F6\u95F4\u7EBF']
+    : ['\u7EC6\u8282', '\u65F6\u95F4\u7EBF'];
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -157,7 +252,41 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({ initialTodo, i
     }
   }, [initialTodo, activeTab]);
 
+  useEffect(() => {
+    if (activeTab !== '子任务' || !isInlineSubtaskComposerOpen) {
+      return;
+    }
+
+    const timer = window.setTimeout(() => {
+      inlineSubtaskTitleInputRef.current?.focus();
+    }, 60);
+
+    return () => window.clearTimeout(timer);
+  }, [activeTab, isInlineSubtaskComposerOpen]);
+
+  useEffect(() => {
+    if (showSubtaskTab) {
+      return;
+    }
+
+    if (activeTab === '子任务') {
+      setActiveTab('细节');
+    }
+
+    if (isInlineSubtaskComposerOpen) {
+      setIsInlineSubtaskComposerOpen(false);
+      setInlineSubtaskTitle('');
+    }
+  }, [activeTab, isInlineSubtaskComposerOpen, showSubtaskTab]);
+
+  useEffect(() => {
+    if (progressTrackingMode === 'subtasks' && !canUseSubtaskProgress) {
+      setProgressTrackingMode('none');
+    }
+  }, [canUseSubtaskProgress, progressTrackingMode]);
+
   const recurrenceRule = useMemo<TodoRecurrenceRule | undefined>(() => {
+    if (isSubtask) return undefined;
     if (recurrenceFrequency === 'none' || !recurrenceStartDate) return undefined;
 
     const normalizedInterval = Math.max(1, recurrenceInterval || 1);
@@ -194,6 +323,10 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({ initialTodo, i
   ]);
 
   const handleRecurrenceFrequencyChange = (nextFrequency: RecurrenceFrequencyMode) => {
+    if (isSubtask) {
+      return;
+    }
+
     setRecurrenceFrequency(nextFrequency);
 
     if (nextFrequency !== 'none') {
@@ -300,6 +433,35 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({ initialTodo, i
     }
   };
 
+  const buildTodoPayload = (overrides?: Partial<TodoItem>): TodoItem => ({
+    id: todoId,
+    categoryId: selectedCategoryId,
+    parentTodoId,
+    childOrder,
+    title: title.trim(),
+    isCompleted,
+    completedAt: isCompleted
+      ? (initialTodo?.isCompleted ? initialTodo.completedAt : new Date().toISOString())
+      : undefined,
+    note: note.trim(),
+    linkedCategoryId: linkedCategoryId || undefined,
+    linkedActivityId: linkedActivityId || undefined,
+    defaultScopeIds,
+    isProgress,
+    progressTrackingMode: resolvedProgressTrackingMode,
+    totalAmount: isManualProgress ? totalAmount : (isSubtaskAutoProgress ? progressSnapshot.totalAmount : undefined),
+    unitAmount: isManualProgress ? unitAmount : (isSubtaskAutoProgress ? progressSnapshot.unitAmount : undefined),
+    completedUnits: isManualProgress ? completedUnits : (isSubtaskAutoProgress ? progressSnapshot.completedUnits : undefined),
+    pin,
+    heatmapMin,
+    heatmapMax,
+    coverImage,
+    scheduledDate: scheduledDate || undefined,
+    deadlineDate: deadlineDate || undefined,
+    recurrenceRule: isSubtask ? undefined : recurrenceRule,
+    ...overrides
+  });
+
   // 实时保存：当状态变化时自动保存
   React.useEffect(() => {
     if (!title.trim()) return; // 不保存空标题
@@ -314,47 +476,25 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({ initialTodo, i
         linkedCategoryId !== (initialTodo.linkedCategoryId || '') ||
         linkedActivityId !== (initialTodo.linkedActivityId || '') ||
         JSON.stringify(defaultScopeIds) !== JSON.stringify(initialTodo.defaultScopeIds) ||
-        isProgress !== initialTodo.isProgress ||
-        totalAmount !== initialTodo.totalAmount ||
-        unitAmount !== initialTodo.unitAmount ||
-        completedUnits !== initialTodo.completedUnits ||
+        resolvedProgressTrackingMode !== getTodoProgressTrackingMode(initialTodo, todos) ||
+        (isManualProgress && totalAmount !== initialTodo.totalAmount) ||
+        (isManualProgress && unitAmount !== initialTodo.unitAmount) ||
+        (isManualProgress && completedUnits !== initialTodo.completedUnits) ||
         heatmapMin !== initialTodo.heatmapMin ||
         heatmapMax !== initialTodo.heatmapMax ||
         pin !== Boolean(initialTodo.pin) ||
         coverImage !== initialTodo.coverImage ||
+        parentTodoId !== initialTodo.parentTodoId ||
+        childOrder !== initialTodo.childOrder ||
         scheduledDate !== (initialTodo.scheduledDate || '') ||
         deadlineDate !== (initialTodo.deadlineDate || '') ||
-        JSON.stringify(recurrenceRule) !== JSON.stringify(initialTodo.recurrenceRule);
+        JSON.stringify(isSubtask ? undefined : recurrenceRule) !== JSON.stringify(initialTodo.recurrenceRule);
       
       if (!hasChanges) return;
     }
 
-    const newTodo: TodoItem = {
-      id: todoId,
-      categoryId: selectedCategoryId,
-      title: title.trim(),
-      isCompleted: isCompleted,
-      completedAt: isCompleted
-        ? (initialTodo?.isCompleted ? initialTodo.completedAt : new Date().toISOString())
-        : undefined,
-      note: note.trim(),
-      linkedCategoryId: linkedCategoryId || undefined,
-      linkedActivityId: linkedActivityId || undefined,
-      defaultScopeIds,
-      isProgress,
-      totalAmount: isProgress ? totalAmount : undefined,
-      unitAmount: isProgress ? unitAmount : undefined,
-      completedUnits: isProgress ? completedUnits : undefined,
-      pin,
-      heatmapMin,
-      heatmapMax,
-      coverImage,
-      scheduledDate: scheduledDate || undefined,
-      deadlineDate: deadlineDate || undefined,
-      recurrenceRule,
-    };
-    onSave(newTodo);
-  }, [selectedCategoryId, title, note, isCompleted, linkedCategoryId, linkedActivityId, defaultScopeIds, isProgress, totalAmount, unitAmount, completedUnits, heatmapMin, heatmapMax, coverImage, scheduledDate, deadlineDate, recurrenceRule]); // 监听所有状态变化
+    onSave(buildTodoPayload());
+  }, [selectedCategoryId, title, note, isCompleted, linkedCategoryId, linkedActivityId, defaultScopeIds, resolvedProgressTrackingMode, isManualProgress, totalAmount, unitAmount, completedUnits, heatmapMin, heatmapMax, pin, coverImage, parentTodoId, childOrder, scheduledDate, deadlineDate, isSubtask, recurrenceRule, initialTodo, onSave, todos]); // 监听所有状态变化
 
   const selectedCategory = todoCategories?.find(c => c.id === selectedCategoryId) || currentCategory;
 
@@ -364,30 +504,58 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({ initialTodo, i
 
     if (!title.trim()) return;
 
+    onSave(buildTodoPayload({ pin: nextPin }));
+  };
+
+  const openInlineSubtaskComposer = () => {
+    if (recurrenceRule) {
+      addToast('info', '循环任务不能添加子任务');
+      return;
+    }
+
+    setActiveTab('子任务');
+    setIsInlineSubtaskComposerOpen(true);
+  };
+
+  const closeInlineSubtaskComposer = () => {
+    setIsInlineSubtaskComposerOpen(false);
+    setInlineSubtaskTitle('');
+  };
+
+  const handleCreateInlineSubtask = () => {
+    if (!initialTodo || isSubtask || recurrenceRule) {
+      if (recurrenceRule) {
+        addToast('info', '循环任务不能添加子任务');
+      }
+      return;
+    }
+
+    const nextTitle = inlineSubtaskTitle.trim();
+    if (!nextTitle) {
+      inlineSubtaskTitleInputRef.current?.focus();
+      return;
+    }
+
     onSave({
-      id: todoId,
-      categoryId: selectedCategoryId,
-      title: title.trim(),
-      isCompleted,
-      completedAt: isCompleted
-        ? (initialTodo?.isCompleted ? initialTodo.completedAt : new Date().toISOString())
-        : undefined,
-      note: note.trim(),
-      linkedCategoryId: linkedCategoryId || undefined,
-      linkedActivityId: linkedActivityId || undefined,
-      defaultScopeIds,
-      isProgress,
-      totalAmount: isProgress ? totalAmount : undefined,
-      unitAmount: isProgress ? unitAmount : undefined,
-      completedUnits: isProgress ? completedUnits : undefined,
-      pin: nextPin,
-      heatmapMin,
-      heatmapMax,
-      coverImage,
-      scheduledDate: scheduledDate || undefined,
-      deadlineDate: deadlineDate || undefined,
-      recurrenceRule,
+      id: crypto.randomUUID(),
+      categoryId: initialTodo.categoryId,
+      parentTodoId: initialTodo.id,
+      childOrder: getNextChildOrder(todos, initialTodo.id),
+      title: nextTitle,
+      isCompleted: false,
+      note: undefined,
+      linkedCategoryId: initialTodo.linkedCategoryId,
+      linkedActivityId: initialTodo.linkedActivityId,
+      defaultScopeIds: initialTodo.defaultScopeIds ? [...initialTodo.defaultScopeIds] : undefined,
+      isProgress: false,
+      progressTrackingMode: 'none',
+      completedUnits: 0,
+      pin: false,
+      recurrenceRule: undefined
     });
+
+    setInlineSubtaskTitle('');
+    setIsInlineSubtaskComposerOpen(true);
   };
 
   const handleDelete = () => {
@@ -465,12 +633,33 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({ initialTodo, i
   };
 
   const selectedLinkCategory = categories?.find(c => c.id === linkedCategoryId);
+  const linkedActivityLabel = linkedCategoryId && linkedActivityId
+    ? (() => {
+      const category = categories.find((item) => item.id === linkedCategoryId);
+      const activity = category?.activities.find((item) => item.id === linkedActivityId);
+      return activity && category ? `${category.name} / ${activity.name}` : '未关联活动';
+    })()
+    : '未关联活动';
+  const inheritedScopeLabel = defaultScopeIds && defaultScopeIds.length > 0
+    ? defaultScopeIds
+      .map((scopeId) => scopes.find((scope) => scope.id === scopeId)?.name)
+      .filter(Boolean)
+      .join(' · ')
+    : '未关联领域';
 
   // Linked Logs
   const linkedLogs = useMemo(() => logs.filter(l => l.linkedTodoId === todoId), [logs, todoId]);
 
+  const handleOpenLinkedTodo = (todo?: TodoItem | null) => {
+    if (!todo || !onOpenTodo) {
+      return;
+    }
+
+    onOpenTodo(todo);
+  };
+
   const handleRecalculateProgressFromLogs = () => {
-    if (!isProgress) return;
+    if (!isManualProgress) return;
     const recalculated = linkedLogs.reduce((sum, log) => sum + (log.progressIncrement || 0), 0);
     setCompletedUnits(Math.max(0, recalculated));
     addToast('success', `已按日志重算进度：${Math.max(0, recalculated)}`);
@@ -550,7 +739,7 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({ initialTodo, i
             <span className="text-2xl font-bold text-stone-300">@</span>
             <span className="text-2xl font-bold text-stone-900 break-all line-clamp-2">{title || '新待办'}</span>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <span className="text-stone-500 text-sm font-medium bg-stone-100 px-3 py-1 rounded-full flex items-center gap-2">
               <IconRenderer icon={selectedCategory.icon} uiIcon={selectedCategory.uiIcon} className="text-sm" />
               <span>{selectedCategory.name}</span>
@@ -572,7 +761,7 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({ initialTodo, i
 
         {/* Tabs */}
         <div className="flex gap-8 border-b border-stone-200 mb-8">
-          {['细节', '時間線'].map(tab => (
+          {tabItems.map(tab => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab as Tab)}
@@ -598,26 +787,48 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({ initialTodo, i
                   {isCompleted ? '已完成' : '标记完成'}
                 </button>
               </div>
-              <div>
-                <label className="text-xs text-stone-400 font-medium mb-1.5 block">分类</label>
-                <div className="grid grid-cols-4 gap-2">
-                  {todoCategories?.map(cat => (
-                    <button
-                      key={cat.id}
-                      onClick={() => setSelectedCategoryId(cat.id)}
-                      className={`
-                            px-2 py-2 rounded-lg text-[10px] font-medium text-center border transition-colors truncate flex items-center justify-center gap-1.5
-                            ${selectedCategoryId === cat.id
-                          ? 'btn-template-filled border-transparent'
-                          : 'bg-stone-50 text-stone-500 border-stone-100 hover:bg-stone-100'}
-                        `}
-                    >
-                      <IconRenderer icon={cat.icon} uiIcon={cat.uiIcon} className="text-xs" />
-                      <span className="truncate">{cat.name}</span>
-                    </button>
-                  ))}
+              {isSubtask ? (
+                <div>
+                  <label className="text-xs text-stone-400 font-medium mb-1.5 block">继承信息</label>
+                  <div className="space-y-2 text-sm leading-6 text-stone-500">
+                    <div>分类：{selectedCategory.name}</div>
+                    <div>关联活动：{linkedActivityLabel}</div>
+                    <div>关联领域：{inheritedScopeLabel}</div>
+                    {parentTodo && (
+                      <button
+                        type="button"
+                        onClick={() => handleOpenLinkedTodo(parentTodo)}
+                        className="block text-left transition-colors hover:text-stone-800"
+                      >
+                        <span className="underline decoration-dashed underline-offset-4">
+                          父任务：{parentTodo.title}
+                        </span>
+                      </button>
+                    )}
+                  </div>
                 </div>
-              </div>
+              ) : (
+                <div>
+                  <label className="text-xs text-stone-400 font-medium mb-1.5 block">分类</label>
+                  <div className="grid grid-cols-4 gap-2">
+                    {todoCategories?.map(cat => (
+                      <button
+                        key={cat.id}
+                        onClick={() => setSelectedCategoryId(cat.id)}
+                        className={`
+                              px-2 py-2 rounded-lg text-[10px] font-medium text-center border transition-colors truncate flex items-center justify-center gap-1.5
+                              ${selectedCategoryId === cat.id
+                            ? 'btn-template-filled border-transparent'
+                            : 'bg-stone-50 text-stone-500 border-stone-100 hover:bg-stone-100'}
+                          `}
+                      >
+                        <IconRenderer icon={cat.icon} uiIcon={cat.uiIcon} className="text-xs" />
+                        <span className="truncate">{cat.name}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
               <div>
                 <label className="text-xs text-stone-400 font-medium mb-1.5 block">待办名称</label>
                 <input
@@ -718,24 +929,44 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({ initialTodo, i
                     <button
                       type="button"
                       onClick={handleRecalculateProgressFromLogs}
-                      disabled={!isProgress}
-                      className={`text-[10px] px-2 py-1 rounded-md border transition-colors flex items-center gap-1 ${isProgress ? 'text-stone-600 border-stone-200 hover:bg-stone-50' : 'text-stone-300 border-stone-100 cursor-not-allowed'}`}
+                      disabled={!isManualProgress}
+                      className={`text-[10px] px-2 py-1 rounded-md border transition-colors flex items-center gap-1 ${isManualProgress ? 'text-stone-600 border-stone-200 hover:bg-stone-50' : 'text-stone-300 border-stone-100 cursor-not-allowed'}`}
                       title={isProgress ? '按关联日志重算进度' : '请先开启进度追踪'}
                     >
                       <RotateCcw size={10} />
                       重算
                     </button>
-                    <div
-                      className={`w-12 h-6 rounded-full relative transition-colors cursor-pointer ${isProgress ? '' : 'bg-stone-200'}`}
-                      style={isProgress ? { backgroundColor: 'var(--progress-bar-fill)' } : undefined}
-                      onClick={() => setIsProgress(!isProgress)}
-                    >
-                      <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all shadow-sm ${isProgress ? 'left-7' : 'left-1'}`}></div>
+                    <div className={`grid gap-1.5 ${canUseSubtaskProgress ? 'grid-cols-3' : 'grid-cols-2'}`}>
+                      {([
+                        { value: 'none', label: '关闭' },
+                        { value: 'manual', label: '手动进度' },
+                        ...(canUseSubtaskProgress ? [{ value: 'subtasks', label: '子任务自动' }] : [])
+                      ] as Array<{ value: TodoProgressTrackingMode; label: string }>).map((option) => {
+                        const isSelected = resolvedProgressTrackingMode === option.value;
+                        return (
+                          <button
+                            key={option.value}
+                            type="button"
+                            onClick={() => setProgressTrackingMode(option.value)}
+                            className={`rounded-lg border px-2 py-1.5 text-[10px] font-medium transition-colors ${
+                              isSelected
+                                ? 'text-white'
+                                : 'bg-stone-50 text-stone-500 border-stone-200 hover:bg-white hover:border-stone-300'
+                            }`}
+                            style={isSelected ? {
+                              backgroundColor: 'var(--progress-bar-fill)',
+                              borderColor: 'var(--progress-bar-fill)'
+                            } : undefined}
+                          >
+                            {option.label}
+                          </button>
+                        );
+                      })}
                     </div>
                   </div>
                 </div>
 
-                {isProgress && (
+                {isManualProgress && (
                   <div className="pt-2 grid grid-cols-2 gap-4 animate-in slide-in-from-top-2 fade-in">
                     <div>
                       <label className="text-xs text-stone-400 font-medium mb-1.5 block">总量</label>
@@ -745,6 +976,12 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({ initialTodo, i
                       <label className="text-xs text-stone-400 font-medium mb-1.5 block">单位大小</label>
                       <input type="number" value={unitAmount} onChange={e => setUnitAmount(parseInt(e.target.value) || 0)} className="w-full bg-stone-50 border border-stone-200 rounded-xl px-4 py-3 text-stone-800 font-bold outline-none focus:border-stone-400 transition-colors" />
                     </div>
+                  </div>
+                )}
+                {isSubtaskAutoProgress && (
+                  <div className="pt-2 rounded-xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm text-stone-500 animate-in slide-in-from-top-2 fade-in">
+                    <p>进度按已完成子任务自动计算。</p>
+                    <p className="mt-1 font-mono text-stone-700">{progressSnapshot.completedUnits} / {progressSnapshot.totalAmount}</p>
                   </div>
                 )}
               </div>
@@ -779,40 +1016,43 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({ initialTodo, i
               </div>
             </div>
 
-            {/* Link Activity */}
-            <div className="bg-white rounded-2xl p-6 border border-stone-100 shadow-sm">
-              <div className="flex items-center justify-between mb-4">
-                <span className="text-xs font-bold text-stone-400 uppercase tracking-widest">关联标签</span>
-                {(linkedCategoryId || linkedActivityId) && (
-                  <button
-                    onClick={() => { 
-                      setLinkedCategoryId(''); 
-                      setLinkedActivityId(''); 
-                    }}
-                    className="text-[10px] text-stone-400 hover:text-red-400 transition-colors"
-                  >
-                    清除
-                  </button>
-                )}
-              </div>
-              
-              <TagAssociation
-                categories={categories}
-                selectedCategoryId={linkedCategoryId || categories[0]?.id || ''}
-                selectedActivityId={linkedActivityId || categories[0]?.activities[0]?.id || ''}
-                onCategorySelect={setLinkedCategoryId}
-                onActivitySelect={setLinkedActivityId}
-              />
-            </div>
+            {!isSubtask && (
+              <>
+                {/* Link Activity */}
+                <div className="bg-white rounded-2xl p-6 border border-stone-100 shadow-sm">
+                  <div className="flex items-center justify-between mb-4">
+                    <span className="text-xs font-bold text-stone-400 uppercase tracking-widest">关联标签</span>
+                    {(linkedCategoryId || linkedActivityId) && (
+                      <button
+                        onClick={() => {
+                          setLinkedCategoryId('');
+                          setLinkedActivityId('');
+                        }}
+                        className="text-[10px] text-stone-400 hover:text-red-400 transition-colors"
+                      >
+                        清除
+                      </button>
+                    )}
+                  </div>
+                  <TagAssociation
+                    categories={categories}
+                    selectedCategoryId={linkedCategoryId || categories[0]?.id || ''}
+                    selectedActivityId={linkedActivityId || categories[0]?.activities[0]?.id || ''}
+                    onCategorySelect={setLinkedCategoryId}
+                    onActivitySelect={setLinkedActivityId}
+                  />
+                </div>
 
-            {/* Scope Association */}
-            <div className="bg-white rounded-2xl p-6 border border-stone-100 shadow-sm">
-              <ScopeAssociation
-                scopes={scopes}
-                selectedScopeIds={defaultScopeIds}
-                onSelect={setDefaultScopeIds}
-              />
-            </div>
+                {/* Scope Association */}
+                <div className="bg-white rounded-2xl p-6 border border-stone-100 shadow-sm">
+                  <ScopeAssociation
+                    scopes={scopes}
+                    selectedScopeIds={defaultScopeIds}
+                    onSelect={setDefaultScopeIds}
+                  />
+                </div>
+              </>
+            )}
 
             <div className="bg-white rounded-2xl p-6 border border-stone-100 shadow-sm space-y-4">
               <div className="flex items-center justify-between">
@@ -856,7 +1096,7 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({ initialTodo, i
                     >
                       {formatDateFieldValue(scheduledDate)}
                     </button>
-                    {recurrenceFrequency !== 'none' && (
+                    {!isSubtask && recurrenceFrequency !== 'none' && (
                       <p className="text-[11px] text-stone-400">设置具体日期后会自动关闭循环规则。</p>
                     )}
                   </div>
@@ -884,135 +1124,137 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({ initialTodo, i
                   >
                     {formatDateFieldValue(deadlineDate)}
                   </button>
-                  {recurrenceFrequency !== 'none' && (
+                  {!isSubtask && recurrenceFrequency !== 'none' && (
                     <p className="text-[11px] text-stone-400">设置截止日期后会自动关闭循环规则。</p>
                   )}
                 </div>
 
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <label className="text-xs text-stone-400 font-medium flex items-center gap-1.5">
-                      <Repeat2 size={12} />
-                      循环规则
-                    </label>
-                    {recurrenceFrequency !== 'none' && (
-                      <button
-                        type="button"
-                        onClick={clearRecurrence}
-                        className="text-[10px] text-stone-400 hover:text-stone-600 transition-colors"
-                      >
-                        关闭循环
-                      </button>
-                    )}
-                  </div>
-
-                  <div className="grid grid-cols-4 gap-1.5">
-                    {[
-                      { value: 'none' as const, label: '不循环' },
-                      { value: 'daily' as const, label: '每天' },
-                      { value: 'weekly' as const, label: '每周' },
-                      { value: 'monthly' as const, label: '每月' }
-                    ].map((option) => {
-                      const isSelected = recurrenceFrequency === option.value;
-                      return (
+                {!isSubtask && (
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <label className="text-xs text-stone-400 font-medium flex items-center gap-1.5">
+                        <Repeat2 size={12} />
+                        循环规则
+                      </label>
+                      {recurrenceFrequency !== 'none' && (
                         <button
-                          key={option.value}
                           type="button"
-                          onClick={() => handleRecurrenceFrequencyChange(option.value)}
-                          className={`rounded-lg border px-2 py-2 text-xs font-medium transition-colors ${
-                            isSelected
-                              ? 'text-white'
-                              : 'bg-stone-50 text-stone-500 border-stone-200 hover:bg-white hover:border-stone-300'
-                          }`}
-                          style={isSelected ? {
-                            backgroundColor: 'var(--accent-color)',
-                            borderColor: 'var(--accent-color)',
-                            boxShadow: '0 8px 18px -10px color-mix(in srgb, var(--accent-color) 45%, transparent)'
-                          } : undefined}
+                          onClick={clearRecurrence}
+                          className="text-[10px] text-stone-400 hover:text-stone-600 transition-colors"
                         >
-                          {option.label}
+                          关闭循环
                         </button>
-                      );
-                    })}
-                  </div>
-                  <p className="text-[11px] text-stone-400">循环规则与分配日期、截止日期互斥。开启循环后会自动清空这两个日期。</p>
-
-                  {recurrenceFrequency !== 'none' && (
-                    <div className="space-y-3 rounded-2xl border border-dashed border-stone-200 bg-stone-50/70 p-4 animate-in slide-in-from-top-2 fade-in">
-                      <div className="grid gap-3 md:grid-cols-3">
-                        <div className="space-y-1.5">
-                          <label className="text-[11px] text-stone-400 font-medium">开始日期</label>
-                          <button
-                            type="button"
-                            onClick={() => setActiveDatePicker('recurrenceStartDate')}
-                            className="w-full rounded-xl border border-stone-200 bg-white px-3 py-2.5 text-left text-sm text-stone-700 transition-colors hover:border-stone-300"
-                          >
-                            {formatDateFieldValue(recurrenceStartDate)}
-                          </button>
-                        </div>
-                        <div className="space-y-1.5">
-                          <label className="text-[11px] text-stone-400 font-medium">结束日期</label>
-                          <button
-                            type="button"
-                            onClick={() => setActiveDatePicker('recurrenceEndDate')}
-                            className="w-full rounded-xl border border-stone-200 bg-white px-3 py-2.5 text-left text-sm text-stone-700 transition-colors hover:border-stone-300"
-                          >
-                            {formatDateFieldValue(recurrenceEndDate)}
-                          </button>
-                        </div>
-                        <div className="space-y-1.5">
-                          <label className="text-[11px] text-stone-400 font-medium">间隔</label>
-                          <input
-                            type="number"
-                            min={1}
-                            value={recurrenceInterval}
-                            onChange={(e) => setRecurrenceInterval(Math.max(1, parseInt(e.target.value, 10) || 1))}
-                            className="w-full bg-white border border-stone-200 rounded-xl px-3 py-2.5 text-stone-700 text-sm outline-none focus:border-stone-400 transition-colors"
-                          />
-                        </div>
-                      </div>
-
-                      {recurrenceFrequency === 'weekly' && (
-                        <div className="space-y-2">
-                          <label className="text-[11px] text-stone-400 font-medium">每周日期</label>
-                          <div className="grid grid-cols-7 gap-2">
-                            {WEEKDAY_OPTIONS.map((weekday) => {
-                              const isSelected = recurrenceWeekdays.includes(weekday.value);
-                              return (
-                                <button
-                                  key={weekday.value}
-                                  type="button"
-                                  onClick={() => toggleRecurrenceWeekday(weekday.value)}
-                                  className={`rounded-xl px-0 py-2 text-xs font-bold border transition-colors ${
-                                    isSelected
-                                      ? 'bg-stone-900 text-white border-stone-900'
-                                      : 'bg-white text-stone-500 border-stone-200 hover:border-stone-300'
-                                  }`}
-                                >
-                                  {weekday.label}
-                                </button>
-                              );
-                            })}
-                          </div>
-                        </div>
-                      )}
-
-                      {recurrenceFrequency === 'monthly' && (
-                        <div className="space-y-1.5">
-                          <label className="text-[11px] text-stone-400 font-medium">每月日期</label>
-                          <input
-                            type="number"
-                            min={1}
-                            max={31}
-                            value={recurrenceMonthDay}
-                            onChange={(e) => setRecurrenceMonthDay(Math.min(31, Math.max(1, parseInt(e.target.value, 10) || 1)))}
-                            className="w-full bg-white border border-stone-200 rounded-xl px-3 py-2.5 text-stone-700 text-sm outline-none focus:border-stone-400 transition-colors"
-                          />
-                        </div>
                       )}
                     </div>
-                  )}
-                </div>
+
+                    <div className="grid grid-cols-4 gap-1.5">
+                      {[
+                        { value: 'none' as const, label: '不循环' },
+                        { value: 'daily' as const, label: '每天' },
+                        { value: 'weekly' as const, label: '每周' },
+                        { value: 'monthly' as const, label: '每月' }
+                      ].map((option) => {
+                        const isSelected = recurrenceFrequency === option.value;
+                        return (
+                          <button
+                            key={option.value}
+                            type="button"
+                            onClick={() => handleRecurrenceFrequencyChange(option.value)}
+                            className={`rounded-lg border px-2 py-2 text-xs font-medium transition-colors ${
+                              isSelected
+                                ? 'text-white'
+                                : 'bg-stone-50 text-stone-500 border-stone-200 hover:bg-white hover:border-stone-300'
+                            }`}
+                            style={isSelected ? {
+                              backgroundColor: 'var(--accent-color)',
+                              borderColor: 'var(--accent-color)',
+                              boxShadow: '0 8px 18px -10px color-mix(in srgb, var(--accent-color) 45%, transparent)'
+                            } : undefined}
+                          >
+                            {option.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    <p className="text-[11px] text-stone-400">循环规则与分配日期、截止日期互斥。开启循环后会自动清空这两个日期。</p>
+
+                    {recurrenceFrequency !== 'none' && (
+                      <div className="space-y-3 rounded-2xl border border-dashed border-stone-200 bg-stone-50/70 p-4 animate-in slide-in-from-top-2 fade-in">
+                        <div className="grid gap-3 md:grid-cols-3">
+                          <div className="space-y-1.5">
+                            <label className="text-[11px] text-stone-400 font-medium">开始日期</label>
+                            <button
+                              type="button"
+                              onClick={() => setActiveDatePicker('recurrenceStartDate')}
+                              className="w-full rounded-xl border border-stone-200 bg-white px-3 py-2.5 text-left text-sm text-stone-700 transition-colors hover:border-stone-300"
+                            >
+                              {formatDateFieldValue(recurrenceStartDate)}
+                            </button>
+                          </div>
+                          <div className="space-y-1.5">
+                            <label className="text-[11px] text-stone-400 font-medium">结束日期</label>
+                            <button
+                              type="button"
+                              onClick={() => setActiveDatePicker('recurrenceEndDate')}
+                              className="w-full rounded-xl border border-stone-200 bg-white px-3 py-2.5 text-left text-sm text-stone-700 transition-colors hover:border-stone-300"
+                            >
+                              {formatDateFieldValue(recurrenceEndDate)}
+                            </button>
+                          </div>
+                          <div className="space-y-1.5">
+                            <label className="text-[11px] text-stone-400 font-medium">间隔</label>
+                            <input
+                              type="number"
+                              min={1}
+                              value={recurrenceInterval}
+                              onChange={(e) => setRecurrenceInterval(Math.max(1, parseInt(e.target.value, 10) || 1))}
+                              className="w-full bg-white border border-stone-200 rounded-xl px-3 py-2.5 text-stone-700 text-sm outline-none focus:border-stone-400 transition-colors"
+                            />
+                          </div>
+                        </div>
+
+                        {recurrenceFrequency === 'weekly' && (
+                          <div className="space-y-2">
+                            <label className="text-[11px] text-stone-400 font-medium">每周日期</label>
+                            <div className="grid grid-cols-7 gap-2">
+                              {WEEKDAY_OPTIONS.map((weekday) => {
+                                const isSelected = recurrenceWeekdays.includes(weekday.value);
+                                return (
+                                  <button
+                                    key={weekday.value}
+                                    type="button"
+                                    onClick={() => toggleRecurrenceWeekday(weekday.value)}
+                                    className={`rounded-xl px-0 py-2 text-xs font-bold border transition-colors ${
+                                      isSelected
+                                        ? 'bg-stone-900 text-white border-stone-900'
+                                        : 'bg-white text-stone-500 border-stone-200 hover:border-stone-300'
+                                    }`}
+                                  >
+                                    {weekday.label}
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        )}
+
+                        {recurrenceFrequency === 'monthly' && (
+                          <div className="space-y-1.5">
+                            <label className="text-[11px] text-stone-400 font-medium">每月日期</label>
+                            <input
+                              type="number"
+                              min={1}
+                              max={31}
+                              value={recurrenceMonthDay}
+                              onChange={(e) => setRecurrenceMonthDay(Math.min(31, Math.max(1, parseInt(e.target.value, 10) || 1)))}
+                              className="w-full bg-white border border-stone-200 rounded-xl px-3 py-2.5 text-stone-700 text-sm outline-none focus:border-stone-400 transition-colors"
+                            />
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
 
@@ -1024,7 +1266,140 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({ initialTodo, i
           </div>
         )}
 
-        {activeTab === '時間線' && (
+        {activeTab === '子任务' && (
+          <div className="space-y-8 animate-in slide-in-from-left-4 fade-in">
+            {parentTodo && (
+              <section className="border-b border-stone-200/80 pb-6">
+                <div className="mb-4">
+                  <h3 className="text-[11px] font-bold uppercase tracking-[0.28em] text-stone-400">父任务</h3>
+                  <p className="mt-2 text-sm leading-6 text-stone-500">当前子任务会实时继承父任务的分类、关联活动和领域。</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => handleOpenLinkedTodo(parentTodo)}
+                  className="group flex w-full items-start justify-between gap-4 py-2 text-left transition-colors hover:text-stone-900"
+                >
+                  <div className="min-w-0">
+                    <div className="truncate text-base font-semibold text-stone-700 transition-colors group-hover:text-stone-900">{parentTodo.title}</div>
+                    <div className="mt-1 text-[11px] tracking-[0.12em] text-stone-400">
+                      {parentTodo.scheduledDate ? `安排 ${formatDateFieldValue(parentTodo.scheduledDate)}` : '父任务未设置安排日期'}
+                    </div>
+                  </div>
+                  <ChevronRight size={14} className="mt-1 shrink-0 text-stone-300 transition-colors group-hover:text-stone-500" />
+                </button>
+              </section>
+            )}
+
+            {initialTodo && !isSubtask && (
+              <section>
+                <div className="mb-4 flex items-end justify-between gap-4">
+                  <div>
+                    <h3 className="text-[11px] font-bold uppercase tracking-[0.28em] text-stone-400">子任务</h3>
+                    <p className="mt-2 text-sm text-stone-500">{completedChildTodoCount}/{childTodoCount} 已完成</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={openInlineSubtaskComposer}
+                    className="inline-flex items-center gap-1.5 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-stone-500 transition-colors hover:text-stone-900"
+                  >
+                    <Plus size={12} />
+                    <span>添加子任务</span>
+                  </button>
+                </div>
+
+                {isInlineSubtaskComposerOpen && (
+                  <div className="border-t border-stone-200/80 py-4">
+                    <div className="flex items-start gap-3">
+                      <input
+                        ref={inlineSubtaskTitleInputRef}
+                        type="text"
+                        value={inlineSubtaskTitle}
+                        onChange={(event) => setInlineSubtaskTitle(event.target.value)}
+                        onKeyDown={(event) => {
+                          if (event.key === 'Enter') {
+                            event.preventDefault();
+                            handleCreateInlineSubtask();
+                          }
+                        }}
+                        placeholder="输入子任务标题，回车可直接保存"
+                        className="min-w-0 flex-1 bg-transparent text-base font-semibold text-stone-800 outline-none placeholder:text-stone-300"
+                      />
+                      <button
+                        type="button"
+                        onClick={handleCreateInlineSubtask}
+                        className="shrink-0 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-stone-500 transition-colors hover:text-stone-900"
+                      >
+                        保存
+                      </button>
+                      <button
+                        type="button"
+                        onClick={closeInlineSubtaskComposer}
+                        className="shrink-0 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-stone-300 transition-colors hover:text-stone-500"
+                      >
+                        取消
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {childTodos.length > 0 ? (
+                  <div className="border-t border-stone-200/80">
+                    {childTodos.map((childTodo) => (
+                      <button
+                        key={childTodo.id}
+                        type="button"
+                        onClick={() => onOpenTodo?.(childTodo)}
+                        className="group flex w-full items-start justify-between gap-4 border-b border-stone-200/70 py-4 text-left transition-colors"
+                      >
+                        <div className="min-w-0">
+                          <div className={`truncate text-base font-semibold transition-colors ${childTodo.isCompleted ? 'text-stone-400 line-through' : 'text-stone-700 group-hover:text-stone-900'}`}>
+                            {childTodo.title}
+                          </div>
+                          {(childTodo.scheduledDate || childTodo.deadlineDate) && (
+                            <div className="mt-1 text-[11px] tracking-[0.12em] text-stone-400">
+                              {childTodo.scheduledDate ? `安排 ${formatDateFieldValue(childTodo.scheduledDate)}` : ''}
+                              {childTodo.scheduledDate && childTodo.deadlineDate ? ' · ' : ''}
+                              {childTodo.deadlineDate ? `截止 ${formatDateFieldValue(childTodo.deadlineDate)}` : ''}
+                            </div>
+                          )}
+                        </div>
+                        <div className="ml-3 flex items-center gap-3">
+                          <button
+                            type="button"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              onSave({
+                                ...childTodo,
+                                isCompleted: !childTodo.isCompleted,
+                                completedAt: !childTodo.isCompleted ? new Date().toISOString() : undefined
+                              });
+                            }}
+                            className={`rounded-full p-1 transition-colors ${childTodo.isCompleted ? 'text-stone-900' : 'text-stone-300 hover:text-stone-600'}`}
+                          >
+                            {childTodo.isCompleted ? <CheckCircle2 size={14} /> : <Circle size={14} />}
+                          </button>
+                          <ChevronRight size={14} className="mt-0.5 shrink-0 text-stone-300 transition-colors group-hover:text-stone-500" />
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="border-t border-stone-200/80 pt-4 text-sm leading-6 text-stone-400">
+                    还没有子任务，可以从这里继续拆分执行项。
+                  </div>
+                )}
+              </section>
+            )}
+
+            {!parentTodo && (!initialTodo || isSubtask) && (
+              <div className="border-t border-stone-200/80 pt-4 text-sm leading-6 text-stone-400">
+                当前没有可展示的层级关系。
+              </div>
+            )}
+          </div>
+        )}
+
+        {activeTab === '时间线' && (
           <DetailTimelineCard
             filteredLogs={linkedLogs}
               displayDate={displayDate}
@@ -1054,23 +1429,24 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({ initialTodo, i
               linkedActivityId: linkedActivityId || undefined,
               defaultScopeIds,
               isProgress,
-              totalAmount: isProgress ? totalAmount : undefined,
-              unitAmount: isProgress ? unitAmount : undefined,
-              completedUnits: isProgress ? completedUnits : undefined,
+              progressTrackingMode: resolvedProgressTrackingMode,
+              totalAmount: progressSnapshot.totalAmount || undefined,
+              unitAmount: progressSnapshot.unitAmount || undefined,
+              completedUnits: progressSnapshot.completedUnits || undefined,
               heatmapMin,
               heatmapMax,
               coverImage,
               scheduledDate: scheduledDate || undefined,
               deadlineDate: deadlineDate || undefined,
-              recurrenceRule,
+              recurrenceRule: isSubtask ? undefined : recurrenceRule,
             }]}
             enableFocusScore={enableFocusScore}
             enableMoodScore={enableMoodScore}
             progressTracking={isProgress ? {
               isProgress,
-              totalAmount,
-              unitAmount,
-              completedUnits
+              totalAmount: progressSnapshot.totalAmount,
+              unitAmount: progressSnapshot.unitAmount,
+              completedUnits: progressSnapshot.completedUnits
             } : undefined}
             renderLogMetadata={(log) => {
               const category = categories?.find(c => c.id === log.categoryId);

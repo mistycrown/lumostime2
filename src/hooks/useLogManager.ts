@@ -15,6 +15,7 @@ import { useNavigation } from '../contexts/NavigationContext';
 import { useCategoryScope } from '../contexts/CategoryScopeContext';
 import { useToast } from '../contexts/ToastContext';
 import { useSettings } from '../contexts/SettingsContext';
+import { getTodoProgressTrackingMode } from '../utils/todoProgressUtils';
 
 export const useLogManager = () => {
     const { logs, setLogs, setTodos } = useData();
@@ -45,9 +46,11 @@ export const useLogManager = () => {
                 // Revert Old Progress (if exists AND had link)
                 if (existingLog && existingLog.linkedTodoId) {
                     const oldTodoIndex = newTodos.findIndex(t => t.id === existingLog.linkedTodoId);
-                    if (oldTodoIndex > -1 && newTodos[oldTodoIndex].isProgress) {
+                    if (oldTodoIndex > -1 && getTodoProgressTrackingMode(newTodos[oldTodoIndex], newTodos) === 'manual') {
                         newTodos[oldTodoIndex] = {
                             ...newTodos[oldTodoIndex],
+                            isProgress: true,
+                            progressTrackingMode: 'manual',
                             completedUnits: Math.max(0, (newTodos[oldTodoIndex].completedUnits || 0) - (existingLog.progressIncrement || 0))
                         };
                     }
@@ -56,9 +59,11 @@ export const useLogManager = () => {
                 // Apply New Progress (if has link)
                 if (log.linkedTodoId) {
                     const newTodoIndex = newTodos.findIndex(t => t.id === log.linkedTodoId);
-                    if (newTodoIndex > -1 && newTodos[newTodoIndex].isProgress) {
+                    if (newTodoIndex > -1 && getTodoProgressTrackingMode(newTodos[newTodoIndex], newTodos) === 'manual') {
                         newTodos[newTodoIndex] = {
                             ...newTodos[newTodoIndex],
+                            isProgress: true,
+                            progressTrackingMode: 'manual',
                             completedUnits: Math.max(0, (newTodos[newTodoIndex].completedUnits || 0) + (log.progressIncrement || 0))
                         };
                     }
@@ -83,9 +88,11 @@ export const useLogManager = () => {
 
         if (logToDelete?.linkedTodoId && logToDelete.progressIncrement) {
             setTodos(prevTodos => prevTodos.map(t => {
-                if (t.id === logToDelete.linkedTodoId && t.isProgress) {
+                if (t.id === logToDelete.linkedTodoId && getTodoProgressTrackingMode(t, prevTodos) === 'manual') {
                     return {
                         ...t,
+                        isProgress: true,
+                        progressTrackingMode: 'manual',
                         completedUnits: Math.max(0, (t.completedUnits || 0) - (logToDelete.progressIncrement || 0))
                     };
                 }

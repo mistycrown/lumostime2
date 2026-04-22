@@ -29,6 +29,19 @@ The views are designed as "dumb" or "presentational" components where possible, 
 > ⚠️ **Note**: When modifying views, ensure that new state requirements are coordinated with `App.tsx` if they affect global data (Logs, Categories, Todos).
 
 > Last updated: 2026-04-21
+- `TodoView.tsx`: Virtual-schedule parent rows now reuse the hierarchy toggle so a `0/1` badge can expand matching child todos inline, while absorbed child rows stop rendering as duplicate standalone schedule items.
+- `TodoView.tsx`: Compact virtual-schedule badges now abbreviate long labels like `Arrange` and `Repeat` to three-letter forms such as `Arr` and `Rep`.
+- `TodoView.tsx`: Nudged the compact `0/1` hierarchy capsule upward again so it sits a bit higher against the compact row center line.
+- `TodoView.tsx`: Compact todo rows now stack flush without extra gaps between adjacent parent groups, and the compact `0/1` hierarchy capsule is nudged a bit further upward.
+- `TodoView.tsx`: Nudged the compact-mode hierarchy capsule upward by one pixel so the `0/1` badge sits closer to the visual midline of adjacent inline tags.
+- `TodoView.tsx`: Normalized loose-mode hierarchy and metadata badge heights so the parent-task `0/1` capsule stays vertically centered with adjacent tag containers.
+- `TodoView.tsx`: Removed the remaining compact-mode subtask branch marker so child rows no longer show any curved connector before the title.
+- `TodoView.tsx`: Child rows inside the expanded parent tree no longer repeat their parent badge, while standalone scheduled subtasks now show an `@`-prefixed four-character parent-title hint.
+- `TodoView.tsx`: Removed the loose-mode curved branch marker before subtasks, while preserving the compact-mode hierarchy connector.
+- `TodoView.tsx`: Merged loose-mode hierarchy chips, pin badges, linked activity tags, and scope tags into one shared wrapping row so badges stay on a single line whenever width allows and only wrap as needed.
+- `TodoView.tsx`: Simplified hierarchy badges so parent rows show only compact counts like `0/1`, while child rows show a four-character ellipsized parent title without extra `子任务` wording.
+- `TodoView.tsx`: Restored parent/subtask hierarchy cues inside the virtual `排期` list so scheduled parent rows show child progress badges and scheduled subtasks show their parent context plus a subtle branch marker.
+- `TodoView.tsx`: Category lists now render one-level parent/subtask trees, defaulting subtasks to collapsed rows with an inline progress summary and expandable child rows.
 - `TodoView.tsx`: Category-specific todo lists now also pin pinned todos to the top and render the pin chip as icon-only in compact mode versus icon plus `Pin` in loose mode.
 - `TodoView.tsx`: The `排期 -> 今` page now includes pin-only todos in a top `Pin` section, while deduplicating todos that are both pinned and already arranged/due today.
 - `TodoView.tsx`: Added a boolean `pin` flag to todo scheduling so `排期 -> 今` now lifts pinned items to the top and shows a matching `Pin` label in the same lightweight badge style as `Arrange` / `Due`.

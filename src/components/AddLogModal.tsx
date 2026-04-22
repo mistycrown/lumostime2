@@ -29,6 +29,7 @@ import { useNavigation } from '../contexts/NavigationContext';
 import { useToast } from '../contexts/ToastContext';
 import { imageService } from '../services/imageService';
 import { appendTemplateToNote, getRecommendedNoteTemplates, RecommendedNoteTemplate } from '../utils/noteTemplateUtils';
+import { getTodoProgressSnapshot, shouldTodoUseManualProgressInput } from '../utils/todoProgressUtils';
 
 interface AddLogModalProps {
   initialLog?: Log | null;
@@ -137,6 +138,14 @@ export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialSta
     scopes,
     autoLinkRules
   );
+  const linkedTodo = useMemo(
+    () => todos.find((todo) => todo.id === formState.linkedTodoId),
+    [formState.linkedTodoId, todos]
+  );
+  const canUseManualProgressIncrement = useMemo(
+    () => shouldTodoUseManualProgressInput(linkedTodo, todos),
+    [linkedTodo, todos]
+  );
 
   // UI 状态
   const [isNoteExpanded, setIsNoteExpanded] = useState(false);
@@ -176,6 +185,12 @@ export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialSta
       }, 400);
     }
   }, [initialLog, autoFocusNote]);
+
+  useEffect(() => {
+    if (!canUseManualProgressIncrement && formState.progressIncrement !== 0) {
+      updateField('progressIncrement', 0);
+    }
+  }, [canUseManualProgressIncrement, formState.progressIncrement, updateField]);
 
   // 同步图片状态到 formState
   useEffect(() => {
@@ -416,7 +431,7 @@ export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialSta
       duration: duration,
       note: formState.note.trim(),
       linkedTodoId: formState.linkedTodoId,
-      progressIncrement: formState.linkedTodoId && formState.progressIncrement ? formState.progressIncrement : undefined,
+      progressIncrement: canUseManualProgressIncrement && formState.progressIncrement ? formState.progressIncrement : undefined,
       focusScore: formState.focusScore,
       moodScore: formState.moodScore,
       scopeIds: formState.scopeIds,
@@ -796,7 +811,8 @@ export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialSta
               }}
               renderExtraContent={(tId) => {
                 const t = todos.find(x => x.id === tId);
-                if (!t?.isProgress) return null;
+                const progress = getTodoProgressSnapshot(t, todos);
+                if (!progress.supportsManualEntry) return null;
                 return (
                   <div className="pt-0 flex items-center justify-between animate-in slide-in-from-top-2">
                     {/* Left: Label + Stats */}
@@ -806,11 +822,11 @@ export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialSta
                         <TrendingUp size={10} />
                         <span className="font-mono">
                           {formState.progressIncrement > 0 ? (
-                            <span className="font-bold" style={{ color: 'var(--accent-color)' }}>{(t.completedUnits || 0) + formState.progressIncrement}</span>
+                            <span className="font-bold" style={{ color: 'var(--accent-color)' }}>{progress.completedUnits + formState.progressIncrement}</span>
                           ) : (
-                            t.completedUnits || 0
+                            progress.completedUnits
                           )}
-                          {" / "}{t.totalAmount}
+                          {" / "}{progress.totalAmount}
                         </span>
                       </div>
                     </div>

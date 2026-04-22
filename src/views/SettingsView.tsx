@@ -78,6 +78,7 @@ import { NfcService } from '../services/NfcService';
 import { aiService, AIConfig } from '../services/aiService';
 import { UpdateService, VersionInfo } from '../services/updateService';
 import { CustomSelect } from '../components/CustomSelect';
+import { getTodoProgressTrackingMode, syncSubtaskProgressToParentTodos } from '../utils/todoProgressUtils';
 import { ToastType } from '../components/Toast';
 import { uploadDataToCloud, downloadWithBackup, CloudService } from '../utils/syncUtils';
 import { validateLocalData, canSafelyUpload } from '../utils/dataValidation';
@@ -1248,16 +1249,18 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
                 onBack={handleBackToMain}
                 logs={logs}
                 onUpdateLogs={(updatedLogs) => {
-                    const recalculatedTodos = (todos || []).map(todo => {
-                        if (!todo.isProgress) return todo;
+                    const recalculatedTodos = syncSubtaskProgressToParentTodos((todos || []).map(todo => {
+                        if (getTodoProgressTrackingMode(todo, todos || []) !== 'manual') return todo;
                         const completedUnits = updatedLogs
                             .filter(log => log.linkedTodoId === todo.id)
                             .reduce((sum, log) => sum + (log.progressIncrement || 0), 0);
                         return {
                             ...todo,
+                            isProgress: true,
+                            progressTrackingMode: 'manual',
                             completedUnits: Math.max(0, completedUnits)
                         };
-                    });
+                    }));
                     onSyncUpdate({
                         ...syncData,
                         logs: updatedLogs,
