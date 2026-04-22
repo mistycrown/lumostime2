@@ -4,6 +4,8 @@
  * @output Shared helpers for validating one-level todo hierarchy, syncing inherited fields, and building tree views
  * @pos Utility (Todo hierarchy)
  * @description Centralizes parent-child todo rules so list rendering, save logic, and detail editing all share the same one-level hierarchy behavior.
+ * @updated 2026-04-22: Added direct-child display ordering plus optional completed-task filtering so expanded parent rows can honor list-level hide-completed controls.
+ * @updated 2026-04-22: Added direct-child display ordering so schedule-expanded parent rows can show all subtasks with unfinished items first.
  * @updated 2026-04-21: Added one-level todo hierarchy helpers for subtasks, inheritance sync, and cascade delete calculations.
  *
  * Once I am updated, be sure to update my header comment and the folder's md.
@@ -38,6 +40,24 @@ export const getDirectChildTodos = (todos: TodoItem[], parentTodoId: string): To
     .filter((todo) => todo.parentTodoId === parentTodoId)
     .sort(compareChildTodos)
 );
+
+export const getDirectChildTodosForDisplay = (
+  todos: TodoItem[],
+  parentTodoId: string,
+  options?: { incompleteFirst?: boolean; includeCompleted?: boolean }
+): TodoItem[] => {
+  const orderedChildren = getDirectChildTodos(todos, parentTodoId)
+    .filter((todo) => options?.includeCompleted ?? true ? true : !todo.isCompleted);
+
+  if (!options?.incompleteFirst) {
+    return orderedChildren;
+  }
+
+  return [
+    ...orderedChildren.filter((todo) => !todo.isCompleted),
+    ...orderedChildren.filter((todo) => todo.isCompleted)
+  ];
+};
 
 export const getDirectChildCount = (todos: TodoItem[], parentTodoId: string): number => (
   todos.filter((todo) => todo.parentTodoId === parentTodoId).length
@@ -147,4 +167,3 @@ export const buildTodoTreeItems = (todos: TodoItem[]): TodoTreeItem[] => {
       children: (childMap.get(todo.id) || []).sort(compareChildTodos)
     }));
 };
-

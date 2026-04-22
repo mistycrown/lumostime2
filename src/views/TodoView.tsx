@@ -4,6 +4,10 @@
  * @output Todo Status Updates, Edit Triggers, Focus Timer Start
  * @pos View (Main Tab)
  * @description The main To-Do list interface. Displays tasks grouped by category, supports swipe actions, and now includes a week planning view with schedule and history badges.
+ * @updated 2026-04-22: Narrowed the `今` filter count to only standalone todos whose own arranged or due date is today, excluding pin-only and overdue entries.
+ * @updated 2026-04-22: Made expanded subtask rows in the virtual schedule view respect the sidebar's hide-completed toggle, so completed child rows disappear together with other completed todos.
+ * @updated 2026-04-22: Hid redundant linked-activity and scope badges for child rows rendered directly beneath their parent so nested subtasks no longer repeat inherited metadata.
+ * @updated 2026-04-22: Fixed the `排期 -> 今` hierarchy filtering so pin-only todos stay visible in the virtual today list instead of being dropped after section counts are computed.
  * @updated 2026-04-21 13:56: Made virtual-schedule parent hierarchy capsules expandable so parent rows can reveal matching child todos inline without duplicate standalone child rows.
  * @updated 2026-04-21 13:44: Abbreviated compact virtual-schedule labels such as `Arrange` and `Repeat` to three-letter forms.
  * @updated 2026-04-21 13:36: Nudged the compact `0/1` hierarchy capsule upward again for a tighter visual center alignment.
@@ -86,7 +90,7 @@ import { TodoDatePickerModal } from '../components/TodoDatePickerModal';
 import { TodoDuplicateModal } from '../components/TodoDuplicateModal';
 import { TodoQuickActionsModal } from '../components/TodoQuickActionsModal';
 import { useTodoQuickActions } from '../hooks/useTodoQuickActions';
-import { buildTodoTreeItems, getCompletedDirectChildCount, getDirectChildCount, getDirectChildTodos, getParentTodo } from '../utils/todoHierarchyUtils';
+import { buildTodoTreeItems, getCompletedDirectChildCount, getDirectChildCount, getDirectChildTodosForDisplay, getParentTodo } from '../utils/todoHierarchyUtils';
 
 
 interface TodoViewProps {
@@ -287,6 +291,9 @@ const SwipeableTodoItem: React.FC<{
   const linkedScopes = (!todo.defaultScopeIds || todo.defaultScopeIds.length === 0)
     ? []
     : todo.defaultScopeIds.map(id => scopes.find(s => s.id === id)).filter(Boolean) as Scope[];
+  const isNestedChildRow = hierarchyDepth === 1 && !parentTitle;
+  const visibleLinkedDetails = isNestedChildRow ? null : linkedDetails;
+  const visibleLinkedScopes = isNestedChildRow ? [] : linkedScopes;
 
   const { isPrivacyMode } = usePrivacy();
 
@@ -355,8 +362,8 @@ const SwipeableTodoItem: React.FC<{
     hierarchyBadges ||
     visibleScheduleMatchLabels.length > 0 ||
     hiddenScheduleMatchCount > 0 ||
-    linkedDetails ||
-    linkedScopes.length > 0
+    visibleLinkedDetails ||
+    visibleLinkedScopes.length > 0
   );
 
   return (
@@ -489,23 +496,23 @@ const SwipeableTodoItem: React.FC<{
                 +{hiddenScheduleMatchCount}
               </span>
             )}
-            {linkedDetails && (
+            {visibleLinkedDetails && (
               <span className={viewMode === 'compact' ? `${baseCompactBadgeClass} text-[11px] text-stone-500 font-medium` : baseLooseBadgeClass}>
                 <span className="text-stone-300 font-sans">#</span>
                 {viewMode === 'loose' ? (
                   <>
-                    <IconRenderer icon={linkedDetails.categoryIcon} uiIcon={linkedDetails.categoryUiIcon} className="text-xs" />
-                    <span className="opacity-90">{linkedDetails.categoryName}</span>
+                    <IconRenderer icon={visibleLinkedDetails.categoryIcon} uiIcon={visibleLinkedDetails.categoryUiIcon} className="text-xs" />
+                    <span className="opacity-90">{visibleLinkedDetails.categoryName}</span>
                     <span className="text-stone-300 px-0.5">/</span>
-                    <IconRenderer icon={linkedDetails.activityIcon} uiIcon={linkedDetails.activityUiIcon} className="text-xs" />
-                    <span className="opacity-90">{linkedDetails.activityName}</span>
+                    <IconRenderer icon={visibleLinkedDetails.activityIcon} uiIcon={visibleLinkedDetails.activityUiIcon} className="text-xs" />
+                    <span className="opacity-90">{visibleLinkedDetails.activityName}</span>
                   </>
                 ) : (
-                  <IconRenderer icon={linkedDetails.activityIcon} uiIcon={linkedDetails.activityUiIcon} className="text-xs" />
+                  <IconRenderer icon={visibleLinkedDetails.activityIcon} uiIcon={visibleLinkedDetails.activityUiIcon} className="text-xs" />
                 )}
               </span>
             )}
-            {linkedScopes.map((scope, idx) => (
+            {visibleLinkedScopes.map((scope, idx) => (
               <span key={idx} className={viewMode === 'compact' ? `${baseCompactBadgeClass} text-[11px] text-stone-500 font-medium` : baseLooseBadgeClass}>
                 <span className="text-stone-300 font-sans">%</span>
                 <IconRenderer 
@@ -761,6 +768,16 @@ const sortCategoryTodoEntries = (left: TodoListEntry, right: TodoListEntry): num
 
   return left.todo.title.localeCompare(right.todo.title, 'zh-CN');
 };
+
+const buildFallbackChildTodoEntry = (todo: TodoItem): TodoListEntry => ({
+  todo,
+  scheduleMatches: [],
+  scheduleMatchLabels: todo.pin ? [PIN_SCHEDULE_MATCH_LABEL] : []
+});
+
+const isHierarchyTodo = (todo: TodoItem, todos: TodoItem[]): boolean => (
+  Boolean(todo.parentTodoId) || getDirectChildCount(todos, todo.id) > 0
+);
 
 const buildOverdueScheduleMatches = (todo: TodoItem, todayDateKey: string): TodoScheduleMatch[] => {
   const matches: TodoScheduleMatch[] = [];
@@ -1185,11 +1202,19 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
       .sort((left, right) => sortTodoListEntries(left, right, { pinFirst: true }));
   }, [todos, nonPinnedTodayEntries, pinnedTodayEntries, todayDateKey]);
 
+  const todayFilterCount = useMemo<number>(() => (
+    filterVisibleTodos(todos, showCompletedTodos)
+      .filter((todo) => !todo.pin)
+      .filter((todo) => todo.scheduledDate === todayDateKey || todo.deadlineDate === todayDateKey)
+      .filter((todo) => !isHierarchyTodo(todo, todos))
+      .length
+  ), [todos, showCompletedTodos, todayDateKey]);
+
   const virtualScheduleVisibleCounts = useMemo<Record<TodoScheduleRange, number>>(() => ({
-    today: pinnedTodayEntries.length + nonPinnedTodayEntries.length + overdueTodayEntries.length,
+    today: todayFilterCount,
     tomorrow: scheduleEntriesByFilter.tomorrow.length,
     thisWeek: scheduleEntriesByFilter.thisWeek.length
-  }), [scheduleEntriesByFilter, nonPinnedTodayEntries.length, pinnedTodayEntries.length, overdueTodayEntries.length]);
+  }), [scheduleEntriesByFilter, todayFilterCount]);
 
   const selectedTodoEntries: TodoListEntry[] = isVirtualScheduleCategory
     ? scheduleEntriesByFilter[selectedScheduleFilter]
@@ -1232,25 +1257,42 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
       .sort((left, right) => sortCategoryTodoEntries(left!.parentEntry, right!.parentEntry)) as TodoTreeEntryGroup[];
   }, [isVirtualScheduleCategory, selectedCategoryId, showCompletedTodos, todos]);
 
+  const virtualScheduleEntriesForHierarchy = useMemo<TodoListEntry[]>(
+    () => (
+      !isVirtualScheduleCategory
+        ? []
+        : selectedScheduleFilter === 'today'
+          ? [
+              ...pinnedTodayEntries,
+              ...nonPinnedTodayEntries,
+              ...overdueTodayEntries
+            ]
+          : selectedTodoEntries
+    ),
+    [isVirtualScheduleCategory, selectedScheduleFilter, pinnedTodayEntries, nonPinnedTodayEntries, overdueTodayEntries, selectedTodoEntries]
+  );
+
   const virtualScheduleTreeGroups = useMemo<Map<string, TodoTreeEntryGroup>>(() => {
     if (!isVirtualScheduleCategory) {
       return new Map();
     }
 
     const selectedEntryMap = new Map(
-      selectedTodoEntries.map((entry) => [entry.todo.id, entry])
+      virtualScheduleEntriesForHierarchy.map((entry) => [entry.todo.id, entry])
     );
     const groups = new Map<string, TodoTreeEntryGroup>();
 
-    selectedTodoEntries.forEach((entry) => {
+    virtualScheduleEntriesForHierarchy.forEach((entry) => {
       const parentTodo = getParentTodo(todos, entry.todo);
       if (parentTodo && selectedEntryMap.has(parentTodo.id)) {
         return;
       }
 
-      const childEntries = getDirectChildTodos(todos, entry.todo.id)
-        .map((childTodo) => selectedEntryMap.get(childTodo.id))
-        .filter(Boolean) as TodoListEntry[];
+      const childEntries = getDirectChildTodosForDisplay(todos, entry.todo.id, {
+        incompleteFirst: true,
+        includeCompleted: showCompletedTodos
+      })
+        .map((childTodo) => selectedEntryMap.get(childTodo.id) || buildFallbackChildTodoEntry(childTodo));
 
       groups.set(entry.todo.id, {
         parentEntry: entry,
@@ -1261,7 +1303,7 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
     });
 
     return groups;
-  }, [isVirtualScheduleCategory, selectedTodoEntries, todos]);
+  }, [isVirtualScheduleCategory, virtualScheduleEntriesForHierarchy, todos, showCompletedTodos]);
 
   const virtualScheduleTopLevelEntryIds = useMemo(
     () => new Set(virtualScheduleTreeGroups.keys()),

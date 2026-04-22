@@ -6,6 +6,7 @@
  * @description The primary daily view. Visualizes time usage on a timeline, supports adding/editing logs, gap detection, gesture and lightweight calendar date-switch animation, quick search and custom filter entry points, and integrates Daily/Weekly/Monthly review plus achievement bottle entry points.
  * 
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
+ * @updated 2026-04-22: Replaced the old AI backfill entry with a local-history chat modal for the first-step conversational AI flow.
  * @updated 2026-04-20: Switched the timeline screen to the shared lightweight custom-background pipeline.
  */
 import React, { useMemo, useState, useRef } from 'react';
@@ -15,7 +16,7 @@ import { CATEGORIES } from '../constants';
 import * as LucideIcons from 'lucide-react';
 import { Plus, MoreHorizontal, BarChart2, FlaskConical, Sparkles, Zap, Heart, Share, Timer, Clock, Search, Filter, Image as ImageIcon } from 'lucide-react';
 import { CalendarWidget } from '../components/CalendarWidget';
-import { AIBatchModal } from '../components/AIBatchModal';
+import { AIBackfillChatModal } from '../components/AIBackfillChatModal';
 import { ParsedTimeEntry } from '../services/aiService';
 import { ToastType } from '../components/Toast';
 import { imageService } from '../services/imageService';
@@ -1935,13 +1936,9 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ logs, todos, scopes,
             </FloatingButton>
             {
                 isAIModalOpen && (
-                    <AIBatchModal
+                    <AIBackfillChatModal
                         onClose={() => setIsAIModalOpen(false)}
-                        onSave={onBatchAddLogs}
-                        categories={categories}
                         targetDate={currentDate}
-                        autoLinkRules={autoLinkRules}
-                        scopes={scopes}
                     />
                 )
             }

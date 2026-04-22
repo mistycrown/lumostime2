@@ -4,8 +4,8 @@
  * @output Modal Interaction (Save/Delete Log)
  * @pos Component (Modal)
  * @description A complex modal for creating or editing time logs. Handles duration calculation, activity selection, todo association, focus scoring, segmented time entry, and inline note template recommendations.
- * @lastModified 2026-03-30
- * @change Auto-advance across hour/minute inputs and continue from start time to end time after segmented time entry. Added direct camera capture functionality using Capacitor Camera plugin and native camera-path persistence fallback for Android photo attachments.
+ * @lastModified 2026-04-22
+ * @change Auto-advance across hour/minute inputs and continue from start time to end time after segmented time entry. Added direct camera capture functionality using Capacitor Camera plugin and native camera-path persistence fallback for Android photo attachments. Enabled hierarchical todo selection in the backfill picker so subtasks stay nested under collapsed parent tasks.
  * 
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
@@ -803,6 +803,7 @@ export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialSta
               todos={todos}
               todoCategories={todoCategories}
               linkedTodoId={formState.linkedTodoId}
+              enableHierarchy={true}
               onChange={(id) => {
                 updateFields({
                   linkedTodoId: id,

@@ -1,7 +1,7 @@
 /**
  * @file aiService.ts
  * @input AI Configuration (OpenAI/Gemini keys), User Natural Language Input, Context Data (categories, scopes, todos)
- * @output Parsed Time Entries (ParsedTimeEntry[]), Parsed Todos (AIParsedTodo[]), Generated Narratives (string), Connection Status (boolean)
+ * @output Parsed Time Entries (ParsedTimeEntry[]), Parsed Todos (AIParsedTodo[]), Backfill Chat Replies (string), Generated Narratives (string), Connection Status (boolean)
  * @pos Service (AI Integration Layer)
  * @description AI 服务 - 处理与 AI 提供商（OpenAI/Gemini）的所有交互，包括配置管理、连接测试和提示执行
  * 
@@ -307,6 +307,46 @@ Output:
             console.error(error);
             throw new Error('Failed to parse time entries');
         }
+    },
+
+    sendBackfillChatMessage: async (
+        text: string,
+        context: {
+            currentDateTime: string;
+            targetDate: string;
+        }
+    ): Promise<string> => {
+        const config = aiService.getConfig();
+
+        if (!config.apiKey?.trim()) {
+            throw new Error('请先在设置中完成 AI 配置。');
+        }
+
+        const systemPrompt = `
+Role: You are LumosTime's AI backfill assistant.
+Task: Help the user talk through what they were doing so the app can later turn it into a backfill record.
+
+Context:
+- Current DateTime: ${context.currentDateTime}
+- Selected Backfill Date: ${context.targetDate}
+
+Requirements:
+1. Reply in natural Chinese.
+2. Treat each request as a single independent turn.
+3. Help the user clarify what they were doing, when they did it, and which details may still be missing.
+4. If the time range is ambiguous, ask concise follow-up questions instead of inventing details.
+5. Do not output JSON, code blocks, or tool-call syntax in this step.
+6. Keep the answer practical and reasonably concise.
+`;
+
+        const userPrompt = `
+Selected Backfill Date: ${context.targetDate}
+Current DateTime: ${context.currentDateTime}
+User Message:
+${text}
+`;
+
+        return aiService.generateNarrative(userPrompt.trim(), systemPrompt.trim());
     },
 
     parseTodoText: async (
