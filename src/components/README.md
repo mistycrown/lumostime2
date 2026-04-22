@@ -19,7 +19,7 @@ Overlay components for complex interactions.
 - `TodoQuickActionsModal.tsx`: Shared quick-actions bottom sheet for lightweight todo scheduling, completion, and detail-entry flows reused by list-row taps and week-plan badges.
 - `GoalEditor.tsx`: Goal creation and editing.
 - `AIBatchModal.tsx`: AI 补记弹窗，支持中文自然语言输入、解析复核与批量保存。
-- `AIBackfillChatModal.tsx`: AI 补记对话弹窗，采用单轮调用 + 本地对话记录展示的第一步聊天体验。
+- `AIBackfillChatModal.tsx`: AI 补记全屏对话页，采用单轮调用 + 本地对话记录展示的第一步聊天体验，并支持命令式调试模式查看每次请求与响应。
 - `AddActivityModal.tsx`: Creating new activities.
 - `ConfirmModal.tsx`: specialized confirmation dialogs.
 - `NarrativeStyleSelectionModal.tsx`: AI narrative style picker.
@@ -93,7 +93,7 @@ Components for theme and appearance customization.
 - `achievement/AchievementBottleIconPackSelector.tsx`: 已改为成就瓶图标包卡片选择器，支持更紧凑的预览式切换。
 - `achievement/AchievementBottleStyleSelector.tsx`: 已改为成就瓶样式卡片选择器，使用玻璃瓶身小预览区分不同气质。
 > Last updated: 2026-04-22
-- `AIBackfillChatModal.tsx`: Added the new first-step AI backfill chat dialog, which keeps per-day conversation history in local storage while sending each user message as an independent AI request.
+- `AIBackfillChatModal.tsx`: Added the new first-step AI backfill full-screen chat view, which keeps per-day conversation history in local storage, supports `/debug` toggling, and lets users inspect each AI call's request and response payloads.
 - `TodoDetailModal.tsx`: Styled the inherited parent-task jump target with a dashed underline so the subtask detail page makes that link state more obvious.
 - `TodoDetailModal.tsx`: Parent todo timeline tabs now aggregate direct child-task logs into the same history list and duration stats while keeping manual progress recalculation scoped to the current todo's own logs.
 - `TodoDetailModal.tsx`: Parent todo timeline entries now add an `@子任务标题` badge whenever a record comes from a direct child task, so merged history stays attributable.

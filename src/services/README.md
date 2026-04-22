@@ -2,7 +2,7 @@
 
 Contains business logic and external integrations.
 
-Update 2026-04-22: `aiService.ts` now exposes a single-turn backfill chat helper used by the new local-history AI dialog in Timeline.
+Update 2026-04-22: `aiService.ts` now exposes a single-turn backfill chat helper plus a debug-oriented request/response capture helper used by the new local-history AI dialog in Timeline.
 
 Update 2026-04-20: `backgroundService.ts` now emits background snapshot events, preloads image switches, and avoids the old 500ms fallback polling loop; `statusBarService.ts` now caches per-image brightness analysis results.
 
@@ -11,7 +11,7 @@ Update 2026-04-09: `obsidianExportService.ts` now supports copying referenced lo
 Update 2026-03-12: timeline styling for normal timeline records is managed by `timelineStyleService.ts`.
 
 ## Files
-- `aiService.ts`: [Active] - Handles AI integration (OpenAI/Gemini) for text parsing, single-turn backfill chat replies, and narrative generation.
+- `aiService.ts`: [Active] - Handles AI integration (OpenAI/Gemini) for text parsing, single-turn backfill chat replies, debug capture of request/response payloads, and narrative generation.
 - `excelExportService.ts`: [Active] - Exports time logs to Excel format.
 - `geminiService.ts`: [Placeholder] - Simple Gemini test service (likely deprecated/experimental).
 - `imageCleanupService.ts`: [Active] - Checks unreferenced images, protects referenced business/settings images, and executes cleanup/report generation.
