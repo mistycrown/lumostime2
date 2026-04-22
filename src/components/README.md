@@ -91,7 +91,12 @@ Components for theme and appearance customization.
 - `ScheduleStyleSelector.tsx`: 日程图样式卡片选择器，提供默认、经典、极简、实色四种轻量预览。
 - `achievement/AchievementBottleIconPackSelector.tsx`: 已改为成就瓶图标包卡片选择器，支持更紧凑的预览式切换。
 - `achievement/AchievementBottleStyleSelector.tsx`: 已改为成就瓶样式卡片选择器，使用玻璃瓶身小预览区分不同气质。
-> Last updated: 2026-04-21
+> Last updated: 2026-04-22
+- `TodoDetailModal.tsx`: Styled the inherited parent-task jump target with a dashed underline so the subtask detail page makes that link state more obvious.
+- `TodoDetailModal.tsx`: Fixed the subtask-to-parent navigation regression so tapping a parent task from inherited info opens the parent detail page without crashing.
+- `TodoDetailModal.tsx`: Renamed subtask inherited-field copy from `范围` to `领域` so the detail page matches the actual association concept.
+- `TodoDetailModal.tsx`: Recurring todos now hide the `子任务` tab entirely, so only non-recurring parent todos can manage or create child tasks.
+- `TodoDetailModal.tsx`: Added a dedicated `子任务` tab alongside `细节 / 时间线`, so parent todos can manage children in their own pane while child todos show inherited parent-owned fields as read-only.
 - `TodoDetailModal.tsx`: Added a detail-level `Pin` toggle so todos can be marked for top placement in the `排期 -> 今` list without leaving the detail screen.
 - `TodoQuickActionsModal.tsx`: Added a lightweight `Pin / 取消 Pin` row and pinned-state metadata so quick actions can toggle the today-schedule priority flag directly.
 - `TimerFloating.tsx`: Matched Todo-view floating timers to the narrower Record-style avoidance width and responsive control hiding so they leave clear space for the bottom-right floating action button.

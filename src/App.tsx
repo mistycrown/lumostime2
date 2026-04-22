@@ -482,6 +482,7 @@ const AppContent: React.FC = () => {
 
   const todoDetailModalNode = isTodoModalOpen ? (
     <TodoDetailModal
+      key={editingTodo?.id || `draft-${newTodoDraft?.parentTodoId || 'root'}-${newTodoDraft?.childOrder || 'new'}-${todoManager.todoCategoryToAdd || 'category'}`}
       initialTodo={editingTodo}
       initialDraft={editingTodo ? null : newTodoDraft}
       currentCategory={todoCategories.find(c => c.id === todoManager.todoCategoryToAdd) || todoCategories[0]}
@@ -489,12 +490,15 @@ const AppContent: React.FC = () => {
       onClose={todoManager.closeTodoModal}
       onSave={todoManager.handleSaveTodo}
       onDelete={todoManager.handleDeleteTodo}
+      onOpenTodo={todoManager.openEditTodoModal}
+      onAddSubtask={todoManager.openAddSubtaskModal}
       logs={logs}
       onLogUpdate={logManager.handleSaveLog}
       onEditLog={logManager.openEditModal}
       todoCategories={todoCategories}
       categories={categories}
       scopes={scopes}
+      todos={todos}
     />
   ) : null;
 
@@ -613,7 +617,9 @@ const AppContent: React.FC = () => {
       <ConfirmModal
         isOpen={todoManager.isDeleteTodoConfirmOpen}
         title="Delete Task?"
-        description="This task is linked to historical records. Deleting it will unlink those records but keep the time logs. Are you sure?"
+        description={todoManager.todoDeleteChildCount > 0
+          ? `This task has linked history and ${todoManager.todoDeleteChildCount} subtasks. Deleting it will also remove those subtasks and unlink related records while keeping the time logs. Are you sure?`
+          : 'This task is linked to historical records. Deleting it will unlink those records but keep the time logs. Are you sure?'}
         onConfirm={todoManager.handleConfirmDeleteTodo}
         onClose={() => todoManager.setIsDeleteTodoConfirmOpen(false)}
         confirmText="Delete"

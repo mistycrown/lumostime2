@@ -7,6 +7,8 @@
 > `useScopeStats.ts` now follows the shared scope aggregation rule: one log linked to multiple scopes contributes its full duration to each linked scope.
 > `useAppInitialization.ts` now uses the shared floating-window startup guard so Android can still restore the overlay when notification permission is disabled, while logging that notification-based stability is reduced.
 > `useTodoManager.ts` now supports configurable todo duplication so copy flows can rename the duplicate first and optionally clear dates, tags, or scopes before saving.
+> `useTodoManager.ts` now supports one-level subtasks, including child draft creation, parent-field inheritance sync, and cascade delete for direct children.
+> `useTodoManager.ts` now blocks subtask creation for recurring parent todos, matching the detail-page rule that recurring tasks do not expose a child-task tab.
 > `useTodoQuickActions.ts` now centralizes lightweight todo quick-actions state so todo-list taps and week-plan badges open the same scheduling/completion sheet behavior.
 > `useTodoQuickActions.ts` also exposes a shared pin/unpin action, and `useTodoManager.ts` now initializes duplicated/new todos with `pin: false` by default.
 

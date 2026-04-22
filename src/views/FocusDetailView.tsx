@@ -19,6 +19,7 @@ import { IconRenderer } from '../components/IconRenderer';
 import { ReactionPicker, ReactionList } from '../components/ReactionComponents';
 import { RecommendedNoteTemplates } from '../components/RecommendedNoteTemplates';
 import { appendTemplateToNote, getRecommendedNoteTemplates, RecommendedNoteTemplate } from '../utils/noteTemplateUtils';
+import { getTodoProgressSnapshot, shouldTodoUseManualProgressInput } from '../utils/todoProgressUtils';
 
 interface FocusDetailViewProps {
     session: ActiveSession;
@@ -49,6 +50,14 @@ export const FocusDetailView: React.FC<FocusDetailViewProps> = ({ session, todos
     
     // Reactions State
     const [reactions, setReactions] = useState<string[]>(session.reactions || []);
+    const linkedTodo = useMemo(
+        () => todos.find((todo) => todo.id === session.linkedTodoId),
+        [session.linkedTodoId, todos]
+    );
+    const canUseManualProgressIncrement = useMemo(
+        () => shouldTodoUseManualProgressInput(linkedTodo, todos),
+        [linkedTodo, todos]
+    );
     
     // 跟踪已自动应用的规则，避免重复应用
     const autoAppliedRulesRef = useRef<Set<string>>(new Set());
@@ -57,6 +66,12 @@ export const FocusDetailView: React.FC<FocusDetailViewProps> = ({ session, todos
     useEffect(() => {
         autoAppliedRulesRef.current.clear();
     }, [session.linkedTodoId, session.activityId]);
+
+    useEffect(() => {
+        if (!canUseManualProgressIncrement && progressAmount !== 0) {
+            setProgressAmount(0);
+        }
+    }, [canUseManualProgressIncrement, progressAmount]);
 
     // Auto-focus note input
     useEffect(() => {
@@ -327,7 +342,7 @@ export const FocusDetailView: React.FC<FocusDetailViewProps> = ({ session, todos
         onComplete({
             ...session,
             note,
-            progressIncrement: progressAmount,
+            progressIncrement: canUseManualProgressIncrement ? progressAmount : undefined,
             reactions: reactions.length > 0 ? reactions : undefined
         });
     };
@@ -446,7 +461,8 @@ export const FocusDetailView: React.FC<FocusDetailViewProps> = ({ session, todos
                         onChange={handleTodoSelect}
                         renderExtraContent={(tId) => {
                             const t = todos.find(x => x.id === tId);
-                            if (!t?.isProgress) return null;
+                            const progress = getTodoProgressSnapshot(t, todos);
+                            if (!progress.supportsManualEntry) return null;
                             return (
                                 <div className="pt-0 flex items-center justify-between animate-in slide-in-from-top-2">
                                     {/* Left: Label + Stats */}
@@ -456,11 +472,11 @@ export const FocusDetailView: React.FC<FocusDetailViewProps> = ({ session, todos
                                             <TrendingUp size={10} />
                                             <span className="font-mono">
                                                 {progressAmount > 0 ? (
-                                                    <span className="font-bold" style={{ color: 'var(--accent-color)' }}>{(t.completedUnits || 0) + progressAmount}</span>
+                                                    <span className="font-bold" style={{ color: 'var(--accent-color)' }}>{progress.completedUnits + progressAmount}</span>
                                                 ) : (
-                                                    t.completedUnits || 0
+                                                    progress.completedUnits
                                                 )}
-                                                {" / "}{t.totalAmount}
+                                                {" / "}{progress.totalAmount}
                                             </span>
                                         </div>
                                     </div>

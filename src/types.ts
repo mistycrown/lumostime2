@@ -4,6 +4,7 @@
  * @output TypeScript Interfaces & Types
  * @pos Type Definitions (Shared contract)
  * @description Defines the core data structures (Log, TodoItem, Category, Activity, Filter order metadata, etc.) used throughout the application.
+ * @updated 2026-04-21: Added one-level todo hierarchy support via optional `parentTodoId` and `childOrder` fields.
  * @updated 2026-04-21: Added an optional boolean `pin` flag for prioritizing todos in the today schedule list.
  * @updated 2026-04-20: Added configurable todo duplication options for quick-copy editing.
  * @updated 2026-04-20: Added todo schedule and recurrence rule types for week-view planning.
@@ -217,9 +218,13 @@ export interface TodoDuplicateOptions {
   clearScopes?: boolean;
 }
 
+export type TodoProgressTrackingMode = 'none' | 'manual' | 'subtasks';
+
 export interface TodoItem {
   id: string;
   categoryId: string; // Belongs to a TodoCategory
+  parentTodoId?: string; // Optional direct parent todo reference for one-level subtasks
+  childOrder?: number; // Stable order among siblings under the same parent
   title: string;
   isCompleted: boolean;
   completedAt?: string; // ISO Date string for completion time
@@ -231,6 +236,7 @@ export interface TodoItem {
 
   // Progress/Habit Features
   isProgress?: boolean;
+  progressTrackingMode?: TodoProgressTrackingMode;
   totalAmount?: number; // Total quantity (e.g. 365 pages)
   unitAmount?: number;  // Quantity per unit (e.g. 50 pages)
   completedUnits?: number; // Number of units completed

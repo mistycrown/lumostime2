@@ -4,6 +4,18 @@
  * @output Todo Status Updates, Edit Triggers, Focus Timer Start
  * @pos View (Main Tab)
  * @description The main To-Do list interface. Displays tasks grouped by category, supports swipe actions, and now includes a week planning view with schedule and history badges.
+ * @updated 2026-04-21 13:56: Made virtual-schedule parent hierarchy capsules expandable so parent rows can reveal matching child todos inline without duplicate standalone child rows.
+ * @updated 2026-04-21 13:44: Abbreviated compact virtual-schedule labels such as `Arrange` and `Repeat` to three-letter forms.
+ * @updated 2026-04-21 13:36: Nudged the compact `0/1` hierarchy capsule upward again for a tighter visual center alignment.
+ * @updated 2026-04-21 13:31: Removed compact-list gaps between adjacent todo rows and nudged the compact `0/1` hierarchy capsule upward a bit more.
+ * @updated 2026-04-21 13:22: Nudged the compact-mode hierarchy capsule slightly upward so the `0/1` badge aligns more naturally with neighboring inline metadata.
+ * @updated 2026-04-21 13:14: Normalized hierarchy and metadata badge heights so the `0/1` capsule sits on the same vertical center line as neighboring containers.
+ * @updated 2026-04-21 13:02: Removed the remaining compact-mode subtask branch marker so child rows rely only on indentation and hierarchy badges.
+ * @updated 2026-04-21 12:55: Hid parent-title badges for child rows already rendered under their parent, while standalone scheduled subtasks now show `@` plus the first four parent-title characters.
+ * @updated 2026-04-21 12:46: Removed the loose-mode curved subtask branch marker while keeping the compact-mode hierarchy connector.
+ * @updated 2026-04-21 12:39: Kept loose-mode hierarchy, pin, link, and scope badges in a shared single-row wrap container so labels only wrap when space actually runs out.
+ * @updated 2026-04-21 12:27: Simplified hierarchy badges to compact counts and four-character parent-title labels without extra `子任务` wording.
+ * @updated 2026-04-21 12:18: Restored parent/subtask hierarchy cues inside the virtual schedule list by showing child progress on parent rows and parent labels on scheduled subtasks.
  * @updated 2026-04-21 11:46: Pinned todos now rise to the top of category lists, with icon-only compact chips and icon-plus-text loose chips.
  * @updated 2026-04-21 11:25: Added todo pin support so the today schedule tab can pin items to the top and show a matching `Pin` label.
  * @updated 2026-04-21 10:29: Let week-view `Trace` and `Done` badges open the shared quick-actions sheet just like `Arrange` and `Due`.
@@ -74,6 +86,7 @@ import { TodoDatePickerModal } from '../components/TodoDatePickerModal';
 import { TodoDuplicateModal } from '../components/TodoDuplicateModal';
 import { TodoQuickActionsModal } from '../components/TodoQuickActionsModal';
 import { useTodoQuickActions } from '../hooks/useTodoQuickActions';
+import { buildTodoTreeItems, getCompletedDirectChildCount, getDirectChildCount, getDirectChildTodos, getParentTodo } from '../utils/todoHierarchyUtils';
 
 
 interface TodoViewProps {
@@ -106,9 +119,34 @@ const SwipeableTodoItem: React.FC<{
   viewMode: 'loose' | 'compact';
   scheduleMatchLabels?: string[];
   scheduleLabelStyle?: 'default' | 'schedule';
+  hierarchyDepth?: 0 | 1;
+  parentTitle?: string;
+  childSummary?: { completed: number; total: number } | null;
+  isExpanded?: boolean;
+  onToggleChildren?: () => void;
   isFirst?: boolean;
   isLast?: boolean;
-}> = ({ todo, categories, activityCategories, scopes, onToggle, onOpenDetail, onOpenQuickActions, onStartFocus, onDuplicate, viewMode, scheduleMatchLabels = [], scheduleLabelStyle = 'default', isFirst = false, isLast = false }) => {
+}> = ({
+  todo,
+  categories,
+  activityCategories,
+  scopes,
+  onToggle,
+  onOpenDetail,
+  onOpenQuickActions,
+  onStartFocus,
+  onDuplicate,
+  viewMode,
+  scheduleMatchLabels = [],
+  scheduleLabelStyle = 'default',
+  hierarchyDepth = 0,
+  parentTitle,
+  childSummary = null,
+  isExpanded = false,
+  onToggleChildren,
+  isFirst = false,
+  isLast = false
+}) => {
   const [translateX, setTranslateX] = useState(0);
   const canQuickToggle = !todo.recurrenceRule;
   const visibleScheduleMatchLabels = scheduleMatchLabels.slice(0, VIRTUAL_SCHEDULE_MATCH_LIMIT);
@@ -121,6 +159,11 @@ const SwipeableTodoItem: React.FC<{
   const progressBarWidth = Math.min(100, Math.max(0, progressRatio * 100));
   const showLooseRightActions = viewMode === 'loose' && (hasLooseDateMarkers || !todo.isCompleted);
   const completedProgressOpacity = todo.isCompleted ? 0.38 : 1;
+  const baseLooseBadgeClass = 'inline-flex min-h-[1.5rem] max-w-full items-center gap-1 whitespace-nowrap rounded-md border border-stone-200 bg-white/50 px-1.5 py-0.5 text-[11px] font-medium leading-none text-stone-500 align-middle';
+  const baseCompactBadgeClass = 'inline-flex max-w-full items-center gap-1 whitespace-nowrap';
+  const hierarchyBadgeClass = viewMode === 'compact'
+    ? 'relative -translate-y-1 inline-flex max-w-full items-center gap-1 rounded-full border border-stone-200 bg-white/80 px-2 py-0.5 font-medium leading-none text-stone-500 text-[10px]'
+    : 'inline-flex min-h-[1.5rem] max-w-full items-center gap-1 whitespace-nowrap rounded-full border border-stone-200 bg-white/80 px-2 py-0.5 font-medium leading-none text-stone-500 text-[11px] align-middle';
 
   // Constants
   const tapActionThreshold = 10;
@@ -279,6 +322,42 @@ const SwipeableTodoItem: React.FC<{
   const rightSwipeBackgroundClass = isDuplicateSwipeState
     ? 'bg-[linear-gradient(135deg,#2563eb_0%,#1d4ed8_100%)]'
     : 'bg-[linear-gradient(135deg,#6b7f93_0%,#516274_100%)]';
+  const hierarchyBadges = (parentTitle || childSummary) ? (
+    <>
+      {childSummary && childSummary.total > 0 && (
+        onToggleChildren ? (
+          <button
+            type="button"
+            data-todo-primary-ignore="true"
+            onClick={(event) => {
+              event.stopPropagation();
+              onToggleChildren();
+            }}
+            className={`${hierarchyBadgeClass} transition-colors hover:border-stone-300 hover:text-stone-700`}
+          >
+            <ChevronRight size={10} className={`transition-transform ${isExpanded ? 'rotate-90' : ''}`} />
+            <span>{childSummary.completed}/{childSummary.total}</span>
+          </button>
+        ) : (
+          <span className={hierarchyBadgeClass}>
+            <span>{childSummary.completed}/{childSummary.total}</span>
+          </span>
+        )
+      )}
+      {parentTitle && (
+        <span className={hierarchyBadgeClass}>
+          <span>@{truncateHierarchyLabel(parentTitle)}</span>
+        </span>
+      )}
+    </>
+  ) : null;
+  const hasMetaBadges = Boolean(
+    hierarchyBadges ||
+    visibleScheduleMatchLabels.length > 0 ||
+    hiddenScheduleMatchCount > 0 ||
+    linkedDetails ||
+    linkedScopes.length > 0
+  );
 
   return (
     <div className={`relative overflow-hidden select-none touch-pan-y group ${viewMode === 'compact' ? `mb-0 ${getRoundedClass()}` : 'mb-3 rounded-2xl'}`}>
@@ -366,21 +445,29 @@ const SwipeableTodoItem: React.FC<{
             <div className={`text-xs text-stone-400 mt-1 line-clamp-1 ${isPrivacyMode ? 'blur-sm select-none transition-all duration-500' : 'transition-all duration-500'}`}>{todo.note}</div>
           )}
 
+          {viewMode === 'compact' && hierarchyBadges && (
+            <div className={`mt-1.5 flex flex-wrap items-center gap-2 ${viewMode === 'compact' ? 'text-[10px]' : 'text-[11px]'}`}>
+              {hierarchyBadges}
+            </div>
+          )}
+
           {/* Linked Tags/Scopes */}
-          <div className={`flex items-center gap-1.5 flex-wrap flex-shrink-0 ${viewMode === 'compact' ? 'mt-0' : 'mt-1.5'}`}>
+          {hasMetaBadges && (
+          <div className={`flex items-center gap-x-1.5 gap-y-1 flex-wrap flex-shrink-0 ${viewMode === 'compact' ? 'mt-0' : 'mt-1.5'}`}>
+            {viewMode === 'loose' && hierarchyBadges}
             {visibleScheduleMatchLabels.map((label) => (
               scheduleLabelStyle === 'schedule' ? (
                 <span
                   key={label}
-                  className={`text-[11px] text-stone-500 font-medium flex items-center gap-1 ${viewMode === 'compact' ? 'px-0 border-0 bg-transparent' : 'px-1.5 py-0.5 rounded-md border border-stone-200 bg-white/50'}`}
+                  className={viewMode === 'compact' ? `${baseCompactBadgeClass} text-[11px] text-stone-500 font-medium` : baseLooseBadgeClass}
                 >
                   <span className="text-stone-300 font-sans">{'⁎'}</span>
-                  <span>{label}</span>
+                  <span>{getVisibleScheduleLabel(label, scheduleLabelStyle, viewMode)}</span>
                 </span>
               ) : label === PIN_SCHEDULE_MATCH_LABEL ? (
                 <span
                   key={label}
-                  className={`text-[11px] text-stone-500 font-medium flex items-center gap-1 ${viewMode === 'compact' ? 'px-0 border-0 bg-transparent' : 'px-1.5 py-0.5 rounded-md border border-stone-200 bg-white/50'}`}
+                  className={viewMode === 'compact' ? `${baseCompactBadgeClass} text-[11px] text-stone-500 font-medium` : baseLooseBadgeClass}
                 >
                   <Pin size={10} className="rotate-[28deg] text-stone-400" />
                   {viewMode === 'loose' && <span>Pin</span>}
@@ -388,7 +475,7 @@ const SwipeableTodoItem: React.FC<{
               ) : (
                 <span
                   key={label}
-                  className={`text-[11px] text-stone-500 font-medium flex items-center gap-1 ${viewMode === 'compact' ? 'px-0 border-0 bg-transparent' : 'px-1.5 py-0.5 rounded-md border border-stone-200 bg-white/50'}`}
+                  className={viewMode === 'compact' ? `${baseCompactBadgeClass} text-[11px] text-stone-500 font-medium` : baseLooseBadgeClass}
                 >
                   <span className="h-1.5 w-1.5 rounded-full bg-stone-300"></span>
                   <span>{label}</span>
@@ -403,7 +490,7 @@ const SwipeableTodoItem: React.FC<{
               </span>
             )}
             {linkedDetails && (
-              <span className={`text-[11px] text-stone-500 font-medium flex items-center gap-1 ${viewMode === 'compact' ? 'px-0 border-0 bg-transparent' : 'px-1.5 py-0.5 rounded-md border border-stone-200 bg-white/50'}`}>
+              <span className={viewMode === 'compact' ? `${baseCompactBadgeClass} text-[11px] text-stone-500 font-medium` : baseLooseBadgeClass}>
                 <span className="text-stone-300 font-sans">#</span>
                 {viewMode === 'loose' ? (
                   <>
@@ -419,7 +506,7 @@ const SwipeableTodoItem: React.FC<{
               </span>
             )}
             {linkedScopes.map((scope, idx) => (
-              <span key={idx} className={`text-[11px] text-stone-500 font-medium flex items-center gap-1 ${viewMode === 'compact' ? 'px-0 border-0 bg-transparent' : 'px-1.5 py-0.5 rounded-md border border-stone-200 bg-white/50'}`}>
+              <span key={idx} className={viewMode === 'compact' ? `${baseCompactBadgeClass} text-[11px] text-stone-500 font-medium` : baseLooseBadgeClass}>
                 <span className="text-stone-300 font-sans">%</span>
                 <IconRenderer 
                     icon={scope.icon} 
@@ -431,6 +518,7 @@ const SwipeableTodoItem: React.FC<{
               </span>
             ))}
           </div>
+          )}
 
         </div>
 
@@ -518,6 +606,15 @@ const formatTodoInlineDate = (dateKey?: string): string | null => {
   return `${month}.${day}`;
 };
 
+const truncateHierarchyLabel = (value: string, maxLength = 4): string => {
+  const characters = Array.from(value);
+  if (characters.length <= maxLength) {
+    return value;
+  }
+
+  return `${characters.slice(0, maxLength).join('')}…`;
+};
+
 const VIRTUAL_SCHEDULE_FILTERS: Array<{ id: TodoScheduleRange; label: string }> = [
   { id: 'today', label: '今' },
   { id: 'tomorrow', label: '明' },
@@ -532,6 +629,13 @@ const TODO_SCHEDULE_MATCH_LABELS: Record<TodoScheduleMatch['kind'], string> = {
   recurring: 'Repeat'
 };
 
+const COMPACT_SCHEDULE_LABELS: Record<string, string> = {
+  Arrange: 'Arr',
+  Repeat: 'Rep',
+  Pin: 'Pin',
+  Due: 'Due'
+};
+
 const TODO_SCHEDULE_MATCH_PRIORITY: Record<TodoScheduleMatch['kind'], number> = {
   deadline: 0,
   scheduled: 1,
@@ -542,12 +646,22 @@ interface TodoListEntry {
   todo: TodoItem;
   scheduleMatchLabels: string[];
   scheduleMatches: TodoScheduleMatch[];
+  hierarchyDepth?: 0 | 1;
+  parentTitle?: string;
+  childSummary?: { completed: number; total: number } | null;
 }
 
 interface TodoListSection {
   dateKey: string;
   label: string;
   entries: TodoListEntry[];
+}
+
+interface TodoTreeEntryGroup {
+  parentEntry: TodoListEntry;
+  childEntries: TodoListEntry[];
+  childCount: number;
+  completedChildCount: number;
 }
 
 const filterVisibleTodos = (todos: TodoItem[], showCompletedTodos: boolean): TodoItem[] =>
@@ -581,6 +695,33 @@ const buildTodoListEntry = (
     ...buildScheduleMatchLabels(scheduleMatches)
   ]
 });
+
+const getVisibleScheduleLabel = (
+  label: string,
+  scheduleLabelStyle: 'default' | 'schedule',
+  viewMode: 'loose' | 'compact'
+): string => (
+  scheduleLabelStyle === 'schedule' && viewMode === 'compact'
+    ? (COMPACT_SCHEDULE_LABELS[label] || label.slice(0, 3))
+    : label
+);
+
+const decorateTodoListEntryWithHierarchy = (entry: TodoListEntry, todos: TodoItem[]): TodoListEntry => {
+  const parentTodo = getParentTodo(todos, entry.todo);
+  const childCount = getDirectChildCount(todos, entry.todo.id);
+
+  return {
+    ...entry,
+    hierarchyDepth: parentTodo ? 1 : 0,
+    parentTitle: parentTodo?.title,
+    childSummary: childCount > 0
+      ? {
+          completed: getCompletedDirectChildCount(todos, entry.todo.id),
+          total: childCount
+        }
+      : null
+  };
+};
 
 const sortTodoListEntries = (
   left: TodoListEntry,
@@ -779,6 +920,7 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
   const [selectedCategoryId, setSelectedCategoryId] = useState<string>(VIRTUAL_SCHEDULE_CATEGORY_ID);
   const [selectedScheduleFilter, setSelectedScheduleFilter] = useState<TodoScheduleRange>('today');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [expandedParentIds, setExpandedParentIds] = useState<Record<string, boolean>>({});
   const { backgroundUrl, hasBackground, panelOverlayOpacity, useReducedEffects } = useBackgroundDisplay();
   const { addToast } = useToast();
   const [screenMode, setScreenMode] = useState<'list' | 'week'>(() => {
@@ -977,9 +1119,12 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
         .map((todo) => {
           const scheduleMatches = getTodoScheduleMatches(todo, range, referenceDate);
 
-          return buildTodoListEntry(todo, scheduleMatches, {
-            includePinLabel: range === 'today'
-          });
+          return decorateTodoListEntryWithHierarchy(
+            buildTodoListEntry(todo, scheduleMatches, {
+              includePinLabel: range === 'today'
+            }),
+            todos
+          );
         })
         .filter((entry) => entry.scheduleMatches.length > 0)
         .sort((left, right) => sortTodoListEntries(left, right, { pinFirst: range === 'today' }))
@@ -1002,9 +1147,12 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
         const overdueMatches = buildOverdueScheduleMatches(todo, todayDateKey);
         const combinedMatches = todayMatches.length > 0 ? todayMatches : overdueMatches;
 
-        return buildTodoListEntry(todo, combinedMatches, {
-          includePinLabel: true
-        });
+        return decorateTodoListEntryWithHierarchy(
+          buildTodoListEntry(todo, combinedMatches, {
+            includePinLabel: true
+          }),
+          todos
+        );
       })
       .sort((left, right) => sortTodoListEntries(left, right, { pinFirst: true }));
   }, [todos, showCompletedTodos, todayDateKey]);
@@ -1026,9 +1174,12 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
       .map((todo) => {
         const scheduleMatches = buildOverdueScheduleMatches(todo, todayDateKey);
 
-        return buildTodoListEntry(todo, scheduleMatches, {
-          includePinLabel: true
-        });
+        return decorateTodoListEntryWithHierarchy(
+          buildTodoListEntry(todo, scheduleMatches, {
+            includePinLabel: true
+          }),
+          todos
+        );
       })
       .filter((entry) => entry.scheduleMatches.length > 0)
       .sort((left, right) => sortTodoListEntries(left, right, { pinFirst: true }));
@@ -1047,6 +1198,84 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
         .filter((todo) => showCompletedTodos || !todo.isCompleted)
         .map((todo) => buildTodoListEntry(todo, [], { includePinLabel: true }))
         .sort(sortCategoryTodoEntries);
+
+  const selectedCategoryTreeGroups = useMemo<TodoTreeEntryGroup[]>(() => {
+    if (isVirtualScheduleCategory) {
+      return [];
+    }
+
+    const categoryTodos = todos.filter((todo) => todo.categoryId === selectedCategoryId);
+    const visibleCategoryTodos = filterVisibleTodos(categoryTodos, showCompletedTodos);
+    const visibleTodoEntryMap = new Map(
+      visibleCategoryTodos.map((todo) => [todo.id, buildTodoListEntry(todo, [], { includePinLabel: true })])
+    );
+
+    return buildTodoTreeItems(visibleCategoryTodos)
+      .map((treeItem) => {
+        const parentEntry = visibleTodoEntryMap.get(treeItem.todo.id);
+        if (!parentEntry) {
+          return null;
+        }
+
+        const childEntries = treeItem.children
+          .map((childTodo) => visibleTodoEntryMap.get(childTodo.id))
+          .filter(Boolean) as TodoListEntry[];
+
+        return {
+          parentEntry,
+          childEntries,
+          childCount: getDirectChildCount(categoryTodos, treeItem.todo.id),
+          completedChildCount: getCompletedDirectChildCount(categoryTodos, treeItem.todo.id)
+        };
+      })
+      .filter(Boolean)
+      .sort((left, right) => sortCategoryTodoEntries(left!.parentEntry, right!.parentEntry)) as TodoTreeEntryGroup[];
+  }, [isVirtualScheduleCategory, selectedCategoryId, showCompletedTodos, todos]);
+
+  const virtualScheduleTreeGroups = useMemo<Map<string, TodoTreeEntryGroup>>(() => {
+    if (!isVirtualScheduleCategory) {
+      return new Map();
+    }
+
+    const selectedEntryMap = new Map(
+      selectedTodoEntries.map((entry) => [entry.todo.id, entry])
+    );
+    const groups = new Map<string, TodoTreeEntryGroup>();
+
+    selectedTodoEntries.forEach((entry) => {
+      const parentTodo = getParentTodo(todos, entry.todo);
+      if (parentTodo && selectedEntryMap.has(parentTodo.id)) {
+        return;
+      }
+
+      const childEntries = getDirectChildTodos(todos, entry.todo.id)
+        .map((childTodo) => selectedEntryMap.get(childTodo.id))
+        .filter(Boolean) as TodoListEntry[];
+
+      groups.set(entry.todo.id, {
+        parentEntry: entry,
+        childEntries,
+        childCount: getDirectChildCount(todos, entry.todo.id),
+        completedChildCount: getCompletedDirectChildCount(todos, entry.todo.id)
+      });
+    });
+
+    return groups;
+  }, [isVirtualScheduleCategory, selectedTodoEntries, todos]);
+
+  const virtualScheduleTopLevelEntryIds = useMemo(
+    () => new Set(virtualScheduleTreeGroups.keys()),
+    [virtualScheduleTreeGroups]
+  );
+
+  const selectedTodoEntriesForRender = useMemo<TodoListEntry[]>(
+    () => (
+      isVirtualScheduleCategory
+        ? selectedTodoEntries.filter((entry) => virtualScheduleTopLevelEntryIds.has(entry.todo.id))
+        : selectedTodoEntries
+    ),
+    [isVirtualScheduleCategory, selectedTodoEntries, virtualScheduleTopLevelEntryIds]
+  );
 
   const selectedCategoryName = isVirtualScheduleCategory
     ? VIRTUAL_SCHEDULE_CATEGORY_NAME
@@ -1114,8 +1343,22 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
 
     return Array.from(sectionMap.values()).sort((left, right) => left.dateKey.localeCompare(right.dateKey));
   }, [isVirtualScheduleCategory, selectedScheduleFilter, selectedTodoEntries, pinnedTodayEntries, nonPinnedTodayEntries, overdueTodayEntries, todayDateKey, tomorrowDateKey]);
-  const hasSectionedTodoEntries = selectedTodoSections.some((section) => section.entries.length > 0);
-  const hasVisibleTodoEntries = hasSectionedTodoEntries || selectedTodoEntries.length > 0;
+  const selectedTodoSectionsForRender = useMemo<TodoListSection[]>(
+    () => (
+      isVirtualScheduleCategory
+        ? selectedTodoSections
+            .map((section) => ({
+              ...section,
+              entries: section.entries.filter((entry) => virtualScheduleTopLevelEntryIds.has(entry.todo.id))
+            }))
+            .filter((section) => section.entries.length > 0)
+        : selectedTodoSections
+    ),
+    [isVirtualScheduleCategory, selectedTodoSections, virtualScheduleTopLevelEntryIds]
+  );
+
+  const hasSectionedTodoEntries = selectedTodoSectionsForRender.some((section) => section.entries.length > 0);
+  const hasVisibleTodoEntries = hasSectionedTodoEntries || (isVirtualScheduleCategory ? selectedTodoEntriesForRender.length > 0 : selectedCategoryTreeGroups.length > 0);
 
   const handleAddTodoClick = () => {
     const targetCategoryId = isVirtualScheduleCategory ? primaryCategoryId : selectedCategoryId;
@@ -2048,7 +2291,7 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
 
         <div className="flex-1 overflow-y-auto pb-24 no-scrollbar">
           {isVirtualScheduleCategory && (selectedScheduleFilter === 'thisWeek' || selectedScheduleFilter === 'today')
-            ? selectedTodoSections.map((section) => (
+            ? selectedTodoSectionsForRender.map((section) => (
               <section key={section.dateKey} className="mb-6">
                 <div className="mb-2 flex items-center gap-3 px-1">
                   <div className="text-[11px] uppercase tracking-[0.18em] text-stone-400">
@@ -2056,46 +2299,193 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
                   </div>
                   <div className="h-px flex-1 bg-stone-200/80"></div>
                 </div>
-                {section.entries.map((entry, index) => (
-                  <SwipeableTodoItem
-                    key={entry.todo.id}
-                    todo={entry.todo}
-                    categories={categories}
-                    activityCategories={activityCategories}
-                    scopes={scopes}
-                    onToggle={onToggleTodo}
-                    onOpenDetail={onEditTodo}
-                    onOpenQuickActions={openQuickActions}
-                    onStartFocus={onStartFocus}
-                    onDuplicate={handleOpenDuplicateModal}
-                    viewMode={viewMode}
-                    scheduleMatchLabels={entry.scheduleMatchLabels}
-                    scheduleLabelStyle="schedule"
-                    isFirst={index === 0}
-                    isLast={index === section.entries.length - 1}
-                  />
-                ))}
+                {section.entries.map((entry, index) => {
+                  const group = virtualScheduleTreeGroups.get(entry.todo.id);
+                  const isExpanded = Boolean(expandedParentIds[entry.todo.id]);
+
+                  return (
+                    <React.Fragment key={entry.todo.id}>
+                      <SwipeableTodoItem
+                        todo={entry.todo}
+                        categories={categories}
+                        activityCategories={activityCategories}
+                        scopes={scopes}
+                        onToggle={onToggleTodo}
+                        onOpenDetail={onEditTodo}
+                        onOpenQuickActions={openQuickActions}
+                        onStartFocus={onStartFocus}
+                        onDuplicate={handleOpenDuplicateModal}
+                        viewMode={viewMode}
+                        scheduleMatchLabels={entry.scheduleMatchLabels}
+                        scheduleLabelStyle="schedule"
+                        hierarchyDepth={entry.hierarchyDepth}
+                        parentTitle={entry.parentTitle}
+                        childSummary={group && group.childCount > 0 ? {
+                          completed: group.completedChildCount,
+                          total: group.childCount
+                        } : entry.childSummary}
+                        isExpanded={isExpanded}
+                        onToggleChildren={group && group.childEntries.length > 0 ? () => {
+                          setExpandedParentIds((prev) => ({
+                            ...prev,
+                            [entry.todo.id]: !prev[entry.todo.id]
+                          }));
+                        } : undefined}
+                        isFirst={index === 0}
+                        isLast={index === section.entries.length - 1 && !(isExpanded && group && group.childEntries.length > 0)}
+                      />
+
+                      {isExpanded && group && group.childEntries.length > 0 && (
+                        <div className={`ml-4 border-l border-stone-200/80 pl-3 ${viewMode === 'compact' ? 'mt-0' : 'mt-1'}`}>
+                          {group.childEntries.map((childEntry, childIndex) => (
+                            <SwipeableTodoItem
+                              key={childEntry.todo.id}
+                              todo={childEntry.todo}
+                              categories={categories}
+                              activityCategories={activityCategories}
+                              scopes={scopes}
+                              onToggle={onToggleTodo}
+                              onOpenDetail={onEditTodo}
+                              onOpenQuickActions={openQuickActions}
+                              onStartFocus={onStartFocus}
+                              onDuplicate={handleOpenDuplicateModal}
+                              viewMode={viewMode}
+                              scheduleMatchLabels={childEntry.scheduleMatchLabels}
+                              scheduleLabelStyle="schedule"
+                              hierarchyDepth={1}
+                              isFirst={childIndex === 0}
+                              isLast={childIndex === group.childEntries.length - 1}
+                            />
+                          ))}
+                        </div>
+                      )}
+                    </React.Fragment>
+                  );
+                })}
               </section>
             ))
-            : selectedTodoEntries.map((entry, index) => (
-              <SwipeableTodoItem
-                key={entry.todo.id}
-                todo={entry.todo}
-                categories={categories}
-                activityCategories={activityCategories}
-                scopes={scopes}
-                onToggle={onToggleTodo}
-                onOpenDetail={onEditTodo}
-                onOpenQuickActions={openQuickActions}
-                onStartFocus={onStartFocus}
-                onDuplicate={handleOpenDuplicateModal}
-                viewMode={viewMode}
-                scheduleMatchLabels={entry.scheduleMatchLabels}
-                scheduleLabelStyle={isVirtualScheduleCategory ? 'schedule' : 'default'}
-                isFirst={index === 0}
-                isLast={index === selectedTodoEntries.length - 1}
-              />
-            ))}
+            : isVirtualScheduleCategory
+              ? selectedTodoEntriesForRender.map((entry, index) => {
+                const group = virtualScheduleTreeGroups.get(entry.todo.id);
+                const isExpanded = Boolean(expandedParentIds[entry.todo.id]);
+
+                return (
+                  <React.Fragment key={entry.todo.id}>
+                    <SwipeableTodoItem
+                      todo={entry.todo}
+                      categories={categories}
+                      activityCategories={activityCategories}
+                      scopes={scopes}
+                      onToggle={onToggleTodo}
+                      onOpenDetail={onEditTodo}
+                      onOpenQuickActions={openQuickActions}
+                      onStartFocus={onStartFocus}
+                      onDuplicate={handleOpenDuplicateModal}
+                      viewMode={viewMode}
+                      scheduleMatchLabels={entry.scheduleMatchLabels}
+                      scheduleLabelStyle="schedule"
+                      hierarchyDepth={entry.hierarchyDepth}
+                      parentTitle={entry.parentTitle}
+                      childSummary={group && group.childCount > 0 ? {
+                        completed: group.completedChildCount,
+                        total: group.childCount
+                      } : entry.childSummary}
+                      isExpanded={isExpanded}
+                      onToggleChildren={group && group.childEntries.length > 0 ? () => {
+                        setExpandedParentIds((prev) => ({
+                          ...prev,
+                          [entry.todo.id]: !prev[entry.todo.id]
+                        }));
+                      } : undefined}
+                      isFirst={index === 0}
+                      isLast={index === selectedTodoEntriesForRender.length - 1 && !(isExpanded && group && group.childEntries.length > 0)}
+                    />
+
+                    {isExpanded && group && group.childEntries.length > 0 && (
+                      <div className={`ml-4 border-l border-stone-200/80 pl-3 ${viewMode === 'compact' ? 'mt-0' : 'mt-1'}`}>
+                        {group.childEntries.map((childEntry, childIndex) => (
+                          <SwipeableTodoItem
+                            key={childEntry.todo.id}
+                            todo={childEntry.todo}
+                            categories={categories}
+                            activityCategories={activityCategories}
+                            scopes={scopes}
+                            onToggle={onToggleTodo}
+                            onOpenDetail={onEditTodo}
+                            onOpenQuickActions={openQuickActions}
+                            onStartFocus={onStartFocus}
+                            onDuplicate={handleOpenDuplicateModal}
+                            viewMode={viewMode}
+                            scheduleMatchLabels={childEntry.scheduleMatchLabels}
+                            scheduleLabelStyle="schedule"
+                            hierarchyDepth={1}
+                            isFirst={childIndex === 0}
+                            isLast={childIndex === group.childEntries.length - 1}
+                          />
+                        ))}
+                      </div>
+                    )}
+                  </React.Fragment>
+                );
+              })
+              : selectedCategoryTreeGroups.map((group, groupIndex) => {
+                const isExpanded = Boolean(expandedParentIds[group.parentEntry.todo.id]);
+
+                return (
+                  <section key={group.parentEntry.todo.id} className={viewMode === 'compact' ? 'mb-0' : 'mb-3'}>
+                    <SwipeableTodoItem
+                      todo={group.parentEntry.todo}
+                      categories={categories}
+                      activityCategories={activityCategories}
+                      scopes={scopes}
+                      onToggle={onToggleTodo}
+                      onOpenDetail={onEditTodo}
+                      onOpenQuickActions={openQuickActions}
+                      onStartFocus={onStartFocus}
+                      onDuplicate={handleOpenDuplicateModal}
+                      viewMode={viewMode}
+                      scheduleMatchLabels={group.parentEntry.scheduleMatchLabels}
+                      childSummary={group.childCount > 0 ? {
+                        completed: group.completedChildCount,
+                        total: group.childCount
+                      } : null}
+                      isExpanded={isExpanded}
+                      onToggleChildren={group.childCount > 0 ? () => {
+                        setExpandedParentIds((prev) => ({
+                          ...prev,
+                          [group.parentEntry.todo.id]: !prev[group.parentEntry.todo.id]
+                        }));
+                      } : undefined}
+                      isFirst={groupIndex === 0}
+                      isLast={groupIndex === selectedCategoryTreeGroups.length - 1 && !(isExpanded && group.childEntries.length > 0)}
+                    />
+
+                    {isExpanded && group.childEntries.length > 0 && (
+                      <div className={`ml-4 border-l border-stone-200/80 pl-3 ${viewMode === 'compact' ? 'mt-0' : 'mt-1'}`}>
+                        {group.childEntries.map((entry, childIndex) => (
+                          <SwipeableTodoItem
+                            key={entry.todo.id}
+                            todo={entry.todo}
+                            categories={categories}
+                            activityCategories={activityCategories}
+                            scopes={scopes}
+                            onToggle={onToggleTodo}
+                            onOpenDetail={onEditTodo}
+                            onOpenQuickActions={openQuickActions}
+                            onStartFocus={onStartFocus}
+                            onDuplicate={handleOpenDuplicateModal}
+                            viewMode={viewMode}
+                            scheduleMatchLabels={entry.scheduleMatchLabels}
+                            hierarchyDepth={1}
+                            isFirst={childIndex === 0}
+                            isLast={childIndex === group.childEntries.length - 1}
+                          />
+                        ))}
+                      </div>
+                    )}
+                  </section>
+                );
+              })}
 
           {!hasVisibleTodoEntries && (
             <div className="flex flex-col items-center justify-center py-20 text-stone-300">
