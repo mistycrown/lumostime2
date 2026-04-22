@@ -4,6 +4,9 @@
  * @output Parsed Time Entries (ParsedTimeEntry[]), Parsed Todos (AIParsedTodo[]), Dated AI Backfill Tool Plans, Backfill Chat Replies (string), Generated Narratives (string), Connection Status (boolean)
  * @pos Service (AI Integration Layer)
  * @description AI 服务 - 处理与 AI 提供商（OpenAI/Gemini）的所有交互，包括配置管理、连接测试和提示执行
+ * @updated 2026-04-22: Simplified unified-chat intent classification into a message-only lightweight routing step without extra runtime context.
+ * @updated 2026-04-22: Added persona-aware formal prompts plus optional cached conversation history for unified AI chat sessions.
+ * @updated 2026-04-22: Added two-stage AI chat support with lightweight intent classification, debug-aware chat replies, and direct todo tool planning alongside backfill planning.
  * @updated 2026-04-22: AI backfill planning now supports per-call dates, latest-log context, todo hierarchy hints, and local cross-midnight normalization.
  * 
  * 核心功能：
@@ -15,7 +18,7 @@
  * 
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
-import { TodoCategory, Category, Scope } from '../types';
+import { TodoCategory, Category, Scope, TodoRecurrenceRule } from '../types';
 import { normalizeAIBackfillToolCalls } from '../utils/aiBackfillUtils';
 export interface AIConfig {
     provider: 'openai' | 'gemini';
@@ -73,6 +76,19 @@ export interface AIBackfillChatResult {
     debug: AIDebugExchange;
 }
 
+export type AIChatIntent = 'chat' | 'add_log' | 'add_todo' | 'clarify';
+
+export interface AIIntentClassification {
+    intent: AIChatIntent;
+    reason: string;
+    assistantReply?: string;
+}
+
+export interface AIIntentClassificationResult {
+    result: AIIntentClassification;
+    debug: AIDebugExchange;
+}
+
 export interface AIBackfillCreateLogArgs {
     date: string; // YYYY-MM-DD
     startTime: string; // HH:mm
@@ -100,8 +116,40 @@ export interface AIBackfillToolPlanningResult {
     debug: AIDebugExchange;
 }
 
+export interface AITodoCreateArgs {
+    title: string;
+    categoryId: string;
+    linkedCategoryId?: string;
+    linkedActivityId?: string;
+    defaultScopeIds?: string[];
+    note?: string;
+    scheduledDate?: string;
+    deadlineDate?: string;
+    recurrenceRule?: TodoRecurrenceRule;
+}
+
+export interface AITodoToolCall {
+    toolName: 'create_todo';
+    args: AITodoCreateArgs;
+}
+
+export interface AITodoToolPlan {
+    assistantReply: string;
+    toolCalls: AITodoToolCall[];
+}
+
+export interface AITodoToolPlanningResult {
+    plan: AITodoToolPlan;
+    debug: AIDebugExchange;
+}
+
 export interface AIRequestOptions {
     signal?: AbortSignal;
+}
+
+export interface AIConversationTurn {
+    role: 'user' | 'assistant';
+    content: string;
 }
 
 const AI_CONFIG_KEY = 'lumostime_ai_config';
@@ -172,6 +220,116 @@ const sanitizeDebugHeaders = (headers: Record<string, string>): Record<string, s
 const sanitizeDebugUrl = (url: string): string => (
     url.replace(/([?&]key=)[^&]+/gi, '$1[REDACTED]')
 );
+
+const AI_INTENTS: AIChatIntent[] = ['chat', 'add_log', 'add_todo', 'clarify'];
+const TODO_RECURRENCE_FREQUENCIES: Array<TodoRecurrenceRule['frequency']> = ['daily', 'weekly', 'monthly'];
+
+const normalizeConversationHistory = (conversationHistory?: AIConversationTurn[]): AIConversationTurn[] => (
+    Array.isArray(conversationHistory)
+        ? conversationHistory
+            .filter((turn): turn is AIConversationTurn => (
+                Boolean(turn)
+                && (turn.role === 'user' || turn.role === 'assistant')
+                && typeof turn.content === 'string'
+                && turn.content.trim().length > 0
+            ))
+            .map((turn) => ({
+                role: turn.role,
+                content: turn.content.trim()
+            }))
+        : []
+);
+
+const buildPersonaInstruction = (personaPrompt?: string): string => {
+    if (!personaPrompt?.trim()) {
+        return '';
+    }
+
+    return `
+
+Persona Guidance:
+${personaPrompt.trim()}
+
+Apply the persona guidance only as a style/interaction layer. Do not break any required JSON schema, tool-planning rules, or field constraints.
+`;
+};
+
+const buildOpenAIMessageList = (
+    systemPrompt: string,
+    userPrompt: string,
+    conversationHistory?: AIConversationTurn[]
+) => ([
+    { role: 'system' as const, content: systemPrompt.trim() },
+    ...normalizeConversationHistory(conversationHistory).map((turn) => ({
+        role: turn.role === 'assistant' ? 'assistant' as const : 'user' as const,
+        content: turn.content
+    })),
+    { role: 'user' as const, content: userPrompt.trim() }
+]);
+
+const buildGeminiContents = (
+    userPrompt: string,
+    conversationHistory?: AIConversationTurn[]
+) => ([
+    ...normalizeConversationHistory(conversationHistory).map((turn) => ({
+        role: turn.role === 'assistant' ? 'model' : 'user',
+        parts: [{ text: turn.content }]
+    })),
+    { role: 'user', parts: [{ text: userPrompt.trim() }] }
+]);
+
+const normalizeAIIntent = (value: unknown): AIChatIntent => (
+    typeof value === 'string' && AI_INTENTS.includes(value as AIChatIntent)
+        ? value as AIChatIntent
+        : 'clarify'
+);
+
+const normalizeTodoRecurrenceRule = (value: unknown): TodoRecurrenceRule | undefined => {
+    if (!value || typeof value !== 'object') {
+        return undefined;
+    }
+
+    const candidate = value as Record<string, unknown>;
+    const frequency = candidate.frequency;
+    const startDate = typeof candidate.startDate === 'string' ? candidate.startDate.trim() : '';
+
+    if (!TODO_RECURRENCE_FREQUENCIES.includes(frequency as TodoRecurrenceRule['frequency']) || !startDate) {
+        return undefined;
+    }
+
+    const normalized: TodoRecurrenceRule = {
+        frequency: frequency as TodoRecurrenceRule['frequency'],
+        startDate
+    };
+
+    if (typeof candidate.endDate === 'string' && candidate.endDate.trim()) {
+        normalized.endDate = candidate.endDate.trim();
+    }
+
+    if (typeof candidate.interval === 'number' && Number.isFinite(candidate.interval) && candidate.interval > 0) {
+        normalized.interval = Math.max(1, Math.round(candidate.interval));
+    }
+
+    if (Array.isArray(candidate.weekdays)) {
+        const weekdays = candidate.weekdays
+            .map((weekday) => Number(weekday))
+            .filter((weekday) => Number.isInteger(weekday) && weekday >= 0 && weekday <= 6);
+        if (weekdays.length > 0) {
+            normalized.weekdays = Array.from(new Set(weekdays));
+        }
+    }
+
+    if (Array.isArray(candidate.monthDays)) {
+        const monthDays = candidate.monthDays
+            .map((monthDay) => Number(monthDay))
+            .filter((monthDay) => Number.isInteger(monthDay) && monthDay >= 1 && monthDay <= 31);
+        if (monthDays.length > 0) {
+            normalized.monthDays = Array.from(new Set(monthDays));
+        }
+    }
+
+    return normalized;
+};
 
 export const aiService = {
     getConfig: (): AIConfig => {
@@ -384,6 +542,7 @@ Output:
         context: {
             currentDateTime: string;
             targetDate: string;
+            personaPrompt?: string;
         }
     ): Promise<string> => {
         const config = aiService.getConfig();
@@ -399,6 +558,8 @@ Task: Help the user talk through what they were doing so the app can later turn 
 Context:
 - Current DateTime: ${context.currentDateTime}
 - Selected Backfill Date: ${context.targetDate}
+
+${buildPersonaInstruction(context.personaPrompt)}
 
 Requirements:
 1. Reply in natural Chinese.
@@ -424,6 +585,8 @@ ${text}
         context: {
             currentDateTime: string;
             targetDate: string;
+            personaPrompt?: string;
+            conversationHistory?: AIConversationTurn[];
         }
     ): Promise<AIBackfillChatResult> => {
         const config = aiService.getConfig();
@@ -440,6 +603,8 @@ Task: Help the user talk through what they were doing so the app can later turn 
 Context:
 - Current DateTime: ${context.currentDateTime}
 - Selected Backfill Date: ${context.targetDate}
+
+${buildPersonaInstruction(context.personaPrompt)}
 
 Requirements:
 1. Reply in natural Chinese.
@@ -465,10 +630,7 @@ ${text}
             };
             const body = {
                 model: config.modelName,
-                messages: [
-                    { role: 'system', content: systemPrompt.trim() },
-                    { role: 'user', content: userPrompt.trim() }
-                ]
+                messages: buildOpenAIMessageList(systemPrompt, userPrompt, context.conversationHistory)
             };
             const requestedAt = new Date().toISOString();
             let responseStatus = 0;
@@ -545,7 +707,7 @@ ${text}
                 'Content-Type': 'application/json'
             };
             const body = {
-                contents: [{ parts: [{ text: userPrompt.trim() }] }],
+                contents: buildGeminiContents(userPrompt, context.conversationHistory),
                 system_instruction: { parts: [{ text: systemPrompt.trim() }] }
             };
             const requestedAt = new Date().toISOString();
@@ -619,6 +781,434 @@ ${text}
         throw new Error('AI provider not supported');
     },
 
+    classifyChatIntentWithDebug: async (
+        text: string,
+        options: AIRequestOptions = {}
+    ): Promise<AIIntentClassificationResult> => {
+        const config = aiService.getConfig();
+        const fetchFn = Capacitor.isNativePlatform() ? nativeFetch : fetch;
+
+        if (!config.apiKey?.trim()) {
+            throw new Error('请先在设置中完成 AI 配置。');
+        }
+
+        const systemPrompt = `
+Role: You are LumosTime's lightweight intent router.
+Task: Read one user message and classify the single primary intent for the next AI step.
+
+Allowed intents:
+- chat: casual conversation, questions, reflection, or discussion that should not call tools
+- add_log: the user is mainly describing things that already happened and wants to record/backfill them
+- add_todo: the user is mainly asking to create one or more todos, reminders, or plans for later
+- clarify: the message is too ambiguous or mixes multiple primary intents, so the app should ask one short follow-up question instead of executing anything
+
+Requirements:
+1. Output ONLY a valid JSON object.
+2. JSON schema:
+{
+  "intent": "chat | add_log | add_todo | clarify",
+  "reason": "short string",
+  "assistantReply": "string"
+}
+3. Choose exactly one primary intent.
+4. If the user mixes multiple primary requests in one sentence, return clarify.
+5. assistantReply should usually be empty for chat, add_log, and add_todo.
+6. When intent is clarify, assistantReply must be one short Chinese follow-up question.
+7. Do not plan tools in this step.
+`;
+
+        const userPrompt = `
+User Message:
+${text}
+`;
+
+        const normalizeResult = (rawValue: any): AIIntentClassification => ({
+            intent: normalizeAIIntent(rawValue?.intent),
+            reason: typeof rawValue?.reason === 'string' ? rawValue.reason.trim() : '',
+            assistantReply: typeof rawValue?.assistantReply === 'string' ? rawValue.assistantReply.trim() : ''
+        });
+
+        if (config.provider === 'openai') {
+            const url = `${config.baseUrl}/chat/completions`;
+            const headers = {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${config.apiKey}`
+            };
+            const body = {
+                model: config.modelName,
+                messages: [
+                    { role: 'system', content: systemPrompt.trim() },
+                    { role: 'user', content: userPrompt.trim() }
+                ],
+                response_format: { type: 'json_object' }
+            };
+            const requestedAt = new Date().toISOString();
+            let responseStatus = 0;
+            let responseOk = false;
+            let responseBody: unknown = null;
+
+            try {
+                const response = await fetchFn(url, {
+                    method: 'POST',
+                    headers,
+                    body: JSON.stringify(body),
+                    ...(options.signal ? { signal: options.signal } : {})
+                });
+                responseStatus = response.status || 0;
+                responseOk = Boolean(response.ok);
+                responseBody = await response.json();
+
+                const debug: AIDebugExchange = {
+                    provider: 'openai',
+                    requestedAt,
+                    completedAt: new Date().toISOString(),
+                    request: {
+                        url: sanitizeDebugUrl(url),
+                        method: 'POST',
+                        headers: sanitizeDebugHeaders(headers),
+                        body
+                    },
+                    response: {
+                        status: responseStatus,
+                        ok: responseOk,
+                        body: responseBody
+                    }
+                };
+
+                if ((responseBody as any)?.error) {
+                    const error = new Error((responseBody as any).error.message || 'AI 请求失败');
+                    (error as Error & { debug?: AIDebugExchange }).debug = debug;
+                    throw error;
+                }
+
+                const rawContent = (responseBody as any)?.choices?.[0]?.message?.content || '{}';
+                return {
+                    result: normalizeResult(aiService.cleanAndParseJSONObject(rawContent)),
+                    debug
+                };
+            } catch (error) {
+                const debug: AIDebugExchange = {
+                    provider: 'openai',
+                    requestedAt,
+                    completedAt: new Date().toISOString(),
+                    request: {
+                        url: sanitizeDebugUrl(url),
+                        method: 'POST',
+                        headers: sanitizeDebugHeaders(headers),
+                        body
+                    },
+                    response: {
+                        status: responseStatus,
+                        ok: responseOk,
+                        body: responseBody || {
+                            transportError: error instanceof Error ? error.message : String(error)
+                        }
+                    }
+                };
+
+                const finalError = error instanceof Error ? error : new Error(String(error));
+                (finalError as Error & { debug?: AIDebugExchange }).debug = debug;
+                throw finalError;
+            }
+        }
+
+        if (config.provider === 'gemini') {
+            const baseUrl = config.baseUrl || 'https://generativelanguage.googleapis.com/v1beta/models';
+            const url = `${baseUrl}/${config.modelName}:generateContent?key=${config.apiKey}`;
+            const headers = {
+                'Content-Type': 'application/json'
+            };
+            const body = {
+                contents: buildGeminiContents(userPrompt),
+                system_instruction: { parts: [{ text: systemPrompt.trim() }] },
+                generationConfig: {
+                    response_mime_type: 'application/json'
+                }
+            };
+            const requestedAt = new Date().toISOString();
+            let responseStatus = 0;
+            let responseOk = false;
+            let responseBody: unknown = null;
+
+            try {
+                const response = await fetchFn(url, {
+                    method: 'POST',
+                    headers,
+                    body: JSON.stringify(body),
+                    ...(options.signal ? { signal: options.signal } : {})
+                });
+                responseStatus = response.status || 0;
+                responseOk = Boolean(response.ok);
+                responseBody = await response.json();
+
+                const debug: AIDebugExchange = {
+                    provider: 'gemini',
+                    requestedAt,
+                    completedAt: new Date().toISOString(),
+                    request: {
+                        url: sanitizeDebugUrl(url),
+                        method: 'POST',
+                        headers: sanitizeDebugHeaders(headers),
+                        body
+                    },
+                    response: {
+                        status: responseStatus,
+                        ok: responseOk,
+                        body: responseBody
+                    }
+                };
+
+                if ((responseBody as any)?.error) {
+                    const error = new Error((responseBody as any).error.message || 'AI 请求失败');
+                    (error as Error & { debug?: AIDebugExchange }).debug = debug;
+                    throw error;
+                }
+
+                const rawContent = (((responseBody as any)?.candidates?.[0]?.content?.parts?.[0]?.text) || '{}');
+                return {
+                    result: normalizeResult(aiService.cleanAndParseJSONObject(rawContent)),
+                    debug
+                };
+            } catch (error) {
+                const debug: AIDebugExchange = {
+                    provider: 'gemini',
+                    requestedAt,
+                    completedAt: new Date().toISOString(),
+                    request: {
+                        url: sanitizeDebugUrl(url),
+                        method: 'POST',
+                        headers: sanitizeDebugHeaders(headers),
+                        body
+                    },
+                    response: {
+                        status: responseStatus,
+                        ok: responseOk,
+                        body: responseBody || {
+                            transportError: error instanceof Error ? error.message : String(error)
+                        }
+                    }
+                };
+
+                const finalError = error instanceof Error ? error : new Error(String(error));
+                (finalError as Error & { debug?: AIDebugExchange }).debug = debug;
+                throw finalError;
+            }
+        }
+
+        throw new Error('AI provider not supported');
+    },
+
+    sendContextualChatReplyWithDebug: async (
+        text: string,
+        context: {
+            currentDateTime: string;
+            defaultDate: string;
+            todayTimelineSummary: string;
+            personaPrompt?: string;
+            conversationHistory?: AIConversationTurn[];
+            latestLog?: {
+                endDateTime: string;
+                date: string;
+                endTime: string;
+                title?: string;
+                note?: string;
+            } | null;
+        },
+        options: AIRequestOptions = {}
+    ): Promise<AIBackfillChatResult> => {
+        const config = aiService.getConfig();
+        const fetchFn = Capacitor.isNativePlatform() ? nativeFetch : fetch;
+
+        if (!config.apiKey?.trim()) {
+            throw new Error('请先在设置中完成 AI 配置。');
+        }
+
+        const systemPrompt = `
+Role: You are LumosTime's chat assistant.
+Task: Have a short natural Chinese conversation with the user without calling tools.
+
+Context:
+- Current DateTime: ${context.currentDateTime}
+- Default Date: ${context.defaultDate}
+- Latest Existing Log: ${JSON.stringify(context.latestLog || null)}
+- Today's Timeline Summary:
+${context.todayTimelineSummary || '今天还没有时间轴记录。'}
+
+Requirements:
+1. Reply in natural Chinese.
+2. Keep the reply practical and concise.
+3. Do not output JSON, code blocks, or tool-call syntax.
+4. Do not claim that you already created logs or todos.
+${buildPersonaInstruction(context.personaPrompt)}
+`;
+
+        const userPrompt = `
+Current DateTime: ${context.currentDateTime}
+User Message:
+${text}
+`;
+
+        if (config.provider === 'openai') {
+            const url = `${config.baseUrl}/chat/completions`;
+            const headers = {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${config.apiKey}`
+            };
+            const body = {
+                model: config.modelName,
+                messages: buildOpenAIMessageList(systemPrompt, userPrompt, context.conversationHistory)
+            };
+            const requestedAt = new Date().toISOString();
+            let responseStatus = 0;
+            let responseOk = false;
+            let responseBody: unknown = null;
+
+            try {
+                const response = await fetchFn(url, {
+                    method: 'POST',
+                    headers,
+                    body: JSON.stringify(body),
+                    ...(options.signal ? { signal: options.signal } : {})
+                });
+                responseStatus = response.status || 0;
+                responseOk = Boolean(response.ok);
+                responseBody = await response.json();
+
+                const debug: AIDebugExchange = {
+                    provider: 'openai',
+                    requestedAt,
+                    completedAt: new Date().toISOString(),
+                    request: {
+                        url: sanitizeDebugUrl(url),
+                        method: 'POST',
+                        headers: sanitizeDebugHeaders(headers),
+                        body
+                    },
+                    response: {
+                        status: responseStatus,
+                        ok: responseOk,
+                        body: responseBody
+                    }
+                };
+
+                if ((responseBody as any)?.error) {
+                    const error = new Error((responseBody as any).error.message || 'AI 请求失败');
+                    (error as Error & { debug?: AIDebugExchange }).debug = debug;
+                    throw error;
+                }
+
+                return {
+                    reply: ((responseBody as any)?.choices?.[0]?.message?.content || '').trim(),
+                    debug
+                };
+            } catch (error) {
+                const debug: AIDebugExchange = {
+                    provider: 'openai',
+                    requestedAt,
+                    completedAt: new Date().toISOString(),
+                    request: {
+                        url: sanitizeDebugUrl(url),
+                        method: 'POST',
+                        headers: sanitizeDebugHeaders(headers),
+                        body
+                    },
+                    response: {
+                        status: responseStatus,
+                        ok: responseOk,
+                        body: responseBody || {
+                            transportError: error instanceof Error ? error.message : String(error)
+                        }
+                    }
+                };
+
+                const finalError = error instanceof Error ? error : new Error(String(error));
+                (finalError as Error & { debug?: AIDebugExchange }).debug = debug;
+                throw finalError;
+            }
+        }
+
+        if (config.provider === 'gemini') {
+            const baseUrl = config.baseUrl || 'https://generativelanguage.googleapis.com/v1beta/models';
+            const url = `${baseUrl}/${config.modelName}:generateContent?key=${config.apiKey}`;
+            const headers = {
+                'Content-Type': 'application/json'
+            };
+            const body = {
+                contents: buildGeminiContents(userPrompt, context.conversationHistory),
+                system_instruction: { parts: [{ text: systemPrompt.trim() }] }
+            };
+            const requestedAt = new Date().toISOString();
+            let responseStatus = 0;
+            let responseOk = false;
+            let responseBody: unknown = null;
+
+            try {
+                const response = await fetchFn(url, {
+                    method: 'POST',
+                    headers,
+                    body: JSON.stringify(body),
+                    ...(options.signal ? { signal: options.signal } : {})
+                });
+                responseStatus = response.status || 0;
+                responseOk = Boolean(response.ok);
+                responseBody = await response.json();
+
+                const debug: AIDebugExchange = {
+                    provider: 'gemini',
+                    requestedAt,
+                    completedAt: new Date().toISOString(),
+                    request: {
+                        url: sanitizeDebugUrl(url),
+                        method: 'POST',
+                        headers: sanitizeDebugHeaders(headers),
+                        body
+                    },
+                    response: {
+                        status: responseStatus,
+                        ok: responseOk,
+                        body: responseBody
+                    }
+                };
+
+                if ((responseBody as any)?.error) {
+                    const error = new Error((responseBody as any).error.message || 'AI 请求失败');
+                    (error as Error & { debug?: AIDebugExchange }).debug = debug;
+                    throw error;
+                }
+
+                return {
+                    reply: (((responseBody as any)?.candidates?.[0]?.content?.parts?.[0]?.text) || '').trim(),
+                    debug
+                };
+            } catch (error) {
+                const debug: AIDebugExchange = {
+                    provider: 'gemini',
+                    requestedAt,
+                    completedAt: new Date().toISOString(),
+                    request: {
+                        url: sanitizeDebugUrl(url),
+                        method: 'POST',
+                        headers: sanitizeDebugHeaders(headers),
+                        body
+                    },
+                    response: {
+                        status: responseStatus,
+                        ok: responseOk,
+                        body: responseBody || {
+                            transportError: error instanceof Error ? error.message : String(error)
+                        }
+                    }
+                };
+
+                const finalError = error instanceof Error ? error : new Error(String(error));
+                (finalError as Error & { debug?: AIDebugExchange }).debug = debug;
+                throw finalError;
+            }
+        }
+
+        throw new Error('AI provider not supported');
+    },
+
     planBackfillToolCallsWithDebug: async (
         text: string,
         context: {
@@ -626,6 +1216,8 @@ ${text}
             defaultDate: string;
             categories: Category[];
             scopes: Scope[];
+            personaPrompt?: string;
+            conversationHistory?: AIConversationTurn[];
             latestLog?: {
                 endDateTime: string;
                 date: string;
@@ -709,6 +1301,8 @@ Arguments schema:
   "progressIncrement": 1
 }
 
+${buildPersonaInstruction(context.personaPrompt)}
+
 Requirements:
 1. Output ONLY a valid JSON object.
 2. JSON schema:
@@ -780,10 +1374,7 @@ ${text}
             };
             const body = {
                 model: config.modelName,
-                messages: [
-                    { role: 'system', content: systemPrompt.trim() },
-                    { role: 'user', content: userPrompt.trim() }
-                ],
+                messages: buildOpenAIMessageList(systemPrompt, userPrompt, context.conversationHistory),
                 response_format: { type: 'json_object' }
             };
             const requestedAt = new Date().toISOString();
@@ -862,7 +1453,7 @@ ${text}
                 'Content-Type': 'application/json'
             };
             const body = {
-                contents: [{ parts: [{ text: userPrompt.trim() }] }],
+                contents: buildGeminiContents(userPrompt, context.conversationHistory),
                 system_instruction: { parts: [{ text: systemPrompt.trim() }] },
                 generationConfig: {
                     response_mime_type: 'application/json'
@@ -940,6 +1531,319 @@ ${text}
         throw new Error('AI provider not supported');
     },
 
+    planTodoToolCallsWithDebug: async (
+        text: string,
+        context: {
+            currentDateTime: string;
+            defaultDate: string;
+            todoCategories: TodoCategory[];
+            activityCategories: Category[];
+            scopes: Scope[];
+            personaPrompt?: string;
+            conversationHistory?: AIConversationTurn[];
+        },
+        options: AIRequestOptions = {}
+    ): Promise<AITodoToolPlanningResult> => {
+        const config = aiService.getConfig();
+        const fetchFn = Capacitor.isNativePlatform() ? nativeFetch : fetch;
+
+        if (!config.apiKey?.trim()) {
+            throw new Error('请先在设置中完成 AI 配置。');
+        }
+
+        const todoCategoryContext = context.todoCategories.map((todoCategory) => ({
+            id: todoCategory.id,
+            name: todoCategory.name
+        }));
+
+        const activityCategoryContext = context.activityCategories.map((category) => ({
+            id: category.id,
+            name: category.name,
+            activities: category.activities.map((activity) => ({
+                id: activity.id,
+                name: activity.name
+            }))
+        }));
+
+        const scopeContext = context.scopes.map((scope) => ({
+            id: scope.id,
+            name: scope.name
+        }));
+
+        const systemPrompt = `
+Role: You are LumosTime's todo planning assistant with tool planning ability.
+Task: Read the user's message, decide whether one or more todos should be created, and separate your natural-language reply from the tool calls.
+
+Context:
+- Current DateTime: ${context.currentDateTime}
+- Default Date: ${context.defaultDate}
+- Available Todo Categories: ${JSON.stringify(todoCategoryContext)}
+- Available Activity Categories and Activities: ${JSON.stringify(activityCategoryContext)}
+- Available Scopes: ${JSON.stringify(scopeContext)}
+
+Available Tool:
+1. create_todo
+Arguments schema:
+{
+  "title": "string",
+  "categoryId": "todo category id",
+  "linkedCategoryId": "activity category id",
+  "linkedActivityId": "activity id",
+  "defaultScopeIds": ["scope id"],
+  "note": "string",
+  "scheduledDate": "YYYY-MM-DD",
+  "deadlineDate": "YYYY-MM-DD",
+  "recurrenceRule": {
+    "frequency": "daily | weekly | monthly",
+    "startDate": "YYYY-MM-DD",
+    "endDate": "YYYY-MM-DD",
+    "interval": 1,
+    "weekdays": [1, 3, 5],
+    "monthDays": [1, 15]
+  }
+}
+
+${buildPersonaInstruction(context.personaPrompt)}
+
+Requirements:
+1. Output ONLY a valid JSON object.
+2. JSON schema:
+{
+  "assistantReply": "string",
+  "toolCalls": [
+    {
+      "toolName": "create_todo",
+      "args": { ... }
+    }
+  ]
+}
+3. assistantReply is what the user will read in the chat.
+4. toolCalls is what the app will apply directly.
+5. If the user asks to create multiple todos, emit multiple toolCalls.
+6. title and categoryId are required for every todo.
+7. linkedCategoryId, linkedActivityId, and defaultScopeIds must come from the provided context exactly. Do not invent IDs.
+8. Use the minimal matching principle for scopes. Better to leave defaultScopeIds empty than to guess incorrectly.
+9. Distinguish the date fields strictly:
+   - scheduledDate = the day the user plans to do it
+   - deadlineDate = the latest day it should be finished
+   - recurrenceRule = a repeating pattern, not a single-day arrangement
+10. If the user does not mention any date, do not include scheduledDate, deadlineDate, or recurrenceRule.
+11. If the user only mentions a scheduled day, only include scheduledDate.
+12. If the user only mentions a deadline, only include deadlineDate.
+13. If the user only mentions recurrence, only include recurrenceRule.
+14. If the request is too ambiguous to create a todo safely, keep toolCalls empty and ask one short follow-up question in assistantReply.
+15. Do not output duplicate toolCalls.
+`;
+
+        const userPrompt = `
+Current DateTime: ${context.currentDateTime}
+Default Date: ${context.defaultDate}
+User Message:
+${text}
+`;
+
+        const normalizePlan = (rawPlan: any): AITodoToolPlan => {
+            const fallbackCategoryId = context.todoCategories[0]?.id || '';
+            const toolCalls = Array.isArray(rawPlan?.toolCalls)
+                ? rawPlan.toolCalls.filter((call: any) => call?.toolName === 'create_todo' && call?.args)
+                : [];
+
+            return {
+                assistantReply: typeof rawPlan?.assistantReply === 'string' ? rawPlan.assistantReply : '',
+                toolCalls: toolCalls.map((call: any) => ({
+                    toolName: 'create_todo' as const,
+                    args: {
+                        title: String(call.args.title || '').trim(),
+                        categoryId: String(call.args.categoryId || fallbackCategoryId || ''),
+                        ...(call.args.linkedCategoryId ? { linkedCategoryId: String(call.args.linkedCategoryId) } : {}),
+                        ...(call.args.linkedActivityId ? { linkedActivityId: String(call.args.linkedActivityId) } : {}),
+                        ...(Array.isArray(call.args.defaultScopeIds)
+                            ? { defaultScopeIds: call.args.defaultScopeIds.map((id: any) => String(id)) }
+                            : {}),
+                        ...(typeof call.args.note === 'string' && call.args.note.trim()
+                            ? { note: call.args.note.trim() }
+                            : {}),
+                        ...(typeof call.args.scheduledDate === 'string' && call.args.scheduledDate.trim()
+                            ? { scheduledDate: call.args.scheduledDate.trim() }
+                            : {}),
+                        ...(typeof call.args.deadlineDate === 'string' && call.args.deadlineDate.trim()
+                            ? { deadlineDate: call.args.deadlineDate.trim() }
+                            : {}),
+                        ...(normalizeTodoRecurrenceRule(call.args.recurrenceRule)
+                            ? { recurrenceRule: normalizeTodoRecurrenceRule(call.args.recurrenceRule) }
+                            : {})
+                    }
+                })).filter((call) => Boolean(call.args.title))
+            };
+        };
+
+        if (config.provider === 'openai') {
+            const url = `${config.baseUrl}/chat/completions`;
+            const headers = {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${config.apiKey}`
+            };
+            const body = {
+                model: config.modelName,
+                messages: buildOpenAIMessageList(systemPrompt, userPrompt, context.conversationHistory),
+                response_format: { type: 'json_object' }
+            };
+            const requestedAt = new Date().toISOString();
+            let responseStatus = 0;
+            let responseOk = false;
+            let responseBody: unknown = null;
+
+            try {
+                const response = await fetchFn(url, {
+                    method: 'POST',
+                    headers,
+                    body: JSON.stringify(body),
+                    ...(options.signal ? { signal: options.signal } : {})
+                });
+                responseStatus = response.status || 0;
+                responseOk = Boolean(response.ok);
+                responseBody = await response.json();
+
+                const debug: AIDebugExchange = {
+                    provider: 'openai',
+                    requestedAt,
+                    completedAt: new Date().toISOString(),
+                    request: {
+                        url: sanitizeDebugUrl(url),
+                        method: 'POST',
+                        headers: sanitizeDebugHeaders(headers),
+                        body
+                    },
+                    response: {
+                        status: responseStatus,
+                        ok: responseOk,
+                        body: responseBody
+                    }
+                };
+
+                if ((responseBody as any)?.error) {
+                    const error = new Error((responseBody as any).error.message || 'AI 请求失败');
+                    (error as Error & { debug?: AIDebugExchange }).debug = debug;
+                    throw error;
+                }
+
+                const rawContent = (responseBody as any)?.choices?.[0]?.message?.content || '{}';
+                return {
+                    plan: normalizePlan(aiService.cleanAndParseJSONObject(rawContent)),
+                    debug
+                };
+            } catch (error) {
+                const debug: AIDebugExchange = {
+                    provider: 'openai',
+                    requestedAt,
+                    completedAt: new Date().toISOString(),
+                    request: {
+                        url: sanitizeDebugUrl(url),
+                        method: 'POST',
+                        headers: sanitizeDebugHeaders(headers),
+                        body
+                    },
+                    response: {
+                        status: responseStatus,
+                        ok: responseOk,
+                        body: responseBody || {
+                            transportError: error instanceof Error ? error.message : String(error)
+                        }
+                    }
+                };
+
+                const finalError = error instanceof Error ? error : new Error(String(error));
+                (finalError as Error & { debug?: AIDebugExchange }).debug = debug;
+                throw finalError;
+            }
+        }
+
+        if (config.provider === 'gemini') {
+            const baseUrl = config.baseUrl || 'https://generativelanguage.googleapis.com/v1beta/models';
+            const url = `${baseUrl}/${config.modelName}:generateContent?key=${config.apiKey}`;
+            const headers = {
+                'Content-Type': 'application/json'
+            };
+            const body = {
+                contents: buildGeminiContents(userPrompt, context.conversationHistory),
+                system_instruction: { parts: [{ text: systemPrompt.trim() }] },
+                generationConfig: {
+                    response_mime_type: 'application/json'
+                }
+            };
+            const requestedAt = new Date().toISOString();
+            let responseStatus = 0;
+            let responseOk = false;
+            let responseBody: unknown = null;
+
+            try {
+                const response = await fetchFn(url, {
+                    method: 'POST',
+                    headers,
+                    body: JSON.stringify(body),
+                    ...(options.signal ? { signal: options.signal } : {})
+                });
+                responseStatus = response.status || 0;
+                responseOk = Boolean(response.ok);
+                responseBody = await response.json();
+
+                const debug: AIDebugExchange = {
+                    provider: 'gemini',
+                    requestedAt,
+                    completedAt: new Date().toISOString(),
+                    request: {
+                        url: sanitizeDebugUrl(url),
+                        method: 'POST',
+                        headers: sanitizeDebugHeaders(headers),
+                        body
+                    },
+                    response: {
+                        status: responseStatus,
+                        ok: responseOk,
+                        body: responseBody
+                    }
+                };
+
+                if ((responseBody as any)?.error) {
+                    const error = new Error((responseBody as any).error.message || 'AI 请求失败');
+                    (error as Error & { debug?: AIDebugExchange }).debug = debug;
+                    throw error;
+                }
+
+                const rawContent = (((responseBody as any)?.candidates?.[0]?.content?.parts?.[0]?.text) || '{}');
+                return {
+                    plan: normalizePlan(aiService.cleanAndParseJSONObject(rawContent)),
+                    debug
+                };
+            } catch (error) {
+                const debug: AIDebugExchange = {
+                    provider: 'gemini',
+                    requestedAt,
+                    completedAt: new Date().toISOString(),
+                    request: {
+                        url: sanitizeDebugUrl(url),
+                        method: 'POST',
+                        headers: sanitizeDebugHeaders(headers),
+                        body
+                    },
+                    response: {
+                        status: responseStatus,
+                        ok: responseOk,
+                        body: responseBody || {
+                            transportError: error instanceof Error ? error.message : String(error)
+                        }
+                    }
+                };
+
+                const finalError = error instanceof Error ? error : new Error(String(error));
+                (finalError as Error & { debug?: AIDebugExchange }).debug = debug;
+                throw finalError;
+            }
+        }
+
+        throw new Error('AI provider not supported');
+    },
+
     parseTodoText: async (
         text: string,
         context: {
@@ -948,109 +1852,21 @@ ${text}
             scopes: Scope[];
         }
     ): Promise<AIParsedTodo[]> => {
-        const config = aiService.getConfig();
-        const fetchFn = Capacitor.isNativePlatform() ? nativeFetch : fetch;
-
-        // Simplify context for AI
-        const todoCats = context.todoCategories.map(c => ({ id: c.id, name: c.name }));
-        const activityCats = context.activityCategories.map(c => ({
-            categoryName: c.name,
-            activities: c.activities.map(a => ({ id: a.id, name: a.name }))
-        }));
-        const scopeList = context.scopes.map(s => ({ id: s.id, name: s.name }));
-
-        const systemPrompt = `
-Role: You are a smart task organizer for a Todo app.
-Task: Parse the user's natural language input into structured todo tasks.
-
-Context Data:
-1. **Todo Lists** (Assign 'categoryId'):
-${JSON.stringify(todoCats)}
-
-2. **Activity Tags** (Assign 'linkedActivityId'):
-${JSON.stringify(activityCats)}
-(Find the most relevant activity. If none fits well, leave it empty.)
-
-3. **Professional Scopes** (Assign 'defaultScopeIds' array):
-${JSON.stringify(scopeList)}
-(Select all relevant scopes based on the context.)
-
-Requirements:
-1. **Extract Tasks**: Split the input into multiple tasks if the user mentions multiple things.
-2. **Analyze**: For each task, infer the best Todo List, Activity Tag, and Scopes based on semantic meaning.
-3. **Format**: Return a JSON Array of objects.
-4. **Strict JSON**: Output ONLY valid JSON.
-5. **Scope Inference**: Adopt a **Minimal Matching Principle**. Only suggest a Scope if you are highly confident it matches based on the user's explicit intent or strong semantic connection. **Better to leave 'defaultScopeIds' empty than to guess incorrectly.**
-
-JSON Output Schema:
-[
-  {
-    "title": "Task Name",
-    "categoryId": "ID from Todo Lists (Required, pick best fit or default)",
-    "linkedActivityId": "ID from Activity Tags (Optional)",
-    "defaultScopeIds": ["ID from Scopes", ...]
-  }
-]
-`;
-
         try {
-            if (config.provider === 'openai') {
-                const response = await fetchFn(`${config.baseUrl}/chat/completions`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${config.apiKey}`
-                    },
-                    body: JSON.stringify({
-                        model: config.modelName,
-                        messages: [
-                            { role: 'system', content: systemPrompt },
-                            { role: 'user', content: text }
-                        ],
-                        response_format: { type: "json_object" }
-                    })
-                });
-                const data = await response.json();
-                if (data.error) throw new Error(data.error.message);
+            const planningResult = await aiService.planTodoToolCallsWithDebug(text, {
+                currentDateTime: new Date().toISOString(),
+                defaultDate: new Date().toISOString().slice(0, 10),
+                todoCategories: context.todoCategories,
+                activityCategories: context.activityCategories,
+                scopes: context.scopes
+            });
 
-                const content = data.choices[0].message.content;
-                const parsed = aiService.cleanAndParseJSON(content) as any[];
-                return parsed.map(item => ({
-                    ...item,
-                    defaultScopeIds: item.defaultScopeIds || item.scopeIds || []
-                })) as AIParsedTodo[];
-            }
-
-            if (config.provider === 'gemini') {
-                const baseUrl = config.baseUrl || 'https://generativelanguage.googleapis.com/v1beta/models';
-                const url = `${baseUrl}/${config.modelName}:generateContent?key=${config.apiKey}`;
-
-                const body = {
-                    contents: [{ role: 'user', parts: [{ text: text }] }],
-                    system_instruction: { parts: [{ text: systemPrompt }] },
-                    generationConfig: {
-                        response_mime_type: "application/json"
-                    }
-                };
-
-                const response = await fetchFn(url, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(body)
-                });
-                const data = await response.json();
-
-                if (data.error) throw new Error(data.error.message);
-                const content = data.candidates?.[0]?.content?.parts?.[0]?.text;
-                if (!content) throw new Error('No content in Gemini response');
-
-                return (aiService.cleanAndParseJSON(content) as any[]).map(item => ({
-                    ...item,
-                    defaultScopeIds: item.defaultScopeIds || item.scopeIds || []
-                })) as AIParsedTodo[];
-            }
-
-            return [];
+            return planningResult.plan.toolCalls.map((toolCall) => ({
+                title: toolCall.args.title,
+                categoryId: toolCall.args.categoryId,
+                linkedActivityId: toolCall.args.linkedActivityId,
+                defaultScopeIds: toolCall.args.defaultScopeIds || []
+            }));
         } catch (error) {
             console.error('Todo Parsing Error', error);
             throw new Error('Failed to parse tasks');

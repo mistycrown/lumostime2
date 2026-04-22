@@ -18,8 +18,7 @@ Overlay components for complex interactions.
 - `TodoDuplicateModal.tsx`: Lightweight pre-copy modal for renaming duplicated todos and clearing dates, tags, or scopes before creation.
 - `TodoQuickActionsModal.tsx`: Shared quick-actions bottom sheet for lightweight todo scheduling, completion, and detail-entry flows reused by list-row taps and week-plan badges.
 - `GoalEditor.tsx`: Goal creation and editing.
-- `AIBatchModal.tsx`: AI 补记弹窗，支持中文自然语言输入、解析复核与批量保存。
-- `AIBackfillChatModal.tsx`: AI 补记全屏对话页，默认按今天理解对话，支持命令式调试、按每条工具调用自带日期直接应用补记，并在应用结果里显示具体日期以便编辑或撤销。
+- `AIBackfillChatModal.tsx`: Unified AI full-screen chat workspace that keeps persistent session history, opens a history drawer from the top-right action, lets the title avatar open persona presets/customization, supports a per-session quick-context toggle, and routes each turn into闲聊、AI 补记或 AI 添加待办 with direct local tool application plus per-result edit/undo and debug inspection.
 - `AddActivityModal.tsx`: Creating new activities.
 - `ConfirmModal.tsx`: specialized confirmation dialogs.
 - `NarrativeStyleSelectionModal.tsx`: AI narrative style picker.
@@ -93,6 +92,20 @@ Components for theme and appearance customization.
 - `achievement/AchievementBottleIconPackSelector.tsx`: 已改为成就瓶图标包卡片选择器，支持更紧凑的预览式切换。
 - `achievement/AchievementBottleStyleSelector.tsx`: 已改为成就瓶样式卡片选择器，使用玻璃瓶身小预览区分不同气质。
 > Last updated: 2026-04-22
+- `AIBackfillChatModal.tsx`: The shared AI window can now stay mounted at the app level while hidden, so closing the modal does not abort requests that are already running in the background.
+- `AIBackfillChatModal.tsx`, `aiService.ts`: Simplified intent routing into a lightweight message-only classification step, removed apply-success toasts because result cards already reflect tool execution, and now only pass unfinished todos into backfill planning context.
+- `AIBackfillChatModal.tsx`: Replaced the old delete-style top-right action with a history drawer, keeps users in one default conversation flow, and only allows creating a new session from the history panel.
+- `AIBackfillChatModal.tsx`: The todo-page magic button now opens this same shared dialog, replacing the older dedicated AI todo parse/confirm modals with one unified conversation entry.
+- `AIBackfillChatModal.tsx`: History-session cards now support inline rename plus guarded delete, and deleting the last session automatically recreates a clean fallback conversation.
+- `AIBackfillChatModal.tsx`: Added persona presets plus editable avatar/name/addressing/system-prompt settings, with session-level persona binding so different conversations can keep different assistant styles.
+- `AIBackfillChatModal.tsx`: AI settings now keep avatar editing inside the same panel, replacing the old emoji prompt with an inline editor plus quick emoji choices and a clearer two-column settings layout.
+- `AIBackfillChatModal.tsx`: The emoji-avatar editor now removes the redundant draft preview tile, and emoji avatars render more centrally inside the round chat/header avatar containers.
+- `AIBackfillChatModal.tsx`: Recent dialogue rounds are now pulled through an explicit per-session conversation-history cache before formal AI requests, and persona selection uses a subtle checkmark state instead of turning the whole card black.
+- `AIBackfillChatModal.tsx`: The empty-chat state is now reduced to concise backfill/todo examples, and the built-in personas have been refreshed into more distinctive presets with customized user call names.
+- `AIBackfillChatModal.tsx`: Custom personas can now be deleted from the settings panel with inline confirmation, and any sessions using that persona automatically fall back to the default built-in preset.
+- `AIBackfillChatModal.tsx`: Added a quick-context cache toggle that can send the most recent `n` conversation rounds with each AI request, where `n` is configured by the active persona.
+- `AIBackfillChatModal.tsx`: The shared AI dialog now runs a lightweight intent-classification pass before formal execution, can directly create todos alongside logs, and exposes quick open-detail / undo actions for AI-created todos.
+- `AIBackfillChatModal.tsx`: AI-applied logs and todos now re-check auto-link rules before saving so missing rule-based domains are merged in even when the model returns incomplete scope data.
 - `AIBackfillChatModal.tsx`: AI backfill chat now defaults to today, passes latest-log and todo hierarchy context into tool planning, applies per-call dated records locally, and shows full date-aware results for cross-day or past-day backfills.
 - `TodoDetailModal.tsx`: Styled the inherited parent-task jump target with a dashed underline so the subtask detail page makes that link state more obvious.
 - `TodoDetailModal.tsx`: Parent todo timeline tabs now aggregate direct child-task logs into the same history list and duration stats while keeping manual progress recalculation scoped to the current todo's own logs.

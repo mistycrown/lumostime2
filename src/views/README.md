@@ -28,8 +28,10 @@ The views are designed as "dumb" or "presentational" components where possible, 
 
 > ⚠️ **Note**: When modifying views, ensure that new state requirements are coordinated with `App.tsx` if they affect global data (Logs, Categories, Todos).
 
-> Last updated: 2026-04-21
+> Last updated: 2026-04-22
+- `TimelineView.tsx`, `TodoView.tsx`: Their AI entry buttons now open one app-level shared AI window that stays mounted in the background, so closing the modal UI no longer interrupts an in-flight AI request.
 - `TimelineView.tsx`: Replaced the floating AI backfill button's old parse modal with a new chat-first dialog that keeps local per-day conversation history while sending each message as an independent AI turn.
+- `TodoView.tsx`: Replaced the old dedicated `AI 添加待办` parse/confirm modals with the same shared AI chat workspace used elsewhere, so the todo-page magic button now opens one unified conversation flow.
 - `TodoView.tsx`: Virtual-schedule parent rows now reuse the hierarchy toggle so a `0/1` badge can expand matching child todos inline, while absorbed child rows stop rendering as duplicate standalone schedule items.
 - `TodoView.tsx`: Compact virtual-schedule badges now abbreviate long labels like `Arrange` and `Repeat` to three-letter forms such as `Arr` and `Rep`.
 - `TodoView.tsx`: Nudged the compact `0/1` hierarchy capsule upward again so it sits a bit higher against the compact row center line.
