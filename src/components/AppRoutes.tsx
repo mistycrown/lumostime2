@@ -385,6 +385,7 @@ export const AppRoutes: React.FC<AppRoutesProps> = ({
                         todoCategories={todoCategories}
                         scopes={scopes}
                         dailyReviews={dailyReviews}
+                        checkTemplates={checkTemplates}
                         forcedRange={statsRange || undefined}
                     />
                 </React.Suspense>

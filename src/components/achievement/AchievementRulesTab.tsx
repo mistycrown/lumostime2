@@ -3,6 +3,7 @@
  * @input Achievement rules plus category, scope, todo, and daily-check metadata for editing targets
  * @output Rule list rows and a modal editor that can safely edit temporary empty numeric input states
  * @description Achievement rule list and modal editor, reusing the shared selectors plus inline filter expressions for duration-based custom matching.
+ * @updated 2026-04-25: Added a fixed per-rule streak toggle for check-category rules without exposing custom streak-tier editing in the UI.
  * @updated 2026-04-17: Added filter-duration rules backed by inline custom filter expressions.
  */
 import React, { useEffect, useMemo, useState } from 'react';
@@ -24,6 +25,7 @@ interface AchievementRulesTabProps {
     effectType: 'earn' | 'spend';
     targetType: AchievementRule['targetType'];
     targetIds: string[];
+    useCheckStreakMultiplier?: boolean;
     filterExpression?: string;
     unitAmount: number;
     deltaPerUnit: number;
@@ -38,6 +40,7 @@ interface RuleDraft {
   effectType: 'earn' | 'spend';
   targetType: AchievementRule['targetType'];
   targetIds: string[];
+  useCheckStreakMultiplier: boolean;
   filterExpression: string;
   unitAmount: number;
   deltaPerUnit: number;
@@ -64,6 +67,7 @@ const createEmptyDraft = (): RuleDraft => ({
   effectType: 'earn',
   targetType: 'activity',
   targetIds: [],
+  useCheckStreakMultiplier: false,
   filterExpression: '',
   unitAmount: 30,
   deltaPerUnit: 1,
@@ -104,6 +108,7 @@ const isSameRuleDraft = (left: RuleDraft, right: RuleDraft) => (
   left.targetType === right.targetType &&
   left.unitAmount === right.unitAmount &&
   left.deltaPerUnit === right.deltaPerUnit &&
+  left.useCheckStreakMultiplier === right.useCheckStreakMultiplier &&
   left.filterExpression === right.filterExpression &&
   left.note === right.note &&
   left.targetIds.length === right.targetIds.length &&
@@ -238,6 +243,7 @@ export const AchievementRulesTab: React.FC<AchievementRulesTabProps> = ({
         effectType: selectedRule.effectType,
         targetType: selectedRule.targetType,
         targetIds: selectedRule.targetIds,
+        useCheckStreakMultiplier: selectedRule.useCheckStreakMultiplier === true,
         filterExpression: selectedRule.filterExpression || '',
         unitAmount: selectedRule.unitAmount,
         deltaPerUnit: selectedRule.deltaPerUnit,
@@ -314,7 +320,6 @@ export const AchievementRulesTab: React.FC<AchievementRulesTabProps> = ({
 
     return baseOptions;
   }, [checkTemplates, draft.targetIds]);
-
   const closeDialog = () => {
     setDialogMode(null);
     setSelectedRuleId(null);
@@ -349,6 +354,7 @@ export const AchievementRulesTab: React.FC<AchievementRulesTabProps> = ({
       ...previous,
       targetType,
       targetIds: targetType === 'filterDuration' ? previous.targetIds : [],
+      useCheckStreakMultiplier: targetType === 'checkCategory' ? previous.useCheckStreakMultiplier : false,
       unitAmount: nextUnitAmount
     }));
   };
@@ -369,6 +375,7 @@ export const AchievementRulesTab: React.FC<AchievementRulesTabProps> = ({
         effectType: draft.effectType,
         targetType: draft.targetType,
         targetIds: normalizedTargetIds,
+        useCheckStreakMultiplier: draft.targetType === 'checkCategory' ? draft.useCheckStreakMultiplier : false,
         filterExpression: normalizedFilterExpression,
         unitAmount: normalizedUnitAmount,
         deltaPerUnit: normalizedDeltaPerUnit,
@@ -385,6 +392,7 @@ export const AchievementRulesTab: React.FC<AchievementRulesTabProps> = ({
         effectType: draft.effectType,
         targetType: draft.targetType,
         targetIds: normalizedTargetIds,
+        useCheckStreakMultiplier: draft.targetType === 'checkCategory' ? draft.useCheckStreakMultiplier : false,
         filterExpression: normalizedFilterExpression,
         unitAmount: normalizedUnitAmount,
         deltaPerUnit: normalizedDeltaPerUnit,
@@ -609,6 +617,37 @@ export const AchievementRulesTab: React.FC<AchievementRulesTabProps> = ({
               <div className="mt-2 text-xs text-stone-400">Current: {formatAchievementStars(draft.deltaPerUnit)} 光点</div>
             </label>
           </div>
+
+          {draft.targetType === 'checkCategory' && (
+            <div className="flex items-center justify-between gap-4 rounded-3xl border border-stone-200 px-4 py-4">
+              <div>
+                <div className="text-[11px] uppercase tracking-[0.14em] text-stone-400">连胜倍率</div>
+                <p className="mt-2 text-xs leading-6 text-stone-500">
+                  开启后连胜打卡积分按倍率计算：5天 1.2x，15天 1.5x，30天 2.0x。
+                </p>
+              </div>
+              <div className="flex items-center justify-between gap-4">
+                <button
+                  type="button"
+                  onClick={() => setDraft((previous) => ({ ...previous, useCheckStreakMultiplier: !previous.useCheckStreakMultiplier }))}
+                  aria-pressed={draft.useCheckStreakMultiplier}
+                  className="inline-flex items-center bg-transparent px-0 py-0"
+                >
+                  <span
+                    className={`relative h-7 w-12 rounded-full transition-colors ${
+                      draft.useCheckStreakMultiplier ? 'bg-stone-900' : 'bg-stone-200'
+                    }`}
+                  >
+                    <span
+                      className={`absolute top-1 h-5 w-5 rounded-full bg-white shadow-sm transition-all ${
+                        draft.useCheckStreakMultiplier ? 'left-6' : 'left-1'
+                      }`}
+                    />
+                  </span>
+                </button>
+              </div>
+            </div>
+          )}
 
           {draft.targetType === 'activity' ? (
             <div>

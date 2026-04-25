@@ -18,14 +18,12 @@ import kotlin.math.min
 object WidgetDailyRuntimeBitmapRenderer {
     private const val GRID_COLUMNS = 24
     private const val GRID_ROWS = 6
-    private const val DEFAULT_MAX_LEGEND_ITEMS = 3
     private const val EMPTY_CELL_COLOR = "#F1F5F9"
 
     private data class DailyRuntimeRenderSpec(
         val bitmapWidthDp: Float,
         val bitmapHeightDp: Float,
-        val showLegend: Boolean,
-        val maxLegendItems: Int = DEFAULT_MAX_LEGEND_ITEMS
+        val showLegend: Boolean
     )
 
     private data class DailyRuntimeLayout(
@@ -136,8 +134,7 @@ object WidgetDailyRuntimeBitmapRenderer {
                 density = density,
                 namePaint = legendNamePaint,
                 durationPaint = legendDurationPaint,
-                metrics = legendMetrics,
-                maxLegendItems = spec.maxLegendItems
+                metrics = legendMetrics
             )
         }
 
@@ -212,10 +209,9 @@ object WidgetDailyRuntimeBitmapRenderer {
         density: Float,
         namePaint: Paint,
         durationPaint: Paint,
-        metrics: LegendMetrics,
-        maxLegendItems: Int
+        metrics: LegendMetrics
     ) {
-        val legend = viewData?.legend.orEmpty().take(maxLegendItems)
+        val legend = viewData?.legend.orEmpty()
         if (legend.isEmpty()) {
             val emptyPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                 color = parseColor("#CBD5E1")

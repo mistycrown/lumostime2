@@ -4,6 +4,7 @@
  * @output TypeScript Interfaces & Types
  * @pos Type Definitions (Shared contract)
  * @description Defines the core data structures (Log, TodoItem, Category, Activity, Filter order metadata, etc.) used throughout the application.
+ * @updated 2026-04-25: Added global check streak multiplier config plus category-level streak toggles for achievement weighting.
  * @updated 2026-04-21: Added one-level todo hierarchy support via optional `parentTodoId` and `childOrder` fields.
  * @updated 2026-04-21: Added an optional boolean `pin` flag for prioritizing todos in the today schedule list.
  * @updated 2026-04-20: Added configurable todo duplication options for quick-copy editing.
@@ -270,6 +271,7 @@ export interface AchievementRule {
   effectType: 'earn' | 'spend';
   targetType: AchievementRuleTargetType;
   targetIds: string[];
+  useCheckStreakMultiplier?: boolean;
   filterExpression?: string;
   unitAmount: number;
   deltaPerUnit: number;
@@ -285,6 +287,7 @@ export interface AchievementDailyRuleBreakdown {
   effectType: 'earn' | 'spend';
   targetType: AchievementRuleTargetType;
   matchedValue: number;
+  useCheckStreakMultiplier?: boolean;
   filterExpression?: string;
   unitAmount: number;
   deltaPerUnit: number;
@@ -369,6 +372,16 @@ export interface AchievementBottleActionRecord {
   occurredAt: number;
 }
 
+export interface CheckStreakTier {
+  thresholdDays: number;
+  multiplier: number;
+}
+
+export interface CheckStreakConfig {
+  enabled: boolean;
+  tiers: CheckStreakTier[];
+}
+
 export interface AchievementSealPreview {
   startDate: string;
   endDate: string;
@@ -382,6 +395,7 @@ export interface AchievementSealPreview {
 export interface AchievementMeta {
   achievementStartDate: string | null;
   activeBottleCarryoverStars: number;
+  checkStreakConfig?: CheckStreakConfig;
 }
 
 export enum AppView {

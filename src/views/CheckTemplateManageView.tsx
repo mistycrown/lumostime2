@@ -27,7 +27,6 @@ import * as LucideIcons from 'lucide-react';
 import { CheckTemplate, CheckTemplateItem } from '../types';
 import { ConfirmModal } from '../components/ConfirmModal';
 import { IconRenderer } from '../components/IconRenderer';
-import { useSettings } from '../contexts/SettingsContext';
 import { scanCheckItems, batchRenameCheckItems, batchDeleteCheckItems } from '../utils/checkItemBatchOperations';
 import { CheckTemplateItemRow } from '../components/CheckTemplateItemRow';
 import { DEFAULT_CHECK_TEMPLATES, DEFAULT_MANUAL_CHECK_TEMPLATES } from '../constants';
