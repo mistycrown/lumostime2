@@ -5,6 +5,7 @@
  * @pos Hook
  * @description Imports completed timer widget actions into logs, mirrors timer runtime state, syncs daily widget progress to native, and replays queued daily taps back into review state.
  * @updated 2026-04-25: Syncs today's DAILY_RUNTIME heatmap payload so the dedicated 4x4 widget reflects logs and live sessions.
+ * @updated 2026-04-25: Strips unsupported widget UI icon assets on app startup so expired supporter access falls back to emoji rendering.
  */
 import { App as CapacitorApp } from '@capacitor/app';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -13,13 +14,19 @@ import { useData } from '../contexts/DataContext';
 import { useReview } from '../contexts/ReviewContext';
 import { useSession } from '../contexts/SessionContext';
 import WidgetBridge from '../plugins/WidgetBridgePlugin';
+import { RedemptionService } from '../services/redemptionService';
+import { uiIconService } from '../services/uiIconService';
 import {
   buildDailyRuntimeWidgetPayload,
   buildDailyWidgetSyncPayload,
   buildLogFromWidgetPendingAction,
   buildWidgetRuntimeStateFromSession,
   buildWidgetSessionFromRuntimeState,
-  isNativeAndroidWidgetSupported
+  isNativeAndroidWidgetSupported,
+  loadWidgetTemplatesFromStorage,
+  normalizeWidgetTemplates,
+  sanitizeWidgetTemplatesForUiIconSupport,
+  saveWidgetTemplatesToStorage
 } from '../services/widgetService';
 import { applyDailyCheckActionForDate } from '../utils/dailyCheckUtils';
 
@@ -48,6 +55,51 @@ export const useWidgetBridgeSync = () => {
       reviewTemplates
     };
   }, [checkTemplates, dailyReviews, reviewTemplates]);
+
+  useEffect(() => {
+    if (!isNativeAndroidWidgetSupported()) {
+      return;
+    }
+
+    let cancelled = false;
+
+    const sanitizeUnsupportedWidgetUiIcons = async () => {
+      try {
+        const redemptionService = new RedemptionService();
+        const verification = await redemptionService.isVerified();
+        const allowUiIcon = verification.isVerified && uiIconService.isCustomTheme();
+
+        if (cancelled || allowUiIcon) {
+          return;
+        }
+
+        const localTemplates = normalizeWidgetTemplates(loadWidgetTemplatesFromStorage());
+        const { templates: nativeTemplates } = await WidgetBridge.getTemplates();
+        if (cancelled) {
+          return;
+        }
+
+        const sourceTemplates =
+          nativeTemplates.length > 0 ? normalizeWidgetTemplates(nativeTemplates) : localTemplates;
+        const sanitizedTemplates = sanitizeWidgetTemplatesForUiIconSupport(sourceTemplates, false);
+
+        if (JSON.stringify(sanitizedTemplates) === JSON.stringify(sourceTemplates)) {
+          return;
+        }
+
+        saveWidgetTemplatesToStorage(sanitizedTemplates);
+        await WidgetBridge.saveTemplates({ templates: sanitizedTemplates });
+      } catch (error) {
+        console.error('[useWidgetBridgeSync] Failed to sanitize widget UI icon state', error);
+      }
+    };
+
+    void sanitizeUnsupportedWidgetUiIcons();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     if (!isNativeAndroidWidgetSupported()) {

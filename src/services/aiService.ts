@@ -5,6 +5,7 @@
  * @pos Service (AI Integration Layer)
  * @description AI 服务 - 处理与 AI 提供商（OpenAI/Gemini）的所有交互，包括配置管理、连接测试和提示执行
  * @updated 2026-04-25: Expanded AI intent routing and tool planning with dedicated edit-log, update-todo, and create-subtask flows that return id-plus-patch payloads for local application.
+ * @updated 2026-04-25: Tightened subtask planning so scheduled or deadline dates are only emitted when the user explicitly asked for them.
  * @updated 2026-04-22: Simplified unified-chat intent classification into a message-only lightweight routing step without extra runtime context.
  * @updated 2026-04-22: Added persona-aware formal prompts plus optional cached conversation history for unified AI chat sessions.
  * @updated 2026-04-22: Added two-stage AI chat support with lightweight intent classification, debug-aware chat replies, and direct todo tool planning alongside backfill planning.
@@ -1911,7 +1912,7 @@ Arguments schema:
   "title": "string",
   "categoryId": "todo category id",
   "linkedCategoryId": "activity category id",
-  "linkedActivityId": "activity id",
+  "linkedActivityId": "activity id (required)",
   "defaultScopeIds": ["scope id"],
   "note": "string",
   "scheduledDate": "YYYY-MM-DD",
@@ -1943,19 +1944,20 @@ Requirements:
 3. assistantReply is what the user will read in the chat.
 4. toolCalls is what the app will apply directly.
 5. If the user asks to create multiple todos, emit multiple toolCalls.
-6. title and categoryId are required for every todo.
-7. linkedCategoryId, linkedActivityId, and defaultScopeIds must come from the provided context exactly. Do not invent IDs.
-8. Use the minimal matching principle for scopes. Better to leave defaultScopeIds empty than to guess incorrectly.
-9. Distinguish the date fields strictly:
+6. title, categoryId, and linkedActivityId are required for every todo.
+7. Every newly created todo must be associated with one activity tag. If you cannot identify a reliable linkedActivityId from the provided context, do not create the todo yet.
+8. linkedCategoryId, linkedActivityId, and defaultScopeIds must come from the provided context exactly. Do not invent IDs.
+9. Use the minimal matching principle for scopes. Better to leave defaultScopeIds empty than to guess incorrectly.
+10. Distinguish the date fields strictly:
    - scheduledDate = the day the user plans to do it
    - deadlineDate = the latest day it should be finished
    - recurrenceRule = a repeating pattern, not a single-day arrangement
-10. If the user does not mention any date, do not include scheduledDate, deadlineDate, or recurrenceRule.
-11. If the user only mentions a scheduled day, only include scheduledDate.
-12. If the user only mentions a deadline, only include deadlineDate.
-13. If the user only mentions recurrence, only include recurrenceRule.
-14. If the request is too ambiguous to create a todo safely, keep toolCalls empty and ask one short follow-up question in assistantReply.
-15. Do not output duplicate toolCalls.
+11. If the user does not mention any date, do not include scheduledDate, deadlineDate, or recurrenceRule.
+12. If the user only mentions a scheduled day, only include scheduledDate.
+13. If the user only mentions a deadline, only include deadlineDate.
+14. If the user only mentions recurrence, only include recurrenceRule.
+15. If the request is too ambiguous to create a todo safely, or the tag cannot be identified safely, keep toolCalls empty and ask one short follow-up question in assistantReply.
+16. Do not output duplicate toolCalls.
 `;
 
         const userPrompt = `
@@ -2366,6 +2368,7 @@ ${text}
             }>;
             personaPrompt?: string;
             conversationHistory?: AIConversationTurn[];
+            allowDateFields?: boolean;
         },
         options: AIRequestOptions = {}
     ): Promise<AICreateSubtaskToolPlanningResult> => {
@@ -2384,6 +2387,7 @@ Context:
 - Current DateTime: ${context.currentDateTime}
 - Default Date: ${context.defaultDate}
 - Eligible Parent Todos: ${JSON.stringify(context.parentTodos)}
+- Allow Date Fields: ${context.allowDateFields !== false ? 'yes' : 'no'}
 
 Available Tool:
 1. create_subtask
@@ -2419,6 +2423,8 @@ Requirements:
 9. If the parent todo cannot be identified safely, keep toolCalls empty and ask one short follow-up question in assistantReply.
 10. Do not output duplicate toolCalls.
 11. If the user is actually asking to assign dates/times to existing subtasks, chapters, or parts, do not treat that as create_subtask.
+12. If the user only asked to create subtasks and did not explicitly request dates, every toolCall must omit scheduledDate and deadlineDate.
+13. If Allow Date Fields is "no", do not include scheduledDate or deadlineDate in any toolCall.
 `;
 
         const userPrompt = `
@@ -2427,6 +2433,8 @@ Default Date: ${context.defaultDate}
 User Message:
 ${text}
 `;
+
+        const allowDateFields = context.allowDateFields !== false;
 
         const normalizePlan = (rawPlan: any): AICreateSubtaskToolPlan => {
             const toolCalls = Array.isArray(rawPlan?.toolCalls)
@@ -2441,8 +2449,12 @@ ${text}
                         parentTodoId: String(call.args.parentTodoId || '').trim(),
                         title: String(call.args.title || '').trim(),
                         ...(typeof call.args.note === 'string' && call.args.note.trim() ? { note: call.args.note.trim() } : {}),
-                        ...(normalizeOptionalDateString(call.args.scheduledDate) ? { scheduledDate: normalizeOptionalDateString(call.args.scheduledDate)! } : {}),
-                        ...(normalizeOptionalDateString(call.args.deadlineDate) ? { deadlineDate: normalizeOptionalDateString(call.args.deadlineDate)! } : {})
+                        ...(allowDateFields && normalizeOptionalDateString(call.args.scheduledDate)
+                            ? { scheduledDate: normalizeOptionalDateString(call.args.scheduledDate)! }
+                            : {}),
+                        ...(allowDateFields && normalizeOptionalDateString(call.args.deadlineDate)
+                            ? { deadlineDate: normalizeOptionalDateString(call.args.deadlineDate)! }
+                            : {})
                     }
                 })).filter((call) => Boolean(call.args.parentTodoId) && Boolean(call.args.title))
             };

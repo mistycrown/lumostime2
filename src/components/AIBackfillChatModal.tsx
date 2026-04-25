@@ -5,6 +5,7 @@
  * @pos Component (AI Integration)
  * @description Provides the shared AI workspace for chat, backfill, and todo creation. Sessions persist locally, persona style is configurable per session, and recent context can be toggled into the formal AI request path.
  * @updated 2026-04-25: Added AI-driven todo updates, subtask creation, and log editing with local patch application plus undo support, and expanded intent routing so edit flows receive dedicated context and tool plans.
+ * @updated 2026-04-25: Rendered subtask result cards with `@分类 / 父任务`, and stripped AI-added subtask dates unless the user explicitly asked for scheduling.
  * @updated 2026-04-25: Corrected applied-todo metadata to render task category as `@`, linked activity hierarchy as `#`, and scope domains as `%`, while respecting the auto-link scope toggle when merging activity rules.
  * @updated 2026-04-25: Fixed the applied-todo detail action so newly created todo results stay clickable even if the live todo lookup lags behind the message render.
  * @updated 2026-04-25: Matched applied-result metadata to the context-page prefix syntax by removing icons and using `# / % / @` markers for tags, domains, and todos.
@@ -1732,6 +1733,47 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
       && subtaskKeywords.some((keyword) => normalized.includes(keyword));
   };
 
+  const hasExplicitSubtaskDateRequest = (text: string): boolean => {
+    const normalized = text.trim().toLowerCase();
+    const datePattern = /\b\d{4}[-/.]\d{1,2}[-/.]\d{1,2}\b|\b\d{1,2}[-/.]\d{1,2}\b/;
+    const explicitDateKeywords = [
+      '安排',
+      '排到',
+      '排在',
+      '哪天',
+      '什么时候',
+      '时间',
+      '日期',
+      '今天',
+      '明天',
+      '后天',
+      '这周',
+      '本周',
+      '下周',
+      '周一',
+      '周二',
+      '周三',
+      '周四',
+      '周五',
+      '周六',
+      '周日',
+      '星期一',
+      '星期二',
+      '星期三',
+      '星期四',
+      '星期五',
+      '星期六',
+      '星期天',
+      '星期日',
+      '截止',
+      'deadline',
+      'due'
+    ];
+
+    return datePattern.test(normalized)
+      || explicitDateKeywords.some((keyword) => normalized.includes(keyword));
+  };
+
   const getMatchedParentTodoIds = (text: string): string[] => (
     todos
       .filter((todo) => !todo.parentTodoId)
@@ -1743,6 +1785,24 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
   const shouldTreatAsExistingSubtaskScheduling = (text: string): boolean => (
     looksLikeSubtaskSchedulingRequest(text) && getMatchedParentTodoIds(text).length > 0
   );
+
+  const stripSubtaskDatesIfNotRequested = (
+    toolCalls: AICreateSubtaskToolCall[],
+    sourceText: string
+  ): AICreateSubtaskToolCall[] => {
+    if (hasExplicitSubtaskDateRequest(sourceText)) {
+      return toolCalls;
+    }
+
+    return toolCalls.map((toolCall) => ({
+      ...toolCall,
+      args: {
+        parentTodoId: toolCall.args.parentTodoId,
+        title: toolCall.args.title,
+        ...(toolCall.args.note ? { note: toolCall.args.note } : {})
+      }
+    }));
+  };
 
   const formatTimeKey = (timestamp: number): string => {
     const date = new Date(timestamp);
@@ -1973,12 +2033,12 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
           || getActivityById(args.linkedActivityId)
         : undefined;
 
-      if (!resolvedTodoCategory || !args.title.trim()) {
+      if (!resolvedTodoCategory || !args.title.trim() || !args.linkedActivityId || !resolvedActivity || !resolvedLinkedCategoryId) {
         actions.push({
           actionId: crypto.randomUUID(),
           kind: 'create_todo',
           status: 'failed',
-          errorMessage: '这条待办缺少标题或待办分类，我先没有替你自动创建。',
+          errorMessage: '这条待办缺少标题、待办分类，或没有识别出要关联的标签，我先没有替你自动创建。',
           snapshot: {
             title: args.title || '未命名待办',
             categoryId: resolvedTodoCategory?.id || '',
@@ -2166,11 +2226,14 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     return actions;
   };
 
-  const applyPlannedCreateSubtaskToolCalls = (toolCalls: AICreateSubtaskToolCall[]): AppliedChatAction[] => {
+  const applyPlannedCreateSubtaskToolCalls = (
+    toolCalls: AICreateSubtaskToolCall[],
+    sourceText: string
+  ): AppliedChatAction[] => {
     const actions: AppliedChatAction[] = [];
     let nextTodos = [...todos];
 
-    toolCalls.forEach((toolCall) => {
+    stripSubtaskDatesIfNotRequested(toolCalls, sourceText).forEach((toolCall) => {
       const { args } = toolCall;
       const parentTodo = nextTodos.find((todo) => todo.id === args.parentTodoId);
 
@@ -2704,12 +2767,14 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
       }
 
       if (resolvedIntent === 'create_subtask') {
+        const allowSubtaskDateFields = hasExplicitSubtaskDateRequest(trimmedText);
         const planningResult = await aiService.planCreateSubtaskToolCallsWithDebug(trimmedText, {
           currentDateTime,
           defaultDate: defaultDateKey,
           parentTodos: subtaskParentContext,
           personaPrompt: buildPersonaPrompt(activePersona),
-          conversationHistory: historyBeforeCurrent
+          conversationHistory: historyBeforeCurrent,
+          allowDateFields: allowSubtaskDateFields
         }, {
           signal: controller.signal
         });
@@ -2721,12 +2786,13 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
           });
         }
 
-        const appliedActions = applyPlannedCreateSubtaskToolCalls(planningResult.plan.toolCalls);
+        const appliedActions = applyPlannedCreateSubtaskToolCalls(planningResult.plan.toolCalls, trimmedText);
         const successCount = appliedActions.filter((action) => action.status === 'applied').length;
-        const content = planningResult.plan.assistantReply
-          || (successCount > 0
-            ? `我先帮你建好了 ${successCount} 条子任务。`
-            : '这次还差一点关键信息，你可以再补一下要挂到哪个父任务下。');
+        const content = successCount > 0
+          ? (allowSubtaskDateFields && planningResult.plan.assistantReply
+            ? planningResult.plan.assistantReply
+            : `我先帮你建好了 ${successCount} 条子任务。`)
+          : (planningResult.plan.assistantReply || '这次还差一点关键信息，你可以再补一下要挂到哪个父任务下。');
 
         replacePendingWithResult(sessionId, pendingMessageId, content, {
           debugSections,
@@ -2759,7 +2825,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
       const content = todoPlanningResult.plan.assistantReply
         || (successCount > 0
           ? `我先帮你建好了 ${successCount} 条待办。`
-          : '这次还差一点关键信息，你可以再补一下标题、时间或待办分类。');
+          : '这次还差一点关键信息，你可以再补一下标题、时间、待办分类，或它要关联的标签。');
 
       replacePendingWithResult(
         sessionId,
@@ -2962,8 +3028,14 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     const liveTodo = action.snapshot.todoId
       ? todos.find((todo) => todo.id === action.snapshot.todoId)
       : undefined;
+    const liveParentTodo = action.kind === 'create_subtask' && liveTodo?.parentTodoId
+      ? todos.find((todo) => todo.id === liveTodo.parentTodoId)
+      : undefined;
     const resolvedTodoCategoryName = todoCategories.find((category) => category.id === (liveTodo?.categoryId || action.snapshot.categoryId))?.name
       || action.snapshot.categoryName;
+    const resolvedTodoAtLabel = action.kind === 'create_subtask'
+      ? [resolvedTodoCategoryName, liveParentTodo?.title || action.snapshot.parentTodoTitle].filter(Boolean).join(' / ')
+      : resolvedTodoCategoryName;
     const resolvedLinkedCategory = (
       categories.find((category) => category.id === (liveTodo?.linkedCategoryId || action.snapshot.linkedCategoryId))
       || getActivityCategory(liveTodo?.linkedActivityId || action.snapshot.linkedActivityId)
@@ -3034,10 +3106,10 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
         </div>
 
         <div className="mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px]" style={{ color: AI_CHAT_THEME.textMuted }}>
-          {resolvedTodoCategoryName && (
+          {resolvedTodoAtLabel && (
             <span className="inline-flex items-center gap-1">
               <span className="font-bold">@</span>
-              <span>{resolvedTodoCategoryName}</span>
+              <span>{resolvedTodoAtLabel}</span>
             </span>
           )}
 

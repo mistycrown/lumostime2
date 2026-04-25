@@ -2,7 +2,7 @@
 
 Contains business logic and external integrations.
 
-Update 2026-04-25: `aiService.ts` now also exposes dedicated edit-log, update-todo, and create-subtask planning flows that return id-plus-patch payloads, letting the unified AI dialog keep create/edit intents separate and apply edits locally through existing save logic.
+Update 2026-04-25: `aiService.ts` now also exposes dedicated edit-log, update-todo, and create-subtask planning flows that return id-plus-patch payloads, letting the unified AI dialog keep create/edit intents separate and apply edits locally through existing save logic. Subtask planning now treats schedule fields as opt-in only and suppresses them unless the user explicitly asked for dates.
 Update 2026-04-22: `aiService.ts` now exposes lightweight AI intent classification plus debug-aware chat reply, add-log planning, and add-todo planning so the unified AI dialog can route each turn with only the needed context.
 Update 2026-04-22: `aiService.ts` now also exposes single-turn backfill tool planning, debug-oriented request/response capture, abort-signal plumbing, and per-tool-call date planning with latest-log/todo-hierarchy context for the AI backfill dialog.
 Update 2026-04-22: `aiService.ts` now accepts persona guidance and optional cached conversation history for unified AI sessions, and aligns OpenAI/Gemini request construction so quick-context and persona settings affect chat, add-log, and add-todo flows consistently.
@@ -14,7 +14,7 @@ Update 2026-04-09: `obsidianExportService.ts` now supports copying referenced lo
 Update 2026-03-12: timeline styling for normal timeline records is managed by `timelineStyleService.ts`.
 
 ## Files
-- `aiService.ts`: [Active] - Handles AI integration (OpenAI/Gemini) for text parsing, lightweight intent classification, persona-aware chat replies, cached-conversation context injection, dated AI-planned backfill tool calls, root-todo creation, todo updates, subtask creation, log editing, abort-aware chat requests, and narrative generation.
+- `aiService.ts`: [Active] - Handles AI integration (OpenAI/Gemini) for text parsing, lightweight intent classification, persona-aware chat replies, cached-conversation context injection, dated AI-planned backfill tool calls, root-todo creation, todo updates, subtask creation, log editing, abort-aware chat requests, and narrative generation, with subtask schedule fields emitted only when explicitly requested.
 - `excelExportService.ts`: [Active] - Exports time logs to Excel format.
 - `geminiService.ts`: [Placeholder] - Simple Gemini test service (likely deprecated/experimental).
 - `imageCleanupService.ts`: [Active] - Checks unreferenced images, protects referenced business/settings images, and executes cleanup/report generation.

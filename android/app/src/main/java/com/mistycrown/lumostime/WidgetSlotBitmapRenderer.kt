@@ -2,15 +2,20 @@ package com.mistycrown.lumostime
 
 import android.content.Context
 import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.RectF
 import android.text.TextPaint
+import android.util.LruCache
 
 /**
  * Renders widget slot visuals as bitmaps so RemoteViews can show
  * dynamic timer states and daily-check progress states.
+ *
+ * Updated 2026-04-25: Prefer packaged UI icon assets for widget slots and
+ * cache decoded bitmaps so unlocked icon rendering does not add visible lag.
  */
 object WidgetSlotBitmapRenderer {
     private const val SLOT_SIZE_DP = 72f
@@ -25,21 +30,22 @@ object WidgetSlotBitmapRenderer {
     private const val DAILY_COUNT_TEXT_SIZE_DP = 15f
     private const val CHECK_MARK = "\u2713"
 
+    private val iconBitmapCache = object : LruCache<String, Bitmap>(48) {}
+
     fun render(context: Context, slot: WidgetSnapshotSlot): Bitmap {
         val sizePx = dpToPx(context, SLOT_SIZE_DP)
         val bitmap = Bitmap.createBitmap(sizePx, sizePx, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(bitmap)
         val tapScale = getTapScale(slot.tapAnimationProgress)
-        val isTapAnimated = tapScale != 1f
-
-        val baseColor = parseColor(slot.color)
-        val dailyAccentColor = darkenColor(baseColor, 0.34f)
         val slotType = WidgetTypes.normalize(slot.slotType)
+
         if (slotType == WidgetTypes.SHORTCUT) {
             drawShortcutSlot(canvas, context, sizePx, slot, tapScale)
             return bitmap
         }
 
+        val baseColor = parseColor(slot.color)
+        val dailyAccentColor = darkenColor(baseColor, 0.34f)
         val fillColor = when {
             slotType == WidgetTypes.TIMER && slot.isActive -> baseColor
             slotType == WidgetTypes.DAILY && slot.isCompleted -> baseColor
@@ -60,14 +66,15 @@ object WidgetSlotBitmapRenderer {
             if (slot.isActive) {
                 drawStop(canvas, context, sizePx, tapScale)
             } else {
-                drawCenteredText(
-                    canvas,
-                    context,
-                    sizePx,
-                    slot.icon,
-                    EMOJI_TEXT_SIZE_DP,
-                    Color.parseColor("#1F2937"),
-                    tapScale
+                drawCenteredIconOrText(
+                    canvas = canvas,
+                    context = context,
+                    sizePx = sizePx,
+                    slot = slot,
+                    text = slot.icon,
+                    textSizeDp = EMOJI_TEXT_SIZE_DP,
+                    textColor = Color.parseColor("#1F2937"),
+                    tapScale = tapScale
                 )
             }
             return bitmap
@@ -75,38 +82,39 @@ object WidgetSlotBitmapRenderer {
 
         if (slot.isCompleted) {
             drawCenteredText(
-                canvas,
-                context,
-                sizePx,
-                CHECK_MARK,
-                DAILY_CHECK_TEXT_SIZE_DP,
-                dailyAccentColor,
-                tapScale
+                canvas = canvas,
+                context = context,
+                sizePx = sizePx,
+                text = CHECK_MARK,
+                textSizeDp = DAILY_CHECK_TEXT_SIZE_DP,
+                textColor = dailyAccentColor,
+                tapScale = tapScale
             )
             return bitmap
         }
 
         if (WidgetDailyModes.normalize(slot.manualMode) == WidgetDailyModes.COUNT && slot.currentCount > 0) {
             drawCountLayout(
-                canvas,
-                context,
-                sizePx,
-                slot.icon,
-                slot.currentCount,
-                dailyAccentColor,
-                tapScale
+                canvas = canvas,
+                context = context,
+                sizePx = sizePx,
+                slot = slot,
+                currentCount = slot.currentCount,
+                accentColor = dailyAccentColor,
+                tapScale = tapScale
             )
             return bitmap
         }
 
-        drawCenteredText(
-            canvas,
-            context,
-            sizePx,
-            slot.icon,
-            EMOJI_TEXT_SIZE_DP,
-            Color.parseColor("#1F2937"),
-            tapScale
+        drawCenteredIconOrText(
+            canvas = canvas,
+            context = context,
+            sizePx = sizePx,
+            slot = slot,
+            text = slot.icon,
+            textSizeDp = EMOJI_TEXT_SIZE_DP,
+            textColor = Color.parseColor("#1F2937"),
+            tapScale = tapScale
         )
         return bitmap
     }
@@ -128,14 +136,16 @@ object WidgetSlotBitmapRenderer {
         val animatedCircleRadius = (circleRadius * getTapCircleScale(slot.tapAnimationProgress))
             .coerceAtMost((sizePx / 2f) - 1f)
         canvas.drawCircle(sizePx / 2f, sizePx / 2f, animatedCircleRadius, fillPaint)
-        drawCenteredText(
-            canvas,
-            context,
-            sizePx,
-            slot.icon,
-            SHORTCUT_EMOJI_TEXT_SIZE_DP,
-            Color.parseColor("#1F2937"),
-            tapScale
+
+        drawCenteredIconOrText(
+            canvas = canvas,
+            context = context,
+            sizePx = sizePx,
+            slot = slot,
+            text = slot.icon,
+            textSizeDp = SHORTCUT_EMOJI_TEXT_SIZE_DP,
+            textColor = Color.parseColor("#1F2937"),
+            tapScale = tapScale
         )
     }
 
@@ -156,27 +166,78 @@ object WidgetSlotBitmapRenderer {
         canvas: Canvas,
         context: Context,
         sizePx: Int,
-        icon: String,
+        slot: WidgetSnapshotSlot,
         currentCount: Int,
         accentColor: Int,
         tapScale: Float
     ) {
-        val emojiPaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = accentColor
-            textAlign = Paint.Align.CENTER
-            textSize = dpToPx(context, DAILY_COUNT_EMOJI_SIZE_DP).toFloat() * tapScale
+        val iconCenterX = sizePx / 2f
+        val iconCenterY = sizePx * 0.42f
+        val iconSizePx = (dpToPx(context, DAILY_COUNT_EMOJI_SIZE_DP).toFloat() * 1.22f * tapScale)
+            .toInt()
+            .coerceAtLeast(1)
+
+        if (!drawBitmapIcon(
+                canvas = canvas,
+                context = context,
+                slot = slot,
+                centerX = iconCenterX,
+                centerY = iconCenterY,
+                iconSizePx = iconSizePx
+            )
+        ) {
+            val emojiPaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = accentColor
+                textAlign = Paint.Align.CENTER
+                textSize = dpToPx(context, DAILY_COUNT_EMOJI_SIZE_DP).toFloat() * tapScale
+            }
+            val iconY = iconCenterY - ((emojiPaint.descent() + emojiPaint.ascent()) / 2f)
+            canvas.drawText(slot.icon.ifBlank { "\u2022" }, iconCenterX, iconY, emojiPaint)
         }
+
         val countPaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
             color = accentColor
             textAlign = Paint.Align.CENTER
             textSize = dpToPx(context, DAILY_COUNT_TEXT_SIZE_DP).toFloat() * tapScale
             isFakeBoldText = true
         }
-
-        val iconY = sizePx * 0.42f - ((emojiPaint.descent() + emojiPaint.ascent()) / 2f)
         val countY = sizePx * 0.68f - ((countPaint.descent() + countPaint.ascent()) / 2f)
-        canvas.drawText(icon.ifBlank { "\u2022" }, sizePx / 2f, iconY, emojiPaint)
         canvas.drawText(currentCount.toString(), sizePx / 2f, countY, countPaint)
+    }
+
+    private fun drawCenteredIconOrText(
+        canvas: Canvas,
+        context: Context,
+        sizePx: Int,
+        slot: WidgetSnapshotSlot,
+        text: String,
+        textSizeDp: Float,
+        textColor: Int,
+        tapScale: Float
+    ) {
+        val iconSizePx = (dpToPx(context, textSizeDp).toFloat() * 1.18f * tapScale)
+            .toInt()
+            .coerceAtLeast(1)
+        val didDrawBitmap = drawBitmapIcon(
+            canvas = canvas,
+            context = context,
+            slot = slot,
+            centerX = sizePx / 2f,
+            centerY = sizePx / 2f,
+            iconSizePx = iconSizePx
+        )
+
+        if (!didDrawBitmap) {
+            drawCenteredText(
+                canvas = canvas,
+                context = context,
+                sizePx = sizePx,
+                text = text,
+                textSizeDp = textSizeDp,
+                textColor = textColor,
+                tapScale = tapScale
+            )
+        }
     }
 
     private fun drawCenteredText(
@@ -196,6 +257,67 @@ object WidgetSlotBitmapRenderer {
         }
         val baseline = (sizePx / 2f) - ((textPaint.descent() + textPaint.ascent()) / 2f)
         canvas.drawText(text.ifBlank { "\u2022" }, sizePx / 2f, baseline, textPaint)
+    }
+
+    private fun drawBitmapIcon(
+        canvas: Canvas,
+        context: Context,
+        slot: WidgetSnapshotSlot,
+        centerX: Float,
+        centerY: Float,
+        iconSizePx: Int
+    ): Boolean {
+        val bitmap = loadSlotIconBitmap(context, slot, iconSizePx) ?: return false
+        val left = centerX - (bitmap.width / 2f)
+        val top = centerY - (bitmap.height / 2f)
+        canvas.drawBitmap(bitmap, left, top, null)
+        return true
+    }
+
+    private fun loadSlotIconBitmap(
+        context: Context,
+        slot: WidgetSnapshotSlot,
+        iconSizePx: Int
+    ): Bitmap? {
+        val primaryPath = slot.uiIconAssetPath?.takeIf { it.isNotBlank() } ?: return null
+        val fallbackPath = slot.uiIconFallbackAssetPath?.takeIf { it.isNotBlank() }
+        return decodePackagedBitmap(context, primaryPath, iconSizePx)
+            ?: fallbackPath?.let { decodePackagedBitmap(context, it, iconSizePx) }
+    }
+
+    private fun decodePackagedBitmap(
+        context: Context,
+        assetPath: String,
+        iconSizePx: Int
+    ): Bitmap? {
+        val normalizedAssetPath = assetPath.replace('\\', '/').trimStart('/')
+        val cacheKey = "$normalizedAssetPath@$iconSizePx"
+        iconBitmapCache.get(cacheKey)?.let { cached ->
+            if (!cached.isRecycled) {
+                return cached
+            }
+            iconBitmapCache.remove(cacheKey)
+        }
+
+        return try {
+            context.assets.open("public/$normalizedAssetPath").use { inputStream ->
+                val decoded = BitmapFactory.decodeStream(inputStream) ?: return null
+                val scaledBitmap =
+                    if (decoded.width == iconSizePx && decoded.height == iconSizePx) {
+                        decoded
+                    } else {
+                        Bitmap.createScaledBitmap(decoded, iconSizePx, iconSizePx, true).also {
+                            if (it != decoded) {
+                                decoded.recycle()
+                            }
+                        }
+                    }
+                iconBitmapCache.put(cacheKey, scaledBitmap)
+                scaledBitmap
+            }
+        } catch (_: Exception) {
+            null
+        }
     }
 
     private fun getTapScale(progress: Float?): Float {

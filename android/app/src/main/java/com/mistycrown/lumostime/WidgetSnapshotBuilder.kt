@@ -99,8 +99,8 @@ object WidgetSnapshotBuilder {
                         ?: slot.icon?.ifBlank { null }
                         ?: shortcutEmojiForAction(slot.shortcutAction)
                         ?: "\u2022",
-                    uiIconAssetPath = null,
-                    uiIconFallbackAssetPath = null,
+                    uiIconAssetPath = slot.uiIconAssetPath,
+                    uiIconFallbackAssetPath = slot.uiIconFallbackAssetPath,
                     label = if (hasTemplate) {
                         slot.label?.ifBlank { null }
                             ?: shortcutLabelForAction(slot.shortcutAction)
