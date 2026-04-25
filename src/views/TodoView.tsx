@@ -4,6 +4,8 @@
  * @output Todo Status Updates, Edit Triggers, Focus Timer Start
  * @pos View (Main Tab)
  * @description The main To-Do list interface. Displays tasks grouped by category, supports swipe actions, and now includes a week planning view with schedule and history badges.
+ * @updated 2026-04-25: Keep the todo page floating list-week switchers on the active color-scheme button style even when the UI icon theme stays default.
+ * @updated 2026-04-25: Let floating list-week switchers inherit button theme colors when the default UI theme falls back to Lucide icons.
  * @updated 2026-04-22: The todo-page AI magic button now opens the app-level shared AI window so closing the modal does not interrupt an in-flight request.
  * @updated 2026-04-22: Routed the todo-page AI magic button into the shared AI chat workspace and removed the old standalone AI todo parse/confirm flow.
  * @updated 2026-04-22: Narrowed the `今` filter count to only standalone todos whose own arranged or due date is today, excluding pin-only and overdue entries.
@@ -72,7 +74,6 @@ import { IconRenderer } from '../components/IconRenderer';
 import { useBackgroundDisplay } from '../hooks/useBackgroundDisplay';
 import { FloatingButton } from '../components/FloatingButton';
 import { UIIcon } from '../components/UIIcon';
-import { uiIconService } from '../services/uiIconService';
 import {
   TodoScheduleMatch,
   TodoScheduleRange,
@@ -944,7 +945,6 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
     return saved === 'week' ? 'week' : 'list';
   });
   const [weekReferenceDate, setWeekReferenceDate] = useState<Date>(new Date());
-  const [hasCustomIconTheme, setHasCustomIconTheme] = useState(() => uiIconService.isCustomTheme());
   const [draggingWeekTodoId, setDraggingWeekTodoId] = useState<string | null>(null);
   const [draggingWeekEntry, setDraggingWeekEntry] = useState<WeekTodoEntry | null>(null);
   const [dragTargetDate, setDragTargetDate] = useState<string | null>(null);
@@ -1008,17 +1008,6 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
       }));
     };
   }, [screenMode]);
-
-  React.useEffect(() => {
-    const handleThemeChange = () => {
-      setHasCustomIconTheme(uiIconService.isCustomTheme());
-    };
-
-    window.addEventListener('ui-icon-theme-changed', handleThemeChange);
-    return () => {
-      window.removeEventListener('ui-icon-theme-changed', handleThemeChange);
-    };
-  }, []);
 
   // 闁告帗绻傞～鎰板礌閺嶎厸鍋撴径澶庡幀闁汇劌瀚崹搴ｇ尵娴兼瑧绐楀┑鈥冲€归悘澶娾柦閳╁啯绠掗梺顐㈩槷閼垫垶绂掔拋宕囩Э闁告帒妫涚悮顐︽晬瀹€鍕笡閻犱降鍊濋埀顒€顦懙鎴犵箔椤戣法顏卞☉?
   React.useEffect(() => {
@@ -2007,10 +1996,9 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
           onClick={() => setScreenMode('list')}
           title="切换回列表"
           ariaLabel="切换回列表"
-          disableThemeStyle={!hasCustomIconTheme}
-          className="text-white shadow-[0_14px_34px_rgba(15,23,42,0.16)]"
+          className="shadow-[0_14px_34px_rgba(15,23,42,0.16)]"
         >
-          <UIIcon type="email" fallbackIcon={ListTodo} size={24} className="text-white" style={{ color: '#ffffff' }} />
+          <UIIcon type="email" fallbackIcon={ListTodo} size={24} />
         </FloatingButton>
 
         <TodoScheduleAssignModal
@@ -2453,13 +2441,11 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
         onClick={() => setScreenMode((prev) => prev === 'list' ? 'week' : 'list')}
         title={screenMode === 'list' ? '切换到周视图' : '切换回列表'}
         ariaLabel={screenMode === 'list' ? '切换到周视图' : '切换回列表'}
-        disableThemeStyle={!hasCustomIconTheme}
-        className="text-white"
       >
         {screenMode === 'list' ? (
-          <UIIcon type="manage" fallbackIcon={CalendarDays} size={24} className="text-white" style={{ color: '#ffffff' }} />
+          <UIIcon type="manage" fallbackIcon={CalendarDays} size={24} />
         ) : (
-          <UIIcon type="email" fallbackIcon={ListTodo} size={24} className="text-white" style={{ color: '#ffffff' }} />
+          <UIIcon type="email" fallbackIcon={ListTodo} size={24} />
         )}
       </FloatingButton>
 

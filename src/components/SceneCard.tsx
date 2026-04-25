@@ -1,6 +1,7 @@
 ﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿/**
  * @file SceneCard.tsx
  * @description 场景卡片组件 - 支持正反面翻转和滑动交互
+ * @updated 2026-04-25: Replaced scene card borders with inset outlines so flipped cards keep their full stroke on mobile WebViews.
  */
 import React, { useState, useRef } from 'react';
 import { Check, ChevronRight, Clock, CheckSquare, ListTodo, BarChart3, BookOpen, Link2 } from 'lucide-react';
@@ -19,6 +20,10 @@ const DEFAULT_COLORS = {
   reference: '#c5a8b5',  // 莫兰迪紫
   stats: '#a8a8c5',      // 莫兰迪靛蓝
 };
+
+const getSceneCardSurfaceStyle = (borderColor: string): React.CSSProperties => ({
+  boxShadow: `inset 0 0 0 1px ${borderColor}, 0 1px 2px rgba(0, 0, 0, 0.06)`,
+});
 
 interface SceneCardProps {
   data: SceneCardData;
@@ -419,8 +424,8 @@ const CardFront: React.FC<{
 
   return (
     <div 
-      className="rounded-2xl p-4 bg-white/90 backdrop-blur-sm shadow-sm border relative"
-      style={{ borderColor: cardPresentation.frontBorderColor }}
+      className="rounded-2xl p-4 bg-white/90 backdrop-blur-sm relative"
+      style={getSceneCardSurfaceStyle(cardPresentation.frontBorderColor)}
     >
       {/* 右上角状态指示 */}
       <div className="absolute top-4 right-4">
@@ -566,9 +571,9 @@ const CardBack: React.FC<{
 
   return (
     <div 
-      className="rounded-2xl p-4 bg-white/90 backdrop-blur-sm shadow-sm border transition-opacity relative"
+      className="rounded-2xl p-4 bg-white/90 backdrop-blur-sm transition-opacity relative"
       style={{ 
-        borderColor: cardPresentation.backBorderColor,
+        ...getSceneCardSurfaceStyle(cardPresentation.backBorderColor),
         opacity: isSwiping ? Math.max(0.6, 1 - Math.abs(swipeProgress) * 0.5) : 1,
         cursor: isClickable ? 'pointer' : 'default'
       }}

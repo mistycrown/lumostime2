@@ -4,6 +4,7 @@
  * @output Updated Review Data, Generated Narrative
  * @pos View (Review System)
  * @description The interface for conducting a daily review. Supports answering template questions (Data/Guide tabs) and generating/editing an AI-assisted narrative summary.
+ * @updated 2026-04-25: Let floating read-edit toggles inherit button theme colors so default UI icons remain visible on accent-theme white buttons.
  * 
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
@@ -1015,7 +1016,6 @@ export const DailyReviewView: React.FC<DailyReviewViewProps> = ({
                         type={isReadingMode ? "editing" : "reading"}
                         fallbackIcon={isReadingMode ? Edit3 : LucideIcons.BookOpen}
                         size={24}
-                        className="text-white"
                     />
                 </FloatingButton>
             )}
@@ -1031,7 +1031,6 @@ export const DailyReviewView: React.FC<DailyReviewViewProps> = ({
                         type={isReadingMode ? "editing" : "reading"}
                         fallbackIcon={isReadingMode ? Edit3 : LucideIcons.BookOpen}
                         size={24}
-                        className="text-white"
                     />
                 </FloatingButton>
             )}

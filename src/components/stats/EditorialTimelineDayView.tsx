@@ -5,6 +5,8 @@
  * @pos Component (Statistics - Matrix Day Tab)
  * @description 日范围矩阵子视图，以 editorial 风格展示 24 小时 * 6 个十分钟切片的时间格子，并在底部展示活动图例。
  *
+ * @updated 2026-04-25: Aligned the populated legend divider with the timeline grid instead of the hour-label gutter.
+ * @updated 2026-04-25: Centered the empty-state card and divider instead of inheriting the timeline gutter offset.
  * @updated 2026-04-25: Initial implementation for the matrix day-range editorial timeline tab.
  */
 
@@ -50,10 +52,16 @@ export const EditorialTimelineDayView: React.FC<EditorialTimelineDayViewProps> =
   timelineRows,
   legendItems
 }) => {
+  const hasTimelineRows = timelineRows.length > 0;
+
   return (
     <div className="animate-in fade-in zoom-in-95 duration-300">
-      <div className="-ml-4 w-full max-w-[452px] pr-2 sm:-ml-5 sm:pr-0">
-        {timelineRows.length === 0 ? (
+      <div
+        className={`w-full max-w-[452px] ${
+          hasTimelineRows ? '-ml-4 pr-2 sm:-ml-5 sm:pr-0' : 'mx-auto'
+        }`}
+      >
+        {!hasTimelineRows ? (
           <div className="rounded-xl border border-dashed border-[#ddd2c5] bg-[#fcfbf8] px-4 py-10 text-center text-sm text-[#9b8a79]">
             当天还没有记录
           </div>
@@ -88,7 +96,11 @@ export const EditorialTimelineDayView: React.FC<EditorialTimelineDayViewProps> =
           </div>
         )}
 
-        <div className="mt-6 border-t border-[#e5ddd2] pt-5 pl-[50px]">
+        <div
+          className={`mt-6 border-t border-[#e5ddd2] pt-5 ${
+            hasTimelineRows ? 'ml-[52px]' : ''
+          }`}
+        >
           {legendItems.length === 0 ? (
             <div className="text-center text-xs tracking-[0.2em] text-[#ad9984]">NO ENTRIES</div>
           ) : (

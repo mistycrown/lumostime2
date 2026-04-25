@@ -1,6 +1,7 @@
 /**
  * @file RecordViewContainer.tsx
  * @description 计时页面容器 - 包含标签视图和场景视图的切换
+ * @updated 2026-04-25: Let the floating record-view switcher inherit button theme colors when falling back to Lucide icons under the default UI theme.
  * @updated 2026-04-25: Added a flex min-height guard so Scene mode inherits a scrollable viewport height on mobile.
  */
 import React, { useState, useEffect } from 'react';
@@ -101,9 +102,9 @@ export const RecordViewContainer: React.FC<RecordViewContainerProps> = ({
         title={viewMode === 'tags' ? '切换到场景视图' : '切换到标签视图'}
       >
         {viewMode === 'tags' ? (
-          <UIIcon type="calendar" fallbackIcon={Clock} size={24} className="text-white" />
+          <UIIcon type="calendar" fallbackIcon={Clock} size={24} />
         ) : (
-          <UIIcon type="location" fallbackIcon={Grid3x3} size={24} className="text-white" />
+          <UIIcon type="location" fallbackIcon={Grid3x3} size={24} />
         )}
       </FloatingButton>
     </div>

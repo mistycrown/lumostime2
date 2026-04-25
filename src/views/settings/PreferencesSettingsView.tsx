@@ -1,11 +1,13 @@
 /**
  * @file PreferencesSettingsView.tsx
  * @description 偏好设置页面
+ * @updated 2026-04-25: Added timeline quick-action customization controls under display preferences.
  */
 import React, { useState } from 'react';
-import { ChevronLeft, ChevronRight, ChevronDown } from 'lucide-react';
+import { ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Plus, X } from 'lucide-react';
 import { ToastType } from '../../components/Toast';
-import { DefaultArchiveView, DefaultIndexView, DefaultRecordView, ImmersiveTimerOrientation, SceneCardTimerMode, TimelineSortOrder } from '../../contexts/SettingsContext';
+import { DefaultArchiveView, DefaultIndexView, DefaultRecordView, ImmersiveTimerOrientation, SceneCardTimerMode, TimelineQuickActionKey, TimelineSortOrder } from '../../contexts/SettingsContext';
+import { TIMELINE_QUICK_ACTION_MAX, TIMELINE_QUICK_ACTION_OPTIONS } from '../../constants/timelineQuickActions';
 
 interface PreferencesSettingsViewProps {
     onBack: () => void;
@@ -48,6 +50,8 @@ interface PreferencesSettingsViewProps {
     onToggleTimelineGalleryMode?: () => void;
     timelineSortOrder?: TimelineSortOrder;
     onSetTimelineSortOrder?: (sortOrder: TimelineSortOrder) => void;
+    timelineQuickActions?: TimelineQuickActionKey[];
+    onSetTimelineQuickActions?: (actions: TimelineQuickActionKey[]) => void;
     collapseThreshold?: number;
     onSetCollapseThreshold?: (val: number) => void;
     manualSyncMode?: boolean;
@@ -97,6 +101,8 @@ export const PreferencesSettingsView: React.FC<PreferencesSettingsViewProps> = (
     onToggleTimelineGalleryMode,
     timelineSortOrder = 'asc',
     onSetTimelineSortOrder,
+    timelineQuickActions = [],
+    onSetTimelineQuickActions,
     collapseThreshold = 9999,
     onSetCollapseThreshold,
     manualSyncMode = false,
@@ -105,6 +111,37 @@ export const PreferencesSettingsView: React.FC<PreferencesSettingsViewProps> = (
     onSetSceneCardTimerMode
 }) => {
     const [isDefaultViewDropdownOpen, setIsDefaultViewDropdownOpen] = useState(false);
+    const [isTimelineQuickActionsExpanded, setIsTimelineQuickActionsExpanded] = useState(false);
+    const selectedQuickActionOptions = timelineQuickActions
+        .map((key) => TIMELINE_QUICK_ACTION_OPTIONS.find((option) => option.key === key))
+        .filter((option): option is (typeof TIMELINE_QUICK_ACTION_OPTIONS)[number] => Boolean(option));
+    const availableQuickActionOptions = TIMELINE_QUICK_ACTION_OPTIONS.filter(
+        (option) => !timelineQuickActions.includes(option.key)
+    );
+    const canAddMoreQuickActions = timelineQuickActions.length < TIMELINE_QUICK_ACTION_MAX;
+
+    const moveQuickAction = (index: number, direction: -1 | 1) => {
+        const nextIndex = index + direction;
+        if (nextIndex < 0 || nextIndex >= timelineQuickActions.length) {
+            return;
+        }
+
+        const nextActions = [...timelineQuickActions];
+        [nextActions[index], nextActions[nextIndex]] = [nextActions[nextIndex], nextActions[index]];
+        onSetTimelineQuickActions?.(nextActions);
+    };
+
+    const removeQuickAction = (key: TimelineQuickActionKey) => {
+        onSetTimelineQuickActions?.(timelineQuickActions.filter((action) => action !== key));
+    };
+
+    const addQuickAction = (key: TimelineQuickActionKey) => {
+        if (!canAddMoreQuickActions || timelineQuickActions.includes(key)) {
+            return;
+        }
+
+        onSetTimelineQuickActions?.([...timelineQuickActions, key]);
+    };
 
     return (
         <div className="fixed inset-0 z-50 bg-[#fdfbf7] flex flex-col font-serif animate-in slide-in-from-right duration-300 pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">
@@ -483,6 +520,98 @@ export const PreferencesSettingsView: React.FC<PreferencesSettingsViewProps> = (
                                     }`}
                                 />
                             </button>
+                        </div>
+
+                        <div className="p-4 border-b border-stone-100 hover:bg-stone-50 transition-colors">
+                            <div className="flex items-start justify-between gap-3">
+                                <div className="flex-1 min-w-0">
+                                    <h4 className="font-bold text-stone-700">脉络页顶部快捷按钮</h4>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <span className="flex-shrink-0 rounded-full bg-stone-100 px-2.5 py-1 text-[11px] font-bold text-stone-500">
+                                        {timelineQuickActions.length}/{TIMELINE_QUICK_ACTION_MAX}
+                                    </span>
+                                    <button
+                                        onClick={() => setIsTimelineQuickActionsExpanded((prev) => !prev)}
+                                        className="rounded-full p-1.5 text-stone-400 transition-colors hover:bg-stone-100 hover:text-stone-600"
+                                        title={isTimelineQuickActionsExpanded ? '收起' : '展开'}
+                                    >
+                                        <ChevronDown
+                                            size={16}
+                                            className={`transition-transform ${isTimelineQuickActionsExpanded ? 'rotate-180' : ''}`}
+                                        />
+                                    </button>
+                                </div>
+                            </div>
+
+                            {isTimelineQuickActionsExpanded && (
+                            <div className="mt-4 space-y-3">
+                                <div>
+                                    <p className="text-[11px] font-bold uppercase tracking-wider text-stone-400">已选按钮</p>
+                                    {selectedQuickActionOptions.length > 0 ? (
+                                        <div className="mt-2 space-y-2">
+                                            {selectedQuickActionOptions.map((option, index) => (
+                                                <div key={option.key} className="flex items-center gap-2 rounded-xl bg-stone-50 px-3 py-2.5">
+                                                    <div className="min-w-0 flex-1 text-sm font-bold text-stone-700">{option.label}</div>
+                                                    <div className="flex items-center gap-1">
+                                                        <button
+                                                            onClick={() => moveQuickAction(index, -1)}
+                                                            disabled={index === 0}
+                                                            className="rounded-lg p-1.5 text-stone-400 transition-colors hover:bg-white hover:text-stone-600 disabled:cursor-not-allowed disabled:opacity-35"
+                                                            title="上移"
+                                                        >
+                                                            <ChevronUp size={14} />
+                                                        </button>
+                                                        <button
+                                                            onClick={() => moveQuickAction(index, 1)}
+                                                            disabled={index === selectedQuickActionOptions.length - 1}
+                                                            className="rounded-lg p-1.5 text-stone-400 transition-colors hover:bg-white hover:text-stone-600 disabled:cursor-not-allowed disabled:opacity-35"
+                                                            title="下移"
+                                                        >
+                                                            <ChevronDown size={14} />
+                                                        </button>
+                                                        <button
+                                                            onClick={() => removeQuickAction(option.key)}
+                                                            className="rounded-lg p-1.5 text-stone-400 transition-colors hover:bg-white hover:text-stone-600"
+                                                            title="移除"
+                                                        >
+                                                            <X size={14} />
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    ) : (
+                                        <div className="mt-2 rounded-xl border border-dashed border-stone-200 px-3 py-3 text-xs text-stone-400">
+                                            暂无已选按钮
+                                        </div>
+                                    )}
+                                </div>
+
+                                <div>
+                                    <p className="text-[11px] font-bold uppercase tracking-wider text-stone-400">可添加按钮</p>
+                                    {availableQuickActionOptions.length > 0 ? (
+                                        <div className="mt-2 flex flex-wrap gap-2">
+                                            {availableQuickActionOptions.map((option) => (
+                                                <button
+                                                    key={option.key}
+                                                    onClick={() => addQuickAction(option.key)}
+                                                    disabled={!canAddMoreQuickActions}
+                                                    className="inline-flex items-center gap-1.5 rounded-full border border-stone-200 bg-white px-3 py-2 text-xs font-bold text-stone-600 transition-colors hover:border-stone-300 hover:bg-stone-50 disabled:cursor-not-allowed disabled:opacity-40"
+                                                >
+                                                    <Plus size={12} />
+                                                    {option.label}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    ) : (
+                                        <div className="mt-2 rounded-xl border border-dashed border-stone-200 px-3 py-3 text-xs text-stone-400">
+                                            已全部添加
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                            )}
                         </div>
 
                         {/* Min Idle Time Config */}

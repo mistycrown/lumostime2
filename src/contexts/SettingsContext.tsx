@@ -1,6 +1,7 @@
 /**
  * @file SettingsContext.tsx
  * @description 管理应用设置和用户偏好（不包括 Review 系统，Review 由 ReviewContext 管理），并兼容自定义筛选器排序。
+ * @updated 2026-04-25: Added configurable timeline quick-action preferences for the timeline header.
  */
 import React, { createContext, useContext, useState, useEffect, ReactNode, useRef } from 'react';
 import {
@@ -45,6 +46,11 @@ import {
     normalizeImmersiveTimerOrientation,
     type ImmersiveTimerOrientation
 } from '../utils/immersiveOrientation';
+import {
+    DEFAULT_TIMELINE_QUICK_ACTIONS,
+    normalizeTimelineQuickActions,
+    type TimelineQuickActionKey
+} from '../constants/timelineQuickActions';
 
 export type DefaultArchiveView = 'CHRONICLE' | 'MEMOIR';
 export type DefaultIndexView = 'TAGS' | 'SCOPE';
@@ -55,6 +61,7 @@ export type ScheduleStyle = 'default' | 'classic' | 'minimal' | 'solid';
 export type DefaultSelectorPage = 'emoji' | string; // 'emoji' 或 sticker set ID (如 'water', 'water-1', 'water-2')
 export type SceneCardTimerMode = 'realtime' | 'backfill'; // 'realtime' 正计时, 'backfill' 补记
 export type { ImmersiveTimerOrientation } from '../utils/immersiveOrientation';
+export type { TimelineQuickActionKey } from '../constants/timelineQuickActions';
 
 interface SettingsContextType {
     // 基础偏好设置
@@ -98,6 +105,8 @@ interface SettingsContextType {
     setTimelineGalleryMode: React.Dispatch<React.SetStateAction<boolean>>;
     timelineSortOrder: TimelineSortOrder;
     setTimelineSortOrder: React.Dispatch<React.SetStateAction<TimelineSortOrder>>;
+    timelineQuickActions: TimelineQuickActionKey[];
+    setTimelineQuickActions: React.Dispatch<React.SetStateAction<TimelineQuickActionKey[]>>;
 
     // 折叠字数设置
     collapseThreshold: number;
@@ -426,6 +435,25 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
         localStorage.setItem('lumos_timeline_sort', timelineSortOrder);
     }, [timelineSortOrder]);
 
+    const [timelineQuickActions, setTimelineQuickActions] = useState<TimelineQuickActionKey[]>(() => {
+        const stored = localStorage.getItem('lumostime_timeline_quick_actions');
+
+        if (!stored) {
+            return [...DEFAULT_TIMELINE_QUICK_ACTIONS];
+        }
+
+        try {
+            return normalizeTimelineQuickActions(JSON.parse(stored));
+        } catch (error) {
+            console.error('[SettingsContext] Failed to parse timeline quick actions:', error);
+            return [...DEFAULT_TIMELINE_QUICK_ACTIONS];
+        }
+    });
+
+    useEffect(() => {
+        localStorage.setItem('lumostime_timeline_quick_actions', JSON.stringify(timelineQuickActions));
+    }, [timelineQuickActions]);
+
     const [collapseThreshold, setCollapseThreshold] = useState<number>(() => {
         const stored = localStorage.getItem('lumostime_collapse_threshold');
         return stored ? parseInt(stored) : 9999; // Default to 9999 (no collapse)
@@ -647,6 +675,8 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
             setTimelineGalleryMode,
             timelineSortOrder,
             setTimelineSortOrder,
+            timelineQuickActions,
+            setTimelineQuickActions,
             collapseThreshold,
             setCollapseThreshold,
             uiIconTheme,
