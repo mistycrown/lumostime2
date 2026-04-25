@@ -1,13 +1,12 @@
 /**
  * @file MatrixView.tsx
- * @input matrixData, categories, excludedCategoryIds
- * @output UI (Matrix Grid), Events (toggleExclusion)
+ * @input matrixData, categories, excludedCategoryIds, matrixRange, editorialTimeline
+ * @output UI (Matrix Grid / Editorial Day Timeline), Events (toggleExclusion)
  * @pos Component (Statistics - Matrix)
- * @description 矩阵统计视图 - 显示活动在一周内的打卡情况
- * 
- * 以矩阵形式展示每个活动在一周内每天是否有记录，
- * 用于追踪活动的连续性和规律性。
- * 
+ * @description 矩阵统计视图，支持周矩阵连续性视图和日范围 editorial 时间格子子视图。
+ *
+ * @updated 2026-04-25: Added a day-range editorial timeline presentation alongside the existing weekly matrix.
+ *
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
 
@@ -15,6 +14,7 @@ import React from 'react';
 import { Activity, Category } from '../../types';
 import { IconRenderer } from '../IconRenderer';
 import { getHexColor } from '../../utils/chartUtils';
+import { EditorialTimelineDayView } from './EditorialTimelineDayView';
 
 export interface MatrixData {
   days: Date[];
@@ -26,12 +26,36 @@ export interface MatrixData {
   }[];
 }
 
+interface EditorialTimelineChunk {
+  activityId: string | null;
+  activityName: string | null;
+  color: string;
+}
+
+interface EditorialTimelineRow {
+  hour: number;
+  chunks: EditorialTimelineChunk[];
+}
+
+interface EditorialTimelineLegendItem {
+  activityId: string;
+  activityName: string;
+  color: string;
+  duration: number;
+}
+
 export interface MatrixViewProps {
   matrixData: MatrixData;
   categories: Category[];
   excludedCategoryIds: string[];
   onToggleExclusion: (id: string) => void;
   isFullScreen?: boolean;
+  matrixRange: 'day' | 'week';
+  editorialTimeline: {
+    displayDate: Date;
+    rows: EditorialTimelineRow[];
+    legendItems: EditorialTimelineLegendItem[];
+  };
 }
 
 export const MatrixView: React.FC<MatrixViewProps> = ({
@@ -39,8 +63,22 @@ export const MatrixView: React.FC<MatrixViewProps> = ({
   categories,
   excludedCategoryIds,
   onToggleExclusion,
-  isFullScreen = false
+  isFullScreen = false,
+  matrixRange,
+  editorialTimeline
 }) => {
+  if (matrixRange === 'day') {
+    return (
+      <div className={`animate-in fade-in zoom-in-95 duration-300 ${isFullScreen ? 'flex-1 flex flex-col justify-center' : ''}`}>
+        <EditorialTimelineDayView
+          displayDate={editorialTimeline.displayDate}
+          timelineRows={editorialTimeline.rows}
+          legendItems={editorialTimeline.legendItems}
+        />
+      </div>
+    );
+  }
+
   return (
     <div className={`animate-in fade-in zoom-in-95 duration-300 ${isFullScreen ? 'flex-1 flex flex-col justify-center' : ''}`}>
       <div className="space-y-4 w-full">
@@ -48,17 +86,18 @@ export const MatrixView: React.FC<MatrixViewProps> = ({
           <div className="text-center py-10 text-stone-300 text-sm">暂无数据</div>
         ) : (
           <div className="w-full max-w-4xl mx-auto">
-            {/* Week Header */}
             <div className="flex items-center mb-4">
               <div className="w-28 shrink-0"></div>
               <div className="flex-1 grid grid-cols-7 gap-2">
                 {matrixData.days.map((d, i) => (
                   <div key={i} className="text-center flex justify-center">
-                    <div className={`text-[10px] font-bold uppercase ${
-                      d.toDateString() === new Date().toDateString() 
-                        ? 'text-stone-900 scale-110' 
-                        : 'text-stone-300'
-                    }`}>
+                    <div
+                      className={`text-[10px] font-bold uppercase ${
+                        d.toDateString() === new Date().toDateString()
+                          ? 'text-stone-900 scale-110'
+                          : 'text-stone-300'
+                      }`}
+                    >
                       {['日', '一', '二', '三', '四', '五', '六'][d.getDay()]}
                     </div>
                   </div>
@@ -66,20 +105,18 @@ export const MatrixView: React.FC<MatrixViewProps> = ({
               </div>
             </div>
 
-            {/* Activity Rows */}
             <div className="space-y-3">
               {matrixData.rows.map((row) => (
                 <div key={row.activity.id} className="flex items-center">
-                  {/* Activity Label */}
                   <div className="w-28 shrink-0 flex items-center gap-2 pr-2 overflow-hidden">
-                    <div 
-                      className="w-6 h-6 rounded-full flex items-center justify-center text-xs shrink-0 bg-stone-50" 
+                    <div
+                      className="w-6 h-6 rounded-full flex items-center justify-center text-xs shrink-0 bg-stone-50"
                       style={{ color: getHexColor(row.activity.color) }}
                     >
-                      <IconRenderer 
-                        icon={row.activity.icon} 
-                        uiIcon={row.activity.uiIcon} 
-                        className="text-xs" 
+                      <IconRenderer
+                        icon={row.activity.icon}
+                        uiIcon={row.activity.uiIcon}
+                        className="text-xs"
                       />
                     </div>
                     <span className="text-xs font-bold text-stone-600 truncate">
@@ -87,14 +124,13 @@ export const MatrixView: React.FC<MatrixViewProps> = ({
                     </span>
                   </div>
 
-                  {/* Week Cells */}
                   <div className="flex-1 grid grid-cols-7 gap-2">
                     {row.cells.map((hasLog, i) => (
                       <div key={i} className="flex justify-center h-6">
                         <div
                           className={`w-full max-w-[24px] h-full rounded-md transition-all duration-300 ${
-                            hasLog 
-                              ? 'scale-100 shadow-sm opacity-90' 
+                            hasLog
+                              ? 'scale-100 shadow-sm opacity-90'
                               : 'scale-75 bg-stone-50/50'
                           }`}
                           style={hasLog ? { backgroundColor: getHexColor(row.activity.color) } : {}}
@@ -109,9 +145,8 @@ export const MatrixView: React.FC<MatrixViewProps> = ({
         )}
       </div>
 
-      {/* Filter Chips */}
       <div className="flex flex-wrap gap-2 justify-center pt-6 pb-2">
-        {categories.map(cat => (
+        {categories.map((cat) => (
           <button
             key={cat.id}
             onClick={() => onToggleExclusion(cat.id)}

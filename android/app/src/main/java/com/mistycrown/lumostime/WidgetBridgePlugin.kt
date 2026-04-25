@@ -171,6 +171,24 @@ class WidgetBridgePlugin : Plugin() {
     }
 
     @PluginMethod
+    fun syncDailyRuntimeWidgetData(call: PluginCall) {
+        val payloadJson = call.getObject("payload")
+        val payload = payloadJson?.let {
+            WidgetDailyRuntimePayload(
+                date = it.optString("date"),
+                totalMinutes = it.optInt("totalMinutes", 0).coerceAtLeast(0),
+                segments = it.optJSONArray("segments").toDailyRuntimeSegmentList(),
+                legend = it.optJSONArray("legend").toDailyRuntimeLegendList(),
+                syncedAt = it.optLong("syncedAt", System.currentTimeMillis())
+            )
+        }
+
+        WidgetStores.saveDailyRuntimePayload(context, payload)
+        WidgetRefreshCoordinator.refreshAllAsync(context)
+        call.resolve()
+    }
+
+    @PluginMethod
     fun refreshWidget(call: PluginCall) {
         val appWidgetId = call.getInt("appWidgetId") ?: -1
         val templateId = parseNullableString(call.getString("templateId"))
@@ -389,5 +407,49 @@ class WidgetBridgePlugin : Plugin() {
             }
         }
         return array
+    }
+
+    private fun JSONArray?.toDailyRuntimeSegmentList(): List<WidgetDailyRuntimeSegment> {
+        if (this == null) {
+            return emptyList()
+        }
+
+        val values = mutableListOf<WidgetDailyRuntimeSegment>()
+        for (index in 0 until length()) {
+            val item = optJSONObject(index) ?: continue
+            values.add(
+                WidgetDailyRuntimeSegment(
+                    index = item.optInt("index", index).coerceAtLeast(0),
+                    categoryId = parseNullableString(item.optString("categoryId")),
+                    categoryName = parseNullableString(item.optString("categoryName")),
+                    color = parseNullableString(item.optString("color")),
+                    minutes = item.optInt("minutes", 0).coerceAtLeast(0)
+                )
+            )
+        }
+        return values
+    }
+
+    private fun JSONArray?.toDailyRuntimeLegendList(): List<WidgetDailyRuntimeLegendItem> {
+        if (this == null) {
+            return emptyList()
+        }
+
+        val values = mutableListOf<WidgetDailyRuntimeLegendItem>()
+        for (index in 0 until length()) {
+            val item = optJSONObject(index) ?: continue
+            val categoryId = parseNullableString(item.optString("categoryId")) ?: continue
+            val categoryName = parseNullableString(item.optString("categoryName")) ?: continue
+            val color = parseNullableString(item.optString("color")) ?: continue
+            values.add(
+                WidgetDailyRuntimeLegendItem(
+                    categoryId = categoryId,
+                    categoryName = categoryName,
+                    color = color,
+                    totalMinutes = item.optInt("totalMinutes", 0).coerceAtLeast(0)
+                )
+            )
+        }
+        return values
     }
 }

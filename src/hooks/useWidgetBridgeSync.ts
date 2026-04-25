@@ -4,7 +4,7 @@
  * @output Runtime reconciliation between the Android widget layer and the React app
  * @pos Hook
  * @description Imports completed timer widget actions into logs, mirrors timer runtime state, syncs daily widget progress to native, and replays queued daily taps back into review state.
- * @updated 2026-04-20: Force-resyncs today's daily widget payload whenever the app becomes visible so cross-day state resets without requiring a widget tap.
+ * @updated 2026-04-25: Syncs today's DAILY_RUNTIME heatmap payload so the dedicated 4x4 widget reflects logs and live sessions.
  */
 import { App as CapacitorApp } from '@capacitor/app';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -14,6 +14,7 @@ import { useReview } from '../contexts/ReviewContext';
 import { useSession } from '../contexts/SessionContext';
 import WidgetBridge from '../plugins/WidgetBridgePlugin';
 import {
+  buildDailyRuntimeWidgetPayload,
   buildDailyWidgetSyncPayload,
   buildLogFromWidgetPendingAction,
   buildWidgetRuntimeStateFromSession,
@@ -24,7 +25,7 @@ import { applyDailyCheckActionForDate } from '../utils/dailyCheckUtils';
 
 export const useWidgetBridgeSync = () => {
   const { categories } = useCategoryScope();
-  const { setLogs } = useData();
+  const { logs, setLogs } = useData();
   const { activeSessions, setActiveSessions } = useSession();
   const { dailyReviews, setDailyReviews, checkTemplates, reviewTemplates } = useReview();
   const [hasHydratedNativeState, setHasHydratedNativeState] = useState(!isNativeAndroidWidgetSupported());
@@ -234,4 +235,20 @@ export const useWidgetBridgeSync = () => {
       console.error('[useWidgetBridgeSync] Failed to sync daily widget data to native widget', error);
     });
   }, [checkTemplates, dailyReviews, hasHydratedNativeState]);
+
+  useEffect(() => {
+    if (!isNativeAndroidWidgetSupported() || !hasHydratedNativeState) {
+      return;
+    }
+
+    const payload = buildDailyRuntimeWidgetPayload({
+      logs,
+      activeSessions,
+      categories
+    });
+
+    WidgetBridge.syncDailyRuntimeWidgetData({ payload }).catch((error) => {
+      console.error('[useWidgetBridgeSync] Failed to sync DAILY_RUNTIME payload to native widget', error);
+    });
+  }, [activeSessions, categories, hasHydratedNativeState, logs]);
 };

@@ -923,7 +923,7 @@ export const DailyReviewView: React.FC<DailyReviewViewProps> = ({
                             hideRangeControls={true} // 隐藏左侧时间范围切换 (日/周/月/年) - 保持日视图简单
                             hideDateNavigation={true} // 隐藏日期导航 - 页面已有
                             forcedRange="day"    // 强制为日视图
-                            allowedViews={['pie', 'schedule']} // 仅允许切换：环形图 & 日程
+                            allowedViews={['pie', 'matrix', 'schedule']} // 允许切换：环形图 / 矩阵图 / 日程
                         />
                         </React.Suspense>
                     </div>

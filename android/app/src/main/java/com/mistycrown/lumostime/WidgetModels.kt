@@ -180,6 +180,29 @@ data class WidgetDailySyncPayload(
     val syncedAt: Long
 )
 
+data class WidgetDailyRuntimeSegment(
+    val index: Int,
+    val categoryId: String? = null,
+    val categoryName: String? = null,
+    val color: String? = null,
+    val minutes: Int = 0
+)
+
+data class WidgetDailyRuntimeLegendItem(
+    val categoryId: String,
+    val categoryName: String,
+    val color: String,
+    val totalMinutes: Int
+)
+
+data class WidgetDailyRuntimePayload(
+    val date: String,
+    val totalMinutes: Int,
+    val segments: List<WidgetDailyRuntimeSegment>,
+    val legend: List<WidgetDailyRuntimeLegendItem>,
+    val syncedAt: Long
+)
+
 data class WidgetPendingDailyAction(
     val id: String,
     val widgetType: String = WidgetTypes.DAILY,

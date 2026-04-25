@@ -4,10 +4,11 @@
  * @output No-op widget bridge implementation for browser environments
  * @pos Plugin
  * @description Prevents widget bridge calls from failing when the app runs outside native Android.
- * @updated 2026-04-18: Kept the browser-safe bridge aligned with shortcut widget metadata.
+ * @updated 2026-04-25: Added no-op DAILY_RUNTIME payload sync for the native 4x4 heatmap widget.
  */
 import { WebPlugin } from '@capacitor/core';
 import type {
+  WidgetBridgeDailyRuntimePayload,
   WidgetBridgeDailySyncPayload,
   WidgetBridgeInstanceBinding,
   WidgetBridgePendingAction,
@@ -47,6 +48,10 @@ export class WidgetBridgeWeb extends WebPlugin implements WidgetBridgePlugin {
   async clearPendingDailyActions(): Promise<void> {}
 
   async syncDailyWidgetData(_options?: { payload: WidgetBridgeDailySyncPayload | null }): Promise<void> {}
+
+  async syncDailyRuntimeWidgetData(
+    _options?: { payload: WidgetBridgeDailyRuntimePayload | null }
+  ): Promise<void> {}
 
   async refreshWidget(): Promise<void> {}
 }

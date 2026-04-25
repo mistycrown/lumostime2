@@ -4,6 +4,9 @@
  * @output Full-screen AI time assistant with session history, persona settings, quick context cache, and direct log/todo application
  * @pos Component (AI Integration)
  * @description Provides the shared AI workspace for chat, backfill, and todo creation. Sessions persist locally, persona style is configurable per session, and recent context can be toggled into the formal AI request path.
+ * @updated 2026-04-25: Corrected applied-todo metadata to render task category as `@`, linked activity hierarchy as `#`, and scope domains as `%`, while respecting the auto-link scope toggle when merging activity rules.
+ * @updated 2026-04-25: Fixed the applied-todo detail action so newly created todo results stay clickable even if the live todo lookup lags behind the message render.
+ * @updated 2026-04-25: Matched applied-result metadata to the context-page prefix syntax by removing icons and using `# / % / @` markers for tags, domains, and todos.
  * @updated 2026-04-25: Softened the AI dialog shadow system so the shell, cards, and avatar surfaces feel lighter and less floating.
  * @updated 2026-04-25: Added a true grayscale fallback for the `default` color scheme so the AI workspace no longer picks up tinted beige/green surfaces when no themed accent is active.
  * @updated 2026-04-25: Refined the title/header alignment and simplified applied-result cards by reducing capsules, moving log time pills to the top-right, and switching action buttons to icon-only controls.
@@ -51,7 +54,6 @@ import {
   type AIConversationTurn,
   type AITodoToolCall
 } from '../services/aiService';
-import { IconRenderer } from './IconRenderer';
 import { useData } from '../contexts/DataContext';
 import { useCategoryScope } from '../contexts/CategoryScopeContext';
 import { useNavigation } from '../contexts/NavigationContext';
@@ -117,6 +119,7 @@ interface AppliedCreateTodoSnapshot {
   categoryId: string;
   categoryName: string;
   linkedCategoryId?: string;
+  linkedCategoryName?: string;
   linkedActivityId?: string;
   linkedActivityName?: string;
   defaultScopeIds: string[];
@@ -866,7 +869,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     setTodoCategoryToAdd
   } = useNavigation();
   const { addToast } = useToast();
-  const { autoLinkRules, colorScheme } = useSettings();
+  const { autoLinkRules, autoApplyAutoLinkRules, colorScheme } = useSettings();
   const AI_CHAT_THEME = useMemo(() => getAIChatTheme(colorScheme === 'default'), [colorScheme]);
 
   const defaultTargetDate = useMemo(() => {
@@ -1518,7 +1521,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
   };
 
   const getRuleScopeIdsForActivity = (activityId?: string): string[] => (
-    activityId
+    autoApplyAutoLinkRules && activityId
       ? autoLinkRules
         .filter((rule) => rule.activityId === activityId)
         .map((rule) => rule.scopeId)
@@ -1529,6 +1532,18 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     scopeIds
       .map((scopeId) => scopes.find((scope) => scope.id === scopeId)?.name)
       .filter((name): name is string => Boolean(name))
+  );
+
+  const getActivityCategory = (activityId?: string) => (
+    activityId
+      ? categories.find((category) => category.activities.some((activity) => activity.id === activityId))
+      : undefined
+  );
+
+  const getActivityById = (activityId?: string) => (
+    activityId
+      ? categories.flatMap((category) => category.activities).find((activity) => activity.id === activityId)
+      : undefined
   );
 
   const applyPlannedLogToolCalls = (toolCalls: AIBackfillToolCall[]): AppliedChatAction[] => {
@@ -1655,10 +1670,12 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
         || (args.linkedActivityId
           ? categories.find((category) => category.activities.some((activity) => activity.id === args.linkedActivityId))?.id
           : undefined);
+      const resolvedLinkedCategory = resolvedLinkedCategoryId
+        ? categories.find((category) => category.id === resolvedLinkedCategoryId)
+        : undefined;
       const resolvedActivity = args.linkedActivityId
-        ? categories
-          .flatMap((category) => category.activities)
-          .find((activity) => activity.id === args.linkedActivityId)
+        ? resolvedLinkedCategory?.activities.find((activity) => activity.id === args.linkedActivityId)
+          || getActivityById(args.linkedActivityId)
         : undefined;
 
       if (!resolvedTodoCategory || !args.title.trim()) {
@@ -1710,6 +1727,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
           categoryId: newTodo.categoryId,
           categoryName: resolvedTodoCategory.name,
           ...(resolvedLinkedCategoryId ? { linkedCategoryId: resolvedLinkedCategoryId } : {}),
+          ...(resolvedLinkedCategory ? { linkedCategoryName: resolvedLinkedCategory.name } : {}),
           ...(args.linkedActivityId ? { linkedActivityId: args.linkedActivityId } : {}),
           ...(resolvedActivity ? { linkedActivityName: resolvedActivity.name } : {}),
           defaultScopeIds,
@@ -2122,23 +2140,21 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
 
         <div className="mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px]" style={{ color: AI_CHAT_THEME.textMuted }}>
           <span className="inline-flex items-center gap-1">
-            <IconRenderer
-              icon={liveCategory?.icon || ''}
-              uiIcon={liveCategory?.uiIcon}
-              className="text-xs"
-            />
+            <span className="font-bold">#</span>
             <span>{categoryActivityLabel}</span>
           </span>
 
           {action.snapshot.scopeNames.map((scopeName) => (
-            <span key={`${action.actionId}-${scopeName}`} className="inline-flex items-center">
-              %{scopeName}
+            <span key={`${action.actionId}-${scopeName}`} className="inline-flex items-center gap-1">
+              <span className="font-bold">%</span>
+              <span>{scopeName}</span>
             </span>
           ))}
 
           {(liveLinkedTodo?.title || action.snapshot.linkedTodoTitle) && (
-            <span className="inline-flex items-center">
-              @{liveLinkedTodo?.title || action.snapshot.linkedTodoTitle}
+            <span className="inline-flex items-center gap-1">
+              <span className="font-bold">@</span>
+              <span>{liveLinkedTodo?.title || action.snapshot.linkedTodoTitle}</span>
             </span>
           )}
         </div>
@@ -2183,10 +2199,26 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     const liveTodo = action.snapshot.todoId
       ? todos.find((todo) => todo.id === action.snapshot.todoId)
       : undefined;
-    const categoryActivityLabel = dedupeStringArray([
-      action.snapshot.categoryName,
-      action.snapshot.linkedActivityName
+    const resolvedTodoCategoryName = todoCategories.find((category) => category.id === (liveTodo?.categoryId || action.snapshot.categoryId))?.name
+      || action.snapshot.categoryName;
+    const resolvedLinkedCategory = (
+      categories.find((category) => category.id === (liveTodo?.linkedCategoryId || action.snapshot.linkedCategoryId))
+      || getActivityCategory(liveTodo?.linkedActivityId || action.snapshot.linkedActivityId)
+    );
+    const resolvedLinkedActivity = getActivityById(liveTodo?.linkedActivityId || action.snapshot.linkedActivityId);
+    const linkedTagLabel = dedupeStringArray([
+      resolvedLinkedCategory?.name || action.snapshot.linkedCategoryName,
+      resolvedLinkedActivity?.name || action.snapshot.linkedActivityName
     ]).join(' / ');
+    const resolvedScopeIds = dedupeStringArray([
+      ...(liveTodo?.defaultScopeIds || action.snapshot.defaultScopeIds)
+    ]);
+    const resolvedScopeNames = resolvedScopeIds.length > 0
+      ? (() => {
+        const names = getScopeNames(resolvedScopeIds);
+        return names.length > 0 ? names : action.snapshot.defaultScopeNames;
+      })()
+      : action.snapshot.defaultScopeNames;
 
     return (
       <div
@@ -2239,15 +2271,24 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
         </div>
 
         <div className="mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px]" style={{ color: AI_CHAT_THEME.textMuted }}>
-          {categoryActivityLabel && (
-            <span className="inline-flex items-center">
-              {categoryActivityLabel}
+          {resolvedTodoCategoryName && (
+            <span className="inline-flex items-center gap-1">
+              <span className="font-bold">@</span>
+              <span>{resolvedTodoCategoryName}</span>
             </span>
           )}
 
-          {action.snapshot.defaultScopeNames.map((scopeName) => (
-            <span key={`${action.actionId}-${scopeName}`} className="inline-flex items-center">
-              %{scopeName}
+          {linkedTagLabel && (
+            <span className="inline-flex items-center gap-1">
+              <span className="font-bold">#</span>
+              <span>{linkedTagLabel}</span>
+            </span>
+          )}
+
+          {resolvedScopeNames.map((scopeName) => (
+            <span key={`${action.actionId}-${scopeName}`} className="inline-flex items-center gap-1">
+              <span className="font-bold">%</span>
+              <span>{scopeName}</span>
             </span>
           ))}
 
@@ -2277,7 +2318,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
         <div className="mt-2.5 flex justify-end gap-2">
           <button
             onClick={() => handleOpenTodoDetail(action.snapshot.todoId)}
-            disabled={!liveTodo || action.status !== 'applied'}
+            disabled={!action.snapshot.todoId || action.status !== 'applied'}
             className="inline-flex h-8 w-8 items-center justify-center rounded-full border transition-colors disabled:cursor-not-allowed disabled:opacity-40"
             style={{
               borderColor: AI_CHAT_THEME.chipBorder,

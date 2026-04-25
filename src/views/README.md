@@ -80,6 +80,7 @@ The views are designed as "dumb" or "presentational" components where possible, 
 - `TodoView.tsx`: Hid empty quick-action Arrange/Due/Completed metadata rows in the week-view badge editor so unset dates no longer render `None`.
 - `TodoView.tsx`: Added a quick duplicate-edit modal before creating todo copies, with default date cleanup plus optional tag and scope clearing.
 - `SceneView.tsx`, `RecordView.tsx`, `TodoView.tsx`: Moved custom background rendering onto a shared preloaded display hook, removed per-view 500ms background polling, dropped duplicate inner background layers, and reduced heavy blur on lower-end mobile devices to smooth scrolling and background switches.
+- `SceneView.tsx`, `RecordViewContainer.tsx`: Added `min-h-0` and `flex-1` guards around the scene sidebar and card stack so long scene-card lists keep scrolling correctly on some Android WebViews instead of being cut off.
 - `TodoView.tsx`: Added a first-pass week planning mode with a floating list/week switcher, seven horizontal day rows, and separate badges for assigned, deadline, recurring, completed, and in-progress todo states.
 - `CategoryDetailView.tsx`, `ScopeDetailView.tsx`, `TagDetailView.tsx`: Added inline note template management in detail pages so template editing lives beside the related category/scope/tag instead of in settings.
 - `FocusDetailView.tsx`: Added note template recommendations directly below the note input to keep active-session note capture one-tap.

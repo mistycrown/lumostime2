@@ -2,6 +2,7 @@
  * @file MainLayout.tsx
  * @input children, navigation state, handlers
  * @output Main Application Layout
+ * @updated 2026-04-25: Added a `min-h-0` guard on the main content shell so nested scene lists can keep scrolling on mobile WebViews.
  * @pos Component (Layout)
  * @description 主应用布局组件 - 包含顶部导航栏、主内容区域和浮动按钮
  * 
@@ -286,7 +287,7 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
                 )}
 
             {/* Main Content Area */}
-            <main className="flex-1 overflow-hidden relative">
+            <main className="flex-1 min-h-0 overflow-hidden relative">
                 {children}
 
                 {/* Global Floating Action Button for Tags/Scope Toggle */}
