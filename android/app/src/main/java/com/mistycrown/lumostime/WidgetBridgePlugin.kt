@@ -7,6 +7,7 @@ import com.getcapacitor.PluginCall
 import com.getcapacitor.PluginMethod
 import com.getcapacitor.annotation.CapacitorPlugin
 import org.json.JSONArray
+import org.json.JSONObject
 
 /**
  * Capacitor bridge for widget templates, instance binding state, runtime synchronization, and pending action import.
@@ -177,8 +178,10 @@ class WidgetBridgePlugin : Plugin() {
             WidgetDailyRuntimePayload(
                 date = it.optString("date"),
                 totalMinutes = it.optInt("totalMinutes", 0).coerceAtLeast(0),
-                segments = it.optJSONArray("segments").toDailyRuntimeSegmentList(),
-                legend = it.optJSONArray("legend").toDailyRuntimeLegendList(),
+                categoryView = it.optJSONObject("categoryView")?.toDailyRuntimeViewData()
+                    ?: WidgetDailyRuntimeViewData(),
+                activityView = it.optJSONObject("activityView")?.toDailyRuntimeViewData()
+                    ?: WidgetDailyRuntimeViewData(),
                 syncedAt = it.optLong("syncedAt", System.currentTimeMillis())
             )
         }
@@ -420,8 +423,10 @@ class WidgetBridgePlugin : Plugin() {
             values.add(
                 WidgetDailyRuntimeSegment(
                     index = item.optInt("index", index).coerceAtLeast(0),
-                    categoryId = parseNullableString(item.optString("categoryId")),
-                    categoryName = parseNullableString(item.optString("categoryName")),
+                    itemId = parseNullableString(item.optString("itemId"))
+                        ?: parseNullableString(item.optString("categoryId")),
+                    itemName = parseNullableString(item.optString("itemName"))
+                        ?: parseNullableString(item.optString("categoryName")),
                     color = parseNullableString(item.optString("color")),
                     minutes = item.optInt("minutes", 0).coerceAtLeast(0)
                 )
@@ -438,18 +443,29 @@ class WidgetBridgePlugin : Plugin() {
         val values = mutableListOf<WidgetDailyRuntimeLegendItem>()
         for (index in 0 until length()) {
             val item = optJSONObject(index) ?: continue
-            val categoryId = parseNullableString(item.optString("categoryId")) ?: continue
-            val categoryName = parseNullableString(item.optString("categoryName")) ?: continue
+            val itemId = parseNullableString(item.optString("itemId"))
+                ?: parseNullableString(item.optString("categoryId"))
+                ?: continue
+            val itemName = parseNullableString(item.optString("itemName"))
+                ?: parseNullableString(item.optString("categoryName"))
+                ?: continue
             val color = parseNullableString(item.optString("color")) ?: continue
             values.add(
                 WidgetDailyRuntimeLegendItem(
-                    categoryId = categoryId,
-                    categoryName = categoryName,
+                    itemId = itemId,
+                    itemName = itemName,
                     color = color,
                     totalMinutes = item.optInt("totalMinutes", 0).coerceAtLeast(0)
                 )
             )
         }
         return values
+    }
+
+    private fun JSONObject.toDailyRuntimeViewData(): WidgetDailyRuntimeViewData {
+        return WidgetDailyRuntimeViewData(
+            segments = optJSONArray("segments").toDailyRuntimeSegmentList(),
+            legend = optJSONArray("legend").toDailyRuntimeLegendList()
+        )
     }
 }

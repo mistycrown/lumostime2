@@ -4,13 +4,14 @@
  * @output Widget template persistence helpers and app/native conversion utilities
  * @pos Service
  * @description Centralizes the shared types and conversions used by the Android widget system while keeping timer, daily, and shortcut slots on one contract.
- * @updated 2026-04-25: Added DAILY_RUNTIME 4x4 payload builders for the native timeline heatmap widget.
+ * @updated 2026-04-25: Added DAILY_RUNTIME dual-view payload builders so native heatmap widgets can toggle between category and activity coloring.
  */
 import { Capacitor } from '@capacitor/core';
 import { ActiveSession, Category, CheckTemplate, DailyReview, Log } from '../types';
 import type {
   WidgetBridgeDailyRuntimeLegendItem,
   WidgetBridgeDailyRuntimePayload,
+  WidgetBridgeDailyRuntimeViewData,
   WidgetBridgeDailyRuntimeSegment,
   DailyWidgetManualMode,
   WidgetBridgeDailyCheckMeta,
@@ -623,10 +624,16 @@ const DAILY_RUNTIME_SEGMENT_MINUTES = 10;
 const DAILY_RUNTIME_EMPTY_COLOR = '#F1F5F9';
 
 type DailyRuntimeAccumulator = {
-  categoryId: string;
-  categoryName: string;
+  itemId: string;
+  itemName: string;
   color: string;
   minutes: number;
+};
+
+type DailyRuntimeEntityMeta = {
+  itemId: string;
+  itemName: string;
+  color: string;
 };
 
 const clampRange = (value: number, min: number, max: number) => Math.min(Math.max(value, min), max);
@@ -644,50 +651,74 @@ const getDailyRuntimeDayBounds = (date: Date) => {
   };
 };
 
-const buildCategoryRuntimeMeta = (category: Category) => ({
-  categoryId: category.id,
-  categoryName: category.name,
-  color: getColorHexForCharts(category.themeColor || '') || DAILY_RUNTIME_EMPTY_COLOR
+const buildDailyRuntimeMeta = (
+  itemId: string,
+  itemName: string,
+  color: string
+): DailyRuntimeEntityMeta => ({
+  itemId,
+  itemName,
+  color
 });
 
-export const buildDailyRuntimeWidgetPayload = ({
+const buildCategoryRuntimeMeta = (category: Category): DailyRuntimeEntityMeta =>
+  buildDailyRuntimeMeta(
+    category.id,
+    category.name,
+    getColorHexForCharts(category.themeColor || '') || DAILY_RUNTIME_EMPTY_COLOR
+  );
+
+const buildActivityRuntimeMeta = (
+  category: Category,
+  activity: Category['activities'][number]
+): DailyRuntimeEntityMeta =>
+  buildDailyRuntimeMeta(
+    activity.id,
+    activity.name,
+    getColorHexForCharts(activity.color || category.themeColor || '') || DAILY_RUNTIME_EMPTY_COLOR
+  );
+
+const buildDailyRuntimeViewData = ({
   logs,
   activeSessions,
-  categories,
-  date = new Date(),
-  now = Date.now()
+  date,
+  now,
+  entityMetaById,
+  resolveEntityId
 }: {
   logs: Log[];
   activeSessions: ActiveSession[];
-  categories: Category[];
-  date?: Date;
-  now?: number;
-}): WidgetBridgeDailyRuntimePayload => {
+  date: Date;
+  now: number;
+  entityMetaById: Map<string, DailyRuntimeEntityMeta>;
+  resolveEntityId: (
+    entry: Pick<Log, 'categoryId' | 'activityId'> | Pick<ActiveSession, 'categoryId' | 'activityId'>
+  ) => string | null;
+}): WidgetBridgeDailyRuntimeViewData => {
   const { dayStartMs, dayEndMs } = getDailyRuntimeDayBounds(date);
-  const categoryMeta = new Map(categories.map((category) => [category.id, buildCategoryRuntimeMeta(category)]));
   const segmentBuckets = Array.from({ length: DAILY_RUNTIME_SEGMENT_COUNT }, () => new Map<string, number>());
   const legendBuckets = new Map<string, DailyRuntimeAccumulator>();
 
-  const accumulateRange = (categoryId: string, startMs: number, endMs: number) => {
+  const accumulateRange = (itemId: string, startMs: number, endMs: number) => {
     const safeStart = clampRange(startMs, dayStartMs, dayEndMs);
     const safeEnd = clampRange(endMs, dayStartMs, dayEndMs);
     if (safeEnd <= safeStart) {
       return;
     }
 
-    const meta = categoryMeta.get(categoryId);
+    const meta = entityMetaById.get(itemId);
     if (!meta) {
       return;
     }
 
     const durationMinutes = (safeEnd - safeStart) / 60000;
-    const existingLegend = legendBuckets.get(categoryId);
+    const existingLegend = legendBuckets.get(itemId);
     if (existingLegend) {
       existingLegend.minutes += durationMinutes;
     } else {
-      legendBuckets.set(categoryId, {
-        categoryId: meta.categoryId,
-        categoryName: meta.categoryName,
+      legendBuckets.set(itemId, {
+        itemId: meta.itemId,
+        itemName: meta.itemName,
         color: meta.color,
         minutes: durationMinutes
       });
@@ -702,49 +733,51 @@ export const buildDailyRuntimeWidgetPayload = ({
       }
 
       const bucket = segmentBuckets[segmentIndex];
-      bucket.set(categoryId, (bucket.get(categoryId) || 0) + overlapMs / 60000);
+      bucket.set(itemId, (bucket.get(itemId) || 0) + overlapMs / 60000);
     }
   };
 
   logs.forEach((log) => {
-    if (!log.categoryId) {
+    const itemId = resolveEntityId(log);
+    if (!itemId) {
       return;
     }
-    accumulateRange(log.categoryId, log.startTime, log.endTime);
+    accumulateRange(itemId, log.startTime, log.endTime);
   });
 
   activeSessions.forEach((session) => {
-    if (!session.categoryId) {
+    const itemId = resolveEntityId(session);
+    if (!itemId) {
       return;
     }
-    accumulateRange(session.categoryId, session.startTime, now);
+    accumulateRange(itemId, session.startTime, now);
   });
 
   const segments: WidgetBridgeDailyRuntimeSegment[] = segmentBuckets.map((bucket, index) => {
-    let dominantCategoryId: string | null = null;
+    let dominantItemId: string | null = null;
     let dominantMinutes = 0;
-    bucket.forEach((minutes, categoryId) => {
+    bucket.forEach((minutes, itemId) => {
       if (minutes > dominantMinutes) {
-        dominantCategoryId = categoryId;
+        dominantItemId = itemId;
         dominantMinutes = minutes;
       }
     });
 
-    if (!dominantCategoryId) {
+    if (!dominantItemId) {
       return {
         index,
-        categoryId: null,
-        categoryName: null,
+        itemId: null,
+        itemName: null,
         color: null,
         minutes: 0
       };
     }
 
-    const meta = categoryMeta.get(dominantCategoryId);
+    const meta = entityMetaById.get(dominantItemId);
     return {
       index,
-      categoryId: dominantCategoryId,
-      categoryName: meta?.categoryName || null,
+      itemId: dominantItemId,
+      itemName: meta?.itemName || null,
       color: meta?.color || DAILY_RUNTIME_EMPTY_COLOR,
       minutes: Math.round(dominantMinutes)
     };
@@ -753,19 +786,65 @@ export const buildDailyRuntimeWidgetPayload = ({
   const legend: WidgetBridgeDailyRuntimeLegendItem[] = Array.from(legendBuckets.values())
     .sort((left, right) => right.minutes - left.minutes)
     .map((item) => ({
-      categoryId: item.categoryId,
-      categoryName: item.categoryName,
+      itemId: item.itemId,
+      itemName: item.itemName,
       color: item.color,
       totalMinutes: Math.round(item.minutes)
     }));
 
   return {
+    segments,
+    legend
+  };
+};
+
+export const buildDailyRuntimeWidgetPayload = ({
+  logs,
+  activeSessions,
+  categories,
+  date = new Date(),
+  now = Date.now()
+}: {
+  logs: Log[];
+  activeSessions: ActiveSession[];
+  categories: Category[];
+  date?: Date;
+  now?: number;
+}): WidgetBridgeDailyRuntimePayload => {
+  const categoryMetaById = new Map(
+    categories.map((category) => [category.id, buildCategoryRuntimeMeta(category)] as const)
+  );
+  const activityMetaById = new Map(
+    categories.flatMap((category) =>
+      category.activities.map((activity) => [activity.id, buildActivityRuntimeMeta(category, activity)] as const)
+    )
+  );
+
+  const categoryView = buildDailyRuntimeViewData({
+    logs,
+    activeSessions,
+    date,
+    now,
+    entityMetaById: categoryMetaById,
+    resolveEntityId: (entry) => entry.categoryId || null
+  });
+
+  const activityView = buildDailyRuntimeViewData({
+    logs,
+    activeSessions,
+    date,
+    now,
+    entityMetaById: activityMetaById,
+    resolveEntityId: (entry) => entry.activityId || null
+  });
+
+  return {
     date: formatDailyRuntimeDate(date),
     totalMinutes: Math.round(
-      Array.from(legendBuckets.values()).reduce((total, item) => total + item.minutes, 0)
+      categoryView.legend.reduce((total, item) => total + item.totalMinutes, 0)
     ),
-    segments,
-    legend,
+    categoryView,
+    activityView,
     syncedAt: now
   };
 };

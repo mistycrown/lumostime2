@@ -4,7 +4,7 @@
  * @output Typed Capacitor widget bridge methods
  * @pos Plugin
  * @description Exposes the Android widget template, instance binding state, and runtime bridge to the React application.
- * @updated 2026-04-25: Added dedicated DAILY_RUNTIME payload sync types for the native 4x4 heatmap widget.
+ * @updated 2026-04-25: Added dedicated DAILY_RUNTIME category/activity dual-view payload sync types for native heatmap widgets.
  */
 import { registerPlugin } from '@capacitor/core';
 import { ShortcutWidgetAction } from '../services/widgetShortcutService';
@@ -122,24 +122,29 @@ export interface WidgetBridgePendingDailyAction {
 
 export interface WidgetBridgeDailyRuntimeSegment {
   index: number;
-  categoryId: string | null;
-  categoryName: string | null;
+  itemId: string | null;
+  itemName: string | null;
   color: string | null;
   minutes: number;
 }
 
 export interface WidgetBridgeDailyRuntimeLegendItem {
-  categoryId: string;
-  categoryName: string;
+  itemId: string;
+  itemName: string;
   color: string;
   totalMinutes: number;
+}
+
+export interface WidgetBridgeDailyRuntimeViewData {
+  segments: WidgetBridgeDailyRuntimeSegment[];
+  legend: WidgetBridgeDailyRuntimeLegendItem[];
 }
 
 export interface WidgetBridgeDailyRuntimePayload {
   date: string;
   totalMinutes: number;
-  segments: WidgetBridgeDailyRuntimeSegment[];
-  legend: WidgetBridgeDailyRuntimeLegendItem[];
+  categoryView: WidgetBridgeDailyRuntimeViewData;
+  activityView: WidgetBridgeDailyRuntimeViewData;
   syncedAt: number;
 }
 
