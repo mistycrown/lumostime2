@@ -18,7 +18,7 @@ Overlay components for complex interactions.
 - `TodoDuplicateModal.tsx`: Lightweight pre-copy modal for renaming duplicated todos and clearing dates, tags, or scopes before creation.
 - `TodoQuickActionsModal.tsx`: Shared quick-actions bottom sheet for lightweight todo scheduling, completion, and detail-entry flows reused by list-row taps and week-plan badges.
 - `GoalEditor.tsx`: Goal creation and editing.
-- `AIBackfillChatModal.tsx`: Unified AI full-screen chat workspace that keeps persistent session history, opens a history drawer from the top-right action, lets the title avatar open persona presets/customization, supports a per-session quick-context toggle, and routes each turn into闲聊、AI 补记或 AI 添加待办 with direct local tool application plus per-result edit/undo and debug inspection.
+- `AIBackfillChatModal.tsx`: Unified AI full-screen chat workspace with a theme-synced editorial shell driven by the current `--accent-color`, persistent session history, persona studio access from the title avatar, configurable AI/user avatars, reordered persona/avatar/context settings, per-session quick-context control, and direct local handling for chat, AI backfill, and AI todo creation plus edit/undo and debug inspection.
 - `AddActivityModal.tsx`: Creating new activities.
 - `ConfirmModal.tsx`: specialized confirmation dialogs.
 - `NarrativeStyleSelectionModal.tsx`: AI narrative style picker.
@@ -91,7 +91,9 @@ Components for theme and appearance customization.
 - `ScheduleStyleSelector.tsx`: 日程图样式卡片选择器，提供默认、经典、极简、实色四种轻量预览。
 - `achievement/AchievementBottleIconPackSelector.tsx`: 已改为成就瓶图标包卡片选择器，支持更紧凑的预览式切换。
 - `achievement/AchievementBottleStyleSelector.tsx`: 已改为成就瓶样式卡片选择器，使用玻璃瓶身小预览区分不同气质。
-> Last updated: 2026-04-22
+> Last updated: 2026-04-25
+- `AIBackfillChatModal.tsx`: Added a dedicated grayscale fallback for the `default` color scheme so the AI workspace no longer keeps the warm tinted surfaces that are used by accent themes.
+- `AIBackfillChatModal.tsx`: Simplified the AI settings panel by flattening the user-avatar and current-persona layouts, removing redundant helper copy, and tightening the visuals around the existing accent-driven theme tokens.
 - `AIBackfillChatModal.tsx`: The shared AI window can now stay mounted at the app level while hidden, so closing the modal does not abort requests that are already running in the background.
 - `AIBackfillChatModal.tsx`, `aiService.ts`: Simplified intent routing into a lightweight message-only classification step, removed apply-success toasts because result cards already reflect tool execution, and now only pass unfinished todos into backfill planning context.
 - `AIBackfillChatModal.tsx`: Replaced the old delete-style top-right action with a history drawer, keeps users in one default conversation flow, and only allows creating a new session from the history panel.
