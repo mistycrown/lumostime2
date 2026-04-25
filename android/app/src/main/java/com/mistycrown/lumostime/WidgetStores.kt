@@ -18,6 +18,7 @@ object WidgetStores {
     private const val KEY_PENDING_DAILY_ACTIONS = "pending_daily_actions_v1"
     private const val KEY_DAILY_SYNC = "daily_sync_v1"
     private const val KEY_DAILY_RUNTIME_SYNC = "daily_runtime_sync_v1"
+    private const val KEY_DAILY_RUNTIME_VIEW_MODES = "daily_runtime_view_modes_v1"
     private const val KEY_TAP_ANIMATION = "tap_animation_v1"
     private const val KEY_LAST_WIDGET_STOP_AT = "last_widget_stop_at_v1"
     private const val KEY_LEGACY_CONFIG = "shared_slots_v1"
@@ -479,11 +480,21 @@ object WidgetStores {
 
         return runCatching {
             val json = JSONObject(raw)
+            val legacySegments = json.optJSONArray("segments").toDailyRuntimeSegmentList()
+            val legacyLegend = json.optJSONArray("legend").toDailyRuntimeLegendList()
             WidgetDailyRuntimePayload(
                 date = json.optString("date"),
                 totalMinutes = json.optInt("totalMinutes", 0).coerceAtLeast(0),
-                segments = json.optJSONArray("segments").toDailyRuntimeSegmentList(),
-                legend = json.optJSONArray("legend").toDailyRuntimeLegendList(),
+                categoryView = json.optJSONObject("categoryView")?.toDailyRuntimeViewData()
+                    ?: WidgetDailyRuntimeViewData(
+                        segments = legacySegments,
+                        legend = legacyLegend
+                    ),
+                activityView = json.optJSONObject("activityView")?.toDailyRuntimeViewData()
+                    ?: WidgetDailyRuntimeViewData(
+                        segments = legacySegments,
+                        legend = legacyLegend
+                    ),
                 syncedAt = json.optLong("syncedAt", System.currentTimeMillis())
             )
         }.getOrNull()
@@ -499,11 +510,63 @@ object WidgetStores {
         val json = JSONObject().apply {
             put("date", payload.date)
             put("totalMinutes", payload.totalMinutes.coerceAtLeast(0))
-            put("segments", payload.segments.toDailyRuntimeSegmentJsonArray())
-            put("legend", payload.legend.toDailyRuntimeLegendJsonArray())
+            put("categoryView", payload.categoryView.toDailyRuntimeViewDataJson())
+            put("activityView", payload.activityView.toDailyRuntimeViewDataJson())
             put("syncedAt", payload.syncedAt)
         }
         editor.putString(KEY_DAILY_RUNTIME_SYNC, json.toString()).commit()
+    }
+
+    fun loadDailyRuntimeViewMode(context: Context, appWidgetId: Int): String {
+        if (appWidgetId <= 0) {
+            return WidgetDailyRuntimeViewModes.DEFAULT
+        }
+
+        val raw = prefs(context).getString(KEY_DAILY_RUNTIME_VIEW_MODES, null)
+        if (raw.isNullOrBlank()) {
+            return WidgetDailyRuntimeViewModes.DEFAULT
+        }
+
+        return runCatching {
+            val json = JSONObject(raw)
+            WidgetDailyRuntimeViewModes.normalize(json.optString(appWidgetId.toString()))
+        }.getOrElse {
+            WidgetDailyRuntimeViewModes.DEFAULT
+        }
+    }
+
+    fun saveDailyRuntimeViewMode(context: Context, appWidgetId: Int, mode: String) {
+        if (appWidgetId <= 0) {
+            return
+        }
+
+        val normalizedMode = WidgetDailyRuntimeViewModes.normalize(mode)
+        val json = runCatching {
+            JSONObject(prefs(context).getString(KEY_DAILY_RUNTIME_VIEW_MODES, null) ?: "{}")
+        }.getOrElse {
+            JSONObject()
+        }
+        json.put(appWidgetId.toString(), normalizedMode)
+        prefs(context).edit().putString(KEY_DAILY_RUNTIME_VIEW_MODES, json.toString()).commit()
+    }
+
+    fun removeDailyRuntimeViewModes(context: Context, appWidgetIds: IntArray) {
+        if (appWidgetIds.isEmpty()) {
+            return
+        }
+
+        val raw = prefs(context).getString(KEY_DAILY_RUNTIME_VIEW_MODES, null)
+        if (raw.isNullOrBlank()) {
+            return
+        }
+
+        val json = runCatching { JSONObject(raw) }.getOrElse { JSONObject() }
+        appWidgetIds.forEach { appWidgetId ->
+            if (appWidgetId > 0) {
+                json.remove(appWidgetId.toString())
+            }
+        }
+        prefs(context).edit().putString(KEY_DAILY_RUNTIME_VIEW_MODES, json.toString()).commit()
     }
 
     fun loadTapAnimationState(context: Context): WidgetTapAnimationState? {
@@ -881,8 +944,10 @@ object WidgetStores {
                 add(
                     WidgetDailyRuntimeSegment(
                         index = item.optInt("index", index).coerceAtLeast(0),
-                        categoryId = parseNullableString(item.optString("categoryId")),
-                        categoryName = parseNullableString(item.optString("categoryName")),
+                        itemId = parseNullableString(item.optString("itemId"))
+                            ?: parseNullableString(item.optString("categoryId")),
+                        itemName = parseNullableString(item.optString("itemName"))
+                            ?: parseNullableString(item.optString("categoryName")),
                         color = parseNullableString(item.optString("color")),
                         minutes = item.optInt("minutes", 0).coerceAtLeast(0)
                     )
@@ -899,13 +964,17 @@ object WidgetStores {
         return buildList {
             for (index in 0 until length()) {
                 val item = optJSONObject(index) ?: continue
-                val categoryId = parseNullableString(item.optString("categoryId")) ?: continue
-                val categoryName = parseNullableString(item.optString("categoryName")) ?: continue
+                val itemId = parseNullableString(item.optString("itemId"))
+                    ?: parseNullableString(item.optString("categoryId"))
+                    ?: continue
+                val itemName = parseNullableString(item.optString("itemName"))
+                    ?: parseNullableString(item.optString("categoryName"))
+                    ?: continue
                 val color = parseNullableString(item.optString("color")) ?: continue
                 add(
                     WidgetDailyRuntimeLegendItem(
-                        categoryId = categoryId,
-                        categoryName = categoryName,
+                        itemId = itemId,
+                        itemName = itemName,
                         color = color,
                         totalMinutes = item.optInt("totalMinutes", 0).coerceAtLeast(0)
                     )
@@ -914,13 +983,20 @@ object WidgetStores {
         }
     }
 
+    private fun JSONObject.toDailyRuntimeViewData(): WidgetDailyRuntimeViewData {
+        return WidgetDailyRuntimeViewData(
+            segments = optJSONArray("segments").toDailyRuntimeSegmentList(),
+            legend = optJSONArray("legend").toDailyRuntimeLegendList()
+        )
+    }
+
     private fun List<WidgetDailyRuntimeSegment>.toDailyRuntimeSegmentJsonArray(): JSONArray {
         val array = JSONArray()
         forEach { item ->
             array.put(JSONObject().apply {
                 put("index", item.index.coerceAtLeast(0))
-                put("categoryId", item.categoryId ?: JSONObject.NULL)
-                put("categoryName", item.categoryName ?: JSONObject.NULL)
+                put("itemId", item.itemId ?: JSONObject.NULL)
+                put("itemName", item.itemName ?: JSONObject.NULL)
                 put("color", item.color ?: JSONObject.NULL)
                 put("minutes", item.minutes.coerceAtLeast(0))
             })
@@ -932,13 +1008,20 @@ object WidgetStores {
         val array = JSONArray()
         forEach { item ->
             array.put(JSONObject().apply {
-                put("categoryId", item.categoryId)
-                put("categoryName", item.categoryName)
+                put("itemId", item.itemId)
+                put("itemName", item.itemName)
                 put("color", item.color)
                 put("totalMinutes", item.totalMinutes.coerceAtLeast(0))
             })
         }
         return array
+    }
+
+    private fun WidgetDailyRuntimeViewData.toDailyRuntimeViewDataJson(): JSONObject {
+        return JSONObject().apply {
+            put("segments", segments.toDailyRuntimeSegmentJsonArray())
+            put("legend", legend.toDailyRuntimeLegendJsonArray())
+        }
     }
 
     private fun migrateLegacyConfigIfNeeded(context: Context) {

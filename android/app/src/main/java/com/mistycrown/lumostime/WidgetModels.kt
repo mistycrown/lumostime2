@@ -36,6 +36,26 @@ object WidgetDailyModes {
     }
 }
 
+object WidgetDailyRuntimeViewModes {
+    const val CATEGORY = "category"
+    const val ACTIVITY = "activity"
+    const val DEFAULT = CATEGORY
+
+    @JvmStatic
+    fun normalize(mode: String?): String {
+        return when (mode) {
+            ACTIVITY -> ACTIVITY
+            CATEGORY -> CATEGORY
+            else -> DEFAULT
+        }
+    }
+
+    @JvmStatic
+    fun toggle(mode: String?): String {
+        return if (normalize(mode) == CATEGORY) ACTIVITY else CATEGORY
+    }
+}
+
 object WidgetTapAnimationModes {
     const val TIMER_START = "timer_start"
     const val TIMER_STOP = "timer_stop"
@@ -182,24 +202,29 @@ data class WidgetDailySyncPayload(
 
 data class WidgetDailyRuntimeSegment(
     val index: Int,
-    val categoryId: String? = null,
-    val categoryName: String? = null,
+    val itemId: String? = null,
+    val itemName: String? = null,
     val color: String? = null,
     val minutes: Int = 0
 )
 
 data class WidgetDailyRuntimeLegendItem(
-    val categoryId: String,
-    val categoryName: String,
+    val itemId: String,
+    val itemName: String,
     val color: String,
     val totalMinutes: Int
+)
+
+data class WidgetDailyRuntimeViewData(
+    val segments: List<WidgetDailyRuntimeSegment> = emptyList(),
+    val legend: List<WidgetDailyRuntimeLegendItem> = emptyList()
 )
 
 data class WidgetDailyRuntimePayload(
     val date: String,
     val totalMinutes: Int,
-    val segments: List<WidgetDailyRuntimeSegment>,
-    val legend: List<WidgetDailyRuntimeLegendItem>,
+    val categoryView: WidgetDailyRuntimeViewData = WidgetDailyRuntimeViewData(),
+    val activityView: WidgetDailyRuntimeViewData = WidgetDailyRuntimeViewData(),
     val syncedAt: Long
 )
 
