@@ -5,7 +5,7 @@
  * @pos Utility (Daily Check / Achievement)
  * @description Calculates per-item daily streaks, resolves the highest matching multiplier tier, and aggregates weighted check-category completion values for achievement snapshots.
  *
- * @updated 2026-04-25: Added category-level weighted completion helpers driven by a global streak tier config.
+ * @updated 2026-04-25: Removed the extra global enabled gate so check-category streak toggles apply fixed tiers directly.
  */
 import { CheckItem, CheckStreakConfig, CheckTemplate, DailyReview } from '../types';
 import { getLocalDateStr } from './dateUtils';
@@ -13,7 +13,7 @@ import { findCheckItemIndexInReview } from './dailyCheckUtils';
 import { normalizeCheckItem } from './checkItemNormalizer';
 
 const DEFAULT_CHECK_STREAK_CONFIG: CheckStreakConfig = {
-  enabled: false,
+  enabled: true,
   tiers: [
     { thresholdDays: 5, multiplier: 1.2 },
     { thresholdDays: 15, multiplier: 1.5 },
@@ -70,7 +70,7 @@ export const normalizeCheckStreakConfig = (config?: CheckStreakConfig | null): C
   );
 
   return {
-    enabled: safeConfig.enabled === true,
+    enabled: true,
     tiers: normalizedTiers.length > 0 ? normalizedTiers : DEFAULT_CHECK_STREAK_CONFIG.tiers
   };
 };
@@ -81,7 +81,7 @@ export const getCheckItemStreakMultiplier = (
 ): number => {
   const normalizedConfig = normalizeCheckStreakConfig(config);
 
-  if (!normalizedConfig.enabled || streakDays <= 0) {
+  if (streakDays <= 0) {
     return 1;
   }
 
@@ -166,10 +166,7 @@ export const getCheckCategoryWeightedCompletionValue = ({
   }
 
   const normalizedConfig = normalizeCheckStreakConfig(checkStreakConfig);
-  const isCategoryStreakEnabled = Boolean(
-    normalizedConfig.enabled
-    && useStreakMultiplier === true
-  );
+  const isCategoryStreakEnabled = Boolean(useStreakMultiplier === true);
 
   if (!isCategoryStreakEnabled) {
     return completedCheckItems.length;
