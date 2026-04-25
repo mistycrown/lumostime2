@@ -4,6 +4,7 @@
  * @output Shared helpers for validating one-level todo hierarchy, syncing inherited fields, and building tree views
  * @pos Utility (Todo hierarchy)
  * @description Centralizes parent-child todo rules so list rendering, save logic, and detail editing all share the same one-level hierarchy behavior.
+ * @updated 2026-04-25: Added parent-completion visibility helpers so list views can hide unfinished subtasks whenever their parent todo is completed, without mutating child completion state.
  * @updated 2026-04-22: Added direct-child display ordering plus optional completed-task filtering so expanded parent rows can honor list-level hide-completed controls.
  * @updated 2026-04-22: Added direct-child display ordering so schedule-expanded parent rows can show all subtasks with unfinished items first.
  * @updated 2026-04-21: Added one-level todo hierarchy helpers for subtasks, inheritance sync, and cascade delete calculations.
@@ -44,10 +45,16 @@ export const getDirectChildTodos = (todos: TodoItem[], parentTodoId: string): To
 export const getDirectChildTodosForDisplay = (
   todos: TodoItem[],
   parentTodoId: string,
-  options?: { incompleteFirst?: boolean; includeCompleted?: boolean }
+  options?: { incompleteFirst?: boolean; includeCompleted?: boolean; hideIncompleteWhenParentCompleted?: boolean }
 ): TodoItem[] => {
+  const parentTodo = todos.find((todo) => todo.id === parentTodoId) || null;
   const orderedChildren = getDirectChildTodos(todos, parentTodoId)
-    .filter((todo) => options?.includeCompleted ?? true ? true : !todo.isCompleted);
+    .filter((todo) => ((options?.includeCompleted ?? true) ? true : !todo.isCompleted))
+    .filter((todo) => !(
+      options?.hideIncompleteWhenParentCompleted
+      && parentTodo?.isCompleted
+      && !todo.isCompleted
+    ));
 
   if (!options?.incompleteFirst) {
     return orderedChildren;
@@ -96,6 +103,18 @@ export const getParentTodo = (todos: TodoItem[], todo: Pick<TodoItem, 'id' | 'pa
   }
 
   return parentTodo;
+};
+
+export const isIncompleteSubtaskHiddenByCompletedParent = (
+  todos: TodoItem[],
+  todo: Pick<TodoItem, 'id' | 'parentTodoId' | 'isCompleted'>
+): boolean => {
+  if (todo.isCompleted) {
+    return false;
+  }
+
+  const parentTodo = getParentTodo(todos, todo);
+  return Boolean(parentTodo?.isCompleted);
 };
 
 export const applyParentTodoInheritance = (todo: TodoItem, parentTodo: TodoItem): TodoItem => ({

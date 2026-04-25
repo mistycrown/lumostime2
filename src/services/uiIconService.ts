@@ -21,6 +21,7 @@
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  * - 每个主题包含完整的96个图标
  * - 图标文件格式: `/uiicon/{theme}/{编号}.webp` (带PNG降级)
+ * @updated 2026-04-25: Added helpers to map packaged UI icon asset paths back to icon ids so widget editors can round-trip native icon selections.
  * - 编号格式: 01-96 (两位数字，前导零)
  * 
  * ### 使用方式
@@ -250,6 +251,14 @@ const ICON_NUMBER_MAP: Record<UIIconType, string> = {
     'star': '79',
     'share': '80'
 };
+
+const ICON_TYPE_BY_NUMBER = Object.entries(ICON_NUMBER_MAP).reduce<Record<string, UIIconType>>(
+    (result, [iconType, iconNumber]) => {
+        result[iconNumber] = iconType as UIIconType;
+        return result;
+    },
+    {}
+);
 
 // 可用的主题列表
 export const UI_ICON_THEMES = ['default', 'purple', 'color', 'prince', 'cat', 'forest', 'plant', 'water', 'knit', 'old', 'paper', 'pencil'] as const;
@@ -607,6 +616,25 @@ export const getUIIconAssetPathWithFallback = (
         primary: `uiicon/${theme}/${iconNumber}.webp`,
         fallback: `uiicon/${theme}/${iconNumber}.png`
     };
+};
+
+export const getUIIconTypeFromAssetPath = (assetPath?: string | null): UIIconType | null => {
+    if (!assetPath) {
+        return null;
+    }
+
+    const normalizedPath = assetPath.replace(/\\/g, '/').replace(/^\/+/, '');
+    const match = normalizedPath.match(/^uiicon\/[^/]+\/(\d{2})\.(?:webp|png)$/i);
+    if (!match) {
+        return null;
+    }
+
+    return ICON_TYPE_BY_NUMBER[match[1]] || null;
+};
+
+export const getUIIconStringFromAssetPath = (assetPath?: string | null): string | null => {
+    const iconType = getUIIconTypeFromAssetPath(assetPath);
+    return iconType ? `ui:${iconType}` : null;
 };
 
 /**

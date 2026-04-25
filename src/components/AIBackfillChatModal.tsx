@@ -4,6 +4,7 @@
  * @output Full-screen AI time assistant with session history, persona settings, quick context cache, and direct log/todo application
  * @pos Component (AI Integration)
  * @description Provides the shared AI workspace for chat, backfill, and todo creation. Sessions persist locally, persona style is configurable per session, and recent context can be toggled into the formal AI request path.
+ * @updated 2026-04-25: Added AI-driven todo updates, subtask creation, and log editing with local patch application plus undo support, and expanded intent routing so edit flows receive dedicated context and tool plans.
  * @updated 2026-04-25: Corrected applied-todo metadata to render task category as `@`, linked activity hierarchy as `#`, and scope domains as `%`, while respecting the auto-link scope toggle when merging activity rules.
  * @updated 2026-04-25: Fixed the applied-todo detail action so newly created todo results stay clickable even if the live todo lookup lags behind the message render.
  * @updated 2026-04-25: Matched applied-result metadata to the context-page prefix syntax by removing icons and using `# / % / @` markers for tags, domains, and todos.
@@ -52,7 +53,10 @@ import {
   type AIDebugExchange,
   type AIBackfillToolCall,
   type AIConversationTurn,
-  type AITodoToolCall
+  type AITodoToolCall,
+  type AITodoUpdateToolCall,
+  type AICreateSubtaskToolCall,
+  type AIEditLogToolCall
 } from '../services/aiService';
 import { useData } from '../contexts/DataContext';
 import { useCategoryScope } from '../contexts/CategoryScopeContext';
@@ -61,8 +65,9 @@ import { useToast } from '../contexts/ToastContext';
 import { useSettings } from '../contexts/SettingsContext';
 import type { Log, TodoItem, TodoRecurrenceRule } from '../types';
 import { formatDateKey, normalizeAIBackfillToolCalls, parseTimeOnDateKey } from '../utils/aiBackfillUtils';
-import { getTodoProgressTrackingMode } from '../utils/todoProgressUtils';
+import { getTodoProgressTrackingMode, syncSubtaskProgressToParentTodos } from '../utils/todoProgressUtils';
 import { imageService } from '../services/imageService';
+import { getNextChildOrder, normalizeTodoHierarchy, syncDirectChildTodosWithParent } from '../utils/todoHierarchyUtils';
 
 type ChatTone = 'normal' | 'system' | 'error' | 'pending';
 type AppliedActionStatus = 'applied' | 'undone' | 'failed';
@@ -138,7 +143,53 @@ interface AppliedCreateTodoAction {
   errorMessage?: string;
 }
 
-type AppliedChatAction = AppliedCreateLogAction | AppliedCreateTodoAction;
+interface AppliedUpdateTodoSnapshot {
+  todoId?: string;
+  previousTodo?: TodoItem;
+  nextTodo?: TodoItem;
+}
+
+interface AppliedUpdateTodoAction {
+  actionId: string;
+  kind: 'update_todo';
+  status: AppliedActionStatus;
+  snapshot: AppliedUpdateTodoSnapshot;
+  errorMessage?: string;
+}
+
+interface AppliedCreateSubtaskSnapshot extends AppliedCreateTodoSnapshot {
+  parentTodoId?: string;
+  parentTodoTitle?: string;
+}
+
+interface AppliedCreateSubtaskAction {
+  actionId: string;
+  kind: 'create_subtask';
+  status: AppliedActionStatus;
+  snapshot: AppliedCreateSubtaskSnapshot;
+  errorMessage?: string;
+}
+
+interface AppliedEditLogSnapshot {
+  logId?: string;
+  previousLog?: Log;
+  nextLog?: Log;
+}
+
+interface AppliedEditLogAction {
+  actionId: string;
+  kind: 'edit_log';
+  status: AppliedActionStatus;
+  snapshot: AppliedEditLogSnapshot;
+  errorMessage?: string;
+}
+
+type AppliedChatAction =
+  | AppliedCreateLogAction
+  | AppliedCreateTodoAction
+  | AppliedUpdateTodoAction
+  | AppliedCreateSubtaskAction
+  | AppliedEditLogAction;
 
 interface AIChatMessage {
   id: string;
@@ -148,6 +199,7 @@ interface AIChatMessage {
   tone?: ChatTone;
   debugSections?: AIChatDebugSection[];
   appliedActions?: AppliedChatAction[];
+  retryInput?: string;
 }
 
 interface AIChatSession {
@@ -530,6 +582,12 @@ const normalizeAppliedActions = (value: unknown): AppliedChatAction[] => (
   Array.isArray(value) ? value as AppliedChatAction[] : []
 );
 
+const normalizeRetryInput = (value: unknown): string | undefined => (
+  typeof value === 'string' && value.trim().length > 0
+    ? value.trim()
+    : undefined
+);
+
 const normalizeMessages = (value: unknown): AIChatMessage[] => {
   if (!Array.isArray(value)) {
     return [];
@@ -560,7 +618,8 @@ const normalizeMessages = (value: unknown): AIChatMessage[] => {
       createdAt: candidate.createdAt,
       ...(candidate.tone ? { tone: candidate.tone } : {}),
       ...(candidate.debugSections ? { debugSections: normalizeDebugSections(candidate.debugSections) } : {}),
-      ...(candidate.appliedActions ? { appliedActions: normalizeAppliedActions(candidate.appliedActions) } : {})
+      ...(candidate.appliedActions ? { appliedActions: normalizeAppliedActions(candidate.appliedActions) } : {}),
+      ...(normalizeRetryInput(candidate.retryInput) ? { retryInput: normalizeRetryInput(candidate.retryInput) } : {})
     };
 
     if (normalizedMessage.tone === 'pending') {
@@ -826,6 +885,36 @@ const isAbortError = (error: unknown): boolean => (
       : false
 );
 
+const getRetryableAIErrorMessage = (error: unknown): string => {
+  const debugTransportError = (
+    typeof error === 'object'
+    && error !== null
+    && 'debug' in error
+    && typeof (error as { debug?: AIDebugExchange }).debug?.response?.body === 'object'
+    && (error as { debug?: AIDebugExchange }).debug?.response?.body
+    && 'transportError' in ((error as { debug?: AIDebugExchange }).debug?.response?.body as Record<string, unknown>)
+  )
+    ? String(((error as { debug?: AIDebugExchange }).debug?.response?.body as Record<string, unknown>).transportError || '')
+    : '';
+
+  const rawMessage = error instanceof Error ? error.message : String(error || '');
+  const message = (debugTransportError || rawMessage || '').trim();
+
+  if (!message) {
+    return 'AI 请求失败了。你可以点“重试”再试一次。';
+  }
+
+  if (/failed to fetch|networkerror|load failed|err_connection_closed|err_connection_reset|err_connection_close/i.test(message)) {
+    return '网络连接失败，可能是连接被关闭、网络波动，或 AI 服务暂时不可用。你可以点“重试”再试一次。';
+  }
+
+  if (/timeout|timed out|network request failed/i.test(message)) {
+    return '请求超时了，可能是网络较慢或 AI 服务响应过久。你可以点“重试”再试一次。';
+  }
+
+  return `AI 请求失败：${message}`;
+};
+
 export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
   isOpen,
   onClose,
@@ -979,6 +1068,95 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
       };
     })
   ), [todos]);
+
+  const todoUpdateContext = useMemo(() => (
+    todos.map((todo) => {
+      const parentTodo = todo.parentTodoId
+        ? todos.find((candidate) => candidate.id === todo.parentTodoId)
+        : undefined;
+      const todoCategory = todoCategories.find((category) => category.id === todo.categoryId);
+      const linkedCategory = todo.linkedCategoryId
+        ? categories.find((category) => category.id === todo.linkedCategoryId)
+        : undefined;
+      const linkedActivity = todo.linkedActivityId
+        ? linkedCategory?.activities.find((activity) => activity.id === todo.linkedActivityId)
+          || categories.flatMap((category) => category.activities).find((activity) => activity.id === todo.linkedActivityId)
+        : undefined;
+
+      return {
+        id: todo.id,
+        title: todo.title,
+        path: parentTodo ? `${parentTodo.title} / ${todo.title}` : todo.title,
+        categoryId: todo.categoryId,
+        categoryName: todoCategory?.name || '',
+        isCompleted: todo.isCompleted,
+        parentTodoId: todo.parentTodoId,
+        parentTodoTitle: parentTodo?.title,
+        linkedCategoryId: todo.linkedCategoryId,
+        linkedActivityId: todo.linkedActivityId,
+        linkedActivityName: linkedActivity?.name,
+        scheduledDate: todo.scheduledDate,
+        deadlineDate: todo.deadlineDate,
+        pin: Boolean(todo.pin)
+      };
+    })
+  ), [categories, todoCategories, todos]);
+
+  const subtaskParentContext = useMemo(() => (
+    todos
+      .filter((todo) => !todo.parentTodoId && !todo.recurrenceRule)
+      .map((todo) => {
+        const todoCategory = todoCategories.find((category) => category.id === todo.categoryId);
+        const linkedCategory = todo.linkedCategoryId
+          ? categories.find((category) => category.id === todo.linkedCategoryId)
+          : undefined;
+        const linkedActivity = todo.linkedActivityId
+          ? linkedCategory?.activities.find((activity) => activity.id === todo.linkedActivityId)
+            || categories.flatMap((category) => category.activities).find((activity) => activity.id === todo.linkedActivityId)
+          : undefined;
+
+        return {
+          id: todo.id,
+          title: todo.title,
+          categoryId: todo.categoryId,
+          categoryName: todoCategory?.name || '',
+          linkedActivityId: todo.linkedActivityId,
+          linkedActivityName: linkedActivity?.name,
+          defaultScopeIds: todo.defaultScopeIds,
+          defaultScopeNames: (todo.defaultScopeIds || [])
+            .map((scopeId) => scopes.find((scope) => scope.id === scopeId)?.name)
+            .filter((name): name is string => Boolean(name))
+        };
+      })
+  ), [categories, scopes, todoCategories, todos]);
+
+  const logEditContext = useMemo(() => (
+    [...logs]
+      .sort((left, right) => right.startTime - left.startTime)
+      .slice(0, 40)
+      .map((log) => {
+        const category = categories.find((item) => item.id === log.categoryId);
+        const activity = category?.activities.find((item) => item.id === log.activityId)
+          || categories.flatMap((item) => item.activities).find((item) => item.id === log.activityId);
+        const linkedTodo = log.linkedTodoId
+          ? todos.find((todo) => todo.id === log.linkedTodoId)
+          : undefined;
+
+        return {
+          id: log.id,
+          date: formatDateKey(new Date(log.startTime)),
+          startTime: `${String(new Date(log.startTime).getHours()).padStart(2, '0')}:${String(new Date(log.startTime).getMinutes()).padStart(2, '0')}`,
+          endTime: `${String(new Date(log.endTime).getHours()).padStart(2, '0')}:${String(new Date(log.endTime).getMinutes()).padStart(2, '0')}`,
+          categoryId: log.categoryId,
+          categoryName: category?.name || '',
+          activityId: log.activityId,
+          activityName: activity?.name || log.title || '',
+          note: log.note,
+          linkedTodoId: log.linkedTodoId,
+          linkedTodoTitle: linkedTodo?.title
+        };
+      })
+  ), [categories, logs, todos]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
@@ -1546,11 +1724,126 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
       : undefined
   );
 
+  const looksLikeSubtaskSchedulingRequest = (text: string): boolean => {
+    const normalized = text.trim().toLowerCase();
+    const schedulingKeywords = ['安排', '分配', '排一下', '排个', '什么时候', '哪天', '时间', '日程', '计划'];
+    const subtaskKeywords = ['子任务', '每章', '章节', '章', '部分'];
+    return schedulingKeywords.some((keyword) => normalized.includes(keyword))
+      && subtaskKeywords.some((keyword) => normalized.includes(keyword));
+  };
+
+  const getMatchedParentTodoIds = (text: string): string[] => (
+    todos
+      .filter((todo) => !todo.parentTodoId)
+      .filter((todo) => text.includes(todo.title))
+      .filter((todo) => todos.some((child) => child.parentTodoId === todo.id))
+      .map((todo) => todo.id)
+  );
+
+  const shouldTreatAsExistingSubtaskScheduling = (text: string): boolean => (
+    looksLikeSubtaskSchedulingRequest(text) && getMatchedParentTodoIds(text).length > 0
+  );
+
+  const formatTimeKey = (timestamp: number): string => {
+    const date = new Date(timestamp);
+    return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
+  };
+
+  const applyTodoSave = (currentTodos: TodoItem[], todo: TodoItem): TodoItem[] => {
+    const normalizedTodo = normalizeTodoHierarchy(todo, currentTodos);
+    const exists = currentTodos.find((item) => item.id === normalizedTodo.id);
+    let nextTodos = exists
+      ? currentTodos.map((item) => item.id === normalizedTodo.id ? normalizedTodo : item)
+      : [normalizedTodo, ...currentTodos];
+
+    if (!normalizedTodo.parentTodoId) {
+      nextTodos = syncDirectChildTodosWithParent(nextTodos, normalizedTodo);
+    }
+
+    return syncSubtaskProgressToParentTodos(nextTodos);
+  };
+
+  const applyLogSave = (
+    currentLogs: Log[],
+    currentTodos: TodoItem[],
+    nextLog: Log
+  ): { logs: Log[]; todos: TodoItem[] } => {
+    const existingLog = currentLogs.find((log) => log.id === nextLog.id);
+    const nextTodos = [...currentTodos];
+
+    if (nextLog.linkedTodoId || existingLog?.linkedTodoId) {
+      if (existingLog?.linkedTodoId) {
+        const oldTodoIndex = nextTodos.findIndex((todo) => todo.id === existingLog.linkedTodoId);
+        if (oldTodoIndex >= 0 && getTodoProgressTrackingMode(nextTodos[oldTodoIndex], nextTodos) === 'manual') {
+          nextTodos[oldTodoIndex] = {
+            ...nextTodos[oldTodoIndex],
+            isProgress: true,
+            progressTrackingMode: 'manual',
+            completedUnits: Math.max(0, (nextTodos[oldTodoIndex].completedUnits || 0) - (existingLog.progressIncrement || 0))
+          };
+        }
+      }
+
+      if (nextLog.linkedTodoId) {
+        const newTodoIndex = nextTodos.findIndex((todo) => todo.id === nextLog.linkedTodoId);
+        if (newTodoIndex >= 0 && getTodoProgressTrackingMode(nextTodos[newTodoIndex], nextTodos) === 'manual') {
+          nextTodos[newTodoIndex] = {
+            ...nextTodos[newTodoIndex],
+            isProgress: true,
+            progressTrackingMode: 'manual',
+            completedUnits: Math.max(0, (nextTodos[newTodoIndex].completedUnits || 0) + (nextLog.progressIncrement || 0))
+          };
+        }
+      }
+    }
+
+    const nextLogs = existingLog
+      ? currentLogs.map((log) => log.id === nextLog.id ? nextLog : log)
+      : [nextLog, ...currentLogs];
+
+    return {
+      logs: nextLogs,
+      todos: nextTodos
+    };
+  };
+
+  const applyLogDelete = (
+    currentLogs: Log[],
+    currentTodos: TodoItem[],
+    logId: string
+  ): { logs: Log[]; todos: TodoItem[] } => {
+    const existingLog = currentLogs.find((log) => log.id === logId);
+    if (!existingLog) {
+      return {
+        logs: currentLogs,
+        todos: currentTodos
+      };
+    }
+
+    const nextTodos = currentTodos.map((todo) => {
+      if (todo.id !== existingLog.linkedTodoId || getTodoProgressTrackingMode(todo, currentTodos) !== 'manual') {
+        return todo;
+      }
+
+      return {
+        ...todo,
+        isProgress: true,
+        progressTrackingMode: 'manual',
+        completedUnits: Math.max(0, (todo.completedUnits || 0) - (existingLog.progressIncrement || 0))
+      };
+    });
+
+    return {
+      logs: currentLogs.filter((log) => log.id !== logId),
+      todos: nextTodos
+    };
+  };
+
   const applyPlannedLogToolCalls = (toolCalls: AIBackfillToolCall[]): AppliedChatAction[] => {
     const normalizedToolCalls = normalizeAIBackfillToolCalls(toolCalls, defaultDateKey);
-    const createdLogs: Log[] = [];
     const actions: AppliedChatAction[] = [];
-    const nextTodos = [...todos];
+    let nextLogs = [...logs];
+    let nextTodos = [...todos];
 
     normalizedToolCalls.forEach((toolCall) => {
       const { args } = toolCall;
@@ -1627,7 +1920,9 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
         ...(progressIncrement ? { progressIncrement } : {})
       };
 
-      createdLogs.push(newLog);
+      const saveResult = applyLogSave(nextLogs, nextTodos, newLog);
+      nextLogs = saveResult.logs;
+      nextTodos = saveResult.todos;
       actions.push({
         actionId: crypto.randomUUID(),
         kind: 'create_log',
@@ -1649,8 +1944,8 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
       });
     });
 
-    if (createdLogs.length > 0) {
-      setLogs((prev) => [...createdLogs, ...prev]);
+    if (actions.some((action) => action.kind === 'create_log' && action.status === 'applied')) {
+      setLogs(nextLogs);
     }
     if (actions.some((action) => action.kind === 'create_log' && action.status === 'applied')) {
       setTodos(nextTodos);
@@ -1660,8 +1955,8 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
   };
 
   const applyPlannedTodoToolCalls = (toolCalls: AITodoToolCall[]): AppliedChatAction[] => {
-    const createdTodos: TodoItem[] = [];
     const actions: AppliedChatAction[] = [];
+    let nextTodos = [...todos];
 
     toolCalls.forEach((toolCall) => {
       const { args } = toolCall;
@@ -1716,7 +2011,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
         ...(args.recurrenceRule ? { recurrenceRule: args.recurrenceRule } : {})
       };
 
-      createdTodos.push(newTodo);
+      nextTodos = applyTodoSave(nextTodos, newTodo);
       actions.push({
         actionId: crypto.randomUUID(),
         kind: 'create_todo',
@@ -1740,8 +2035,322 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
       });
     });
 
-    if (createdTodos.length > 0) {
-      setTodos((prev) => [...createdTodos, ...prev]);
+    if (actions.some((action) => action.kind === 'create_todo' && action.status === 'applied')) {
+      setTodos(nextTodos);
+    }
+
+    return actions;
+  };
+
+  const applyPlannedTodoUpdateToolCalls = (toolCalls: AITodoUpdateToolCall[]): AppliedChatAction[] => {
+    const actions: AppliedChatAction[] = [];
+    let nextTodos = [...todos];
+
+    toolCalls.forEach((toolCall) => {
+      const { args } = toolCall;
+      const currentTodo = nextTodos.find((todo) => todo.id === args.todoId);
+      if (!currentTodo) {
+        actions.push({
+          actionId: crypto.randomUUID(),
+          kind: 'update_todo',
+          status: 'failed',
+          errorMessage: '杩欐潯寰呭姙娌℃壘鍒帮紝鎴戝厛娌℃湁鏇夸綘鑷姩淇敼銆?',
+          snapshot: {
+            todoId: args.todoId
+          }
+        });
+        return;
+      }
+
+      const patch = args.patch;
+      const resolvedActivity = patch.linkedActivityId === undefined
+        ? undefined
+        : patch.linkedActivityId === null
+          ? null
+          : getActivityById(patch.linkedActivityId);
+      const resolvedLinkedCategory = patch.linkedActivityId === undefined
+        ? undefined
+        : patch.linkedActivityId === null
+          ? null
+          : getActivityCategory(patch.linkedActivityId);
+
+      if (patch.linkedActivityId && (!resolvedActivity || !resolvedLinkedCategory)) {
+        actions.push({
+          actionId: crypto.randomUUID(),
+          kind: 'update_todo',
+          status: 'failed',
+          errorMessage: '杩欐潯寰呭姙鐨勫叧鑱旀爣绛句俊鎭笉瀹屾暣锛屾垜鍏堟病鏈夎嚜鍔ㄤ慨鏀广€?',
+          snapshot: {
+            todoId: currentTodo.id,
+            previousTodo: currentTodo
+          }
+        });
+        return;
+      }
+
+      const nextDefaultScopeIds = patch.defaultScopeIds === undefined
+        ? currentTodo.defaultScopeIds
+        : patch.defaultScopeIds === null
+          ? undefined
+          : dedupeStringArray(patch.defaultScopeIds).filter((scopeId) => scopes.some((scope) => scope.id === scopeId));
+
+      const nextTitle = patch.title === undefined ? currentTodo.title : patch.title.trim();
+      if (!nextTitle) {
+        actions.push({
+          actionId: crypto.randomUUID(),
+          kind: 'update_todo',
+          status: 'failed',
+          errorMessage: '寰呭姙鏍囬涓嶈兘涓虹┖锛屾垜鍏堟病鏈夎嚜鍔ㄤ慨鏀广€?',
+          snapshot: {
+            todoId: currentTodo.id,
+            previousTodo: currentTodo
+          }
+        });
+        return;
+      }
+
+      const nextLinkedCategoryId = patch.linkedActivityId !== undefined
+        ? (resolvedLinkedCategory?.id || undefined)
+        : patch.linkedCategoryId === undefined
+          ? currentTodo.linkedCategoryId
+          : patch.linkedCategoryId || undefined;
+
+      const nextLinkedActivityId = patch.linkedActivityId === undefined
+        ? currentTodo.linkedActivityId
+        : patch.linkedActivityId || undefined;
+
+      const shouldClearRecurrence = !currentTodo.parentTodoId
+        && (patch.scheduledDate !== undefined || patch.deadlineDate !== undefined)
+        && patch.recurrenceRule === undefined;
+
+      const nextTodo: TodoItem = {
+        ...currentTodo,
+        title: nextTitle,
+        ...(patch.note !== undefined ? { note: patch.note || undefined } : {}),
+        ...(patch.categoryId !== undefined ? { categoryId: patch.categoryId } : {}),
+        ...(patch.linkedCategoryId !== undefined || patch.linkedActivityId !== undefined ? { linkedCategoryId: nextLinkedCategoryId } : {}),
+        ...(patch.linkedActivityId !== undefined ? { linkedActivityId: nextLinkedActivityId } : {}),
+        ...(patch.defaultScopeIds !== undefined ? { defaultScopeIds: nextDefaultScopeIds } : {}),
+        ...(patch.scheduledDate !== undefined ? { scheduledDate: patch.scheduledDate || undefined } : {}),
+        ...(patch.deadlineDate !== undefined ? { deadlineDate: patch.deadlineDate || undefined } : {}),
+        ...(!currentTodo.parentTodoId && patch.recurrenceRule !== undefined ? { recurrenceRule: patch.recurrenceRule || undefined } : {}),
+        ...(!currentTodo.parentTodoId && shouldClearRecurrence ? { recurrenceRule: undefined } : {}),
+        ...(typeof patch.pin === 'boolean' ? { pin: patch.pin } : {}),
+        ...(typeof patch.isCompleted === 'boolean'
+          ? {
+              isCompleted: patch.isCompleted,
+              completedAt: patch.isCompleted
+                ? (currentTodo.isCompleted ? currentTodo.completedAt : new Date().toISOString())
+                : undefined
+            }
+          : {})
+      };
+
+      nextTodos = applyTodoSave(nextTodos, nextTodo);
+      actions.push({
+        actionId: crypto.randomUUID(),
+        kind: 'update_todo',
+        status: 'applied',
+        snapshot: {
+          todoId: nextTodo.id,
+          previousTodo: currentTodo,
+          nextTodo
+        }
+      });
+    });
+
+    if (actions.some((action) => action.kind === 'update_todo' && action.status === 'applied')) {
+      setTodos(nextTodos);
+    }
+
+    return actions;
+  };
+
+  const applyPlannedCreateSubtaskToolCalls = (toolCalls: AICreateSubtaskToolCall[]): AppliedChatAction[] => {
+    const actions: AppliedChatAction[] = [];
+    let nextTodos = [...todos];
+
+    toolCalls.forEach((toolCall) => {
+      const { args } = toolCall;
+      const parentTodo = nextTodos.find((todo) => todo.id === args.parentTodoId);
+
+      if (!parentTodo || parentTodo.parentTodoId || parentTodo.recurrenceRule || !args.title.trim()) {
+        actions.push({
+          actionId: crypto.randomUUID(),
+          kind: 'create_subtask',
+          status: 'failed',
+          errorMessage: '杩欐潯瀛愪换鍔＄己灏戠埗浠诲姟鎴栨爣棰橈紝鎴戝厛娌℃湁鏇夸綘鑷姩鍒涘缓銆?',
+          snapshot: {
+            title: args.title || '鏈懡鍚嶅瓙浠诲姟',
+            categoryId: parentTodo?.categoryId || '',
+            categoryName: todoCategories.find((category) => category.id === parentTodo?.categoryId)?.name || '鏈煡鍒嗙被',
+            defaultScopeIds: parentTodo?.defaultScopeIds || [],
+            defaultScopeNames: getScopeNames(parentTodo?.defaultScopeIds || []),
+            parentTodoId: args.parentTodoId,
+            parentTodoTitle: parentTodo?.title
+          }
+        });
+        return;
+      }
+
+      const resolvedCategory = todoCategories.find((category) => category.id === parentTodo.categoryId);
+      const newTodo: TodoItem = {
+        id: crypto.randomUUID(),
+        categoryId: parentTodo.categoryId,
+        parentTodoId: parentTodo.id,
+        childOrder: getNextChildOrder(nextTodos, parentTodo.id),
+        title: args.title.trim(),
+        isCompleted: false,
+        pin: false,
+        completedUnits: 0,
+        ...(args.note ? { note: args.note } : {}),
+        ...(args.scheduledDate ? { scheduledDate: args.scheduledDate } : {}),
+        ...(args.deadlineDate ? { deadlineDate: args.deadlineDate } : {})
+      };
+
+      nextTodos = applyTodoSave(nextTodos, newTodo);
+      const liveSubtask = nextTodos.find((todo) => todo.id === newTodo.id) || newTodo;
+      actions.push({
+        actionId: crypto.randomUUID(),
+        kind: 'create_subtask',
+        status: 'applied',
+        snapshot: {
+          todoId: liveSubtask.id,
+          title: liveSubtask.title,
+          categoryId: liveSubtask.categoryId,
+          categoryName: resolvedCategory?.name || '',
+          defaultScopeIds: liveSubtask.defaultScopeIds || [],
+          defaultScopeNames: getScopeNames(liveSubtask.defaultScopeIds || []),
+          ...(liveSubtask.note ? { note: liveSubtask.note } : {}),
+          ...(liveSubtask.scheduledDate ? { scheduledDate: liveSubtask.scheduledDate } : {}),
+          ...(liveSubtask.deadlineDate ? { deadlineDate: liveSubtask.deadlineDate } : {}),
+          parentTodoId: parentTodo.id,
+          parentTodoTitle: parentTodo.title
+        }
+      });
+    });
+
+    if (actions.some((action) => action.kind === 'create_subtask' && action.status === 'applied')) {
+      setTodos(nextTodos);
+    }
+
+    return actions;
+  };
+
+  const applyPlannedEditLogToolCalls = (toolCalls: AIEditLogToolCall[]): AppliedChatAction[] => {
+    const actions: AppliedChatAction[] = [];
+    let nextLogs = [...logs];
+    let nextTodos = [...todos];
+
+    toolCalls.forEach((toolCall) => {
+      const { args } = toolCall;
+      const currentLog = nextLogs.find((log) => log.id === args.logId);
+      if (!currentLog) {
+        actions.push({
+          actionId: crypto.randomUUID(),
+          kind: 'edit_log',
+          status: 'failed',
+          errorMessage: '杩欐潯璁板綍娌℃壘鍒帮紝鎴戝厛娌℃湁鏇夸綘鑷姩淇敼銆?',
+          snapshot: {
+            logId: args.logId
+          }
+        });
+        return;
+      }
+
+      const targetDateKey = args.patch.date || formatDateKey(new Date(currentLog.startTime));
+      const startTime = args.patch.startTime
+        ? parseTimeOnDateKey(targetDateKey, args.patch.startTime)
+        : parseTimeOnDateKey(targetDateKey, formatTimeKey(currentLog.startTime));
+      const endTime = args.patch.endTime
+        ? parseTimeOnDateKey(targetDateKey, args.patch.endTime)
+        : parseTimeOnDateKey(targetDateKey, formatTimeKey(currentLog.endTime));
+
+      const resolvedActivity = args.patch.activityId
+        ? getActivityById(args.patch.activityId)
+        : undefined;
+      const resolvedActivityCategory = args.patch.activityId
+        ? getActivityCategory(args.patch.activityId)
+        : undefined;
+      const resolvedCategory = args.patch.categoryId
+        ? categories.find((category) => category.id === args.patch.categoryId)
+        : undefined;
+
+      const nextCategory = resolvedActivityCategory
+        || resolvedCategory
+        || categories.find((category) => category.id === currentLog.categoryId);
+      const nextActivity = resolvedActivity
+        || nextCategory?.activities.find((activity) => activity.id === currentLog.activityId)
+        || getActivityById(currentLog.activityId);
+
+      if (!startTime || !endTime || endTime <= startTime || !nextCategory || !nextActivity) {
+        actions.push({
+          actionId: crypto.randomUUID(),
+          kind: 'edit_log',
+          status: 'failed',
+          errorMessage: '杩欐潯璁板綍鐨勬椂闂存垨鍒嗙被淇℃伅涓嶅畬鏁达紝鎴戝厛娌℃湁鏇夸綘鑷姩淇敼銆?',
+          snapshot: {
+            logId: currentLog.id,
+            previousLog: currentLog
+          }
+        });
+        return;
+      }
+
+      const nextLinkedTodoId = args.patch.linkedTodoId === undefined
+        ? currentLog.linkedTodoId
+        : args.patch.linkedTodoId || undefined;
+      if (nextLinkedTodoId && !nextTodos.some((todo) => todo.id === nextLinkedTodoId)) {
+        actions.push({
+          actionId: crypto.randomUUID(),
+          kind: 'edit_log',
+          status: 'failed',
+          errorMessage: '璁板綍瑕佸叧鑱旂殑寰呭姙娌℃壘鍒帮紝鎴戝厛娌℃湁鑷姩淇敼銆?',
+          snapshot: {
+            logId: currentLog.id,
+            previousLog: currentLog
+          }
+        });
+        return;
+      }
+
+      const nextScopeIds = args.patch.scopeIds === undefined
+        ? currentLog.scopeIds
+        : args.patch.scopeIds === null
+          ? undefined
+          : dedupeStringArray(args.patch.scopeIds).filter((scopeId) => scopes.some((scope) => scope.id === scopeId));
+
+      const nextLog: Log = {
+        ...currentLog,
+        categoryId: nextCategory.id,
+        activityId: nextActivity.id,
+        title: nextActivity.name,
+        startTime,
+        endTime,
+        duration: Math.max(0, (endTime - startTime) / 1000),
+        ...(args.patch.note !== undefined ? { note: args.patch.note || '' } : {}),
+        ...(args.patch.linkedTodoId !== undefined ? { linkedTodoId: nextLinkedTodoId } : {}),
+        ...(args.patch.scopeIds !== undefined ? { scopeIds: nextScopeIds } : {})
+      };
+
+      const saveResult = applyLogSave(nextLogs, nextTodos, nextLog);
+      nextLogs = saveResult.logs;
+      nextTodos = saveResult.todos;
+      actions.push({
+        actionId: crypto.randomUUID(),
+        kind: 'edit_log',
+        status: 'applied',
+        snapshot: {
+          logId: nextLog.id,
+          previousLog: currentLog,
+          nextLog
+        }
+      });
+    });
+
+    if (actions.some((action) => action.kind === 'edit_log' && action.status === 'applied')) {
+      setLogs(nextLogs);
+      setTodos(nextTodos);
     }
 
     return actions;
@@ -1758,22 +2367,9 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
       return;
     }
 
-    setLogs((prev) => prev.filter((log) => log.id !== liveLog.id));
-
-    if (action.snapshot.linkedTodoId && action.snapshot.progressIncrement) {
-      setTodos((prev) => prev.map((todo) => {
-        if (todo.id !== action.snapshot.linkedTodoId || getTodoProgressTrackingMode(todo, prev) !== 'manual') {
-          return todo;
-        }
-
-        return {
-          ...todo,
-          isProgress: true,
-          progressTrackingMode: 'manual',
-          completedUnits: Math.max(0, (todo.completedUnits || 0) - action.snapshot.progressIncrement)
-        };
-      }));
-    }
+    const deleteResult = applyLogDelete(logs, todos, liveLog.id);
+    setLogs(deleteResult.logs);
+    setTodos(deleteResult.todos);
 
     updateAppliedActionStatus(activeSession.id, messageId, action.actionId, 'undone');
     addToast('success', '已撤销这条 AI 补记');
@@ -1787,6 +2383,38 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     setTodos((prev) => prev.filter((todo) => todo.id !== action.snapshot.todoId));
     updateAppliedActionStatus(activeSession.id, messageId, action.actionId, 'undone');
     addToast('success', '已撤销这条 AI 待办');
+  };
+
+  const handleUndoUpdateTodoAction = (messageId: string, action: AppliedUpdateTodoAction) => {
+    if (action.status !== 'applied' || !activeSession || !action.snapshot.previousTodo) {
+      return;
+    }
+
+    setTodos((prev) => applyTodoSave(prev, action.snapshot.previousTodo!));
+    updateAppliedActionStatus(activeSession.id, messageId, action.actionId, 'undone');
+    addToast('success', '已撤销这次 AI 待办修改');
+  };
+
+  const handleUndoCreateSubtaskAction = (messageId: string, action: AppliedCreateSubtaskAction) => {
+    if (action.status !== 'applied' || !activeSession || !action.snapshot.todoId) {
+      return;
+    }
+
+    setTodos((prev) => prev.filter((todo) => todo.id !== action.snapshot.todoId));
+    updateAppliedActionStatus(activeSession.id, messageId, action.actionId, 'undone');
+    addToast('success', '已撤销这条 AI 子任务');
+  };
+
+  const handleUndoEditLogAction = (messageId: string, action: AppliedEditLogAction) => {
+    if (action.status !== 'applied' || !activeSession || !action.snapshot.previousLog) {
+      return;
+    }
+
+    const restoreResult = applyLogSave(logs, todos, action.snapshot.previousLog);
+    setLogs(restoreResult.logs);
+    setTodos(restoreResult.todos);
+    updateAppliedActionStatus(activeSession.id, messageId, action.actionId, 'undone');
+    addToast('success', '已撤销这次 AI 记录修改');
   };
 
   const handleOpenLogEditor = (logId?: string) => {
@@ -1830,6 +2458,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
       tone?: ChatTone;
       debugSections?: AIChatDebugSection[];
       appliedActions?: AppliedChatAction[];
+      retryInput?: string;
     }
   ) => {
     replaceMessage(sessionId, pendingMessageId, {
@@ -1839,7 +2468,8 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
       createdAt: Date.now(),
       ...(options?.tone ? { tone: options.tone } : {}),
       ...(options?.debugSections && options.debugSections.length > 0 ? { debugSections: options.debugSections } : {}),
-      ...(options?.appliedActions && options.appliedActions.length > 0 ? { appliedActions: options.appliedActions } : {})
+      ...(options?.appliedActions && options.appliedActions.length > 0 ? { appliedActions: options.appliedActions } : {}),
+      ...(options?.retryInput ? { retryInput: options.retryInput } : {})
     });
   };
 
@@ -1908,7 +2538,13 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
         });
       }
 
-      if (classifyResult.result.intent === 'clarify') {
+      const matchedParentTodoIds = getMatchedParentTodoIds(trimmedText);
+      const existingSubtaskSchedulingIntent = shouldTreatAsExistingSubtaskScheduling(trimmedText);
+      const resolvedIntent = existingSubtaskSchedulingIntent
+        ? 'update_todo'
+        : classifyResult.result.intent;
+
+      if (resolvedIntent === 'clarify') {
         replacePendingWithResult(
           sessionId,
           pendingMessageId,
@@ -1920,7 +2556,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
         return;
       }
 
-      if (classifyResult.result.intent === 'chat') {
+      if (resolvedIntent === 'chat') {
         const chatResult = await aiService.sendContextualChatReplyWithDebug(trimmedText, {
           currentDateTime,
           defaultDate: defaultDateKey,
@@ -1950,7 +2586,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
         return;
       }
 
-      if (classifyResult.result.intent === 'add_log') {
+      if (resolvedIntent === 'add_log') {
         const planningResult = await aiService.planBackfillToolCallsWithDebug(trimmedText, {
           currentDateTime,
           defaultDate: defaultDateKey,
@@ -1987,6 +2623,115 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
             appliedActions
           }
         );
+        return;
+      }
+
+      if (resolvedIntent === 'edit_log') {
+        const planningResult = await aiService.planEditLogToolCallsWithDebug(trimmedText, {
+          currentDateTime,
+          defaultDate: defaultDateKey,
+          categories,
+          scopes,
+          todos: todoUpdateContext.map((todo) => ({
+            id: todo.id,
+            title: todo.title,
+            path: todo.path
+          })),
+          logs: logEditContext,
+          personaPrompt: buildPersonaPrompt(activePersona),
+          conversationHistory: historyBeforeCurrent
+        }, {
+          signal: controller.signal
+        });
+
+        if (debugMode) {
+          debugSections.push({
+            label: '记录修改规划',
+            exchange: planningResult.debug
+          });
+        }
+
+        const appliedActions = applyPlannedEditLogToolCalls(planningResult.plan.toolCalls);
+        const successCount = appliedActions.filter((action) => action.status === 'applied').length;
+        const content = planningResult.plan.assistantReply
+          || (successCount > 0
+            ? `我先帮你修改了 ${successCount} 条记录。`
+            : '这次还差一点关键信息，你可以再补一下要改的是哪条记录。');
+
+        replacePendingWithResult(sessionId, pendingMessageId, content, {
+          debugSections,
+          appliedActions
+        });
+        return;
+      }
+
+      if (resolvedIntent === 'update_todo') {
+        const scopedTodoUpdateContext = existingSubtaskSchedulingIntent
+          ? todoUpdateContext.filter((todo) => matchedParentTodoIds.includes(todo.parentTodoId || ''))
+          : todoUpdateContext;
+        const planningResult = await aiService.planTodoUpdateToolCallsWithDebug(trimmedText, {
+          currentDateTime,
+          defaultDate: defaultDateKey,
+          todoCategories,
+          activityCategories: categories,
+          scopes,
+          todos: scopedTodoUpdateContext,
+          personaPrompt: buildPersonaPrompt(activePersona),
+          conversationHistory: historyBeforeCurrent
+        }, {
+          signal: controller.signal
+        });
+
+        if (debugMode) {
+          debugSections.push({
+            label: '待办修改规划',
+            exchange: planningResult.debug
+          });
+        }
+
+        const appliedActions = applyPlannedTodoUpdateToolCalls(planningResult.plan.toolCalls);
+        const successCount = appliedActions.filter((action) => action.status === 'applied').length;
+        const content = planningResult.plan.assistantReply
+          || (successCount > 0
+            ? `我先帮你修改了 ${successCount} 条待办。`
+            : '这次还差一点关键信息，你可以再补一下要改的是哪条待办。');
+
+        replacePendingWithResult(sessionId, pendingMessageId, content, {
+          debugSections,
+          appliedActions
+        });
+        return;
+      }
+
+      if (resolvedIntent === 'create_subtask') {
+        const planningResult = await aiService.planCreateSubtaskToolCallsWithDebug(trimmedText, {
+          currentDateTime,
+          defaultDate: defaultDateKey,
+          parentTodos: subtaskParentContext,
+          personaPrompt: buildPersonaPrompt(activePersona),
+          conversationHistory: historyBeforeCurrent
+        }, {
+          signal: controller.signal
+        });
+
+        if (debugMode) {
+          debugSections.push({
+            label: '子任务规划',
+            exchange: planningResult.debug
+          });
+        }
+
+        const appliedActions = applyPlannedCreateSubtaskToolCalls(planningResult.plan.toolCalls);
+        const successCount = appliedActions.filter((action) => action.status === 'applied').length;
+        const content = planningResult.plan.assistantReply
+          || (successCount > 0
+            ? `我先帮你建好了 ${successCount} 条子任务。`
+            : '这次还差一点关键信息，你可以再补一下要挂到哪个父任务下。');
+
+        replacePendingWithResult(sessionId, pendingMessageId, content, {
+          debugSections,
+          appliedActions
+        });
         return;
       }
 
@@ -2031,9 +2776,10 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
           tone: 'system'
         });
       } else {
-        const message = error instanceof Error ? error.message : 'AI 请求失败';
+        const message = getRetryableAIErrorMessage(error);
         replacePendingWithResult(sessionId, pendingMessageId, message, {
-          tone: 'error'
+          tone: 'error',
+          retryInput: trimmedText
         });
       }
     } finally {
@@ -2046,6 +2792,14 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
 
   const handleStopRequest = () => {
     activeRequestRef.current?.controller.abort();
+  };
+
+  const handleRetryMessage = (retryInput?: string) => {
+    if (!retryInput || isLoading) {
+      return;
+    }
+
+    void handleSend(retryInput);
   };
 
   const handleKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -2159,6 +2913,15 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
           )}
         </div>
 
+        {action.kind === 'create_subtask' && action.snapshot.parentTodoTitle && (
+          <div className="mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px]" style={{ color: AI_CHAT_THEME.textMuted }}>
+            <span className="inline-flex items-center gap-1">
+              <span className="font-bold">↳</span>
+              <span>{action.snapshot.parentTodoTitle}</span>
+            </span>
+          </div>
+        )}
+
         {action.errorMessage && (
           <p className="mt-2 text-xs" style={{ color: AI_CHAT_THEME.dangerText }}>{action.errorMessage}</p>
         )}
@@ -2195,7 +2958,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     );
   };
 
-  const renderTodoAction = (messageId: string, action: AppliedCreateTodoAction) => {
+  const renderTodoAction = (messageId: string, action: AppliedCreateTodoAction | AppliedCreateSubtaskAction) => {
     const liveTodo = action.snapshot.todoId
       ? todos.find((todo) => todo.id === action.snapshot.todoId)
       : undefined;
@@ -2330,7 +3093,224 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
             <Pencil size={13} />
           </button>
           <button
-            onClick={() => handleUndoTodoAction(messageId, action)}
+            onClick={() => (
+              action.kind === 'create_subtask'
+                ? handleUndoCreateSubtaskAction(messageId, action)
+                : handleUndoTodoAction(messageId, action)
+            )}
+            disabled={action.status !== 'applied'}
+            className="inline-flex h-8 w-8 items-center justify-center rounded-full border transition-colors disabled:cursor-not-allowed disabled:opacity-40"
+            style={{
+              borderColor: AI_CHAT_THEME.chipBorder,
+              backgroundColor: AI_CHAT_THEME.inputBg,
+              color: AI_CHAT_THEME.textSecondary
+            }}
+            title="撤销"
+          >
+            <Undo2 size={13} />
+          </button>
+        </div>
+      </div>
+    );
+  };
+
+  const renderUpdateTodoAction = (messageId: string, action: AppliedUpdateTodoAction) => {
+    const liveTodo = action.snapshot.todoId
+      ? todos.find((todo) => todo.id === action.snapshot.todoId)
+      : undefined;
+    const displayTodo = liveTodo || action.snapshot.nextTodo || action.snapshot.previousTodo;
+    const linkedCategory = displayTodo?.linkedCategoryId
+      ? categories.find((category) => category.id === displayTodo.linkedCategoryId)
+      : undefined;
+    const linkedActivity = displayTodo?.linkedActivityId
+      ? linkedCategory?.activities.find((activity) => activity.id === displayTodo.linkedActivityId) || getActivityById(displayTodo.linkedActivityId)
+      : undefined;
+    const linkedTagLabel = dedupeStringArray([
+      linkedCategory?.name,
+      linkedActivity?.name
+    ]).join(' / ');
+    const scopeNames = getScopeNames(displayTodo?.defaultScopeIds || []);
+    const todoCategoryName = displayTodo?.categoryId
+      ? todoCategories.find((category) => category.id === displayTodo.categoryId)?.name
+      : '';
+
+    return (
+      <div
+        key={action.actionId}
+        className={`border-l-2 pl-3 pr-1 py-1 ${action.status === 'undone' ? 'opacity-70' : ''}`}
+        style={{
+          borderColor: action.status === 'failed'
+            ? AI_CHAT_THEME.dangerBorder
+            : action.status === 'undone'
+              ? AI_CHAT_THEME.undoneBorder
+              : AI_CHAT_THEME.activeBorder
+        }}
+      >
+        <div className="min-w-0">
+          <p className="font-serif text-[1rem] leading-6" style={{ color: AI_CHAT_THEME.textPrimary }}>
+            {displayTodo?.title || action.snapshot.previousTodo?.title || '未找到待办'}
+          </p>
+          {displayTodo?.note && (
+            <p className="mt-1.5 whitespace-pre-wrap break-words text-[13px] leading-6" style={{ color: AI_CHAT_THEME.textSecondary }}>
+              {displayTodo.note}
+            </p>
+          )}
+        </div>
+
+        {displayTodo && (
+          <div className="mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px]" style={{ color: AI_CHAT_THEME.textMuted }}>
+            {todoCategoryName && (
+              <span className="inline-flex items-center gap-1">
+                <span className="font-bold">@</span>
+                <span>{todoCategoryName}</span>
+              </span>
+            )}
+            {linkedTagLabel && (
+              <span className="inline-flex items-center gap-1">
+                <span className="font-bold">#</span>
+                <span>{linkedTagLabel}</span>
+              </span>
+            )}
+            {scopeNames.map((scopeName) => (
+              <span key={`${action.actionId}-scope-${scopeName}`} className="inline-flex items-center gap-1">
+                <span className="font-bold">%</span>
+                <span>{scopeName}</span>
+              </span>
+            ))}
+            {displayTodo.pin && <span className="inline-flex items-center">Pin</span>}
+            {displayTodo.scheduledDate && <span className="inline-flex items-center">安排 {displayTodo.scheduledDate}</span>}
+            {displayTodo.deadlineDate && <span className="inline-flex items-center">截止 {displayTodo.deadlineDate}</span>}
+            {displayTodo.isCompleted && <span className="inline-flex items-center">已完成</span>}
+          </div>
+        )}
+
+        {action.errorMessage && (
+          <p className="mt-2 text-xs" style={{ color: AI_CHAT_THEME.dangerText }}>{action.errorMessage}</p>
+        )}
+
+        <div className="mt-2.5 flex justify-end gap-2">
+          <button
+            onClick={() => handleOpenTodoDetail(action.snapshot.todoId)}
+            disabled={!action.snapshot.todoId || action.status !== 'applied'}
+            className="inline-flex h-8 w-8 items-center justify-center rounded-full border transition-colors disabled:cursor-not-allowed disabled:opacity-40"
+            style={{
+              borderColor: AI_CHAT_THEME.chipBorder,
+              backgroundColor: AI_CHAT_THEME.inputBg,
+              color: AI_CHAT_THEME.textSecondary
+            }}
+            title="详情"
+          >
+            <Pencil size={13} />
+          </button>
+          <button
+            onClick={() => handleUndoUpdateTodoAction(messageId, action)}
+            disabled={action.status !== 'applied'}
+            className="inline-flex h-8 w-8 items-center justify-center rounded-full border transition-colors disabled:cursor-not-allowed disabled:opacity-40"
+            style={{
+              borderColor: AI_CHAT_THEME.chipBorder,
+              backgroundColor: AI_CHAT_THEME.inputBg,
+              color: AI_CHAT_THEME.textSecondary
+            }}
+            title="撤销"
+          >
+            <Undo2 size={13} />
+          </button>
+        </div>
+      </div>
+    );
+  };
+
+  const renderEditLogAction = (messageId: string, action: AppliedEditLogAction) => {
+    const liveLog = action.snapshot.logId
+      ? logs.find((log) => log.id === action.snapshot.logId)
+      : undefined;
+    const displayLog = liveLog || action.snapshot.nextLog || action.snapshot.previousLog;
+    const category = displayLog
+      ? categories.find((item) => item.id === displayLog.categoryId)
+      : undefined;
+    const activity = displayLog
+      ? category?.activities.find((item) => item.id === displayLog.activityId)
+        || categories.flatMap((item) => item.activities).find((item) => item.id === displayLog.activityId)
+      : undefined;
+    const linkedTodo = displayLog?.linkedTodoId
+      ? todos.find((todo) => todo.id === displayLog.linkedTodoId)
+      : undefined;
+    const scopeNames = getScopeNames(displayLog?.scopeIds || []);
+
+    return (
+      <div
+        key={action.actionId}
+        className={`border-l-2 pl-3 pr-1 py-1 ${action.status === 'undone' ? 'opacity-70' : ''}`}
+        style={{
+          borderColor: action.status === 'failed'
+            ? AI_CHAT_THEME.dangerBorder
+            : action.status === 'undone'
+              ? AI_CHAT_THEME.undoneBorder
+              : AI_CHAT_THEME.activeBorder
+        }}
+      >
+        <div className="min-w-0">
+          <div className="flex items-start justify-between gap-3">
+            <span className="pt-0.5 text-[11px]" style={{ color: AI_CHAT_THEME.textMuted }}>
+              {displayLog ? formatActionDate(displayLog.startTime) : ''}
+            </span>
+            <span
+              className="inline-flex shrink-0 items-center rounded-full border px-2 py-0.5 text-[11px]"
+              style={{
+                color: AI_CHAT_THEME.textSecondary,
+                borderColor: AI_CHAT_THEME.chipBorder,
+                backgroundColor: AI_CHAT_THEME.chipBg
+              }}
+            >
+              {displayLog ? formatTimeRange(displayLog.startTime, displayLog.endTime) : ''}
+            </span>
+          </div>
+          <p className="mt-1 font-serif text-[1rem] leading-6" style={{ color: AI_CHAT_THEME.textPrimary }}>
+            {displayLog?.note?.trim() || activity?.name || '已修改记录'}
+          </p>
+        </div>
+
+        {displayLog && (
+          <div className="mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px]" style={{ color: AI_CHAT_THEME.textMuted }}>
+            <span className="inline-flex items-center gap-1">
+              <span className="font-bold">#</span>
+              <span>{dedupeStringArray([category?.name, activity?.name]).join(' / ')}</span>
+            </span>
+            {scopeNames.map((scopeName) => (
+              <span key={`${action.actionId}-log-scope-${scopeName}`} className="inline-flex items-center gap-1">
+                <span className="font-bold">%</span>
+                <span>{scopeName}</span>
+              </span>
+            ))}
+            {linkedTodo?.title && (
+              <span className="inline-flex items-center gap-1">
+                <span className="font-bold">@</span>
+                <span>{linkedTodo.title}</span>
+              </span>
+            )}
+          </div>
+        )}
+
+        {action.errorMessage && (
+          <p className="mt-2 text-xs" style={{ color: AI_CHAT_THEME.dangerText }}>{action.errorMessage}</p>
+        )}
+
+        <div className="mt-2.5 flex justify-end gap-2">
+          <button
+            onClick={() => handleOpenLogEditor(action.snapshot.logId)}
+            disabled={!action.snapshot.logId || action.status !== 'applied'}
+            className="inline-flex h-8 w-8 items-center justify-center rounded-full border transition-colors disabled:cursor-not-allowed disabled:opacity-40"
+            style={{
+              borderColor: AI_CHAT_THEME.chipBorder,
+              backgroundColor: AI_CHAT_THEME.inputBg,
+              color: AI_CHAT_THEME.textSecondary
+            }}
+            title="编辑"
+          >
+            <Pencil size={13} />
+          </button>
+          <button
+            onClick={() => handleUndoEditLogAction(messageId, action)}
             disabled={action.status !== 'applied'}
             className="inline-flex h-8 w-8 items-center justify-center rounded-full border transition-colors disabled:cursor-not-allowed disabled:opacity-40"
             style={{
@@ -2350,7 +3330,11 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
   const renderAppliedAction = (messageId: string, action: AppliedChatAction) => (
     action.kind === 'create_log'
       ? renderLogAction(messageId, action)
-      : renderTodoAction(messageId, action)
+      : action.kind === 'edit_log'
+        ? renderEditLogAction(messageId, action)
+        : action.kind === 'update_todo'
+          ? renderUpdateTodoAction(messageId, action)
+          : renderTodoAction(messageId, action)
   );
 
   const emptyPromptExamples = [
@@ -2495,6 +3479,24 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
                 >
                   <Sparkles size={12} />
                   查看调试
+                </button>
+              </div>
+            )}
+
+            {!isUser && tone === 'error' && message.retryInput && (
+              <div className="pl-1">
+                <button
+                  onClick={() => handleRetryMessage(message.retryInput)}
+                  disabled={isLoading}
+                  className="inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-40"
+                  style={{
+                    borderColor: AI_CHAT_THEME.chipBorder,
+                    backgroundColor: AI_CHAT_THEME.panelBg,
+                    color: AI_CHAT_THEME.textSecondary
+                  }}
+                >
+                  <RotateCcw size={12} />
+                  重试
                 </button>
               </div>
             )}
@@ -2745,7 +3747,6 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
               >
                 <div>
                   <h3 className="text-base font-bold text-stone-800">历史对话</h3>
-                  <p className="text-xs text-stone-400">默认一直留在同一条会话里，只有这里才能新建。</p>
                 </div>
                 <button
                   onClick={() => setIsHistoryPanelOpen(false)}

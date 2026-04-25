@@ -4,6 +4,7 @@
  * @output Pure row models for hierarchical todo-association pickers
  * @pos Utility (Todo association)
  * @description Builds collapsed or expanded parent/subtask row models so UI pickers can render one-level todo hierarchy consistently without mixing stateful component code into tests.
+ * @updated 2026-04-25: Hid unfinished subtasks in association pickers whenever their parent todo is completed, so hidden children never resurface as standalone rows.
  * @updated 2026-04-22: Added optional full-child expansion support so virtual picker categories can show every direct subtask under a visible parent.
  * @updated 2026-04-22: Added helper functions for hierarchical todo-association pickers, including selected-child parent auto-expansion.
  *
@@ -11,7 +12,7 @@
  */
 
 import { TodoItem } from '../types';
-import { buildTodoTreeItems, getCompletedDirectChildCount, getDirectChildCount, getDirectChildTodosForDisplay, getParentTodo } from './todoHierarchyUtils';
+import { buildTodoTreeItems, getCompletedDirectChildCount, getDirectChildCount, getDirectChildTodosForDisplay, getParentTodo, isIncompleteSubtaskHiddenByCompletedParent } from './todoHierarchyUtils';
 
 export interface TodoAssociationRow {
   todo: TodoItem;
@@ -43,8 +44,10 @@ export const buildTodoAssociationRows = (
   countSourceTodos: TodoItem[] = todos,
   childSourceTodos: TodoItem[] = todos
 ): TodoAssociationRow[] => {
+  const visibleTodos = todos.filter((todo) => !isIncompleteSubtaskHiddenByCompletedParent(countSourceTodos, todo));
+
   if (!enableHierarchy) {
-    return todos.map((todo) => ({
+    return visibleTodos.map((todo) => ({
       todo,
       level: 0,
       childCount: 0,
@@ -56,7 +59,7 @@ export const buildTodoAssociationRows = (
 
   const expandedParentIdSet = new Set(expandedParentIds);
 
-  return buildTodoTreeItems(todos).flatMap((item) => {
+  return buildTodoTreeItems(visibleTodos).flatMap((item) => {
     const childCount = getDirectChildCount(countSourceTodos, item.todo.id);
     const completedChildCount = getCompletedDirectChildCount(countSourceTodos, item.todo.id);
     const parentRow: TodoAssociationRow = {
@@ -74,7 +77,10 @@ export const buildTodoAssociationRows = (
 
     return [
       parentRow,
-      ...getDirectChildTodosForDisplay(childSourceTodos, item.todo.id, { incompleteFirst: true }).map((childTodo) => ({
+      ...getDirectChildTodosForDisplay(childSourceTodos, item.todo.id, {
+        incompleteFirst: true,
+        hideIncompleteWhenParentCompleted: true
+      }).map((childTodo) => ({
         todo: childTodo,
         level: 1 as const,
         childCount: 0,

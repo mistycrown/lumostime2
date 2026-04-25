@@ -28,7 +28,8 @@ The views are designed as "dumb" or "presentational" components where possible, 
 
 > ⚠️ **Note**: When modifying views, ensure that new state requirements are coordinated with `App.tsx` if they affect global data (Logs, Categories, Todos).
 
-> Last updated: 2026-04-23
+> Last updated: 2026-04-25
+- `TodoView.tsx`: Todo-list rendering now hides unfinished subtasks whenever their parent task is completed, without mutating the child tasks; undoing the parent completion restores those child rows through the existing expand state.
 - `TodoBatchManageView.tsx`: The todo batch-management screen now hides subtasks entirely, while save operations still preserve hidden child todos and completed todos unless their parent task or category is removed.
 - `TimelineView.tsx`, `TodoView.tsx`: Their AI entry buttons now open one app-level shared AI window that stays mounted in the background, so closing the modal UI no longer interrupts an in-flight AI request.
 - `TimelineView.tsx`: Replaced the floating AI backfill button's old parse modal with a new chat-first dialog that keeps local per-day conversation history while sending each message as an independent AI turn.

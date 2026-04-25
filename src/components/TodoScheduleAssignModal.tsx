@@ -4,6 +4,7 @@
  * @output Lightweight modal for assigning or quickly creating todos for a specific week-view day
  * @pos Component (Modal)
  * @description Lets users assign unfinished todos to a selected day as either Arrange or Due, or create a linked todo, without leaving the week schedule view.
+ * @updated 2026-04-25: Hid unfinished subtasks from the schedule assignment picker whenever their parent todo is completed, using the full todo source so completed parents can still suppress orphan child rows.
  * @updated 2026-04-20 18:21: Fixed the schedule assign modal to a stable three-quarter viewport height and kept the inner content scrollable.
  * @updated 2026-04-20: Sorted assignable todos so items without a current date appear first and dated items follow in chronological order.
  *
@@ -14,6 +15,7 @@ import { X, CalendarDays, Flag } from 'lucide-react';
 import { Category, TodoCategory, TodoItem } from '../types';
 import { IconRenderer } from './IconRenderer';
 import { parseDateKey } from '../utils/todoScheduleUtils';
+import { isIncompleteSubtaskHiddenByCompletedParent } from '../utils/todoHierarchyUtils';
 import { CustomSelect } from './CustomSelect';
 import { TagAssociation } from './TagAssociation';
 
@@ -23,6 +25,7 @@ interface TodoScheduleAssignModalProps {
   assignType: 'scheduled' | 'deadline';
   onAssignTypeChange: (type: 'scheduled' | 'deadline') => void;
   todos: TodoItem[];
+  allTodos?: TodoItem[];
   todoCategories: TodoCategory[];
   activityCategories: Category[];
   onAssign: (todo: TodoItem) => void;
@@ -46,12 +49,45 @@ const getStatusDateValue = (todo: TodoItem, type: 'scheduled' | 'deadline'): str
   type === 'scheduled' ? todo.scheduledDate : todo.deadlineDate
 );
 
+export const getVisibleScheduleAssignTodos = (
+  todos: TodoItem[],
+  sourceTodos: TodoItem[],
+  selectedCategoryId: string,
+  activeType: 'scheduled' | 'deadline' | 'new',
+  assignType: 'scheduled' | 'deadline'
+): TodoItem[] => {
+  const nextTodos = selectedCategoryId === 'all'
+    ? [...todos]
+    : todos.filter((todo) => todo.categoryId === selectedCategoryId);
+
+  const visibleTodos = nextTodos.filter((todo) => !isIncompleteSubtaskHiddenByCompletedParent(sourceTodos, todo));
+
+  visibleTodos.sort((left, right) => {
+    const leftDate = getStatusDateValue(left, activeType === 'new' ? assignType : activeType);
+    const rightDate = getStatusDateValue(right, activeType === 'new' ? assignType : activeType);
+
+    if (!leftDate && !rightDate) {
+      return left.title.localeCompare(right.title, 'zh-CN');
+    }
+    if (!leftDate) return -1;
+    if (!rightDate) return 1;
+
+    const dateCompare = leftDate.localeCompare(rightDate);
+    if (dateCompare !== 0) return dateCompare;
+
+    return left.title.localeCompare(right.title, 'zh-CN');
+  });
+
+  return visibleTodos;
+};
+
 export const TodoScheduleAssignModal: React.FC<TodoScheduleAssignModalProps> = ({
   isOpen,
   dateLabel,
   assignType,
   onAssignTypeChange,
   todos,
+  allTodos,
   todoCategories,
   activityCategories,
   onAssign,
@@ -83,28 +119,14 @@ export const TodoScheduleAssignModal: React.FC<TodoScheduleAssignModalProps> = (
   }, [activeTab, onAssignTypeChange]);
 
   const filteredTodos = useMemo(() => {
-    const nextTodos = selectedCategoryId === 'all'
-      ? [...todos]
-      : todos.filter((todo) => todo.categoryId === selectedCategoryId);
-
-    nextTodos.sort((left, right) => {
-      const leftDate = getStatusDateValue(left, activeTab === 'new' ? assignType : activeTab);
-      const rightDate = getStatusDateValue(right, activeTab === 'new' ? assignType : activeTab);
-
-      if (!leftDate && !rightDate) {
-        return left.title.localeCompare(right.title, 'zh-CN');
-      }
-      if (!leftDate) return -1;
-      if (!rightDate) return 1;
-
-      const dateCompare = leftDate.localeCompare(rightDate);
-      if (dateCompare !== 0) return dateCompare;
-
-      return left.title.localeCompare(right.title, 'zh-CN');
-    });
-
-    return nextTodos;
-  }, [activeTab, assignType, selectedCategoryId, todos]);
+    return getVisibleScheduleAssignTodos(
+      todos,
+      allTodos || todos,
+      selectedCategoryId,
+      activeTab,
+      assignType
+    );
+  }, [activeTab, allTodos, assignType, selectedCategoryId, todos]);
 
   if (!isOpen) return null;
 

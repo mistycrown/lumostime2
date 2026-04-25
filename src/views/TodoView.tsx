@@ -4,6 +4,7 @@
  * @output Todo Status Updates, Edit Triggers, Focus Timer Start
  * @pos View (Main Tab)
  * @description The main To-Do list interface. Displays tasks grouped by category, supports swipe actions, and now includes a week planning view with schedule and history badges.
+ * @updated 2026-04-25: Hide unfinished subtasks from todo-list rendering whenever their parent task is completed, while preserving child state and restoring the rows when the parent is reopened.
  * @updated 2026-04-25: Keep the todo page floating list-week switchers on the active color-scheme button style even when the UI icon theme stays default.
  * @updated 2026-04-25: Let floating list-week switchers inherit button theme colors when the default UI theme falls back to Lucide icons.
  * @updated 2026-04-22: The todo-page AI magic button now opens the app-level shared AI window so closing the modal does not interrupt an in-flight request.
@@ -90,7 +91,7 @@ import { TodoDatePickerModal } from '../components/TodoDatePickerModal';
 import { TodoDuplicateModal } from '../components/TodoDuplicateModal';
 import { TodoQuickActionsModal } from '../components/TodoQuickActionsModal';
 import { useTodoQuickActions } from '../hooks/useTodoQuickActions';
-import { buildTodoTreeItems, getCompletedDirectChildCount, getDirectChildCount, getDirectChildTodosForDisplay, getParentTodo } from '../utils/todoHierarchyUtils';
+import { buildTodoTreeItems, getCompletedDirectChildCount, getDirectChildCount, getDirectChildTodosForDisplay, getParentTodo, isIncompleteSubtaskHiddenByCompletedParent } from '../utils/todoHierarchyUtils';
 import { useAIChatWindow } from '../contexts/AIChatWindowContext';
 
 
@@ -672,7 +673,7 @@ interface TodoTreeEntryGroup {
 }
 
 const filterVisibleTodos = (todos: TodoItem[], showCompletedTodos: boolean): TodoItem[] =>
-  todos.filter((todo) => showCompletedTodos || !todo.isCompleted);
+  todos.filter((todo) => (showCompletedTodos || !todo.isCompleted) && !isIncompleteSubtaskHiddenByCompletedParent(todos, todo));
 
 const buildScheduleMatchLabels = (matches: TodoScheduleMatch[]): string[] => {
   const labels: string[] = [];
@@ -1101,8 +1102,7 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
       ...pinnedTodayEntries.map((entry) => entry.todo.id)
     ]);
 
-    return todos
-      .filter((todo) => !todo.isCompleted)
+    return filterVisibleTodos(todos, false)
       .filter((todo) => !visibleTodayEntryIds.has(todo.id))
       .map((todo) => {
         const scheduleMatches = buildOverdueScheduleMatches(todo, todayDateKey);
@@ -1206,7 +1206,8 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
 
       const childEntries = getDirectChildTodosForDisplay(todos, entry.todo.id, {
         incompleteFirst: true,
-        includeCompleted: showCompletedTodos
+        includeCompleted: showCompletedTodos,
+        hideIncompleteWhenParentCompleted: true
       })
         .map((childTodo) => selectedEntryMap.get(childTodo.id) || buildFallbackChildTodoEntry(childTodo));
 
@@ -2007,6 +2008,7 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
           assignType={assignModalType}
           onAssignTypeChange={setAssignModalType}
           todos={assignableTodos}
+          allTodos={todos}
           todoCategories={categories}
           activityCategories={activityCategories}
           onAssign={handleAssignTodoToDate}

@@ -4,13 +4,14 @@
  * @output Regression coverage for expanded subtask display ordering
  * @pos Test
  * @description Verifies that expanded parent-task displays can show all direct subtasks while prioritizing unfinished items ahead of completed ones.
+ * @updated 2026-04-25: Added coverage for hiding unfinished subtasks when their parent todo is completed without mutating child completion flags.
  * @updated 2026-04-22: Added tests for direct-child display ordering plus optional completed-task filtering.
  * @updated 2026-04-22: Added tests for direct-child display ordering with unfinished subtasks first.
  */
 
 import { describe, expect, it } from 'vitest';
 import type { TodoItem } from '../types';
-import { getDirectChildTodosForDisplay } from './todoHierarchyUtils';
+import { getDirectChildTodosForDisplay, isIncompleteSubtaskHiddenByCompletedParent } from './todoHierarchyUtils';
 
 const baseTodos: TodoItem[] = [
   {
@@ -70,5 +71,34 @@ describe('todoHierarchyUtils display ordering', () => {
       'child-2',
       'child-3'
     ]);
+  });
+
+  it('hides only unfinished subtasks when the parent todo is completed', () => {
+    const completedParentTodos = baseTodos.map((todo) => (
+      todo.id === 'parent-1'
+        ? { ...todo, isCompleted: true }
+        : todo
+    ));
+
+    expect(getDirectChildTodosForDisplay(completedParentTodos, 'parent-1', {
+      incompleteFirst: true,
+      hideIncompleteWhenParentCompleted: true
+    }).map((todo) => todo.id)).toEqual([
+      'child-1-done'
+    ]);
+  });
+});
+
+describe('isIncompleteSubtaskHiddenByCompletedParent', () => {
+  it('returns true only for unfinished subtasks under completed parents', () => {
+    const completedParentTodos = baseTodos.map((todo) => (
+      todo.id === 'parent-1'
+        ? { ...todo, isCompleted: true }
+        : todo
+    ));
+
+    expect(isIncompleteSubtaskHiddenByCompletedParent(completedParentTodos, completedParentTodos[1])).toBe(true);
+    expect(isIncompleteSubtaskHiddenByCompletedParent(completedParentTodos, completedParentTodos[2])).toBe(false);
+    expect(isIncompleteSubtaskHiddenByCompletedParent(completedParentTodos, completedParentTodos[0])).toBe(false);
   });
 });

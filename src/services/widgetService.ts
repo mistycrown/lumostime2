@@ -5,6 +5,7 @@
  * @pos Service
  * @description Centralizes the shared types and conversions used by the Android widget system while keeping timer, daily, and shortcut slots on one contract.
  * @updated 2026-04-25: Added DAILY_RUNTIME dual-view payload builders so native heatmap widgets can toggle between category and activity coloring.
+ * @updated 2026-04-25: Added widget UI icon asset preservation and sanitization helpers so Android widgets can prefer local icon bitmaps with emoji fallback.
  */
 import { Capacitor } from '@capacitor/core';
 import { ActiveSession, Category, CheckTemplate, DailyReview, Log } from '../types';
@@ -255,19 +256,26 @@ export const buildTimerWidgetSlotConfig = (
   activity: Category['activities'][number],
   slotIndex: number,
   overrides?: {
+    icon?: string | null;
     linkedTodoId?: string | null;
     scopeIds?: string[] | null;
     customIcon?: string | null;
+    uiIconAssetPath?: string | null;
+    uiIconFallbackAssetPath?: string | null;
   }
 ): WidgetTemplateSlotConfig => ({
   slotIndex,
   slotType: 'timer',
   activityId: activity.id,
   categoryId: category.id,
-  icon: normalizeNullableString(overrides?.customIcon) || activity.icon || category.icon,
+  icon:
+    normalizeNullableString(overrides?.customIcon)
+    || normalizeNullableString(overrides?.icon)
+    || activity.icon
+    || category.icon,
   customIcon: normalizeNullableString(overrides?.customIcon),
-  uiIconAssetPath: null,
-  uiIconFallbackAssetPath: null,
+  uiIconAssetPath: normalizeNullableString(overrides?.uiIconAssetPath),
+  uiIconFallbackAssetPath: normalizeNullableString(overrides?.uiIconFallbackAssetPath),
   label: activity.name,
   color: getColorHexForCharts(activity.color || category.themeColor || ''),
   linkedTodoId: normalizeNullableString(overrides?.linkedTodoId),
@@ -282,18 +290,25 @@ export const buildDailyWidgetSlotConfig = (
   binding: DailyWidgetSlotBinding,
   slotIndex: number,
   overrides?: {
+    icon?: string | null;
     customIcon?: string | null;
     backgroundColor?: string | null;
+    uiIconAssetPath?: string | null;
+    uiIconFallbackAssetPath?: string | null;
   }
 ): WidgetTemplateSlotConfig => ({
   slotIndex,
   slotType: 'daily',
   activityId: null,
   categoryId: null,
-  icon: normalizeNullableString(overrides?.customIcon) || binding.icon || FALLBACK_WIDGET_ICON,
+  icon:
+    normalizeNullableString(overrides?.customIcon)
+    || normalizeNullableString(overrides?.icon)
+    || binding.icon
+    || FALLBACK_WIDGET_ICON,
   customIcon: normalizeNullableString(overrides?.customIcon),
-  uiIconAssetPath: null,
-  uiIconFallbackAssetPath: null,
+  uiIconAssetPath: normalizeNullableString(overrides?.uiIconAssetPath),
+  uiIconFallbackAssetPath: normalizeNullableString(overrides?.uiIconFallbackAssetPath),
   label: binding.content,
   color: normalizeNullableString(overrides?.backgroundColor) || DEFAULT_DAILY_WIDGET_COLOR,
   linkedTodoId: null,
@@ -309,18 +324,24 @@ export const buildShortcutWidgetSlotConfig = (
   slotIndex: number,
   overrides?: {
     label?: string | null;
+    icon?: string | null;
     customIcon?: string | null;
     backgroundColor?: string | null;
+    uiIconAssetPath?: string | null;
+    uiIconFallbackAssetPath?: string | null;
   }
 ): WidgetTemplateSlotConfig => ({
   slotIndex,
   slotType: 'shortcut',
   activityId: null,
   categoryId: null,
-  icon: normalizeNullableString(overrides?.customIcon) || getShortcutWidgetActionEmoji(shortcutAction),
+  icon:
+    normalizeNullableString(overrides?.customIcon)
+    || normalizeNullableString(overrides?.icon)
+    || getShortcutWidgetActionEmoji(shortcutAction),
   customIcon: normalizeNullableString(overrides?.customIcon),
-  uiIconAssetPath: null,
-  uiIconFallbackAssetPath: null,
+  uiIconAssetPath: normalizeNullableString(overrides?.uiIconAssetPath),
+  uiIconFallbackAssetPath: normalizeNullableString(overrides?.uiIconFallbackAssetPath),
   label: normalizeNullableString(overrides?.label) || getShortcutWidgetActionLabel(shortcutAction),
   color: normalizeNullableString(overrides?.backgroundColor) || getShortcutWidgetActionColor(shortcutAction),
   linkedTodoId: null,
@@ -357,9 +378,12 @@ export const rebuildTimerWidgetSlotConfig = (
   }
 
   return buildTimerWidgetSlotConfig(category, activity, slot.slotIndex, {
+    icon: slot.icon ?? null,
     linkedTodoId: slot.linkedTodoId ?? null,
     scopeIds: slot.scopeIds ?? null,
-    customIcon: slot.customIcon ?? null
+    customIcon: slot.customIcon ?? null,
+    uiIconAssetPath: slot.uiIconAssetPath ?? null,
+    uiIconFallbackAssetPath: slot.uiIconFallbackAssetPath ?? null
   });
 };
 
@@ -377,8 +401,11 @@ export const rebuildDailyWidgetSlotConfig = (
   }
 
   return buildDailyWidgetSlotConfig(binding, slot.slotIndex, {
+    icon: slot.icon ?? null,
     customIcon: slot.customIcon ?? null,
-    backgroundColor: slot.color ?? DEFAULT_DAILY_WIDGET_COLOR
+    backgroundColor: slot.color ?? DEFAULT_DAILY_WIDGET_COLOR,
+    uiIconAssetPath: slot.uiIconAssetPath ?? null,
+    uiIconFallbackAssetPath: slot.uiIconFallbackAssetPath ?? null
   });
 };
 
@@ -391,9 +418,58 @@ export const rebuildShortcutWidgetSlotConfig = (
 
   return buildShortcutWidgetSlotConfig(slot.shortcutAction, slot.slotIndex, {
     label: slot.label ?? undefined,
+    icon: slot.icon ?? null,
     customIcon: slot.customIcon ?? null,
-    backgroundColor: slot.color ?? null
+    backgroundColor: slot.color ?? null,
+    uiIconAssetPath: slot.uiIconAssetPath ?? null,
+    uiIconFallbackAssetPath: slot.uiIconFallbackAssetPath ?? null
   });
+};
+
+const stripWidgetSlotUiIconFields = (
+  slot: WidgetTemplateSlotConfig
+): WidgetTemplateSlotConfig => {
+  if (!slot.uiIconAssetPath && !slot.uiIconFallbackAssetPath) {
+    return slot;
+  }
+
+  return {
+    ...slot,
+    uiIconAssetPath: null,
+    uiIconFallbackAssetPath: null
+  };
+};
+
+export const sanitizeWidgetTemplatesForUiIconSupport = (
+  templates: WidgetTemplate[],
+  allowUiIcon: boolean
+): WidgetTemplate[] => {
+  if (allowUiIcon) {
+    return normalizeWidgetTemplates(templates);
+  }
+
+  let didChange = false;
+
+  const sanitizedTemplates = templates.map((template) => {
+    const normalizedSlots = normalizeWidgetTemplateSlots(template.slots, template.size);
+    const sanitizedSlots = normalizedSlots.map((slot) => {
+      const nextSlot = stripWidgetSlotUiIconFields(slot);
+      if (nextSlot !== slot) {
+        didChange = true;
+      }
+      return nextSlot;
+    });
+
+    return didChange
+      ? {
+          ...template,
+          slots: sanitizedSlots,
+          updatedAt: Date.now()
+        }
+      : template;
+  });
+
+  return didChange ? normalizeWidgetTemplates(sanitizedTemplates) : normalizeWidgetTemplates(templates);
 };
 
 export const rebuildWidgetTemplate = (

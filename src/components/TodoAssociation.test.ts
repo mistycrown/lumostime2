@@ -4,6 +4,7 @@
  * @output Regression coverage for hierarchical todo picker row building
  * @pos Test
  * @description Ensures the todo association picker keeps parent/subtask rows collapsed by default and auto-expands the selected child's parent.
+ * @updated 2026-04-25: Added regression coverage so unfinished subtasks stay hidden in the picker whenever their parent todo is completed.
  * @updated 2026-04-22: Added regression coverage for virtual-category style expansion where a visible parent can reveal children from a broader todo source.
  * @updated 2026-04-22: Added regression coverage for collapsed parent rows and expandable child rows inside the shared todo association picker.
  */
@@ -134,5 +135,30 @@ describe('TodoAssociation hierarchy helpers', () => {
       childCount: 2,
       completedChildCount: 1
     });
+  });
+
+  it('does not surface unfinished subtasks as standalone picker rows when their parent is completed', () => {
+    const visibleTodos: TodoItem[] = [
+      {
+        id: 'child-hidden',
+        categoryId: 'cat-1',
+        parentTodoId: 'parent-done',
+        childOrder: 1,
+        title: 'Hidden child',
+        isCompleted: false
+      } as TodoItem
+    ];
+    const allTodos: TodoItem[] = [
+      {
+        id: 'parent-done',
+        categoryId: 'cat-1',
+        title: 'Completed parent',
+        isCompleted: true
+      } as TodoItem,
+      ...visibleTodos
+    ];
+
+    expect(buildTodoAssociationRows(visibleTodos, [], true, allTodos, allTodos)).toEqual([]);
+    expect(buildTodoAssociationRows(visibleTodos, [], false, allTodos, allTodos)).toEqual([]);
   });
 });

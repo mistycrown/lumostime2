@@ -4,6 +4,7 @@
  * @output Parsed Time Entries (ParsedTimeEntry[]), Parsed Todos (AIParsedTodo[]), Dated AI Backfill Tool Plans, Backfill Chat Replies (string), Generated Narratives (string), Connection Status (boolean)
  * @pos Service (AI Integration Layer)
  * @description AI 服务 - 处理与 AI 提供商（OpenAI/Gemini）的所有交互，包括配置管理、连接测试和提示执行
+ * @updated 2026-04-25: Expanded AI intent routing and tool planning with dedicated edit-log, update-todo, and create-subtask flows that return id-plus-patch payloads for local application.
  * @updated 2026-04-22: Simplified unified-chat intent classification into a message-only lightweight routing step without extra runtime context.
  * @updated 2026-04-22: Added persona-aware formal prompts plus optional cached conversation history for unified AI chat sessions.
  * @updated 2026-04-22: Added two-stage AI chat support with lightweight intent classification, debug-aware chat replies, and direct todo tool planning alongside backfill planning.
@@ -76,7 +77,7 @@ export interface AIBackfillChatResult {
     debug: AIDebugExchange;
 }
 
-export type AIChatIntent = 'chat' | 'add_log' | 'add_todo' | 'clarify';
+export type AIChatIntent = 'chat' | 'add_log' | 'edit_log' | 'add_todo' | 'update_todo' | 'create_subtask' | 'clarify';
 
 export interface AIIntentClassification {
     intent: AIChatIntent;
@@ -140,6 +141,94 @@ export interface AITodoToolPlan {
 
 export interface AITodoToolPlanningResult {
     plan: AITodoToolPlan;
+    debug: AIDebugExchange;
+}
+
+export interface AITodoUpdatePatch {
+    title?: string;
+    note?: string | null;
+    categoryId?: string;
+    linkedCategoryId?: string | null;
+    linkedActivityId?: string | null;
+    defaultScopeIds?: string[] | null;
+    scheduledDate?: string | null;
+    deadlineDate?: string | null;
+    recurrenceRule?: TodoRecurrenceRule | null;
+    pin?: boolean;
+    isCompleted?: boolean;
+}
+
+export interface AITodoUpdateArgs {
+    todoId: string;
+    patch: AITodoUpdatePatch;
+}
+
+export interface AITodoUpdateToolCall {
+    toolName: 'update_todo';
+    args: AITodoUpdateArgs;
+}
+
+export interface AITodoUpdateToolPlan {
+    assistantReply: string;
+    toolCalls: AITodoUpdateToolCall[];
+}
+
+export interface AITodoUpdateToolPlanningResult {
+    plan: AITodoUpdateToolPlan;
+    debug: AIDebugExchange;
+}
+
+export interface AICreateSubtaskArgs {
+    parentTodoId: string;
+    title: string;
+    note?: string;
+    scheduledDate?: string;
+    deadlineDate?: string;
+}
+
+export interface AICreateSubtaskToolCall {
+    toolName: 'create_subtask';
+    args: AICreateSubtaskArgs;
+}
+
+export interface AICreateSubtaskToolPlan {
+    assistantReply: string;
+    toolCalls: AICreateSubtaskToolCall[];
+}
+
+export interface AICreateSubtaskToolPlanningResult {
+    plan: AICreateSubtaskToolPlan;
+    debug: AIDebugExchange;
+}
+
+export interface AIEditLogPatch {
+    date?: string;
+    startTime?: string;
+    endTime?: string;
+    categoryId?: string;
+    activityId?: string;
+    note?: string | null;
+    linkedTodoId?: string | null;
+    scopeIds?: string[] | null;
+}
+
+export interface AIEditLogArgs {
+    logId: string;
+    patch: AIEditLogPatch;
+}
+
+export interface AIEditLogToolCall {
+    toolName: 'edit_log';
+    args: AIEditLogArgs;
+}
+
+export interface AIEditLogToolPlan {
+    assistantReply: string;
+    toolCalls: AIEditLogToolCall[];
+}
+
+export interface AIEditLogToolPlanningResult {
+    plan: AIEditLogToolPlan;
     debug: AIDebugExchange;
 }
 
@@ -221,7 +310,7 @@ const sanitizeDebugUrl = (url: string): string => (
     url.replace(/([?&]key=)[^&]+/gi, '$1[REDACTED]')
 );
 
-const AI_INTENTS: AIChatIntent[] = ['chat', 'add_log', 'add_todo', 'clarify'];
+const AI_INTENTS: AIChatIntent[] = ['chat', 'add_log', 'edit_log', 'add_todo', 'update_todo', 'create_subtask', 'clarify'];
 const TODO_RECURRENCE_FREQUENCIES: Array<TodoRecurrenceRule['frequency']> = ['daily', 'weekly', 'monthly'];
 
 const normalizeConversationHistory = (conversationHistory?: AIConversationTurn[]): AIConversationTurn[] => (
@@ -329,6 +418,235 @@ const normalizeTodoRecurrenceRule = (value: unknown): TodoRecurrenceRule | undef
     }
 
     return normalized;
+};
+
+const normalizeOptionalDateString = (value: unknown): string | undefined => (
+    typeof value === 'string' && value.trim()
+        ? value.trim()
+        : undefined
+);
+
+const normalizeNullableString = (value: unknown): string | null | undefined => {
+    if (value === null) {
+        return null;
+    }
+
+    if (typeof value !== 'string') {
+        return undefined;
+    }
+
+    return value.trim();
+};
+
+const normalizeNullableStringArray = (value: unknown): string[] | null | undefined => {
+    if (value === null) {
+        return null;
+    }
+
+    if (!Array.isArray(value)) {
+        return undefined;
+    }
+
+    return value.map((item) => String(item)).filter((item) => item.trim().length > 0);
+};
+
+const cleanAndParseJSONObjectContent = (content: string): any => {
+    if (content.includes('```json')) {
+        content = content.replace(/```json\n?|\n?```/g, '');
+    } else if (content.includes('```')) {
+        content = content.replace(/```\n?|\n?```/g, '');
+    }
+
+    const objectStart = content.indexOf('{');
+    const objectEnd = content.lastIndexOf('}') + 1;
+    if (objectStart >= 0 && objectEnd > objectStart) {
+        content = content.substring(objectStart, objectEnd);
+    }
+
+    try {
+        return JSON.parse(content);
+    } catch (error) {
+        console.error('JSON Object Parse Error', error);
+        return {};
+    }
+};
+
+const requestJsonObjectWithDebug = async <T>(
+    config: AIConfig,
+    fetchFn: any,
+    params: {
+        systemPrompt: string;
+        userPrompt: string;
+        conversationHistory?: AIConversationTurn[];
+        normalizeResult: (rawValue: any) => T;
+        options?: AIRequestOptions;
+    }
+): Promise<{ result: T; debug: AIDebugExchange }> => {
+    if (config.provider === 'openai') {
+        const url = `${config.baseUrl}/chat/completions`;
+        const headers = {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${config.apiKey}`
+        };
+        const body = {
+            model: config.modelName,
+            messages: buildOpenAIMessageList(params.systemPrompt, params.userPrompt, params.conversationHistory),
+            response_format: { type: 'json_object' }
+        };
+        const requestedAt = new Date().toISOString();
+        let responseStatus = 0;
+        let responseOk = false;
+        let responseBody: unknown = null;
+
+        try {
+            const response = await fetchFn(url, {
+                method: 'POST',
+                headers,
+                body: JSON.stringify(body),
+                ...(params.options?.signal ? { signal: params.options.signal } : {})
+            });
+            responseStatus = response.status || 0;
+            responseOk = Boolean(response.ok);
+            responseBody = await response.json();
+
+            const debug: AIDebugExchange = {
+                provider: 'openai',
+                requestedAt,
+                completedAt: new Date().toISOString(),
+                request: {
+                    url: sanitizeDebugUrl(url),
+                    method: 'POST',
+                    headers: sanitizeDebugHeaders(headers),
+                    body
+                },
+                response: {
+                    status: responseStatus,
+                    ok: responseOk,
+                    body: responseBody
+                }
+            };
+
+            if ((responseBody as any)?.error) {
+                const error = new Error((responseBody as any).error.message || 'AI 璇锋眰澶辫触');
+                (error as Error & { debug?: AIDebugExchange }).debug = debug;
+                throw error;
+            }
+
+            const rawContent = (responseBody as any)?.choices?.[0]?.message?.content || '{}';
+            return {
+                result: params.normalizeResult(cleanAndParseJSONObjectContent(rawContent)),
+                debug
+            };
+        } catch (error) {
+            const debug: AIDebugExchange = {
+                provider: 'openai',
+                requestedAt,
+                completedAt: new Date().toISOString(),
+                request: {
+                    url: sanitizeDebugUrl(url),
+                    method: 'POST',
+                    headers: sanitizeDebugHeaders(headers),
+                    body
+                },
+                response: {
+                    status: responseStatus,
+                    ok: responseOk,
+                    body: responseBody || {
+                        transportError: error instanceof Error ? error.message : String(error)
+                    }
+                }
+            };
+
+            const finalError = error instanceof Error ? error : new Error(String(error));
+            (finalError as Error & { debug?: AIDebugExchange }).debug = debug;
+            throw finalError;
+        }
+    }
+
+    if (config.provider === 'gemini') {
+        const baseUrl = config.baseUrl || 'https://generativelanguage.googleapis.com/v1beta/models';
+        const url = `${baseUrl}/${config.modelName}:generateContent?key=${config.apiKey}`;
+        const headers = {
+            'Content-Type': 'application/json'
+        };
+        const body = {
+            contents: buildGeminiContents(params.userPrompt, params.conversationHistory),
+            system_instruction: { parts: [{ text: params.systemPrompt.trim() }] },
+            generationConfig: {
+                response_mime_type: 'application/json'
+            }
+        };
+        const requestedAt = new Date().toISOString();
+        let responseStatus = 0;
+        let responseOk = false;
+        let responseBody: unknown = null;
+
+        try {
+            const response = await fetchFn(url, {
+                method: 'POST',
+                headers,
+                body: JSON.stringify(body),
+                ...(params.options?.signal ? { signal: params.options.signal } : {})
+            });
+            responseStatus = response.status || 0;
+            responseOk = Boolean(response.ok);
+            responseBody = await response.json();
+
+            const debug: AIDebugExchange = {
+                provider: 'gemini',
+                requestedAt,
+                completedAt: new Date().toISOString(),
+                request: {
+                    url: sanitizeDebugUrl(url),
+                    method: 'POST',
+                    headers: sanitizeDebugHeaders(headers),
+                    body
+                },
+                response: {
+                    status: responseStatus,
+                    ok: responseOk,
+                    body: responseBody
+                }
+            };
+
+            if ((responseBody as any)?.error) {
+                const error = new Error((responseBody as any).error.message || 'AI 璇锋眰澶辫触');
+                (error as Error & { debug?: AIDebugExchange }).debug = debug;
+                throw error;
+            }
+
+            const rawContent = (((responseBody as any)?.candidates?.[0]?.content?.parts?.[0]?.text) || '{}');
+            return {
+                result: params.normalizeResult(cleanAndParseJSONObjectContent(rawContent)),
+                debug
+            };
+        } catch (error) {
+            const debug: AIDebugExchange = {
+                provider: 'gemini',
+                requestedAt,
+                completedAt: new Date().toISOString(),
+                request: {
+                    url: sanitizeDebugUrl(url),
+                    method: 'POST',
+                    headers: sanitizeDebugHeaders(headers),
+                    body
+                },
+                response: {
+                    status: responseStatus,
+                    ok: responseOk,
+                    body: responseBody || {
+                        transportError: error instanceof Error ? error.message : String(error)
+                    }
+                }
+            };
+
+            const finalError = error instanceof Error ? error : new Error(String(error));
+            (finalError as Error & { debug?: AIDebugExchange }).debug = debug;
+            throw finalError;
+        }
+    }
+
+    throw new Error('AI provider not supported');
 };
 
 export const aiService = {
@@ -799,22 +1117,27 @@ Task: Read one user message and classify the single primary intent for the next 
 Allowed intents:
 - chat: casual conversation, questions, reflection, or discussion that should not call tools
 - add_log: the user is mainly describing things that already happened and wants to record/backfill them
+- edit_log: the user wants to modify an existing log/backfill record
 - add_todo: the user is mainly asking to create one or more todos, reminders, or plans for later
+- update_todo: the user wants to modify an existing todo, including schedule, deadline, pin, completion, category, note, or other fields
+- create_subtask: the user wants to add one or more child todos under an existing parent todo
 - clarify: the message is too ambiguous or mixes multiple primary intents, so the app should ask one short follow-up question instead of executing anything
 
 Requirements:
 1. Output ONLY a valid JSON object.
 2. JSON schema:
 {
-  "intent": "chat | add_log | add_todo | clarify",
+  "intent": "chat | add_log | edit_log | add_todo | update_todo | create_subtask | clarify",
   "reason": "short string",
   "assistantReply": "string"
 }
 3. Choose exactly one primary intent.
 4. If the user mixes multiple primary requests in one sentence, return clarify.
-5. assistantReply should usually be empty for chat, add_log, and add_todo.
+5. assistantReply should usually be empty for chat, add_log, edit_log, add_todo, update_todo, and create_subtask.
 6. When intent is clarify, assistantReply must be one short Chinese follow-up question.
 7. Do not plan tools in this step.
+8. If the user is talking about assigning dates/times to existing subtasks, chapters, or parts of an existing task, prefer update_todo rather than create_subtask.
+9. Use create_subtask only when the user clearly wants to add new child tasks, split a task, or generate subtasks that do not exist yet.
 `;
 
         const userPrompt = `
@@ -1844,6 +2167,473 @@ ${text}
         throw new Error('AI provider not supported');
     },
 
+    planTodoUpdateToolCallsWithDebug: async (
+        text: string,
+        context: {
+            currentDateTime: string;
+            defaultDate: string;
+            todoCategories: TodoCategory[];
+            activityCategories: Category[];
+            scopes: Scope[];
+            todos: Array<{
+                id: string;
+                title: string;
+                path: string;
+                categoryId: string;
+                categoryName: string;
+                isCompleted: boolean;
+                parentTodoId?: string;
+                parentTodoTitle?: string;
+                linkedCategoryId?: string;
+                linkedActivityId?: string;
+                scheduledDate?: string;
+                deadlineDate?: string;
+                pin?: boolean;
+            }>;
+            personaPrompt?: string;
+            conversationHistory?: AIConversationTurn[];
+        },
+        options: AIRequestOptions = {}
+    ): Promise<AITodoUpdateToolPlanningResult> => {
+        const config = aiService.getConfig();
+        const fetchFn = Capacitor.isNativePlatform() ? nativeFetch : fetch;
+
+        if (!config.apiKey?.trim()) {
+            throw new Error('请先在设置中完成 AI 配置。');
+        }
+
+        const todoCategoryContext = context.todoCategories.map((todoCategory) => ({
+            id: todoCategory.id,
+            name: todoCategory.name
+        }));
+        const activityCategoryContext = context.activityCategories.map((category) => ({
+            id: category.id,
+            name: category.name,
+            activities: category.activities.map((activity) => ({
+                id: activity.id,
+                name: activity.name
+            }))
+        }));
+        const scopeContext = context.scopes.map((scope) => ({
+            id: scope.id,
+            name: scope.name
+        }));
+
+        const systemPrompt = `
+Role: You are LumosTime's todo editing assistant with tool planning ability.
+Task: Read the user's message, identify which existing todo should be updated, and return only the changed fields as a patch.
+
+Context:
+- Current DateTime: ${context.currentDateTime}
+- Default Date: ${context.defaultDate}
+- Available Todo Categories: ${JSON.stringify(todoCategoryContext)}
+- Available Activity Categories and Activities: ${JSON.stringify(activityCategoryContext)}
+- Available Scopes: ${JSON.stringify(scopeContext)}
+- Existing Todos: ${JSON.stringify(context.todos)}
+
+Available Tool:
+1. update_todo
+Arguments schema:
+{
+  "todoId": "existing todo id",
+  "patch": {
+    "title": "string",
+    "note": "string | null",
+    "categoryId": "todo category id",
+    "linkedCategoryId": "activity category id | null",
+    "linkedActivityId": "activity id | null",
+    "defaultScopeIds": ["scope id"] | null,
+    "scheduledDate": "YYYY-MM-DD | null",
+    "deadlineDate": "YYYY-MM-DD | null",
+    "recurrenceRule": {
+      "frequency": "daily | weekly | monthly",
+      "startDate": "YYYY-MM-DD",
+      "endDate": "YYYY-MM-DD",
+      "interval": 1,
+      "weekdays": [1, 3, 5],
+      "monthDays": [1, 15]
+    } | null,
+    "pin": true,
+    "isCompleted": true
+  }
+}
+
+${buildPersonaInstruction(context.personaPrompt)}
+
+Requirements:
+1. Output ONLY a valid JSON object.
+2. JSON schema:
+{
+  "assistantReply": "string",
+  "toolCalls": [
+    {
+      "toolName": "update_todo",
+      "args": { ... }
+    }
+  ]
+}
+3. assistantReply is what the user will read in the chat.
+4. toolCalls is what the app will apply directly.
+5. update_todo is for editing existing todos only, including subtasks.
+6. Find the target todo strictly from the provided Existing Todos list. Do not invent IDs.
+7. patch must contain ONLY the fields that should change. Never return the full todo object.
+8. To clear a field, return null. This applies to note, linkedCategoryId, linkedActivityId, defaultScopeIds, scheduledDate, deadlineDate, and recurrenceRule.
+9. Quick operations such as schedule changes, pin/unpin, mark complete, mark incomplete, and clearing dates must also use update_todo.
+10. categoryId, linkedCategoryId, linkedActivityId, and defaultScopeIds must come from the provided context exactly.
+11. If the target todo cannot be identified safely, keep toolCalls empty and ask one short follow-up question in assistantReply.
+12. Do not output duplicate toolCalls.
+13. If the user mentions a parent task and wants to assign dates/times for its existing subtasks, chapters, or parts, update those matching child todos instead of the parent todo itself.
+14. If the user asks to arrange multiple existing subtasks, emit multiple update_todo toolCalls.
+15. If scheduling intent is clear but the exact pattern is still missing, ask one targeted follow-up question such as whether to start from today and how dense the schedule should be, instead of asking broad generic questions.
+16. If the provided Existing Todos list only contains child todos under a matched parent task, you must only update those child todos and must not invent or imply any new parent-level task.
+`;
+
+        const userPrompt = `
+Current DateTime: ${context.currentDateTime}
+Default Date: ${context.defaultDate}
+User Message:
+${text}
+`;
+
+        const normalizePlan = (rawPlan: any): AITodoUpdateToolPlan => {
+            const toolCalls = Array.isArray(rawPlan?.toolCalls)
+                ? rawPlan.toolCalls.filter((call: any) => call?.toolName === 'update_todo' && call?.args?.patch)
+                : [];
+
+            return {
+                assistantReply: typeof rawPlan?.assistantReply === 'string' ? rawPlan.assistantReply : '',
+                toolCalls: toolCalls
+                    .map((call: any) => {
+                        const patch = call.args.patch || {};
+                        const normalizedPatch: AITodoUpdatePatch = {
+                            ...(typeof patch.title === 'string' ? { title: patch.title.trim() } : {}),
+                            ...(normalizeNullableString(patch.note) !== undefined ? { note: normalizeNullableString(patch.note) } : {}),
+                            ...(typeof patch.categoryId === 'string' && patch.categoryId.trim() ? { categoryId: patch.categoryId.trim() } : {}),
+                            ...(normalizeNullableString(patch.linkedCategoryId) !== undefined ? { linkedCategoryId: normalizeNullableString(patch.linkedCategoryId) } : {}),
+                            ...(normalizeNullableString(patch.linkedActivityId) !== undefined ? { linkedActivityId: normalizeNullableString(patch.linkedActivityId) } : {}),
+                            ...(normalizeNullableStringArray(patch.defaultScopeIds) !== undefined ? { defaultScopeIds: normalizeNullableStringArray(patch.defaultScopeIds) } : {}),
+                            ...(normalizeNullableString(patch.scheduledDate) !== undefined ? { scheduledDate: normalizeNullableString(patch.scheduledDate) } : {}),
+                            ...(normalizeNullableString(patch.deadlineDate) !== undefined ? { deadlineDate: normalizeNullableString(patch.deadlineDate) } : {}),
+                            ...(patch.recurrenceRule === null
+                                ? { recurrenceRule: null }
+                                : normalizeTodoRecurrenceRule(patch.recurrenceRule)
+                                    ? { recurrenceRule: normalizeTodoRecurrenceRule(patch.recurrenceRule)! }
+                                    : {}),
+                            ...(typeof patch.pin === 'boolean' ? { pin: patch.pin } : {}),
+                            ...(typeof patch.isCompleted === 'boolean' ? { isCompleted: patch.isCompleted } : {})
+                        };
+
+                        return {
+                            toolName: 'update_todo' as const,
+                            args: {
+                                todoId: String(call.args.todoId || '').trim(),
+                                patch: normalizedPatch
+                            }
+                        };
+                    })
+                    .filter((call) => Boolean(call.args.todoId) && Object.keys(call.args.patch).length > 0)
+            };
+        };
+
+        const { result, debug } = await requestJsonObjectWithDebug(config, fetchFn, {
+            systemPrompt,
+            userPrompt,
+            conversationHistory: context.conversationHistory,
+            normalizeResult: normalizePlan,
+            options
+        });
+
+        return {
+            plan: result,
+            debug
+        };
+    },
+
+    planCreateSubtaskToolCallsWithDebug: async (
+        text: string,
+        context: {
+            currentDateTime: string;
+            defaultDate: string;
+            parentTodos: Array<{
+                id: string;
+                title: string;
+                categoryId: string;
+                categoryName: string;
+                linkedActivityId?: string;
+                linkedActivityName?: string;
+                defaultScopeIds?: string[];
+                defaultScopeNames?: string[];
+            }>;
+            personaPrompt?: string;
+            conversationHistory?: AIConversationTurn[];
+        },
+        options: AIRequestOptions = {}
+    ): Promise<AICreateSubtaskToolPlanningResult> => {
+        const config = aiService.getConfig();
+        const fetchFn = Capacitor.isNativePlatform() ? nativeFetch : fetch;
+
+        if (!config.apiKey?.trim()) {
+            throw new Error('请先在设置中完成 AI 配置。');
+        }
+
+        const systemPrompt = `
+Role: You are LumosTime's subtask planning assistant with tool planning ability.
+Task: Read the user's message, identify the parent todo, and create one or more child todos under it.
+
+Context:
+- Current DateTime: ${context.currentDateTime}
+- Default Date: ${context.defaultDate}
+- Eligible Parent Todos: ${JSON.stringify(context.parentTodos)}
+
+Available Tool:
+1. create_subtask
+Arguments schema:
+{
+  "parentTodoId": "existing parent todo id",
+  "title": "string",
+  "note": "string",
+  "scheduledDate": "YYYY-MM-DD",
+  "deadlineDate": "YYYY-MM-DD"
+}
+
+${buildPersonaInstruction(context.personaPrompt)}
+
+Requirements:
+1. Output ONLY a valid JSON object.
+2. JSON schema:
+{
+  "assistantReply": "string",
+  "toolCalls": [
+    {
+      "toolName": "create_subtask",
+      "args": { ... }
+    }
+  ]
+}
+3. assistantReply is what the user will read in the chat.
+4. toolCalls is what the app will apply directly.
+5. parentTodoId must come from the provided Eligible Parent Todos list exactly. Do not invent IDs.
+6. title is required for every subtask.
+7. note, scheduledDate, and deadlineDate are optional. Do not include them unless the user really asked for them.
+8. create_subtask is only for creating child todos under an existing parent todo, not for editing.
+9. If the parent todo cannot be identified safely, keep toolCalls empty and ask one short follow-up question in assistantReply.
+10. Do not output duplicate toolCalls.
+11. If the user is actually asking to assign dates/times to existing subtasks, chapters, or parts, do not treat that as create_subtask.
+`;
+
+        const userPrompt = `
+Current DateTime: ${context.currentDateTime}
+Default Date: ${context.defaultDate}
+User Message:
+${text}
+`;
+
+        const normalizePlan = (rawPlan: any): AICreateSubtaskToolPlan => {
+            const toolCalls = Array.isArray(rawPlan?.toolCalls)
+                ? rawPlan.toolCalls.filter((call: any) => call?.toolName === 'create_subtask' && call?.args)
+                : [];
+
+            return {
+                assistantReply: typeof rawPlan?.assistantReply === 'string' ? rawPlan.assistantReply : '',
+                toolCalls: toolCalls.map((call: any) => ({
+                    toolName: 'create_subtask' as const,
+                    args: {
+                        parentTodoId: String(call.args.parentTodoId || '').trim(),
+                        title: String(call.args.title || '').trim(),
+                        ...(typeof call.args.note === 'string' && call.args.note.trim() ? { note: call.args.note.trim() } : {}),
+                        ...(normalizeOptionalDateString(call.args.scheduledDate) ? { scheduledDate: normalizeOptionalDateString(call.args.scheduledDate)! } : {}),
+                        ...(normalizeOptionalDateString(call.args.deadlineDate) ? { deadlineDate: normalizeOptionalDateString(call.args.deadlineDate)! } : {})
+                    }
+                })).filter((call) => Boolean(call.args.parentTodoId) && Boolean(call.args.title))
+            };
+        };
+
+        const { result, debug } = await requestJsonObjectWithDebug(config, fetchFn, {
+            systemPrompt,
+            userPrompt,
+            conversationHistory: context.conversationHistory,
+            normalizeResult: normalizePlan,
+            options
+        });
+
+        return {
+            plan: result,
+            debug
+        };
+    },
+
+    planEditLogToolCallsWithDebug: async (
+        text: string,
+        context: {
+            currentDateTime: string;
+            defaultDate: string;
+            categories: Category[];
+            scopes: Scope[];
+            todos: Array<{
+                id: string;
+                title: string;
+                path?: string;
+            }>;
+            logs: Array<{
+                id: string;
+                date: string;
+                startTime: string;
+                endTime: string;
+                categoryId: string;
+                categoryName: string;
+                activityId: string;
+                activityName: string;
+                note?: string;
+                linkedTodoId?: string;
+                linkedTodoTitle?: string;
+            }>;
+            personaPrompt?: string;
+            conversationHistory?: AIConversationTurn[];
+        },
+        options: AIRequestOptions = {}
+    ): Promise<AIEditLogToolPlanningResult> => {
+        const config = aiService.getConfig();
+        const fetchFn = Capacitor.isNativePlatform() ? nativeFetch : fetch;
+
+        if (!config.apiKey?.trim()) {
+            throw new Error('请先在设置中完成 AI 配置。');
+        }
+
+        const categoryContext = context.categories.map((category) => ({
+            id: category.id,
+            name: category.name,
+            activities: category.activities.map((activity) => ({
+                id: activity.id,
+                name: activity.name
+            }))
+        }));
+        const scopeContext = context.scopes.map((scope) => ({
+            id: scope.id,
+            name: scope.name
+        }));
+        const todoContext = context.todos.map((todo) => ({
+            id: todo.id,
+            title: todo.title,
+            path: todo.path || todo.title
+        }));
+
+        const systemPrompt = `
+Role: You are LumosTime's log editing assistant with tool planning ability.
+Task: Read the user's message, identify which existing log should be edited, and return only the changed fields as a patch.
+
+Context:
+- Current DateTime: ${context.currentDateTime}
+- Default Date: ${context.defaultDate}
+- Existing Logs: ${JSON.stringify(context.logs)}
+- Available Categories and Activities: ${JSON.stringify(categoryContext)}
+- Available Scopes: ${JSON.stringify(scopeContext)}
+- Available Todos: ${JSON.stringify(todoContext)}
+
+Available Tool:
+1. edit_log
+Arguments schema:
+{
+  "logId": "existing log id",
+  "patch": {
+    "date": "YYYY-MM-DD",
+    "startTime": "HH:mm",
+    "endTime": "HH:mm",
+    "categoryId": "category id",
+    "activityId": "activity id",
+    "note": "string | null",
+    "linkedTodoId": "todo id | null",
+    "scopeIds": ["scope id"] | null
+  }
+}
+
+${buildPersonaInstruction(context.personaPrompt)}
+
+Requirements:
+1. Output ONLY a valid JSON object.
+2. JSON schema:
+{
+  "assistantReply": "string",
+  "toolCalls": [
+    {
+      "toolName": "edit_log",
+      "args": { ... }
+    }
+  ]
+}
+3. assistantReply is what the user will read in the chat.
+4. toolCalls is what the app will apply directly.
+5. Find the target log strictly from the provided Existing Logs list. Do not invent IDs.
+6. patch must contain ONLY the fields that should change. Never return the full log object.
+7. To clear a field, return null. This applies to note, linkedTodoId, and scopeIds.
+8. date, startTime, and endTime should only be included when the user actually wants to change them.
+9. categoryId, activityId, linkedTodoId, and scopeIds must come from the provided context exactly.
+10. If the target log cannot be identified safely, keep toolCalls empty and ask one short follow-up question in assistantReply.
+11. Do not output duplicate toolCalls.
+`;
+
+        const userPrompt = `
+Current DateTime: ${context.currentDateTime}
+Default Date: ${context.defaultDate}
+User Message:
+${text}
+`;
+
+        const normalizePlan = (rawPlan: any): AIEditLogToolPlan => {
+            const toolCalls = Array.isArray(rawPlan?.toolCalls)
+                ? rawPlan.toolCalls.filter((call: any) => call?.toolName === 'edit_log' && call?.args?.patch)
+                : [];
+
+            return {
+                assistantReply: typeof rawPlan?.assistantReply === 'string' ? rawPlan.assistantReply : '',
+                toolCalls: toolCalls
+                    .map((call: any) => ({
+                        toolName: 'edit_log' as const,
+                        args: {
+                            logId: String(call.args.logId || '').trim(),
+                            patch: {
+                                ...(normalizeOptionalDateString(call.args.patch?.date) ? { date: normalizeOptionalDateString(call.args.patch.date)! } : {}),
+                                ...(typeof call.args.patch?.startTime === 'string' && call.args.patch.startTime.trim()
+                                    ? { startTime: call.args.patch.startTime.trim() }
+                                    : {}),
+                                ...(typeof call.args.patch?.endTime === 'string' && call.args.patch.endTime.trim()
+                                    ? { endTime: call.args.patch.endTime.trim() }
+                                    : {}),
+                                ...(typeof call.args.patch?.categoryId === 'string' && call.args.patch.categoryId.trim()
+                                    ? { categoryId: call.args.patch.categoryId.trim() }
+                                    : {}),
+                                ...(typeof call.args.patch?.activityId === 'string' && call.args.patch.activityId.trim()
+                                    ? { activityId: call.args.patch.activityId.trim() }
+                                    : {}),
+                                ...(normalizeNullableString(call.args.patch?.note) !== undefined
+                                    ? { note: normalizeNullableString(call.args.patch.note) }
+                                    : {}),
+                                ...(normalizeNullableString(call.args.patch?.linkedTodoId) !== undefined
+                                    ? { linkedTodoId: normalizeNullableString(call.args.patch.linkedTodoId) }
+                                    : {}),
+                                ...(normalizeNullableStringArray(call.args.patch?.scopeIds) !== undefined
+                                    ? { scopeIds: normalizeNullableStringArray(call.args.patch.scopeIds) }
+                                    : {})
+                            }
+                        }
+                    }))
+                    .filter((call) => Boolean(call.args.logId) && Object.keys(call.args.patch).length > 0)
+            };
+        };
+
+        const { result, debug } = await requestJsonObjectWithDebug(config, fetchFn, {
+            systemPrompt,
+            userPrompt,
+            conversationHistory: context.conversationHistory,
+            normalizeResult: normalizePlan,
+            options
+        });
+
+        return {
+            plan: result,
+            debug
+        };
+    },
+
     parseTodoText: async (
         text: string,
         context: {
@@ -1972,23 +2762,6 @@ ${text}
     },
 
     cleanAndParseJSONObject: (content: string): any => {
-        if (content.includes('```json')) {
-            content = content.replace(/```json\n?|\n?```/g, '');
-        } else if (content.includes('```')) {
-            content = content.replace(/```\n?|\n?```/g, '');
-        }
-
-        const objectStart = content.indexOf('{');
-        const objectEnd = content.lastIndexOf('}') + 1;
-        if (objectStart >= 0 && objectEnd > objectStart) {
-            content = content.substring(objectStart, objectEnd);
-        }
-
-        try {
-            return JSON.parse(content);
-        } catch (e) {
-            console.error('JSON Object Parse Error', e);
-            return {};
-        }
+        return cleanAndParseJSONObjectContent(content);
     }
 };
