@@ -12,7 +12,7 @@ import {
   normalizeAchievementStarValue,
   partitionAchievementRedemptionsForSeal
 } from './achievementUtils';
-import type { AchievementRule, DailyReview, Log, TodoItem } from '../types';
+import type { AchievementRule, CheckStreakConfig, CheckTemplate, DailyReview, Log, TodoItem } from '../types';
 
 describe('achievementUtils decimal stars', () => {
   it('normalizes decimal star values and floors only the rendered bottle count', () => {
@@ -458,5 +458,102 @@ describe('achievementUtils decimal stars', () => {
         }
       ]
     )).toBe('2026-04-06');
+  });
+
+  it('weights check-category completion by per-item streak multipliers when the category toggle is enabled', () => {
+    const rules: AchievementRule[] = [
+      {
+        id: 'rule-check-1',
+        name: 'Morning checks',
+        enabled: true,
+        effectType: 'earn',
+        targetType: 'checkCategory',
+        targetIds: ['Morning'],
+        useCheckStreakMultiplier: true,
+        unitAmount: 1,
+        deltaPerUnit: 1,
+        roundingMode: 'floor',
+        createdAt: 0,
+        updatedAt: 0
+      }
+    ];
+    const checkTemplates: CheckTemplate[] = [
+      {
+        id: 'template-morning',
+        title: 'Morning',
+        items: [
+          { id: 'drink-water', content: 'Drink water', type: 'manual', manualMode: 'binary' },
+          { id: 'stretch', content: 'Stretch', type: 'manual', manualMode: 'binary' }
+        ],
+        enabled: true,
+        order: 0,
+        isDaily: true
+      } as CheckTemplate
+    ];
+    const checkStreakConfig: CheckStreakConfig = {
+      enabled: true,
+      tiers: [
+        { thresholdDays: 2, multiplier: 1.2 },
+        { thresholdDays: 3, multiplier: 1.5 }
+      ]
+    };
+    const dailyReviews: DailyReview[] = [
+      {
+        id: 'review-1',
+        date: '2026-03-26',
+        createdAt: 1,
+        updatedAt: 1,
+        answers: [],
+        checkItems: [
+          { id: 'drink-water', category: 'Morning', content: 'Drink water', isCompleted: true, type: 'manual', manualMode: 'binary', currentCount: 1, targetCount: 1 }
+        ]
+      },
+      {
+        id: 'review-2',
+        date: '2026-03-27',
+        createdAt: 2,
+        updatedAt: 2,
+        answers: [],
+        checkItems: [
+          { id: 'drink-water', category: 'Morning', content: 'Drink water', isCompleted: true, type: 'manual', manualMode: 'binary', currentCount: 1, targetCount: 1 },
+          { id: 'stretch', category: 'Morning', content: 'Stretch', isCompleted: true, type: 'manual', manualMode: 'binary', currentCount: 1, targetCount: 1 }
+        ]
+      },
+      {
+        id: 'review-3',
+        date: '2026-03-28',
+        createdAt: 3,
+        updatedAt: 3,
+        answers: [],
+        checkItems: [
+          { id: 'drink-water', category: 'Morning', content: 'Drink water', isCompleted: true, type: 'manual', manualMode: 'binary', currentCount: 1, targetCount: 1 },
+          { id: 'stretch', category: 'Morning', content: 'Stretch', isCompleted: true, type: 'manual', manualMode: 'binary', currentCount: 1, targetCount: 1 }
+        ]
+      }
+    ];
+
+    const snapshot = computeAchievementDailySnapshot(
+      '2026-03-28',
+      [],
+      [],
+      dailyReviews,
+      rules,
+      {
+        categories: [],
+        scopes: [],
+        todos: [],
+        todoCategories: [],
+        checkTemplates,
+        checkStreakConfig
+      }
+    );
+
+    expect(snapshot.netDelta).toBe(2.7);
+    expect(snapshot.ruleBreakdown[0]).toMatchObject({
+      targetType: 'checkCategory',
+      matchedValue: 2.7,
+      appliedUnits: 2.7,
+      delta: 2.7
+    });
   });
 });

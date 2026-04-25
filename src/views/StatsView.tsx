@@ -11,11 +11,12 @@
  * - 2026-03-11: 统一统计分享导出协议，修复分享图片页因解析失败导致的空白问题。
  * - 2026-04-03: 复用共享周范围计算，修复矩阵视图跨月时被错误扩展为超过 7 天的问题。
  * - 2026-04-25: 为矩阵视图新增日范围切换和 editorial 时间格子图，使用活动标签颜色与本地书法字体。
+ * - 2026-04-25: check 统计视图仅统计仍存在于启用日课模板中的条目，隐藏停用或已删除模板项。
  *
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
 import React, { useState, useMemo, useEffect } from 'react';
-import { Log, Category, Activity, Scope, TodoItem, TodoCategory, DailyReview } from '../types';
+import { Log, Category, Activity, Scope, TodoItem, TodoCategory, DailyReview, CheckTemplate } from '../types';
 import { COLOR_OPTIONS } from '../constants';
 import { Minimize2, Share, PieChart, Grid, Calendar, ChevronLeft, ChevronRight, TrendingUp, TrendingDown, CheckCircle2, Smile } from 'lucide-react';
 import { ToastType } from '../components/Toast';
@@ -89,6 +90,7 @@ interface StatsViewProps {
   todoCategories: TodoCategory[];
   scopes: Scope[];
   dailyReviews?: DailyReview[]; // Add dailyReviews prop
+  checkTemplates?: CheckTemplate[];
   // Daily Review 鏀寔
   hideControls?: boolean;  // 闅愯棌鎵€鏈夋帶鍒舵潯
   hideRangeControls?: boolean; // 闅愯棌宸︿晶鏃堕棿鑼冨洿閫夋嫨 (鏃?鍛?鏈?骞?
@@ -113,7 +115,7 @@ interface CategoryStat extends Category {
   items: ActivityStat[];
 }
 
-export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentDate, onBack, onDateChange, isFullScreen, onToggleFullScreen, onToast, onTitleChange, todos, todoCategories, scopes, dailyReviews = [], hideControls = false, hideRangeControls = false, hideDateNavigation = false, forcedView, forcedRange, allowedViews = ['pie', 'matrix', 'line', 'schedule', 'check', 'emoji'] }) => {
+export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentDate, onBack, onDateChange, isFullScreen, onToggleFullScreen, onToast, onTitleChange, todos, todoCategories, scopes, dailyReviews = [], checkTemplates, hideControls = false, hideRangeControls = false, hideDateNavigation = false, forcedView, forcedRange, allowedViews = ['pie', 'matrix', 'line', 'schedule', 'check', 'emoji'] }) => {
   const { isPrivacyMode } = usePrivacy();
   const { setIsExportViewOpen } = useNavigation();
   const { scheduleStyle } = useSettings();
@@ -608,6 +610,12 @@ export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentD
     const habits: Record<string, Record<string, Record<string, boolean>>> = {};
     const habitDayDetails: Record<string, Record<string, { value: number; target: number }>> = {}; // Key: "Category|Habit" -> Date -> Count Detail
     const habitStats: Record<string, { total: number, checked: number, countTotal: number, isCountMode: boolean }> = {}; // Key: "Category|Habit"
+    const activeTemplateItemKeys = new Set(
+      (checkTemplates || [])
+        .filter(template => template.enabled && template.isDaily)
+        .flatMap(template => template.items.map(item => `${template.title}|${item.content}`))
+    );
+    const shouldFilterByTemplates = Array.isArray(checkTemplates);
 
     // Track insertion order for categories and habits
     const categoryOrder: string[] = [];
@@ -624,6 +632,7 @@ export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentD
           const category = item.category;
           const content = item.content;
           const key = `${category}|${content}`;
+          if (shouldFilterByTemplates && !activeTemplateItemKeys.has(key)) return;
 
           if (!habits[category]) {
             habits[category] = {};
@@ -670,6 +679,7 @@ export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentD
         review.checkItems.forEach(item => {
           if (!item.category) return;
           const key = `${item.category}|${item.content}`;
+          if (shouldFilterByTemplates && !activeTemplateItemKeys.has(key)) return;
           // Store the first encountered icon for each habit
           if (!habitIcons[key] && item.icon) {
             habitIcons[key] = { icon: item.icon, uiIcon: item.uiIcon };
@@ -698,7 +708,7 @@ export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentD
     });
 
     return { categories: sortedCategories, allDays: days, dateMap };
-  }, [dailyReviews, rangeStart, rangeEnd, viewType]);
+  }, [checkTemplates, dailyReviews, pieRange, rangeEnd, rangeStart, viewType]);
 
   // If ChronoPrint view is active, render it instead
   if (showChronoPrint) {

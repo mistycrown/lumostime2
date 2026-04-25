@@ -5,6 +5,7 @@
  * @pos Utility (Achievement)
  * @description 成就系统计算工具 - 负责每日快照计算、日期枚举和账本汇总。
  *
+ * @updated 2026-04-25: Added check-category streak weighting so daily check rules can sum per-item multiplier contributions.
  * @updated 2026-04-17: Added filter-expression duration rules that reuse the shared custom-filter matching logic.
  * @updated 2026-04-07: Separates live-period spending from remaining carryover so archived carryover-funded redemptions do not inflate the active balance.
  */
@@ -13,6 +14,8 @@ import {
   AchievementBottleActionRecord,
   AchievementDailySnapshot,
   AchievementDailyRuleBreakdown,
+  CheckStreakConfig,
+  CheckTemplate,
   AchievementRedemptionRecord,
   AchievementSealPreview,
   AchievementRule,
@@ -21,6 +24,7 @@ import {
   TodoItem
 } from '../types';
 import { getLocalDateStr } from './dateUtils';
+import { getCheckCategoryWeightedCompletionValue } from './checkStreakUtils';
 import { FilterContext, matchesFilter, parseFilterExpression } from './filterUtils';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -123,6 +127,7 @@ export const normalizeAchievementRule = (
 ): AchievementRule => ({
   ...rule,
   targetType: rule.targetType ?? 'activity',
+  useCheckStreakMultiplier: rule.useCheckStreakMultiplier === true,
   filterExpression: rule.filterExpression?.trim() || undefined,
   unitAmount: normalizeUnitAmount(rule),
   deltaPerUnit: Math.max(0.1, normalizeAchievementStarValue(rule.deltaPerUnit || 1)),
@@ -143,14 +148,20 @@ export const normalizeAchievementSnapshot = (
   ruleBreakdown: (snapshot.ruleBreakdown || []).map((item) => ({
     ...item,
     targetType: item.targetType ?? 'activity',
+    useCheckStreakMultiplier: item.useCheckStreakMultiplier === true,
     filterExpression: item.filterExpression?.trim() || undefined,
-    matchedValue: Math.max(0, Math.floor(item.matchedValue ?? item.matchedMinutes ?? 0)),
+    matchedValue: Math.max(0, normalizeAchievementStarValue(item.matchedValue ?? item.matchedMinutes ?? 0)),
     unitAmount: Math.max(1, Math.floor(item.unitAmount ?? item.unitMinutes ?? 1)),
     deltaPerUnit: Math.max(0.1, normalizeAchievementStarValue(item.deltaPerUnit || 1)),
     delta: normalizeAchievementStarValue(item.delta || 0),
     targetIds: Array.isArray(item.targetIds) ? item.targetIds : []
   }))
 });
+
+interface AchievementComputationContext extends FilterContext {
+  checkTemplates?: CheckTemplate[];
+  checkStreakConfig?: CheckStreakConfig | null;
+}
 
 export const getAchievementYesterday = (baseDate: Date = new Date()): string => {
   const yesterday = new Date(baseDate.getTime() - DAY_MS);
@@ -181,13 +192,15 @@ export const computeAchievementDailySnapshot = (
   todos: TodoItem[],
   dailyReviews: DailyReview[],
   rules: AchievementRule[],
-  filterContext?: FilterContext
+  filterContext?: AchievementComputationContext
 ): AchievementDailySnapshot => {
-  const effectiveFilterContext: FilterContext = filterContext ?? {
+  const effectiveFilterContext: AchievementComputationContext = filterContext ?? {
     categories: [],
     scopes: [],
     todos,
-    todoCategories: []
+    todoCategories: [],
+    checkTemplates: [],
+    checkStreakConfig: null
   };
   const activeRules = rules
     .map(normalizeAchievementRule)
@@ -207,7 +220,6 @@ export const computeAchievementDailySnapshot = (
     && getLocalDateStr(new Date(todo.completedAt)) === date
   ));
   const dayReview = dailyReviews.find((review) => review.date === date);
-  const completedCheckItems = (dayReview?.checkItems || []).filter((item) => item.isCompleted && item.category);
 
   const ruleBreakdown: AchievementDailyRuleBreakdown[] = activeRules.map((rule) => {
     const matchedValue = (() => {
@@ -237,7 +249,21 @@ export const computeAchievementDailySnapshot = (
         return completedTodos.filter((todo) => rule.targetIds.includes(todo.categoryId)).length;
       }
 
-      return completedCheckItems.filter((item) => item.category && rule.targetIds.includes(item.category)).length;
+      return normalizeAchievementStarValue(rule.targetIds.reduce((sum, categoryId) => {
+        if (!dayReview) {
+          return sum;
+        }
+
+        return sum + getCheckCategoryWeightedCompletionValue({
+          category: categoryId,
+          dayReview,
+          dailyReviews,
+          checkTemplates: effectiveFilterContext.checkTemplates || [],
+          targetDate: createDateAtNoon(date),
+          checkStreakConfig: effectiveFilterContext.checkStreakConfig,
+          useStreakMultiplier: rule.useCheckStreakMultiplier === true
+        });
+      }, 0));
     })();
 
     const appliedUnits = normalizeAchievementStarValue(matchedValue / rule.unitAmount);
@@ -250,6 +276,7 @@ export const computeAchievementDailySnapshot = (
       effectType: rule.effectType,
       targetType: rule.targetType,
       matchedValue,
+      useCheckStreakMultiplier: rule.useCheckStreakMultiplier === true,
       filterExpression: rule.filterExpression,
       unitAmount: rule.unitAmount,
       deltaPerUnit: rule.deltaPerUnit,

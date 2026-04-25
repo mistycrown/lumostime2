@@ -1,10 +1,11 @@
 ﻿/**
  * @file AchievementContext.tsx
  * @description Manages achievement bottle data, live snapshots, archived bottles, and reward redemption records with repository hydration and selective recent-day recomputation.
+ * @updated 2026-04-25: Added global check streak config plus active-period recomputation for streak-weighted check-category rules.
  * @updated 2026-04-17: Added filter-duration achievement rules that reuse the shared custom filter expression logic.
  * @updated 2026-04-07: Separates live and carryover redemption funding so sealing only archives live-period spending.
  */
-import React, { createContext, ReactNode, useContext, useEffect, useRef, useState } from 'react';
+import React, { createContext, ReactNode, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { dataRepository } from '../repositories/dataRepository';
 import {
   AchievementArchivedBottle,
@@ -12,6 +13,7 @@ import {
   AchievementCollection,
   AchievementCollectionRecord,
   AchievementDailySnapshot,
+  CheckStreakConfig,
   AchievementMeta,
   AchievementRedemptionRecord,
   AchievementReward,
@@ -34,6 +36,7 @@ import {
   partitionAchievementRedemptionsForSeal,
   sortAchievementSnapshots
 } from '../utils/achievementUtils';
+import { getDefaultCheckStreakConfig, normalizeCheckStreakConfig } from '../utils/checkStreakUtils';
 import { getLocalDateStr } from '../utils/dateUtils';
 import {
   isLocalDataTimestampUpdateLocked,
@@ -48,6 +51,7 @@ interface CreateAchievementRuleInput {
   effectType: 'earn' | 'spend';
   targetType: AchievementRule['targetType'];
   targetIds: string[];
+  useCheckStreakMultiplier?: boolean;
   filterExpression?: string;
   unitAmount: number;
   deltaPerUnit: number;
@@ -65,6 +69,7 @@ interface AchievementContextType {
   isReady: boolean;
   achievementStartDate: string | null;
   activeBottleCarryoverStars: number;
+  checkStreakConfig: CheckStreakConfig;
   rules: AchievementRule[];
   rewards: AchievementReward[];
   collections: AchievementCollection[];
@@ -79,6 +84,7 @@ interface AchievementContextType {
   totalRedeemedStars: number;
   ensureRecentSnapshots: () => Promise<void>;
   recomputeSnapshotForDate: (date: string) => { ok: boolean; message?: string };
+  updateCheckStreakConfig: (config: CheckStreakConfig) => void;
   createRule: (input: CreateAchievementRuleInput) => void;
   updateRule: (rule: AchievementRule) => void;
   deleteRule: (ruleId: string) => void;
@@ -138,7 +144,8 @@ const normalizeCollectionRecord = (record: AchievementCollectionRecord): Achieve
 
 const normalizeAchievementMeta = (meta: AchievementMeta): AchievementMeta => ({
   achievementStartDate: meta.achievementStartDate ?? null,
-  activeBottleCarryoverStars: Math.max(0, normalizeAchievementStarValue(meta.activeBottleCarryoverStars || 0))
+  activeBottleCarryoverStars: Math.max(0, normalizeAchievementStarValue(meta.activeBottleCarryoverStars || 0)),
+  checkStreakConfig: normalizeCheckStreakConfig(meta.checkStreakConfig)
 });
 
 const normalizeArchivedBottle = (bottle: AchievementArchivedBottle): AchievementArchivedBottle => ({
@@ -167,14 +174,15 @@ export const useAchievement = () => {
 export const AchievementProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const { logs, todos, todoCategories } = useData();
   const { categories, scopes } = useCategoryScope();
-  const { dailyReviews } = useReview();
+  const { dailyReviews, checkTemplates } = useReview();
   const [isReady, setIsReady] = useState(false);
   const [canPersist, setCanPersist] = useState(false);
   const isHydratingRef = useRef(true);
 
   const [meta, setMeta] = useState<AchievementMeta>({
     achievementStartDate: null,
-    activeBottleCarryoverStars: 0
+    activeBottleCarryoverStars: 0,
+    checkStreakConfig: getDefaultCheckStreakConfig()
   });
   const [rules, setRules] = useState<AchievementRule[]>([]);
   const [rewards, setRewards] = useState<AchievementReward[]>([]);
@@ -184,6 +192,39 @@ export const AchievementProvider: React.FC<{ children: ReactNode }> = ({ childre
   const [collectionRecords, setCollectionRecords] = useState<AchievementCollectionRecord[]>([]);
   const [archivedBottles, setArchivedBottles] = useState<AchievementArchivedBottle[]>([]);
   const [bottleActionRecords, setBottleActionRecords] = useState<AchievementBottleActionRecord[]>([]);
+  const hasEnabledCheckCategoryRules = useMemo(() => (
+    rules.some((rule) => rule.enabled && rule.targetType === 'checkCategory')
+  ), [rules]);
+  const dailyCheckSignature = useMemo(() => JSON.stringify(
+    dailyReviews.map((review) => ({
+      date: review.date,
+      checkItems: (review.checkItems || []).map((item) => ({
+        id: item.id,
+        category: item.category,
+        content: item.content,
+        isCompleted: item.isCompleted,
+        type: item.type,
+        manualMode: item.manualMode,
+        currentCount: item.currentCount,
+        targetCount: item.targetCount
+      }))
+    }))
+  ), [dailyReviews]);
+  const checkTemplateAchievementSignature = useMemo(() => JSON.stringify(
+    checkTemplates.map((template) => ({
+      id: template.id,
+      title: template.title,
+      enabled: template.enabled,
+      isDaily: template.isDaily,
+      items: template.items.map((item) => ({
+        id: item.id,
+        content: item.content,
+        type: item.type,
+        manualMode: item.manualMode,
+        targetCount: item.targetCount
+      }))
+    }))
+  ), [checkTemplates]);
 
   useEffect(() => {
     let cancelled = false;
@@ -232,7 +273,9 @@ export const AchievementProvider: React.FC<{ children: ReactNode }> = ({ childre
   const reconcileSnapshots = (
     startDate: string,
     baseSnapshots: AchievementDailySnapshot[],
-    rulesSource: AchievementRule[]
+    rulesSource: AchievementRule[],
+    forceRecomputeAllDates = false,
+    checkStreakConfigSource: CheckStreakConfig = normalizeCheckStreakConfig(meta.checkStreakConfig)
   ): AchievementDailySnapshot[] => {
     const today = getLocalDateStr(new Date());
     const yesterday = getAchievementYesterday();
@@ -241,7 +284,7 @@ export const AchievementProvider: React.FC<{ children: ReactNode }> = ({ childre
 
     const nextSnapshots = dates.map((date) => {
       const existing = snapshotMap.get(date);
-      const shouldRecompute = !existing || date === today || date === yesterday;
+      const shouldRecompute = forceRecomputeAllDates || !existing || date === today || date === yesterday;
 
       if (!shouldRecompute && existing) {
         return normalizeAchievementSnapshot(existing);
@@ -251,7 +294,9 @@ export const AchievementProvider: React.FC<{ children: ReactNode }> = ({ childre
         categories,
         scopes,
         todos,
-        todoCategories
+        todoCategories,
+        checkTemplates,
+        checkStreakConfig: checkStreakConfigSource
       });
       if (existing) {
         computed.id = existing.id;
@@ -276,6 +321,29 @@ export const AchievementProvider: React.FC<{ children: ReactNode }> = ({ childre
     setDailySnapshots((previous) => reconcileSnapshots(startDate, previous, rules));
   };
 
+  useEffect(() => {
+    if (!isReady || !canPersist || isHydratingRef.current || !hasEnabledCheckCategoryRules) {
+      return;
+    }
+
+    const activeStartDate = getAchievementActiveStartDate(meta.achievementStartDate, archivedBottles);
+    if (!activeStartDate) {
+      return;
+    }
+
+    setDailySnapshots((previous) => reconcileSnapshots(activeStartDate, previous, rules, true));
+  }, [
+    archivedBottles,
+    canPersist,
+    checkTemplateAchievementSignature,
+    dailyCheckSignature,
+    hasEnabledCheckCategoryRules,
+    isReady,
+    meta.achievementStartDate,
+    meta.checkStreakConfig,
+    rules
+  ]);
+
   const recomputeSnapshotForDate = (date: string) => {
     const normalizedDate = date.trim();
 
@@ -298,7 +366,9 @@ export const AchievementProvider: React.FC<{ children: ReactNode }> = ({ childre
           categories,
           scopes,
           todos,
-          todoCategories
+          todoCategories,
+          checkTemplates,
+          checkStreakConfig: meta.checkStreakConfig
         }
       );
 
@@ -316,6 +386,19 @@ export const AchievementProvider: React.FC<{ children: ReactNode }> = ({ childre
     return { ok: true };
   };
 
+  const updateCheckStreakConfig = (config: CheckStreakConfig) => {
+    const normalizedConfig = normalizeCheckStreakConfig(config);
+    setMeta((previous) => ({
+      ...previous,
+      checkStreakConfig: normalizedConfig
+    }));
+
+    const activeStartDate = getAchievementActiveStartDate(meta.achievementStartDate, archivedBottles);
+    if (activeStartDate && hasEnabledCheckCategoryRules) {
+      setDailySnapshots((previous) => reconcileSnapshots(activeStartDate, previous, rules, true, normalizedConfig));
+    }
+  };
+
   const createRule = (input: CreateAchievementRuleInput) => {
     const now = Date.now();
     const nextRule: AchievementRule = {
@@ -325,6 +408,7 @@ export const AchievementProvider: React.FC<{ children: ReactNode }> = ({ childre
       effectType: input.effectType,
       targetType: input.targetType,
       targetIds: input.targetType === 'filterDuration' ? [] : input.targetIds,
+      useCheckStreakMultiplier: input.targetType === 'checkCategory' ? input.useCheckStreakMultiplier === true : false,
       filterExpression: input.filterExpression?.trim() || undefined,
       unitAmount: Math.max(1, Math.floor(input.unitAmount)),
       deltaPerUnit: Math.max(0.1, normalizeAchievementStarValue(input.deltaPerUnit || 0.1)),
@@ -350,6 +434,7 @@ export const AchievementProvider: React.FC<{ children: ReactNode }> = ({ childre
           ...rule,
           name: rule.name.trim() || '未命名规则',
           targetIds: rule.targetType === 'filterDuration' ? [] : rule.targetIds,
+          useCheckStreakMultiplier: rule.targetType === 'checkCategory' ? rule.useCheckStreakMultiplier === true : false,
           filterExpression: rule.filterExpression?.trim() || undefined,
           unitAmount: Math.max(1, Math.floor(rule.unitAmount)),
           deltaPerUnit: Math.max(0.1, normalizeAchievementStarValue(rule.deltaPerUnit || 0.1)),
@@ -721,6 +806,7 @@ export const AchievementProvider: React.FC<{ children: ReactNode }> = ({ childre
         isReady,
         achievementStartDate: meta.achievementStartDate,
         activeBottleCarryoverStars: meta.activeBottleCarryoverStars,
+        checkStreakConfig: normalizeCheckStreakConfig(meta.checkStreakConfig),
         rules,
         rewards,
         collections,
@@ -735,6 +821,7 @@ export const AchievementProvider: React.FC<{ children: ReactNode }> = ({ childre
         totalRedeemedStars,
         ensureRecentSnapshots,
         recomputeSnapshotForDate,
+        updateCheckStreakConfig,
         createRule,
         updateRule,
         deleteRule,
