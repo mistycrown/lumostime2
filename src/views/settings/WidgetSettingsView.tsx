@@ -5,6 +5,7 @@
  * @pos View
  * @description Lets the user create, rename, resize, edit, and manage Android widget templates while configuring each slot as a timer, daily check, or shortcut.
  * @updated 2026-04-18: Removed template-level widget categories and switched to slot-type-first editing.
+ * @updated 2026-04-25: Added supporter-gated widget UI icon editing and native asset-backed icon slot persistence.
  */
 import React, { useEffect, useMemo, useState } from 'react';
 import { ChevronLeft, Plus, Trash2 } from 'lucide-react';
@@ -17,6 +18,13 @@ import {
 } from '../../components/WidgetSlotEditorModal';
 import { ToastType } from '../../components/Toast';
 import WidgetBridge from '../../plugins/WidgetBridgePlugin';
+import { RedemptionService } from '../../services/redemptionService';
+import {
+  getUIIconAssetPathWithFallback,
+  getUIIconStringFromAssetPath,
+  UIIconType,
+  uiIconService
+} from '../../services/uiIconService';
 import {
   DEFAULT_WIDGET_SIZE,
   WidgetTemplate,
@@ -41,6 +49,7 @@ import {
   rebuildShortcutWidgetSlotConfig,
   rebuildTimerWidgetSlotConfig,
   rebuildWidgetTemplate,
+  sanitizeWidgetTemplatesForUiIconSupport,
   saveWidgetTemplatesToStorage,
   updateWidgetTemplateSize,
   updateWidgetTemplateSlots
@@ -62,6 +71,9 @@ const AUTO_SAVE_DELAY_MS = 350;
 const PREVIEW_MAX_COLUMNS = 4;
 const PREVIEW_MAX_ROWS = 2;
 const PREVIEW_TITLE_ROW_RATIO = 0.6;
+
+const areWidgetTemplatesEqual = (left: WidgetTemplate[], right: WidgetTemplate[]): boolean =>
+  JSON.stringify(left) === JSON.stringify(right);
 
 const getTemplateSlotSummary = (template: WidgetTemplate): string => {
   const configuredLabels = template.slots
@@ -91,7 +103,10 @@ const getTemplateSlotSummary = (template: WidgetTemplate): string => {
   return configuredLabels.length > 4 ? `${previewLabels} 等 ${configuredLabels.length} 项` : previewLabels;
 };
 
-const toSlotEditorDraft = (slot: WidgetTemplateSlotConfig): WidgetSlotEditorDraft => ({
+const toSlotEditorDraft = (
+  slot: WidgetTemplateSlotConfig,
+  canUseUiIcon: boolean
+): WidgetSlotEditorDraft => ({
   slotIndex: slot.slotIndex,
   slotType: slot.slotType ?? null,
   categoryId: slot.categoryId ?? null,
@@ -103,6 +118,8 @@ const toSlotEditorDraft = (slot: WidgetTemplateSlotConfig): WidgetSlotEditorDraf
   shortcutAction: slot.shortcutAction ?? null,
   label: slot.label ?? null,
   customIcon: slot.customIcon ?? null,
+  iconMode: canUseUiIcon && Boolean(slot.uiIconAssetPath) ? 'uiIcon' : 'emoji',
+  uiIcon: canUseUiIcon ? getUIIconStringFromAssetPath(slot.uiIconAssetPath) : null,
   backgroundColor: slot.color ?? null
 });
 
@@ -123,7 +140,19 @@ const getSlotPreviewColor = (slot: WidgetTemplateSlotConfig) => {
   return '#F5F5F4';
 };
 
-const getSlotPreviewIcon = (slot: WidgetTemplateSlotConfig) => slot.icon || '\u2022';
+const getSlotPreviewIcon = (
+  slot: WidgetTemplateSlotConfig,
+  canUseUiIcon: boolean
+) => {
+  if (canUseUiIcon) {
+    const uiIcon = getUIIconStringFromAssetPath(slot.uiIconAssetPath);
+    if (uiIcon) {
+      return uiIcon;
+    }
+  }
+
+  return slot.icon || '\u2022';
+};
 
 export const WidgetSettingsView: React.FC<WidgetSettingsViewProps> = ({
   onBack,
@@ -134,6 +163,7 @@ export const WidgetSettingsView: React.FC<WidgetSettingsViewProps> = ({
   todoCategories,
   scopes
 }) => {
+  const redemptionService = useMemo(() => new RedemptionService(), []);
   const [templates, setTemplates] = useState<WidgetTemplate[]>([]);
   const [bindingCounts, setBindingCounts] = useState<Record<string, number>>({});
   const [isLoading, setIsLoading] = useState(true);
@@ -142,6 +172,7 @@ export const WidgetSettingsView: React.FC<WidgetSettingsViewProps> = ({
   const [editingSlotIndex, setEditingSlotIndex] = useState<number | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<WidgetTemplate | null>(null);
   const [isDraftDirty, setIsDraftDirty] = useState(false);
+  const [canUseWidgetUiIcon, setCanUseWidgetUiIcon] = useState(false);
 
   const sizeOptions = useMemo(
     () =>
@@ -152,9 +183,13 @@ export const WidgetSettingsView: React.FC<WidgetSettingsViewProps> = ({
     []
   );
 
-  const loadTemplates = async () => {
-    const localTemplates = normalizeWidgetTemplates(loadWidgetTemplatesFromStorage());
+  const loadTemplates = async (allowUiIcon: boolean) => {
+    const localTemplates = sanitizeWidgetTemplatesForUiIconSupport(
+      normalizeWidgetTemplates(loadWidgetTemplatesFromStorage()),
+      allowUiIcon
+    );
     setTemplates(localTemplates);
+    saveWidgetTemplatesToStorage(localTemplates);
 
     if (!isNativeAndroidWidgetSupported()) {
       setBindingCounts({});
@@ -169,11 +204,16 @@ export const WidgetSettingsView: React.FC<WidgetSettingsViewProps> = ({
       ]);
 
       let effectiveBindings = bindings;
-      const nextTemplates =
-        nativeTemplates.length > 0 ? normalizeWidgetTemplates(nativeTemplates) : localTemplates;
+      const nextTemplates = sanitizeWidgetTemplatesForUiIconSupport(
+        nativeTemplates.length > 0 ? normalizeWidgetTemplates(nativeTemplates) : localTemplates,
+        allowUiIcon
+      );
 
-      if (nativeTemplates.length === 0 && localTemplates.length > 0) {
-        await WidgetBridge.saveTemplates({ templates: localTemplates });
+      if (
+        (nativeTemplates.length === 0 && localTemplates.length > 0)
+        || !areWidgetTemplatesEqual(nextTemplates, normalizeWidgetTemplates(nativeTemplates))
+      ) {
+        await WidgetBridge.saveTemplates({ templates: nextTemplates });
         const { bindings: refreshedBindings } = await WidgetBridge.getInstanceBindings();
         effectiveBindings = refreshedBindings;
       }
@@ -195,8 +235,33 @@ export const WidgetSettingsView: React.FC<WidgetSettingsViewProps> = ({
   };
 
   useEffect(() => {
-    void loadTemplates();
-  }, []);
+    let cancelled = false;
+
+    const initialize = async () => {
+      try {
+        const verification = await redemptionService.isVerified();
+        const allowUiIcon = verification.isVerified && uiIconService.isCustomTheme();
+        if (cancelled) {
+          return;
+        }
+
+        setCanUseWidgetUiIcon(allowUiIcon);
+        await loadTemplates(allowUiIcon);
+      } catch (error) {
+        console.error('[WidgetSettingsView] Failed to initialize widget UI icon support', error);
+        if (!cancelled) {
+          setCanUseWidgetUiIcon(false);
+          await loadTemplates(false);
+        }
+      }
+    };
+
+    void initialize();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [redemptionService]);
 
   useEffect(() => {
     if (!editingTemplateDraft || editingSlotIndex === null) {
@@ -209,7 +274,10 @@ export const WidgetSettingsView: React.FC<WidgetSettingsViewProps> = ({
   }, [editingSlotIndex, editingTemplateDraft]);
 
   const persistTemplates = async (nextTemplates: WidgetTemplate[], successMessage?: string) => {
-    const normalizedTemplates = normalizeWidgetTemplates(nextTemplates);
+    const normalizedTemplates = sanitizeWidgetTemplatesForUiIconSupport(
+      normalizeWidgetTemplates(nextTemplates),
+      canUseWidgetUiIcon
+    );
     const previousTemplates = templates;
     const previousBindingCounts = bindingCounts;
     setIsSaving(true);
@@ -326,6 +394,28 @@ export const WidgetSettingsView: React.FC<WidgetSettingsViewProps> = ({
     setIsDraftDirty(true);
   };
 
+  const resolveDraftIconConfig = (draft: WidgetSlotEditorDraft) => {
+    if (canUseWidgetUiIcon && draft.iconMode === 'uiIcon' && draft.uiIcon && uiIconService.isCustomTheme()) {
+      const { isUIIcon, value } = uiIconService.parseIconString(draft.uiIcon);
+      if (isUIIcon) {
+        const assetPaths = getUIIconAssetPathWithFallback(value as UIIconType, uiIconService.getCurrentTheme());
+        return {
+          icon: uiIconService.convertUIIconToEmoji(draft.uiIcon),
+          customIcon: null,
+          uiIconAssetPath: assetPaths.primary,
+          uiIconFallbackAssetPath: assetPaths.fallback
+        };
+      }
+    }
+
+    return {
+      icon: null,
+      customIcon: draft.customIcon,
+      uiIconAssetPath: null,
+      uiIconFallbackAssetPath: null
+    };
+  };
+
   const updateSlotDraft = (draft: WidgetSlotEditorDraft) => {
     setEditingTemplateDraft((previousDraft) => {
       if (!previousDraft || !draft.slotType) {
@@ -333,6 +423,7 @@ export const WidgetSettingsView: React.FC<WidgetSettingsViewProps> = ({
       }
 
       const nextSlots = normalizeWidgetTemplateSlots(previousDraft.slots, previousDraft.size);
+      const iconConfig = resolveDraftIconConfig(draft);
 
       if (draft.slotType === 'timer') {
         if (!draft.categoryId || !draft.activityId) {
@@ -345,9 +436,12 @@ export const WidgetSettingsView: React.FC<WidgetSettingsViewProps> = ({
         }
 
         nextSlots[draft.slotIndex] = buildTimerWidgetSlotConfig(category, activity, draft.slotIndex, {
+          icon: iconConfig.icon,
           linkedTodoId: draft.linkedTodoId,
           scopeIds: draft.scopeIds,
-          customIcon: draft.customIcon
+          customIcon: iconConfig.customIcon,
+          uiIconAssetPath: iconConfig.uiIconAssetPath,
+          uiIconFallbackAssetPath: iconConfig.uiIconFallbackAssetPath
         });
       } else if (draft.slotType === 'daily') {
         if (!draft.checkItemId) {
@@ -358,8 +452,11 @@ export const WidgetSettingsView: React.FC<WidgetSettingsViewProps> = ({
           return previousDraft;
         }
         nextSlots[draft.slotIndex] = buildDailyWidgetSlotConfig(binding, draft.slotIndex, {
-          customIcon: draft.customIcon,
-          backgroundColor: draft.backgroundColor
+          icon: iconConfig.icon,
+          customIcon: iconConfig.customIcon,
+          backgroundColor: draft.backgroundColor,
+          uiIconAssetPath: iconConfig.uiIconAssetPath,
+          uiIconFallbackAssetPath: iconConfig.uiIconFallbackAssetPath
         });
       } else if (draft.slotType === 'shortcut') {
         if (!draft.shortcutAction) {
@@ -367,8 +464,11 @@ export const WidgetSettingsView: React.FC<WidgetSettingsViewProps> = ({
         }
         nextSlots[draft.slotIndex] = buildShortcutWidgetSlotConfig(draft.shortcutAction, draft.slotIndex, {
           label: draft.label,
-          customIcon: draft.customIcon,
-          backgroundColor: draft.backgroundColor
+          icon: iconConfig.icon,
+          customIcon: iconConfig.customIcon,
+          backgroundColor: draft.backgroundColor,
+          uiIconAssetPath: iconConfig.uiIconAssetPath,
+          uiIconFallbackAssetPath: iconConfig.uiIconFallbackAssetPath
         });
       }
 
@@ -556,7 +656,11 @@ export const WidgetSettingsView: React.FC<WidgetSettingsViewProps> = ({
                                 height: '74cqmin'
                               } as React.CSSProperties}
                             >
-                              <IconRenderer icon={getSlotPreviewIcon(slot)} size="42cqmin" />
+                              <IconRenderer
+                                key={getSlotPreviewIcon(slot, canUseWidgetUiIcon)}
+                                icon={getSlotPreviewIcon(slot, canUseWidgetUiIcon)}
+                                size="42cqmin"
+                              />
                             </div>
                           </div>
                         </button>
@@ -647,12 +751,13 @@ export const WidgetSettingsView: React.FC<WidgetSettingsViewProps> = ({
 
       <WidgetSlotEditorModal
         isOpen={Boolean(editingTemplateDraft && currentEditingSlot)}
-        draft={currentEditingSlot ? toSlotEditorDraft(currentEditingSlot) : null}
+        draft={currentEditingSlot ? toSlotEditorDraft(currentEditingSlot, canUseWidgetUiIcon) : null}
         categories={categories}
         checkTemplates={checkTemplates}
         todos={todos}
         todoCategories={todoCategories}
         scopes={scopes}
+        canUseUiIcon={canUseWidgetUiIcon}
         onClose={() => setEditingSlotIndex(null)}
         onSave={updateSlotDraft}
       />

@@ -4,18 +4,23 @@
  * @output Lightweight modal for assigning or quickly creating todos for a specific week-view day
  * @pos Component (Modal)
  * @description Lets users assign unfinished todos to a selected day as either Arrange or Due, or create a linked todo, without leaving the week schedule view.
+ * @updated 2026-04-25: Rendered assignable subtasks in a parent-child hierarchy so schedule pickers show child tasks nested beneath their parent rows instead of as flat standalone cards.
  * @updated 2026-04-25: Hid unfinished subtasks from the schedule assignment picker whenever their parent todo is completed, using the full todo source so completed parents can still suppress orphan child rows.
  * @updated 2026-04-20 18:21: Fixed the schedule assign modal to a stable three-quarter viewport height and kept the inner content scrollable.
  * @updated 2026-04-20: Sorted assignable todos so items without a current date appear first and dated items follow in chronological order.
  *
- * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
+ * Once I am updated, be sure to update my header comment and the folder's md.
  */
 import React, { useEffect, useMemo, useState } from 'react';
-import { X, CalendarDays, Flag } from 'lucide-react';
+import { X, CalendarDays, ChevronDown, ChevronRight, Flag } from 'lucide-react';
 import { Category, TodoCategory, TodoItem } from '../types';
 import { IconRenderer } from './IconRenderer';
 import { parseDateKey } from '../utils/todoScheduleUtils';
-import { isIncompleteSubtaskHiddenByCompletedParent } from '../utils/todoHierarchyUtils';
+import {
+  buildTodoScheduleAssignRows,
+  getInitialExpandedScheduleAssignParentIds,
+  getVisibleScheduleAssignTodos
+} from '../utils/todoScheduleAssignUtils';
 import { CustomSelect } from './CustomSelect';
 import { TagAssociation } from './TagAssociation';
 
@@ -45,42 +50,6 @@ const formatStatusDate = (value?: string): string | null => {
   return `${parsed.getMonth() + 1}/${parsed.getDate()}`;
 };
 
-const getStatusDateValue = (todo: TodoItem, type: 'scheduled' | 'deadline'): string | undefined => (
-  type === 'scheduled' ? todo.scheduledDate : todo.deadlineDate
-);
-
-export const getVisibleScheduleAssignTodos = (
-  todos: TodoItem[],
-  sourceTodos: TodoItem[],
-  selectedCategoryId: string,
-  activeType: 'scheduled' | 'deadline' | 'new',
-  assignType: 'scheduled' | 'deadline'
-): TodoItem[] => {
-  const nextTodos = selectedCategoryId === 'all'
-    ? [...todos]
-    : todos.filter((todo) => todo.categoryId === selectedCategoryId);
-
-  const visibleTodos = nextTodos.filter((todo) => !isIncompleteSubtaskHiddenByCompletedParent(sourceTodos, todo));
-
-  visibleTodos.sort((left, right) => {
-    const leftDate = getStatusDateValue(left, activeType === 'new' ? assignType : activeType);
-    const rightDate = getStatusDateValue(right, activeType === 'new' ? assignType : activeType);
-
-    if (!leftDate && !rightDate) {
-      return left.title.localeCompare(right.title, 'zh-CN');
-    }
-    if (!leftDate) return -1;
-    if (!rightDate) return 1;
-
-    const dateCompare = leftDate.localeCompare(rightDate);
-    if (dateCompare !== 0) return dateCompare;
-
-    return left.title.localeCompare(right.title, 'zh-CN');
-  });
-
-  return visibleTodos;
-};
-
 export const TodoScheduleAssignModal: React.FC<TodoScheduleAssignModalProps> = ({
   isOpen,
   dateLabel,
@@ -96,6 +65,7 @@ export const TodoScheduleAssignModal: React.FC<TodoScheduleAssignModalProps> = (
 }) => {
   const [selectedCategoryId, setSelectedCategoryId] = useState<string>('all');
   const [activeTab, setActiveTab] = useState<'scheduled' | 'deadline' | 'new'>(assignType);
+  const [expandedParentIds, setExpandedParentIds] = useState<string[]>([]);
   const [newTitle, setNewTitle] = useState('');
   const [newTodoCategoryId, setNewTodoCategoryId] = useState<string>(todoCategories[0]?.id || '');
   const [newLinkedCategoryId, setNewLinkedCategoryId] = useState<string>(activityCategories[0]?.id || '');
@@ -105,6 +75,7 @@ export const TodoScheduleAssignModal: React.FC<TodoScheduleAssignModalProps> = (
     if (isOpen) {
       setSelectedCategoryId('all');
       setActiveTab(assignType);
+      setExpandedParentIds([]);
       setNewTitle('');
       setNewTodoCategoryId(todoCategories[0]?.id || '');
       setNewLinkedCategoryId(activityCategories[0]?.id || '');
@@ -118,15 +89,48 @@ export const TodoScheduleAssignModal: React.FC<TodoScheduleAssignModalProps> = (
     }
   }, [activeTab, onAssignTypeChange]);
 
-  const filteredTodos = useMemo(() => {
-    return getVisibleScheduleAssignTodos(
+  const filteredTodos = useMemo(() => (
+    getVisibleScheduleAssignTodos(
       todos,
       allTodos || todos,
       selectedCategoryId,
       activeTab,
       assignType
-    );
-  }, [activeTab, allTodos, assignType, selectedCategoryId, todos]);
+    )
+  ), [activeTab, allTodos, assignType, selectedCategoryId, todos]);
+
+  useEffect(() => {
+    if (activeTab === 'new') {
+      return;
+    }
+
+    const initialExpandedIds = getInitialExpandedScheduleAssignParentIds(filteredTodos, allTodos || todos);
+    setExpandedParentIds((previousIds) => {
+      const previousSet = new Set(previousIds);
+      const visibleSet = new Set(initialExpandedIds);
+      const nextIds = previousIds.filter((id) => visibleSet.has(id));
+
+      initialExpandedIds.forEach((id) => {
+        if (!previousSet.has(id)) {
+          nextIds.push(id);
+        }
+      });
+
+      return nextIds.length === previousIds.length && nextIds.every((id, index) => id === previousIds[index])
+        ? previousIds
+        : nextIds;
+    });
+  }, [activeTab, allTodos, filteredTodos, todos]);
+
+  const scheduleRows = useMemo(() => (
+    buildTodoScheduleAssignRows(
+      filteredTodos,
+      allTodos || todos,
+      expandedParentIds,
+      activeTab,
+      assignType
+    )
+  ), [activeTab, allTodos, assignType, expandedParentIds, filteredTodos, todos]);
 
   if (!isOpen) return null;
 
@@ -134,7 +138,7 @@ export const TodoScheduleAssignModal: React.FC<TodoScheduleAssignModalProps> = (
     <div
       className="fixed inset-0 z-[125] flex items-end justify-center bg-[rgba(15,23,42,0.12)] px-4 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-12 backdrop-blur-sm md:items-center md:pb-4"
       onClick={onClose}
-      >
+    >
       <div
         className="flex h-[75vh] max-h-[75vh] w-full max-w-[28rem] flex-col overflow-hidden rounded-[2rem] border border-stone-200 bg-[#faf9f6] shadow-[0_26px_70px_rgba(15,23,42,0.14)]"
         onClick={(event) => event.stopPropagation()}
@@ -149,7 +153,7 @@ export const TodoScheduleAssignModal: React.FC<TodoScheduleAssignModalProps> = (
               type="button"
               onClick={onClose}
               className="rounded-full p-2 text-stone-400 transition-colors hover:bg-white hover:text-stone-600"
-              title="关闭"
+              title="Close"
             >
               <X size={18} />
             </button>
@@ -182,42 +186,42 @@ export const TodoScheduleAssignModal: React.FC<TodoScheduleAssignModalProps> = (
 
           {activeTab !== 'new' && (
             <div className="mt-4 flex gap-2 overflow-x-auto pb-1 no-scrollbar">
-            <button
-              type="button"
-              onClick={() => setSelectedCategoryId('all')}
-              className={`shrink-0 rounded-full border px-3 py-1.5 text-xs transition-colors ${
-                selectedCategoryId === 'all'
-                  ? 'text-white'
-                  : 'bg-white/70 text-stone-500 border-stone-200 hover:border-stone-300'
-              }`}
-              style={selectedCategoryId === 'all' ? {
-                backgroundColor: 'var(--accent-color)',
-                borderColor: 'var(--accent-color)'
-              } : undefined}
-            >
-              全部
-            </button>
-            {todoCategories.map((category) => {
-              const isSelected = selectedCategoryId === category.id;
-              return (
-                <button
-                  key={category.id}
-                  type="button"
-                  onClick={() => setSelectedCategoryId(category.id)}
-                  className={`shrink-0 rounded-full border px-3 py-1.5 text-xs transition-colors ${
-                    isSelected
-                      ? 'text-white'
-                      : 'bg-white/70 text-stone-500 border-stone-200 hover:border-stone-300'
-                  }`}
-                  style={isSelected ? {
-                    backgroundColor: 'var(--accent-color)',
-                    borderColor: 'var(--accent-color)'
-                  } : undefined}
-                >
-                  {category.name}
-                </button>
-              );
-            })}
+              <button
+                type="button"
+                onClick={() => setSelectedCategoryId('all')}
+                className={`shrink-0 rounded-full border px-3 py-1.5 text-xs transition-colors ${
+                  selectedCategoryId === 'all'
+                    ? 'text-white'
+                    : 'bg-white/70 text-stone-500 border-stone-200 hover:border-stone-300'
+                }`}
+                style={selectedCategoryId === 'all' ? {
+                  backgroundColor: 'var(--accent-color)',
+                  borderColor: 'var(--accent-color)'
+                } : undefined}
+              >
+                全部
+              </button>
+              {todoCategories.map((category) => {
+                const isSelected = selectedCategoryId === category.id;
+                return (
+                  <button
+                    key={category.id}
+                    type="button"
+                    onClick={() => setSelectedCategoryId(category.id)}
+                    className={`shrink-0 rounded-full border px-3 py-1.5 text-xs transition-colors ${
+                      isSelected
+                        ? 'text-white'
+                        : 'bg-white/70 text-stone-500 border-stone-200 hover:border-stone-300'
+                    }`}
+                    style={isSelected ? {
+                      backgroundColor: 'var(--accent-color)',
+                      borderColor: 'var(--accent-color)'
+                    } : undefined}
+                  >
+                    {category.name}
+                  </button>
+                );
+              })}
             </div>
           )}
         </div>
@@ -285,9 +289,10 @@ export const TodoScheduleAssignModal: React.FC<TodoScheduleAssignModalProps> = (
                 快速新建任务
               </button>
             </div>
-          ) : filteredTodos.length > 0 ? (
+          ) : scheduleRows.length > 0 ? (
             <div className="space-y-2">
-              {filteredTodos.map((todo) => {
+              {scheduleRows.map((row) => {
+                const { todo } = row;
                 const category = todoCategories.find((item) => item.id === todo.categoryId);
                 const currentStatus = activeTab === 'scheduled'
                   ? formatStatusDate(todo.scheduledDate)
@@ -297,28 +302,61 @@ export const TodoScheduleAssignModal: React.FC<TodoScheduleAssignModalProps> = (
                   : (currentStatus ? `Due: ${currentStatus}` : 'Due: none');
 
                 return (
-                  <button
+                  <div
                     key={todo.id}
-                    type="button"
-                    onClick={() => onAssign(todo)}
-                    className="flex w-full items-center gap-3 rounded-2xl border border-stone-200 bg-white/80 px-4 py-3 text-left transition-colors hover:border-stone-300 hover:bg-white"
+                    className={`group flex flex-col ${row.level === 1 ? 'pl-5' : ''}`}
                   >
-                    <span className="shrink-0 text-stone-400">
-                      <IconRenderer
-                        icon={category?.icon || '•'}
-                        uiIcon={category?.uiIcon}
-                        className="text-sm"
-                      />
-                    </span>
-                    <div className="min-w-0 flex-1">
-                      <div className="truncate text-sm font-medium text-stone-700">{todo.title}</div>
-                      <div className="mt-0.5 flex items-center gap-2 text-[11px] uppercase tracking-[0.14em] text-stone-400">
-                        <span className="truncate">{category?.name || 'Todo'}</span>
-                        <span className="shrink-0 text-stone-300">·</span>
-                        <span className="truncate">{statusLabel}</span>
-                      </div>
+                    <div className="flex items-center gap-2">
+                      {row.level === 1 && (
+                        <div className="h-full w-3 flex-shrink-0 border-l border-stone-200/90" />
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => onAssign(todo)}
+                        className="flex min-w-0 flex-1 items-center gap-3 rounded-2xl border border-stone-200 bg-white/80 px-4 py-3 text-left transition-colors hover:border-stone-300 hover:bg-white"
+                      >
+                        <span className="shrink-0 text-stone-400">
+                          <IconRenderer
+                            icon={category?.icon || '📋'}
+                            uiIcon={category?.uiIcon}
+                            className="text-sm"
+                          />
+                        </span>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2">
+                            <div className="truncate text-sm font-medium text-stone-700">{todo.title}</div>
+                            {row.level === 0 && row.hasChildren && (
+                              <span className="shrink-0 rounded-full border border-stone-200 bg-stone-50 px-1.5 py-0.5 text-[10px] font-medium text-stone-400">
+                                {row.childCount}
+                              </span>
+                            )}
+                          </div>
+                          <div className="mt-0.5 flex items-center gap-2 text-[11px] uppercase tracking-[0.14em] text-stone-400">
+                            <span className="truncate">{category?.name || 'Todo'}</span>
+                            <span className="shrink-0 text-stone-300">·</span>
+                            <span className="truncate">{statusLabel}</span>
+                          </div>
+                        </div>
+                      </button>
+
+                      {row.hasChildren && (
+                        <button
+                          type="button"
+                          aria-label={row.isExpanded ? 'Collapse subtasks' : 'Expand subtasks'}
+                          onClick={() => {
+                            setExpandedParentIds((previousIds) => (
+                              previousIds.includes(todo.id)
+                                ? previousIds.filter((id) => id !== todo.id)
+                                : [...previousIds, todo.id]
+                            ));
+                          }}
+                          className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full text-stone-300 transition-colors hover:bg-white hover:text-stone-500"
+                        >
+                          {row.isExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+                        </button>
+                      )}
                     </div>
-                  </button>
+                  </div>
                 );
               })}
             </div>

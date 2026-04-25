@@ -9,7 +9,11 @@
 
 import { describe, expect, it } from 'vitest';
 import type { TodoItem } from '../types';
-import { getVisibleScheduleAssignTodos } from './TodoScheduleAssignModal';
+import {
+  buildTodoScheduleAssignRows,
+  getInitialExpandedScheduleAssignParentIds,
+  getVisibleScheduleAssignTodos
+} from '../utils/todoScheduleAssignUtils';
 
 describe('getVisibleScheduleAssignTodos', () => {
   it('hides unfinished subtasks whose completed parent only exists in the full todo source', () => {
@@ -40,6 +44,50 @@ describe('getVisibleScheduleAssignTodos', () => {
 
     expect(getVisibleScheduleAssignTodos(assignableTodos, allTodos, 'all', 'scheduled', 'scheduled').map((todo) => todo.id)).toEqual([
       'solo-open'
+    ]);
+  });
+
+  it('builds visible rows so subtasks render beneath their parent instead of as flat standalone cards', () => {
+    const allTodos: TodoItem[] = [
+      {
+        id: 'parent-open',
+        categoryId: 'cat-1',
+        title: 'Parent task',
+        isCompleted: false
+      } as TodoItem,
+      {
+        id: 'child-a',
+        categoryId: 'cat-1',
+        parentTodoId: 'parent-open',
+        childOrder: 1,
+        title: 'Child A',
+        isCompleted: false
+      } as TodoItem,
+      {
+        id: 'child-b',
+        categoryId: 'cat-1',
+        parentTodoId: 'parent-open',
+        childOrder: 2,
+        title: 'Child B',
+        isCompleted: false
+      } as TodoItem,
+      {
+        id: 'solo-open',
+        categoryId: 'cat-1',
+        title: 'Solo task',
+        isCompleted: false
+      } as TodoItem
+    ];
+
+    const visibleTodos = getVisibleScheduleAssignTodos(allTodos, allTodos, 'all', 'scheduled', 'scheduled');
+    const expandedParentIds = getInitialExpandedScheduleAssignParentIds(visibleTodos, allTodos);
+    const rows = buildTodoScheduleAssignRows(visibleTodos, allTodos, expandedParentIds, 'scheduled', 'scheduled');
+
+    expect(rows.map((row) => `${row.level}:${row.todo.id}`)).toEqual([
+      '0:parent-open',
+      '1:child-a',
+      '1:child-b',
+      '0:solo-open'
     ]);
   });
 });
