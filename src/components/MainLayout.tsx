@@ -2,6 +2,7 @@
  * @file MainLayout.tsx
  * @input children, navigation state, handlers
  * @output Main Application Layout
+ * @updated 2026-04-25: Let floating switch-button fallback icons inherit the button theme color so default UI icons stay visible on accent-theme white buttons.
  * @updated 2026-04-25: Added a `min-h-0` guard on the main content shell so nested scene lists can keep scrolling on mobile WebViews.
  * @pos Component (Layout)
  * @description 主应用布局组件 - 包含顶部导航栏、主内容区域和浮动按钮
@@ -301,7 +302,6 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
                                 type={currentView === AppView.TAGS ? "scope" : "tags"}
                                 fallbackIcon={currentView === AppView.TAGS ? Target : Tag}
                                 size={24}
-                                className="text-white"
                             />
                         </FloatingButton>
                     )}
@@ -313,9 +313,9 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
                         ariaLabel={isJournalMode ? "Switch to Chronicle" : "Switch to Memoir"}
                     >
                         {isJournalMode ? (
-                            <UIIcon type="chronicle" fallbackIcon={BookHeart} size={24} className="text-white" />
+                            <UIIcon type="chronicle" fallbackIcon={BookHeart} size={24} />
                         ) : (
-                            <UIIcon type="memoir" fallbackIcon={AudioWaveform} size={24} className="text-white" />
+                            <UIIcon type="memoir" fallbackIcon={AudioWaveform} size={24} />
                         )}
                     </FloatingButton>
                 )}

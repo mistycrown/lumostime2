@@ -4,6 +4,7 @@
  * @output Review Updates, Narrative Generation
  * @pos View (Review Modal)
  * @description The interface for conducting Weekly Reviews. Integrates statistics visualization, guided reflection templates, and AI-assisted narrative generation.
+ * @updated 2026-04-25: Let floating read-edit toggles inherit button theme colors so default UI icons remain visible on accent-theme white buttons.
  * 
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
@@ -515,7 +516,6 @@ export const WeeklyReviewView: React.FC<WeeklyReviewViewProps> = ({
                         type={isReadingMode ? "editing" : "reading"}
                         fallbackIcon={isReadingMode ? Edit3 : LucideIcons.BookOpen}
                         size={24}
-                        className="text-white"
                     />
                 </FloatingButton>
             )}
@@ -531,7 +531,6 @@ export const WeeklyReviewView: React.FC<WeeklyReviewViewProps> = ({
                         type={isReadingMode ? "editing" : "reading"}
                         fallbackIcon={isReadingMode ? Edit3 : LucideIcons.BookOpen}
                         size={24}
-                        className="text-white"
                     />
                 </FloatingButton>
             )}

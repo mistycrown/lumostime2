@@ -6,6 +6,7 @@
  * @description The primary daily view. Visualizes time usage on a timeline, supports adding/editing logs, gap detection, gesture and lightweight calendar date-switch animation, quick search and custom filter entry points, and integrates Daily/Weekly/Monthly review plus achievement bottle entry points.
  * 
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
+ * @updated 2026-04-25: Replaced the fixed five timeline header buttons with user-configurable quick actions.
  * @updated 2026-04-22: The floating AI button now opens the app-level shared AI window so closing the modal does not interrupt an in-flight request.
  * @updated 2026-04-22: Replaced the old AI backfill entry with a local-history chat modal for the first-step conversational AI flow.
  * @updated 2026-04-20: Switched the timeline screen to the shared lightweight custom-background pipeline.
@@ -15,7 +16,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { Log, Activity, TodoItem, Category, TodoCategory, Scope, DailyReview, ReviewTemplate, WeeklyReview, MonthlyReview, AutoLinkRule, Goal } from '../types';
 import { CATEGORIES } from '../constants';
 import * as LucideIcons from 'lucide-react';
-import { Plus, MoreHorizontal, BarChart2, FlaskConical, Sparkles, Zap, Heart, Share, Timer, Clock, Search, Filter, Image as ImageIcon } from 'lucide-react';
+import { Plus, MoreHorizontal, BarChart2, BookOpen, FlaskConical, RefreshCw, Sparkles, Zap, Heart, Share, Timer, Clock, Search, Filter, Image as ImageIcon } from 'lucide-react';
 import { CalendarWidget } from '../components/CalendarWidget';
 import { ParsedTimeEntry } from '../services/aiService';
 import { ToastType } from '../components/Toast';
@@ -39,6 +40,7 @@ import { toCssColor } from '../utils/colorUtils';
 import { TimelineStyleRail } from '../components/TimelineStyleRail';
 import { TimelineStyleAdjuster } from '../components/TimelineStyleAdjuster';
 import { useBackgroundDisplay } from '../hooks/useBackgroundDisplay';
+import { type TimelineQuickActionKey } from '../constants/timelineQuickActions';
 
 // Image Thumbnail Component
 const TimelineImage: React.FC<{ filename: string, className?: string, useThumbnail?: boolean, refreshKey?: number }> = ({ filename, className = "w-16 h-16", useThumbnail = false, refreshKey = 0 }) => {
@@ -205,11 +207,23 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ logs, todos, scopes,
     const [previewImage, setPreviewImage] = useState<string | null>(null);
     const [copyFailureModal, setCopyFailureModal] = useState<{ isOpen: boolean; text: string }>({ isOpen: false, text: '' });
     const [showTimePalDebugger, setShowTimePalDebugger] = useState(false);
-    const { isGalleryViewOpen, setIsGalleryViewOpen, setIsSearchOpen, setIsSearchOpenedFromSettings, setIsFiltersOpen, setActiveFilterId, setIsAchievementOpen } = useNavigation();
+    const {
+        isGalleryViewOpen,
+        setIsGalleryViewOpen,
+        setIsSearchOpen,
+        setIsSearchOpenedFromSettings,
+        setIsFiltersOpen,
+        setActiveFilterId,
+        setIsAchievementOpen,
+        setIsSettingsOpen,
+        setSettingsSubmenu,
+        setSettingsSubmenuBackCloses
+    } = useNavigation();
     const {
         timelineStyleTheme,
         timelineStyleConfigs,
         timelineSortOrder,
+        timelineQuickActions,
         timelineStyleAdjusterOpen,
         setTimelineStyleAdjusterOpen
     } = useSettings();
@@ -238,6 +252,64 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ logs, todos, scopes,
     const currentStyleConfig = timelineStyleConfigs[timelineStyleTheme];
     const railOffsetX = currentStyleConfig.railOffsetX || 0;
     const timeNodeOffsetY = currentStyleConfig.timeNodeOffsetY || 0;
+    const quickActionMap: Record<TimelineQuickActionKey, { label: string; title: string; icon: React.ReactNode; onClick: (event?: React.MouseEvent) => void; disabled?: boolean }> = {
+        search: {
+            label: '搜索',
+            title: '搜索',
+            icon: <Search size={20} />,
+            onClick: () => {
+                setIsSearchOpenedFromSettings(false);
+                setIsSearchOpen(true);
+            }
+        },
+        filters: {
+            label: '全部筛选器',
+            title: '全部筛选器',
+            icon: <Filter size={20} />,
+            onClick: () => {
+                setActiveFilterId(null);
+                setIsFiltersOpen(true);
+            }
+        },
+        stats: {
+            label: '统计视图',
+            title: '统计视图',
+            icon: <BarChart2 size={20} />,
+            onClick: onShowStats
+        },
+        gallery: {
+            label: '画廊',
+            title: '画廊',
+            icon: <ImageIcon size={20} />,
+            onClick: () => setIsGalleryViewOpen(true)
+        },
+        achievement: {
+            label: '成就屏',
+            title: '成就屏',
+            icon: <FlaskConical size={20} />,
+            onClick: () => setIsAchievementOpen(true)
+        },
+        principle: {
+            label: '原则库',
+            title: '原则库',
+            icon: <BookOpen size={20} />,
+            onClick: () => {
+                setIsSettingsOpen(true);
+                setSettingsSubmenu('principle');
+                setSettingsSubmenuBackCloses(true);
+            }
+        },
+        sync: {
+            label: '同步',
+            title: isSyncing ? '同步中' : '同步',
+            icon: <RefreshCw size={20} className={isSyncing ? 'animate-spin text-purple-500' : ''} />,
+            onClick: (event) => onSync(event),
+            disabled: isSyncing
+        }
+    };
+    const configuredQuickActions = timelineQuickActions
+        .map((actionKey) => quickActionMap[actionKey])
+        .filter(Boolean);
 
     // 计算当前日期所在周的范围和周报相关数据
     const weeklyReviewData = useMemo(() => {
@@ -1045,47 +1117,17 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ logs, todos, scopes,
                     todos={todos}
                     extraHeaderControls={
                         <>
-                            <button
-                                onClick={() => {
-                                    setIsSearchOpenedFromSettings(false);
-                                    setIsSearchOpen(true);
-                                }}
-                                className="p-2 text-stone-400 hover:text-stone-600 hover:bg-stone-100 rounded-full transition-colors"
-                                title="Search All"
-                            >
-                                <Search size={20} />
-                            </button>
-                            <button
-                                onClick={() => {
-                                    setActiveFilterId(null);
-                                    setIsFiltersOpen(true);
-                                }}
-                                className="p-2 text-stone-400 hover:text-stone-600 hover:bg-stone-100 rounded-full transition-colors"
-                                title="Custom Filters"
-                            >
-                                <Filter size={20} />
-                            </button>
-                            <button
-                                onClick={onShowStats}
-                                className="p-2 text-stone-400 hover:text-stone-600 hover:bg-stone-100 rounded-full transition-colors"
-                                title="View Statistics"
-                            >
-                                <BarChart2 size={20} />
-                            </button>
-                            <button
-                                onClick={() => setIsGalleryViewOpen(true)}
-                                className="p-2 text-stone-400 hover:text-stone-600 hover:bg-stone-100 rounded-full transition-colors"
-                                title="Gallery View"
-                            >
-                                <ImageIcon size={20} />
-                            </button>
-                            <button
-                                onClick={() => setIsAchievementOpen(true)}
-                                className="p-2 text-stone-400 hover:text-stone-600 hover:bg-stone-100 rounded-full transition-colors"
-                                title="Achievement Bottle"
-                            >
-                                <FlaskConical size={20} />
-                            </button>
+                            {configuredQuickActions.map((action) => (
+                                <button
+                                    key={action.label}
+                                    onClick={(event) => action.onClick(event)}
+                                    disabled={action.disabled}
+                                    className="p-2 text-stone-400 hover:text-stone-600 hover:bg-stone-100 rounded-full transition-colors disabled:cursor-not-allowed disabled:opacity-60"
+                                    title={action.title}
+                                >
+                                    {action.icon}
+                                </button>
+                            ))}
                         </>
                     }
                 />

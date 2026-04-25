@@ -481,8 +481,10 @@ export const useSyncManager = () => {
         }
     };
 
-    const handleQuickSync = async (e?: React.MouseEvent) => {
-        e?.stopPropagation();
+    const handleQuickSync = async (e?: React.MouseEvent | { stopPropagation?: () => void } | null) => {
+        if (typeof e?.stopPropagation === 'function') {
+            e.stopPropagation();
+        }
         
         // 如果开启了手动同步模式，弹出方向选择模态框
         if (manualSyncMode) {

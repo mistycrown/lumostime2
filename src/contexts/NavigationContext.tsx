@@ -40,6 +40,8 @@ interface NavigationContextType {
     setIsSettingsOpen: (open: boolean) => void;
     settingsSubmenu: SettingsSubmenu;
     setSettingsSubmenu: (submenu: SettingsSubmenu) => void;
+    settingsSubmenuBackCloses: boolean;
+    setSettingsSubmenuBackCloses: (value: boolean) => void;
     isAutoLinkOpen: boolean;
     setIsAutoLinkOpen: (open: boolean) => void;
     isSearchOpen: boolean;
@@ -211,6 +213,7 @@ export const NavigationProvider: React.FC<NavigationProviderProps> = ({
     // 模态框状态
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
     const [settingsSubmenu, setSettingsSubmenu] = useState<SettingsSubmenu>('main');
+    const [settingsSubmenuBackCloses, setSettingsSubmenuBackCloses] = useState(false);
     const [isAutoLinkOpen, setIsAutoLinkOpen] = useState(false);
     const [isSearchOpen, setIsSearchOpen] = useState(false);
     const [isFiltersOpen, setIsFiltersOpen] = useState(false);
@@ -297,6 +300,9 @@ export const NavigationProvider: React.FC<NavigationProviderProps> = ({
     const handleSetIsSettingsOpen = (open: boolean) => {
         if (open) {
             setSettingsSubmenu('main');
+            setSettingsSubmenuBackCloses(false);
+        } else {
+            setSettingsSubmenuBackCloses(false);
         }
         setIsSettingsOpen(open);
     };
@@ -309,6 +315,8 @@ export const NavigationProvider: React.FC<NavigationProviderProps> = ({
             setIsSettingsOpen: handleSetIsSettingsOpen,
             settingsSubmenu,
             setSettingsSubmenu,
+            settingsSubmenuBackCloses,
+            setSettingsSubmenuBackCloses,
             isAutoLinkOpen,
             setIsAutoLinkOpen,
             isSearchOpen,

@@ -113,6 +113,7 @@ const AppContent: React.FC = () => {
     autoOpenFocusDetail, setAutoOpenFocusDetail,
     timelineGalleryMode, setTimelineGalleryMode,
     timelineSortOrder, setTimelineSortOrder,
+    timelineQuickActions, setTimelineQuickActions,
     collapseThreshold, setCollapseThreshold,
     manualSyncMode, setManualSyncMode
   } = useSettings();
@@ -894,6 +895,8 @@ const AppContent: React.FC = () => {
             onToggleTimelineGalleryMode={() => setTimelineGalleryMode(!timelineGalleryMode)}
             timelineSortOrder={timelineSortOrder}
             onSetTimelineSortOrder={setTimelineSortOrder}
+            timelineQuickActions={timelineQuickActions}
+            onSetTimelineQuickActions={setTimelineQuickActions}
 
             collapseThreshold={collapseThreshold}
             onSetCollapseThreshold={setCollapseThreshold}

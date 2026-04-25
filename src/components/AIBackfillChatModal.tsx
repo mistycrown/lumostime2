@@ -2729,7 +2729,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
         {isHistoryPanelOpen && (
           <div className="absolute inset-0 z-10 backdrop-blur-[10px]" style={{ backgroundColor: AI_CHAT_THEME.overlayDark }}>
             <div
-              className="absolute inset-y-3 right-3 w-[min(100%,420px)] rounded-[1.35rem] border"
+              className="absolute inset-3 flex flex-col overflow-hidden rounded-[1.35rem] border sm:inset-4"
               style={{
                 borderColor: AI_CHAT_THEME.panelBorder,
                 backgroundColor: AI_CHAT_THEME.panelBg,
@@ -2776,7 +2776,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
                 </button>
               </div>
 
-              <div className="h-[calc(100%-154px)] overflow-y-auto px-3 py-3">
+              <div className="min-h-0 flex-1 overflow-y-auto px-3 py-3">
                 <div className="space-y-2">
                   {sortedSessions.map((session) => {
                     const sessionPersona = personaMap.get(session.personaId) || personas[0] || DEFAULT_AI_PERSONAS[0];

@@ -4,6 +4,7 @@
  * @output Update Review Data, Generate Narrative
  * @pos View (Review System)
  * @description A comprehensive view for conducting monthly reviews. Includes tabs for statistical data, guided questions (Review Guide), and an AI-assisted narrative editor.
+ * @updated 2026-04-25: Let floating read-edit toggles inherit button theme colors so default UI icons remain visible on accent-theme white buttons.
  * 
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
@@ -530,7 +531,6 @@ export const MonthlyReviewView: React.FC<MonthlyReviewViewProps> = ({
                             type={isReadingMode ? "editing" : "reading"}
                             fallbackIcon={isReadingMode ? Edit3 : LucideIcons.BookOpen}
                             size={24}
-                            className="text-white"
                         />
                     </FloatingButton>
                 )
@@ -548,7 +548,6 @@ export const MonthlyReviewView: React.FC<MonthlyReviewViewProps> = ({
                             type={isReadingMode ? "editing" : "reading"}
                             fallbackIcon={isReadingMode ? Edit3 : LucideIcons.BookOpen}
                             size={24}
-                            className="text-white"
                         />
                     </FloatingButton>
                 )
