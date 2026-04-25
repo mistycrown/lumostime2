@@ -4,6 +4,7 @@
  * @output Todo Selection UI
  * @pos Component (Input)
  * @description A specialized selector for linking a log entry to a specific Todo item, grouped by category and optionally rendered as a collapsible parent/subtask tree.
+ * @updated 2026-04-25: Shared pickers now hide unfinished subtasks whenever their parent todo is completed, so completed parents never leave orphan child rows behind.
  * @updated 2026-04-22: Let pinned or today-arranged parent todos in the virtual today category expand to their full direct-subtask set.
  * @updated 2026-04-22: Made the picker default to the virtual today category and added a visible `Pin` badge for pinned rows inside that bucket.
  * @updated 2026-04-22: Fixed manual category switching so the virtual today category no longer snaps back to the linked todo's source category after a tap.

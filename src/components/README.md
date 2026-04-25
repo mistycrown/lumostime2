@@ -18,7 +18,7 @@ Overlay components for complex interactions.
 - `TodoDuplicateModal.tsx`: Lightweight pre-copy modal for renaming duplicated todos and clearing dates, tags, or scopes before creation.
 - `TodoQuickActionsModal.tsx`: Shared quick-actions bottom sheet for lightweight todo scheduling, completion, and detail-entry flows reused by list-row taps and week-plan badges.
 - `GoalEditor.tsx`: Goal creation and editing.
-- `AIBackfillChatModal.tsx`: Unified AI full-screen chat workspace with a theme-synced editorial shell driven by the current `--accent-color`, persistent session history, persona studio access from the title avatar, configurable AI/user avatars, reordered persona/avatar/context settings, per-session quick-context control, and direct local handling for chat, AI backfill, and AI todo creation plus edit/undo and debug inspection.
+- `AIBackfillChatModal.tsx`: Unified AI full-screen chat workspace with a theme-synced editorial shell driven by the current `--accent-color`, persistent session history, persona studio access from the title avatar, configurable AI/user avatars, reordered persona/avatar/context settings, per-session quick-context control, and direct local handling for chat, AI backfill, AI todo creation, AI todo updates, AI subtask creation, and AI log editing plus edit/undo and debug inspection.
 - `AddActivityModal.tsx`: Creating new activities.
 - `ConfirmModal.tsx`: specialized confirmation dialogs.
 - `NarrativeStyleSelectionModal.tsx`: AI narrative style picker.
@@ -92,8 +92,10 @@ Components for theme and appearance customization.
 - `achievement/AchievementBottleIconPackSelector.tsx`: 已改为成就瓶图标包卡片选择器，支持更紧凑的预览式切换。
 - `achievement/AchievementBottleStyleSelector.tsx`: 已改为成就瓶样式卡片选择器，使用玻璃瓶身小预览区分不同气质。
 > Last updated: 2026-04-25
+- `TodoAssociation.tsx`, `TodoScheduleAssignModal.tsx`: Shared todo pickers now hide unfinished subtasks whenever their parent todo is completed, so completed parents no longer leave orphan child rows in association or schedule-selection lists.
 - `MainLayout.tsx`: The floating Tag/Scope and Chronicle/Memoir switch buttons now let fallback Lucide icons inherit the floating button color, so the default UI theme stays visible on white accent-theme buttons.
 - `AIBackfillChatModal.tsx`: Applied todo result cards now separate task category as `@`, linked activity hierarchy as `#`, and scope domains as `%`, and they respect the auto-link scope toggle when merging activity-based domains into newly created todos.
+- `AIBackfillChatModal.tsx`: The shared AI workspace now distinguishes create-vs-edit intents, can update existing todos, create subtasks under parent todos, and patch existing logs by returning only target ids plus changed fields for local application.
 - `AIBackfillChatModal.tsx`: Changed applied-result metadata to the same `# / % / @` text-prefix convention used by context views, removing the extra category icon so association lines read more consistently.
 - `AIBackfillChatModal.tsx`: Added a dedicated grayscale fallback for the `default` color scheme so the AI workspace no longer keeps the warm tinted surfaces that are used by accent themes.
 - `AIBackfillChatModal.tsx`: Simplified the AI settings panel by flattening the user-avatar and current-persona layouts, removing redundant helper copy, and tightening the visuals around the existing accent-driven theme tokens.
