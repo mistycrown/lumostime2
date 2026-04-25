@@ -3,13 +3,14 @@
  * @input Logs, Categories, Todos, Scopes, Current Date
  * @output Navigation Events (Date Change, Back)
  * @pos View (Statistics Dashboard)
- * @description A comprehensive analytics dashboard supporting multiple visualization modes: Pie (Distribution), Matrix (Consistency), Schedule (Timeline), Line (Trend), and Check (Habit tracking). Analyzes time usage across Activities, Todos, and Scopes.
+ * @description A comprehensive analytics dashboard supporting multiple visualization modes: Pie (Distribution), Matrix (Consistency + daily editorial timeline), Schedule (Timeline), Line (Trend), and Check (Habit tracking). Analyzes time usage across Activities, Todos, and Scopes.
  *
  * 修改历史:
  * - 2026-01-10: 修复日课统计（check）视图的日期导航功能，补充 check 视图范围处理。
  * - 2026-03-03: 数字类型日课统计改为按完成次数展示，避免仅按是否完成呈现。
  * - 2026-03-11: 统一统计分享导出协议，修复分享图片页因解析失败导致的空白问题。
  * - 2026-04-03: 复用共享周范围计算，修复矩阵视图跨月时被错误扩展为超过 7 天的问题。
+ * - 2026-04-25: 为矩阵视图新增日范围切换和 editorial 时间格子图，使用活动标签颜色与本地书法字体。
  *
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
@@ -37,6 +38,42 @@ import { LineChartView } from '../components/stats/LineChartView';
 import { EmojiStatsView } from '../components/stats/EmojiStatsView';
 import { getDateRange as getSharedDateRange, getDynamicTitle as getSharedDynamicTitle } from '../components/StatsView/statsUtils';
 import { formatDuration, getHexColor, getScheduleStyle } from '../utils/chartUtils';
+
+const toRgba = (hexColor: string, alpha: number): string => {
+  const normalized = hexColor.replace('#', '');
+  const full = normalized.length === 3
+    ? normalized.split('').map((ch) => ch + ch).join('')
+    : normalized;
+
+  if (!/^[0-9a-fA-F]{6}$/.test(full)) {
+    return `rgba(214, 211, 209, ${alpha})`;
+  }
+
+  const r = parseInt(full.slice(0, 2), 16);
+  const g = parseInt(full.slice(2, 4), 16);
+  const b = parseInt(full.slice(4, 6), 16);
+
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+};
+
+const darkenHex = (hexColor: string, factor: number): string => {
+  const normalized = hexColor.replace('#', '');
+  const full = normalized.length === 3
+    ? normalized.split('').map((ch) => ch + ch).join('')
+    : normalized;
+
+  if (!/^[0-9a-fA-F]{6}$/.test(full)) {
+    return '#4b5563';
+  }
+
+  const toChannel = (value: string) => Math.max(0, Math.min(255, Math.round(parseInt(value, 16) * factor)));
+
+  const r = toChannel(full.slice(0, 2)).toString(16).padStart(2, '0');
+  const g = toChannel(full.slice(2, 4)).toString(16).padStart(2, '0');
+  const b = toChannel(full.slice(4, 6)).toString(16).padStart(2, '0');
+
+  return `#${r}${g}${b}`;
+};
 
 interface StatsViewProps {
   logs: Log[];
@@ -87,6 +124,7 @@ export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentD
   );
   const [lineRange, setLineRange] = useState<'week' | 'month'>((forcedRange === 'month' || forcedRange === 'year') ? 'month' : 'week');
   const [emojiRange, setEmojiRange] = useState<EmojiRange>('month');
+  const [matrixRange, setMatrixRange] = useState<'day' | 'week'>(forcedRange === 'day' ? 'day' : 'week');
   const [excludedCategoryIds, setExcludedCategoryIds] = useState<string[]>([]);
 
   const toggleExclusion = (id: string) => {
@@ -116,7 +154,7 @@ export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentD
     if (viewType === 'pie') {
       rangeType = pieRange;
     } else if (viewType === 'matrix') {
-      rangeType = 'week_fixed';
+      rangeType = matrixRange === 'day' ? 'day_fixed' : 'week_fixed';
     } else if (viewType === 'line') {
       rangeType = lineRange === 'week' ? 'week_fixed' : 'month';
     } else if (viewType === 'schedule') {
@@ -188,7 +226,7 @@ export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentD
 
   const effectiveRange = useMemo(() => {
     if (viewType === 'pie') return getDateRange(currentDate, pieRange);
-    if (viewType === 'matrix') return getDateRange(currentDate, 'week_fixed');
+    if (viewType === 'matrix') return getDateRange(currentDate, matrixRange === 'day' ? 'day_fixed' : 'week_fixed');
     if (viewType === 'line') return getDateRange(currentDate, lineRange === 'week' ? 'week_fixed' : 'month');
     if (viewType === 'schedule') {
       if (scheduleRange === 'day') return getDateRange(currentDate, 'day_fixed');
@@ -205,7 +243,7 @@ export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentD
       return getDateRange(currentDate, emojiRange);
     }
     return getDateRange(currentDate, 'day');
-  }, [currentDate, viewType, pieRange, scheduleRange, lineRange, emojiRange]);
+  }, [currentDate, viewType, pieRange, scheduleRange, lineRange, emojiRange, matrixRange]);
 
   // 褰撹鍥剧被鍨嬨€佹椂闂磋寖鍥存垨鏃ユ湡鍙樺寲鏃讹紝鑷姩鏇存柊鏍囬
   useEffect(() => {
@@ -214,7 +252,7 @@ export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentD
       if (viewType === 'pie') {
         rangeType = pieRange;
       } else if (viewType === 'matrix') {
-        rangeType = 'week_fixed';
+        rangeType = matrixRange === 'day' ? 'day_fixed' : 'week_fixed';
       } else if (viewType === 'schedule') {
         if (scheduleRange === 'day') rangeType = 'day_fixed';
         else if (scheduleRange === 'month') rangeType = 'month';
@@ -232,7 +270,7 @@ export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentD
       const title = getSharedDynamicTitle(currentDate, rangeType);
       onTitleChange(title);
     }
-  }, [currentDate, viewType, pieRange, scheduleRange, lineRange, emojiRange, onTitleChange]);
+  }, [currentDate, viewType, pieRange, scheduleRange, lineRange, emojiRange, matrixRange, onTitleChange]);
 
   const { start: rangeStart, end: rangeEnd } = effectiveRange;
 
@@ -271,7 +309,7 @@ export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentD
       }[pieRange];
     }
 
-    if (viewType === 'matrix') return '周矩阵';
+    if (viewType === 'matrix') return matrixRange === 'day' ? '日矩阵' : '周矩阵';
 
     if (viewType === 'schedule') {
       return {
@@ -423,6 +461,124 @@ export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentD
     });
     return { days, rows };
   }, [rangeStart, rangeEnd, filteredLogs, categories]);
+
+  const editorialTimeline = useMemo(() => {
+    const chunksPerHour = 6;
+    const minutesPerChunk = 10;
+    const timelineStart = new Date(rangeStart);
+    timelineStart.setHours(0, 0, 0, 0);
+    const timelineEnd = new Date(timelineStart);
+    timelineEnd.setDate(timelineEnd.getDate() + 1);
+
+    const activityLookup = new Map<string, Activity>();
+    categories.forEach((category) => {
+      category.activities.forEach((activity) => {
+        activityLookup.set(activity.id, activity);
+      });
+    });
+
+    const dayLogs = filteredLogs
+      .filter((log) => log.endTime > timelineStart.getTime() && log.startTime < timelineEnd.getTime())
+      .sort((a, b) => a.startTime - b.startTime);
+
+    const durationByActivity = new Map<string, { activityName: string; color: string; duration: number }>();
+
+    dayLogs.forEach((log) => {
+      const activity = activityLookup.get(log.activityId);
+      if (!activity) return;
+
+      const overlapStart = Math.max(log.startTime, timelineStart.getTime());
+      const overlapEnd = Math.min(log.endTime, timelineEnd.getTime());
+      const overlapDuration = Math.max(0, Math.floor((overlapEnd - overlapStart) / 1000));
+
+      if (overlapDuration <= 0) return;
+
+      const current = durationByActivity.get(activity.id);
+      durationByActivity.set(activity.id, {
+        activityName: activity.name,
+        color: getHexColor(activity.color),
+        duration: (current?.duration || 0) + overlapDuration
+      });
+    });
+
+    const allChunks = Array.from({ length: 24 }, (_, hour) =>
+      Array.from({ length: chunksPerHour }, (_, chunkIndex) => {
+        const chunkStart = new Date(timelineStart);
+        chunkStart.setHours(hour, chunkIndex * minutesPerChunk, 0, 0);
+        const chunkEnd = new Date(chunkStart);
+        chunkEnd.setMinutes(chunkEnd.getMinutes() + minutesPerChunk);
+
+        let activeLog: Log | null = null;
+        dayLogs.forEach((log) => {
+          if (log.startTime < chunkEnd.getTime() && log.endTime > chunkStart.getTime()) {
+            activeLog = log;
+          }
+        });
+
+        if (!activeLog) {
+          return {
+            activityId: null,
+            activityName: null,
+            color: 'transparent',
+            textColor: 'transparent',
+            label: ''
+          };
+        }
+
+        const activity = activityLookup.get(activeLog.activityId);
+        const baseColor = getHexColor(activity?.color || '#d6d3d1');
+        return {
+          activityId: activeLog.activityId,
+          activityName: activity?.name || '未命名活动',
+          color: toRgba(baseColor, 0.72),
+          textColor: darkenHex(baseColor, 0.58),
+          label: ''
+        };
+      })
+    ).flat();
+
+    const labeledAllChunks = allChunks.map((chunk, chunkIndex) => {
+      if (!chunk.activityId || !chunk.activityName) {
+        return chunk;
+      }
+
+      const previousChunk = chunkIndex > 0 ? allChunks[chunkIndex - 1] : null;
+      const isSegmentStart = !previousChunk || previousChunk.activityId !== chunk.activityId;
+
+      if (!isSegmentStart) {
+        return chunk;
+      }
+
+      return {
+        ...chunk,
+        label: chunk.activityName
+      };
+    });
+
+    const rows = Array.from({ length: 24 }, (_, hour) => {
+      const startIndex = hour * chunksPerHour;
+      const endIndex = startIndex + chunksPerHour;
+      return {
+        hour,
+        chunks: labeledAllChunks.slice(startIndex, endIndex)
+      };
+    }).filter((row) => row.chunks.some((chunk) => chunk.activityId));
+
+    const legendItems = Array.from(durationByActivity.entries())
+      .map(([activityId, item]) => ({
+        activityId,
+        activityName: item.activityName,
+        color: item.color,
+        duration: item.duration
+      }))
+      .sort((a, b) => b.duration - a.duration);
+
+    return {
+      displayDate: new Date(rangeStart),
+      rows,
+      legendItems
+    };
+  }, [rangeStart, filteredLogs, categories]);
 
   // --- Check Stats Logic ---
   const checkStats = useMemo(() => {
@@ -624,6 +780,19 @@ export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentD
                     </button>
                   </div>
                 )}
+                {!hideRangeControls && viewType === 'matrix' && (
+                  <div className="flex bg-stone-100/50 p-0.5 rounded-lg w-fit">
+                    {(['day', 'week'] as Array<'day' | 'week'>).map((r) => (
+                      <button
+                        key={r}
+                        onClick={() => setMatrixRange(r)}
+                        className={`px-2.5 py-1 rounded-md text-[10px] font-bold transition-all ${matrixRange === r ? 'bg-white text-stone-900 shadow-sm' : 'text-stone-400 hover:text-stone-600'}`}
+                      >
+                        {r === 'day' ? '日' : '周'}
+                      </button>
+                    ))}
+                  </div>
+                )}
                 {!hideRangeControls && viewType === 'check' && (
                   <div className="flex bg-stone-100/50 p-0.5 rounded-lg w-fit">
                     {/* Check view supports Week, Month, Year. Day is disabled/hidden or just excluded */}
@@ -778,6 +947,8 @@ export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentD
               excludedCategoryIds={excludedCategoryIds}
               onToggleExclusion={toggleExclusion}
               isFullScreen={isFullScreen}
+              matrixRange={matrixRange}
+              editorialTimeline={editorialTimeline}
             />
           )}
 

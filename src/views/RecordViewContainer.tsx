@@ -1,6 +1,7 @@
 /**
  * @file RecordViewContainer.tsx
  * @description 计时页面容器 - 包含标签视图和场景视图的切换
+ * @updated 2026-04-25: Added a flex min-height guard so Scene mode inherits a scrollable viewport height on mobile.
  */
 import React, { useState, useEffect } from 'react';
 import { Category, Activity, TodoItem } from '../types';
@@ -75,7 +76,7 @@ export const RecordViewContainer: React.FC<RecordViewContainerProps> = ({
   };
 
   return (
-    <div className="h-full relative">
+    <div className="h-full min-h-0 relative">
       {/* 主内容区域 */}
       {viewMode === 'tags' ? (
         <RecordView 

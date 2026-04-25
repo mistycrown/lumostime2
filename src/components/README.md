@@ -92,6 +92,8 @@ Components for theme and appearance customization.
 - `achievement/AchievementBottleIconPackSelector.tsx`: 已改为成就瓶图标包卡片选择器，支持更紧凑的预览式切换。
 - `achievement/AchievementBottleStyleSelector.tsx`: 已改为成就瓶样式卡片选择器，使用玻璃瓶身小预览区分不同气质。
 > Last updated: 2026-04-25
+- `AIBackfillChatModal.tsx`: Applied todo result cards now separate task category as `@`, linked activity hierarchy as `#`, and scope domains as `%`, and they respect the auto-link scope toggle when merging activity-based domains into newly created todos.
+- `AIBackfillChatModal.tsx`: Changed applied-result metadata to the same `# / % / @` text-prefix convention used by context views, removing the extra category icon so association lines read more consistently.
 - `AIBackfillChatModal.tsx`: Added a dedicated grayscale fallback for the `default` color scheme so the AI workspace no longer keeps the warm tinted surfaces that are used by accent themes.
 - `AIBackfillChatModal.tsx`: Simplified the AI settings panel by flattening the user-avatar and current-persona layouts, removing redundant helper copy, and tightening the visuals around the existing accent-driven theme tokens.
 - `AIBackfillChatModal.tsx`: The shared AI window can now stay mounted at the app level while hidden, so closing the modal does not abort requests that are already running in the background.
@@ -103,12 +105,14 @@ Components for theme and appearance customization.
 - `AIBackfillChatModal.tsx`: AI settings now keep avatar editing inside the same panel, replacing the old emoji prompt with an inline editor plus quick emoji choices and a clearer two-column settings layout.
 - `AIBackfillChatModal.tsx`: The emoji-avatar editor now removes the redundant draft preview tile, and emoji avatars render more centrally inside the round chat/header avatar containers.
 - `AIBackfillChatModal.tsx`: Recent dialogue rounds are now pulled through an explicit per-session conversation-history cache before formal AI requests, and persona selection uses a subtle checkmark state instead of turning the whole card black.
+- `MainLayout.tsx`: Added a `min-h-0` flex guard on the main content shell so nested scene-mode card lists can scroll instead of being clipped on some mobile WebViews.
 - `AIBackfillChatModal.tsx`: The empty-chat state is now reduced to concise backfill/todo examples, and the built-in personas have been refreshed into more distinctive presets with customized user call names.
 - `AIBackfillChatModal.tsx`: Custom personas can now be deleted from the settings panel with inline confirmation, and any sessions using that persona automatically fall back to the default built-in preset.
 - `AIBackfillChatModal.tsx`: Added a quick-context cache toggle that can send the most recent `n` conversation rounds with each AI request, where `n` is configured by the active persona.
 - `AIBackfillChatModal.tsx`: The shared AI dialog now runs a lightweight intent-classification pass before formal execution, can directly create todos alongside logs, and exposes quick open-detail / undo actions for AI-created todos.
 - `AIBackfillChatModal.tsx`: AI-applied logs and todos now re-check auto-link rules before saving so missing rule-based domains are merged in even when the model returns incomplete scope data.
 - `AIBackfillChatModal.tsx`: AI backfill chat now defaults to today, passes latest-log and todo hierarchy context into tool planning, applies per-call dated records locally, and shows full date-aware results for cross-day or past-day backfills.
+- `TodoDetailModal.tsx`: Overlay-mode todo details now mount as a fixed `z-[100]` viewport layer so they stay above the shared AI chat window instead of rendering behind it.
 - `TodoDetailModal.tsx`: Styled the inherited parent-task jump target with a dashed underline so the subtask detail page makes that link state more obvious.
 - `TodoDetailModal.tsx`: Parent todo timeline tabs now aggregate direct child-task logs into the same history list and duration stats while keeping manual progress recalculation scoped to the current todo's own logs.
 - `TodoDetailModal.tsx`: Parent todo timeline entries now add an `@子任务标题` badge whenever a record comes from a direct child task, so merged history stays attributable.

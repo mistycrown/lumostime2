@@ -9,6 +9,7 @@
  * @updated 2026-04-22: Styled the inherited parent-task link with a dashed underline so clickable parent navigation reads like a link.
  * @updated 2026-04-22: Renamed inherited scope copy to inherited domain wording inside subtask detail pages for clearer terminology.
  * @updated 2026-04-22: Fixed parent-task navigation from subtask detail pages so opening a parent todo no longer crashes the detail view.
+ * @updated 2026-04-25: Raised the overlay detail layer above the shared AI chat window and switched it to a fixed viewport mount so todo details no longer render behind the AI dialog.
  * @updated 2026-04-21: Hid the subtask tab whenever a todo has a recurrence rule so recurring todos can no longer add child tasks.
  * @updated 2026-04-21: Rendered subtask inherited fields as plain strings inside the basic-info card and hid non-editable recurrence UI on child todo pages.
  * @updated 2026-04-21: Moved parent-link context into the detail tab footer and hid subtask hierarchy chips/tabs on child todo pages.
@@ -726,7 +727,7 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({
   const renderSquares = totalSquares > 3000 ? 3000 : totalSquares;
   const containerClassName = displayMode === 'page'
     ? 'h-full bg-[#faf9f6] flex flex-col pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]'
-    : `absolute inset-0 z-[60] bg-[#faf9f6] flex flex-col pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] ${isEntering ? 'animate-in slide-in-from-right duration-300' : ''}`;
+    : `fixed inset-0 z-[100] bg-[#faf9f6] flex flex-col pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] ${isEntering ? 'animate-in slide-in-from-right duration-300' : ''}`;
 
   return (
     <div

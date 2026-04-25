@@ -1,7 +1,7 @@
 /**
  * @file SceneView.tsx
  * @description 闂傚倷绶氬缁樹繆閸ヮ剙纾块柕鍫濇噳閺嬪秵绻涢崱妯诲碍缂佲偓瀹€鍕厸鐎广儱鍟俊鑺ャ亜锜婚崶銊㈡嫽闂佺鏈銊╁箺閻樼偨浜滈柡鍌濇硶閻忛亶鏌熼崣澶嬪唉鐎规洖宕灃濞达絼璀﹀ú?- 闂傚倷鑳剁涵鍫曞疾閻愬樊娴栭柕濞у棗小濡炪倖甯掗崯銊︾瑜版帗鐓欓柟顖嗗啯姣愬銈冨€曢幊蹇曟崲濠靛牆鏋堟俊顖濇〃婢规洘绻濋悽闈涗哗閻忓浚浜、姘愁槻闁崇懓鍟撮崺鈧い鎺戝閻撴盯鏌涘鈧粈渚€鎮橀敐鍥╃＜妞ゆ棁鍋愯倴婵炲濯寸粻鎾愁嚕閹绢喗鍋愭い鏃囧吹妞规娊姊绘担鍛婂暈妞ゃ劍鍔楀Σ鎰板即閻斿憡鐝烽梺鍝勮癁鐏炶姤顓块梻濠庡亜濞诧箑顫忚ぐ鎹ゅ洩顦规慨濠傤煼瀹曟帒顫濇潏銊﹀枛婵＄偑鍊栭弻銊╂儗閸屾氨鏆︽慨妞诲亾鐎规洏鍔戦、妯款槻闁?
- * @updated 2026-04-20: Switched custom background rendering to the shared preloaded display hook and reduced mobile blur cost.
+ * @updated 2026-04-25: Added flex min-height guards for the scene sidebar and card list so long card stacks keep scrolling instead of being clipped on some mobile WebViews.
  */
 import React, { useState, useEffect } from 'react';
 import { Clock } from 'lucide-react';
@@ -1003,7 +1003,7 @@ export const SceneView: React.FC<SceneViewProps> = ({
 
   return (
     <div 
-      className="flex h-full relative"
+      className="flex h-full min-h-0 relative"
       style={{
         backgroundColor: hasBackground ? 'transparent' : '#faf9f6'
       }}
@@ -1026,7 +1026,7 @@ export const SceneView: React.FC<SceneViewProps> = ({
       <div className="absolute inset-0 -z-10" style={{ backgroundColor: 'rgba(250, 249, 246, 0.5)' }}></div>
 
       {/* 闂佽楠哥紞濠傤焽閼姐倗纾芥慨妯挎硾閻ら箖鏌ょ粙璺ㄤ粵缂傚秴娲幃宄扳枎韫囨搩浼€闂?- 闂傚倷绀侀幖顐﹀疮椤愶附鍋夐柣鎾冲濞戙垹鍨傛い鏃囶潐閻忎線姊婚崒姘卞缂佸鍨块幃妯衡枎閹炬潙浠?*/}
-      <div className="flex-shrink-0 flex flex-col overflow-y-auto pt-6 pb-20 pl-0 pr-2 no-scrollbar z-0 transition-all duration-300 relative w-16 items-center">
+      <div className="flex-shrink-0 flex h-full min-h-0 flex-col overflow-y-auto pt-6 pb-20 pl-0 pr-2 no-scrollbar z-0 transition-all duration-300 relative w-16 items-center">
         <div className="flex-1 w-full">
           {timeSlots.map((slot, index) => {
             const isSelected = selectedSlotIndex === index;
@@ -1065,7 +1065,7 @@ export const SceneView: React.FC<SceneViewProps> = ({
 
       {/* 闂傚倷绀侀幉锟犳偡閵夆晛鍌ㄩ柡宥庡幖閻ら箖鏌ら崫銉︽毄闁崇粯妫冮幃瑙勬媴閸濄儻绱炵紓浣割槸閵堟悂寮诲☉銏犵疀妞ゆ帊绀佸▍锝咁渻?*/}
       <div 
-        className="flex-1 overflow-hidden flex flex-col p-5 md:p-10 rounded-tl-[2rem] shadow-[-5px_0_20px_rgba(0,0,0,0.08)] z-10 ml-[-10px] relative"
+        className="flex-1 min-h-0 overflow-hidden flex flex-col p-5 md:p-10 rounded-tl-[2rem] shadow-[-5px_0_20px_rgba(0,0,0,0.08)] z-10 ml-[-10px] relative"
         id="scene-content"
       >
         {/* 闂傚倷绀侀幉锟犮€冮崨瀛樻櫇妞ゅ繐鐗嗛悞鍨亜閹哄棗浜剧紓浣虹帛閸ㄩ潧宓勯梺纭呮彧闂勫嫰宕曞畝鍕厱濠电姴瀚弸搴亜閵夈儳绠绘慨濠冩そ椤㈡寰勬繝鍐壕闂備胶顭堢粔鍫曞极閸涘﹦顩?*/}
@@ -1088,7 +1088,7 @@ export const SceneView: React.FC<SceneViewProps> = ({
         </div>
 
         {/* 濠电姷鏁搁崑鐘典焊椤忓牜鏁嬬憸搴ㄥ箞閵娾晛鐓涢柛娑卞幘椤㈠懘姊洪幐搴ｂ槈閻庢凹鍓熼妴鍌涚節濮橆厾鍘遍梺鍦劋閹尖晛鈻撳▎鎾寸厪?- 闂傚倷绀侀幉锟犮€冮崱妞曟椽寮介鐐茬€銈呯箰濡瑩寮冲鍫熺厱闁规壋鏅涙俊鎸庣節閳?*/}
-        <div className="flex flex-col gap-3 overflow-y-auto pb-24 no-scrollbar">
+        <div className="flex-1 min-h-0 flex flex-col gap-3 overflow-y-auto pb-24 no-scrollbar">
           {currentCards.length === 0 ? (
             <div className="flex items-center justify-center py-12">
               <div className="text-center text-stone-400">

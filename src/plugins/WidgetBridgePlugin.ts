@@ -4,7 +4,7 @@
  * @output Typed Capacitor widget bridge methods
  * @pos Plugin
  * @description Exposes the Android widget template, instance binding state, and runtime bridge to the React application.
- * @updated 2026-04-18: Moved widget type selection from template level to slot level so mixed-type templates can share one contract.
+ * @updated 2026-04-25: Added dedicated DAILY_RUNTIME payload sync types for the native 4x4 heatmap widget.
  */
 import { registerPlugin } from '@capacitor/core';
 import { ShortcutWidgetAction } from '../services/widgetShortcutService';
@@ -120,6 +120,29 @@ export interface WidgetBridgePendingDailyAction {
   slotIndex?: number | null;
 }
 
+export interface WidgetBridgeDailyRuntimeSegment {
+  index: number;
+  categoryId: string | null;
+  categoryName: string | null;
+  color: string | null;
+  minutes: number;
+}
+
+export interface WidgetBridgeDailyRuntimeLegendItem {
+  categoryId: string;
+  categoryName: string;
+  color: string;
+  totalMinutes: number;
+}
+
+export interface WidgetBridgeDailyRuntimePayload {
+  date: string;
+  totalMinutes: number;
+  segments: WidgetBridgeDailyRuntimeSegment[];
+  legend: WidgetBridgeDailyRuntimeLegendItem[];
+  syncedAt: number;
+}
+
 export interface WidgetBridgePlugin {
   getTemplates(): Promise<{ templates: WidgetBridgeTemplate[] }>;
   saveTemplates(options: { templates: WidgetBridgeTemplate[] }): Promise<void>;
@@ -131,6 +154,7 @@ export interface WidgetBridgePlugin {
   getPendingDailyActions(): Promise<{ actions: WidgetBridgePendingDailyAction[] }>;
   clearPendingDailyActions(options: { ids: string[] }): Promise<void>;
   syncDailyWidgetData(options: { payload: WidgetBridgeDailySyncPayload | null }): Promise<void>;
+  syncDailyRuntimeWidgetData(options: { payload: WidgetBridgeDailyRuntimePayload | null }): Promise<void>;
   refreshWidget(options?: { appWidgetId?: number; templateId?: string }): Promise<void>;
 }
 

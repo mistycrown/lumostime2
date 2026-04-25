@@ -4,11 +4,14 @@
  * @output Widget template persistence helpers and app/native conversion utilities
  * @pos Service
  * @description Centralizes the shared types and conversions used by the Android widget system while keeping timer, daily, and shortcut slots on one contract.
- * @updated 2026-04-18: Removed template-level widget families and moved widget type selection down to each slot.
+ * @updated 2026-04-25: Added DAILY_RUNTIME 4x4 payload builders for the native timeline heatmap widget.
  */
 import { Capacitor } from '@capacitor/core';
 import { ActiveSession, Category, CheckTemplate, DailyReview, Log } from '../types';
 import type {
+  WidgetBridgeDailyRuntimeLegendItem,
+  WidgetBridgeDailyRuntimePayload,
+  WidgetBridgeDailyRuntimeSegment,
   DailyWidgetManualMode,
   WidgetBridgeDailyCheckMeta,
   WidgetBridgeDailyProgress,
@@ -614,3 +617,155 @@ export const buildDailyWidgetSyncPayload = ({
 
 export const buildWidgetTimerSlotConfig = buildTimerWidgetSlotConfig;
 export const rebuildWidgetTimerSlotConfig = rebuildTimerWidgetSlotConfig;
+
+const DAILY_RUNTIME_SEGMENT_COUNT = 24 * 6;
+const DAILY_RUNTIME_SEGMENT_MINUTES = 10;
+const DAILY_RUNTIME_EMPTY_COLOR = '#F1F5F9';
+
+type DailyRuntimeAccumulator = {
+  categoryId: string;
+  categoryName: string;
+  color: string;
+  minutes: number;
+};
+
+const clampRange = (value: number, min: number, max: number) => Math.min(Math.max(value, min), max);
+
+const formatDailyRuntimeDate = (date: Date): string => getLocalDateStr(date);
+
+const getDailyRuntimeDayBounds = (date: Date) => {
+  const dayStart = new Date(date);
+  dayStart.setHours(0, 0, 0, 0);
+  const dayEnd = new Date(dayStart);
+  dayEnd.setDate(dayEnd.getDate() + 1);
+  return {
+    dayStartMs: dayStart.getTime(),
+    dayEndMs: dayEnd.getTime()
+  };
+};
+
+const buildCategoryRuntimeMeta = (category: Category) => ({
+  categoryId: category.id,
+  categoryName: category.name,
+  color: getColorHexForCharts(category.themeColor || '') || DAILY_RUNTIME_EMPTY_COLOR
+});
+
+export const buildDailyRuntimeWidgetPayload = ({
+  logs,
+  activeSessions,
+  categories,
+  date = new Date(),
+  now = Date.now()
+}: {
+  logs: Log[];
+  activeSessions: ActiveSession[];
+  categories: Category[];
+  date?: Date;
+  now?: number;
+}): WidgetBridgeDailyRuntimePayload => {
+  const { dayStartMs, dayEndMs } = getDailyRuntimeDayBounds(date);
+  const categoryMeta = new Map(categories.map((category) => [category.id, buildCategoryRuntimeMeta(category)]));
+  const segmentBuckets = Array.from({ length: DAILY_RUNTIME_SEGMENT_COUNT }, () => new Map<string, number>());
+  const legendBuckets = new Map<string, DailyRuntimeAccumulator>();
+
+  const accumulateRange = (categoryId: string, startMs: number, endMs: number) => {
+    const safeStart = clampRange(startMs, dayStartMs, dayEndMs);
+    const safeEnd = clampRange(endMs, dayStartMs, dayEndMs);
+    if (safeEnd <= safeStart) {
+      return;
+    }
+
+    const meta = categoryMeta.get(categoryId);
+    if (!meta) {
+      return;
+    }
+
+    const durationMinutes = (safeEnd - safeStart) / 60000;
+    const existingLegend = legendBuckets.get(categoryId);
+    if (existingLegend) {
+      existingLegend.minutes += durationMinutes;
+    } else {
+      legendBuckets.set(categoryId, {
+        categoryId: meta.categoryId,
+        categoryName: meta.categoryName,
+        color: meta.color,
+        minutes: durationMinutes
+      });
+    }
+
+    for (let segmentIndex = 0; segmentIndex < DAILY_RUNTIME_SEGMENT_COUNT; segmentIndex += 1) {
+      const segmentStart = dayStartMs + segmentIndex * DAILY_RUNTIME_SEGMENT_MINUTES * 60000;
+      const segmentEnd = segmentStart + DAILY_RUNTIME_SEGMENT_MINUTES * 60000;
+      const overlapMs = Math.min(safeEnd, segmentEnd) - Math.max(safeStart, segmentStart);
+      if (overlapMs <= 0) {
+        continue;
+      }
+
+      const bucket = segmentBuckets[segmentIndex];
+      bucket.set(categoryId, (bucket.get(categoryId) || 0) + overlapMs / 60000);
+    }
+  };
+
+  logs.forEach((log) => {
+    if (!log.categoryId) {
+      return;
+    }
+    accumulateRange(log.categoryId, log.startTime, log.endTime);
+  });
+
+  activeSessions.forEach((session) => {
+    if (!session.categoryId) {
+      return;
+    }
+    accumulateRange(session.categoryId, session.startTime, now);
+  });
+
+  const segments: WidgetBridgeDailyRuntimeSegment[] = segmentBuckets.map((bucket, index) => {
+    let dominantCategoryId: string | null = null;
+    let dominantMinutes = 0;
+    bucket.forEach((minutes, categoryId) => {
+      if (minutes > dominantMinutes) {
+        dominantCategoryId = categoryId;
+        dominantMinutes = minutes;
+      }
+    });
+
+    if (!dominantCategoryId) {
+      return {
+        index,
+        categoryId: null,
+        categoryName: null,
+        color: null,
+        minutes: 0
+      };
+    }
+
+    const meta = categoryMeta.get(dominantCategoryId);
+    return {
+      index,
+      categoryId: dominantCategoryId,
+      categoryName: meta?.categoryName || null,
+      color: meta?.color || DAILY_RUNTIME_EMPTY_COLOR,
+      minutes: Math.round(dominantMinutes)
+    };
+  });
+
+  const legend: WidgetBridgeDailyRuntimeLegendItem[] = Array.from(legendBuckets.values())
+    .sort((left, right) => right.minutes - left.minutes)
+    .map((item) => ({
+      categoryId: item.categoryId,
+      categoryName: item.categoryName,
+      color: item.color,
+      totalMinutes: Math.round(item.minutes)
+    }));
+
+  return {
+    date: formatDailyRuntimeDate(date),
+    totalMinutes: Math.round(
+      Array.from(legendBuckets.values()).reduce((total, item) => total + item.minutes, 0)
+    ),
+    segments,
+    legend,
+    syncedAt: now
+  };
+};
