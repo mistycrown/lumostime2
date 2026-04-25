@@ -4,6 +4,7 @@
  * @output Updated Categories/Todos (Reorder, CRUD)
  * @pos View (Modal/Page)
  * @description A specialized view for bulk management of To-Do items and categories. Supports drag-and-drop reordering and category color configuration for todo statistics.
+ * @updated 2026-04-23: Hid subtasks from the batch-management list while preserving hidden child todos and completed todos during save.
  * 
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
@@ -16,6 +17,7 @@ import { useSettings } from '../contexts/SettingsContext';
 import { COLOR_OPTIONS } from '../constants';
 import { useCustomColors } from '../hooks/useCustomColors';
 import { getColorPreviewValue, isStoredColorSelected } from '../utils/colorUtils';
+import { applyParentTodoInheritance, isSubtask } from '../utils/todoHierarchyUtils';
 
 interface TodoBatchManageViewProps {
     onBack: () => void;
@@ -28,12 +30,16 @@ interface CategoryWithTodos extends TodoCategory {
     items: TodoItem[];
 }
 
+const getVisibleBatchTodos = (todos: TodoItem[], categoryId: string): TodoItem[] => (
+    todos.filter((todo) => todo.categoryId === categoryId && !todo.isCompleted && !isSubtask(todo))
+);
+
 export const TodoBatchManageView: React.FC<TodoBatchManageViewProps> = ({ onBack, categories: initialCategories, todos: initialTodos, onSave }) => {
-    // Initialize state by merging categories and todos (only show uncompleted todos)
+    // Initialize state by merging categories and todos (only show uncompleted parent todos)
     const [data, setData] = useState<CategoryWithTodos[]>(() => {
         return initialCategories.map(cat => ({
             ...cat,
-            items: initialTodos.filter(t => t.categoryId === cat.id && !t.isCompleted)
+            items: getVisibleBatchTodos(initialTodos, cat.id)
         }));
     });
 
@@ -204,17 +210,35 @@ export const TodoBatchManageView: React.FC<TodoBatchManageViewProps> = ({ onBack
     };
 
     const handleSave = () => {
-        // Separate categories and todos
         const finalCategories: TodoCategory[] = data.map(({ id, name, icon, uiIcon, color }) => ({ id, name, icon, uiIcon, color }));
+        const remainingCategoryIds = new Set(finalCategories.map((category) => category.id));
+        const initialVisibleTodoIds = new Set(
+            initialTodos
+                .filter((todo) => !todo.isCompleted && !isSubtask(todo))
+                .map((todo) => todo.id)
+        );
+        const editedRootTodos: TodoItem[] = data.flatMap((category) => (
+            category.items.map((todo) => ({ ...todo, categoryId: category.id }))
+        ));
+        const preservedHiddenTodos = initialTodos.filter((todo) => !initialVisibleTodoIds.has(todo.id));
+        const preservedRootTodos = preservedHiddenTodos.filter((todo) => (
+            !isSubtask(todo) && remainingCategoryIds.has(todo.categoryId)
+        ));
+        const rootTodoMap = new Map<string, TodoItem>(
+            [...editedRootTodos, ...preservedRootTodos].map((todo) => [todo.id, todo])
+        );
+        const preservedSubtasks = preservedHiddenTodos
+            .filter((todo) => isSubtask(todo))
+            .map((todo) => {
+                const parentTodo = todo.parentTodoId ? rootTodoMap.get(todo.parentTodoId) : null;
+                if (!parentTodo || !remainingCategoryIds.has(parentTodo.categoryId)) {
+                    return null;
+                }
 
-        // Get all edited uncompleted todos
-        const editedTodos: TodoItem[] = data.flatMap(c => c.items.map(t => ({ ...t, categoryId: c.id })));
-
-        // Get completed todos from original data (they were not loaded into edit state)
-        const completedTodos = initialTodos.filter(t => t.isCompleted);
-
-        // Merge edited todos with completed todos
-        const finalTodos = [...editedTodos, ...completedTodos];
+                return applyParentTodoInheritance(todo, parentTodo);
+            })
+            .filter((todo): todo is TodoItem => Boolean(todo));
+        const finalTodos = [...editedRootTodos, ...preservedRootTodos, ...preservedSubtasks];
 
         onSave(finalCategories, finalTodos);
     };

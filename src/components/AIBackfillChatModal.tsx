@@ -4,6 +4,13 @@
  * @output Full-screen AI time assistant with session history, persona settings, quick context cache, and direct log/todo application
  * @pos Component (AI Integration)
  * @description Provides the shared AI workspace for chat, backfill, and todo creation. Sessions persist locally, persona style is configurable per session, and recent context can be toggled into the formal AI request path.
+ * @updated 2026-04-25: Softened the AI dialog shadow system so the shell, cards, and avatar surfaces feel lighter and less floating.
+ * @updated 2026-04-25: Added a true grayscale fallback for the `default` color scheme so the AI workspace no longer picks up tinted beige/green surfaces when no themed accent is active.
+ * @updated 2026-04-25: Refined the title/header alignment and simplified applied-result cards by reducing capsules, moving log time pills to the top-right, and switching action buttons to icon-only controls.
+ * @updated 2026-04-25: Simplified the AI settings panel by flattening the avatar/persona layouts, trimming low-value helper copy, and tightening everything around the existing theme tokens.
+ * @updated 2026-04-23: Unified the AI workspace colors around dynamic `--accent-color` theme tokens and reordered the settings panel into persona list, current persona, user avatar, and context sections.
+ * @updated 2026-04-23: Shifted the editorial redesign toward a cooler grayscale palette, removed the inset rounded shell for full-bleed layout, tightened header/composer sizing, simplified applied-result cards into left-rule summaries, and added configurable user avatars with default, emoji, and upload support.
+ * @updated 2026-04-23: Rebuilt the full AI workspace into a warmer editorial shell inspired by Claude, unifying the chat stage, history rail, persona studio, and debug ledger with a production-grade reading-first layout.
  * @updated 2026-04-22: Added deletion for custom personas with inline confirmation and automatic session fallback to the default built-in preset.
  * @updated 2026-04-22: Simplified the empty-chat state into example prompts and refreshed the built-in persona roster with stronger themed voices plus personalized user addressing.
  * @updated 2026-04-22: Cached recent conversation turns per session before formal AI calls, and changed persona selection to a lightweight checkmark state instead of a full black card.
@@ -21,9 +28,7 @@
  */
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  Bot,
   Check,
-  Clock3,
   History,
   Loader2,
   MessageSquarePlus,
@@ -34,6 +39,7 @@ import {
   Sparkles,
   Square,
   Trash2,
+  Undo2,
   Upload,
   User,
   X
@@ -74,6 +80,11 @@ interface AIChatPersona {
   systemPrompt: string;
   contextMessageLimit: number;
   isBuiltIn: boolean;
+}
+
+interface AIChatUserProfile {
+  avatarIcon: string;
+  avatarImage?: string;
 }
 
 interface AppliedCreateLogSnapshot {
@@ -203,6 +214,61 @@ const PersonaAvatar: React.FC<{
   );
 };
 
+const UserAvatar: React.FC<{
+  profile: AIChatUserProfile;
+  className?: string;
+  iconClassName?: string;
+}> = ({
+  profile,
+  className = '',
+  iconClassName = ''
+}) => {
+  const [src, setSrc] = useState('');
+
+  useEffect(() => {
+    let cancelled = false;
+
+    if (!profile.avatarImage) {
+      setSrc('');
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    imageService.getImageUrl(profile.avatarImage).then((url) => {
+      if (!cancelled) {
+        setSrc(url);
+      }
+    }).catch((error) => {
+      console.error('[AIBackfillChatModal] Failed to load user avatar', error);
+      if (!cancelled) {
+        setSrc('');
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [profile.avatarImage]);
+
+  if (src) {
+    return <img src={src} alt="user avatar" className={`h-full w-full object-cover ${className}`.trim()} />;
+  }
+
+  if (profile.avatarIcon.trim()) {
+    return (
+      <span
+        className={`inline-flex h-full w-full items-center justify-center text-center leading-none ${iconClassName}`.trim()}
+        style={{ lineHeight: 1 }}
+      >
+        {profile.avatarIcon}
+      </span>
+    );
+  }
+
+  return <User size={15} className={iconClassName} />;
+};
+
 interface ActiveRequestRef {
   controller: AbortController;
   sessionId: string;
@@ -219,12 +285,116 @@ interface InitialChatState {
   sessions: AIChatSession[];
   activeSessionId: string;
   debugMode: boolean;
+  userProfile: AIChatUserProfile;
 }
 
 const CHAT_SESSIONS_KEY = 'lumostime_ai_chat_sessions_v1';
 const ACTIVE_SESSION_KEY = 'lumostime_ai_chat_active_session_v1';
 const CHAT_PERSONAS_KEY = 'lumostime_ai_chat_personas_v1';
 const DEBUG_MODE_KEY = 'lumostime_ai_chat_debug_mode_v1';
+const USER_PROFILE_KEY = 'lumostime_ai_chat_user_profile_v1';
+
+const accentMix = (accentPercent: number, baseColor: string): string => (
+  `color-mix(in srgb, var(--accent-color) ${accentPercent}%, ${baseColor})`
+);
+
+const ACCENT_AI_CHAT_THEME = {
+  shellBg: accentMix(8, '#f4efe7'),
+  shellLayerBg: accentMix(4, '#fbf8f2'),
+  panelBg: accentMix(3, '#fffdf8'),
+  panelBgStrong: accentMix(5, '#faf5ec'),
+  panelBgSoft: accentMix(7, '#f8f2e8'),
+  panelBgMuted: accentMix(9, '#f2eadf'),
+  panelBorder: accentMix(16, '#ddd3c6'),
+  panelBorderStrong: accentMix(26, '#d4c6b6'),
+  chipBg: accentMix(8, '#fffaf4'),
+  chipBorder: accentMix(18, '#ddd1c3'),
+  chipBorderStrong: accentMix(28, '#d1c0ad'),
+  inputBg: accentMix(6, '#f8f2e8'),
+  inputBgStrong: accentMix(10, '#f1e7da'),
+  activeBg: accentMix(12, '#fff8f0'),
+  activeBorder: accentMix(30, '#d5c5b3'),
+  avatarBg: accentMix(4, '#ffffff'),
+  textPrimary: '#201c19',
+  textSecondary: '#655d55',
+  textMuted: '#8b8176',
+  textFaint: '#a19386',
+  primaryButtonBg: accentMix(56, '#2f2b28'),
+  primaryButtonHoverBg: accentMix(64, '#2b2623'),
+  primaryButtonBorder: accentMix(30, '#2f2b28'),
+  primaryButtonText: '#fffaf3',
+  successBg: '#edf3ea',
+  successBorder: '#ced8ca',
+  successText: '#556a52',
+  undoneBg: accentMix(7, '#f1ebe3'),
+  undoneBorder: accentMix(16, '#ddd2c4'),
+  undoneText: '#7a7067',
+  dangerBg: accentMix(8, '#f8e9e6'),
+  dangerBorder: accentMix(20, '#e2b4ab'),
+  dangerText: '#9d544d',
+  pendingBg: accentMix(6, '#f3eee7'),
+  pendingBorder: accentMix(12, '#ddd3c8'),
+  codeBg: '#2d2926',
+  codeBorder: '#433a34',
+  codeText: '#efe7db',
+  overlayDark: 'rgba(32, 25, 19, 0.18)',
+  overlayLight: 'rgba(247, 241, 233, 0.94)',
+  cardShadow: '0 8px 22px rgba(52, 38, 27, 0.04)',
+  cardShadowStrong: '0 12px 28px rgba(52, 38, 27, 0.06)',
+  avatarShadow: '0 6px 16px rgba(52, 38, 27, 0.05)'
+} as const;
+
+const getAIChatTheme = (isDefaultTheme: boolean) => {
+  if (isDefaultTheme) {
+    return {
+      shellBg: '#f5f5f5',
+      shellLayerBg: '#fafafa',
+      panelBg: '#ffffff',
+      panelBgStrong: '#fafafa',
+      panelBgSoft: '#f5f5f5',
+      panelBgMuted: '#f0f0f0',
+      panelBorder: '#e7e5e4',
+      panelBorderStrong: '#d6d3d1',
+      chipBg: '#fafaf9',
+      chipBorder: '#e7e5e4',
+      chipBorderStrong: '#d6d3d1',
+      inputBg: '#f5f5f4',
+      inputBgStrong: '#f0f0ef',
+      activeBg: '#f5f5f4',
+      activeBorder: '#d6d3d1',
+      avatarBg: '#ffffff',
+      textPrimary: '#1c1917',
+      textSecondary: '#57534e',
+      textMuted: '#78716c',
+      textFaint: '#a8a29e',
+      primaryButtonBg: '#1c1917',
+      primaryButtonHoverBg: '#292524',
+      primaryButtonBorder: '#1c1917',
+      primaryButtonText: '#ffffff',
+      successBg: '#f5f5f4',
+      successBorder: '#d6d3d1',
+      successText: '#57534e',
+      undoneBg: '#fafaf9',
+      undoneBorder: '#e7e5e4',
+      undoneText: '#78716c',
+      dangerBg: '#f5f5f4',
+      dangerBorder: '#d6d3d1',
+      dangerText: '#57534e',
+      pendingBg: '#fafaf9',
+      pendingBorder: '#e7e5e4',
+      codeBg: '#2d2926',
+      codeBorder: '#433a34',
+      codeText: '#efe7db',
+      overlayDark: 'rgba(0, 0, 0, 0.18)',
+      overlayLight: 'rgba(250, 250, 250, 0.94)',
+      cardShadow: '0 8px 20px rgba(0, 0, 0, 0.04)',
+      cardShadowStrong: '0 12px 26px rgba(0, 0, 0, 0.05)',
+      avatarShadow: '0 6px 14px rgba(0, 0, 0, 0.05)'
+    } as const;
+  }
+
+  return ACCENT_AI_CHAT_THEME;
+};
 
 const BUILTIN_PERSONAS: AIChatPersona[] = [
   {
@@ -459,6 +629,22 @@ const normalizePersonas = (value: unknown): AIChatPersona[] => {
   });
 };
 
+const normalizeUserProfile = (value: unknown): AIChatUserProfile => {
+  if (!value || typeof value !== 'object') {
+    return {
+      avatarIcon: ''
+    };
+  }
+
+  const candidate = value as Partial<AIChatUserProfile>;
+  return {
+    avatarIcon: typeof candidate.avatarIcon === 'string' ? candidate.avatarIcon.trim() : '',
+    ...(typeof candidate.avatarImage === 'string' && candidate.avatarImage.trim()
+      ? { avatarImage: candidate.avatarImage.trim() }
+      : {})
+  };
+};
+
 const createDefaultSession = (personaId: string): AIChatSession => {
   const now = Date.now();
   return {
@@ -513,6 +699,7 @@ const normalizeSessions = (value: unknown, personas: AIChatPersona[]): AIChatSes
 const loadInitialChatState = (): InitialChatState => {
   const personas = normalizePersonas(safeJsonParse<unknown>(localStorage.getItem(CHAT_PERSONAS_KEY), []));
   const sessions = normalizeSessions(safeJsonParse<unknown>(localStorage.getItem(CHAT_SESSIONS_KEY), []), personas);
+  const userProfile = normalizeUserProfile(safeJsonParse<unknown>(localStorage.getItem(USER_PROFILE_KEY), null));
   const storedActiveSessionId = localStorage.getItem(ACTIVE_SESSION_KEY);
   const activeSessionId = sessions.some((session) => session.id === storedActiveSessionId)
     ? storedActiveSessionId as string
@@ -522,7 +709,8 @@ const loadInitialChatState = (): InitialChatState => {
     personas,
     sessions,
     activeSessionId,
-    debugMode: localStorage.getItem(DEBUG_MODE_KEY) === 'true'
+    debugMode: localStorage.getItem(DEBUG_MODE_KEY) === 'true',
+    userProfile
   };
 };
 
@@ -549,6 +737,13 @@ const formatDateTimeRange = (startTime: number, endTime: number): string => (
     day: 'numeric',
     weekday: 'short'
   }).format(startTime)} · ${formatTimeRange(startTime, endTime)}`
+);
+
+const formatActionDate = (timestamp: number): string => (
+  new Intl.DateTimeFormat('zh-CN', {
+    month: 'numeric',
+    day: 'numeric'
+  }).format(timestamp)
 );
 
 const formatConversationTime = (timestamp: number): string => (
@@ -638,6 +833,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
   const [sessions, setSessions] = useState<AIChatSession[]>(initialState.sessions);
   const [activeSessionId, setActiveSessionId] = useState<string>(initialState.activeSessionId);
   const [debugMode, setDebugMode] = useState<boolean>(initialState.debugMode);
+  const [userProfile, setUserProfile] = useState<AIChatUserProfile>(initialState.userProfile);
   const [inputText, setInputText] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isHistoryPanelOpen, setIsHistoryPanelOpen] = useState(false);
@@ -650,8 +846,12 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
   const [isEmojiEditorOpen, setIsEmojiEditorOpen] = useState(false);
   const [emojiDraft, setEmojiDraft] = useState('');
+  const [isUploadingUserAvatar, setIsUploadingUserAvatar] = useState(false);
+  const [isUserEmojiEditorOpen, setIsUserEmojiEditorOpen] = useState(false);
+  const [userEmojiDraft, setUserEmojiDraft] = useState('');
   const activeRequestRef = useRef<ActiveRequestRef | null>(null);
   const avatarInputRef = useRef<HTMLInputElement | null>(null);
+  const userAvatarInputRef = useRef<HTMLInputElement | null>(null);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
 
   const { logs, setLogs, todos, setTodos, todoCategories } = useData();
@@ -666,7 +866,8 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     setTodoCategoryToAdd
   } = useNavigation();
   const { addToast } = useToast();
-  const { autoLinkRules } = useSettings();
+  const { autoLinkRules, colorScheme } = useSettings();
+  const AI_CHAT_THEME = useMemo(() => getAIChatTheme(colorScheme === 'default'), [colorScheme]);
 
   const defaultTargetDate = useMemo(() => {
     if (targetDate) {
@@ -698,11 +899,22 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     setIsEmojiEditorOpen(false);
   }, [activePersona.id, activePersona.avatarIcon]);
 
+  useEffect(() => {
+    setUserEmojiDraft(userProfile.avatarIcon || '');
+    setIsUserEmojiEditorOpen(false);
+  }, [userProfile.avatarIcon, userProfile.avatarImage]);
+
   const referenceDayLogs = useMemo(() => (
     logs
       .filter((log) => formatDateKey(new Date(log.startTime)) === defaultDateKey)
       .sort((left, right) => left.startTime - right.startTime)
   ), [defaultDateKey, logs]);
+
+  const targetDateLabel = useMemo(() => new Intl.DateTimeFormat('zh-CN', {
+    month: 'long',
+    day: 'numeric',
+    weekday: 'short'
+  }).format(defaultTargetDate), [defaultTargetDate]);
 
   const latestLog = useMemo(() => (
     logs.length > 0
@@ -786,6 +998,10 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
   useEffect(() => {
     localStorage.setItem(DEBUG_MODE_KEY, String(debugMode));
   }, [debugMode]);
+
+  useEffect(() => {
+    localStorage.setItem(USER_PROFILE_KEY, JSON.stringify(userProfile));
+  }, [userProfile]);
 
   useEffect(() => {
     if (sessions.length === 0) {
@@ -1169,6 +1385,98 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
       avatarImage: undefined
     });
     setIsEmojiEditorOpen(false);
+  };
+
+  const updateUserProfile = (patch: Partial<AIChatUserProfile>) => {
+    setUserProfile((prev) => ({
+      ...prev,
+      ...patch
+    }));
+  };
+
+  const handleUserAvatarUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) {
+      return;
+    }
+
+    if (!file.type.startsWith('image/')) {
+      addToast('warning', '请选择图片文件');
+      return;
+    }
+
+    if (file.size > 10 * 1024 * 1024) {
+      addToast('warning', '图片大小不能超过 10MB');
+      return;
+    }
+
+    const previousAvatarImage = userProfile.avatarImage;
+    setIsUserEmojiEditorOpen(false);
+    setIsUploadingUserAvatar(true);
+    try {
+      const filename = await imageService.saveImage(file);
+      if (previousAvatarImage) {
+        await imageService.deleteImage(previousAvatarImage).catch((error) => {
+          console.error('[AIBackfillChatModal] Failed to delete previous user avatar image', error);
+        });
+      }
+
+      updateUserProfile({
+        avatarImage: filename
+      });
+    } catch (error) {
+      console.error('[AIBackfillChatModal] Failed to upload user avatar', error);
+      addToast('error', '用户头像上传失败，请重试');
+    } finally {
+      setIsUploadingUserAvatar(false);
+    }
+  };
+
+  const handleUseUserEmojiAvatar = () => {
+    setUserEmojiDraft(userProfile.avatarIcon || '');
+    setIsUserEmojiEditorOpen(true);
+  };
+
+  const handleCancelUserEmojiAvatarEdit = () => {
+    setUserEmojiDraft(userProfile.avatarIcon || '');
+    setIsUserEmojiEditorOpen(false);
+  };
+
+  const handleApplyUserEmojiAvatar = async () => {
+    const previousAvatarImage = userProfile.avatarImage;
+
+    if (previousAvatarImage) {
+      try {
+        await imageService.deleteImage(previousAvatarImage);
+      } catch (error) {
+        console.error('[AIBackfillChatModal] Failed to delete user avatar image when switching to emoji', error);
+      }
+    }
+
+    updateUserProfile({
+      avatarIcon: userEmojiDraft.trim(),
+      avatarImage: undefined
+    });
+    setIsUserEmojiEditorOpen(false);
+  };
+
+  const handleResetUserAvatar = async () => {
+    const previousAvatarImage = userProfile.avatarImage;
+
+    if (previousAvatarImage) {
+      try {
+        await imageService.deleteImage(previousAvatarImage);
+      } catch (error) {
+        console.error('[AIBackfillChatModal] Failed to delete user avatar image on reset', error);
+      }
+    }
+
+    setUserProfile({
+      avatarIcon: ''
+    });
+    setUserEmojiDraft('');
+    setIsUserEmojiEditorOpen(false);
   };
 
   const handleDebugCommand = (trimmedText: string): boolean => {
@@ -1746,90 +2054,125 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     const liveLinkedTodo = liveLog?.linkedTodoId
       ? todos.find((todo) => todo.id === liveLog.linkedTodoId)
       : undefined;
+    const categoryActivityLabel = dedupeStringArray([
+      liveCategory?.name || action.snapshot.categoryName,
+      liveActivity?.name || action.snapshot.activityName
+    ]).join(' / ');
+    const primaryText = action.snapshot.description.trim() || liveActivity?.name || action.snapshot.activityName;
 
     return (
       <div
         key={action.actionId}
-        className={`rounded-xl border px-3 py-2.5 ${
-          action.status === 'failed'
-            ? 'border-red-200 bg-red-50'
+        className={`border-l-2 pl-3 pr-1 py-1 ${action.status === 'undone' ? 'opacity-70' : ''}`}
+        style={{
+          borderColor: action.status === 'failed'
+            ? AI_CHAT_THEME.dangerBorder
             : action.status === 'undone'
-              ? 'border-stone-200 bg-stone-50 opacity-75'
-              : 'border-stone-200 bg-stone-50'
-        }`}
+              ? AI_CHAT_THEME.undoneBorder
+              : AI_CHAT_THEME.activeBorder
+        }}
       >
-        <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <div className="flex items-start justify-between gap-3">
+            <span className="pt-0.5 text-[11px]" style={{ color: AI_CHAT_THEME.textMuted }}>
+              {formatActionDate(action.snapshot.startTime)}
+            </span>
+            <span
+              className="inline-flex shrink-0 items-center rounded-full border px-2 py-0.5 text-[11px]"
+              style={{
+                color: AI_CHAT_THEME.textSecondary,
+                borderColor: AI_CHAT_THEME.chipBorder,
+                backgroundColor: AI_CHAT_THEME.chipBg
+              }}
+            >
+              {formatTimeRange(action.snapshot.startTime, action.snapshot.endTime)}
+            </span>
+          </div>
           <div className="min-w-0">
-            <div className="flex items-center gap-1.5 text-sm font-bold text-stone-700">
-              <Clock3 size={13} />
-              <span>{formatDateTimeRange(action.snapshot.startTime, action.snapshot.endTime)}</span>
-            </div>
-            <p className="mt-1 text-[15px] font-medium leading-5 text-stone-800">
-              {liveActivity?.name || action.snapshot.activityName}
+            <p className="mt-1 font-serif text-[1rem] leading-6" style={{ color: AI_CHAT_THEME.textPrimary }}>
+              {primaryText}
             </p>
-            {action.snapshot.description && (
-              <p className="mt-1.5 whitespace-pre-wrap break-words text-sm leading-5 text-stone-600">
-                {action.snapshot.description}
-              </p>
-            )}
           </div>
 
           <span
-            className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-bold ${
+            className="hidden shrink-0 rounded-full border px-2.5 py-1 text-[11px] font-semibold"
+            style={
               action.status === 'failed'
-                ? 'bg-red-100 text-red-700'
+                ? {
+                    borderColor: AI_CHAT_THEME.dangerBorder,
+                    backgroundColor: AI_CHAT_THEME.dangerBg,
+                    color: AI_CHAT_THEME.dangerText
+                  }
                 : action.status === 'undone'
-                  ? 'bg-stone-200 text-stone-500'
-                  : 'bg-emerald-100 text-emerald-700'
-            }`}
+                  ? {
+                      borderColor: AI_CHAT_THEME.undoneBorder,
+                      backgroundColor: AI_CHAT_THEME.undoneBg,
+                      color: AI_CHAT_THEME.undoneText
+                    }
+                  : {
+                      borderColor: AI_CHAT_THEME.successBorder,
+                      backgroundColor: AI_CHAT_THEME.successBg,
+                      color: AI_CHAT_THEME.successText
+                    }
+            }
           >
             {action.status === 'failed' ? '失败' : action.status === 'undone' ? '已撤销' : '已应用'}
           </span>
         </div>
 
-        <div className="mt-2 flex flex-wrap gap-1.5 text-[10px] text-stone-500">
-          <span className="inline-flex items-center gap-1 rounded border border-stone-200 bg-white px-2 py-0.5">
+        <div className="mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px]" style={{ color: AI_CHAT_THEME.textMuted }}>
+          <span className="inline-flex items-center gap-1">
             <IconRenderer
               icon={liveCategory?.icon || ''}
               uiIcon={liveCategory?.uiIcon}
               className="text-xs"
             />
-            <span>{liveCategory?.name || action.snapshot.categoryName}</span>
+            <span>{categoryActivityLabel}</span>
           </span>
 
           {action.snapshot.scopeNames.map((scopeName) => (
-            <span key={`${action.actionId}-${scopeName}`} className="inline-flex items-center rounded border border-stone-200 bg-white px-2 py-0.5">
+            <span key={`${action.actionId}-${scopeName}`} className="inline-flex items-center">
               %{scopeName}
             </span>
           ))}
 
           {(liveLinkedTodo?.title || action.snapshot.linkedTodoTitle) && (
-            <span className="inline-flex items-center rounded border border-stone-200 bg-white px-2 py-0.5">
+            <span className="inline-flex items-center">
               @{liveLinkedTodo?.title || action.snapshot.linkedTodoTitle}
             </span>
           )}
         </div>
 
         {action.errorMessage && (
-          <p className="mt-2 text-xs text-red-600">{action.errorMessage}</p>
+          <p className="mt-2 text-xs" style={{ color: AI_CHAT_THEME.dangerText }}>{action.errorMessage}</p>
         )}
 
-        <div className="mt-2 flex items-center gap-1.5">
+        <div className="mt-2.5 flex justify-end gap-2">
           <button
             onClick={() => handleOpenLogEditor(action.snapshot.logId)}
             disabled={!liveLog || action.status !== 'applied'}
-            className="inline-flex h-8 items-center justify-center rounded-full border border-stone-200 bg-white px-3 text-xs font-medium text-stone-600 transition-colors hover:border-stone-300 hover:text-stone-800 disabled:cursor-not-allowed disabled:opacity-40"
+            className="inline-flex h-8 w-8 items-center justify-center rounded-full border transition-colors disabled:cursor-not-allowed disabled:opacity-40"
+            style={{
+              borderColor: AI_CHAT_THEME.chipBorder,
+              backgroundColor: AI_CHAT_THEME.inputBg,
+              color: AI_CHAT_THEME.textSecondary
+            }}
+            title="编辑"
           >
-            <Pencil size={12} className="mr-1" />
-            编辑
+            <Pencil size={13} />
           </button>
           <button
             onClick={() => handleUndoLogAction(messageId, action)}
             disabled={action.status !== 'applied'}
-            className="inline-flex h-8 items-center justify-center rounded-full border border-stone-200 bg-white px-3 text-xs font-medium text-stone-600 transition-colors hover:border-stone-300 hover:text-stone-800 disabled:cursor-not-allowed disabled:opacity-40"
+            className="inline-flex h-8 w-8 items-center justify-center rounded-full border transition-colors disabled:cursor-not-allowed disabled:opacity-40"
+            style={{
+              borderColor: AI_CHAT_THEME.chipBorder,
+              backgroundColor: AI_CHAT_THEME.inputBg,
+              color: AI_CHAT_THEME.textSecondary
+            }}
+            title="撤销"
           >
-            <RotateCcw size={12} className="mr-1" />
-            撤销
+            <Undo2 size={13} />
           </button>
         </div>
       </div>
@@ -1840,99 +2183,123 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     const liveTodo = action.snapshot.todoId
       ? todos.find((todo) => todo.id === action.snapshot.todoId)
       : undefined;
+    const categoryActivityLabel = dedupeStringArray([
+      action.snapshot.categoryName,
+      action.snapshot.linkedActivityName
+    ]).join(' / ');
 
     return (
       <div
         key={action.actionId}
-        className={`rounded-xl border px-3 py-2.5 ${
-          action.status === 'failed'
-            ? 'border-red-200 bg-red-50'
+        className={`border-l-2 pl-3 pr-1 py-1 ${action.status === 'undone' ? 'opacity-70' : ''}`}
+        style={{
+          borderColor: action.status === 'failed'
+            ? AI_CHAT_THEME.dangerBorder
             : action.status === 'undone'
-              ? 'border-stone-200 bg-stone-50 opacity-75'
-              : 'border-stone-200 bg-stone-50'
-        }`}
+              ? AI_CHAT_THEME.undoneBorder
+              : AI_CHAT_THEME.activeBorder
+        }}
       >
-        <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0">
           <div className="min-w-0">
-            <p className="text-[15px] font-medium leading-5 text-stone-800">
+            <p className="font-serif text-[1rem] leading-6" style={{ color: AI_CHAT_THEME.textPrimary }}>
               {liveTodo?.title || action.snapshot.title}
             </p>
             {action.snapshot.note && (
-              <p className="mt-1.5 whitespace-pre-wrap break-words text-sm leading-5 text-stone-600">
+              <p className="mt-1.5 whitespace-pre-wrap break-words text-[13px] leading-6" style={{ color: AI_CHAT_THEME.textSecondary }}>
                 {action.snapshot.note}
               </p>
             )}
           </div>
 
           <span
-            className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-bold ${
+            className="hidden shrink-0 rounded-full border px-2.5 py-1 text-[11px] font-semibold"
+            style={
               action.status === 'failed'
-                ? 'bg-red-100 text-red-700'
+                ? {
+                    borderColor: AI_CHAT_THEME.dangerBorder,
+                    backgroundColor: AI_CHAT_THEME.dangerBg,
+                    color: AI_CHAT_THEME.dangerText
+                  }
                 : action.status === 'undone'
-                  ? 'bg-stone-200 text-stone-500'
-                  : 'bg-emerald-100 text-emerald-700'
-            }`}
+                  ? {
+                      borderColor: AI_CHAT_THEME.undoneBorder,
+                      backgroundColor: AI_CHAT_THEME.undoneBg,
+                      color: AI_CHAT_THEME.undoneText
+                    }
+                  : {
+                      borderColor: AI_CHAT_THEME.successBorder,
+                      backgroundColor: AI_CHAT_THEME.successBg,
+                      color: AI_CHAT_THEME.successText
+                    }
+            }
           >
             {action.status === 'failed' ? '失败' : action.status === 'undone' ? '已撤销' : '已创建'}
           </span>
         </div>
 
-        <div className="mt-2 flex flex-wrap gap-1.5 text-[10px] text-stone-500">
-          <span className="inline-flex items-center rounded border border-stone-200 bg-white px-2 py-0.5">
-            {action.snapshot.categoryName}
-          </span>
-
-          {action.snapshot.linkedActivityName && (
-            <span className="inline-flex items-center rounded border border-stone-200 bg-white px-2 py-0.5">
-              #{action.snapshot.linkedActivityName}
+        <div className="mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px]" style={{ color: AI_CHAT_THEME.textMuted }}>
+          {categoryActivityLabel && (
+            <span className="inline-flex items-center">
+              {categoryActivityLabel}
             </span>
           )}
 
           {action.snapshot.defaultScopeNames.map((scopeName) => (
-            <span key={`${action.actionId}-${scopeName}`} className="inline-flex items-center rounded border border-stone-200 bg-white px-2 py-0.5">
+            <span key={`${action.actionId}-${scopeName}`} className="inline-flex items-center">
               %{scopeName}
             </span>
           ))}
 
           {action.snapshot.scheduledDate && (
-            <span className="inline-flex items-center rounded border border-stone-200 bg-white px-2 py-0.5">
+            <span className="inline-flex items-center">
               安排 {action.snapshot.scheduledDate}
             </span>
           )}
 
           {action.snapshot.deadlineDate && (
-            <span className="inline-flex items-center rounded border border-stone-200 bg-white px-2 py-0.5">
+            <span className="inline-flex items-center">
               截止 {action.snapshot.deadlineDate}
             </span>
           )}
 
           {action.snapshot.recurrenceRule && (
-            <span className="inline-flex items-center rounded border border-stone-200 bg-white px-2 py-0.5">
+            <span className="inline-flex items-center">
               循环 {action.snapshot.recurrenceRule.frequency}
             </span>
           )}
         </div>
 
         {action.errorMessage && (
-          <p className="mt-2 text-xs text-red-600">{action.errorMessage}</p>
+          <p className="mt-2 text-xs" style={{ color: AI_CHAT_THEME.dangerText }}>{action.errorMessage}</p>
         )}
 
-        <div className="mt-2 flex items-center gap-1.5">
+        <div className="mt-2.5 flex justify-end gap-2">
           <button
             onClick={() => handleOpenTodoDetail(action.snapshot.todoId)}
             disabled={!liveTodo || action.status !== 'applied'}
-            className="inline-flex h-8 items-center justify-center rounded-full border border-stone-200 bg-white px-3 text-xs font-medium text-stone-600 transition-colors hover:border-stone-300 hover:text-stone-800 disabled:cursor-not-allowed disabled:opacity-40"
+            className="inline-flex h-8 w-8 items-center justify-center rounded-full border transition-colors disabled:cursor-not-allowed disabled:opacity-40"
+            style={{
+              borderColor: AI_CHAT_THEME.chipBorder,
+              backgroundColor: AI_CHAT_THEME.inputBg,
+              color: AI_CHAT_THEME.textSecondary
+            }}
+            title="详情"
           >
-            <Pencil size={12} className="mr-1" />
-            详情
+            <Pencil size={13} />
           </button>
           <button
             onClick={() => handleUndoTodoAction(messageId, action)}
             disabled={action.status !== 'applied'}
-            className="inline-flex h-8 items-center justify-center rounded-full border border-stone-200 bg-white px-3 text-xs font-medium text-stone-600 transition-colors hover:border-stone-300 hover:text-stone-800 disabled:cursor-not-allowed disabled:opacity-40"
+            className="inline-flex h-8 w-8 items-center justify-center rounded-full border transition-colors disabled:cursor-not-allowed disabled:opacity-40"
+            style={{
+              borderColor: AI_CHAT_THEME.chipBorder,
+              backgroundColor: AI_CHAT_THEME.inputBg,
+              color: AI_CHAT_THEME.textSecondary
+            }}
+            title="撤销"
           >
-            <RotateCcw size={12} className="mr-1" />
-            撤销
+            <Undo2 size={13} />
           </button>
         </div>
       </div>
@@ -1945,64 +2312,124 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
       : renderTodoAction(messageId, action)
   );
 
+  const emptyPromptExamples = [
+    '今天下午两点到三点半写周报，挂到工作 / 写作。',
+    '刚刚看了 40 分钟论文，帮我补一条记录。',
+    '帮我建一个明天下午提交的待办：论文初稿。',
+    '这周日安排一个待办：整理实验数据。'
+  ];
+
   const renderMessageBubble = (message: AIChatMessage) => {
     const isUser = message.role === 'user';
     const tone = message.tone || 'normal';
 
-    let bubbleClassName = 'border border-stone-200 bg-white text-stone-700';
+    let bubbleStyle = {
+      borderColor: AI_CHAT_THEME.panelBorder,
+      backgroundColor: AI_CHAT_THEME.panelBg,
+      color: AI_CHAT_THEME.textPrimary,
+      boxShadow: `0 0 0 1px ${accentMix(8, 'rgba(0,0,0,0.02)')}`
+    };
     if (isUser) {
-      bubbleClassName = 'bg-stone-900 text-white';
+      bubbleStyle = {
+        borderColor: AI_CHAT_THEME.activeBorder,
+        backgroundColor: AI_CHAT_THEME.activeBg,
+        color: AI_CHAT_THEME.textPrimary,
+        boxShadow: `0 0 0 1px ${accentMix(10, 'rgba(0,0,0,0.03)')}`
+      };
     } else if (tone === 'system') {
-      bubbleClassName = 'border border-amber-200 bg-amber-50 text-amber-800';
+      bubbleStyle = {
+        borderColor: AI_CHAT_THEME.panelBorder,
+        backgroundColor: AI_CHAT_THEME.inputBg,
+        color: AI_CHAT_THEME.textSecondary,
+        boxShadow: `0 0 0 1px ${accentMix(7, 'rgba(0,0,0,0.02)')}`
+      };
     } else if (tone === 'error') {
-      bubbleClassName = 'border border-red-200 bg-red-50 text-red-700';
+      bubbleStyle = {
+        borderColor: AI_CHAT_THEME.dangerBorder,
+        backgroundColor: AI_CHAT_THEME.dangerBg,
+        color: AI_CHAT_THEME.dangerText,
+        boxShadow: '0 0 0 1px rgba(157,84,77,0.08)'
+      };
     } else if (tone === 'pending') {
-      bubbleClassName = 'border border-stone-200 bg-stone-50 text-stone-600';
+      bubbleStyle = {
+        borderColor: AI_CHAT_THEME.pendingBorder,
+        backgroundColor: AI_CHAT_THEME.pendingBg,
+        color: AI_CHAT_THEME.textMuted,
+        boxShadow: `0 0 0 1px ${accentMix(6, 'rgba(0,0,0,0.02)')}`
+      };
     }
+
+    const avatarStyle = isUser
+      ? {
+          borderColor: AI_CHAT_THEME.activeBorder,
+          backgroundColor: AI_CHAT_THEME.activeBg,
+          color: AI_CHAT_THEME.textSecondary
+        }
+      : tone === 'error'
+        ? {
+            borderColor: AI_CHAT_THEME.dangerBorder,
+            backgroundColor: AI_CHAT_THEME.dangerBg,
+            color: AI_CHAT_THEME.dangerText
+          }
+        : tone === 'system'
+          ? {
+              borderColor: AI_CHAT_THEME.panelBorder,
+              backgroundColor: AI_CHAT_THEME.inputBg,
+              color: AI_CHAT_THEME.textMuted
+            }
+          : {
+              borderColor: AI_CHAT_THEME.panelBorder,
+              backgroundColor: AI_CHAT_THEME.avatarBg,
+              color: AI_CHAT_THEME.textSecondary
+            };
 
     return (
       <div key={message.id} className={`flex ${isUser ? 'justify-end' : 'justify-start'}`}>
-        <div className={`flex max-w-[88%] items-start gap-3 ${isUser ? 'flex-row-reverse' : 'flex-row'}`}>
+        <div className={`flex max-w-[92%] items-start gap-3 ${isUser ? 'flex-row-reverse' : 'flex-row'} sm:max-w-[86%]`}>
           <div
-            className={`mt-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${
-              isUser
-                ? 'bg-stone-900 text-white'
-                : tone === 'error'
-                  ? 'bg-red-100 text-red-700'
-                  : tone === 'system'
-                    ? 'bg-amber-100 text-amber-700'
-                    : 'bg-white text-stone-700'
-            }`}
+            className="mt-1 flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-[0.85rem] border"
+            style={avatarStyle}
           >
             {isUser ? (
-              <User size={15} />
+              <UserAvatar profile={userProfile} iconClassName="text-sm" />
             ) : (
-              <div className="h-full w-full overflow-hidden rounded-full">
-                <PersonaAvatar persona={activePersona} className="rounded-full" iconClassName="text-sm" />
+              <div className="h-full w-full overflow-hidden rounded-[0.85rem]">
+                <PersonaAvatar persona={activePersona} className="rounded-[0.85rem]" iconClassName="text-sm" />
               </div>
             )}
           </div>
 
-          <div className="space-y-2">
-            <div className={`rounded-[1.5rem] px-4 py-3 shadow-sm ${bubbleClassName}`}>
+          <div className="space-y-2.5">
+            <div className="rounded-[1.25rem] border px-4 py-3" style={bubbleStyle}>
               {!isUser && (
-                <p className="mb-2 text-[11px] font-bold uppercase tracking-[0.2em] text-stone-400">
+                <p className="mb-1.5 font-serif text-[11px] tracking-[0.14em]" style={{ color: AI_CHAT_THEME.textFaint }}>
                   {activePersona.assistantSelfName || 'AI 回答'}
                 </p>
               )}
               <div className="flex items-start gap-2">
                 {tone === 'pending' && (
-                  <Loader2 size={15} className="mt-1 shrink-0 animate-spin text-stone-400" />
+                  <Loader2 size={15} className="mt-1 shrink-0 animate-spin" style={{ color: AI_CHAT_THEME.textFaint }} />
                 )}
-                <p className="whitespace-pre-wrap break-words text-sm leading-6">
+                <p className="whitespace-pre-wrap break-words text-[14px] leading-6 sm:text-[15px]">
                   {message.content}
                 </p>
+              </div>
+              <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px]" style={{ color: AI_CHAT_THEME.textMuted }}>
+                <span>面向 {targetDateLabel}</span>
+                <span className="hidden text-[#b4a79a] sm:inline">·</span>
+                <span>{activeSession?.contextCacheEnabled ? `上下文已开启 · ${activePersona.contextMessageLimit} 轮` : '单轮模式'}</span>
               </div>
             </div>
 
             {message.appliedActions && message.appliedActions.length > 0 && (
-              <div className="space-y-2 rounded-[1.5rem] border border-stone-200 bg-white p-3 shadow-sm">
-                <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-stone-400">
+              <div
+                className="space-y-2 rounded-[1.15rem] border p-3"
+                style={{
+                  borderColor: AI_CHAT_THEME.panelBorder,
+                  backgroundColor: AI_CHAT_THEME.panelBgStrong
+                }}
+              >
+                <p className="font-serif text-[11px] tracking-[0.14em]" style={{ color: AI_CHAT_THEME.textFaint }}>
                   应用结果
                 </p>
                 <div className="space-y-2">
@@ -2018,7 +2445,12 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
                     title: `${activePersona.assistantSelfName || 'AI'} 调试`,
                     sections: message.debugSections || []
                   })}
-                  className="inline-flex items-center gap-1 rounded-full border border-stone-200 bg-white px-3 py-1 text-xs font-medium text-stone-500 transition-colors hover:border-stone-300 hover:text-stone-700"
+                  className="inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors"
+                  style={{
+                    borderColor: AI_CHAT_THEME.chipBorder,
+                    backgroundColor: AI_CHAT_THEME.panelBg,
+                    color: AI_CHAT_THEME.textSecondary
+                  }}
                 >
                   <Sparkles size={12} />
                   查看调试
@@ -2032,32 +2464,57 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-[60] flex flex-col overflow-hidden bg-[#f3efe7]">
+    <div
+      className="fixed inset-0 z-[60] overflow-hidden"
+      style={{
+        backgroundColor: AI_CHAT_THEME.shellBg,
+        color: AI_CHAT_THEME.textPrimary
+      }}
+    >
       <div
-        className="relative flex min-h-0 flex-1 flex-col"
+        className="relative flex h-full w-full flex-col overflow-hidden"
         style={{
+          backgroundColor: AI_CHAT_THEME.shellLayerBg,
           paddingTop: 'env(safe-area-inset-top)',
           paddingBottom: 'env(safe-area-inset-bottom)'
         }}
       >
-        <div className="flex items-center justify-between border-b border-stone-200/80 bg-[#f7f3eb]/95 px-5 py-4 backdrop-blur">
-          <div className="flex min-w-0 items-center gap-3">
+        <div
+          className="flex items-center justify-between gap-4 border-b px-4 py-3 backdrop-blur-xl sm:px-5 sm:py-3.5"
+          style={{
+            borderColor: AI_CHAT_THEME.panelBorder,
+            backgroundColor: AI_CHAT_THEME.panelBg
+          }}
+        >
+          <div className="flex min-w-0 items-center gap-3 sm:gap-4">
             <button
               onClick={() => !isLoading && setIsPersonaPanelOpen(true)}
               disabled={isLoading}
-              className="flex h-11 w-11 items-center justify-center overflow-hidden rounded-2xl bg-white text-lg shadow-sm transition-transform hover:scale-[1.02] disabled:cursor-not-allowed disabled:opacity-60"
+              className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-[1rem] border text-base transition-all disabled:cursor-not-allowed disabled:opacity-60"
+              style={{
+                borderColor: AI_CHAT_THEME.panelBorder,
+                backgroundColor: AI_CHAT_THEME.avatarBg,
+                boxShadow: AI_CHAT_THEME.avatarShadow
+              }}
               title="打开 AI 设置"
             >
-              <PersonaAvatar persona={activePersona} iconClassName="text-lg" />
+              <PersonaAvatar persona={activePersona} iconClassName="text-base" />
             </button>
 
-            <div className="min-w-0">
-              <div className="flex items-center gap-2">
-                <h2 className="truncate text-lg font-bold text-stone-800">
+            <div className="min-w-0 self-center">
+              <div className="flex flex-wrap items-center gap-2">
+                <h2 className="truncate font-serif text-[1.25rem] leading-none sm:text-[1.45rem]" style={{ color: AI_CHAT_THEME.textPrimary }}>
                   {activePersona.name || '时间助理'}
                 </h2>
                 {debugMode && (
-                  <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-bold text-amber-700">
+                  <span
+                    className="rounded-full border px-2 py-0.5 text-[10px] font-medium tracking-[0.12em]"
+                    style={{
+                      borderColor: AI_CHAT_THEME.chipBorder,
+                      backgroundColor: AI_CHAT_THEME.chipBg,
+                      color: AI_CHAT_THEME.textMuted
+                    }}
+                  >
                     调试中
                   </span>
                 )}
@@ -2069,15 +2526,26 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
             <button
               onClick={() => !isLoading && setIsHistoryPanelOpen(true)}
               disabled={isLoading}
-              className="rounded-full p-2 text-stone-400 transition-colors hover:bg-white hover:text-stone-700 disabled:cursor-not-allowed disabled:opacity-60"
+              className="inline-flex h-9 items-center gap-2 rounded-full border px-3 text-[13px] transition-colors disabled:cursor-not-allowed disabled:opacity-60"
+              style={{
+                borderColor: AI_CHAT_THEME.chipBorder,
+                backgroundColor: AI_CHAT_THEME.panelBg,
+                color: AI_CHAT_THEME.textSecondary
+              }}
               title="历史对话"
             >
               <History size={18} />
+              <span className="hidden sm:inline">历史</span>
             </button>
 
             <button
               onClick={onClose}
-              className="rounded-full p-2 text-stone-400 transition-colors hover:bg-white hover:text-stone-700"
+              className="flex h-9 w-9 items-center justify-center rounded-full border transition-colors"
+              style={{
+                borderColor: AI_CHAT_THEME.chipBorder,
+                backgroundColor: AI_CHAT_THEME.panelBg,
+                color: AI_CHAT_THEME.textMuted
+              }}
               title="关闭"
             >
               <X size={20} />
@@ -2085,9 +2553,17 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
           </div>
         </div>
 
-        <div className="min-h-0 flex-1 overflow-y-auto px-4 py-5 sm:px-6">
+        <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-5 sm:py-5">
           {!activeSession || activeSession.messages.length === 0 ? (
-            <div className="mx-auto mt-10 max-w-2xl rounded-[2rem] border border-dashed border-stone-200 bg-white/85 px-6 py-7 text-sm leading-7 text-stone-500 shadow-sm">
+            <div
+              className="mx-auto mt-10 max-w-2xl rounded-[1.4rem] border border-dashed px-6 py-7 text-sm leading-7"
+              style={{
+                borderColor: AI_CHAT_THEME.panelBorderStrong,
+                background: `linear-gradient(180deg, ${AI_CHAT_THEME.panelBg} 0%, ${AI_CHAT_THEME.panelBgSoft} 100%)`,
+                color: AI_CHAT_THEME.textSecondary,
+                boxShadow: AI_CHAT_THEME.cardShadow
+              }}
+            >
               <p className="font-medium text-stone-700">试试这样说</p>
               <div className="mt-4 space-y-4">
                 <div>
@@ -2122,35 +2598,58 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
               <p>输入 `/debug` 可以打开或关闭调试模式。</p>
             </div>
           ) : (
-            <div className="mx-auto max-w-3xl space-y-4">
+            <div className="mx-auto max-w-[920px] space-y-5">
               {activeSession.messages.map(renderMessageBubble)}
               <div ref={messagesEndRef} />
             </div>
           )}
         </div>
 
-        <div className="border-t border-stone-200/80 bg-[#f7f3eb]/96 px-4 pb-4 pt-3 backdrop-blur sm:px-6">
-          <div className="mx-auto max-w-3xl rounded-[1.75rem] border border-stone-200 bg-white px-3 py-2.5 shadow-sm">
+        <div
+          className="border-t px-4 pb-3 pt-3 backdrop-blur-xl sm:px-5"
+          style={{
+            borderColor: AI_CHAT_THEME.panelBorder,
+            backgroundColor: AI_CHAT_THEME.panelBg
+          }}
+        >
+          <div
+            className="mx-auto max-w-[920px] rounded-[1.1rem] border p-2.5"
+            style={{
+              borderColor: AI_CHAT_THEME.panelBorder,
+              backgroundColor: AI_CHAT_THEME.panelBg,
+              boxShadow: AI_CHAT_THEME.avatarShadow
+            }}
+          >
             <textarea
               value={inputText}
               onChange={(event) => setInputText(event.target.value)}
               onKeyDown={handleKeyDown}
               placeholder={`和 ${activePersona.assistantSelfName || 'AI'} 说点什么...`}
-              className="min-h-[72px] max-h-[144px] w-full resize-none bg-transparent px-1 py-1 text-sm leading-6 text-stone-700 outline-none placeholder:text-stone-300"
+              className="min-h-[64px] max-h-[120px] w-full resize-none bg-transparent px-1.5 py-1 text-[15px] leading-6 outline-none"
+              style={{ color: AI_CHAT_THEME.textPrimary }}
               autoFocus
             />
 
-            <div className="mt-2 flex items-end justify-between gap-3">
+            <div className="mt-2.5 flex flex-wrap items-center justify-between gap-3 border-t pt-2.5" style={{ borderColor: AI_CHAT_THEME.panelBorder }}>
               <button
                 onClick={() => activeSession && mutateSession(activeSession.id, (session) => ({
                   ...session,
                   contextCacheEnabled: !session.contextCacheEnabled
                 }))}
-                className={`inline-flex shrink-0 items-center rounded-full border px-3 py-1.5 text-xs font-medium transition-colors ${
+                className="inline-flex h-9 shrink-0 items-center rounded-full border px-3 text-[13px] transition-colors"
+                style={
                   activeSession?.contextCacheEnabled
-                    ? 'border-stone-300 bg-white text-stone-700'
-                    : 'border-stone-200 bg-white text-stone-500'
-                }`}
+                    ? {
+                        borderColor: AI_CHAT_THEME.activeBorder,
+                        backgroundColor: AI_CHAT_THEME.activeBg,
+                        color: AI_CHAT_THEME.textPrimary
+                      }
+                    : {
+                        borderColor: AI_CHAT_THEME.chipBorder,
+                        backgroundColor: AI_CHAT_THEME.inputBg,
+                        color: AI_CHAT_THEME.textMuted
+                      }
+                }
                 title="快速上下文开关"
               >
                 上下文 {activeSession?.contextCacheEnabled ? `ON · ${activePersona.contextMessageLimit}轮` : 'OFF'}
@@ -2164,45 +2663,79 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
                   void handleSend();
                 }}
                 disabled={!isLoading && !inputText.trim()}
-                className={`ml-auto inline-flex items-center justify-center rounded-full px-4 py-2 text-sm font-bold transition-all ${
+                className="ml-auto inline-flex h-10 min-w-[7rem] items-center justify-center gap-2 rounded-full px-4 text-sm font-semibold transition-all disabled:cursor-not-allowed"
+                style={
                   isLoading
-                    ? 'border border-stone-200 bg-white text-stone-600 hover:border-stone-300 hover:text-stone-800'
-                    : 'bg-stone-900 text-white hover:bg-black disabled:cursor-not-allowed disabled:bg-stone-300'
-                }`}
+                    ? {
+                        border: `1px solid ${AI_CHAT_THEME.chipBorder}`,
+                        backgroundColor: AI_CHAT_THEME.inputBg,
+                        color: AI_CHAT_THEME.textSecondary
+                      }
+                    : {
+                        backgroundColor: AI_CHAT_THEME.primaryButtonBg,
+                        color: AI_CHAT_THEME.primaryButtonText,
+                        boxShadow: `0 0 0 1px ${AI_CHAT_THEME.primaryButtonBorder}`
+                      }
+                }
               >
                 {isLoading ? <Square size={16} /> : <Send size={16} />}
+                <span>{isLoading ? '停止' : '发送'}</span>
               </button>
             </div>
           </div>
         </div>
 
         {isHistoryPanelOpen && (
-          <div className="absolute inset-0 z-10 bg-black/25 backdrop-blur-[2px]">
-            <div className="absolute inset-y-0 right-0 w-full max-w-sm border-l border-stone-200 bg-[#f8f4ed] shadow-2xl">
-              <div className="flex items-center justify-between border-b border-stone-200 px-5 py-4">
+          <div className="absolute inset-0 z-10 backdrop-blur-[10px]" style={{ backgroundColor: AI_CHAT_THEME.overlayDark }}>
+            <div
+              className="absolute inset-y-3 right-3 w-[min(100%,420px)] rounded-[1.35rem] border"
+              style={{
+                borderColor: AI_CHAT_THEME.panelBorder,
+                backgroundColor: AI_CHAT_THEME.panelBg,
+                boxShadow: AI_CHAT_THEME.cardShadowStrong
+              }}
+            >
+              <div
+                className="flex items-start justify-between border-b px-5 py-4 backdrop-blur"
+                style={{
+                  borderColor: AI_CHAT_THEME.panelBorder,
+                  backgroundColor: AI_CHAT_THEME.panelBg
+                }}
+              >
                 <div>
                   <h3 className="text-base font-bold text-stone-800">历史对话</h3>
                   <p className="text-xs text-stone-400">默认一直留在同一条会话里，只有这里才能新建。</p>
                 </div>
                 <button
                   onClick={() => setIsHistoryPanelOpen(false)}
-                  className="rounded-full p-2 text-stone-400 transition-colors hover:bg-white hover:text-stone-700"
+                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border transition-colors"
+                  style={{
+                    borderColor: AI_CHAT_THEME.chipBorder,
+                    backgroundColor: AI_CHAT_THEME.panelBg,
+                    color: AI_CHAT_THEME.textMuted
+                  }}
                 >
                   <X size={18} />
                 </button>
               </div>
 
-              <div className="border-b border-stone-200 px-5 py-4">
+              <div className="border-b px-5 py-4" style={{ borderColor: AI_CHAT_THEME.panelBorder }}>
                 <button
                   onClick={handleCreateSession}
-                  className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-stone-900 px-4 py-3 text-sm font-bold text-white transition-colors hover:bg-black"
+                  className="inline-flex w-full items-center justify-center gap-2 rounded-[1rem] border px-4 py-3 text-sm font-semibold transition-colors"
+                  style={{
+                    borderColor: AI_CHAT_THEME.primaryButtonBorder,
+                    backgroundColor: AI_CHAT_THEME.primaryButtonBg,
+                    color: AI_CHAT_THEME.primaryButtonText,
+                    boxShadow: `0 0 0 1px ${AI_CHAT_THEME.primaryButtonBorder}`
+                  }}
                 >
                   <MessageSquarePlus size={16} />
                   新建对话
                 </button>
               </div>
 
-              <div className="h-[calc(100%-132px)] overflow-y-auto px-3 py-3">
+              <div className="h-[calc(100%-154px)] overflow-y-auto px-3 py-3">
                 <div className="space-y-2">
                   {sortedSessions.map((session) => {
                     const sessionPersona = personaMap.get(session.personaId) || personas[0] || DEFAULT_AI_PERSONAS[0];
@@ -2212,11 +2745,19 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
                     return (
                       <div
                         key={session.id}
-                        className={`w-full rounded-2xl border px-4 py-3 text-left transition-colors ${
+                        className="w-full rounded-[1.45rem] border px-4 py-3 text-left transition-all"
+                        style={
                           session.id === activeSessionId
-                            ? 'border-stone-900 bg-white shadow-sm'
-                            : 'border-stone-200 bg-white/60 hover:bg-white'
-                        }`}
+                            ? {
+                                borderColor: AI_CHAT_THEME.activeBorder,
+                                backgroundColor: AI_CHAT_THEME.activeBg,
+                                boxShadow: '0 12px 28px rgba(52,38,27,0.08), 0 0 0 1px rgba(0,0,0,0.02)'
+                              }
+                            : {
+                                borderColor: AI_CHAT_THEME.panelBorder,
+                                backgroundColor: AI_CHAT_THEME.panelBg
+                              }
+                        }
                       >
                         <div className="flex items-start gap-3">
                           <div
@@ -2229,7 +2770,14 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
                             }}
                             className={`flex min-w-0 flex-1 items-start gap-3 text-left ${isEditing ? '' : 'cursor-pointer'}`}
                           >
-                            <div className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-white text-base shadow-sm">
+                            <div
+                              className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-[0.9rem] border text-base"
+                              style={{
+                                borderColor: AI_CHAT_THEME.panelBorder,
+                                backgroundColor: AI_CHAT_THEME.avatarBg,
+                                boxShadow: AI_CHAT_THEME.avatarShadow
+                              }}
+                            >
                               <PersonaAvatar persona={sessionPersona} iconClassName="text-base" />
                             </div>
                             <div className="min-w-0 flex-1">
@@ -2250,20 +2798,25 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
                                         handleCancelRenameSession();
                                       }
                                     }}
-                                    className="w-full rounded-xl border border-stone-200 bg-stone-50 px-3 py-1.5 text-sm font-bold text-stone-800 outline-none focus:border-stone-400 focus:bg-white"
+                                    className="w-full rounded-[0.95rem] border px-3 py-1.5 text-sm font-semibold outline-none"
+                                    style={{
+                                      borderColor: AI_CHAT_THEME.chipBorder,
+                                      backgroundColor: AI_CHAT_THEME.inputBg,
+                                      color: AI_CHAT_THEME.textPrimary
+                                    }}
                                     autoFocus
                                   />
                                 ) : (
-                                  <p className="truncate text-sm font-bold text-stone-800">{session.title}</p>
+                                  <p className="truncate font-serif text-[1.05rem] text-[#26211d]">{session.title}</p>
                                 )}
-                                <span className="shrink-0 text-[11px] text-stone-400">
+                                <span className="shrink-0 text-[11px] text-[#978d82]">
                                   {formatConversationTime(session.updatedAt)}
                                 </span>
                               </div>
-                              <p className="mt-1 truncate text-xs text-stone-500">
+                              <p className="mt-1 truncate text-xs text-[#69615a]">
                                 {lastMessage?.content || '还没有消息'}
                               </p>
-                              <div className="mt-2 flex items-center gap-2 text-[11px] text-stone-400">
+                              <div className="mt-2 flex items-center gap-2 text-[11px] text-[#91877d]">
                                 <span>{sessionPersona.name}</span>
                                 <span>·</span>
                                 <span>{session.contextCacheEnabled ? `上下文 ${sessionPersona.contextMessageLimit}轮` : '单轮'}</span>
@@ -2276,14 +2829,14 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
                               <>
                                 <button
                                   onClick={() => handleCommitRenameSession(session.id)}
-                                  className="rounded-full px-2.5 py-1 text-xs font-medium text-emerald-700 transition-colors hover:bg-emerald-50"
+                                  className="rounded-full border border-[#ced8ca] bg-[#edf3ea] px-2.5 py-1 text-xs font-medium text-[#556a52] transition-colors hover:bg-[#e5eee1]"
                                   title="保存名称"
                                 >
                                   保存
                                 </button>
                                 <button
                                   onClick={handleCancelRenameSession}
-                                  className="rounded-full px-2.5 py-1 text-xs font-medium text-stone-500 transition-colors hover:bg-stone-100"
+                                  className="rounded-full border border-[#e3d8ca] bg-[#fff8f0] px-2.5 py-1 text-xs font-medium text-[#736a61] transition-colors hover:bg-[#f2e9de]"
                                   title="取消重命名"
                                 >
                                   取消
@@ -2293,7 +2846,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
                               <>
                                 <button
                                   onClick={() => handleStartRenameSession(session)}
-                                  className="rounded-full p-2 text-stone-400 transition-colors hover:bg-stone-100 hover:text-stone-700"
+                                  className="rounded-full p-2 text-[#897f75] transition-colors hover:bg-[#f1e8dd] hover:text-[#2f2a26]"
                                   title="重命名对话"
                                 >
                                   <Pencil size={14} />
@@ -2304,7 +2857,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
                                     setEditingSessionTitle('');
                                     setDeleteConfirmSessionId((current) => current === session.id ? null : session.id);
                                   }}
-                                  className="rounded-full p-2 text-stone-400 transition-colors hover:bg-red-50 hover:text-red-600"
+                                  className="rounded-full p-2 text-[#897f75] transition-colors hover:bg-[#f8e9e6] hover:text-[#b35b50]"
                                   title="删除对话"
                                 >
                                   <Trash2 size={14} />
@@ -2315,18 +2868,18 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
                         </div>
 
                         {isDeleteConfirming && !isEditing && (
-                          <div className="mt-3 flex items-center justify-between rounded-2xl border border-red-100 bg-red-50 px-3 py-2 text-xs text-red-700">
+                          <div className="mt-3 flex items-center justify-between rounded-[1.15rem] border border-[#e4c1bc] bg-[#f8e9e6] px-3 py-2 text-xs text-[#9d544d]">
                             <span>删除后不能恢复，确认删除这个对话吗？</span>
                             <div className="flex items-center gap-2">
                               <button
                                 onClick={() => setDeleteConfirmSessionId(null)}
-                                className="rounded-full px-2.5 py-1 font-medium text-stone-500 transition-colors hover:bg-white"
+                                className="rounded-full border border-[#e0d5c8] bg-[#fffaf3] px-2.5 py-1 font-medium text-[#71685f] transition-colors hover:bg-white"
                               >
                                 取消
                               </button>
                               <button
                                 onClick={() => handleDeleteSession(session.id)}
-                                className="rounded-full bg-red-600 px-2.5 py-1 font-medium text-white transition-colors hover:bg-red-700"
+                                className="rounded-full border border-[#ba6256] bg-[#c46f4f] px-2.5 py-1 font-medium text-[#fff8f2] transition-colors hover:bg-[#b95f43]"
                               >
                                 删除
                               </button>
@@ -2343,7 +2896,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
         )}
 
         {isPersonaPanelOpen && (
-          <div className="absolute inset-0 z-10 bg-[#f6f2ea]">
+          <div className="absolute inset-0 z-10 backdrop-blur-[10px]" style={{ backgroundColor: AI_CHAT_THEME.overlayLight }}>
             <div
               className="flex h-full flex-col"
               style={{
@@ -2351,24 +2904,45 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
                 paddingBottom: 'env(safe-area-inset-bottom)'
               }}
             >
-              <div className="flex items-center justify-between border-b border-stone-200 bg-white/90 px-5 py-4 backdrop-blur">
+              <div
+                className="flex items-center justify-between border-b px-5 py-4 backdrop-blur"
+                style={{
+                  borderColor: AI_CHAT_THEME.panelBorder,
+                  backgroundColor: AI_CHAT_THEME.panelBg
+                }}
+              >
                 <h3 className="text-base font-bold text-stone-800">AI 设置</h3>
                 <button
                   onClick={() => setIsPersonaPanelOpen(false)}
-                  className="rounded-full p-2 text-stone-400 transition-colors hover:bg-stone-100 hover:text-stone-700"
+                  className="flex h-9 w-9 items-center justify-center rounded-full border transition-colors"
+                  style={{
+                    borderColor: AI_CHAT_THEME.chipBorder,
+                    backgroundColor: AI_CHAT_THEME.panelBg,
+                    color: AI_CHAT_THEME.textMuted
+                  }}
                 >
                   <X size={20} />
                 </button>
               </div>
 
               <div className="min-h-0 flex-1 overflow-y-auto px-4 py-5 sm:px-6">
-                <div className="mx-auto max-w-4xl space-y-6">
-                  <section className="rounded-[1.75rem] border border-stone-200 bg-white p-5 shadow-sm">
+                <div className="mx-auto flex max-w-4xl flex-col gap-6">
+                  <section
+                    className="order-1 rounded-[1.35rem] border border-[#e5e7eb] bg-[rgba(255,255,255,0.94)] p-5 shadow-[0_8px_22px_rgba(15,23,42,0.035)]"
+                    style={{
+                      borderColor: 'color-mix(in srgb, var(--accent-color) 10%, #e5e7eb)',
+                      backgroundColor: 'color-mix(in srgb, var(--accent-color) 2.5%, white)'
+                    }}
+                  >
                     <div className="mb-3 flex items-center justify-between gap-3">
                       <p className="text-sm font-bold text-stone-800">人设列表</p>
                       <button
                         onClick={handleCreatePersona}
-                        className="inline-flex items-center gap-1.5 rounded-full border border-stone-200 bg-stone-50 px-3 py-1.5 text-xs font-medium text-stone-700 transition-colors hover:bg-stone-100"
+                        className="inline-flex items-center gap-1.5 rounded-full border px-3 py-2 text-xs font-medium text-[#4b5563] transition-colors hover:bg-white"
+                        style={{
+                          borderColor: 'color-mix(in srgb, var(--accent-color) 14%, #d8dde6)',
+                          backgroundColor: 'color-mix(in srgb, var(--accent-color) 4%, white)'
+                        }}
                       >
                         <Plus size={14} />
                         添加人设
@@ -2379,21 +2953,39 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
                         <button
                           key={persona.id}
                           onClick={() => handleApplyPersonaPreset(persona.id)}
-                          className={`rounded-2xl border px-4 py-3 text-left transition-colors ${
+                          className={`rounded-[1.45rem] border px-4 py-3 text-left transition-all ${
                             activeSession?.personaId === persona.id
-                              ? 'border-stone-900 bg-stone-50 text-stone-700 shadow-sm'
-                              : 'border-stone-200 bg-stone-50 text-stone-700 hover:bg-stone-100'
+                              ? 'text-[#1f2937] shadow-[0_8px_20px_rgba(15,23,42,0.045)]'
+                              : 'text-[#4b5563] hover:bg-white'
                           }`}
+                          style={
+                            activeSession?.personaId === persona.id
+                              ? {
+                                  borderColor: 'color-mix(in srgb, var(--accent-color) 22%, #d8dde6)',
+                                  backgroundColor: 'color-mix(in srgb, var(--accent-color) 7%, white)',
+                                  boxShadow: '0 8px 20px rgba(15,23,42,0.045), 0 0 0 1px color-mix(in srgb, var(--accent-color) 8%, transparent)'
+                                }
+                              : {
+                                  borderColor: 'color-mix(in srgb, var(--accent-color) 12%, #e5e7eb)',
+                                  backgroundColor: 'color-mix(in srgb, var(--accent-color) 3%, white)'
+                                }
+                          }
                         >
                           <div className="flex items-center gap-3">
-                            <div className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-white text-lg shadow-sm">
+                            <div
+                              className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-[1rem] border bg-white text-lg shadow-[0_4px_12px_rgba(15,23,42,0.03)]"
+                              style={{ borderColor: 'color-mix(in srgb, var(--accent-color) 12%, #e5e7eb)' }}
+                            >
                               <PersonaAvatar persona={persona} iconClassName="text-lg" />
                             </div>
                             <div>
                               <div className="flex items-center gap-2">
                                 <p className="text-sm font-bold">{persona.name}</p>
                                 {activeSession?.personaId === persona.id && (
-                                  <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-stone-200 bg-white text-stone-700">
+                                  <span
+                                    className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full border bg-white text-[#374151]"
+                                    style={{ borderColor: 'color-mix(in srgb, var(--accent-color) 16%, #d8dde6)' }}
+                                  >
                                     <Check size={12} />
                                   </span>
                                 )}
@@ -2409,21 +3001,39 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
                         <button
                           key={persona.id}
                           onClick={() => handleApplyPersonaPreset(persona.id)}
-                          className={`rounded-2xl border px-4 py-3 text-left transition-colors ${
+                          className={`rounded-[1.45rem] border px-4 py-3 text-left transition-all ${
                             activeSession?.personaId === persona.id
-                              ? 'border-stone-900 bg-stone-50 text-stone-700 shadow-sm'
-                              : 'border-stone-200 bg-stone-50 text-stone-700 hover:bg-stone-100'
+                              ? 'text-[#1f2937] shadow-[0_8px_20px_rgba(15,23,42,0.045)]'
+                              : 'text-[#4b5563] hover:bg-white'
                           }`}
+                          style={
+                            activeSession?.personaId === persona.id
+                              ? {
+                                  borderColor: 'color-mix(in srgb, var(--accent-color) 22%, #d8dde6)',
+                                  backgroundColor: 'color-mix(in srgb, var(--accent-color) 7%, white)',
+                                  boxShadow: '0 8px 20px rgba(15,23,42,0.045), 0 0 0 1px color-mix(in srgb, var(--accent-color) 8%, transparent)'
+                                }
+                              : {
+                                  borderColor: 'color-mix(in srgb, var(--accent-color) 12%, #e5e7eb)',
+                                  backgroundColor: 'color-mix(in srgb, var(--accent-color) 3%, white)'
+                                }
+                          }
                         >
                           <div className="flex items-center gap-3">
-                            <div className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-white text-lg shadow-sm">
+                            <div
+                              className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-[1rem] border bg-white text-lg shadow-[0_4px_12px_rgba(15,23,42,0.03)]"
+                              style={{ borderColor: 'color-mix(in srgb, var(--accent-color) 12%, #e5e7eb)' }}
+                            >
                               <PersonaAvatar persona={persona} iconClassName="text-lg" />
                             </div>
                             <div className="min-w-0">
                               <div className="flex items-center gap-2">
                                 <p className="truncate text-sm font-bold">{persona.name}</p>
                                 {activeSession?.personaId === persona.id && (
-                                  <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-stone-200 bg-white text-stone-700">
+                                  <span
+                                    className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full border bg-white text-[#374151]"
+                                    style={{ borderColor: 'color-mix(in srgb, var(--accent-color) 16%, #d8dde6)' }}
+                                  >
                                     <Check size={12} />
                                   </span>
                                 )}
@@ -2438,16 +3048,189 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
                     </div>
                   </section>
 
-                  <section className="rounded-[1.75rem] border border-stone-200 bg-white p-5 shadow-sm">
+                  <section
+                    className="order-3 rounded-[1.35rem] border border-[#e5e7eb] bg-[rgba(255,255,255,0.94)] p-5 shadow-[0_8px_22px_rgba(15,23,42,0.035)]"
+                    style={{
+                      borderColor: 'color-mix(in srgb, var(--accent-color) 10%, #e5e7eb)',
+                      backgroundColor: 'color-mix(in srgb, var(--accent-color) 2.5%, white)'
+                    }}
+                  >
+                    <div className="mb-4 flex items-center justify-between gap-3">
+                      <div>
+                        <p className="text-sm font-bold text-stone-800">用户头像</p>
+                      </div>
+                      <span
+                        className="rounded-full border px-3 py-1 text-xs font-medium"
+                        style={{
+                          borderColor: AI_CHAT_THEME.chipBorder,
+                          backgroundColor: AI_CHAT_THEME.chipBg,
+                          color: AI_CHAT_THEME.textMuted
+                        }}
+                      >
+                        全局设置
+                      </span>
+                    </div>
+
+                    <input
+                      ref={userAvatarInputRef}
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={handleUserAvatarUpload}
+                    />
+
+                    <div className="grid gap-4 lg:grid-cols-[220px_minmax(0,1fr)] lg:items-start">
+                      <div className="px-1 py-1">
+                        <div className="flex items-center gap-4">
+                          <div
+                            className="flex h-20 w-20 items-center justify-center overflow-hidden rounded-[1.35rem] border text-2xl"
+                            style={{
+                              borderColor: AI_CHAT_THEME.panelBorder,
+                              backgroundColor: AI_CHAT_THEME.avatarBg,
+                              boxShadow: AI_CHAT_THEME.avatarShadow
+                            }}
+                          >
+                            <UserAvatar profile={userProfile} iconClassName="text-xl" />
+                          </div>
+                          <div className="min-w-0">
+                            <p className="text-sm font-semibold" style={{ color: AI_CHAT_THEME.textPrimary }}>当前用户头像</p>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="space-y-3">
+                        <div className="flex flex-wrap gap-2">
+                          <button
+                            onClick={handleUseUserEmojiAvatar}
+                            className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-full border px-3 py-2 text-xs font-medium transition-colors hover:bg-white sm:flex-none"
+                            style={{
+                              borderColor: AI_CHAT_THEME.chipBorder,
+                              backgroundColor: AI_CHAT_THEME.avatarBg,
+                              color: AI_CHAT_THEME.textSecondary
+                            }}
+                          >
+                            <Sparkles size={14} />
+                            Emoji
+                          </button>
+                          <button
+                            onClick={() => userAvatarInputRef.current?.click()}
+                            disabled={isUploadingUserAvatar}
+                            className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-full border px-3 py-2 text-xs font-medium transition-colors hover:bg-white disabled:cursor-not-allowed disabled:opacity-60 sm:flex-none"
+                            style={{
+                              borderColor: AI_CHAT_THEME.chipBorder,
+                              backgroundColor: AI_CHAT_THEME.avatarBg,
+                              color: AI_CHAT_THEME.textSecondary
+                            }}
+                          >
+                            {isUploadingUserAvatar ? <Loader2 size={14} className="animate-spin" /> : <Upload size={14} />}
+                            {isUploadingUserAvatar ? '上传中' : '上传图片'}
+                          </button>
+                          <button
+                            onClick={() => void handleResetUserAvatar()}
+                            className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-full border px-3 py-2 text-xs font-medium transition-colors hover:bg-white sm:flex-none"
+                            style={{
+                              borderColor: AI_CHAT_THEME.chipBorder,
+                              backgroundColor: AI_CHAT_THEME.avatarBg,
+                              color: AI_CHAT_THEME.textSecondary
+                            }}
+                          >
+                            <RotateCcw size={14} />
+                            默认
+                          </button>
+                        </div>
+
+                        {isUserEmojiEditorOpen && (
+                          <div
+                            className="rounded-[1.05rem] border p-3"
+                            style={{
+                              borderColor: AI_CHAT_THEME.panelBorder,
+                              backgroundColor: AI_CHAT_THEME.panelBg
+                            }}
+                          >
+                            <div className="flex flex-wrap gap-2">
+                              {PERSONA_EMOJI_CHOICES.map((emoji) => (
+                                <button
+                                  key={`user-${emoji}`}
+                                  onClick={() => setUserEmojiDraft(emoji)}
+                                  className="flex h-10 w-10 items-center justify-center rounded-[0.9rem] border text-lg transition-colors hover:bg-white"
+                                  style={{
+                                    borderColor: userEmojiDraft.trim() === emoji ? AI_CHAT_THEME.activeBorder : AI_CHAT_THEME.panelBorder,
+                                    backgroundColor: userEmojiDraft.trim() === emoji ? AI_CHAT_THEME.activeBg : AI_CHAT_THEME.panelBgStrong,
+                                    color: userEmojiDraft.trim() === emoji ? AI_CHAT_THEME.textPrimary : AI_CHAT_THEME.textSecondary,
+                                    boxShadow: userEmojiDraft.trim() === emoji ? `0 0 0 1px ${accentMix(8, 'rgba(0,0,0,0.02)')}` : undefined
+                                  }}
+                                >
+                                  {emoji}
+                                </button>
+                              ))}
+                            </div>
+                            <div
+                              className="mt-3 rounded-[0.95rem] border px-3 py-3"
+                              style={{
+                                borderColor: AI_CHAT_THEME.chipBorder,
+                                backgroundColor: AI_CHAT_THEME.inputBg
+                              }}
+                            >
+                              <input
+                                value={userEmojiDraft}
+                                onChange={(event) => setUserEmojiDraft(event.target.value)}
+                                className="w-full bg-transparent text-sm outline-none"
+                                style={{ color: AI_CHAT_THEME.textPrimary }}
+                                placeholder="输入一个 Emoji，例如 🙂"
+                              />
+                            </div>
+                            <div className="mt-3 flex justify-end gap-2">
+                              <button
+                                onClick={handleCancelUserEmojiAvatarEdit}
+                                className="rounded-full border px-3 py-1.5 text-xs font-medium transition-colors hover:bg-white"
+                                style={{
+                                  borderColor: AI_CHAT_THEME.chipBorder,
+                                  backgroundColor: AI_CHAT_THEME.chipBg,
+                                  color: AI_CHAT_THEME.textSecondary
+                                }}
+                              >
+                                取消
+                              </button>
+                              <button
+                                onClick={() => void handleApplyUserEmojiAvatar()}
+                                className="rounded-full border px-3 py-1.5 text-xs font-medium text-white transition-colors"
+                                style={{
+                                  borderColor: AI_CHAT_THEME.primaryButtonBorder,
+                                  backgroundColor: AI_CHAT_THEME.primaryButtonBg
+                                }}
+                              >
+                                保存 Emoji
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </section>
+
+                  <section
+                    className="order-2 rounded-[1.35rem] border border-[#e5e7eb] bg-[rgba(255,255,255,0.94)] p-5 shadow-[0_8px_22px_rgba(15,23,42,0.035)]"
+                    style={{
+                      borderColor: 'color-mix(in srgb, var(--accent-color) 10%, #e5e7eb)',
+                      backgroundColor: 'color-mix(in srgb, var(--accent-color) 2.5%, white)'
+                    }}
+                  >
                     <div className="mb-4 flex items-center justify-between gap-3">
                       <p className="text-sm font-bold text-stone-800">当前人设</p>
-                      <span className="rounded-full border border-stone-200 bg-stone-50 px-3 py-1 text-xs font-medium text-stone-500">
+                      <span
+                        className="rounded-full border px-3 py-1 text-xs font-medium"
+                        style={{
+                          borderColor: AI_CHAT_THEME.chipBorder,
+                          backgroundColor: AI_CHAT_THEME.chipBg,
+                          color: AI_CHAT_THEME.textMuted
+                        }}
+                      >
                         {activePersona.isBuiltIn ? '内置模板' : '自定义人设'}
                       </span>
                     </div>
 
-                    <div className="grid gap-4 lg:grid-cols-[260px_minmax(0,1fr)]">
-                      <div className="rounded-[1.5rem] border border-stone-200 bg-stone-50/80 p-4">
+                    <div className="grid gap-5 lg:grid-cols-[240px_minmax(0,1fr)] lg:items-start">
+                      <div className="space-y-3">
                         <input
                           ref={avatarInputRef}
                           type="file"
@@ -2456,21 +3239,32 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
                           onChange={handleAvatarUpload}
                         />
 
-                        <div className="flex flex-col gap-4">
+                        <div className="flex flex-col gap-3 px-1 py-1">
                           <div className="flex items-center gap-4">
-                            <div className="flex h-20 w-20 items-center justify-center overflow-hidden rounded-[1.5rem] bg-white text-2xl shadow-sm">
+                            <div
+                              className="flex h-20 w-20 items-center justify-center overflow-hidden rounded-[1.5rem] border text-2xl"
+                              style={{
+                                borderColor: AI_CHAT_THEME.panelBorder,
+                                backgroundColor: AI_CHAT_THEME.avatarBg,
+                                boxShadow: AI_CHAT_THEME.avatarShadow
+                              }}
+                            >
                               <PersonaAvatar persona={activePersona} iconClassName="text-2xl" />
                             </div>
                             <div className="min-w-0">
-                              <p className="truncate text-sm font-bold text-stone-800">{activePersona.name || '未命名人设'}</p>
-                              <p className="mt-1 text-xs text-stone-500">当前会话使用中</p>
+                              <p className="truncate text-sm font-bold" style={{ color: AI_CHAT_THEME.textPrimary }}>{activePersona.name || '未命名人设'}</p>
                             </div>
                           </div>
 
                           <div className="flex flex-wrap gap-2">
                             <button
                               onClick={handleUseEmojiAvatar}
-                              className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-full border border-stone-200 bg-white px-3 py-2 text-xs font-medium text-stone-700 transition-colors hover:bg-stone-100 sm:flex-none"
+                              className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-full border px-3 py-2 text-xs font-medium transition-colors hover:bg-white sm:flex-none"
+                              style={{
+                                borderColor: AI_CHAT_THEME.chipBorder,
+                                backgroundColor: AI_CHAT_THEME.avatarBg,
+                                color: AI_CHAT_THEME.textSecondary
+                              }}
                             >
                               <Sparkles size={14} />
                               Emoji
@@ -2478,7 +3272,12 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
                             <button
                               onClick={() => avatarInputRef.current?.click()}
                               disabled={isUploadingAvatar}
-                              className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-full border border-stone-200 bg-white px-3 py-2 text-xs font-medium text-stone-700 transition-colors hover:bg-stone-100 disabled:cursor-not-allowed disabled:opacity-60 sm:flex-none"
+                              className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-full border px-3 py-2 text-xs font-medium transition-colors hover:bg-white disabled:cursor-not-allowed disabled:opacity-60 sm:flex-none"
+                              style={{
+                                borderColor: AI_CHAT_THEME.chipBorder,
+                                backgroundColor: AI_CHAT_THEME.avatarBg,
+                                color: AI_CHAT_THEME.textSecondary
+                              }}
                             >
                               {isUploadingAvatar ? <Loader2 size={14} className="animate-spin" /> : <Upload size={14} />}
                               {isUploadingAvatar ? '上传中' : '上传图片'}
@@ -2486,7 +3285,12 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
                             {!activePersona.isBuiltIn && (
                               <button
                                 onClick={() => setDeleteConfirmPersonaId((current) => current === activePersona.id ? null : activePersona.id)}
-                                className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-full border border-red-200 bg-red-50 px-3 py-2 text-xs font-medium text-red-600 transition-colors hover:bg-red-100 sm:flex-none"
+                                className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-full border px-3 py-2 text-xs font-medium transition-colors sm:flex-none"
+                                style={{
+                                  borderColor: AI_CHAT_THEME.dangerBorder,
+                                  backgroundColor: AI_CHAT_THEME.dangerBg,
+                                  color: AI_CHAT_THEME.dangerText
+                                }}
                               >
                                 <Trash2 size={14} />
                                 删除人设
@@ -2496,29 +3300,54 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
                         </div>
 
                         {isEmojiEditorOpen && (
-                          <div className="mt-4 rounded-[1.25rem] border border-stone-200 bg-white p-3 shadow-sm">
-                            <p className="text-xs font-medium text-stone-500">输入一个 Emoji，或直接点选下方常用头像。</p>
-                            <div className="mt-3 flex flex-wrap gap-2">
+                          <div
+                            className="rounded-[1.1rem] border p-3 shadow-[0_6px_16px_rgba(15,23,42,0.03)]"
+                            style={{
+                              borderColor: AI_CHAT_THEME.panelBorder,
+                              backgroundColor: AI_CHAT_THEME.panelBg
+                            }}
+                          >
+                            <div className="flex flex-wrap gap-2">
                               {PERSONA_EMOJI_CHOICES.map((emoji) => (
                                 <button
                                   key={emoji}
                                   onClick={() => setEmojiDraft(emoji)}
                                   className={`flex h-10 w-10 items-center justify-center rounded-2xl border text-lg transition-colors ${
                                     emojiDraft.trim() === emoji
-                                      ? 'border-stone-300 bg-white text-stone-700 shadow-sm'
-                                      : 'border-stone-200 bg-stone-50 text-stone-700 hover:bg-stone-100'
+                                      ? 'shadow-[0_0_0_1px_rgba(0,0,0,0.03)]'
+                                      : 'hover:bg-white'
                                   }`}
+                                  style={
+                                    emojiDraft.trim() === emoji
+                                      ? {
+                                          borderColor: AI_CHAT_THEME.activeBorder,
+                                          backgroundColor: AI_CHAT_THEME.activeBg,
+                                          color: AI_CHAT_THEME.textPrimary
+                                        }
+                                      : {
+                                          borderColor: AI_CHAT_THEME.panelBorder,
+                                          backgroundColor: AI_CHAT_THEME.panelBgStrong,
+                                          color: AI_CHAT_THEME.textSecondary
+                                        }
+                                  }
                                 >
                                   {emoji}
                                 </button>
                               ))}
                             </div>
 
-                            <div className="mt-3 rounded-[1rem] border border-stone-200 bg-stone-50 px-3 py-3">
+                            <div
+                              className="mt-3 rounded-[0.95rem] border px-3 py-3"
+                              style={{
+                                borderColor: AI_CHAT_THEME.chipBorder,
+                                backgroundColor: AI_CHAT_THEME.inputBg
+                              }}
+                            >
                               <input
                                 value={emojiDraft}
                                 onChange={(event) => setEmojiDraft(event.target.value)}
-                                className="w-full bg-transparent text-sm text-stone-700 outline-none"
+                                className="w-full bg-transparent text-sm outline-none"
+                                style={{ color: AI_CHAT_THEME.textPrimary }}
                                 placeholder="输入一个 Emoji，例如 ✨"
                               />
                             </div>
@@ -2526,13 +3355,22 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
                             <div className="mt-3 flex justify-end gap-2">
                               <button
                                 onClick={handleCancelEmojiAvatarEdit}
-                                className="rounded-full border border-stone-200 bg-white px-3 py-1.5 text-xs font-medium text-stone-700 transition-colors hover:bg-stone-100"
+                                className="rounded-full border px-3 py-1.5 text-xs font-medium transition-colors hover:bg-white"
+                                style={{
+                                  borderColor: AI_CHAT_THEME.chipBorder,
+                                  backgroundColor: AI_CHAT_THEME.inputBg,
+                                  color: AI_CHAT_THEME.textSecondary
+                                }}
                               >
                                 取消
                               </button>
                               <button
                                 onClick={() => void handleApplyEmojiAvatar()}
-                                className="rounded-full bg-stone-900 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-stone-700"
+                                className="rounded-full border px-3 py-1.5 text-xs font-medium text-white transition-colors"
+                                style={{
+                                  borderColor: AI_CHAT_THEME.primaryButtonBorder,
+                                  backgroundColor: AI_CHAT_THEME.primaryButtonBg
+                                }}
                               >
                                 保存 Emoji
                               </button>
@@ -2540,23 +3378,121 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
                           </div>
                         )}
                         {deleteConfirmPersonaId === activePersona.id && !activePersona.isBuiltIn && (
-                          <div className="mt-4 rounded-[1.25rem] border border-red-100 bg-red-50 p-3 text-xs text-red-700 shadow-sm">
-                            <p>删除后，这个人设会从所有会话中移除，并回退到默认预设。</p>
+                          <div
+                            className="rounded-[1.2rem] border p-3 text-xs shadow-[0_6px_16px_rgba(35,25,18,0.03)]"
+                            style={{
+                              borderColor: AI_CHAT_THEME.dangerBorder,
+                              backgroundColor: AI_CHAT_THEME.dangerBg,
+                              color: AI_CHAT_THEME.dangerText
+                            }}
+                          >
+                            <p>确认删除这个人设？</p>
                             <div className="mt-3 flex justify-end gap-2">
                               <button
                                 onClick={() => setDeleteConfirmPersonaId(null)}
-                                className="rounded-full border border-stone-200 bg-white px-3 py-1.5 font-medium text-stone-600 transition-colors hover:bg-stone-100"
+                                className="rounded-full border px-3 py-1.5 font-medium transition-colors hover:bg-white"
+                                style={{
+                                  borderColor: AI_CHAT_THEME.chipBorder,
+                                  backgroundColor: AI_CHAT_THEME.avatarBg,
+                                  color: AI_CHAT_THEME.textSecondary
+                                }}
                               >
                                 取消
                               </button>
                               <button
                                 onClick={() => void handleDeleteCurrentPersona()}
-                                className="rounded-full bg-red-600 px-3 py-1.5 font-medium text-white transition-colors hover:bg-red-700"
+                                className="rounded-full border px-3 py-1.5 font-medium text-white transition-colors"
+                                style={{
+                                  borderColor: AI_CHAT_THEME.dangerBorder,
+                                  backgroundColor: AI_CHAT_THEME.dangerText
+                                }}
                               >
                                 删除
                               </button>
                             </div>
                           </div>
+                        )}
+
+                        {false && (
+                        <div className="mt-4 rounded-[1.3rem] border border-[#d8dde6] bg-[#f8fafc] p-3 shadow-[0_10px_28px_rgba(15,23,42,0.04)]">
+                          <div className="flex items-center gap-3">
+                            <div className="flex h-14 w-14 items-center justify-center overflow-hidden rounded-[1rem] border border-[#d8dde6] bg-white text-xl">
+                              <UserAvatar profile={userProfile} iconClassName="text-base" />
+                            </div>
+                            <div className="min-w-0">
+                              <p className="text-sm font-semibold text-[#111827]">用户头像</p>
+                              <p className="mt-1 text-xs text-[#6b7280]">可保持默认，也可以换成 Emoji 或图片。</p>
+                            </div>
+                          </div>
+
+                          <div className="mt-3 flex flex-wrap gap-2">
+                            <button
+                              onClick={handleUseUserEmojiAvatar}
+                              className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-full border border-[#d8dde6] bg-white px-3 py-2 text-xs font-medium text-[#4b5563] transition-colors hover:border-[#c7cfdb] hover:bg-[#f9fafb] sm:flex-none"
+                            >
+                              <Sparkles size={14} />
+                              Emoji
+                            </button>
+                            <button
+                              onClick={() => userAvatarInputRef.current?.click()}
+                              disabled={isUploadingUserAvatar}
+                              className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-full border border-[#d8dde6] bg-white px-3 py-2 text-xs font-medium text-[#4b5563] transition-colors hover:border-[#c7cfdb] hover:bg-[#f9fafb] disabled:cursor-not-allowed disabled:opacity-60 sm:flex-none"
+                            >
+                              {isUploadingUserAvatar ? <Loader2 size={14} className="animate-spin" /> : <Upload size={14} />}
+                              {isUploadingUserAvatar ? '上传中' : '上传图片'}
+                            </button>
+                            <button
+                              onClick={() => void handleResetUserAvatar()}
+                              className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-full border border-[#d8dde6] bg-white px-3 py-2 text-xs font-medium text-[#4b5563] transition-colors hover:border-[#c7cfdb] hover:bg-[#f9fafb] sm:flex-none"
+                            >
+                              <RotateCcw size={14} />
+                              默认
+                            </button>
+                          </div>
+
+                          {isUserEmojiEditorOpen && (
+                            <div className="mt-3 rounded-[1.05rem] border border-[#d8dde6] bg-white p-3">
+                              <p className="text-xs font-medium text-[#6b7280]">输入一个 Emoji，或直接点选下方常用头像。</p>
+                              <div className="mt-3 flex flex-wrap gap-2">
+                                {PERSONA_EMOJI_CHOICES.map((emoji) => (
+                                  <button
+                                    key={`user-${emoji}`}
+                                    onClick={() => setUserEmojiDraft(emoji)}
+                                    className={`flex h-10 w-10 items-center justify-center rounded-[0.9rem] border text-lg transition-colors ${
+                                      userEmojiDraft.trim() === emoji
+                                        ? 'border-[#c7cfdb] bg-[#f5f7fa] text-[#111827]'
+                                        : 'border-[#e5e7eb] bg-[#f8fafc] text-[#4b5563] hover:bg-white'
+                                    }`}
+                                  >
+                                    {emoji}
+                                  </button>
+                                ))}
+                              </div>
+                              <div className="mt-3 rounded-[0.95rem] border border-[#e5e7eb] bg-[#f8fafc] px-3 py-3">
+                                <input
+                                  value={userEmojiDraft}
+                                  onChange={(event) => setUserEmojiDraft(event.target.value)}
+                                  className="w-full bg-transparent text-sm text-[#111827] outline-none"
+                                  placeholder="输入一个 Emoji，例如 🙂"
+                                />
+                              </div>
+                              <div className="mt-3 flex justify-end gap-2">
+                                <button
+                                  onClick={handleCancelUserEmojiAvatarEdit}
+                                  className="rounded-full border border-[#d8dde6] bg-[#f8fafc] px-3 py-1.5 text-xs font-medium text-[#4b5563] transition-colors hover:bg-white"
+                                >
+                                  取消
+                                </button>
+                                <button
+                                  onClick={() => void handleApplyUserEmojiAvatar()}
+                                  className="rounded-full border border-[#111827] bg-[#111827] px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-[#0f172a]"
+                                >
+                                  保存 Emoji
+                                </button>
+                              </div>
+                            </div>
+                          )}
+                        </div>
                         )}
                       </div>
 
@@ -2567,7 +3503,12 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
                             <input
                               value={activePersona.name}
                               onChange={(event) => updateCurrentPersona({ name: event.target.value })}
-                              className="w-full rounded-2xl border border-stone-200 bg-stone-50 px-3 py-2 text-sm text-stone-700 outline-none focus:border-stone-400 focus:bg-white"
+                              className="w-full rounded-[1rem] border px-3 py-2 text-sm outline-none"
+                              style={{
+                                borderColor: AI_CHAT_THEME.chipBorder,
+                                backgroundColor: AI_CHAT_THEME.inputBg,
+                                color: AI_CHAT_THEME.textPrimary
+                              }}
                               placeholder="时间助理"
                             />
                           </label>
@@ -2577,7 +3518,12 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
                             <input
                               value={activePersona.assistantSelfName}
                               onChange={(event) => updateCurrentPersona({ assistantSelfName: event.target.value })}
-                              className="w-full rounded-2xl border border-stone-200 bg-stone-50 px-3 py-2 text-sm text-stone-700 outline-none focus:border-stone-400 focus:bg-white"
+                              className="w-full rounded-[1rem] border px-3 py-2 text-sm outline-none"
+                              style={{
+                                borderColor: AI_CHAT_THEME.chipBorder,
+                                backgroundColor: AI_CHAT_THEME.inputBg,
+                                color: AI_CHAT_THEME.textPrimary
+                              }}
                               placeholder="时间助理"
                             />
                           </label>
@@ -2588,7 +3534,12 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
                           <input
                             value={activePersona.userCallName}
                             onChange={(event) => updateCurrentPersona({ userCallName: event.target.value })}
-                            className="w-full rounded-2xl border border-stone-200 bg-stone-50 px-3 py-2 text-sm text-stone-700 outline-none focus:border-stone-400 focus:bg-white"
+                            className="w-full rounded-[1rem] border px-3 py-2 text-sm outline-none"
+                            style={{
+                              borderColor: AI_CHAT_THEME.chipBorder,
+                              backgroundColor: AI_CHAT_THEME.inputBg,
+                              color: AI_CHAT_THEME.textPrimary
+                            }}
                             placeholder="你"
                           />
                         </label>
@@ -2598,7 +3549,12 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
                           <textarea
                             value={activePersona.systemPrompt}
                             onChange={(event) => updateCurrentPersona({ systemPrompt: event.target.value })}
-                            className="min-h-[160px] w-full rounded-[1.5rem] border border-stone-200 bg-stone-50 px-4 py-3 text-sm leading-6 text-stone-700 outline-none focus:border-stone-400 focus:bg-white"
+                            className="min-h-[180px] w-full rounded-[1.2rem] border px-4 py-3 text-sm leading-7 outline-none"
+                            style={{
+                              borderColor: AI_CHAT_THEME.chipBorder,
+                              backgroundColor: AI_CHAT_THEME.inputBg,
+                              color: AI_CHAT_THEME.textPrimary
+                            }}
                             placeholder="补充这个人设的语气、风格、偏好、边界条件。"
                           />
                         </label>
@@ -2606,7 +3562,13 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
                     </div>
                   </section>
 
-                  <section className="rounded-[1.75rem] border border-stone-200 bg-white p-5 shadow-sm">
+                  <section
+                    className="order-4 rounded-[1.35rem] border border-[#e5e7eb] bg-[rgba(255,255,255,0.94)] p-5 shadow-[0_8px_22px_rgba(15,23,42,0.035)]"
+                    style={{
+                      borderColor: 'color-mix(in srgb, var(--accent-color) 10%, #e5e7eb)',
+                      backgroundColor: 'color-mix(in srgb, var(--accent-color) 2.5%, white)'
+                    }}
+                  >
                     <p className="mb-4 text-sm font-bold text-stone-800">上下文设置</p>
                     <label className="block">
                       <span className="mb-1 block text-xs font-medium text-stone-500">最近上下文轮数 n</span>
@@ -2616,9 +3578,13 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
                         max={20}
                         value={activePersona.contextMessageLimit}
                         onChange={(event) => updateCurrentPersona({ contextMessageLimit: Number(event.target.value) })}
-                        className="w-full rounded-2xl border border-stone-200 bg-stone-50 px-3 py-2 text-sm text-stone-700 outline-none focus:border-stone-400 focus:bg-white"
+                        className="w-full rounded-[1rem] border px-3 py-2 text-sm outline-none"
+                        style={{
+                          borderColor: AI_CHAT_THEME.chipBorder,
+                          backgroundColor: AI_CHAT_THEME.inputBg,
+                          color: AI_CHAT_THEME.textPrimary
+                        }}
                       />
-                      <p className="mt-2 text-xs text-stone-400">这里只控制正式请求最多带上几轮历史，不属于人设信息本身。</p>
                     </label>
                   </section>
                 </div>
@@ -2628,42 +3594,49 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
         )}
 
         {debugViewer && (
-          <div className="absolute inset-0 z-20 bg-black/30 backdrop-blur-sm">
+          <div className="absolute inset-0 z-20 bg-[rgba(15,23,42,0.14)] backdrop-blur-[10px]">
             <div
-              className="flex h-full flex-col bg-[#f6f2ea]"
+              className="flex h-full flex-col bg-[#f3f4f6]"
               style={{
                 paddingTop: 'env(safe-area-inset-top)',
                 paddingBottom: 'env(safe-area-inset-bottom)'
               }}
             >
-              <div className="flex items-center justify-between border-b border-stone-200 bg-white/90 px-5 py-4 backdrop-blur">
+              <div className="flex items-center justify-between border-b border-[#e5e7eb] bg-[rgba(255,255,255,0.9)] px-5 py-4 backdrop-blur">
                 <div>
-                  <h3 className="text-base font-bold text-stone-800">{debugViewer.title}</h3>
+                  <h3 className="font-serif text-[1.75rem] leading-none text-[#201c19]">{debugViewer.title}</h3>
                   <p className="text-xs text-stone-400">按阶段查看请求与响应</p>
                 </div>
                 <button
                   onClick={() => setDebugViewer(null)}
-                  className="rounded-full p-2 text-stone-400 transition-colors hover:bg-stone-100 hover:text-stone-700"
+                  className="flex h-9 w-9 items-center justify-center rounded-full border border-[#e5e7eb] bg-white text-[#6b7280] transition-colors hover:border-[#cfd8e3] hover:bg-[#f9fafb] hover:text-[#111827]"
                 >
                   <X size={20} />
                 </button>
               </div>
 
-              <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-6">
+              <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-6 sm:py-5">
                 <div className="mx-auto max-w-4xl space-y-4">
                   {debugViewer.sections.map((section) => (
-                    <div key={section.label} className="rounded-[1.5rem] border border-stone-200 bg-white p-4 shadow-sm">
-                      <p className="mb-3 text-sm font-bold text-stone-800">{section.label}</p>
+                    <div
+                      key={section.label}
+                      className="rounded-[1.2rem] border border-[#e5e7eb] bg-[rgba(255,255,255,0.96)] p-4 shadow-[0_8px_20px_rgba(15,23,42,0.035)]"
+                      style={{
+                        borderColor: 'color-mix(in srgb, var(--accent-color) 10%, #e5e7eb)',
+                        backgroundColor: 'color-mix(in srgb, var(--accent-color) 2.5%, white)'
+                      }}
+                    >
+                      <p className="mb-3 font-serif text-xl text-[#231f1b]">{section.label}</p>
                       <div className="space-y-3">
                         <div>
                           <p className="mb-2 text-xs font-bold uppercase tracking-[0.2em] text-stone-400">客户端发送</p>
-                          <pre className="overflow-x-auto whitespace-pre-wrap break-words rounded-2xl bg-stone-900 p-4 text-xs leading-6 text-stone-100">
+                          <pre className="overflow-x-auto whitespace-pre-wrap break-words rounded-[1.3rem] border border-[#433a34] bg-[#2d2926] p-4 text-xs leading-6 text-[#efe7db] shadow-[inset_0_0_0_1px_rgba(255,255,255,0.03)]">
                             {stringifyDebugSection(section.exchange.request)}
                           </pre>
                         </div>
                         <div>
                           <p className="mb-2 text-xs font-bold uppercase tracking-[0.2em] text-stone-400">服务端返回</p>
-                          <pre className="overflow-x-auto whitespace-pre-wrap break-words rounded-2xl bg-stone-900 p-4 text-xs leading-6 text-stone-100">
+                          <pre className="overflow-x-auto whitespace-pre-wrap break-words rounded-[1.3rem] border border-[#433a34] bg-[#2d2926] p-4 text-xs leading-6 text-[#efe7db] shadow-[inset_0_0_0_1px_rgba(255,255,255,0.03)]">
                             {stringifyDebugSection(section.exchange.response)}
                           </pre>
                         </div>
