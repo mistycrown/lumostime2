@@ -3,7 +3,7 @@
  * @input Partial assistant-agent config updates from UI or startup hydration
  * @output Persistent Android-first assistant agent config snapshots
  * @pos Service (Assistant Agent Config)
- * @description Stores the background assistant agent's runtime configuration, including polling, random check-in, reminder availability, and long-term-memory toggles, so the shared AI window and native plugin can stay in sync.
+ * @description Stores the background assistant agent's runtime configuration, including polling, random check-in, and long-term-memory toggles, so the shared AI window and native plugin can stay in sync.
  *
  * @updated 2026-04-26: Added persistent assistant agent config storage for AI chat settings, native polling sync, and long-term-memory control.
  */
@@ -20,7 +20,6 @@ const DEFAULT_ASSISTANT_AGENT_CONFIG: AssistantAgentConfig = {
   maxCheckinMinutes: 120,
   quietHoursEnabled: false,
   minimumNudgeGapMinutes: 45,
-  reminderEnabled: false,
   longTermMemoryEnabled: true
 };
 
@@ -39,10 +38,10 @@ const normalizeConfig = (value: unknown): AssistantAgentConfig => {
   }
 
   const candidate = value as Partial<AssistantAgentConfig>;
-  const minCheckinMinutes = clampMinutes(candidate.minCheckinMinutes, DEFAULT_ASSISTANT_AGENT_CONFIG.minCheckinMinutes, 5, 24 * 60);
+  const minCheckinMinutes = clampMinutes(candidate.minCheckinMinutes, DEFAULT_ASSISTANT_AGENT_CONFIG.minCheckinMinutes, 15, 24 * 60);
   const maxCheckinMinutes = Math.max(
     minCheckinMinutes,
-    clampMinutes(candidate.maxCheckinMinutes, DEFAULT_ASSISTANT_AGENT_CONFIG.maxCheckinMinutes, 5, 24 * 60)
+    clampMinutes(candidate.maxCheckinMinutes, DEFAULT_ASSISTANT_AGENT_CONFIG.maxCheckinMinutes, 15, 24 * 60)
   );
 
   return {
@@ -64,7 +63,6 @@ const normalizeConfig = (value: unknown): AssistantAgentConfig => {
       1,
       24 * 60
     ),
-    reminderEnabled: candidate.reminderEnabled === true,
     longTermMemoryEnabled: candidate.longTermMemoryEnabled !== false
   };
 };

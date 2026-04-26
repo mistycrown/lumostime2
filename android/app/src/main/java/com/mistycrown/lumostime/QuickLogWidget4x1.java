@@ -15,7 +15,8 @@ public class QuickLogWidget4x1 extends AppWidgetProvider {
             R.id.widget_slot_0,
             R.id.widget_slot_1,
             R.id.widget_slot_2,
-            R.id.widget_slot_3
+            R.id.widget_slot_3,
+            R.id.widget_slot_4
     };
 
     public static void refreshAllAsync(Context context) {

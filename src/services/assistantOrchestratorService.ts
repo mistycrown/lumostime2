@@ -205,7 +205,7 @@ export const assistantOrchestratorService = {
     }
 
     if (
-      assistantConfig.reminderEnabled
+      assistantConfig.enabled
       && normalizedDecision.action === 'create_reminder'
       && normalizedDecision.reminder?.dueAt
       && normalizedDecision.reminder.text

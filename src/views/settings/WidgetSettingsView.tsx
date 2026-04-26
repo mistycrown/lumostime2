@@ -6,6 +6,7 @@
  * @description Lets the user create, rename, resize, edit, and manage Android widget templates while configuring each slot as a timer, daily check, or shortcut.
  * @updated 2026-04-18: Removed template-level widget categories and switched to slot-type-first editing.
  * @updated 2026-04-25: Added supporter-gated widget UI icon editing and native asset-backed icon slot persistence.
+ * @updated 2026-04-26: Updated 4x1 widget previews to render five evenly spaced slots.
  */
 import React, { useEffect, useMemo, useState } from 'react';
 import { ChevronLeft, Plus, Trash2 } from 'lucide-react';
@@ -68,7 +69,7 @@ interface WidgetSettingsViewProps {
 }
 
 const AUTO_SAVE_DELAY_MS = 350;
-const PREVIEW_MAX_COLUMNS = 4;
+const PREVIEW_MAX_COLUMNS = 5;
 const PREVIEW_MAX_ROWS = 2;
 const PREVIEW_TITLE_ROW_RATIO = 0.6;
 

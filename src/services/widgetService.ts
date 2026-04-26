@@ -7,6 +7,7 @@
  * @updated 2026-04-25: Added DAILY_RUNTIME dual-view payload builders so native heatmap widgets can toggle between category and activity coloring.
  * @updated 2026-04-25: Added widget UI icon asset preservation and sanitization helpers so Android widgets can prefer local icon bitmaps with emoji fallback.
  * @updated 2026-04-26: Added TODAY + PIN widget payload builders for the dedicated scrollable 4x2 todo widget.
+ * @updated 2026-04-26: Expanded the 4x1 timer widget template from 4 to 5 evenly spaced slots.
  */
 import { Capacitor } from '@capacitor/core';
 import { ActiveSession, Category, CheckTemplate, DailyReview, Log, TodoItem } from '../types';
@@ -66,7 +67,7 @@ const WIDGET_SIZE_SLOT_COUNT: Record<WidgetSize, number> = {
   '2x1': 2,
   '2x2': 4,
   '3x2': 6,
-  '4x1': 4,
+  '4x1': 5,
   '4x2': 8
 };
 
@@ -74,7 +75,7 @@ const WIDGET_SIZE_GRID: Record<WidgetSize, { columns: number; rows: number }> = 
   '2x1': { columns: 2, rows: 1 },
   '2x2': { columns: 2, rows: 2 },
   '3x2': { columns: 3, rows: 2 },
-  '4x1': { columns: 4, rows: 1 },
+  '4x1': { columns: 5, rows: 1 },
   '4x2': { columns: 4, rows: 2 }
 };
 

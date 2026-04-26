@@ -89,7 +89,7 @@ object WidgetSizes {
             SIZE_2X1 -> 2
             SIZE_2X2 -> 4
             SIZE_3X2 -> 6
-            SIZE_4X1 -> 4
+            SIZE_4X1 -> 5
             SIZE_4X2 -> 8
             else -> 4
         }
