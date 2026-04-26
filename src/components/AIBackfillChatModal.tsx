@@ -1,9 +1,10 @@
-/**
+﻿/**
  * @file AIBackfillChatModal.tsx
  * @input Unified AI chat sessions, local logs/todos/categories/scopes, and user natural-language messages
  * @output Full-screen AI time assistant with session history, persona settings, quick context cache, and direct log/todo application
  * @pos Component (AI Integration)
  * @description Provides the shared AI workspace for chat, backfill, and todo creation. Sessions persist locally, persona style is configurable per session, and recent context can be toggled into the formal AI request path.
+ * @updated 2026-04-26: Reframed the built-in assistant personas around continuity-aware companionship so the default voice feels more present, more natural, and less like a detached helper in both foreground and background turns.
  * @updated 2026-04-25: Added AI-driven todo updates, subtask creation, and log editing with local patch application plus undo support, and expanded intent routing so edit flows receive dedicated context and tool plans.
  * @updated 2026-04-25: Rendered subtask result cards with `@分类 / 父任务`, and stripped AI-added subtask dates unless the user explicitly asked for scheduling.
  * @updated 2026-04-25: Corrected applied-todo metadata to render task category as `@`, linked activity hierarchy as `#`, and scope domains as `%`, while respecting the auto-link scope toggle when merging activity rules.
@@ -11,7 +12,9 @@
  * @updated 2026-04-25: Matched applied-result metadata to the context-page prefix syntax by removing icons and using `# / % / @` markers for tags, domains, and todos.
  * @updated 2026-04-25: Softened the AI dialog shadow system so the shell, cards, and avatar surfaces feel lighter and less floating.
  * @updated 2026-04-25: Added a true grayscale fallback for the `default` color scheme so the AI workspace no longer picks up tinted beige/green surfaces when no themed accent is active.
- * @updated 2026-04-26: Added background-assistant settings inside the AI panel, including polling and long-term-memory toggles, disabled reminder preview, a read-only memory viewer, and native assistant-trigger wiring for Android.
+ * @updated 2026-04-26: Switched planned log/todo/subtask/edit application to the shared `assistantActionExecutor` service so the modal no longer owns the primary local tool execution layer.
+ * @updated 2026-04-26: Switched foreground chat onto the unified single-turn path, made memory updates explicit in the main turn result, surfaced memory-update feedback to the user, and kept the older planner chain disabled for safety during cleanup.
+ * @updated 2026-04-26: Added background-assistant settings inside the AI panel, including polling frequency, check-in timing, long-term-memory toggles, background call history, and native assistant-trigger wiring for Android.
  * @updated 2026-04-25: Refined the title/header alignment and simplified applied-result cards by reducing capsules, moving log time pills to the top-right, and switching action buttons to icon-only controls.
  * @updated 2026-04-25: Simplified the AI settings panel by flattening the avatar/persona layouts, trimming low-value helper copy, and tightening everything around the existing theme tokens.
  * @updated 2026-04-23: Unified the AI workspace colors around dynamic `--accent-color` theme tokens and reordered the settings panel into persona list, current persona, user avatar, and context sections.
@@ -29,6 +32,9 @@
  * @updated 2026-04-22: Restored direct AI log/todo application with edit-detail and undo actions inside the new session-based workspace.
  * @updated 2026-04-22: Added session rename/delete controls in history and changed quick-context caching from raw message count to recent conversation rounds.
  * @updated 2026-04-22: Moved the quick-context toggle into the chat composer footer and simplified the title/input helper copy.
+ * @updated 2026-04-26: Added open-time session/message navigation handling so Android assistant notifications can reopen the modal at the exact background reply.
+ * @updated 2026-04-26: Normalized assistant reminder timestamps before enqueue/dispatch, exposed unambiguous local-vs-UTC time context to unified turns, and persisted background debug sections onto surfaced assistant messages so debug mode also works for automatic replies.
+ * @updated 2026-04-26: Changed background assistant interval inputs to use editable draft strings with inline validation, so users can clear and retype values without invalid intermediate states being auto-saved.
  *
  * Once I am updated, be sure to update my header comment and the folder's md.
  */
@@ -48,10 +54,10 @@ import {
   Undo2,
   Upload,
   User,
-  X
+  X,
+  XCircle
 } from 'lucide-react';
 import {
-  aiService,
   type AIDebugExchange,
   type AIBackfillToolCall,
   type AIConversationTurn,
@@ -67,19 +73,49 @@ import { useSession } from '../contexts/SessionContext';
 import { useToast } from '../contexts/ToastContext';
 import { useSettings } from '../contexts/SettingsContext';
 import type { Log, TodoItem, TodoRecurrenceRule } from '../types';
-import type { AssistantAgentConfig, AssistantMemory, AssistantSystemTrigger } from '../types/assistant';
-import { formatDateKey, normalizeAIBackfillToolCalls, parseTimeOnDateKey } from '../utils/aiBackfillUtils';
-import { getTodoProgressTrackingMode, syncSubtaskProgressToParentTodos } from '../utils/todoProgressUtils';
+import type {
+  AssistantAgentConfig,
+  AssistantMemory,
+  AssistantReminder,
+  AssistantSystemTrigger
+} from '../types/assistant';
+import { formatDateKey } from '../utils/aiBackfillUtils';
+import {
+  formatAssistantDateTimeForDisplay,
+  formatAssistantLocalDateTime,
+  getAssistantDelayMinutes,
+  normalizeAssistantDateTime,
+  parseAssistantDateTime
+} from '../utils/assistantTime';
+import { getTodoProgressTrackingMode } from '../utils/todoProgressUtils';
 import { imageService } from '../services/imageService';
-import { getNextChildOrder, normalizeTodoHierarchy, syncDirectChildTodosWithParent } from '../utils/todoHierarchyUtils';
 import AssistantAgent from '../plugins/AssistantAgentPlugin';
 import { assistantAgentConfigService } from '../services/assistantAgentConfigService';
 import { assistantMemoryService } from '../services/assistantMemoryService';
+import { assistantPromptService } from '../services/assistantPromptService';
 import { assistantReminderQueueService } from '../services/assistantReminderQueueService';
-import { assistantOrchestratorService } from '../services/assistantOrchestratorService';
+import {
+  assistantOrchestratorService,
+  type AssistantBackgroundCallHistoryEntry
+} from '../services/assistantOrchestratorService';
+import { assistantTurnService } from '../services/assistantTurnService';
+import { assistantContextBuilder } from '../services/assistantContextBuilder';
+import {
+  assistantActionExecutor,
+  applyLogDelete,
+  applyLogSave,
+  applyTodoSave,
+  type AppliedChatAction,
+  type AppliedCreateLogAction,
+  type AppliedCreateSubtaskAction,
+  type AppliedCreateTodoAction,
+  type AppliedEditLogAction,
+  type AppliedUpdateTodoAction,
+  type AppliedActionStatus
+} from '../services/assistantActionExecutor';
+import type { AssistantToolCall, AssistantUnifiedTurnOutput } from '../types/assistant';
 
 type ChatTone = 'normal' | 'system' | 'error' | 'pending';
-type AppliedActionStatus = 'applied' | 'undone' | 'failed';
 
 interface AIChatDebugSection {
   label: string;
@@ -103,103 +139,6 @@ interface AIChatUserProfile {
   avatarImage?: string;
 }
 
-interface AppliedCreateLogSnapshot {
-  logId?: string;
-  startTime: number;
-  endTime: number;
-  description: string;
-  categoryId: string;
-  categoryName: string;
-  activityId: string;
-  activityName: string;
-  scopeIds: string[];
-  scopeNames: string[];
-  linkedTodoId?: string;
-  linkedTodoTitle?: string;
-  progressIncrement?: number;
-}
-
-interface AppliedCreateLogAction {
-  actionId: string;
-  kind: 'create_log';
-  status: AppliedActionStatus;
-  snapshot: AppliedCreateLogSnapshot;
-  errorMessage?: string;
-}
-
-interface AppliedCreateTodoSnapshot {
-  todoId?: string;
-  title: string;
-  categoryId: string;
-  categoryName: string;
-  linkedCategoryId?: string;
-  linkedCategoryName?: string;
-  linkedActivityId?: string;
-  linkedActivityName?: string;
-  defaultScopeIds: string[];
-  defaultScopeNames: string[];
-  note?: string;
-  scheduledDate?: string;
-  deadlineDate?: string;
-  recurrenceRule?: TodoRecurrenceRule;
-}
-
-interface AppliedCreateTodoAction {
-  actionId: string;
-  kind: 'create_todo';
-  status: AppliedActionStatus;
-  snapshot: AppliedCreateTodoSnapshot;
-  errorMessage?: string;
-}
-
-interface AppliedUpdateTodoSnapshot {
-  todoId?: string;
-  previousTodo?: TodoItem;
-  nextTodo?: TodoItem;
-}
-
-interface AppliedUpdateTodoAction {
-  actionId: string;
-  kind: 'update_todo';
-  status: AppliedActionStatus;
-  snapshot: AppliedUpdateTodoSnapshot;
-  errorMessage?: string;
-}
-
-interface AppliedCreateSubtaskSnapshot extends AppliedCreateTodoSnapshot {
-  parentTodoId?: string;
-  parentTodoTitle?: string;
-}
-
-interface AppliedCreateSubtaskAction {
-  actionId: string;
-  kind: 'create_subtask';
-  status: AppliedActionStatus;
-  snapshot: AppliedCreateSubtaskSnapshot;
-  errorMessage?: string;
-}
-
-interface AppliedEditLogSnapshot {
-  logId?: string;
-  previousLog?: Log;
-  nextLog?: Log;
-}
-
-interface AppliedEditLogAction {
-  actionId: string;
-  kind: 'edit_log';
-  status: AppliedActionStatus;
-  snapshot: AppliedEditLogSnapshot;
-  errorMessage?: string;
-}
-
-type AppliedChatAction =
-  | AppliedCreateLogAction
-  | AppliedCreateTodoAction
-  | AppliedUpdateTodoAction
-  | AppliedCreateSubtaskAction
-  | AppliedEditLogAction;
-
 interface AIChatMessage {
   id: string;
   role: 'user' | 'assistant';
@@ -208,7 +147,14 @@ interface AIChatMessage {
   tone?: ChatTone;
   debugSections?: AIChatDebugSection[];
   appliedActions?: AppliedChatAction[];
+  memoryUpdates?: AIChatMemoryUpdateSection[];
+  reminderUpdates?: string[];
   retryInput?: string;
+}
+
+interface AIChatMemoryUpdateSection {
+  label: string;
+  items: string[];
 }
 
 interface AIChatSession {
@@ -225,7 +171,91 @@ interface AIBackfillChatModalProps {
   isOpen: boolean;
   onClose: () => void;
   targetDate?: Date;
+  targetSessionId?: string;
+  targetMessageId?: string;
+  onUnreadAssistantMessage?: (count?: number) => void;
+  onMarkRead?: () => void;
 }
+
+type AssistantAgentIntervalField = 'basePollMinutes' | 'minCheckinMinutes' | 'maxCheckinMinutes';
+
+type AssistantAgentIntervalDrafts = Record<AssistantAgentIntervalField, string>;
+
+type AssistantAgentIntervalErrors = Record<AssistantAgentIntervalField, string | null>;
+
+const ASSISTANT_AGENT_INTERVAL_FIELD_META: Record<
+  AssistantAgentIntervalField,
+  { label: string; minimum: number; maximum: number }
+> = {
+  basePollMinutes: {
+    label: '检查频率',
+    minimum: 1,
+    maximum: 60
+  },
+  minCheckinMinutes: {
+    label: '最低间隔',
+    minimum: 1,
+    maximum: 24 * 60
+  },
+  maxCheckinMinutes: {
+    label: '最高间隔',
+    minimum: 1,
+    maximum: 24 * 60
+  }
+};
+
+const buildAssistantAgentIntervalDrafts = (config: AssistantAgentConfig): AssistantAgentIntervalDrafts => ({
+  basePollMinutes: String(config.basePollMinutes),
+  minCheckinMinutes: String(config.minCheckinMinutes),
+  maxCheckinMinutes: String(config.maxCheckinMinutes)
+});
+
+const validateAssistantAgentIntervalDrafts = (
+  drafts: AssistantAgentIntervalDrafts
+): AssistantAgentIntervalErrors => {
+  const errors: AssistantAgentIntervalErrors = {
+    basePollMinutes: null,
+    minCheckinMinutes: null,
+    maxCheckinMinutes: null
+  };
+  const parsedValues: Partial<Record<AssistantAgentIntervalField, number>> = {};
+
+  (Object.keys(ASSISTANT_AGENT_INTERVAL_FIELD_META) as AssistantAgentIntervalField[]).forEach((field) => {
+    const { label, minimum, maximum } = ASSISTANT_AGENT_INTERVAL_FIELD_META[field];
+    const rawValue = drafts[field].trim();
+
+    if (!rawValue) {
+      errors[field] = `${label}不能为空`;
+      return;
+    }
+
+    if (!/^\d+$/.test(rawValue)) {
+      errors[field] = `${label}只能输入正整数`;
+      return;
+    }
+
+    const parsedValue = Number(rawValue);
+    if (parsedValue < minimum || parsedValue > maximum) {
+      errors[field] = `${label}需在 ${minimum} 到 ${maximum} 分钟之间`;
+      return;
+    }
+
+    parsedValues[field] = parsedValue;
+  });
+
+  if (
+    errors.minCheckinMinutes === null
+    && errors.maxCheckinMinutes === null
+    && parsedValues.minCheckinMinutes !== undefined
+    && parsedValues.maxCheckinMinutes !== undefined
+    && parsedValues.minCheckinMinutes > parsedValues.maxCheckinMinutes
+  ) {
+    errors.minCheckinMinutes = '最低间隔不能大于最高间隔';
+    errors.maxCheckinMinutes = '最高间隔不能小于最低间隔';
+  }
+
+  return errors;
+};
 
 const PersonaAvatar: React.FC<{
   persona: AIChatPersona;
@@ -468,7 +498,7 @@ const BUILTIN_PERSONAS: AIChatPersona[] = [
     avatarIcon: '✨',
     assistantSelfName: '时间助理',
     userCallName: '你',
-    systemPrompt: '语气克制、清晰、执行导向。先帮用户把事情讲清楚，再给出简洁可落地的下一步。',
+    systemPrompt: '像一个一直在线、会接着上下文陪用户往前走的人。语气自然、简洁、有分寸，像微信，不像客服。先判断用户现在卡在哪、累不累、还在不在原来的事上，再给最小可执行下一步；如果状态不清楚，可以短短确认一句。可以温柔，也可以轻轻催一下，但不要油腻、不要表演深情。',
     contextMessageLimit: 6,
     isBuiltIn: true
   },
@@ -478,7 +508,7 @@ const BUILTIN_PERSONAS: AIChatPersona[] = [
     avatarIcon: '🌷',
     assistantSelfName: '陪伴助手',
     userCallName: '你',
-    systemPrompt: '语气温和、支持感更强。先接住情绪，再给出轻量建议，不要说教。',
+    systemPrompt: '语气温和、支持感更强，但仍然自然克制。先接住当下状态，再顺手把用户带回下一步；如果她散掉了、累了、拖住了，就把入口缩小，不要说教。',
     contextMessageLimit: 6,
     isBuiltIn: true
   },
@@ -488,7 +518,7 @@ const BUILTIN_PERSONAS: AIChatPersona[] = [
     avatarIcon: '📐',
     assistantSelfName: '规划助手',
     userCallName: '你',
-    systemPrompt: '偏结构化、拆解式表达。遇到复杂请求时先澄清关键信息，再明确步骤和约束。',
+    systemPrompt: '偏结构化、拆解式表达，但不要失去陪伴感。遇到复杂请求时先抓关键约束，再把事情压缩成清楚的几步；如果用户启动困难，就先给最先动得起来的那一步。',
     contextMessageLimit: 8,
     isBuiltIn: true
   },
@@ -498,7 +528,7 @@ const BUILTIN_PERSONAS: AIChatPersona[] = [
     avatarIcon: '☕',
     assistantSelfName: '聊天搭子',
     userCallName: '你',
-    systemPrompt: '更自然、更像对话搭子。保持轻松口吻，但回答仍要有信息量，不要油腻。',
+    systemPrompt: '更自然、更像一直在同一条线上聊天的人。保持轻松口吻，但别空转；该接话时接话，该推进时推进，别油腻，也别把简单的话说得太满。',
     contextMessageLimit: 6,
     isBuiltIn: true
   }
@@ -511,7 +541,7 @@ const DEFAULT_AI_PERSONAS: AIChatPersona[] = [
     avatarIcon: '🗂️',
     assistantSelfName: '私人助理',
     userCallName: '老板',
-    systemPrompt: '你是用户的私人助理，稳重、清晰、可靠。你的首要任务是帮用户把模糊的话整理成可执行的信息：能补记就补记，能落成待办就落成待办，缺信息时只追问最关键的一点。说话简洁、得体、不油腻，不夸张，不自我表演。你可以温和，但始终以解决问题和减轻用户负担为先。面对日常闲聊时，也保持陪伴感和分寸感，像一个真正有判断力的助理。',
+    systemPrompt: '你是用户身边一个一直在线、会接续她时间线的私人助理。你的首要任务不只是整理信息，也是别把她今天的状态弄丢：她在忙什么、卡在哪、是不是又散了、是不是已经太累。能补记就补记，能落成待办就落成待办，缺信息时只追问最关键的一点。说话要短、自然、像微信，不要客服腔，不要夸张表演。任务明确时直接推进；用户累、拖、启动困难时，先把入口缩到最小一步。必要时可以轻轻催一下，但始终要有分寸和判断。',
     contextMessageLimit: 6,
     isBuiltIn: true
   },
@@ -521,7 +551,7 @@ const DEFAULT_AI_PERSONAS: AIChatPersona[] = [
     avatarIcon: '🐱',
     assistantSelfName: '喵喵',
     userCallName: '主人',
-    systemPrompt: '你是一个温柔、松弛、会陪人的喵喵助手。你说话轻一点，软一点，有陪伴感，但不要刻意卖萌，更不要频繁拟声词或过度角色扮演。你擅长先接住用户的情绪，再自然地帮他理顺事情：想聊天时能陪聊，想补记时能顺手整理时间，想建待办时能帮他收束成清楚的一条。你的存在感像一只安静趴在旁边的小猫，让人放松，但关键时刻也很靠谱。',
+    systemPrompt: '你是一个温柔、松弛、会陪人的喵喵助手。你说话轻一点，软一点，有陪伴感，但不要刻意卖萌，更不要频繁拟声词或过度角色扮演。你擅长先接住用户当下的状态，再自然地帮她理顺事情：想聊天时能陪聊，想补记时能顺手整理时间，想建待办时能帮她收束成清楚的一条。如果她累了、散了、拖住了，就把动作压到很小，让她更容易接上。',
     contextMessageLimit: 6,
     isBuiltIn: true
   },
@@ -531,7 +561,7 @@ const DEFAULT_AI_PERSONAS: AIChatPersona[] = [
     avatarIcon: '🏃',
     assistantSelfName: '成长教练',
     userCallName: '同学',
-    systemPrompt: '你是一位擅长行为设计和长期主义的成长教练。你关注的不是一时情绪，而是下一步怎么走、怎样更稳地推进。你的表达要有启发性，但不要空泛鼓励；要善于把大目标拆成小动作，把模糊愿望翻译成可以开始的第一步。遇到用户卡住、拖延、混乱时，先帮他看清阻力来自哪里，再给出低门槛、能执行的建议。语气坚定、专业、向前看，但不过度施压。',
+    systemPrompt: '你是一位擅长行为设计和长期主义的成长教练。你关注的不是一时情绪，而是下一步怎么走、怎样更稳地推进。你的表达要有启发性，但不要空泛鼓励；要善于把大目标拆成小动作，把模糊愿望翻译成可以开始的第一步。遇到用户卡住、拖延、混乱时，先判断她现在的阻力到底是累、散、怕，还是信息不清，再给出低门槛、能执行的建议。语气坚定、专业、向前看，但不过度施压。',
     contextMessageLimit: 8,
     isBuiltIn: true
   },
@@ -541,7 +571,7 @@ const DEFAULT_AI_PERSONAS: AIChatPersona[] = [
     avatarIcon: '🪶',
     assistantSelfName: '首辅',
     userCallName: '陛下',
-    systemPrompt: '你是用户身边的内阁首辅，冷静、审慎、善于权衡轻重缓急。你看问题讲究全局、次序与分寸，擅长从杂乱信息中理出主次，迅速判断什么该先办、什么可暂缓、什么仍需澄清。你的表达应像一份简洁有力的条陈：不空喊口号，不情绪化，不拖泥带水。必要时可以更锋利一点，指出关键漏洞，但始终是为了帮用户把局面稳住、把事情往前推。',
+    systemPrompt: '你是用户身边的内阁首辅，冷静、审慎、善于权衡轻重缓急。你看问题讲究全局、次序与分寸，擅长从杂乱信息中理出主次，迅速判断什么该先办、什么可暂缓、什么仍需澄清。你的表达应像一份简洁有力的条陈，但不要失去在场感：你要接着用户此刻的状态说话，而不是只对抽象问题发言。必要时可以更锋利一点，指出关键漏洞，但始终是为了帮用户把局面稳住、把事情往前推。',
     contextMessageLimit: 6,
     isBuiltIn: true
   }
@@ -592,6 +622,42 @@ const normalizeAppliedActions = (value: unknown): AppliedChatAction[] => (
   Array.isArray(value) ? value as AppliedChatAction[] : []
 );
 
+const normalizeMemoryUpdates = (value: unknown): AIChatMemoryUpdateSection[] => {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value.flatMap((item) => {
+    if (!item || typeof item !== 'object') {
+      return [];
+    }
+
+    const candidate = item as Partial<AIChatMemoryUpdateSection>;
+    if (typeof candidate.label !== 'string' || !Array.isArray(candidate.items)) {
+      return [];
+    }
+
+    const items = candidate.items
+      .map((entry) => (typeof entry === 'string' ? entry.trim() : ''))
+      .filter(Boolean);
+
+    if (!candidate.label.trim() || items.length === 0) {
+      return [];
+    }
+
+    return [{
+      label: candidate.label.trim(),
+      items
+    }];
+  });
+};
+
+const normalizeReminderUpdates = (value: unknown): string[] => (
+  Array.isArray(value)
+    ? value.map((item) => (typeof item === 'string' ? item.trim() : '')).filter(Boolean)
+    : []
+);
+
 const normalizeRetryInput = (value: unknown): string | undefined => (
   typeof value === 'string' && value.trim().length > 0
     ? value.trim()
@@ -629,6 +695,8 @@ const normalizeMessages = (value: unknown): AIChatMessage[] => {
       ...(candidate.tone ? { tone: candidate.tone } : {}),
       ...(candidate.debugSections ? { debugSections: normalizeDebugSections(candidate.debugSections) } : {}),
       ...(candidate.appliedActions ? { appliedActions: normalizeAppliedActions(candidate.appliedActions) } : {}),
+      ...(candidate.memoryUpdates ? { memoryUpdates: normalizeMemoryUpdates(candidate.memoryUpdates) } : {}),
+      ...(candidate.reminderUpdates ? { reminderUpdates: normalizeReminderUpdates(candidate.reminderUpdates) } : {}),
       ...(normalizeRetryInput(candidate.retryInput) ? { retryInput: normalizeRetryInput(candidate.retryInput) } : {})
     };
 
@@ -836,20 +904,13 @@ const createSessionTitleFromUserMessage = (text: string): string => {
   return condensed.length > 18 ? `${condensed.slice(0, 18)}…` : condensed;
 };
 
-const formatLocalDateTimeContext = (date: Date): string => {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  const hours = String(date.getHours()).padStart(2, '0');
-  const minutes = String(date.getMinutes()).padStart(2, '0');
-  const seconds = String(date.getSeconds()).padStart(2, '0');
-  const offsetMinutes = -date.getTimezoneOffset();
-  const sign = offsetMinutes >= 0 ? '+' : '-';
-  const offsetHours = String(Math.floor(Math.abs(offsetMinutes) / 60)).padStart(2, '0');
-  const offsetRemainder = String(Math.abs(offsetMinutes) % 60).padStart(2, '0');
+const formatLocalDateTimeContext = (date: Date): string => formatAssistantLocalDateTime(date);
 
-  return `${year}-${month}-${day} ${hours}:${minutes}:${seconds} GMT${sign}${offsetHours}:${offsetRemainder}`;
-};
+const buildAssistantCurrentTimeSnapshot = (date: Date) => ({
+  currentDateTime: formatLocalDateTimeContext(date),
+  currentDateTimeLocal: formatAssistantLocalDateTime(date),
+  currentDateTimeUtc: date.toISOString()
+});
 
 const stringifyDebugSection = (value: unknown): string => {
   if (typeof value === 'string') {
@@ -862,6 +923,283 @@ const stringifyDebugSection = (value: unknown): string => {
     console.error('[AIBackfillChatModal] Failed to stringify debug payload', error);
     return String(value);
   }
+};
+
+interface DebugTextBlock {
+  label: string;
+  content: string;
+}
+
+const splitLabeledSections = (content: string): DebugTextBlock[] => {
+  const normalized = content.trim();
+  if (!normalized.includes('=== ')) {
+    return [];
+  }
+
+  const markerRegex = /^===\s+(.+?)\s+===$/gm;
+  const matches = Array.from(normalized.matchAll(markerRegex));
+  if (matches.length === 0) {
+    return [];
+  }
+
+  return matches.map((match, index) => {
+    const label = match[1]?.trim() || '';
+    const start = (match.index || 0) + match[0].length;
+    const end = index + 1 < matches.length ? (matches[index + 1].index || normalized.length) : normalized.length;
+    const sectionContent = normalized.slice(start, end).trim();
+    return {
+      label,
+      content: sectionContent
+    };
+  }).filter((section) => section.label && section.content);
+};
+
+const mapPromptSectionLabel = (label: string): string => {
+  switch (label) {
+    case 'Assistant Base Prompt':
+      return '基础 System Prompt';
+    case 'Foreground Mode Prompt':
+      return '前台调用 Prompt';
+    case 'Background Mode Prompt':
+      return '后台调用 Prompt';
+    case 'User Persona Prompt':
+      return '人格 Prompt';
+    case 'Foreground Tool Prompt':
+    case 'Background Tool Prompt':
+    case 'Tool and Mode Rules':
+      return '工具与模式规则 Prompt';
+    case 'Memory Update Rules':
+      return '记忆更新规则 Prompt';
+    case 'Unified Turn Output Schema':
+      return '统一输出 Schema';
+    case 'Memory Snapshot':
+      return '长期记忆快照';
+    case 'State Context':
+      return '应用状态上下文';
+    case 'Dictionary Context':
+      return '应用候选字典上下文';
+    case 'Trigger':
+      return '触发信息';
+    case 'Conversation Context':
+      return '对话上下文';
+    default:
+      return label;
+  }
+};
+
+const toPrettyJson = (value: unknown): string => {
+  try {
+    return JSON.stringify(value, null, 2);
+  } catch (error) {
+    console.error('[AIBackfillChatModal] Failed to stringify debug payload', error);
+    return String(value);
+  }
+};
+
+const normalizeDebugText = (value: unknown): string => {
+  if (typeof value === 'string') {
+    return value.trim();
+  }
+  return toPrettyJson(value).trim();
+};
+
+const buildMemoryUpdateSections = (
+  before: AssistantMemory,
+  after: AssistantMemory
+): AIChatMemoryUpdateSection[] => {
+  const sections: AIChatMemoryUpdateSection[] = [];
+
+  const addedProfile = after.profileMemory.filter((item) => !before.profileMemory.includes(item));
+  if (addedProfile.length > 0) {
+    sections.push({ label: '用户画像记忆', items: addedProfile });
+  }
+
+  const addedPreferences = after.preferenceMemory.filter((item) => !before.preferenceMemory.includes(item));
+  if (addedPreferences.length > 0) {
+    sections.push({ label: '偏好记忆', items: addedPreferences });
+  }
+
+  if (after.lastKnownState && after.lastKnownState !== before.lastKnownState) {
+    sections.push({ label: '当前状态', items: [after.lastKnownState] });
+  }
+
+  if (after.workingMemorySummary && after.workingMemorySummary !== before.workingMemorySummary) {
+    sections.push({ label: '工作记忆摘要', items: [after.workingMemorySummary] });
+  }
+
+  const addedDecisions = after.recentDecisions.filter((item) => !before.recentDecisions.includes(item));
+  if (addedDecisions.length > 0) {
+    sections.push({ label: '决策摘要', items: addedDecisions });
+  }
+
+  return sections;
+};
+
+const buildDebugBlocks = (exchange: AIDebugExchange): DebugTextBlock[] => {
+  const blocks: DebugTextBlock[] = [];
+  const requestBody = exchange.request.body as Record<string, unknown> | null | undefined;
+  const responseBody = exchange.response.body as Record<string, unknown> | null | undefined;
+
+  blocks.push({
+    label: '请求元信息',
+    content: [
+      `provider: ${exchange.provider}`,
+      `requestedAt: ${exchange.requestedAt}`,
+      `completedAt: ${exchange.completedAt}`,
+      `url: ${exchange.request.url}`,
+      `method: ${exchange.request.method}`
+    ].join('\n')
+  });
+
+  const modelValue = typeof requestBody?.model === 'string'
+    ? requestBody.model
+    : typeof requestBody?.['model'] === 'string'
+      ? String(requestBody.model)
+      : '';
+  if (modelValue) {
+    blocks.push({
+      label: '模型',
+      content: modelValue
+    });
+  }
+
+  const openAIMessages = Array.isArray(requestBody?.messages)
+    ? requestBody.messages as Array<{ role?: string; content?: unknown }>
+    : [];
+  if (openAIMessages.length > 0) {
+    const systemMessage = openAIMessages.find((message) => message.role === 'system');
+    const historyMessages = openAIMessages.slice(systemMessage ? 1 : 0, -1);
+    const latestUserMessage = openAIMessages[openAIMessages.length - 1];
+
+    if (systemMessage?.content) {
+      const systemPromptContent = normalizeDebugText(systemMessage.content);
+      const promptSections = splitLabeledSections(systemPromptContent);
+      if (promptSections.length > 0) {
+        blocks.push(...promptSections.map((section) => ({
+          label: mapPromptSectionLabel(section.label),
+          content: section.content
+        })));
+      } else {
+        blocks.push({
+          label: '系统提示词',
+          content: systemPromptContent
+        });
+      }
+    }
+
+    if (historyMessages.length > 0) {
+      blocks.push({
+        label: '对话上下文',
+        content: historyMessages.map((message) => (
+          `${message.role === 'assistant' ? 'assistant' : 'user'}:\n${normalizeDebugText(message.content || '')}`
+        )).join('\n\n')
+      });
+    }
+
+    if (latestUserMessage?.content) {
+      const userPromptContent = normalizeDebugText(latestUserMessage.content);
+      const userPromptSections = splitLabeledSections(userPromptContent);
+      if (userPromptSections.length > 0) {
+        blocks.push(...userPromptSections.map((section) => ({
+          label: mapPromptSectionLabel(section.label),
+          content: section.content
+        })));
+      } else {
+        blocks.push({
+          label: '最终用户输入',
+          content: userPromptContent
+        });
+      }
+    }
+  }
+
+  const geminiSystemInstruction = requestBody?.system_instruction as { parts?: Array<{ text?: string }> } | undefined;
+  if (!openAIMessages.length && geminiSystemInstruction?.parts?.length) {
+    const systemPromptContent = geminiSystemInstruction.parts.map((part) => part.text || '').filter(Boolean).join('\n\n').trim();
+    const promptSections = splitLabeledSections(systemPromptContent);
+    if (promptSections.length > 0) {
+      blocks.push(...promptSections.map((section) => ({
+        label: mapPromptSectionLabel(section.label),
+        content: section.content
+      })));
+    } else {
+      blocks.push({
+        label: '系统提示词',
+        content: systemPromptContent
+      });
+    }
+  }
+
+  const geminiContents = Array.isArray(requestBody?.contents)
+    ? requestBody.contents as Array<{ role?: string; parts?: Array<{ text?: string }> }>
+    : [];
+  if (!openAIMessages.length && geminiContents.length > 0) {
+    const conversationItems = geminiContents.slice(0, -1);
+    const finalUser = geminiContents[geminiContents.length - 1];
+
+    if (conversationItems.length > 0) {
+      blocks.push({
+        label: '对话上下文',
+        content: conversationItems.map((item) => (
+          `${item.role || 'user'}:\n${(item.parts || []).map((part) => part.text || '').filter(Boolean).join('\n')}`
+        )).join('\n\n')
+      });
+    }
+
+    if (finalUser?.parts?.length) {
+      const userPromptContent = finalUser.parts.map((part) => part.text || '').filter(Boolean).join('\n').trim();
+      const userPromptSections = splitLabeledSections(userPromptContent);
+      if (userPromptSections.length > 0) {
+        blocks.push(...userPromptSections.map((section) => ({
+          label: mapPromptSectionLabel(section.label),
+          content: section.content
+        })));
+      } else {
+        blocks.push({
+          label: '最终用户输入',
+          content: userPromptContent
+        });
+      }
+    }
+  }
+
+  const openAIResponseContent = typeof (responseBody as any)?.choices?.[0]?.message?.content === 'string'
+    ? (responseBody as any).choices[0].message.content.trim()
+    : '';
+  const geminiResponseContent = typeof (responseBody as any)?.candidates?.[0]?.content?.parts?.[0]?.text === 'string'
+    ? (responseBody as any).candidates[0].content.parts[0].text.trim()
+    : '';
+  const responseContent = openAIResponseContent || geminiResponseContent;
+  if (responseContent) {
+    blocks.push({
+      label: '模型原始输出',
+      content: responseContent
+    });
+  }
+
+  return blocks.filter((block) => block.content.trim().length > 0);
+};
+
+const formatAssistantReminderSnapshot = (reminders: AssistantReminder[]): string => {
+  if (!reminders.length) {
+    return '暂无';
+  }
+
+  return reminders.map((reminder, index) => {
+    const delayMinutes = getAssistantDelayMinutes(reminder.dueAt, reminder.lastDispatchedAt);
+
+    return [
+      `${index + 1}. ${reminder.text}`,
+      `   type: ${reminder.type}`,
+      `   status: ${reminder.status}`,
+      `   scheduledDueAt: ${formatAssistantDateTimeForDisplay(reminder.dueAt)}`,
+      `   scheduledDueAtUtc: ${reminder.dueAt}`,
+      `   lastDispatchAttemptAt: ${formatAssistantDateTimeForDisplay(reminder.lastDispatchAttemptAt) || '-'}`,
+      `   actualDispatchAt: ${formatAssistantDateTimeForDisplay(reminder.lastDispatchedAt) || '-'}`,
+      `   delayMinutes: ${delayMinutes ?? '-'}`,
+      `   dispatchAttemptCount: ${reminder.dispatchAttemptCount || 0}`
+    ].join('\n');
+  }).join('\n\n');
 };
 
 const buildPersonaPrompt = (persona: AIChatPersona): string => {
@@ -928,7 +1266,11 @@ const getRetryableAIErrorMessage = (error: unknown): string => {
 export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
   isOpen,
   onClose,
-  targetDate
+  targetDate,
+  targetSessionId,
+  targetMessageId,
+  onUnreadAssistantMessage,
+  onMarkRead
 }) => {
   const [initialState] = useState<InitialChatState>(() => loadInitialChatState());
   const [personas, setPersonas] = useState<AIChatPersona[]>(initialState.personas);
@@ -952,12 +1294,22 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
   const [isUserEmojiEditorOpen, setIsUserEmojiEditorOpen] = useState(false);
   const [userEmojiDraft, setUserEmojiDraft] = useState('');
   const [assistantAgentConfig, setAssistantAgentConfig] = useState<AssistantAgentConfig>(() => assistantAgentConfigService.getConfig());
+  const [assistantAgentIntervalDrafts, setAssistantAgentIntervalDrafts] = useState<AssistantAgentIntervalDrafts>(() => (
+    buildAssistantAgentIntervalDrafts(assistantAgentConfigService.getConfig())
+  ));
   const [assistantMemorySnapshot, setAssistantMemorySnapshot] = useState<AssistantMemory>(() => assistantMemoryService.getMemory());
+  const [assistantReminderSnapshot, setAssistantReminderSnapshot] = useState<AssistantReminder[]>(() => assistantReminderQueueService.listReminders());
   const [isAssistantMemoryViewerOpen, setIsAssistantMemoryViewerOpen] = useState(false);
+  const [assistantBackgroundCallHistory, setAssistantBackgroundCallHistory] = useState<AssistantBackgroundCallHistoryEntry[]>(() => assistantOrchestratorService.listBackgroundCallHistory());
+  const [isAssistantBackgroundHistoryViewerOpen, setIsAssistantBackgroundHistoryViewerOpen] = useState(false);
   const activeRequestRef = useRef<ActiveRequestRef | null>(null);
+  const isOpenRef = useRef(isOpen);
+  const processingDueReminderIdsRef = useRef<Set<string>>(new Set());
   const avatarInputRef = useRef<HTMLInputElement | null>(null);
   const userAvatarInputRef = useRef<HTMLInputElement | null>(null);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
+  const messageElementRefs = useRef<Map<string, HTMLDivElement | null>>(new Map());
+  const handledNavigationKeyRef = useRef('');
 
   const { logs, setLogs, todos, setTodos, todoCategories } = useData();
   const { activeSessions } = useSession();
@@ -987,6 +1339,10 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
 
   const defaultDateKey = useMemo(() => formatDateKey(defaultTargetDate), [defaultTargetDate]);
   const personaMap = useMemo(() => new Map(personas.map((persona) => [persona.id, persona])), [personas]);
+  const assistantAgentIntervalErrors = useMemo(
+    () => validateAssistantAgentIntervalDrafts(assistantAgentIntervalDrafts),
+    [assistantAgentIntervalDrafts]
+  );
   const activeSession = useMemo(
     () => sessions.find((session) => session.id === activeSessionId) || sessions[0] || null,
     [activeSessionId, sessions]
@@ -1022,30 +1378,6 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     weekday: 'short'
   }).format(defaultTargetDate), [defaultTargetDate]);
 
-  const latestLog = useMemo(() => (
-    logs.length > 0
-      ? [...logs].sort((left, right) => right.endTime - left.endTime)[0]
-      : null
-  ), [logs]);
-
-  const latestLogContext = useMemo(() => {
-    if (!latestLog) {
-      return null;
-    }
-
-    return {
-      endDateTime: formatLocalDateTimeContext(new Date(latestLog.endTime)),
-      date: formatDateKey(new Date(latestLog.endTime)),
-      endTime: new Intl.DateTimeFormat('zh-CN', {
-        hour: '2-digit',
-        minute: '2-digit',
-        hour12: false
-      }).format(latestLog.endTime),
-      title: latestLog.title || '',
-      note: latestLog.note || ''
-    };
-  }, [latestLog]);
-
   const todayTimelineSummary = useMemo(() => {
     if (referenceDayLogs.length === 0) {
       return '';
@@ -1068,35 +1400,32 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
       )).join('；')
   ), [activeSessions, todos]);
 
-  const todoPlanningContext = useMemo(() => (
+  const todoSummary = useMemo(() => (
     todos
       .filter((todo) => !todo.isCompleted)
-      .map((todo, _, unfinishedTodos) => {
-      const parentTodo = todo.parentTodoId
-        ? unfinishedTodos.find((candidate) => candidate.id === todo.parentTodoId)
-        : undefined;
-
-      return {
-        id: todo.id,
-        title: todo.title,
-        path: parentTodo ? `${parentTodo.title} / ${todo.title}` : todo.title,
-        isProgress: todo.isProgress,
-        progressTrackingMode: getTodoProgressTrackingMode(todo, todos),
-        totalAmount: todo.totalAmount,
-        unitAmount: todo.unitAmount,
-        completedUnits: todo.completedUnits,
-        parentTodoId: todo.parentTodoId,
-        parentTodoTitle: parentTodo?.title
-      };
-    })
+      .slice(0, 8)
+      .map((todo) => {
+        const parentTodo = todo.parentTodoId
+          ? todos.find((candidate) => candidate.id === todo.parentTodoId)
+          : undefined;
+        return parentTodo ? `${parentTodo.title} / ${todo.title}` : todo.title;
+      })
+      .join('；')
   ), [todos]);
 
-  const todoSummary = useMemo(() => (
-    todoPlanningContext
-      .slice(0, 8)
-      .map((todo) => todo.path || todo.title)
-      .join('；')
-  ), [todoPlanningContext]);
+  const todayScheduledTodoSummary = useMemo(() => (
+    todos
+      .filter((todo) => todo.scheduledDate === defaultDateKey)
+      .map((todo) => `${todo.title} [${todo.isCompleted ? 'completed' : 'pending'}]`)
+      .join('\n')
+  ), [defaultDateKey, todos]);
+
+  const pinnedTodoSummary = useMemo(() => (
+    todos
+      .filter((todo) => Boolean(todo.pin))
+      .map((todo) => `${todo.title} [${todo.isCompleted ? 'completed' : 'pending'}]`)
+      .join('\n')
+  ), [todos]);
 
   const todoUpdateContext = useMemo(() => (
     todos.map((todo) => {
@@ -1187,9 +1516,19 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
       })
   ), [categories, logs, todos]);
 
+  const activeNavigationKey = isOpen && targetSessionId
+    ? `${targetSessionId}:${targetMessageId || ''}`
+    : '';
+  const hasPendingNavigation = Boolean(activeNavigationKey)
+    && handledNavigationKeyRef.current !== activeNavigationKey;
+
   useEffect(() => {
+    if (hasPendingNavigation && activeSessionId === targetSessionId) {
+      return;
+    }
+
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
-  }, [activeSession?.messages, isLoading]);
+  }, [activeSession?.messages, activeSessionId, hasPendingNavigation, isLoading, targetSessionId]);
 
   useEffect(() => {
     localStorage.setItem(CHAT_PERSONAS_KEY, JSON.stringify(personas));
@@ -1214,6 +1553,10 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
   }, [userProfile]);
 
   useEffect(() => {
+    isOpenRef.current = isOpen;
+  }, [isOpen]);
+
+  useEffect(() => {
     if (sessions.length === 0) {
       const fallbackSession = createDefaultSession(personas[0]?.id || DEFAULT_AI_PERSONAS[0].id);
       setSessions([fallbackSession]);
@@ -1225,6 +1568,56 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
       setActiveSessionId(sessions[0].id);
     }
   }, [activeSessionId, personas, sessions]);
+
+  useEffect(() => {
+    if (isOpen) {
+      onMarkRead?.();
+    }
+  }, [isOpen, onMarkRead]);
+
+  useEffect(() => {
+    if (!isOpen) {
+      handledNavigationKeyRef.current = '';
+      return;
+    }
+
+    if (!targetSessionId || !hasPendingNavigation) {
+      return;
+    }
+
+    if (!sessions.some((session) => session.id === targetSessionId)) {
+      handledNavigationKeyRef.current = activeNavigationKey;
+      return;
+    }
+
+    if (activeSessionId !== targetSessionId) {
+      setActiveSessionId(targetSessionId);
+      return;
+    }
+
+    window.requestAnimationFrame(() => {
+      if (targetMessageId) {
+        const targetElement = messageElementRefs.current.get(targetMessageId);
+        if (targetElement) {
+          targetElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          handledNavigationKeyRef.current = activeNavigationKey;
+          return;
+        }
+      }
+
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
+      handledNavigationKeyRef.current = activeNavigationKey;
+    });
+  }, [
+    activeNavigationKey,
+    activeSession?.messages,
+    activeSessionId,
+    hasPendingNavigation,
+    isOpen,
+    sessions,
+    targetMessageId,
+    targetSessionId
+  ]);
 
   useEffect(() => {
     if (activeSession && !personaMap.has(activeSession.personaId)) {
@@ -1316,6 +1709,26 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     setAssistantMemorySnapshot(assistantMemoryService.getMemory());
   };
 
+  const refreshAssistantReminderSnapshot = () => {
+    setAssistantReminderSnapshot(assistantReminderQueueService.listReminders());
+  };
+
+  const refreshAssistantBackgroundCallHistory = () => {
+    setAssistantBackgroundCallHistory(assistantOrchestratorService.listBackgroundCallHistory());
+  };
+
+  const shouldShowBackgroundSystemNotification = () => (
+    typeof document !== 'undefined' && document.hidden
+  );
+
+  useEffect(() => {
+    setAssistantAgentIntervalDrafts(buildAssistantAgentIntervalDrafts(assistantAgentConfig));
+  }, [
+    assistantAgentConfig.basePollMinutes,
+    assistantAgentConfig.maxCheckinMinutes,
+    assistantAgentConfig.minCheckinMinutes
+  ]);
+
   const handleUpdateAssistantAgentConfig = (patch: Partial<AssistantAgentConfig>) => {
     const nextConfig = assistantAgentConfigService.saveConfig(patch);
     setAssistantAgentConfig(nextConfig);
@@ -1324,12 +1737,137 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     }
   };
 
+  const handleAssistantAgentIntervalDraftChange = (
+    field: AssistantAgentIntervalField,
+    nextValue: string
+  ) => {
+    setAssistantAgentIntervalDrafts((current) => ({
+      ...current,
+      [field]: nextValue
+    }));
+  };
+
+  const commitAssistantAgentIntervalDraft = (field: AssistantAgentIntervalField) => {
+    const nextErrors = validateAssistantAgentIntervalDrafts(assistantAgentIntervalDrafts);
+
+    if (field === 'basePollMinutes') {
+      if (nextErrors.basePollMinutes) {
+        return;
+      }
+
+      handleUpdateAssistantAgentConfig({
+        basePollMinutes: Number(assistantAgentIntervalDrafts.basePollMinutes.trim())
+      });
+      return;
+    }
+
+    if (nextErrors.minCheckinMinutes || nextErrors.maxCheckinMinutes) {
+      return;
+    }
+
+    handleUpdateAssistantAgentConfig({
+      minCheckinMinutes: Number(assistantAgentIntervalDrafts.minCheckinMinutes.trim()),
+      maxCheckinMinutes: Number(assistantAgentIntervalDrafts.maxCheckinMinutes.trim())
+    });
+  };
+
+  const buildReminderDueTrigger = (reminder: AssistantReminder): AssistantSystemTrigger => {
+    const now = new Date();
+    const nowIso = now.toISOString();
+    const nowLocal = formatAssistantLocalDateTime(now);
+    const dueAtMs = parseAssistantDateTime(reminder.dueAt);
+    const delayMinutes = Number.isFinite(dueAtMs)
+      ? Math.max(0, Math.round((now.getTime() - dueAtMs) / 60000))
+      : 0;
+
+    return {
+      id: `reminder_due:${reminder.id}:${now.getTime()}`,
+      type: 'reminder_due',
+      source: 'system',
+      createdAt: nowIso,
+      text: reminder.text,
+      metadata: {
+        reminderId: reminder.id,
+        reminderType: reminder.type,
+        scheduledDueAt: reminder.dueAt,
+        scheduledDueAtLocal: formatAssistantDateTimeForDisplay(reminder.dueAt),
+        actualDispatchAt: nowIso,
+        actualDispatchAtLocal: nowLocal,
+        delayMinutes,
+        dispatchAttemptCount: reminder.dispatchAttemptCount || 0
+      }
+    };
+  };
+
+  const dispatchDueReminder = (reminder: AssistantReminder) => {
+    if (processingDueReminderIdsRef.current.has(reminder.id)) {
+      return;
+    }
+
+    processingDueReminderIdsRef.current.add(reminder.id);
+    const now = new Date();
+    const attemptedAt = now.toISOString();
+    assistantReminderQueueService.recordDispatchAttempt(reminder.id, attemptedAt);
+
+    const targetSession = getBackgroundTargetSession();
+    const conversationHistory = targetSession
+      ? (conversationHistoryCache.get(targetSession.id) || [])
+      : [];
+
+    void assistantOrchestratorService.runSystemTurn({
+      trigger: buildReminderDueTrigger({
+        ...reminder,
+        ...(reminder.dispatchAttemptCount !== undefined ? { dispatchAttemptCount: reminder.dispatchAttemptCount + 1 } : { dispatchAttemptCount: 1 }),
+        lastDispatchAttemptAt: attemptedAt
+      }),
+      ...(targetSession ? { targetSessionId: targetSession.id } : {}),
+      showSystemNotification: shouldShowBackgroundSystemNotification(),
+      ...buildAssistantCurrentTimeSnapshot(now),
+      defaultDate: defaultDateKey,
+      todayTimelineSummary,
+      activeSessionSummary,
+      todoSummary,
+      todayScheduledTodoSummary,
+      pinnedTodoSummary,
+      reminderSummary: buildAssistantReminderSummary(),
+      userPersonaPrompt: buildBackgroundPersonaPrompt(targetSession),
+      dictionaryContext: buildAssistantDictionaryContext(),
+      conversationHistory,
+      includeDebugInPersistedMessage: debugMode
+    }).then((result) => {
+      assistantReminderQueueService.markDispatched(reminder.id, new Date().toISOString());
+      refreshAssistantMemorySnapshot();
+      reloadPersistedChatSessions();
+      if (result.surfacedMessage && !isOpenRef.current) {
+        onUnreadAssistantMessage?.(1);
+        addToast('info', `AI 助理：${result.surfacedMessage}`);
+      }
+    }).catch((error) => {
+      console.error('[AIBackfillChatModal] Due reminder dispatch failed', error);
+      refreshAssistantMemorySnapshot();
+    }).finally(() => {
+      processingDueReminderIdsRef.current.delete(reminder.id);
+    });
+  };
+
+  const flushDueReminders = () => {
+    if (!assistantAgentConfig.enabled) {
+      return;
+    }
+
+    const dueReminders = assistantReminderQueueService.listDueReminders();
+    dueReminders.forEach((reminder) => {
+      dispatchDueReminder(reminder);
+    });
+  };
+
   useEffect(() => {
     if (!isPersonaPanelOpen) {
       return;
     }
 
     refreshAssistantMemorySnapshot();
+    refreshAssistantReminderSnapshot();
   }, [assistantAgentConfig.longTermMemoryEnabled, isPersonaPanelOpen]);
 
   useEffect(() => {
@@ -1338,12 +1876,23 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     }
 
     refreshAssistantMemorySnapshot();
+    refreshAssistantReminderSnapshot();
   }, [isAssistantMemoryViewerOpen]);
+
+  useEffect(() => {
+    if (!isAssistantBackgroundHistoryViewerOpen) {
+      return;
+    }
+
+    refreshAssistantBackgroundCallHistory();
+  }, [isAssistantBackgroundHistoryViewerOpen]);
 
   useEffect(() => {
     const handleAssistantChatUpdated = () => {
       reloadPersistedChatSessions();
       refreshAssistantMemorySnapshot();
+      refreshAssistantReminderSnapshot();
+      refreshAssistantBackgroundCallHistory();
     };
 
     window.addEventListener(ASSISTANT_CHAT_UPDATED_EVENT, handleAssistantChatUpdated);
@@ -1361,23 +1910,32 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
             return;
           }
 
-          const latestSession = [...sortedSessions].sort((left, right) => right.updatedAt - left.updatedAt)[0] || activeSession;
-          const conversationHistory = latestSession
-            ? (conversationHistoryCache.get(latestSession.id) || [])
+          const targetSession = getBackgroundTargetSession();
+          const conversationHistory = targetSession
+            ? (conversationHistoryCache.get(targetSession.id) || [])
             : [];
 
           void assistantOrchestratorService.runSystemTurn({
             trigger: trigger as AssistantSystemTrigger,
-            currentDateTime: formatLocalDateTimeContext(new Date()),
+            ...(targetSession ? { targetSessionId: targetSession.id } : {}),
+            showSystemNotification: shouldShowBackgroundSystemNotification(),
+            ...buildAssistantCurrentTimeSnapshot(new Date()),
             defaultDate: defaultDateKey,
             todayTimelineSummary,
             activeSessionSummary,
             todoSummary,
-            conversationHistory
+            todayScheduledTodoSummary,
+            pinnedTodoSummary,
+            reminderSummary: buildAssistantReminderSummary(),
+            userPersonaPrompt: buildBackgroundPersonaPrompt(targetSession),
+            dictionaryContext: buildAssistantDictionaryContext(),
+            conversationHistory,
+            includeDebugInPersistedMessage: debugMode
           }).then((result) => {
             refreshAssistantMemorySnapshot();
             reloadPersistedChatSessions();
             if (result.surfacedMessage && !isOpen) {
+              onUnreadAssistantMessage?.(1);
               addToast('info', `AI 助理：${result.surfacedMessage}`);
             }
           }).catch((error) => {
@@ -1403,6 +1961,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     conversationHistoryCache,
     defaultDateKey,
     isOpen,
+    onUnreadAssistantMessage,
     sortedSessions,
     todoSummary,
     todayTimelineSummary
@@ -1431,6 +1990,29 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
       cancelled = true;
     };
   }, [assistantAgentConfig]);
+
+  useEffect(() => {
+    flushDueReminders();
+
+    if (!assistantAgentConfig.enabled) {
+      return;
+    }
+
+    const timer = window.setInterval(() => {
+      flushDueReminders();
+    }, 60_000);
+
+    return () => window.clearInterval(timer);
+  }, [
+    activeSession,
+    activeSessionSummary,
+    assistantAgentConfig.enabled,
+    conversationHistoryCache,
+    defaultDateKey,
+    sortedSessions,
+    todoSummary,
+    todayTimelineSummary
+  ]);
 
   const mutateSession = (sessionId: string, updater: (session: AIChatSession) => AIChatSession) => {
     setSessions((prev) => prev.map((session) => (
@@ -1472,6 +2054,27 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
               ? { ...action, status: nextStatus }
               : action
           ))
+        };
+      })
+    }));
+  };
+
+  const appendDebugSectionToMessage = (
+    sessionId: string,
+    messageId: string,
+    section: AIChatDebugSection
+  ) => {
+    mutateSession(sessionId, (session) => ({
+      ...session,
+      messages: session.messages.map((message) => {
+        if (message.id !== messageId) {
+          return message;
+        }
+
+        const nextSections = [...(message.debugSections || []), section];
+        return {
+          ...message,
+          debugSections: nextSections
         };
       })
     }));
@@ -1818,6 +2421,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
 
   const handleOpenAssistantMemoryViewer = () => {
     refreshAssistantMemorySnapshot();
+    refreshAssistantReminderSnapshot();
     setIsAssistantMemoryViewerOpen(true);
   };
 
@@ -1825,15 +2429,266 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     setIsAssistantMemoryViewerOpen(false);
   };
 
+  const handleOpenAssistantBackgroundHistoryViewer = () => {
+    refreshAssistantBackgroundCallHistory();
+    setIsAssistantBackgroundHistoryViewerOpen(true);
+  };
+
+  const handleCloseAssistantBackgroundHistoryViewer = () => {
+    setIsAssistantBackgroundHistoryViewerOpen(false);
+  };
+
+  const handleClearAssistantBackgroundCallHistory = () => {
+    assistantOrchestratorService.clearBackgroundCallHistory();
+    refreshAssistantBackgroundCallHistory();
+    addToast('success', '已清空后台调用记录');
+  };
+
   const handleClearAssistantMemory = () => {
     assistantMemoryService.clearMemory();
     assistantReminderQueueService.clearQueue();
     refreshAssistantMemorySnapshot();
+    refreshAssistantReminderSnapshot();
     addToast('success', '已清空长期记忆');
+  };
+
+  const runManualAssistantCheckinDebug = () => {
+    if (!activeSession || isLoading) {
+      return;
+    }
+
+    const sessionId = activeSession.id;
+    const now = Date.now();
+    const userMessageId = crypto.randomUUID();
+    const pendingMessageId = crypto.randomUUID();
+    const historyBeforeCurrent = conversationHistoryCache.get(sessionId) || [];
+
+    mutateSession(sessionId, (session) => ({
+      ...session,
+      messages: [
+        ...session.messages,
+        {
+          id: userMessageId,
+          role: 'user',
+          content: '/agent checkin',
+          createdAt: now
+        },
+        {
+          id: pendingMessageId,
+          role: 'assistant',
+          content: '我先模拟一轮后台 check-in…',
+          createdAt: now + 1,
+          tone: 'pending'
+        }
+      ]
+    }));
+
+    setInputText('');
+    setIsLoading(true);
+
+    void assistantOrchestratorService.runSystemTurn({
+      trigger: {
+        id: crypto.randomUUID(),
+        type: 'manual_background_nudge',
+        source: 'system',
+        createdAt: new Date(now).toISOString(),
+        text: 'Manual debug trigger for assistant background check-in'
+      },
+      targetSessionId: sessionId,
+      showSystemNotification: false,
+      ...buildAssistantCurrentTimeSnapshot(new Date(now)),
+      defaultDate: defaultDateKey,
+      todayTimelineSummary,
+      activeSessionSummary,
+      todoSummary,
+      todayScheduledTodoSummary,
+      pinnedTodoSummary,
+      reminderSummary: buildAssistantReminderSummary(),
+      userPersonaPrompt: buildBackgroundPersonaPrompt(activeSession),
+      dictionaryContext: buildAssistantDictionaryContext(),
+      conversationHistory: historyBeforeCurrent,
+      includeDebugInPersistedMessage: debugMode
+    }).then((result) => {
+      refreshAssistantMemorySnapshot();
+      reloadPersistedChatSessions();
+
+      const content = [
+        '后台 check-in 调试完成',
+        `Action: ${result.decision.action}`,
+        `Memory: ${result.decision.memoryAction}`,
+        ...(result.appliedReminders?.length ? [`Reminders: ${result.appliedReminders.length}`] : []),
+        ...(result.surfacedMessage ? [`Message: ${result.surfacedMessage}`] : [])
+      ].join('\n');
+
+      replacePendingWithResult(sessionId, pendingMessageId, content, {
+        tone: result.decision.action === 'silent' ? 'system' : 'normal',
+        debugSections: debugMode
+          ? [{
+            label: '后台 Check-in 调试',
+            exchange: result.debug
+          }]
+          : undefined
+      });
+    }).catch((error) => {
+      console.error('[AIBackfillChatModal] Manual assistant check-in debug failed', error);
+      replacePendingWithResult(
+        sessionId,
+        pendingMessageId,
+        getRetryableAIErrorMessage(error),
+        {
+          tone: 'error',
+          retryInput: '/agent checkin',
+          debugSections: (
+            debugMode
+            && typeof error === 'object'
+            && error !== null
+            && 'debug' in error
+            && (error as { debug?: AIDebugExchange }).debug
+          )
+            ? [{
+              label: '后台 Check-in 调试',
+              exchange: (error as { debug?: AIDebugExchange }).debug!
+            }]
+            : undefined
+        }
+      );
+    }).finally(() => {
+      if (activeRequestRef.current?.pendingMessageId === pendingMessageId) {
+        activeRequestRef.current = null;
+      }
+      setIsLoading(false);
+    });
+  };
+
+  const runManualAssistantReminderDebug = () => {
+    if (!activeSession || isLoading) {
+      return;
+    }
+
+    const sessionId = activeSession.id;
+    const now = Date.now();
+    const scheduledDueAt = new Date(now - (30 * 60 * 1000)).toISOString();
+    const actualDispatchAt = new Date(now).toISOString();
+    const pendingMessageId = crypto.randomUUID();
+    const userMessageId = crypto.randomUUID();
+    const historyBeforeCurrent = conversationHistoryCache.get(sessionId) || [];
+
+    mutateSession(sessionId, (session) => ({
+      ...session,
+      messages: [
+        ...session.messages,
+        {
+          id: userMessageId,
+          role: 'user',
+          content: '/agent reminder due',
+          createdAt: now
+        },
+        {
+          id: pendingMessageId,
+          role: 'assistant',
+          content: '我先模拟一轮延迟 reminder 补发…',
+          createdAt: now + 1,
+          tone: 'pending'
+        }
+      ]
+    }));
+
+    setInputText('');
+    setIsLoading(true);
+
+    void assistantOrchestratorService.runSystemTurn({
+      trigger: {
+        id: crypto.randomUUID(),
+        type: 'reminder_due',
+        source: 'system',
+        createdAt: actualDispatchAt,
+        text: '请确认用户是否还在做刚才那件事，如果已经做完就不要机械重复提醒。',
+        metadata: {
+          scheduledDueAt,
+          scheduledDueAtLocal: formatAssistantDateTimeForDisplay(scheduledDueAt),
+          actualDispatchAt,
+          actualDispatchAtLocal: formatAssistantDateTimeForDisplay(actualDispatchAt),
+          delayMinutes: 30,
+          reminderId: crypto.randomUUID(),
+          reminderType: 'self_followup'
+        }
+      },
+      targetSessionId: sessionId,
+      showSystemNotification: false,
+      ...buildAssistantCurrentTimeSnapshot(new Date(now)),
+      defaultDate: defaultDateKey,
+      todayTimelineSummary,
+      activeSessionSummary,
+      todoSummary,
+      todayScheduledTodoSummary,
+      pinnedTodoSummary,
+      reminderSummary: buildAssistantReminderSummary(),
+      userPersonaPrompt: buildBackgroundPersonaPrompt(activeSession),
+      dictionaryContext: buildAssistantDictionaryContext(),
+      conversationHistory: historyBeforeCurrent,
+      includeDebugInPersistedMessage: debugMode
+    }).then((result) => {
+      refreshAssistantMemorySnapshot();
+      reloadPersistedChatSessions();
+      const content = [
+        '延迟 reminder 调试完成',
+        `Action: ${result.decision.action}`,
+        `Memory: ${result.decision.memoryAction}`,
+        ...(result.appliedReminders?.length ? [`Reminders: ${result.appliedReminders.length}`] : []),
+        ...(result.surfacedMessage ? [`Message: ${result.surfacedMessage}`] : [])
+      ].join('\n');
+      replacePendingWithResult(sessionId, pendingMessageId, content, {
+        tone: result.decision.action === 'silent' ? 'system' : 'normal',
+        debugSections: debugMode
+          ? [{
+            label: '延迟 Reminder 调试',
+            exchange: result.debug
+          }]
+          : undefined
+      });
+    }).catch((error) => {
+      console.error('[AIBackfillChatModal] Manual assistant reminder debug failed', error);
+      replacePendingWithResult(
+        sessionId,
+        pendingMessageId,
+        getRetryableAIErrorMessage(error),
+        {
+          tone: 'error',
+          retryInput: '/agent reminder due',
+          debugSections: (
+            debugMode
+            && typeof error === 'object'
+            && error !== null
+            && 'debug' in error
+            && (error as { debug?: AIDebugExchange }).debug
+          )
+            ? [{
+              label: '延迟 Reminder 调试',
+              exchange: (error as { debug?: AIDebugExchange }).debug!
+            }]
+            : undefined
+        }
+      );
+    }).finally(() => {
+      if (activeRequestRef.current?.pendingMessageId === pendingMessageId) {
+        activeRequestRef.current = null;
+      }
+      setIsLoading(false);
+    });
   };
 
   const handleDebugCommand = (trimmedText: string): boolean => {
     const normalized = trimmedText.toLowerCase();
+    if (normalized === '/agent checkin' && activeSession) {
+      runManualAssistantCheckinDebug();
+      return true;
+    }
+
+    if (normalized === '/agent reminder due' && activeSession) {
+      runManualAssistantReminderDebug();
+      return true;
+    }
+
     if (!['/debug', '/debug on', '/debug off'].includes(normalized) || !activeSession) {
       return false;
     }
@@ -1870,14 +2725,6 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     return true;
   };
 
-  const getRuleScopeIdsForActivity = (activityId?: string): string[] => (
-    autoApplyAutoLinkRules && activityId
-      ? autoLinkRules
-        .filter((rule) => rule.activityId === activityId)
-        .map((rule) => rule.scopeId)
-      : []
-  );
-
   const getScopeNames = (scopeIds: string[]): string[] => (
     scopeIds
       .map((scopeId) => scopes.find((scope) => scope.id === scopeId)?.name)
@@ -1896,700 +2743,57 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
       : undefined
   );
 
-  const looksLikeSubtaskSchedulingRequest = (text: string): boolean => {
-    const normalized = text.trim().toLowerCase();
-    const schedulingKeywords = ['安排', '分配', '排一下', '排个', '什么时候', '哪天', '时间', '日程', '计划'];
-    const subtaskKeywords = ['子任务', '每章', '章节', '章', '部分'];
-    return schedulingKeywords.some((keyword) => normalized.includes(keyword))
-      && subtaskKeywords.some((keyword) => normalized.includes(keyword));
-  };
-
-  const hasExplicitSubtaskDateRequest = (text: string): boolean => {
-    const normalized = text.trim().toLowerCase();
-    const datePattern = /\b\d{4}[-/.]\d{1,2}[-/.]\d{1,2}\b|\b\d{1,2}[-/.]\d{1,2}\b/;
-    const explicitDateKeywords = [
-      '安排',
-      '排到',
-      '排在',
-      '哪天',
-      '什么时候',
-      '时间',
-      '日期',
-      '今天',
-      '明天',
-      '后天',
-      '这周',
-      '本周',
-      '下周',
-      '周一',
-      '周二',
-      '周三',
-      '周四',
-      '周五',
-      '周六',
-      '周日',
-      '星期一',
-      '星期二',
-      '星期三',
-      '星期四',
-      '星期五',
-      '星期六',
-      '星期天',
-      '星期日',
-      '截止',
-      'deadline',
-      'due'
-    ];
-
-    return datePattern.test(normalized)
-      || explicitDateKeywords.some((keyword) => normalized.includes(keyword));
-  };
-
-  const getMatchedParentTodoIds = (text: string): string[] => (
-    todos
-      .filter((todo) => !todo.parentTodoId)
-      .filter((todo) => text.includes(todo.title))
-      .filter((todo) => todos.some((child) => child.parentTodoId === todo.id))
-      .map((todo) => todo.id)
-  );
-
-  const shouldTreatAsExistingSubtaskScheduling = (text: string): boolean => (
-    looksLikeSubtaskSchedulingRequest(text) && getMatchedParentTodoIds(text).length > 0
-  );
-
-  const stripSubtaskDatesIfNotRequested = (
-    toolCalls: AICreateSubtaskToolCall[],
-    sourceText: string
-  ): AICreateSubtaskToolCall[] => {
-    if (hasExplicitSubtaskDateRequest(sourceText)) {
-      return toolCalls;
-    }
-
-    return toolCalls.map((toolCall) => ({
-      ...toolCall,
-      args: {
-        parentTodoId: toolCall.args.parentTodoId,
-        title: toolCall.args.title,
-        ...(toolCall.args.note ? { note: toolCall.args.note } : {})
-      }
-    }));
-  };
-
-  const formatTimeKey = (timestamp: number): string => {
-    const date = new Date(timestamp);
-    return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
-  };
-
-  const applyTodoSave = (currentTodos: TodoItem[], todo: TodoItem): TodoItem[] => {
-    const normalizedTodo = normalizeTodoHierarchy(todo, currentTodos);
-    const exists = currentTodos.find((item) => item.id === normalizedTodo.id);
-    let nextTodos = exists
-      ? currentTodos.map((item) => item.id === normalizedTodo.id ? normalizedTodo : item)
-      : [normalizedTodo, ...currentTodos];
-
-    if (!normalizedTodo.parentTodoId) {
-      nextTodos = syncDirectChildTodosWithParent(nextTodos, normalizedTodo);
-    }
-
-    return syncSubtaskProgressToParentTodos(nextTodos);
-  };
-
-  const applyLogSave = (
-    currentLogs: Log[],
-    currentTodos: TodoItem[],
-    nextLog: Log
-  ): { logs: Log[]; todos: TodoItem[] } => {
-    const existingLog = currentLogs.find((log) => log.id === nextLog.id);
-    const nextTodos = [...currentTodos];
-
-    if (nextLog.linkedTodoId || existingLog?.linkedTodoId) {
-      if (existingLog?.linkedTodoId) {
-        const oldTodoIndex = nextTodos.findIndex((todo) => todo.id === existingLog.linkedTodoId);
-        if (oldTodoIndex >= 0 && getTodoProgressTrackingMode(nextTodos[oldTodoIndex], nextTodos) === 'manual') {
-          nextTodos[oldTodoIndex] = {
-            ...nextTodos[oldTodoIndex],
-            isProgress: true,
-            progressTrackingMode: 'manual',
-            completedUnits: Math.max(0, (nextTodos[oldTodoIndex].completedUnits || 0) - (existingLog.progressIncrement || 0))
-          };
-        }
-      }
-
-      if (nextLog.linkedTodoId) {
-        const newTodoIndex = nextTodos.findIndex((todo) => todo.id === nextLog.linkedTodoId);
-        if (newTodoIndex >= 0 && getTodoProgressTrackingMode(nextTodos[newTodoIndex], nextTodos) === 'manual') {
-          nextTodos[newTodoIndex] = {
-            ...nextTodos[newTodoIndex],
-            isProgress: true,
-            progressTrackingMode: 'manual',
-            completedUnits: Math.max(0, (nextTodos[newTodoIndex].completedUnits || 0) + (nextLog.progressIncrement || 0))
-          };
-        }
-      }
-    }
-
-    const nextLogs = existingLog
-      ? currentLogs.map((log) => log.id === nextLog.id ? nextLog : log)
-      : [nextLog, ...currentLogs];
-
-    return {
-      logs: nextLogs,
-      todos: nextTodos
-    };
-  };
-
-  const applyLogDelete = (
-    currentLogs: Log[],
-    currentTodos: TodoItem[],
-    logId: string
-  ): { logs: Log[]; todos: TodoItem[] } => {
-    const existingLog = currentLogs.find((log) => log.id === logId);
-    if (!existingLog) {
-      return {
-        logs: currentLogs,
-        todos: currentTodos
-      };
-    }
-
-    const nextTodos = currentTodos.map((todo) => {
-      if (todo.id !== existingLog.linkedTodoId || getTodoProgressTrackingMode(todo, currentTodos) !== 'manual') {
-        return todo;
-      }
-
-      return {
-        ...todo,
-        isProgress: true,
-        progressTrackingMode: 'manual',
-        completedUnits: Math.max(0, (todo.completedUnits || 0) - (existingLog.progressIncrement || 0))
-      };
-    });
-
-    return {
-      logs: currentLogs.filter((log) => log.id !== logId),
-      todos: nextTodos
-    };
-  };
+  const buildAssistantActionContext = () => ({
+    defaultDateKey,
+    logs,
+    todos,
+    categories,
+    scopes,
+    todoCategories,
+    autoApplyAutoLinkRules,
+    autoLinkRules
+  });
 
   const applyPlannedLogToolCalls = (toolCalls: AIBackfillToolCall[]): AppliedChatAction[] => {
-    const normalizedToolCalls = normalizeAIBackfillToolCalls(toolCalls, defaultDateKey);
-    const actions: AppliedChatAction[] = [];
-    let nextLogs = [...logs];
-    let nextTodos = [...todos];
-
-    normalizedToolCalls.forEach((toolCall) => {
-      const { args } = toolCall;
-      const actionDate = args.date || defaultDateKey;
-      const startTime = parseTimeOnDateKey(actionDate, args.startTime);
-      const endTime = parseTimeOnDateKey(actionDate, args.endTime);
-      const category = categories.find((item) => item.id === args.categoryId)
-        || categories.find((item) => item.activities.some((activity) => activity.id === args.activityId));
-      const activity = category?.activities.find((item) => item.id === args.activityId)
-        || categories.flatMap((item) => item.activities).find((item) => item.id === args.activityId);
-      const linkedTodo = args.linkedTodoId
-        ? nextTodos.find((todo) => todo.id === args.linkedTodoId)
-        : undefined;
-
-      if (!startTime || !endTime || endTime <= startTime || !category || !activity) {
-        actions.push({
-          actionId: crypto.randomUUID(),
-          kind: 'create_log',
-          status: 'failed',
-          errorMessage: '这条补记的时间或分类信息不完整，我先没有替你自动应用。',
-          snapshot: {
-            startTime: startTime || Date.now(),
-            endTime: endTime || Date.now(),
-            description: args.description || '',
-            categoryId: category?.id || args.categoryId,
-            categoryName: category?.name || '未知分类',
-            activityId: activity?.id || args.activityId,
-            activityName: activity?.name || '未知标签',
-            scopeIds: [],
-            scopeNames: []
-          }
-        });
-        return;
-      }
-
-      const scopeIds = dedupeStringArray([
-        ...(args.scopeIds || []),
-        ...(linkedTodo?.defaultScopeIds || []),
-        ...getRuleScopeIdsForActivity(activity.id)
-      ]).filter((scopeId) => scopes.some((scope) => scope.id === scopeId));
-
-      const progressIncrement = (
-        linkedTodo
-        && typeof args.progressIncrement === 'number'
-        && args.progressIncrement > 0
-        && getTodoProgressTrackingMode(linkedTodo, nextTodos) === 'manual'
-      )
-        ? Math.max(1, Math.round(args.progressIncrement))
-        : undefined;
-
-      if (linkedTodo && progressIncrement) {
-        const todoIndex = nextTodos.findIndex((todo) => todo.id === linkedTodo.id);
-        if (todoIndex >= 0) {
-          nextTodos[todoIndex] = {
-            ...nextTodos[todoIndex],
-            isProgress: true,
-            progressTrackingMode: 'manual',
-            completedUnits: Math.max(0, (nextTodos[todoIndex].completedUnits || 0) + progressIncrement)
-          };
-        }
-      }
-
-      const newLog: Log = {
-        id: crypto.randomUUID(),
-        categoryId: category.id,
-        activityId: activity.id,
-        title: activity.name,
-        startTime,
-        endTime,
-        duration: Math.max(0, (endTime - startTime) / 1000),
-        note: args.description,
-        ...(scopeIds.length > 0 ? { scopeIds } : {}),
-        ...(linkedTodo ? { linkedTodoId: linkedTodo.id } : {}),
-        ...(progressIncrement ? { progressIncrement } : {})
-      };
-
-      const saveResult = applyLogSave(nextLogs, nextTodos, newLog);
-      nextLogs = saveResult.logs;
-      nextTodos = saveResult.todos;
-      actions.push({
-        actionId: crypto.randomUUID(),
-        kind: 'create_log',
-        status: 'applied',
-        snapshot: {
-          logId: newLog.id,
-          startTime,
-          endTime,
-          description: args.description,
-          categoryId: category.id,
-          categoryName: category.name,
-          activityId: activity.id,
-          activityName: activity.name,
-          scopeIds,
-          scopeNames: getScopeNames(scopeIds),
-          ...(linkedTodo ? { linkedTodoId: linkedTodo.id, linkedTodoTitle: linkedTodo.title } : {}),
-          ...(progressIncrement ? { progressIncrement } : {})
-        }
-      });
-    });
-
-    if (actions.some((action) => action.kind === 'create_log' && action.status === 'applied')) {
-      setLogs(nextLogs);
+    const result = assistantActionExecutor.applyLogToolCalls(buildAssistantActionContext(), toolCalls);
+    if (result.actions.some((action) => action.kind === 'create_log' && action.status === 'applied')) {
+      setLogs(result.nextLogs);
+      setTodos(result.nextTodos);
     }
-    if (actions.some((action) => action.kind === 'create_log' && action.status === 'applied')) {
-      setTodos(nextTodos);
-    }
-
-    return actions;
+    return result.actions;
   };
-
   const applyPlannedTodoToolCalls = (toolCalls: AITodoToolCall[]): AppliedChatAction[] => {
-    const actions: AppliedChatAction[] = [];
-    let nextTodos = [...todos];
-
-    toolCalls.forEach((toolCall) => {
-      const { args } = toolCall;
-      const resolvedTodoCategory = todoCategories.find((category) => category.id === args.categoryId) || todoCategories[0];
-      const resolvedLinkedCategoryId = args.linkedCategoryId
-        || (args.linkedActivityId
-          ? categories.find((category) => category.activities.some((activity) => activity.id === args.linkedActivityId))?.id
-          : undefined);
-      const resolvedLinkedCategory = resolvedLinkedCategoryId
-        ? categories.find((category) => category.id === resolvedLinkedCategoryId)
-        : undefined;
-      const resolvedActivity = args.linkedActivityId
-        ? resolvedLinkedCategory?.activities.find((activity) => activity.id === args.linkedActivityId)
-          || getActivityById(args.linkedActivityId)
-        : undefined;
-
-      if (!resolvedTodoCategory || !args.title.trim() || !args.linkedActivityId || !resolvedActivity || !resolvedLinkedCategoryId) {
-        actions.push({
-          actionId: crypto.randomUUID(),
-          kind: 'create_todo',
-          status: 'failed',
-          errorMessage: '这条待办缺少标题、待办分类，或没有识别出要关联的标签，我先没有替你自动创建。',
-          snapshot: {
-            title: args.title || '未命名待办',
-            categoryId: resolvedTodoCategory?.id || '',
-            categoryName: resolvedTodoCategory?.name || '未知分类',
-            defaultScopeIds: [],
-            defaultScopeNames: []
-          }
-        });
-        return;
-      }
-
-      const defaultScopeIds = dedupeStringArray([
-        ...(args.defaultScopeIds || []),
-        ...getRuleScopeIdsForActivity(args.linkedActivityId)
-      ]).filter((scopeId) => scopes.some((scope) => scope.id === scopeId));
-
-      const newTodo: TodoItem = {
-        id: crypto.randomUUID(),
-        categoryId: resolvedTodoCategory.id,
-        title: args.title.trim(),
-        isCompleted: false,
-        pin: false,
-        completedUnits: 0,
-        ...(resolvedLinkedCategoryId ? { linkedCategoryId: resolvedLinkedCategoryId } : {}),
-        ...(args.linkedActivityId ? { linkedActivityId: args.linkedActivityId } : {}),
-        ...(defaultScopeIds.length > 0 ? { defaultScopeIds } : {}),
-        ...(args.note ? { note: args.note } : {}),
-        ...(args.scheduledDate ? { scheduledDate: args.scheduledDate } : {}),
-        ...(args.deadlineDate ? { deadlineDate: args.deadlineDate } : {}),
-        ...(args.recurrenceRule ? { recurrenceRule: args.recurrenceRule } : {})
-      };
-
-      nextTodos = applyTodoSave(nextTodos, newTodo);
-      actions.push({
-        actionId: crypto.randomUUID(),
-        kind: 'create_todo',
-        status: 'applied',
-        snapshot: {
-          todoId: newTodo.id,
-          title: newTodo.title,
-          categoryId: newTodo.categoryId,
-          categoryName: resolvedTodoCategory.name,
-          ...(resolvedLinkedCategoryId ? { linkedCategoryId: resolvedLinkedCategoryId } : {}),
-          ...(resolvedLinkedCategory ? { linkedCategoryName: resolvedLinkedCategory.name } : {}),
-          ...(args.linkedActivityId ? { linkedActivityId: args.linkedActivityId } : {}),
-          ...(resolvedActivity ? { linkedActivityName: resolvedActivity.name } : {}),
-          defaultScopeIds,
-          defaultScopeNames: getScopeNames(defaultScopeIds),
-          ...(args.note ? { note: args.note } : {}),
-          ...(args.scheduledDate ? { scheduledDate: args.scheduledDate } : {}),
-          ...(args.deadlineDate ? { deadlineDate: args.deadlineDate } : {}),
-          ...(args.recurrenceRule ? { recurrenceRule: args.recurrenceRule } : {})
-        }
-      });
-    });
-
-    if (actions.some((action) => action.kind === 'create_todo' && action.status === 'applied')) {
-      setTodos(nextTodos);
+    const result = assistantActionExecutor.applyTodoToolCalls(buildAssistantActionContext(), toolCalls);
+    if (result.actions.some((action) => action.kind === 'create_todo' && action.status === 'applied')) {
+      setTodos(result.nextTodos);
     }
-
-    return actions;
+    return result.actions;
   };
-
   const applyPlannedTodoUpdateToolCalls = (toolCalls: AITodoUpdateToolCall[]): AppliedChatAction[] => {
-    const actions: AppliedChatAction[] = [];
-    let nextTodos = [...todos];
-
-    toolCalls.forEach((toolCall) => {
-      const { args } = toolCall;
-      const currentTodo = nextTodos.find((todo) => todo.id === args.todoId);
-      if (!currentTodo) {
-        actions.push({
-          actionId: crypto.randomUUID(),
-          kind: 'update_todo',
-          status: 'failed',
-          errorMessage: '杩欐潯寰呭姙娌℃壘鍒帮紝鎴戝厛娌℃湁鏇夸綘鑷姩淇敼銆?',
-          snapshot: {
-            todoId: args.todoId
-          }
-        });
-        return;
-      }
-
-      const patch = args.patch;
-      const resolvedActivity = patch.linkedActivityId === undefined
-        ? undefined
-        : patch.linkedActivityId === null
-          ? null
-          : getActivityById(patch.linkedActivityId);
-      const resolvedLinkedCategory = patch.linkedActivityId === undefined
-        ? undefined
-        : patch.linkedActivityId === null
-          ? null
-          : getActivityCategory(patch.linkedActivityId);
-
-      if (patch.linkedActivityId && (!resolvedActivity || !resolvedLinkedCategory)) {
-        actions.push({
-          actionId: crypto.randomUUID(),
-          kind: 'update_todo',
-          status: 'failed',
-          errorMessage: '杩欐潯寰呭姙鐨勫叧鑱旀爣绛句俊鎭笉瀹屾暣锛屾垜鍏堟病鏈夎嚜鍔ㄤ慨鏀广€?',
-          snapshot: {
-            todoId: currentTodo.id,
-            previousTodo: currentTodo
-          }
-        });
-        return;
-      }
-
-      const nextDefaultScopeIds = patch.defaultScopeIds === undefined
-        ? currentTodo.defaultScopeIds
-        : patch.defaultScopeIds === null
-          ? undefined
-          : dedupeStringArray(patch.defaultScopeIds).filter((scopeId) => scopes.some((scope) => scope.id === scopeId));
-
-      const nextTitle = patch.title === undefined ? currentTodo.title : patch.title.trim();
-      if (!nextTitle) {
-        actions.push({
-          actionId: crypto.randomUUID(),
-          kind: 'update_todo',
-          status: 'failed',
-          errorMessage: '寰呭姙鏍囬涓嶈兘涓虹┖锛屾垜鍏堟病鏈夎嚜鍔ㄤ慨鏀广€?',
-          snapshot: {
-            todoId: currentTodo.id,
-            previousTodo: currentTodo
-          }
-        });
-        return;
-      }
-
-      const nextLinkedCategoryId = patch.linkedActivityId !== undefined
-        ? (resolvedLinkedCategory?.id || undefined)
-        : patch.linkedCategoryId === undefined
-          ? currentTodo.linkedCategoryId
-          : patch.linkedCategoryId || undefined;
-
-      const nextLinkedActivityId = patch.linkedActivityId === undefined
-        ? currentTodo.linkedActivityId
-        : patch.linkedActivityId || undefined;
-
-      const shouldClearRecurrence = !currentTodo.parentTodoId
-        && (patch.scheduledDate !== undefined || patch.deadlineDate !== undefined)
-        && patch.recurrenceRule === undefined;
-
-      const nextTodo: TodoItem = {
-        ...currentTodo,
-        title: nextTitle,
-        ...(patch.note !== undefined ? { note: patch.note || undefined } : {}),
-        ...(patch.categoryId !== undefined ? { categoryId: patch.categoryId } : {}),
-        ...(patch.linkedCategoryId !== undefined || patch.linkedActivityId !== undefined ? { linkedCategoryId: nextLinkedCategoryId } : {}),
-        ...(patch.linkedActivityId !== undefined ? { linkedActivityId: nextLinkedActivityId } : {}),
-        ...(patch.defaultScopeIds !== undefined ? { defaultScopeIds: nextDefaultScopeIds } : {}),
-        ...(patch.scheduledDate !== undefined ? { scheduledDate: patch.scheduledDate || undefined } : {}),
-        ...(patch.deadlineDate !== undefined ? { deadlineDate: patch.deadlineDate || undefined } : {}),
-        ...(!currentTodo.parentTodoId && patch.recurrenceRule !== undefined ? { recurrenceRule: patch.recurrenceRule || undefined } : {}),
-        ...(!currentTodo.parentTodoId && shouldClearRecurrence ? { recurrenceRule: undefined } : {}),
-        ...(typeof patch.pin === 'boolean' ? { pin: patch.pin } : {}),
-        ...(typeof patch.isCompleted === 'boolean'
-          ? {
-              isCompleted: patch.isCompleted,
-              completedAt: patch.isCompleted
-                ? (currentTodo.isCompleted ? currentTodo.completedAt : new Date().toISOString())
-                : undefined
-            }
-          : {})
-      };
-
-      nextTodos = applyTodoSave(nextTodos, nextTodo);
-      actions.push({
-        actionId: crypto.randomUUID(),
-        kind: 'update_todo',
-        status: 'applied',
-        snapshot: {
-          todoId: nextTodo.id,
-          previousTodo: currentTodo,
-          nextTodo
-        }
-      });
-    });
-
-    if (actions.some((action) => action.kind === 'update_todo' && action.status === 'applied')) {
-      setTodos(nextTodos);
+    const result = assistantActionExecutor.applyTodoUpdateToolCalls(buildAssistantActionContext(), toolCalls);
+    if (result.actions.some((action) => action.kind === 'update_todo' && action.status === 'applied')) {
+      setTodos(result.nextTodos);
     }
-
-    return actions;
+    return result.actions;
   };
-
   const applyPlannedCreateSubtaskToolCalls = (
     toolCalls: AICreateSubtaskToolCall[],
     sourceText: string
   ): AppliedChatAction[] => {
-    const actions: AppliedChatAction[] = [];
-    let nextTodos = [...todos];
-
-    stripSubtaskDatesIfNotRequested(toolCalls, sourceText).forEach((toolCall) => {
-      const { args } = toolCall;
-      const parentTodo = nextTodos.find((todo) => todo.id === args.parentTodoId);
-
-      if (!parentTodo || parentTodo.parentTodoId || parentTodo.recurrenceRule || !args.title.trim()) {
-        actions.push({
-          actionId: crypto.randomUUID(),
-          kind: 'create_subtask',
-          status: 'failed',
-          errorMessage: '杩欐潯瀛愪换鍔＄己灏戠埗浠诲姟鎴栨爣棰橈紝鎴戝厛娌℃湁鏇夸綘鑷姩鍒涘缓銆?',
-          snapshot: {
-            title: args.title || '鏈懡鍚嶅瓙浠诲姟',
-            categoryId: parentTodo?.categoryId || '',
-            categoryName: todoCategories.find((category) => category.id === parentTodo?.categoryId)?.name || '鏈煡鍒嗙被',
-            defaultScopeIds: parentTodo?.defaultScopeIds || [],
-            defaultScopeNames: getScopeNames(parentTodo?.defaultScopeIds || []),
-            parentTodoId: args.parentTodoId,
-            parentTodoTitle: parentTodo?.title
-          }
-        });
-        return;
-      }
-
-      const resolvedCategory = todoCategories.find((category) => category.id === parentTodo.categoryId);
-      const newTodo: TodoItem = {
-        id: crypto.randomUUID(),
-        categoryId: parentTodo.categoryId,
-        parentTodoId: parentTodo.id,
-        childOrder: getNextChildOrder(nextTodos, parentTodo.id),
-        title: args.title.trim(),
-        isCompleted: false,
-        pin: false,
-        completedUnits: 0,
-        ...(args.note ? { note: args.note } : {}),
-        ...(args.scheduledDate ? { scheduledDate: args.scheduledDate } : {}),
-        ...(args.deadlineDate ? { deadlineDate: args.deadlineDate } : {})
-      };
-
-      nextTodos = applyTodoSave(nextTodos, newTodo);
-      const liveSubtask = nextTodos.find((todo) => todo.id === newTodo.id) || newTodo;
-      actions.push({
-        actionId: crypto.randomUUID(),
-        kind: 'create_subtask',
-        status: 'applied',
-        snapshot: {
-          todoId: liveSubtask.id,
-          title: liveSubtask.title,
-          categoryId: liveSubtask.categoryId,
-          categoryName: resolvedCategory?.name || '',
-          defaultScopeIds: liveSubtask.defaultScopeIds || [],
-          defaultScopeNames: getScopeNames(liveSubtask.defaultScopeIds || []),
-          ...(liveSubtask.note ? { note: liveSubtask.note } : {}),
-          ...(liveSubtask.scheduledDate ? { scheduledDate: liveSubtask.scheduledDate } : {}),
-          ...(liveSubtask.deadlineDate ? { deadlineDate: liveSubtask.deadlineDate } : {}),
-          parentTodoId: parentTodo.id,
-          parentTodoTitle: parentTodo.title
-        }
-      });
-    });
-
-    if (actions.some((action) => action.kind === 'create_subtask' && action.status === 'applied')) {
-      setTodos(nextTodos);
+    const result = assistantActionExecutor.applyCreateSubtaskToolCalls(buildAssistantActionContext(), toolCalls, sourceText);
+    if (result.actions.some((action) => action.kind === 'create_subtask' && action.status === 'applied')) {
+      setTodos(result.nextTodos);
     }
-
-    return actions;
+    return result.actions;
   };
-
   const applyPlannedEditLogToolCalls = (toolCalls: AIEditLogToolCall[]): AppliedChatAction[] => {
-    const actions: AppliedChatAction[] = [];
-    let nextLogs = [...logs];
-    let nextTodos = [...todos];
-
-    toolCalls.forEach((toolCall) => {
-      const { args } = toolCall;
-      const currentLog = nextLogs.find((log) => log.id === args.logId);
-      if (!currentLog) {
-        actions.push({
-          actionId: crypto.randomUUID(),
-          kind: 'edit_log',
-          status: 'failed',
-          errorMessage: '杩欐潯璁板綍娌℃壘鍒帮紝鎴戝厛娌℃湁鏇夸綘鑷姩淇敼銆?',
-          snapshot: {
-            logId: args.logId
-          }
-        });
-        return;
-      }
-
-      const targetDateKey = args.patch.date || formatDateKey(new Date(currentLog.startTime));
-      const startTime = args.patch.startTime
-        ? parseTimeOnDateKey(targetDateKey, args.patch.startTime)
-        : parseTimeOnDateKey(targetDateKey, formatTimeKey(currentLog.startTime));
-      const endTime = args.patch.endTime
-        ? parseTimeOnDateKey(targetDateKey, args.patch.endTime)
-        : parseTimeOnDateKey(targetDateKey, formatTimeKey(currentLog.endTime));
-
-      const resolvedActivity = args.patch.activityId
-        ? getActivityById(args.patch.activityId)
-        : undefined;
-      const resolvedActivityCategory = args.patch.activityId
-        ? getActivityCategory(args.patch.activityId)
-        : undefined;
-      const resolvedCategory = args.patch.categoryId
-        ? categories.find((category) => category.id === args.patch.categoryId)
-        : undefined;
-
-      const nextCategory = resolvedActivityCategory
-        || resolvedCategory
-        || categories.find((category) => category.id === currentLog.categoryId);
-      const nextActivity = resolvedActivity
-        || nextCategory?.activities.find((activity) => activity.id === currentLog.activityId)
-        || getActivityById(currentLog.activityId);
-
-      if (!startTime || !endTime || endTime <= startTime || !nextCategory || !nextActivity) {
-        actions.push({
-          actionId: crypto.randomUUID(),
-          kind: 'edit_log',
-          status: 'failed',
-          errorMessage: '杩欐潯璁板綍鐨勬椂闂存垨鍒嗙被淇℃伅涓嶅畬鏁达紝鎴戝厛娌℃湁鏇夸綘鑷姩淇敼銆?',
-          snapshot: {
-            logId: currentLog.id,
-            previousLog: currentLog
-          }
-        });
-        return;
-      }
-
-      const nextLinkedTodoId = args.patch.linkedTodoId === undefined
-        ? currentLog.linkedTodoId
-        : args.patch.linkedTodoId || undefined;
-      if (nextLinkedTodoId && !nextTodos.some((todo) => todo.id === nextLinkedTodoId)) {
-        actions.push({
-          actionId: crypto.randomUUID(),
-          kind: 'edit_log',
-          status: 'failed',
-          errorMessage: '璁板綍瑕佸叧鑱旂殑寰呭姙娌℃壘鍒帮紝鎴戝厛娌℃湁鑷姩淇敼銆?',
-          snapshot: {
-            logId: currentLog.id,
-            previousLog: currentLog
-          }
-        });
-        return;
-      }
-
-      const nextScopeIds = args.patch.scopeIds === undefined
-        ? currentLog.scopeIds
-        : args.patch.scopeIds === null
-          ? undefined
-          : dedupeStringArray(args.patch.scopeIds).filter((scopeId) => scopes.some((scope) => scope.id === scopeId));
-
-      const nextLog: Log = {
-        ...currentLog,
-        categoryId: nextCategory.id,
-        activityId: nextActivity.id,
-        title: nextActivity.name,
-        startTime,
-        endTime,
-        duration: Math.max(0, (endTime - startTime) / 1000),
-        ...(args.patch.note !== undefined ? { note: args.patch.note || '' } : {}),
-        ...(args.patch.linkedTodoId !== undefined ? { linkedTodoId: nextLinkedTodoId } : {}),
-        ...(args.patch.scopeIds !== undefined ? { scopeIds: nextScopeIds } : {})
-      };
-
-      const saveResult = applyLogSave(nextLogs, nextTodos, nextLog);
-      nextLogs = saveResult.logs;
-      nextTodos = saveResult.todos;
-      actions.push({
-        actionId: crypto.randomUUID(),
-        kind: 'edit_log',
-        status: 'applied',
-        snapshot: {
-          logId: nextLog.id,
-          previousLog: currentLog,
-          nextLog
-        }
-      });
-    });
-
-    if (actions.some((action) => action.kind === 'edit_log' && action.status === 'applied')) {
-      setLogs(nextLogs);
-      setTodos(nextTodos);
+    const result = assistantActionExecutor.applyEditLogToolCalls(buildAssistantActionContext(), toolCalls);
+    if (result.actions.some((action) => action.kind === 'edit_log' && action.status === 'applied')) {
+      setLogs(result.nextLogs);
+      setTodos(result.nextTodos);
     }
-
-    return actions;
+    return result.actions;
   };
-
   const handleUndoLogAction = (messageId: string, action: AppliedCreateLogAction) => {
     if (action.status !== 'applied' || !activeSession || !action.snapshot.logId) {
       return;
@@ -2651,6 +2855,54 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     addToast('success', '已撤销这次 AI 记录修改');
   };
 
+  const applyUnifiedToolCalls = (toolCalls: AssistantToolCall[], sourceText: string): AppliedChatAction[] => {
+    const logCalls = toolCalls.filter((toolCall): toolCall is AIBackfillToolCall => toolCall.toolName === 'create_log');
+    const todoCalls = toolCalls.filter((toolCall): toolCall is AITodoToolCall => toolCall.toolName === 'create_todo');
+    const todoUpdateCalls = toolCalls.filter((toolCall): toolCall is AITodoUpdateToolCall => toolCall.toolName === 'update_todo');
+    const subtaskCalls = toolCalls.filter((toolCall): toolCall is AICreateSubtaskToolCall => toolCall.toolName === 'create_subtask');
+    const editLogCalls = toolCalls.filter((toolCall): toolCall is AIEditLogToolCall => toolCall.toolName === 'edit_log');
+
+    return [
+      ...applyPlannedLogToolCalls(logCalls),
+      ...applyPlannedTodoToolCalls(todoCalls),
+      ...applyPlannedTodoUpdateToolCalls(todoUpdateCalls),
+      ...applyPlannedCreateSubtaskToolCalls(subtaskCalls, sourceText),
+      ...applyPlannedEditLogToolCalls(editLogCalls)
+    ];
+  };
+
+  const applyUnifiedReminders = (output: AssistantUnifiedTurnOutput): string[] => {
+    const reminders = output.reminders || [];
+    if (reminders.length === 0) {
+      return [];
+    }
+
+    const reminderUpdates: string[] = [];
+    reminders.forEach((reminder) => {
+      const normalizedDueAt = normalizeAssistantDateTime(reminder.dueAt);
+      if (!normalizedDueAt) {
+        console.warn('[AIBackfillChatModal] Ignored reminder with invalid dueAt', reminder.dueAt);
+        return;
+      }
+
+      assistantReminderQueueService.enqueueReminder({
+        id: crypto.randomUUID(),
+        type: reminder.type || 'self_followup',
+        dueAt: normalizedDueAt,
+        status: 'pending',
+        text: reminder.text,
+        ...(reminder.todoId ? { todoId: reminder.todoId } : {}),
+        source: 'user',
+        createdAt: new Date().toISOString()
+      });
+      reminderUpdates.push(`${formatAssistantDateTimeForDisplay(normalizedDueAt)} · ${reminder.text}`);
+    });
+
+    refreshAssistantReminderSnapshot();
+    refreshAssistantMemorySnapshot();
+    return reminderUpdates;
+  };
+
   const handleOpenLogEditor = (logId?: string) => {
     if (!logId) {
       return;
@@ -2692,6 +2944,8 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
       tone?: ChatTone;
       debugSections?: AIChatDebugSection[];
       appliedActions?: AppliedChatAction[];
+      memoryUpdates?: AIChatMemoryUpdateSection[];
+      reminderUpdates?: string[];
       retryInput?: string;
     }
   ) => {
@@ -2703,8 +2957,52 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
       ...(options?.tone ? { tone: options.tone } : {}),
       ...(options?.debugSections && options.debugSections.length > 0 ? { debugSections: options.debugSections } : {}),
       ...(options?.appliedActions && options.appliedActions.length > 0 ? { appliedActions: options.appliedActions } : {}),
+      ...(options?.memoryUpdates && options.memoryUpdates.length > 0 ? { memoryUpdates: options.memoryUpdates } : {}),
+      ...(options?.reminderUpdates && options.reminderUpdates.length > 0 ? { reminderUpdates: options.reminderUpdates } : {}),
       ...(options?.retryInput ? { retryInput: options.retryInput } : {})
     });
+
+    if (!isOpenRef.current) {
+      onUnreadAssistantMessage?.(1);
+    }
+  };
+
+  const getBackgroundTargetSession = (): AIChatSession | undefined => (
+    activeSession || sortedSessions[0] || undefined
+  );
+
+  const buildAssistantReminderSummary = (): string | undefined => {
+    const summary = formatAssistantReminderSnapshot(assistantReminderQueueService.listReminders());
+    return summary === '暂无' ? undefined : summary;
+  };
+
+  const buildAssistantDictionaryContext = () => assistantContextBuilder.buildDictionaryContext({
+    categories,
+    scopes,
+    todoCategories,
+    todos: todos.filter((todo) => !todo.isCompleted).slice(0, 60),
+    logs: [...logs].sort((left, right) => right.startTime - left.startTime).slice(0, 40)
+  });
+
+  const buildBackgroundPersonaPrompt = (session?: AIChatSession): string | undefined => {
+    const resolvedPersona = session
+      ? (personaMap.get(session.personaId) || personas[0] || DEFAULT_AI_PERSONAS[0])
+      : activePersona;
+    const prompt = buildPersonaPrompt(resolvedPersona);
+    return prompt.trim() ? prompt : undefined;
+  };
+
+  const applyAssistantMemoryPatch = (
+    patch?: AssistantUnifiedTurnOutput['memoryPatch'],
+  ): AIChatMemoryUpdateSection[] => {
+    if (!patch) {
+      return [];
+    }
+
+    const before = assistantMemoryService.getMemory();
+    const after = assistantMemoryService.applyPatch(patch);
+    refreshAssistantMemorySnapshot();
+    return buildMemoryUpdateSections(before, after);
   };
 
   const handleSend = async (overrideText?: string) => {
@@ -2765,255 +3063,83 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     };
 
     try {
-      const currentDateTime = formatLocalDateTimeContext(new Date());
+      const currentTurnDate = new Date();
+      const currentTimeSnapshot = buildAssistantCurrentTimeSnapshot(currentTurnDate);
       const debugSections: AIChatDebugSection[] = [];
 
-      const classifyResult = await aiService.classifyChatIntentWithDebug(trimmedText, {
-        signal: controller.signal
-      });
+      const [basePrompt, foregroundModePrompt] = await Promise.all([
+        assistantPromptService.getAssistantBasePrompt(),
+        assistantPromptService.getForegroundModePrompt()
+      ]);
 
-      if (debugMode) {
-        debugSections.push({
-          label: '意图识别',
-          exchange: classifyResult.debug
-        });
-      }
-
-      const matchedParentTodoIds = getMatchedParentTodoIds(trimmedText);
-      const existingSubtaskSchedulingIntent = shouldTreatAsExistingSubtaskScheduling(trimmedText);
-      const resolvedIntent = existingSubtaskSchedulingIntent
-        ? 'update_todo'
-        : classifyResult.result.intent;
-
-      if (resolvedIntent === 'clarify') {
-        replacePendingWithResult(
-          sessionId,
-          pendingMessageId,
-          classifyResult.result.assistantReply || '你是想聊聊，还是想让我直接帮你补记/建待办？',
-          {
-            debugSections
-          }
-        );
-        return;
-      }
-
-      if (resolvedIntent === 'chat') {
-        const chatResult = await aiService.sendContextualChatReplyWithDebug(trimmedText, {
-          currentDateTime,
-          defaultDate: defaultDateKey,
-          todayTimelineSummary,
-          personaPrompt: buildPersonaPrompt(activePersona),
-          conversationHistory: historyBeforeCurrent,
-          latestLog: latestLogContext
-        }, {
-          signal: controller.signal
-        });
-
-        if (debugMode) {
-          debugSections.push({
-            label: '正式回复',
-            exchange: chatResult.debug
-          });
-        }
-
-        replacePendingWithResult(
-          sessionId,
-          pendingMessageId,
-          chatResult.reply || '我在。',
-          {
-            debugSections
-          }
-        );
-        return;
-      }
-
-      if (resolvedIntent === 'add_log') {
-        const planningResult = await aiService.planBackfillToolCallsWithDebug(trimmedText, {
-          currentDateTime,
-          defaultDate: defaultDateKey,
-          categories,
-          scopes,
-          personaPrompt: buildPersonaPrompt(activePersona),
-          conversationHistory: historyBeforeCurrent,
-          latestLog: latestLogContext,
-          todos: todoPlanningContext
-        }, {
-          signal: controller.signal
-        });
-
-        if (debugMode) {
-          debugSections.push({
-            label: '补记规划',
-            exchange: planningResult.debug
-          });
-        }
-
-        const appliedActions = applyPlannedLogToolCalls(planningResult.plan.toolCalls);
-        const successCount = appliedActions.filter((action) => action.status === 'applied').length;
-        const content = planningResult.plan.assistantReply
-          || (successCount > 0
-            ? `我先帮你补记了 ${successCount} 条记录。`
-            : '这次信息还不够我安全地下手，你可以再补充一下时间或分类。');
-
-        replacePendingWithResult(
-          sessionId,
-          pendingMessageId,
-          content,
-          {
-            debugSections,
-            appliedActions
-          }
-        );
-        return;
-      }
-
-      if (resolvedIntent === 'edit_log') {
-        const planningResult = await aiService.planEditLogToolCallsWithDebug(trimmedText, {
-          currentDateTime,
-          defaultDate: defaultDateKey,
-          categories,
-          scopes,
-          todos: todoUpdateContext.map((todo) => ({
-            id: todo.id,
-            title: todo.title,
-            path: todo.path
-          })),
-          logs: logEditContext,
-          personaPrompt: buildPersonaPrompt(activePersona),
-          conversationHistory: historyBeforeCurrent
-        }, {
-          signal: controller.signal
-        });
-
-        if (debugMode) {
-          debugSections.push({
-            label: '记录修改规划',
-            exchange: planningResult.debug
-          });
-        }
-
-        const appliedActions = applyPlannedEditLogToolCalls(planningResult.plan.toolCalls);
-        const successCount = appliedActions.filter((action) => action.status === 'applied').length;
-        const content = planningResult.plan.assistantReply
-          || (successCount > 0
-            ? `我先帮你修改了 ${successCount} 条记录。`
-            : '这次还差一点关键信息，你可以再补一下要改的是哪条记录。');
-
-        replacePendingWithResult(sessionId, pendingMessageId, content, {
-          debugSections,
-          appliedActions
-        });
-        return;
-      }
-
-      if (resolvedIntent === 'update_todo') {
-        const scopedTodoUpdateContext = existingSubtaskSchedulingIntent
-          ? todoUpdateContext.filter((todo) => matchedParentTodoIds.includes(todo.parentTodoId || ''))
-          : todoUpdateContext;
-        const planningResult = await aiService.planTodoUpdateToolCallsWithDebug(trimmedText, {
-          currentDateTime,
-          defaultDate: defaultDateKey,
-          todoCategories,
-          activityCategories: categories,
-          scopes,
-          todos: scopedTodoUpdateContext,
-          personaPrompt: buildPersonaPrompt(activePersona),
-          conversationHistory: historyBeforeCurrent
-        }, {
-          signal: controller.signal
-        });
-
-        if (debugMode) {
-          debugSections.push({
-            label: '待办修改规划',
-            exchange: planningResult.debug
-          });
-        }
-
-        const appliedActions = applyPlannedTodoUpdateToolCalls(planningResult.plan.toolCalls);
-        const successCount = appliedActions.filter((action) => action.status === 'applied').length;
-        const content = planningResult.plan.assistantReply
-          || (successCount > 0
-            ? `我先帮你修改了 ${successCount} 条待办。`
-            : '这次还差一点关键信息，你可以再补一下要改的是哪条待办。');
-
-        replacePendingWithResult(sessionId, pendingMessageId, content, {
-          debugSections,
-          appliedActions
-        });
-        return;
-      }
-
-      if (resolvedIntent === 'create_subtask') {
-        const allowSubtaskDateFields = hasExplicitSubtaskDateRequest(trimmedText);
-        const planningResult = await aiService.planCreateSubtaskToolCallsWithDebug(trimmedText, {
-          currentDateTime,
-          defaultDate: defaultDateKey,
-          parentTodos: subtaskParentContext,
-          personaPrompt: buildPersonaPrompt(activePersona),
-          conversationHistory: historyBeforeCurrent,
-          allowDateFields: allowSubtaskDateFields
-        }, {
-          signal: controller.signal
-        });
-
-        if (debugMode) {
-          debugSections.push({
-            label: '子任务规划',
-            exchange: planningResult.debug
-          });
-        }
-
-        const appliedActions = applyPlannedCreateSubtaskToolCalls(planningResult.plan.toolCalls, trimmedText);
-        const successCount = appliedActions.filter((action) => action.status === 'applied').length;
-        const content = successCount > 0
-          ? (allowSubtaskDateFields && planningResult.plan.assistantReply
-            ? planningResult.plan.assistantReply
-            : `我先帮你建好了 ${successCount} 条子任务。`)
-          : (planningResult.plan.assistantReply || '这次还差一点关键信息，你可以再补一下要挂到哪个父任务下。');
-
-        replacePendingWithResult(sessionId, pendingMessageId, content, {
-          debugSections,
-          appliedActions
-        });
-        return;
-      }
-
-      const todoPlanningResult = await aiService.planTodoToolCallsWithDebug(trimmedText, {
-        currentDateTime,
+      const conversationContext = assistantContextBuilder.buildConversationContext(historyBeforeCurrent);
+      const stateContext = assistantContextBuilder.buildStateContext({
+        ...currentTimeSnapshot,
         defaultDate: defaultDateKey,
-        todoCategories,
-        activityCategories: categories,
-        scopes,
-        personaPrompt: buildPersonaPrompt(activePersona),
-        conversationHistory: historyBeforeCurrent
-      }, {
-        signal: controller.signal
+        logs,
+        categories,
+        todos,
+        activeSessions,
+        reminderSummary: buildAssistantReminderSummary()
       });
+      const dictionaryContext = buildAssistantDictionaryContext();
+
+      const unifiedTurnResult = await assistantTurnService.runUnifiedTurn({
+        mode: 'foreground',
+        trigger: {
+          type: 'user_message',
+          source: 'user',
+          text: trimmedText,
+          createdAt: new Date(now).toISOString()
+        },
+        promptLayers: {
+          basePrompt,
+          modePrompt: foregroundModePrompt,
+          userPersonaPrompt: buildPersonaPrompt(activePersona)
+        },
+        memory: assistantMemoryService.getMemory(),
+        conversation: conversationContext,
+        stateContext,
+        dictionaryContext
+      }, historyBeforeCurrent);
 
       if (debugMode) {
         debugSections.push({
-          label: '待办规划',
-          exchange: todoPlanningResult.debug
+          label: '统一单轮调用',
+          exchange: unifiedTurnResult.debug
         });
       }
 
-      const appliedActions = applyPlannedTodoToolCalls(todoPlanningResult.plan.toolCalls);
-      const successCount = appliedActions.filter((action) => action.status === 'applied').length;
-      const content = todoPlanningResult.plan.assistantReply
-        || (successCount > 0
-          ? `我先帮你建好了 ${successCount} 条待办。`
-          : '这次还差一点关键信息，你可以再补一下标题、时间、待办分类，或它要关联的标签。');
+      const output = unifiedTurnResult.output;
+      const toolCalls = output.toolCalls || [];
+      const unifiedAppliedActions = toolCalls.length > 0
+        ? applyUnifiedToolCalls(toolCalls, trimmedText)
+        : [];
+      const unifiedSuccessCount = unifiedAppliedActions.filter((action) => action.status === 'applied').length;
+      const successCount = unifiedSuccessCount;
 
-      replacePendingWithResult(
-        sessionId,
-        pendingMessageId,
-        content,
-        {
-          debugSections,
-          appliedActions
-        }
-      );
+      const reminderUpdates = applyUnifiedReminders(output);
+
+      const memoryUpdates = output.memoryAction === 'update_memory'
+        ? applyAssistantMemoryPatch(output.memoryPatch)
+        : [];
+
+      const unifiedContent = (output.assistantReply || '').trim()
+        || (output.outcome === 'clarify'
+          ? '这次还差一点关键信息，你再补一句我就能继续。'
+          : (unifiedSuccessCount > 0
+            ? `我先帮你处理好了 ${successCount} 项。`
+            : ((output.reminders || []).length > 0
+              ? '我记下来了，到时候会提醒你。'
+              : '我在。')));
+
+      replacePendingWithResult(sessionId, pendingMessageId, unifiedContent, {
+        debugSections,
+        ...(unifiedAppliedActions.length > 0 ? { appliedActions: unifiedAppliedActions } : {}),
+        ...(memoryUpdates.length > 0 ? { memoryUpdates } : {}),
+        ...(reminderUpdates.length > 0 ? { reminderUpdates } : {})
+      });
+      return;
     } catch (error) {
       if (isAbortError(error)) {
         replacePendingWithResult(sessionId, pendingMessageId, '已停止这次请求。', {
@@ -3659,7 +3785,18 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
             };
 
     return (
-      <div key={message.id} className={`flex ${isUser ? 'justify-end' : 'justify-start'}`}>
+      <div
+        key={message.id}
+        ref={(node) => {
+          if (node) {
+            messageElementRefs.current.set(message.id, node);
+            return;
+          }
+
+          messageElementRefs.current.delete(message.id);
+        }}
+        className={`flex ${isUser ? 'justify-end' : 'justify-start'}`}
+      >
         <div className={`flex max-w-[92%] items-start gap-3 ${isUser ? 'flex-row-reverse' : 'flex-row'} sm:max-w-[86%]`}>
           <div
             className="mt-1 flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-[0.85rem] border"
@@ -3709,6 +3846,65 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
                 </p>
                 <div className="space-y-2">
                   {message.appliedActions.map((action) => renderAppliedAction(message.id, action))}
+                </div>
+              </div>
+            )}
+
+            {message.memoryUpdates && message.memoryUpdates.length > 0 && (
+              <div
+                className="space-y-2 rounded-[1.15rem] border p-3"
+                style={{
+                  borderColor: AI_CHAT_THEME.panelBorder,
+                  backgroundColor: AI_CHAT_THEME.panelBgStrong
+                }}
+              >
+                <p className="font-serif text-[11px] tracking-[0.14em]" style={{ color: AI_CHAT_THEME.textFaint }}>
+                  记忆更新
+                </p>
+                <div className="space-y-2">
+                  {message.memoryUpdates.map((section) => (
+                    <div
+                      key={`${message.id}-memory-${section.label}`}
+                      className="border-l-2 pl-3 pr-1 py-1"
+                      style={{ borderColor: AI_CHAT_THEME.activeBorder }}
+                    >
+                      <p className="text-[11px] font-semibold" style={{ color: AI_CHAT_THEME.textSecondary }}>
+                        {section.label}
+                      </p>
+                      <div className="mt-1.5 space-y-1 text-[13px] leading-6" style={{ color: AI_CHAT_THEME.textPrimary }}>
+                        {section.items.map((item) => (
+                          <p key={`${message.id}-memory-item-${section.label}-${item}`}>{item}</p>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {message.reminderUpdates && message.reminderUpdates.length > 0 && (
+              <div
+                className="space-y-2 rounded-[1.15rem] border p-3"
+                style={{
+                  borderColor: AI_CHAT_THEME.panelBorder,
+                  backgroundColor: AI_CHAT_THEME.panelBgStrong
+                }}
+              >
+                <p className="font-serif text-[11px] tracking-[0.14em]" style={{ color: AI_CHAT_THEME.textFaint }}>
+                  提醒结果
+                </p>
+                <div className="space-y-2">
+                  {message.reminderUpdates.map((item) => (
+                    <div
+                      key={`${message.id}-reminder-${item}`}
+                      className="border-l-2 pl-3 pr-1 py-1"
+                      style={{ borderColor: AI_CHAT_THEME.activeBorder }}
+                    >
+                      <p className="text-[13px] leading-6" style={{ color: AI_CHAT_THEME.textPrimary }}>
+                        {item}
+                      </p>
+                    </div>
+                  ))}
                 </div>
               </div>
             )}
@@ -4398,6 +4594,131 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
                       </div>
 
                       <div
+                        className="rounded-[1rem] border px-4 py-3"
+                        style={{
+                          borderColor: AI_CHAT_THEME.panelBorder,
+                          backgroundColor: AI_CHAT_THEME.panelBg
+                        }}
+                      >
+                        <div className="mb-3">
+                          <p className="text-sm font-semibold" style={{ color: AI_CHAT_THEME.textPrimary }}>check-in 间隔</p>
+                          <p className="mt-1 text-xs leading-5" style={{ color: AI_CHAT_THEME.textMuted }}>
+                            后台服务会按“检查频率”定期醒来检查一次；如果到了随机 check-in 的时间，就会触发后台调用。
+                          </p>
+                        </div>
+
+                        <div className="grid gap-3 sm:grid-cols-3">
+                          <label className="block">
+                            <span className="mb-1 block text-xs font-medium text-stone-500">检查频率（分钟）</span>
+                            <div className="relative">
+                              <input
+                                type="text"
+                                inputMode="numeric"
+                                value={assistantAgentIntervalDrafts.basePollMinutes}
+                                onChange={(event) => handleAssistantAgentIntervalDraftChange('basePollMinutes', event.target.value)}
+                                onBlur={() => commitAssistantAgentIntervalDraft('basePollMinutes')}
+                                onKeyDown={(event) => {
+                                  if (event.key === 'Enter') {
+                                    event.preventDefault();
+                                    commitAssistantAgentIntervalDraft('basePollMinutes');
+                                  }
+                                }}
+                                aria-invalid={!!assistantAgentIntervalErrors.basePollMinutes}
+                                className="w-full rounded-[1rem] border px-3 py-2 pr-9 text-sm outline-none"
+                                style={{
+                                  borderColor: assistantAgentIntervalErrors.basePollMinutes ? '#ef4444' : AI_CHAT_THEME.chipBorder,
+                                  backgroundColor: AI_CHAT_THEME.inputBg,
+                                  color: AI_CHAT_THEME.textPrimary
+                                }}
+                              />
+                              {assistantAgentIntervalErrors.basePollMinutes ? (
+                                <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-red-500">
+                                  <XCircle size={15} aria-hidden="true" />
+                                </span>
+                              ) : null}
+                            </div>
+                            {assistantAgentIntervalErrors.basePollMinutes ? (
+                              <span className="mt-1 block text-xs font-medium text-red-500" role="alert">
+                                {assistantAgentIntervalErrors.basePollMinutes}
+                              </span>
+                            ) : null}
+                          </label>
+
+                          <label className="block">
+                            <span className="mb-1 block text-xs font-medium text-stone-500">最低间隔（分钟）</span>
+                            <div className="relative">
+                              <input
+                                type="text"
+                                inputMode="numeric"
+                                value={assistantAgentIntervalDrafts.minCheckinMinutes}
+                                onChange={(event) => handleAssistantAgentIntervalDraftChange('minCheckinMinutes', event.target.value)}
+                                onBlur={() => commitAssistantAgentIntervalDraft('minCheckinMinutes')}
+                                onKeyDown={(event) => {
+                                  if (event.key === 'Enter') {
+                                    event.preventDefault();
+                                    commitAssistantAgentIntervalDraft('minCheckinMinutes');
+                                  }
+                                }}
+                                aria-invalid={!!assistantAgentIntervalErrors.minCheckinMinutes}
+                                className="w-full rounded-[1rem] border px-3 py-2 pr-9 text-sm outline-none"
+                                style={{
+                                  borderColor: assistantAgentIntervalErrors.minCheckinMinutes ? '#ef4444' : AI_CHAT_THEME.chipBorder,
+                                  backgroundColor: AI_CHAT_THEME.inputBg,
+                                  color: AI_CHAT_THEME.textPrimary
+                                }}
+                              />
+                              {assistantAgentIntervalErrors.minCheckinMinutes ? (
+                                <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-red-500">
+                                  <XCircle size={15} aria-hidden="true" />
+                                </span>
+                              ) : null}
+                            </div>
+                            {assistantAgentIntervalErrors.minCheckinMinutes ? (
+                              <span className="mt-1 block text-xs font-medium text-red-500" role="alert">
+                                {assistantAgentIntervalErrors.minCheckinMinutes}
+                              </span>
+                            ) : null}
+                          </label>
+
+                          <label className="block">
+                            <span className="mb-1 block text-xs font-medium text-stone-500">最高间隔（分钟）</span>
+                            <div className="relative">
+                              <input
+                                type="text"
+                                inputMode="numeric"
+                                value={assistantAgentIntervalDrafts.maxCheckinMinutes}
+                                onChange={(event) => handleAssistantAgentIntervalDraftChange('maxCheckinMinutes', event.target.value)}
+                                onBlur={() => commitAssistantAgentIntervalDraft('maxCheckinMinutes')}
+                                onKeyDown={(event) => {
+                                  if (event.key === 'Enter') {
+                                    event.preventDefault();
+                                    commitAssistantAgentIntervalDraft('maxCheckinMinutes');
+                                  }
+                                }}
+                                aria-invalid={!!assistantAgentIntervalErrors.maxCheckinMinutes}
+                                className="w-full rounded-[1rem] border px-3 py-2 pr-9 text-sm outline-none"
+                                style={{
+                                  borderColor: assistantAgentIntervalErrors.maxCheckinMinutes ? '#ef4444' : AI_CHAT_THEME.chipBorder,
+                                  backgroundColor: AI_CHAT_THEME.inputBg,
+                                  color: AI_CHAT_THEME.textPrimary
+                                }}
+                              />
+                              {assistantAgentIntervalErrors.maxCheckinMinutes ? (
+                                <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-red-500">
+                                  <XCircle size={15} aria-hidden="true" />
+                                </span>
+                              ) : null}
+                            </div>
+                            {assistantAgentIntervalErrors.maxCheckinMinutes ? (
+                              <span className="mt-1 block text-xs font-medium text-red-500" role="alert">
+                                {assistantAgentIntervalErrors.maxCheckinMinutes}
+                              </span>
+                            ) : null}
+                          </label>
+                        </div>
+                      </div>
+
+                      <div
                         className="flex items-start justify-between gap-4 rounded-[1rem] border px-4 py-3"
                         style={{
                           borderColor: AI_CHAT_THEME.panelBorder,
@@ -4430,7 +4751,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
                       </div>
 
                       <div
-                        className="flex items-start justify-between gap-4 rounded-[1rem] border px-4 py-3 opacity-75"
+                        className="hidden"
                         style={{
                           borderColor: AI_CHAT_THEME.panelBorder,
                           backgroundColor: AI_CHAT_THEME.panelBg
@@ -4468,15 +4789,15 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
                           查看长期记忆
                         </button>
                         <button
-                          onClick={handleClearAssistantMemory}
+                          onClick={handleOpenAssistantBackgroundHistoryViewer}
                           className="rounded-full border px-3 py-2 text-xs font-medium transition-colors"
                           style={{
-                            borderColor: AI_CHAT_THEME.dangerBorder,
-                            backgroundColor: AI_CHAT_THEME.dangerBg,
-                            color: AI_CHAT_THEME.dangerText
+                            borderColor: AI_CHAT_THEME.chipBorder,
+                            backgroundColor: AI_CHAT_THEME.panelBg,
+                            color: AI_CHAT_THEME.textSecondary
                           }}
                         >
-                          清空长期记忆
+                          查看后台调用记录
                         </button>
                       </div>
                     </div>
@@ -5043,12 +5364,25 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
                     {assistantAgentConfig.longTermMemoryEnabled ? '当前会在后台 system turn 中复用这些结构化记忆。' : '长期记忆当前已关闭，下面仅展示本地已保存的历史记忆。'}
                   </p>
                 </div>
-                <button
-                  onClick={handleCloseAssistantMemoryViewer}
-                  className="flex h-9 w-9 items-center justify-center rounded-full border border-[#e5e7eb] bg-white text-[#6b7280] transition-colors hover:border-[#cfd8e3] hover:bg-[#f9fafb] hover:text-[#111827]"
-                >
-                  <X size={20} />
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={handleClearAssistantMemory}
+                    className="rounded-full border px-3 py-2 text-xs font-medium transition-colors"
+                    style={{
+                      borderColor: AI_CHAT_THEME.dangerBorder,
+                      backgroundColor: AI_CHAT_THEME.dangerBg,
+                      color: AI_CHAT_THEME.dangerText
+                    }}
+                  >
+                    清空长期记忆
+                  </button>
+                  <button
+                    onClick={handleCloseAssistantMemoryViewer}
+                    className="flex h-9 w-9 items-center justify-center rounded-full border border-[#e5e7eb] bg-white text-[#6b7280] transition-colors hover:border-[#cfd8e3] hover:bg-[#f9fafb] hover:text-[#111827]"
+                  >
+                    <X size={20} />
+                  </button>
+                </div>
               </div>
 
               <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-6 sm:py-5">
@@ -5075,7 +5409,6 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
                   {[
                     { label: '用户画像记忆', value: assistantMemorySnapshot.profileMemory },
                     { label: '偏好记忆', value: assistantMemorySnapshot.preferenceMemory },
-                    { label: '未关闭事项', value: assistantMemorySnapshot.openLoops },
                     { label: '活跃 reminders', value: assistantMemorySnapshot.activeReminders },
                     { label: '最近 agent 决策', value: assistantMemorySnapshot.recentDecisions }
                   ].map((section) => (
@@ -5093,6 +5426,106 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
                       </pre>
                     </div>
                   ))}
+
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {isAssistantBackgroundHistoryViewerOpen && (
+          <div className="absolute inset-0 z-20 bg-[rgba(15,23,42,0.14)] backdrop-blur-[10px]">
+            <div
+              className="flex h-full flex-col bg-[#f3f4f6]"
+              style={{
+                paddingTop: 'env(safe-area-inset-top)',
+                paddingBottom: 'env(safe-area-inset-bottom)'
+              }}
+            >
+              <div className="flex items-center justify-between border-b border-[#e5e7eb] bg-[rgba(255,255,255,0.9)] px-5 py-4 backdrop-blur">
+                <div>
+                  <h3 className="font-serif text-[1.75rem] leading-none text-[#201c19]">后台调用记录</h3>
+                  <p className="text-xs text-stone-400">按时间倒序记录每次后台调用的结果，包含 silent 调用。</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={handleClearAssistantBackgroundCallHistory}
+                    className="rounded-full border px-3 py-2 text-xs font-medium transition-colors"
+                    style={{
+                      borderColor: AI_CHAT_THEME.dangerBorder,
+                      backgroundColor: AI_CHAT_THEME.dangerBg,
+                      color: AI_CHAT_THEME.dangerText
+                    }}
+                  >
+                    清空记录
+                  </button>
+                  <button
+                    onClick={handleCloseAssistantBackgroundHistoryViewer}
+                    className="flex h-9 w-9 items-center justify-center rounded-full border border-[#e5e7eb] bg-white text-[#6b7280] transition-colors hover:border-[#cfd8e3] hover:bg-[#f9fafb] hover:text-[#111827]"
+                  >
+                    <X size={20} />
+                  </button>
+                </div>
+              </div>
+
+              <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-6 sm:py-5">
+                <div className="mx-auto max-w-4xl space-y-4">
+                  {assistantBackgroundCallHistory.length === 0 ? (
+                    <div
+                      className="rounded-[1.2rem] border border-[#e5e7eb] bg-[rgba(255,255,255,0.96)] p-5 shadow-[0_8px_20px_rgba(15,23,42,0.035)]"
+                      style={{
+                        borderColor: 'color-mix(in srgb, var(--accent-color) 10%, #e5e7eb)',
+                        backgroundColor: 'color-mix(in srgb, var(--accent-color) 2.5%, white)'
+                      }}
+                    >
+                      <p className="text-sm leading-6 text-stone-600">暂无后台调用记录。</p>
+                    </div>
+                  ) : (
+                    assistantBackgroundCallHistory.map((entry) => (
+                      <div
+                        key={entry.id}
+                        className="rounded-[1.2rem] border border-[#e5e7eb] bg-[rgba(255,255,255,0.96)] p-4 shadow-[0_8px_20px_rgba(15,23,42,0.035)]"
+                        style={{
+                          borderColor: 'color-mix(in srgb, var(--accent-color) 10%, #e5e7eb)',
+                          backgroundColor: 'color-mix(in srgb, var(--accent-color) 2.5%, white)'
+                        }}
+                      >
+                        <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                          <p className="font-serif text-xl text-[#231f1b]">{entry.triggerType}</p>
+                          <span className="rounded-full border px-2 py-0.5 text-[11px]" style={{
+                            borderColor: AI_CHAT_THEME.chipBorder,
+                            backgroundColor: AI_CHAT_THEME.panelBg,
+                            color: AI_CHAT_THEME.textSecondary
+                          }}>
+                            {entry.status}
+                          </span>
+                          <span className="rounded-full border px-2 py-0.5 text-[11px]" style={{
+                            borderColor: AI_CHAT_THEME.chipBorder,
+                            backgroundColor: AI_CHAT_THEME.panelBg,
+                            color: AI_CHAT_THEME.textSecondary
+                          }}>
+                            action: {entry.action}
+                          </span>
+                          <span className="rounded-full border px-2 py-0.5 text-[11px]" style={{
+                            borderColor: AI_CHAT_THEME.chipBorder,
+                            backgroundColor: AI_CHAT_THEME.panelBg,
+                            color: AI_CHAT_THEME.textSecondary
+                          }}>
+                            memory: {entry.memoryAction}
+                          </span>
+                        </div>
+                        <div className="mt-2 space-y-1 text-sm leading-6 text-stone-700">
+                          <p>请求发出：{entry.requestedAt}</p>
+                          <p>请求返回：{entry.completedAt}</p>
+                          {entry.targetSessionId && <p>会话：{entry.targetSessionId}</p>}
+                          {entry.reminderCount > 0 && <p>提醒数：{entry.reminderCount}</p>}
+                          {entry.triggerText && <p>触发文本：{entry.triggerText}</p>}
+                          {entry.message && <p>返回消息：{entry.message}</p>}
+                          {entry.errorMessage && <p style={{ color: AI_CHAT_THEME.dangerText }}>错误：{entry.errorMessage}</p>}
+                        </div>
+                      </div>
+                    ))
+                  )}
                 </div>
               </div>
             </div>
@@ -5133,19 +5566,15 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
                       }}
                     >
                       <p className="mb-3 font-serif text-xl text-[#231f1b]">{section.label}</p>
-                      <div className="space-y-3">
-                        <div>
-                          <p className="mb-2 text-xs font-bold uppercase tracking-[0.2em] text-stone-400">客户端发送</p>
-                          <pre className="overflow-x-auto whitespace-pre-wrap break-words rounded-[1.3rem] border border-[#433a34] bg-[#2d2926] p-4 text-xs leading-6 text-[#efe7db] shadow-[inset_0_0_0_1px_rgba(255,255,255,0.03)]">
-                            {stringifyDebugSection(section.exchange.request)}
-                          </pre>
-                        </div>
-                        <div>
-                          <p className="mb-2 text-xs font-bold uppercase tracking-[0.2em] text-stone-400">服务端返回</p>
-                          <pre className="overflow-x-auto whitespace-pre-wrap break-words rounded-[1.3rem] border border-[#433a34] bg-[#2d2926] p-4 text-xs leading-6 text-[#efe7db] shadow-[inset_0_0_0_1px_rgba(255,255,255,0.03)]">
-                            {stringifyDebugSection(section.exchange.response)}
-                          </pre>
-                        </div>
+                      <div className="mb-3 space-y-3">
+                        {buildDebugBlocks(section.exchange).map((block) => (
+                          <div key={`${section.label}-${block.label}`}>
+                            <p className="mb-2 text-xs font-bold uppercase tracking-[0.2em] text-stone-400">{block.label}</p>
+                            <pre className="overflow-x-auto whitespace-pre-wrap break-words rounded-[1.3rem] border border-[#433a34] bg-[#2d2926] p-4 text-xs leading-6 text-[#efe7db] shadow-[inset_0_0_0_1px_rgba(255,255,255,0.03)]">
+                              {block.content}
+                            </pre>
+                          </div>
+                        ))}
                       </div>
                     </div>
                   ))}
@@ -5158,3 +5587,5 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     </div>
   );
 };
+
+

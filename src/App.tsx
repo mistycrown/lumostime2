@@ -6,14 +6,17 @@
  * @description The main component that holds the global state (logs, todos, active sessions) and handles routing between views and overlays, including preserving standalone return paths for search and custom filters while keeping export/import, NFC stop confirmation, and reset flows aligned with repository-backed data.
  * @updated 2026-04-22: Mounted the shared AI chat window at the app level so it can keep running in the background after the modal UI is closed.
  * @updated 2026-04-25: Added AI assistant widget shortcut handling so Android widget shortcut slots can open the shared AI chat window.
+ * @updated 2026-04-26: Added Android assistant notification navigation consumption so tapping a background AI alert reopens the shared chat at the exact target message.
  *
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
 import React, { useEffect, useRef } from 'react';
 import { Buffer } from 'buffer';
 import { Capacitor } from '@capacitor/core';
+import { App as CapacitorApp } from '@capacitor/app';
 import { Filesystem, Directory, Encoding } from '@capacitor/filesystem';
 import { AppView } from './types';
+import AssistantAgent from './plugins/AssistantAgentPlugin';
 
 import { ToastProvider, useToast } from './contexts/ToastContext';
 import { DataProvider, useData } from './contexts/DataContext';
@@ -123,6 +126,50 @@ const AppContent: React.FC = () => {
   const { addToast } = useToast();
   const { openAIChat } = useAIChatWindow();
   const lastStorageErrorToastRef = useRef<{ signature: string; timestamp: number } | null>(null);
+
+  useEffect(() => {
+    if (!Capacitor.isNativePlatform()) {
+      return;
+    }
+
+    let cancelled = false;
+    let appStateListener: Awaited<ReturnType<typeof CapacitorApp.addListener>> | null = null;
+
+    const consumePendingAssistantNavigation = async () => {
+      try {
+        const pendingNavigation = await AssistantAgent.consumePendingAssistantNavigation();
+        if (cancelled || !pendingNavigation.hasPending) {
+          return;
+        }
+
+        openAIChat({
+          ...(pendingNavigation.targetSessionId ? { targetSessionId: pendingNavigation.targetSessionId } : {}),
+          ...(pendingNavigation.targetMessageId ? { targetMessageId: pendingNavigation.targetMessageId } : {})
+        });
+      } catch (error) {
+        if (!cancelled) {
+          console.error('[App] Failed to consume pending assistant navigation', error);
+        }
+      }
+    };
+
+    void consumePendingAssistantNavigation();
+
+    void CapacitorApp.addListener('appStateChange', ({ isActive }) => {
+      if (isActive) {
+        void consumePendingAssistantNavigation();
+      }
+    }).then((listener) => {
+      appStateListener = listener;
+    }).catch((error) => {
+      console.error('[App] Failed to register assistant navigation listener', error);
+    });
+
+    return () => {
+      cancelled = true;
+      void appStateListener?.remove();
+    };
+  }, [openAIChat]);
 
   useEffect(() => {
     const handleStorageWriteError = (event: Event) => {

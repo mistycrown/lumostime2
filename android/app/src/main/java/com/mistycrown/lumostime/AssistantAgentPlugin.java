@@ -3,7 +3,7 @@
  * @input JS-side assistant-agent control requests
  * @output Android foreground-service control and assistant system-trigger events
  * @pos Native Plugin
- * @description Capacitor plugin bridge for the Android-first background assistant agent. Starts and stops the foreground agent service, updates lightweight polling config, and relays native system-trigger events back into the web layer.
+ * @description Capacitor plugin bridge for the Android-first background assistant agent. Starts and stops the foreground agent service, updates lightweight polling config, relays native system-trigger events back into the web layer, and surfaces assistant notification navigation.
  */
 package com.mistycrown.lumostime;
 
@@ -107,6 +107,47 @@ public class AssistantAgentPlugin extends Plugin {
         } catch (Exception exception) {
             call.reject(exception.getMessage());
         }
+    }
+
+    @PluginMethod
+    public void showAssistantNotification(PluginCall call) {
+        String title = call.getString("title", "LumosTime AI 助理");
+        String body = call.getString("body", "");
+        String targetSessionId = call.getString("targetSessionId", "");
+        String targetMessageId = call.getString("targetMessageId", "");
+
+        if (targetSessionId == null || targetSessionId.trim().isEmpty()) {
+            call.reject("targetSessionId is required");
+            return;
+        }
+
+        AssistantMessageNotificationManager.showNotification(
+            getContext(),
+            title,
+            body,
+            targetSessionId.trim(),
+            targetMessageId == null ? "" : targetMessageId.trim()
+        );
+        call.resolve();
+    }
+
+    @PluginMethod
+    public void consumePendingAssistantNavigation(PluginCall call) {
+        AssistantNotificationNavigationStore.PendingNavigation pendingNavigation =
+            AssistantNotificationNavigationStore.consumePendingNavigation(getContext());
+
+        JSObject result = new JSObject();
+        if (pendingNavigation == null) {
+            result.put("hasPending", false);
+            call.resolve(result);
+            return;
+        }
+
+        result.put("hasPending", true);
+        result.put("targetSessionId", pendingNavigation.targetSessionId);
+        result.put("targetMessageId", pendingNavigation.targetMessageId);
+        result.put("openedAt", pendingNavigation.openedAt);
+        call.resolve(result);
     }
 
     public static void dispatchSystemTrigger(String triggerType, String text, String source) {

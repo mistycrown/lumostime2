@@ -96,7 +96,7 @@
 
 ### 1. assistant-base
 
-新增共享基础 prompt，例如 `static/assistant/assistant-base.md`，前台后台共用。
+新增共享基础 prompt，例如 `public/assistant/assistant-base.md`，前台后台共用。
 
 职责：
 
@@ -111,7 +111,7 @@
 
 ### 2. foreground-mode
 
-新增 `static/assistant/foreground-mode.md`。
+新增 `public/assistant/foreground-mode.md`。
 
 职责：
 
@@ -121,7 +121,7 @@
 
 ### 3. background-mode
 
-新增 `static/assistant/background-mode.md`。
+新增 `public/assistant/background-mode.md`。
 
 职责：
 
@@ -414,9 +414,9 @@ Reminder 到点后，系统生成 `reminder_due` 触发，再以后台 turn 方�
    - `AssistantToolCall`
 
 2. 重组 prompt 文件：
-   - 新增 `assistant-base.md`
-   - 新增 `foreground-mode.md`
-   - 新增 `background-mode.md`
+   - 新增 `public/assistant/assistant-base.md`
+   - 新增 `public/assistant/foreground-mode.md`
+   - 新增 `public/assistant/background-mode.md`
    - 合并并删除旧 `assistant-persona.md`
 
 3. 新增 `assistantContextBuilder`

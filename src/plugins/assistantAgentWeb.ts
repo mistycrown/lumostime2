@@ -5,13 +5,19 @@
  * @pos Plugin Implementation (Web)
  * @description Provides a lightweight web fallback for the Android-first assistant agent plugin so browser builds can compile and simulate plugin events without crashing.
  *
+ * @updated 2026-04-26: Added no-op active-notification and pending-navigation fallbacks for browser builds.
  * @updated 2026-04-26: Added a no-op web AssistantAgent plugin implementation with event-listener support.
  */
 
 import { WebPlugin } from '@capacitor/core';
 import type { PluginListenerHandle } from '@capacitor/core';
 import type { AssistantAgentPlugin } from './AssistantAgentPlugin';
-import type { AssistantAgentConfig, AssistantSystemTrigger } from '../types/assistant';
+import type {
+  AssistantAgentConfig,
+  AssistantNotificationNavigation,
+  AssistantNotificationPayload,
+  AssistantSystemTrigger
+} from '../types/assistant';
 
 export class AssistantAgentWeb extends WebPlugin implements AssistantAgentPlugin {
   async startAgent(options?: Partial<AssistantAgentConfig>): Promise<void> {
@@ -36,6 +42,14 @@ export class AssistantAgentWeb extends WebPlugin implements AssistantAgentPlugin
 
   async triggerImmediateCheckin(): Promise<void> {
     console.log('AssistantAgent.triggerImmediateCheckin (Web - No-op)');
+  }
+
+  async showAssistantNotification(payload: AssistantNotificationPayload): Promise<void> {
+    console.log('AssistantAgent.showAssistantNotification (Web - No-op)', payload);
+  }
+
+  async consumePendingAssistantNavigation(): Promise<AssistantNotificationNavigation> {
+    return { hasPending: false };
   }
 
   addListener(

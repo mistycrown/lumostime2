@@ -7,6 +7,7 @@
  * @updated 2026-04-25: Added DAILY_RUNTIME dual-view payload builders so native heatmap widgets can toggle between category and activity coloring.
  * @updated 2026-04-25: Added widget UI icon asset preservation and sanitization helpers so Android widgets can prefer local icon bitmaps with emoji fallback.
  * @updated 2026-04-26: Added TODAY + PIN widget payload builders for the dedicated scrollable 4x2 todo widget.
+ * @updated 2026-04-26: Let TODAY + PIN payloads inherit linked activity/category metadata from a parent todo when the pinned child itself does not carry the mapping.
  * @updated 2026-04-26: Expanded the 4x1 timer widget template from 4 to 5 evenly spaced slots.
  */
 import { Capacitor } from '@capacitor/core';
@@ -933,6 +934,63 @@ export const buildDailyRuntimeWidgetPayload = ({
 const TODO_PIN_BADGE_PIN: WidgetBridgeTodoPinItem['badgeLabel'] = 'PIN';
 const TODO_PIN_BADGE_TODAY: WidgetBridgeTodoPinItem['badgeLabel'] = 'TODAY';
 
+const resolveTodoPinLinkedTarget = (
+  todo: TodoItem,
+  todos: TodoItem[],
+  categories: Category[]
+): {
+  categoryId: string | null;
+  activityId: string | null;
+  activityLabel: string | null;
+  icon: string | null;
+  color: string | null;
+} => {
+  const candidateTodos: TodoItem[] = [todo];
+  const parentTodo = todo.parentTodoId
+    ? todos.find((item) => item.id === todo.parentTodoId)
+    : null;
+
+  if (parentTodo) {
+    candidateTodos.push(parentTodo);
+  }
+
+  for (const candidate of candidateTodos) {
+    const linkedCategory = candidate.linkedCategoryId
+      ? categories.find((category) => category.id === candidate.linkedCategoryId)
+      : undefined;
+    const linkedActivity = candidate.linkedActivityId
+      ? linkedCategory?.activities.find((activity) => activity.id === candidate.linkedActivityId)
+        || categories.flatMap((category) => category.activities).find((activity) => activity.id === candidate.linkedActivityId)
+      : undefined;
+    const resolvedCategoryId = linkedCategory?.id
+      || (linkedActivity
+        ? categories.find((category) => category.activities.some((activity) => activity.id === linkedActivity.id))?.id
+        : null)
+      || null;
+    const resolvedCategory = resolvedCategoryId
+      ? categories.find((category) => category.id === resolvedCategoryId)
+      : linkedCategory;
+
+    if (resolvedCategoryId && linkedActivity?.id) {
+      return {
+        categoryId: resolvedCategoryId,
+        activityId: linkedActivity.id,
+        activityLabel: linkedActivity.name,
+        icon: linkedActivity.icon || resolvedCategory?.icon || null,
+        color: getColorHexForCharts(linkedActivity.color || resolvedCategory?.themeColor || '') || null
+      };
+    }
+  }
+
+  return {
+    categoryId: null,
+    activityId: null,
+    activityLabel: null,
+    icon: null,
+    color: null
+  };
+};
+
 export const buildTodoPinWidgetPayload = ({
   todos,
   categories,
@@ -949,31 +1007,17 @@ export const buildTodoPinWidgetPayload = ({
   return {
     date: getLocalDateStr(date),
     items: visibleTodos.map((todo) => {
-      const linkedCategory = todo.linkedCategoryId
-        ? categories.find((category) => category.id === todo.linkedCategoryId)
-        : undefined;
-      const linkedActivity = todo.linkedActivityId
-        ? linkedCategory?.activities.find((activity) => activity.id === todo.linkedActivityId)
-          || categories.flatMap((category) => category.activities).find((activity) => activity.id === todo.linkedActivityId)
-        : undefined;
-      const resolvedCategoryId = linkedCategory?.id
-        || (linkedActivity
-          ? categories.find((category) => category.activities.some((activity) => activity.id === linkedActivity.id))?.id
-          : null)
-        || null;
-      const resolvedCategory = resolvedCategoryId
-        ? categories.find((category) => category.id === resolvedCategoryId)
-        : linkedCategory;
+      const linkedTarget = resolveTodoPinLinkedTarget(todo, todos, categories);
 
       return {
         todoId: todo.id,
         title: todo.title,
         badgeLabel: todo.pin ? TODO_PIN_BADGE_PIN : TODO_PIN_BADGE_TODAY,
-        categoryId: resolvedCategoryId,
-        activityId: linkedActivity?.id || null,
-        activityLabel: linkedActivity?.name || null,
-        icon: linkedActivity?.icon || resolvedCategory?.icon || null,
-        color: getColorHexForCharts(linkedActivity?.color || resolvedCategory?.themeColor || '') || null,
+        categoryId: linkedTarget.categoryId,
+        activityId: linkedTarget.activityId,
+        activityLabel: linkedTarget.activityLabel,
+        icon: linkedTarget.icon,
+        color: linkedTarget.color,
         scopeIds: todo.defaultScopeIds ?? null
       };
     }),

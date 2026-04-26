@@ -38,10 +38,10 @@ const normalizeConfig = (value: unknown): AssistantAgentConfig => {
   }
 
   const candidate = value as Partial<AssistantAgentConfig>;
-  const minCheckinMinutes = clampMinutes(candidate.minCheckinMinutes, DEFAULT_ASSISTANT_AGENT_CONFIG.minCheckinMinutes, 15, 24 * 60);
+  const minCheckinMinutes = clampMinutes(candidate.minCheckinMinutes, DEFAULT_ASSISTANT_AGENT_CONFIG.minCheckinMinutes, 1, 24 * 60);
   const maxCheckinMinutes = Math.max(
     minCheckinMinutes,
-    clampMinutes(candidate.maxCheckinMinutes, DEFAULT_ASSISTANT_AGENT_CONFIG.maxCheckinMinutes, 15, 24 * 60)
+    clampMinutes(candidate.maxCheckinMinutes, DEFAULT_ASSISTANT_AGENT_CONFIG.maxCheckinMinutes, 1, 24 * 60)
   );
 
   return {

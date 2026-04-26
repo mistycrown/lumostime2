@@ -7,6 +7,7 @@
  * @updated 2026-04-25: Hide unfinished subtasks from todo-list rendering whenever their parent task is completed, while preserving child state and restoring the rows when the parent is reopened.
  * @updated 2026-04-25: Keep the todo page floating list-week switchers on the active color-scheme button style even when the UI icon theme stays default.
  * @updated 2026-04-25: Let floating list-week switchers inherit button theme colors when the default UI theme falls back to Lucide icons.
+ * @updated 2026-04-26: Let the AI unread badge use the shared overlap positioning so it sits slightly inside the circular button edge instead of feeling detached.
  * @updated 2026-04-22: The todo-page AI magic button now opens the app-level shared AI window so closing the modal does not interrupt an in-flight request.
  * @updated 2026-04-22: Routed the todo-page AI magic button into the shared AI chat workspace and removed the old standalone AI todo parse/confirm flow.
  * @updated 2026-04-22: Narrowed the `今` filter count to only standalone todos whose own arranged or due date is today, excluding pin-only and overdue entries.
@@ -93,6 +94,7 @@ import { TodoQuickActionsModal } from '../components/TodoQuickActionsModal';
 import { useTodoQuickActions } from '../hooks/useTodoQuickActions';
 import { buildTodoTreeItems, getCompletedDirectChildCount, getDirectChildCount, getDirectChildTodosForDisplay, getParentTodo, isIncompleteSubtaskHiddenByCompletedParent } from '../utils/todoHierarchyUtils';
 import { useAIChatWindow } from '../contexts/AIChatWindowContext';
+import { UnreadCountBadge } from '../components/UnreadCountBadge';
 
 
 interface TodoViewProps {
@@ -987,7 +989,7 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
     const saved = localStorage.getItem('todoShowCompleted');
     return saved !== 'false';
   });
-  const { openAIChat } = useAIChatWindow();
+  const { openAIChat, unreadCount } = useAIChatWindow();
 
   // 鐟?viewMode 闁衡偓閻熸澘缍侀柡鍐啇缁辨繃绌卞┑鍡欐憼闁?localStorage
   React.useEffect(() => {
@@ -2214,10 +2216,11 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
           <div className="flex items-center gap-3">
             <button
               onClick={() => openAIChat({ targetDate: todayDate })}
-              className="theme-icon-button"
+              className="theme-icon-button relative overflow-visible"
               title="AI 助理"
             >
               <Sparkles size={16} />
+              <UnreadCountBadge count={unreadCount} />
             </button>
             <button
               onClick={handleAddTodoClick}

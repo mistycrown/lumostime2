@@ -7,19 +7,19 @@ import android.content.Context;
 import android.content.Intent;
 
 /**
- * Dedicated TODAY + PIN 4x2 widget provider with a scrollable todo list.
+ * Dedicated TODAY + PIN 4x3 widget provider with a scrollable todo list.
  */
-public class QuickLogWidgetTodoPin4x2 extends AppWidgetProvider {
+public class QuickLogWidgetTodoPin4x3 extends AppWidgetProvider {
     public static void refreshAllAsync(Context context) {
         AppWidgetManager appWidgetManager = AppWidgetManager.getInstance(context);
-        ComponentName componentName = new ComponentName(context, QuickLogWidgetTodoPin4x2.class);
+        ComponentName componentName = new ComponentName(context, QuickLogWidgetTodoPin4x3.class);
         int[] appWidgetIds = appWidgetManager.getAppWidgetIds(componentName);
         WidgetTodoPinProviderSupport.updateWidgets(
                 context,
                 appWidgetManager,
                 appWidgetIds,
-                R.layout.widget_layout_todo_pin_4x2,
-                QuickLogWidgetTodoPin4x2.class
+                R.layout.widget_layout_todo_pin_4x3,
+                QuickLogWidgetTodoPin4x3.class
         );
     }
 
@@ -32,8 +32,8 @@ public class QuickLogWidgetTodoPin4x2 extends AppWidgetProvider {
                 context,
                 appWidgetManager,
                 new int[] { appWidgetId },
-                R.layout.widget_layout_todo_pin_4x2,
-                QuickLogWidgetTodoPin4x2.class
+                R.layout.widget_layout_todo_pin_4x3,
+                QuickLogWidgetTodoPin4x3.class
         );
     }
 
@@ -43,15 +43,15 @@ public class QuickLogWidgetTodoPin4x2 extends AppWidgetProvider {
                 context,
                 appWidgetManager,
                 appWidgetIds,
-                R.layout.widget_layout_todo_pin_4x2,
-                QuickLogWidgetTodoPin4x2.class
+                R.layout.widget_layout_todo_pin_4x3,
+                QuickLogWidgetTodoPin4x3.class
         );
     }
 
     @Override
     public void onReceive(Context context, Intent intent) {
         super.onReceive(context, intent);
-        if (WidgetTodoPinProviderSupport.handleCommonReceive(context, intent, QuickLogWidgetTodoPin4x2.class)) {
+        if (WidgetTodoPinProviderSupport.handleCommonReceive(context, intent, QuickLogWidgetTodoPin4x3.class)) {
             if (intent == null || !WidgetTodoPinProviderSupport.ACTION_TOGGLE_TODO_ITEM.equals(intent.getAction())) {
                 refreshAllAsync(context);
             }

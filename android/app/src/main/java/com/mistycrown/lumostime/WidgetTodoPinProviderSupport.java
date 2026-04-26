@@ -14,7 +14,7 @@ import java.util.Date;
 import java.util.Locale;
 
 /**
- * Shared rendering and tap handling for the dedicated TODAY + PIN 4x2 widget.
+ * Shared rendering and tap handling for the dedicated TODAY + PIN widgets.
  */
 public final class WidgetTodoPinProviderSupport {
     public static final String ACTION_TOGGLE_TODO_ITEM =
@@ -65,6 +65,22 @@ public final class WidgetTodoPinProviderSupport {
             int[] appWidgetIds,
             Class<? extends AppWidgetProvider> providerClass
     ) {
+        updateWidgets(
+                context,
+                appWidgetManager,
+                appWidgetIds,
+                R.layout.widget_layout_todo_pin_4x2,
+                providerClass
+        );
+    }
+
+    public static void updateWidgets(
+            Context context,
+            AppWidgetManager appWidgetManager,
+            int[] appWidgetIds,
+            int layoutResId,
+            Class<? extends AppWidgetProvider> providerClass
+    ) {
         if (appWidgetIds == null || appWidgetIds.length == 0) {
             return;
         }
@@ -76,7 +92,7 @@ public final class WidgetTodoPinProviderSupport {
         WidgetRuntimeState runtimeState = WidgetStores.INSTANCE.loadRuntimeState(context);
 
         for (int appWidgetId : appWidgetIds) {
-            RemoteViews views = new RemoteViews(context.getPackageName(), R.layout.widget_layout_todo_pin_4x2);
+            RemoteViews views = new RemoteViews(context.getPackageName(), layoutResId);
             Intent serviceIntent = new Intent(context, WidgetTodoPinRemoteViewsService.class);
             serviceIntent.putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId);
             serviceIntent.setData(Uri.parse(serviceIntent.toUri(Intent.URI_INTENT_SCHEME)));
@@ -85,7 +101,6 @@ public final class WidgetTodoPinProviderSupport {
             views.setEmptyView(R.id.widget_todo_pin_list, R.id.widget_todo_pin_empty);
             views.setTextViewText(R.id.widget_todo_pin_subtitle, formatHeaderDate());
             views.setTextViewText(R.id.widget_todo_pin_status, formatStatus(payload, runtimeState));
-            views.setOnClickPendingIntent(R.id.widget_todo_pin_header, buildOpenAppPendingIntent(context, appWidgetId));
             views.setPendingIntentTemplate(
                     R.id.widget_todo_pin_list,
                     buildItemTemplatePendingIntent(context, appWidgetId, providerClass)

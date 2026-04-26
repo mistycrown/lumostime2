@@ -1,9 +1,11 @@
-/**
+﻿/**
  * @file aiService.ts
  * @input AI Configuration (OpenAI/Gemini keys), User Natural Language Input, Context Data (categories, scopes, todos)
  * @output Parsed Time Entries (ParsedTimeEntry[]), Parsed Todos (AIParsedTodo[]), Dated AI Backfill Tool Plans, Backfill Chat Replies (string), Generated Narratives (string), Connection Status (boolean)
  * @pos Service (AI Integration Layer)
- * @description AI 闂備礁鎼悧鍡欑矓鐎涙ɑ鍙?- 濠电姰鍨煎▔娑氣偓姘煎櫍楠炲啯绻濋崘顏佹灃?AI 闂備礁婀辩划顖炲礉閹烘梹顐介柣銏㈩焾閻ゎ噣鏌涢埥鍡楀箻缂佲偓閸戠晝enAI/Gemini闂備焦瀵х粙鎴λ囬崡鐐╂灁闁硅揪绠戠粻銉╂煃瑜滈崜鐔奉嚕閸偄绶炲璺侯儏閺€顓熺箾鐎涙鐭嬮悽顖ｄ簽濡叉劕鈹戠€ｎ亞顦遍梺鍛婁緱閸犳牠顢旈鍫熲拺闁哄娉曡倴闂佹眹鍊曞Λ娑氬垝婵犳碍鏅柛鏇ㄥ墮閳ь剛鍋ら弻鏇㈠幢閺囩喓銈扮紓浣虹帛閻╊垶鐛幒妤€唯闁挎柧鍕橀崑鐐烘煟閻樺弶澶勬繛鍙夌墵楠炲繑瀵奸弶鎴狀唽闂佸綊鍋婇崰鎾寸濞戙垺鐓欑紒妤佺☉濡參寮? * @updated 2026-04-26: Added a structured assistant system-turn decision endpoint so the new Android-first background agent can reuse the same provider/debug pipeline as the foreground AI chat flows.
+ * @description AI 闂備礁鎼悧鍡欑矓鐎涙ɑ鍙?- 濠电姰鍨煎▔娑氣偓姘煎櫍楠炲啯绻濋崘顏佹灃?AI 闂備礁婀辩划顖炲礉閹烘梹顐介柣銏㈩焾閻ゎ噣鏌涢埥鍡楀箻缂佲偓閸戠晝enAI/Gemini闂備焦瀵х粙鎴λ囬崡鐐╂灁闁硅揪绠戠粻銉╂煃瑜滈崜鐔奉嚕閸偄绶炲璺侯儏閺€顓熺箾鐎涙鐭嬮悽顖ｄ簽濡叉劕鈹戠€ｎ亞顦遍梺鍛婁緱閸犳牠顢旈鍫熲拺闁哄娉曡倴闂佹眹鍊曞Λ娑氬垝婵犳碍鏅柛鏇ㄥ墮閳ь剛鍋ら弻鏇㈠幢閺囩喓銈扮紓浣虹帛閻╊垶鐛幒妤€唯闁挎柧鍕橀崑鐐烘煟閻樺弶澶勬繛鍙夌墵楠炲繑瀵奸弶鎴狀唽闂佸綊鍋婇崰鎾寸濞戙垺鐓欑紒妤佺☉濡參寮? * @updated 2026-04-26: Consolidated assistant inference around the shared unified-turn endpoint so foreground chat and Android-first background runs reuse the same provider/debug pipeline and explicit memory-action schema.
+ 
+ * @updated 2026-04-26: Guaranteed a lowercase json instruction on every OpenAI json_object request so structured assistant and tool-planning calls do not fail provider-side validation.
  * @updated 2026-04-25: Expanded AI intent routing and tool planning with dedicated edit-log, update-todo, and create-subtask flows that return id-plus-patch payloads for local application.
  * @updated 2026-04-25: Tightened subtask planning so scheduled or deadline dates are only emitted when the user explicitly asked for them.
  * @updated 2026-04-22: Simplified unified-chat intent classification into a message-only lightweight routing step without extra runtime context.
@@ -21,7 +23,12 @@
  * 闂備礁鐤囧▔鏇熷垔鐎靛摜绠?Once I am updated, be sure to update my header comment and the folder's md.
  */
 import { TodoCategory, Category, Scope, TodoRecurrenceRule } from '../types';
-import type { AssistantSystemTurnDecision } from '../types/assistant';
+import type {
+    AssistantReminderDraft,
+    AssistantToolCall,
+    AssistantUnifiedTurnOutput,
+    AssistantTurnMode
+} from '../types/assistant';
 import { normalizeAIBackfillToolCalls } from '../utils/aiBackfillUtils';
 export interface AIConfig {
     provider: 'openai' | 'gemini';
@@ -79,8 +86,8 @@ export interface AIBackfillChatResult {
     debug: AIDebugExchange;
 }
 
-export interface AIAssistantSystemTurnResult {
-    decision: AssistantSystemTurnDecision;
+export interface AIAssistantUnifiedTurnResult {
+    output: AssistantUnifiedTurnOutput;
     debug: AIDebugExchange;
 }
 
@@ -363,6 +370,32 @@ const buildOpenAIMessageList = (
     { role: 'user' as const, content: userPrompt.trim() }
 ]);
 
+const buildOpenAIJsonMessageList = (
+    systemPrompt: string,
+    userPrompt: string,
+    conversationHistory?: AIConversationTurn[]
+) => {
+    const messages = buildOpenAIMessageList(systemPrompt, userPrompt, conversationHistory);
+    const jsonInstruction = 'Return a valid json object only.';
+
+    if (!messages.length) {
+        return [{ role: 'system' as const, content: jsonInstruction }];
+    }
+
+    const [firstMessage, ...remainingMessages] = messages;
+    if (firstMessage.role === 'system') {
+        return [{
+            ...firstMessage,
+            content: `${firstMessage.content.trim()}\n\n${jsonInstruction}`
+        }, ...remainingMessages];
+    }
+
+    return [
+        { role: 'system' as const, content: jsonInstruction },
+        ...messages
+    ];
+};
+
 const buildGeminiContents = (
     userPrompt: string,
     conversationHistory?: AIConversationTurn[]
@@ -457,6 +490,160 @@ const normalizeNullableStringArray = (value: unknown): string[] | null | undefin
     return value.map((item) => String(item)).filter((item) => item.trim().length > 0);
 };
 
+const normalizeAssistantReminderDrafts = (value: unknown): AssistantReminderDraft[] => (
+    Array.isArray(value)
+        ? value.flatMap((item) => {
+            if (!item || typeof item !== 'object') {
+                return [];
+            }
+
+            const reminder = item as Record<string, unknown>;
+            const dueAt = typeof reminder.dueAt === 'string'
+                ? reminder.dueAt.trim()
+                : typeof reminder.triggerAt === 'string'
+                    ? reminder.triggerAt.trim()
+                    : '';
+            const text = typeof reminder.text === 'string' ? reminder.text.trim() : '';
+            if (!dueAt || !text) {
+                return [];
+            }
+
+            return [{
+                ...(typeof reminder.type === 'string' && reminder.type.trim() ? { type: reminder.type.trim() as any } : {}),
+                dueAt,
+                text,
+                ...(typeof reminder.todoId === 'string' && reminder.todoId.trim() ? { todoId: reminder.todoId.trim() } : {})
+            }];
+        })
+        : []
+);
+
+const normalizeAssistantToolCalls = (value: unknown): AssistantToolCall[] => {
+    if (!Array.isArray(value)) {
+        return [];
+    }
+
+    return value.flatMap((item) => {
+        if (!item || typeof item !== 'object') {
+            return [];
+        }
+
+        const toolCall = item as Record<string, any>;
+        const toolName = String(toolCall.toolName || '').trim();
+        const args = toolCall.args || {};
+
+        if (toolName === 'create_log') {
+            const normalized = {
+                toolName: 'create_log' as const,
+                args: {
+                    date: normalizeOptionalDateString(args.date) || '',
+                    startTime: typeof args.startTime === 'string' ? args.startTime.trim() : '',
+                    endTime: typeof args.endTime === 'string' ? args.endTime.trim() : '',
+                    description: typeof args.description === 'string' ? args.description.trim() : '',
+                    categoryId: typeof args.categoryId === 'string' ? args.categoryId.trim() : '',
+                    activityId: typeof args.activityId === 'string' ? args.activityId.trim() : '',
+                    ...(Array.isArray(args.scopeIds) ? { scopeIds: args.scopeIds.map((scopeId: unknown) => String(scopeId).trim()).filter(Boolean) } : {}),
+                    ...(typeof args.linkedTodoId === 'string' && args.linkedTodoId.trim() ? { linkedTodoId: args.linkedTodoId.trim() } : {}),
+                    ...(typeof args.progressIncrement === 'number' && Number.isFinite(args.progressIncrement)
+                        ? { progressIncrement: Math.max(1, Math.round(args.progressIncrement)) }
+                        : {})
+                }
+            };
+
+            return (
+                normalized.args.date
+                && normalized.args.startTime
+                && normalized.args.endTime
+                && normalized.args.categoryId
+                && normalized.args.activityId
+            )
+                ? [normalized]
+                : [];
+        }
+
+        if (toolName === 'create_todo') {
+            const normalized = {
+                toolName: 'create_todo' as const,
+                args: {
+                    title: typeof args.title === 'string' ? args.title.trim() : '',
+                    categoryId: typeof args.categoryId === 'string' ? args.categoryId.trim() : '',
+                    ...(normalizeNullableString(args.linkedCategoryId) ? { linkedCategoryId: normalizeNullableString(args.linkedCategoryId)! } : {}),
+                    ...(normalizeNullableString(args.linkedActivityId) ? { linkedActivityId: normalizeNullableString(args.linkedActivityId)! } : {}),
+                    ...(Array.isArray(args.defaultScopeIds) ? { defaultScopeIds: args.defaultScopeIds.map((scopeId: unknown) => String(scopeId).trim()).filter(Boolean) } : {}),
+                    ...(typeof args.note === 'string' && args.note.trim() ? { note: args.note.trim() } : {}),
+                    ...(normalizeOptionalDateString(args.scheduledDate) ? { scheduledDate: normalizeOptionalDateString(args.scheduledDate)! } : {}),
+                    ...(normalizeOptionalDateString(args.deadlineDate) ? { deadlineDate: normalizeOptionalDateString(args.deadlineDate)! } : {})
+                }
+            };
+            return normalized.args.title && normalized.args.categoryId ? [normalized] : [];
+        }
+
+        if (toolName === 'update_todo') {
+            const patch = args.patch || {};
+            const normalizedPatch = {
+                ...(typeof patch.title === 'string' ? { title: patch.title.trim() } : {}),
+                ...(normalizeNullableString(patch.note) !== undefined ? { note: normalizeNullableString(patch.note) } : {}),
+                ...(typeof patch.categoryId === 'string' && patch.categoryId.trim() ? { categoryId: patch.categoryId.trim() } : {}),
+                ...(normalizeNullableString(patch.linkedCategoryId) !== undefined ? { linkedCategoryId: normalizeNullableString(patch.linkedCategoryId) } : {}),
+                ...(normalizeNullableString(patch.linkedActivityId) !== undefined ? { linkedActivityId: normalizeNullableString(patch.linkedActivityId) } : {}),
+                ...(normalizeNullableStringArray(patch.defaultScopeIds) !== undefined ? { defaultScopeIds: normalizeNullableStringArray(patch.defaultScopeIds) } : {}),
+                ...(normalizeNullableString(patch.scheduledDate) !== undefined ? { scheduledDate: normalizeNullableString(patch.scheduledDate) } : {}),
+                ...(normalizeNullableString(patch.deadlineDate) !== undefined ? { deadlineDate: normalizeNullableString(patch.deadlineDate) } : {}),
+                ...(typeof patch.pin === 'boolean' ? { pin: patch.pin } : {}),
+                ...(typeof patch.isCompleted === 'boolean' ? { isCompleted: patch.isCompleted } : {})
+            };
+            return typeof args.todoId === 'string' && args.todoId.trim() && Object.keys(normalizedPatch).length > 0
+                ? [{
+                    toolName: 'update_todo' as const,
+                    args: {
+                        todoId: args.todoId.trim(),
+                        patch: normalizedPatch
+                    }
+                }]
+                : [];
+        }
+
+        if (toolName === 'create_subtask') {
+            const normalized = {
+                toolName: 'create_subtask' as const,
+                args: {
+                    parentTodoId: typeof args.parentTodoId === 'string' ? args.parentTodoId.trim() : '',
+                    title: typeof args.title === 'string' ? args.title.trim() : '',
+                    ...(typeof args.note === 'string' && args.note.trim() ? { note: args.note.trim() } : {}),
+                    ...(normalizeOptionalDateString(args.scheduledDate) ? { scheduledDate: normalizeOptionalDateString(args.scheduledDate)! } : {}),
+                    ...(normalizeOptionalDateString(args.deadlineDate) ? { deadlineDate: normalizeOptionalDateString(args.deadlineDate)! } : {})
+                }
+            };
+            return normalized.args.parentTodoId && normalized.args.title ? [normalized] : [];
+        }
+
+        if (toolName === 'edit_log') {
+            const patch = args.patch || {};
+            const normalizedPatch = {
+                ...(normalizeNullableString(patch.date) !== undefined ? { date: normalizeNullableString(patch.date) } : {}),
+                ...(normalizeNullableString(patch.startTime) !== undefined ? { startTime: normalizeNullableString(patch.startTime) } : {}),
+                ...(normalizeNullableString(patch.endTime) !== undefined ? { endTime: normalizeNullableString(patch.endTime) } : {}),
+                ...(normalizeNullableString(patch.categoryId) !== undefined ? { categoryId: normalizeNullableString(patch.categoryId) } : {}),
+                ...(normalizeNullableString(patch.activityId) !== undefined ? { activityId: normalizeNullableString(patch.activityId) } : {}),
+                ...(normalizeNullableString(patch.note) !== undefined ? { note: normalizeNullableString(patch.note) } : {}),
+                ...(normalizeNullableString(patch.linkedTodoId) !== undefined ? { linkedTodoId: normalizeNullableString(patch.linkedTodoId) } : {}),
+                ...(normalizeNullableStringArray(patch.scopeIds) !== undefined ? { scopeIds: normalizeNullableStringArray(patch.scopeIds) } : {})
+            };
+            return typeof args.logId === 'string' && args.logId.trim() && Object.keys(normalizedPatch).length > 0
+                ? [{
+                    toolName: 'edit_log' as const,
+                    args: {
+                        logId: args.logId.trim(),
+                        patch: normalizedPatch
+                    }
+                }]
+                : [];
+        }
+
+        return [];
+    });
+};
+
 const cleanAndParseJSONObjectContent = (content: string): any => {
     if (content.includes('```json')) {
         content = content.replace(/```json\n?|\n?```/g, '');
@@ -497,7 +684,7 @@ const requestJsonObjectWithDebug = async <T>(
         };
         const body = {
             model: config.modelName,
-            messages: buildOpenAIMessageList(params.systemPrompt, params.userPrompt, params.conversationHistory),
+            messages: buildOpenAIJsonMessageList(params.systemPrompt, params.userPrompt, params.conversationHistory),
             response_format: { type: 'json_object' }
         };
         const requestedAt = new Date().toISOString();
@@ -1106,14 +1293,15 @@ ${text}
         throw new Error('AI provider not supported');
     },
 
-    requestAssistantSystemDecisionWithDebug: async (
+    requestAssistantUnifiedTurnWithDebug: async (
         params: {
+            mode: AssistantTurnMode;
             systemPrompt: string;
             userPrompt: string;
             conversationHistory?: AIConversationTurn[];
         },
         options: AIRequestOptions = {}
-    ): Promise<AIAssistantSystemTurnResult> => {
+    ): Promise<AIAssistantUnifiedTurnResult> => {
         const config = aiService.getConfig();
         const fetchFn = Capacitor.isNativePlatform() ? nativeFetch : fetch;
 
@@ -1121,52 +1309,59 @@ ${text}
             throw new Error('Please configure AI settings first.');
         }
 
-        const normalizeDecision = (rawDecision: any): AssistantSystemTurnDecision => {
-            const action = rawDecision?.action === 'send_message'
-                || rawDecision?.action === 'create_reminder'
-                || rawDecision?.action === 'update_memory'
-                ? rawDecision.action
-                : 'silent';
+        const normalizeOutput = (rawOutput: any): AssistantUnifiedTurnOutput => {
+            const mode = params.mode;
+            const rawOutcome = typeof rawOutput?.outcome === 'string' ? rawOutput.outcome.trim() : '';
+            const outcome = rawOutcome === 'clarify'
+                ? (mode === 'foreground' ? 'clarify' : 'silent')
+                : rawOutcome === 'silent'
+                    ? (mode === 'background' ? 'silent' : 'reply')
+                    : 'reply';
 
-            return {
-                action,
-                ...(typeof rawDecision?.message === 'string' && rawDecision.message.trim()
-                    ? { message: rawDecision.message.trim() }
-                    : {}),
-                ...(rawDecision?.reminder && typeof rawDecision.reminder === 'object'
-                    ? {
-                        reminder: {
-                            ...(typeof rawDecision.reminder.type === 'string' && rawDecision.reminder.type.trim()
-                                ? { type: rawDecision.reminder.type.trim() }
-                                : {}),
-                            dueAt: typeof rawDecision.reminder.dueAt === 'string'
-                                ? rawDecision.reminder.dueAt.trim()
-                                : '',
-                            text: typeof rawDecision.reminder.text === 'string'
-                                ? rawDecision.reminder.text.trim()
-                                : '',
-                            ...(typeof rawDecision.reminder.todoId === 'string' && rawDecision.reminder.todoId.trim()
-                                ? { todoId: rawDecision.reminder.todoId.trim() }
-                                : {})
-                        }
-                    }
-                    : {}),
-                ...(rawDecision?.memoryPatch && typeof rawDecision.memoryPatch === 'object'
-                    ? { memoryPatch: rawDecision.memoryPatch }
-                    : {})
+            const normalized: AssistantUnifiedTurnOutput = {
+                mode,
+                outcome,
+                memoryAction: (
+                    rawOutput?.memoryAction === 'update_memory'
+                    || (rawOutput?.memoryPatch && typeof rawOutput.memoryPatch === 'object')
+                )
+                    ? 'update_memory'
+                    : 'no_update'
             };
+
+            if (typeof rawOutput?.assistantReply === 'string' && rawOutput.assistantReply.trim()) {
+                normalized.assistantReply = rawOutput.assistantReply.trim();
+            }
+
+            const reminders = normalizeAssistantReminderDrafts(rawOutput?.reminders);
+            if (reminders.length > 0) {
+                normalized.reminders = reminders;
+            }
+
+            if (rawOutput?.memoryPatch && typeof rawOutput.memoryPatch === 'object') {
+                normalized.memoryPatch = rawOutput.memoryPatch;
+            }
+
+            if (mode === 'foreground') {
+                const toolCalls = normalizeAssistantToolCalls(rawOutput?.toolCalls);
+                if (toolCalls.length > 0) {
+                    normalized.toolCalls = toolCalls;
+                }
+            }
+
+            return normalized;
         };
 
         const { result, debug } = await requestJsonObjectWithDebug(config, fetchFn, {
             systemPrompt: params.systemPrompt,
             userPrompt: params.userPrompt,
             conversationHistory: params.conversationHistory,
-            normalizeResult: normalizeDecision,
+            normalizeResult: normalizeOutput,
             options
         });
 
         return {
-            decision: result,
+            output: result,
             debug
         };
     },
@@ -1231,10 +1426,7 @@ ${text}
             };
             const body = {
                 model: config.modelName,
-                messages: [
-                    { role: 'system', content: systemPrompt.trim() },
-                    { role: 'user', content: userPrompt.trim() }
-                ],
+                messages: buildOpenAIJsonMessageList(systemPrompt, userPrompt),
                 response_format: { type: 'json_object' }
             };
             const requestedAt = new Date().toISOString();
@@ -1769,7 +1961,7 @@ ${text}
             };
             const body = {
                 model: config.modelName,
-                messages: buildOpenAIMessageList(systemPrompt, userPrompt, context.conversationHistory),
+                messages: buildOpenAIJsonMessageList(systemPrompt, userPrompt, context.conversationHistory),
                 response_format: { type: 'json_object' }
             };
             const requestedAt = new Date().toISOString();
@@ -2081,7 +2273,7 @@ ${text}
             };
             const body = {
                 model: config.modelName,
-                messages: buildOpenAIMessageList(systemPrompt, userPrompt, context.conversationHistory),
+                messages: buildOpenAIJsonMessageList(systemPrompt, userPrompt, context.conversationHistory),
                 response_format: { type: 'json_object' }
             };
             const requestedAt = new Date().toISOString();
@@ -2848,3 +3040,4 @@ ${text}
         return cleanAndParseJSONObjectContent(content);
     }
 };
+

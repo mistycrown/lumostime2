@@ -12,13 +12,13 @@ Components that form the structural or global UI elements.
 ## Modals
 Overlay components for complex interactions.
 
+- `AIBackfillChatModal.tsx`: Reminder due-times are now normalized onto a single canonical timeline, foreground turns receive explicit local/UTC current-time anchors for reminder math, background assistant replies can persist per-message debug payloads, and the check-in interval inputs now keep editable draft text with inline validation so invalid intermediate states never auto-save.
 - `AddLogModal.tsx`: Main modal for logging time, including segmented start/end time inputs that auto-advance from hour to minute after two digits.
 - `TodoDatePickerModal.tsx`: Lightweight planning picker shared by todo scheduling and Memoir, supporting both full date selection and a centered month-only modal with the duplicate footer close action removed.
 - `TodoDetailModal.tsx`: Detailed view and editing for Todos, including planning fields for assigned date, deadline date, and lightweight recurrence rules.
 - `TodoDuplicateModal.tsx`: Lightweight pre-copy modal for renaming duplicated todos and clearing dates, tags, or scopes before creation.
 - `TodoQuickActionsModal.tsx`: Shared quick-actions bottom sheet for lightweight todo scheduling, completion, and detail-entry flows reused by list-row taps and week-plan badges.
 - `GoalEditor.tsx`: Goal creation and editing.
-- `AIBackfillChatModal.tsx`: Unified AI full-screen chat workspace with a theme-synced editorial shell driven by the current `--accent-color`, persistent session history, persona studio access from the title avatar, configurable AI/user avatars, reordered persona/avatar/context settings, per-session quick-context control, direct local handling for chat, AI backfill, AI todo creation, AI todo updates, AI subtask creation, and AI log editing plus edit/undo and debug inspection, and the first background-assistant controls for Android polling, long-term memory, disabled-for-now reminder preview, read-only memory inspection, and native assistant-trigger wiring.
 - `AddActivityModal.tsx`: Creating new activities.
 - `ConfirmModal.tsx`: specialized confirmation dialogs.
 - `NarrativeStyleSelectionModal.tsx`: AI narrative style picker.
