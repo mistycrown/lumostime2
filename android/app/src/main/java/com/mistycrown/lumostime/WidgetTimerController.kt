@@ -33,6 +33,60 @@ object WidgetTimerController {
         }
     }
 
+    fun handleTodoPinItemTap(
+        context: Context,
+        appWidgetId: Int,
+        todoId: String
+    ): Boolean {
+        if (todoId.isBlank()) {
+            return false
+        }
+
+        val payload = WidgetStores.loadTodoPinPayload(context) ?: return false
+        val item = payload.items.firstOrNull { it.todoId == todoId } ?: return false
+        if (!item.isActionable()) {
+            return false
+        }
+
+        val now = System.currentTimeMillis()
+        val currentRuntime = WidgetStores.loadRuntimeState(context)
+        val isSameTodoActive = currentRuntime?.linkedTodoId == todoId
+
+        if (isSameTodoActive && currentRuntime != null) {
+            finishRuntime(context, currentRuntime, now)
+            WidgetStores.saveRuntimeState(context, null)
+            WidgetStores.saveLastWidgetStopAt(context, now)
+            FloatingWindowService.syncFocusStateIfRunning(currentRuntime.icon, false, 0L)
+            return true
+        }
+
+        if (currentRuntime != null) {
+            finishRuntime(context, currentRuntime, now)
+        }
+
+        val nextRuntime = WidgetRuntimeState(
+            id = UUID.randomUUID().toString(),
+            widgetType = WidgetTypes.TIMER,
+            activityId = item.activityId.orEmpty(),
+            categoryId = item.categoryId.orEmpty(),
+            icon = item.icon?.ifBlank { null } ?: "\u2022",
+            label = item.activityLabel?.ifBlank { null } ?: "",
+            color = item.color?.ifBlank { null } ?: "#E7E5E4",
+            startedAt = now,
+            source = "widget",
+            linkedTodoId = item.todoId,
+            scopeIds = item.scopeIds,
+            slotIndex = null,
+            templateId = null,
+            appWidgetId = appWidgetId
+        )
+
+        WidgetStores.saveRuntimeState(context, nextRuntime)
+        WidgetStores.saveLastWidgetStopAt(context, null)
+        FloatingWindowService.syncFocusStateIfRunning(nextRuntime.icon, true, nextRuntime.startedAt)
+        return true
+    }
+
     private fun handleTimerSlotTap(
         context: Context,
         appWidgetId: Int,

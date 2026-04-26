@@ -228,6 +228,28 @@ data class WidgetDailyRuntimePayload(
     val syncedAt: Long
 )
 
+data class WidgetTodoPinItem(
+    val todoId: String,
+    val title: String,
+    val badgeLabel: String,
+    val categoryId: String? = null,
+    val activityId: String? = null,
+    val activityLabel: String? = null,
+    val icon: String? = null,
+    val color: String? = null,
+    val scopeIds: List<String> = emptyList()
+) {
+    fun isActionable(): Boolean {
+        return !activityId.isNullOrBlank() && !categoryId.isNullOrBlank()
+    }
+}
+
+data class WidgetTodoPinPayload(
+    val date: String,
+    val items: List<WidgetTodoPinItem> = emptyList(),
+    val syncedAt: Long
+)
+
 data class WidgetPendingDailyAction(
     val id: String,
     val widgetType: String = WidgetTypes.DAILY,

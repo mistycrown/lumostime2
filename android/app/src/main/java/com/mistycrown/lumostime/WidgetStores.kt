@@ -18,6 +18,7 @@ object WidgetStores {
     private const val KEY_PENDING_DAILY_ACTIONS = "pending_daily_actions_v1"
     private const val KEY_DAILY_SYNC = "daily_sync_v1"
     private const val KEY_DAILY_RUNTIME_SYNC = "daily_runtime_sync_v1"
+    private const val KEY_TODO_PIN_SYNC = "todo_pin_sync_v1"
     private const val KEY_DAILY_RUNTIME_VIEW_MODES = "daily_runtime_view_modes_v1"
     private const val KEY_TAP_ANIMATION = "tap_animation_v1"
     private const val KEY_LAST_WIDGET_STOP_AT = "last_widget_stop_at_v1"
@@ -515,6 +516,37 @@ object WidgetStores {
             put("syncedAt", payload.syncedAt)
         }
         editor.putString(KEY_DAILY_RUNTIME_SYNC, json.toString()).commit()
+    }
+
+    fun loadTodoPinPayload(context: Context): WidgetTodoPinPayload? {
+        val raw = prefs(context).getString(KEY_TODO_PIN_SYNC, null)
+        if (raw.isNullOrBlank()) {
+            return null
+        }
+
+        return runCatching {
+            val json = JSONObject(raw)
+            WidgetTodoPinPayload(
+                date = json.optString("date"),
+                items = json.optJSONArray("items").toTodoPinItemList(),
+                syncedAt = json.optLong("syncedAt", System.currentTimeMillis())
+            )
+        }.getOrNull()
+    }
+
+    fun saveTodoPinPayload(context: Context, payload: WidgetTodoPinPayload?) {
+        val editor = prefs(context).edit()
+        if (payload == null) {
+            editor.remove(KEY_TODO_PIN_SYNC).commit()
+            return
+        }
+
+        val json = JSONObject().apply {
+            put("date", payload.date)
+            put("items", payload.items.toTodoPinItemJsonArray())
+            put("syncedAt", payload.syncedAt)
+        }
+        editor.putString(KEY_TODO_PIN_SYNC, json.toString()).commit()
     }
 
     fun loadDailyRuntimeViewMode(context: Context, appWidgetId: Int): String {
@@ -1022,6 +1054,51 @@ object WidgetStores {
             put("segments", segments.toDailyRuntimeSegmentJsonArray())
             put("legend", legend.toDailyRuntimeLegendJsonArray())
         }
+    }
+
+    private fun JSONArray?.toTodoPinItemList(): List<WidgetTodoPinItem> {
+        if (this == null) {
+            return emptyList()
+        }
+
+        return buildList {
+            for (index in 0 until length()) {
+                val item = optJSONObject(index) ?: continue
+                val todoId = parseNullableString(item.optString("todoId")) ?: continue
+                val title = parseNullableString(item.optString("title")) ?: continue
+                add(
+                    WidgetTodoPinItem(
+                        todoId = todoId,
+                        title = title,
+                        badgeLabel = parseNullableString(item.optString("badgeLabel")) ?: "TODAY",
+                        categoryId = parseNullableString(item.optString("categoryId")),
+                        activityId = parseNullableString(item.optString("activityId")),
+                        activityLabel = parseNullableString(item.optString("activityLabel")),
+                        icon = parseNullableString(item.optString("icon")),
+                        color = parseNullableString(item.optString("color")),
+                        scopeIds = item.optJSONArray("scopeIds").toStringList()
+                    )
+                )
+            }
+        }
+    }
+
+    private fun List<WidgetTodoPinItem>.toTodoPinItemJsonArray(): JSONArray {
+        val array = JSONArray()
+        forEach { item ->
+            array.put(JSONObject().apply {
+                put("todoId", item.todoId)
+                put("title", item.title)
+                put("badgeLabel", item.badgeLabel)
+                put("categoryId", item.categoryId ?: JSONObject.NULL)
+                put("activityId", item.activityId ?: JSONObject.NULL)
+                put("activityLabel", item.activityLabel ?: JSONObject.NULL)
+                put("icon", item.icon ?: JSONObject.NULL)
+                put("color", item.color ?: JSONObject.NULL)
+                put("scopeIds", item.scopeIds.toJsonArray())
+            })
+        }
+        return array
     }
 
     private fun migrateLegacyConfigIfNeeded(context: Context) {

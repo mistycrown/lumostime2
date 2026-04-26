@@ -5,6 +5,7 @@
  * @pos Root Component, Application Entry Point (Logic Hub)
  * @description The main component that holds the global state (logs, todos, active sessions) and handles routing between views and overlays, including preserving standalone return paths for search and custom filters while keeping export/import, NFC stop confirmation, and reset flows aligned with repository-backed data.
  * @updated 2026-04-22: Mounted the shared AI chat window at the app level so it can keep running in the background after the modal UI is closed.
+ * @updated 2026-04-25: Added AI assistant widget shortcut handling so Android widget shortcut slots can open the shared AI chat window.
  *
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
@@ -24,6 +25,7 @@ import { CategoryScopeProvider, useCategoryScope } from './contexts/CategoryScop
 import { AchievementProvider, useAchievement } from './contexts/AchievementContext';
 import { PrivacyProvider } from './contexts/PrivacyContext';
 import { AIChatWindowProvider } from './contexts/AIChatWindowContext';
+import { useAIChatWindow } from './contexts/AIChatWindowContext';
 
 import { MainLayout } from './components/MainLayout';
 import { AppRoutes } from './components/AppRoutes';
@@ -119,6 +121,7 @@ const AppContent: React.FC = () => {
   } = useSettings();
 
   const { addToast } = useToast();
+  const { openAIChat } = useAIChatWindow();
   const lastStorageErrorToastRef = useRef<{ signature: string; timestamp: number } | null>(null);
 
   useEffect(() => {
@@ -430,10 +433,17 @@ const AppContent: React.FC = () => {
         setIsSearchOpen(false);
         setIsGalleryViewOpen(true);
         break;
+      case 'open_ai_assistant':
+        setCurrentView(AppView.TIMELINE);
+        setIsSearchOpen(false);
+        setIsGalleryViewOpen(false);
+        openAIChat();
+        break;
     }
   }, [
     closeFiltersOverlay,
     logManager,
+    openAIChat,
     reviewManager,
     setCurrentView,
     setIsAutoLinkOpen,

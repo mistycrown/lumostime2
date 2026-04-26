@@ -6,9 +6,10 @@
  * @description Centralizes the shared types and conversions used by the Android widget system while keeping timer, daily, and shortcut slots on one contract.
  * @updated 2026-04-25: Added DAILY_RUNTIME dual-view payload builders so native heatmap widgets can toggle between category and activity coloring.
  * @updated 2026-04-25: Added widget UI icon asset preservation and sanitization helpers so Android widgets can prefer local icon bitmaps with emoji fallback.
+ * @updated 2026-04-26: Added TODAY + PIN widget payload builders for the dedicated scrollable 4x2 todo widget.
  */
 import { Capacitor } from '@capacitor/core';
-import { ActiveSession, Category, CheckTemplate, DailyReview, Log } from '../types';
+import { ActiveSession, Category, CheckTemplate, DailyReview, Log, TodoItem } from '../types';
 import type {
   WidgetBridgeDailyRuntimeLegendItem,
   WidgetBridgeDailyRuntimePayload,
@@ -23,6 +24,8 @@ import type {
   WidgetBridgeRuntimeState,
   WidgetBridgeSlot,
   WidgetBridgeTemplate,
+  WidgetBridgeTodoPinItem,
+  WidgetBridgeTodoPinPayload,
   WidgetType
 } from '../plugins/WidgetBridgePlugin';
 import {
@@ -40,6 +43,7 @@ import {
   getEligibleNfcDailyCheckItems
 } from '../utils/dailyCheckUtils';
 import { getLocalDateStr } from '../utils/dateUtils';
+import { getTodoAssociationTodayTodos } from '../utils/todoScheduleUtils';
 
 const LEGACY_WIDGET_TIMER_STORAGE_KEY = 'lumostime_widget_timer_slots_v1';
 const WIDGET_TEMPLATE_STORAGE_KEY = 'lumostime_widget_templates_v1';
@@ -921,6 +925,57 @@ export const buildDailyRuntimeWidgetPayload = ({
     ),
     categoryView,
     activityView,
+    syncedAt: now
+  };
+};
+
+const TODO_PIN_BADGE_PIN: WidgetBridgeTodoPinItem['badgeLabel'] = 'PIN';
+const TODO_PIN_BADGE_TODAY: WidgetBridgeTodoPinItem['badgeLabel'] = 'TODAY';
+
+export const buildTodoPinWidgetPayload = ({
+  todos,
+  categories,
+  date = new Date(),
+  now = Date.now()
+}: {
+  todos: TodoItem[];
+  categories: Category[];
+  date?: Date;
+  now?: number;
+}): WidgetBridgeTodoPinPayload => {
+  const visibleTodos = getTodoAssociationTodayTodos(todos, date);
+
+  return {
+    date: getLocalDateStr(date),
+    items: visibleTodos.map((todo) => {
+      const linkedCategory = todo.linkedCategoryId
+        ? categories.find((category) => category.id === todo.linkedCategoryId)
+        : undefined;
+      const linkedActivity = todo.linkedActivityId
+        ? linkedCategory?.activities.find((activity) => activity.id === todo.linkedActivityId)
+          || categories.flatMap((category) => category.activities).find((activity) => activity.id === todo.linkedActivityId)
+        : undefined;
+      const resolvedCategoryId = linkedCategory?.id
+        || (linkedActivity
+          ? categories.find((category) => category.activities.some((activity) => activity.id === linkedActivity.id))?.id
+          : null)
+        || null;
+      const resolvedCategory = resolvedCategoryId
+        ? categories.find((category) => category.id === resolvedCategoryId)
+        : linkedCategory;
+
+      return {
+        todoId: todo.id,
+        title: todo.title,
+        badgeLabel: todo.pin ? TODO_PIN_BADGE_PIN : TODO_PIN_BADGE_TODAY,
+        categoryId: resolvedCategoryId,
+        activityId: linkedActivity?.id || null,
+        activityLabel: linkedActivity?.name || null,
+        icon: linkedActivity?.icon || resolvedCategory?.icon || null,
+        color: getColorHexForCharts(linkedActivity?.color || resolvedCategory?.themeColor || '') || null,
+        scopeIds: todo.defaultScopeIds ?? null
+      };
+    }),
     syncedAt: now
   };
 };

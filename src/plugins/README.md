@@ -13,3 +13,4 @@ LumosTime uses Capacitor to bridge the web application with native Android APIs.
 
 *   **AppUsagePlugin**: Monitors app usage stats and manages accessibility permissions for auto-tracking.
 *   **FocusNotificationPlugin**: Controls the persistent status bar notification and the floating window overlay (Xiaomi Super Island style), including Android notification-permission checks and settings handoff.
+*   **AssistantAgentPlugin**: Starts and stops the Android-first background AI agent foreground service, updates lightweight polling config, and emits native assistant system-trigger events back to the web layer.

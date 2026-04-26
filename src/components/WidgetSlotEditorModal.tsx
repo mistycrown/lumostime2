@@ -6,12 +6,14 @@
  * @description Unifies timer, daily, and shortcut widget slot editing into a single modal so each slot can choose its own behavior type.
  * @updated 2026-04-18: Added slot-type-first editing flow for mixed widget templates.
  * @updated 2026-04-25: Added supporter-gated widget UI icon mode while keeping emoji-only editing as the fallback path.
+ * @updated 2026-04-25: Added quick-apply UI icon defaults so widget slots can inherit tag and shortcut UI icons with one tap.
  */
 import React, { useEffect, useMemo, useState } from 'react';
 import { X } from 'lucide-react';
 import { COLOR_OPTIONS } from '../constants';
 import { useCustomColors } from '../hooks/useCustomColors';
 import { normalizeCustomColorHex } from '../services/customColorGroupService';
+import { uiIconService } from '../services/uiIconService';
 import {
   DEFAULT_DAILY_WIDGET_COLOR
 } from '../services/widgetService';
@@ -83,6 +85,20 @@ const ICON_MODE_OPTIONS: Array<{ value: WidgetSlotIconMode; label: string }> = [
 const normalizeCustomIcon = (value: string): string | null => {
   const trimmed = value.trim();
   return trimmed ? trimmed.slice(0, EMOJI_INPUT_MAX_LENGTH) : null;
+};
+
+const resolveUiIconFromEmoji = (value?: string | null): string | null => {
+  const normalized = value?.trim();
+  if (!normalized) {
+    return null;
+  }
+
+  if (normalized.startsWith('ui:')) {
+    return normalized;
+  }
+
+  const mapped = uiIconService.convertEmojiToUIIcon(normalized);
+  return mapped.startsWith('ui:') ? mapped : null;
 };
 
 const applyIconSupportRules = (
@@ -224,15 +240,6 @@ export const WidgetSlotEditorModal: React.FC<WidgetSlotEditorModalProps> = ({
     }));
   };
 
-  const setIconMode = (nextMode: WidgetSlotIconMode) => {
-    updateDraft((previousDraft) => ({
-      ...previousDraft,
-      iconMode: nextMode,
-      customIcon: nextMode === 'emoji' ? previousDraft.customIcon : null,
-      uiIcon: nextMode === 'uiIcon' ? previousDraft.uiIcon : null
-    }));
-  };
-
   const defaultEmojiIcon = (() => {
     if (localDraft.slotType === 'timer') {
       return selectedActivity?.icon || selectedCategory?.icon || '\u2022';
@@ -245,6 +252,43 @@ export const WidgetSlotEditorModal: React.FC<WidgetSlotEditorModalProps> = ({
     }
     return '\u2022';
   })();
+
+  const defaultUiIcon = (() => {
+    if (localDraft.slotType === 'timer') {
+      return selectedActivity?.uiIcon
+        || selectedCategory?.uiIcon
+        || resolveUiIconFromEmoji(selectedActivity?.icon || selectedCategory?.icon || null);
+    }
+    if (localDraft.slotType === 'daily') {
+      return selectedDailyItem?.uiIcon || resolveUiIconFromEmoji(selectedDailyItem?.icon || null);
+    }
+    if (localDraft.slotType === 'shortcut') {
+      return resolveUiIconFromEmoji(getShortcutWidgetActionEmoji(localDraft.shortcutAction));
+    }
+    return null;
+  })();
+
+  const defaultUiIconApplyLabel = (() => {
+    if (localDraft.slotType === 'timer') {
+      return '跟随标签 UI Icon';
+    }
+    if (localDraft.slotType === 'daily') {
+      return '跟随日课 UI Icon';
+    }
+    if (localDraft.slotType === 'shortcut') {
+      return '使用动作默认 UI Icon';
+    }
+    return '快速应用默认 UI Icon';
+  })();
+
+  const setIconMode = (nextMode: WidgetSlotIconMode) => {
+    updateDraft((previousDraft) => ({
+      ...previousDraft,
+      iconMode: nextMode,
+      customIcon: nextMode === 'emoji' ? previousDraft.customIcon : null,
+      uiIcon: nextMode === 'uiIcon' ? (previousDraft.uiIcon || defaultUiIcon) : null
+    }));
+  };
 
   const effectiveIcon =
     canUseUiIcon && localDraft.iconMode === 'uiIcon' && localDraft.uiIcon
@@ -406,9 +450,27 @@ export const WidgetSlotEditorModal: React.FC<WidgetSlotEditorModalProps> = ({
 
   const renderUiIconSection = (description: string) => (
     <div>
-      <div className="mb-3 px-1">
-        <h3 className="text-sm font-bold text-stone-800">UI icon</h3>
-        <p className="mt-1 text-xs text-stone-400">{description}</p>
+      <div className="mb-3 flex items-start justify-between gap-3 px-1">
+        <div>
+          <h3 className="text-sm font-bold text-stone-800">UI icon</h3>
+          <p className="mt-1 text-xs text-stone-400">{description}</p>
+        </div>
+        {defaultUiIcon && (
+          <button
+            type="button"
+            onClick={() => {
+              updateDraft((previousDraft) => ({
+                ...previousDraft,
+                iconMode: 'uiIcon',
+                uiIcon: defaultUiIcon,
+                customIcon: null
+              }));
+            }}
+            className="shrink-0 rounded-full border border-stone-200 bg-white px-3 py-1.5 text-[11px] font-medium text-stone-500 transition-colors hover:border-stone-300 hover:text-stone-800"
+          >
+            {defaultUiIconApplyLabel}
+          </button>
+        )}
       </div>
       <UIIconSelector
         currentIcon={defaultEmojiIcon}

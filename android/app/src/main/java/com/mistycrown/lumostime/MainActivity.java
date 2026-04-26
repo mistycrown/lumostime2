@@ -36,6 +36,7 @@ public class MainActivity extends BridgeActivity {
     public void onCreate(Bundle savedInstanceState) {
         registerPlugin(LumosNfcPlugin.class);
         registerPlugin(FocusNotificationPlugin.class);
+        registerPlugin(AssistantAgentPlugin.class);
         registerPlugin(AppUsagePlugin.class);
         registerPlugin(IconPlugin.class);
         registerPlugin(AppLauncherPlugin.class);

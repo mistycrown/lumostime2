@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="utf-8"?>
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item>
+        <shape android:shape="rectangle">
+            <size
+                android:width="440dp"
+                android:height="220dp" />
+            <solid android:color="#FFFFFF" />
+            <corners android:radius="16dp" />
+        </shape>
+    </item>
+    <item android:top="46dp" android:left="56dp" android:right="364dp" android:bottom="154dp" android:drawable="@drawable/widget_preview_heat_low" />
+    <item android:top="46dp" android:left="84dp" android:right="336dp" android:bottom="154dp" android:drawable="@drawable/widget_preview_heat_mid" />
+    <item android:top="46dp" android:left="112dp" android:right="308dp" android:bottom="154dp" android:drawable="@drawable/widget_preview_heat_empty" />
+    <item android:top="46dp" android:left="140dp" android:right="280dp" android:bottom="154dp" android:drawable="@drawable/widget_preview_heat_high" />
+    <item android:top="46dp" android:left="168dp" android:right="252dp" android:bottom="154dp" android:drawable="@drawable/widget_preview_heat_mid" />
+    <item android:top="46dp" android:left="196dp" android:right="224dp" android:bottom="154dp" android:drawable="@drawable/widget_preview_heat_low" />
+    <item android:top="46dp" android:left="224dp" android:right="196dp" android:bottom="154dp" android:drawable="@drawable/widget_preview_heat_empty" />
+    <item android:top="46dp" android:left="252dp" android:right="168dp" android:bottom="154dp" android:drawable="@drawable/widget_preview_heat_high" />
+    <item android:top="46dp" android:left="280dp" android:right="140dp" android:bottom="154dp" android:drawable="@drawable/widget_preview_heat_low" />
+    <item android:top="46dp" android:left="308dp" android:right="112dp" android:bottom="154dp" android:drawable="@drawable/widget_preview_heat_mid" />
+    <item android:top="46dp" android:left="336dp" android:right="84dp" android:bottom="154dp" android:drawable="@drawable/widget_preview_heat_empty" />
+    <item android:top="46dp" android:left="364dp" android:right="56dp" android:bottom="154dp" android:drawable="@drawable/widget_preview_heat_high" />
+
+    <item android:top="74dp" android:left="56dp" android:right="364dp" android:bottom="126dp" android:drawable="@drawable/widget_preview_heat_empty" />
+    <item android:top="74dp" android:left="84dp" android:right="336dp" android:bottom="126dp" android:drawable="@drawable/widget_preview_heat_low" />
+    <item android:top="74dp" android:left="112dp" android:right="308dp" android:bottom="126dp" android:drawable="@drawable/widget_preview_heat_mid" />
+    <item android:top="74dp" android:left="140dp" android:right="280dp" android:bottom="126dp" android:drawable="@drawable/widget_preview_heat_high" />
+    <item android:top="74dp" android:left="168dp" android:right="252dp" android:bottom="126dp" android:drawable="@drawable/widget_preview_heat_empty" />
+    <item android:top="74dp" android:left="196dp" android:right="224dp" android:bottom="126dp" android:drawable="@drawable/widget_preview_heat_low" />
+    <item android:top="74dp" android:left="224dp" android:right="196dp" android:bottom="126dp" android:drawable="@drawable/widget_preview_heat_mid" />
+    <item android:top="74dp" android:left="252dp" android:right="168dp" android:bottom="126dp" android:drawable="@drawable/widget_preview_heat_high" />
+    <item android:top="74dp" android:left="280dp" android:right="140dp" android:bottom="126dp" android:drawable="@drawable/widget_preview_heat_empty" />
+    <item android:top="74dp" android:left="308dp" android:right="112dp" android:bottom="126dp" android:drawable="@drawable/widget_preview_heat_low" />
+    <item android:top="74dp" android:left="336dp" android:right="84dp" android:bottom="126dp" android:drawable="@drawable/widget_preview_heat_mid" />
+    <item android:top="74dp" android:left="364dp" android:right="56dp" android:bottom="126dp" android:drawable="@drawable/widget_preview_heat_high" />
+
+    <item android:top="102dp" android:left="56dp" android:right="364dp" android:bottom="98dp" android:drawable="@drawable/widget_preview_heat_mid" />
+    <item android:top="102dp" android:left="84dp" android:right="336dp" android:bottom="98dp" android:drawable="@drawable/widget_preview_heat_high" />
+    <item android:top="102dp" android:left="112dp" android:right="308dp" android:bottom="98dp" android:drawable="@drawable/widget_preview_heat_low" />
+    <item android:top="102dp" android:left="140dp" android:right="280dp" android:bottom="98dp" android:drawable="@drawable/widget_preview_heat_empty" />
+    <item android:top="102dp" android:left="168dp" android:right="252dp" android:bottom="98dp" android:drawable="@drawable/widget_preview_heat_mid" />
+    <item android:top="102dp" android:left="196dp" android:right="224dp" android:bottom="98dp" android:drawable="@drawable/widget_preview_heat_high" />
+    <item android:top="102dp" android:left="224dp" android:right="196dp" android:bottom="98dp" android:drawable="@drawable/widget_preview_heat_low" />
+    <item android:top="102dp" android:left="252dp" android:right="168dp" android:bottom="98dp" android:drawable="@drawable/widget_preview_heat_empty" />
+    <item android:top="102dp" android:left="280dp" android:right="140dp" android:bottom="98dp" android:drawable="@drawable/widget_preview_heat_mid" />
+    <item android:top="102dp" android:left="308dp" android:right="112dp" android:bottom="98dp" android:drawable="@drawable/widget_preview_heat_high" />
+    <item android:top="102dp" android:left="336dp" android:right="84dp" android:bottom="98dp" android:drawable="@drawable/widget_preview_heat_empty" />
+    <item android:top="102dp" android:left="364dp" android:right="56dp" android:bottom="98dp" android:drawable="@drawable/widget_preview_heat_low" />
+
+    <item android:top="130dp" android:left="56dp" android:right="364dp" android:bottom="70dp" android:drawable="@drawable/widget_preview_heat_empty" />
+    <item android:top="130dp" android:left="84dp" android:right="336dp" android:bottom="70dp" android:drawable="@drawable/widget_preview_heat_low" />
+    <item android:top="130dp" android:left="112dp" android:right="308dp" android:bottom="70dp" android:drawable="@drawable/widget_preview_heat_mid" />
+    <item android:top="130dp" android:left="140dp" android:right="280dp" android:bottom="70dp" android:drawable="@drawable/widget_preview_heat_high" />
+    <item android:top="130dp" android:left="168dp" android:right="252dp" android:bottom="70dp" android:drawable="@drawable/widget_preview_heat_empty" />
+    <item android:top="130dp" android:left="196dp" android:right="224dp" android:bottom="70dp" android:drawable="@drawable/widget_preview_heat_low" />
+    <item android:top="130dp" android:left="224dp" android:right="196dp" android:bottom="70dp" android:drawable="@drawable/widget_preview_heat_mid" />
+    <item android:top="130dp" android:left="252dp" android:right="168dp" android:bottom="70dp" android:drawable="@drawable/widget_preview_heat_high" />
+    <item android:top="130dp" android:left="280dp" android:right="140dp" android:bottom="70dp" android:drawable="@drawable/widget_preview_heat_low" />
+    <item android:top="130dp" android:left="308dp" android:right="112dp" android:bottom="70dp" android:drawable="@drawable/widget_preview_heat_empty" />
+    <item android:top="130dp" android:left="336dp" android:right="84dp" android:bottom="70dp" android:drawable="@drawable/widget_preview_heat_mid" />
+    <item android:top="130dp" android:left="364dp" android:right="56dp" android:bottom="70dp" android:drawable="@drawable/widget_preview_heat_high" />
+</layer-list>

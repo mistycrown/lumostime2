@@ -3,7 +3,8 @@
  * @input AI Configuration (OpenAI/Gemini keys), User Natural Language Input, Context Data (categories, scopes, todos)
  * @output Parsed Time Entries (ParsedTimeEntry[]), Parsed Todos (AIParsedTodo[]), Dated AI Backfill Tool Plans, Backfill Chat Replies (string), Generated Narratives (string), Connection Status (boolean)
  * @pos Service (AI Integration Layer)
- * @description AI 服务 - 处理与 AI 提供商（OpenAI/Gemini）的所有交互，包括配置管理、连接测试和提示执行
+ * @description AI 鏈嶅姟 - 澶勭悊涓?AI 鎻愪緵鍟嗭紙OpenAI/Gemini锛夌殑鎵€鏈変氦浜掞紝鍖呮嫭閰嶇疆绠＄悊銆佽繛鎺ユ祴璇曞拰鎻愮ず鎵ц
+ * @updated 2026-04-26: Added a structured assistant system-turn decision endpoint so the new Android-first background agent can reuse the same provider/debug pipeline as the foreground AI chat flows.
  * @updated 2026-04-25: Expanded AI intent routing and tool planning with dedicated edit-log, update-todo, and create-subtask flows that return id-plus-patch payloads for local application.
  * @updated 2026-04-25: Tightened subtask planning so scheduled or deadline dates are only emitted when the user explicitly asked for them.
  * @updated 2026-04-22: Simplified unified-chat intent classification into a message-only lightweight routing step without extra runtime context.
@@ -11,16 +12,17 @@
  * @updated 2026-04-22: Added two-stage AI chat support with lightweight intent classification, debug-aware chat replies, and direct todo tool planning alongside backfill planning.
  * @updated 2026-04-22: AI backfill planning now supports per-call dates, latest-log context, todo hierarchy hints, and local cross-midnight normalization.
  * 
- * 核心功能：
- * - 自然语言解析为时间记录
- * - 待办任务智能提取
- * - AI 叙事生成
- * - 多 AI 提供商支持
- * - 配置文件管理
+ * 鏍稿績鍔熻兘锛?
+ * - 鑷劧璇█瑙ｆ瀽涓烘椂闂磋褰?
+ * - 寰呭姙浠诲姟鏅鸿兘鎻愬彇
+ * - AI 鍙欎簨鐢熸垚
+ * - 澶?AI 鎻愪緵鍟嗘敮鎸?
+ * - 閰嶇疆鏂囦欢绠＄悊
  * 
- * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
+ * 鈿狅笍 Once I am updated, be sure to update my header comment and the folder's md.
  */
 import { TodoCategory, Category, Scope, TodoRecurrenceRule } from '../types';
+import type { AssistantSystemTurnDecision } from '../types/assistant';
 import { normalizeAIBackfillToolCalls } from '../utils/aiBackfillUtils';
 export interface AIConfig {
     provider: 'openai' | 'gemini';
@@ -30,25 +32,25 @@ export interface AIConfig {
 }
 
 export interface ParsedTimeEntry {
-    startTime: string; // ISO (完整日期时间)
-    endTime: string;   // ISO (完整日期时间)
+    startTime: string; // ISO (瀹屾暣鏃ユ湡鏃堕棿)
+    endTime: string;   // ISO (瀹屾暣鏃ユ湡鏃堕棿)
     description: string;
     categoryName: string;
     activityName: string;
-    scopeIds?: string[]; // 可选：用户接受的关联领域ID
+    scopeIds?: string[]; // 鍙€夛細鐢ㄦ埛鎺ュ彈鐨勫叧鑱旈鍩烮D
 }
 
-// AI返回的原始时间条目（只包含时间，不包含日期）
+// AI杩斿洖鐨勫師濮嬫椂闂存潯鐩紙鍙寘鍚椂闂达紝涓嶅寘鍚棩鏈燂級
 interface AIRawTimeEntry {
-    startTime: string; // HH:mm格式
-    endTime: string;   // HH:mm格式
+    startTime: string; // HH:mm鏍煎紡
+    endTime: string;   // HH:mm鏍煎紡
     description: string;
     categoryName: string;
     activityName: string;
     scopeIds?: string[]; // AI inferred scopes
 }
 
-// AI返回的待办任务结构
+// AI杩斿洖鐨勫緟鍔炰换鍔＄粨鏋?
 export interface AIParsedTodo {
     title: string;
     categoryId?: string;
@@ -75,6 +77,11 @@ export interface AIDebugExchange {
 
 export interface AIBackfillChatResult {
     reply: string;
+    debug: AIDebugExchange;
+}
+
+export interface AIAssistantSystemTurnResult {
+    decision: AssistantSystemTurnDecision;
     debug: AIDebugExchange;
 }
 
@@ -528,7 +535,7 @@ const requestJsonObjectWithDebug = async <T>(
             };
 
             if ((responseBody as any)?.error) {
-                const error = new Error((responseBody as any).error.message || 'AI 璇锋眰澶辫触');
+                const error = new Error((responseBody as any).error.message || 'AI 鐠囬攱鐪版径杈Е');
                 (error as Error & { debug?: AIDebugExchange }).debug = debug;
                 throw error;
             }
@@ -611,7 +618,7 @@ const requestJsonObjectWithDebug = async <T>(
             };
 
             if ((responseBody as any)?.error) {
-                const error = new Error((responseBody as any).error.message || 'AI 璇锋眰澶辫触');
+                const error = new Error((responseBody as any).error.message || 'AI 鐠囬攱鐪版径杈Е');
                 (error as Error & { debug?: AIDebugExchange }).debug = debug;
                 throw error;
             }
@@ -726,8 +733,8 @@ export const aiService = {
     parseNaturalLanguage: async (
         text: string,
         context: {
-            now: string; // YYYY-MM-DD格式的当前日期
-            targetDate: string; // YYYY-MM-DD格式的目标日期（用户选择补记的日期）
+            now: string; // YYYY-MM-DD鏍煎紡鐨勫綋鍓嶆棩鏈?
+            targetDate: string; // YYYY-MM-DD鏍煎紡鐨勭洰鏍囨棩鏈燂紙鐢ㄦ埛閫夋嫨琛ヨ鐨勬棩鏈燂級
             categories: any[]; // Pass simplified structure
             scopes?: Scope[]; // Optional scopes for context
         }
@@ -782,12 +789,12 @@ JSON Output Schema:
 ]
 
 Example 1:
-User: "下午三点到五点阅读,五点半吃饭一个小时,七点到八点玩游戏"
+User: "涓嬪崍涓夌偣鍒颁簲鐐归槄璇?浜旂偣鍗婂悆楗竴涓皬鏃?涓冪偣鍒板叓鐐圭帺娓告垙"
 Output:
 [
-  {"startTime": "15:00", "endTime": "17:00", "description": "阅读", "categoryName": "学习", "activityName": "书籍文献", "scopeIds": ["scope_id_for_growth"]},
-  {"startTime": "17:30", "endTime": "18:30", "description": "吃饭", "categoryName": "生活", "activityName": "饮食", "scopeIds": ["scope_id_for_life"]},
-  {"startTime": "19:00", "endTime": "20:00", "description": "玩游戏", "categoryName": "爱欲再生产", "activityName": "玩玩游戏", "scopeIds": []}
+  {"startTime": "15:00", "endTime": "17:00", "description": "闃呰", "categoryName": "瀛︿範", "activityName": "涔︾睄鏂囩尞", "scopeIds": ["scope_id_for_growth"]},
+  {"startTime": "17:30", "endTime": "18:30", "description": "鍚冮キ", "categoryName": "鐢熸椿", "activityName": "楗", "scopeIds": ["scope_id_for_life"]},
+  {"startTime": "19:00", "endTime": "20:00", "description": "鐜╂父鎴?, "categoryName": "鐖辨鍐嶇敓浜?, "activityName": "鐜╃帺娓告垙", "scopeIds": []}
 ]
 `;
 
@@ -867,7 +874,7 @@ Output:
         const config = aiService.getConfig();
 
         if (!config.apiKey?.trim()) {
-            throw new Error('请先在设置中完成 AI 配置。');
+            throw new Error('Please configure AI settings first.');
         }
 
         const systemPrompt = `
@@ -912,7 +919,7 @@ ${text}
         const fetchFn = Capacitor.isNativePlatform() ? nativeFetch : fetch;
 
         if (!config.apiKey?.trim()) {
-            throw new Error('请先在设置中完成 AI 配置。');
+            throw new Error('Please configure AI settings first.');
         }
 
         const systemPrompt = `
@@ -984,7 +991,7 @@ ${text}
                 };
 
                 if ((responseBody as any)?.error) {
-                    const error = new Error((responseBody as any).error.message || 'AI 请求失败');
+                    const error = new Error((responseBody as any).error.message || 'AI 璇锋眰澶辫触');
                     (error as Error & { debug?: AIDebugExchange }).debug = debug;
                     throw error;
                 }
@@ -1062,7 +1069,7 @@ ${text}
                 };
 
                 if ((responseBody as any)?.error) {
-                    const error = new Error((responseBody as any).error.message || 'AI 请求失败');
+                    const error = new Error((responseBody as any).error.message || 'AI 璇锋眰澶辫触');
                     (error as Error & { debug?: AIDebugExchange }).debug = debug;
                     throw error;
                 }
@@ -1100,6 +1107,71 @@ ${text}
         throw new Error('AI provider not supported');
     },
 
+    requestAssistantSystemDecisionWithDebug: async (
+        params: {
+            systemPrompt: string;
+            userPrompt: string;
+            conversationHistory?: AIConversationTurn[];
+        },
+        options: AIRequestOptions = {}
+    ): Promise<AIAssistantSystemTurnResult> => {
+        const config = aiService.getConfig();
+        const fetchFn = Capacitor.isNativePlatform() ? nativeFetch : fetch;
+
+        if (!config.apiKey?.trim()) {
+            throw new Error('Please configure AI settings first.');
+        }
+
+        const normalizeDecision = (rawDecision: any): AssistantSystemTurnDecision => {
+            const action = rawDecision?.action === 'send_message'
+                || rawDecision?.action === 'create_reminder'
+                || rawDecision?.action === 'update_memory'
+                ? rawDecision.action
+                : 'silent';
+
+            return {
+                action,
+                ...(typeof rawDecision?.message === 'string' && rawDecision.message.trim()
+                    ? { message: rawDecision.message.trim() }
+                    : {}),
+                ...(rawDecision?.reminder && typeof rawDecision.reminder === 'object'
+                    ? {
+                        reminder: {
+                            ...(typeof rawDecision.reminder.type === 'string' && rawDecision.reminder.type.trim()
+                                ? { type: rawDecision.reminder.type.trim() }
+                                : {}),
+                            dueAt: typeof rawDecision.reminder.dueAt === 'string'
+                                ? rawDecision.reminder.dueAt.trim()
+                                : '',
+                            text: typeof rawDecision.reminder.text === 'string'
+                                ? rawDecision.reminder.text.trim()
+                                : '',
+                            ...(typeof rawDecision.reminder.todoId === 'string' && rawDecision.reminder.todoId.trim()
+                                ? { todoId: rawDecision.reminder.todoId.trim() }
+                                : {})
+                        }
+                    }
+                    : {}),
+                ...(rawDecision?.memoryPatch && typeof rawDecision.memoryPatch === 'object'
+                    ? { memoryPatch: rawDecision.memoryPatch }
+                    : {})
+            };
+        };
+
+        const { result, debug } = await requestJsonObjectWithDebug(config, fetchFn, {
+            systemPrompt: params.systemPrompt,
+            userPrompt: params.userPrompt,
+            conversationHistory: params.conversationHistory,
+            normalizeResult: normalizeDecision,
+            options
+        });
+
+        return {
+            decision: result,
+            debug
+        };
+    },
+
     classifyChatIntentWithDebug: async (
         text: string,
         options: AIRequestOptions = {}
@@ -1108,7 +1180,7 @@ ${text}
         const fetchFn = Capacitor.isNativePlatform() ? nativeFetch : fetch;
 
         if (!config.apiKey?.trim()) {
-            throw new Error('请先在设置中完成 AI 配置。');
+            throw new Error('Please configure AI settings first.');
         }
 
         const systemPrompt = `
@@ -1200,7 +1272,7 @@ ${text}
                 };
 
                 if ((responseBody as any)?.error) {
-                    const error = new Error((responseBody as any).error.message || 'AI 请求失败');
+                    const error = new Error((responseBody as any).error.message || 'AI 璇锋眰澶辫触');
                     (error as Error & { debug?: AIDebugExchange }).debug = debug;
                     throw error;
                 }
@@ -1283,7 +1355,7 @@ ${text}
                 };
 
                 if ((responseBody as any)?.error) {
-                    const error = new Error((responseBody as any).error.message || 'AI 请求失败');
+                    const error = new Error((responseBody as any).error.message || 'AI 璇锋眰澶辫触');
                     (error as Error & { debug?: AIDebugExchange }).debug = debug;
                     throw error;
                 }
@@ -1344,7 +1416,7 @@ ${text}
         const fetchFn = Capacitor.isNativePlatform() ? nativeFetch : fetch;
 
         if (!config.apiKey?.trim()) {
-            throw new Error('请先在设置中完成 AI 配置。');
+            throw new Error('Please configure AI settings first.');
         }
 
         const systemPrompt = `
@@ -1356,7 +1428,7 @@ Context:
 - Default Date: ${context.defaultDate}
 - Latest Existing Log: ${JSON.stringify(context.latestLog || null)}
 - Today's Timeline Summary:
-${context.todayTimelineSummary || '今天还没有时间轴记录。'}
+${context.todayTimelineSummary || '浠婂ぉ杩樻病鏈夋椂闂磋酱璁板綍銆?}
 
 Requirements:
 1. Reply in natural Chinese.
@@ -1416,7 +1488,7 @@ ${text}
                 };
 
                 if ((responseBody as any)?.error) {
-                    const error = new Error((responseBody as any).error.message || 'AI 请求失败');
+                    const error = new Error((responseBody as any).error.message || 'AI 璇锋眰澶辫触');
                     (error as Error & { debug?: AIDebugExchange }).debug = debug;
                     throw error;
                 }
@@ -1495,7 +1567,7 @@ ${text}
                 };
 
                 if ((responseBody as any)?.error) {
-                    const error = new Error((responseBody as any).error.message || 'AI 请求失败');
+                    const error = new Error((responseBody as any).error.message || 'AI 璇锋眰澶辫触');
                     (error as Error & { debug?: AIDebugExchange }).debug = debug;
                     throw error;
                 }
@@ -1568,7 +1640,7 @@ ${text}
         const fetchFn = Capacitor.isNativePlatform() ? nativeFetch : fetch;
 
         if (!config.apiKey?.trim()) {
-            throw new Error('请先在设置中完成 AI 配置。');
+            throw new Error('Please configure AI settings first.');
         }
 
         const categoryContext = context.categories.map((category) => ({
@@ -1647,7 +1719,7 @@ Requirements:
 8. If the user describes multiple time ranges, emit multiple toolCalls.
 9. All times must use 24-hour HH:mm format.
 10. Never create a single cross-day record. If an activity crosses midnight, split it into multiple create_log tool calls, one per date segment.
-11. For words like "刚刚", "现在", "到现在", or "刚才", when the user is talking about today, use Current DateTime and Latest Existing Log to infer the most likely contiguous range.
+11. For words like "鍒氬垰", "鐜板湪", "鍒扮幇鍦?, or "鍒氭墠", when the user is talking about today, use Current DateTime and Latest Existing Log to infer the most likely contiguous range.
 12. If the user describes a sequence without exact times, prefer splitting the available gap into contiguous, reasonable segments that fully cover the described period instead of leaving unexplained holes.
 13. categoryId, activityId, scopeIds, and linkedTodoId must come from the provided context exactly. Do not invent IDs.
 14. Prefer a specific subtask when the todo context clearly matches a child task path or child title better than its parent.
@@ -1735,7 +1807,7 @@ ${text}
                 };
 
                 if ((responseBody as any)?.error) {
-                    const error = new Error((responseBody as any).error.message || 'AI 请求失败');
+                    const error = new Error((responseBody as any).error.message || 'AI 璇锋眰澶辫触');
                     (error as Error & { debug?: AIDebugExchange }).debug = debug;
                     throw error;
                 }
@@ -1817,7 +1889,7 @@ ${text}
                 };
 
                 if ((responseBody as any)?.error) {
-                    const error = new Error((responseBody as any).error.message || 'AI 请求失败');
+                    const error = new Error((responseBody as any).error.message || 'AI 璇锋眰澶辫触');
                     (error as Error & { debug?: AIDebugExchange }).debug = debug;
                     throw error;
                 }
@@ -1872,7 +1944,7 @@ ${text}
         const fetchFn = Capacitor.isNativePlatform() ? nativeFetch : fetch;
 
         if (!config.apiKey?.trim()) {
-            throw new Error('请先在设置中完成 AI 配置。');
+            throw new Error('Please configure AI settings first.');
         }
 
         const todoCategoryContext = context.todoCategories.map((todoCategory) => ({
@@ -2047,7 +2119,7 @@ ${text}
                 };
 
                 if ((responseBody as any)?.error) {
-                    const error = new Error((responseBody as any).error.message || 'AI 请求失败');
+                    const error = new Error((responseBody as any).error.message || 'AI 璇锋眰澶辫触');
                     (error as Error & { debug?: AIDebugExchange }).debug = debug;
                     throw error;
                 }
@@ -2130,7 +2202,7 @@ ${text}
                 };
 
                 if ((responseBody as any)?.error) {
-                    const error = new Error((responseBody as any).error.message || 'AI 请求失败');
+                    const error = new Error((responseBody as any).error.message || 'AI 璇锋眰澶辫触');
                     (error as Error & { debug?: AIDebugExchange }).debug = debug;
                     throw error;
                 }
@@ -2201,7 +2273,7 @@ ${text}
         const fetchFn = Capacitor.isNativePlatform() ? nativeFetch : fetch;
 
         if (!config.apiKey?.trim()) {
-            throw new Error('请先在设置中完成 AI 配置。');
+            throw new Error('Please configure AI settings first.');
         }
 
         const todoCategoryContext = context.todoCategories.map((todoCategory) => ({
@@ -2376,7 +2448,7 @@ ${text}
         const fetchFn = Capacitor.isNativePlatform() ? nativeFetch : fetch;
 
         if (!config.apiKey?.trim()) {
-            throw new Error('请先在设置中完成 AI 配置。');
+            throw new Error('Please configure AI settings first.');
         }
 
         const systemPrompt = `
@@ -2508,7 +2580,7 @@ ${text}
         const fetchFn = Capacitor.isNativePlatform() ? nativeFetch : fetch;
 
         if (!config.apiKey?.trim()) {
-            throw new Error('请先在设置中完成 AI 配置。');
+            throw new Error('Please configure AI settings first.');
         }
 
         const categoryContext = context.categories.map((category) => ({
@@ -2675,12 +2747,12 @@ ${text}
         }
     },
 
-    // 将AI返回的时间（HH:mm）与用户选择的日期组合成完整的ISO字符串
+    // 灏咥I杩斿洖鐨勬椂闂达紙HH:mm锛変笌鐢ㄦ埛閫夋嫨鐨勬棩鏈熺粍鍚堟垚瀹屾暣鐨処SO瀛楃涓?
     combineWithDate: (rawEntries: AIRawTimeEntry[], targetDate: string): ParsedTimeEntry[] => {
         return rawEntries.map(entry => {
-            // targetDate格式: YYYY-MM-DD
-            // entry.startTime格式: HH:mm
-            // 组合成: YYYY-MM-DDTHH:mm:ss
+            // targetDate鏍煎紡: YYYY-MM-DD
+            // entry.startTime鏍煎紡: HH:mm
+            // 缁勫悎鎴? YYYY-MM-DDTHH:mm:ss
             const startISO = `${targetDate}T${entry.startTime}:00`;
             const endISO = `${targetDate}T${entry.endTime}:00`;
 

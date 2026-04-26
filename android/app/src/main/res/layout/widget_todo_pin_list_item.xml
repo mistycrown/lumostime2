@@ -1,0 +1,93 @@
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:minHeight="34dp"
+        android:orientation="horizontal"
+        android:paddingTop="3dp"
+        android:paddingBottom="4dp">
+
+        <TextView
+            android:id="@+id/widget_todo_pin_badge"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:background="@drawable/widget_todo_pin_badge_background"
+            android:fontFamily="monospace"
+            android:gravity="center"
+            android:minWidth="44dp"
+            android:paddingStart="6dp"
+            android:paddingTop="2dp"
+            android:paddingEnd="6dp"
+            android:paddingBottom="2dp"
+            android:text="TODAY"
+            android:textColor="#6C6359"
+            android:textSize="8sp" />
+
+        <TextView
+            android:id="@+id/widget_todo_pin_title"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="8dp"
+            android:layout_marginEnd="8dp"
+            android:layout_weight="1"
+            android:ellipsize="end"
+            android:maxLines="1"
+            android:text="待办标题"
+            android:textColor="#1F1B16"
+            android:textSize="15sp" />
+
+        <FrameLayout
+            android:layout_width="64dp"
+            android:layout_height="28dp">
+
+            <TextView
+                android:id="@+id/widget_todo_pin_button_start"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:background="@drawable/widget_todo_pin_button_outline"
+                android:fontFamily="monospace"
+                android:gravity="center"
+                android:text="START"
+                android:textColor="#1F1B16"
+                android:textSize="9sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/widget_todo_pin_button_stop"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:background="@drawable/widget_todo_pin_button_active"
+                android:fontFamily="monospace"
+                android:gravity="center"
+                android:text="STOP"
+                android:textColor="#F7F2E9"
+                android:textSize="9sp"
+                android:textStyle="bold"
+                android:visibility="gone" />
+
+            <TextView
+                android:id="@+id/widget_todo_pin_button_open"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:background="@drawable/widget_todo_pin_button_outline"
+                android:fontFamily="monospace"
+                android:gravity="center"
+                android:text="OPEN"
+                android:textColor="#1F1B16"
+                android:textSize="9sp"
+                android:textStyle="bold"
+                android:visibility="gone" />
+        </FrameLayout>
+    </LinearLayout>
+
+    <TextView
+        android:id="@+id/widget_todo_pin_divider"
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:background="#14362C21" />
+</LinearLayout>

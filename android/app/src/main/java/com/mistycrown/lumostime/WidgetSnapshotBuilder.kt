@@ -60,7 +60,7 @@ object WidgetSnapshotBuilder {
                     label = if (hasTemplate) {
                         meta?.content?.ifBlank { null }
                             ?: slot.label?.ifBlank { null }
-                            ?: "日课 ${slot.slotIndex + 1}"
+                            ?: "\u65E5\u8BFE ${slot.slotIndex + 1}"
                     } else {
                         ""
                     },
@@ -104,7 +104,7 @@ object WidgetSnapshotBuilder {
                     label = if (hasTemplate) {
                         slot.label?.ifBlank { null }
                             ?: shortcutLabelForAction(slot.shortcutAction)
-                            ?: "快捷入口 ${slot.slotIndex + 1}"
+                            ?: "\u5FEB\u6377\u5165\u53E3 ${slot.slotIndex + 1}"
                     } else {
                         ""
                     },
@@ -214,11 +214,12 @@ object WidgetSnapshotBuilder {
 
     private fun shortcutLabelForAction(action: String?): String? {
         return when (action) {
-            "open_supplement_log" -> "补记"
-            "quick_punch" -> "打点"
+            "open_supplement_log" -> "\u8865\u8BB0"
+            "quick_punch" -> "\u6253\u70B9"
             "open_today_review" -> "Review"
-            "open_search" -> "搜索"
-            "open_gallery" -> "画廊"
+            "open_search" -> "\u641C\u7D22"
+            "open_gallery" -> "\u753B\u5ECA"
+            "open_ai_assistant" -> "AI \u52A9\u7406"
             else -> null
         }
     }
@@ -230,6 +231,7 @@ object WidgetSnapshotBuilder {
             "open_today_review" -> "\uD83D\uDCD3"
             "open_search" -> "\uD83D\uDD0D"
             "open_gallery" -> "\uD83D\uDDBC\uFE0F"
+            "open_ai_assistant" -> "\u2728"
             else -> null
         }
     }
@@ -241,6 +243,7 @@ object WidgetSnapshotBuilder {
             "open_today_review" -> "#DBEAFE"
             "open_search" -> "#E0E7FF"
             "open_gallery" -> "#DCFCE7"
+            "open_ai_assistant" -> "#E0F2FE"
             else -> null
         }
     }
