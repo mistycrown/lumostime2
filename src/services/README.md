@@ -2,7 +2,7 @@
 
 Contains business logic and external integrations.
 
-Update 2026-04-26: Added the first Android-agent service layer: `assistantMemoryService.ts`, `assistantReminderQueueService.ts`, `assistantPromptService.ts`, and `assistantOrchestratorService.ts`, plus a new `aiService.ts` system-turn decision endpoint so background assistant runs can reuse the same provider/debug pipeline as foreground chat.
+Update 2026-04-26: Added the first Android-agent service layer: `assistantAgentConfigService.ts`, `assistantMemoryService.ts`, `assistantReminderQueueService.ts`, `assistantPromptService.ts`, and `assistantOrchestratorService.ts`, plus a new `aiService.ts` system-turn decision endpoint so background assistant runs can reuse the same provider/debug pipeline as foreground chat.
 Update 2026-04-25: `aiService.ts` now also exposes dedicated edit-log, update-todo, and create-subtask planning flows that return id-plus-patch payloads, letting the unified AI dialog keep create/edit intents separate and apply edits locally through existing save logic. Subtask planning now treats schedule fields as opt-in only and suppresses them unless the user explicitly asked for dates.
 Update 2026-04-22: `aiService.ts` now exposes lightweight AI intent classification plus debug-aware chat reply, add-log planning, and add-todo planning so the unified AI dialog can route each turn with only the needed context.
 Update 2026-04-22: `aiService.ts` now also exposes single-turn backfill tool planning, debug-oriented request/response capture, abort-signal plumbing, and per-tool-call date planning with latest-log/todo-hierarchy context for the AI backfill dialog.
@@ -16,6 +16,7 @@ Update 2026-03-12: timeline styling for normal timeline records is managed by `t
 
 ## Files
 - `aiService.ts`: [Active] - Handles AI integration (OpenAI/Gemini) for text parsing, lightweight intent classification, persona-aware chat replies, cached-conversation context injection, dated AI-planned backfill tool calls, root-todo creation, todo updates, subtask creation, log editing, abort-aware chat requests, and narrative generation, with subtask schedule fields emitted only when explicitly requested.
+- `assistantAgentConfigService.ts`: [Active] - Persists background assistant runtime settings such as polling enablement, long-term-memory enablement, random check-in ranges, and future reminder toggles so the AI chat settings panel and native Android service can stay aligned.
 - `assistantMemoryService.ts`: [Active] - Stores structured assistant memory for the Android-first background AI agent, including profile facts, open loops, working summaries, recent decisions, and active reminders.
 - `assistantReminderQueueService.ts`: [Active] - Persists and queries the assistant's follow-up reminder queue, including due-reminder lookup and memory synchronization.
 - `assistantPromptService.ts`: [Active] - Loads or falls back to local assistant persona and system-trigger prompt templates, then assembles compact background agent prompts from memory and trigger context.

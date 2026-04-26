@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="utf-8"?>
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item>
+        <shape android:shape="rectangle">
+            <size
+                android:width="440dp"
+                android:height="220dp" />
+            <solid android:color="#FFFFFF" />
+            <corners android:radius="16dp" />
+        </shape>
+    </item>
+
+    <item android:top="28dp" android:left="32dp" android:right="248dp" android:bottom="176dp">
+        <shape android:shape="rectangle">
+            <solid android:color="#111827" />
+            <corners android:radius="2dp" />
+        </shape>
+    </item>
+
+    <item android:top="54dp" android:left="32dp" android:right="270dp" android:bottom="154dp">
+        <shape android:shape="rectangle">
+            <solid android:color="#94A3B8" />
+            <corners android:radius="2dp" />
+        </shape>
+    </item>
+
+    <item android:top="34dp" android:left="336dp" android:right="32dp" android:bottom="168dp">
+        <shape android:shape="rectangle">
+            <solid android:color="#94A3B8" />
+            <corners android:radius="2dp" />
+        </shape>
+    </item>
+
+    <item android:top="78dp" android:left="32dp" android:right="32dp" android:bottom="141dp" android:drawable="@drawable/widget_preview_separator" />
+    <item android:top="116dp" android:left="32dp" android:right="32dp" android:bottom="103dp" android:drawable="@drawable/widget_preview_separator" />
+
+    <item android:top="88dp" android:left="32dp" android:right="110dp" android:bottom="116dp">
+        <shape android:shape="rectangle">
+            <solid android:color="#D6D3D1" />
+            <corners android:radius="6dp" />
+        </shape>
+    </item>
+
+    <item android:top="126dp" android:left="32dp" android:right="92dp" android:bottom="78dp">
+        <shape android:shape="rectangle">
+            <solid android:color="#D6D3D1" />
+            <corners android:radius="6dp" />
+        </shape>
+    </item>
+
+    <item android:top="164dp" android:left="32dp" android:right="124dp" android:bottom="40dp">
+        <shape android:shape="rectangle">
+            <solid android:color="#D6D3D1" />
+            <corners android:radius="6dp" />
+        </shape>
+    </item>
+
+    <item android:top="88dp" android:left="92dp" android:right="110dp" android:bottom="116dp">
+        <shape android:shape="rectangle">
+            <solid android:color="#E5E7EB" />
+            <corners android:radius="4dp" />
+        </shape>
+    </item>
+
+    <item android:top="126dp" android:left="72dp" android:right="92dp" android:bottom="78dp">
+        <shape android:shape="rectangle">
+            <solid android:color="#E5E7EB" />
+            <corners android:radius="4dp" />
+        </shape>
+    </item>
+
+    <item android:top="164dp" android:left="104dp" android:right="124dp" android:bottom="40dp">
+        <shape android:shape="rectangle">
+            <solid android:color="#E5E7EB" />
+            <corners android:radius="4dp" />
+        </shape>
+    </item>
+
+    <item android:top="86dp" android:left="378dp" android:right="32dp" android:bottom="114dp" android:drawable="@drawable/widget_todo_pin_play_icon" />
+    <item android:top="124dp" android:left="378dp" android:right="32dp" android:bottom="76dp" android:drawable="@drawable/widget_todo_pin_play_icon" />
+    <item android:top="162dp" android:left="378dp" android:right="32dp" android:bottom="38dp" android:drawable="@drawable/widget_todo_pin_play_icon" />
+</layer-list>

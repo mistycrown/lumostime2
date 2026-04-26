@@ -72,7 +72,6 @@ public class WidgetTodoPinRemoteViewsService extends RemoteViewsService {
             boolean isActionable = item.isActionable();
 
             RemoteViews views = new RemoteViews(context.getPackageName(), R.layout.widget_todo_pin_list_item);
-            views.setTextViewText(R.id.widget_todo_pin_badge, item.getBadgeLabel());
             views.setTextViewText(R.id.widget_todo_pin_title, item.getTitle());
             views.setViewVisibility(
                     R.id.widget_todo_pin_button_start,
@@ -94,9 +93,8 @@ public class WidgetTodoPinRemoteViewsService extends RemoteViewsService {
             Intent fillInIntent = new Intent();
             fillInIntent.putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId);
             fillInIntent.putExtra(WidgetTodoPinProviderSupport.EXTRA_TODO_ID, item.getTodoId());
-            views.setOnClickFillInIntent(R.id.widget_todo_pin_button_start, fillInIntent);
-            views.setOnClickFillInIntent(R.id.widget_todo_pin_button_stop, fillInIntent);
-            views.setOnClickFillInIntent(R.id.widget_todo_pin_button_open, fillInIntent);
+            views.setOnClickFillInIntent(R.id.widget_todo_pin_row, fillInIntent);
+            views.setOnClickFillInIntent(R.id.widget_todo_pin_action_button, fillInIntent);
             return views;
         }
 

@@ -3,8 +3,7 @@
  * @input AI Configuration (OpenAI/Gemini keys), User Natural Language Input, Context Data (categories, scopes, todos)
  * @output Parsed Time Entries (ParsedTimeEntry[]), Parsed Todos (AIParsedTodo[]), Dated AI Backfill Tool Plans, Backfill Chat Replies (string), Generated Narratives (string), Connection Status (boolean)
  * @pos Service (AI Integration Layer)
- * @description AI 鏈嶅姟 - 澶勭悊涓?AI 鎻愪緵鍟嗭紙OpenAI/Gemini锛夌殑鎵€鏈変氦浜掞紝鍖呮嫭閰嶇疆绠＄悊銆佽繛鎺ユ祴璇曞拰鎻愮ず鎵ц
- * @updated 2026-04-26: Added a structured assistant system-turn decision endpoint so the new Android-first background agent can reuse the same provider/debug pipeline as the foreground AI chat flows.
+ * @description AI 闂備礁鎼悧鍡欑矓鐎涙ɑ鍙?- 濠电姰鍨煎▔娑氣偓姘煎櫍楠炲啯绻濋崘顏佹灃?AI 闂備礁婀辩划顖炲礉閹烘梹顐介柣銏㈩焾閻ゎ噣鏌涢埥鍡楀箻缂佲偓閸戠晝enAI/Gemini闂備焦瀵х粙鎴λ囬崡鐐╂灁闁硅揪绠戠粻銉╂煃瑜滈崜鐔奉嚕閸偄绶炲璺侯儏閺€顓熺箾鐎涙鐭嬮悽顖ｄ簽濡叉劕鈹戠€ｎ亞顦遍梺鍛婁緱閸犳牠顢旈鍫熲拺闁哄娉曡倴闂佹眹鍊曞Λ娑氬垝婵犳碍鏅柛鏇ㄥ墮閳ь剛鍋ら弻鏇㈠幢閺囩喓銈扮紓浣虹帛閻╊垶鐛幒妤€唯闁挎柧鍕橀崑鐐烘煟閻樺弶澶勬繛鍙夌墵楠炲繑瀵奸弶鎴狀唽闂佸綊鍋婇崰鎾寸濞戙垺鐓欑紒妤佺☉濡參寮? * @updated 2026-04-26: Added a structured assistant system-turn decision endpoint so the new Android-first background agent can reuse the same provider/debug pipeline as the foreground AI chat flows.
  * @updated 2026-04-25: Expanded AI intent routing and tool planning with dedicated edit-log, update-todo, and create-subtask flows that return id-plus-patch payloads for local application.
  * @updated 2026-04-25: Tightened subtask planning so scheduled or deadline dates are only emitted when the user explicitly asked for them.
  * @updated 2026-04-22: Simplified unified-chat intent classification into a message-only lightweight routing step without extra runtime context.
@@ -12,14 +11,14 @@
  * @updated 2026-04-22: Added two-stage AI chat support with lightweight intent classification, debug-aware chat replies, and direct todo tool planning alongside backfill planning.
  * @updated 2026-04-22: AI backfill planning now supports per-call dates, latest-log context, todo hierarchy hints, and local cross-midnight normalization.
  * 
- * 鏍稿績鍔熻兘锛?
- * - 鑷劧璇█瑙ｆ瀽涓烘椂闂磋褰?
- * - 寰呭姙浠诲姟鏅鸿兘鎻愬彇
- * - AI 鍙欎簨鐢熸垚
- * - 澶?AI 鎻愪緵鍟嗘敮鎸?
- * - 閰嶇疆鏂囦欢绠＄悊
+ * 闂備礁鎼粔鍫曗€﹂崼銏㈢处濡わ絽鍟粈澶愭煟閺冨浂鍤欓柛妯绘尦閺?
+ * - 闂備胶鍘ч〃搴㈢閻愬搫绀夌憸蹇涘箯閻樻椿鏁囬柍閿亾闁哄鎳橀幃宄扳枎濞嗘垹蓱闂佽姘︽慨銈囩矙婢舵劖鍊绘俊顖涙た濡差垶姊婚崒姘偓濠毸夐幇閭︽晩闁搞儺浜楁禍?
+ * - 闁诲骸鐏氬姗€骞婃惔銏″弿婵炲棙鍔楅々鐑芥偣閸ャ劌绲绘い顐犲€濋弻锟犲川鐎靛摜绐楅梺绋跨箲閿曘垽鐛幘璇茬疀妞ゆ巻鍋撶紒?
+ * - AI 闂備礁鎲￠悷锕傛偡閵堝洩濮抽柕濞炬櫆閸嬨劑鏌ｉ弮鍌ょ劸闁?
+ * - 濠?AI 闂備礁婀辩划顖炲礉閹烘梹顐介柣銏㈩焾閻ゎ噣鏌涢埄鍏╂垿寮冲鍫熺厵?
+ * - 闂傚倷鐒﹀妯肩矓閸洘鍋柛鈩冪☉濡﹢鏌涢妷顖炴妞ゆ劗鏅槐鎺楁偑閸涱垳锛熼梺?
  * 
- * 鈿狅笍 Once I am updated, be sure to update my header comment and the folder's md.
+ * 闂備礁鐤囧▔鏇熷垔鐎靛摜绠?Once I am updated, be sure to update my header comment and the folder's md.
  */
 import { TodoCategory, Category, Scope, TodoRecurrenceRule } from '../types';
 import type { AssistantSystemTurnDecision } from '../types/assistant';
@@ -32,25 +31,25 @@ export interface AIConfig {
 }
 
 export interface ParsedTimeEntry {
-    startTime: string; // ISO (瀹屾暣鏃ユ湡鏃堕棿)
-    endTime: string;   // ISO (瀹屾暣鏃ユ湡鏃堕棿)
+    startTime: string; // ISO (闂佽娴烽幊鎾诲嫉椤掑嫬姹查柨婵嗩槸缁秹鏌曟径娑㈡闁糕晛鍊块弻锟犲礃閵娧冪厽濠?
+    endTime: string;   // ISO (闂佽娴烽幊鎾诲嫉椤掑嫬姹查柨婵嗩槸缁秹鏌曟径娑㈡闁糕晛鍊块弻锟犲礃閵娧冪厽濠?
     description: string;
     categoryName: string;
     activityName: string;
-    scopeIds?: string[]; // 鍙€夛細鐢ㄦ埛鎺ュ彈鐨勫叧鑱旈鍩烮D
+    scopeIds?: string[]; // 闂備礁鎲￠悷顖炲垂閸洖鐒垫い鎺嗗亾妞ぱ€鍋撶紓浣稿綁閸楁娊骞冩禒瀣╅柨鏇楀亾闁绘挻娲熼弻鐔煎箒閹烘垵濮庨悷婊勬緲閻楁捇骞嗛崘顔肩妞ゆ劑鍨圭紞姗€姊洪懝浼村摵婵☆偄鍟撮妴鍌烆敃閿曗偓閺勩儵鏌ｉ幋鐘虫嚈
 }
 
-// AI杩斿洖鐨勫師濮嬫椂闂存潯鐩紙鍙寘鍚椂闂达紝涓嶅寘鍚棩鏈燂級
+// AI闂佸搫顦弲婊堝蓟閵娿儍娲冀椤撶喎鍓梺鍛婃处閸嬪嫰寮閳规垿顢欑喊鍗炲壉濠碉紕鍋涢崐鍨潖閼姐倐鍋撳☉娅虫垿鎷忕€ｎ喗鐓熼柍鍝勶工濞呮瑧绱掓潏銊ф噰鐎规洩缍侀、鏃堝礋椤愩倖鈻夐梻浣告啞閸戝綊宕戦崨顓ф富闁稿瞼鍋為埛鎺楀级閸繂鈷旂紒鈧径濞炬闁规儳纾瓭闁诲骸鐏氶敃銏犵暦閵夆晩鏁冮柨婵嗘４缁辨岸姊洪崫鍕ⅱ闁革綇濡囧Σ?
 interface AIRawTimeEntry {
-    startTime: string; // HH:mm鏍煎紡
-    endTime: string;   // HH:mm鏍煎紡
+    startTime: string; // HH:mm闂備礁鎼粔鍫曞储瑜忓Σ?
+    endTime: string;   // HH:mm闂備礁鎼粔鍫曞储瑜忓Σ?
     description: string;
     categoryName: string;
     activityName: string;
     scopeIds?: string[]; // AI inferred scopes
 }
 
-// AI杩斿洖鐨勫緟鍔炰换鍔＄粨鏋?
+// AI闂佸搫顦弲婊堝蓟閵娿儍娲冀椤撶喎鍓梺鍛婃处閸嬪棛绮ｉ敓鐘崇厱闁哄啫鍊告禒鎺楁煙楠炲灝鐏茬€规洘绻堥弫宥夊礋椤撶喎鐨鹃梻?
 export interface AIParsedTodo {
     title: string;
     categoryId?: string;
@@ -535,7 +534,7 @@ const requestJsonObjectWithDebug = async <T>(
             };
 
             if ((responseBody as any)?.error) {
-                const error = new Error((responseBody as any).error.message || 'AI 鐠囬攱鐪版径杈Е');
+                const error = new Error((responseBody as any).error.message || 'AI request failed');
                 (error as Error & { debug?: AIDebugExchange }).debug = debug;
                 throw error;
             }
@@ -618,7 +617,7 @@ const requestJsonObjectWithDebug = async <T>(
             };
 
             if ((responseBody as any)?.error) {
-                const error = new Error((responseBody as any).error.message || 'AI 鐠囬攱鐪版径杈Е');
+                const error = new Error((responseBody as any).error.message || 'AI request failed');
                 (error as Error & { debug?: AIDebugExchange }).debug = debug;
                 throw error;
             }
@@ -733,8 +732,8 @@ export const aiService = {
     parseNaturalLanguage: async (
         text: string,
         context: {
-            now: string; // YYYY-MM-DD鏍煎紡鐨勫綋鍓嶆棩鏈?
-            targetDate: string; // YYYY-MM-DD鏍煎紡鐨勭洰鏍囨棩鏈燂紙鐢ㄦ埛閫夋嫨琛ヨ鐨勬棩鏈燂級
+            now: string; // YYYY-MM-DD闂備礁鎼粔鍫曞储瑜忓Σ鎰版晸閻樺啿鍓梺鍛婃处閸嬪棛绮旀總鍛婄厱闁规儳纾牎濠碘槅鍋€閺呯姴顕?
+            targetDate: string; // YYYY-MM-DD闂備礁鎼粔鍫曞储瑜忓Σ鎰版晸閻樺啿鍓梺鍛婃处閸樼晫绮ｅΔ鍛厸鐎广儱鎳忔径鍕繆椤愮喐娅婄€殿喚鏁婚幃銈夊磼濠婂拋妲遍梻浣规た濞煎潡宕濆澶婃槬婵炴垯鍨洪悞璇差熆鐠轰警鍎忔い蹇嬪劦閹泛鈽夐弽褍濮ゅ銈嗘煥濞差參骞嗛崘顔肩妞ゆ帊绶ょ槐姘舵⒑閸濆嫮澧㈤柛锝忓濡?
             categories: any[]; // Pass simplified structure
             scopes?: Scope[]; // Optional scopes for context
         }
@@ -789,12 +788,12 @@ JSON Output Schema:
 ]
 
 Example 1:
-User: "涓嬪崍涓夌偣鍒颁簲鐐归槄璇?浜旂偣鍗婂悆楗竴涓皬鏃?涓冪偣鍒板叓鐐圭帺娓告垙"
+User: "濠电偞鍨堕幐鎼侇敄閸涱厾鏆︾€广儱妫涢埢鏂款熆鐠洪缚瀚板ù鐙€鍨堕弻娑㈠箳濡ゅ﹥娈ョ紓浣靛妽閻擄繝骞冨▎鎺嬩汗闁圭儤鎼╁鎰版煟?濠电偛鐡ㄧ划宥咁潖婵犳艾纾婚柨婵嗩槸绾偓婵犵數濮撮崐褰掑磹閺嶎灛鏂课旀繝鍌氱缂備焦鏌ㄩ悺銊х矙婢舵劦鏁傞柛鏇ㄥ幗閻︽捇姊?濠电偞鍨堕幐鎼佸疮娴兼潙纾婚柨婵嗩槸缁€鍡涙煛婢跺﹦浠㈢憸鏉垮閺岋綁骞囬浣界闁汇埄鍨伴幖顐﹀Υ閹烘宸濆┑鐘插€绘禍?
 Output:
 [
-  {"startTime": "15:00", "endTime": "17:00", "description": "闃呰", "categoryName": "瀛︿範", "activityName": "涔︾睄鏂囩尞", "scopeIds": ["scope_id_for_growth"]},
-  {"startTime": "17:30", "endTime": "18:30", "description": "鍚冮キ", "categoryName": "鐢熸椿", "activityName": "楗", "scopeIds": ["scope_id_for_life"]},
-  {"startTime": "19:00", "endTime": "20:00", "description": "鐜╂父鎴?, "categoryName": "鐖辨鍐嶇敓浜?, "activityName": "鐜╃帺娓告垙", "scopeIds": []}
+  {"startTime": "15:00", "endTime": "17:00", "description": "闂傚倸鍊搁崯顐﹀箠閹炬椿鏁?, "categoryName": "闂佽瀛╅崘鑽ょ磽濮樺崬濮?, "activityName": "濠电偞鍨跺Λ鎴炰繆閸ヮ剚鍎撻柛鏇ㄥ灠濡﹢鏌涢妷銏℃珔闁烩斁鍋?, "scopeIds": ["scope_id_for_growth"]},
+  {"startTime": "17:30", "endTime": "18:30", "description": "闂備礁鎲￠懝楣冨疮閹绢喖围?, "categoryName": "闂備焦鐪归崹濠氬窗閹邦剦娓?, "activityName": "濠德板€栭〃蹇涘闯閿濆＆?, "scopeIds": ["scope_id_for_life"]},
+  {"startTime": "19:00", "endTime": "20:00", "description": "闂備胶绮竟鏇㈠疾濠婂牊鍋夐柛顐ｆ礀缁?, "categoryName": "闂備胶绮悧鐐淬仈閹间緡鏁勭€广儱顦粈鍐偓骞垮劚濞诧箓寮茬粙妫?, "activityName": "闂備胶绮竟鏇㈠疾濠靛牊鏆滈柛婵嗗閳ь剚甯″畷銊︾節閸屾粈绨?, "scopeIds": []}
 ]
 `;
 
@@ -991,7 +990,7 @@ ${text}
                 };
 
                 if ((responseBody as any)?.error) {
-                    const error = new Error((responseBody as any).error.message || 'AI 璇锋眰澶辫触');
+                    const error = new Error((responseBody as any).error.message || 'AI request failed');
                     (error as Error & { debug?: AIDebugExchange }).debug = debug;
                     throw error;
                 }
@@ -1069,7 +1068,7 @@ ${text}
                 };
 
                 if ((responseBody as any)?.error) {
-                    const error = new Error((responseBody as any).error.message || 'AI 璇锋眰澶辫触');
+                    const error = new Error((responseBody as any).error.message || 'AI request failed');
                     (error as Error & { debug?: AIDebugExchange }).debug = debug;
                     throw error;
                 }
@@ -1272,7 +1271,7 @@ ${text}
                 };
 
                 if ((responseBody as any)?.error) {
-                    const error = new Error((responseBody as any).error.message || 'AI 璇锋眰澶辫触');
+                    const error = new Error((responseBody as any).error.message || 'AI request failed');
                     (error as Error & { debug?: AIDebugExchange }).debug = debug;
                     throw error;
                 }
@@ -1355,7 +1354,7 @@ ${text}
                 };
 
                 if ((responseBody as any)?.error) {
-                    const error = new Error((responseBody as any).error.message || 'AI 璇锋眰澶辫触');
+                    const error = new Error((responseBody as any).error.message || 'AI request failed');
                     (error as Error & { debug?: AIDebugExchange }).debug = debug;
                     throw error;
                 }
@@ -1428,7 +1427,7 @@ Context:
 - Default Date: ${context.defaultDate}
 - Latest Existing Log: ${JSON.stringify(context.latestLog || null)}
 - Today's Timeline Summary:
-${context.todayTimelineSummary || '浠婂ぉ杩樻病鏈夋椂闂磋酱璁板綍銆?}
+${context.todayTimelineSummary || 'No timeline summary available for today.'}
 
 Requirements:
 1. Reply in natural Chinese.
@@ -1488,7 +1487,7 @@ ${text}
                 };
 
                 if ((responseBody as any)?.error) {
-                    const error = new Error((responseBody as any).error.message || 'AI 璇锋眰澶辫触');
+                    const error = new Error((responseBody as any).error.message || 'AI request failed');
                     (error as Error & { debug?: AIDebugExchange }).debug = debug;
                     throw error;
                 }
@@ -1567,7 +1566,7 @@ ${text}
                 };
 
                 if ((responseBody as any)?.error) {
-                    const error = new Error((responseBody as any).error.message || 'AI 璇锋眰澶辫触');
+                    const error = new Error((responseBody as any).error.message || 'AI request failed');
                     (error as Error & { debug?: AIDebugExchange }).debug = debug;
                     throw error;
                 }
@@ -1719,7 +1718,7 @@ Requirements:
 8. If the user describes multiple time ranges, emit multiple toolCalls.
 9. All times must use 24-hour HH:mm format.
 10. Never create a single cross-day record. If an activity crosses midnight, split it into multiple create_log tool calls, one per date segment.
-11. For words like "鍒氬垰", "鐜板湪", "鍒扮幇鍦?, or "鍒氭墠", when the user is talking about today, use Current DateTime and Latest Existing Log to infer the most likely contiguous range.
+11. For words like "闂備礁鎲＄敮妤呮嚌妤ｅ啫鍨?, "闂備胶绮划宥咁熆濡尨鑰?, "闂備礁鎲＄敮妤佺珶閸℃稓宓侀柛銉墮閹?, or "闂備礁鎲＄敮妤冨枈瀹ュ棙娅?, when the user is talking about today, use Current DateTime and Latest Existing Log to infer the most likely contiguous range.
 12. If the user describes a sequence without exact times, prefer splitting the available gap into contiguous, reasonable segments that fully cover the described period instead of leaving unexplained holes.
 13. categoryId, activityId, scopeIds, and linkedTodoId must come from the provided context exactly. Do not invent IDs.
 14. Prefer a specific subtask when the todo context clearly matches a child task path or child title better than its parent.
@@ -1807,7 +1806,7 @@ ${text}
                 };
 
                 if ((responseBody as any)?.error) {
-                    const error = new Error((responseBody as any).error.message || 'AI 璇锋眰澶辫触');
+                    const error = new Error((responseBody as any).error.message || 'AI request failed');
                     (error as Error & { debug?: AIDebugExchange }).debug = debug;
                     throw error;
                 }
@@ -1889,7 +1888,7 @@ ${text}
                 };
 
                 if ((responseBody as any)?.error) {
-                    const error = new Error((responseBody as any).error.message || 'AI 璇锋眰澶辫触');
+                    const error = new Error((responseBody as any).error.message || 'AI request failed');
                     (error as Error & { debug?: AIDebugExchange }).debug = debug;
                     throw error;
                 }
@@ -2119,7 +2118,7 @@ ${text}
                 };
 
                 if ((responseBody as any)?.error) {
-                    const error = new Error((responseBody as any).error.message || 'AI 璇锋眰澶辫触');
+                    const error = new Error((responseBody as any).error.message || 'AI request failed');
                     (error as Error & { debug?: AIDebugExchange }).debug = debug;
                     throw error;
                 }
@@ -2202,7 +2201,7 @@ ${text}
                 };
 
                 if ((responseBody as any)?.error) {
-                    const error = new Error((responseBody as any).error.message || 'AI 璇锋眰澶辫触');
+                    const error = new Error((responseBody as any).error.message || 'AI request failed');
                     (error as Error & { debug?: AIDebugExchange }).debug = debug;
                     throw error;
                 }
@@ -2747,12 +2746,12 @@ ${text}
         }
     },
 
-    // 灏咥I杩斿洖鐨勬椂闂达紙HH:mm锛変笌鐢ㄦ埛閫夋嫨鐨勬棩鏈熺粍鍚堟垚瀹屾暣鐨処SO瀛楃涓?
+    // 闂佽绻愮换鎰板箰濞ｆ岸鏌℃径鍡樻珕闁哄被鍔岀叅闁哄稁鍘介崕宥夋煕閺囥劌澧い蟻鍥ㄢ拻闁稿本绻冭ぐ褏绱掓潏銊㈡敜H:mm闂備焦瀵х粙鎴λ囬鍓х當鐎光偓閸曨剙浠洪梺闈涱煭缁犳垿鎮￠弴銏♀拺妞ゆ劑鍩勫Σ褰掓倵濮樸儱濮傞柟顖氬暣瀹曠喖顢楁笟濠勭闂備礁鎼悧蹇涘窗閹捐泛鍨濈€广儱顦憴锕傛煕椤愩倕鏋庨柣蹇撴喘閹鎮烽悧鍫熸嫳闂佸搫妫寸紞渚€骞嗛崘顔肩妞ゃ劎鐡岄梺璇插缁嬫帡銆冮崼銉晞濞达絽婀遍埢?
     combineWithDate: (rawEntries: AIRawTimeEntry[], targetDate: string): ParsedTimeEntry[] => {
         return rawEntries.map(entry => {
-            // targetDate鏍煎紡: YYYY-MM-DD
-            // entry.startTime鏍煎紡: HH:mm
-            // 缁勫悎鎴? YYYY-MM-DDTHH:mm:ss
+            // targetDate闂備礁鎼粔鍫曞储瑜忓Σ? YYYY-MM-DD
+            // entry.startTime闂備礁鎼粔鍫曞储瑜忓Σ? HH:mm
+            // 缂傚倸鍊风粈浣衡偓姘煎墴楠炲啯鎯旈妸銉ь吅? YYYY-MM-DDTHH:mm:ss
             const startISO = `${targetDate}T${entry.startTime}:00`;
             const endISO = `${targetDate}T${entry.endTime}:00`;
 

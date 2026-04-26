@@ -1,86 +1,73 @@
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_todo_pin_row"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
+    android:clickable="true"
+    android:focusable="false"
     android:orientation="vertical">
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:gravity="center_vertical"
-        android:minHeight="34dp"
+        android:minHeight="28dp"
         android:orientation="horizontal"
-        android:paddingTop="3dp"
-        android:paddingBottom="4dp">
-
-        <TextView
-            android:id="@+id/widget_todo_pin_badge"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:background="@drawable/widget_todo_pin_badge_background"
-            android:fontFamily="monospace"
-            android:gravity="center"
-            android:minWidth="44dp"
-            android:paddingStart="6dp"
-            android:paddingTop="2dp"
-            android:paddingEnd="6dp"
-            android:paddingBottom="2dp"
-            android:text="TODAY"
-            android:textColor="#6C6359"
-            android:textSize="8sp" />
+        android:paddingStart="0dp"
+        android:paddingEnd="2dp"
+        android:paddingTop="2dp"
+        android:paddingBottom="3dp">
 
         <TextView
             android:id="@+id/widget_todo_pin_title"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:layout_marginStart="8dp"
-            android:layout_marginEnd="8dp"
+            android:layout_marginEnd="6dp"
             android:layout_weight="1"
             android:ellipsize="end"
+            android:fontFamily="sans-serif-light"
             android:maxLines="1"
             android:text="待办标题"
-            android:textColor="#1F1B16"
-            android:textSize="15sp" />
+            android:textColor="#2E2822"
+            android:textSize="12sp"
+            android:textStyle="normal" />
 
         <FrameLayout
-            android:layout_width="64dp"
-            android:layout_height="28dp">
+            android:id="@+id/widget_todo_pin_action_button"
+            android:layout_width="34dp"
+            android:layout_height="24dp"
+            android:clickable="true"
+            android:focusable="false">
 
-            <TextView
+            <ImageView
                 android:id="@+id/widget_todo_pin_button_start"
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
-                android:background="@drawable/widget_todo_pin_button_outline"
-                android:fontFamily="monospace"
-                android:gravity="center"
-                android:text="START"
-                android:textColor="#1F1B16"
-                android:textSize="9sp"
-                android:textStyle="bold" />
+                android:contentDescription="@null"
+                android:padding="5dp"
+                android:scaleType="centerInside"
+                android:src="@drawable/widget_todo_pin_play_icon"
+                android:tint="#1F1B16" />
 
-            <TextView
+            <ImageView
                 android:id="@+id/widget_todo_pin_button_stop"
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
-                android:background="@drawable/widget_todo_pin_button_active"
-                android:fontFamily="monospace"
-                android:gravity="center"
-                android:text="STOP"
-                android:textColor="#F7F2E9"
-                android:textSize="9sp"
-                android:textStyle="bold"
+                android:contentDescription="@null"
+                android:padding="5dp"
+                android:scaleType="centerInside"
+                android:src="@drawable/widget_todo_pin_stop_icon"
+                android:tint="#1F1B16"
                 android:visibility="gone" />
 
-            <TextView
+            <ImageView
                 android:id="@+id/widget_todo_pin_button_open"
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
-                android:background="@drawable/widget_todo_pin_button_outline"
-                android:fontFamily="monospace"
-                android:gravity="center"
-                android:text="OPEN"
-                android:textColor="#1F1B16"
-                android:textSize="9sp"
-                android:textStyle="bold"
+                android:contentDescription="@null"
+                android:padding="5dp"
+                android:scaleType="centerInside"
+                android:src="@drawable/widget_todo_pin_play_icon"
+                android:tint="#1F1B16"
                 android:visibility="gone" />
         </FrameLayout>
     </LinearLayout>
