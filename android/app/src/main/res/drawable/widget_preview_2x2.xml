@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item>
+        <shape android:shape="rectangle">
+            <size
+                android:width="220dp"
+                android:height="220dp" />
+            <solid android:color="#FFFFFF" />
+            <corners android:radius="16dp" />
+        </shape>
+    </item>
+    <item
+        android:top="34dp"
+        android:left="34dp"
+        android:right="122dp"
+        android:bottom="122dp"
+        android:drawable="@drawable/widget_preview_circle" />
+    <item
+        android:top="34dp"
+        android:left="122dp"
+        android:right="34dp"
+        android:bottom="122dp"
+        android:drawable="@drawable/widget_preview_circle" />
+    <item
+        android:top="122dp"
+        android:left="34dp"
+        android:right="122dp"
+        android:bottom="34dp"
+        android:drawable="@drawable/widget_preview_circle" />
+    <item
+        android:top="122dp"
+        android:left="122dp"
+        android:right="34dp"
+        android:bottom="34dp"
+        android:drawable="@drawable/widget_preview_circle" />
+</layer-list>

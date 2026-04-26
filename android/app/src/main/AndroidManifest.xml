@@ -566,6 +566,22 @@
             android:exported="false"
             android:foregroundServiceType="dataSync" />
 
+        <service
+            android:name=".AssistantAgentService"
+            android:enabled="true"
+            android:exported="false"
+            android:foregroundServiceType="dataSync" />
+
+        <service
+            android:name=".WidgetTodoPinRemoteViewsService"
+            android:enabled="true"
+            android:exported="false"
+            android:permission="android.permission.BIND_REMOTEVIEWS">
+            <intent-filter>
+                <action android:name="android.widget.RemoteViewsService" />
+            </intent-filter>
+        </service>
+
         <!-- 无障碍服务 - 用于即时检测应用切换 -->
         <service
             android:name=".AppAccessibilityService"
@@ -667,6 +683,21 @@
             <meta-data
                 android:name="android.appwidget.provider"
                 android:resource="@xml/widget_info_daily_runtime_4x2" />
+        </receiver>
+
+        <receiver
+            android:name=".QuickLogWidgetTodoPin4x2"
+            android:exported="true"
+            android:label="@string/widget_label_todo_pin_4x2">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="android.intent.action.DATE_CHANGED" />
+                <action android:name="android.intent.action.TIME_SET" />
+                <action android:name="android.intent.action.TIMEZONE_CHANGED" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_todo_pin_4x2" />
         </receiver>
 
         <receiver

@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="utf-8"?>
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item>
+        <shape android:shape="rectangle">
+            <size
+                android:width="440dp"
+                android:height="220dp" />
+            <solid android:color="#FFFFFF" />
+            <corners android:radius="16dp" />
+        </shape>
+    </item>
+    <item
+        android:top="28dp"
+        android:left="52dp"
+        android:right="316dp"
+        android:bottom="120dp"
+        android:drawable="@drawable/widget_preview_circle" />
+    <item
+        android:top="28dp"
+        android:left="140dp"
+        android:right="228dp"
+        android:bottom="120dp"
+        android:drawable="@drawable/widget_preview_circle" />
+    <item
+        android:top="28dp"
+        android:left="228dp"
+        android:right="140dp"
+        android:bottom="120dp"
+        android:drawable="@drawable/widget_preview_circle" />
+    <item
+        android:top="28dp"
+        android:left="316dp"
+        android:right="52dp"
+        android:bottom="120dp"
+        android:drawable="@drawable/widget_preview_circle" />
+    <item
+        android:top="120dp"
+        android:left="52dp"
+        android:right="316dp"
+        android:bottom="28dp"
+        android:drawable="@drawable/widget_preview_circle" />
+    <item
+        android:top="120dp"
+        android:left="140dp"
+        android:right="228dp"
+        android:bottom="28dp"
+        android:drawable="@drawable/widget_preview_circle" />
+    <item
+        android:top="120dp"
+        android:left="228dp"
+        android:right="140dp"
+        android:bottom="28dp"
+        android:drawable="@drawable/widget_preview_circle" />
+    <item
+        android:top="120dp"
+        android:left="316dp"
+        android:right="52dp"
+        android:bottom="28dp"
+        android:drawable="@drawable/widget_preview_circle" />
+</layer-list>

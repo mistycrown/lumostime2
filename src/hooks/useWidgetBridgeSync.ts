@@ -6,6 +6,7 @@
  * @description Imports completed timer widget actions into logs, mirrors timer runtime state, syncs daily widget progress to native, and replays queued daily taps back into review state.
  * @updated 2026-04-25: Syncs today's DAILY_RUNTIME heatmap payload so the dedicated 4x4 widget reflects logs and live sessions.
  * @updated 2026-04-25: Strips unsupported widget UI icon assets on app startup so expired supporter access falls back to emoji rendering.
+ * @updated 2026-04-26: Syncs today's TODAY + PIN todo payload so the dedicated scrollable 4x2 widget stays current.
  */
 import { App as CapacitorApp } from '@capacitor/app';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -20,6 +21,7 @@ import {
   buildDailyRuntimeWidgetPayload,
   buildDailyWidgetSyncPayload,
   buildLogFromWidgetPendingAction,
+  buildTodoPinWidgetPayload,
   buildWidgetRuntimeStateFromSession,
   buildWidgetSessionFromRuntimeState,
   isNativeAndroidWidgetSupported,
@@ -32,7 +34,7 @@ import { applyDailyCheckActionForDate } from '../utils/dailyCheckUtils';
 
 export const useWidgetBridgeSync = () => {
   const { categories } = useCategoryScope();
-  const { logs, setLogs } = useData();
+  const { logs, todos, setLogs } = useData();
   const { activeSessions, setActiveSessions } = useSession();
   const { dailyReviews, setDailyReviews, checkTemplates, reviewTemplates } = useReview();
   const [hasHydratedNativeState, setHasHydratedNativeState] = useState(!isNativeAndroidWidgetSupported());
@@ -303,4 +305,19 @@ export const useWidgetBridgeSync = () => {
       console.error('[useWidgetBridgeSync] Failed to sync DAILY_RUNTIME payload to native widget', error);
     });
   }, [activeSessions, categories, hasHydratedNativeState, logs]);
+
+  useEffect(() => {
+    if (!isNativeAndroidWidgetSupported() || !hasHydratedNativeState) {
+      return;
+    }
+
+    const payload = buildTodoPinWidgetPayload({
+      todos,
+      categories
+    });
+
+    WidgetBridge.syncTodoPinWidgetData({ payload }).catch((error) => {
+      console.error('[useWidgetBridgeSync] Failed to sync TODAY + PIN widget payload to native widget', error);
+    });
+  }, [categories, hasHydratedNativeState, todos]);
 };

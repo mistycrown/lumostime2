@@ -39,7 +39,7 @@ object WidgetDailyRuntimeBitmapRenderer {
 
     private val expandedSpec = DailyRuntimeRenderSpec(
         bitmapWidthDp = 308f,
-        bitmapHeightDp = 188f,
+        bitmapHeightDp = 224f,
         showLegend = true
     )
 
@@ -226,21 +226,21 @@ object WidgetDailyRuntimeBitmapRenderer {
         val dotPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             style = Paint.Style.FILL
         }
-        val itemGap = 14f * density
-        val rowGap = 6f * density
+        val itemGap = 10f * density
+        val rowGap = 5f * density
         var cursorX = left
         var rowTop = top
         val maxBottom = bottom - metrics.rowHeight
 
         legend.forEach { item ->
             val durationText = formatLegendDuration(item.totalMinutes)
-            val labelMaxWidth = (right - left) * 0.34f
+            val labelMaxWidth = (right - left) * 0.26f
             val labelText = ellipsizeText(item.itemName, namePaint, labelMaxWidth)
             val itemWidth =
                 metrics.dotRadius * 2 +
-                    6f * density +
+                    5f * density +
                     namePaint.measureText(labelText) +
-                    8f * density +
+                    6f * density +
                     durationPaint.measureText(durationText)
 
             if (cursorX + itemWidth > right && cursorX > left) {
@@ -334,13 +334,13 @@ object WidgetDailyRuntimeBitmapRenderer {
 
     private fun createLegendNamePaint(density: Float) = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = parseColor("#334155")
-        textSize = 11f * density
+        textSize = 10.2f * density
         typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
     }
 
     private fun createLegendDurationPaint(density: Float) = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = parseColor("#94A3B8")
-        textSize = 9.6f * density
+        textSize = 8.8f * density
         typeface = Typeface.create(Typeface.MONOSPACE, Typeface.NORMAL)
     }
 
@@ -382,7 +382,11 @@ object WidgetDailyRuntimeBitmapRenderer {
         val hours = safeMinutes / 60
         val minutes = safeMinutes % 60
         return if (hours > 0) {
-            String.format("%dH:%02dM", hours, minutes)
+            if (minutes == 0) {
+                String.format("%dH", hours)
+            } else {
+                String.format("%dH%02dM", hours, minutes)
+            }
         } else {
             "${minutes}M"
         }

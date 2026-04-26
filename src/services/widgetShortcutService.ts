@@ -5,6 +5,7 @@
  * @pos Service
  * @description Defines supported shortcut widget actions, labels, default emoji, and default colors for the shortcut widget family.
  * @updated 2026-04-18: Switched shortcut widgets from fixed Lucide icons to configurable emoji and background colors.
+ * @updated 2026-04-25: Added an AI assistant shortcut action for widget slots.
  */
 
 export type ShortcutWidgetAction =
@@ -12,7 +13,8 @@ export type ShortcutWidgetAction =
   | 'quick_punch'
   | 'open_today_review'
   | 'open_search'
-  | 'open_gallery';
+  | 'open_gallery'
+  | 'open_ai_assistant';
 
 export interface ShortcutWidgetActionOption {
   value: ShortcutWidgetAction;
@@ -27,22 +29,22 @@ export const DEFAULT_SHORTCUT_WIDGET_COLOR = '#E7E5E4';
 export const SHORTCUT_WIDGET_ACTION_OPTIONS: ShortcutWidgetActionOption[] = [
   {
     value: 'open_supplement_log',
-    label: '打开添加补记',
-    description: '进入脉络页并直接打开添加补记入口。',
+    label: '打开补记',
+    description: '进入时间线页，并直接打开补记入口。',
     defaultEmoji: '✍️',
     defaultColor: '#F5E6D3'
   },
   {
     value: 'quick_punch',
     label: '快速打点',
-    description: '进入脉络页并立即执行一次快速打点。',
+    description: '进入时间线页，并立即执行一次快速打点。',
     defaultEmoji: '⚡',
     defaultColor: '#FEF3C7'
   },
   {
     value: 'open_today_review',
     label: '今天 Review',
-    description: '若今天还没有 Review，则先新建，再直接打开。',
+    description: '如果今天还没有 Review，则先新建，再直接打开。',
     defaultEmoji: '📓',
     defaultColor: '#DBEAFE'
   },
@@ -56,9 +58,16 @@ export const SHORTCUT_WIDGET_ACTION_OPTIONS: ShortcutWidgetActionOption[] = [
   {
     value: 'open_gallery',
     label: '画廊',
-    description: '进入时间轴画廊视图。',
+    description: '进入时间线画廊视图。',
     defaultEmoji: '🖼️',
     defaultColor: '#DCFCE7'
+  },
+  {
+    value: 'open_ai_assistant',
+    label: 'AI 助理',
+    description: '直接打开 AI 助理页，继续聊天、补记或规划。',
+    defaultEmoji: '✨',
+    defaultColor: '#E0F2FE'
   }
 ];
 

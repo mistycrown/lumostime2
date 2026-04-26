@@ -192,6 +192,22 @@ class WidgetBridgePlugin : Plugin() {
     }
 
     @PluginMethod
+    fun syncTodoPinWidgetData(call: PluginCall) {
+        val payloadJson = call.getObject("payload")
+        val payload = payloadJson?.let {
+            WidgetTodoPinPayload(
+                date = it.optString("date"),
+                items = it.optJSONArray("items").toTodoPinItemList(),
+                syncedAt = it.optLong("syncedAt", System.currentTimeMillis())
+            )
+        }
+
+        WidgetStores.saveTodoPinPayload(context, payload)
+        WidgetRefreshCoordinator.refreshAllAsync(context)
+        call.resolve()
+    }
+
+    @PluginMethod
     fun refreshWidget(call: PluginCall) {
         val appWidgetId = call.getInt("appWidgetId") ?: -1
         val templateId = parseNullableString(call.getString("templateId"))
@@ -467,5 +483,32 @@ class WidgetBridgePlugin : Plugin() {
             segments = optJSONArray("segments").toDailyRuntimeSegmentList(),
             legend = optJSONArray("legend").toDailyRuntimeLegendList()
         )
+    }
+
+    private fun JSONArray?.toTodoPinItemList(): List<WidgetTodoPinItem> {
+        if (this == null) {
+            return emptyList()
+        }
+
+        val values = mutableListOf<WidgetTodoPinItem>()
+        for (index in 0 until length()) {
+            val item = optJSONObject(index) ?: continue
+            val todoId = parseNullableString(item.optString("todoId")) ?: continue
+            val title = parseNullableString(item.optString("title")) ?: continue
+            values.add(
+                WidgetTodoPinItem(
+                    todoId = todoId,
+                    title = title,
+                    badgeLabel = parseNullableString(item.optString("badgeLabel")) ?: "TODAY",
+                    categoryId = parseNullableString(item.optString("categoryId")),
+                    activityId = parseNullableString(item.optString("activityId")),
+                    activityLabel = parseNullableString(item.optString("activityLabel")),
+                    icon = parseNullableString(item.optString("icon")),
+                    color = parseNullableString(item.optString("color")),
+                    scopeIds = item.optJSONArray("scopeIds").toStringList()
+                )
+            )
+        }
+        return values
     }
 }

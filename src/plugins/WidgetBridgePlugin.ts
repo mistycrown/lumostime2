@@ -5,6 +5,7 @@
  * @pos Plugin
  * @description Exposes the Android widget template, instance binding state, and runtime bridge to the React application.
  * @updated 2026-04-25: Added dedicated DAILY_RUNTIME category/activity dual-view payload sync types for native heatmap widgets.
+ * @updated 2026-04-26: Added TODAY + PIN widget payload sync types for the dedicated scrollable 4x2 todo widget.
  */
 import { registerPlugin } from '@capacitor/core';
 import { ShortcutWidgetAction } from '../services/widgetShortcutService';
@@ -148,6 +149,24 @@ export interface WidgetBridgeDailyRuntimePayload {
   syncedAt: number;
 }
 
+export interface WidgetBridgeTodoPinItem {
+  todoId: string;
+  title: string;
+  badgeLabel: 'TODAY' | 'PIN';
+  categoryId: string | null;
+  activityId: string | null;
+  activityLabel: string | null;
+  icon: string | null;
+  color: string | null;
+  scopeIds?: string[] | null;
+}
+
+export interface WidgetBridgeTodoPinPayload {
+  date: string;
+  items: WidgetBridgeTodoPinItem[];
+  syncedAt: number;
+}
+
 export interface WidgetBridgePlugin {
   getTemplates(): Promise<{ templates: WidgetBridgeTemplate[] }>;
   saveTemplates(options: { templates: WidgetBridgeTemplate[] }): Promise<void>;
@@ -160,6 +179,7 @@ export interface WidgetBridgePlugin {
   clearPendingDailyActions(options: { ids: string[] }): Promise<void>;
   syncDailyWidgetData(options: { payload: WidgetBridgeDailySyncPayload | null }): Promise<void>;
   syncDailyRuntimeWidgetData(options: { payload: WidgetBridgeDailyRuntimePayload | null }): Promise<void>;
+  syncTodoPinWidgetData(options: { payload: WidgetBridgeTodoPinPayload | null }): Promise<void>;
   refreshWidget(options?: { appWidgetId?: number; templateId?: string }): Promise<void>;
 }
 
