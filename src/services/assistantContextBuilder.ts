@@ -5,6 +5,7 @@
  * @pos Service (Assistant Context Builder)
  * @description Builds the minimal structured context payloads used by the unified assistant-turn architecture so foreground and background flows can share the same state summaries and full candidate dictionaries without duplicating formatting logic in UI components.
  *
+ * @updated 2026-04-26: Replaced raw recent-log dictionary payloads with a compact digest builder that excludes today's logs and caps history length for lower token use.
  * @updated 2026-04-26: Started carrying both local-offset and UTC "current time" snapshots so reminder prompts have an unambiguous time anchor.
  * @updated 2026-04-26: Added unified state-context, dictionary-context, and conversation-summary builders for the new single-turn assistant architecture.
  */
@@ -20,7 +21,6 @@ import type {
 import type {
   AssistantActivityCategoryDictionaryItem,
   AssistantConversationEntry,
-  AssistantLogDictionaryItem,
   AssistantScopeDictionaryItem,
   AssistantTodoCategoryDictionaryItem,
   AssistantTodoDictionaryItem,
@@ -48,11 +48,19 @@ interface BuildDictionaryContextParams {
   scopes?: Scope[];
   todoCategories?: TodoCategory[];
   todos?: TodoItem[];
-  logs?: Log[];
+}
+
+interface BuildRecentLogsDigestParams {
+  defaultDate: string;
+  logs: Log[];
+  categories: Category[];
+  todos: TodoItem[];
+  limit?: number;
 }
 
 const DEFAULT_TIMELINE_LIMIT = 12;
 const DEFAULT_TODO_LIMIT = 8;
+const DEFAULT_RECENT_LOG_LIMIT = 20;
 
 const formatDateKey = (date: Date): string => {
   const year = date.getFullYear();
@@ -74,6 +82,40 @@ const getActivityById = (categories: Category[], activityId?: string) => (
     ? categories.flatMap((category) => category.activities).find((activity) => activity.id === activityId)
     : undefined
 );
+
+const compactInlineText = (value?: string, maxLength = 48): string => {
+  const normalized = (value || '').replace(/\s+/g, ' ').trim();
+  if (!normalized) {
+    return '';
+  }
+
+  return normalized.length > maxLength
+    ? `${normalized.slice(0, Math.max(0, maxLength - 1)).trimEnd()}…`
+    : normalized;
+};
+
+const buildLogDigestLine = (
+  log: Log,
+  categories: Category[],
+  todos: TodoItem[]
+): string => {
+  const category = categories.find((item) => item.id === log.categoryId);
+  const activity = category?.activities.find((item) => item.id === log.activityId)
+    || getActivityById(categories, log.activityId);
+  const linkedTodo = log.linkedTodoId
+    ? todos.find((todo) => todo.id === log.linkedTodoId)
+    : undefined;
+  const label = [category?.name, activity?.name || log.title].filter(Boolean).join(' / ');
+  const note = compactInlineText(log.note);
+
+  return [
+    formatDateKey(new Date(log.startTime)),
+    formatTimeRange(log.startTime, log.endTime),
+    label,
+    linkedTodo ? `@${linkedTodo.title}` : '',
+    note ? `note:${note}` : ''
+  ].filter(Boolean).join(' | ');
+};
 
 export const assistantContextBuilder = {
   summarizeConversationTurns(turns: AssistantConversationEntry[], limit = 6): string {
@@ -162,6 +204,23 @@ export const assistantContextBuilder = {
     };
   },
 
+  buildRecentLogsDigest(params: BuildRecentLogsDigestParams): string | undefined {
+    const limit = params.limit ?? DEFAULT_RECENT_LOG_LIMIT;
+    const recentLogs = params.logs
+      .filter((log) => formatDateKey(new Date(log.startTime)) !== params.defaultDate)
+      .sort((left, right) => right.startTime - left.startTime)
+      .slice(0, limit);
+
+    if (recentLogs.length === 0) {
+      return undefined;
+    }
+
+    return [
+      `以下是最近日志摘要：已排除今天（${params.defaultDate}）的记录；当前提供 ${recentLogs.length} 条；最多保留 ${limit} 条；按时间倒序排列。`,
+      ...recentLogs.map((log) => buildLogDigestLine(log, params.categories, params.todos))
+    ].join('\n');
+  },
+
   buildDictionaryContext(params: BuildDictionaryContextParams): AssistantTurnDictionaryContext {
     const activityCategories: AssistantActivityCategoryDictionaryItem[] = (params.categories || []).map((category) => ({
       id: category.id,
@@ -207,33 +266,11 @@ export const assistantContextBuilder = {
       };
     });
 
-    const logs: AssistantLogDictionaryItem[] = (params.logs || []).map((log) => {
-      const category = (params.categories || []).find((item) => item.id === log.categoryId);
-      const activity = category?.activities.find((item) => item.id === log.activityId)
-        || getActivityById(params.categories || [], log.activityId);
-      const linkedTodo = log.linkedTodoId
-        ? (params.todos || []).find((todo) => todo.id === log.linkedTodoId)
-        : undefined;
-      return {
-        id: log.id,
-        date: formatDateKey(new Date(log.startTime)),
-        startTime: `${String(new Date(log.startTime).getHours()).padStart(2, '0')}:${String(new Date(log.startTime).getMinutes()).padStart(2, '0')}`,
-        endTime: `${String(new Date(log.endTime).getHours()).padStart(2, '0')}:${String(new Date(log.endTime).getMinutes()).padStart(2, '0')}`,
-        categoryId: log.categoryId,
-        categoryName: category?.name || '',
-        activityId: log.activityId,
-        activityName: activity?.name || log.title || '',
-        ...(log.note ? { note: log.note } : {}),
-        ...(linkedTodo ? { linkedTodoId: linkedTodo.id, linkedTodoTitle: linkedTodo.title } : {})
-      };
-    });
-
     return {
       ...(activityCategories.length > 0 ? { activityCategories } : {}),
       ...(scopes.length > 0 ? { scopes } : {}),
       ...(todoCategories.length > 0 ? { todoCategories } : {}),
-      ...(todos.length > 0 ? { todos } : {}),
-      ...(logs.length > 0 ? { logs } : {})
+      ...(todos.length > 0 ? { todos } : {})
     };
   }
 };

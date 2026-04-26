@@ -995,6 +995,8 @@ const mapPromptSectionLabel = (label: string): string => {
       return '长期记忆快照';
     case 'State Context':
       return '应用状态上下文';
+    case 'Recent Logs Digest':
+      return '近期日志摘要上下文';
     case 'Dictionary Context':
       return '应用候选字典上下文';
     case 'Trigger':
@@ -1860,6 +1862,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
       todayScheduledTodoSummary,
       pinnedTodoSummary,
       reminderSummary: buildAssistantReminderSummary(),
+      recentLogsDigest: buildAssistantRecentLogsDigest(),
       userPersonaPrompt: buildBackgroundPersonaPrompt(targetSession),
       dictionaryContext: buildAssistantDictionaryContext(),
       conversationHistory,
@@ -1957,6 +1960,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
             todayScheduledTodoSummary,
             pinnedTodoSummary,
             reminderSummary: buildAssistantReminderSummary(),
+            recentLogsDigest: buildAssistantRecentLogsDigest(),
             userPersonaPrompt: buildBackgroundPersonaPrompt(targetSession),
             dictionaryContext: buildAssistantDictionaryContext(),
             conversationHistory,
@@ -2600,6 +2604,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
       todayScheduledTodoSummary,
       pinnedTodoSummary,
       reminderSummary: buildAssistantReminderSummary(),
+      recentLogsDigest: buildAssistantRecentLogsDigest(),
       userPersonaPrompt: buildBackgroundPersonaPrompt(activeSession),
       dictionaryContext: buildAssistantDictionaryContext(),
       conversationHistory: historyBeforeCurrent,
@@ -2719,6 +2724,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
       todayScheduledTodoSummary,
       pinnedTodoSummary,
       reminderSummary: buildAssistantReminderSummary(),
+      recentLogsDigest: buildAssistantRecentLogsDigest(),
       userPersonaPrompt: buildBackgroundPersonaPrompt(activeSession),
       dictionaryContext: buildAssistantDictionaryContext(),
       conversationHistory: historyBeforeCurrent,
@@ -3076,8 +3082,14 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     categories,
     scopes,
     todoCategories,
-    todos: todos.filter((todo) => !todo.isCompleted).slice(0, 60),
-    logs: [...logs].sort((left, right) => right.startTime - left.startTime).slice(0, 40)
+    todos: todos.filter((todo) => !todo.isCompleted).slice(0, 60)
+  });
+
+  const buildAssistantRecentLogsDigest = () => assistantContextBuilder.buildRecentLogsDigest({
+    defaultDate: defaultDateKey,
+    logs,
+    categories,
+    todos
   });
 
   const buildBackgroundPersonaPrompt = (session?: AIChatSession): string | undefined => {
@@ -3179,6 +3191,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
         reminderSummary: buildAssistantReminderSummary()
       });
       const dictionaryContext = buildAssistantDictionaryContext();
+      const recentLogsDigest = buildAssistantRecentLogsDigest();
 
       const unifiedTurnResult = await assistantTurnService.runUnifiedTurn({
         mode: 'foreground',
@@ -3196,7 +3209,8 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
         memory: assistantMemoryService.getMemory(),
         conversation: conversationContext,
         stateContext,
-        dictionaryContext
+        dictionaryContext,
+        ...(recentLogsDigest ? { recentLogsDigest } : {})
       }, historyBeforeCurrent);
 
       if (debugMode) {
