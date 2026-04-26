@@ -5,6 +5,7 @@
  * @pos Service (Assistant Orchestrator)
  * @description Orchestrates Android-first assistant system turns by loading structured memory, assembling a prompt, calling the existing AI service, and applying the resulting silent/message/reminder/memory actions back into local state.
  *
+ * @updated 2026-04-26: Removed an unused long-term-memory field from ephemeral assistant-memory snapshots.
  * @updated 2026-04-26: Assistant active-message notifications now use the target chat session's persona card name as the notification title when available.
  * @updated 2026-04-26: Added Android assistant active-notification surfacing and exact session/message navigation payloads for background replies that should alert the user outside the app.
  * @updated 2026-04-26: Surfaced background debug sections onto persisted assistant messages when debug mode is enabled, and carried local/UTC time anchors into reminder-sensitive background prompts.
@@ -118,7 +119,6 @@ const createEphemeralMemory = (): AssistantMemory => ({
   updatedAt: new Date().toISOString(),
   profileMemory: [],
   preferenceMemory: [],
-  openLoops: [],
   activeReminders: [],
   recentDecisions: []
 });

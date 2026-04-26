@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { Category, Log, TodoItem } from '../types';
+import type { Category, Log, Scope, TodoCategory, TodoItem } from '../types';
 import { assistantContextBuilder } from './assistantContextBuilder';
 
 const categories: Category[] = [{
@@ -15,11 +15,40 @@ const categories: Category[] = [{
   themeColor: '#111111'
 }];
 
-const todos: TodoItem[] = [{
-  id: 'todo-draft',
-  categoryId: 'todo-general',
-  title: 'Draft chapter',
-  isCompleted: false
+const todos: TodoItem[] = [
+  {
+    id: 'todo-parent',
+    categoryId: 'todo-general',
+    title: 'Thesis',
+    isCompleted: false
+  },
+  {
+    id: 'todo-draft',
+    categoryId: 'todo-general',
+    parentTodoId: 'todo-parent',
+    title: 'Draft chapter',
+    linkedActivityId: 'act-writing',
+    defaultScopeIds: ['scope-research'],
+    scheduledDate: '2026-04-27',
+    deadlineDate: '2026-04-30',
+    pin: true,
+    isCompleted: false
+  }
+];
+
+const scopes: Scope[] = [{
+  id: 'scope-research',
+  name: 'Research',
+  icon: 'R',
+  isArchived: false,
+  order: 0,
+  themeColor: '#222222'
+}];
+
+const todoCategories: TodoCategory[] = [{
+  id: 'todo-general',
+  name: 'General',
+  icon: 'G'
 }];
 
 const createLog = (
@@ -96,10 +125,40 @@ describe('assistantContextBuilder', () => {
   it('buildDictionaryContext no longer includes raw log objects', () => {
     const dictionaryContext = assistantContextBuilder.buildDictionaryContext({
       categories,
+      scopes,
+      todoCategories,
       todos
     });
 
     expect('logs' in dictionaryContext).toBe(false);
-    expect(dictionaryContext.todos).toHaveLength(1);
+    expect(dictionaryContext.todos).toHaveLength(2);
+    expect(dictionaryContext.todos?.find((todo) => todo.id === 'todo-draft')?.parentTodoId).toBe('todo-parent');
+  });
+
+  it('buildDictionaryDigest renders all candidate groups as compact tables', () => {
+    const dictionaryContext = assistantContextBuilder.buildDictionaryContext({
+      categories,
+      scopes,
+      todoCategories,
+      todos
+    });
+
+    const digest = assistantContextBuilder.buildDictionaryDigest(dictionaryContext);
+
+    expect(digest).toContain('以下是候选词典无损表。字段与应用词典一一对应；活动通过 categoryId 关联分类；子任务通过 parentTodoId 关联父任务；数组字段保持 JSON 数组；空值记为 - 。');
+    expect(digest).toContain('[ActivityCategories] rows=1');
+    expect(digest).toContain('id\tname');
+    expect(digest).toContain('"cat-work"\t"Work"');
+    expect(digest).toContain('[Activities] rows=1');
+    expect(digest).toContain('categoryId\tid\tname');
+    expect(digest).toContain('"cat-work"\t"act-writing"\t"Writing"');
+    expect(digest).toContain('[Scopes] rows=1');
+    expect(digest).toContain('"scope-research"\t"Research"');
+    expect(digest).toContain('[TodoCategories] rows=1');
+    expect(digest).toContain('"todo-general"\t"General"');
+    expect(digest).toContain('[Todos] rows=2');
+    expect(digest).toContain('id\ttitle\tpath\tparentTodoId\tparentTodoTitle\tcategoryId\tcategoryName\tlinkedCategoryId\tlinkedActivityId\tlinkedActivityName\tdefaultScopeIds\tscheduledDate\tdeadlineDate\tpin\tisCompleted');
+    expect(digest).toContain('"todo-parent"\t"Thesis"\t-\t-\t-\t"todo-general"\t"General"\t-\t-\t-\t-\t-\t-\tfalse\tfalse');
+    expect(digest).toContain('"todo-draft"\t"Draft chapter"\t"Thesis / Draft chapter"\t"todo-parent"\t"Thesis"\t"todo-general"\t"General"\t-\t"act-writing"\t"Writing"\t["scope-research"]\t"2026-04-27"\t"2026-04-30"\ttrue\tfalse');
   });
 });

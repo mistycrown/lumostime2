@@ -5,6 +5,7 @@
  * @pos Service (Assistant Memory)
  * @description Stores and updates the Android-first assistant agent's structured memory so background turns can rely on compact durable state instead of replaying unbounded chat history.
  *
+ * @updated 2026-04-26: Removed an unused long-term-memory normalization and merge path from assistant memory persistence.
  * @updated 2026-04-26: Added narrow helpers for manually appending and removing profile/preference memory entries so the long-term-memory viewer can manage user-maintained notes without owning persistence logic.
  * @updated 2026-04-26: Fixed active-reminder replacement so completed background reminders are truly removed from memory instead of being merged back in.
  * @updated 2026-04-26: Added structured assistant memory persistence, patch application, and decision-summary helpers for the new background AI agent.
@@ -14,7 +15,6 @@ import type {
   AssistantEditableMemoryListKey,
   AssistantMemory,
   AssistantMemoryPatch,
-  AssistantOpenLoop,
   AssistantReminder
 } from '../types/assistant';
 
@@ -62,39 +62,11 @@ const normalizeReminder = (value: unknown): AssistantReminder | null => {
   };
 };
 
-const normalizeOpenLoop = (value: unknown): AssistantOpenLoop | null => {
-  if (!value || typeof value !== 'object') {
-    return null;
-  }
-
-  const candidate = value as Partial<AssistantOpenLoop>;
-  const id = typeof candidate.id === 'string' ? candidate.id.trim() : '';
-  const title = typeof candidate.title === 'string' ? candidate.title.trim() : '';
-  const status = typeof candidate.status === 'string' ? candidate.status.trim() : '';
-  const updatedAt = typeof candidate.updatedAt === 'string' ? candidate.updatedAt.trim() : '';
-
-  if (!id || !title || !status || !updatedAt) {
-    return null;
-  }
-
-  return {
-    id,
-    title,
-    status: candidate.status!,
-    ...(typeof candidate.relatedTodoId === 'string' && candidate.relatedTodoId.trim()
-      ? { relatedTodoId: candidate.relatedTodoId.trim() }
-      : {}),
-    ...(typeof candidate.note === 'string' && candidate.note.trim() ? { note: candidate.note.trim() } : {}),
-    updatedAt
-  };
-};
-
 const createDefaultMemory = (): AssistantMemory => ({
   version: 1,
   updatedAt: new Date().toISOString(),
   profileMemory: [],
   preferenceMemory: [],
-  openLoops: [],
   activeReminders: [],
   recentDecisions: []
 });
@@ -119,9 +91,6 @@ const normalizeMemory = (value: unknown): AssistantMemory => {
     ...(typeof candidate.workingMemorySummary === 'string' && candidate.workingMemorySummary.trim()
       ? { workingMemorySummary: candidate.workingMemorySummary.trim() }
       : {}),
-    openLoops: Array.isArray(candidate.openLoops)
-      ? candidate.openLoops.map(normalizeOpenLoop).filter((item): item is AssistantOpenLoop => Boolean(item))
-      : [],
     activeReminders: Array.isArray(candidate.activeReminders)
       ? candidate.activeReminders.map(normalizeReminder).filter((item): item is AssistantReminder => Boolean(item))
       : [],
@@ -147,26 +116,6 @@ const dedupeStrings = (items: string[], limit = MAX_MEMORY_ITEMS): string[] => {
   });
 
   return next.slice(0, limit);
-};
-
-const mergeOpenLoops = (
-  current: AssistantOpenLoop[],
-  patch: AssistantOpenLoop[] | undefined
-): AssistantOpenLoop[] => {
-  if (!patch) {
-    return current;
-  }
-
-  const nextMap = new Map<string, AssistantOpenLoop>();
-  current.forEach((loop) => nextMap.set(loop.id, loop));
-  patch.forEach((loop) => {
-    const normalized = normalizeOpenLoop(loop);
-    if (!normalized) {
-      return;
-    }
-    nextMap.set(normalized.id, normalized);
-  });
-  return Array.from(nextMap.values()).slice(0, MAX_MEMORY_ITEMS);
 };
 
 const mergeReminders = (
@@ -244,7 +193,6 @@ export const assistantMemoryService = {
       preferenceMemory: patch.preferenceMemory
         ? dedupeStrings([...current.preferenceMemory, ...normalizeStringArray(patch.preferenceMemory)])
         : current.preferenceMemory,
-      openLoops: mergeOpenLoops(current.openLoops, patch.openLoops),
       activeReminders: mergeReminders(current.activeReminders, patch.activeReminders),
       recentDecisions: patch.recentDecisions
         ? dedupeStrings([...current.recentDecisions, ...normalizeStringArray(patch.recentDecisions, MAX_DECISIONS)], MAX_DECISIONS)

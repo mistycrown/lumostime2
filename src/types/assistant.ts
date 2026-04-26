@@ -5,6 +5,7 @@
  * @pos Type Definitions (Assistant Agent)
  * @description Defines the structured contracts used by the Android-first assistant agent layer so background triggers, memory updates, reminder queues, and AI system-turn decisions can stay typed and stable across services and plugins.
  *
+ * @updated 2026-04-26: Removed an unused long-term-memory field so the assistant memory schema stays focused on the active fields still used by the app.
  * @updated 2026-04-26: Added a shared editable-memory key type so manual long-term-memory UI can safely append and remove only the user-maintained string-list sections.
  * @updated 2026-04-26: Added assistant system-notification payload and pending-navigation result types so Android alerts can reopen the shared AI chat at the exact background message.
  * @updated 2026-04-26: Added explicit local/UTC state time context fields so reminder-oriented prompts can reason about one current moment without ambiguous timezone math.
@@ -55,17 +56,6 @@ export interface AssistantReminder {
   lastDispatchedAt?: string;
 }
 
-export type AssistantOpenLoopStatus = 'open' | 'resolved' | 'stale';
-
-export interface AssistantOpenLoop {
-  id: string;
-  title: string;
-  status: AssistantOpenLoopStatus;
-  relatedTodoId?: string;
-  note?: string;
-  updatedAt: string;
-}
-
 export interface AssistantMemory {
   version: 1;
   updatedAt: string;
@@ -73,7 +63,6 @@ export interface AssistantMemory {
   preferenceMemory: string[];
   lastKnownState?: string;
   workingMemorySummary?: string;
-  openLoops: AssistantOpenLoop[];
   activeReminders: AssistantReminder[];
   recentDecisions: string[];
   lastAgentRunAt?: string;
@@ -84,7 +73,6 @@ export interface AssistantMemoryPatch {
   preferenceMemory?: string[];
   lastKnownState?: string | null;
   workingMemorySummary?: string | null;
-  openLoops?: AssistantOpenLoop[];
   activeReminders?: AssistantReminder[];
   recentDecisions?: string[];
   lastAgentRunAt?: string | null;

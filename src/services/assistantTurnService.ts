@@ -5,12 +5,14 @@
  * @pos Service (Assistant Unified Turn)
  * @description Builds the single-turn prompt payload for the converged assistant architecture and forwards it through aiService so foreground and background flows can gradually migrate off the older multi-prompt planner stack.
  *
+ * @updated 2026-04-26: Switched dictionary prompt serialization from pretty JSON to compact table-style text to reduce token overhead while preserving candidate ids.
  * @updated 2026-04-26: Broke recent compressed log history into its own prompt section so debug viewers can inspect it separately from candidate dictionaries.
  * @updated 2026-04-26: Added the first unified assistant-turn service with layered prompt assembly, shared context serialization, and a single structured aiService gateway call.
  */
 
 import type { AIDebugExchange, AIConversationTurn } from './aiService';
 import { aiService } from './aiService';
+import { assistantContextBuilder } from './assistantContextBuilder';
 import { assistantPromptService } from './assistantPromptService';
 import type {
   AssistantUnifiedTurnInput,
@@ -44,6 +46,7 @@ const buildSystemPrompt = async (input: AssistantUnifiedTurnInput): Promise<stri
     buildToolSchemaPrompt(input.mode),
     assistantPromptService.getMemoryRulesPrompt()
   ]);
+  const dictionaryDigest = assistantContextBuilder.buildDictionaryDigest(input.dictionaryContext);
   const modePromptLabel = input.mode === 'background' ? 'Background Mode Prompt' : 'Foreground Mode Prompt';
   const toolPromptLabel = input.mode === 'background' ? 'Background Tool Prompt' : 'Foreground Tool Prompt';
   return [
@@ -79,7 +82,7 @@ const buildSystemPrompt = async (input: AssistantUnifiedTurnInput): Promise<stri
     '',
     ...(input.recentLogsDigest ? ['=== Recent Logs Digest ===', input.recentLogsDigest, ''] : []),
     '=== Dictionary Context ===',
-    stringifyJson(input.dictionaryContext)
+    dictionaryDigest
   ].filter(Boolean).join('\n');
 };
 
