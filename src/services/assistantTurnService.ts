@@ -5,6 +5,7 @@
  * @pos Service (Assistant Unified Turn)
  * @description Builds the single-turn prompt payload for the converged assistant architecture and forwards it through aiService so foreground and background flows can gradually migrate off the older multi-prompt planner stack.
  *
+ * @updated 2026-04-26: Broke recent compressed log history into its own prompt section so debug viewers can inspect it separately from candidate dictionaries.
  * @updated 2026-04-26: Added the first unified assistant-turn service with layered prompt assembly, shared context serialization, and a single structured aiService gateway call.
  */
 
@@ -76,6 +77,7 @@ const buildSystemPrompt = async (input: AssistantUnifiedTurnInput): Promise<stri
     '=== State Context ===',
     stringifyJson(input.stateContext),
     '',
+    ...(input.recentLogsDigest ? ['=== Recent Logs Digest ===', input.recentLogsDigest, ''] : []),
     '=== Dictionary Context ===',
     stringifyJson(input.dictionaryContext)
   ].filter(Boolean).join('\n');

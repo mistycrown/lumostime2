@@ -9,6 +9,7 @@
  * @updated 2026-04-26: Added Android assistant active-notification surfacing and exact session/message navigation payloads for background replies that should alert the user outside the app.
  * @updated 2026-04-26: Surfaced background debug sections onto persisted assistant messages when debug mode is enabled, and carried local/UTC time anchors into reminder-sensitive background prompts.
  * @updated 2026-04-26: Background assistant replies now persist into the explicitly targeted active chat session instead of guessing by most-recent session activity.
+ * @updated 2026-04-26: Added a standalone compressed recent-log digest channel so background prompt debug views no longer bury recent history inside dictionary payloads.
  * @updated 2026-04-26: Unified background turns around the shared turn-output schema so reminders, memory decisions, persona prompts, and dictionary context no longer collapse back into the older single-action path.
  * @updated 2026-04-26: Added the first-pass assistant orchestrator for background system turns, including memory updates, reminder queue writes, and persisted AI-chat message surfacing.
  */
@@ -47,6 +48,7 @@ interface AssistantSystemTurnRequest {
   todayScheduledTodoSummary?: string;
   pinnedTodoSummary?: string;
   reminderSummary?: string;
+  recentLogsDigest?: string;
   userPersonaPrompt?: string;
   dictionaryContext?: AssistantTurnDictionaryContext;
   conversationHistory?: AIConversationTurn[];
@@ -375,7 +377,8 @@ export const assistantOrchestratorService = {
           ...(request.pinnedTodoSummary ? { pinnedTodoSummary: request.pinnedTodoSummary } : {}),
           ...(request.reminderSummary ? { reminderSummary: request.reminderSummary } : {})
         },
-        dictionaryContext: request.dictionaryContext || {}
+        dictionaryContext: request.dictionaryContext || {},
+        ...(request.recentLogsDigest ? { recentLogsDigest: request.recentLogsDigest } : {})
       });
       output = turnResult.output;
       debug = turnResult.debug;

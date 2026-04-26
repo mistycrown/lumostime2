@@ -9,6 +9,7 @@
  * @updated 2026-04-26: Added assistant system-notification payload and pending-navigation result types so Android alerts can reopen the shared AI chat at the exact background message.
  * @updated 2026-04-26: Added explicit local/UTC state time context fields so reminder-oriented prompts can reason about one current moment without ambiguous timezone math.
  * @updated 2026-04-26: Expanded the shared assistant turn/result contracts with explicit memory actions so foreground and background flows can persist memory through the same unified schema.
+ * @updated 2026-04-26: Split compressed recent-log context out of the dictionary payload so debug views and prompt assembly can show it as its own block.
  * @updated 2026-04-26: Added Android-first assistant agent memory, reminder, trigger, config, and system-turn decision types for the new background AI architecture.
  */
 
@@ -233,26 +234,11 @@ export interface AssistantTodoDictionaryItem {
   pin?: boolean;
 }
 
-export interface AssistantLogDictionaryItem {
-  id: string;
-  date: string;
-  startTime: string;
-  endTime: string;
-  categoryId: string;
-  categoryName: string;
-  activityId: string;
-  activityName: string;
-  linkedTodoId?: string;
-  linkedTodoTitle?: string;
-  note?: string;
-}
-
 export interface AssistantTurnDictionaryContext {
   activityCategories?: AssistantActivityCategoryDictionaryItem[];
   scopes?: AssistantScopeDictionaryItem[];
   todoCategories?: AssistantTodoCategoryDictionaryItem[];
   todos?: AssistantTodoDictionaryItem[];
-  logs?: AssistantLogDictionaryItem[];
 }
 
 export interface AssistantUnifiedTurnInput {
@@ -263,6 +249,7 @@ export interface AssistantUnifiedTurnInput {
   conversation: AssistantTurnConversationContext;
   stateContext: AssistantTurnStateContext;
   dictionaryContext: AssistantTurnDictionaryContext;
+  recentLogsDigest?: string;
 }
 
 export interface AssistantReminderDraft {
