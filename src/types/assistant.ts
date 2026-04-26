@@ -92,7 +92,6 @@ export interface AssistantAgentConfig {
   quietHoursStart?: string;
   quietHoursEnd?: string;
   minimumNudgeGapMinutes: number;
-  reminderEnabled: boolean;
   longTermMemoryEnabled: boolean;
 }
 

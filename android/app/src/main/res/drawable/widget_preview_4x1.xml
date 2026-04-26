@@ -11,26 +11,32 @@
     </item>
     <item
         android:top="21dp"
-        android:left="54dp"
-        android:right="318dp"
+        android:left="16dp"
+        android:right="356dp"
         android:bottom="21dp"
         android:drawable="@drawable/widget_preview_circle" />
     <item
         android:top="21dp"
-        android:left="142dp"
-        android:right="230dp"
+        android:left="101dp"
+        android:right="271dp"
         android:bottom="21dp"
         android:drawable="@drawable/widget_preview_circle" />
     <item
         android:top="21dp"
-        android:left="230dp"
-        android:right="142dp"
+        android:left="186dp"
+        android:right="186dp"
         android:bottom="21dp"
         android:drawable="@drawable/widget_preview_circle" />
     <item
         android:top="21dp"
-        android:left="318dp"
-        android:right="54dp"
+        android:left="271dp"
+        android:right="101dp"
+        android:bottom="21dp"
+        android:drawable="@drawable/widget_preview_circle" />
+    <item
+        android:top="21dp"
+        android:left="356dp"
+        android:right="16dp"
         android:bottom="21dp"
         android:drawable="@drawable/widget_preview_circle" />
 </layer-list>
