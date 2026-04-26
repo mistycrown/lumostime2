@@ -11,6 +11,7 @@
  * @updated 2026-04-25: Matched applied-result metadata to the context-page prefix syntax by removing icons and using `# / % / @` markers for tags, domains, and todos.
  * @updated 2026-04-25: Softened the AI dialog shadow system so the shell, cards, and avatar surfaces feel lighter and less floating.
  * @updated 2026-04-25: Added a true grayscale fallback for the `default` color scheme so the AI workspace no longer picks up tinted beige/green surfaces when no themed accent is active.
+ * @updated 2026-04-26: Added background-assistant settings inside the AI panel, including polling and long-term-memory toggles, disabled reminder preview, a read-only memory viewer, and native assistant-trigger wiring for Android.
  * @updated 2026-04-25: Refined the title/header alignment and simplified applied-result cards by reducing capsules, moving log time pills to the top-right, and switching action buttons to icon-only controls.
  * @updated 2026-04-25: Simplified the AI settings panel by flattening the avatar/persona layouts, trimming low-value helper copy, and tightening everything around the existing theme tokens.
  * @updated 2026-04-23: Unified the AI workspace colors around dynamic `--accent-color` theme tokens and reordered the settings panel into persona list, current persona, user avatar, and context sections.
@@ -62,13 +63,20 @@ import {
 import { useData } from '../contexts/DataContext';
 import { useCategoryScope } from '../contexts/CategoryScopeContext';
 import { useNavigation } from '../contexts/NavigationContext';
+import { useSession } from '../contexts/SessionContext';
 import { useToast } from '../contexts/ToastContext';
 import { useSettings } from '../contexts/SettingsContext';
 import type { Log, TodoItem, TodoRecurrenceRule } from '../types';
+import type { AssistantAgentConfig, AssistantMemory, AssistantSystemTrigger } from '../types/assistant';
 import { formatDateKey, normalizeAIBackfillToolCalls, parseTimeOnDateKey } from '../utils/aiBackfillUtils';
 import { getTodoProgressTrackingMode, syncSubtaskProgressToParentTodos } from '../utils/todoProgressUtils';
 import { imageService } from '../services/imageService';
 import { getNextChildOrder, normalizeTodoHierarchy, syncDirectChildTodosWithParent } from '../utils/todoHierarchyUtils';
+import AssistantAgent from '../plugins/AssistantAgentPlugin';
+import { assistantAgentConfigService } from '../services/assistantAgentConfigService';
+import { assistantMemoryService } from '../services/assistantMemoryService';
+import { assistantReminderQueueService } from '../services/assistantReminderQueueService';
+import { assistantOrchestratorService } from '../services/assistantOrchestratorService';
 
 type ChatTone = 'normal' | 'system' | 'error' | 'pending';
 type AppliedActionStatus = 'applied' | 'undone' | 'failed';
@@ -349,6 +357,7 @@ const ACTIVE_SESSION_KEY = 'lumostime_ai_chat_active_session_v1';
 const CHAT_PERSONAS_KEY = 'lumostime_ai_chat_personas_v1';
 const DEBUG_MODE_KEY = 'lumostime_ai_chat_debug_mode_v1';
 const USER_PROFILE_KEY = 'lumostime_ai_chat_user_profile_v1';
+const ASSISTANT_CHAT_UPDATED_EVENT = assistantOrchestratorService.getAssistantDecisionEventName();
 
 const accentMix = (accentPercent: number, baseColor: string): string => (
   `color-mix(in srgb, var(--accent-color) ${accentPercent}%, ${baseColor})`
@@ -942,12 +951,16 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
   const [isUploadingUserAvatar, setIsUploadingUserAvatar] = useState(false);
   const [isUserEmojiEditorOpen, setIsUserEmojiEditorOpen] = useState(false);
   const [userEmojiDraft, setUserEmojiDraft] = useState('');
+  const [assistantAgentConfig, setAssistantAgentConfig] = useState<AssistantAgentConfig>(() => assistantAgentConfigService.getConfig());
+  const [assistantMemorySnapshot, setAssistantMemorySnapshot] = useState<AssistantMemory>(() => assistantMemoryService.getMemory());
+  const [isAssistantMemoryViewerOpen, setIsAssistantMemoryViewerOpen] = useState(false);
   const activeRequestRef = useRef<ActiveRequestRef | null>(null);
   const avatarInputRef = useRef<HTMLInputElement | null>(null);
   const userAvatarInputRef = useRef<HTMLInputElement | null>(null);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
 
   const { logs, setLogs, todos, setTodos, todoCategories } = useData();
+  const { activeSessions } = useSession();
   const { categories, scopes } = useCategoryScope();
   const {
     setEditingLog,
@@ -1047,6 +1060,14 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     }).join('\n');
   }, [categories, referenceDayLogs]);
 
+  const activeSessionSummary = useMemo(() => (
+    activeSessions.length === 0
+      ? ''
+      : activeSessions.map((session) => (
+        `${session.activityName}${session.linkedTodoId ? ` @${todos.find((todo) => todo.id === session.linkedTodoId)?.title || '待办'}` : ''}`
+      )).join('；')
+  ), [activeSessions, todos]);
+
   const todoPlanningContext = useMemo(() => (
     todos
       .filter((todo) => !todo.isCompleted)
@@ -1069,6 +1090,13 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
       };
     })
   ), [todos]);
+
+  const todoSummary = useMemo(() => (
+    todoPlanningContext
+      .slice(0, 8)
+      .map((todo) => todo.path || todo.title)
+      .join('；')
+  ), [todoPlanningContext]);
 
   const todoUpdateContext = useMemo(() => (
     todos.map((todo) => {
@@ -1276,6 +1304,133 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     ),
     [personas, personaMap, sessions]
   );
+
+  const reloadPersistedChatSessions = () => {
+    setSessions(normalizeSessions(
+      safeJsonParse<unknown>(localStorage.getItem(CHAT_SESSIONS_KEY), []),
+      personas
+    ));
+  };
+
+  const refreshAssistantMemorySnapshot = () => {
+    setAssistantMemorySnapshot(assistantMemoryService.getMemory());
+  };
+
+  const handleUpdateAssistantAgentConfig = (patch: Partial<AssistantAgentConfig>) => {
+    const nextConfig = assistantAgentConfigService.saveConfig(patch);
+    setAssistantAgentConfig(nextConfig);
+    if (patch.longTermMemoryEnabled === false) {
+      refreshAssistantMemorySnapshot();
+    }
+  };
+
+  useEffect(() => {
+    if (!isPersonaPanelOpen) {
+      return;
+    }
+
+    refreshAssistantMemorySnapshot();
+  }, [assistantAgentConfig.longTermMemoryEnabled, isPersonaPanelOpen]);
+
+  useEffect(() => {
+    if (!isAssistantMemoryViewerOpen) {
+      return;
+    }
+
+    refreshAssistantMemorySnapshot();
+  }, [isAssistantMemoryViewerOpen]);
+
+  useEffect(() => {
+    const handleAssistantChatUpdated = () => {
+      reloadPersistedChatSessions();
+      refreshAssistantMemorySnapshot();
+    };
+
+    window.addEventListener(ASSISTANT_CHAT_UPDATED_EVENT, handleAssistantChatUpdated);
+    return () => window.removeEventListener(ASSISTANT_CHAT_UPDATED_EVENT, handleAssistantChatUpdated);
+  }, [personas]);
+
+  useEffect(() => {
+    let cancelled = false;
+    let pluginListener: Awaited<ReturnType<typeof AssistantAgent.addListener>> | null = null;
+
+    const bindAssistantAgent = async () => {
+      try {
+        pluginListener = await AssistantAgent.addListener('assistantSystemTrigger', (trigger) => {
+          if (cancelled || !assistantAgentConfig.enabled) {
+            return;
+          }
+
+          const latestSession = [...sortedSessions].sort((left, right) => right.updatedAt - left.updatedAt)[0] || activeSession;
+          const conversationHistory = latestSession
+            ? (conversationHistoryCache.get(latestSession.id) || [])
+            : [];
+
+          void assistantOrchestratorService.runSystemTurn({
+            trigger: trigger as AssistantSystemTrigger,
+            currentDateTime: formatLocalDateTimeContext(new Date()),
+            defaultDate: defaultDateKey,
+            todayTimelineSummary,
+            activeSessionSummary,
+            todoSummary,
+            conversationHistory
+          }).then((result) => {
+            refreshAssistantMemorySnapshot();
+            reloadPersistedChatSessions();
+            if (result.surfacedMessage && !isOpen) {
+              addToast('info', `AI 助理：${result.surfacedMessage}`);
+            }
+          }).catch((error) => {
+            console.error('[AIBackfillChatModal] Assistant system turn failed', error);
+          });
+        });
+      } catch (error) {
+        console.error('[AIBackfillChatModal] Failed to bind assistant agent listener', error);
+      }
+    };
+
+    void bindAssistantAgent();
+
+    return () => {
+      cancelled = true;
+      pluginListener?.remove();
+    };
+  }, [
+    activeSession,
+    activeSessionSummary,
+    addToast,
+    assistantAgentConfig.enabled,
+    conversationHistoryCache,
+    defaultDateKey,
+    isOpen,
+    sortedSessions,
+    todoSummary,
+    todayTimelineSummary
+  ]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const syncAssistantAgent = async () => {
+      try {
+        if (assistantAgentConfig.enabled) {
+          await AssistantAgent.startAgent(assistantAgentConfig);
+        } else {
+          await AssistantAgent.stopAgent();
+        }
+      } catch (error) {
+        if (!cancelled) {
+          console.error('[AIBackfillChatModal] Failed to sync assistant agent config', error);
+        }
+      }
+    };
+
+    void syncAssistantAgent();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [assistantAgentConfig]);
 
   const mutateSession = (sessionId: string, updater: (session: AIChatSession) => AIChatSession) => {
     setSessions((prev) => prev.map((session) => (
@@ -1659,6 +1814,22 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     });
     setUserEmojiDraft('');
     setIsUserEmojiEditorOpen(false);
+  };
+
+  const handleOpenAssistantMemoryViewer = () => {
+    refreshAssistantMemorySnapshot();
+    setIsAssistantMemoryViewerOpen(true);
+  };
+
+  const handleCloseAssistantMemoryViewer = () => {
+    setIsAssistantMemoryViewerOpen(false);
+  };
+
+  const handleClearAssistantMemory = () => {
+    assistantMemoryService.clearMemory();
+    assistantReminderQueueService.clearQueue();
+    refreshAssistantMemorySnapshot();
+    addToast('success', '已清空长期记忆');
   };
 
   const handleDebugCommand = (trimmedText: string): boolean => {
@@ -2573,6 +2744,13 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
         }
       ]
     }));
+
+    void AssistantAgent.notifyUserTurn({
+      text: trimmedText,
+      at: new Date(now).toISOString()
+    }).catch((error) => {
+      console.error('[AIBackfillChatModal] Failed to notify assistant agent about user turn', error);
+    });
 
     setInputText('');
     setIsLoading(true);
@@ -4163,6 +4341,148 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
                   </section>
 
                   <section
+                    className="order-4 rounded-[1.35rem] border border-[#e5e7eb] bg-[rgba(255,255,255,0.94)] p-5 shadow-[0_8px_22px_rgba(15,23,42,0.035)]"
+                    style={{
+                      borderColor: 'color-mix(in srgb, var(--accent-color) 10%, #e5e7eb)',
+                      backgroundColor: 'color-mix(in srgb, var(--accent-color) 2.5%, white)'
+                    }}
+                  >
+                    <div className="mb-4 flex items-center justify-between gap-3">
+                      <div>
+                        <p className="text-sm font-bold text-stone-800">后台助理</p>
+                        <p className="mt-1 text-xs text-stone-500">控制 Android 后台轮询、长期记忆和未来的 Reminder 能力。</p>
+                      </div>
+                      <span
+                        className="rounded-full border px-3 py-1 text-xs font-medium"
+                        style={{
+                          borderColor: AI_CHAT_THEME.chipBorder,
+                          backgroundColor: AI_CHAT_THEME.chipBg,
+                          color: AI_CHAT_THEME.textMuted
+                        }}
+                      >
+                        Android
+                      </span>
+                    </div>
+
+                    <div className="space-y-3">
+                      <div
+                        className="flex items-start justify-between gap-4 rounded-[1rem] border px-4 py-3"
+                        style={{
+                          borderColor: AI_CHAT_THEME.panelBorder,
+                          backgroundColor: AI_CHAT_THEME.panelBg
+                        }}
+                      >
+                        <div>
+                          <p className="text-sm font-semibold" style={{ color: AI_CHAT_THEME.textPrimary }}>开启后台轮询</p>
+                          <p className="mt-1 text-xs leading-5" style={{ color: AI_CHAT_THEME.textMuted }}>
+                            开启后，后台 Agent 才会随机 check-in，并在收到系统触发时发起 system turn。
+                          </p>
+                        </div>
+                        <button
+                          onClick={() => handleUpdateAssistantAgentConfig({ enabled: !assistantAgentConfig.enabled })}
+                          className="inline-flex min-w-[72px] items-center justify-center rounded-full border px-3 py-1.5 text-xs font-medium transition-colors"
+                          style={assistantAgentConfig.enabled
+                            ? {
+                              borderColor: AI_CHAT_THEME.activeBorder,
+                              backgroundColor: AI_CHAT_THEME.activeBg,
+                              color: AI_CHAT_THEME.textPrimary
+                            }
+                            : {
+                              borderColor: AI_CHAT_THEME.chipBorder,
+                              backgroundColor: AI_CHAT_THEME.inputBg,
+                              color: AI_CHAT_THEME.textMuted
+                            }}
+                        >
+                          {assistantAgentConfig.enabled ? '已开启' : '未开启'}
+                        </button>
+                      </div>
+
+                      <div
+                        className="flex items-start justify-between gap-4 rounded-[1rem] border px-4 py-3"
+                        style={{
+                          borderColor: AI_CHAT_THEME.panelBorder,
+                          backgroundColor: AI_CHAT_THEME.panelBg
+                        }}
+                      >
+                        <div>
+                          <p className="text-sm font-semibold" style={{ color: AI_CHAT_THEME.textPrimary }}>开启长期记忆</p>
+                          <p className="mt-1 text-xs leading-5" style={{ color: AI_CHAT_THEME.textMuted }}>
+                            开启后，后台助理会持续保存结构化记忆，并在后续 system turn 中复用。
+                          </p>
+                        </div>
+                        <button
+                          onClick={() => handleUpdateAssistantAgentConfig({ longTermMemoryEnabled: !assistantAgentConfig.longTermMemoryEnabled })}
+                          className="inline-flex min-w-[72px] items-center justify-center rounded-full border px-3 py-1.5 text-xs font-medium transition-colors"
+                          style={assistantAgentConfig.longTermMemoryEnabled
+                            ? {
+                              borderColor: AI_CHAT_THEME.activeBorder,
+                              backgroundColor: AI_CHAT_THEME.activeBg,
+                              color: AI_CHAT_THEME.textPrimary
+                            }
+                            : {
+                              borderColor: AI_CHAT_THEME.chipBorder,
+                              backgroundColor: AI_CHAT_THEME.inputBg,
+                              color: AI_CHAT_THEME.textMuted
+                            }}
+                        >
+                          {assistantAgentConfig.longTermMemoryEnabled ? '已开启' : '未开启'}
+                        </button>
+                      </div>
+
+                      <div
+                        className="flex items-start justify-between gap-4 rounded-[1rem] border px-4 py-3 opacity-75"
+                        style={{
+                          borderColor: AI_CHAT_THEME.panelBorder,
+                          backgroundColor: AI_CHAT_THEME.panelBg
+                        }}
+                      >
+                        <div>
+                          <p className="text-sm font-semibold" style={{ color: AI_CHAT_THEME.textPrimary }}>开启 Reminder</p>
+                          <p className="mt-1 text-xs leading-5" style={{ color: AI_CHAT_THEME.textMuted }}>
+                            这一项会在后续版本开放。第一版先只接通后台轮询和长期记忆。
+                          </p>
+                        </div>
+                        <button
+                          disabled
+                          className="inline-flex min-w-[84px] items-center justify-center rounded-full border px-3 py-1.5 text-xs font-medium"
+                          style={{
+                            borderColor: AI_CHAT_THEME.chipBorder,
+                            backgroundColor: AI_CHAT_THEME.inputBg,
+                            color: AI_CHAT_THEME.textMuted
+                          }}
+                        >
+                          即将支持
+                        </button>
+                      </div>
+
+                      <div className="flex flex-wrap gap-2 pt-1">
+                        <button
+                          onClick={handleOpenAssistantMemoryViewer}
+                          className="rounded-full border px-3 py-2 text-xs font-medium transition-colors hover:bg-white"
+                          style={{
+                            borderColor: AI_CHAT_THEME.chipBorder,
+                            backgroundColor: AI_CHAT_THEME.panelBg,
+                            color: AI_CHAT_THEME.textSecondary
+                          }}
+                        >
+                          查看长期记忆
+                        </button>
+                        <button
+                          onClick={handleClearAssistantMemory}
+                          className="rounded-full border px-3 py-2 text-xs font-medium transition-colors"
+                          style={{
+                            borderColor: AI_CHAT_THEME.dangerBorder,
+                            backgroundColor: AI_CHAT_THEME.dangerBg,
+                            color: AI_CHAT_THEME.dangerText
+                          }}
+                        >
+                          清空长期记忆
+                        </button>
+                      </div>
+                    </div>
+                  </section>
+
+                  <section
                     className="order-3 rounded-[1.35rem] border border-[#e5e7eb] bg-[rgba(255,255,255,0.94)] p-5 shadow-[0_8px_22px_rgba(15,23,42,0.035)]"
                     style={{
                       borderColor: 'color-mix(in srgb, var(--accent-color) 10%, #e5e7eb)',
@@ -4701,6 +5021,78 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
                       />
                     </label>
                   </section>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {isAssistantMemoryViewerOpen && (
+          <div className="absolute inset-0 z-20 bg-[rgba(15,23,42,0.14)] backdrop-blur-[10px]">
+            <div
+              className="flex h-full flex-col bg-[#f3f4f6]"
+              style={{
+                paddingTop: 'env(safe-area-inset-top)',
+                paddingBottom: 'env(safe-area-inset-bottom)'
+              }}
+            >
+              <div className="flex items-center justify-between border-b border-[#e5e7eb] bg-[rgba(255,255,255,0.9)] px-5 py-4 backdrop-blur">
+                <div>
+                  <h3 className="font-serif text-[1.75rem] leading-none text-[#201c19]">长期记忆</h3>
+                  <p className="text-xs text-stone-400">
+                    {assistantAgentConfig.longTermMemoryEnabled ? '当前会在后台 system turn 中复用这些结构化记忆。' : '长期记忆当前已关闭，下面仅展示本地已保存的历史记忆。'}
+                  </p>
+                </div>
+                <button
+                  onClick={handleCloseAssistantMemoryViewer}
+                  className="flex h-9 w-9 items-center justify-center rounded-full border border-[#e5e7eb] bg-white text-[#6b7280] transition-colors hover:border-[#cfd8e3] hover:bg-[#f9fafb] hover:text-[#111827]"
+                >
+                  <X size={20} />
+                </button>
+              </div>
+
+              <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-6 sm:py-5">
+                <div className="mx-auto max-w-4xl space-y-4">
+                  <div
+                    className="rounded-[1.2rem] border border-[#e5e7eb] bg-[rgba(255,255,255,0.96)] p-4 shadow-[0_8px_20px_rgba(15,23,42,0.035)]"
+                    style={{
+                      borderColor: 'color-mix(in srgb, var(--accent-color) 10%, #e5e7eb)',
+                      backgroundColor: 'color-mix(in srgb, var(--accent-color) 2.5%, white)'
+                    }}
+                  >
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <div>
+                        <p className="mb-2 text-xs font-bold uppercase tracking-[0.2em] text-stone-400">状态摘要</p>
+                        <p className="text-sm leading-6 text-stone-700">{assistantMemorySnapshot.lastKnownState || '暂无'}</p>
+                      </div>
+                      <div>
+                        <p className="mb-2 text-xs font-bold uppercase tracking-[0.2em] text-stone-400">工作记忆摘要</p>
+                        <p className="text-sm leading-6 text-stone-700">{assistantMemorySnapshot.workingMemorySummary || '暂无'}</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {[
+                    { label: '用户画像记忆', value: assistantMemorySnapshot.profileMemory },
+                    { label: '偏好记忆', value: assistantMemorySnapshot.preferenceMemory },
+                    { label: '未关闭事项', value: assistantMemorySnapshot.openLoops },
+                    { label: '活跃 reminders', value: assistantMemorySnapshot.activeReminders },
+                    { label: '最近 agent 决策', value: assistantMemorySnapshot.recentDecisions }
+                  ].map((section) => (
+                    <div
+                      key={section.label}
+                      className="rounded-[1.2rem] border border-[#e5e7eb] bg-[rgba(255,255,255,0.96)] p-4 shadow-[0_8px_20px_rgba(15,23,42,0.035)]"
+                      style={{
+                        borderColor: 'color-mix(in srgb, var(--accent-color) 10%, #e5e7eb)',
+                        backgroundColor: 'color-mix(in srgb, var(--accent-color) 2.5%, white)'
+                      }}
+                    >
+                      <p className="mb-3 font-serif text-xl text-[#231f1b]">{section.label}</p>
+                      <pre className="overflow-x-auto whitespace-pre-wrap break-words rounded-[1.3rem] border border-[#433a34] bg-[#2d2926] p-4 text-xs leading-6 text-[#efe7db] shadow-[inset_0_0_0_1px_rgba(255,255,255,0.03)]">
+                        {stringifyDebugSection(section.value)}
+                      </pre>
+                    </div>
+                  ))}
                 </div>
               </div>
             </div>

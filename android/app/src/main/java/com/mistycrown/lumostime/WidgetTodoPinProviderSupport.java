@@ -86,7 +86,6 @@ public final class WidgetTodoPinProviderSupport {
             views.setTextViewText(R.id.widget_todo_pin_subtitle, formatHeaderDate());
             views.setTextViewText(R.id.widget_todo_pin_status, formatStatus(payload, runtimeState));
             views.setOnClickPendingIntent(R.id.widget_todo_pin_header, buildOpenAppPendingIntent(context, appWidgetId));
-            views.setOnClickPendingIntent(R.id.widget_todo_pin_footer, buildOpenAppPendingIntent(context, appWidgetId));
             views.setPendingIntentTemplate(
                     R.id.widget_todo_pin_list,
                     buildItemTemplatePendingIntent(context, appWidgetId, providerClass)
@@ -181,13 +180,23 @@ public final class WidgetTodoPinProviderSupport {
                 context,
                 appWidgetId + 7400,
                 intent,
-                pendingIntentFlags()
+                pendingIntentTemplateFlags()
         );
     }
 
     private static int pendingIntentFlags() {
         int flags = PendingIntent.FLAG_UPDATE_CURRENT;
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            flags |= PendingIntent.FLAG_IMMUTABLE;
+        }
+        return flags;
+    }
+
+    private static int pendingIntentTemplateFlags() {
+        int flags = PendingIntent.FLAG_UPDATE_CURRENT;
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            flags |= PendingIntent.FLAG_MUTABLE;
+        } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             flags |= PendingIntent.FLAG_IMMUTABLE;
         }
         return flags;

@@ -17,6 +17,7 @@ import {
   type AssistantSystemTurnDecision
 } from '../types/assistant';
 import { aiService, type AIDebugExchange, type AIConversationTurn } from './aiService';
+import { assistantAgentConfigService } from './assistantAgentConfigService';
 import { assistantMemoryService } from './assistantMemoryService';
 import { assistantPromptService } from './assistantPromptService';
 import { assistantReminderQueueService } from './assistantReminderQueueService';
@@ -55,6 +56,16 @@ interface PersistedAIChatSession {
 
 const CHAT_SESSIONS_KEY = 'lumostime_ai_chat_sessions_v1';
 const ASSISTANT_DECISION_EVENT = 'lumostime:assistant-chat-updated';
+
+const createEphemeralMemory = (): AssistantMemory => ({
+  version: 1,
+  updatedAt: new Date().toISOString(),
+  profileMemory: [],
+  preferenceMemory: [],
+  openLoops: [],
+  activeReminders: [],
+  recentDecisions: []
+});
 
 const isValidAssistantAction = (value: unknown): value is AssistantSystemTurnDecision['action'] => (
   value === 'silent'
@@ -156,7 +167,10 @@ export const assistantOrchestratorService = {
   },
 
   async runSystemTurn(request: AssistantSystemTurnRequest): Promise<AssistantSystemTurnExecution> {
-    const memory = assistantMemoryService.getMemory();
+    const assistantConfig = assistantAgentConfigService.getConfig();
+    const memory = assistantConfig.longTermMemoryEnabled
+      ? assistantMemoryService.getMemory()
+      : createEphemeralMemory();
     const context: AssistantSystemTurnContext = {
       currentDateTime: request.currentDateTime,
       defaultDate: request.defaultDate,
@@ -186,11 +200,16 @@ export const assistantOrchestratorService = {
     let appliedReminder: AssistantReminder | undefined;
     const normalizedDecision = normalizeDecision(decision);
 
-    if (normalizedDecision.memoryPatch) {
+    if (assistantConfig.longTermMemoryEnabled && normalizedDecision.memoryPatch) {
       updatedMemory = assistantMemoryService.applyPatch(normalizedDecision.memoryPatch);
     }
 
-    if (normalizedDecision.action === 'create_reminder' && normalizedDecision.reminder?.dueAt && normalizedDecision.reminder.text) {
+    if (
+      assistantConfig.reminderEnabled
+      && normalizedDecision.action === 'create_reminder'
+      && normalizedDecision.reminder?.dueAt
+      && normalizedDecision.reminder.text
+    ) {
       appliedReminder = assistantReminderQueueService.enqueueReminder({
         id: crypto.randomUUID(),
         type: normalizedDecision.reminder.type || 'self_followup',
@@ -201,18 +220,24 @@ export const assistantOrchestratorService = {
         source: 'agent',
         createdAt: new Date().toISOString()
       });
-      updatedMemory = assistantMemoryService.replaceActiveReminders(
-        assistantReminderQueueService.listReminders().filter((reminder) => reminder.status === 'pending')
-      );
+      if (assistantConfig.longTermMemoryEnabled) {
+        updatedMemory = assistantMemoryService.replaceActiveReminders(
+          assistantReminderQueueService.listReminders().filter((reminder) => reminder.status === 'pending')
+        );
+      }
     }
 
     let surfacedMessage: string | undefined;
     if (normalizedDecision.action === 'send_message' && normalizedDecision.message) {
       surfacedMessage = normalizedDecision.message;
       persistAssistantMessage(surfacedMessage);
-      updatedMemory = assistantMemoryService.appendDecisionSummary(`system_turn:${request.trigger.type}:${surfacedMessage}`);
+      if (assistantConfig.longTermMemoryEnabled) {
+        updatedMemory = assistantMemoryService.appendDecisionSummary(`system_turn:${request.trigger.type}:${surfacedMessage}`);
+      }
     } else if (normalizedDecision.action === 'silent') {
-      updatedMemory = assistantMemoryService.appendDecisionSummary(`system_turn:${request.trigger.type}:silent`);
+      if (assistantConfig.longTermMemoryEnabled) {
+        updatedMemory = assistantMemoryService.appendDecisionSummary(`system_turn:${request.trigger.type}:silent`);
+      }
     }
 
     return {

@@ -73,7 +73,11 @@
             android:dividerHeight="0dp"
             android:fadingEdge="none"
             android:listSelector="@android:color/transparent"
-            android:scrollbarStyle="outsideInset" />
+            android:paddingStart="4dp"
+            android:paddingEnd="4dp"
+            android:scrollbarSize="2dp"
+            android:scrollbarStyle="insideInset"
+            android:scrollbarThumbVertical="@drawable/widget_todo_pin_scrollbar_thumb" />
 
         <TextView
             android:id="@+id/widget_todo_pin_empty"
@@ -85,34 +89,4 @@
             android:textSize="12sp"
             android:visibility="gone" />
     </FrameLayout>
-
-    <LinearLayout
-        android:id="@+id/widget_todo_pin_footer"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="6dp"
-        android:gravity="center_vertical"
-        android:orientation="horizontal"
-        android:paddingStart="4dp"
-        android:paddingEnd="4dp">
-
-        <TextView
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:fontFamily="monospace"
-            android:letterSpacing="0.08"
-            android:text="TAP TITLE TO OPEN"
-            android:textColor="#6C6359"
-            android:textSize="9sp" />
-
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:fontFamily="monospace"
-            android:letterSpacing="0.08"
-            android:text="SCROLL FOR MORE"
-            android:textColor="#6C6359"
-            android:textSize="9sp" />
-    </LinearLayout>
 </LinearLayout>
