@@ -5,11 +5,13 @@
  * @pos Service (Assistant Memory)
  * @description Stores and updates the Android-first assistant agent's structured memory so background turns can rely on compact durable state instead of replaying unbounded chat history.
  *
+ * @updated 2026-04-26: Added narrow helpers for manually appending and removing profile/preference memory entries so the long-term-memory viewer can manage user-maintained notes without owning persistence logic.
  * @updated 2026-04-26: Fixed active-reminder replacement so completed background reminders are truly removed from memory instead of being merged back in.
  * @updated 2026-04-26: Added structured assistant memory persistence, patch application, and decision-summary helpers for the new background AI agent.
  */
 
 import type {
+  AssistantEditableMemoryListKey,
   AssistantMemory,
   AssistantMemoryPatch,
   AssistantOpenLoop,
@@ -275,6 +277,35 @@ export const assistantMemoryService = {
     return assistantMemoryService.saveMemory({
       ...current,
       activeReminders: normalizeReminderList(reminders)
+    });
+  },
+
+  appendEditableListEntry(key: AssistantEditableMemoryListKey, value: string): AssistantMemory {
+    const trimmed = value.trim();
+    if (!trimmed) {
+      return assistantMemoryService.getMemory();
+    }
+
+    return assistantMemoryService.applyPatch({
+      [key]: [trimmed]
+    } as AssistantMemoryPatch);
+  },
+
+  removeEditableListEntry(key: AssistantEditableMemoryListKey, value: string): AssistantMemory {
+    const trimmed = value.trim();
+    if (!trimmed) {
+      return assistantMemoryService.getMemory();
+    }
+
+    const current = assistantMemoryService.getMemory();
+    const nextList = current[key].filter((item) => item !== trimmed);
+    if (nextList.length === current[key].length) {
+      return current;
+    }
+
+    return assistantMemoryService.saveMemory({
+      ...current,
+      [key]: nextList
     });
   },
 

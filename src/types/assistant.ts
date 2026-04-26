@@ -5,6 +5,7 @@
  * @pos Type Definitions (Assistant Agent)
  * @description Defines the structured contracts used by the Android-first assistant agent layer so background triggers, memory updates, reminder queues, and AI system-turn decisions can stay typed and stable across services and plugins.
  *
+ * @updated 2026-04-26: Added a shared editable-memory key type so manual long-term-memory UI can safely append and remove only the user-maintained string-list sections.
  * @updated 2026-04-26: Added assistant system-notification payload and pending-navigation result types so Android alerts can reopen the shared AI chat at the exact background message.
  * @updated 2026-04-26: Added explicit local/UTC state time context fields so reminder-oriented prompts can reason about one current moment without ambiguous timezone math.
  * @updated 2026-04-26: Expanded the shared assistant turn/result contracts with explicit memory actions so foreground and background flows can persist memory through the same unified schema.
@@ -87,6 +88,8 @@ export interface AssistantMemoryPatch {
   recentDecisions?: string[];
   lastAgentRunAt?: string | null;
 }
+
+export type AssistantEditableMemoryListKey = 'profileMemory' | 'preferenceMemory';
 
 export interface AssistantAgentConfig {
   enabled: boolean;

@@ -12,7 +12,7 @@ Components that form the structural or global UI elements.
 ## Modals
 Overlay components for complex interactions.
 
-- `AIBackfillChatModal.tsx`: Reminder due-times are now normalized onto a single canonical timeline, foreground turns receive explicit local/UTC current-time anchors for reminder math, background assistant replies can persist per-message debug payloads, and the check-in interval inputs now keep editable draft text with inline validation so invalid intermediate states never auto-save.
+- `AIBackfillChatModal.tsx`: The long-term-memory viewer now renders `用户画像记忆` and `偏好记忆` as readable note lists with manual add/delete controls; reminder due-times stay normalized onto a single canonical timeline, foreground turns receive explicit local/UTC current-time anchors for reminder math, background assistant replies can persist per-message debug payloads, the check-in interval inputs keep editable draft text with inline validation so invalid intermediate states never auto-save, and the built-in persona roster ships with six richer voices while allowing AI self-address and user-address fields to stay intentionally empty.
 - `AddLogModal.tsx`: Main modal for logging time, including segmented start/end time inputs that auto-advance from hour to minute after two digits.
 - `TodoDatePickerModal.tsx`: Lightweight planning picker shared by todo scheduling and Memoir, supporting both full date selection and a centered month-only modal with the duplicate footer close action removed.
 - `TodoDetailModal.tsx`: Detailed view and editing for Todos, including planning fields for assigned date, deadline date, and lightweight recurrence rules.

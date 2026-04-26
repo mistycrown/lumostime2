@@ -70,4 +70,39 @@ describe('assistantMemoryService', () => {
 
     expect(assistantMemoryService.getMemory().activeReminders).toEqual([reminderB]);
   });
+
+  it('appendEditableListEntry adds profile memory once and trims whitespace', () => {
+    assistantMemoryService.appendEditableListEntry('profileMemory', '  用户正在准备论文答辩  ');
+    assistantMemoryService.appendEditableListEntry('profileMemory', '用户正在准备论文答辩');
+
+    expect(assistantMemoryService.getMemory().profileMemory).toEqual(['用户正在准备论文答辩']);
+  });
+
+  it('appendEditableListEntry keeps preference memory isolated from profile memory', () => {
+    assistantMemoryService.appendEditableListEntry('preferenceMemory', '喜欢简短提醒');
+
+    const memory = assistantMemoryService.getMemory();
+    expect(memory.preferenceMemory).toEqual(['喜欢简短提醒']);
+    expect(memory.profileMemory).toEqual([]);
+  });
+
+  it('removeEditableListEntry deletes only the targeted editable memory entry', () => {
+    assistantMemoryService.appendEditableListEntry('profileMemory', '用户在准备作品集');
+    assistantMemoryService.appendEditableListEntry('profileMemory', '用户最近在搬家');
+    assistantMemoryService.appendEditableListEntry('preferenceMemory', '偏好先做一小步');
+
+    assistantMemoryService.removeEditableListEntry('profileMemory', '用户在准备作品集');
+
+    const memory = assistantMemoryService.getMemory();
+    expect(memory.profileMemory).toEqual(['用户最近在搬家']);
+    expect(memory.preferenceMemory).toEqual(['偏好先做一小步']);
+  });
+
+  it('removeEditableListEntry ignores missing values', () => {
+    assistantMemoryService.appendEditableListEntry('profileMemory', '用户固定周三开组会');
+
+    assistantMemoryService.removeEditableListEntry('profileMemory', '不存在的记忆');
+
+    expect(assistantMemoryService.getMemory().profileMemory).toEqual(['用户固定周三开组会']);
+  });
 });
