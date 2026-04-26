@@ -30,6 +30,7 @@ import { FloatingButton } from '../components/FloatingButton';
 import { useAIChatWindow } from '../contexts/AIChatWindowContext';
 import { UIIcon } from '../components/UIIcon';
 import { IconRenderer } from '../components/IconRenderer';
+import { UnreadCountBadge } from '../components/UnreadCountBadge';
 import { usePrivacy } from '../contexts/PrivacyContext';
 import { useNavigation } from '../contexts/NavigationContext';
 import { useSettings } from '../contexts/SettingsContext';
@@ -246,7 +247,7 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ logs, todos, scopes,
         };
     }, []);
 
-    const { openAIChat } = useAIChatWindow();
+    const { openAIChat, unreadCount } = useAIChatWindow();
 
     // 计算时间线样式偏移量
     const currentStyleConfig = timelineStyleConfigs[timelineStyleTheme];
@@ -1954,7 +1955,10 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ logs, todos, scopes,
                 title="AI Magic Backfill"
                 disableThemeStyle={true}
             >
-                <UIIcon type="ai-assist" fallbackIcon={Sparkles} size={20} className="text-stone-600" />
+                <span className="relative inline-flex items-center justify-center overflow-visible">
+                    <UIIcon type="ai-assist" fallbackIcon={Sparkles} size={20} className="text-stone-600" />
+                    <UnreadCountBadge count={unreadCount} />
+                </span>
             </FloatingButton>
 
             {/* Floating Punch Button */}

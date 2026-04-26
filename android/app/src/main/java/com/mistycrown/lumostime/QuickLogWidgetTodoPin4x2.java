@@ -18,6 +18,7 @@ public class QuickLogWidgetTodoPin4x2 extends AppWidgetProvider {
                 context,
                 appWidgetManager,
                 appWidgetIds,
+                R.layout.widget_layout_todo_pin_4x2,
                 QuickLogWidgetTodoPin4x2.class
         );
     }
@@ -31,6 +32,7 @@ public class QuickLogWidgetTodoPin4x2 extends AppWidgetProvider {
                 context,
                 appWidgetManager,
                 new int[] { appWidgetId },
+                R.layout.widget_layout_todo_pin_4x2,
                 QuickLogWidgetTodoPin4x2.class
         );
     }
@@ -41,6 +43,7 @@ public class QuickLogWidgetTodoPin4x2 extends AppWidgetProvider {
                 context,
                 appWidgetManager,
                 appWidgetIds,
+                R.layout.widget_layout_todo_pin_4x2,
                 QuickLogWidgetTodoPin4x2.class
         );
     }

@@ -5,6 +5,7 @@
  * @pos Service (Assistant Memory)
  * @description Stores and updates the Android-first assistant agent's structured memory so background turns can rely on compact durable state instead of replaying unbounded chat history.
  *
+ * @updated 2026-04-26: Fixed active-reminder replacement so completed background reminders are truly removed from memory instead of being merged back in.
  * @updated 2026-04-26: Added structured assistant memory persistence, patch application, and decision-summary helpers for the new background AI agent.
  */
 
@@ -188,6 +189,16 @@ const mergeReminders = (
     .slice(0, MAX_MEMORY_ITEMS);
 };
 
+const normalizeReminderList = (value: unknown): AssistantReminder[] => (
+  Array.isArray(value)
+    ? value
+      .map(normalizeReminder)
+      .filter((item): item is AssistantReminder => Boolean(item))
+      .sort((left, right) => left.dueAt.localeCompare(right.dueAt))
+      .slice(0, MAX_MEMORY_ITEMS)
+    : []
+);
+
 const safeParseJson = <T>(raw: string | null, fallback: T): T => {
   if (!raw) {
     return fallback;
@@ -260,8 +271,10 @@ export const assistantMemoryService = {
   },
 
   replaceActiveReminders(reminders: AssistantReminder[]): AssistantMemory {
-    return assistantMemoryService.applyPatch({
-      activeReminders: reminders
+    const current = assistantMemoryService.getMemory();
+    return assistantMemoryService.saveMemory({
+      ...current,
+      activeReminders: normalizeReminderList(reminders)
     });
   },
 

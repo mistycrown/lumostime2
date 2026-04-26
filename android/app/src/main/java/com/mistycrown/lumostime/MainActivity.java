@@ -4,9 +4,11 @@
  * @output WebView container with edge-to-edge support
  * @pos Android Entry Point
  * @description The main Android activity provided by Capacitor. Serves as the WebView container, configures edge-to-edge window behavior, and registers native plugins.
+ * @updated 2026-04-26: Captures assistant-notification navigation intents so the Web layer can reopen the shared AI chat at the targeted background reply after resume or cold start.
  */
 package com.mistycrown.lumostime;
 
+import android.content.Intent;
 import android.content.res.Configuration;
 import android.graphics.Color;
 import android.graphics.drawable.ColorDrawable;
@@ -45,8 +47,16 @@ public class MainActivity extends BridgeActivity {
         super.onCreate(savedInstanceState);
 
         configureWindowForEdgeToEdge();
+        AssistantNotificationNavigationStore.captureFromIntent(this, getIntent());
         ensureImmersiveProtectionOverlay();
         initializeIconState();
+    }
+
+    @Override
+    protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        setIntent(intent);
+        AssistantNotificationNavigationStore.captureFromIntent(this, intent);
     }
 
     private void configureWindowForEdgeToEdge() {

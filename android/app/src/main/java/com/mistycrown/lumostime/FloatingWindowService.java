@@ -3,8 +3,8 @@
  * @input Intent Commands (Start/Stop/Update)
  * @output Floating UI Overlay and Foreground Notification
  * @pos Native Service
- * @description Foreground Android service managing the "LumosTime Island" floating window, including overlay rendering, touch interaction, runtime state updates, and a persistent notification that helps reduce background kills.
- * @updated 2026-04-15: Added foreground-notification support for the floating window service.
+ * @description Foreground Android service managing the "LumosTime Island" floating window, including overlay rendering, touch interaction, runtime state updates, and a shared persistent status notification with the AI assistant service.
+ * @updated 2026-04-26: Switched the floating-window foreground notification onto the shared runtime-status manager so Android only shows one persistent LumosTime service notification.
  */
 package com.mistycrown.lumostime;
 
@@ -176,7 +176,9 @@ public class FloatingWindowService extends Service {
     public void onDestroy() {
         super.onDestroy();
         instance = null;
-        stopForeground(true);
+        UnifiedServiceNotificationManager.clearFloatingWindowState(this);
+        stopForeground(false);
+        UnifiedServiceNotificationManager.refreshStatusNotification(this);
         Log.d(TAG, "🔴 悬浮窗服务销毁, instance已清空");
         if (floatingView != null) {
             try {
@@ -203,8 +205,9 @@ public class FloatingWindowService extends Service {
         instance = this;
         Log.d(TAG, "🟢 悬浮窗服务 onCreate");
 
-        createNotificationChannel();
+        UnifiedServiceNotificationManager.setFloatingWindowState(this, true, false);
         startForeground(NOTIFICATION_ID, createNotification("悬浮球已开启，点击可返回 LumosTime"));
+        UnifiedServiceNotificationManager.refreshStatusNotification(this);
 
         windowManager = (WindowManager) getSystemService(WINDOW_SERVICE);
         initView();
@@ -544,10 +547,8 @@ public class FloatingWindowService extends Service {
     }
 
     private void updateNotification(String contentText) {
-        NotificationManager manager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
-        if (manager != null) {
-            manager.notify(NOTIFICATION_ID, createNotification(contentText));
-        }
+        UnifiedServiceNotificationManager.setFloatingWindowState(this, true, this.isFocusing);
+        UnifiedServiceNotificationManager.refreshStatusNotification(this);
     }
 
     private void setupTouchListener() {
