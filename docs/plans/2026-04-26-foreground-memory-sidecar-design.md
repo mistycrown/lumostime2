@@ -112,7 +112,6 @@ sidecar 请求需要组装一份紧凑上下文，包含：
 - `preferenceMemory`
 - `lastKnownState`
 - `workingMemorySummary`
-- `openLoops`
 - `recentDecisions`
 
 ### 落库

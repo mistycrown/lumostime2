@@ -5,6 +5,7 @@
  * @pos Service (Assistant Prompt Builder)
  * @description Loads or falls back to shared assistant-base and mode-specific prompt assets, then assembles layered prompts for the unified assistant flow without duplicating prompt logic across the app.
  *
+ * @updated 2026-04-26: Removed outdated fallback memory guidance so the built-in prompt matches the active memory schema.
  * @updated 2026-04-26: Shifted the shared assistant fallback prompts toward continuity-aware companionship, making short state-preserving check-ins the default alternative to abstraction instead of reflexive silence.
  * @updated 2026-04-26: Added base-prompt fallback guidance for current-time awareness, timeline-gap backfill nudges, and active-focus protection via activeFocusSummary.
  * @updated 2026-04-26: Tightened reminder-time instructions so relative reminder requests anchor to the provided current time and delayed reminder replays trust explicit delay metadata first.
@@ -136,21 +137,47 @@ Foreground rules:
 const FALLBACK_MEMORY_RULES_PROMPT = `
 MEMORY UPDATE RULES
 
-When memoryAction is "update_memory", only write durable information that will help future turns.
+When memoryAction is "update_memory", proactively write durable information that will help future turns.
+
+Do not wait only for explicit "remember this" wording. Prefer updating memory when:
+- the user explicitly asks you to remember something.
+- the turn reveals high-confidence durable information that will likely help later.
+- a pattern is repeated across recent conversation or structured context.
+- the assistant would be meaningfully better in a future turn if this information were remembered.
+
+You may extract durable information not only from the current message, but also from:
+- recent conversation context.
+- state context such as timeline summary, todo summary, scheduled todos, pinned todos, reminder summary.
+- recent logs digest.
+
+Only write high-confidence memory. Good confidence usually means:
+- the user directly stated it.
+- it has appeared repeatedly.
+- it is strongly implied by structured context and is likely useful soon.
+
+Write at most 1 to 3 high-value memory updates in one turn. Prefer fewer precise notes over many weak notes.
 
 Write to these memory fields carefully:
-- profileMemory: stable user identity facts, long-running responsibilities, recurring realities.
-- preferenceMemory: stable preferences about reminder style, pacing, tone, formatting, or workflow.
+- profileMemory: stable identity facts, long-running responsibilities, recurring realities, recurring constraints, or long-running projects.
+- preferenceMemory: stable preferences about reminder style, pacing, tone, formatting, workflow, or collaboration style.
 - lastKnownState: the user's current real-world state when it is important and likely to matter soon.
-- workingMemorySummary: the short-to-medium-term thread the assistant should continue helping with.
-- recentDecisions: concise reusable decisions the assistant should remember later.
+- workingMemorySummary: the short-to-medium-term thread, workstream, or active objective the assistant should continue helping with.
+- recentDecisions: concise reusable decisions, rules, or agreed process choices the assistant should remember later.
+
+Use these triggers:
+- Write profileMemory when the user reveals a stable role, responsibility, recurring schedule, long-running project, or recurring difficulty pattern that is more durable than the current session.
+- Write preferenceMemory when the user states a stable preference, or repeatedly responds well to a specific reminder style, response style, pacing, or workflow.
+- Write lastKnownState more readily when the user describes their present state, or when the current state is clear enough from context and is likely to matter soon.
+- Write workingMemorySummary when the current main thread becomes clear and the assistant should continue tracking it across the next turns.
+- Write recentDecisions when the user and assistant settle on a concrete rule, product decision, process choice, or operating rule that should be reused later.
 
 Do not store:
 - raw logs, raw todos, or timeline entries already present in app context.
 - one-off chit-chat with no future value.
+- low-confidence guesses, speculative personality labels, or vague emotional interpretation.
 - vague praise, filler summaries, or information that duplicates existing memory.
 
-Do not use openLoops for normal unfinished work, because the app already sends todos and task state as structured context.
+Be stricter for profileMemory. Be more willing to update lastKnownState, workingMemorySummary, and recentDecisions when they are clear and useful.
 
 If no durable memory changed, set memoryAction to "no_update" and omit memoryPatch.
 `.trim();

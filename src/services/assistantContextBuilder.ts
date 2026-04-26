@@ -6,6 +6,7 @@
  * @description Builds the minimal structured context payloads used by the unified assistant-turn architecture so foreground and background flows can share the same state summaries and full candidate dictionaries without duplicating formatting logic in UI components.
  *
  * @updated 2026-04-26: Replaced raw recent-log dictionary payloads with a compact digest builder that excludes today's logs and caps history length for lower token use.
+ * @updated 2026-04-26: Added a lossless table-style dictionary digest so candidate dictionaries keep their original fields and structural relationships while still avoiding bulky pretty-printed JSON.
  * @updated 2026-04-26: Started carrying both local-offset and UTC "current time" snapshots so reminder prompts have an unambiguous time anchor.
  * @updated 2026-04-26: Added unified state-context, dictionary-context, and conversation-summary builders for the new single-turn assistant architecture.
  */
@@ -92,6 +93,30 @@ const compactInlineText = (value?: string, maxLength = 48): string => {
   return normalized.length > maxLength
     ? `${normalized.slice(0, Math.max(0, maxLength - 1)).trimEnd()}…`
     : normalized;
+};
+
+const encodeExactCell = (value: unknown): string => {
+  if (value === undefined) {
+    return '-';
+  }
+
+  return JSON.stringify(value);
+};
+
+const buildExactTableSection = (
+  title: string,
+  headers: string[],
+  rows: unknown[][]
+): string => {
+  if (rows.length === 0) {
+    return `[${title}] rows=0`;
+  }
+
+  return [
+    `[${title}] rows=${rows.length}`,
+    headers.join('\t'),
+    ...rows.map((row) => row.map((cell) => encodeExactCell(cell)).join('\t'))
+  ].join('\n');
 };
 
 const buildLogDigestLine = (
@@ -219,6 +244,58 @@ export const assistantContextBuilder = {
       `以下是最近日志摘要：已排除今天（${params.defaultDate}）的记录；当前提供 ${recentLogs.length} 条；最多保留 ${limit} 条；按时间倒序排列。`,
       ...recentLogs.map((log) => buildLogDigestLine(log, params.categories, params.todos))
     ].join('\n');
+  },
+
+  buildDictionaryDigest(context: AssistantTurnDictionaryContext): string {
+    const activityCategoryRows = (context.activityCategories || []).map((category) => ([
+      category.id,
+      category.name
+    ]));
+
+    const activityRows = (context.activityCategories || []).flatMap((category) => (
+      category.activities.map((activity) => ([
+        category.id,
+        activity.id,
+        activity.name
+      ]))
+    ));
+
+    const scopeRows = (context.scopes || []).map((scope) => ([
+      scope.id,
+      scope.name
+    ]));
+
+    const todoCategoryRows = (context.todoCategories || []).map((category) => ([
+      category.id,
+      category.name
+    ]));
+
+    const todoRows = (context.todos || []).map((todo) => ([
+      todo.id,
+      todo.title,
+      todo.path,
+      todo.parentTodoId,
+      todo.parentTodoTitle,
+      todo.categoryId,
+      todo.categoryName,
+      todo.linkedCategoryId,
+      todo.linkedActivityId,
+      todo.linkedActivityName,
+      todo.defaultScopeIds,
+      todo.scheduledDate,
+      todo.deadlineDate,
+      todo.pin,
+      todo.isCompleted
+    ]));
+
+    return [
+      '以下是候选词典无损表。字段与应用词典一一对应；活动通过 categoryId 关联分类；子任务通过 parentTodoId 关联父任务；数组字段保持 JSON 数组；空值记为 - 。',
+      buildExactTableSection('ActivityCategories', ['id', 'name'], activityCategoryRows),
+      buildExactTableSection('Activities', ['categoryId', 'id', 'name'], activityRows),
+      buildExactTableSection('Scopes', ['id', 'name'], scopeRows),
+      buildExactTableSection('TodoCategories', ['id', 'name'], todoCategoryRows),
+      buildExactTableSection('Todos', ['id', 'title', 'path', 'parentTodoId', 'parentTodoTitle', 'categoryId', 'categoryName', 'linkedCategoryId', 'linkedActivityId', 'linkedActivityName', 'defaultScopeIds', 'scheduledDate', 'deadlineDate', 'pin', 'isCompleted'], todoRows)
+    ].join('\n\n');
   },
 
   buildDictionaryContext(params: BuildDictionaryContextParams): AssistantTurnDictionaryContext {

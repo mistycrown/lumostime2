@@ -12,7 +12,7 @@
 ## 非目标
 
 - 本轮不改 `状态摘要`、`工作记忆摘要`、`活跃 reminders`、`最近 agent 决策` 的展示方式。
-- 本轮不支持手动编辑 `recentDecisions`、`activeReminders`、`openLoops`。
+- 本轮不支持手动编辑 `recentDecisions`、`activeReminders`。
 - 本轮不支持拖拽排序、批量删除、搜索、标签化等扩展能力。
 
 ## 需求结论

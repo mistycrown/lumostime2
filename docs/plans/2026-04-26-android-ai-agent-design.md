@@ -115,15 +115,6 @@ export interface AssistantReminder {
   createdAt: string;
 }
 
-export interface AssistantOpenLoop {
-  id: string;
-  title: string;
-  status: 'open' | 'resolved' | 'stale';
-  relatedTodoId?: string;
-  note?: string;
-  updatedAt: string;
-}
-
 export interface AssistantMemory {
   version: 1;
   updatedAt: string;
@@ -131,7 +122,6 @@ export interface AssistantMemory {
   preferenceMemory: string[];
   lastKnownState?: string;
   workingMemorySummary?: string;
-  openLoops: AssistantOpenLoop[];
   activeReminders: AssistantReminder[];
   recentDecisions: string[];
   lastAgentRunAt?: string;
