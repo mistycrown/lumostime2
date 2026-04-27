@@ -5,6 +5,7 @@
  * @pos Service (Assistant Memory)
  * @description Stores and updates the Android-first assistant agent's structured memory so background turns can rely on compact durable state instead of replaying unbounded chat history.
  *
+ * @updated 2026-04-27: Accepted malformed single-string memory patch fields such as recentDecisions so foreground/background turns do not silently lose durable memory writes when model output drifts from the exact schema.
  * @updated 2026-04-27: Collapsed recent decision memory down to the latest single summary so the assistant keeps only the newest behavior snapshot.
  * @updated 2026-04-26: Removed an unused long-term-memory normalization and merge path from assistant memory persistence.
  * @updated 2026-04-26: Added narrow helpers for manually appending and removing profile/preference memory entries so the long-term-memory viewer can manage user-maintained notes without owning persistence logic.
@@ -24,14 +25,21 @@ const ASSISTANT_MEMORY_KEY = 'lumostime_assistant_memory_v1';
 const MAX_MEMORY_ITEMS = 24;
 const MAX_DECISIONS = 1;
 
-const normalizeStringArray = (value: unknown, limit = MAX_MEMORY_ITEMS): string[] => (
-  Array.isArray(value)
-    ? value
-      .map((item) => (typeof item === 'string' ? item.trim() : ''))
-      .filter(Boolean)
-      .slice(0, limit)
-    : []
-);
+const normalizeStringArray = (value: unknown, limit = MAX_MEMORY_ITEMS): string[] => {
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    return trimmed ? [trimmed].slice(0, limit) : [];
+  }
+
+  return (
+    Array.isArray(value)
+      ? value
+        .map((item) => (typeof item === 'string' ? item.trim() : ''))
+        .filter(Boolean)
+        .slice(0, limit)
+      : []
+  );
+};
 
 const normalizeLatestDecisionArray = (value: unknown): string[] => {
   const normalized = normalizeStringArray(value, MAX_MEMORY_ITEMS);

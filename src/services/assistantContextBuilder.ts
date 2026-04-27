@@ -5,6 +5,7 @@
  * @pos Service (Assistant Context Builder)
  * @description Builds the minimal structured context payloads used by the unified assistant-turn architecture so foreground and background flows can share the same state summaries and full candidate dictionaries without duplicating formatting logic in UI components.
  *
+ * @updated 2026-04-27: Simplified prompt state time snapshots to one local-offset ISO current-time anchor and stopped exposing assistant-facing UTC `Z` variants.
  * @updated 2026-04-26: Replaced raw recent-log dictionary payloads with a compact digest builder that excludes today's logs and caps history length for lower token use.
  * @updated 2026-04-26: Added a lossless table-style dictionary digest so candidate dictionaries keep their original fields and structural relationships while still avoiding bulky pretty-printed JSON.
  * @updated 2026-04-26: Started carrying both local-offset and UTC "current time" snapshots so reminder prompts have an unambiguous time anchor.
@@ -32,8 +33,6 @@ import type {
 
 interface BuildStateContextParams {
   currentDateTime: string;
-  currentDateTimeLocal?: string;
-  currentDateTimeUtc?: string;
   defaultDate: string;
   logs: Log[];
   categories: Category[];
@@ -224,8 +223,6 @@ export const assistantContextBuilder = {
 
     return {
       currentDateTime: params.currentDateTime,
-      ...(params.currentDateTimeLocal ? { currentDateTimeLocal: params.currentDateTimeLocal } : {}),
-      ...(params.currentDateTimeUtc ? { currentDateTimeUtc: params.currentDateTimeUtc } : {}),
       defaultDate: params.defaultDate,
       ...(todayTimelineSummary ? { todayTimelineSummary } : {}),
       ...(activeSessionSummary ? { activeSessionSummary } : {}),

@@ -4,6 +4,7 @@
  * @output Parsed Time Entries (ParsedTimeEntry[]), structured unified assistant turns, local tool-call payloads, generated narratives (string), and connection status (boolean)
  * @pos Service (AI Integration Layer)
  * @description AI 闂備礁鎼悧鍡欑矓鐎涙ɑ鍙?- 濠电姰鍨煎▔娑氣偓姘煎櫍楠炲啯绻濋崘顏佹灃?AI 闂備礁婀辩划顖炲礉閹烘梹顐介柣銏㈩焾閻ゎ噣鏌涢埥鍡楀箻缂佲偓閸戠晝enAI/Gemini闂備焦瀵х粙鎴λ囬崡鐐╂灁闁硅揪绠戠粻銉╂煃瑜滈崜鐔奉嚕閸偄绶炲璺侯儏閺€顓熺箾鐎涙鐭嬮悽顖ｄ簽濡cljs劕鈹戠€ｎ亞顦遍梺鍛婁緱閸犳牠顢旈鍫熲拺闁哄娉曡倴闂佹眹鍊曞Λ娑氬垝婵犳碍鏅柛鏇ㄥ墮閳ь剛鍋ら弻鏇㈠幢閺囩喓銈扮紓浣虹帛閻╊垶鐛幒妤€唯闁挎柧鍕橀崑鐐烘煟閻樺弶澶勬繛鍙夌墵楠炲繑瀵奸弶鎴狀唽闂佸綊鍋婇崰鎾寸濞戙垺鐓欑紒妤佺☉濡參寮? * @updated 2026-04-27: Extended unified assistant-turn normalization with decision summaries, silent reasons, side effects, and structured multi-bubble reply parts.
+ * @updated 2026-04-27: Normalized malformed unified-turn memoryPatch fields such as single-string recentDecisions so durable memory updates are not silently dropped downstream.
  * @updated 2026-04-27: Removed retired intent-router and multi-planner assistant endpoints so the service now centers on the shared unified-turn path plus still-used parsing and narrative helpers.
  * @updated 2026-04-26: Consolidated assistant inference around the shared unified-turn endpoint so foreground chat and Android-first background runs reuse the same provider/debug pipeline and explicit memory-action schema.
  
@@ -26,6 +27,7 @@
  */
 import { Scope, TodoRecurrenceRule } from '../types';
 import type {
+    AssistantMemoryPatch,
     AssistantReminderDraft,
     AssistantSilentReason,
     AssistantToolCall,
@@ -460,6 +462,59 @@ const normalizeStringList = (value: unknown): string[] => (
             .filter(Boolean)
         : []
 );
+
+const normalizeFlexibleStringList = (value: unknown): string[] => {
+    if (typeof value === 'string' && value.trim().length > 0) {
+        return [value.trim()];
+    }
+
+    return normalizeStringList(value);
+};
+
+const normalizeAssistantMemoryPatch = (value: unknown): AssistantMemoryPatch | undefined => {
+    if (!value || typeof value !== 'object') {
+        return undefined;
+    }
+
+    const candidate = value as Record<string, unknown>;
+    const normalized: AssistantMemoryPatch = {};
+
+    const profileMemory = normalizeFlexibleStringList(candidate.profileMemory);
+    if (profileMemory.length > 0) {
+        normalized.profileMemory = profileMemory;
+    }
+
+    const preferenceMemory = normalizeFlexibleStringList(candidate.preferenceMemory);
+    if (preferenceMemory.length > 0) {
+        normalized.preferenceMemory = preferenceMemory;
+    }
+
+    const recentDecisions = normalizeFlexibleStringList(candidate.recentDecisions);
+    if (recentDecisions.length > 0) {
+        normalized.recentDecisions = recentDecisions;
+    }
+
+    if (Array.isArray(candidate.activeReminders) && candidate.activeReminders.length > 0) {
+        normalized.activeReminders = candidate.activeReminders as AssistantMemoryPatch['activeReminders'];
+    }
+
+    const lastKnownState = normalizeNullableString(candidate.lastKnownState);
+    if (lastKnownState !== undefined) {
+        normalized.lastKnownState = lastKnownState;
+    }
+
+    const workingMemorySummary = normalizeNullableString(candidate.workingMemorySummary);
+    if (workingMemorySummary !== undefined) {
+        normalized.workingMemorySummary = workingMemorySummary;
+    }
+
+    const lastAgentRunAt = normalizeNullableString(candidate.lastAgentRunAt);
+    if (lastAgentRunAt !== undefined) {
+        normalized.lastAgentRunAt = lastAgentRunAt;
+    }
+
+    return Object.keys(normalized).length > 0 ? normalized : undefined;
+};
 
 const normalizeAssistantToolCalls = (value: unknown): AssistantToolCall[] => {
     if (!Array.isArray(value)) {
@@ -1052,8 +1107,9 @@ Output:
                 normalized.reminders = reminders;
             }
 
-            if (rawOutput?.memoryPatch && typeof rawOutput.memoryPatch === 'object') {
-                normalized.memoryPatch = rawOutput.memoryPatch;
+            const normalizedMemoryPatch = normalizeAssistantMemoryPatch(rawOutput?.memoryPatch);
+            if (normalizedMemoryPatch) {
+                normalized.memoryPatch = normalizedMemoryPatch;
             }
 
             if (typeof rawOutput?.decisionSummary === 'string' && rawOutput.decisionSummary.trim()) {

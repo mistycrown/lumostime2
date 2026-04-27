@@ -10,8 +10,15 @@ Components that form the structural or global UI elements.
 - `Toast.tsx`: Notification system.
 
 ## Modals
+- Update 2026-04-27: `AIBackfillChatModal.tsx` now renders both user and assistant avatars above each message group as a light outside-the-bubble header, freeing more horizontal space for the conversation body without bringing back the old side avatar rail.
+- Update 2026-04-27: `AIBackfillChatModal.tsx` now labels each assistant message group with the active persona name instead of the generic `AI 回答` fallback whenever a persona name is available.
+- Update 2026-04-27: `AIBackfillChatModal.tsx` now keeps per-message `记忆更新` cards collapsed by default and expands their detailed section list only when the user taps the header row.
+- Update 2026-04-27: `AIBackfillChatModal.tsx` now also collapses `提醒结果` by default, and both summary rows use the same light metadata-style typography as the message timestamp/context line instead of pill-heavy controls.
+- Update 2026-04-27: `AIBackfillChatModal.tsx` now trims the AI workspace, AI settings panel, long-term-memory viewer, background-history viewer, and debug-viewer title bars down to the same compact single-line pattern used by other external pages, removing the extra subtitle copy and oversized heading treatment.
+- Update 2026-04-27: `AIBackfillChatModal.tsx` now compresses the background history drawer into a single request-chain view that focuses on wake time, request start, request result, returned content, and an optional request debugger for completed web calls.
 - Update 2026-04-27: `AIBackfillChatModal.tsx` now renders one assistant turn as grouped multi-bubble chat bursts when structured reply parts are available, and the background history drawer shows readable silent-decision summaries plus post-silent side effects instead of bare `silent` outcomes.
 - Update 2026-04-27: `AIBackfillChatModal.tsx` now skips foreground reminder-summary injection when background polling is off, omits long-term-memory prompt sections when memory is disabled, and blocks foreground memory writes while long-term memory is off.
+- Update 2026-04-27: `AIBackfillChatModal.tsx` now uses plus-only icon buttons for adding long-term-memory notes and reminders, replacing the repeated `新增一条` labels in that management view.
 Overlay components for complex interactions.
 
 - `AIBackfillChatModal.tsx`: The long-term-memory viewer now renders `用户画像记忆`, `偏好记忆`, and `活跃 reminders` as readable note/reminder cards with manual add/delete controls; reminder due-times stay normalized onto a single canonical timeline, foreground turns receive explicit local/UTC current-time anchors for reminder math, background assistant replies can persist per-message debug payloads, the check-in interval inputs keep editable draft text with inline validation so invalid intermediate states never auto-save, and the built-in persona roster ships with six richer voices while allowing AI self-address and user-address fields to stay intentionally empty.

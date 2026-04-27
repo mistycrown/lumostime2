@@ -43,7 +43,7 @@ const createInput = (patch?: Partial<AssistantUnifiedTurnInput>): AssistantUnifi
     summary: 'No history yet'
   },
   stateContext: {
-    currentDateTime: '2026-04-27T09:00:00.000Z',
+    currentDateTime: '2026-04-27T17:00:00+08:00',
     defaultDate: '2026-04-27'
   },
   dictionaryContext: {},
@@ -89,6 +89,9 @@ describe('assistantTurnService', () => {
     expect(request?.systemPrompt).toContain('memory rules prompt');
     expect(request?.systemPrompt).toContain('=== Memory Snapshot ===');
     expect(request?.systemPrompt).toContain('"profileMemory": [');
+    expect(request?.systemPrompt).toContain('"updatedAt": "2026-04-27T17:00:00+08:00"');
+    expect(request?.systemPrompt).not.toContain('"updatedAt": "2026-04-27T09:00:00.000Z"');
+    expect(request?.userPrompt).toContain('"createdAt": "2026-04-27T17:00:00+08:00"');
   });
 
   it('omits memory sections and forces no_update guidance when long-term memory is disabled', async () => {

@@ -113,4 +113,13 @@ describe('assistantMemoryService', () => {
       '这次先不打扰：后续关注已经安排好了。'
     ]);
   });
+  it('applyPatch accepts a single-string recentDecisions value from malformed model output', () => {
+    assistantMemoryService.applyPatch({
+      recentDecisions: 'keep the next reminder lightweight'
+    } as any);
+
+    expect(assistantMemoryService.getMemory().recentDecisions).toEqual([
+      'keep the next reminder lightweight'
+    ]);
+  });
 });

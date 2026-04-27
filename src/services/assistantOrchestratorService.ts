@@ -5,6 +5,8 @@
  * @pos Service (Assistant Orchestrator)
  * @description Orchestrates Android-first assistant system turns by loading structured memory, assembling a prompt, calling the existing AI service, and applying the resulting silent/message/reminder/memory actions back into local state.
  *
+ * @updated 2026-04-27: Added background call trigger ids plus persisted request/response debug exchanges so web AI execution can be correlated with native poll diagnostics.
+ * @updated 2026-04-27: Stopped exposing assistant-facing UTC `Z` current-time anchors and now keep one local-offset ISO time anchor in background prompt state.
  * @updated 2026-04-27: Added readable decision summaries, silent reasons, side-effect tracking, and multi-bubble reply-part persistence for background assistant turns.
  * @updated 2026-04-27: Passed the long-term-memory feature flag into unified turns so background prompts can skip memory instructions when memory is disabled.
  * @updated 2026-04-26: Removed an unused long-term-memory field from ephemeral assistant-memory snapshots.
@@ -44,8 +46,6 @@ interface AssistantSystemTurnRequest {
   targetSessionId?: string;
   showSystemNotification?: boolean;
   currentDateTime: string;
-  currentDateTimeLocal?: string;
-  currentDateTimeUtc?: string;
   defaultDate: string;
   todayTimelineSummary: string;
   activeSessionSummary?: string;
@@ -66,12 +66,13 @@ interface AssistantSystemTurnExecution extends AssistantOrchestratorResult {
 
 export interface AssistantBackgroundCallHistoryEntry {
   id: string;
+  triggerId?: string;
   triggerType: string;
   triggerText: string;
   targetSessionId?: string;
   requestedAt: string;
-  completedAt: string;
-  status: 'completed' | 'failed';
+  completedAt?: string;
+  status: 'pending' | 'completed' | 'failed';
   action: AssistantSystemTurnDecision['action'];
   memoryAction: AssistantSystemTurnDecision['memoryAction'];
   reminderCount: number;
@@ -80,6 +81,7 @@ export interface AssistantBackgroundCallHistoryEntry {
   silentReason?: AssistantSilentReason;
   sideEffects?: string[];
   errorMessage?: string;
+  debugExchange?: AIDebugExchange;
 }
 
 interface PersistedAIChatMessage {
@@ -192,7 +194,11 @@ const normalizeBackgroundCallHistoryEntry = (value: unknown): AssistantBackgroun
   const triggerText = typeof candidate.triggerText === 'string' ? candidate.triggerText.trim() : '';
   const requestedAt = typeof candidate.requestedAt === 'string' ? candidate.requestedAt.trim() : '';
   const completedAt = typeof candidate.completedAt === 'string' ? candidate.completedAt.trim() : '';
-  const status = candidate.status === 'failed' ? 'failed' : 'completed';
+  const status = candidate.status === 'failed'
+    ? 'failed'
+    : candidate.status === 'pending'
+      ? 'pending'
+      : 'completed';
   const action = candidate.action === 'send_message' ? 'send_message' : 'silent';
   const memoryAction = candidate.memoryAction === 'update_memory' ? 'update_memory' : 'no_update';
   const sideEffects = Array.isArray(candidate.sideEffects)
@@ -201,7 +207,7 @@ const normalizeBackgroundCallHistoryEntry = (value: unknown): AssistantBackgroun
       .filter(Boolean)
     : [];
 
-  if (!id || !triggerType || !requestedAt || !completedAt) {
+  if (!id || !triggerType || !requestedAt) {
     return null;
   }
 
@@ -210,17 +216,19 @@ const normalizeBackgroundCallHistoryEntry = (value: unknown): AssistantBackgroun
     triggerType,
     triggerText,
     requestedAt,
-    completedAt,
+    ...(completedAt ? { completedAt } : {}),
     status,
     action,
     memoryAction,
     reminderCount: Number.isFinite(candidate.reminderCount) ? Math.max(0, Number(candidate.reminderCount)) : 0,
     ...(typeof candidate.targetSessionId === 'string' && candidate.targetSessionId.trim() ? { targetSessionId: candidate.targetSessionId.trim() } : {}),
+    ...(typeof candidate.triggerId === 'string' && candidate.triggerId.trim() ? { triggerId: candidate.triggerId.trim() } : {}),
     ...(typeof candidate.message === 'string' && candidate.message.trim() ? { message: candidate.message.trim() } : {}),
     ...(typeof candidate.decisionSummary === 'string' && candidate.decisionSummary.trim() ? { decisionSummary: candidate.decisionSummary.trim() } : {}),
     ...(typeof candidate.silentReason === 'string' && candidate.silentReason.trim() ? { silentReason: candidate.silentReason.trim() as AssistantSilentReason } : {}),
     ...(sideEffects.length > 0 ? { sideEffects } : {}),
-    ...(typeof candidate.errorMessage === 'string' && candidate.errorMessage.trim() ? { errorMessage: candidate.errorMessage.trim() } : {})
+    ...(typeof candidate.errorMessage === 'string' && candidate.errorMessage.trim() ? { errorMessage: candidate.errorMessage.trim() } : {}),
+    ...(candidate.debugExchange ? { debugExchange: candidate.debugExchange as AIDebugExchange } : {})
   };
 };
 
@@ -240,8 +248,17 @@ const saveBackgroundCallHistory = (entries: AssistantBackgroundCallHistoryEntry[
   }
 };
 
-const appendBackgroundCallHistory = (entry: AssistantBackgroundCallHistoryEntry) => {
-  saveBackgroundCallHistory([entry, ...loadBackgroundCallHistory()]);
+const upsertBackgroundCallHistory = (entry: AssistantBackgroundCallHistoryEntry) => {
+  const existingEntries = loadBackgroundCallHistory();
+  const existingIndex = existingEntries.findIndex((item) => item.id === entry.id);
+  if (existingIndex === -1) {
+    saveBackgroundCallHistory([entry, ...existingEntries]);
+    return;
+  }
+
+  const nextEntries = [...existingEntries];
+  nextEntries[existingIndex] = entry;
+  saveBackgroundCallHistory(nextEntries);
 };
 
 const getBackgroundDebugLabel = (triggerType: AssistantSystemTrigger['type']): string => {
@@ -427,6 +444,8 @@ export const assistantOrchestratorService = {
   },
 
   async runSystemTurn(request: AssistantSystemTurnRequest): Promise<AssistantSystemTurnExecution> {
+    const backgroundCallId = crypto.randomUUID();
+    const pendingRequestedAt = new Date().toISOString();
     const assistantConfig = assistantAgentConfigService.getConfig();
     const memory = assistantConfig.longTermMemoryEnabled
       ? assistantMemoryService.getMemory()
@@ -443,6 +462,19 @@ export const assistantOrchestratorService = {
       createdAt: request.trigger.createdAt,
       ...(request.trigger.metadata ? { metadata: request.trigger.metadata } : {})
     };
+
+    upsertBackgroundCallHistory({
+      id: backgroundCallId,
+      ...(request.trigger.id ? { triggerId: request.trigger.id } : {}),
+      triggerType: request.trigger.type,
+      triggerText: request.trigger.text,
+      ...(request.targetSessionId ? { targetSessionId: request.targetSessionId } : {}),
+      requestedAt: pendingRequestedAt,
+      status: 'pending',
+      action: 'silent',
+      memoryAction: 'no_update',
+      reminderCount: 0
+    });
 
     let output: AssistantUnifiedTurnOutput;
     let debug: AIDebugExchange;
@@ -465,8 +497,6 @@ export const assistantOrchestratorService = {
         ),
         stateContext: {
           currentDateTime: request.currentDateTime,
-          ...(request.currentDateTimeLocal ? { currentDateTimeLocal: request.currentDateTimeLocal } : {}),
-          ...(request.currentDateTimeUtc ? { currentDateTimeUtc: request.currentDateTimeUtc } : {}),
           defaultDate: request.defaultDate,
           todayTimelineSummary: request.todayTimelineSummary,
           ...(request.activeSessionSummary ? { activeSessionSummary: request.activeSessionSummary } : {}),
@@ -481,12 +511,13 @@ export const assistantOrchestratorService = {
       output = turnResult.output;
       debug = turnResult.debug;
     } catch (error) {
-      appendBackgroundCallHistory({
-        id: crypto.randomUUID(),
+      upsertBackgroundCallHistory({
+        id: backgroundCallId,
+        ...(request.trigger.id ? { triggerId: request.trigger.id } : {}),
         triggerType: request.trigger.type,
         triggerText: request.trigger.text,
         ...(request.targetSessionId ? { targetSessionId: request.targetSessionId } : {}),
-        requestedAt: new Date().toISOString(),
+        requestedAt: pendingRequestedAt,
         completedAt: new Date().toISOString(),
         status: 'failed',
         action: 'silent',
@@ -573,8 +604,9 @@ export const assistantOrchestratorService = {
       updatedMemory = assistantMemoryService.appendDecisionSummary(decisionSummary);
     }
 
-    appendBackgroundCallHistory({
-      id: crypto.randomUUID(),
+    upsertBackgroundCallHistory({
+      id: backgroundCallId,
+      ...(request.trigger.id ? { triggerId: request.trigger.id } : {}),
       triggerType: request.trigger.type,
       triggerText: request.trigger.text,
       ...(request.targetSessionId ? { targetSessionId: request.targetSessionId } : {}),
@@ -587,7 +619,8 @@ export const assistantOrchestratorService = {
       ...(surfacedMessage ? { message: surfacedMessage } : {}),
       decisionSummary,
       ...(output.silentReason ? { silentReason: output.silentReason } : {}),
-      ...(sideEffects.length > 0 ? { sideEffects } : {})
+      ...(sideEffects.length > 0 ? { sideEffects } : {}),
+      debugExchange: debug
     });
 
     if (request.showSystemNotification && surfacedMessage && surfacedMessageLocation) {

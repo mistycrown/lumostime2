@@ -4,6 +4,7 @@
  * @output Regression coverage for virtual-category date matching and week-view badge normalization
  * @pos Test (todo planning utilities)
  * @description Verifies today/tomorrow/this-week filtering against Arrange, Due, and recurrence rules without creating occurrence records.
+ * @updated 2026-04-27: Added regression coverage for the shared today-category helper so `today + pin` widget and picker views keep due-today and recurring-today todos.
  * @updated 2026-04-22: Added regression coverage for the shared todo-picker today category that mixes pinned todos with todos arranged for today.
  * @updated 2026-04-20: Added tests for virtual todo category schedule matches and deadline-over-scheduled normalization.
  */
@@ -74,16 +75,32 @@ describe('todoScheduleUtils virtual category helpers', () => {
     ]);
   });
 
-  test('matches the picker today category for pinned todos or todos arranged today only', () => {
+  test('matches the picker today category for pinned, arranged, due, or recurring todos that hit today', () => {
     expect(isTodoInAssociationTodayCategory(buildTodo({ pin: true }), REFERENCE_DATE)).toBe(true);
     expect(isTodoInAssociationTodayCategory(buildTodo({ scheduledDate: '2026-04-20' }), REFERENCE_DATE)).toBe(true);
+    expect(isTodoInAssociationTodayCategory(buildTodo({ deadlineDate: '2026-04-20' }), REFERENCE_DATE)).toBe(true);
+    expect(isTodoInAssociationTodayCategory(buildTodo({
+      recurrenceRule: {
+        frequency: 'daily',
+        startDate: '2026-04-18'
+      }
+    }), REFERENCE_DATE)).toBe(true);
     expect(isTodoInAssociationTodayCategory(buildTodo({ scheduledDate: '2026-04-19' }), REFERENCE_DATE)).toBe(false);
     expect(isTodoInAssociationTodayCategory(buildTodo({ scheduledDate: '2026-04-21' }), REFERENCE_DATE)).toBe(false);
   });
 
   test('builds today-category picker todos with pinned items first and excludes unrelated or completed todos', () => {
     const todos: TodoItem[] = [
+      buildTodo({
+        id: 'recurring',
+        title: 'Alpha',
+        recurrenceRule: {
+          frequency: 'daily',
+          startDate: '2026-04-18'
+        }
+      }),
       buildTodo({ id: 'scheduled', title: 'Beta', scheduledDate: '2026-04-20' }),
+      buildTodo({ id: 'due', title: 'Delta', deadlineDate: '2026-04-20' }),
       buildTodo({ id: 'pinned', title: 'Omega', pin: true }),
       buildTodo({ id: 'other-day', title: 'Alpha', scheduledDate: '2026-04-21' }),
       buildTodo({ id: 'overdue', title: 'Gamma', scheduledDate: '2026-04-19' }),
@@ -92,7 +109,9 @@ describe('todoScheduleUtils virtual category helpers', () => {
 
     expect(getTodoAssociationTodayTodos(todos, REFERENCE_DATE).map((todo) => todo.id)).toEqual([
       'pinned',
-      'scheduled'
+      'recurring',
+      'scheduled',
+      'due'
     ]);
   });
 });

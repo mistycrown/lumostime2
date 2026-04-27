@@ -1,9 +1,10 @@
 /**
  * @file widgetService.test.ts
  * @input TODAY + PIN payload builders plus native provider source text
- * @output Regression coverage for pinned-todo widget actions and header tap bindings
+ * @output Regression coverage for pinned/recurring TODAY + PIN widget payload items and header tap bindings
  * @pos Test (widget service)
- * @description Verifies pinned todos can still resolve a startable activity via parent linkage and guards against reintroducing the TODAY + PIN header tap-to-open binding.
+ * @description Verifies pinned and recurring-today todos can populate the TODAY + PIN widget payload, and guards against reintroducing the header tap-to-open binding.
+ * @updated 2026-04-27: Added regression coverage so recurring todos that match today are included in the TODAY + PIN widget payload.
  * @updated 2026-04-26: Added regression coverage for pinned todo actionability and removed header click bindings from the dedicated TODAY + PIN widgets.
  */
 
@@ -71,6 +72,41 @@ describe('buildTodoPinWidgetPayload', () => {
       activityId: 'writing-activity',
       activityLabel: 'Writing',
       icon: '✍️'
+    });
+  });
+  it('includes recurring todos that match today in the TODAY + PIN widget payload', () => {
+    const todos: TodoItem[] = [
+      buildTodo({
+        id: 'recurring-todo',
+        title: 'Recurring today todo',
+        linkedCategoryId: 'focus-category',
+        linkedActivityId: 'writing-activity',
+        recurrenceRule: {
+          frequency: 'daily',
+          startDate: '2026-04-20'
+        }
+      }),
+      buildTodo({
+        id: 'other-day-todo',
+        title: 'Other day todo',
+        scheduledDate: '2026-04-27'
+      })
+    ];
+
+    const payload = buildTodoPinWidgetPayload({
+      todos,
+      categories,
+      date: REFERENCE_DATE,
+      now: 123456789
+    });
+
+    expect(payload.items).toHaveLength(1);
+    expect(payload.items[0]).toMatchObject({
+      todoId: 'recurring-todo',
+      badgeLabel: 'TODAY',
+      categoryId: 'focus-category',
+      activityId: 'writing-activity',
+      activityLabel: 'Writing'
     });
   });
 });

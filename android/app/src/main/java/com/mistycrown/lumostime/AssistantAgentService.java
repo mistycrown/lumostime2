@@ -4,6 +4,7 @@
  * @output Persistent Android agent loop, shared runtime notification state, and bridge-triggered assistant events
  * @pos Native Service
  * @description Minimal Android foreground service scaffold for the background AI agent. Maintains a lightweight polling loop, shares one persistent Android status notification with the floating-window service, and emits assistant system-trigger events through the Capacitor plugin bridge.
+ * @updated 2026-04-27: Added persistent native diagnostics for poll ticks, skip reasons, and trigger dispatches so missed background calls can be traced from the shared AI history UI.
  * @updated 2026-04-27: Tracked recent user/task activity plus quiet hours and minimum nudge gaps so native random check-ins stop interrupting immediately after foreground activity.
  * @updated 2026-04-26: Re-schedules the next random check-in whenever runtime config changes so shorter intervals take effect immediately instead of waiting for an older long-delay schedule to expire.
  */
@@ -18,6 +19,9 @@ import android.os.IBinder;
 import android.os.Looper;
 
 import java.util.Calendar;
+import java.util.HashMap;
+import java.util.Locale;
+import java.util.Map;
 import java.util.Random;
 
 public class AssistantAgentService extends Service {
@@ -59,17 +63,45 @@ public class AssistantAgentService extends Service {
             }
 
             long now = System.currentTimeMillis();
+            appendDiagnostic(
+                "poll_tick",
+                "info",
+                "Assistant background poll tick",
+                null,
+                null,
+                null,
+                buildPollDiagnosticContext(now)
+            );
             if (enableRandomCheckin && nextRandomCheckinAtMs > 0L && now >= nextRandomCheckinAtMs) {
                 if (shouldDispatchRandomCheckin(now)) {
-                    AssistantAgentPlugin.dispatchSystemTrigger(
+                    String triggerId = AssistantAgentPlugin.dispatchSystemTrigger(
                         "checkin",
                         "Assistant background check-in trigger",
                         "system"
                     );
                     recordAssistantNudge(now);
                     scheduleNextRandomCheckin(now);
+                    appendDiagnostic(
+                        "checkin_dispatched",
+                        "success",
+                        "Native poll dispatched an assistant check-in trigger",
+                        triggerId,
+                        "checkin",
+                        null,
+                        buildPollDiagnosticContext(now)
+                    );
                 } else {
+                    String skipReason = resolveSkipReason(now);
                     nextRandomCheckinAtMs = computeRetryCheckinAt(now);
+                    appendDiagnostic(
+                        "checkin_skipped",
+                        "warning",
+                        "Native poll skipped an assistant check-in trigger",
+                        null,
+                        "checkin",
+                        skipReason,
+                        buildPollDiagnosticContext(now)
+                    );
                 }
             }
 
@@ -84,6 +116,15 @@ public class AssistantAgentService extends Service {
         loadRuntimeSignals();
         UnifiedServiceNotificationManager.startForeground(this);
         syncUnifiedStatusNotification();
+        appendDiagnostic(
+            "service_started",
+            "info",
+            "Assistant agent service created",
+            null,
+            null,
+            null,
+            buildPollDiagnosticContext(System.currentTimeMillis())
+        );
     }
 
     @Override
@@ -91,6 +132,15 @@ public class AssistantAgentService extends Service {
         String action = intent != null ? intent.getAction() : ACTION_START;
 
         if (ACTION_STOP.equals(action)) {
+            appendDiagnostic(
+                "service_stopped",
+                "info",
+                "Assistant agent service stop requested",
+                null,
+                null,
+                null,
+                buildPollDiagnosticContext(System.currentTimeMillis())
+            );
             stopAgentLoop();
             UnifiedServiceNotificationManager.clearAssistantState(this);
             stopForeground(false);
@@ -100,9 +150,28 @@ public class AssistantAgentService extends Service {
         }
 
         applyConfig(intent);
+        appendDiagnostic(
+            "config_applied",
+            "info",
+            String.format(Locale.US, "Assistant agent handled action: %s", action),
+            null,
+            null,
+            null,
+            buildPollDiagnosticContext(System.currentTimeMillis())
+        );
 
         if (ACTION_NOTIFY_USER_TURN.equals(action)) {
-            recordUserTurn(System.currentTimeMillis());
+            long now = System.currentTimeMillis();
+            recordUserTurn(now);
+            appendDiagnostic(
+                "user_turn_recorded",
+                "info",
+                "Recorded recent foreground user activity for native throttling",
+                null,
+                null,
+                null,
+                buildPollDiagnosticContext(now)
+            );
             if (loopStarted) {
                 rescheduleAgentLoop();
             } else {
@@ -112,7 +181,17 @@ public class AssistantAgentService extends Service {
         }
 
         if (ACTION_NOTIFY_TASK_STATE_CHANGED.equals(action)) {
-            recordTaskStateChanged(System.currentTimeMillis());
+            long now = System.currentTimeMillis();
+            recordTaskStateChanged(now);
+            appendDiagnostic(
+                "task_state_changed_recorded",
+                "info",
+                "Recorded recent task-state activity for native throttling",
+                null,
+                null,
+                null,
+                buildPollDiagnosticContext(now)
+            );
             if (loopStarted) {
                 rescheduleAgentLoop();
             } else {
@@ -124,10 +203,19 @@ public class AssistantAgentService extends Service {
         if (ACTION_TRIGGER_IMMEDIATE.equals(action)) {
             long now = System.currentTimeMillis();
             recordAssistantNudge(now);
-            AssistantAgentPlugin.dispatchSystemTrigger(
+            String triggerId = AssistantAgentPlugin.dispatchSystemTrigger(
                 "manual_background_nudge",
                 "Manual immediate background assistant trigger",
                 "system"
+            );
+            appendDiagnostic(
+                "manual_trigger_dispatched",
+                "success",
+                "Manual background assistant trigger dispatched",
+                triggerId,
+                "manual_background_nudge",
+                null,
+                buildPollDiagnosticContext(now)
             );
         }
 
@@ -252,6 +340,18 @@ public class AssistantAgentService extends Service {
         return retryAt;
     }
 
+    private String resolveSkipReason(long nowMs) {
+        if (isWithinQuietHours(nowMs)) {
+            return "quiet_hours";
+        }
+
+        if (isWithinMinimumNudgeGap(nowMs)) {
+            return "minimum_nudge_gap";
+        }
+
+        return "condition_blocked";
+    }
+
     private boolean isWithinQuietHours(long nowMs) {
         if (!quietHoursEnabled) {
             return false;
@@ -320,6 +420,66 @@ public class AssistantAgentService extends Service {
 
     private String safeTrim(String value) {
         return value == null ? "" : value.trim();
+    }
+
+    private void appendDiagnostic(
+        String type,
+        String level,
+        String message,
+        String triggerId,
+        String triggerType,
+        String reason,
+        Map<String, String> diagnosticContext
+    ) {
+        AssistantAgentDiagnosticsStore.appendEntry(
+            this,
+            type,
+            level,
+            message,
+            triggerId,
+            triggerType,
+            reason,
+            diagnosticContext
+        );
+    }
+
+    private Map<String, String> buildPollDiagnosticContext(long nowMs) {
+        Map<String, String> context = new HashMap<>();
+        context.put("enabled", String.valueOf(enabled));
+        context.put("enableRandomCheckin", String.valueOf(enableRandomCheckin));
+        context.put("basePollMinutes", String.valueOf(basePollMinutes));
+        context.put("minCheckinMinutes", String.valueOf(minCheckinMinutes));
+        context.put("maxCheckinMinutes", String.valueOf(maxCheckinMinutes));
+        context.put("minimumNudgeGapMinutes", String.valueOf(minimumNudgeGapMinutes));
+        context.put("quietHoursEnabled", String.valueOf(quietHoursEnabled));
+        if (!safeTrim(quietHoursStart).isEmpty()) {
+            context.put("quietHoursStart", safeTrim(quietHoursStart));
+        }
+        if (!safeTrim(quietHoursEnd).isEmpty()) {
+            context.put("quietHoursEnd", safeTrim(quietHoursEnd));
+        }
+        context.put("nowMs", String.valueOf(nowMs));
+        context.put("nowLocal", formatTimestamp(nowMs));
+        context.put("nextRandomCheckinAtMs", String.valueOf(nextRandomCheckinAtMs));
+        context.put("nextRandomCheckinAtLocal", formatTimestamp(nextRandomCheckinAtMs));
+        context.put("lastUserTurnAtMs", String.valueOf(lastUserTurnAtMs));
+        context.put("lastUserTurnAtLocal", formatTimestamp(lastUserTurnAtMs));
+        context.put("lastTaskStateChangedAtMs", String.valueOf(lastTaskStateChangedAtMs));
+        context.put("lastTaskStateChangedAtLocal", formatTimestamp(lastTaskStateChangedAtMs));
+        context.put("lastAssistantNudgeAtMs", String.valueOf(lastAssistantNudgeAtMs));
+        context.put("lastAssistantNudgeAtLocal", formatTimestamp(lastAssistantNudgeAtMs));
+        context.put("withinQuietHours", String.valueOf(isWithinQuietHours(nowMs)));
+        context.put("withinMinimumNudgeGap", String.valueOf(isWithinMinimumNudgeGap(nowMs)));
+        return context;
+    }
+
+    private String formatTimestamp(long timestampMs) {
+        if (timestampMs <= 0L) {
+            return "";
+        }
+
+        return new java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSXXX", Locale.US)
+            .format(new java.util.Date(timestampMs));
     }
 
     private void syncUnifiedStatusNotification() {
