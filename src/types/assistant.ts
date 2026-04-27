@@ -5,6 +5,7 @@
  * @pos Type Definitions (Assistant Agent)
  * @description Defines the structured contracts used by the Android-first assistant agent layer so background triggers, memory updates, reminder queues, and AI system-turn decisions can stay typed and stable across services and plugins.
  *
+ * @updated 2026-04-27: Added structured silent-reason, decision-summary, side-effect, and multi-bubble reply fields so background turns can explain quiet decisions and foreground/background replies can render as grouped short bubbles.
  * @updated 2026-04-26: Removed an unused long-term-memory field so the assistant memory schema stays focused on the active fields still used by the app.
  * @updated 2026-04-26: Added a shared editable-memory key type so manual long-term-memory UI can safely append and remove only the user-maintained string-list sections.
  * @updated 2026-04-26: Added assistant system-notification payload and pending-navigation result types so Android alerts can reopen the shared AI chat at the exact background message.
@@ -109,6 +110,14 @@ export interface AssistantNotificationNavigation {
 
 export type AssistantMemoryAction = 'no_update' | 'update_memory';
 
+export type AssistantSilentReason =
+  | 'active_focus_protection'
+  | 'likely_do_not_disturb'
+  | 'state_still_clear'
+  | 'insufficient_confidence'
+  | 'waiting_for_stronger_signal'
+  | 'followup_already_scheduled';
+
 export type AssistantSystemAction =
   | 'silent'
   | 'send_message';
@@ -116,9 +125,13 @@ export type AssistantSystemAction =
 export interface AssistantSystemTurnDecision {
   action: AssistantSystemAction;
   message?: string;
+  messageParts?: string[];
   reminders?: AssistantReminderDraft[];
   memoryAction: AssistantMemoryAction;
   memoryPatch?: AssistantMemoryPatch;
+  decisionSummary?: string;
+  silentReason?: AssistantSilentReason;
+  silentSideEffects?: string[];
 }
 
 export interface AssistantSystemTurnContext {
@@ -126,7 +139,6 @@ export interface AssistantSystemTurnContext {
   defaultDate: string;
   todayTimelineSummary: string;
   activeSessionSummary?: string;
-  todoSummary?: string;
   memory: AssistantMemory;
   trigger: AssistantSystemTrigger;
 }
@@ -177,9 +189,9 @@ export interface AssistantTurnStateContext {
   defaultDate: string;
   todayTimelineSummary?: string;
   activeSessionSummary?: string;
-  todoSummary?: string;
   todayScheduledTodoSummary?: string;
   pinnedTodoSummary?: string;
+  overdueTodoSummary?: string;
   reminderSummary?: string;
 }
 
@@ -233,6 +245,7 @@ export interface AssistantUnifiedTurnInput {
   mode: AssistantTurnMode;
   trigger: AssistantTurnTrigger;
   promptLayers: AssistantPromptLayers;
+  memoryEnabled?: boolean;
   memory: AssistantMemory;
   conversation: AssistantTurnConversationContext;
   stateContext: AssistantTurnStateContext;
@@ -262,6 +275,8 @@ export interface AssistantCreateLogToolCall {
   };
 }
 
+import type { TodoRecurrenceRule } from '../types';
+
 export interface AssistantCreateTodoToolCall {
   toolName: 'create_todo';
   args: {
@@ -273,6 +288,7 @@ export interface AssistantCreateTodoToolCall {
     note?: string;
     scheduledDate?: string;
     deadlineDate?: string;
+    recurrenceRule?: TodoRecurrenceRule;
   };
 }
 
@@ -289,6 +305,7 @@ export interface AssistantUpdateTodoToolCall {
       defaultScopeIds?: string[] | null;
       scheduledDate?: string | null;
       deadlineDate?: string | null;
+      recurrenceRule?: TodoRecurrenceRule | null;
       pin?: boolean;
       isCompleted?: boolean;
     };
@@ -334,8 +351,12 @@ export interface AssistantUnifiedTurnOutput {
   mode: AssistantTurnMode;
   outcome: AssistantTurnOutcome;
   assistantReply?: string;
+  assistantReplyParts?: string[];
   toolCalls?: AssistantToolCall[];
   reminders?: AssistantReminderDraft[];
   memoryAction: AssistantMemoryAction;
   memoryPatch?: AssistantMemoryPatch;
+  decisionSummary?: string;
+  silentReason?: AssistantSilentReason;
+  silentSideEffects?: string[];
 }

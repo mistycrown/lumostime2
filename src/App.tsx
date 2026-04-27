@@ -4,6 +4,7 @@
  * @output Main UI Render, State Management, Data Persistence (JSON in localStorage)
  * @pos Root Component, Application Entry Point (Logic Hub)
  * @description The main component that holds the global state (logs, todos, active sessions) and handles routing between views and overlays, including preserving standalone return paths for search and custom filters while keeping export/import, NFC stop confirmation, and reset flows aligned with repository-backed data.
+ * @updated 2026-04-27: Passed todo delete callbacks into the shared quick-actions sheet path so list and week todo action bars can trigger task removal.
  * @updated 2026-04-22: Mounted the shared AI chat window at the app level so it can keep running in the background after the modal UI is closed.
  * @updated 2026-04-25: Added AI assistant widget shortcut handling so Android widget shortcut slots can open the shared AI chat window.
  * @updated 2026-04-26: Added Android assistant notification navigation consumption so tapping a background AI alert reopens the shared chat at the exact target message.
@@ -606,6 +607,7 @@ const AppContent: React.FC = () => {
         handleBatchAddTodos={todoManager.handleBatchAddTodos}
         handleDuplicateTodo={todoManager.handleDuplicateTodo}
         handleSaveTodo={todoManager.handleSaveTodo}
+        handleDeleteTodo={todoManager.handleDeleteTodo}
         handleUpdateTodoData={todoManager.handleUpdateTodoData}
 
         // 大目标处理

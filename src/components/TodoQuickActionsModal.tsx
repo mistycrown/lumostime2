@@ -4,12 +4,13 @@
  * @output Shared todo quick-actions sheet UI for list rows and week-view badges
  * @pos Component
  * @description A reusable bottom sheet that exposes lightweight todo planning and completion actions without opening the full todo detail editor first.
+ * @updated 2026-04-27: Added an inline two-step delete action so the shared todo quick-actions sheet can remove tasks without opening the full detail editor.
  * @updated 2026-04-21: Added pin/unpin quick action support plus pinned-state metadata for today-schedule prioritization.
  * @updated 2026-04-21: Switched backdrop dismissal to pointer-down handling so opening clicks no longer immediately close the shared sheet on desktop.
  * @updated 2026-04-20: Extracted from TodoView so todo-list taps and week badges can share one quick-actions sheet implementation.
  */
-import React from 'react';
-import { CalendarDays, Flag, PanelRightOpen, Check, CheckCircle2, Pin, X } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { CalendarDays, Check, CheckCircle2, Flag, PanelRightOpen, Pin, Trash2, X } from 'lucide-react';
 import { TodoItem } from '../types';
 import { parseDateKey } from '../utils/todoScheduleUtils';
 
@@ -22,6 +23,7 @@ interface TodoQuickActionsModalProps {
   onComplete: () => void;
   onUndoComplete: () => void;
   onTogglePin: () => void;
+  onDelete: () => void;
   onClose: () => void;
 }
 
@@ -34,8 +36,15 @@ export const TodoQuickActionsModal: React.FC<TodoQuickActionsModalProps> = ({
   onComplete,
   onUndoComplete,
   onTogglePin,
+  onDelete,
   onClose
 }) => {
+  const [isDeleteConfirming, setIsDeleteConfirming] = useState(false);
+
+  useEffect(() => {
+    setIsDeleteConfirming(false);
+  }, [isOpen, todo?.id]);
+
   if (!isOpen || !todo) return null;
 
   const formatQuickActionDate = (dateKey?: string) => {
@@ -49,17 +58,18 @@ export const TodoQuickActionsModal: React.FC<TodoQuickActionsModalProps> = ({
     if (!dateValue) return null;
     const date = new Date(dateValue);
     if (Number.isNaN(date.getTime())) return dateValue;
-    return `${date.getMonth() + 1}/${date.getDate()} ${date.toLocaleTimeString('en-US', {
-      hour: 'numeric',
-      minute: '2-digit'
+    return `${date.getMonth() + 1}/${date.getDate()} ${date.toLocaleTimeString('zh-CN', {
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false
     })}`;
   };
 
   const quickActionDateRows = [
     { label: 'Pin', value: todo.pin ? 'On' : null },
-    { label: 'Arrange', value: formatQuickActionDate(todo.scheduledDate) },
-    { label: 'Due', value: formatQuickActionDate(todo.deadlineDate) },
-    { label: 'Completed', value: formatQuickActionDateTime(todo.completedAt) }
+    { label: '安排', value: formatQuickActionDate(todo.scheduledDate) },
+    { label: '截止', value: formatQuickActionDate(todo.deadlineDate) },
+    { label: '完成', value: formatQuickActionDateTime(todo.completedAt) }
   ].filter((item): item is { label: string; value: string } => Boolean(item.value));
 
   return (
@@ -214,6 +224,26 @@ export const TodoQuickActionsModal: React.FC<TodoQuickActionsModalProps> = ({
                 <span>取消完成</span>
               </button>
             )}
+
+            <button
+              type="button"
+              onClick={() => {
+                if (isDeleteConfirming) {
+                  onDelete();
+                  return;
+                }
+
+                setIsDeleteConfirming(true);
+              }}
+              className={`flex w-full items-center gap-2 rounded-2xl border px-4 py-3 text-left text-sm transition-colors ${
+                isDeleteConfirming
+                  ? 'border-red-200 bg-red-50 text-red-700 hover:border-red-300 hover:bg-red-100'
+                  : 'border-stone-200 bg-white/80 text-stone-700 hover:border-red-200 hover:bg-red-50 hover:text-red-600'
+              }`}
+            >
+              <Trash2 size={16} className={isDeleteConfirming ? 'text-red-500' : 'text-stone-400'} />
+              <span>{isDeleteConfirming ? '确认删除？' : '删除任务'}</span>
+            </button>
           </div>
         </div>
       </div>

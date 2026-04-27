@@ -5,6 +5,7 @@
  * @pos Service (Assistant Memory)
  * @description Stores and updates the Android-first assistant agent's structured memory so background turns can rely on compact durable state instead of replaying unbounded chat history.
  *
+ * @updated 2026-04-27: Collapsed recent decision memory down to the latest single summary so the assistant keeps only the newest behavior snapshot.
  * @updated 2026-04-26: Removed an unused long-term-memory normalization and merge path from assistant memory persistence.
  * @updated 2026-04-26: Added narrow helpers for manually appending and removing profile/preference memory entries so the long-term-memory viewer can manage user-maintained notes without owning persistence logic.
  * @updated 2026-04-26: Fixed active-reminder replacement so completed background reminders are truly removed from memory instead of being merged back in.
@@ -21,7 +22,7 @@ import type {
 const ASSISTANT_MEMORY_KEY = 'lumostime_assistant_memory_v1';
 
 const MAX_MEMORY_ITEMS = 24;
-const MAX_DECISIONS = 16;
+const MAX_DECISIONS = 1;
 
 const normalizeStringArray = (value: unknown, limit = MAX_MEMORY_ITEMS): string[] => (
   Array.isArray(value)
@@ -31,6 +32,11 @@ const normalizeStringArray = (value: unknown, limit = MAX_MEMORY_ITEMS): string[
       .slice(0, limit)
     : []
 );
+
+const normalizeLatestDecisionArray = (value: unknown): string[] => {
+  const normalized = normalizeStringArray(value, MAX_MEMORY_ITEMS);
+  return normalized.length > 0 ? [normalized[normalized.length - 1]] : [];
+};
 
 const normalizeReminder = (value: unknown): AssistantReminder | null => {
   if (!value || typeof value !== 'object') {
@@ -94,7 +100,7 @@ const normalizeMemory = (value: unknown): AssistantMemory => {
     activeReminders: Array.isArray(candidate.activeReminders)
       ? candidate.activeReminders.map(normalizeReminder).filter((item): item is AssistantReminder => Boolean(item))
       : [],
-    recentDecisions: normalizeStringArray(candidate.recentDecisions, MAX_DECISIONS),
+    recentDecisions: normalizeLatestDecisionArray(candidate.recentDecisions),
     ...(typeof candidate.lastAgentRunAt === 'string' && candidate.lastAgentRunAt.trim()
       ? { lastAgentRunAt: candidate.lastAgentRunAt.trim() }
       : {})
@@ -195,7 +201,7 @@ export const assistantMemoryService = {
         : current.preferenceMemory,
       activeReminders: mergeReminders(current.activeReminders, patch.activeReminders),
       recentDecisions: patch.recentDecisions
-        ? dedupeStrings([...current.recentDecisions, ...normalizeStringArray(patch.recentDecisions, MAX_DECISIONS)], MAX_DECISIONS)
+        ? normalizeLatestDecisionArray(patch.recentDecisions)
         : current.recentDecisions
     };
 

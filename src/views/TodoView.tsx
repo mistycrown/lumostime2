@@ -4,6 +4,7 @@
  * @output Todo Status Updates, Edit Triggers, Focus Timer Start
  * @pos View (Main Tab)
  * @description The main To-Do list interface. Displays tasks grouped by category, supports swipe actions, and now includes a week planning view with schedule and history badges.
+ * @updated 2026-04-27: Routed the shared quick-actions sheet into todo deletion and added an inline two-tap delete entry for list and week-view action bars.
  * @updated 2026-04-25: Hide unfinished subtasks from todo-list rendering whenever their parent task is completed, while preserving child state and restoring the rows when the parent is reopened.
  * @updated 2026-04-25: Keep the todo page floating list-week switchers on the active color-scheme button style even when the UI icon theme stays default.
  * @updated 2026-04-25: Let floating list-week switchers inherit button theme colors when the default UI theme falls back to Lucide icons.
@@ -109,6 +110,7 @@ interface TodoViewProps {
   onStartFocus: (todo: TodoItem) => void;
   onDuplicateTodo: (todo: TodoItem, options: TodoDuplicateOptions) => void;
   onSaveTodo: (todo: TodoItem) => void;
+  onDeleteTodo: (id: string) => void;
   autoLinkRules?: AutoLinkRule[];
 }
 
@@ -936,7 +938,7 @@ const WeekTodoLineItem: React.FC<{
   );
 };
 
-export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, activityCategories, scopes, onToggleTodo, onEditTodo, onAddTodo, onStartFocus, onDuplicateTodo, onSaveTodo, autoLinkRules = [] }) => {
+export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, activityCategories, scopes, onToggleTodo, onEditTodo, onAddTodo, onStartFocus, onDuplicateTodo, onSaveTodo, onDeleteTodo, autoLinkRules = [] }) => {
   const [selectedCategoryId, setSelectedCategoryId] = useState<string>(VIRTUAL_SCHEDULE_CATEGORY_ID);
   const [selectedScheduleFilter, setSelectedScheduleFilter] = useState<TodoScheduleRange>('today');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -977,8 +979,9 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
     handleQuickActionComplete,
     handleQuickActionUndoComplete,
     handleQuickActionClearDate,
-    handleQuickActionTogglePin
-  } = useTodoQuickActions({ onSaveTodo, onEditTodo });
+    handleQuickActionTogglePin,
+    handleQuickActionDelete
+  } = useTodoQuickActions({ onSaveTodo, onEditTodo, onDeleteTodo });
 
   // 濞?localStorage 閻犲洩顕цぐ鍥偨閵婏箑鐓曞☉鎾筹攻椤愬ジ鏌呮径瀣仴闁汇劌瀚～瀣炊閻愵儫浣割嚕?
   const [viewMode, setViewMode] = useState<'loose' | 'compact'>(() => {
@@ -1837,6 +1840,7 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
       onComplete={handleQuickActionComplete}
       onUndoComplete={handleQuickActionUndoComplete}
       onTogglePin={handleQuickActionTogglePin}
+      onDelete={handleQuickActionDelete}
       onClose={closeQuickActions}
     />
   );

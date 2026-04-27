@@ -11,6 +11,7 @@
 > `useTodoManager.ts` now supports one-level subtasks, including child draft creation, parent-field inheritance sync, and cascade delete for direct children.
 > `useTodoManager.ts` now blocks subtask creation for recurring parent todos, matching the detail-page rule that recurring tasks do not expose a child-task tab.
 > `useTodoQuickActions.ts` now centralizes lightweight todo quick-actions state so todo-list taps and week-plan badges open the same scheduling/completion sheet behavior.
+> `useTodoQuickActions.ts` now also routes shared delete requests into the existing todo deletion flow, so the quick-actions sheet can trigger the same task-removal rules as the detail editor.
 > `useTodoQuickActions.ts` also exposes a shared pin/unpin action, and `useTodoManager.ts` now initializes duplicated/new todos with `pin: false` by default.
 
 > `useTodoStats.ts` 优先使用 `TodoCategory.color` 作为待办环形图颜色；旧分类没有保存颜色时，继续回退到历史默认调色板。
